@@ -76,10 +76,12 @@
     state: present
 
 - name: Load br_netfilter module at boot
-  ansible.builtin.lineinfile:
-    path: /etc/modules
-    create: true
-    line: "br_netfilter"
+  # /etc/modules-load.d/*.conf is read by systemd-modules-load on both
+  # Debian/Ubuntu and the RHEL family (RHEL does not read /etc/modules), so the
+  # module persists across reboot on every supported OS.
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/br_netfilter.conf
+    content: "br_netfilter\n"
     owner: "root"
     group: "root"
     mode: "0644"
