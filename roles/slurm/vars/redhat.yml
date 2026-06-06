@@ -1,6 +1,12 @@
 ---
 slurm_pam_lib_dir: /lib64/security
 
+# Build dependencies per the Slurm 25.11.x admin quickstart. dbus-devel and
+# libbpf-devel are needed for the cgroup/v2 plugin; http-parser-devel/json-c-devel/
+# libyaml-devel enable the REST API; numactl-devel, lua-devel and readline-devel
+# enable NUMA affinity, Lua plugins (job_submit) and interactive scontrol.
+# (http-parser-devel/json-c-devel come from CRB; see build.yml enablerepo.)
+# https://slurm.schedmd.com/archive/slurm-25.11.6/quickstart_admin.html
 slurm_build_deps:
   - "@Development Tools"
   - munge-devel
@@ -10,8 +16,12 @@ slurm_build_deps:
   - mariadb-devel
   - numactl-devel
   - pam-devel
+  - dbus-devel
+  - libbpf-devel
   - http-parser-devel
   - json-c-devel
+  - libyaml-devel
+  - lua-devel
   - perl-ExtUtils-MakeMaker
   - libatomic
 

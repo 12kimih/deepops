@@ -1,6 +1,11 @@
 ---
 slurm_pam_lib_dir: /lib/x86_64-linux-gnu/security
 
+# Build dependencies per the Slurm 25.11.x admin quickstart. libdbus-1-dev and
+# libbpf-dev are needed for the cgroup/v2 plugin; libjson-c-dev/libhttp-parser-dev/
+# libyaml-dev enable the REST API; libnuma-dev, liblua5.4-dev and libreadline-dev
+# enable NUMA affinity, Lua plugins (job_submit) and interactive scontrol.
+# https://slurm.schedmd.com/archive/slurm-25.11.6/quickstart_admin.html
 slurm_build_deps:
   - build-essential
   - libmunge-dev
@@ -8,6 +13,13 @@ slurm_build_deps:
   - libmariadbclient-dev-compat
   - libpam0g-dev
   - libdbus-1-dev
+  - libbpf-dev
+  - libnuma-dev
+  - libjson-c-dev
+  - libhttp-parser-dev
+  - libyaml-dev
+  - liblua5.4-dev
+  - libreadline-dev
   - python3-minimal
   - ruby-dev
   - wget
