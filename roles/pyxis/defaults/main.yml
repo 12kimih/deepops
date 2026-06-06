@@ -2,8 +2,19 @@
 slurm_install_pyxis: true
 slurm_install_prefix: /usr/local
 slurm_config_dir: /etc/slurm
-slurm_pyxis_version: 0.11.1
+# pyxis is a SPANK plugin and MUST be (re)built against the deployed Slurm
+# headers; DeepOps builds Slurm from source under slurm_install_prefix, so the
+# build points CPPFLAGS at {{ slurm_install_prefix }}/include/slurm.
+slurm_pyxis_version: 0.24.0
 slurm_pyxis_tarball_url: "https://github.com/NVIDIA/pyxis/archive/v{{ slurm_pyxis_version }}.tar.gz"
+
+# pyxis SPANK plugin options written into plugstack.conf.d/pyxis.conf.
+# https://github.com/NVIDIA/pyxis/wiki/Setup
+pyxis_runtime_path: /run/pyxis
+pyxis_execute_entrypoint: 0
+pyxis_container_scope: job
+pyxis_sbatch_support: 1
+pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 
 is_controller: false
 is_compute: false
