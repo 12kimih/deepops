@@ -66,7 +66,10 @@
 
 - name: Ubuntu | install NVIDIA Container Toolkit
   ansible.builtin.apt:
-    name: "{{ nvidia_container_toolkit_package }}"
+    # apt pins as pkg=version; an empty version installs the latest.
+    name: "{{ nvidia_container_toolkit_packages | map('regex_replace', '$', _version_suffix) | list }}"
     state: present
     update_cache: "{{ nvidia_container_toolkit_apt_source.changed or nvidia_container_toolkit_keyring_install.changed | default(false) }}"
+  vars:
+    _version_suffix: "{{ ('=' ~ nvidia_container_toolkit_version) if (nvidia_container_toolkit_version | default('') | length > 0) else '' }}"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
