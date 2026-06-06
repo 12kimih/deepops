@@ -1,11 +1,13 @@
 [Unit]
 Description=Prometheus Node Exporter
-After=docker.service
+After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
 TimeoutStartSec=0
 Restart=always
+RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
 ExecStartPre=/usr/bin/docker pull {{ node_exporter_container }}
