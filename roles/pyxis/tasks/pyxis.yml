@@ -41,6 +41,22 @@
     - Restart slurmd
   tags: pyxis
 
+# `make install` places the plugin at {{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so
+# (a consistent, owned location) instead of running it from the source tree.
+- name: Install pyxis
+  ansible.builtin.command:
+    chdir: /usr/local/src/pyxis
+    argv:
+      - make
+      - install
+  environment:
+    CPPFLAGS: "-I {{ slurm_install_prefix }}/include/slurm"
+  changed_when: true
+  notify:
+    - Restart slurmctld
+    - Restart slurmd
+  tags: pyxis
+
 # Needed for 17.11, but not for 19.05. Doesn't hurt either way.
 - name: Copy top-level plugstack file
   ansible.builtin.template:
@@ -61,8 +77,3 @@
     - Restart slurmctld
     - Restart slurmd
   tags: pyxis
-
-- name: Set pyxis shared-object permissions
-  ansible.builtin.file:
-    path: "/usr/local/src/pyxis/spank_pyxis.so"
-    mode: "0755"
