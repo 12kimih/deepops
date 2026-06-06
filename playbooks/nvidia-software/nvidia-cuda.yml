@@ -1,42 +1,32 @@
 ---
-# Install NVIDIA CUDA (and driver if present)
-
+# Install the NVIDIA CUDA toolkit (and the driver, unless installed separately).
+#
+# Set nvidia_cuda_install: false to skip the system-wide toolkit install (for
+# example when CUDA is provided per-version through Lmod/environment modules).
 - hosts: all
   become: true
   tasks:
     - name: Check for DGX packages
-      stat:
+      ansible.builtin.stat:
         path: /etc/dgx-release
       register: is_dgx
 
-    - name: install custom facts
-      include_role:
+    - name: Install custom facts
+      ansible.builtin.include_role:
         name: facts
 
-    - name: configure Ubuntu NVIDIA driver packages
-      include_tasks: tasks/nvidia-driver-ubuntu-packages.yml
-      when: ansible_distribution == 'Ubuntu'
-
-    - name: install nvidia driver
-      include_role:
-        name: nvidia.nvidia_driver
+    - name: Install the NVIDIA driver
+      ansible.builtin.include_role:
+        name: nvidia_driver
       when:
-        - ansible_local['gpus']['count']
-        - is_dgx.stat.exists == False
-        - cuda_playbook_install_driver|default(true)
+        - ansible_local['gpus']['count'] | int > 0
+        - not is_dgx.stat.exists
+        - cuda_playbook_install_driver | default(true) | bool
       tags:
-      - nvidia_driver
+        - nvidia_driver
 
-    - name: install nvidia cuda toolkit
-      include_role:
+    - name: Install the NVIDIA CUDA toolkit
+      ansible.builtin.include_role:
         name: nvidia_cuda
-
-    - name: test nvidia-smi
-      command: nvidia-smi
-      changed_when: false
-      when:
-        - ansible_local['gpus']['count']
-        - cuda_playbook_install_driver|default(true)
-      tags:
-      - nvidia_driver
-  environment: "{{ proxy_env if proxy_env is defined else{} }}"
+      when: nvidia_cuda_install | default(true) | bool
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
