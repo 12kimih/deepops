@@ -3,8 +3,19 @@
   ansible.builtin.include_vars: ubuntu.yml
   when: ansible_distribution == "Ubuntu"
 
+# Fall back to the EL8 prereq list on EL9/EL10 (no per-major vars file yet), so
+# the role does not error on a missing rhel9.yml / rhel10.yml. NOTE: mofed_version
+# in defaults is a 2022 release with no build for Ubuntu 24.04+/26.04 or EL9/10 —
+# bump it (or move to NVIDIA DOCA-OFED) and override mofed_download_url for those.
 - name: Include vars if redhat-compatible
-  ansible.builtin.include_vars: rhel{{ ansible_distribution_major_version }}.yml
+  ansible.builtin.include_vars: "{{ lookup('first_found', _mofed_redhat_vars) }}"
+  vars:
+    _mofed_redhat_vars:
+      files:
+        - "rhel{{ ansible_distribution_major_version }}.yml"
+        - "rhel8.yml"
+      paths:
+        - vars
   when: ansible_os_family == "RedHat"
 
 - name: Ensure perl is installed
