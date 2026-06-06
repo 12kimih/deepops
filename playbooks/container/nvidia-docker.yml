@@ -8,35 +8,25 @@
     - name: Install custom facts module
       ansible.builtin.include_role:
         name: facts
-      when: docker_install | default('yes')
+      when: docker_install | default(true) | bool
 
     - name: Remove docker overrides, specifically to deal with conflicting options from DGX OS
       ansible.builtin.file:
         path: /etc/systemd/system/docker.service.d/docker-override.conf
         state: absent
-      when: docker_install | default('yes')
+      when: docker_install | default(true) | bool
 
-    - name: Install NVIDIA Container Toolkit on current OS releases
+    # The unified NVIDIA Container Toolkit (nvidia-ctk) covers every supported OS:
+    # Ubuntu 22.04/24.04 and RHEL/Rocky 8/9/10. The legacy nvidia-docker2 path is
+    # end-of-life and has been removed.
+    - name: Install NVIDIA Container Toolkit
       ansible.builtin.include_role:
         name: nvidia_container_toolkit
       when:
-        - ansible_local['gpus']['count']
+        - ansible_local['gpus']['count'] | int > 0
         - >
-          (ansible_distribution == "Ubuntu" and ansible_distribution_version is version('24.04', '>='))
+          (ansible_distribution == "Ubuntu" and ansible_distribution_version is version('22.04', '>='))
           or
           (ansible_os_family == "RedHat" and ansible_distribution_major_version is version('8', '>='))
-        - docker_install | default('yes')
-
-    - name: Install nvidia-docker
-      ansible.builtin.include_role:
-        name: nvidia.nvidia_docker
-      when:
-        - ansible_local['gpus']['count'] and (ansible_distribution == "Ubuntu" or ansible_os_family == "RedHat")
-        - >
-          not (
-            (ansible_distribution == "Ubuntu" and ansible_distribution_version is version('24.04', '>='))
-            or
-            (ansible_os_family == "RedHat" and ansible_distribution_major_version is version('8', '>='))
-          )
-        - docker_install | default('yes')
+        - docker_install | default(true) | bool
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
