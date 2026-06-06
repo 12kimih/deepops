@@ -12,6 +12,6 @@ platforms:
 provisioner:
   name: ansible
   ansible_args:
-  - -vv
+    - -vv
 verifier:
   name: ansible

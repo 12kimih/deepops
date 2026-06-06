@@ -1,0 +1,42 @@
+---
+# Ubuntu ships the driver meta-packages in its own archives, so no extra
+# repository is required. Installing the single meta package lets apt resolve one
+# consistent kernel-module closure (either DKMS or the precompiled
+# linux-modules-nvidia path), unlike hand-listing the dkms and no-dkms headless
+# packages together (which leaves no usable module built).
+# https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
+- name: Determine the NVIDIA driver package (Ubuntu)
+  ansible.builtin.set_fact:
+    nvidia_driver_package_resolved: >-
+      {{ nvidia_driver_package if (nvidia_driver_package | default('') | length > 0)
+         else 'nvidia-driver-' ~ nvidia_driver_branch
+              ~ ('-server' if (nvidia_driver_server_branch | bool) else '')
+              ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '') }}
+
+- name: Find pre-existing NVIDIA driver packages (Ubuntu)
+  ansible.builtin.shell:
+    cmd: >-
+      dpkg-query -W -f='${Package}\n' 2>/dev/null
+      | grep -E '^(nvidia-|libnvidia-)'
+      | grep -vE 'container' || true
+  register: nvidia_driver_existing_packages
+  changed_when: false
+  check_mode: false
+  when: nvidia_driver_purge_existing | bool
+
+- name: Purge pre-existing NVIDIA driver packages (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nvidia_driver_existing_packages.stdout_lines }}"
+    state: absent
+    purge: true
+    autoremove: true
+  when:
+    - nvidia_driver_purge_existing | bool
+    - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
+
+- name: Install the NVIDIA driver (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nvidia_driver_package_resolved }}"
+    state: present
+    update_cache: true
+  register: nvidia_driver_install

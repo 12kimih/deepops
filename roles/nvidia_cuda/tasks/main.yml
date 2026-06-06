@@ -1,26 +1,36 @@
 ---
-- name: check if we are running on DGX
-  stat:
+- name: Check if we are running on DGX
+  ansible.builtin.stat:
     path: "/etc/dgx-release"
   register: is_dgx
 
 - name: DGX install tasks
-  include_tasks: install-dgx.yml
-  when: is_dgx.stat.exists == True
+  ansible.builtin.include_tasks: install-dgx.yml
+  when:
+    - nvidia_cuda_install | bool
+    - is_dgx.stat.exists
 
-- name: ubuntu install tasks
-  include_tasks: install-ubuntu.yml
-  when: (ansible_distribution == "Ubuntu") and (is_dgx.stat.exists == False)
+- name: Ubuntu install tasks
+  ansible.builtin.include_tasks: install-ubuntu.yml
+  when:
+    - nvidia_cuda_install | bool
+    - ansible_distribution == "Ubuntu"
+    - not is_dgx.stat.exists
 
-- name: redhat family install tasks
-  include_tasks: install-redhat.yml
-  when: (ansible_os_family == "RedHat") and (is_dgx.stat.exists == False)
+- name: RedHat family install tasks
+  ansible.builtin.include_tasks: install-redhat.yml
+  when:
+    - nvidia_cuda_install | bool
+    - ansible_os_family == "RedHat"
+    - not is_dgx.stat.exists
 
-- name: add profile script to set environment for toolkit
-  copy:
+- name: Add profile script to set environment for toolkit
+  ansible.builtin.copy:
     src: "cuda-vars.sh"
     dest: "/etc/profile.d/cuda-vars.sh"
     owner: "root"
     group: "root"
     mode: "0644"
-  when: cuda_toolkit_add_profile_script
+  when:
+    - nvidia_cuda_install | bool
+    - cuda_toolkit_add_profile_script | bool

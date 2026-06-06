@@ -1,3 +1,4 @@
+---
 ################################################################################
 # DeepOps Ansible Config                                                       #
 ################################################################################
@@ -125,6 +126,10 @@ sftp_chroot: false
 # Install latest version by default,
 # if you want a specific version, use i.e. cuda-toolkit=12.2.0-1
 # cuda_version: cuda-toolkit
+# Set false to skip the system-wide CUDA toolkit install (e.g. when CUDA is
+# provided per-version through Lmod/environment modules). In the slurm-cluster
+# playbook the toolkit is additionally gated by slurm_cluster_install_cuda.
+nvidia_cuda_install: true
 
 # DGX-specific vars may be used to target specific models,
 # because available versions for DGX may differ from the generic repo
@@ -134,7 +139,7 @@ sftp_chroot: false
 
 # Playbook: nvidia-set-gpu-clocks
 # Resets the Gpu clocks to the default values. (see the `--reset-gpu-clocks` flag in nvidia-smi for more)
-gpu_clock_reset: no
+gpu_clock_reset: false
 # Specifies <minGpuClock,maxGpuClock> clocks as a pair (e.g. 1500,1500) that defines the range of desired locked GPU clock speed in MHz. Setting this will supersede application clocks and take effect regardless if an app is running. Input can also be a singular desired clock value. (see the `--lock-gpu-clocks` flag in nvidia-smi for more)
 gpu_clock_lock: "1507,1507"
 
@@ -142,8 +147,22 @@ gpu_clock_lock: "1507,1507"
 nvidia_driver_force_install: false
 # Default NVIDIA driver branch for generic host driver installs.
 nvidia_driver_branch: "580"
-# Set true on Ubuntu systems that require NVIDIA open kernel modules.
-nvidia_driver_ubuntu_use_open_kernel_modules: false
+# Kernel module flavor: "open" (NVIDIA default since the 560 series, recommended
+# for Turing and newer GPUs) or "proprietary" (Maxwell/Pascal/Volta).
+nvidia_driver_kernel_modules: "open"
+# Ubuntu only: use the data-center "Enterprise Ready" (-server) branch. Set false
+# for the desktop/latest branch (no -server suffix).
+nvidia_driver_server_branch: true
+# Full override of the driver package name. Leave empty ("") to build it from the
+# toggles above (e.g. "nvidia-driver-580-server-open"). Set explicitly for any
+# other combination, e.g. "nvidia-driver-580" or "nvidia-driver-570-open".
+# nvidia_driver_package: ""
+# RHEL/Rocky package/stream overrides (empty = build from toggles):
+# nvidia_driver_rhel_module_stream: ""
+# nvidia_driver_rhel_package: ""
+# Purge any pre-existing NVIDIA driver packages before installing (clean
+# reinstall). Container Toolkit packages are excluded from the purge.
+nvidia_driver_purge_existing: true
 
 
 ################################################################################
@@ -153,9 +172,9 @@ nvidia_driver_ubuntu_use_open_kernel_modules: false
 # Playbook: docker, nvidia-docker, k8s_cluster
 #
 # For supported Docker versions, see: submodules/kubespray/roles/container-engine/docker/vars/*
-docker_install: yes
+docker_install: true
 # docker_version: 'latest'
-docker_dns_servers_strict: no
+docker_dns_servers_strict: false
 docker_storage_options: -s overlay2
 #docker_options: "--bip=192.168.99.1/24"
 # Enable docker iptables

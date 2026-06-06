@@ -1,4 +1,8 @@
 ---
+# Install the system-wide CUDA toolkit. Set to false to skip it entirely, e.g.
+# when CUDA is provided per-version through Lmod/environment modules instead.
+nvidia_cuda_install: true
+
 # 'cuda-toolkit' is the generic package and will pull the latest version
 # if you want a specific version, use i.e. cuda-toolkit=12.2.0-1
 cuda_version: cuda-toolkit
@@ -16,7 +20,7 @@ cuda_dgx_a100_version: "{{ cuda_version }}"
 
 # Should we install the /etc/profile.d/cuda-vars.sh script that will put
 # the CUDA toolkit binaries and libraries in the default environment?
-cuda_toolkit_add_profile_script: yes
+cuda_toolkit_add_profile_script: true
 
 # RedHat family
 epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
