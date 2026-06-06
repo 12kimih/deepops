@@ -1,0 +1,15 @@
+---
+# Update the apt cache and dist-upgrade OS packages (Ubuntu). Pair with
+# utilities/reboot.yml when a kernel/driver upgrade needs a reboot to take effect.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - apt-upgrade
+  tasks:
+    - name: Update apt cache and dist-upgrade (Ubuntu)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        upgrade: dist
+      when: ansible_distribution == "Ubuntu"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
