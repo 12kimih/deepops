@@ -6,22 +6,36 @@
   with_items:
     - dns_config_servers
 
-- name: Disable services (xenial)
+- name: Disable resolvconf (Ubuntu 16.04)
   ansible.builtin.service:
-    name: "{{ item }}"
+    name: resolvconf
     state: stopped
     enabled: false
-  loop:
-    - resolvconf
-    - systemd-resolved
+  failed_when: false
   when: ansible_distribution == 'Ubuntu' and ansible_distribution_major_version == '16'
 
-- name: Disable services (bionic, focal)
+# systemd-resolved manages /etc/resolv.conf as a symlink to a stub resolver on
+# Ubuntu 18.04+ (including 22.04/24.04/26.04). Disable it so a static
+# /etc/resolv.conf can be written.
+- name: Disable systemd-resolved (Ubuntu 18.04+)
   ansible.builtin.service:
     name: systemd-resolved
     state: stopped
     enabled: false
-  when: ansible_distribution == 'Ubuntu' and (ansible_distribution_major_version in ['18', '20'])
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version is version('18.04', '>=')
+
+- name: Check /etc/resolv.conf
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+  register: dns_config_resolv
+
+# Replace the systemd-resolved stub symlink with a real file before templating,
+# otherwise the template writes through the stub (and is then overwritten).
+- name: Remove the systemd-resolved stub symlink
+  ansible.builtin.file:
+    path: /etc/resolv.conf
+    state: absent
+  when: dns_config_resolv.stat.islnk | default(false)
 
 - name: Install /etc/resolv.conf
   ansible.builtin.template:
