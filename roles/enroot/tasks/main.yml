@@ -1,0 +1,92 @@
+---
+# enroot requires user.max_user_namespaces and user.max_mnt_namespaces > 1 on
+# every supported OS (a hard prerequisite for the container start path).
+# https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+- name: Set user.max_user_namespaces
+  ansible.posix.sysctl:
+    name: user.max_user_namespaces
+    value: "{{ enroot_max_user_namespaces }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/90-enroot.conf
+    reload: true
+
+- name: Set user.max_mnt_namespaces
+  ansible.posix.sysctl:
+    name: user.max_mnt_namespaces
+    value: "{{ enroot_max_mnt_namespaces }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/90-enroot.conf
+    reload: true
+
+- name: Install enroot (Ubuntu)
+  ansible.builtin.include_tasks: ubuntu.yml
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Install enroot (RHEL/Rocky)
+  ansible.builtin.include_tasks: redhat.yml
+  when: ansible_os_family == 'RedHat'
+
+- name: Install enroot bash completion
+  ansible.builtin.file:
+    path: /etc/bash_completion.d/enroot.bash_completion
+    src: /usr/share/enroot/bash_completion
+    state: link
+  failed_when: false
+
+- name: Configure /etc/enroot/enroot.conf
+  ansible.builtin.blockinfile:
+    path: /etc/enroot/enroot.conf
+    block: "{{ enroot_config }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (roles/enroot)"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: enroot_config | length > 0
+
+# System-wide extension dirs run hooks with full capabilities before switch_root,
+# so they must be root-write-only (a user-writable hook is a privesc vector).
+- name: Ensure enroot system extension directories are root-owned
+  ansible.builtin.file:
+    path: "/etc/enroot/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - environ.d
+    - hooks.d
+    - mounts.d
+
+- name: Configure enroot environ.d files
+  ansible.builtin.copy:
+    dest: "/etc/enroot/environ.d/{{ item.filename }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ enroot_environ_config_files }}"
+  loop_control:
+    label: "{{ item.filename }}"
+
+- name: Configure enroot hooks.d files
+  ansible.builtin.copy:
+    dest: "/etc/enroot/hooks.d/{{ item.filename }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ enroot_hook_config_files }}"
+  loop_control:
+    label: "{{ item.filename }}"
+
+- name: Configure enroot mounts.d files
+  ansible.builtin.copy:
+    dest: "/etc/enroot/mounts.d/{{ item.filename }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ enroot_mount_config_files }}"
+  loop_control:
+    label: "{{ item.filename }}"

@@ -1,0 +1,65 @@
+---
+# In-tree NVIDIA enroot role (replaces the nvidia.enroot Galaxy role, which was
+# pinned to an EOL 3.x release and did not handle the unprivileged user namespace
+# restriction that modern Ubuntu (23.10+/24.04) enables by default).
+#
+# enroot's container start path always creates an unprivileged user namespace, in
+# every package flavor. The recommended way to permit that on Ubuntu is NOT to
+# globally disable the AppArmor restriction, but to load enroot's own scoped
+# AppArmor profile (which the .deb installs automatically via dh_apparmor and
+# which grants `userns create` only to /usr/bin/enroot-nsenter).
+# Docs:
+#   https://github.com/NVIDIA/enroot/blob/main/doc/installation.md
+#   https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+#   https://github.com/NVIDIA/enroot/blob/main/doc/configuration.md
+
+# --- Version / packages -------------------------------------------------------
+enroot_version: "4.2.0"
+enroot_release: "1"
+enroot_version_string: "{{ enroot_version }}-{{ enroot_release }}"
+
+# Install the hardened build (keeps Spectre v2/v4 mitigations enabled) instead of
+# the standard build. Recommended for shared multi-tenant nodes.
+enroot_hardened: false
+# Also install the +caps package, which adds CAP_SYS_ADMIN file capabilities to
+# the two image-import helpers so unprivileged users can import images on the
+# node. NOT required for running containers; leave off unless on-node image
+# import is needed (enroot 4.x can import via `enroot load` without it).
+enroot_install_caps: false
+
+_enroot_base_pkg: "{{ 'enroot-hardened' if (enroot_hardened | bool) else 'enroot' }}"
+enroot_packages: "{{ [_enroot_base_pkg] + ([_enroot_base_pkg ~ '+caps'] if (enroot_install_caps | bool) else []) }}"
+enroot_package_state: present
+
+# Direct release artifacts (no apt/dnf repo upstream). The amd64 .deb works on
+# both Ubuntu 22.04 and 24.04; the .el8 RPM is supported on Rocky/RHEL 8, 9 and
+# 10. Per-package URLs are built in the OS task files from these values.
+enroot_release_base_url: "https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}"
+_enroot_deb_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(ansible_architecture, ansible_architecture) }}"
+_enroot_rpm_el: "{{ '8' if (ansible_distribution_major_version | int >= 8) else ansible_distribution_major_version }}"
+
+# --- Unprivileged user namespace enablement ----------------------------------
+# Namespace counts must be > 1 on every OS (a hard enroot prerequisite).
+enroot_max_user_namespaces: 65536
+enroot_max_mnt_namespaces: 65536
+
+# Ubuntu 23.10+/24.04 restricts unprivileged userns via AppArmor. enroot's .deb
+# installs a scoped profile that re-grants it to enroot-nsenter only, so the
+# global restriction can stay enabled. Set this true ONLY for a trusted/dev box
+# to disable the restriction system-wide instead (larger security blast radius).
+enroot_apparmor_global_disable: false
+
+# RHEL/Rocky: enable unprivileged userns via kernel cmdline if missing (+ reboot).
+enroot_configure_kernel_options: true
+enroot_configure_kernel_options_versions: "ALL"
+enroot_reboot_timeout: 900
+
+# --- enroot.conf / extension dirs --------------------------------------------
+# Block appended to /etc/enroot/enroot.conf (set via group_vars; see the example
+# in config.example/group_vars/all.yml for per-user RUNTIME/CACHE/DATA paths).
+enroot_config: ""
+# Lists of { filename: '', content: '' }. System-wide extension dirs run with
+# full capabilities pre-switch_root, so they are kept root-write-only.
+enroot_environ_config_files: []  # filenames end with .env
+enroot_hook_config_files: []     # filenames end with .sh
+enroot_mount_config_files: []    # filenames end with .fstab
