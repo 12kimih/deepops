@@ -1,6 +1,6 @@
 ---
-- name: configure docker to use nginx proxy via http
-  template:
+- name: Configure docker to use nginx proxy via http
+  ansible.builtin.template:
     src: "{{ nginx_docker_cache_docker_config_src }}"
     dest: "{{ nginx_docker_cache_docker_config_dest }}"
     owner: "root"
@@ -8,34 +8,34 @@
     mode: "0644"
   when: nginx_docker_cache_dockerd_clients
   notify:
-  - restart docker
+    - Restart docker
 
-- name: install pre-defined CA certificate
+- name: Install pre-defined CA certificate
   when: nginx_docker_cache_ca is defined
   block:
-  - name: copy CA certificate in place
-    copy:
-      src: "{{ nginx_docker_cache_ca.crt }}"
-      dest: "{{ nginx_docker_cache_ca_client_crt_el }}"
-      owner: "root"
-      group: "root"
-      mode: "0644"
-    register: copy_ca_cert
-  - name: update CA cert bundle
-    command: update-ca-trust
-    when: copy_ca_cert.changed
+    - name: Copy CA certificate in place
+      ansible.builtin.copy:
+        src: "{{ nginx_docker_cache_ca.crt }}"
+        dest: "{{ nginx_docker_cache_ca_client_crt_el }}"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      register: copy_ca_cert
+    - name: Update CA cert bundle
+      ansible.builtin.command: update-ca-trust
+      when: copy_ca_cert.changed
 
-- name: install CA certificate from live proxy
+- name: Install CA certificate from live proxy
   when: nginx_docker_cache_ca is not defined
   block:
-  - name: download CA certificate from live proxy
-    get_url:
-      url: "{{ nginx_docker_cache_proxy_url }}/ca.crt"
-      dest: "{{ nginx_docker_cache_ca_client_crt_el }}"
-      owner: "root"
-      group: "root"
-      mode: "0644"
-    register: download_ca_cert
-  - name: update CA cert bundle
-    command: update-ca-trust
-    when: download_ca_cert.changed
+    - name: Download CA certificate from live proxy
+      ansible.builtin.get_url:
+        url: "{{ nginx_docker_cache_proxy_url }}/ca.crt"
+        dest: "{{ nginx_docker_cache_ca_client_crt_el }}"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      register: download_ca_cert
+    - name: Update CA cert bundle
+      ansible.builtin.command: update-ca-trust
+      when: download_ca_cert.changed

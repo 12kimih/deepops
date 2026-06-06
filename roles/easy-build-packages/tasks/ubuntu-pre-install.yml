@@ -2,12 +2,11 @@
 # install software modules using EasyBuild:
 #
 ---
-- name: "install depending software"
+- name: "Install depending software"
   become: true
-  apt:
+  ansible.builtin.apt:
     name:
       - libssl-dev
       - build-essential
       - libsysfs-dev
       - libibverbs-dev
-

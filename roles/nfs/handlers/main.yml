@@ -1,10 +1,10 @@
 ---
-- name: restart rpcbind
-  service:
+- name: Restart rpcbind
+  ansible.builtin.service:
     name: rpcbind
     state: restarted
 
-- name: restart nfs
-  service:
+- name: Restart nfs
+  ansible.builtin.service:
     name: "{{ nfs_server_daemon }}"
     state: restarted

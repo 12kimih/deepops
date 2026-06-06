@@ -1,28 +1,27 @@
 ---
-- name: assert that variables are defined
-  fail:
+- name: Assert that variables are defined
+  ansible.builtin.fail:
     msg: "Variable '{{ item }}' is not defined"
   when: item not in vars
   with_items:
     - autofs_mount
     - autofs_map
 
-- name: install packages
-  package: name=autofs
-
-- name: configure /home
-  template:
+- name: Install packages
+  ansible.builtin.package: name=autofs
+- name: Configure /home
+  ansible.builtin.template:
     src: templates/master.j2
     dest: /etc/auto.master
     owner: root
     group: root
-    mode: 0644
-  notify: "restart autofs"
+    mode: "0644"
+  notify: "Restart autofs"
   tags:
     - configuration
 
-- name: ensure mountpoint exists
-  file: 
+- name: Ensure mountpoint exists
+  ansible.builtin.file:
     path: "{{ autofs_mount }}"
     state: directory
     owner: "root"
@@ -30,5 +29,5 @@
     mode: "0755"
   when: autofs_mount is defined
 
-- name: make sure autofs is running
-  service: name=autofs state=started enabled=yes
+- name: Make sure autofs is running
+  ansible.builtin.service: name=autofs state=started enabled=yes

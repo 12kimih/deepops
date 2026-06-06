@@ -1,17 +1,17 @@
 ---
 - name: Check for DGX packages
-  stat:
+  ansible.builtin.stat:
     path: /etc/dgx-release
   register: is_dgx
 
 - name: Autoinstall DKMS modules
-  command: dkms autoinstall
+  ansible.builtin.command: dkms autoinstall
   when:
     - ansible_local['gpus']['count']
     - is_dgx.stat.exists
 
 - name: Modprobe nv_peer_mem
-  modprobe:
+  community.general.modprobe:
     name: nv_peer_mem
     state: present
   when:
@@ -19,7 +19,7 @@
     - is_dgx.stat.exists
 
 - name: Start nv_peer_mem service
-  service:
+  ansible.builtin.service:
     name: nv_peer_mem
     state: started
   when:

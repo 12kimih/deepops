@@ -11,8 +11,8 @@
   import_playbook: ../slurm-cluster/lmod.yml
 
 - hosts: all
-  become: yes
+  become: true
   tasks:
-    - name: install rootless docker
-      include_role:
+    - name: Install rootless docker
+      ansible.builtin.include_role:
         name: docker-rootless

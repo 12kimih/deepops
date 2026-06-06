@@ -3,8 +3,8 @@
   import_playbook: ../container/docker.yml
 
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   tasks:
-    - name: configure grafana
-      include_role:
+    - name: Configure grafana
+      ansible.builtin.include_role:
         name: grafana

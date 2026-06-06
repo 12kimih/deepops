@@ -3,100 +3,100 @@
 #
 ---
 - name: RedHat | trust GPG key for EPEL
-  rpm_key:
+  ansible.builtin.rpm_key:
     key: "{{ epel_key_url }}"
     state: present
   when: ansible_os_family == "RedHat"
 
 - name: RedHat | add epel repo
-  become: yes
-  yum:
-    name: 
+  become: true
+  ansible.builtin.dnf:
+    name:
       - "{{ epel_package }}"
     state: present
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   when: ansible_os_family == "RedHat"
 
-- name: "install packages"
-  become: yes
-  apt:
-    update_cache: yes
+- name: "Install packages"
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
     name:
-    - bash
-    - tcsh
-    - lmod
+      - bash
+      - tcsh
+      - lmod
     state: present
   when: ansible_os_family == "Debian"
 
-- name: "install packages"
-  become: yes
-  dnf:
+- name: "Install packages"
+  become: true
+  ansible.builtin.dnf:
     name:
-    - bash
-    - tcsh
-    - Lmod
+      - bash
+      - tcsh
+      - Lmod
     enablerepo: powertools
   when: ansible_os_family == "RedHat"
 
-- name: "mkdir software path"
-  become: yes
-  file:
+- name: "Mkdir software path"
+  become: true
+  ansible.builtin.file:
     path: "{{ sm_software_path }}"
     state: directory
     mode: "0755"
 
-- name: "mkdir module path"
-  become: yes
-  file:
+- name: "Mkdir module path"
+  become: true
+  ansible.builtin.file:
     path: "{{ sm_module_path }}"
-    state: directory 
-    mode: 0755
+    state: directory
+    mode: "0755"
 
-- name: "configure sh profile"
-  become: yes
-  template:
+- name: "Configure sh profile"
+  become: true
+  ansible.builtin.template:
     src: templates/z00_lmod.sh
     dest: /etc/profile.d
     owner: root
     group: root
-    mode: 0755
+    mode: "0755"
   tags:
     - configuration
 
-- name: "configure csh profile"
-  become: yes
-  template:
+- name: "Configure csh profile"
+  become: true
+  ansible.builtin.template:
     src: templates/z00_lmod.csh
     dest: /etc/profile.d
     owner: root
     group: root
-    mode: 0755
+    mode: "0755"
   tags:
     - configuration
 
-- name: "unset previous lmod setup"
-  shell: unset MODULEPATH_ROOT  # noqa command-instead-of-shell
+- name: "Unset previous lmod setup"
+  ansible.builtin.shell: unset MODULEPATH_ROOT
   register: unset_lmod_bash
   args:
     executable: /bin/bash
   changed_when: unset_lmod_bash.rc != 0
 
-- name: "unset previous lmod setup"
-  shell: unsetenv MODULEPATH_ROOT  # noqa command-instead-of-shell
+- name: "Unset previous lmod setup"
+  ansible.builtin.shell: unsetenv MODULEPATH_ROOT
   register: unset_lmod_csh
   args:
     executable: /bin/csh
   changed_when: unset_lmod_csh.rc != 0
 
-- name: "auto load lmod"
-  shell: . /etc/profile.d/z00_lmod.sh  # noqa command-instead-of-shell
+- name: "Auto load lmod"
+  ansible.builtin.shell: . /etc/profile.d/z00_lmod.sh
   register: load_lmod_bash
   args:
     executable: /bin/bash
   changed_when: load_lmod_bash.rc != 0
 
-- name: "auto load lmod "
-  shell: source /etc/profile.d/z00_lmod.csh  # noqa command-instead-of-shell
+- name: "Auto load lmod "
+  ansible.builtin.shell: source /etc/profile.d/z00_lmod.csh
   register: load_lmod_csh
   args:
     executable: /bin/csh

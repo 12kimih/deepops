@@ -29,4 +29,4 @@
     cmd: "nvidia-ctk runtime configure --runtime=docker{{ ' --set-as-default' if nvidia_container_toolkit_set_as_default_runtime | bool else '' }}"
   when: nvidia_container_toolkit_docker_runtime.rc != 0
   changed_when: true
-  notify: restart docker
+  notify: Restart docker

@@ -6,11 +6,11 @@
 # ansible ssh flakes out in `auto` mode.
 
 - hosts: all
-  become: yes
+  become: true
   connection: paramiko_ssh
   tasks:
     - name: Include NVIDIA DGX Firmware role
-      include_role:
+      ansible.builtin.include_role:
         name: nvidia-dgx-firmware
       vars:
         run_diagnostics: true

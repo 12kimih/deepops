@@ -20,7 +20,7 @@
   copy:
     src: "{{ firmware_container_src_dir }}/{{ firmware_update_container }}"
     dest: "{{ fw_dir }}"
-  when: not tarball_exists.stat.exists 
+  when: not tarball_exists.stat.exists
 
 # Verify Remote tarball is correct before loading it
 - name: Get md5sum of remote tarball
@@ -42,7 +42,7 @@
   command: "docker load -i {{ firmware_update_container }}"
   args:
     chdir: "{{ fw_dir }}"
-  ignore_errors: yes
+  ignore_errors: true
   register: load_image_output
 - name: Print the response from the load image command
   debug:

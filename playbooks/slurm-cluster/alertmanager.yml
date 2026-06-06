@@ -3,9 +3,8 @@
   import_playbook: ../container/docker.yml
 
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   tasks:
-    - name: configure alertmanager
-      include_role:
+    - name: Configure alertmanager
+      ansible.builtin.include_role:
         name: alertmanager
-

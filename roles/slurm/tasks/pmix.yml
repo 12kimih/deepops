@@ -1,42 +1,42 @@
 ---
-- name: default to building pmix
-  set_fact:
-    pmix_build: yes
-    pmix_ver_alt: "{{ pmix_version | replace('.','') }}"
+- name: Default to building pmix
+  ansible.builtin.set_fact:
+    pmix_build: true
+    pmix_ver_alt: "{{ pmix_version | replace('.', '') }}"
 
-- name: check installed pmix version
-  shell: "grep PMIX_NUMERIC_VERSION {{ pmix_install_prefix }}/include/pmix_version.h | awk '{print $3}' | tr -d 'x0'"
+- name: Check installed pmix version
+  ansible.builtin.shell: "grep PMIX_NUMERIC_VERSION {{ pmix_install_prefix }}/include/pmix_version.h | awk '{print $3}' | tr -d 'x0'"
   register: pmix_info_version
-  ignore_errors: yes
+  ignore_errors: true
   changed_when: pmix_info_version.rc != 0
 
-- name: don't build pmix if it's already installed, unless forced
-  set_fact:
-    pmix_build: no
+- name: Don't build pmix if it's already installed, unless forced
+  ansible.builtin.set_fact:
+    pmix_build: false
   when: pmix_info_version.stdout == pmix_ver_alt and not pmix_force_rebuild
 
-- name: install pmix build dependencies
-  apt:
+- name: Install pmix build dependencies
+  ansible.builtin.apt:
     name: "{{ item }}"
   with_items: "{{ slurm_pmix_deps }}"
   when: ansible_distribution == 'Ubuntu'
 
-- name: install pmix build dependencies
-  yum:
+- name: Install pmix build dependencies
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items: "{{ slurm_pmix_deps }}"
   when: ansible_os_family == 'RedHat'
 
-- name: install pmix 'pandoc' build dependency
-  dnf:
+- name: Install pmix 'pandoc' build dependency
+  ansible.builtin.dnf:
     name: pandoc
     state: present
     enablerepo: powertools
   when: ansible_os_family == 'RedHat'
 
-- name: remove pmix packages
-  apt:
+- name: Remove pmix packages
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: absent
   with_items:
@@ -46,8 +46,8 @@
   when: ansible_distribution == 'Ubuntu'
   failed_when: false
 
-- name: remove pmix packages
-  yum:
+- name: Remove pmix packages
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: absent
   with_items:
@@ -57,65 +57,64 @@
   when: ansible_os_family == 'RedHat'
   failed_when: false
 
-- name: when building, try to uninstall first before downloading source
+- name: When building, try to uninstall first before downloading source
   when: pmix_build
   block:
+    - name: Check that we have an old build dir
+      ansible.builtin.stat:
+        path: "{{ pmix_build_dir }}"
+      register: pmix_old_build_dir
 
-  - name: check that we have an old build dir
-    stat:
-      path: "{{ pmix_build_dir }}"
-    register: pmix_old_build_dir
+    - name: Uninstall old verson
+      ansible.builtin.command: make -j uninstall
+      args:
+        chdir: "{{ pmix_build_dir }}"
+      ignore_errors: true
+      when: pmix_old_build_dir.stat.exists
 
-  - name: uninstall old verson
-    command: make -j uninstall
-    args:
-      chdir: "{{ pmix_build_dir }}"
-    ignore_errors: yes
-    when: pmix_old_build_dir.stat.exists
+    - name: Remove old build dir
+      ansible.builtin.file:
+        path: "{{ pmix_build_dir }}"
+        state: absent
 
-  - name: remove old build dir
-    file:
-      path: "{{ pmix_build_dir }}"
-      state: absent
-
-- name: make pmix build directory
-  file:
+- name: Make pmix build directory
+  ansible.builtin.file:
     path: "{{ pmix_build_dir }}"
     state: directory
     mode: "0755"
   when: pmix_build
 
-- name: download pmix source
-  unarchive:
+- name: Download pmix source
+  ansible.builtin.unarchive:
     src: "{{ pmix_src_url }}"
-    remote_src: yes
+    remote_src: true
     dest: "{{ pmix_build_dir }}"
     extra_opts:
       - --strip-components=1
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   when: pmix_build
 
-- name: clean pmix src dir
-  command: make distclean
+- name: Clean pmix src dir
+  ansible.builtin.command: make distclean
   args:
     chdir: "{{ pmix_build_dir }}"
   failed_when: false
   when: pmix_build
 
-- name: configure pmix
-  command: "{{ pmix_configure }}"
+- name: Configure pmix
+  ansible.builtin.command: "{{ pmix_configure }}"
   args:
     chdir: "{{ pmix_build_dir }}"
   when: pmix_build
 
-- name: build pmix
-  shell: "make -j$(nproc) > build.log 2>&1"
+- name: Build pmix
+  ansible.builtin.shell: "make -j$(nproc) > build.log 2>&1"
   args:
     chdir: "{{ pmix_build_dir }}"
   when: pmix_build
 
-- name: install pmix
-  shell: "make -j$(nproc) install >> build.log 2>&1"
+- name: Install pmix
+  ansible.builtin.shell: "make -j$(nproc) install >> build.log 2>&1"
   args:
     chdir: "{{ pmix_build_dir }}"
   when: pmix_build

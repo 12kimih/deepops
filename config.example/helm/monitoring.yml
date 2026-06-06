@@ -1,3 +1,4 @@
+---
 prometheusOperator:
   nodeSelector:
     node-role.kubernetes.io/control-plane: ""
@@ -49,7 +50,7 @@ prometheus:
     endpoints:
     - port: scrape
       interval: 1s
-      honorLabels: true       
+      honorLabels: true
   serviceMonitorsSelector:
     matchLabels:
       prometheus: "kube-prometheus"

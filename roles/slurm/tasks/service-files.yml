@@ -1,9 +1,9 @@
 ---
-- name: copy service files
-  copy:
+- name: Copy service files
+  ansible.builtin.copy:
     src: "{{ slurm_build_dir }}/etc/{{ item }}"
     dest: "/etc/systemd/system/{{ item }}"
-    remote_src: yes
+    remote_src: true
     mode: "0644"
   with_items:
     - slurmctld.service
@@ -11,11 +11,11 @@
   when: is_controller
   failed_when: false
 
-- name: copy service files
-  copy:
+- name: Copy service files
+  ansible.builtin.copy:
     src: "{{ slurm_build_dir }}/etc/{{ item }}"
     dest: "/etc/systemd/system/{{ item }}"
-    remote_src: yes
+    remote_src: true
     mode: "0644"
   with_items:
     - slurmd.service

@@ -19,7 +19,7 @@
     #   nccl_tests_container (will delete/overwrite if one already exists). If
     #   false assumes nccl_tests_container already has the NCCL tests and uses
     #   the nccl_tests_container.
-    compile_nccl_tests: True
+    compile_nccl_tests: true
     # String; NCCL allreduce test command.
     allreduce_command: "all_reduce_perf -b 1M -e 4G -f 2 -g 1"
     # Int; Number of GPUs per node. DGX-1 and DGX A100 Server have 8 GPUs.
@@ -37,11 +37,11 @@
     num_nodes:
     # Bool; Delete the `nccl_tests_container` after running the playbook, only
     #   if `compile_nccl_tests` is true as well.
-    cleanup: False
+    cleanup: false
 
   tasks:
     - name: Check that NCCL sqsh base container exists when sqsh is specified.
-      file:
+      ansible.builtin.file:
         path: "{{ base_container }}"
         state: file
       when:
@@ -49,7 +49,7 @@
         - base_container | splitext | last == ".sqsh"
 
     - name: Check nccl_tests_container is sqsh path when compiling.
-      fail:
+      ansible.builtin.fail:
         msg: >
           When compiling the `nccl_tests_container` must be a path to enroot
           ".sqsh" file. Currently it is set to:
@@ -59,7 +59,7 @@
         - nccl_tests_container | splitext | last != ".sqsh"
 
     - name: Set nccl tests compilation command
-      set_fact:
+      ansible.builtin.set_fact:
         ncclmake: |
           mkdir -p /opt/nccl_tests
           cd /opt/nccl_tests
@@ -71,29 +71,29 @@
       when: compile_nccl_tests|bool == True
 
     - name: Print nccl make command
-      debug:
+      ansible.builtin.debug:
         msg:
           - |
             Will compile container:
               {{ nccl_tests_container }}
-            {% if not cleanup|bool %}Delete container manually afterwards.{% endif %}
+            {% if not cleanup | bool %}Delete container manually afterwards.{% endif %}
           - "NCCL compilation command:\n{{ ncclmake }}"
       when: compile_nccl_tests|bool == True
 
     - name: Check or create enroot images directory for nccl_tests_container.
-      file:
+      ansible.builtin.file:
         path: "{{ nccl_tests_container | dirname }}"
         state: directory
       when: compile_nccl_tests|bool == True
 
     - name: Remove NCCL container if re-compiling.
-      file:
+      ansible.builtin.file:
         path: "{{ nccl_tests_container }}"
         state: absent
       when: compile_nccl_tests|bool == True
 
     - name: Compiling NCCL tests
-      shell:
+      ansible.builtin.shell:
         cmd: |
           srun -p {{ partition }} -N 1 \
             --ntasks-per-node=1 \
@@ -107,7 +107,7 @@
       when: compile_nccl_tests|bool == True
 
     - name: Check that nccl_tests_container exists when sqsh is specified.
-      file:
+      ansible.builtin.file:
         path: "{{ nccl_tests_container }}"
         state: file
       when:
@@ -115,7 +115,7 @@
         - nccl_tests_container | splitext | last == ".sqsh"
 
     - name: Print nccl_tests_container setting if not sqsh file.
-      debug:
+      ansible.builtin.debug:
         msg: >
           The nccl_tests_container is not set to sqsh file. Assuming it is a
           valid docker tag. Currently it is set to:
@@ -126,7 +126,7 @@
         - nccl_tests_container | splitext | last != ".sqsh"
 
     - name: Get node count from sinfo
-      shell: >
+      ansible.builtin.shell: >
         sinfo -p {{ partition }} -t idle |
         tail -n +2  |
         awk '{sum += $4} END {print sum}'
@@ -134,11 +134,11 @@
       when: (not num_nodes) or (num_nodes|int <= 0)
 
     - name: Set num_nodes variable
-      set_fact:
+      ansible.builtin.set_fact:
         num_nodes_: "{{ node_out.stdout | default(num_nodes) }}"
 
     - name: Set nccl run command
-      set_fact:
+      ansible.builtin.set_fact:
         ncclcmd: |
           srun --export={{ srun_exports }} \
             -p {{ partition }} \
@@ -154,42 +154,41 @@
             {{ allreduce_command }}
 
     - name: Print node/gpu counts and nccl tests run command
-      debug:
+      ansible.builtin.debug:
         msg:
           - "Detected {{ num_nodes_ }} nodes with {{ num_gpus }} gpus each."
-          - "Proceeding to run validation test, this may take several
-            minutes:\n{{ ncclcmd }}"
+          - "Proceeding to run validation test, this may take several minutes:\n{{ ncclcmd }}"
 
     - block:
-      - name: Execute NCCL allreduce test
-        shell:
-          cmd: "{{ ncclcmd }}"
-        register: result
-        no_log: true
+        - name: Execute NCCL allreduce test
+          ansible.builtin.shell:
+            cmd: "{{ ncclcmd }}"
+          register: result
+          no_log: true
 
       rescue:
         - name: NCCL allreduce running error
-          debug:
+          ansible.builtin.debug:
             msg: "{{ result }}"
 
         - name: Save error results to /tmp/nccl_tests.err
-          local_action: 
-            module: copy 
+          local_action:
+            module: ansible.builtin.copy
             content: "STDOUT:\n{{ result.stdout }}\n\nSTDERR:\n{{ result.stderr }}"
             dest: /tmp/nccl_tests.err
 
         - name: Fail Slurm validation playbook
-          fail:
+          ansible.builtin.fail:
             msg: See debug of stderr above. Also refer to "/tmp/nccl_tests.err"
 
     - name: Save results to /tmp/nccl_tests.out
-      local_action: 
-        module: copy 
+      local_action:
+        module: ansible.builtin.copy
         content: "STDERR:\n{{ result.stderr }}\n\nSTDOUT:\n{{ result.stdout }}"
         dest: /tmp/nccl_tests.out
 
     - name: Extract "Out of bounds values" and "Avg bus bandwidth".
-      shell:
+      ansible.builtin.shell:
         cmd: |
           echo "{{ result.stdout }}" | \
             grep "Out of bounds values\|Avg bus bandwidth"
@@ -197,7 +196,7 @@
       when: result.stdout != ""
 
     - name: Print and analyze results
-      debug: 
+      ansible.builtin.debug:
         msg:
           - "{{ result_vals.stdout }}"
           - Out of bounds values should be 0 otherwise FAIL.
@@ -205,7 +204,7 @@
           - Refer to /tmp/nccl_tests.out for detailed NCCL allreduce output.
 
     - name: Cleanup NCCL container.
-      file:
+      ansible.builtin.file:
         path: "{{ nccl_tests_container }}"
         state: absent
       when:

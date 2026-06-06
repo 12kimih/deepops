@@ -1,3 +1,4 @@
+---
 # This yaml file will launch a container onto any node that has a nvidia.com/gpu resource
 # This container could potentially be deployed on a NVIDIA A100, V100, T4, or any other GPU type
 # If a node is configured with mig-strategy=single, this container could potentially run with a MIG device

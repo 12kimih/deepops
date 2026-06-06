@@ -1,5 +1,5 @@
 ---
-- name: restart dcgm
-  service:
+- name: Restart dcgm
+  ansible.builtin.service:
     name: "{{ nvidia_dcgm_svc_name }}"
     state: restarted

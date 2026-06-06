@@ -1,7 +1,6 @@
 ---
-
-- name: install dependencies
-  apt:
+- name: Install dependencies
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   with_items:
@@ -11,8 +10,8 @@
     - ssmtp
   when: ansible_os_family == "Debian"
 
-- name: install dependencies
-  dnf:
+- name: Install dependencies
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items:
@@ -23,131 +22,131 @@
   when: ansible_os_family == "RedHat"
 
 - name: Allow mysql to read libaio.so.1
-  sefcontext:
-    target: '/lib64(/.*)?'
+  community.general.sefcontext:
+    target: "/lib64(/.*)?"
     setype: mysqld_db_t
     state: present
-  when: 
-  - ansible_os_family == "RedHat"
-  - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
+  when:
+    - ansible_os_family == "RedHat"
+    - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
 
 - name: Apply new SELinux file context to filesystem
-  command: restorecon -irv /lib64
-  when: 
-  - ansible_os_family == "RedHat"
-  - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
+  ansible.builtin.command: restorecon -irv /lib64
+  when:
+    - ansible_os_family == "RedHat"
+    - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
 
-- name: start mariadb
-  systemd:
+- name: Start mariadb
+  ansible.builtin.systemd:
     name: mariadb
     state: started
-    enabled: yes
-    daemon-reload: yes
+    enabled: true
+    daemon-reload: true
   when: ansible_os_family == "RedHat"
 
-- name: setup slurm db user
-  mysql_user:
+- name: Setup slurm db user
+  community.mysql.mysql_user:
     name: "{{ slurm_db_username }}"
     password: "{{ slurm_db_password }}"
     host: localhost
     priv: "*.*:USAGE/slurm_acct_db.*:ALL"
     state: present
 
-- name: create slurm directories
-  file:
+- name: Create slurm directories
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: slurm
-    mode: 0755
+    mode: "0755"
   with_items:
     - "{{ slurm_config_dir }}"
     - /var/spool/slurm/ctld
     - /var/log/slurm
 
-- name: create slurm directories for nfs sharing
-  file:
+- name: Create slurm directories for nfs sharing
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: slurm
-    mode: 0755
+    mode: "0755"
   with_items:
     - "{{ slurmctl_config_dir }}"
   when: slurm_conf_symlink
 
-- name: create slurm HA directory
-  file:
+- name: Create slurm HA directory
+  ansible.builtin.file:
     path: "{{ slurm_ha_state_save_location }}"
     state: directory
     owner: slurm
-    mode: 0755
+    mode: "0755"
   when: slurm_enable_ha
 
-- name: configure slurm.conf
-  template:
+- name: Configure slurm.conf
+  ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
     dest: "{{ slurm_config_dir }}/slurm.conf"
     mode: "0644"
   when: not slurm_conf_symlink
   notify:
-  - restart slurmctld
+    - Restart slurmctld
   tags:
-  - config
+    - config
 
-- name: configure slurm.conf to nfs
-  template:
+- name: Configure slurm.conf to nfs
+  ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
     dest: "{{ slurmctl_config_dir }}/slurm.conf"
     mode: "0644"
   when: slurm_conf_symlink
   tags:
-  - config
+    - config
 
-- name: complete slurm.conf
-  file:
+- name: Complete slurm.conf
+  ansible.builtin.file:
     path: "{{ slurm_config_dir }}/slurm.conf"
     state: link
     src: "{{ slurmctl_config_dir }}/slurm.conf"
-    force: yes
+    force: true
   when: slurm_conf_symlink
   notify:
-  - restart slurmctld
+    - Restart slurmctld
   tags:
-  - config
+    - config
 
-- name: configure slurmdbd.conf
-  template:
+- name: Configure slurmdbd.conf
+  ansible.builtin.template:
     src: "{{ slurm_dbd_conf_template }}"
     dest: "{{ slurm_config_dir }}/slurmdbd.conf"
     owner: "{{ slurm_username }}"
-    mode: 0600
+    mode: "0600"
   notify:
-  - restart slurmdbd
+    - Restart slurmdbd
   tags:
-  - config
+    - config
 
-- name: restart slurmdbd
-  systemd:
+- name: Restart slurmdbd
+  ansible.builtin.systemd:
     name: slurmdbd
     state: restarted
-    enabled: yes
-    daemon-reload: yes
+    enabled: true
+    daemon-reload: true
 
-- name: wait for slurmdbd to be available
-  wait_for:
+- name: Wait for slurmdbd to be available
+  ansible.builtin.wait_for:
     port: 6819
     delay: 5
 
-- name: create cluster
-  command: sacctmgr -i add cluster {{ slurm_cluster_name }}
+- name: Create cluster
+  ansible.builtin.command: sacctmgr -i add cluster {{ slurm_cluster_name }}
   register: create_cluster_result
   failed_when: "create_cluster_result.rc != 0 and 'already exists' not in create_cluster_result.stdout"
   changed_when: "'already exists' not in create_cluster_result.stdout"
   environment:
-    PATH: '{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}'
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
   run_once: true
 
-- name: create account
-  command: sacctmgr -i add account compute-account Description="Compute Accounts" Organization="Prestige"
+- name: Create account
+  ansible.builtin.command: sacctmgr -i add account compute-account Description="Compute Accounts" Organization="Prestige"
   register: create_account_result
   failed_when: >
     create_account_result.rc != 0 and
@@ -159,10 +158,10 @@
     'Nothing added' not in create_account_result.stdout and
     'Already existing' not in create_account_result.stdout
   environment:
-    PATH: '{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}'
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
 
-- name: create users
-  command: sacctmgr -i create user {{ item }} account=compute-account adminlevel=None
+- name: Create users
+  ansible.builtin.command: sacctmgr -i create user {{ item }} account=compute-account adminlevel=None
   register: create_user_result
   failed_when: >
     create_user_result.rc != 0 and
@@ -176,27 +175,27 @@
   with_items:
     - "{{ user }}"
   environment:
-    PATH: '{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}'
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
 
-- name: clear slurm state when downgrading
-  command: slurmctld -i
+- name: Clear slurm state when downgrading
+  ansible.builtin.command: slurmctld -i
   when: slurm_downgrade
   environment:
-    PATH: '{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}'
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
 
-- name: wait for slurmctld to start
-  pause:
+- name: Wait for slurmctld to start
+  ansible.builtin.pause:
     seconds: 20
   when: slurm_downgrade
 
-- name: kill slurmctld
-  command: killall slurmctld
+- name: Kill slurmctld
+  ansible.builtin.command: killall slurmctld
   failed_when: false
   when: slurm_downgrade
 
-- name: restart slurmctld
-  systemd:
+- name: Restart slurmctld
+  ansible.builtin.systemd:
     name: slurmctld
     state: restarted
-    enabled: yes
-    daemon-reload: yes
+    enabled: true
+    daemon-reload: true

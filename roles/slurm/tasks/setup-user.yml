@@ -1,14 +1,14 @@
 ---
-- name: create slurm user home
-  file:
-   path: "{{ slurm_user_home }}"
-   recurse: yes
-   state: directory
+- name: Create slurm user home
+  ansible.builtin.file:
+    path: "{{ slurm_user_home }}"
+    recurse: true
+    state: directory
 
-- name: create slurm user
-  user:
+- name: Create slurm user
+  ansible.builtin.user:
     name: "{{ slurm_username }}"
     state: present
-    system: yes
+    system: true
     home: "{{ slurm_user_home }}"
     uid: "{{ slurm_user_uid }}"

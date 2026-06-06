@@ -11,7 +11,7 @@
 # Note that the valid choices for hpcsdk_file_cuda are the latest CUDA
 # toolkit supported (e.g. 11.0) or a tarball which includes the last three
 # releases (named multi).
-# 
+#
 # See https://developer.nvidia.com/nvidia-hpc-sdk-downloads for more detail on available downloads.
 
 # Version strings used to construct download URL

@@ -1,12 +1,12 @@
 ---
-- name: kill user processes for {{ user }}
-  command: killall -u {{ user }}
+- name: Kill user processes for {{ user }}
+  ansible.builtin.command: killall -u {{ user }}
   register: kill_user_procs
   failed_when: false
   changed_when: kill_user_procs.rc == 0
 
-- name: move home directory for {{ user }}
-  user:
+- name: Move home directory for {{ user }}
+  ansible.builtin.user:
     name: "{{ user }}"
     home: "{{ move_home_dirs_new_root }}/{{ user }}"
-    move_home: yes
+    move_home: true

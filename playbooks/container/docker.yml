@@ -3,7 +3,7 @@
   become: true
   become_method: sudo
   tags:
-  - docker
+    - docker
   vars_files:
     # include kubespray-defaults here so that we can set the facts using the
     # kubespray 0020-set_facts.yml tasks
@@ -23,7 +23,7 @@
   become: true
   become_method: sudo
   tags:
-  - docker
+    - docker
   vars:
     fallback_ips: []
   roles:

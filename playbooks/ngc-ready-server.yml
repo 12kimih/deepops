@@ -1,5 +1,4 @@
 ---
-
 - name: Install python
   import_playbook: bootstrap/bootstrap-python.yml
 
@@ -25,125 +24,125 @@
 - hosts: all
   become: true
   tasks:
-    - name: install docker python3 module
-      apt:
+    - name: Install docker python3 module
+      ansible.builtin.apt:
         name: python3-docker
         state: present
-        update_cache: yes
+        update_cache: true
       when: ansible_distribution == "Ubuntu"
     - name: Enable EPEL repo
-      package:
+      ansible.builtin.package:
         name:
           - "{{ epel_package }}"
         state: present
       when: ansible_os_family == 'RedHat'
     - name: Install package dependencies
-      package:
+      ansible.builtin.package:
         name:
           - python3-pip
         state: present
       when: ansible_os_family == "RedHat"
     - name: Install python3 dependencies
-      pip:
+      ansible.builtin.pip:
         name:
           - docker
         state: present
       when: ansible_os_family == "RedHat"
-    - name: pull CUDA container
-      docker_container:
+    - name: Pull CUDA container
+      community.docker.docker_container:
         name: gpu-test-pull
-        image: "{{ ngc_ready_cuda_container }}" 
-        auto_remove: yes
-        pull: yes
+        image: "{{ ngc_ready_cuda_container }}"
+        auto_remove: true
+        pull: true
       tags:
         - test
         - never
-    - name: test CUDA container
-      docker_container:
+    - name: Test CUDA container
+      community.docker.docker_container:
         name: gpu-test
-        image: "{{ ngc_ready_cuda_container }}" 
-        detach: no
+        image: "{{ ngc_ready_cuda_container }}"
+        detach: false
         command: nvidia-smi -L
       register: cuda
       tags:
         - test
         - never
-    - name: functional test output
-      debug:
+    - name: Functional test output
+      ansible.builtin.debug:
         var: cuda.ansible_facts.docker_container.Output
       tags:
         - test
         - never
-    - name: remove CUDA container
-      docker_container:
+    - name: Remove CUDA container
+      community.docker.docker_container:
         name: gpu-test
         state: absent
       tags:
         - test
         - never
-    - name: pull pytorch container
-      docker_container:
+    - name: Pull pytorch container
+      community.docker.docker_container:
         name: pytorch-pull
         image: "{{ ngc_ready_pytorch }}"
-        auto_remove: yes
-        pull: yes
+        auto_remove: true
+        pull: true
       tags:
         - test
         - never
-    - name: test pytorch
-      docker_container:
+    - name: Test pytorch
+      community.docker.docker_container:
         name: pytorch
         image: "{{ ngc_ready_pytorch }}"
         working_dir: /opt/pytorch/examples/upstream/mnist
-        detach: no
+        detach: false
         network_mode: host
         command: "python main.py"
       register: pytorch
       tags:
         - test
         - never
-    - name: pytorch test output
-      debug:
+    - name: Pytorch test output
+      ansible.builtin.debug:
         var: pytorch.ansible_facts.docker_container.Output
       tags:
         - test
         - never
-    - name: remove pytorch container
-      docker_container:
+    - name: Remove pytorch container
+      community.docker.docker_container:
         name: pytorch-test
         state: absent
       tags:
         - test
         - never
-    - name: pull tensorflow container
-      docker_container:
+    - name: Pull tensorflow container
+      community.docker.docker_container:
         name: tensorflow-pull
         image: "{{ ngc_ready_tensorflow }}"
-        auto_remove: yes
-        pull: yes
+        auto_remove: true
+        pull: true
       tags:
         - test
         - never
-    - name: test tensorflow
-      docker_container:
+    - name: Test tensorflow
+      community.docker.docker_container:
         name: tensorflow
         image: "{{ ngc_ready_tensorflow }}"
         working_dir: /opt/tensorflow/tensorflow/examples/tutorials/mnist
-        detach: no
+        detach: false
         network_mode: host
         command: "python mnist_with_summaries.py"
       register: tensorflow
       tags:
         - test
         - never
-    - name: tensorflow test output
-      debug:
+    - name: Tensorflow test output
+      ansible.builtin.debug:
         var: tensorflow.ansible_facts.docker_container.Output
       tags:
         - test
         - never
-    - name: remove tensorflow container
-      docker_container:
+    - name: Remove tensorflow container
+      community.docker.docker_container:
         name: tensorflow-test
         state: absent
       tags:

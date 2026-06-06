@@ -1,6 +1,6 @@
 ---
 dependencies:
-- role: facts
+  - role: facts
 
 galaxy_info:
   namespace: deepops

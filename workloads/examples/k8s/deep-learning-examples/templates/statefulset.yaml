@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -12,7 +13,7 @@ spec:
   replicas: 1
   template:
     metadata:
-      labels: 
+      labels:
         app: {{ .Values.exampleName }}
     spec:
       containers:
@@ -129,4 +130,4 @@ spec:
       volumes:
         - name: dshm
           emptyDir: {}
- 
+

@@ -2,36 +2,35 @@
 - hosts: all
   become: false
   tasks:
-    - name: set SSH key location
-      set_fact:
-        private_key: "{{ ansible_ssh_private_key_file | default(lookup('env','HOME') + '/.ssh/id_rsa') }}"
+    - name: Set SSH key location
+      ansible.builtin.set_fact:
+        private_key: "{{ ansible_ssh_private_key_file | default(lookup('env', 'HOME') + '/.ssh/id_rsa') }}"
 
     - name: Create SSH directory if it doesn't exist
-      file:
-        path: "{{ lookup('env','HOME') + '/.ssh' }}"
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') + '/.ssh' }}"
         state: directory
-        mode: 0700
+        mode: "0700"
       delegate_to: 127.0.0.1
       run_once: true
 
     - name: Generate default SSH keypair if it doesn't exist
-      command: ssh-keygen -q -t rsa -f "{{ private_key }}" -C "" -N ""
+      ansible.builtin.command: ssh-keygen -q -t rsa -f "{{ private_key }}" -C "" -N ""
       args:
         creates: "{{ private_key }}"
       delegate_to: 127.0.0.1
       run_once: true
 
-    - name: run setup to get ansible user
-      setup: gather_subset=min
-
+    - name: Run setup to get ansible user
+      ansible.builtin.setup: gather_subset=min
     - name: Add SSH public key to ansible user authorized keys
-      authorized_key:
+      ansible.posix.authorized_key:
         user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
         state: present
         key: "{{ lookup('file', private_key + '.pub') }}"
       tags: ssh-public
 
-    - debug:
+    - ansible.builtin.debug:
         msg: Now, you shouldn't need to use -k/--ask-pass for these hosts anymore.
       delegate_to: 127.0.0.1
       run_once: true

@@ -5,11 +5,11 @@ gpu_test_samples_dir: "{{ gpu_test_cuda_dir }}/Samples"
 
 # Whether to install the CUDA toolkit package
 # Set to no if the CUDA toolkit is installed
-gpu_test_install_toolkit: no
+gpu_test_install_toolkit: false
 
 # Whether or not to download and build cuda-samples
 # Set to no if they have already been built once
-gpu_test_build: yes
+gpu_test_build: true
 
 # 1 -> quick test (seconds), 2 -> regular test (minute), 3 -> long test (minutes)
 gpu_test_dcgm_level: 3

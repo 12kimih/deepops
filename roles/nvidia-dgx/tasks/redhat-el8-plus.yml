@@ -31,13 +31,13 @@
   dnf:
     name: "{{ dgx_redhat_repo_setup_rpms[ansible_distribution_major_version] }}"
     state: present
-    disable_gpg_check: yes
+    disable_gpg_check: true
 
 - name: Upgrade Red Hat DGX Software Stack packages
   dnf:
     name: "*"
     state: latest
-    nobest: yes
+    nobest: true
   when: dgx_redhat_upgrade_packages
   tags: skip_ansible_lint
 
@@ -87,7 +87,7 @@
   loop: "{{ dgx_redhat_driver_module_specs }}"
   register: dgx_redhat_driver_module_install
   changed_when: "'Nothing to do' not in dgx_redhat_driver_module_install.stdout"
-  notify: reboot after driver install
+  notify: Reboot after driver install
   when: dgx_redhat_install_driver
 
 - name: Mark Red Hat DGX driver install state for reboot handler
@@ -114,7 +114,7 @@
   dnf:
     name: docker-ce
     state: present
-    allowerasing: yes
+    allowerasing: true
   when:
     - dgx_redhat_install_container_runtime
     - dgx_redhat_install_docker_ce
@@ -123,9 +123,9 @@
   dnf:
     name: "@NVIDIA Container Runtime"
     state: present
-    allowerasing: yes
+    allowerasing: true
   notify:
-    - restart docker
+    - Restart docker
   when: dgx_redhat_install_container_runtime
 
 - name: Install Red Hat DGX optional cachefilesd configuration
@@ -141,7 +141,7 @@
   systemd:
     name: "{{ item }}"
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   loop: "{{ dgx_redhat_services + (dgx_redhat_fabricmanager_services if dgx_redhat_platform.nvswitch else []) }}"
   when: item in ansible_facts.services

@@ -7,14 +7,14 @@
 - hosts: all
   tasks:
     - name: Set facts when not using docker container runtime (default)
-      set_fact:
+      ansible.builtin.set_fact:
         deepops_gpu_operator_enabled: true
         etcd_deployment_type: host
       when:
         - container_manager is defined
         - container_manager != "docker"
     - name: Set facts when using Docker container runtime
-      set_fact:
+      ansible.builtin.set_fact:
         etcd_deployment_type: docker
         gpu_operator_default_runtime: "docker"
       when:
@@ -30,14 +30,14 @@
 - hosts: all
   gather_facts: false
   tasks:
-    - name: make sure kubespray is at the correct version
-      command: git submodule update --init
+    - name: Make sure kubespray is at the correct version
+      ansible.builtin.command: git submodule update --init
       args:
         chdir: "{{ playbook_dir | dirname }}"
       delegate_to: localhost
       run_once: true
   vars:
-    ansible_become: no
+    ansible_become: false
     ansible_connection: local
   tags:
     - local
@@ -75,13 +75,13 @@
 - hosts: all
   gather_facts: true
   tasks:
-    - name: install epel
-      package:
+    - name: Install epel
+      ansible.builtin.package:
         name: epel-release
         state: present
       when: ansible_os_family == "RedHat"
-    - name: install sshpass
-      package:
+    - name: Install sshpass
+      ansible.builtin.package:
         name: sshpass
         state: present
   environment: "{{proxy_env if proxy_env is defined else {}}}"
@@ -94,8 +94,8 @@
 - hosts: all
   gather_facts: true
   tasks:
-    - name: un-hold container runtime packages on Ubuntu
-      dpkg_selections:
+    - name: Un-hold container runtime packages on Ubuntu
+      ansible.builtin.dpkg_selections:
         name: "{{ item }}"
         selection: purge
       with_items:
@@ -106,7 +106,7 @@
       when:
         - container_manager is defined and container_manager != "docker"
         - ansible_distribution == "Ubuntu"
-      ignore_errors: yes
+      ignore_errors: true
   environment: "{{proxy_env if proxy_env is defined else {}}}"
 
 # Install Kubernetes
@@ -120,42 +120,42 @@
 - hosts: all
   become: true
   tasks:
-    - name: remove swap from fstab
-      lineinfile: path=/etc/fstab regexp='swap' state=absent
-    - name: disable swap
-      command: swapoff -a
+    - name: Remove swap from fstab
+      ansible.builtin.lineinfile: path=/etc/fstab regexp='swap' state=absent
+    - name: Disable swap
+      ansible.builtin.command: swapoff -a
   tags:
     - swap
- 
+
 # Manage Kubernetes cluster access config file
 - hosts: k8s_cluster
   gather_facts: false
   vars:
-    ansible_become: no
+    ansible_become: false
   tasks:
-    - name: create artifacts directory
-      file:
+    - name: Create artifacts directory
+      ansible.builtin.file:
         path: "{{ artifacts_dir }}"
         state: directory
       delegate_to: localhost
       run_once: true
-    - name: create kube config directory for current user
-      file:
-        path: "{{ lookup('env','HOME') + '/.kube/' }}"
+    - name: Create kube config directory for current user
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') + '/.kube/' }}"
         state: directory
       delegate_to: localhost
       run_once: true
-    - name: check for kube config file
-      stat:
+    - name: Check for kube config file
+      ansible.builtin.stat:
         path: "{{ artifacts_dir }}/admin.conf"
       register: kubeconf
       delegate_to: localhost
       run_once: true
-    - name: copy kube config file for current user
-      copy:
+    - name: Copy kube config file for current user
+      ansible.builtin.copy:
         src: "{{ artifacts_dir }}/admin.conf"
-        dest: "{{ lookup('env','HOME') + '/.kube/config' }}"
-        backup: yes
+        dest: "{{ lookup('env', 'HOME') + '/.kube/config' }}"
+        backup: true
       when: kubeconf.stat.exists
       delegate_to: localhost
       run_once: true
@@ -168,8 +168,7 @@
     hostlist: "k8s_cluster"
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled|default(true) | bool == false or
-        gpu_operator_preinstalled_nvidia_software|default(true)
+  when: deepops_gpu_operator_enabled|default(true) | bool == false or gpu_operator_preinstalled_nvidia_software|default(true)
 
 - name: Install NVIDIA container runtime on GPU servers
   import_playbook: container/nvidia-docker.yml
@@ -178,62 +177,61 @@
   tags:
     - nvidia
   when:
-    - deepops_gpu_operator_enabled|default(true) | bool == false or
-      gpu_operator_preinstalled_nvidia_software|default(true)
+    - deepops_gpu_operator_enabled|default(true) | bool == false or gpu_operator_preinstalled_nvidia_software|default(true)
     - container_manager is defined and container_manager == "docker"
 
 # Manage kubectl binary — handles cross-platform (e.g., Linux cluster → macOS controller)
 - hosts: kube_control_plane
   gather_facts: false
   vars:
-    ansible_become: no
+    ansible_become: false
   tasks:
-    - name: detect ansible host platform
-      command: uname -sm
+    - name: Detect ansible host platform
+      ansible.builtin.command: uname -sm
       register: local_uname
       delegate_to: localhost
       run_once: true
       changed_when: false
 
-    - name: detect remote platform
-      command: uname -sm
+    - name: Detect remote platform
+      ansible.builtin.command: uname -sm
       register: remote_uname
       run_once: true
       changed_when: false
 
-    - name: copy kubectl binary to ansible host (matching platform)
-      fetch:
+    - name: Copy kubectl binary to ansible host (matching platform)
+      ansible.builtin.fetch:
         src: "/usr/local/bin/kubectl"
         dest: "{{ artifacts_dir }}/kubectl"
-        flat: yes
+        flat: true
       run_once: true
       when: local_uname.stdout == remote_uname.stdout
 
-    - name: ensure fetched kubectl is executable
-      file:
+    - name: Ensure fetched kubectl is executable
+      ansible.builtin.file:
         path: "{{ artifacts_dir }}/kubectl"
-        mode: '0755'
+        mode: "0755"
       delegate_to: localhost
       run_once: true
       when: local_uname.stdout == remote_uname.stdout
 
-    - name: get kubectl version for cross-platform download
-      command: /usr/local/bin/kubectl version --client -o json
+    - name: Get kubectl version for cross-platform download
+      ansible.builtin.command: /usr/local/bin/kubectl version --client -o json
       register: kubectl_ver_json
       run_once: true
       changed_when: false
       when: local_uname.stdout != remote_uname.stdout
 
-    - name: download kubectl for ansible host platform
+    - name: Download kubectl for ansible host platform
       vars:
         kubectl_ver: "{{ (kubectl_ver_json.stdout | from_json).clientVersion.gitVersion }}"
         kubectl_os: "{{ 'darwin' if 'Darwin' in local_uname.stdout else 'linux' }}"
         kubectl_arch: "{{ 'arm64' if 'arm64' in local_uname.stdout or 'aarch64' in local_uname.stdout else 'amd64' }}"
-      get_url:
+      ansible.builtin.get_url:
         url: "https://dl.k8s.io/release/{{ kubectl_ver }}/bin/{{ kubectl_os }}/{{ kubectl_arch }}/kubectl"
         dest: "{{ artifacts_dir }}/kubectl"
-        mode: '0755'
-        force: yes
+        mode: "0755"
+        force: true
         checksum: "sha256:https://dl.k8s.io/release/{{ kubectl_ver }}/bin/{{ kubectl_os }}/{{ kubectl_arch }}/kubectl.sha256"
       environment: "{{ proxy_env if proxy_env is defined else {} }}"
       delegate_to: localhost
@@ -247,24 +245,24 @@
     config_dir: "../config"
     venv_dir: "{{ lookup('env', 'VIRTUAL_ENV') }}"
   tasks:
-    - name: check for kubectl in artifacts
-      stat:
+    - name: Check for kubectl in artifacts
+      ansible.builtin.stat:
         path: "{{ artifacts_dir }}/kubectl"
       register: kubectl_local
-      become: no
+      become: false
       delegate_to: localhost
       run_once: true
-    - name: install kubectl to virtualenv
-      copy:
+    - name: Install kubectl to virtualenv
+      ansible.builtin.copy:
         src: "{{ artifacts_dir }}/kubectl"
         dest: "{{ venv_dir }}/bin/kubectl"
-        mode: '0755'
-      become: no
+        mode: "0755"
+      become: false
       delegate_to: localhost
       run_once: true
       when: kubectl_local.stat.exists and venv_dir != ''
-    - name: kubectl location
-      debug:
+    - name: Kubectl location
+      ansible.builtin.debug:
         msg: >-
           {{ 'kubectl installed to ' ~ venv_dir ~ '/bin/kubectl'
              if venv_dir != ''
@@ -279,16 +277,16 @@
 - hosts: kube_control_plane
   gather_facts: false
   vars:
-    ansible_become: no
+    ansible_become: false
   tasks:
     - name: Install Helm on admin node
-      command: "bash {{ playbook_dir }}/../scripts/k8s/install_helm.sh"
+      ansible.builtin.command: "bash {{ playbook_dir }}/../scripts/k8s/install_helm.sh"
       delegate_to: localhost
     - name: Globally update the deprecated "stable" helm repo
-      command: "/usr/local/bin/helm repo add 'stable' 'https://charts.helm.sh/stable' --force-update"
+      ansible.builtin.command: "/usr/local/bin/helm repo add 'stable' 'https://charts.helm.sh/stable' --force-update"
       delegate_to: localhost
-    - name: kubeadm | Remove taint for master with node role
-      command: "{{ artifacts_dir }}/kubectl --kubeconfig {{ artifacts_dir }}/admin.conf taint node {{ inventory_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
+    - name: Kubeadm | Remove taint for master with node role
+      ansible.builtin.command: "{{ artifacts_dir }}/kubectl --kubeconfig {{ artifacts_dir }}/admin.conf taint node {{ inventory_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
       delegate_to: localhost
       failed_when: false # Taint will not be present if kube_control_plane also under kube_node
 

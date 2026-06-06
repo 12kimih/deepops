@@ -4,16 +4,16 @@
   register: hostname
 
 - name: check mlxconfig
-  become: yes
+  become: true
   shell: "mlxconfig query  | egrep -e Device\\|LINK_TYPE_P1\\|LINK_TYPE_P2"
   register: mlx_config
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: check ibstat
-  become: yes
+  become: true
   shell: "ibstat | egrep -e mlx\\|Link"
   register: ibstat
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: save actual hostname
   shell: echo "{{ hostname.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"

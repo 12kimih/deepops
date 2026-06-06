@@ -1,3 +1,4 @@
+---
 persistence:
   enabled: "{{ container_registry_persistence_enabled }}"
   deleteEnabled: "{{ container_registry_delete_enabled }}"

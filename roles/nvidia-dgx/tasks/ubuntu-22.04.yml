@@ -38,7 +38,7 @@
 
 - name: Update apt cache for DGX OS 6 repositories
   apt:
-    update_cache: yes
+    update_cache: true
 
 - name: Upgrade packages for DGX OS 6
   apt:
@@ -49,66 +49,66 @@
   apt:
     name: "{{ dgx_os6_platform.config_packages + dgx_os6_common_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Install DGX OS 6 NVIDIA driver packages
   apt:
     name: "{{ dgx_os6_driver_packages + (dgx_os6_fabricmanager_packages if dgx_os6_platform.nvswitch else []) }}"
     state: present
-    update_cache: yes
+    update_cache: true
   register: install_driver
-  notify: reboot after driver install
+  notify: Reboot after driver install
   when: dgx_os6_install_driver
 
 - name: Install DGX OS 6 Docker and NVIDIA container toolkit
   apt:
     name: "{{ dgx_os6_container_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
   notify:
-    - restart docker
+    - Restart docker
   when: dgx_os6_install_container_runtime
 
 - name: Install DGX OS 6 NVSM packages
   apt:
     name: "{{ dgx_os6_nvsm_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
   when: dgx_os6_install_nvsm
 
 - name: Install additional DGX OS 6 administration packages
   apt:
     name: "{{ dgx_os6_admin_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
   when: dgx_os6_install_admin_packages
 
 - name: Install additional DGX OS 6 development packages
   apt:
     name: "{{ dgx_os6_development_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
   when: dgx_os6_install_development_packages
 
 - name: Disable unattended upgrades for DGX OS 6
   apt:
     name: unattended-upgrades
     state: absent
-    purge: yes
+    purge: true
   when: dgx_os6_disable_unattended_upgrades
 
 - name: Install DGX OS 6 serial-over-LAN console package
   apt:
     name: nvidia-ipmisol
     state: present
-    update_cache: yes
+    update_cache: true
   when: dgx_os6_install_ipmisol
 
 - name: Install DGX OS 6 logrotate package
   apt:
     name: nvidia-logrotate
     state: present
-    update_cache: yes
+    update_cache: true
   when: dgx_os6_install_logrotate
 
 - name: Populate DGX OS 6 service facts
@@ -118,7 +118,7 @@
   systemd:
     name: "{{ item }}"
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   loop: "{{ dgx_os6_services }}"
   when: item in ansible_facts.services

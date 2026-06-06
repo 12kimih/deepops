@@ -2,11 +2,11 @@
 - hosts: all
   become: true
   tasks:
-    - name: install xfsprogs for ceph/rook
-      package:
+    - name: Install xfsprogs for ceph/rook
+      ansible.builtin.package:
         name: xfsprogs
         state: present
-    - name: install python3-setuptools for ceph/rook
-      package:
+    - name: Install python3-setuptools for ceph/rook
+      ansible.builtin.package:
         name: python3-setuptools
         state: present
