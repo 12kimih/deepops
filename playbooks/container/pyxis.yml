@@ -21,10 +21,12 @@
         enroot_environ_config_files: "{{ enroot_environ_config_files_dgx }}"
       when: ansible_product_name is search("DGX")
 
-- hosts: slurm-node
+# enroot and pyxis are installed on both login (slurm-master) and compute
+# (slurm-node) hosts so containers can be imported and launched from either.
+- hosts: slurm-cluster
   become: true
   roles:
-    - name: nvidia.enroot
+    - name: enroot
 
 - hosts: slurm-cluster
   become: true
