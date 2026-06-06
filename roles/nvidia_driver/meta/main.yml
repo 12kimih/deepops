@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: nvidia_driver
+  author: DeepOps
+  description: Install the NVIDIA data-center GPU driver (open kernel modules by default)
+  license: BSD-3-Clause
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - nvidia
+    - gpu
+    - driver
+dependencies: []

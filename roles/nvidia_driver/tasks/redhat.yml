@@ -1,0 +1,72 @@
+---
+# RHEL/Rocky: install the driver from NVIDIA's cuda-rhel repository using dnf
+# module streams. The "-open" stream + the nvidia-open meta installs the open
+# kernel modules; "-dkms" + cuda-drivers installs the proprietary modules.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/red-hat-enterprise-linux.html
+- name: Determine the NVIDIA driver module stream and package (RHEL/Rocky)
+  ansible.builtin.set_fact:
+    nvidia_driver_rhel_stream_resolved: >-
+      {{ nvidia_driver_rhel_module_stream if (nvidia_driver_rhel_module_stream | default('') | length > 0)
+         else 'nvidia-driver:' ~ nvidia_driver_branch
+              ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '-dkms') }}
+    nvidia_driver_rhel_package_resolved: >-
+      {{ nvidia_driver_rhel_package if (nvidia_driver_rhel_package | default('') | length > 0)
+         else ('nvidia-open' if (nvidia_driver_kernel_modules == 'open') else 'cuda-drivers') }}
+
+- name: Add the NVIDIA CUDA repository (RHEL/Rocky)
+  ansible.builtin.get_url:
+    url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel{{ ansible_distribution_major_version }}/{{ nvidia_driver_rhel_arch }}/cuda-rhel{{ ansible_distribution_major_version
+      }}.repo"
+    dest: "/etc/yum.repos.d/cuda-rhel{{ ansible_distribution_major_version }}.repo"
+    mode: "0644"
+
+# CodeReady Builder / CRB provides build deps (e.g. dkms). On Rocky/Alma this is
+# enabled with dnf config-manager; on RHEL proper it is the codeready-builder
+# repo enabled via subscription-manager (override nvidia_driver_rhel_crb_repo).
+- name: Enable the CodeReady Builder (CRB) repository (RHEL/Rocky)
+  ansible.builtin.command:
+    cmd: "dnf config-manager --set-enabled {{ nvidia_driver_rhel_crb_repo }}"
+  changed_when: false
+
+- name: Install matching kernel headers and development packages (RHEL/Rocky)
+  ansible.builtin.dnf:
+    name:
+      - "kernel-devel-{{ ansible_kernel }}"
+      - "kernel-headers-{{ ansible_kernel }}"
+    state: present
+
+- name: Find pre-existing NVIDIA driver packages (RHEL/Rocky)
+  ansible.builtin.shell:
+    cmd: >-
+      rpm -qa --qf '%{NAME}\n' 'nvidia-*' 'kmod-nvidia-*' 'cuda-drivers*' 2>/dev/null
+      | grep -vE 'container' || true
+  register: nvidia_driver_existing_packages
+  changed_when: false
+  check_mode: false
+  when: nvidia_driver_purge_existing | bool
+
+- name: Purge pre-existing NVIDIA driver packages (RHEL/Rocky)
+  ansible.builtin.dnf:
+    name: "{{ nvidia_driver_existing_packages.stdout_lines }}"
+    state: absent
+    autoremove: true
+  when:
+    - nvidia_driver_purge_existing | bool
+    - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
+
+- name: Reset the NVIDIA driver dnf module (RHEL/Rocky)
+  ansible.builtin.command:
+    cmd: "dnf -y module reset nvidia-driver"
+  changed_when: false
+  when: nvidia_driver_purge_existing | bool
+
+- name: Enable the NVIDIA driver dnf module stream (RHEL/Rocky)
+  ansible.builtin.command:
+    cmd: "dnf -y module enable {{ nvidia_driver_rhel_stream_resolved }}"
+  changed_when: false
+
+- name: Install the NVIDIA driver (RHEL/Rocky)
+  ansible.builtin.dnf:
+    name: "{{ nvidia_driver_rhel_package_resolved }}"
+    state: present
+  register: nvidia_driver_install

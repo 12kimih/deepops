@@ -1,0 +1,65 @@
+---
+# In-tree NVIDIA data-center driver role.
+#
+# Installs the driver from the single official meta-package per OS, using the
+# open kernel modules by default. This replaces the nvidia.nvidia_driver Galaxy
+# role, whose per-package apt loop and mixed dkms + no-dkms package list produced
+# a non-functional driver (nvidia-smi could not communicate with the module) and
+# which had no open-module support on RHEL/Rocky.
+#
+# References:
+#   Open vs proprietary modules (open is the NVIDIA default since the 560 series,
+#   recommended for Turing and newer):
+#     https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/kernel-modules.html
+#   Ubuntu packaged "-server" / "-server-open" meta-packages:
+#     https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
+#   RHEL/Rocky dnf module streams (nvidia-driver:<branch>-open + nvidia-open):
+#     https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/red-hat-enterprise-linux.html
+
+# --- Package selection -------------------------------------------------------
+# The effective package is built from the toggles below, OR you can override it
+# completely with nvidia_driver_package (Ubuntu) / nvidia_driver_rhel_package
+# (RHEL/Rocky) for any combination not covered by the toggles.
+
+# Driver branch to install (e.g. "580", "575"). Open modules require Turing+.
+nvidia_driver_branch: "580"
+
+# Kernel module flavor: "open" (default, Turing and newer; adds the "-open"
+# suffix / "-open" dnf stream) or "proprietary" (omits it).
+nvidia_driver_kernel_modules: "open"
+
+# Ubuntu only: use the data-center "Enterprise Ready" branch (adds the "-server"
+# suffix). Set false for the desktop/latest branch (no "-server" suffix).
+nvidia_driver_server_branch: true
+
+# Full override of the exact package name. Leave empty ("") to construct it from
+# the toggles above. Examples:
+#   "nvidia-driver-580-server-open"  (default: data-center, open kernel modules)
+#   "nvidia-driver-580"              (desktop, proprietary)
+#   "nvidia-driver-570-open"         (desktop, open)
+#   "nvidia-driver-535-server"       (data-center, proprietary)
+nvidia_driver_package: ""
+
+# RHEL/Rocky override of the dnf module stream and meta-package. Leave empty to
+# construct from the toggles, e.g. stream "nvidia-driver:580-open" + package
+# "nvidia-open" (open), or "nvidia-driver:580-dkms" + "cuda-drivers" (proprietary).
+nvidia_driver_rhel_module_stream: ""
+nvidia_driver_rhel_package: ""
+
+# Purge any pre-existing NVIDIA driver packages before installing. This avoids
+# the broken mixed-package state that prevents the kernel module from building.
+# Container Toolkit packages (libnvidia-container*, nvidia-container-toolkit*)
+# are deliberately excluded from the purge.
+nvidia_driver_purge_existing: true
+
+# Reboot after a driver change (required to load the new kernel module).
+nvidia_driver_reboot: true
+nvidia_driver_reboot_timeout: 600
+
+# Run `nvidia-smi` after install to verify the driver loaded.
+nvidia_driver_verify: true
+
+# RHEL/Rocky: repo architecture directory ("sbsa" for aarch64) and the
+# CodeReady Builder / CRB repository name (powertools on EL8, crb on EL9+).
+nvidia_driver_rhel_arch: "{{ 'sbsa' if ansible_architecture == 'aarch64' else ansible_architecture }}"
+nvidia_driver_rhel_crb_repo: "{{ 'powertools' if ansible_distribution_major_version | int == 8 else 'crb' }}"

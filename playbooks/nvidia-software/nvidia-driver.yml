@@ -2,31 +2,24 @@
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   tags:
-  - nvidia
-  - nvidia_driver
+    - nvidia
+    - nvidia_driver
   tasks:
     - name: Check for DGX packages
-      stat:
+      ansible.builtin.stat:
         path: /etc/dgx-release
       register: is_dgx
 
-    - name: install custom facts
-      include_role:
+    - name: Install custom facts
+      ansible.builtin.include_role:
         name: facts
 
-    - name: configure Ubuntu NVIDIA driver packages
-      include_tasks: tasks/nvidia-driver-ubuntu-packages.yml
-      when: ansible_distribution == 'Ubuntu'
-
-    - name: install nvidia driver
-      include_role:
-        name: nvidia.nvidia_driver
-      when: (ansible_local['gpus']['count'] and is_dgx.stat.exists == False) or (nvidia_driver_force_install|default(false))
-
-    - name: test nvidia-smi
-      command: nvidia-smi
-      changed_when: false
-      when:
-        - ansible_local['gpus']['count']
-        - is_dgx.stat.exists == False
-  environment: "{{proxy_env if proxy_env is defined else{}}}"
+    # DGX systems ship their own driver stack (see the nvidia-dgx role), so the
+    # driver is only installed on non-DGX hosts that have GPUs (or when forced).
+    - name: Install the NVIDIA driver
+      ansible.builtin.include_role:
+        name: nvidia_driver
+      when: >-
+        (ansible_local['gpus']['count'] | int > 0 and not is_dgx.stat.exists)
+        or (nvidia_driver_force_install | default(false) | bool)
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
