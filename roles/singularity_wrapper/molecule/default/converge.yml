@@ -3,5 +3,5 @@
   hosts: all
   tasks:
     - name: "Include singularity_wrapper"
-      include_role:
+      ansible.builtin.include_role:
         name: "singularity_wrapper"

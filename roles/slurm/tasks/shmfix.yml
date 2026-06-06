@@ -1,8 +1,7 @@
 ---
-
 - name: Fix RemoveIPC
-  lineinfile:
+  ansible.builtin.lineinfile:
     dest: /etc/systemd/logind.conf
-    regexp: '^#RemoveIPC=yes'
-    line: 'RemoveIPC=no'
-  notify: "restart logind"
+    regexp: "^#RemoveIPC=yes"
+    line: "RemoveIPC=no"
+  notify: "Restart logind"

@@ -1,11 +1,11 @@
 ---
-- name: restart slurm-exporter
-  service:
+- name: Restart slurm-exporter
+  ansible.builtin.service:
     name: "{{ slurm_exporter_svc_name }}"
     state: restarted
 
-- name: restart grafana
-  service:
+- name: Restart grafana
+  ansible.builtin.service:
     name: "{{ grafana_svc_name }}"
     state: restarted
   failed_when: false

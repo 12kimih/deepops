@@ -1,13 +1,13 @@
 ---
 # set gpu clocks on all worker nodes
 - hosts: all
-  gather_facts: no
-  become: yes
+  gather_facts: false
+  become: true
   tasks:
-    - name: set the gpu clock to a specified amount
-      shell: "nvidia-smi -lgc {{ gpu_clock_lock }}"
+    - name: Set the gpu clock to a specified amount
+      ansible.builtin.shell: "nvidia-smi -lgc {{ gpu_clock_lock }}"
       when: not gpu_clock_reset
 
-    - name: reset the gpu clock to the default
-      shell: "nvidia-smi -rgc"
+    - name: Reset the gpu clock to the default
+      ansible.builtin.shell: "nvidia-smi -rgc"
       when: gpu_clock_reset

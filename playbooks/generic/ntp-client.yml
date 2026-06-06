@@ -3,5 +3,5 @@
   become: true
   tasks:
     - name: Configure NTP client
-      include_role:
+      ansible.builtin.include_role:
         name: geerlingguy.ntp

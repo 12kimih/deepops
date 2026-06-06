@@ -2,22 +2,22 @@
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   tags:
-  - nvidia
-  - nvidia_docker
+    - nvidia
+    - nvidia_docker
   tasks:
-    - name: install custom facts module
-      include_role:
+    - name: Install custom facts module
+      ansible.builtin.include_role:
         name: facts
       when: docker_install | default('yes')
 
-    - name: remove docker overrides, specifically to deal with conflicting options from DGX OS
-      file:
+    - name: Remove docker overrides, specifically to deal with conflicting options from DGX OS
+      ansible.builtin.file:
         path: /etc/systemd/system/docker.service.d/docker-override.conf
         state: absent
       when: docker_install | default('yes')
 
-    - name: install NVIDIA Container Toolkit on current OS releases
-      include_role:
+    - name: Install NVIDIA Container Toolkit on current OS releases
+      ansible.builtin.include_role:
         name: nvidia_container_toolkit
       when:
         - ansible_local['gpus']['count']
@@ -27,8 +27,8 @@
           (ansible_os_family == "RedHat" and ansible_distribution_major_version is version('8', '>='))
         - docker_install | default('yes')
 
-    - name: install nvidia-docker
-      include_role:
+    - name: Install nvidia-docker
+      ansible.builtin.include_role:
         name: nvidia.nvidia_docker
       when:
         - ansible_local['gpus']['count'] and (ansible_distribution == "Ubuntu" or ansible_os_family == "RedHat")

@@ -1,8 +1,8 @@
 ---
 - name: Set up Ubuntu client
-  include_tasks: client-ubuntu.yml
+  ansible.builtin.include_tasks: client-ubuntu.yml
   when: ansible_distribution == 'Ubuntu'
 
 - name: Set up RHEL client
-  include_tasks: client-el.yml
+  ansible.builtin.include_tasks: client-el.yml
   when: ansible_os_family == 'RedHat'

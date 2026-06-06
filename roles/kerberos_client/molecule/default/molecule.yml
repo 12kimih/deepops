@@ -12,7 +12,7 @@ platforms:
 provisioner:
   name: ansible
   ansible_args:
-  - -vv
+    - -vv
   inventory:
     group_vars:
       all:

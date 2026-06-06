@@ -1,0 +1,54 @@
+---
+# pre-commit configuration for DeepOps
+# https://pre-commit.com
+#
+# One-time setup:
+#   pip install pre-commit
+#   pre-commit install
+# Run against the whole tree:
+#   pre-commit run --all-files
+minimum_pre_commit_version: "3.5.0"
+
+# Vendored / generated / site-specific trees are never linted here.
+exclude: |
+  (?x)^(
+    submodules/|
+    roles/galaxy/|
+    collections/|
+    config/|
+    .*/templates/.*
+  )
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+        exclude: '(\.j2$|/templates/)'
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        # Uses the project .yamllint; fails only on error-level rules.
+
+  # ansible-lint is pinned to the same versions as the CI job so local and CI
+  # results match. Runs once over the project (config-driven, see .ansible-lint).
+  - repo: local
+    hooks:
+      - id: ansible-lint
+        name: ansible-lint
+        entry: ansible-lint
+        language: python
+        additional_dependencies:
+          - "ansible-lint==26.1.1"
+          - "ansible==10.7.0"
+        pass_filenames: false
+        always_run: true

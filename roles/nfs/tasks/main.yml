@@ -1,52 +1,52 @@
 ---
-- name: gather os specific variables
-  include_vars: "{{ item }}"
+- name: Gather os specific variables
+  ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
-      - "{{ ansible_distribution|lower }}.yml"
-      - "{{ ansible_os_family|lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
       paths:
-      - ../vars
+        - ../vars
       skip: true
   tags:
     - vars
     - nfs
 
-- name: install ubuntu packages
-  apt:
+- name: Install ubuntu packages
+  ansible.builtin.apt:
     name: nfs-common
     state: present
   when: ansible_os_family == "Debian"
   tags:
     - nfs
 
-- name: install rhel packages
-  yum:
+- name: Install rhel packages
+  ansible.builtin.dnf:
     name: nfs-utils
     state: present
   when: ansible_os_family == "RedHat"
   tags:
     - nfs
 
-- name: configure idmapd domain for nfsv4
-  lineinfile:
+- name: Configure idmapd domain for nfsv4
+  ansible.builtin.lineinfile:
     dest: /etc/idmapd.conf
     regexp: "^Domain"
     insertafter: "^# Domain"
     line: "Domain = {{ nfs_idmapd_domain }}"
-    backup: yes
+    backup: true
   when: nfs_idmapd_domain is defined
   tags:
     - nfs
 
-- name: setup server
-  include_tasks: server.yml
+- name: Setup server
+  ansible.builtin.include_tasks: server.yml
   when: nfs_is_server
 
-- name: setup firewall
-  include_tasks: firewall.yml
+- name: Setup firewall
+  ansible.builtin.include_tasks: firewall.yml
   when: nfs_is_server
 
-- name: setup client
-  include_tasks: client.yml
+- name: Setup client
+  ansible.builtin.include_tasks: client.yml
   when: nfs_is_client

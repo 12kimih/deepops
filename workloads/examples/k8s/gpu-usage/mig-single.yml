@@ -1,3 +1,4 @@
+---
 # This yaml file will launch a container with a 1g.5gb MIG device
 # It will only deploy onto a node containing A100 40B GPUs
 # The node must be configured in mig-strategy=single mode with all 1g.5gb profiles created

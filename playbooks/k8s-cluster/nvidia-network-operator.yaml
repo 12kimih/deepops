@@ -5,6 +5,6 @@
   become: true
   become_method: sudo
   tasks:
-    - include_role:
+    - ansible.builtin.include_role:
         name: nvidia-network-operator
         tasks_from: main

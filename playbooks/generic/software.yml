@@ -2,14 +2,14 @@
 - hosts: all
   become: true
   tasks:
-    - name: remove old/undesirable packages
-      package:
+    - name: Remove old/undesirable packages
+      ansible.builtin.package:
         name: "{{ software_remove_packages }}"
         state: absent
       when: software_remove_packages is defined
 
-    - name: install extra packages
-      package:
+    - name: Install extra packages
+      ansible.builtin.package:
         name: "{{ software_extra_packages }}"
         state: present
       when: software_extra_packages is defined

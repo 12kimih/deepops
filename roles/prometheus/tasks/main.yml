@@ -1,62 +1,62 @@
 ---
-- name: create config dir
-  file:
+- name: Create config dir
+  ansible.builtin.file:
     path: "{{ prometheus_config_dir }}"
     state: directory
     mode: "0755"
 
-- name: create endpoints config dir
-  file:
+- name: Create endpoints config dir
+  ansible.builtin.file:
     path: "{{ prometheus_cfg_endpoint_dir }}"
     state: directory
     mode: "0755"
 
-- name: create alarm rules dir
-  file:
+- name: Create alarm rules dir
+  ansible.builtin.file:
     path: "{{ prometheus_config_dir }}/rules"
     state: directory
     mode: "0755"
 
-- name: install alarm rules file
-  template:
+- name: Install alarm rules file
+  ansible.builtin.template:
     src: "{{ prometheus_alert_rules_src }}"
     dest: "{{ prometheus_config_dir }}/rules/alert_rules.yml"
     owner: root
     group: root
-    mode: 0644
+    mode: "0644"
 
-- name: install config file
-  template:
+- name: Install config file
+  ansible.builtin.template:
     src: "{{ prometheus_config_src }}"
     dest: "{{ prometheus_config_dir }}/prometheus.yml"
     owner: root
     group: root
-    mode: 0644
-  notify: restart prometheus
+    mode: "0644"
+  notify: Restart prometheus
 
-- name: install python3 docker module
-  package:
+- name: Install python3 docker module
+  ansible.builtin.package:
     name: python3-docker
     state: present
 
-- name: create a persistent docker volume for metrics
-  docker_volume:
+- name: Create a persistent docker volume for metrics
+  community.docker.docker_volume:
     name: "{{ prometheus_docker_volume_name }}"
     state: "present"
 
-- name: install systemd unit file
-  template:
+- name: Install systemd unit file
+  ansible.builtin.template:
     src: templates/docker.prometheus.service.j2
     dest: "/etc/systemd/system/{{ prometheus_svc_name }}"
     owner: root
     group: root
-    mode: 0644
-  notify: restart prometheus
+    mode: "0644"
+  notify: Restart prometheus
 
-- name: configure service
-  systemd:
+- name: Configure service
+  ansible.builtin.systemd:
     name: "{{ prometheus_svc_name }}"
     state: "{{ prometheus_state }}"
     enabled: "{{ prometheus_enabled }}"
-    daemon_reload: yes
-  notify: restart prometheus
+    daemon_reload: true
+  notify: Restart prometheus

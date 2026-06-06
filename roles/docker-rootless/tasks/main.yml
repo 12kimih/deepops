@@ -1,85 +1,84 @@
 ---
-
-- name: install dependencies (ubuntu)
-  apt:
+- name: Install dependencies (ubuntu)
+  ansible.builtin.apt:
     name:
-    - "uidmap"
+      - "uidmap"
     state: present
   when: ansible_distribution == "Ubuntu"
 
-- name: install dependencies (Red Hat)
-  yum:
+- name: Install dependencies (Red Hat)
+  ansible.builtin.dnf:
     name:
-    - "shadow-utils"
-    - "fuse-overlayfs"
+      - "shadow-utils"
+      - "fuse-overlayfs"
     state: present
   when: ansible_os_family == "RedHat"
 
 - name: Ensure directory structure exists
-  file:
-    path: '{{ rootlessdocker_install_dir }}/{{ item.path }}'
-    owner: 'root'
-    group: 'root'
+  ansible.builtin.file:
+    path: "{{ rootlessdocker_install_dir }}/{{ item.path }}"
+    owner: "root"
+    group: "root"
     state: directory
-    mode: '0755'
-  with_filetree: '{{ role_path }}/templates/rootless-docker'
+    mode: "0755"
+  with_filetree: "{{ role_path }}/templates/rootless-docker"
   when: item.state == 'directory'
 
 - name: Copy over templates.
-  template:
-    src: '{{ item.src }}'
-    dest: '{{ rootlessdocker_install_dir }}/{{ item.path }}'
-    owner: 'root'
-    group: 'root'
-    mode: '{{ item.mode }}'
-    force: no
-  with_filetree: '{{ role_path }}/templates/rootless-docker'
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ rootlessdocker_install_dir }}/{{ item.path }}"
+    owner: "root"
+    group: "root"
+    mode: "{{ item.mode }}"
+    force: false
+  with_filetree: "{{ role_path }}/templates/rootless-docker"
   when: item.state == 'file'
 
-- name: add rootless docker profile script to source modules
-  template:
-    src: '{{ item }}'
-    dest: '/etc/profile.d/{{ item }}'
-    owner: 'root'
-    group: 'root'
-    mode: '0644'
-    force: no
+- name: Add rootless docker profile script to source modules
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/profile.d/{{ item }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    force: false
   with_items:
-  - 'z96_rootlessdocker_modules.sh'
+    - "z96_rootlessdocker_modules.sh"
 
-- name: check if rootless docker already installed successfully
-  stat: 
-    path: '{{ rootlessdocker_install_dir }}/config/install_success'
+- name: Check if rootless docker already installed successfully
+  ansible.builtin.stat:
+    path: "{{ rootlessdocker_install_dir }}/config/install_success"
   register: rootless_docker_installed
 
 - name: Template setup rootless docker script
-  template:
-    src: '{{ role_path }}/templates/rootless_docker_setup.sh.j2'
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/rootless_docker_setup.sh.j2"
     dest: /tmp/rootless_docker_setup.sh
-    mode: 0755
+    mode: "0755"
   when: not rootless_docker_installed.stat.exists
 
 - name: Execute setup rootless docker script
   become: true
-  command: /tmp/rootless_docker_setup.sh
+  ansible.builtin.command: /tmp/rootless_docker_setup.sh
   args:
     executable: /bin/bash
-    creates: '{{ rootlessdocker_install_dir }}/config/install_success'
+    creates: "{{ rootlessdocker_install_dir }}/config/install_success"
 
 - name: Clean up rootless docker set script
-  file:
+  ansible.builtin.file:
     path: /tmp/rootless_docker_setup.sh
     state: absent
 
 - name: Add the br_netfilter module
-  modprobe:
+  community.general.modprobe:
     name: br_netfilter
     state: present
 
 - name: Load br_netfilter module at boot
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/modules
-    create: yes
+    create: true
     line: "br_netfilter"
     owner: "root"
     group: "root"

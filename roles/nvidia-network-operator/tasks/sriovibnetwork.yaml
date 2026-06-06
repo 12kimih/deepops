@@ -1,6 +1,6 @@
 ---
-## This example configures the IB interfaces used by the K8s cluster.
-##
+# # This example configures the IB interfaces used by the K8s cluster.
+# #
 - name: Create sriov network definition
   vars:
     spec_yaml: |
@@ -12,7 +12,7 @@
           "type": "{{ nvidia_network_operator_ipam_type }}",
           "poolName": "{{ item.ip_pool_name | default(item.res_name) }}"
         }
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: sriovnetwork.openshift.io/v1

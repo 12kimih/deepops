@@ -15,7 +15,7 @@
     src: parse_manifest.py
     dest: "{{ fw_dir }}/parse_manifest.py"
     mode: '0644'
-    force: yes
+    force: true
 
 - block:
   # Run some pre-flight diagnostics pre-firmware update in case things go wrong
@@ -34,7 +34,7 @@
   - name: stop system services
     systemd:
       state: stopped
-      enabled: no
+      enabled: false
       name: "{{ item }}"
     with_items: "{{ nv_services }}"
     when: update_firmware

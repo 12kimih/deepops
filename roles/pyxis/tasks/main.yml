@@ -1,42 +1,42 @@
 ---
-- name: install dependencies (Ubuntu)
-  apt:
+- name: Install dependencies (Ubuntu)
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   with_items: "{{ pyxis_ubuntu_deps }}"
   when: ansible_distribution == "Ubuntu"
 
-- name: install dependencies (EL)
-  package:
+- name: Install dependencies (EL)
+  ansible.builtin.package:
     name: "{{ item }}"
     state: present
   with_items: "{{ pyxis_el_deps }}"
   when: ansible_os_family == "RedHat"
 
-- name: install slurm-pmi hook
-  file:
+- name: Install slurm-pmi hook
+  ansible.builtin.file:
     path: /etc/enroot/hooks.d/50-slurm-pmi.sh
     state: link
     src: /usr/share/enroot/hooks.d/50-slurm-pmi.sh
   when: is_compute
 
-- name: install slurm-pytorch hook
-  file:
+- name: Install slurm-pytorch hook
+  ansible.builtin.file:
     path: /etc/enroot/hooks.d/50-slurm-pytorch.sh
     state: link
     src: /usr/share/enroot/hooks.d/50-slurm-pytorch.sh
   when: is_compute
 
-- name: pyxis tasks
-  include_tasks: pyxis.yml
+- name: Pyxis tasks
+  ansible.builtin.include_tasks: pyxis.yml
   when: slurm_install_pyxis
   tags: pyxis
 
 # Resize /run temporary file system, which is used to import docker image.
 #  - Default pyxis runtime_path is: /run/pyxis
 # If image is bigger than the file system, the importing will be failed
-- name: resize /run partition
-  mount:
+- name: Resize /run partition
+  ansible.posix.mount:
     name: /run
     src: tmpfs
     opts: size={{ pyxis_run_tmpfs_size }}

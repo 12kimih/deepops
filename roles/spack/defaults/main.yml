@@ -6,19 +6,19 @@ spack_user: "root"
 spack_group: "root"
 
 spack_ubuntu_deps:
-- "gcc"
-- "gfortran"
-- "make"
-- "git"
+  - "gcc"
+  - "gfortran"
+  - "make"
+  - "git"
 
 spack_redhat_deps:
-- "gcc"
-- "gcc-c++"
-- "gcc-gfortran"
-- "make"
-- "git"
+  - "gcc"
+  - "gcc-c++"
+  - "gcc-gfortran"
+  - "make"
+  - "git"
 
 spack_build_packages: false
 spack_default_packages:
-- "cuda@10.2.89"
-- "openmpi@3.1.6 +cuda +pmi schedulers=auto"
+  - "cuda@10.2.89"
+  - "openmpi@3.1.6 +cuda +pmi schedulers=auto"

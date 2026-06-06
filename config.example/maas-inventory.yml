@@ -1,3 +1,4 @@
+---
 # MAAS Dynamic Inventory Configuration
 #
 # This file is copied to config/maas-inventory.yml by scripts/setup.sh.

@@ -6,16 +6,16 @@
   tags:
     - roce_k8s
 
-- name: check for module openshift
+- name: Check for module openshift
   python_requirements_facts:
     dependencies:
       - openshift
   tags:
     - roce_k8s
 
-#Create configmap for SRIOV device plugin    
+#Create configmap for SRIOV device plugin
 
-- name: create configmap
+- name: Create configmap
   k8s:
     state: present
     definition:
@@ -35,7 +35,7 @@
 - name: Install Universal SR-IOV device plugin
   k8s:
     state: present
-    definition: "{{ lookup('url', '{{ sriov_dp_ds }}', split_lines=False ) }}"
+    definition: "{{ lookup('url', '{{ sriov_dp_ds }}', split_lines=False) }}"
   run_once: true
   tags:
     - roce_k8s
@@ -88,5 +88,3 @@
   run_once: true
   tags:
     - roce_k8s
-
-

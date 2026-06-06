@@ -4,11 +4,11 @@ ood_config_dir: /etc/ood/config
 ood_base_dir: /opt/ood
 
 # Cluster configuration
-ood_cluster_config_dir: '{{ ood_config_dir }}/clusters.d'
+ood_cluster_config_dir: "{{ ood_config_dir }}/clusters.d"
 ood_cluster_title: "NVIDIA DeepOps Cluster"
-ood_cluster_name: "deepops"         # has to match Slurm cluster name
+ood_cluster_name: "deepops" # has to match Slurm cluster name
 ood_default_password: "deepops"
-ood_install_linuxhost_adapter: yes
+ood_install_linuxhost_adapter: true
 
 ood_build_dir: "/tmp/ood-build"
 ood_source_dir: "{{ ood_build_dir }}/ondemand"
@@ -21,7 +21,7 @@ ood_install_apps:
     version: gtc
 
 # OOD front page config
-ood_frontpage_config : |
+ood_frontpage_config: |
   pun_custom_env:
     OOD_DASHBOARD_TITLE: "NVIDIA DeepOps Cluster"
     OOD_BRAND_BG_COLOR: "#76B900"
@@ -80,5 +80,5 @@ ood_linuxhost_adapter_config: |
 ###
 ood_url_codeserver_src: https://github.com/cdr/code-server/releases/download/2.1698/code-server2.1698-vsc1.41.1-linux-x86_64.tar.gz
 
-ood_is_server: no
-ood_is_client: no
+ood_is_server: false
+ood_is_client: false

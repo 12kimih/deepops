@@ -1,3 +1,4 @@
+---
 # kubectl apply -f tests/nbody.yml
 # kubectl scale deploy/cuda-nbody --replicas=2
 apiVersion: apps/v1

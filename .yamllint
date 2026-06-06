@@ -1,0 +1,69 @@
+---
+# yamllint configuration for DeepOps
+# https://yamllint.readthedocs.io/en/stable/configuration.html
+#
+# Philosophy: enforce objective hygiene rules as errors (these are auto-fixed
+# and kept clean), and treat subjective style rules (line length, sequence
+# indentation, comment formatting) as warnings so they guide without blocking
+# CI. ansible-lint also auto-discovers this file and uses it for its `yaml`
+# rule, so the two tools stay consistent.
+
+extends: default
+
+# Jinja2 / Helm chart templates under any templates/ dir are not valid
+# standalone YAML, so they are excluded from linting.
+ignore: |
+  /submodules/
+  /roles/galaxy/
+  /.venv/
+  /collections/
+  **/templates/**
+
+rules:
+  # --- Errors: objective hygiene, kept at zero -----------------------------
+  trailing-spaces: enable
+  new-line-at-end-of-file: enable
+  new-lines:
+    type: unix
+  key-duplicates: enable
+  document-start:
+    present: true
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  # Booleans must be true/false (not yes/no/on/off). check-keys is disabled so
+  # the GitHub Actions `on:` key is not flagged.
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+
+  # --- Warnings: subjective style, advisory only ---------------------------
+  line-length:
+    max: 160
+    level: warning
+  # Ansible YAML legitimately mixes block- and flow-style sequence indentation;
+  # require consistency within a block rather than a single global style.
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+    level: warning
+  comments:
+    min-spaces-from-content: 1
+    require-starting-space: true
+    level: warning
+  # ansible-lint requires comments-indentation disabled for compatibility with
+  # its `yaml` rule, so leave it off here too.
+  comments-indentation: false
+  empty-lines:
+    max: 2
+    level: warning
+  braces:
+    max-spaces-inside: 1
+    level: warning
+  brackets:
+    max-spaces-inside: 1
+    level: warning
+  colons:
+    level: warning
+  commas:
+    level: warning

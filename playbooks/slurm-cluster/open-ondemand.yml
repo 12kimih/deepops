@@ -1,10 +1,10 @@
 ---
 - hosts: slurm-master[0]
-  become: yes
+  become: true
   roles:
-    - {role: ood-wrapper, ood_is_server: yes }
+    - { role: ood-wrapper, ood_is_server: true }
 
 - hosts: slurm-node
-  become: yes
+  become: true
   roles:
-    - {role: ood-wrapper, ood_is_client: yes }
+    - { role: ood-wrapper, ood_is_client: true }

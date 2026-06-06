@@ -1,53 +1,53 @@
 ---
-- name: ensure development tools are installed (Ubuntu)
-  apt:
-    update_cache: yes
+- name: Ensure development tools are installed (Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
     name: "{{ item }}"
     state: "present"
   with_items: "{{ spack_ubuntu_deps }}"
   when: ansible_distribution == "Ubuntu"
 
-- name: ensure development tools are installed (Red Hat)
-  package:
+- name: Ensure development tools are installed (Red Hat)
+  ansible.builtin.package:
     name: "{{ item }}"
     state: "present"
   with_items: "{{ spack_redhat_deps }}"
   when: ansible_os_family == "RedHat"
 
-- name: ensure install directory exists
-  file:
+- name: Ensure install directory exists
+  ansible.builtin.file:
     path: "{{ spack_install_dir }}"
     owner: "{{ spack_user }}"
     group: "{{ spack_group }}"
     mode: "0755"
     state: "directory"
 
-- name: clone spack repository
-  git:
+- name: Clone spack repository
+  ansible.builtin.git:
     repo: "{{ spack_repo }}"
     dest: "{{ spack_install_dir }}"
     version: "{{ spack_version }}"
 
-- name: set up spack profile scripts
-  template:
+- name: Set up spack profile scripts
+  ansible.builtin.template:
     src: "{{ item }}"
     dest: "/etc/profile.d/{{ item }}"
     owner: "root"
     group: "root"
     mode: "0755"
   with_items:
-  - "z00_spack.sh"
-  - "z00_spack.csh"
+    - "z00_spack.sh"
+    - "z00_spack.csh"
 
-- name: source spack environment once for initialization
-  shell: |
-      . /etc/profile.d/z00_spack.sh
+- name: Source spack environment once for initialization
+  ansible.builtin.shell: |
+    . /etc/profile.d/z00_spack.sh
   register: source_spack_env
   changed_when: source_spack_env.rc != 0
 
-- name: build spack packages
-  shell: |
-      . /etc/profile.d/z00_spack.sh &&
-      spack install {{ item }}
+- name: Build spack packages
+  ansible.builtin.shell: |
+    . /etc/profile.d/z00_spack.sh &&
+    spack install {{ item }}
   with_items: "{{ spack_default_packages }}"
   when: spack_build_packages

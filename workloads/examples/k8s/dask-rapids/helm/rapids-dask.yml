@@ -1,3 +1,4 @@
+---
 # See the github repo for more details:  https://github.com/helm/charts/blob/master/stable/dask/values.yaml
 # For best results, use the same docker image for workers and schedulers
 
@@ -9,7 +10,7 @@ worker:
     tag: latest
     env:
   replicas: 3
-  resources: 
+  resources:
     requests:
       nvidia.com/gpu: 1
     limits:
@@ -26,7 +27,7 @@ jupyter:
   image:
     repository: ajdecon/deepops-example-k8s-dask-rapids
     tag: latest
-  resources: 
+  resources:
     requests:
       nvidia.com/gpu: 1
     limits:

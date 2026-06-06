@@ -1,46 +1,46 @@
 ---
-- name: create local directory for configuration
-  file:
+- name: Create local directory for configuration
+  ansible.builtin.file:
     path: "{{ standalone_container_registry_config_dir }}"
     state: directory
     owner: "root"
     group: "root"
     mode: "0700"
 
-- name: add config file
-  template:
+- name: Add config file
+  ansible.builtin.template:
     src: "{{ standalone_container_registry_config_template }}"
     dest: "{{ standalone_container_registry_config_dir }}/config.yml"
     owner: "root"
     group: "root"
     mode: "0600"
 
-- name: trust GPG key for EPEL
-  rpm_key:
+- name: Trust GPG key for EPEL
+  ansible.builtin.rpm_key:
     key: "{{ epel_key_url }}"
     state: present
   when: ansible_os_family == "RedHat"
 
 - name: Enable EPEL repo
-  package:
+  ansible.builtin.package:
     name:
       - "{{ epel_package }}"
     state: present
   when: ansible_os_family == 'RedHat'
 
-- name: install python3 docker module
-  package:
+- name: Install python3 docker module
+  ansible.builtin.package:
     name: python3-docker
     state: present
 
-- name: run registry docker container
-  docker_container:
+- name: Run registry docker container
+  community.docker.docker_container:
     name: "{{ standalone_container_registry_name }}"
     image: "{{ standalone_container_registry_image }}"
     state: started
     network_mode: host
-    restart: yes
+    restart: true
     restart_policy: unless-stopped
     env: "{{ proxy_env if proxy_env is defined else {} }}"
     volumes:
-    - "{{ standalone_container_registry_config_dir }}/config.yml:/etc/docker/registry/config.yml"
+      - "{{ standalone_container_registry_config_dir }}/config.yml:/etc/docker/registry/config.yml"

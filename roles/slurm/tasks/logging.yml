@@ -1,10 +1,10 @@
 ---
-- name: import slurm logs into rsyslog
-  template:
+- name: Import slurm logs into rsyslog
+  ansible.builtin.template:
     src: "etc/rsyslog.d/99-slurm.conf"
     dest: "/etc/rsyslog.d/99-slurm.conf"
     owner: "root"
     group: "root"
     mode: "0644"
   notify:
-  - restart rsyslog
+    - Restart rsyslog

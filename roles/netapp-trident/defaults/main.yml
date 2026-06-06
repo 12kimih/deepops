@@ -61,7 +61,7 @@ backends_to_create:
       exportPolicy: default
       securityStyle: unix
       tieringPolicy: none
-  # Add additional backends as needed
+# Add additional backends as needed
 
 # Denotes whether or not to create new StorageClasses for your NetApp storage
 # For more info, refer to: https://netapp-trident.readthedocs.io/en/stable-v20.04/kubernetes/operator-install.html#creating-a-storage-class
@@ -87,7 +87,7 @@ storageClasses_to_create:
     provisioner: csi.trident.netapp.io
     parameters:
       backendType: "ontap-nas-flexgroup"
-  # Add additional StorageClasses as needed
+# Add additional StorageClasses as needed
 
 # Denotes whether or not to enable volume snapshots in your Kubernetes cluster
 # For more info, refer to: https://netapp-trident.readthedocs.io/en/stable-v21.01/kubernetes/operations/tasks/volumes/snapshots.html

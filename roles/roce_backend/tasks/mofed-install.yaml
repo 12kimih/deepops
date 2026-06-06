@@ -1,25 +1,26 @@
 ---
 - name: Check MLNX NIC's
-  shell: set -o pipefail && lspci | grep Mellanox | awk '{print $1}' | wc -l
+  ansible.builtin.shell: set -o pipefail && lspci | grep Mellanox | awk '{print $1}' | wc -l
   register: check_mlnx_adapter
   changed_when: false
 
 - name: MOFED install
+  when: check_mlnx_adapter.stdout|int > 0
   block:
-    - name: check availability of Mellanox OFED
-      stat:
+    - name: Check availability of Mellanox OFED
+      ansible.builtin.stat:
         path: /usr/bin/ofed_info
       register: ofed_installed
     - name: Check Mellanox OFED version
-      shell: /usr/bin/ofed_info -n  # noqa command-instead-of-shell
+      ansible.builtin.shell: /usr/bin/ofed_info -n
       register: current_mofed_version
       when: ofed_installed.stat.exists
     - name: Mellanox OFED version
-      debug:
+      ansible.builtin.debug:
         msg: "Mellanox OFED version - {{ current_mofed_version.stdout }}"
-      when: ofed_installed.stat.exists  
+      when: ofed_installed.stat.exists
     - name: Download and install Mellanox OFED
-      shell: |
+      ansible.builtin.shell: |
         cd /tmp
         rm -f /tmp/{{ mofed_file_name }}
         wget http://content.mellanox.com/ofed/{{ mofed_site_place }}/{{ mofed_file_name }}
@@ -28,11 +29,10 @@
         /mnt/iso/mlnxofedinstall --all -q
       args:
         executable: /bin/bash
-        warn: no
+        warn: false
       when: (not ofed_installed.stat.exists) or (mofed_version not in current_mofed_version.stdout)
       register: install_mofed
       changed_when: install_mofed.rc == 0
     - name: Reboot host after installing mellanox OFED
-      reboot:
+      ansible.builtin.reboot:
       when: install_mofed.changed
-  when: check_mlnx_adapter.stdout|int > 0
