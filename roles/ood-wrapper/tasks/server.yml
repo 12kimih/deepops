@@ -53,23 +53,20 @@
   tags:
     - configure
 
-- name: Install package dependency for htpasswd module
+# passlib backs the community.general.htpasswd module. Modern Ubuntu and EL8/9/10
+# ship it as python3-passlib; only EL7 used the python2 package.
+- name: Install passlib for the htpasswd module
   ansible.builtin.package:
-    name: "{{ item }}"
+    name: python3-passlib
     state: present
-  with_items:
-    - python-passlib
-    - python3-passlib
   tags:
     - configure
-  when: (ansible_distribution == "Ubuntu") or ((ansible_os_family == "RedHat") and (ansible_distribution_major_version == "8"))
+  when: (ansible_distribution == "Ubuntu") or ((ansible_os_family == "RedHat") and (ansible_distribution_major_version is version("8", ">=")))
 
-- name: Install package dependency for htpasswd module
+- name: Install passlib for the htpasswd module (EL7)
   ansible.builtin.package:
-    name: "{{ item }}"
+    name: python-passlib
     state: present
-  with_items:
-    - python-passlib
   tags:
     - configure
   when: (ansible_os_family == "RedHat") and (ansible_distribution_major_version == "7")
