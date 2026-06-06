@@ -1,0 +1,16 @@
+---
+# Reboot the targeted hosts and wait for them to return. Pass `-e hostlist=...`
+# to target a subset; reboot_serial controls the rolling-reboot batch size
+# (e.g. `-e reboot_serial=1` to reboot one node at a time).
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  serial: "{{ reboot_serial | default('100%') }}"
+  tags:
+    - reboot
+  tasks:
+    - name: Reboot and wait for the host to come back
+      ansible.builtin.reboot:
+        msg: "Reboot initiated by Ansible"
+        pre_reboot_delay: 5
+        reboot_timeout: 600
+        connect_timeout: 5
