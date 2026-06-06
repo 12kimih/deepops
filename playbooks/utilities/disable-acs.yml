@@ -1,0 +1,43 @@
+---
+# Disable PCIe Access Control Services (ACS) so NVIDIA NCCL can use direct GPU
+# peer-to-peer (P2P) over PCIe. Installs a persistent oneshot systemd unit so the
+# setting is reapplied on every boot.
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  tags:
+    - nvidia
+    - disable-acs
+  tasks:
+    - name: Install the disable-acs systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/disable-acs.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Disable PCIe ACS for NVIDIA NCCL P2P
+          After=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/bash -c "for dev in $$(lspci -d '*:*:*' | awk '{print $$1}'); do setpci -v -s $$dev ECAP_ACS+0x6.w=0000 >/dev/null 2>&1 || true; done"
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart disable-acs
+
+    - name: Enable the disable-acs service
+      ansible.builtin.systemd:
+        name: disable-acs.service
+        enabled: true
+        state: started
+        daemon_reload: true
+  handlers:
+    - name: Restart disable-acs
+      ansible.builtin.systemd:
+        name: disable-acs.service
+        state: restarted
+        daemon_reload: true
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"

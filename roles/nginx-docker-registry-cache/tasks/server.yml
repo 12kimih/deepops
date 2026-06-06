@@ -39,7 +39,8 @@
     image: "{{ nginx_docker_cache_image }}"
     state: started
     network_mode: host
-    restart: true
+    # restart_policy gives boot persistence; a forced restart on every run would
+    # bounce the container needlessly, so it is intentionally omitted.
     restart_policy: unless-stopped
     volumes:
       - "{{ nginx_docker_cache_mirror_path }}:/docker_mirror_cache"
