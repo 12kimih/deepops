@@ -1,20 +1,24 @@
 ---
-- name: Legacy CentOS 8 - ensure powertools installed
-  when: (ansible_distribution == "CentOS") and (ansible_distribution_major_version == "8")
-
+# Build deps come from the CodeReady Builder repo: "powertools" on EL8 and "crb"
+# on EL9+ (Rocky/Alma/CentOS Stream); RHEL proper uses the subscription repo.
+- name: Rocky/Alma/CentOS - enable the CodeReady Builder repo
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_distribution != "Red Hat Enterprise Linux"
   block:
-    - name: Ensure prereq packages installed
+    - name: Ensure dnf-plugins-core is installed
       ansible.builtin.dnf:
         name: "dnf-plugins-core"
         state: "present"
-    - name: Enable powertools
-      ansible.builtin.command: "yum config-manager --set-enabled powertools"
-      register: enable_powertools
-      changed_when: enable_powertools.rc != 0
-- name: Rhel 8 - ensure CRB repository is enabled
+    - name: Enable the CRB/powertools repo
+      ansible.builtin.command: "dnf config-manager --set-enabled {{ 'powertools' if ansible_distribution_major_version == '8' else 'crb' }}"
+      register: enable_crb
+      changed_when: enable_crb.rc != 0
+
+- name: RHEL - ensure the CodeReady Builder repository is enabled
   community.general.rhsm_repository:
-    name: "codeready-builder-for-rhel-8-x86_64-rpms"
-  when: (ansible_distribution == "Red Hat Enterprise Linux") and (ansible_distribution_major_version == "8")
+    name: "codeready-builder-for-rhel-{{ ansible_distribution_major_version }}-x86_64-rpms"
+  when: ansible_distribution == "Red Hat Enterprise Linux"
 
 - name: Debian - ensure apt cache is up to date
   ansible.builtin.apt:

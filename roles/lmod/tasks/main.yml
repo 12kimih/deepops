@@ -35,7 +35,9 @@
       - bash
       - tcsh
       - Lmod
-    enablerepo: powertools
+    # Lmod ships from EPEL; tcsh comes from CodeReady Builder, named "powertools"
+    # on EL8 and "crb" on EL9+ (Rocky/Alma/CentOS Stream).
+    enablerepo: "{{ 'powertools' if ansible_distribution_major_version == '8' else 'crb' }}"
   when: ansible_os_family == "RedHat"
 
 - name: "Mkdir software path"
