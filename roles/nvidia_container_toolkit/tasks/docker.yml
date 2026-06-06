@@ -7,6 +7,13 @@
     group: root
     mode: "0755"
 
+- name: Docker | ensure the docker service is enabled and running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  when: nvidia_container_toolkit_enable_docker | bool
+
 - name: Docker | check NVIDIA runtime configuration
   ansible.builtin.command:
     cmd: >-

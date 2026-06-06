@@ -8,7 +8,23 @@ nvidia_container_toolkit_rpm_repo_url: "{{ nvidia_container_toolkit_repo_base_ur
 nvidia_container_toolkit_yum_repo_path: "/etc/yum.repos.d/nvidia-container-toolkit.repo"
 nvidia_container_toolkit_rpm_prerequisites:
   - ca-certificates
-nvidia_container_toolkit_package: "nvidia-container-toolkit"
+
+# Pin the toolkit to an exact package version for reproducibility (set "" to
+# track the latest). All packages in the set are pinned to the same version.
+# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+nvidia_container_toolkit_version: "1.19.1-1"
+# The unified toolkit package set (nvidia-docker2 / nvidia-container-runtime are
+# end-of-life and replaced by these). Pin all four together.
+nvidia_container_toolkit_packages:
+  - nvidia-container-toolkit
+  - nvidia-container-toolkit-base
+  - libnvidia-container-tools
+  - libnvidia-container1
+
 nvidia_container_toolkit_configure_docker: true
 nvidia_container_toolkit_set_as_default_runtime: true
 nvidia_container_toolkit_restart_docker: true
+# Ensure the docker service is enabled at boot and running. On RHEL the docker-ce
+# package does not auto-enable docker, so every docker-based service (DCGM/Slurm
+# exporters, registry, ...) would be dead after reboot without this.
+nvidia_container_toolkit_enable_docker: true
