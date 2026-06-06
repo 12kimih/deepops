@@ -1,3 +1,6 @@
 ---
-_ubuntu_repo_dir: "{{ ansible_distribution | lower }}{{ ansible_distribution_version | replace('.', '') }}/{{ ansible_architecture }}"
+# NVIDIA publishes the CUDA apt repo per OS release (ubuntu2204/ubuntu2404/...).
+# A brand-new LTS (e.g. 26.04) may not have a path yet; override
+# nvidia_cuda_ubuntu_repo_release (e.g. "24.04") in group_vars until it does.
+_ubuntu_repo_dir: "{{ ansible_distribution | lower }}{{ (nvidia_cuda_ubuntu_repo_release | default(ansible_distribution_version)) | replace('.', '') }}/{{ ansible_architecture }}"
 _rhel_repo_dir: "rhel{{ ansible_distribution_major_version }}/{{ ansible_architecture }}"
