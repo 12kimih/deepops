@@ -1,0 +1,20 @@
+---
+# Install the Vulkan runtime, tools, and Mesa Vulkan drivers (Ubuntu).
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - nvidia
+    - vulkan
+  tasks:
+    - name: Install Vulkan packages (Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - libvulkan1
+          - libvulkan-dev
+          - vulkan-tools
+          - mesa-vulkan-drivers
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_distribution == "Ubuntu"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"

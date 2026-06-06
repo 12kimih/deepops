@@ -14,6 +14,7 @@
   community.general.modprobe:
     name: nv_peer_mem
     state: present
+    persistent: present  # write /etc/modules-load.d so it loads at boot
   when:
     - ansible_local['gpus']['count']
     - is_dgx.stat.exists
@@ -22,6 +23,7 @@
   ansible.builtin.service:
     name: nv_peer_mem
     state: started
+    enabled: true  # survive reboot
   when:
     - ansible_local['gpus']['count']
     - is_dgx.stat.exists
