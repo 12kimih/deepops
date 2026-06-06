@@ -74,7 +74,10 @@
   ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
-    enablerepo: "powertools"
+    # The CodeReady Builder repo is named "powertools" on EL8 but was renamed to
+    # "crb" on EL9+ (Rocky/Alma/CentOS Stream). On RHEL proper, enable the
+    # codeready-builder-for-rhel-<N> repo via subscription-manager beforehand.
+    enablerepo: "{{ 'powertools' if ansible_distribution_major_version == '8' else 'crb' }}"
   with_items: "{{ slurm_build_deps }}"
   when: ansible_os_family == 'RedHat'
 

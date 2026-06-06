@@ -32,7 +32,8 @@
   ansible.builtin.dnf:
     name: pandoc
     state: present
-    enablerepo: powertools
+    # CodeReady Builder repo: "powertools" on EL8, "crb" on EL9+ (Rocky/Alma).
+    enablerepo: "{{ 'powertools' if ansible_distribution_major_version == '8' else 'crb' }}"
   when: ansible_os_family == 'RedHat'
 
 - name: Remove pmix packages
