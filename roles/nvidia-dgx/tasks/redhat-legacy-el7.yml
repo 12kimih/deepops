@@ -24,21 +24,21 @@
   yum:
     name: "@DGX-1 Configurations"
     state: present
-    update_cache: yes
+    update_cache: true
   when: ansible_product_name is search("DGX-1")
 
 - name: Install packages
   yum:
     name: "@DGX-2 Configurations"
     state: present
-    update_cache: yes
+    update_cache: true
   when: ansible_product_name is search("DGX-2")
 
 - name: Install extra packages
   yum:
     name: "{{ dgx_extra_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: check kernel versions
   yum:
@@ -82,24 +82,24 @@
     - cuda-drivers-diagnostic
     - dgx-persistence-mode
   register: install_driver
-  notify: reboot after driver install
+  notify: Reboot after driver install
 
 - name: Install Docker and the NVIDIA container runtime
   yum:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - docker
     - "@NVIDIA container runtime"
   notify:
-    - restart docker
+    - Restart docker
 
 - name: Install DGX System Management Tools
   yum:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - python36
     - "@DGX System Management"

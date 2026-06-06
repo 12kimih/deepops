@@ -2,8 +2,8 @@
 - hosts: kube_control_plane[0]
   become: true
   tasks:
-    - name: install k8s GPU feature discovery
-      include_role:
+    - name: Install k8s GPU feature discovery
+      ansible.builtin.include_role:
         name: nvidia-k8s-gpu-feature-discovery
       run_once: true
   environment: "{{proxy_env if proxy_env is defined else {}}}"

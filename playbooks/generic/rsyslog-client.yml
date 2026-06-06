@@ -1,8 +1,8 @@
 ---
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   roles:
-  - rsyslog_client
+    - rsyslog_client
   tags:
-  - rsyslog-client
-  - rsyslog
+    - rsyslog-client
+    - rsyslog

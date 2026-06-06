@@ -1,57 +1,57 @@
 ---
-- name: gather os specific variables
-  include_vars: "{{ item }}"
+- name: Gather os specific variables
+  ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
-      - "{{ ansible_distribution|lower }}.yml"
-      - "{{ ansible_os_family|lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
       paths:
-      - ../vars
+        - ../vars
       skip: true
   tags:
     - always
 
-- name: configure alternative library path
-  template:
+- name: Configure alternative library path
+  ansible.builtin.template:
     src: ld-openmpi.conf.j2
     dest: /etc/ld.so.conf.d/openmpi.conf
-    mode: 0644
+    mode: "0644"
   register: updated_openmpi_ld
 
-- name: update ld cache
-  command: ldconfig
-  when: updated_openmpi_ld.changed  # noqa no-handler
+- name: Update ld cache
+  ansible.builtin.command: ldconfig
+  when: updated_openmpi_ld.changed # noqa no-handler
 
-- name: default to building openmpi
-  set_fact:
-    openmpi_build: yes
+- name: Default to building openmpi
+  ansible.builtin.set_fact:
+    openmpi_build: true
 
-- name: check installed openmpi version
-  shell: "{{ openmpi_install_prefix }}/bin/ompi_info | grep 'Open MPI:' | awk '{print $3}'"
+- name: Check installed openmpi version
+  ansible.builtin.shell: "{{ openmpi_install_prefix }}/bin/ompi_info | grep 'Open MPI:' | awk '{print $3}'"
   register: openmpi_info_version
-  ignore_errors: yes
+  ignore_errors: true
   changed_when: openmpi_info_version.rc != 0
 
-- name: don't build openmpi if it's already installed, unless forced
-  set_fact:
-    openmpi_build: no
+- name: Don't build openmpi if it's already installed, unless forced
+  ansible.builtin.set_fact:
+    openmpi_build: false
   when: openmpi_info_version.stdout == openmpi_version and not openmpi_force_rebuild
 
-- name: install openmpi build dependencies
-  apt:
+- name: Install openmpi build dependencies
+  ansible.builtin.apt:
     name: "{{ item }}"
   with_items: "{{ openmpi_deps }}"
   when: ansible_distribution == 'Ubuntu'
 
-- name: install openmpi build dependencies
-  yum:
+- name: Install openmpi build dependencies
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items: "{{ openmpi_deps }}"
   when: ansible_os_family == 'RedHat'
 
-- name: remove openmpi packages
-  apt:
+- name: Remove openmpi packages
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: absent
   with_items:
@@ -61,8 +61,8 @@
   when: ansible_distribution == 'Ubuntu'
   failed_when: false
 
-- name: remove openmpi packages
-  yum:
+- name: Remove openmpi packages
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: absent
   with_items:
@@ -71,24 +71,24 @@
   when: ansible_os_family == 'RedHat'
   failed_when: false
 
-- name: make openmpi build directory
-  file:
+- name: Make openmpi build directory
+  ansible.builtin.file:
     path: "{{ openmpi_build_dir }}"
     state: directory
     mode: "0755"
   when: openmpi_build
 
-- name: download openmpi source
-  unarchive:
+- name: Download openmpi source
+  ansible.builtin.unarchive:
     src: "{{ openmpi_src_url }}"
-    remote_src: yes
+    remote_src: true
     dest: "{{ openmpi_build_dir }}"
     extra_opts:
       - --strip-components=1
   when: openmpi_build
 
-- name: uninstall old openmpi version
-  command: make -j uninstall
+- name: Uninstall old openmpi version
+  ansible.builtin.command: make -j uninstall
   args:
     chdir: "{{ openmpi_build_dir }}"
   failed_when: false
@@ -96,31 +96,31 @@
   tags:
     - uninstall
 
-- name: clean openmpi src dir
-  command: make distclean
+- name: Clean openmpi src dir
+  ansible.builtin.command: make distclean
   args:
     chdir: "{{ openmpi_build_dir }}"
   failed_when: false
   when: openmpi_build
 
-- name: configure openmpi
-  command: "{{ openmpi_configure }}"
+- name: Configure openmpi
+  ansible.builtin.command: "{{ openmpi_configure }}"
   args:
     chdir: "{{ openmpi_build_dir }}"
   when: openmpi_build
 
-- name: build openmpi
-  shell: "make -j$(nproc) > build.log 2>&1"
+- name: Build openmpi
+  ansible.builtin.shell: "make -j$(nproc) > build.log 2>&1"
   args:
     chdir: "{{ openmpi_build_dir }}"
   when: openmpi_build
 
-- name: install openmpi
-  shell: "make -j$(nproc) install >> build.log 2>&1"
+- name: Install openmpi
+  ansible.builtin.shell: "make -j$(nproc) install >> build.log 2>&1"
   args:
     chdir: "{{ openmpi_build_dir }}"
   when: openmpi_build
 
-- name: run ldconfig to ensure libs are found
-  command: "ldconfig"
+- name: Run ldconfig to ensure libs are found
+  ansible.builtin.command: "ldconfig"
   when: openmpi_build

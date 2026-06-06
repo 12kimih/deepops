@@ -1,5 +1,6 @@
+---
 # This yaml file will launch a container with a 40GB or 80 GB NVIDIA Ampere GPU
-# Specifying the nvidia.com/gpu.product label and the nvidia.com/gpu resource type 
+# Specifying the nvidia.com/gpu.product label and the nvidia.com/gpu resource type
 #    restricts the type of GPU this container will run on
 #
 # Specifying both an affinity and resource type supports clusters with multiple GPU types or MIG configurations

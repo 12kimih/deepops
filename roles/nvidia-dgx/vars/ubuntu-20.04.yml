@@ -1,3 +1,4 @@
+---
 G_PREREQS:
   - lsb-release
   - efibootmgr

@@ -10,17 +10,17 @@
   - name: Check if force update requested
     set_fact:
       force_parameter: "{{ '-f' if force_update else '' }}"
-  
+
   - name: Check if inactive update requested
     set_fact:
       inactive_parameter: "{{ '-i' if inactive_update else '' }}"
-  
+
   - name: Set update_performed flag
     set_fact:
       update_performed: true
 
   - name: Update firmware if required
-    shell: "docker run --rm -ti --privileged -v /:/hostfs -e NVSM_MODE=1 {{ firmware_update_repo }}:{{ firmware_update_tag }} set_flags AUTO=1 update_fw {{ target_fw }} {{ inactive_parameter }} {{ force_parameter }} > {{ fw_dir }}/fw-update.json" 
+    shell: "docker run --rm -ti --privileged -v /:/hostfs -e NVSM_MODE=1 {{ firmware_update_repo }}:{{ firmware_update_tag }} set_flags AUTO=1 update_fw {{ target_fw }} {{ inactive_parameter }} {{ force_parameter }} > {{ fw_dir }}/fw-update.json"
 
   - name: "Parse FW Update output"
     command: "python3 {{ fw_dir }}/parse_manifest.py parse_update_json {{ fw_dir }}/fw-update.json"
@@ -43,7 +43,7 @@
   when:
     - reboot_required | default(false)
 
-# TODO: This script does not handle the case of a chassis-levl power cycle being required with ipmitool 
+# TODO: This script does not handle the case of a chassis-levl power cycle being required with ipmitool
 
 - name: Register power cycle required
   when: fw_update_json.FirmwareLoadAction is defined and fw_update_json.FirmwareLoadAction == "DC Power Cycle"

@@ -4,46 +4,47 @@
   become: true
   gather_facts: false
   tasks:
-    - name: install python (no proxy)
-      raw: test -e /usr/bin/python3 || (apt -y update && apt install -y python3-minimal) || (yum install -y python3)
+    - name: Install python (no proxy)
+      ansible.builtin.raw: test -e /usr/bin/python3 || (apt -y update && apt install -y python3-minimal) || (yum install -y python3)
       register: output
       changed_when: output.stdout != ""
       when: proxy_env is not defined
 
-    - name: install python (using proxy)
-      raw: test -e /usr/bin/python3 || (https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" apt -y update && https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" apt install -y python3-minimal) || (https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" yum install -y python3)
+    - name: Install python (using proxy)
+      ansible.builtin.raw: test -e /usr/bin/python3 || (https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" apt -y update && https_proxy="{{
+        https_proxy }}" http_proxy="{{ http_proxy }}" apt install -y python3-minimal) || (https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" yum
+        install -y python3)
       register: output
       changed_when: output.stdout != ""
       when: proxy_env is defined
 
-
 # Install necessary Python packages for future pip and setuptools requirements
 - hosts: all
-  become: true 
+  become: true
   gather_facts: true
   tasks:
-    - name: force an apt update on Ubuntu
-      apt:
-        update_cache: yes
+    - name: Force an apt update on Ubuntu
+      ansible.builtin.apt:
+        update_cache: true
       when: ansible_distribution == "Ubuntu"
 
-    - name: install python 3 libraries if python 3 is present
-      package:
+    - name: Install python 3 libraries if python 3 is present
+      ansible.builtin.package:
         name:
-        - python3-setuptools
-        - python3-pip
+          - python3-setuptools
+          - python3-pip
         state: present
       when: ansible_python.version.major == 3
 
-    - name: legacy EL7 - install epel
-      package:
+    - name: Legacy EL7 - install epel
+      ansible.builtin.package:
         name: epel-release
         state: present
       when: (ansible_python.version.major == 2) and (ansible_os_family == "RedHat") and (ansible_distribution_major_version == "7")
 
-    - name: legacy EL7 - install python 2 libraries
-      package:
+    - name: Legacy EL7 - install python 2 libraries
+      ansible.builtin.package:
         name:
-        - python-setuptools
-        - python-pip
+          - python-setuptools
+          - python-pip
       when: (ansible_python.version.major == 2) and (ansible_os_family == "RedHat") and (ansible_distribution_major_version == "7")

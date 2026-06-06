@@ -2,57 +2,57 @@
 # So, we create a temporary user and login with that
 
 ---
-- name: create {{ move_home_dirs_new_root }}
-  file:
+- name: Create {{ move_home_dirs_new_root }}
+  ansible.builtin.file:
     path: "{{ move_home_dirs_new_root }}"
     mode: "0755"
     state: directory
 
-- name: set key path
-  set_fact:
+- name: Set key path
+  ansible.builtin.set_fact:
     tmp_user_key_path: /tmp/ssh-key-for-ansible-move-home-dirs
 
-- name: generate key for temporary user
-  command: ssh-keygen -q -t rsa -f "{{ tmp_user_key_path }}" -C "" -N ""
+- name: Generate key for temporary user
+  ansible.builtin.command: ssh-keygen -q -t rsa -f "{{ tmp_user_key_path }}" -C "" -N ""
   args:
     creates: "{{ tmp_user_key_path }}"
   delegate_to: 127.0.0.1
   become: false
   run_once: true
 
-- name: delete temporary user
-  user:
-     name: "{{ tmp_user }}"
-     state: absent
-     remove: yes
-     force: yes
+- name: Delete temporary user
+  ansible.builtin.user:
+    name: "{{ tmp_user }}"
+    state: absent
+    remove: true
+    force: true
 
-- name: create temporary user
-  user:
+- name: Create temporary user
+  ansible.builtin.user:
     name: "{{ tmp_user }}"
     home: "{{ move_home_dirs_new_root }}/{{ tmp_user }}"
 
-- name: add new key for temporary user
-  authorized_key:
+- name: Add new key for temporary user
+  ansible.posix.authorized_key:
     user: "{{ tmp_user }}"
     key: "{{ lookup('file', tmp_user_key_path + '.pub') }}"
 
-- name: grant sudo to temporary user
-  copy:
+- name: Grant sudo to temporary user
+  ansible.builtin.copy:
     content: "{{ tmp_user }} ALL=(ALL) NOPASSWD:ALL"
     dest: "/etc/sudoers.d/{{ tmp_user }}"
     mode: "0700"
 
 # Useful for slurm clusters
-- name: grant SSH access to temporary user
-  lineinfile:
+- name: Grant SSH access to temporary user
+  ansible.builtin.lineinfile:
     path: /etc/localusers
     line: "{{ tmp_user }}"
-    create: yes
+    create: true
     mode: "0644"
 
-- name: move each user
-  include_tasks: move_user.yml
+- name: Move each user
+  ansible.builtin.include_tasks: move_user.yml
   vars:
     ansible_user: "{{ tmp_user }}"
     ansible_ssh_private_key_file: "{{ tmp_user_key_path }}"
@@ -60,20 +60,20 @@
   loop_control:
     loop_var: user
 
-- name: revoke SSH access from temporary user
-  lineinfile:
+- name: Revoke SSH access from temporary user
+  ansible.builtin.lineinfile:
     path: /etc/localusers
     line: "{{ tmp_user }}"
     state: absent
 
-- name: revoke sudo for temporary user
-  file:
+- name: Revoke sudo for temporary user
+  ansible.builtin.file:
     path: "/etc/sudoers.d/{{ tmp_user }}"
     state: absent
 
-- name: delete temporary user
-  user:
-     name: "{{ tmp_user }}"
-     state: absent
-     remove: yes
-     force: yes
+- name: Delete temporary user
+  ansible.builtin.user:
+    name: "{{ tmp_user }}"
+    state: absent
+    remove: true
+    force: true

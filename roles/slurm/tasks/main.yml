@@ -1,48 +1,45 @@
 ---
 - name: Install CUDA when we require NVML support for autodetection
-  include_role:
+  ansible.builtin.include_role:
     name: nvidia_cuda
   when: slurm_autodetect_nvml|default(false)
 
 - name: Setup role
-  include_tasks: setup-role.yml
-
+  ansible.builtin.include_tasks: setup-role.yml
 - name: Setup build
-  include_tasks: build.yml
+  ansible.builtin.include_tasks: build.yml
   tags: build
   when: slurm_workflow_build
 
 - name: Setup slurm systemd services
-  include_tasks: service-files.yml
-
+  ansible.builtin.include_tasks: service-files.yml
 - name: Setup slurm user environment
-  include_tasks: setup-user.yml
-
+  ansible.builtin.include_tasks: setup-user.yml
 - name: Setup slurm controller
-  include_tasks: controller.yml
+  ansible.builtin.include_tasks: controller.yml
   when: is_controller
 
 - name: Setup slurm on compute nodes
-  include_tasks: compute.yml
+  ansible.builtin.include_tasks: compute.yml
   when: is_compute
 
 - name: Setup slurm on other nodes
-  include_tasks: misc-node.yml
+  ansible.builtin.include_tasks: misc-node.yml
   when: (not is_compute) and (not is_controller)
 
 - name: Apply shm fix
-  include_tasks: shmfix.yml
+  ansible.builtin.include_tasks: shmfix.yml
   when: is_compute and slurm_fix_shm
 
 - name: Setup logging
-  include_tasks: logging.yml
+  ansible.builtin.include_tasks: logging.yml
   tags:
-  - rsyslog
-  - logging
+    - rsyslog
+    - logging
 
 - name: Setup undrain
-  include_tasks: undrain.yml
+  ansible.builtin.include_tasks: undrain.yml
   when: is_compute
 
 - name: Cleanup
-  include_tasks: build-cleanup.yml
+  ansible.builtin.include_tasks: build-cleanup.yml

@@ -1,3 +1,4 @@
+---
 # Vars needed to install nfs-client-provisioner
 k8s_nfs_server: "127.0.0.1"
 k8s_nfs_export_path: "/export/deepops_nfs"

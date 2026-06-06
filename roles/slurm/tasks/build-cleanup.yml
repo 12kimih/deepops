@@ -1,13 +1,13 @@
 ---
-- name: make clean in build directory after install
-  command: make clean
+- name: Make clean in build directory after install
+  ansible.builtin.command: make clean
   args:
     chdir: "{{ slurm_build_dir }}"
   failed_when: false
   when: slurm_build_make_clean
 
-- name: remove build directory
-  file:
+- name: Remove build directory
+  ansible.builtin.file:
     path: "{{ slurm_build_dir }}"
     state: absent
   when: slurm_build_dir_cleanup

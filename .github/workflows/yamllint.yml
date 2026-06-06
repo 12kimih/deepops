@@ -1,0 +1,23 @@
+---
+name: yamllint
+on:
+  - push
+  - pull_request
+jobs:
+  yamllint:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: check out repo
+        uses: actions/checkout@v4
+
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install yamllint
+        run: python3 -m pip install yamllint==1.35.1
+
+      - name: run yamllint
+        # Uses the project .yamllint config; fails on error-level rules only.
+        run: yamllint -f github .

@@ -1,5 +1,5 @@
 ---
-- name: install DCGM from repos
-  package:
+- name: Install DCGM from repos
+  ansible.builtin.package:
     name: "datacenter-gpu-manager"
     state: present

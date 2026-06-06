@@ -1,25 +1,25 @@
 ---
-- name: gather package facts
-  package_facts:
+- name: Gather package facts
+  ansible.builtin.package_facts:
     manager: rpm
   tags:
     - nfs
   when:
     - ansible_os_family == "RedHat"
 
-- name: gather service facts
+- name: Gather service facts
   ansible.builtin.service_facts:
   tags:
     - nfs
   when:
     - ansible_os_family == "RedHat"
 
-- name: configure firewall to allow NFS server
+- name: Configure firewall to allow NFS server
   ansible.posix.firewalld:
     service: "{{ item }}"
-    permanent: yes
+    permanent: true
     state: enabled
-    immediate: no
+    immediate: false
   with_items:
     - mountd
     - rpc-bind
@@ -30,15 +30,15 @@
     - ansible_os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"
 
-- name: restart firewalld if it was running
+- name: Restart firewalld if it was running
   ansible.builtin.systemd:
     state: restarted
     name: firewalld
   tags:
     - nfs
   notify:
-  - restart rpcbind
-  - restart nfs
+    - Restart rpcbind
+    - Restart nfs
   when:
     - ansible_os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"

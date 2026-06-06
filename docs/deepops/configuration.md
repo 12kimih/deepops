@@ -10,6 +10,7 @@
     - [Which file should my variables go in?](#which-file-should-my-variables-go-in)
   - [Adding custom playbooks](#adding-custom-playbooks)
   - [Managing your configuration directory in Git](#managing-your-configuration-directory-in-git)
+  - [Keeping secrets out of Git with Ansible Vault](#keeping-secrets-out-of-git-with-ansible-vault)
   - [Using multiple configuration directories for separate clusters](#using-multiple-configuration-directories-for-separate-clusters)
   
 ## The DeepOps configuration directory
@@ -206,6 +207,45 @@ vim slurm-cluster.yml
 git add slurm-cluster.yml
 git commit -m "Update cluster to Slurm 20.11"
 ```
+
+## Keeping secrets out of Git with Ansible Vault
+
+Your `config` directory is ignored by Git by default, but if you version it in a
+(private) repository as recommended above, you should still **encrypt any
+secrets** rather than storing them in plain text. DeepOps uses
+[Ansible Vault](https://docs.ansible.com/ansible/latest/vault_guide/index.html)
+for this.
+
+Typical values that should be encrypted include:
+
+- `slurm_password` and `slurm_db_password` (Slurm and SlurmDBD database credentials)
+- `grafana_cfg_pass` (Grafana admin password)
+- Container registry credentials (`docker_login_registries`, `standalone_container_registry_cache_username`/`password`)
+- Any BMC/IPMI credentials used for provisioning
+
+A common pattern is to keep encrypted secrets in a dedicated vault file, for
+example `config/group_vars/all/vault.yml`:
+
+```bash
+# Create (or edit) an encrypted vault file
+ansible-vault create config/group_vars/all/vault.yml
+
+# Reference the encrypted values from your normal (unencrypted) group_vars,
+# e.g. in config/group_vars/slurm-cluster.yml:
+#   slurm_db_password: "{{ vault_slurm_db_password }}"
+```
+
+So that you don't have to type the vault password on every run, point Ansible at
+a password file by uncommenting and setting `vault_password_file` in
+[`ansible.cfg`](../../ansible.cfg):
+
+```ini
+vault_password_file = ./config/.vault-pass
+```
+
+The `.vault-pass` file (and any `*.vault-pass` file) is ignored by Git, so the
+password itself is never committed. Keep it out of your config repository too —
+store it in a password manager and recreate it on each admin workstation.
 
 ## Using multiple configuration directories for separate clusters
 

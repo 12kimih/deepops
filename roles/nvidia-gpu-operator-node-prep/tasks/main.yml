@@ -3,36 +3,34 @@
 # Handling of the Nouveau drivers and loading of these modules is handled within the GPU Oparator itself
 # Leaving this here for historical reasons and until GPU Operator v1.10.0 comes out
 
-- name: unload nouveau
-  modprobe:
+- name: Unload nouveau
+  community.general.modprobe:
     name: nouveau
     state: absent
   failed_when: false
 
-- name: blocklist nouveau
-  copy:
+- name: Blocklist nouveau
+  ansible.builtin.copy:
     src: "blocklist-nouveau.conf"
     dest: "/etc/modprobe.d/blocklist-nouveau.conf"
     owner: "root"
     group: "root"
     mode: "0644"
   notify:
-  - update-initramfs
+    - update-initramfs
 
-- name: configure to include required kernel modules
-  copy:
+- name: Configure to include required kernel modules
+  ansible.builtin.copy:
     src: "nvidia-driver.conf"
     dest: "/etc/modules-load.d/nvidia-driver.conf"
     owner: "root"
     group: "root"
     mode: "0644"
 
-- name: load required kernel modules
-  modprobe:
+- name: Load required kernel modules
+  community.general.modprobe:
     name: "{{ item }}"
     state: present
   with_items:
     - "i2c_core"
     - "ipmi_msghandler"
-
-

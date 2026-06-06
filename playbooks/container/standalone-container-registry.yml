@@ -6,4 +6,4 @@
   become: true
   become_method: sudo
   roles:
-  - standalone-container-registry
+    - standalone-container-registry

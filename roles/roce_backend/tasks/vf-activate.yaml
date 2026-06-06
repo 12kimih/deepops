@@ -1,32 +1,31 @@
 ---
 - name: Check activation
   register: result
-  command: "grep -i {{ item.pf_name }} /etc/rc.local"
+  ansible.builtin.command: "grep -i {{ item.pf_name }} /etc/rc.local"
   failed_when: result.rc == 2
-  changed_when: result.rc == 1 
+  changed_when: result.rc == 1
   tags: roce_host
 
 - name: VF activation
-  shell: |
-    echo {{ num_vf|int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs
+  ansible.builtin.shell: |
+    echo {{ num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs
   args:
     executable: /bin/bash
-    warn: no  
+    warn: false
   when: result.rc > 0
   tags: roce_host
 
 - name: VF activation update (remove)
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/rc.local
-    regexp: '^{{ item.pf_name }}'
+    regexp: "^{{ item.pf_name }}"
     state: absent
   when: result.rc == 0
   tags: roce_host
 
-- name: For persistant VF activation 
-  lineinfile:
+- name: For persistant VF activation
+  ansible.builtin.lineinfile:
     path: /etc/rc.local
-    line: 'echo {{ num_vf|int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs'
-    insertbefore: '^exit 0'
+    line: "echo {{ num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs"
+    insertbefore: "^exit 0"
   tags: roce_host
-  

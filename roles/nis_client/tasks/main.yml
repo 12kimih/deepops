@@ -1,41 +1,40 @@
 ---
-- name: assert that variables are defined
-  fail:
+- name: Assert that variables are defined
+  ansible.builtin.fail:
     msg: "Variable '{{ item }}' is not defined"
   when: item not in vars
   with_items:
     - nis_domain
     - nis_server
 
-- name: prevent daemons from starting when installing packages, particularly ypbind
-  copy:
+- name: Prevent daemons from starting when installing packages, particularly ypbind
+  ansible.builtin.copy:
     src: policy-rc.d
     dest: /usr/sbin/policy-rc.d
     owner: root
     group: root
-    mode: 0700
+    mode: "0700"
   changed_when: false
 
-- name: install Ubuntu packages
-  apt: name=nis,rpcbind state=present
+- name: Install Ubuntu packages
+  ansible.builtin.apt: name=nis,rpcbind state=present
   when: ansible_os_family == "Debian"
 
-- name: install CentOS NIS packages
-  yum: name=ypbind state=present
+- name: Install CentOS NIS packages
+  ansible.builtin.dnf: name=ypbind state=present
   when: ansible_os_family == "RedHat"
 
-- name: ensure rpcbind is running
-  service: name=rpcbind state=started enabled=yes
-
-- name: set server
-  lineinfile:
+- name: Ensure rpcbind is running
+  ansible.builtin.service: name=rpcbind state=started enabled=yes
+- name: Set server
+  ansible.builtin.lineinfile:
     dest: /etc/yp.conf
-    regexp: '^domain'
-    line: 'domain {{ nis_domain }} server {{ nis_server }}'
-  notify: "restart nis"
+    regexp: "^domain"
+    line: "domain {{ nis_domain }} server {{ nis_server }}"
+  notify: "Restart nis"
 
-- name: create default domain name file
-  file:
+- name: Create default domain name file
+  ansible.builtin.file:
     path: /etc/defaultdomain
     owner: root
     group: root
@@ -43,42 +42,41 @@
     state: touch
   changed_when: false
 
-- name: configure yp domainname
-  lineinfile:
+- name: Configure yp domainname
+  ansible.builtin.lineinfile:
     dest: /etc/defaultdomain
-    regexp: '^'
-    line: '{{ nis_domain }}'
-  notify: "restart nis"
+    regexp: "^"
+    line: "{{ nis_domain }}"
+  notify: "Restart nis"
 
-- name: configure nsswitch.conf
-  lineinfile:
+- name: Configure nsswitch.conf
+  ansible.builtin.lineinfile:
     dest: /etc/nsswitch.conf
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
   with_items:
-    - { regexp: '^passwd', line: 'passwd: files nis' }
-    - { regexp: '^group', line: 'group: files nis' }
-    - { regexp: '^shadow', line: 'shadow: files nis' }
-    - { regexp: '^automount', line: 'automount: files nis' }
-  notify: "restart nis"
+    - { regexp: "^passwd", line: "passwd: files nis" }
+    - { regexp: "^group", line: "group: files nis" }
+    - { regexp: "^shadow", line: "shadow: files nis" }
+    - { regexp: "^automount", line: "automount: files nis" }
+  notify: "Restart nis"
 
-- name: make sure rpcbind is running
-  service: name=rpcbind state=started enabled=yes
-
+- name: Make sure rpcbind is running
+  ansible.builtin.service: name=rpcbind state=started enabled=yes
 - name: Debian - make sure ypbind is running
-  service: name=nis state=started enabled=yes
+  ansible.builtin.service: name=nis state=started enabled=yes
   when: ansible_os_family == "Debian"
 
 # ypbind will not successfull start on RedHat if there's no NIS server to
 # bind to, so we skip this in Molecule tests
 - name: RedHat - make sure ypbind is running
-  service: name=ypbind state=started enabled=yes
+  ansible.builtin.service: name=ypbind state=started enabled=yes
   when: ansible_os_family == "RedHat"
   tags:
-  - molecule-notest
+    - molecule-notest
 
-- name: remove file to prevent starting services at install time
-  file:
+- name: Remove file to prevent starting services at install time
+  ansible.builtin.file:
     path: /usr/sbin/policy-rc.d
     state: absent
   changed_when: false

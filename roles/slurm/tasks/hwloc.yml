@@ -1,34 +1,34 @@
 ---
-- name: default to building hwloc
-  set_fact:
-    hwloc_build: yes
+- name: Default to building hwloc
+  ansible.builtin.set_fact:
+    hwloc_build: true
 
-- name: check installed hwloc version
-  shell: "{{ hwloc_install_prefix }}/bin/hwloc-info --version | awk '{print $2}'"
+- name: Check installed hwloc version
+  ansible.builtin.shell: "{{ hwloc_install_prefix }}/bin/hwloc-info --version | awk '{print $2}'"
   register: hwloc_info_version
-  ignore_errors: yes
+  ignore_errors: true
   changed_when: hwloc_info_version.rc != 0
 
-- name: don't build hwloc if it's already installed, unless forced
-  set_fact:
-    hwloc_build: no
+- name: Don't build hwloc if it's already installed, unless forced
+  ansible.builtin.set_fact:
+    hwloc_build: false
   when: hwloc_info_version.stdout == hwloc_version and not hwloc_force_rebuild
 
-- name: install hwloc build dependencies
-  apt:
+- name: Install hwloc build dependencies
+  ansible.builtin.apt:
     name: "{{ item }}"
   with_items: "{{ slurm_hwloc_deps }}"
   when: ansible_distribution == 'Ubuntu'
 
-- name: install hwloc build dependencies
-  yum:
+- name: Install hwloc build dependencies
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items: "{{ slurm_hwloc_deps }}"
   when: ansible_os_family == 'RedHat'
 
-- name: remove hwloc packages
-  apt:
+- name: Remove hwloc packages
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: absent
   with_items:
@@ -38,8 +38,8 @@
   when: ansible_distribution == 'Ubuntu'
   failed_when: false
 
-- name: remove hwloc packages
-  yum:
+- name: Remove hwloc packages
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: absent
   with_items:
@@ -49,65 +49,64 @@
   when: ansible_os_family == 'RedHat'
   failed_when: false
 
-- name: when building, try to uninstall first before downloading source
+- name: When building, try to uninstall first before downloading source
   when: hwloc_build
   block:
+    - name: Check that we have an old build dir
+      ansible.builtin.stat:
+        path: "{{ hwloc_build_dir }}"
+      register: hwloc_old_build_dir
 
-  - name: check that we have an old build dir
-    stat:
-      path: "{{ hwloc_build_dir }}"
-    register: hwloc_old_build_dir
+    - name: Uninstall old verson
+      ansible.builtin.command: make -j uninstall
+      args:
+        chdir: "{{ hwloc_build_dir }}"
+      ignore_errors: true
+      when: hwloc_old_build_dir.stat.exists
 
-  - name: uninstall old verson
-    command: make -j uninstall
-    args:
-      chdir: "{{ hwloc_build_dir }}"
-    ignore_errors: yes
-    when: hwloc_old_build_dir.stat.exists
+    - name: Remove old build dir
+      ansible.builtin.file:
+        path: "{{ hwloc_build_dir }}"
+        state: absent
 
-  - name: remove old build dir
-    file:
-      path: "{{ hwloc_build_dir }}"
-      state: absent
-
-- name: make hwloc build directory
-  file:
+- name: Make hwloc build directory
+  ansible.builtin.file:
     path: "{{ hwloc_build_dir }}"
     state: directory
     mode: "0755"
   when: hwloc_build
 
-- name: download hwloc source
-  unarchive:
+- name: Download hwloc source
+  ansible.builtin.unarchive:
     src: "{{ hwloc_src_url }}"
-    remote_src: yes
+    remote_src: true
     dest: "{{ hwloc_build_dir }}"
     extra_opts:
       - --strip-components=1
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   when: hwloc_build
 
-- name: clean hwloc src dir
-  command: make distclean
+- name: Clean hwloc src dir
+  ansible.builtin.command: make distclean
   args:
     chdir: "{{ hwloc_build_dir }}"
   failed_when: false
   when: hwloc_build
 
-- name: configure hwloc
-  command: "{{ hwloc_configure }}"
+- name: Configure hwloc
+  ansible.builtin.command: "{{ hwloc_configure }}"
   args:
     chdir: "{{ hwloc_build_dir }}"
   when: hwloc_build
 
-- name: build hwloc
-  shell: "make -j$(nproc) > build.log 2>&1"
+- name: Build hwloc
+  ansible.builtin.shell: "make -j$(nproc) > build.log 2>&1"
   args:
     chdir: "{{ hwloc_build_dir }}"
   when: hwloc_build
 
-- name: install hwloc
-  shell: "make -j$(nproc) install >> build.log 2>&1"
+- name: Install hwloc
+  ansible.builtin.shell: "make -j$(nproc) install >> build.log 2>&1"
   args:
     chdir: "{{ hwloc_build_dir }}"
   when: hwloc_build

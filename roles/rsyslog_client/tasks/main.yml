@@ -1,16 +1,15 @@
 ---
-- name: ensure rsyslog is installed
-  package:
+- name: Ensure rsyslog is installed
+  ansible.builtin.package:
     name: rsyslog
     state: present
 
-- name: configure syslog forwarding
-  template:
+- name: Configure syslog forwarding
+  ansible.builtin.template:
     src: "99-forward-syslog.conf"
     dest: "/etc/rsyslog.d/99-forward-syslog.conf"
     owner: "root"
     group: "root"
     mode: "0644"
   notify:
-  - restart rsyslog
-  
+    - Restart rsyslog

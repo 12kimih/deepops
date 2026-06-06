@@ -1,19 +1,19 @@
 ---
-- name: install
-  package:
+- name: Install
+  ansible.builtin.package:
     name: cachefilesd
     state: "{{ cachefilesd_package_state }}"
 
-- name: enable
-  template:
+- name: Enable
+  ansible.builtin.template:
     src: cachefilesd.j2
     dest: /etc/default/cachefilesd
     owner: "root"
     group: "root"
     mode: "0644"
 
-- name: configure
-  template:
+- name: Configure
+  ansible.builtin.template:
     src: cachefilesd_config.j2
     dest: /etc/cachefilesd.conf
     owner: "root"
@@ -21,10 +21,10 @@
     mode: "0644"
 
 # Service start not tested in molecule as we require a kernel module
-- name: start
-  service:
+- name: Start
+  ansible.builtin.service:
     name: cachefilesd
     state: restarted
-    enabled: yes
+    enabled: true
   tags:
-  - molecule-notest
+    - molecule-notest

@@ -1,15 +1,15 @@
 ---
-- name: ensure python3 docker module is installed
-  package:
+- name: Ensure python3 docker module is installed
+  ansible.builtin.package:
     name: python3-docker
     state: present
 
-- name: log into docker registry
-  docker_login:
+- name: Log into docker registry
+  community.docker.docker_login:
     state: "{{ docker_login_state }}"
     registry: "{{ item.registry }}"
     username: "{{ item.username }}"
     password: "{{ item.password }}"
-    reauthorize: "{{ docker_login_reauth }}" 
+    reauthorize: "{{ docker_login_reauth }}"
   with_items: "{{ docker_login_registries }}"
   no_log: "{{ docker_login_disable_log_password }}"

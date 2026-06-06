@@ -1,15 +1,14 @@
 ---
-
-- name: install dependencies
-  apt:
+- name: Install dependencies
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   with_items:
     - numactl
   when: ansible_distribution == 'Ubuntu'
 
-- name: install dependencies
-  yum:
+- name: Install dependencies
+  ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items:
@@ -17,48 +16,48 @@
     - numactl
   when: ansible_os_family == "RedHat"
 
-- name: add cgroups to grub options
-  lineinfile:
+- name: Add cgroups to grub options
+  ansible.builtin.lineinfile:
     dest: /etc/default/grub
-    insertafter: '^GRUB_CMDLINE_LINUX=[^\\$]'
+    insertafter: "^GRUB_CMDLINE_LINUX=[^\\\\$]"
     line: 'GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} cgroup_enable=memory swapaccount=1"'
   register: update_grub
 
-- name: update grub
-  block:
-    - name: update grub
-      command: update-grub
-      register: update_grub_cmd
-      changed_when: update_grub_cmd.rc == 0
-    - name: reboot after updating grub config
-      reboot:
-        reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+- name: Update grub
   when: update_grub.changed and ansible_os_family == "Debian"
 
-- name: update grub
   block:
-    - name: update grub
-      command: grub2-mkconfig -o /boot/grub2/grub.cfg
-      register: grub2_mkconfig_cmd
-      changed_when: grub2_mkconfig_cmd.rc == 0
-    - name: reboot after updating grub config
-      reboot:
+    - name: Update grub
+      ansible.builtin.command: update-grub
+      register: update_grub_cmd
+      changed_when: update_grub_cmd.rc == 0
+    - name: Reboot after updating grub config
+      ansible.builtin.reboot:
         reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+- name: Update grub
   when: update_grub.changed and ansible_os_family == "RedHat"
 
-- name: create sysconfig dir
-  file:
+  block:
+    - name: Update grub
+      ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
+      register: grub2_mkconfig_cmd
+      changed_when: grub2_mkconfig_cmd.rc == 0
+    - name: Reboot after updating grub config
+      ansible.builtin.reboot:
+        reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+- name: Create sysconfig dir
+  ansible.builtin.file:
     path: "{{ slurm_sysconf_dir }}"
     state: directory
     owner: root
-    mode: 0755
+    mode: "0755"
 
-- name: create slurm directories
-  file:
+- name: Create slurm directories
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: slurm
-    mode: 0755
+    mode: "0755"
   with_items:
     - "{{ slurm_config_dir }}"
     - "{{ slurm_config_dir }}/shared"
@@ -69,97 +68,97 @@
     - prolog
     - epilog
 
-- name: configure slurmd for pmix
-  blockinfile:
+- name: Configure slurmd for pmix
+  ansible.builtin.blockinfile:
     path: "{{ slurm_sysconf_dir }}/slurmd"
-    create: yes
+    create: true
     mode: "0644"
     block: |
       PMIX_MCA_ptl=^usock
       PMIX_MCA_psec=none
       PMIX_SYSTEM_TMPDIR=/var/empty
       PMIX_MCA_gds=hash
-  notify: restart slurmd
+  notify: Restart slurmd
   tags: config
 
-- name: copy shared scripts
-  template:
+- name: Copy shared scripts
+  ansible.builtin.template:
     src: "{{ item }}"
     dest: "{{ slurm_config_dir }}/shared/bin/"
-    mode: 0755
+    mode: "0755"
   with_fileglob:
     - templates/etc/slurm/shared/bin/*
   tags:
     - prolog
     - epilog
 
-- name: include prolog/epilog
-  include_tasks: prolog_epilog.yml
+- name: Include prolog/epilog
+  ansible.builtin.include_tasks: prolog_epilog.yml
   when: slurm_enable_prolog_epilog
 
-- name: configure slurm.conf
-  template:
+- name: Configure slurm.conf
+  ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
     dest: "{{ slurm_config_dir }}/slurm.conf"
     mode: "0644"
   when: not slurm_conf_symlink
   notify:
-  - restart slurmd
+    - Restart slurmd
   tags:
-  - config
+    - config
 
-- name: configure slurm.conf by symbolic link
-  file:
+- name: Configure slurm.conf by symbolic link
+  ansible.builtin.file:
     path: "{{ slurm_config_dir }}/slurm.conf"
     state: link
     src: "{{ slurmctl_config_dir }}/slurm.conf"
-    force: yes
+    force: true
   when: slurm_conf_symlink
   notify:
-  - restart slurmd
+    - Restart slurmd
   tags:
-  - config
+    - config
 
-- name: configure cgroup.conf
-  template:
+- name: Configure cgroup.conf
+  ansible.builtin.template:
     src: "{{ slurm_cgroup_conf_template }}"
     dest: "{{ slurm_config_dir }}/cgroup.conf"
     mode: "0644"
   notify:
-  - restart slurmd
+    - Restart slurmd
   tags:
-  - config
+    - config
 
-- name: configure gres.conf
-  template:
+- name: Configure gres.conf
+  ansible.builtin.template:
     src: "{{ slurm_gres_conf_template }}"
     dest: "{{ slurm_config_dir }}/gres.conf"
     mode: "0644"
   notify:
-  - restart slurmd
+    - Restart slurmd
   tags:
-  - config
+    - config
 
-- name: start slurmd
-  systemd:
+- name: Start slurmd
+  ansible.builtin.systemd:
     name: slurmd
     state: restarted
-    enabled: yes
-    daemon-reload: yes
+    enabled: true
+    daemon-reload: true
 
-- name: install /etc/localusers
-  template:
+- name: Install /etc/localusers
+  ansible.builtin.template:
     src: etc/localusers
     dest: "{{ item }}"
-    mode: 0600
+    mode: "0600"
   with_items:
     - "{{ slurm_config_dir }}/localusers.backup"
     - /etc/localusers
   tags:
     - localusers
 
-- name: configure /etc/pam.d/sshd to restrict node access without jobs
-  blockinfile:
+- name: Configure /etc/pam.d/sshd to restrict node access without jobs
+  ansible.builtin.blockinfile:
     path: /etc/pam.d/sshd
     block: |
       -account sufficient {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so action_no_jobs=ignore
@@ -170,11 +169,11 @@
   tags:
     - config
   when:
-  - slurm_enable_pam_slurm_adopt
-  - slurm_restrict_node_access
+    - slurm_enable_pam_slurm_adopt
+    - slurm_restrict_node_access
 
-- name: configure /etc/pam.d/sshd to adopt processes but not otherwise deny access
-  blockinfile:
+- name: Configure /etc/pam.d/sshd to adopt processes but not otherwise deny access
+  ansible.builtin.blockinfile:
     path: /etc/pam.d/sshd
     block: |
       -account sufficient {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so action_no_jobs=ignore
@@ -184,28 +183,27 @@
   tags:
     - config
   when:
-  - slurm_enable_pam_slurm_adopt
-  - not slurm_restrict_node_access
+    - slurm_enable_pam_slurm_adopt
+    - not slurm_restrict_node_access
 
-- name: comment out pam_systemd.so as it conflicts with pam_slurm_adapt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
-  replace:
+- name: Comment out pam_systemd.so as it conflicts with pam_slurm_adapt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
+  ansible.builtin.replace:
     path: /etc/pam.d/common-session
-    regexp: '^([^#].*pam_systemd.so.*)'
-    replace: '# \1 # ANSIBLE MANAGED (ansible-role-slurm)'
-  when: 
-  - ansible_distribution == 'Ubuntu'
-  - slurm_enable_pam_slurm_adopt
-  tags:
-    - config
-
-- name: comment out pam_systemd.so in RHEL as it conflicts with pam_slurm_adapt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
-  replace:
-    path: /etc/pam.d/password-auth
-    regexp: '^([^#].*pam_systemd.so.*)'
-    replace: '# \1 # ANSIBLE MANAGED (ansible-role-slurm)'
+    regexp: "^([^#].*pam_systemd.so.*)"
+    replace: "# \\1 # ANSIBLE MANAGED (ansible-role-slurm)"
   when:
-  - ansible_os_family == "RedHat"
-  - slurm_enable_pam_slurm_adopt
+    - ansible_distribution == 'Ubuntu'
+    - slurm_enable_pam_slurm_adopt
   tags:
     - config
 
+- name: Comment out pam_systemd.so in RHEL as it conflicts with pam_slurm_adapt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
+  ansible.builtin.replace:
+    path: /etc/pam.d/password-auth
+    regexp: "^([^#].*pam_systemd.so.*)"
+    replace: "# \\1 # ANSIBLE MANAGED (ansible-role-slurm)"
+  when:
+    - ansible_os_family == "RedHat"
+    - slurm_enable_pam_slurm_adopt
+  tags:
+    - config

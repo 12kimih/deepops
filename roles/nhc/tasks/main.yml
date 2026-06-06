@@ -1,40 +1,40 @@
 ---
-- name: "gather os specific variables"
-  include_vars: "{{ item }}"
+- name: "Gather os specific variables"
+  ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
-      - "{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml"
-      - "{{ ansible_distribution|lower }}.yml"
-      - "{{ ansible_os_family|lower }}.yml"
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
       paths:
-      - ../vars
+        - ../vars
       skip: true
   tags:
     - always
 
-- name: default to building NHC
-  set_fact:
+- name: Default to building NHC
+  ansible.builtin.set_fact:
     nhc_build: true
 
-- name: check if nhc is installed
-  command: ls -l {{ nhc_install_dir }}/sbin/nhc
+- name: Check if nhc is installed
+  ansible.builtin.command: ls -l {{ nhc_install_dir }}/sbin/nhc
   register: nhc_check
-  ignore_errors: yes
+  ignore_errors: true
   changed_when: nhc_check.rc != 0
 
-- name: don't build if installed unless we force
-  set_fact:
+- name: Don't build if installed unless we force
+  ansible.builtin.set_fact:
     nhc_build: false
   when: nhc_check.rc == 0 and not nhc_force_reinstall
 
-- name: install build dependencies
-  package:
+- name: Install build dependencies
+  ansible.builtin.package:
     name: "{{ item }}"
     state: present
   with_items: "{{ nhc_build_deps }}"
 
-- name: ensure build dir exists
-  file:
+- name: Ensure build dir exists
+  ansible.builtin.file:
     path: "{{ nhc_build_dir }}"
     state: "directory"
     owner: "root"
@@ -42,65 +42,65 @@
     mode: "0755"
   when: nhc_build
 
-- name: download nhc src
-  get_url:
+- name: Download nhc src
+  ansible.builtin.get_url:
     url: "{{ nhc_src_url }}"
     dest: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
     mode: "0644"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   when: nhc_build
 
-- name: extract nhc src
-  unarchive:
+- name: Extract nhc src
+  ansible.builtin.unarchive:
     src: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
     dest: "{{ nhc_build_dir }}/"
-    remote_src: yes
+    remote_src: true
   when: nhc_build
 
-- name: configure nhc
-  command: "{{ nhc_configure }}"
+- name: Configure nhc
+  ansible.builtin.command: "{{ nhc_configure }}"
   args:
     chdir: "{{ nhc_extract_dir }}"
   when: nhc_build
 
-- name: test nhc src
-  command: "{{ nhc_test }}"
+- name: Test nhc src
+  ansible.builtin.command: "{{ nhc_test }}"
   args:
     chdir: "{{ nhc_extract_dir }}"
   when: nhc_build and nhc_run_test
 
-- name: make and install nhc
-  command: "{{ nhc_make }}"
+- name: Make and install nhc
+  ansible.builtin.command: "{{ nhc_make }}"
   args:
     chdir: "{{ nhc_extract_dir }}"
   when: nhc_build
 
-- name: add deepops checks to nhc
-  copy:
+- name: Add deepops checks to nhc
+  ansible.builtin.copy:
     src: "deepops.nhc"
     dest: "{{ nhc_config_dir }}/nhc/scripts/deepops.nhc"
     owner: "root"
     group: "root"
     mode: "0644"
 
-- name: install NHC config
-  template:
+- name: Install NHC config
+  ansible.builtin.template:
     src: "{{ nhc_config_template }}"
     dest: "{{ nhc_config_dir }}/nhc/nhc.conf"
     owner: "root"
     group: "root"
     mode: "0644"
 
-- name: create sysconfig dir
-  file:
+- name: Create sysconfig dir
+  ansible.builtin.file:
     path: "{{ nhc_sysconfig_dir }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
 
-- name: add sysconfig to use slurm
-  template:
+- name: Add sysconfig to use slurm
+  ansible.builtin.template:
     src: "{{ nhc_sysconfig_template }}"
     dest: "{{ nhc_sysconfig_dir }}/nhc"
     owner: root

@@ -1,32 +1,32 @@
 ---
 - hosts: slurm-master
   tasks:
-    - name: set controller fact
-      set_fact:
+    - name: Set controller fact
+      ansible.builtin.set_fact:
         is_controller: true
       tags: always
 
 - hosts: slurm-node
   tasks:
-    - name: set compute fact
-      set_fact:
+    - name: Set compute fact
+      ansible.builtin.set_fact:
         is_compute: true
       tags: always
 
 - hosts: slurm-cluster
-  become: yes
+  become: true
   tasks:
-    - name: set enroot DGX config fact
-      set_fact:
+    - name: Set enroot DGX config fact
+      ansible.builtin.set_fact:
         enroot_environ_config_files: "{{ enroot_environ_config_files_dgx }}"
       when: ansible_product_name is search("DGX")
 
 - hosts: slurm-node
-  become: yes
+  become: true
   roles:
     - name: nvidia.enroot
 
 - hosts: slurm-cluster
-  become: yes
+  become: true
   roles:
     - name: pyxis

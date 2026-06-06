@@ -1,7 +1,7 @@
 ---
 # Anaconda on all hosts
 - hosts: all
-  become: yes
+  become: true
   roles:
   - andrewrothstein.miniconda
   tasks:
@@ -12,7 +12,7 @@
 
 # CUDA components just on workers
 - hosts: slurm-workers
-  become: yes
+  become: true
   roles:
   - facts
   - nvidia-ml
@@ -36,14 +36,14 @@
 
 # Pre-copy scripts to all nodes
 - hosts: all
-  become: yes
+  become: true
   vars:
     share_dir: "/usr/share/deepops"
   tasks:
   - name: create a doc directory for these files
     file:
       path: "{{ share_dir }}"
-      mode: 0777
+      mode: "0777"
       owner: root
       group: root
       state: directory
@@ -53,14 +53,14 @@
       dest: "{{ share_dir}}/conda-requirements.yml"
       owner: root
       group: root
-      mode: 0444
+      mode: "0444"
   - name: copy scripts to doc dir
     copy:
       src: "{{ item }}"
       dest: "{{ share_dir }}/{{ item }}"
       owner: root
       group: root
-      mode: 0555
+      mode: "0555"
     with_items:
     - launch-dask-cuda-worker.sh
     - launch-dask-scheduler.sh

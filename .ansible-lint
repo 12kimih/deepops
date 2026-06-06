@@ -1,7 +1,12 @@
 ---
 # Project-level ansible-lint configuration for ansible-lint 26.x
 # Profile levels: min, basic, moderate, safety, shared, production
-profile: min
+#
+# The repo is held at the strict `production` profile so that the consistency
+# rules already cleaned up across the tree — FQCN module names, capitalized
+# task/play names, jinja spacing, task key ordering, and YAML style (truthy,
+# octal modes) — stay enforced in CI and cannot regress.
+profile: production
 
 # Exclude external/vendored roles and hardware-specific roles
 exclude_paths:
@@ -11,16 +16,24 @@ exclude_paths:
   - roles/nvidia-gpu-tests/
   - submodules/
 
-# Skip rules for pre-existing issues across the codebase.
-# These should be fixed incrementally in future PRs.
+# Pre-existing, higher-risk issues that are NOT auto-fixable and are being
+# addressed incrementally as each subsystem is modernized. These are the only
+# categories still allowed; everything else (incl. fqcn/name/jinja/key-order)
+# must pass.
 skip_list:
-  - fqcn[action-core]    # 634 violations: modules not using FQCN
-  - fqcn[action]         # 24 violations: same for non-core
-  - name[casing]         # 526 violations: task names not capitalized
-  - yaml[truthy]         # 152 violations: yes/no instead of true/false
-  - yaml[octal-values]   # 52 violations: octal file modes
-  - jinja[spacing]       # 20 violations: jinja2 spacing
-  - name[play]           # 12 violations: play names
-  - schema[meta]         # 3 violations: meta/main.yml schema
-  - key-order[task]      # 3 violations: task key ordering
-  - ignore-errors        # pre-existing ignore_errors usage
+  - var-naming[no-role-prefix]   # vars not prefixed with the role name
+  - var-naming[pattern]          # non-conforming variable names
+  - name[play]                   # plays missing a descriptive name
+  - name[missing]                # tasks missing a name
+  - no-changed-when              # commands without changed_when
+  - no-free-form                 # free-form module invocation
+  - no-handler                   # change-driven tasks that could be handlers
+  - risky-shell-pipe             # shell pipes without pipefail
+  - risky-file-permissions       # file/copy tasks without an explicit mode
+  - command-instead-of-module    # raw command where a module exists
+  - command-instead-of-shell     # shell used where command would do
+  - meta-no-tags                 # role meta missing galaxy_tags
+  - schema[meta]                 # role meta/main.yml schema gaps
+  - schema[requirements]         # non-standard requirements.yml entries
+  - yaml[line-length]            # long lines (> 160 chars)
+  - ignore-errors                # pre-existing ignore_errors usage

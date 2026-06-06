@@ -1,25 +1,25 @@
 ---
-- name: gather os specific variables
-  include_vars: "{{ item }}"
+- name: Gather os specific variables
+  ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
-      - "{{ ansible_distribution|lower }}.yml"
-      - "{{ ansible_os_family|lower }}.yml"
+        - "{{ ansible_distribution | lower }}.yml"
+        - "{{ ansible_os_family | lower }}.yml"
       paths:
-      - ../vars
+        - ../vars
       skip: true
   tags:
     - always
 
-- name: trust GPG key for EPEL
-  rpm_key:
+- name: Trust GPG key for EPEL
+  ansible.builtin.rpm_key:
     key: "{{ epel_key_url }}"
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: add epel repo
-  yum:
-    name: 
+- name: Add epel repo
+  ansible.builtin.dnf:
+    name:
       - "{{ epel_package }}"
     state: present
   when: ansible_os_family == "RedHat"

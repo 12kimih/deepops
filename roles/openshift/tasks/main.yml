@@ -1,6 +1,6 @@
 ---
-- name: install virtualenv and setuptools
-  apt:
+- name: Install virtualenv and setuptools
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   with_items:
@@ -9,32 +9,32 @@
   when: ansible_distribution == 'Ubuntu'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
-- name: create location for deepops files
-  file:
+- name: Create location for deepops files
+  ansible.builtin.file:
     path: "{{ deepops_dir }}"
     state: directory
     mode: "0755"
 
-- name: install openshift python client for k8s_raw module
-  pip:
+- name: Install openshift python client for k8s_raw module
+  ansible.builtin.pip:
     name: openshift
     virtualenv: "{{ deepops_venv }}"
   when: ansible_distribution == 'Ubuntu'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
-- name: trust GPG key for EPEL
-  rpm_key:
+- name: Trust GPG key for EPEL
+  ansible.builtin.rpm_key:
     key: "{{ epel_key_url }}"
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: install EPEL for CentOS
-  yum:
+- name: Install EPEL for CentOS
+  ansible.builtin.dnf:
     name: "{{ epel_package }}"
   when: ansible_os_family == "RedHat"
 
-- name: install openshift python client for k8s_raw module
-  yum:
+- name: Install openshift python client for k8s_raw module
+  ansible.builtin.dnf:
     name: python3-openshift
   when: ansible_os_family == 'RedHat'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"

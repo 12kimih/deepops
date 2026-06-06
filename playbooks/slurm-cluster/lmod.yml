@@ -1,5 +1,5 @@
 ---
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   roles:
-  - lmod
+    - lmod

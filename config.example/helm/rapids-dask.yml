@@ -1,3 +1,4 @@
+---
 # See the github repo for more details:  https://github.com/helm/charts/blob/master/stable/dask/values.yaml
 # For best results, use the same docker image for workers and schedulers
 
@@ -10,7 +11,7 @@ worker:
     tag: cuda9.2-runtime-ubuntu16.04
     env:
   replicas: 1
-  resources: 
+  resources:
     requests:
       nvidia.com/gpu: 1
     limits:
@@ -27,7 +28,7 @@ jupyter:
   image:
     repository: supertetelman/k8s-rapids-dask
     tag: cuda9.2-runtime-ubuntu16.04
-  resources: 
+  resources:
     requests:
       nvidia.com/gpu: 0
     limits:

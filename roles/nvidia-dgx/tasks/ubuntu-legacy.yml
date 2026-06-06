@@ -24,7 +24,7 @@
   apt:
     name: dmidecode
     state: present
-    update_cache: yes
+    update_cache: true
 
 # Housekeeping
 - name: register DGX product name
@@ -69,7 +69,7 @@
 - name: update dgx platform file
   blockinfile:
     path: /etc/dgx-release
-    create: yes
+    create: true
     block: |
       DGX_NAME="DGX Server"
       DGX_PRETTY_NAME="NVIDIA DGX Server"
@@ -79,7 +79,7 @@
 - name: update dgx platform file with additional info for DGX OS 4
   blockinfile:
     path: /etc/dgx-release
-    create: yes
+    create: true
     block: |
       DGX_SWBUILD_DATE="{{ DGX_SWBUILD_DATE }}"
       DGX_SWBUILD_VERSION="{{ DGX_SWBUILD_VERSION }}"
@@ -96,7 +96,7 @@
   apt:
     name: "{{ item }}"
     state: absent
-    purge: yes
+    purge: true
   with_items:
     - cuda-dcgm
     - cuda-driver
@@ -135,38 +135,38 @@
   template:
     src: dgx.list.j2
     dest: /etc/apt/sources.list.d/dgx.list
-    mode: 0644
+    mode: "0644"
   when: ansible_distribution_version == "18.04"
 
 - name: add DGX repo for DGX OS 5
   template:
     src: dgxos5.list.j2
     dest: /etc/apt/sources.list.d/dgx-temp.list
-    mode: 0644
+    mode: "0644"
   when: ansible_distribution_version == "20.04"
 
 - name: update apt cache
   apt:
-    update_cache: yes
+    update_cache: true
 
 - name: add DGX cuda 10.1 repo for DGX OS 4
   apt:
     name: dgx-bionic-r418+cuda10.1-repo
-    update_cache: yes
+    update_cache: true
     dpkg_options: "force-confdef,force-confold"
   when: ansible_distribution_version == "18.04"
 
 - name: add DGX cuda 11.0 repo for DGX OS 4
   apt:
     name: dgx-bionic-r450+cuda11.0-repo
-    update_cache: yes
+    update_cache: true
     dpkg_options: "force-confdef,force-confold"
   when: ansible_distribution_version == "18.04"
 
 - name: add DGXA100 repo for DGX OS 4
   apt:
     name: dgx-bionic-4.99-repo
-    update_cache: yes
+    update_cache: true
     dpkg_options: "force-confdef,force-confold"
   when:
     - ansible_distribution_version == "18.04"
@@ -176,7 +176,7 @@
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ G_PREREQS }}"
     - "{{ G_SETUP_PKGS }}"
@@ -185,7 +185,7 @@
 - name: install DGX repo package for DGX OS 5
   apt:
     name: "{{ item }}"
-    update_cache: yes
+    update_cache: true
     dpkg_options: "force-confdef,force-confold"
   with_items:
     - "{{ G_DGX_REPO_PKG }}"
@@ -200,7 +200,7 @@
 - name: install more packages for DGX OS 5
   apt:
     name: "{{ item }}"
-    update_cache: yes
+    update_cache: true
     dpkg_options: "force-confdef,force-confold"
   with_items:
     - "{{ G_PKGS_DEFAULT }}"
@@ -210,20 +210,20 @@
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ PKGS_DGX1_ALL }}"
   when:
     - ansible_distribution_version == "18.04"
     - ansible_product_name is search("DGX-1")
   notify:
-    - restart docker
+    - Restart docker
 
 - name: install DGX-1 packages for DGX OS 5
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ G_DGX_COMMON_PKGS }}"
     - "{{ G_DGX1_PKGS }}"
@@ -231,26 +231,26 @@
     - ansible_distribution_version == "20.04"
     - ansible_product_name is search("DGX-1")
   notify:
-    - restart docker
+    - Restart docker
 
 - name: install DGX-2 packages for DGX OS 4
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ PKGS_DGX2_ALL }}"
   when:
     - ansible_distribution_version == "18.04"
     - ansible_product_name is search("DGX-2")
   notify:
-    - restart docker
+    - Restart docker
 
 - name: install DGX-2 packages for DGX OS 5
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ G_DGX_COMMON_PKGS }}"
     - "{{ G_DGX2_PKGS }}"
@@ -258,26 +258,26 @@
     - ansible_distribution_version == "20.04"
     - ansible_product_name is search("DGX-2")
   notify:
-    - restart docker
+    - Restart docker
 
 - name: install DGXA100 packages for DGX OS 4
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ PKGS_DGXA100_ALL }}"
   when:
     - ansible_distribution_version == "18.04"
     - ansible_product_name is search("DGXA100")
   notify:
-    - restart docker
+    - Restart docker
 
 - name: install DGXA100 packages for DGX OS 5
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ G_DGX_COMMON_PKGS }}"
     - "{{ G_DGX_A100_PKGS }}"
@@ -285,13 +285,13 @@
     - ansible_distribution_version == "20.04"
     - ansible_product_name is search("DGXA100")
   notify:
-    - restart docker
+    - Restart docker
 
 - name: install extra DGX packages for DGX OS 4
   apt:
     name: "{{ item }}"
     state: present
-    update_cache: yes
+    update_cache: true
   with_items:
     - "{{ dgx_extra_packages }}"
   when: ansible_distribution_version == "18.04"
@@ -330,8 +330,8 @@
   systemd:
     name: "{{ item }}"
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   loop:
     - openibd.service
     - dcgm.service
@@ -351,14 +351,14 @@
   template:
     src: sources.list.j2
     dest: /etc/apt/sources.list
-    mode: 0644
+    mode: "0644"
   when: ansible_distribution_version == "18.04"
 
 - name: disable srp services
   systemd:
     name: "{{ item }}"
     state: stopped
-    enabled: no
+    enabled: false
   when: ansible_product_name is search("DGXA100")
   with_items:
     - srp_daemon
@@ -381,4 +381,4 @@
   systemd:
     name: docker
     state: restarted
-    enabled: yes
+    enabled: true

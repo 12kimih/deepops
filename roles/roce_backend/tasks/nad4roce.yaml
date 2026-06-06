@@ -10,10 +10,10 @@
       type: "sriov"
       spoofChk: "off"
       name: "{{ item.network_name }}"
-      vlan: {{ item.vlan_id |int }}
+      vlan: {{ item.vlan_id | int }}
       ipam:
         type: "dhcp"
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: "k8s.cni.cncf.io/v1"

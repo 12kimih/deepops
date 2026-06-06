@@ -1,56 +1,56 @@
 ---
-- name: create config dir
-  file:
+- name: Create config dir
+  ansible.builtin.file:
     path: "{{ prometheus_config_dir }}"
     state: directory
     mode: "0755"
 
-- name: create endpoints config dir
-  file:
+- name: Create endpoints config dir
+  ansible.builtin.file:
     path: "{{ prometheus_cfg_endpoint_dir }}"
     state: directory
     mode: "0755"
 
-- name: install config file
-  template:
+- name: Install config file
+  ansible.builtin.template:
     src: "{{ nvidia_dcgm_exporter_conf_template }}"
     dest: "{{ prometheus_cfg_endpoint_dir }}/dcgm-exporter.yml"
     owner: root
     group: root
-    mode: 0644
+    mode: "0644"
 
-- name: create dcgm-exporter config dir
-  file:
+- name: Create dcgm-exporter config dir
+  ansible.builtin.file:
     path: "{{ nvidia_dcgm_container_config_dir }}"
     state: directory
     mode: "0755"
   when: has_gpus
 
-- name: copy metrics file
-  copy:
+- name: Copy metrics file
+  ansible.builtin.copy:
     src: "{{ nvidia_dcgm_container_custom_metrics_file }}"
     dest: "{{ nvidia_dcgm_container_config_dir }}/{{ nvidia_dcgm_container_custom_metrics_file }}"
     owner: "root"
     group: "root"
     mode: "0644"
   when: has_gpus
-  notify: restart dcgm
+  notify: Restart dcgm
 
-- name: install systemd unit file
-  template:
+- name: Install systemd unit file
+  ansible.builtin.template:
     src: templates/docker.dcgm-exporter.service.j2
     dest: "/etc/systemd/system/{{ nvidia_dcgm_svc_name }}"
     owner: root
     group: root
-    mode: 0644
+    mode: "0644"
   when: has_gpus
-  notify: restart dcgm
+  notify: Restart dcgm
 
-- name: configure service
-  systemd:
+- name: Configure service
+  ansible.builtin.systemd:
     name: "{{ nvidia_dcgm_svc_name }}"
     state: "{{ nvidia_dcgm_state }}"
     enabled: "{{ nvidia_dcgm_enabled }}"
-    daemon_reload: yes
-  notify: restart dcgm
+    daemon_reload: true
+  notify: Restart dcgm
   when: has_gpus

@@ -1,8 +1,8 @@
 ---
 - name: Converge
   hosts: all
-  become: yes
+  become: true
   tasks:
     - name: "Include nvidia_hpc_sdk"
-      include_role:
+      ansible.builtin.include_role:
         name: "nvidia_hpc_sdk"

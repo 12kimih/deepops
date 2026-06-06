@@ -4,5 +4,5 @@
   become: true
   tasks:
     - name: Configure Chrony client
-      include_role:
+      ansible.builtin.include_role:
         name: DeepOps.chrony

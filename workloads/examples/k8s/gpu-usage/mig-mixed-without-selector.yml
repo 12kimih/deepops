@@ -1,3 +1,4 @@
+---
 # This yaml file will launch a container with a 1g.5gb MIG device
 # It will deploy onto any GPU where this profile is available
 apiVersion: v1

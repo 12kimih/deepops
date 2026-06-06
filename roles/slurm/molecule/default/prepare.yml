@@ -1,13 +1,12 @@
 ---
 - hosts: all
-  become: yes
+  become: true
   tasks:
+    - name: Ensure apt cache is updated
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_distribution == "Ubuntu"
 
-  - name: ensure apt cache is updated
-    apt:
-      update_cache: true
-    when: ansible_distribution == "Ubuntu"
-
-  - name: workaround to enable service in container
-    shell: printf '$!/bin/sh\nexit 0' > /usr/sbin/policy-rc.d
-    when: ansible_distribution == "Ubuntu"
+    - name: Workaround to enable service in container
+      ansible.builtin.shell: printf '$!/bin/sh\nexit 0' > /usr/sbin/policy-rc.d
+      when: ansible_distribution == "Ubuntu"

@@ -18,7 +18,7 @@
   import_playbook: generic/hosts.yml
   when: "{{ slurm_configure_etc_hosts | default(true) }}"
   tags:
-  - set-etc-hosts
+    - set-etc-hosts
 
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
@@ -50,7 +50,7 @@
 - name: Install NVIDIA CUDA Toolkit
   import_playbook: nvidia-software/nvidia-cuda.yml
   vars:
-     cuda_playbook_install_driver: "{{ slurm_cluster_install_nvidia_driver }}"
+    cuda_playbook_install_driver: "{{ slurm_cluster_install_nvidia_driver }}"
   when: slurm_cluster_install_cuda|default(true)
 
 - name: Install software
@@ -110,7 +110,7 @@
   vars:
     hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
   when: slurm_enable_monitoring
-  
+
 - name: Install monitoring exporters | Install prometheus slurm exporter
   import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
   vars:

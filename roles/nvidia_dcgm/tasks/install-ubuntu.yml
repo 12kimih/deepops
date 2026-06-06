@@ -1,17 +1,17 @@
 ---
 - name: Ubuntu | install CUDA keyring
-  apt:
+  ansible.builtin.apt:
     deb: "{{ nvidia_driver_ubuntu_cuda_keyring_url }}"
     state: "present"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Ubuntu | force apt update
-  apt:
+  ansible.builtin.apt:
     update_cache: true
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   changed_when: false
 
 - name: Ubuntu | install package
-  apt:
+  ansible.builtin.apt:
     name: "{{ dcgm_pkg_name }}"
     state: "present"

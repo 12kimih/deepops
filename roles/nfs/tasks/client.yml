@@ -1,35 +1,35 @@
 ---
-- name: ensure mountpoint exists
-  file:
-    path: '{{ item.mountpoint }}'
+- name: Ensure mountpoint exists
+  ansible.builtin.file:
+    path: "{{ item.mountpoint }}"
     state: directory
     mode: "0755"
-  with_items: '{{ nfs_mounts }}'
+  with_items: "{{ nfs_mounts }}"
   when: nfs_mounts|length
   tags:
     - nfs
 
-- name: configure /etc/fstab on clients
-  mount:
+- name: Configure /etc/fstab on clients
+  ansible.posix.mount:
     name: "{{ item.mountpoint }}"
     src: "{{ item.server }}:{{ item.path }}"
     opts: "{{ item.options }}"
-    fstype: nfs 
+    fstype: nfs
     state: mounted
-  with_items: '{{ nfs_mounts }}'
+  with_items: "{{ nfs_mounts }}"
   when: nfs_mounts|length
   tags:
     - nfs
 
-- name: rhel | install management prereq
-  yum:
+- name: Rhel | Install management prereq
+  ansible.builtin.dnf:
     name: "python3-libsemanage"
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: rhel | enable nfs home directory usage
-  seboolean:
+- name: Rhel | Enable nfs home directory usage
+  ansible.posix.seboolean:
     name: "use_nfs_home_dirs"
-    state: yes
-    persistent: yes
+    state: true
+    persistent: true
   when: ansible_os_family == "RedHat"

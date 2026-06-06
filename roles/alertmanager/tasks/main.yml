@@ -1,42 +1,42 @@
 ---
-- name: create config dir
-  file:
+- name: Create config dir
+  ansible.builtin.file:
     path: "{{ alertmanager_config_dir }}"
     state: directory
     mode: "0755"
 
-- name: install config file
-  template:
+- name: Install config file
+  ansible.builtin.template:
     src: "{{ alertmanager_config_src }}"
     dest: "{{ alertmanager_config_dir }}/alertmanager.yml"
     owner: root
     group: root
-    mode: 0644
-  notify: restart alertmanager
+    mode: "0644"
+  notify: Restart alertmanager
 
-- name: install python3 docker module
-  package:
+- name: Install python3 docker module
+  ansible.builtin.package:
     name: python3-docker
     state: present
 
-- name: create a persistent docker volume for metrics
-  docker_volume:
+- name: Create a persistent docker volume for metrics
+  community.docker.docker_volume:
     name: "{{ alertmanager_docker_volume_name }}"
     state: "present"
 
-- name: install systemd unit file
-  template:
+- name: Install systemd unit file
+  ansible.builtin.template:
     src: templates/docker.alertmanager.service.j2
     dest: "/etc/systemd/system/{{ alertmanager_svc_name }}"
     owner: root
     group: root
-    mode: 0644
-  notify: restart alertmanager
+    mode: "0644"
+  notify: Restart alertmanager
 
-- name: configure service
-  systemd:
+- name: Configure service
+  ansible.builtin.systemd:
     name: "{{ alertmanager_svc_name }}"
     state: "{{ alertmanager_state }}"
     enabled: "{{ alertmanager_enabled }}"
-    daemon_reload: yes
-  notify: restart alertmanager
+    daemon_reload: true
+  notify: Restart alertmanager

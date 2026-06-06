@@ -3,8 +3,8 @@
   import_playbook: ../container/docker.yml
 
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   tasks:
-    - name: configure node exporter
-      include_role:
+    - name: Configure node exporter
+      ansible.builtin.include_role:
         name: prometheus-node-exporter

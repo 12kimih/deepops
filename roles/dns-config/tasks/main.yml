@@ -1,38 +1,38 @@
 ---
-- name: assert that variables are defined
-  fail:
+- name: Assert that variables are defined
+  ansible.builtin.fail:
     msg: "Variable '{{ item }}' is not defined"
   when: item not in vars
   with_items:
     - dns_config_servers
 
-- name: disable services (xenial)
-  service:
+- name: Disable services (xenial)
+  ansible.builtin.service:
     name: "{{ item }}"
     state: stopped
-    enabled: no
+    enabled: false
   loop:
     - resolvconf
     - systemd-resolved
   when: ansible_distribution == 'Ubuntu' and ansible_distribution_major_version == '16'
 
-- name: disable services (bionic, focal)
-  service:
+- name: Disable services (bionic, focal)
+  ansible.builtin.service:
     name: systemd-resolved
     state: stopped
-    enabled: no
+    enabled: false
   when: ansible_distribution == 'Ubuntu' and (ansible_distribution_major_version in ['18', '20'])
 
-- name: install /etc/resolv.conf
-  template:
+- name: Install /etc/resolv.conf
+  ansible.builtin.template:
     src: resolv.conf.j2
     dest: /etc/resolv.conf
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
 
-- name: update /etc/nsswitch.conf
-  lineinfile:
+- name: Update /etc/nsswitch.conf
+  ansible.builtin.lineinfile:
     path: /etc/nsswitch.conf
-    regexp: '^hosts:'
-    line: 'hosts: files dns'
+    regexp: "^hosts:"
+    line: "hosts: files dns"

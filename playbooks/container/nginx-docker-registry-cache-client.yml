@@ -3,9 +3,9 @@
   import_playbook: docker.yml
 
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   tasks:
-  - name: configure nginx container caching proxy client
-    include_role:
-      name: "nginx-docker-registry-cache"
-      tasks_from: client
+    - name: Configure nginx container caching proxy client
+      ansible.builtin.include_role:
+        name: "nginx-docker-registry-cache"
+        tasks_from: client

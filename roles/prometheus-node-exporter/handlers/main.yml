@@ -1,5 +1,5 @@
 ---
-- name: restart node-exporter
-  service:
+- name: Restart node-exporter
+  ansible.builtin.service:
     name: "{{ node_exporter_svc_name }}"
     state: restarted

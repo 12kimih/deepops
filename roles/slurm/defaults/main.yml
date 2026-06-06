@@ -1,3 +1,4 @@
+---
 epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
 epel_key_url: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}"
 
@@ -6,20 +7,24 @@ slurm_build_dir: /opt/deepops/build/slurm
 hwloc_build_dir: /opt/deepops/build/hwloc
 pmix_build_dir: /opt/deepops/build/pmix
 
-slurm_workflow_build: yes
+slurm_workflow_build: true
 slurm_version: "25.11.6"
 slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
-slurm_build_make_clean: no
-slurm_build_dir_cleanup: no
+slurm_build_make_clean: false
+slurm_build_dir_cleanup: false
 slurm_config_dir: /etc/slurm
 slurmctl_config_dir: /sw/.slurm
 slurm_sysconf_dir: /etc/sysconfig
 slurm_install_prefix: /usr/local
 slurm_cuda_prefix: /usr/local/cuda
-slurm_configure:  './configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }}'
-slurm_configure_nvml:  './configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }} --with-nvml={{ slurm_cuda_prefix }}'
-slurm_force_rebuild: no
-slurm_contain_ssh: yes
+slurm_configure: "./configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd
+  --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix
+  }} --with-hwloc={{ hwloc_install_prefix }}"
+slurm_configure_nvml: "./configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd
+  --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix
+  }} --with-hwloc={{ hwloc_install_prefix }} --with-nvml={{ slurm_cuda_prefix }}"
+slurm_force_rebuild: false
+slurm_contain_ssh: true
 
 slurm_cluster_name: deepops
 slurm_username: slurm
@@ -28,15 +33,14 @@ slurm_user_uid: 22078
 slurm_user_home: /local/slurm
 
 slurm_allow_ssh_user: []
-
 slurm_db_username: slurm
 slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
 
 slurm_enable_ha: false
 slurm_ha_state_save_location: "/sw/slurm"
 
-is_controller: no
-is_compute: no
+is_controller: false
+is_compute: false
 
 # Controls when a DOWN node will be returned to service.
 # See "man slurm.conf" for more details.
@@ -47,7 +51,7 @@ slurm_resume_timeout: 900
 # Sets: GresTypes=gpu
 # Sets: Gres=gpu:{{ gpu_topology|count }}
 slurm_manage_gpus: true
-slurm_autodetect_nvml: true 
+slurm_autodetect_nvml: true
 
 # Configuration file templates to use for configuring Slurm.
 # The default values are relative paths that will point to files within the
@@ -61,7 +65,7 @@ slurm_dbd_conf_template: "etc/slurm/slurmdbd.conf"
 # Flags for sharing slurm.conf among compute and control nodes
 slurm_conf_symlink: false
 
-# Controls the ability of the partition to execute more than one job at a time on each resource (node, socket or core depending upon the value of SelectTypeParameters). If resources are to be over-subscribed, avoiding memory over-subscription is very important. SelectTypeParameters should be configured to treat memory as a consumable resource and the --mem option should be used for job allocations. Sharing of resources is typically useful only when using gang scheduling (PreemptMode=suspend,gang). Possible values for OverSubscribe are "EXCLUSIVE", "FORCE", "YES", and "NO". Note that a value of "YES" or "FORCE" can negatively impact performance for systems with many thousands of running jobs. The default value is "NO". For more information see the following web pages: 
+# Controls the ability of the partition to execute more than one job at a time on each resource (node, socket or core depending upon the value of SelectTypeParameters). If resources are to be over-subscribed, avoiding memory over-subscription is very important. SelectTypeParameters should be configured to treat memory as a consumable resource and the --mem option should be used for job allocations. Sharing of resources is typically useful only when using gang scheduling (PreemptMode=suspend,gang). Possible values for OverSubscribe are "EXCLUSIVE", "FORCE", "YES", and "NO". Note that a value of "YES" or "FORCE" can negatively impact performance for systems with many thousands of running jobs. The default value is "NO". For more information see the following web pages:
 # Sets partition OverSubscribe
 # To avoid sharing nodes, set to "EXCLUSIVE"
 slurm_oversubscribe: "NO"
@@ -74,7 +78,7 @@ slurm_oversubscribe: "NO"
 # Run time limit used for jobs that don't specify a value. If not set then MaxTime will be used. Format is the same as for MaxTime.
 # Sets: DefaultTime={{ slurm_default_job_timelimit }}
 # Default: <not included>
-# slurm_default_job_timelimit: 
+# slurm_default_job_timelimit:
 
 # Maximum time to wait for Slurm compute nodes to reboot during playbook setup
 slurm_node_reboot_timeout: 600
@@ -99,17 +103,17 @@ slurm_enable_pam_slurm_adopt: true
 # Restrict user SSH access to only allow users with a running job
 slurm_restrict_node_access: true
 
-slurm_include_hwloc: yes
+slurm_include_hwloc: true
 hwloc_version: 2.5.0
 hwloc_tag: "v{{ hwloc_version.split('.')[0] }}.{{ hwloc_version.split('.')[1] }}"
 hwloc_src_url: "https://download.open-mpi.org/release/hwloc/{{ hwloc_tag }}/hwloc-{{ hwloc_version }}.tar.gz"
 hwloc_install_prefix: /opt/deepops/hwloc
 hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-static --disable-cairo --disable-libxml2 --enable-netloc --enable-plugins"
-hwloc_force_rebuild: no
+hwloc_force_rebuild: false
 
-slurm_include_pmix: yes
+slurm_include_pmix: true
 pmix_version: 3.2.3
 pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{ pmix_version }}.tar.bz2"
 pmix_install_prefix: /opt/deepops/pmix
 pmix_configure: "./configure --prefix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }}"
-pmix_force_rebuild: no
+pmix_force_rebuild: false

@@ -1,3 +1,4 @@
+---
 exampleName: pytorch-detection-efficientdet
 
 # registryName/registryPort are the hostname and port for the container

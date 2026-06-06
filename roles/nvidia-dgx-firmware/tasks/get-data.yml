@@ -5,4 +5,4 @@
   register: command_output
 - debug:
     msg: "{{ command_output.stdout }}"
-  ignore_errors: yes
+  ignore_errors: true

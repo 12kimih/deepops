@@ -8,17 +8,17 @@
 - name: Install NVIDIA container runtime
   import_playbook: ../container/nvidia-docker.yml
 
-- hosts:  "{{ hostlist | default('all') }}"
-  become: yes
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
   tasks:
-    - name: install custom facts module
-      include_role:
+    - name: Install custom facts module
+      ansible.builtin.include_role:
         name: facts
-    - name: set GPU fact
-      set_fact:
+    - name: Set GPU fact
+      ansible.builtin.set_fact:
         has_gpus: true
       when: ansible_local['gpus']['count']
-    - name: configure dcgm exporter
-      include_role:
+    - name: Configure dcgm exporter
+      ansible.builtin.include_role:
         name: nvidia-dcgm-exporter
       when: ansible_distribution == "Ubuntu" or ansible_os_family == "RedHat"

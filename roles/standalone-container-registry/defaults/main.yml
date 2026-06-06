@@ -17,5 +17,5 @@ standalone_container_registry_config_dir: "{{ deepops_dir }}/registry"
 # or take advantage of higher rate limits in a pro account.
 standalone_container_registry_cache_enable: false
 standalone_container_registry_cache_upstream: "https://registry-1.docker.io"
-# standalone_container_registry_cache_username: 
+# standalone_container_registry_cache_username:
 # standalone_container_registry_cache_password:

@@ -1,26 +1,25 @@
 ---
-
-- name: install munge
-  package:
+- name: Install munge
+  ansible.builtin.package:
     name: munge
     state: present
   notify:
-    - restart munge
+    - Restart munge
 
-- name: create munge.key
-  template:
+- name: Create munge.key
+  ansible.builtin.template:
     src: templates/etc/munge/munge.key.j2
     dest: /etc/munge/munge.key
-    mode: 0400
+    mode: "0400"
     owner: munge
   notify:
-    - restart munge
+    - Restart munge
 
-- name: start munge
-  service:
+- name: Start munge
+  ansible.builtin.service:
     name: munge
-    enabled: yes
+    enabled: true
     state: started
 
-- name: flush handlers to ensure munge gets restarted now
-  meta: flush_handlers
+- name: Flush handlers to ensure munge gets restarted now
+  ansible.builtin.meta: flush_handlers

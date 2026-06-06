@@ -7,6 +7,9 @@
 # virtualenv
 /.venv/
 
+# ansible-lint / ansible runtime cache
+/.ansible/
+
 # claude code
 /CLAUDE.md
 /tasks/
@@ -20,3 +23,8 @@
 /k8s-config/
 /kubectl
 /tridentctl
+
+# secrets — never commit (Ansible Vault password files, plaintext creds)
+.vault-pass
+*.vault-pass
+vault-password*

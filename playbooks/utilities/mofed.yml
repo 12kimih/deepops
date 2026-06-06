@@ -7,6 +7,6 @@
 # https://community.mellanox.com/s/article/howto-install-mlnx-ofed-driver
 ---
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   roles:
-  - mofed
+    - mofed

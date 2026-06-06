@@ -1,3 +1,4 @@
+---
 install_from_src: false
 
 ood_apache_service_name: httpd24-httpd.service
@@ -15,7 +16,7 @@ ood_client_sw_deps:
   - unzip
   - nmap
   - python-websockify
-  - '@xfce4'
+  - "@xfce4"
   - xfce4-session
   - xfce4-settings
   - xfce4-terminal

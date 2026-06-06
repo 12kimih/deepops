@@ -4,10 +4,10 @@
 
 # GPU operator
 - hosts: kube_control_plane[0]
-  become: yes
+  become: true
   tasks:
     - name: Install helm chart for GPU operator
-      include_role:
+      ansible.builtin.include_role:
         name: nvidia-gpu-operator
       run_once: true
   environment: "{{proxy_env if proxy_env is defined else {}}}"

@@ -3,6 +3,6 @@
   become: true
   tasks:
     - name: Include NVIDIA DGX role
-      include_role:
+      ansible.builtin.include_role:
         name: nvidia-dgx
   environment: "{{proxy_env if proxy_env is defined else {}}}"

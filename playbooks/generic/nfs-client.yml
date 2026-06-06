@@ -1,7 +1,7 @@
 ---
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   roles:
-    - { role: nfs, nfs_is_client: yes }
+    - { role: nfs, nfs_is_client: true }
   tags:
     - nfs_client

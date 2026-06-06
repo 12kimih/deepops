@@ -3,6 +3,5 @@
 #
 ---
 - name: "RHEL install"
-  debug:
+  ansible.builtin.debug:
     msg: "No installs for RHEL"
-

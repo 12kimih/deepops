@@ -5,6 +5,6 @@
 
 # Log into Docker registries
 - hosts: "{{ hostlist | default('all') }}"
-  become: yes
+  become: true
   roles:
-  - docker-login
+    - docker-login

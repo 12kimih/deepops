@@ -1,66 +1,66 @@
 ---
 - hosts: all
-  become: yes
+  become: true
   roles:
     - name: facts
 
 # Set root SSH key to allow SSH/ansible when no slurm job running for ansible user
 - hosts: slurm-node
-  become: yes
+  become: true
   tasks:
     - name: Add SSH public key to root user authorized keys
-      authorized_key:
+      ansible.posix.authorized_key:
         user: root
         state: present
-        key: "{{ lookup('file', ansible_ssh_private_key_file | default(lookup('env','HOME') + '/.ssh/id_rsa') + '.pub') }}"
+        key: "{{ lookup('file', ansible_ssh_private_key_file | default(lookup('env', 'HOME') + '/.ssh/id_rsa') + '.pub') }}"
 
 # Build slurm first on all nodes
 - hosts: slurm-cluster
-  become: yes
+  become: true
   tasks:
-    - name: build slurm on all nodes
-      include_role:
+    - name: Build slurm on all nodes
+      ansible.builtin.include_role:
         name: slurm
         tasks_from: build
 
 # Configure slurm.conf on all nodes
 - hosts: slurm-cluster
-  become: yes
+  become: true
   roles:
     - name: slurm
       vars:
         user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
-        slurm_workflow_build: no
+        slurm_workflow_build: false
 
 # Set up slurm controller
 - hosts: slurm-master
-  become: yes
+  become: true
   roles:
     - name: slurm
       vars:
         user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
-        is_controller: yes
-        slurm_workflow_build: no
+        is_controller: true
+        slurm_workflow_build: false
 
 # Set up slurm nodes
 - hosts: slurm-node
-  become: yes
+  become: true
   roles:
     - name: slurm
       vars:
         user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
-        is_compute: yes
-        slurm_workflow_build: no
+        is_compute: true
+        slurm_workflow_build: false
 
 # Set up slurm-login-on-compute if enabled
 - hosts: slurm-master
-  become: yes
+  become: true
   tasks:
     - name: Setup slurm login on compute if enabled.
-      include_role:
+      ansible.builtin.include_role:
         name: slurm
         tasks_from: login-compute-setup
       vars:
         user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
-        is_controller: yes
+        is_controller: true
       when: slurm_login_on_compute | default(false)

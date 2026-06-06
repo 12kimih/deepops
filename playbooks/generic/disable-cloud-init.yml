@@ -9,33 +9,32 @@
 # This playbook disables cloud-init to prevent DeepOps and cloud-init from
 # stepping on each other.
 
-- hosts: "{{ hostlist | default('all') }}" 
+- hosts: "{{ hostlist | default('all') }}"
   become: true
   tasks:
+    - name: Check if /etc/cloud is present
+      ansible.builtin.stat:
+        path: "/etc/cloud"
+      when: deepops_disable_cloud_init|default(true)
+      register: etc_cloud
 
-  - name: check if /etc/cloud is present
-    stat:
-      path: "/etc/cloud"
-    when: deepops_disable_cloud_init|default(true)
-    register: etc_cloud
+    - name: Disable generator for setting cloud-init target
+      ansible.builtin.file:
+        path: "/etc/cloud/cloud-init.disabled"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+        state: "touch"
+      when: deepops_disable_cloud_init|default(true) and etc_cloud.stat.exists
 
-  - name: disable generator for setting cloud-init target
-    file:
-      path: "/etc/cloud/cloud-init.disabled"
-      owner: "root"
-      group: "root"
-      mode: "0644"
-      state: "touch"
-    when: deepops_disable_cloud_init|default(true) and etc_cloud.stat.exists
-
-  - name: disable all systemd services
-    ignore_errors: yes
-    service:
-      name: "{{ item }}"
-      state: stopped
-      enabled: no
-    with_items:
-    - "cloud-init"
-    - "cloud-config"
-    - "cloud-final"
-    when: deepops_disable_cloud_init|default(true)
+    - name: Disable all systemd services
+      ignore_errors: true
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      with_items:
+        - "cloud-init"
+        - "cloud-config"
+        - "cloud-final"
+      when: deepops_disable_cloud_init|default(true)

@@ -38,7 +38,7 @@
 
 - name: Update apt cache for DGX OS 7 repositories
   apt:
-    update_cache: yes
+    update_cache: true
 
 - name: Upgrade packages for DGX OS 7
   apt:
@@ -49,7 +49,7 @@
   apt:
     name: "{{ dgx_os7_system_packages + ([dgx_os7_station_package] if dgx_os7_platform.station else []) }}"
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Install DGX OS 7 kernel tools and peer memory loader
   apt:
@@ -57,22 +57,22 @@
       - "{{ dgx_os7_platform.linux_tools_package }}"
       - nvidia-peermem-loader
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Install DGX OS 7 NVIDIA driver packages
   apt:
     name: "{{ dgx_os7_driver_packages + (dgx_os7_fabricmanager_packages if dgx_os7_platform.nvswitch else []) + (dgx_os7_nvlink5_packages if dgx_os7_platform.nvlink5 else []) + (dgx_os7_imex_packages if dgx_os7_platform.imex else []) }}"
     state: present
-    update_cache: yes
+    update_cache: true
   register: install_driver
-  notify: reboot after driver install
+  notify: Reboot after driver install
   when: dgx_os7_install_driver
 
 - name: Disable unattended upgrades for DGX OS 7
   apt:
     name: unattended-upgrades
     state: absent
-    purge: yes
+    purge: true
   when: dgx_os7_disable_unattended_upgrades
 
 - name: Populate DGX OS 7 service facts
@@ -86,7 +86,7 @@
   systemd:
     name: "{{ item }}"
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   loop: "{{ dgx_os7_enabled_services }}"
   when: item in ansible_facts.services
