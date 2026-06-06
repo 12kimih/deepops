@@ -1,0 +1,60 @@
+---
+- name: RHEL | install EPEL repository
+  ansible.builtin.dnf:
+    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
+    state: present
+    disable_gpg_check: true
+
+- name: RHEL | install enroot dependencies
+  ansible.builtin.dnf:
+    name:
+      - curl
+      - gawk
+      - jq
+      - squashfs-tools
+      - parallel
+      - bash-completion
+      - fuse-overlayfs
+      - squashfuse
+      - pigz
+      - zstd
+    state: present
+
+- name: RHEL | gather installed package facts
+  ansible.builtin.package_facts:
+    manager: rpm
+
+- name: RHEL | remove existing enroot before a version change
+  ansible.builtin.dnf:
+    name: "{{ enroot_packages }}"
+    state: absent
+  when:
+    - "'enroot' in ansible_facts.packages"
+    - ansible_facts.packages['enroot'][0]['version'] != enroot_version_string
+
+- name: RHEL | install enroot from the release .rpm
+  ansible.builtin.dnf:
+    name: "{{ enroot_release_base_url }}/{{ item }}-{{ enroot_version_string }}.el{{ _enroot_rpm_el }}.{{ ansible_architecture }}.rpm"
+    state: "{{ enroot_package_state }}"
+    disable_gpg_check: true
+  loop: "{{ enroot_packages }}"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+# On RHEL, unprivileged user namespaces are enabled via the kernel cmdline.
+# https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+- name: RHEL | read kernel cmdline
+  ansible.builtin.command:
+    cmd: cat /proc/cmdline
+  register: enroot_kernel_cmdline
+  changed_when: false
+
+- name: RHEL | enable unprivileged userns on the kernel cmdline
+  ansible.builtin.command:
+    cmd: "grubby --update-kernel={{ enroot_configure_kernel_options_versions }} --args='namespace.unpriv_enable=1 user_namespace.enable=1'"
+  when:
+    - enroot_configure_kernel_options | bool
+    - >
+      'namespace.unpriv_enable=1' not in enroot_kernel_cmdline.stdout
+      or 'user_namespace.enable=1' not in enroot_kernel_cmdline.stdout
+  changed_when: true
+  notify: Reboot node

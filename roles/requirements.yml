@@ -27,13 +27,11 @@ roles:
   - src: andrewrothstein.miniconda
     version: "v6.1.9"
 
-# The NVIDIA driver is installed by the in-tree roles/nvidia_driver role and the
-# NVIDIA container runtime by the in-tree roles/nvidia_container_toolkit role
-# (nvidia-ctk). The legacy nvidia.nvidia_driver and nvidia.nvidia_docker (EOL
-# nvidia-docker2) Galaxy roles have been removed.
-
-  - src: nvidia.enroot
-    version: "v0.5.0"
+# NVIDIA tooling is installed by in-tree roles, replacing the corresponding
+# Galaxy roles: roles/nvidia_driver (was nvidia.nvidia_driver), the in-tree
+# roles/nvidia_container_toolkit via nvidia-ctk (was the EOL nvidia.nvidia_docker /
+# nvidia-docker2), and roles/enroot pinned to enroot 4.x (was nvidia.enroot v0.5.0,
+# an EOL 3.x release without modern unprivileged-userns handling).
 
   - src: geerlingguy.filebeat
     version: "3.5.0"

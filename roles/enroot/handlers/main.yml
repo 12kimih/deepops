@@ -1,0 +1,12 @@
+---
+- name: Reload enroot AppArmor profile
+  # The enroot .deb ships /etc/apparmor.d/enroot (enroot 4.x); reload it so the
+  # scoped userns grant is active. Safe no-op if AppArmor or the profile is absent.
+  ansible.builtin.command:
+    cmd: apparmor_parser -r -W /etc/apparmor.d/enroot
+  failed_when: false
+  changed_when: true
+
+- name: Reboot node
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ enroot_reboot_timeout }}"

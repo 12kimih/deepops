@@ -1,0 +1,53 @@
+---
+# Ubuntu 23.10+/24.04 restrict unprivileged user namespaces via AppArmor. The
+# enroot .deb installs a scoped profile (/etc/apparmor.d/enroot) that re-grants
+# userns creation to enroot-nsenter only, so the global restriction stays on.
+# Only disable it globally as an explicit escape hatch for trusted/dev nodes.
+# https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+- name: Ubuntu | disable AppArmor unprivileged userns restriction (escape hatch)
+  ansible.posix.sysctl:
+    name: kernel.apparmor_restrict_unprivileged_userns
+    value: "0"
+    state: present
+    sysctl_file: /etc/sysctl.d/90-enroot.conf
+    reload: true
+  failed_when: false  # key only exists on 23.10+ kernels
+  when: enroot_apparmor_global_disable | bool
+
+- name: Ubuntu | install enroot dependencies
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gawk
+      - jq
+      - squashfs-tools
+      - parallel
+      - bash-completion
+      - fuse-overlayfs
+      - squashfuse
+      - pigz
+      - zstd
+    state: present
+    update_cache: true
+
+- name: Ubuntu | gather installed package facts
+  ansible.builtin.package_facts:
+    manager: apt
+
+# Direct .deb installs conflict on a version change, so remove first when the
+# installed version differs from the target.
+- name: Ubuntu | remove existing enroot before a version change
+  ansible.builtin.apt:
+    name: "{{ enroot_packages }}"
+    state: absent
+  when:
+    - "'enroot' in ansible_facts.packages"
+    - ansible_facts.packages['enroot'][0]['version'] != enroot_version_string
+
+- name: Ubuntu | install enroot from the release .deb
+  ansible.builtin.apt:
+    deb: "{{ enroot_release_base_url }}/{{ item }}_{{ enroot_version_string }}_{{ _enroot_deb_arch }}.deb"
+    state: "{{ enroot_package_state }}"
+  loop: "{{ enroot_packages }}"
+  notify: Reload enroot AppArmor profile
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
