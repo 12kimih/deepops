@@ -44,6 +44,7 @@
     mode: "0644"
   with_items:
     - "00-rootlessdocker-modulepath.sh"
+    - "00-rootlessdocker-modulepath.csh"
 
 - name: Remove the superseded z96 rootless docker modulepath snippet
   ansible.builtin.file:

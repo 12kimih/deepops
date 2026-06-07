@@ -5,11 +5,14 @@
 
 - name: Register the site modulefiles tree with Lmod (LMOD_SITE_MODULEPATH)
   ansible.builtin.template:
-    src: "site-modulepath.sh.j2"
-    dest: "{{ cuda_site_profile }}"
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
     owner: root
     group: root
     mode: "0644"
+  loop:
+    - {src: "site-modulepath.sh.j2", dest: "{{ cuda_site_profile }}"}
+    - {src: "site-modulepath.csh.j2", dest: "{{ cuda_site_profile_csh }}"}
 
 - name: Remove superseded CUDA modulepath profile snippets
   ansible.builtin.file:
