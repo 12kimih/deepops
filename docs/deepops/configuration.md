@@ -22,7 +22,7 @@ In particular, this directory includes:
 
 - `config/inventory`: The [Ansible inventory file](https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html) that lists the hosts in your cluster
 - `config/group_vars/all.yml`: An Ansible [variables file](https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html) that contains variables we expect to work for all hosts
-- `config/group_vars/k8s-cluster.yml`: Variables specific to deploying Kubernetes clusters
+- `config/group_vars/k8s_cluster.yml`: Variables specific to deploying Kubernetes clusters
 - `config/group_vars/slurm-cluster.yml`: Variables specific to deploying Slurm clusters
 - `config/env.sh`: Global variables that override default variable values for all `sh` files in `scripts/*`.
 - `config/requirements.yml`: An Ansible Galaxy [requirements file](https://docs.ansible.com/ansible/latest/galaxy/user_guide.html#installing-roles-and-collections-from-the-same-requirements-yml-file) that contains a list of custom Collections and Roles to install. Collections and Roles required by DeepOps are stored in a separate `roles/requirements.yml` file, which should not be modified.
@@ -106,7 +106,7 @@ This feature can be disabled by setting `slurm_enable_container_registry: false`
 
 Many of the Ansible roles in DeepOps are parameterized, allowing you to change values such as component versions, download URLs, or filesystem paths.
 
-For example, the [OpenMPI role](../../roles/openmpi) installs OpenMPI 4.0.3 by default.
+For example, the [OpenMPI role](../../roles/openmpi) installs OpenMPI 5.0.10 by default.
 However, some applications still don't work with more recent versions of OpenMPI, and you may want to install OpenMPI 3.1.6 instead.
 You can do this with an Ansible variable by setting `openmpi_version: "3.1.6"`.
 

@@ -59,7 +59,7 @@ This playbook is developed and tested in following environments:
 
 4. Set up Kubernetes cluster
 
-   Kubernetes installation is done by DeepOps Ansible playbooks, For more information on Ansible and why we use it, consult the [Ansible Guide](ANSIBLE.md).
+   Kubernetes installation is done by DeepOps Ansible playbooks, For more information on Ansible and why we use it, consult the [Ansible Guide](../deepops/ansible.md).
 
 - Install and configure DeepOps on managemet node:
 

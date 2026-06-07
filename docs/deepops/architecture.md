@@ -91,7 +91,6 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware
 │   ├── nvidia-gpu-operator
-│   ├── nvidia-gpu-operator-node-prep
 │   ├── nvidia-gpu-tests
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia-k8s-gpu-device-plugin
