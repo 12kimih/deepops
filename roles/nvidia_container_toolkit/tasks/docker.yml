@@ -14,6 +14,30 @@
     enabled: true
   when: nvidia_container_toolkit_enable_docker | bool
 
+# NGC/NCCL workloads run via bare `docker run` need a larger /dev/shm and unlimited
+# memlock (pinned GPU memory) + a large stack; docker's 64 MiB shm default breaks
+# multi-GPU NCCL. Merge these daemon-wide defaults BEFORE nvidia-ctk writes its
+# runtime block (nvidia-ctk merges into the existing daemon.json, preserving these).
+# Idempotent: only writes + reports changed when a key actually differs.
+# https://docs.nvidia.com/deeplearning/frameworks/user-guide/
+- name: Docker | apply daemon defaults for NGC/NCCL workloads (shm-size + ulimits)
+  ansible.builtin.command:
+    cmd: >-
+      python3 -c 'import json, pathlib, sys;
+      p = pathlib.Path("/etc/docker/daemon.json");
+      tuning = {{ nvidia_container_toolkit_docker_tuning | to_json }};
+      text = p.read_text().strip() if p.exists() else "";
+      data = json.loads(text) if text else {};
+      changed = any(data.get(k) != v for k, v in tuning.items());
+      data.update(tuning);
+      (p.write_text(json.dumps(data, indent=2) + chr(10)) if changed else None);
+      sys.exit(10 if changed else 0)'
+  register: nvidia_container_toolkit_docker_tuning_result
+  changed_when: nvidia_container_toolkit_docker_tuning_result.rc == 10
+  failed_when: nvidia_container_toolkit_docker_tuning_result.rc not in [0, 10]
+  when: nvidia_container_toolkit_set_docker_tuning | bool
+  notify: Restart docker
+
 - name: Docker | check NVIDIA runtime configuration
   ansible.builtin.command:
     cmd: >-
