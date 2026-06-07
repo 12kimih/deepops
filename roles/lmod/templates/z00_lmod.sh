@@ -30,7 +30,7 @@ if [ $(id -u) -ne 0 ] ; then
     #
     # Prepend any site module trees registered in LMOD_SITE_MODULEPATH (set by
     # the /etc/profile.d/00-*.sh snippets that sort before this one, e.g. the
-    # cuda_toolkits and nvhpc modulepath hooks). Lmod's stock z00_lmod -- the one
+    # nvidia_cuda_toolkit and nvhpc modulepath hooks). Lmod's stock z00_lmod -- the one
     # generated from init/profile.in -- does this; because this custom script
     # sources init/bash directly, which does NOT apply LMOD_SITE_MODULEPATH, we
     # must replicate the loop or those snippets are silently ignored. addto with

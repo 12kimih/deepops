@@ -198,14 +198,14 @@ spack_install_dir: "{{ sm_prefix }}/spack"
 spack_build_packages: false
 # Illustrative only (spack_build_packages is false by default). Latest CUDA as the
 # single example spec -- `cuda` with no version lets Spack pick its newest. (CUDA
-# is also available as Lmod modules via the cuda_toolkits role.)
+# is also available as Lmod modules via the nvidia_cuda_toolkit role.)
 spack_default_packages:
 - "cuda"
 
 # Which host should we run installs on for software going into the NFS share?
 sm_install_host: "slurm-master[0]"
 
-# CUDA toolkits as Lmod modules (playbooks/slurm-cluster/cuda-toolkits.yml).
+# CUDA toolkits as Lmod modules (playbooks/slurm-cluster/nvidia-cuda-toolkit.yml).
 # Installs CUDA toolkits from the official runfiles into {{ sm_prefix }}/cuda and
 # exposes each as `module load cuda/<version>`. Driver is never touched. Opt-in:
 # run the playbook explicitly. Installs once on the NFS server, visible on every

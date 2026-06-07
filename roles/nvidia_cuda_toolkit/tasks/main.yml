@@ -1,7 +1,7 @@
 ---
 # Registering the site modulefiles tree with Lmod runs on every node; the
 # download+install path runs only where the playbook sets
-# cuda_toolkits_do_install (the host that owns the shared software tree).
+# nvidia_cuda_toolkit_install (the host that owns the shared software tree).
 
 - name: Register the site modulefiles tree with Lmod (LMOD_SITE_MODULEPATH)
   ansible.builtin.template:
@@ -24,4 +24,4 @@
 
 - name: Install CUDA toolkits from the official runfiles
   ansible.builtin.import_tasks: install.yml
-  when: cuda_toolkits_do_install | bool
+  when: nvidia_cuda_toolkit_install | bool
