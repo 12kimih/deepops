@@ -36,9 +36,9 @@ For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./m
 
 Container images are only needed if you want to run the tests built into the playbook:
 
-- nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-- nvcr.io/nvidia/pytorch:24.04-py3
-- nvcr.io/nvidia/tensorflow:24.04-tf2-py3
+- nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
+- nvcr.io/nvidia/pytorch:26.05-py3
+- nvcr.io/nvidia/tensorflow:25.02-tf2-py3
 
 For instructions on setting up a Docker registry mirror, see the [doc on Docker mirrors](./mirror-docker-images.md).
 
@@ -61,9 +61,9 @@ For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./m
 
 Container images (how to mirror) are only needed if you want to run the tests built into the playbook:
 
-- nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-- nvcr.io/nvidia/pytorch:24.04-py3
-- nvcr.io/nvidia/tensorflow:24.04-tf2-py3
+- nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
+- nvcr.io/nvidia/pytorch:26.05-py3
+- nvcr.io/nvidia/tensorflow:25.02-tf2-py3
 
 For instructions on setting up a Docker registry mirror, see the [doc on Docker mirrors](./mirror-docker-images.md).
 
@@ -176,9 +176,9 @@ dcgm_rpm_package: "/path/to/datacenter-gpu-manager.rpm"
 If running the container tests as part of the NGC-Ready playbook, set the following variables in your DeepOps configuration:
 
 ```bash
-ngc_ready_cuda_container: "<your-container-registry>/nvidia/cuda:12.4.1-base-ubuntu22.04"
-ngc_ready_pytorch: "<your-container-registry>/nvidia/pytorch:24.04-py3"
-ngc_ready_tensorflow: "<your-container-registry>/nvidia/tensorflow:24.04-tf2-py3"
+ngc_ready_cuda_container: "<your-container-registry>/nvidia/cuda:13.2.1-base-ubuntu24.04"
+ngc_ready_pytorch: "<your-container-registry>/nvidia/pytorch:26.05-py3"
+ngc_ready_tensorflow: "<your-container-registry>/nvidia/tensorflow:25.02-tf2-py3"
 ```
 
 ## Running the NGC-Ready playbook

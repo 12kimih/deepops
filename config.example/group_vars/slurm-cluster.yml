@@ -15,7 +15,7 @@ slurm_manage_gpus: true
 slurm_password: ReplaceWithASecurePasswordInTheVault
 #slurm_db_username: slurm
 slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
-#slurm_max_job_timelimit: INFINITE
+#slurm_max_job_timelimit: UNLIMITED
 #slurm_default_job_timelimit:
 
 # Auto-detect GPUs using NVML
