@@ -1,2 +1,3 @@
 ---
-mofed_distro: "ubuntu"
+# DOCA-OFED on Ubuntu pulls its build/runtime prerequisites via apt dependencies,
+# so no extra prerequisite list is needed here.
