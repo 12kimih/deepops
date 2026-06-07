@@ -33,13 +33,55 @@ slurm_enable_ha: false
 slurm_ha_state_save_location: "/sw/slurm"
 
 # Slurm configuration is auto-generated from templates in the `slurm` role.
-# If you want to override any of these files with custom config files, please
-# set the following vars to the absolute path of your custom files.
+# There are three levels of customization, from least to most invasive:
 #
-#slurm_conf_template: "/path/to/slurm.conf"
+# 1) Tunables (below) tweak individual slurm.conf options.
+# 2) The *_raw lists inject literal, hand-tuned node/partition/gres lines while
+#    keeping the role's best-practice base (the common case for fixed hardware).
+# 3) The *_conf_template vars point at your OWN template file for total control.
+#    (Point them at an absolute path on the Ansible controller, e.g. under config/.)
+#
+#slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf.j2"
 #slurm_cgroup_conf_template: "/path/to/cgroup.conf"
 #slurm_gres_conf_template: "/path/to/gres.conf"
 #slurm_dbd_conf_template: "/path/to/slurmdbd.conf"
+#slurm_job_submit_template: "/path/to/job_submit.lua"
+
+# --- Server-specific hardware (option 2) ------------------------------------
+# Literal lines that replace the auto-detected node/partition/gres sections.
+# Leave empty ([]) to auto-detect CPUs/GPUs/memory from gathered facts.
+# Keep these in your git-untracked config/ (see the private-repo note at the end).
+#slurm_nodes_raw:
+#  - "NodeName=gpu[01-08] NodeAddr=10.0.0.[1-8] CPUs=96 Boards=1 SocketsPerBoard=2 CoresPerSocket=48 ThreadsPerCore=1 RealMemory=515000 Gres=gpu:l40:4 State=UNKNOWN"
+#slurm_partitions_raw:
+#  - "PartitionName=l40 Nodes=gpu[01-05,08] Default=YES State=UP DefCpuPerGPU=8 DefMemPerCPU=4000 MaxTime=3-00:00:00 OverSubscribe=NO"
+#  - "PartitionName=pro6000 Nodes=gpu[06-07] State=UP DefCpuPerGPU=16 DefMemPerCPU=3600 MaxTime=3-00:00:00 OverSubscribe=NO"
+#slurm_gres_raw:
+#  - "NodeName=gpu[01-05,08] AutoDetect=nvml"
+#  - "NodeName=gpu[06-07] AutoDetect=off Name=gpu Type=pro6000 File=/dev/nvidia[0-7]"
+
+# --- AI/ML slurm.conf tunables (sensible defaults already set in the role) ----
+#slurm_accounting_tres: "gres/gpu,gres/gpu:l40,gres/gpu:pro6000"   # typed GPU billing
+#slurm_accounting_enforce: "associations,limits,qos,safe"          # after sacctmgr setup
+#slurm_scheduler_parameters: "bf_continue,bf_window=4320,bf_busy_nodes"
+#slurm_enable_preempt: true            # QOS preemption (REQUEUE frees GPUs cleanly)
+#slurm_topology_plugin: "topology/tree"  # multi-rack clusters (needs topology.conf)
+
+# --- job_submit.lua routing (option, set slurm_job_submit_plugins: "lua") ------
+#slurm_job_submit_plugins: "lua"
+#slurm_job_submit_cpu_partitions: "l40,pro6000"   # where CPU-only jobs land
+#slurm_default_gpu_type: "l40"
+#slurm_default_gpu_partition: "l40"
+#slurm_gpu_type_partition_map:
+#  l40: "l40"
+#  pro6000: "pro6000"
+
+# --- Keeping server-specific settings out of git -----------------------------
+# The outer deepops repo ignores config/ (.gitignore: /config*/), so site data and
+# secrets live ONLY in your copy. Manage it as a separate PRIVATE repo:
+#   cp -r config.example config
+#   cd config && git init && git remote add origin git@github.com:yourorg/deepops-config.git
+#   ansible-vault encrypt group_vars/slurm-cluster.yml   # encrypts slurm_password etc.
 
 ################################################################################
 # Login on compute
