@@ -392,11 +392,71 @@ is flagged legacy and points at the `mofed` role.
 
 ---
 
+## 18. my-deepops production optimizations + NFS random-IO tuning  (`520d0932`, `ec14c854`)
+
+A second, exhaustive file-by-file pass over the maintainer's working cluster
+(`my-deepops`, all uncommitted working-tree edits) classified every change as
+*port* (general optimization), *skip* (server-specific), or *already have*. The 19
+general optimizations were ported and generalized; server-specific values (NodeName
+hardware, real inventory, usernames, `/data0x` paths) stay as placeholders.
+
+- **Versions/idempotency:** hwloc 2.5.0→2.12.2, pmix 3.2.3→3.2.5; the pmix
+  "already installed?" check now reads `pmix_info` (the old `tr -d 'x0'` hex parse
+  always rebuilt); slurmdbd controller uses `python3-pymysql` + `mysql_user` over
+  the local unix socket (OS-aware path) with `column_case_sensitive`; the
+  slurm-exporter stop/restart only fires when the service is actually running.
+- **Robustness:** pyxis copies (not symlinks) the enroot hooks; grafana HTTP port
+  is configurable; slurm-exporter bind-mounts are `:ro` and add `sshare`;
+  node-exporter restarts on its endpoint-config change; nis ypbind `daemon_reload`;
+  the dcgm-exporter playbook honours `slurm_cluster_install_nvidia_driver`; a
+  deprecated `{{ }}`-wrapped `when:` was unwrapped; spack/nvhpc gained selective-run
+  tags; new `config.example/playbooks/ufw-disable.yml`.
+- **NFS random-IO bottleneck** (single NFS head + RAID5 + many GPU nodes,
+  web-researched with citations): client mount options `async,vers=3` (the `async`
+  was a silent no-op client-side, `vers=3` a downgrade) →
+  `rw,hard,vers=4.2,nconnect=8,rsize=1048576,wsize=1048576,…`; a new
+  `nfs_server_threads` (default 32) writes `/etc/nfs.conf` `[nfsd] threads` (the
+  Linux default of 8 starves many clients); and a guardrail to keep enroot
+  cache/data/runtime on node-local NVMe. The remaining lever (RAID5→RAID10) is
+  documented as operator hardware action. See `docs/slurm-cluster/slurm-nfs.md`.
+- **Private-config management** (`docs/deepops/managing-cluster-config.md`): the
+  recommended `config.example` (public placeholders) → gitignored `config/` as its
+  own private repo → `ansible-vault` workflow, and how to pull upstream updates
+  without committing site config.
+
+## 19. Final multi-agent verification round  (`c7063698`)
+
+An 18-agent final sweep (deepops↔my-deepops parity, per-program docs compliance,
+login/compute idempotency + reboot persistence, and a consistency/corruption
+file-by-file scan over 661 files) surfaced 8 critical issues, all fixed:
+
+- **slurm.conf:** removed `AccountingStorageUser` — not a valid 25.11.6 keyword and
+  a fatal slurmctld parse error (the DB user comes from `slurmdbd.conf` StorageUser).
+- **requirements.yml:** added `community.mysql` (the `mysql_user` task had no
+  collection declared, so it would fail to resolve on a clean install).
+- **authentication.yml:** each directory role (move-home-dirs/kerberos/nis/autofs)
+  now runs only when its config vars are defined, so the default run is a clean
+  no-op instead of tripping each role's "variable not defined" assert.
+- **Idempotency:** slurmd uses `state: started` (+ handler-driven restarts) instead
+  of restarting every run; pyxis gates build/install on a stat of the installed
+  `spank_pyxis.so` so re-runs no longer rebuild and bounce slurmd.
+- **Reboot persistence:** MariaDB is boot-enabled on Debian too (was RedHat-only).
+- **Linting corruption recovered (16 files):** the auto-format passes had mangled
+  `printf '#!/bin/sh'` → `'$!/bin/sh'` in six molecule `prepare.yml` files (breaking
+  the policy-rc.d shim), and left jinja-spacing/`{{ share_dir}}`/typo artefacts;
+  all restored. This is why every later change is re-scanned for corruption.
+
 ## Status
 
 Every item from the modernization brief is implemented, linted (yamllint 0;
 ansible-lint **production** clean except the two `kubespray_defaults` syntax-checks
-that need the kubespray submodule checked out), and verified by multi-agent
-file-by-file review until each pass converged. The only change that cannot be fully
-validated in this environment is the DOCA-OFED migration (§17), which needs RDMA/IB
-hardware and is marked accordingly.
+that need the kubespray submodule checked out), and verified by repeated multi-agent
+file-by-file review until each pass converged to zero findings. Caveats explicitly
+marked: the DOCA-OFED migration (§17) needs RDMA/IB hardware to validate; bumping the
+runtime Ansible major (10→14) is coupled to the pinned kubespray and must be done
+together with a kubespray bump (the lint/format tooling — ansible-lint, yamllint,
+pre-commit-hooks — is tracked to latest separately).
+
+> Maintenance note: keep this file current. When a change lands, add or amend the
+> relevant section (what / how / why + commit) and refresh the Status — do not let it
+> go stale.
