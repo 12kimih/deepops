@@ -36,7 +36,7 @@ cd <deepops>/config
 git init -b main
 printf '.vault-pass\n*.vault-pass\nvault-password*\n' > .gitignore   # never commit the vault password
 git add -A && git commit -m "Initial private cluster config"
-gh repo create my-deepops-config --private --source=. --remote=origin --push
+gh repo create deepops-config --private --source=. --remote=origin --push
 ```
 
 The outer DeepOps repo treats `config/` as ignored and never recurses into its `.git`;
