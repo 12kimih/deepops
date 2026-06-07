@@ -7,6 +7,7 @@ Slurm cluster configuration for NFS filesystems
   - [Configuring NFS shares from the Slurm control node](#configuring-nfs-shares-from-the-slurm-control-node)
     - [Exports from the Slurm control node](#exports-from-the-slurm-control-node)
     - [NFS mounts on the clients](#nfs-mounts-on-the-clients)
+  - [Performance tuning for random I/O](#performance-tuning-for-random-io)
   - [Configuring a separate NFS server](#configuring-a-separate-nfs-server)
   - [Disabling NFS](#disabling-nfs)
 
@@ -63,6 +64,49 @@ As above, you can add as many additional mounts to the list as you wish.
 
 The `options` field for each mount specifies the NFS options used to mount the filesystem.
 For the available NFS options, see the manpages for your Linux distribution: `man 5 nfs`.
+
+## Performance tuning for random I/O
+
+A single NFS head serving `/home` to many GPU nodes commonly becomes a **random‑I/O
+bottleneck** under job load: one server is a single network/metadata chokepoint, a
+wide RAID5 group pays a 4× read‑modify‑write penalty on every small random write, and
+hot job I/O runs directly against the share. No single knob fixes this — separating hot
+I/O from NFS is the durable fix — but the DeepOps defaults now apply the high‑ROI
+config quick‑wins. In priority order:
+
+1. **Keep hot I/O on node‑local NVMe, not NFS.** Container import/unpack and dataset
+   small‑file reads are latency‑bound random I/O that melts a single NFS head. The
+   `enroot_*_path` defaults are already node‑local — **do not** repoint them at an NFS
+   mount (see the warning in `config.example/group_vars/all.yml`). Stage datasets to
+   local `/tmp` (or a mounted NVMe scratch via `TMPDIR`/`sbcast`), compute locally,
+   copy results back.
+
+2. **Client mount options.** The default `nfs_mounts` options are now
+   `rw,hard,vers=4.2,nconnect=8,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
+   `vers=4.2` uses COMPOUND ops; `nconnect=8` opens 8 TCP connections per mount (max 16)
+   to beat the single‑flow limit — size it to the link (4 @40G / 8 @100G / 16 @200G),
+   needs kernel ≥ 5.3, and keep it identical on every mount to the same server. Note the
+   old `async` here was a **no‑op** (it is a server `/etc/exports` option, not a client
+   mount option). Append `,fsc` and run the `cachefilesd` role to cache repeat reads.
+   (`man 5 nfs`)
+
+3. **Server `nfsd` thread count.** The Linux default is only **8** threads — far too few
+   for many clients under random I/O (each thread serves one RPC and blocks on disk).
+   Set `nfs_server_threads` (default `32`; busy servers run 64–256). Verify with
+   `cat /proc/fs/nfsd/threads` and size it by watching `sockets-enqueued` grow in
+   `/proc/fs/nfsd/pool_stats` under load. Do **not** use the `/proc/net/rpc/nfsd` `th`
+   histogram — it was removed in kernel 2.6.32 and always reads zero. (`rpc.nfsd(8)`)
+
+4. **Server socket buffers / exports.** Raise `net.core.{r,w}mem_max` and
+   `netdev_max_backlog` and restart NFS; consider MTU 9000 end‑to‑end. `no_subtree_check`
+   is already the default. Use export `async` only for reproducible scratch (biggest
+   throughput lever, but a crash loses unflushed data).
+
+5. **Hardware (operator action, not a DeepOps setting): RAID5 → RAID10.** A 17‑disk
+   RAID5 pays 4 physical I/Os per random write and has a slow, risky rebuild. RAID10 (or
+   ZFS mirror vdevs + NVMe SLOG + a metadata special vdev) gives far better random‑write
+   IOPS. For 8 nodes, tuned NFS + local NVMe staging is usually enough; only graduate to
+   a parallel filesystem (BeeGFS/Lustre/WekaFS) if GPUs are provably starved.
 
 ## Configuring a separate NFS server
 
