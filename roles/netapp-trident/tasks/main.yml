@@ -6,6 +6,7 @@
     src: "{{ trident_installer_url }}"
     dest: "{{ deepops_dir }}"
     remote_src: true
+    creates: "{{ deepops_dir }}/trident-installer/tridentctl"
 
 - name: Copy namespace config file to control node
   ansible.builtin.template:
@@ -22,9 +23,11 @@
     filename: "{{ deepops_dir }}/trident-installer/namespace.yaml"
   run_once: true
 
+# upgrade --install (not plain install) so a re-run no-ops instead of failing
+# with "cannot re-use a name that is still in use".
 - name: Install Trident using Helm
-  ansible.builtin.command: "/usr/local/bin/helm -n {{ trident_namespace }} install trident {{ deepops_dir }}/trident-installer/helm/trident-operator-{{ trident_version
-    }}.tgz"
+  ansible.builtin.command: "/usr/local/bin/helm -n {{ trident_namespace }} upgrade --install trident {{ deepops_dir }}/trident-installer/helm/trident-operator-{{
+    trident_version }}.tgz"
   run_once: true
   changed_when: false
 
@@ -44,7 +47,13 @@
   retries: 10
   delay: 30
   register: result
-  until: result.rc == 0
+  # Stop retrying once created OR already present (a re-run hits the latter
+  # immediately instead of spinning ~5 min then failing the play).
+  until: result.rc == 0 or 'already exists' in (result.stdout + result.stderr)
+  changed_when: "'already exists' not in (result.stdout + result.stderr)"
+  failed_when:
+    - result.rc != 0
+    - "'already exists' not in (result.stdout + result.stderr)"
   when: create_backends
   run_once: true
 
