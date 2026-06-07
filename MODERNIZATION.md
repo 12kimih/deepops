@@ -10,11 +10,13 @@ changed, *how*, and *why*. It is meant for review before merging.
 - **Target OS matrix:** Ubuntu 22.04 / 24.04 / 26.04 + RHEL-family 8 / 9 / 10
   (RHEL / Rocky / Alma).
 - **Verification:** every change validated with `yamllint` (0 errors) and
-  `ansible-lint roles/` (0 failures, **production** profile). The whole tree was
-  additionally reviewed file-by-file against the baseline (2 rounds, converged to
-  0 problems) and against the OS matrix (80 files).
-- **Diff vs baseline:** ~404 files, +3988 / −2985 (the bulk is mechanical
-  FQCN / naming / formatting normalization — see §1).
+  `ansible-lint roles playbooks` (**production** profile; clean except the two
+  `kubespray_defaults` syntax-checks, which only resolve when the kubespray
+  submodule is checked out). The tree was additionally reviewed file-by-file by
+  multi-agent workflows — against the baseline, the OS matrix, per-program official
+  docs, and for repo-wide consistency — fixing findings until each converged.
+- **Diff vs baseline:** the bulk of the line count is mechanical FQCN / naming /
+  formatting normalization (§1, §12); the substantive changes are in §2–§16.
 
 ---
 
@@ -227,9 +229,147 @@ Boot-persistence / idempotency fixes:
   and `cat /proc/driver/nvidia/version` verification. Standard practice for a
   stock-kernel Slurm fleet is the Canonical `-server-open` default (Secure Boot
   works without MOK enrollment); the NVIDIA-repo path is the opt-in alternative.
-- **nvidia-dgx** 26.04/EL10 — NVIDIA DGX OS bundles for those aren't published
-  yet; the role intentionally fails on an unvalidated DGX OS.
-- **mofed** — needs a version bump (or DOCA-OFED) for Ubuntu 24.04+/EL9+.
+- **nvidia-dgx 26.04/EL10 gates — DONE** (§11): the role no longer hard-fails on
+  26.04/EL10 (lower-bound version gates), and the EL7/18.04/20.04 DGX-OS legacy
+  was removed.
+- **ood-wrapper EL8+ — DONE** (§11): `vars/redhat.yml` now uses base-OS `httpd` +
+  `python3` instead of the EL7 SCL (`httpd24`, python2) packages.
+- **mofed** — STILL PENDING: needs a version bump (or migration to NVIDIA
+  DOCA-OFED) for Ubuntu 24.04+/EL9+; the pinned MLNX_OFED 5.6 (2022) and the dead
+  `mellanox.com` download host are 404 on every supported OS. `roce_backend` is
+  likewise pinned to an Ubuntu 18.04 MOFED 4.7 ISO. (Both are opt-in RDMA roles.)
 - **ufw firewall** — port as a parameterized firewall role (the source hardcoded
   subnets/ports).
-- **ood-wrapper EL8+** — replace the EL7/SCL (`httpd24`, python2) vars.
+
+---
+
+> The sections below (10+) cover the **continued modernization** after the initial
+> review: driver idempotency, legacy-OS removal, the repo-wide consistency pass,
+> two web-research audits (persistenced / AppArmor), the Slurm 25.11.6 config
+> overhaul + the my-deepops port, and prerequisite-package fixes.
+
+## 10. NVIDIA driver idempotency + post-install hardening  (`142480b6`, `b83476fa`)
+
+- **Idempotent purge (critical fix).** The pre-existing-driver purge matched the
+  driver the role had just installed, so every re-run purged it, reinstalled, and
+  rebooted (a reboot loop). Now the target package is resolved first, package
+  facts are gathered, and the find/purge/module-reset only run when the desired
+  driver is **not** already installed (still fires on a real branch/flavor change).
+- **Post-install guard.** A `nvidia_driver_module_loaded` fact gates the
+  persistence-daemon enable and the `nvidia-smi` / `/proc/driver/nvidia/version`
+  verification so they are skipped (not failed) when a fresh install ran with the
+  reboot suppressed.
+- **persistenced drop-in (opt-in).** Web research confirmed plain
+  `systemctl enable --now nvidia-persistenced` is correct on current drivers
+  (the daemon enables persistence mode by default; the packaged unit already runs
+  as `--user nvidia-persistenced`), so the manual `--persistence-mode` drop-in is
+  redundant. Exposed as opt-in `nvidia_driver_persistenced_dropin` (default false)
+  for those who want `--verbose`.
+
+## 11. Legacy-OS removal + supported-OS gate fixes  (`eb46e09b`)
+
+A file-by-file OS-matrix/legacy audit (12 reviewers) drove these. Removed code that
+served **only** Ubuntu ≤20.04 / EL≤7, and fixed gates that rejected supported releases:
+
+- **nvidia-dgx:** deleted `ubuntu-legacy.yml` + `vars/ubuntu-18.04.yml` +
+  `vars/ubuntu-20.04.yml` (DGX OS 4/5), `redhat-legacy-el7.yml` + its include/guard,
+  the bionic gpgkey/apt-repo defaults, and the orphaned `sources.list.j2`. The
+  Ubuntu dispatcher now uses a `>= 22.04` lower-bound and routes 24.04/26.04 to the
+  DGX OS 7 path (was a hardcoded `== 24.04` allowlist that failed on 26.04); the
+  RHEL dispatcher supports majors 8/9/10 (`int >= 8`).
+- **ood-wrapper:** dropped the EL7 `python-passlib` task and the EL7 `httpd24` SCL
+  PATH override; `vars/redhat.yml` now targets base-OS `httpd` + `python3`.
+- **mofed/nhc:** deleted dead `vars/rhel7.yml` / `vars/ubuntu-20.04.yml` first_found
+  cases. **dns-config:** dropped the Ubuntu 16.04 `resolvconf` task.
+  **bootstrap-python:** dropped the EL7/python2 tasks.
+- `.ansible-lint`: skip `role-name` (DeepOps role dirs use hyphens).
+
+## 12. Repo-wide consistency pass  (`c691ab61`, `d28fb847`, `da5cde44`)
+
+A 12-reviewer uniformity audit (98 findings) plus follow-up, applied as minimal
+targeted edits across ~40 files: short module names → FQCN; task-name capitalization
+(imperative, acronyms, no trailing periods, OS-disambiguated duplicates); booleans
+→ `true`/`false` and dropped redundant `== True`/`== False`; Jinja spacing
+(`{{ var }}`, `| default`), `when`-list indent, blank-line separation, key order;
+`local_action` → `delegate_to: localhost`; and a few value typos
+(`dashboard_metrics_scraper_tag`, `ssh_max_auth_retries`). yamllint stays at 0
+errors and `ansible-lint roles playbooks` is clean except the two
+`kubespray_defaults` syntax-checks (the kubespray submodule is not checked out).
+
+## 13. AppArmor unprivileged-userns audit (enroot)  (`b83476fa`)
+
+Web research confirmed the role was already correct: enroot's `.deb` ships a
+**scoped** AppArmor profile (`/etc/apparmor.d/enroot`, loaded via `dh_apparmor`)
+that re-grants `userns create` to `enroot-nsenter` only, so Ubuntu 24.04's
+`kernel.apparmor_restrict_unprivileged_userns=1` stays on. The global sysctl
+disable (a user's manual workaround) strips userns hardening host-wide and remains
+an opt-in escape hatch (`enroot_apparmor_global_disable`, default false). Expanded
+the inline citations (upstream requirements + the Ubuntu 23.10 blog).
+
+## 14. Slurm 25.11.6 config overhaul + flexibility  (`8247cef2`, `e987d556`, `5db2a738`)
+
+Driven by a research pass over the official 25.11.6 man pages + AI/ML cluster
+trends; **every doc-backed option is cited inline** to the SchedMD anchors.
+
+- **slurm.conf** rebuilt on the official 25.11.6 configurator structure merged with
+  DeepOps templating: `TaskPlugin=task/cgroup,task/affinity` (recommended order);
+  `PrologFlags` drops redundant `Alloc` + throughput-penalty `Serial`;
+  `SelectTypeParameters` drops `CR_ONE_TASK_PER_CORE`; multifactor priority +
+  fairshare with non-zero weights incl. `PriorityWeightTRES=GRES/gpu` (fairshare
+  was inert before); backfill `SchedulerParameters`; `ReturnToService=2`;
+  `HealthCheckNodeState` var; typed `AccountingStorageTRES`; optional/default-off
+  `JobSubmitPlugins=lua`, QOS `Preempt`, `TopologyPlugin`. `AccountingStorageEnforce`
+  is exposed but **empty by default** (a fresh cluster runs before sacctmgr
+  associations exist).
+- **cgroup.conf:** add `SignalChildrenProcesses=yes` (cleanly kills multi-process
+  GPU jobs) + dependency notes (CR_*_Memory, Ubuntu `swapaccount=1`).
+- **gres.conf:** add a `slurm_gres_raw` branch (MIG/MPS/mixed types) + optional
+  `Type=` in the manual fallback; corrected header.
+- **slurmdbd.conf:** `DbdHost` = the slurm-master; fixed stale port/purge/archive
+  comments to the 25.11 names (`Purge*After`, `Archive*`) with month units;
+  `DebugLevel` var; documented `PrivateData`/`CommitDelay`.
+- **Flexibility:** `slurm_nodes_raw` / `slurm_partitions_raw` / `slurm_gres_raw`
+  inject literal hardware lines from the git-untracked `config/`; the existing
+  `slurm_*_conf_template` vars remain a full-file escape hatch; ~25 new tunables.
+  Documented in `config.example/group_vars/slurm-cluster.yml` and the
+  [Slurm guide](docs/slurm-cluster/README.md), incl. the private-config-repo workflow.
+
+## 15. Ported from `my-deepops` (the maintainer's production-tested cluster)
+
+Selectively merged the good parts of the maintainer's real Ubuntu 24.04 Slurm
+cluster, generalizing anything server-specific into config:
+
+- **`job_submit.lua`** (net-new): a generalized, Jinja-parameterized port of the
+  maintainer's GPU-type→partition routing plugin. Site config (CPU partitions,
+  gpu-type→partition map, default type/partition) comes from Ansible vars, so it is
+  a safe no-op with the empty defaults. Improvements over the source: respects an
+  explicit `--partition`, also reads modern `--gpus` (`tres_per_node`/`tres_per_job`),
+  nil-guards parsing, and writes a **bare** `gpu:<type>:N` gres (the source wrote the
+  invalid `gres/gpu:` TRES name). Deployed by `controller.yml` only when
+  `slurm_job_submit_plugins` includes `"lua"`.
+- **Scheduling/accounting policy** (fairshare, QOS preemption,
+  `AccountingStorageEnforce`, typed `AccountingStorageTRES`): adopted as documented,
+  opt-in-where-risky tunables rather than hardcoded site values (§14).
+- **slurmdbd archive/purge** defaults: adopted as the commented `Purge*After` /
+  `Archive*` recommendations.
+- **`prolog.d/50-all-enroot-dirs`:** dropped the parent-dir `chmod 0755` (the
+  maintainer removed it in production — `mkdir -p` already creates it 0755 and the
+  parent may be a shared/systemd-managed path).
+- **Server-specific values NOT copied** (NodeName hardware lines, NodeAddr, specific
+  Gres types, user allowlists, NFS exports, hpcsdk versions): these stay as
+  placeholders / `*_raw` overrides the operator fills in under `config/`.
+
+## 16. Prerequisite-package modernization  (`a20f1670`)
+
+Re-read each project's current install docs and fixed outdated/breaking prereqs:
+
+- **Slurm (Ubuntu):** `libmariadbclient-dev-compat` was **removed on Ubuntu
+  24.04/26.04** (apt failure) → replaced the mariadb pair with
+  `default-libmysqlclient-dev`; dropped unused `ruby-dev`; `python3-minimal` →
+  `python3`.
+- **Slurm (both OS):** moved the slurmrestd-only headers into a new
+  `slurm_slurmrestd_deps` installed only when `slurm_build_slurmrestd=true` — this
+  keeps EL10 working (`http-parser-devel` is EPEL-only on EL8/9 and absent on EL10)
+  and stops installing REST-API deps the default build never uses.
+- **pyxis:** added an explicit compiler dep (`build-essential` / `@Development Tools`).
+- **nvidia-container-toolkit:** `gnupg` → `gnupg2` to match the install guide.
