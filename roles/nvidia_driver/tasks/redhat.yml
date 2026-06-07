@@ -35,6 +35,14 @@
       - "kernel-headers-{{ ansible_kernel }}"
     state: present
 
+# Gather installed packages so the purge can be skipped when the target driver is
+# already present. Without this guard the find/purge below would match the driver
+# this role just installed and remove it on every re-run, forcing a reboot loop.
+- name: Gather installed package facts (RHEL/Rocky)
+  ansible.builtin.package_facts:
+    manager: rpm
+  when: nvidia_driver_purge_existing | bool
+
 - name: Find pre-existing NVIDIA driver packages (RHEL/Rocky)
   ansible.builtin.shell:
     cmd: >-
@@ -43,7 +51,9 @@
   register: nvidia_driver_existing_packages
   changed_when: false
   check_mode: false
-  when: nvidia_driver_purge_existing | bool
+  when:
+    - nvidia_driver_purge_existing | bool
+    - (nvidia_driver_rhel_package_resolved | trim) not in ansible_facts.packages
 
 - name: Purge pre-existing NVIDIA driver packages (RHEL/Rocky)
   ansible.builtin.dnf:
@@ -52,13 +62,16 @@
     autoremove: true
   when:
     - nvidia_driver_purge_existing | bool
+    - nvidia_driver_existing_packages.stdout_lines is defined
     - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
 
 - name: Reset the NVIDIA driver dnf module (RHEL/Rocky)
   ansible.builtin.command:
     cmd: "dnf -y module reset nvidia-driver"
   changed_when: false
-  when: nvidia_driver_purge_existing | bool
+  when:
+    - nvidia_driver_purge_existing | bool
+    - (nvidia_driver_rhel_package_resolved | trim) not in ansible_facts.packages
 
 - name: Enable the NVIDIA driver dnf module stream (RHEL/Rocky)
   ansible.builtin.command:
