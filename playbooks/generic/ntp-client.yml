@@ -1,7 +1,0 @@
----
-- hosts: all
-  become: true
-  tasks:
-    - name: Configure NTP client
-      ansible.builtin.include_role:
-        name: geerlingguy.ntp
