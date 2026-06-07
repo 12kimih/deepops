@@ -1,19 +1,20 @@
--- job_submit.lua -- Slurm submit-time site policy: default partition routing by
--- GPU type. Deployed only when slurm.conf has JobSubmitPlugins=lua
--- (set slurm_job_submit_plugins: "lua"). All site config comes from Ansible vars
--- (config/group_vars/slurm-cluster.yml); with the defaults (empty) this plugin is
--- a safe no-op. Runs inside slurmctld holding locks -- keep it pure string
--- parsing, no I/O.
--- https://slurm.schedmd.com/archive/slurm-25.11.6/job_submit_plugins.html
+-- job_submit.lua -- EXAMPLE Slurm submit-time site policy (default partition
+-- routing by GPU type). DeepOps does NOT generate this file -- copy it into your
+-- config/ (config/files/slurm/job_submit.lua), EDIT the [1] block for your
+-- cluster, then enable it with:
+--     slurm_job_submit_plugins: "lua"
+--     slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
+-- It is copied verbatim and runs inside slurmctld holding locks -- keep it pure
+-- string parsing, no I/O. https://slurm.schedmd.com/job_submit_plugins.html
 
--- [1] Site configuration (templated from Ansible vars)
-local CPU_PARTITIONS        = "{{ slurm_job_submit_cpu_partitions | default('') }}"
-local DEFAULT_GPU_TYPE      = "{{ slurm_default_gpu_type | default('') }}"
-local DEFAULT_GPU_PARTITION = "{{ slurm_default_gpu_partition | default('') }}"
-local GPU_TYPE_TO_PARTITION = {
-{% for gtype, part in (slurm_gpu_type_partition_map | default({})).items() %}
-    ["{{ gtype }}"] = "{{ part }}",
-{% endfor %}
+-- [1] Site configuration -- EDIT THESE for your cluster (or set "" to disable a rule).
+local CPU_PARTITIONS        = "cpu"     -- partition(s) for CPU-only jobs ("" = leave unset)
+local DEFAULT_GPU_TYPE      = "b200"    -- GPU type assumed when a GPU job omits the type
+local DEFAULT_GPU_PARTITION = "b200"    -- partition for GPU jobs of unknown/default type
+local GPU_TYPE_TO_PARTITION = {         -- map each GPU type to its partition (add your own)
+    ["b200"] = "b200",
+    ["h100"] = "h100",
+    ["h200"] = "h200",
 }
 
 -- [2] Detect a GPU request from --gres=gpu[:type][:count] and the modern
