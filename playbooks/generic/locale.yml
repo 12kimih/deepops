@@ -1,0 +1,8 @@
+---
+# Set a consistent UTF-8 system locale on every node (avoids the C/POSIX-fallback
+# mojibake problem). Override locale_lang (e.g. C.UTF-8) in config/group_vars.
+- name: Configure a consistent system locale on all nodes
+  hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - locale
