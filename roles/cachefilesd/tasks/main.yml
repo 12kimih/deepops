@@ -11,7 +11,7 @@
     owner: "root"
     group: "root"
     mode: "0644"
-  notify: Restart cachefilesd
+  register: cachefilesd_default
 
 - name: Configure
   ansible.builtin.template:
@@ -20,15 +20,25 @@
     owner: "root"
     group: "root"
     mode: "0644"
-  notify: Restart cachefilesd
+  register: cachefilesd_conf
 
-# state: started (not restarted) so re-runs with no config change are no-ops; the
-# Restart cachefilesd handler bounces it only when /etc/default or the conf change.
-# Not tested in molecule as cachefilesd requires a kernel module.
+# The service tasks are skipped in molecule (cachefilesd needs a kernel module the
+# container lacks) via molecule-notest -- which reliably skips TASKS, unlike a
+# notified handler. state: started makes an unchanged re-run a no-op, and the
+# restart fires only when the config above changed, so re-runs don't bounce the
+# daemon.
 - name: Start
   ansible.builtin.service:
     name: cachefilesd
     state: started
     enabled: true
+  tags:
+    - molecule-notest
+
+- name: Restart cachefilesd to apply config changes
+  ansible.builtin.service:
+    name: cachefilesd
+    state: restarted
+  when: cachefilesd_default is changed or cachefilesd_conf is changed
   tags:
     - molecule-notest
