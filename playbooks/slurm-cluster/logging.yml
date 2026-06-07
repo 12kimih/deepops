@@ -18,7 +18,9 @@
 - hosts: slurm-master[0]
   become: true
   vars:
-    filebeat_port: "5000"
+    # Logstash beats-input port; override logstash_beats_port in config/ if 5000
+    # is taken. (Play-level default so the literal isn't baked into the template.)
+    filebeat_port: "{{ logstash_beats_port | default('5000') }}"
   tasks:
     - name: Configure logstash to accept logs from filebeat
       ansible.builtin.template:
