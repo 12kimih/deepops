@@ -126,9 +126,11 @@ nfs_mounts:
   # NFS *client* mount options, tuned for many GPU nodes under heavy random I/O:
   #   vers=4.2  - modern protocol (COMPOUND ops, integrated locking); the client
   #               negotiates down if the server is older. (man 5 nfs)
-  #   nconnect=8 - 8 TCP connections per mount (max 16) to beat the single-flow
-  #               bottleneck; size to the link (4@40G/8@100G/16@200G), keep it
-  #               identical on every mount to the same server. Needs kernel >= 5.3.
+  #   nconnect=4 - 4 TCP connections per mount to beat the single-flow bottleneck.
+  #               4 is the broadly-recommended sweet spot for a single NFS head
+  #               (gains plateau past 4-8 and >8 can saturate the link); raise to 8
+  #               only on 100GbE+/scale-out storage, max 16. Keep it identical on
+  #               every mount to the same server. Needs kernel >= 5.3.
   #   rsize/wsize=1048576 - 1 MiB payload/RPC (fewer round-trips); try 262144 on
   #               latency-sensitive backends.
   #   hard,timeo=600,retrans=2 - retry indefinitely, no silent data loss.
@@ -138,11 +140,11 @@ nfs_mounts:
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'
     path: /home
-    options: rw,hard,vers=4.2,nconnect=8,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
+    options: rw,hard,vers=4.2,nconnect=4,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
   - mountpoint: /sw
     server: '{{ groups["slurm-master"][0] }}'
     path: /sw
-    options: rw,hard,vers=4.2,nconnect=8,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
+    options: rw,hard,vers=4.2,nconnect=4,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
 
 # Flags for enable/disable of NFS deployment
 #  - Set up an NFS server on nfs-server?

@@ -82,10 +82,13 @@ config quick-wins. In priority order:
    copy results back.
 
 2. **Client mount options.** The default `nfs_mounts` options are now
-   `rw,hard,vers=4.2,nconnect=8,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
-   `vers=4.2` uses COMPOUND ops; `nconnect=8` opens 8 TCP connections per mount (max 16)
-   to beat the single-flow limit -- size it to the link (4 @40G / 8 @100G / 16 @200G),
-   needs kernel >= 5.3, and keep it identical on every mount to the same server. Note the
+   `rw,hard,vers=4.2,nconnect=4,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
+   `vers=4.2` uses COMPOUND ops; `nconnect=4` opens 4 TCP connections per mount to beat
+   the single-flow limit. **4 is the broadly-recommended sweet spot** for a single NFS
+   head -- gains plateau past 4-8 and >8 can saturate the link (Azure Files caps the
+   benefit at 4); raise to 8 only on 100GbE+/scale-out storage (NetApp), max 16. Needs
+   kernel >= 5.3, and keep it identical on every mount to the same server. Note `nconnect`
+   helps *bandwidth* (streaming, checkpoints), not small-file/metadata random I/O. The
    old `async` here was a **no-op** (it is a server `/etc/exports` option, not a client
    mount option). Append `,fsc` and run the `cachefilesd` role to cache repeat reads.
    (`man 5 nfs`)
