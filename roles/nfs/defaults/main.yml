@@ -21,17 +21,28 @@ nfs_mounts: []
 # reads zero. (rpc.nfsd(8); NFS-HOWTO 5.6; kernel knfsd-stats)
 nfs_server_threads: "{{ [(ansible_processor_vcpus | default(16) | int) * 4, 64] | max }}"
 
-# Network/socket-buffer tuning for the NFS data path on fast cluster networks (applied on
-# both NFS servers and clients). Bigger TCP buffers let a single high-bandwidth
-# flow stay full and absorb many concurrent clients; the NFS-HOWTO / IBM / RHEL NFS
-# tuning guides recommend raising these for high-bandwidth NFS. Set false to skip.
-# https://nfs.sourceforge.net/nfs-howto/ar01s05.html
+# Network/socket-buffer tuning for the NFS data path, sized for a 100GbE+ cluster
+# fabric (B200-class) as the GENERAL default. Lower these in config/ for slower
+# fabrics if you prefer -- but the values are safe ceilings (TCP autotunes within
+# them), so leaving them is fine on 10/25GbE too. Bigger buffers keep a single
+# high-bandwidth flow's window full across the bandwidth-delay product; the old
+# 16 MiB ceiling throttles single-stream throughput far below 100G line rate.
+# Values follow ESnet's Fasterdata 100G host-tuning guide. Applied on both NFS
+# servers and clients. Set nfs_tune_network=false to skip.
+# https://fasterdata.es.net/host-tuning/linux/
 nfs_tune_network: true
 nfs_network_sysctls:
-  net.core.rmem_max: "16777216"
-  net.core.wmem_max: "16777216"
-  net.core.rmem_default: "262144"
+  net.core.rmem_max: "2147483647"               # 2 GiB-1 max recv buffer (ESnet 100G)
+  net.core.wmem_max: "2147483647"               # 2 GiB-1 max send buffer
+  net.core.rmem_default: "262144"               # per-socket default; TCP autotunes up
   net.core.wmem_default: "262144"
-  net.ipv4.tcp_rmem: "4096 87380 16777216"
-  net.ipv4.tcp_wmem: "4096 65536 16777216"
-  net.core.netdev_max_backlog: "30000"
+  net.core.optmem_max: "1048576"                # ancillary buffer (MSG_ZEROCOPY)
+  net.ipv4.tcp_rmem: "4096 131072 1073741824"   # min/default/1 GiB autotune ceiling
+  net.ipv4.tcp_wmem: "4096 16384 1073741824"
+  net.core.netdev_max_backlog: "300000"         # default 1000 drops packets at 100G
+  net.ipv4.tcp_mtu_probing: "1"                 # use with jumbo frames (MTU 9000)
+  net.core.default_qdisc: "fq"                  # fair-queue pacing for fast flows
+  net.core.somaxconn: "4096"                    # larger listen backlog for many clients
+# For peak single-mount throughput also set sunrpc.tcp_slot_table_entries=128
+# (and tcp_max_slot_table_entries=128). Not set here because the sunrpc module may
+# not be loaded yet at provision time; add it on the client once NFS is in use.
