@@ -83,12 +83,13 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    copy results back.
 
 2. **Client mount options.** The default `nfs_mounts` options are now
-   `rw,hard,vers=4.2,nconnect=4,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
-   `vers=4.2` uses COMPOUND ops; `nconnect=4` opens 4 TCP connections per mount to beat
-   the single-flow limit. **4 is the broadly-recommended sweet spot** for a single NFS
-   head -- gains plateau past 4-8 and >8 can saturate the link (Azure Files caps the
-   benefit at 4); raise to 8 only on 100GbE+/scale-out storage (NetApp), max 16. Needs
-   kernel >= 5.3, and keep it identical on every mount to the same server. Note `nconnect`
+   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
+   `vers=4.2` uses COMPOUND ops; `nconnect=16` opens 16 TCP connections per mount to beat
+   the single-flow limit. **The default targets a 100GbE+ fabric** -- NetApp shows
+   `nconnect` reaching ~line rate (~11 GB/s) on a single 100G NIC at 16 connections. On
+   10/25GbE, lower it to ~4 (gains plateau past 4-8, and too many connections can saturate
+   a slower link); max 16. Needs kernel >= 5.3, and keep it identical on every mount to the
+   same server. Note `nconnect`
    helps *bandwidth* (streaming, checkpoints), not small-file/metadata random I/O. The
    old `async` here was a **no-op** (it is a server `/etc/exports` option, not a client
    mount option). Append `,fsc` and run the `cachefilesd` role to cache repeat reads.
