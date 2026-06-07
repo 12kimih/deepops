@@ -218,10 +218,15 @@ Boot-persistence / idempotency fixes:
 
 ## 9. Known follow-ups (intentionally deferred)
 
-- **NVIDIA driver post-install / install-method** — auditing the official driver
-  guide for `nvidia-persistenced` enablement, the cuda-keyring + `nvidia-open`
-  (NVIDIA-repo) method vs the Canonical `-server-open` method, and fabricmanager.
-  *(In progress — this section will be updated when the role is revised.)*
+- **NVIDIA driver post-install / install-method — DONE** (commit `6d290421`):
+  audited against the official driver guide. Added `nvidia-persistenced`
+  enablement (the recommended daemon, over the deprecating `nvidia-smi -pm 1`);
+  added `nvidia_driver_install_method` (default `ubuntu_repo` = Canonical signed
+  `-server-open`; `nvidia_repo` = cuda-keyring + `nvidia-driver-pinning-<branch>`
+  + `nvidia-open`); added opt-in `nvidia_driver_fabricmanager` for NVSwitch HGX;
+  and `cat /proc/driver/nvidia/version` verification. Standard practice for a
+  stock-kernel Slurm fleet is the Canonical `-server-open` default (Secure Boot
+  works without MOK enrollment); the NVIDIA-repo path is the opt-in alternative.
 - **nvidia-dgx** 26.04/EL10 — NVIDIA DGX OS bundles for those aren't published
   yet; the role intentionally fails on an unvalidated DGX OS.
 - **mofed** — needs a version bump (or DOCA-OFED) for Ubuntu 24.04+/EL9+.
