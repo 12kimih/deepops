@@ -147,7 +147,7 @@ For example, DeepOps 21.09 uses Kubespray v2.16.0, with upgrade instructions fou
 When performing an update, it's important to make sure that your configured versions align with the supported versions in the version of Kubespray you are using.
 In particular,
 
-- Make sure the `helm_version` variable in your `config/group_vars/k8s-cluster.yml` file matches the version supported in the current Kubespray release.
+- Make sure the `helm_version` variable in your `config/group_vars/k8s_cluster.yml` file matches the version supported in the current Kubespray release.
   You can determine this version by running:
 
   ```bash
@@ -269,7 +269,7 @@ DeepOps offers the option to configure each of the necessary NVIDIA components i
 
 ##### Updating the NVIDIA driver
 
-**Important**: Note that upgrading the NVIDIA driver will reboot the node, unless you set `nvidia_driver_skip_reboot` to true.
+**Important**: Note that upgrading the NVIDIA driver will reboot the node, unless you set `nvidia_driver_reboot` to false.
 If you are using MIG-enabled GPUs ensure that your MIG configuration is persistent by using the [nvidia-mig-manager systemd](https://github.com/NVIDIA/mig-parted/tree/master/deployments/systemd) service
 or the [nvidia-mig-manager Kubernetes GPU Operator-included DaemonSet](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-operator-mig.html).
 
@@ -290,13 +290,13 @@ ansible-playbook playbooks/nvidia-software/nvidia-driver.yml -e nvidia_driver_pa
 To upgrade the driver to a new release branch, set the following parameter in your DeepOps configuration:
 
 ```bash
-nvidia_driver_ubuntu_branch: "580"
+nvidia_driver_branch: "580"
 ```
 
 Some newer GPUs require NVIDIA open kernel modules. To install the Ubuntu open kernel module packages for the selected branch, set:
 
 ```bash
-nvidia_driver_ubuntu_use_open_kernel_modules: true
+nvidia_driver_kernel_modules: "open"
 ```
 
 Then run:
@@ -441,7 +441,7 @@ Note that this can take a long time, as we download and build Slurm from source 
 
 #### Updating the NVIDIA driver
 
-**Important**: Note that upgrading the NVIDIA driver will reboot the node, unless you set `nvidia_driver_skip_reboot` to true.
+**Important**: Note that upgrading the NVIDIA driver will reboot the node, unless you set `nvidia_driver_reboot` to false.
 
 ##### On DGX
 
@@ -460,13 +460,13 @@ ansible-playbook playbooks/nvidia-software/nvidia-driver.yml -e nvidia_driver_pa
 To upgrade the driver to a new release branch, set the following parameter in your DeepOps configuration:
 
 ```bash
-nvidia_driver_ubuntu_branch: "580"
+nvidia_driver_branch: "580"
 ```
 
 Some newer GPUs require NVIDIA open kernel modules. To install the Ubuntu open kernel module packages for the selected branch, set:
 
 ```bash
-nvidia_driver_ubuntu_use_open_kernel_modules: true
+nvidia_driver_kernel_modules: "open"
 ```
 
 Then run:

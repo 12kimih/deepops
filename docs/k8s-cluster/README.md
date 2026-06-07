@@ -64,7 +64,7 @@ Instructions for deploying a GPU cluster with Kubernetes
    Note that as part of the kubernetes deployment process, the default behavior is to also deploy the [NVIDIA k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) for GPU support. The [GPU Operator](https://github.com/NVIDIA/gpu-operator) is an alternative all-in-one deployment method, which will deploy the [device plugin](https://github.com/NVIDIA/k8s-device-plugin) and optionally includes GPU tooling such as driver containers, [GPU Feature Discovery](https://github.com/NVIDIA/gpu-feature-discovery), [DCGM-Exporter](https://github.com/NVIDIA/dcgm-exporter) and [MIG Manager](https://github.com/NVIDIA/mig-parted). The default behavior of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) in DeepOps is to deploy host-level drivers and NVIDIA software. To leverage driver containers as part of the GPU Operator, disable the `gpu_operator_preinstalled_nvidia_software` flag. To enable the GPU Operator in DeepOps...
 
    ```bash
-   vi config/group_vars/k8s-cluster.yml
+   vi config/group_vars/k8s_cluster.yml
 
    # Enable GPU Operator
    # set: deepops_gpu_operator_enabled: true
@@ -126,7 +126,7 @@ Run the following script to create an administrative user and print out the dash
 
 The default behavior of DeepOps is to setup an NFS server on the first `kube_control_plane` node. This temporary NFS server is used by the `nfs-client-provisioner` which is installed as the default StorageClass of a standard DeepOps deployment.
 
-To use an existing nfs server server update the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s-cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s-cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
+To use an existing nfs server server update the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s_cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s_cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
 
 To manually install or re-install the `nfs-client-provisioner` run:
 

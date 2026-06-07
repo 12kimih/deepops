@@ -19,7 +19,7 @@ High-Performance Multi-Node Cluster Deployment Guide
 
 This guide utilizes a collection of playbooks to configure a cluster, deploy a workload manager, and verify performance.
 
-It leverages open source tools such as Pyxis and Enroot to optimize Slurm for multi-node Deep Learning jobs beyond the cluster configuration described in the [DeepOps Slurm Deployment Guide](/docs/slurm-cluster.md). Additional details can be found [here](https://docs.nvidia.com/ngc/multi-node-bert-user-guide).
+It leverages open source tools such as Pyxis and Enroot to optimize Slurm for multi-node Deep Learning jobs beyond the cluster configuration described in the [DeepOps Slurm Deployment Guide](README.md). Additional details can be found [here](https://docs.nvidia.com/ngc/multi-node-bert-user-guide).
 
 ## Supported Distributions
 
@@ -53,7 +53,7 @@ These packages have been installed and tested with the following Linux distribut
 
    Install Ansible and required software on the provisioning machine.
 
-   DeepOps uses a single provisioning machine to deploy all other software to the cluster. This process may take several minutes as ansible-galaxy roles are downloaded and python packages are installed. For more information on Ansible and why we use it, consult the [Ansible Guide](ANSIBLE.md).
+   DeepOps uses a single provisioning machine to deploy all other software to the cluster. This process may take several minutes as ansible-galaxy roles are downloaded and python packages are installed. For more information on Ansible and why we use it, consult the [Ansible Guide](../deepops/ansible.md).
 
    ```bash
    # Install software prerequisites and copy default configuration
@@ -217,11 +217,11 @@ For examples of how to run BERT multi-node training jobs using this configuratio
 
 ### Setup.sh fails due to unsupported ansible version
 
-DeepOps requires Ansible v2.7.8 or greater. If the setup.sh script fails to achieve this, the latest version of ansible can be installed via pip...
+DeepOps pins Ansible 10.7.0 (installed by `setup.sh`). If `setup.sh` fails to install it, install the pinned version directly via pip:
 
 ```bash
 # on the provisioning node
-sudo pip install ansible=="2.7.11"
+sudo pip install ansible==10.7.0
 ```
 
 ### Connection to hosts via ansible refused/blocked

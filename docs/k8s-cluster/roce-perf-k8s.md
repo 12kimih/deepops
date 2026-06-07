@@ -127,7 +127,7 @@ add switch PFC, ECN configuration
 
    Install Ansible and required software on the management node.
 
-   DeepOps uses a single management node deploy all other software to the cluster. This process may take several minutes as ansible-galaxy roles are downloaded and python packages are installed. For more information on Ansible and why we use it, consult the [Ansible Guide](ANSIBLE.md).
+   DeepOps uses a single management node deploy all other software to the cluster. This process may take several minutes as ansible-galaxy roles are downloaded and python packages are installed. For more information on Ansible and why we use it, consult the [Ansible Guide](../deepops/ansible.md).
 
    ```bash
    # Install software prerequisites and copy default configuration
