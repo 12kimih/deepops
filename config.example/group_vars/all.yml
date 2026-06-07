@@ -344,3 +344,13 @@ standalone_container_registry_port: "5000"
 ngc_ready_cuda_container: "nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04"
 ngc_ready_pytorch: "nvcr.io/nvidia/pytorch:24.04-py3"
 ngc_ready_tensorflow: "nvcr.io/nvidia/tensorflow:24.04-tf2-py3"
+
+################################################################################
+# Kubespray runtime defaults                                                   #
+################################################################################
+# Surface a few kubespray vars explicitly to avoid undefined-variable runtime
+# errors on some kubespray releases. These are the standard defaults; override
+# in your config/ if your cluster differs.
+dns_domain: cluster.local
+is_fedora_coreos: false
+etcd_deployment_type: kubeadm

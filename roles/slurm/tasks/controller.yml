@@ -149,6 +149,29 @@
   tags:
     - config
 
+# Also place cgroup.conf/gres.conf on the controller: compute.yml (which normally
+# templates them) only runs on is_compute nodes, so a controller that is also the
+# NFS config source, or a combined head+compute node, would otherwise lack them.
+- name: Configure cgroup.conf
+  ansible.builtin.template:
+    src: "{{ slurm_cgroup_conf_template }}"
+    dest: "{{ slurm_config_dir }}/cgroup.conf"
+    mode: "0644"
+  notify:
+    - Restart slurmctld
+  tags:
+    - config
+
+- name: Configure gres.conf
+  ansible.builtin.template:
+    src: "{{ slurm_gres_conf_template }}"
+    dest: "{{ slurm_config_dir }}/gres.conf"
+    mode: "0644"
+  notify:
+    - Restart slurmctld
+  tags:
+    - config
+
 - name: Restart slurmdbd
   ansible.builtin.systemd:
     name: slurmdbd
