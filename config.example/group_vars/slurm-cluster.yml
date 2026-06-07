@@ -241,7 +241,11 @@ hpcsdk_install_in_path: false
 slurm_cluster_install_openmpi: false
 #openmpi_version:
 openmpi_install_prefix: "/usr/local"
-openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }} --with-pmi={{ slurm_install_prefix }} --with-slurm={{ slurm_install_prefix }} --with-libevent=/usr"
+# OpenMPI 5.0.x built against the external PMIx + hwloc that Slurm uses (SchedMD
+# best practice). v5 removed --with-pmi/--with-slurm; `srun --mpi=pmix` needs only
+# --with-pmix. (On OpenMPI 4.x add back --with-pmi/--with-slurm and use a
+# libevent path instead of =external.)
+openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }} --with-libevent=external"
 
 ################################################################################
 # Open OnDemand                                                                #
