@@ -3,9 +3,9 @@
 # Profile levels: min, basic, moderate, safety, shared, production
 #
 # The repo is held at the strict `production` profile so that the consistency
-# rules already cleaned up across the tree — FQCN module names, capitalized
+# rules already cleaned up across the tree -- FQCN module names, capitalized
 # task/play names, jinja spacing, task key ordering, and YAML style (truthy,
-# octal modes) — stay enforced in CI and cannot regress.
+# octal modes) -- stay enforced in CI and cannot regress.
 profile: production
 
 # Exclude external/vendored roles and hardware-specific roles

@@ -9,7 +9,7 @@
 #    https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/ubuntu.html
 
 # Resolve the target package up front so the purge can be skipped when the desired
-# driver is already installed (keeps re-runs idempotent — otherwise the purge would
+# driver is already installed (keeps re-runs idempotent -- otherwise the purge would
 # match the driver this role just installed and force a reboot on every run).
 - name: Determine the NVIDIA driver package (Ubuntu, Canonical archive)
   ansible.builtin.set_fact:
