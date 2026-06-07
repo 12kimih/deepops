@@ -1,7 +1,7 @@
 ---
 # Install the system-wide CUDA toolkit. Set to false to skip it entirely, e.g.
 # when CUDA is provided per-version through Lmod/environment modules instead.
-nvidia_cuda_install: true
+nvidia_cuda_install: false
 
 # 'cuda-toolkit' is the generic package and will pull the latest version
 # if you want a specific version, use i.e. cuda-toolkit=12.2.0-1
