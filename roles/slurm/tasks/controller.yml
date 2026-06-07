@@ -92,6 +92,20 @@
   tags:
     - config
 
+# Deploy the lua job_submit plugin only when slurm.conf enables it
+# (slurm_job_submit_plugins includes "lua"). Must live in the slurm config dir.
+# https://slurm.schedmd.com/archive/slurm-25.11.6/job_submit_plugins.html
+- name: Configure job_submit.lua
+  ansible.builtin.template:
+    src: "{{ slurm_job_submit_template }}"
+    dest: "{{ slurm_config_dir }}/job_submit.lua"
+    mode: "0644"
+  when: "'lua' in (slurm_job_submit_plugins | default(''))"
+  notify:
+    - Restart slurmctld
+  tags:
+    - config
+
 - name: Configure slurm.conf to nfs
   ansible.builtin.template:
     src: "{{ slurm_conf_template }}"

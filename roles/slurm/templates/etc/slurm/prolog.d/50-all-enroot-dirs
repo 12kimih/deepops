@@ -7,7 +7,8 @@ command -v enroot >/dev/null || exit 0  # enroot not installed
 runtime_path="$(sudo -u "$SLURM_JOB_USER" sh -c 'echo "{{ enroot_runtime_path }}"')"
 mkdir -p "$runtime_path"
 chown "$SLURM_JOB_UID:$(id -g "$SLURM_JOB_UID")" "$runtime_path"
-chmod 0755 "$(dirname $runtime_path)"
+# Do not chmod the parent dir: mkdir -p already creates it 0755, and the parent may
+# be a shared or systemd-managed path (e.g. /run/user/$UID) we must not relax.
 chmod 0700 "$runtime_path"
 {% endif %}
 
