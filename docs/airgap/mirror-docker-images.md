@@ -42,8 +42,8 @@ Then, for each image you want to download, you should pull the image from the re
 In this example, we're saving all our Docker images to `/tmp/images`:
 
 ```
-$ docker pull nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-$ docker save -o /tmp/images/nvidia-cuda-12.4.1-base-ubuntu22.04.tar nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
+$ docker pull nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
+$ docker save -o /tmp/images/nvidia-cuda-13.2.1-base-ubuntu24.04.tar nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
 ```
 
 Additionally, you should download and save the [`registry` image](https://hub.docker.com/_/registry) so that you can deploy a local registry on the offline network.
@@ -115,7 +115,7 @@ docker_insecure_registries:
 Once your registry is running and you've configured your hosts to access it, you can load additional images and push them to the offline registry:
 
 ```bash
-docker load -i /tmp/images/nvidia-cuda-12.4.1-base-ubuntu22.04.tar
-docker tag nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04 registry-host:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
-docker push registry-host:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
+docker load -i /tmp/images/nvidia-cuda-13.2.1-base-ubuntu24.04.tar
+docker tag nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04 registry-host:5000/nvidia/cuda:13.2.1-base-ubuntu24.04
+docker push registry-host:5000/nvidia/cuda:13.2.1-base-ubuntu24.04
 ```
