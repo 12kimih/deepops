@@ -1,5 +1,4 @@
 ---
-mofed_distro: "rhel"
 mofed_pkg_prereqs:
   - tcsh
   - gcc-gfortran

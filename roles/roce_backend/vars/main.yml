@@ -31,7 +31,10 @@ vendor: "15b3"
 dev_id: "101c"
 num_vf: 8
 
-#Mellanox OFED parameters
+# Mellanox OFED parameters for the bundled ISO installer below.
+# LEGACY: this MLNX_OFED 4.7 / Ubuntu 18.04 ISO is unsupported on the current OS
+# matrix. For a modern RoCE host, install OFED via the `mofed` role (DOCA-OFED)
+# instead, and override these for your adapter from https://developer.nvidia.com/doca-downloads.
 mofed_version: "4.7-3.2.9.0"
 mofed_site_place: "MLNX_OFED-4.7-3.2.9.0"
 mofed_file_name: "MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu18.04-x86_64.iso"

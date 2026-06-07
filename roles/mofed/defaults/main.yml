@@ -1,11 +1,30 @@
 ---
-mofed_version: "5.6-2.0.9.0"
+# DOCA-OFED is the successor to MLNX_OFED (the last standalone MLNX_OFED was the
+# 24.10 LTS, October 2024). It is installed from NVIDIA's DOCA network repository
+# and then `apt/dnf install doca-ofed` (the MLNX_OFED-equivalent driver/lib/tool
+# bundle: the same kernel drivers, user-space libraries and management tools).
+# Transition: https://docs.nvidia.com/doca/sdk/mlnx_ofed-to-doca-ofed-transition-guide/index.html
+# Host install: https://docs.nvidia.com/doca/sdk/doca-host-installation-and-upgrade/index.html
+#
+# VALIDATION REQUIRED: confirm the version and that mofed_repo_base_url resolves for
+# YOUR exact OS + adapter on https://developer.nvidia.com/doca-downloads before
+# running on RDMA/InfiniBand hardware. DOCA pins driver/firmware combinations per
+# release, and not every OS/arch is published for every DOCA version.
+mofed_doca_version: "3.3.0"
 
-mofed_download_dir: "/tmp/mofed-install"
-mofed_download_dest: "mofed.tgz"
-mofed_download_name: "MLNX_OFED_LINUX-{{ mofed_version }}-{{ mofed_distro }}{{ ansible_distribution_version }}-{{ ansible_architecture }}"
-mofed_download_url: "http://www.mellanox.com/downloads/ofed/MLNX_OFED-{{ mofed_version }}/{{ mofed_download_name }}.tgz"
+# Repo distro id (ubuntu<ver> / rhel<major.minor>) and arch (x86_64 / arm64-sbsa).
+mofed_repo_distro: >-
+  {{ ('ubuntu' ~ ansible_distribution_version) if ansible_distribution == 'Ubuntu'
+     else ('rhel' ~ ansible_distribution_version) }}
+mofed_repo_arch: "{{ 'arm64-sbsa' if ansible_architecture == 'aarch64' else 'x86_64' }}"
+mofed_repo_base_url: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_repo_distro | trim }}/{{ mofed_repo_arch }}"
+mofed_repo_gpg_key: "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
 
-mofed_install_flags: "--all --without-fw-update"
+# Package to install. doca-ofed = OFED drivers/libs/tools (MLNX_OFED equivalent);
+# doca-all and doca-networking are larger supersets.
+mofed_package: "doca-ofed"
 
-mofed_cleanup_install_dir: true
+# Reboot after install to load the OFED kernel modules (off by default; pair with
+# playbooks/utilities/reboot.yml for a controlled rolling reboot).
+mofed_reboot: false
+mofed_reboot_timeout: 600
