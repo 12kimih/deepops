@@ -8,11 +8,13 @@
       arm64: arm64
       x86_64: amd64
 
+# Prerequisites named by the official install guide (ca-certificates, gnupg2 — we
+# use get_url instead of curl). https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 - name: Ubuntu | install repository prerequisites
   ansible.builtin.apt:
     name:
       - ca-certificates
-      - gnupg
+      - gnupg2
     state: present
     update_cache: true
   when: nvidia_container_toolkit_repo_base_url | length > 0

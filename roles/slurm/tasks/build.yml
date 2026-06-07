@@ -67,7 +67,7 @@
     name: "{{ item }}"
     state: present
     update_cache: true
-  with_items: "{{ slurm_build_deps }}"
+  with_items: "{{ slurm_build_deps + (slurm_slurmrestd_deps if slurm_build_slurmrestd | default(false) else []) }}"
   when: ansible_distribution == 'Ubuntu'
 
 - name: Install build dependencies
@@ -78,7 +78,7 @@
     # "crb" on EL9+ (Rocky/Alma/CentOS Stream). On RHEL proper, enable the
     # codeready-builder-for-rhel-<N> repo via subscription-manager beforehand.
     enablerepo: "{{ 'powertools' if ansible_distribution_major_version == '8' else 'crb' }}"
-  with_items: "{{ slurm_build_deps }}"
+  with_items: "{{ slurm_build_deps + (slurm_slurmrestd_deps if slurm_build_slurmrestd | default(false) else []) }}"
   when: ansible_os_family == 'RedHat'
 
 - name: Remove slurm packages

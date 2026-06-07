@@ -2,10 +2,9 @@
 slurm_pam_lib_dir: /lib64/security
 
 # Build dependencies per the Slurm 25.11.x admin quickstart. dbus-devel and
-# libbpf-devel are needed for the cgroup/v2 plugin; http-parser-devel/json-c-devel/
-# libyaml-devel enable the REST API; numactl-devel, lua-devel and readline-devel
-# enable NUMA affinity, Lua plugins (job_submit) and interactive scontrol.
-# (http-parser-devel/json-c-devel come from CRB; see build.yml enablerepo.)
+# libbpf-devel are needed for the cgroup/v2 plugin; numactl-devel, lua-devel and
+# readline-devel enable NUMA affinity, Lua plugins (job_submit) and interactive
+# scontrol. mariadb-devel provides mysql.h for the accounting store.
 # https://slurm.schedmd.com/archive/slurm-25.11.6/quickstart_admin.html
 slurm_build_deps:
   - "@Development Tools"
@@ -18,12 +17,17 @@ slurm_build_deps:
   - pam-devel
   - dbus-devel
   - libbpf-devel
-  - http-parser-devel
-  - json-c-devel
-  - libyaml-devel
   - lua-devel
   - perl-ExtUtils-MakeMaker
   - libatomic
+
+# slurmrestd REST API only (installed when slurm_build_slurmrestd=true).
+# http-parser-devel lives in EPEL on EL8/9 and is absent on EL10 (deprecated
+# upstream), so it is gated out of the default build to keep EL10 working.
+slurm_slurmrestd_deps:
+  - http-parser-devel
+  - json-c-devel
+  - libyaml-devel
 
 slurm_pmix_deps:
   - "@Development Tools"
