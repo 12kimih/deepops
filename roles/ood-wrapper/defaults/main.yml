@@ -1,4 +1,8 @@
 ---
+# Pinned to the 2.x line. Open OnDemand 3.x/4.x changed packaging substantially
+# (4.0 dropped SCL on RHEL and reworked the repo/build layout), so this role's
+# build-from-source steps need reworking + validation before bumping -- it is NOT a
+# drop-in version change. Latest upstream as of 2026-06 is 4.0.x.
 ood_source_version: "v2.0.9"
 ood_config_dir: /etc/ood/config
 ood_base_dir: /opt/ood
