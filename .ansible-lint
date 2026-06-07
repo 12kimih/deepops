@@ -21,6 +21,7 @@ exclude_paths:
 # categories still allowed; everything else (incl. fqcn/name/jinja/key-order)
 # must pass.
 skip_list:
+  - role-name                    # DeepOps role dirs use hyphens (dns-config, ood-wrapper, ...)
   - var-naming[no-role-prefix]   # vars not prefixed with the role name
   - var-naming[pattern]          # non-conforming variable names
   - name[play]                   # plays missing a descriptive name

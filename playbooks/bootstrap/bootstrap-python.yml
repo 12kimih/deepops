@@ -35,16 +35,3 @@
           - python3-pip
         state: present
       when: ansible_python.version.major == 3
-
-    - name: Legacy EL7 - install epel
-      ansible.builtin.package:
-        name: epel-release
-        state: present
-      when: (ansible_python.version.major == 2) and (ansible_os_family == "RedHat") and (ansible_distribution_major_version == "7")
-
-    - name: Legacy EL7 - install python 2 libraries
-      ansible.builtin.package:
-        name:
-          - python-setuptools
-          - python-pip
-      when: (ansible_python.version.major == 2) and (ansible_os_family == "RedHat") and (ansible_distribution_major_version == "7")

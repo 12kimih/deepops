@@ -63,14 +63,6 @@
     - configure
   when: (ansible_distribution == "Ubuntu") or ((ansible_os_family == "RedHat") and (ansible_distribution_major_version is version("8", ">=")))
 
-- name: Install passlib for the htpasswd module (EL7)
-  ansible.builtin.package:
-    name: python-passlib
-    state: present
-  tags:
-    - configure
-  when: (ansible_os_family == "RedHat") and (ansible_distribution_major_version == "7")
-
 - name: Create .htpasswd entries
   community.general.htpasswd:
     path: "{{ ood_htpasswd_file }}"
@@ -81,7 +73,7 @@
   tags:
     - configure
 
-- name: Install required apache module
+- name: Install required apache module (Ubuntu)
   community.general.apache2_module:
     state: present
     name: proxy_wstunnel
@@ -90,14 +82,13 @@
     - configure
   when: ansible_distribution == 'Ubuntu'
 
-- name: Install required apache module
+# On EL8+ httpd is the base-OS package (mod_proxy_wstunnel ships in mod_proxy);
+# the legacy EL7 Software Collections httpd24 PATH override has been removed.
+- name: Install required apache module (RedHat)
   community.general.apache2_module:
     state: present
     name: proxy_wstunnel
   register: mod_install
-  environment:
-    PATH: /opt/rh/httpd24/root/usr/sbin
-    LD_LIBRARY_PATH: /opt/rh/httpd24/root/usr/lib64
   tags:
     - configure
   when: ansible_os_family == 'RedHat'
