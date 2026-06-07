@@ -129,7 +129,7 @@ These variables are specified in files named for the inventory group used, in th
 ```console
 config/group_vars/
 |-- all.yml
-|-- k8s-cluster.yml
+|-- k8s_cluster.yml
 |-- netapp-trident.yml
 `-- slurm-cluster.yml
 ```

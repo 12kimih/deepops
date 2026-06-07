@@ -123,14 +123,18 @@ slurm_cluster_install_singularity: false
 ################################################################################
 # NFS                                                                          #
 ################################################################################
-# Default exports:
-# - /home: shared home directories, needed for Open OnDemand and best practice
-# - /sw:   shared space for software installs, used for Spack or EasyBuild
+# NFS server exports (man 5 exports). Option notes:
+# - no_subtree_check: modern recommended default (reliability; the man page advises it).
+# - sync: data hits disk before the write is acked (crash-safe). Use async only for
+#   scratch/temporary data where throughput matters more than durability.
+# - no_root_squash: lets the head node's root manage these trees (common in HPC) but is
+#   a security risk if any client is untrusted -- prefer root_squash where you can.
+# - "*" exports to ANY host -- restrict to your cluster subnet (e.g. 10.0.0.0/16(...)).
 nfs_exports:
-  - path: /home
-    options: "*(rw,sync,no_root_squash)"
-  - path: /sw
-    options: "*(rw,sync,no_root_squash)"
+  - path: /home    # shared home dirs (needed for Open OnDemand)
+    options: "*(rw,sync,no_root_squash,no_subtree_check)"
+  - path: /sw      # shared software (Spack / EasyBuild / CUDA modules)
+    options: "*(rw,sync,no_root_squash,no_subtree_check)"
 nfs_mounts:
   # Client mount options below are a safe starting point -- tune per your network
   # and storage. nconnect (parallel TCP connections) is the main lever: ~4 on

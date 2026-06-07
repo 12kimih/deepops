@@ -1,5 +1,15 @@
 ---
+# nv_peer_mem only applies on GPU nodes, and the role gates on GPU detection, so
+# populate the gpus fact first (via the facts role) -- otherwise a standalone run
+# on a node that has never gathered ansible_local.gpus errors out. Within
+# slurm-cluster.yml an earlier play already populates it; this makes the playbook
+# safe to run on its own too (mirrors nvidia-dcgm.yml / nvidia-dcgm-exporter.yml).
 - hosts: "{{ hostlist | default('all') }}"
   become: true
-  roles:
-    - nvidia-peer-memory
+  tasks:
+    - name: Install custom facts module (provides ansible_local.gpus.count)
+      ansible.builtin.include_role:
+        name: facts
+    - name: Configure nv_peer_mem (GPU nodes only; the role gates on GPU detection)
+      ansible.builtin.include_role:
+        name: nvidia-peer-memory
