@@ -1,0 +1,53 @@
+---
+# roles/cuda_toolkits -- install NVIDIA CUDA toolkits from the official runfiles
+# into a shared (NFS) software tree and expose each one as an Lmod module.
+#
+# The host GPU driver is never touched: the runfile is invoked with --toolkit
+# only. The heavy download+install path runs on ONE host (the node that owns the
+# shared software tree); because that tree is shared, the modules become visible
+# on every node that mounts it. See playbooks/slurm-cluster/cuda-toolkits.yml.
+
+# Whether the download+install path runs on this host. The playbook turns this
+# on only for the software-tree host; everywhere else the role just registers
+# the modulefiles tree with Lmod (the profile.d snippet). Override with -e or in
+# config/ if your software tree lives on a different host.
+cuda_toolkits_do_install: false
+
+# Install + module layout. Reuses the lmod role's sm_* vars so CUDA lands in the
+# same tree Lmod already searches (sm_module_path is placed on MODULEPATH by the
+# lmod role's z00_lmod profile script), which is why no extra registration is
+# needed on a stock DeepOps slurm cluster.
+cuda_prefix: "{{ sm_prefix | default('/sw') }}"
+cuda_install_root: "{{ cuda_prefix }}/cuda"                        # toolkit -> <root>/<version>
+cuda_modroot: "{{ sm_module_path | default('/sw/modules/all') }}"  # module  -> <modroot>/cuda/<version>.lua
+
+# Runfile download cache (reused across runs; kept off /tmp in case it is small).
+cuda_cache_dir: "/var/tmp/cuda_runfiles"
+cuda_base_url: "https://developer.download.nvidia.com/compute/cuda"
+
+# profile.d snippet that registers the site modulefiles tree with Lmod using
+# LMOD_SITE_MODULEPATH (the official Lmod site mechanism: read before Lmod init
+# and preserved across `module reset`). Generic -- the tree may hold more than
+# just CUDA.
+cuda_site_profile: "/etc/profile.d/00-site-modulepath.sh"
+
+# CUDA toolkits to install: the latest patch of each minor from 11.8 to 13.3.
+# Each entry needs the exact runfile name (the embedded driver version is not
+# derivable from the toolkit version). Trim or extend this in
+# config/group_vars/ to match the toolkits you actually want; current runfiles
+# are listed at https://developer.nvidia.com/cuda-toolkit-archive
+cuda_versions:
+  - {version: "11.8.0", runfile: "cuda_11.8.0_520.61.05_linux.run"}
+  - {version: "12.0.1", runfile: "cuda_12.0.1_525.85.12_linux.run"}
+  - {version: "12.1.1", runfile: "cuda_12.1.1_530.30.02_linux.run"}
+  - {version: "12.2.2", runfile: "cuda_12.2.2_535.104.05_linux.run"}
+  - {version: "12.3.2", runfile: "cuda_12.3.2_545.23.08_linux.run"}
+  - {version: "12.4.1", runfile: "cuda_12.4.1_550.54.15_linux.run"}
+  - {version: "12.5.1", runfile: "cuda_12.5.1_555.42.06_linux.run"}
+  - {version: "12.6.3", runfile: "cuda_12.6.3_560.35.05_linux.run"}
+  - {version: "12.8.2", runfile: "cuda_12.8.2_570.211.01_linux.run"}
+  - {version: "12.9.2", runfile: "cuda_12.9.2_575.57.08_linux.run"}
+  - {version: "13.0.3", runfile: "cuda_13.0.3_580.126.20_linux.run"}
+  - {version: "13.1.2", runfile: "cuda_13.1.2_590.48.01_linux.run"}
+  - {version: "13.2.1", runfile: "cuda_13.2.1_595.58.03_linux.run"}
+  - {version: "13.3.0", runfile: "cuda_13.3.0_610.43.02_linux.run"}

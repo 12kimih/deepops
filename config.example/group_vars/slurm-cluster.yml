@@ -197,6 +197,22 @@ spack_default_packages:
 # Which host should we run installs on for software going into the NFS share?
 sm_install_host: "slurm-master[0]"
 
+# CUDA toolkits as Lmod modules (playbooks/slurm-cluster/cuda-toolkits.yml).
+# Installs CUDA toolkits from the official runfiles into {{ sm_prefix }}/cuda and
+# exposes each as `module load cuda/<version>`. Driver is never touched. Opt-in:
+# run the playbook explicitly. Installs once on the NFS server, visible on every
+# node. The role ships the full "latest patch of each minor, 11.8..13.3" list;
+# trim it here to just the toolkits you want (each entry needs the exact runfile
+# name from https://developer.nvidia.com/cuda-toolkit-archive):
+#cuda_versions:
+#  - {version: "12.4.1", runfile: "cuda_12.4.1_550.54.15_linux.run"}
+#  - {version: "12.8.2", runfile: "cuda_12.8.2_570.211.01_linux.run"}
+#  - {version: "13.3.0", runfile: "cuda_13.3.0_610.43.02_linux.run"}
+# Where the toolkits and their modulefiles land (default: alongside the Lmod tree
+# so `module avail` finds them with no extra MODULEPATH wiring):
+#cuda_prefix: "{{ sm_prefix }}"
+#cuda_modroot: "{{ sm_module_path }}"
+
 ################################################################################
 # NVIDIA HPC SDK                                                               #
 ################################################################################
