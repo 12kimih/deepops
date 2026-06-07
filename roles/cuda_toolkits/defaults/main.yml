@@ -25,11 +25,12 @@ cuda_modroot: "{{ sm_module_path | default('/sw/modules/all') }}"  # module  -> 
 cuda_cache_dir: "/var/tmp/cuda_runfiles"
 cuda_base_url: "https://developer.download.nvidia.com/compute/cuda"
 
-# profile.d snippet that registers the site modulefiles tree with Lmod using
-# LMOD_SITE_MODULEPATH (the official Lmod site mechanism: read before Lmod init
-# and preserved across `module reset`). Generic -- the tree may hold more than
-# just CUDA.
+# profile.d snippets (sh + csh) that register the site modulefiles tree with Lmod
+# using LMOD_SITE_MODULEPATH (the official Lmod site mechanism: read before Lmod
+# init and preserved across `module reset`). Generic -- the tree may hold more
+# than just CUDA. The 00- prefix sorts them before z00_lmod.
 cuda_site_profile: "/etc/profile.d/00-site-modulepath.sh"
+cuda_site_profile_csh: "/etc/profile.d/00-site-modulepath.csh"
 
 # CUDA toolkits to install: the latest patch of each minor from 11.8 to 13.3.
 # Each entry needs the exact runfile name (the embedded driver version is not
