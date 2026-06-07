@@ -196,12 +196,11 @@ sm_module_path: "{{ sm_module_root }}/all"
 # Spack-specific
 spack_install_dir: "{{ sm_prefix }}/spack"
 spack_build_packages: false
-# Illustrative only (spack_build_packages is false by default). CUDA itself is now
-# provided by the cuda_toolkits role as Lmod modules, so use Spack for other
-# libraries; pick specs that resolve in your Spack version.
+# Illustrative only (spack_build_packages is false by default). Latest CUDA as the
+# single example spec -- `cuda` with no version lets Spack pick its newest. (CUDA
+# is also available as Lmod modules via the cuda_toolkits role.)
 spack_default_packages:
-- "fftw@3.3.10"
-- "openblas@0.3.28"
+- "cuda"
 
 # Which host should we run installs on for software going into the NFS share?
 sm_install_host: "slurm-master[0]"
