@@ -13,18 +13,22 @@
   with_items: "{{ pyxis_el_deps }}"
   when: ansible_os_family == "RedHat"
 
+# Copy (not symlink) the enroot hooks so they survive an enroot package
+# upgrade/removal that would otherwise leave a dangling symlink target.
 - name: Install slurm-pmi hook
-  ansible.builtin.file:
-    path: /etc/enroot/hooks.d/50-slurm-pmi.sh
-    state: link
+  ansible.builtin.copy:
     src: /usr/share/enroot/hooks.d/50-slurm-pmi.sh
+    dest: /etc/enroot/hooks.d/50-slurm-pmi.sh
+    remote_src: true
+    mode: "0755"
   when: is_compute
 
 - name: Install slurm-pytorch hook
-  ansible.builtin.file:
-    path: /etc/enroot/hooks.d/50-slurm-pytorch.sh
-    state: link
+  ansible.builtin.copy:
     src: /usr/share/enroot/hooks.d/50-slurm-pytorch.sh
+    dest: /etc/enroot/hooks.d/50-slurm-pytorch.sh
+    remote_src: true
+    mode: "0755"
   when: is_compute
 
 - name: Pyxis tasks

@@ -114,7 +114,9 @@
       ansible.builtin.service:
         name: "docker.slurm-exporter.service"
         state: stopped
-      when: (ansible_distribution == 'Ubuntu') and ("docker.slurm-exporter.service" in ansible_facts.services)
+      when: (ansible_distribution == 'Ubuntu') and
+        ("docker.slurm-exporter.service" in ansible_facts.services) and
+        (ansible_facts.services["docker.slurm-exporter.service"].state == "running")
 
     - name: Check that we have an old build dir
       ansible.builtin.stat:
@@ -239,4 +241,6 @@
   ansible.builtin.service:
     name: "docker.slurm-exporter.service"
     state: restarted
-  when: (ansible_distribution == 'Ubuntu') and ("docker.slurm-exporter.service" in ansible_facts.services)
+  when: (ansible_distribution == 'Ubuntu') and
+    ("docker.slurm-exporter.service" in ansible_facts.services) and
+    (ansible_facts.services["docker.slurm-exporter.service"].state == "running")

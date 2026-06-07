@@ -2,10 +2,12 @@
 - name: Default to building pmix
   ansible.builtin.set_fact:
     pmix_build: true
-    pmix_ver_alt: "{{ pmix_version | replace('.', '') }}"
 
+# Read the clean version (e.g. "3.2.5") from pmix_info instead of decoding the
+# PMIX_NUMERIC_VERSION hex header, which the old `tr -d 'x0'` parsed incorrectly
+# and so always rebuilt.
 - name: Check installed pmix version
-  ansible.builtin.shell: "grep PMIX_NUMERIC_VERSION {{ pmix_install_prefix }}/include/pmix_version.h | awk '{print $3}' | tr -d 'x0'"
+  ansible.builtin.shell: "{{ pmix_install_prefix }}/bin/pmix_info | grep PMIX: | awk '{print $2}'"
   register: pmix_info_version
   ignore_errors: true
   changed_when: pmix_info_version.rc != 0
@@ -13,7 +15,7 @@
 - name: Don't build pmix if it's already installed, unless forced
   ansible.builtin.set_fact:
     pmix_build: false
-  when: pmix_info_version.stdout == pmix_ver_alt and not pmix_force_rebuild
+  when: pmix_info_version.stdout == pmix_version and not pmix_force_rebuild
 
 - name: Install pmix build dependencies
   ansible.builtin.apt:
