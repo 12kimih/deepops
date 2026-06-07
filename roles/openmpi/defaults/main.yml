@@ -1,8 +1,24 @@
 ---
-openmpi_version: 4.0.3
+# OpenMPI built from source for the Slurm cluster. 5.0.x is the current stable
+# series (5.0.10, Feb 2026); 4.0.x is EOL. Must move in step with pmix_version
+# because OpenMPI compiles against the PMIx headers (5.0.x needs PMIx >= 4.2.0).
+openmpi_version: 5.0.10
 openmpi_tag: "v{{ openmpi_version.split('.')[0] }}.{{ openmpi_version.split('.')[1] }}"
 openmpi_src_url: "https://download.open-mpi.org/release/open-mpi/{{ openmpi_tag }}/openmpi-{{ openmpi_version }}.tar.bz2"
 openmpi_build_dir: /tmp/openmpi-build
 openmpi_install_prefix: /usr/local
-openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix=internal"
+# Best practice (SchedMD MPI guide): build against the SAME external PMIx + hwloc
+# that Slurm uses rather than OpenMPI's bundled PMIx, to remove cross-version
+# risk -- so point --with-pmix/--with-hwloc at the deepops-built prefixes (run the
+# slurm role's pmix/hwloc build first, or override the prefixes). v5 removed
+# --with-pmi/--with-slurm; `srun --mpi=pmix` needs only --with-pmix. libevent is
+# taken from the system (--with-libevent=external). PRRTE stays internal (mpirun).
+# https://docs.open-mpi.org/en/v5.0.x/installing-open-mpi/required-support-libraries.html
+# https://slurm.schedmd.com/mpi_guide.html
+openmpi_configure: >-
+  ./configure --prefix={{ openmpi_install_prefix }}
+  --disable-dependency-tracking --disable-getpwuid
+  --with-pmix={{ pmix_install_prefix | default('/opt/deepops/pmix') }}
+  --with-hwloc={{ hwloc_install_prefix | default('/opt/deepops/hwloc') }}
+  --with-libevent=external
 openmpi_force_rebuild: false

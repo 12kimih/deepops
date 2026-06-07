@@ -167,7 +167,14 @@ hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-stati
 hwloc_force_rebuild: false
 
 slurm_include_pmix: true
-pmix_version: 3.2.5
+# PMIx is built from source and linked into Slurm (--with-pmix) and, optionally,
+# OpenMPI. 5.0.x is the current stable OpenPMIx series (5.0.10, Jan 2026); Slurm
+# 22.05+ supports PMIx v2-v5, so 25.11 links 5.0.x cleanly. Keep this in step
+# with openmpi_version -- OpenMPI compiles against these PMIx headers when built
+# --with-pmix=<prefix>. libevent (a PMIx build dep) comes from slurm_pmix_deps;
+# hwloc is the role-built one below.
+# https://slurm.schedmd.com/mpi_guide.html  https://openpmix.org/downloads.html
+pmix_version: 5.0.10
 pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{ pmix_version }}.tar.bz2"
 pmix_install_prefix: /opt/deepops/pmix
 pmix_configure: "./configure --prefix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }}"
