@@ -65,6 +65,7 @@ Playbooks run via Ansible as part of complete Slurm or Kubernetes installation o
 Roles run as part of the various playbooks. Includes default values and tasks as well.
 ```bash
 ├── roles
+│   ├── alertmanager
 │   ├── autofs
 │   ├── cachefilesd
 │   ├── dns-config
@@ -72,11 +73,13 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── docker-rootless
 │   ├── easy-build
 │   ├── easy-build-packages
+│   ├── enroot
 │   ├── facts
 │   ├── grafana
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
 │   ├── lmod
+│   ├── locale
 │   ├── mofed
 │   ├── move-home-dirs
 │   ├── netapp-trident
@@ -85,19 +88,22 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nginx-docker-registry-cache
 │   ├── nhc
 │   ├── nis_client
-│   ├── nvidia_cuda
-│   ├── nvidia_dcgm
 │   ├── nvidia-dcgm-exporter
 │   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware
 │   ├── nvidia-gpu-operator
 │   ├── nvidia-gpu-tests
-│   ├── nvidia_hpc_sdk
 │   ├── nvidia-k8s-gpu-device-plugin
 │   ├── nvidia-k8s-gpu-feature-discovery
 │   ├── nvidia-mig-manager
 │   ├── nvidia-network-operator
 │   ├── nvidia-peer-memory
+│   ├── nvidia_container_toolkit
+│   ├── nvidia_cuda
+│   ├── nvidia_cuda_toolkit
+│   ├── nvidia_dcgm
+│   ├── nvidia_driver
+│   ├── nvidia_hpc_sdk
 │   ├── ood-wrapper
 │   ├── openmpi
 │   ├── openshift

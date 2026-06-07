@@ -33,7 +33,7 @@ kubectl get pods --all-namespaces
    A simple PyTorch Job can be run via `kubectl` using the following yml:
 
    ```bash
-   kubectl create -f tests/pytorch-job.yml
+   kubectl create -f workloads/examples/k8s/pytorch-job.yml
    ```
 
    Take a look at the yml and observe that:

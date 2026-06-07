@@ -35,7 +35,7 @@ By default the Ingress controller will be assigned an external IP managed by the
 
 If you do not have control over your subnet to assign IPs to the load balancer, you can expose
 ingress routes on specific ports and access them via the IP of any management node. To do this,
-modify `config/helm/ingress.yml` and set the service type to `NodePort`.
+modify `workloads/examples/k8s/ingress-nodeport.yml` and set the service type to `NodePort`.
 
 Run the script to deploy the Ingress controller:
 

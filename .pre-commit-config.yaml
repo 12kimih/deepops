@@ -34,7 +34,7 @@ repos:
         exclude: '(\.j2$|/templates/)'
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         # Uses the project .yamllint; fails only on error-level rules.

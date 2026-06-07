@@ -48,3 +48,7 @@
     - "{{ eb_files | sort() }}"
   args:
     executable: /bin/bash
+  register: eb_install
+  # eb --robot is a no-op for specs already built; only report changed when it
+  # actually completed an install (matches the spack build task's pattern).
+  changed_when: "'COMPLETED' in eb_install.stdout"

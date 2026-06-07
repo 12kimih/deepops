@@ -16,7 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: install yamllint
-        run: python3 -m pip install yamllint==1.35.1
+        run: python3 -m pip install yamllint==1.38.0
 
       - name: run yamllint
         # Uses the project .yamllint config; fails on error-level rules only.
