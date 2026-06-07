@@ -531,21 +531,86 @@ versions (OpenMPI/PMIx/Ansible), driver var names (`nvidia_driver_branch`,
 (`k8s_cluster.yml`), removal of the Helm-2/Tiller manual-install block, and broken
 relative links.
 
+## 27. Version-currency sweep  (`2fc74b55`, `b34c2c0f`)
+
+Web-verified every pin (2026-06-08). **Updated:** NGC ready-containers (pytorch
+24.04->26.05, cuda 12.4.1->13.2.1-ubuntu24.04, tensorflow ->25.02 -- the FINAL NGC
+TF release), hwloc 2.12.2->2.13.0, gpu-operator chart v26.3.2, k8s device-plugin +
+GFD 0.19.2, nfs-client-provisioner 4.0.18, HPC SDK 23.7->26.3 (cuda 13.1),
+SingularityCE 3.11.4->4.4.2 (+ Go 1.26.4). **Already current (confirmed):** slurm
+25.11.6, pmix 5.0.10, openmpi 5.0.10, enroot 4.2.0, pyxis 0.24.0,
+container-toolkit 1.19.1, dcgm-exporter, prometheus/alertmanager/node-exporter, nhc,
+spack, mofed/DOCA 3.3.0. **Deferred (major reworks -- documented in each role's
+defaults, need install-flow rework + validation, not blind bumps):** Open OnDemand
+2->4, NetApp Trident 21->26, k8s-registry chart 2->3 (did fix the deprecated
+`helm.twun.io` repo URL), k8s dashboard v2->v7.
+
+## 28. NFS re-based on a 100GbE+ fabric  (`7a654c8e`, `276dc245`)
+
+The general default now assumes a 100GbE+ (B200-class) fabric: client `nconnect`
+4->16 and the role's socket-buffer sysctls bumped to ESnet Fasterdata 100G values
+(rmem/wmem_max 2 GiB-1, 1 GiB tcp autotune ceiling, + netdev_max_backlog/optmem_max/
+tcp_mtu_probing/default_qdisc=fq/somaxconn). These are safe ceilings (TCP autotunes),
+so fine on 10/25GbE too -- lower `nconnect` there. Exports gained `no_subtree_check`
+(modern recommended default); `sync` exports vs `async`-only-for-scratch documented.
+Values verified against ESnet, NetApp ONTAP, RHEL, and NVIDIA DGX BasePOD docs.
+
+## 29. Slurm: bring-your-own job_submit + GPU billing + generalized examples  (`0cfa77f6`, `08272e81`, `2fc74b55`)
+
+`job_submit.lua` is no longer generated from routing vars -- users supply their own
+(`config.example/files/slurm/job_submit.lua` is a starting point) and the role
+copies it **verbatim** (`copy`, not `template` -- lua `{{` table literals would break
+Jinja) with an assert when the lua plugin is enabled. Added optional per-partition
+`TRESBillingWeights` (`slurm_tres_billing_weights`) so GPU usage -- not CPU count --
+drives fairshare / GrpTRESMins billing (the one gap the 2026 AI/ML standard-practice
+review found). config.example node/partition/gres + tunables examples generalized to
+modern 8-GPU nodes (B200 baseline, comments kept general). `MaxTime` INFINITE->UNLIMITED
+(the documented `MaxTime` keyword + default).
+
+## 30. enroot CLI permissions  (`20dca8f0`)
+
+enroot creates each user's RUNTIME/CACHE/DATA leaf by `mkdir`-ing **as the user**, so
+the parents must be writable. deepops only made the per-user leaf in the Slurm prolog,
+so pyxis-under-srun worked but **interactive `enroot` failed** ("mkdir /run/enroot:
+Permission denied", NVIDIA/enroot#23), recurring each reboot (`/run` is tmpfs). Fix
+(ports my-deepops's approach): the enroot role ships a tmpfiles.d creating the
+sticky-1777 parents (`/run/enroot`, `/var/lib/enroot-cache`, `/tmp/enroot-data`), and
+the per-user paths + a correct `enroot.conf` are now role defaults (were only in the
+example group_vars, so a bare deploy used to put cache/data on the NFS home). Kept
+deepops's already-correct scoped-AppArmor + userns sysctls + prolog/epilog lifecycle.
+
+## 31. NGC docker daemon defaults + slurmrestd JWT  (`4a106d37`, `fe5b947f`)
+
+Ported the daemon.json shm/ulimit tuning the comparison surfaced: NGC/NCCL bare
+`docker run` needs `default-shm-size=1G` + `default-ulimits` memlock=-1 /
+stack=67108864 (docker's 64 MiB shm breaks multi-GPU NCCL) -- the exact values are
+NVIDIA's (Frameworks / Triton / DeepLearningExamples docs). Merged into daemon.json
+before `nvidia-ctk` (idempotent). Added `libjwt` to the slurmrestd build deps
+(`rest_auth/jwt`).
+
+## 32. Docs + housekeeping  (`99b9190d`, `5041a3f5`, `feb606cf`, `d230ee0b`)
+
+Added `docs/deepops/config-defaults-vs-upstream.md` (config.example defaults vs the
+fork point). Dropped the unused `geerlingguy.ntp` galaxy dependency (matching the
+docs). Documented the deferred OOD/Trident/registry major bumps in their role
+defaults. Removed `scripts/deepops/config-diff.sh` per maintainer preference, plus
+assorted doc cleanups.
+
 ## Status
 
 Every item from the modernization brief is implemented, linted (yamllint 0;
 ansible-lint **production** clean except the two `kubespray_defaults` syntax-checks
 that need the kubespray submodule checked out), and verified by repeated multi-agent
-file-by-file review until each pass converged to zero findings. Caveats explicitly
-marked: the DOCA-OFED migration (section 17) needs RDMA/IB hardware to validate;
-bumping the runtime Ansible major (10->14) is coupled to the pinned kubespray and
-must be done together with a kubespray bump (the lint/format tooling -- ansible-lint,
-yamllint, pre-commit-hooks -- is tracked to latest separately).
+file-by-file review. The lint/format tooling is current (yamllint 1.38.0). Caveats
+explicitly marked: the DOCA-OFED migration (section 17) needs RDMA/IB hardware to
+validate; bumping the runtime Ansible major (10->14) is coupled to the pinned
+kubespray and must be done together with a kubespray bump.
 
-Open follow-ups (tracked, not yet done): a local NVMe RAID5 `/scratch` + second
-NFS server on the repurposed CPU node (the maintainer will do the RAID step);
-bumping the yamllint pin to the already-verified 1.38.0; and a final full
-file-by-file re-verification pass over the post-modernization tree.
+Deferred by design (each needs an install-flow rework + validation on a real
+cluster, not a blind bump -- documented in the relevant role's defaults): Open
+OnDemand 2->4, NetApp Trident 21->26, k8s-registry chart 2->3, k8s dashboard
+v2->v7. Maintainer-owned: the local NVMe RAID5 `/scratch` + second NFS server on the
+repurposed CPU node.
 
 > Maintenance note: keep this file current. When a change lands, add or amend the
 > relevant section (what / how / why + commit) and refresh the Status -- do not let it
