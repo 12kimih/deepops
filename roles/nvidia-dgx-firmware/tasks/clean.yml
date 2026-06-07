@@ -9,7 +9,7 @@
   ignore_errors: true
 
 - name: Remove firmware image tarbal
-  command: "rm {{ fw_dir}}/{{ firmware_update_container }}"
+  command: "rm {{ fw_dir }}/{{ firmware_update_container }}"
   ignore_errors: true
 
 # nvsm does not allow you to specify a dump location, so we search /tmp for the last dump
