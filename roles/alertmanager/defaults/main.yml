@@ -2,6 +2,9 @@
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_config_src: templates/alertmanager.yml.j2
 alertmanager_container: "prom/alertmanager:v0.32.2"
+# Port Alertmanager serves on; single source of truth for the Prometheus
+# alertmanagers target.
+alertmanager_port: 9093
 alertmanager_svc_name: "docker.alertmanager.service"
 alertmanager_docker_volume_name: "deepops_alertmanager_metrics"
 alertmanager_state: started
