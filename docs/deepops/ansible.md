@@ -96,7 +96,7 @@ cat config/inventory
 
 # Review and edit configuration under config/group_vars/*.yml
 cat config/group_vars/all.yml
-cat config/group_vars/gpu-servers.yml
+cat config/group_vars/all.yml
 ```
 
 After creating an inventory file all `ansbile` and `ansible-playbook` commands must be run in the `./deepops` directory or the inventory file must be provided with the `-i` flag (`-i config/inventory`).
@@ -107,7 +107,7 @@ To run arbitrary commands in parallel across nodes in the cluster, you can use a
 
 ```bash
 # ansible <host-group> -a hostname
-ansible management -a hostname
+ansible all -a hostname
 ```
 
 _Run Playbooks_
@@ -118,7 +118,7 @@ To run playbooks, use the `ansible-playbook` command:
 # If sudo requires a password, add the -K flag
 
 # ansible-playbook <host-group> playbooks/<playbook>.yml
-ansible-playbook -l management,localhost -b playbooks/k8s-cluster.yml
+ansible-playbook -l k8s_cluster,localhost -b playbooks/k8s-cluster.yml
 ```
 
 ### Useful commands
