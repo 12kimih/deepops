@@ -20,3 +20,18 @@ nfs_mounts: []
 # /proc/net/rpc/nfsd "th" histogram - it was removed in kernel 2.6.32 and always
 # reads zero. (rpc.nfsd(8); NFS-HOWTO 5.6; kernel knfsd-stats)
 nfs_server_threads: "{{ [(ansible_processor_vcpus | default(16) | int) * 4, 64] | max }}"
+
+# Network/socket-buffer tuning for the NFS data path on 10GbE+ links (applied on
+# both NFS servers and clients). Bigger TCP buffers let a single high-bandwidth
+# flow stay full and absorb many concurrent clients; the NFS-HOWTO / IBM / RHEL NFS
+# tuning guides recommend raising these for high-bandwidth NFS. Set false to skip.
+# https://nfs.sourceforge.net/nfs-howto/ar01s05.html
+nfs_tune_network: true
+nfs_network_sysctls:
+  net.core.rmem_max: "16777216"
+  net.core.wmem_max: "16777216"
+  net.core.rmem_default: "262144"
+  net.core.wmem_default: "262144"
+  net.ipv4.tcp_rmem: "4096 87380 16777216"
+  net.ipv4.tcp_wmem: "4096 65536 16777216"
+  net.core.netdev_max_backlog: "30000"

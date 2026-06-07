@@ -39,6 +39,21 @@
   tags:
     - nfs
 
+# Raise TCP/socket buffers for the NFS data path on 10GbE+ links (applies on both
+# NFS servers and clients). https://nfs.sourceforge.net/nfs-howto/ar01s05.html
+- name: Tune the network buffers for NFS
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/30-nfs-tuning.conf
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ nfs_network_sysctls | dict2items }}"
+  when: nfs_tune_network | bool
+  tags:
+    - nfs
+
 - name: Setup server
   ansible.builtin.include_tasks: server.yml
   when: nfs_is_server
