@@ -1,5 +1,5 @@
 ---
-- name: Install dependencies (ubuntu)
+- name: Install dependencies (Ubuntu)
   ansible.builtin.apt:
     name:
       - "uidmap"
@@ -24,7 +24,7 @@
   with_filetree: "{{ role_path }}/templates/rootless-docker"
   when: item.state == 'directory'
 
-- name: Copy over templates.
+- name: Copy over templates
   ansible.builtin.template:
     src: "{{ item.src }}"
     dest: "{{ rootlessdocker_install_dir }}/{{ item.path }}"

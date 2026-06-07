@@ -33,7 +33,7 @@
 # Playbook: chrony-client
 chrony_install: true
 chrony_service_state: "started"
-chrony_service_enabled: "yes"
+chrony_service_enabled: true
 chrony_timezone: "Etc/UTC"
 chrony_config_server:
   - 0.pool.ntp.org

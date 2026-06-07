@@ -5,18 +5,22 @@
   tasks:
     - name: Set backward compatible values for ssh-hardening if not defined
       block:
-        - ansible.builtin.set_fact:
+        - name: Default ssh_client_hardening when undefined
+          ansible.builtin.set_fact:
             ssh_client_hardening: false
           when: ssh_client_hardening is undefined
-        - ansible.builtin.set_fact:
+        - name: Default ssh_server_password_login when undefined
+          ansible.builtin.set_fact:
             ssh_server_password_login: true
           when: ssh_server_password_login is undefined
-        - ansible.builtin.set_fact:
+        - name: Default ssh_use_pam when undefined
+          ansible.builtin.set_fact:
             ssh_use_pam: true
           when: ssh_use_pam is undefined
-        - ansible.builtin.set_fact:
+        - name: Default ssh_max_auth_retries when undefined
+          ansible.builtin.set_fact:
             ssh_max_auth_retries: 10
-          when: ssh_use_pam is undefined
+          when: ssh_max_auth_retries is undefined
 
     - name: Configure SSH to allow login with password
       ansible.builtin.include_role:

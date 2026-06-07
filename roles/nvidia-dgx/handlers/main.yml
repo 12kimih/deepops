@@ -1,19 +1,19 @@
 ---
 - name: Apt update
-  apt:
+  ansible.builtin.apt:
     update_cache: true
   when: ansible_distribution == 'Ubuntu'
 
 - name: Restart cachefilesd
-  service:
+  ansible.builtin.service:
     name: cachefilesd
     state: restarted
 
 - name: Reboot after driver install
-  reboot:
+  ansible.builtin.reboot:
   when: install_driver.changed and not nvidia_driver_skip_reboot
 
 - name: Restart docker
-  service:
+  ansible.builtin.service:
     name: docker
     state: restarted

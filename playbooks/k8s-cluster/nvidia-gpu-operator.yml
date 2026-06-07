@@ -10,7 +10,7 @@
       ansible.builtin.include_role:
         name: nvidia-gpu-operator
       run_once: true
-  environment: "{{proxy_env if proxy_env is defined else {}}}"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
   tags:
     - nvidia
     - nvidia-gpu-operator

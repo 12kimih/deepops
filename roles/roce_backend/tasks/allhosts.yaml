@@ -49,7 +49,8 @@
   tags:
     - roce_host
 
-- ansible.builtin.include_tasks: vf-activate.yaml
+- name: Activate VFs for SR-IOV resources
+  ansible.builtin.include_tasks: vf-activate.yaml
   with_items: "{{ sriov_resources }}"
   when: ofed_present.stat.exists
   tags:

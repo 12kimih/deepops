@@ -1,5 +1,5 @@
 ---
-- name: Copy service files
+- name: Copy controller service files
   ansible.builtin.copy:
     src: "{{ slurm_build_dir }}/etc/{{ item }}"
     dest: "/etc/systemd/system/{{ item }}"
@@ -11,7 +11,7 @@
   when: is_controller
   failed_when: false
 
-- name: Copy service files
+- name: Copy compute service files
   ansible.builtin.copy:
     src: "{{ slurm_build_dir }}/etc/{{ item }}"
     dest: "/etc/systemd/system/{{ item }}"
