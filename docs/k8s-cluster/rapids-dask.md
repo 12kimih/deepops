@@ -24,7 +24,7 @@ When deploying through Kubeflow, it is necessary to ensure that a proper Docker 
 
 ### Stand-alone
 
-Deploy Kubernetes by following the [DeepOps Kubernetes Deployment Guide](kubernetes-cluster.md)
+Deploy Kubernetes by following the [DeepOps Kubernetes Deployment Guide](README.md)
 
 Deploy the [LoadBalancer](ingress.md#on-prem-loadbalancer)
 
