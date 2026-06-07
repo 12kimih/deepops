@@ -50,4 +50,8 @@
     . /etc/profile.d/z00_spack.sh &&
     spack install {{ item }}
   with_items: "{{ spack_default_packages }}"
+  register: spack_build_result
+  # `spack install` prints "already installed" and is a no-op when the spec is
+  # present, so a re-run reports unchanged instead of always-changed.
+  changed_when: "'already installed' not in spack_build_result.stdout"
   when: spack_build_packages

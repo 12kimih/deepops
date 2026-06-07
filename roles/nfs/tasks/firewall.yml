@@ -24,12 +24,15 @@
     - mountd
     - rpc-bind
     - nfs
+  register: nfs_firewalld_rules
   tags:
     - nfs
   when:
     - ansible_os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"
 
+# Only reload (permanent rules above used immediate: false) when a rule actually
+# changed, so an unchanged re-run does not bounce firewalld every time.
 - name: Restart firewalld if it was running
   ansible.builtin.systemd:
     state: restarted
@@ -44,3 +47,4 @@
     - "'firewalld' in ansible_facts.packages"
     - "'firewalld.service' in ansible_facts.services"
     - ansible_facts.services['firewalld.service']['state'] == "running"
+    - nfs_firewalld_rules is changed
