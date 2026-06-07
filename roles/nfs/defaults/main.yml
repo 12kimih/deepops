@@ -6,3 +6,13 @@ nfs_is_client: false
 
 nfs_exports: []
 nfs_mounts: []
+
+# Number of nfsd (kernel NFS server) threads. The Linux default is only 8, far too
+# few for many concurrent clients under heavy random I/O: each nfsd thread serves
+# one RPC at a time and blocks on disk, so too few threads serializes clients and
+# the server bottlenecks while CPU/disk sit idle. Rule of thumb: >=1 thread/core,
+# 4-8/core better; 32 is a floor, busy servers run 64-256. Size empirically by
+# watching `sockets-enqueued` in /proc/fs/nfsd/pool_stats under load (a growing
+# value = too few threads). Do NOT use the /proc/net/rpc/nfsd "th" histogram - it
+# was removed in kernel 2.6.32 and always reads zero. (rpc.nfsd(8); knfsd-stats)
+nfs_server_threads: 32

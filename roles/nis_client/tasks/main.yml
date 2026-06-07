@@ -72,7 +72,11 @@
 # ypbind will not successfull start on RedHat if there's no NIS server to
 # bind to, so we skip this in Molecule tests
 - name: Make sure ypbind is running on RedHat
-  ansible.builtin.service: name=ypbind state=started enabled=true
+  ansible.builtin.service:
+    name: ypbind
+    state: started
+    enabled: true
+    daemon_reload: true
   when: ansible_os_family == "RedHat"
   tags:
     - molecule-notest

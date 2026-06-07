@@ -1,0 +1,17 @@
+---
+# Convenience helper: stop and disable UFW so it cannot block Slurm/munge/NFS
+# ports on a fresh Ubuntu install. Safe where ufw is absent (ignore_errors).
+- name: Disable the UFW firewall on all nodes
+  hosts: slurm-cluster
+  become: true
+  tasks:
+    - name: Stop the ufw service
+      ansible.builtin.systemd:
+        name: ufw
+        state: stopped
+      ignore_errors: true
+
+    - name: Disable ufw so it does not start on boot
+      community.general.ufw:
+        state: disabled
+      ignore_errors: true

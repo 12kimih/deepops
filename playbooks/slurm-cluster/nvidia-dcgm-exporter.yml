@@ -4,6 +4,7 @@
 
 - name: Install NVIDIA driver
   import_playbook: ../nvidia-software/nvidia-driver.yml
+  when: slurm_cluster_install_nvidia_driver | default(true)
 
 - name: Install NVIDIA container runtime
   import_playbook: ../container/nvidia-docker.yml

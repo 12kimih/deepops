@@ -3,6 +3,8 @@
   ansible.builtin.stat:
     path: "{{ hpcsdk_install_dir }}/Linux_{{ hpcsdk_arch }}/{{ hpcsdk_version_dir }}/compilers/bin/localrc"
   register: nvhpc_localrc
+  tags:
+    - nvhpc_deps
 
 - name: Install dependencies (ubuntu)
   ansible.builtin.apt:
@@ -11,6 +13,8 @@
       - "g++"
     state: present
   when: ansible_distribution == "Ubuntu" and not nvhpc_localrc.stat.exists
+  tags:
+    - nvhpc_deps
 
 - name: Install dependencies (rhel)
   ansible.builtin.dnf:
@@ -18,6 +22,8 @@
       - "gcc"
       - "gcc-c++"
   when: ansible_os_family == "RedHat" and not nvhpc_localrc.stat.exists
+  tags:
+    - nvhpc_deps
 
 - name: Ensure download and install directories exist
   when: not nvhpc_localrc.stat.exists
@@ -30,6 +36,8 @@
   with_items:
     - "{{ hpcsdk_temp_dir }}"
     - "{{ hpcsdk_install_dir }}"
+  tags:
+    - nvhpc_install
 
 - name: Download nvidia hpc sdk
   when: not nvhpc_localrc.stat.exists
@@ -37,6 +45,8 @@
     url: "{{ hpcsdk_download_url }}"
     dest: "{{ hpcsdk_dest_download_path }}"
     mode: "0444"
+  tags:
+    - nvhpc_install
 
 - name: Extract archive
   when: not nvhpc_localrc.stat.exists
@@ -45,6 +55,8 @@
     dest: "{{ hpcsdk_temp_dir }}"
     remote_src: true
     creates: "{{ hpcsdk_temp_dir }}/{{ hpcsdk_download_name }}/install"
+  tags:
+    - nvhpc_install
 
 - name: Run the installer
   when: not nvhpc_localrc.stat.exists
@@ -57,6 +69,8 @@
     NVHPC_INSTALL_DIR: "{{ hpcsdk_install_dir }}"
     NVHPC_INSTALL_TYPE: "{{ hpcsdk_install_type }}"
     NVHPC_DEFAULT_CUDA: "{{ hpcsdk_default_cuda }}"
+  tags:
+    - nvhpc_install
 
 - name: Clean up the temp directory
   ansible.builtin.file:
@@ -65,6 +79,8 @@
   when:
     - not nvhpc_localrc.stat.exists
     - hpcsdk_clean_up_temp_dir
+  tags:
+    - nvhpc_install
 
 - name: Run the makelocalrc script
   when: not nvhpc_localrc.stat.exists
@@ -72,6 +88,8 @@
     hpcsdk_arch }}/{{ hpcsdk_version_dir }}/compilers"
   args:
     creates: "{{ hpcsdk_install_dir }}/Linux_{{ hpcsdk_arch }}/{{ hpcsdk_version_dir }}/compilers/bin/localrc"
+  tags:
+    - nvhpc_configure
 
 - name: Add profile script to add to environment
   ansible.builtin.template:
@@ -84,6 +102,8 @@
     - "z95_nvhpc.sh"
     - "z95_nvhpc.csh"
   when: hpcsdk_install_in_path
+  tags:
+    - nvhpc_configure
 
 - name: Add profile script to source modules
   ansible.builtin.template:
@@ -96,3 +116,5 @@
     - "z95_nvhpc_modules.sh"
     - "z95_nvhpc_modules.csh"
   when: hpcsdk_install_as_modules
+  tags:
+    - nvhpc_configure
