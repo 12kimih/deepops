@@ -39,7 +39,7 @@
   tags:
     - nfs
 
-# Raise TCP/socket buffers for the NFS data path on 10GbE+ links (applies on both
+# Raise TCP/socket buffers for the NFS data path on fast cluster networks (applies on both
 # NFS servers and clients). https://nfs.sourceforge.net/nfs-howto/ar01s05.html
 # A container shares the host kernel, so setting these from inside one is either
 # impossible (read-only /proc/sys) or would mutate the host - skip there (this

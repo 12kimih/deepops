@@ -27,25 +27,20 @@ Infrastructure automation tools for Kubernetes and Slurm clusters with NVIDIA GP
 
 ## About this fork
 
-This fork keeps the upstream DeepOps architecture but modernizes the pieces that had
-drifted, focused on a **multi-user GPU + Slurm cluster** kept current and reproducible:
+This fork keeps upstream DeepOps' architecture and entry points, but modernizes the
+parts that had drifted -- aimed at keeping a GPU + Slurm cluster current and
+reproducible. At a glance:
 
+- **Current OS matrix** (Ubuntu 22.04 / 24.04 / 26.04, RHEL 8 / 9 / 10) and
+  up-to-date component versions (Slurm 25.11.x, enroot, pyxis, PMIx / OpenMPI,
+  DOCA-OFED, monitoring stack).
 - **In-tree NVIDIA roles** (driver / CUDA / container-toolkit / DCGM) replacing the
-  EOL Galaxy roles. The driver and GPU roles are gated on GPU *detection*, so
-  CPU-only and login nodes are skipped cleanly.
-- **OS matrix:** Ubuntu 22.04 / 24.04 / 26.04 and RHEL-family 8 / 9 / 10; legacy
-  paths (16.04/18.04, CentOS 7, the MLNX_OFED ISO installer, ntpd) removed.
-- **Current stack:** Slurm 25.11.x, enroot 4.2.0, pyxis 0.24.0,
-  nvidia-container-toolkit 1.19.1, PMIx 5.0.10 / OpenMPI 5.0.10, DOCA-OFED, and a
-  current Prometheus / Grafana / DCGM monitoring stack.
-- **CUDA as Lmod modules** (per-version, from the official runfiles into a shared
-  `/sw` tree) via the `nvidia_cuda_toolkit` role -- an alternative to the
-  system-wide CUDA install. See [choosing roles/playbooks](docs/deepops/choosing-roles-and-playbooks.md).
-- **10GbE NFS tuning**, full **idempotency + reboot-persistence** across all node
-  types, and an Lmod / profile.d best-practice cleanup.
-- **Server-agnostic code + a `config/` overlay:** all role/playbook code is generic;
-  every site-specific value (inventory, `NodeName=` lines, NFS exports, secrets)
-  lives in a gitignored `config/` overlay, so the public repo stays clean.
+  EOL Galaxy roles.
+- **CUDA as per-version Lmod modules**, plus performance tuning and broad
+  idempotency + reboot-persistence work.
+
+See **[MODERNIZATION.md](MODERNIZATION.md)** for the complete, sectioned list of what
+changed and why.
 
 ### How to use it
 
