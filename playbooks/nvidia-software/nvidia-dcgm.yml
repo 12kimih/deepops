@@ -1,5 +1,15 @@
 ---
+# DCGM talks to the GPUs through NVML, so it only makes sense on nodes that have
+# a GPU. Gate the role on GPU detection -- otherwise the dcgm service-start fails
+# on a CPU-only slurm-node (or the login/head node) and breaks the run. Mirrors
+# the GPU gate used by nvidia-driver.yml and nvidia-docker.yml.
 - hosts: "{{ hostlist | default('all') }}"
   become: true
-  roles:
-    - nvidia_dcgm
+  tasks:
+    - name: Install custom facts module (provides ansible_local.gpus.count)
+      ansible.builtin.include_role:
+        name: facts
+    - name: Configure DCGM on GPU nodes only
+      ansible.builtin.include_role:
+        name: nvidia_dcgm
+      when: ansible_local['gpus']['count'] | int > 0
