@@ -128,10 +128,10 @@ These variables are specified in files named for the inventory group used, in th
 
 ```console
 config/group_vars/
-├── all.yml
-├── k8s-cluster.yml
-├── netapp-trident.yml
-└── slurm-cluster.yml
+|-- all.yml
+|-- k8s-cluster.yml
+|-- netapp-trident.yml
+`-- slurm-cluster.yml
 ```
 
 So, for example, variables in the `all.yml` file will apply to all the hosts in your inventory;
@@ -147,7 +147,7 @@ These variables go in files named for each host in the `host_vars` directory:
 
 ```bash
 config/host_vars/
-└── gpu01
+`-- gpu01
 ```
 
 The variables in `host_vars/gpu01` would only be applied for a host named `gpu01`.
@@ -162,7 +162,7 @@ you would put it in your `config/playbooks` directory:
 
 ```bash
 config/playbooks/
-└── pingus.yml
+`-- pingus.yml
 ```
 
 This playbook can then be run with Ansible like any other DeepOps playbook:
@@ -244,7 +244,7 @@ vault_password_file = ./config/.vault-pass
 ```
 
 The `.vault-pass` file (and any `*.vault-pass` file) is ignored by Git, so the
-password itself is never committed. Keep it out of your config repository too —
+password itself is never committed. Keep it out of your config repository too --
 store it in a password manager and recreate it on each admin workstation.
 
 ## Using multiple configuration directories for separate clusters
@@ -253,14 +253,14 @@ If you're running multiple clusters, you can keep their configuration in separat
 
 ```bash
 config.cluster-0
-└── group_vars
+`-- group_vars
 config.cluster-1
-├── group_vars
-└── host_vars
+|-- group_vars
+`-- host_vars
 config.cluster-2
-├── group_vars
-├── host_vars
-└── playbooks
+|-- group_vars
+|-- host_vars
+`-- playbooks
 ```
 
 These configuration directories can each have their own inventory files, Ansible variables, and playbooks.

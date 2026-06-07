@@ -61,7 +61,7 @@ nvidia_driver_verify: true
 
 # --- Ubuntu install method -----------------------------------------------------
 # "ubuntu_repo" (default): the Canonical archive nvidia-driver-{branch}-server-open.
-#   Signed precompiled modules — Secure Boot works without MOK enrollment,
+#   Signed precompiled modules -- Secure Boot works without MOK enrollment,
 #   SRU-qualified, no extra repo. Recommended for stock-kernel data-center fleets.
 #   https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
 # "nvidia_repo": NVIDIA's CUDA apt repo (cuda-keyring + nvidia-open / cuda-drivers),

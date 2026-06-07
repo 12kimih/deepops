@@ -201,7 +201,7 @@ docker_iptables_enabled: true
 # IMPORTANT: keep ALL of these on node-LOCAL disk/NVMe, never on the NFS share.
 # enroot image import/unpack + container runtime layers are heavy small-file random
 # I/O; putting cache/data/runtime on NFS turns local scratch I/O into network I/O
-# and crushes a single NFS head. The defaults below are local — do not repoint them
+# and crushes a single NFS head. The defaults below are local -- do not repoint them
 # at /home, /sw or any NFS mountpoint (point enroot_data_path at a mounted NVMe if
 # you have one). See docs/slurm-cluster/slurm-nfs.md.
 enroot_runtime_path: '/run/enroot/user-$(id -u)'

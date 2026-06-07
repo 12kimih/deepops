@@ -24,7 +24,7 @@
 /kubectl
 /tridentctl
 
-# secrets — never commit (Ansible Vault password files, plaintext creds)
+# secrets -- never commit (Ansible Vault password files, plaintext creds)
 .vault-pass
 *.vault-pass
 vault-password*
