@@ -27,5 +27,21 @@ if [ $(id -u) -ne 0 ] ; then
       export MANPATH=:
     fi
     export MANPATH=$(/usr/share/lmod/lmod/libexec/addto MANPATH /usr/share/lmod/lmod/share/man)
+    #
+    # Prepend any site module trees registered in LMOD_SITE_MODULEPATH (set by
+    # the /etc/profile.d/00-*.sh snippets that sort before this one, e.g. the
+    # cuda_toolkits and nvhpc modulepath hooks). Lmod's stock z00_lmod -- the one
+    # generated from init/profile.in -- does this; because this custom script
+    # sources init/bash directly, which does NOT apply LMOD_SITE_MODULEPATH, we
+    # must replicate the loop or those snippets are silently ignored. addto with
+    # no --append prepends and de-duplicates, so it is safe to re-run.
+    # https://github.com/TACC/Lmod/blob/main/init/profile.in
+    #
+    if [ -n "${LMOD_SITE_MODULEPATH:-}" ]; then
+      for dir in $(echo "$LMOD_SITE_MODULEPATH" | tr ':' ' '); do
+        MODULEPATH=$(/usr/share/lmod/lmod/libexec/addto MODULEPATH "$dir")
+      done
+      export MODULEPATH
+    fi
     . /usr/share/lmod/lmod/init/bash >/dev/null # Module Support
 fi

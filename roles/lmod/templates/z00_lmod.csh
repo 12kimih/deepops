@@ -45,6 +45,17 @@ if ( ! $?MODULEPATH_ROOT ) then
 
 endif
 
+# Prepend any site module trees registered in LMOD_SITE_MODULEPATH (set by the
+# /etc/profile.d/00-*.csh snippets that sort before this one, e.g. cuda/nvhpc).
+# Mirrors the LMOD_SITE_MODULEPATH loop in stock Lmod's profile.in; without it
+# init/csh would silently ignore those snippets. See z00_lmod.sh for details.
+# https://github.com/TACC/Lmod/blob/main/init/profile.in
+if ( $?LMOD_SITE_MODULEPATH ) then
+    foreach dir (`echo "$LMOD_SITE_MODULEPATH" | tr ':' ' '`)
+        setenv MODULEPATH `/usr/share/lmod/lmod/libexec/addto MODULEPATH "$dir"`
+    end
+endif
+
 if ( -f  /usr/share/lmod/lmod/init/csh  ) then
   source /usr/share/lmod/lmod/init/csh
 endif
