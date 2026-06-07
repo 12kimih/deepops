@@ -1,0 +1,9 @@
+---
+# Tagged molecule-notest so the docker converge (which can't run the kernel
+# module) skips the restart even when the templates above report changed.
+- name: Restart cachefilesd
+  ansible.builtin.service:
+    name: cachefilesd
+    state: restarted
+  tags:
+    - molecule-notest
