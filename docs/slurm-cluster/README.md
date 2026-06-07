@@ -211,10 +211,11 @@ these in your git-untracked `config/group_vars/slurm-cluster.yml`:
    `slurm_dbd_conf_template`, or `slurm_job_submit_template` at your own file on
    the Ansible controller (e.g. under `config/files/slurm/`).
 
-Optional submit-time routing of GPU jobs to per-GPU-type partitions is available
-by setting `slurm_job_submit_plugins: "lua"` and the
-`slurm_gpu_type_partition_map` / `slurm_default_gpu_*` / `slurm_job_submit_cpu_partitions`
-variables; the bundled `job_submit.lua` is a safe no-op until configured.
+Optional submit-time routing (e.g. GPU jobs to per-GPU-type partitions) is available
+by setting `slurm_job_submit_plugins: "lua"` and pointing `slurm_job_submit_template`
+at your own `job_submit.lua`. DeepOps does not generate one;
+`config.example/files/slurm/job_submit.lua` is a ready-to-edit starting point that
+routes by GPU type and sends CPU-only jobs to a CPU partition.
 
 Because `config/` is git-ignored by DeepOps, keep your server-specific settings
 and secrets there and manage that directory as a separate **private** repo:
