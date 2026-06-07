@@ -6,14 +6,6 @@
   with_items:
     - dns_config_servers
 
-- name: Disable resolvconf (Ubuntu 16.04)
-  ansible.builtin.service:
-    name: resolvconf
-    state: stopped
-    enabled: false
-  failed_when: false
-  when: ansible_distribution == 'Ubuntu' and ansible_distribution_major_version == '16'
-
 # systemd-resolved manages /etc/resolv.conf as a symlink to a stub resolver on
 # Ubuntu 18.04+ (including 22.04/24.04/26.04). Disable it so a static
 # /etc/resolv.conf can be written.
