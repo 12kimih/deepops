@@ -45,7 +45,7 @@
         path: "{{ base_container }}"
         state: file
       when:
-        - compile_nccl_tests|bool == True
+        - compile_nccl_tests | bool
         - base_container | splitext | last == ".sqsh"
 
     - name: Check nccl_tests_container is sqsh path when compiling.
@@ -55,7 +55,7 @@
           ".sqsh" file. Currently it is set to:
             "{{ nccl_tests_container }}"
       when:
-        - compile_nccl_tests|bool == True
+        - compile_nccl_tests | bool
         - nccl_tests_container | splitext | last != ".sqsh"
 
     - name: Set nccl tests compilation command
@@ -68,7 +68,7 @@
             tar --strip-components=1 -xzf - \
           && CC=mpicc CXX=mpicxx make MPI=1
           cp -R /opt/nccl_tests/build/* /usr/local/bin/
-      when: compile_nccl_tests|bool == True
+      when: compile_nccl_tests | bool
 
     - name: Print nccl make command
       ansible.builtin.debug:
@@ -78,19 +78,19 @@
               {{ nccl_tests_container }}
             {% if not cleanup | bool %}Delete container manually afterwards.{% endif %}
           - "NCCL compilation command:\n{{ ncclmake }}"
-      when: compile_nccl_tests|bool == True
+      when: compile_nccl_tests | bool
 
     - name: Check or create enroot images directory for nccl_tests_container.
       ansible.builtin.file:
         path: "{{ nccl_tests_container | dirname }}"
         state: directory
-      when: compile_nccl_tests|bool == True
+      when: compile_nccl_tests | bool
 
     - name: Remove NCCL container if re-compiling.
       ansible.builtin.file:
         path: "{{ nccl_tests_container }}"
         state: absent
-      when: compile_nccl_tests|bool == True
+      when: compile_nccl_tests | bool
 
     - name: Compiling NCCL tests
       ansible.builtin.shell:
@@ -104,14 +104,14 @@
             {{ srun_options }} \
             bash -c '{{ ncclmake }}'
         creates: "{{ nccl_tests_container }}"
-      when: compile_nccl_tests|bool == True
+      when: compile_nccl_tests | bool
 
     - name: Check that nccl_tests_container exists when sqsh is specified.
       ansible.builtin.file:
         path: "{{ nccl_tests_container }}"
         state: file
       when:
-        - compile_nccl_tests|bool == False
+        - not (compile_nccl_tests | bool)
         - nccl_tests_container | splitext | last == ".sqsh"
 
     - name: Print nccl_tests_container setting if not sqsh file.
@@ -122,7 +122,7 @@
             "{{ nccl_tests_container }}"
           WARNING: No validation is performed.
       when:
-        - compile_nccl_tests|bool == False
+        - not (compile_nccl_tests | bool)
         - nccl_tests_container | splitext | last != ".sqsh"
 
     - name: Get node count from sinfo
@@ -208,5 +208,5 @@
         path: "{{ nccl_tests_container }}"
         state: absent
       when:
-        - cleanup|bool == True
-        - compile_nccl_tests|bool == True
+        - cleanup | bool
+        - compile_nccl_tests | bool

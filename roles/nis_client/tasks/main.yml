@@ -25,7 +25,8 @@
   when: ansible_os_family == "RedHat"
 
 - name: Ensure rpcbind is running
-  ansible.builtin.service: name=rpcbind state=started enabled=yes
+  ansible.builtin.service: name=rpcbind state=started enabled=true
+
 - name: Set server
   ansible.builtin.lineinfile:
     dest: /etc/yp.conf
@@ -62,15 +63,16 @@
   notify: "Restart nis"
 
 - name: Make sure rpcbind is running
-  ansible.builtin.service: name=rpcbind state=started enabled=yes
-- name: Debian - make sure ypbind is running
-  ansible.builtin.service: name=nis state=started enabled=yes
+  ansible.builtin.service: name=rpcbind state=started enabled=true
+
+- name: Make sure ypbind is running on Debian
+  ansible.builtin.service: name=nis state=started enabled=true
   when: ansible_os_family == "Debian"
 
 # ypbind will not successfull start on RedHat if there's no NIS server to
 # bind to, so we skip this in Molecule tests
-- name: RedHat - make sure ypbind is running
-  ansible.builtin.service: name=ypbind state=started enabled=yes
+- name: Make sure ypbind is running on RedHat
+  ansible.builtin.service: name=ypbind state=started enabled=true
   when: ansible_os_family == "RedHat"
   tags:
     - molecule-notest

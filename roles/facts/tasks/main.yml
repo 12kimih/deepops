@@ -1,11 +1,11 @@
 ---
 - name: Apt install pciutils
-  ansible.builtin.apt: name=pciutils update_cache=yes
+  ansible.builtin.apt: name=pciutils update_cache=true
   when: ansible_os_family == 'Debian'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
-- name: Yum install pciutils
-  ansible.builtin.dnf: name=pciutils update_cache=yes
+- name: Dnf install pciutils
+  ansible.builtin.dnf: name=pciutils update_cache=true
   when: ansible_os_family == 'RedHat'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 

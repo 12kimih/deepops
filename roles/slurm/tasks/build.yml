@@ -121,7 +121,7 @@
         path: "{{ slurm_build_dir }}"
       register: slurm_old_build_dir
 
-    - name: Uninstall old verson
+    - name: Uninstall old version
       ansible.builtin.command: make -j uninstall
       args:
         chdir: "{{ slurm_build_dir }}"

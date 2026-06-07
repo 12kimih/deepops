@@ -1,13 +1,13 @@
 ---
-- name: Install dependencies
+- name: Install dependencies (Ubuntu)
   ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   with_items:
     - numactl
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_distribution == "Ubuntu"
 
-- name: Install dependencies
+- name: Install dependencies (RHEL/Rocky)
   ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
@@ -25,7 +25,6 @@
 
 - name: Update grub
   when: update_grub.changed and ansible_os_family == "Debian"
-
   block:
     - name: Update grub
       ansible.builtin.command: update-grub
@@ -34,9 +33,9 @@
     - name: Reboot after updating grub config
       ansible.builtin.reboot:
         reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+
 - name: Update grub
   when: update_grub.changed and ansible_os_family == "RedHat"
-
   block:
     - name: Update grub
       ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -45,6 +44,7 @@
     - name: Reboot after updating grub config
       ansible.builtin.reboot:
         reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+
 - name: Create sysconfig dir
   ansible.builtin.file:
     path: "{{ slurm_sysconf_dir }}"
@@ -192,7 +192,7 @@
     regexp: "^([^#].*pam_systemd.so.*)"
     replace: "# \\1 # ANSIBLE MANAGED (ansible-role-slurm)"
   when:
-    - ansible_distribution == 'Ubuntu'
+    - ansible_distribution == "Ubuntu"
     - slurm_enable_pam_slurm_adopt
   tags:
     - config

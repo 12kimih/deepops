@@ -1,5 +1,5 @@
 ---
-- name: "Gather os specific variables"
+- name: Gather OS specific variables
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:

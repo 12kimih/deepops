@@ -41,7 +41,7 @@ k8s_gpu_mig_strategy: "mixed"
 dashboard_enabled: true
 dashboard_image_tag: "v2.0.3"
 dashboard_image_repo: "kubernetesui/dashboard"
-dashboard_metrics_scrape_tagr: "v1.0.4"
+dashboard_metrics_scraper_tag: "v1.0.4"
 dashboard_metrics_scraper_repo: "kubernetesui/metrics-scraper"
 
 # Ensure hosts file generation only runs across k8s cluster

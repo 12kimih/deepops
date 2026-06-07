@@ -22,7 +22,7 @@ spec:
             - A100-SXM4-80GB
   containers:
     - name: gpu-pod
-      image:  nvcr.io/nvidia/k8s/cuda-sample:nbody
+      image: nvcr.io/nvidia/k8s/cuda-sample:nbody
       command: ["/bin/sh"]
       args: ["-c", "nvidia-smi"]
       resources:

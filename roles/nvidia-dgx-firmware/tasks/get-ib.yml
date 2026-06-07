@@ -1,23 +1,23 @@
 ---
-- name: get hostname
-  shell: hostname
+- name: Get hostname
+  ansible.builtin.shell: hostname
   register: hostname
 
-- name: check mlxconfig
+- name: Check mlxconfig
   become: true
-  shell: "mlxconfig query  | egrep -e Device\\|LINK_TYPE_P1\\|LINK_TYPE_P2"
+  ansible.builtin.shell: "mlxconfig query  | egrep -e Device\\|LINK_TYPE_P1\\|LINK_TYPE_P2"
   register: mlx_config
   ignore_errors: true
 
-- name: check ibstat
+- name: Check ibstat
   become: true
-  shell: "ibstat | egrep -e mlx\\|Link"
+  ansible.builtin.shell: "ibstat | egrep -e mlx\\|Link"
   register: ibstat
   ignore_errors: true
 
-- name: save actual hostname
-  shell: echo "{{ hostname.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"
-- name: save mlx_config
-  shell: echo "{{ mlx_config.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"
-- name: save ibstat
-  shell: echo "{{ ibstat.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"
+- name: Save actual hostname
+  ansible.builtin.shell: echo "{{ hostname.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"
+- name: Save mlx_config
+  ansible.builtin.shell: echo "{{ mlx_config.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"
+- name: Save ibstat
+  ansible.builtin.shell: echo "{{ ibstat.stdout }}" >> "{{ fw_dir }}/{{ inventory_hostname }}.log"

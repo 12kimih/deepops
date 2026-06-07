@@ -21,13 +21,13 @@
   tags:
     - nfs
 
-- name: Rhel | Install management prereq
+- name: RedHat | Install management prereq
   ansible.builtin.dnf:
     name: "python3-libsemanage"
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: Rhel | Enable nfs home directory usage
+- name: RedHat | Enable nfs home directory usage
   ansible.posix.seboolean:
     name: "use_nfs_home_dirs"
     state: true

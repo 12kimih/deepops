@@ -1,22 +1,22 @@
 ---
 # Tasks for Master node
 - name: Install Openshift pip module
-  pip:
+  ansible.builtin.pip:
     name: openshift
   tags:
     - roce_k8s
 
 - name: Check for module openshift
-  python_requirements_facts:
+  community.general.python_requirements_facts:
     dependencies:
       - openshift
   tags:
     - roce_k8s
 
-#Create configmap for SRIOV device plugin
+# Create configmap for SRIOV device plugin
 
 - name: Create configmap
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       kind: ConfigMap
@@ -30,10 +30,10 @@
   tags:
     - roce_k8s
 
-#Install DP and CNI's
+# Install DP and CNI's
 
 - name: Install Universal SR-IOV device plugin
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', '{{ sriov_dp_ds }}', split_lines=False) }}"
   run_once: true
@@ -41,7 +41,7 @@
     - roce_k8s
 
 - name: Install SR-IOV CNI
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', '{{ sriov_cni_ds }}', split_lines=False) }}"
   run_once: true
@@ -49,40 +49,41 @@
     - roce_k8s
 
 - name: Install DHCP CNI
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', 'https://raw.githubusercontent.com/Mellanox/dhcp-cni/master/k8s-1.16/dhcp-cni-ds.yaml', split_lines=False) }}"
   run_once: true
   tags:
     - roce_k8s
 
-#Update Multus to latest version
+# Update Multus to latest version
 
 - name: Multus update
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', '{{ multus_ds }}', split_lines=False) }}"
   run_once: true
   tags:
     - roce_k8s
-- name: Multus is updating, please wait for a while
-  pause:
+
+- name: Wait for Multus update to settle
+  ansible.builtin.pause:
     minutes: 1
   tags:
     - roce_k8s
 
-#Create Network Attach Definitions
+# Create Network Attach Definitions
 
 - name: Add NetworkAttachmentDefinition
-  include_tasks: nad4roce.yaml
+  ansible.builtin.include_tasks: nad4roce.yaml
   with_items: "{{ sriov_resources }}"
   tags:
     - roce_k8s
 
-#Install MPI Operator:latest
+# Install MPI Operator:latest
 
 - name: Install Kubeflow MPI-Operator version v1alpha2
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', 'https://raw.githubusercontent.com/kubeflow/mpi-operator/master/deploy/v1/mpi-operator.yaml', split_lines=False) }}"
   run_once: true

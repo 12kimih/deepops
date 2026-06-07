@@ -13,9 +13,5 @@ provisioner:
   name: ansible
   ansible_args:
     - -vv
-  inventory:
-    group_vars:
-      all:
-        kerberos_client_realm_name: "example.com"
 verifier:
   name: ansible

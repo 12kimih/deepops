@@ -38,4 +38,4 @@
     - name: Install nfs-client-provisioner
       ansible.builtin.include_role:
         name: nfs-client-provisioner
-  environment: "{{proxy_env if proxy_env is defined else {}}}"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"

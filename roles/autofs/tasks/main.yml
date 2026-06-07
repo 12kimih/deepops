@@ -8,7 +8,9 @@
     - autofs_map
 
 - name: Install packages
-  ansible.builtin.package: name=autofs
+  ansible.builtin.package:
+    name: autofs
+
 - name: Configure /home
   ansible.builtin.template:
     src: templates/master.j2
@@ -30,4 +32,7 @@
   when: autofs_mount is defined
 
 - name: Make sure autofs is running
-  ansible.builtin.service: name=autofs state=started enabled=yes
+  ansible.builtin.service:
+    name: autofs
+    state: started
+    enabled: true

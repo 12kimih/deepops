@@ -1,22 +1,25 @@
 ---
 - name: Check for DGX
-  when: ansible_product_name is search("DGX")
   ansible.builtin.set_fact:
     dcgm_is_dgx: true
+  when: ansible_product_name is search("DGX")
 
 - name: DGX tasks
-  when: dcgm_is_dgx
   ansible.builtin.include_tasks: install-dgx.yml
+  when: dcgm_is_dgx
+
 - name: Ubuntu tasks
-  when: (ansible_distribution == "Ubuntu") and not dcgm_is_dgx
   ansible.builtin.include_tasks: install-ubuntu.yml
+  when: (ansible_distribution == "Ubuntu") and not dcgm_is_dgx
+
 - name: Red Hat family tasks
-  when: (ansible_os_family == "RedHat") and not dcgm_is_dgx
   ansible.builtin.include_tasks: install-redhat.yml
+  when: (ansible_os_family == "RedHat") and not dcgm_is_dgx
+
 - name: Populate service facts
+  ansible.builtin.service_facts:
   tags:
     - molecule-notest
-  ansible.builtin.service_facts:
 
 - name: Start the nvidia-dcgm service when present (preferred)
   ansible.builtin.systemd:

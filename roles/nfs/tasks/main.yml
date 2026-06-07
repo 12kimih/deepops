@@ -1,5 +1,5 @@
 ---
-- name: Gather os specific variables
+- name: Gather OS specific variables
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
@@ -12,7 +12,7 @@
     - vars
     - nfs
 
-- name: Install ubuntu packages
+- name: Install Ubuntu packages
   ansible.builtin.apt:
     name: nfs-common
     state: present
@@ -20,7 +20,7 @@
   tags:
     - nfs
 
-- name: Install rhel packages
+- name: Install RHEL packages
   ansible.builtin.dnf:
     name: nfs-utils
     state: present

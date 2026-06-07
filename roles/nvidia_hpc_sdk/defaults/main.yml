@@ -38,7 +38,7 @@ hpcsdk_install_dir: "/sw/hpc-sdk"
 hpcsdk_install_type: "single"
 
 # Construct the download URL
-hpcsdk_file_version: "20{{ hpcsdk_major_version }}_{{ hpcsdk_major_version }}{{hpcsdk_minor_version }}"
+hpcsdk_file_version: "20{{ hpcsdk_major_version }}_{{ hpcsdk_major_version }}{{ hpcsdk_minor_version }}"
 hpcsdk_download_name: "nvhpc_{{ hpcsdk_file_version }}_Linux_{{ hpcsdk_arch }}_cuda_{{ hpcsdk_file_cuda }}"
 hpcsdk_version_dir: "{{ hpcsdk_major_version }}.{{ hpcsdk_minor_version }}"
 hpcsdk_download_url: "https://developer.download.nvidia.com/hpc-sdk/{{ hpcsdk_version_dir }}/{{ hpcsdk_download_name }}.tar.gz"
