@@ -201,24 +201,15 @@ docker_iptables_enabled: true
 #
 # See: https://github.com/NVIDIA/pyxis/wiki/Setup#enroot-configuration-example
 #
-# IMPORTANT: keep ALL of these on node-LOCAL disk/NVMe, never on the NFS share.
-# enroot image import/unpack + container runtime layers are heavy small-file random
-# I/O; putting cache/data/runtime on NFS turns local scratch I/O into network I/O
-# and crushes a single NFS head. The defaults below are local -- do not repoint them
-# at /home, /sw or any NFS mountpoint (point enroot_data_path at a mounted NVMe if
-# you have one). See docs/slurm-cluster/slurm-nfs.md.
-enroot_runtime_path: '/run/enroot/user-$(id -u)'
-enroot_cache_path: '/var/lib/enroot-cache/user-$(id -u)'
-enroot_data_path: '/tmp/enroot-data/user-$(id -u)'
-enroot_config: |
-  ENROOT_CONFIG_PATH ${HOME}/.config/enroot
-  ENROOT_SQUASH_OPTIONS -noI -noD -noF -noX -no-duplicates
-  ENROOT_MOUNT_HOME y
-  ENROOT_RESTRICT_DEV y
-  ENROOT_ROOTFS_WRITABLE y
-  ENROOT_RUNTIME_PATH {{ enroot_runtime_path }}
-  ENROOT_CACHE_PATH {{ enroot_cache_path }}
-  ENROOT_DATA_PATH {{ enroot_data_path }}
+# IMPORTANT: keep enroot RUNTIME/CACHE/DATA on node-LOCAL disk/NVMe, never on NFS.
+# Image import/unpack is heavy small-file random I/O; on NFS it crushes a single NFS
+# head. The enroot ROLE sets local defaults (/run/enroot, /var/lib/enroot-cache,
+# /tmp/enroot-data) AND provisions their sticky-1777 parents via tmpfiles.d so users
+# can run enroot from the CLI and under Slurm without "permission denied". Uncomment
+# below ONLY to override -- e.g. to put cache/data on a mounted NVMe (still local!).
+# See docs/slurm-cluster/slurm-nfs.md.
+#enroot_data_path: '/mnt/nvme/enroot-data/user-$(id -u)'
+#enroot_cache_path: '/mnt/nvme/enroot-cache/user-$(id -u)'
 enroot_environ_config_files: []
 enroot_environ_config_files_dgx:
   - filename: 50-mellanox.env

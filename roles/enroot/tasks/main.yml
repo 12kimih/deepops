@@ -44,6 +44,29 @@
     mode: "0644"
   when: enroot_config | length > 0
 
+# enroot creates each user's RUNTIME/CACHE/DATA leaf (user-$(id -u)) by running
+# `mkdir -p` AS THE UNPRIVILEGED USER, so the PARENT dirs must exist sticky-1777 or
+# interactive `enroot` fails ("mkdir /run/enroot: Permission denied", enroot#23).
+# /run is tmpfs, so this tmpfiles.d drop-in recreates /run/enroot every boot. (The
+# Slurm prolog also makes the per-job leaf, but only for jobs -- not interactive use.)
+- name: Provision sticky enroot runtime/cache/data parent dirs (tmpfiles.d)
+  ansible.builtin.template:
+    src: enroot-tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/enroot.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: enroot_tmpfiles
+
+- name: Apply the enroot tmpfiles.d entries now
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/enroot.conf
+  changed_when: false
+  when:
+    - enroot_tmpfiles is changed
+    - ansible_virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
+  tags:
+    - molecule-notest
+
 # System-wide extension dirs run hooks with full capabilities before switch_root,
 # so they must be root-write-only (a user-writable hook is a privesc vector).
 - name: Ensure enroot system extension directories are root-owned

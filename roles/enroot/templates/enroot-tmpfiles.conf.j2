@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Sticky-1777 parents for enroot's per-user RUNTIME/CACHE/DATA leaf dirs. enroot
+# creates each user's "user-$(id -u)" leaf by running `mkdir -p` AS THE UNPRIVILEGED
+# USER, so these parents must be world-writable + sticky or interactive `enroot`
+# fails with "mkdir: cannot create directory '/run/enroot': Permission denied"
+# (NVIDIA/enroot#23). /run is tmpfs, so this drop-in recreates /run/enroot on every
+# boot. 'd' creates the dir (and corrects mode on an existing one) WITHOUT wiping
+# contents, so the persistent cache survives. The sticky bit stops users from
+# deleting each other's leaves.
+d {{ enroot_runtime_path | dirname }} 1777 root root -
+d {{ enroot_cache_path | dirname }} 1777 root root -
+d {{ enroot_data_path | dirname }} 1777 root root -
