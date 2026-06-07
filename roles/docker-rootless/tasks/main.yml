@@ -35,16 +35,20 @@
   with_filetree: "{{ role_path }}/templates/rootless-docker"
   when: item.state == 'file'
 
-- name: Add rootless docker profile script to source modules
+- name: Register the rootless docker modulefiles tree with Lmod (sorts before z00_lmod)
   ansible.builtin.template:
     src: "{{ item }}"
     dest: "/etc/profile.d/{{ item }}"
     owner: "root"
     group: "root"
     mode: "0644"
-    force: false
   with_items:
-    - "z96_rootlessdocker_modules.sh"
+    - "00-rootlessdocker-modulepath.sh"
+
+- name: Remove the superseded z96 rootless docker modulepath snippet
+  ansible.builtin.file:
+    path: "/etc/profile.d/z96_rootlessdocker_modules.sh"
+    state: absent
 
 - name: Check if rootless docker already installed successfully
   ansible.builtin.stat:
