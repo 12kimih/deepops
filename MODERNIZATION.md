@@ -151,8 +151,8 @@ that is known to work. *(Note: a follow-up docs audit of post-install actions --
 - **Version bumps:** prometheus `v3.11.3`->`v3.12.0`, alertmanager `v0.32.1`->
   `v0.32.2`, grafana `13.0.1`->`13.0.2`. node-exporter `v1.11.1` and dcgm
   `4.5.3-4.8.2-distroless` already current.
-- **slurm-exporter:** use the maintainer image `12kimih/prometheus-slurm-exporter`
-  (documented to pin a versioned tag in production).
+- **slurm-exporter:** set `slurm_exporter_container` to your own built image
+  (pin a versioned tag in production).
 
 ---
 
@@ -248,7 +248,7 @@ Boot-persistence / idempotency fixes:
 > The sections below (10+) cover the **continued modernization** after the initial
 > review: driver idempotency, legacy-OS removal, the repo-wide consistency pass,
 > two web-research audits (persistenced / AppArmor), the Slurm 25.11.6 config
-> overhaul + the my-deepops port, and prerequisite-package fixes.
+> overhaul + the reference-deployment port, and prerequisite-package fixes.
 
 ## 10. NVIDIA driver idempotency + post-install hardening  (`142480b6`, `b83476fa`)
 
@@ -336,13 +336,13 @@ trends; **every doc-backed option is cited inline** to the SchedMD anchors.
   Documented in `config.example/group_vars/slurm-cluster.yml` and the
   [Slurm guide](docs/slurm-cluster/README.md), incl. the private-config-repo workflow.
 
-## 15. Ported from `my-deepops` (the maintainer's production-tested cluster)
+## 15. Ported from a production-tested reference deployment
 
-Selectively merged the good parts of the maintainer's real Ubuntu 24.04 Slurm
+Selectively merged the good parts of a production-tested Ubuntu Slurm
 cluster, generalizing anything server-specific into config:
 
-- **`job_submit.lua`** (net-new): a generalized, Jinja-parameterized port of the
-  maintainer's GPU-type->partition routing plugin. Site config (CPU partitions,
+- **`job_submit.lua`** (net-new): a generalized, Jinja-parameterized port of a
+  real GPU-type->partition routing plugin. Site config (CPU partitions,
   gpu-type->partition map, default type/partition) comes from Ansible vars, so it is
   a safe no-op with the empty defaults. Improvements over the source: respects an
   explicit `--partition`, also reads modern `--gpus` (`tres_per_node`/`tres_per_job`),
@@ -354,8 +354,8 @@ cluster, generalizing anything server-specific into config:
   opt-in-where-risky tunables rather than hardcoded site values (section 14).
 - **slurmdbd archive/purge** defaults: adopted as the commented `Purge*After` /
   `Archive*` recommendations.
-- **`prolog.d/50-all-enroot-dirs`:** dropped the parent-dir `chmod 0755` (the
-  maintainer removed it in production -- `mkdir -p` already creates it 0755 and the
+- **`prolog.d/50-all-enroot-dirs`:** dropped the parent-dir `chmod 0755` (it
+  was removed in production -- `mkdir -p` already creates it 0755 and the
   parent may be a shared/systemd-managed path).
 - **Server-specific values NOT copied** (NodeName hardware lines, NodeAddr, specific
   Gres types, user allowlists, NFS exports, hpcsdk versions): these stay as
@@ -392,10 +392,10 @@ is flagged legacy and points at the `mofed` role.
 
 ---
 
-## 18. my-deepops production optimizations + NFS random-IO tuning  (`520d0932`, `ec14c854`)
+## 18. Production optimizations + NFS random-IO tuning  (`520d0932`, `ec14c854`)
 
-A second, exhaustive file-by-file pass over the maintainer's working cluster
-(`my-deepops`, all uncommitted working-tree edits) classified every change as
+A second, exhaustive file-by-file pass over a production-tested reference
+cluster's working-tree edits classified every change as
 *port* (general optimization), *skip* (server-specific), or *already have*. The 19
 general optimizations were ported and generalized; server-specific values (NodeName
 hardware, real inventory, usernames, `/data0x` paths) stay as placeholders.
@@ -426,7 +426,7 @@ hardware, real inventory, usernames, `/data0x` paths) stay as placeholders.
 
 ## 19. Final multi-agent verification round  (`c7063698`)
 
-An 18-agent final sweep (deepops<->my-deepops parity, per-program docs compliance,
+An 18-agent final sweep (deepops<->reference-config parity, per-program docs compliance,
 login/compute idempotency + reboot persistence, and a consistency/corruption
 file-by-file scan over 661 files) surfaced 8 critical issues, all fixed:
 
@@ -502,7 +502,7 @@ already correctly gated on `ansible_local['gpus']['count']`.
 Scrubbed real-looking NetApp creds from the committed example; made the logging port
 overridable; documented the new tunables (`nfs_server_threads`, `nfs_tune_network`,
 `grafana_port`, `locale_lang`) and de-staled the spack example. The gitignored
-`config/` overlay was built to replicate the maintainer's cluster (real inventory,
+`config/` overlay is built to replicate a real site's cluster (real inventory,
 `slurm_nodes_raw`/`partitions_raw`/`gres_raw`, NFS exports/mounts, job_submit
 routing, ports) and diffed against `config.example`. Default install posture set to:
 driver **on** (branch 595, GPU-gated), system CUDA **off** (served as Lmod modules),
@@ -573,7 +573,7 @@ enroot creates each user's RUNTIME/CACHE/DATA leaf by `mkdir`-ing **as the user*
 the parents must be writable. deepops only made the per-user leaf in the Slurm prolog,
 so pyxis-under-srun worked but **interactive `enroot` failed** ("mkdir /run/enroot:
 Permission denied", NVIDIA/enroot#23), recurring each reboot (`/run` is tmpfs). Fix
-(ports my-deepops's approach): the enroot role ships a tmpfiles.d creating the
+(ports the reference deployment's approach): the enroot role ships a tmpfiles.d creating the
 sticky-1777 parents (`/run/enroot`, `/var/lib/enroot-cache`, `/tmp/enroot-data`), and
 the per-user paths + a correct `enroot.conf` are now role defaults (were only in the
 example group_vars, so a bare deploy used to put cache/data on the NFS home). Kept
@@ -593,7 +593,7 @@ before `nvidia-ctk` (idempotent). Added `libjwt` to the slurmrestd build deps
 Added `docs/deepops/config-defaults-vs-upstream.md` (config.example defaults vs the
 fork point). Dropped the unused `geerlingguy.ntp` galaxy dependency (matching the
 docs). Documented the deferred OOD/Trident/registry major bumps in their role
-defaults. Removed `scripts/deepops/config-diff.sh` per maintainer preference, plus
+defaults. Removed `scripts/deepops/config-diff.sh` by preference, plus
 assorted doc cleanups.
 
 ## Status
@@ -601,16 +601,22 @@ assorted doc cleanups.
 Every item from the modernization brief is implemented, linted (yamllint 0;
 ansible-lint **production** clean except the two `kubespray_defaults` syntax-checks
 that need the kubespray submodule checked out), and verified by repeated multi-agent
-file-by-file review. The lint/format tooling is current (yamllint 1.38.0). Caveats
-explicitly marked: the DOCA-OFED migration (section 17) needs RDMA/IB hardware to
-validate; bumping the runtime Ansible major (10->14) is coupled to the pinned
-kubespray and must be done together with a kubespray bump.
+file-by-file review.
+
+**Tooling currency (some pins held on purpose):** yamllint is bumped to **1.38.0**,
+but **ansible-lint stays at 26.1.1** and **pre-commit-hooks at v5** -- the newer
+ansible-lint (26.4.0) adds ~11 schema / yaml-strictness failures, so those are held
+for CI stability and tracked separately. The runtime **Ansible major (10->14)** is
+coupled to the pinned kubespray (kubespray pins ansible-core ranges), so it moves
+only together with a kubespray bump. In short: ansible-lint 26.4.0, pre-commit-hooks
+v6, and Ansible 14 are deliberate, tested upgrades for later -- not blind bumps now.
+
+Other caveats: the DOCA-OFED migration (section 17) needs RDMA/IB hardware to validate.
 
 Deferred by design (each needs an install-flow rework + validation on a real
 cluster, not a blind bump -- documented in the relevant role's defaults): Open
 OnDemand 2->4, NetApp Trident 21->26, k8s-registry chart 2->3, k8s dashboard
-v2->v7. Maintainer-owned: the local NVMe RAID5 `/scratch` + second NFS server on the
-repurposed CPU node.
+v2->v7.
 
 > Maintenance note: keep this file current. When a change lands, add or amend the
 > relevant section (what / how / why + commit) and refresh the Status -- do not let it
