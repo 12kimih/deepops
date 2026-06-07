@@ -7,28 +7,10 @@
 #  - nvidia_repo: NVIDIA's CUDA apt repo (cuda-keyring + nvidia-open / cuda-drivers),
 #    branch-pinned with nvidia-driver-pinning-{branch} (installed FIRST).
 #    https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/ubuntu.html
-- name: Find pre-existing NVIDIA driver packages (Ubuntu)
-  ansible.builtin.shell:
-    cmd: >-
-      dpkg-query -W -f='${Package}\n' 2>/dev/null
-      | grep -E '^(nvidia-|libnvidia-)'
-      | grep -vE 'container' || true
-  register: nvidia_driver_existing_packages
-  changed_when: false
-  check_mode: false
-  when: nvidia_driver_purge_existing | bool
 
-- name: Purge pre-existing NVIDIA driver packages (Ubuntu)
-  ansible.builtin.apt:
-    name: "{{ nvidia_driver_existing_packages.stdout_lines }}"
-    state: absent
-    purge: true
-    autoremove: true
-  when:
-    - nvidia_driver_purge_existing | bool
-    - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
-
-# --- Method: ubuntu_repo (Canonical archive) ---------------------------------
+# Resolve the target package up front so the purge can be skipped when the desired
+# driver is already installed (keeps re-runs idempotent — otherwise the purge would
+# match the driver this role just installed and force a reboot on every run).
 - name: Determine the NVIDIA driver package (Ubuntu, Canonical archive)
   ansible.builtin.set_fact:
     nvidia_driver_package_resolved: >-
@@ -38,6 +20,42 @@
               ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '') }}
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
+- name: Set the target NVIDIA driver package name (Ubuntu)
+  ansible.builtin.set_fact:
+    nvidia_driver_target_package: >-
+      {{ nvidia_driver_package_resolved if nvidia_driver_install_method == 'ubuntu_repo'
+         else ('nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers') }}
+
+- name: Gather installed package facts (Ubuntu)
+  ansible.builtin.package_facts:
+    manager: apt
+  when: nvidia_driver_purge_existing | bool
+
+- name: Find pre-existing NVIDIA driver packages (Ubuntu)
+  ansible.builtin.shell:
+    cmd: >-
+      dpkg-query -W -f='${Package}\n' 2>/dev/null
+      | grep -E '^(nvidia-|libnvidia-)'
+      | grep -vE 'container' || true
+  register: nvidia_driver_existing_packages
+  changed_when: false
+  check_mode: false
+  when:
+    - nvidia_driver_purge_existing | bool
+    - (nvidia_driver_target_package | trim) not in ansible_facts.packages
+
+- name: Purge pre-existing NVIDIA driver packages (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nvidia_driver_existing_packages.stdout_lines }}"
+    state: absent
+    purge: true
+    autoremove: true
+  when:
+    - nvidia_driver_purge_existing | bool
+    - nvidia_driver_existing_packages.stdout_lines is defined
+    - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
+
+# --- Method: ubuntu_repo (Canonical archive) ---------------------------------
 - name: Install the NVIDIA driver from the Ubuntu archive
   ansible.builtin.apt:
     name: "{{ nvidia_driver_package_resolved }}"
