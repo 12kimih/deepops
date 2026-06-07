@@ -55,9 +55,25 @@ enroot_configure_kernel_options_versions: "ALL"
 enroot_reboot_timeout: 900
 
 # --- enroot.conf / extension dirs --------------------------------------------
-# Block appended to /etc/enroot/enroot.conf (set via group_vars; see the example
-# in config.example/group_vars/all.yml for per-user RUNTIME/CACHE/DATA paths).
-enroot_config: ""
+# Per-user RUNTIME/CACHE/DATA paths. enroot expands $(id -u) at runtime; the role
+# provisions their PARENTS sticky-1777 via tmpfiles.d (tasks/main.yml) so an
+# unprivileged user can create their own leaf -- both from an interactive CLI and
+# inside a Slurm job. Without writable parents, interactive `enroot` fails with
+# "mkdir /run/enroot: Permission denied" (NVIDIA/enroot#23). Keep cache/data OFF
+# the NFS home (heavy small-file random I/O); repoint at local disk/NVMe in group_vars.
+enroot_runtime_path: "/run/enroot/user-$(id -u)"
+enroot_cache_path: "/var/lib/enroot-cache/user-$(id -u)"
+enroot_data_path: "/tmp/enroot-data/user-$(id -u)"
+# Block appended to /etc/enroot/enroot.conf. Override in group_vars to customize.
+enroot_config: |
+  ENROOT_CONFIG_PATH ${HOME}/.config/enroot
+  ENROOT_SQUASH_OPTIONS -noI -noD -noF -noX -no-duplicates
+  ENROOT_MOUNT_HOME y
+  ENROOT_RESTRICT_DEV y
+  ENROOT_ROOTFS_WRITABLE y
+  ENROOT_RUNTIME_PATH {{ enroot_runtime_path }}
+  ENROOT_CACHE_PATH {{ enroot_cache_path }}
+  ENROOT_DATA_PATH {{ enroot_data_path }}
 # Lists of { filename: '', content: '' }. System-wide extension dirs run with
 # full capabilities pre-switch_root, so they are kept root-write-only.
 enroot_environ_config_files: []  # filenames end with .env
