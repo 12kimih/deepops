@@ -1,0 +1,6 @@
+---
+- name: Restart ypserv
+  ansible.builtin.service:
+    name: "{{ nis_server_service | default('ypserv') }}"
+    state: restarted
+    enabled: true

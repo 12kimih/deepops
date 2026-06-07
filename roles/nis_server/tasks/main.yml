@@ -1,0 +1,119 @@
+---
+# Set up an NIS (YP) master server. Steps follow the LBNL/TLDP NIS-HOWTO and the
+# ypinit(8)/ypserv(8) man pages. https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html
+- name: Assert nis_domain is set for the NIS master
+  ansible.builtin.assert:
+    that:
+      - nis_domain is defined
+      - (nis_domain | trim | length) > 0
+    fail_msg: "nis_make_server is true but nis_domain is not defined (set it in group_vars)."
+
+- name: Load OS-specific NIS server variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+# On Debian, installing ypserv tries to start it before the database exists (it
+# would fail). Block daemon auto-start for the duration of the package install.
+- name: Block daemon auto-start during package install (Debian)
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      exit 101
+    dest: /usr/sbin/policy-rc.d
+    mode: "0755"
+  when: ansible_os_family == "Debian"
+  changed_when: false
+
+- name: Install NIS server packages
+  ansible.builtin.package:
+    name: "{{ nis_server_packages }}"
+    state: present
+
+- name: Remove the daemon-start block (Debian)
+  ansible.builtin.file:
+    path: /usr/sbin/policy-rc.d
+    state: absent
+  when: ansible_os_family == "Debian"
+  changed_when: false
+
+# The NIS domain must be set (kernel domainname) before ypinit/ypserv, and persist
+# across reboot.
+- name: Set the NIS domain for the running system
+  ansible.builtin.command: "nisdomainname {{ nis_domain }}"
+  changed_when: false
+
+- name: Persist the NIS domain (Debian /etc/defaultdomain)
+  ansible.builtin.copy:
+    dest: /etc/defaultdomain
+    content: "{{ nis_domain }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+
+- name: Persist the NIS domain (RHEL /etc/sysconfig/network)
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/network
+    regexp: "^NISDOMAIN="
+    line: "NISDOMAIN={{ nis_domain }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_os_family == "RedHat"
+
+# Restrict which client networks may query this server (security).
+- name: Configure NIS securenets
+  ansible.builtin.copy:
+    dest: "{{ nis_server_securenets_path }}"
+    content: |
+      # {{ ansible_managed }}
+      # NETMASK         NETWORK   -- hosts/networks allowed to query this NIS server.
+      {% for line in nis_server_securenets %}
+      {{ line }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ypserv
+
+- name: Ensure rpcbind and ypserv are enabled and running
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - rpcbind
+    - "{{ nis_server_service }}"
+  tags:
+    - molecule-notest
+
+# Build the NIS database once. ypinit -m reads the list of NIS servers from stdin;
+# empty stdin (immediate EOF) accepts THIS host as the sole master. Idempotent via
+# `creates`. Rebuild maps after passwd/group changes with `make -C /var/yp`.
+# https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypinit(8)
+- name: Initialize the NIS master database (first run only)
+  ansible.builtin.command:
+    cmd: "{{ nis_server_ypinit }} -m"
+    creates: "/var/yp/{{ nis_domain }}"
+    stdin: ""
+  tags:
+    - molecule-notest
+
+# Optional daemons: yppasswdd lets users change NIS passwords (yppasswd); ypxfrd
+# speeds map transfer to NIS SLAVE servers. Best-effort -- the systemd unit name can
+# vary by distro/version; if one does not start, enable it by hand and adjust
+# nis_server_yppasswdd_service / nis_server_ypxfrd_service.
+- name: Enable optional NIS server daemons (yppasswdd / ypxfrd)
+  ansible.builtin.service:
+    name: "{{ item.name }}"
+    state: started
+    enabled: true
+  loop:
+    - { name: "{{ nis_server_yppasswdd_service }}", want: "{{ nis_server_enable_yppasswdd }}" }
+    - { name: "{{ nis_server_ypxfrd_service }}", want: "{{ nis_server_enable_ypxfrd }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.want | bool
+  failed_when: false
+  tags:
+    - molecule-notest

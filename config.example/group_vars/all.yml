@@ -236,9 +236,19 @@ golang_gopath: /opt/go/packages
 # AUTH                                                                         #
 ################################################################################
 # NIS configuration
-# Playbook: authentication
+# Playbook: authentication (also runs inside slurm-cluster.yml)
+# CLIENTS: set nis_domain + nis_server (the master's hostname/IP) to bind nodes to NIS.
 #nis_domain: example.com
 #nis_server: 10.0.0.1
+# MASTER SERVER (ypserv): set nis_make_server: true on the ONE node that should serve
+# NIS -- typically your head node, in host_vars (e.g. config/host_vars/<master>.yml).
+# It installs ypserv, builds the database (ypinit -m), and serves the maps. Restrict
+# who may query it with nis_server_securenets ("NETMASK NETWORK" lines; the role
+# defaults to localhost + RFC1918 -- TIGHTEN to your actual cluster subnet).
+#nis_make_server: true
+#nis_server_securenets:
+#  - "255.0.0.0       127.0.0.0"
+#  - "255.255.255.0   10.0.0.0"
 
 # Kerberos configuration
 # Playbook: authentication
