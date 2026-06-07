@@ -1,6 +1,6 @@
-# DeepOps Modernization -- Change Log (branch `modernize`)
+# DeepOps Modernization -- Change Log (branch `main`, formerly `modernize`)
 
-This document explains **every change made on the `modernize` branch since the
+This document explains **every change made on the `main` branch (formerly `modernize`) since the
 forked NVIDIA DeepOps baseline** (commit `8858399d`, "release 26.05"): *what* was
 changed, *how*, and *why*. It is meant for review before merging.
 
@@ -446,16 +446,106 @@ file-by-file scan over 661 files) surfaced 8 critical issues, all fixed:
   the policy-rc.d shim), and left jinja-spacing/`{{ share_dir}}`/typo artefacts;
   all restored. This is why every later change is re-scanned for corruption.
 
+## 20. CUDA toolkits as Lmod modules -- `nvidia_cuda_toolkit` role  (`3c026a67`, `94fa1419`)
+
+New in-tree role (originally `cuda_toolkits`, renamed to `nvidia_cuda_toolkit` for
+naming consistency with the other `nvidia_*` roles -- the rename was kept to this
+NEW role only, leaving upstream role names untouched). It installs the latest patch
+of each CUDA minor (11.8 .. 13.3) from the official NVIDIA `.run` files into a
+shared `/sw/cuda/<version>` tree and generates one Lmod modulefile per version, so
+users `module load cuda/<ver>` on any node. The host driver is never touched
+(`--toolkit` only). Idempotent (stat `nvcc` per version), opt-in (default off),
+installs once on the NFS server. This is the modules-based alternative to the
+system-wide `nvidia_cuda` role; with it, `slurm_cluster_install_cuda` is set false.
+Playbook: `playbooks/slurm-cluster/nvidia-cuda-toolkit.yml`.
+
+## 21. profile.d / Lmod best-practice overhaul  (`a43200bc`, `1b55c3f8`, `cc74da53`)
+
+- **`z00_lmod.{sh,csh}` now consume `LMOD_SITE_MODULEPATH`.** The custom DeepOps
+  z00_lmod hard-set `MODULEPATH` and sourced `init/bash` directly, so it silently
+  ignored `LMOD_SITE_MODULEPATH` (Lmod's official site hook). Replicated the prepend
+  loop from Lmod's stock `profile.in`, so per-role snippets that register a
+  modulefiles tree actually land on `MODULEPATH` and survive `module reset`.
+- **All site-registration snippets unified** on the `00-*` + `LMOD_SITE_MODULEPATH`
+  pattern (sorted before z00_lmod): cuda (`00-site-modulepath`), nvhpc
+  (`z95_nvhpc_modules` -> `00-nvhpc-modulepath`, which also fixed a doubled MANPATH
+  and two csh syntax bugs), rootless-docker (`z96_*` -> `00-rootlessdocker-*`).
+- **sh/csh parity** for every profile.d script; **`z01_eb.csh`** fixed (bash
+  `unset $(...)` is invalid in csh -> `foreach`/`unsetenv`; EBROOT match anchored).
+Grounded in lmod.readthedocs.io/.../090_configuring_lmod.html and Lmod's init/profile.in.
+
+## 22. MPI stack -- PMIx 5.0.10 + OpenMPI 5.0.10  (`16226705`, `075c9489`)
+
+PMIx 3.2.5 -> **5.0.10** (current stable OpenPMIx; Slurm 22.05+ supports v2-v5, so
+25.11 links it cleanly). OpenMPI 4.0.3 (EOL) -> **5.0.10**. The OpenMPI role default
+keeps `--with-pmix=internal` (5.0.x bundles PMIx 5.x = the same major Slurm links,
+wire-compatible, builds anywhere); `config.example` documents the SchedMD
+best-practice external-PMIx build (`--with-pmix=<prefix>`, dropping the v5-removed
+`--with-pmi`/`--with-slurm`). Sources: slurm.schedmd.com/mpi_guide.html.
+
+## 23. Idempotency + molecule-CI hardening  (`402db12f`, `0d462604`, `8ecdc6d4`, `b06d697b`, `3e0b9e51`, `5c3b232f`)
+
+A file-by-file idempotency audit fixed every re-run-unsafe task: netapp-trident
+(`helm install` -> `upgrade --install`; backend create tolerates "already exists";
+unarchive `creates:`), ood-wrapper (semanage shell-outs -> idempotent
+`community.general.seport`/`selinux_permissive`), cachefilesd / nfs-firewalld /
+spack (change-gated restarts + `changed_when`), nis_client (OS-aware service name,
+proper domain file). Three molecule-CI breakages fixed (nfs sysctl + cachefilesd
+restart skipped in containers; openmpi default reverted to internal PMIx so the
+converge builds). **`nvidia-dcgm` is now GPU-gated** -- it had no gate, so the dcgm
+service-start failed on a 0-GPU slurm-node (the one task that broke a default run on
+a CPU-only node); CPU-only nodes now complete cleanly. Every other GPU role was
+already correctly gated on `ansible_local['gpus']['count']`.
+
+## 24. Generality, config overlay, and install defaults  (`a3aaffdb`, `f81b4623`, `5c3b232f`)
+
+Scrubbed real-looking NetApp creds from the committed example; made the logging port
+overridable; documented the new tunables (`nfs_server_threads`, `nfs_tune_network`,
+`grafana_port`, `locale_lang`) and de-staled the spack example. The gitignored
+`config/` overlay was built to replicate the maintainer's cluster (real inventory,
+`slurm_nodes_raw`/`partitions_raw`/`gres_raw`, NFS exports/mounts, job_submit
+routing, ports) and diffed against `config.example`. Default install posture set to:
+driver **on** (branch 595, GPU-gated), system CUDA **off** (served as Lmod modules),
+HPC SDK **off**, spack build **off**. node_exporter now mounts the host rootfs
+(`--path.rootfs=/host`) so its filesystem metrics describe the node, not the container.
+
+## 25. Dead-code removal + disambiguation guide  (`e7495ca3`)
+
+A duplication/overlap sweep found no true duplicates. Removed the only orphan +
+self-superseded role (`nvidia-gpu-operator-node-prep`, handled by GPU Operator
+>=1.9) and the redundant ntpd path (`ntp-client.yml` + `geerlingguy.ntp`; chrony is
+the default). Added `docs/deepops/choosing-roles-and-playbooks.md` to disambiguate
+the similar-looking-but-distinct pairs (nvidia_cuda vs nvidia_cuda_toolkit, the three
+registries, the module-build systems, dcgm agent vs exporter, the two gpu-clocks
+playbooks, mofed vs roce_backend, chrony) -- the real fix for "which one do I use?"
+without merging distinct components.
+
+## 26. Repo housekeeping  (`372b808d`, branch rename)
+
+The working branch was renamed `modernize` -> **`main`** and set as the GitHub
+default; `master`/`modernize` were removed from the fork; the `upstream` remote
+(github.com/NVIDIA/deepops) is configured for periodic
+`git fetch upstream && git merge upstream/master`. Documentation de-staled:
+versions (OpenMPI/PMIx/Ansible), driver var names (`nvidia_driver_branch`,
+`nvidia_driver_kernel_modules`, `nvidia_driver_reboot`), config paths
+(`k8s_cluster.yml`), removal of the Helm-2/Tiller manual-install block, and broken
+relative links.
+
 ## Status
 
 Every item from the modernization brief is implemented, linted (yamllint 0;
 ansible-lint **production** clean except the two `kubespray_defaults` syntax-checks
 that need the kubespray submodule checked out), and verified by repeated multi-agent
 file-by-file review until each pass converged to zero findings. Caveats explicitly
-marked: the DOCA-OFED migration (section 17) needs RDMA/IB hardware to validate; bumping the
-runtime Ansible major (10->14) is coupled to the pinned kubespray and must be done
-together with a kubespray bump (the lint/format tooling -- ansible-lint, yamllint,
-pre-commit-hooks -- is tracked to latest separately).
+marked: the DOCA-OFED migration (section 17) needs RDMA/IB hardware to validate;
+bumping the runtime Ansible major (10->14) is coupled to the pinned kubespray and
+must be done together with a kubespray bump (the lint/format tooling -- ansible-lint,
+yamllint, pre-commit-hooks -- is tracked to latest separately).
+
+Open follow-ups (tracked, not yet done): a local NVMe RAID5 `/scratch` + second
+NFS server on the repurposed CPU node (the maintainer will do the RAID step);
+bumping the yamllint pin to the already-verified 1.38.0; and a final full
+file-by-file re-verification pass over the post-modernization tree.
 
 > Maintenance note: keep this file current. When a change lands, add or amend the
 > relevant section (what / how / why + commit) and refresh the Status -- do not let it
