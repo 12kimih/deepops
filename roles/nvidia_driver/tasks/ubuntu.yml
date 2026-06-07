@@ -1,18 +1,12 @@
 ---
-# Ubuntu ships the driver meta-packages in its own archives, so no extra
-# repository is required. Installing the single meta package lets apt resolve one
-# consistent kernel-module closure (either DKMS or the precompiled
-# linux-modules-nvidia path), unlike hand-listing the dkms and no-dkms headless
-# packages together (which leaves no usable module built).
-# https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
-- name: Determine the NVIDIA driver package (Ubuntu)
-  ansible.builtin.set_fact:
-    nvidia_driver_package_resolved: >-
-      {{ nvidia_driver_package if (nvidia_driver_package | default('') | length > 0)
-         else 'nvidia-driver-' ~ nvidia_driver_branch
-              ~ ('-server' if (nvidia_driver_server_branch | bool) else '')
-              ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '') }}
-
+# Two install methods, selected by nvidia_driver_install_method:
+#  - ubuntu_repo (default): the Canonical archive nvidia-driver-{branch}-server-open.
+#    The single meta resolves one consistent kernel-module closure (signed
+#    precompiled, Secure-Boot-friendly), unlike hand-listing dkms + no-dkms.
+#    https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
+#  - nvidia_repo: NVIDIA's CUDA apt repo (cuda-keyring + nvidia-open / cuda-drivers),
+#    branch-pinned with nvidia-driver-pinning-{branch} (installed FIRST).
+#    https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/ubuntu.html
 - name: Find pre-existing NVIDIA driver packages (Ubuntu)
   ansible.builtin.shell:
     cmd: >-
@@ -34,9 +28,55 @@
     - nvidia_driver_purge_existing | bool
     - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
 
-- name: Install the NVIDIA driver (Ubuntu)
+# --- Method: ubuntu_repo (Canonical archive) ---------------------------------
+- name: Determine the NVIDIA driver package (Ubuntu, Canonical archive)
+  ansible.builtin.set_fact:
+    nvidia_driver_package_resolved: >-
+      {{ nvidia_driver_package if (nvidia_driver_package | default('') | length > 0)
+         else 'nvidia-driver-' ~ nvidia_driver_branch
+              ~ ('-server' if (nvidia_driver_server_branch | bool) else '')
+              ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '') }}
+  when: nvidia_driver_install_method == 'ubuntu_repo'
+
+- name: Install the NVIDIA driver from the Ubuntu archive
   ansible.builtin.apt:
     name: "{{ nvidia_driver_package_resolved }}"
     state: present
     update_cache: true
   register: nvidia_driver_install
+  when: nvidia_driver_install_method == 'ubuntu_repo'
+
+# --- Method: nvidia_repo (NVIDIA CUDA apt repo) ------------------------------
+- name: Install the cuda-keyring (Ubuntu, nvidia_repo)
+  ansible.builtin.apt:
+    deb: "https://developer.download.nvidia.com/compute/cuda/repos/{{ nvidia_driver_ubuntu_repo_distro | trim }}/{{ nvidia_driver_ubuntu_repo_arch }}/cuda-keyring_{{ nvidia_driver_cuda_keyring_version }}_all.deb"
+  when: nvidia_driver_install_method == 'nvidia_repo'
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+# Branch is pinned via a separate package installed first; from the 590 series
+# Ubuntu drops the branch suffix from the driver package name.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/version-locking.html
+- name: Pin the NVIDIA driver branch (Ubuntu, nvidia_repo)
+  ansible.builtin.apt:
+    name: "nvidia-driver-pinning-{{ nvidia_driver_branch }}"
+    state: present
+    update_cache: true
+  when: nvidia_driver_install_method == 'nvidia_repo'
+
+- name: Install the NVIDIA driver from the NVIDIA repo (Ubuntu, nvidia_repo)
+  ansible.builtin.apt:
+    name: "{{ 'nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers' }}"
+    state: present
+    update_cache: true
+  register: nvidia_driver_install
+  when: nvidia_driver_install_method == 'nvidia_repo'
+
+# --- Fabric Manager (opt-in, NVSwitch HGX) -----------------------------------
+- name: Install NVIDIA Fabric Manager and NSCQ (Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - "nvidia-fabricmanager-{{ nvidia_driver_branch }}"
+      - "libnvidia-nscq-{{ nvidia_driver_branch }}"
+    state: present
+    update_cache: true
+  when: nvidia_driver_fabricmanager | bool

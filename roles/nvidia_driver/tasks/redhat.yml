@@ -70,3 +70,13 @@
     name: "{{ nvidia_driver_rhel_package_resolved }}"
     state: present
   register: nvidia_driver_install
+
+# Fabric Manager (opt-in, NVSwitch HGX), branch-matched to the driver.
+# https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
+- name: Install NVIDIA Fabric Manager and NSCQ (RHEL/Rocky)
+  ansible.builtin.dnf:
+    name:
+      - "nvidia-fabricmanager-{{ nvidia_driver_branch }}"
+      - "libnvidia-nscq-{{ nvidia_driver_branch }}"
+    state: present
+  when: nvidia_driver_fabricmanager | bool

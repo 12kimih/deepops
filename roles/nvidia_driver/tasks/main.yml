@@ -16,7 +16,35 @@
     - nvidia_driver_install is defined
     - nvidia_driver_install.changed
 
-- name: Verify the NVIDIA driver with nvidia-smi
+# Post-installation actions, run after the reboot so the new module is loaded.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
+
+# NVIDIA recommends the persistence daemon over the legacy `nvidia-smi -pm 1`
+# ("the daemon approach provides a more elegant and robust solution"; legacy
+# persistence mode is slated for deprecation). The driver packages pull in
+# nvidia-persistenced with an enable preset; enable it explicitly to be deterministic.
+- name: Enable the NVIDIA persistence daemon
+  ansible.builtin.systemd:
+    name: nvidia-persistenced
+    enabled: true
+    state: started
+  when: nvidia_driver_persistenced | bool
+
+# NVSwitch HGX baseboards require Fabric Manager, branch-matched to the driver.
+# https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
+- name: Enable NVIDIA Fabric Manager
+  ansible.builtin.systemd:
+    name: nvidia-fabricmanager
+    enabled: true
+    state: started
+  when: nvidia_driver_fabricmanager | bool
+
+- name: Verify the loaded NVIDIA driver version
+  ansible.builtin.command: cat /proc/driver/nvidia/version
+  changed_when: false
+  when: nvidia_driver_verify | bool
+
+- name: Verify GPUs are visible with nvidia-smi
   ansible.builtin.command: nvidia-smi
   changed_when: false
   when: nvidia_driver_verify | bool
