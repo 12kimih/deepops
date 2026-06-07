@@ -103,11 +103,21 @@
   tags:
     - config
 
-# Deploy the lua job_submit plugin only when slurm.conf enables it
-# (slurm_job_submit_plugins includes "lua"). Must live in the slurm config dir.
-# https://slurm.schedmd.com/archive/slurm-25.11.6/job_submit_plugins.html
+# Deploy a user-provided job_submit.lua only when the lua plugin is enabled. DeepOps
+# does not generate it -- you supply your own (config.example/files/slurm/job_submit.lua
+# is a starting point). Copied VERBATIM, not templated: lua table literals contain
+# "{{" which would break Jinja. https://slurm.schedmd.com/archive/slurm-25.11.6/job_submit_plugins.html
+- name: Assert a job_submit.lua is provided when the lua plugin is enabled
+  ansible.builtin.assert:
+    that: slurm_job_submit_template | length > 0
+    fail_msg: >-
+      slurm_job_submit_plugins includes 'lua' but slurm_job_submit_template is empty.
+      Write a job_submit.lua, place it under config/files/slurm/, and point
+      slurm_job_submit_template at it (see config.example/files/slurm/job_submit.lua).
+  when: "'lua' in (slurm_job_submit_plugins | default(''))"
+
 - name: Configure job_submit.lua
-  ansible.builtin.template:
+  ansible.builtin.copy:
     src: "{{ slurm_job_submit_template }}"
     dest: "{{ slurm_config_dir }}/job_submit.lua"
     mode: "0644"

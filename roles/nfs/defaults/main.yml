@@ -22,7 +22,7 @@ nfs_mounts: []
 nfs_server_threads: "{{ [(ansible_processor_vcpus | default(16) | int) * 4, 64] | max }}"
 
 # Network/socket-buffer tuning for the NFS data path, sized for a 100GbE+ cluster
-# fabric (B200-class) as the GENERAL default. Lower these in config/ for slower
+# fabric as the GENERAL default. Lower these in config/ for slower
 # fabrics if you prefer -- but the values are safe ceilings (TCP autotunes within
 # them), so leaving them is fine on 10/25GbE too. Bigger buffers keep a single
 # high-bandwidth flow's window full across the bandwidth-delay product; the old
