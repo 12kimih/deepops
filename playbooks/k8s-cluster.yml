@@ -84,7 +84,7 @@
       ansible.builtin.package:
         name: sshpass
         state: present
-  environment: "{{proxy_env if proxy_env is defined else {}}}"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
   tags:
     - bootstrap
 
@@ -107,7 +107,7 @@
         - container_manager is defined and container_manager != "docker"
         - ansible_distribution == "Ubuntu"
       ignore_errors: true
-  environment: "{{proxy_env if proxy_env is defined else {}}}"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 # Install Kubernetes
 # for configuration, see: config/group_vars/k8s_cluster.yml

@@ -97,7 +97,7 @@
     executable: /bin/bash
   changed_when: load_lmod_bash.rc != 0
 
-- name: "Auto load lmod "
+- name: "Auto load lmod"
   ansible.builtin.shell: source /etc/profile.d/z00_lmod.csh
   register: load_lmod_csh
   args:
