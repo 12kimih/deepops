@@ -194,7 +194,7 @@
   run_once: true
 
 - name: Create account
-  ansible.builtin.command: sacctmgr -i add account compute-account Description="Compute Accounts" Organization="Prestige"
+  ansible.builtin.command: sacctmgr -i add account {{ slurm_acct_account }} Description="Compute Accounts" Organization="{{ slurm_acct_organization }}"
   register: create_account_result
   failed_when: >
     create_account_result.rc != 0 and
@@ -209,7 +209,7 @@
     PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
 
 - name: Create users
-  ansible.builtin.command: sacctmgr -i create user {{ item }} account=compute-account adminlevel=None
+  ansible.builtin.command: sacctmgr -i create user {{ item }} account={{ slurm_acct_account }} adminlevel=None
   register: create_user_result
   failed_when: >
     create_user_result.rc != 0 and
