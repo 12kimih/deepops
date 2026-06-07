@@ -15,7 +15,7 @@
     - name: Check if /etc/cloud is present
       ansible.builtin.stat:
         path: "/etc/cloud"
-      when: deepops_disable_cloud_init|default(true)
+      when: deepops_disable_cloud_init | default(true)
       register: etc_cloud
 
     - name: Disable generator for setting cloud-init target
@@ -25,7 +25,7 @@
         group: "root"
         mode: "0644"
         state: "touch"
-      when: deepops_disable_cloud_init|default(true) and etc_cloud.stat.exists
+      when: deepops_disable_cloud_init | default(true) and etc_cloud.stat.exists
 
     - name: Disable all systemd services
       ignore_errors: true
@@ -37,4 +37,4 @@
         - "cloud-init"
         - "cloud-config"
         - "cloud-final"
-      when: deepops_disable_cloud_init|default(true)
+      when: deepops_disable_cloud_init | default(true)
