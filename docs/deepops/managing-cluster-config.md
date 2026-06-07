@@ -96,16 +96,6 @@ ansible-playbook -l slurm-cluster playbooks/slurm-cluster.yml
 
 Inventory and the vault password resolve automatically from `ansible.cfg`.
 
-### Reviewing what your `config/` overrides
-
-To see how your live `config/` differs from the tracked `config.example` template --
-a list of which files differ, then a per-file side-by-side of only the changed lines:
-
-```bash
-scripts/deepops/config-diff.sh                                # all differing files
-scripts/deepops/config-diff.sh group_vars/slurm-cluster.yml   # just one file
-```
-
 ## Pulling upstream DeepOps updates without clobbering `config/`
 
 `config/` is gitignored, so `git pull` / `rebase` / `checkout` physically cannot touch or
