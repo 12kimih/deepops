@@ -131,7 +131,7 @@
         tail -n +2  |
         awk '{sum += $4} END {print sum}'
       register: node_out
-      when: (not num_nodes) or (num_nodes|int <= 0)
+      when: (not num_nodes) or (num_nodes | int <= 0)
 
     - name: Set num_nodes variable
       ansible.builtin.set_fact:
