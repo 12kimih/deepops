@@ -34,20 +34,16 @@
     line: "domain {{ nis_domain }} server {{ nis_server }}"
   notify: "Restart nis"
 
-- name: Create default domain name file
-  ansible.builtin.file:
-    path: /etc/defaultdomain
+# /etc/defaultdomain holds exactly the NIS domain. The old lineinfile used
+# regexp "^" (matches the start of EVERY line) which clobbers line 1 of any
+# multi-line file; a single-value copy is both correct and idempotent.
+- name: Configure the NIS domain name
+  ansible.builtin.copy:
+    dest: /etc/defaultdomain
+    content: "{{ nis_domain }}\n"
     owner: root
     group: root
     mode: "0644"
-    state: touch
-  changed_when: false
-
-- name: Configure yp domainname
-  ansible.builtin.lineinfile:
-    dest: /etc/defaultdomain
-    regexp: "^"
-    line: "{{ nis_domain }}"
   notify: "Restart nis"
 
 - name: Configure nsswitch.conf

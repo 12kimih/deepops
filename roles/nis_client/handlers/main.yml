@@ -1,10 +1,10 @@
 ---
 # The NIS client service is named "nis" on modern Debian/Ubuntu (22.04/24.04/
-# 26.04) and on the RedHat family here, so a single handler covers both. The old
-# handler was gated to Ubuntu 14.04 (ypbind) and never fired on current Ubuntu,
-# leaving config changes unapplied.
+# 26.04) but "ypbind" on the RedHat family -- matching the per-distro service the
+# task file actually starts. A single hardcoded name would fail the handler on
+# the other family (there is no "nis" unit on RHEL).
 - name: Restart nis
   ansible.builtin.service:
-    name: nis
+    name: "{{ 'nis' if ansible_os_family == 'Debian' else 'ypbind' }}"
     state: restarted
     enabled: true
