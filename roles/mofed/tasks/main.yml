@@ -1,80 +1,70 @@
 ---
-- name: Include vars if ubuntu
-  ansible.builtin.include_vars: ubuntu.yml
-  when: ansible_distribution == "Ubuntu"
-
-# Fall back to the EL8 prereq list on EL9/EL10 (no per-major vars file yet), so
-# the role does not error on a missing rhel9.yml / rhel10.yml. NOTE: mofed_version
-# in defaults is a 2022 release with no build for Ubuntu 24.04+/26.04 or EL9/10 —
-# bump it (or move to NVIDIA DOCA-OFED) and override mofed_download_url for those.
-- name: Include vars if redhat-compatible
-  ansible.builtin.include_vars: "{{ lookup('first_found', _mofed_redhat_vars) }}"
+# Install DOCA-OFED (the MLNX_OFED successor) from NVIDIA's DOCA network repo.
+# https://docs.nvidia.com/doca/sdk/doca-host-installation-and-upgrade/index.html
+- name: Include OS-specific prerequisite vars
+  ansible.builtin.include_vars: "{{ lookup('first_found', _mofed_vars) }}"
   vars:
-    _mofed_redhat_vars:
+    _mofed_vars:
       files:
+        - "{{ ansible_distribution | lower }}.yml"
         - "rhel{{ ansible_distribution_major_version }}.yml"
         - "rhel8.yml"
       paths:
         - vars
+
+# --- Ubuntu: DOCA-OFED apt repository ---
+- name: Ubuntu | add the DOCA repository GPG key
+  ansible.builtin.get_url:
+    url: "{{ mofed_repo_gpg_key }}"
+    dest: /usr/share/keyrings/mellanox-doca.asc
+    mode: "0644"
+  when: ansible_distribution == "Ubuntu"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+- name: Ubuntu | add the DOCA-OFED apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/mellanox-doca.asc] {{ mofed_repo_base_url }} ./"
+    filename: mellanox-doca
+    state: present
+  when: ansible_distribution == "Ubuntu"
+
+# --- RHEL/Rocky: DOCA-OFED dnf repository ---
+- name: RHEL | add the DOCA-OFED dnf repository
+  ansible.builtin.yum_repository:
+    name: mellanox-doca
+    description: NVIDIA DOCA-OFED
+    baseurl: "{{ mofed_repo_base_url }}"
+    gpgcheck: true
+    gpgkey: "{{ mofed_repo_gpg_key }}"
   when: ansible_os_family == "RedHat"
 
-- name: Ensure perl is installed
-  ansible.builtin.package:
-    name: perl
-    state: present
-
-- name: Ensure rhel prereqs are installed
+- name: RHEL | install prerequisites
   ansible.builtin.dnf:
     name: "{{ mofed_pkg_prereqs }}"
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: Attempt to get installed ofed version # noqa risky-shell-pipe
-  ansible.builtin.shell: ofed_info | head -n1
-  register: ofed_info
-  changed_when: ofed_info.rc != 0
+# --- Install the OFED bundle (apt/dnf state=present is idempotent) ---
+- name: Install DOCA-OFED (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ mofed_package }}"
+    state: present
+    update_cache: true
+  register: mofed_install_ubuntu
+  when: ansible_distribution == "Ubuntu"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
-- name: Default to skipping install
-  ansible.builtin.set_fact:
-    mofed_do_install: false
+- name: Install DOCA-OFED (RHEL/Rocky)
+  ansible.builtin.dnf:
+    name: "{{ mofed_package }}"
+    state: present
+  register: mofed_install_redhat
+  when: ansible_os_family == "RedHat"
 
-- name: Check ofed version against desired version # noqa no-handler
-  ansible.builtin.set_fact:
-    mofed_do_install: true
-  when: ofed_info.changed or (mofed_version not in ofed_info.stdout)
-
-- name: Create download directory
-  ansible.builtin.file:
-    path: "{{ mofed_download_dir }}"
-    state: "directory"
-    owner: "root"
-    group: "root"
-    mode: "0755"
-  when: mofed_do_install
-
-- name: Download mofed distribution
-  ansible.builtin.get_url:
-    url: "{{ mofed_download_url }}"
-    dest: "{{ mofed_download_dir }}/{{ mofed_download_dest }}"
-  when: mofed_do_install
-
-- name: Extract mofed distribution
-  ansible.builtin.unarchive:
-    src: "{{ mofed_download_dir }}/{{ mofed_download_dest }}"
-    remote_src: true
-    dest: "{{ mofed_download_dir }}"
-  when: mofed_do_install
-
-- name: Execute mlnxofedinstall
-  ansible.builtin.shell:
-    cmd: yes | ./mlnxofedinstall {{ mofed_install_flags }}
-    chdir: "{{ mofed_download_dir }}/{{ mofed_download_name }}"
-  environment:
-    TERM: "xterm"
-  when: mofed_do_install
-
-- name: Clean up install dir
-  ansible.builtin.file:
-    path: "{{ mofed_download_dir }}"
-    state: "absent"
-  when: mofed_do_install and mofed_cleanup_install_dir
+- name: Reboot to load the OFED kernel modules
+  ansible.builtin.reboot:
+    msg: "Rebooting to load DOCA-OFED kernel modules"
+    reboot_timeout: "{{ mofed_reboot_timeout }}"
+  when:
+    - mofed_reboot | bool
+    - (mofed_install_ubuntu.changed | default(false)) or (mofed_install_redhat.changed | default(false))

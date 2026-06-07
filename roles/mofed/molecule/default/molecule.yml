@@ -13,9 +13,5 @@ provisioner:
   name: ansible
   ansible_args:
     - -vv
-  inventory:
-    group_vars:
-      all:
-        mofed_install_flags: "--all --without-fw-update --user-space-only"
 verifier:
   name: ansible
