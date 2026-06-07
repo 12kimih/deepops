@@ -21,12 +21,13 @@ slurm_build_deps:
   - python3
   - wget
 
-# slurmrestd REST API only (installed when slurm_build_slurmrestd=true). Add
-# libjwt-dev as well if JWT auth (auth/jwt) is configured.
+# slurmrestd REST API only (installed when slurm_build_slurmrestd=true). libjwt is
+# for slurmrestd's JWT token auth (rest_auth/jwt) and Slurm's auth/jwt plugin.
 slurm_slurmrestd_deps:
   - libjson-c-dev
   - libhttp-parser-dev
   - libyaml-dev
+  - libjwt-dev
 
 slurm_pmix_deps:
   - build-essential
