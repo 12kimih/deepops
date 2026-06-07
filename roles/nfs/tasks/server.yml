@@ -40,6 +40,21 @@
   tags:
     - nfs
 
+# threads= in the [nfsd] section of /etc/nfs.conf is the modern nfs-utils knob
+# (equivalent to the legacy RPCNFSDCOUNT). A restart applies it; verify with
+# `cat /proc/fs/nfsd/threads`. https://man7.org/linux/man-pages/man8/rpc.nfsd.8.html
+- name: Configure nfsd thread count
+  community.general.ini_file:
+    path: /etc/nfs.conf
+    section: nfsd
+    option: threads
+    value: "{{ nfs_server_threads }}"
+    mode: "0644"
+  when: nfs_exports|length
+  notify: Restart nfs
+  tags:
+    - nfs
+
 - name: Ensure nfs server is running
   ansible.builtin.service:
     name: "{{ nfs_server_daemon }}"

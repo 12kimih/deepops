@@ -6,6 +6,8 @@
     state: "present"
   with_items: "{{ spack_ubuntu_deps }}"
   when: ansible_distribution == "Ubuntu"
+  tags:
+    - spack_deps
 
 - name: Ensure development tools are installed (Red Hat)
   ansible.builtin.package:
@@ -13,6 +15,8 @@
     state: "present"
   with_items: "{{ spack_redhat_deps }}"
   when: ansible_os_family == "RedHat"
+  tags:
+    - spack_deps
 
 - name: Ensure install directory exists
   ansible.builtin.file:
@@ -21,12 +25,16 @@
     group: "{{ spack_group }}"
     mode: "0755"
     state: "directory"
+  tags:
+    - spack_install
 
 - name: Clone spack repository
   ansible.builtin.git:
     repo: "{{ spack_repo }}"
     dest: "{{ spack_install_dir }}"
     version: "{{ spack_version }}"
+  tags:
+    - spack_install
 
 - name: Set up spack profile scripts
   ansible.builtin.template:
@@ -38,12 +46,16 @@
   with_items:
     - "z00_spack.sh"
     - "z00_spack.csh"
+  tags:
+    - spack_configure
 
 - name: Source spack environment once for initialization
   ansible.builtin.shell: |
     . /etc/profile.d/z00_spack.sh
   register: source_spack_env
   changed_when: source_spack_env.rc != 0
+  tags:
+    - spack_configure
 
 - name: Build spack packages
   ansible.builtin.shell: |
@@ -51,3 +63,5 @@
     spack install {{ item }}
   with_items: "{{ spack_default_packages }}"
   when: spack_build_packages
+  tags:
+    - spack_build
