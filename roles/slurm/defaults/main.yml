@@ -97,14 +97,19 @@ slurm_default_mem_per_cpu: 0        # 0 = unlimited; set a value to bound --mem-
 # slurm_default_cpu_per_gpu: 8      # CPUs per GPU for GPU-only requests (optional)
 # slurm_prolog_flags: "Contain"    # override the computed PrologFlags (optional)
 
-# Multifactor priority + fairshare (inert until weights are non-zero).
+# Multifactor priority + fairshare. Fairshare + QOS weights always render; Age,
+# Partition and TRES weights are OPT-IN (set them in config/group_vars to render).
+# PriorityWeightTRES="GRES/gpu=1000" makes GPU-hours drive fairshare, but is redundant
+# when partitions already set per-partition TRESBillingWeights -- leave it unset then.
 slurm_enable_fairshare: true
+# slurm_priority_flags: "DEPTH_OBLIVIOUS"      # opt-in (classic-fairshare depth fix)
 slurm_priority_decay_halflife: "7-0"
 slurm_priority_weight_fairshare: 100000
-slurm_priority_weight_age: 1000
 slurm_priority_weight_qos: 10000
-slurm_priority_weight_partition: 10000
-slurm_priority_weight_tres: "GRES/gpu=1000"
+# slurm_priority_weight_age: 1000              # opt-in
+# slurm_priority_weight_partition: 10000       # opt-in (needs partition PriorityTier)
+# slurm_priority_weight_tres: "GRES/gpu=1000"  # opt-in (redundant with TRESBillingWeights)
+slurm_min_job_age: 300                          # completed-job in-memory retention (seconds)
 
 # QOS preemption (REQUEUE frees GPUs cleanly). Off by default.
 slurm_enable_preempt: false
