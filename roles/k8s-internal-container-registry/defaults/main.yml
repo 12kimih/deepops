@@ -1,7 +1,9 @@
 ---
 helm_cmd: "/usr/local/bin/helm"
 
-container_registry_chart_location: "https://helm.twun.io"
+# Canonical twuni helm repo (the old vanity URL https://helm.twun.io is deprecated
+# and may go offline). Hosts all chart versions including the 2.x pinned below.
+container_registry_chart_location: "https://twuni.github.io/docker-registry.helm"
 container_registry_repo_name: "twuni"
 container_registry_chart_name: "{{ container_registry_repo_name }}/docker-registry"
 container_registry_installed_name: "docker-registry"
@@ -10,6 +12,10 @@ container_registry_values_template: "values.yaml"
 container_registry_values_path: "/tmp/container-registry.yaml"
 
 container_registry_namespace: "deepops-docker"
+# Pinned to chart 2.x (registry/distribution 2.x). Chart 3.0.0 ships distribution 3.x
+# with breaking config changes (the config mount moved /etc/docker/registry ->
+# /etc/distribution and needs a `configPath` value), so bumping requires reworking
+# the values template + validation -- intentionally left on 2.1.0.
 container_registry_version: "2.1.0"
 container_registry_hostname: registry.local
 container_registry_ingress_enabled: false
