@@ -116,7 +116,7 @@ dns_late: false
 # Optional installs                                                            #
 ################################################################################
 slurm_configure_etc_hosts: true
-slurm_cluster_install_cuda: true
+slurm_cluster_install_cuda: false
 slurm_cluster_install_nvidia_driver: true
 slurm_cluster_install_singularity: false
 

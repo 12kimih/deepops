@@ -149,7 +149,7 @@ gpu_clock_lock: "1507,1507"
 # Debugging var: force install NVIDIA driver even if GPU not detected
 nvidia_driver_force_install: false
 # Default NVIDIA driver branch for generic host driver installs.
-nvidia_driver_branch: "580"
+nvidia_driver_branch: "595"
 # Kernel module flavor: "open" (NVIDIA default since the 560 series, recommended
 # for Turing and newer GPUs) or "proprietary" (Maxwell/Pascal/Volta).
 nvidia_driver_kernel_modules: "open"
