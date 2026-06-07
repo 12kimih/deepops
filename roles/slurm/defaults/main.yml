@@ -13,7 +13,10 @@ slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar
 slurm_build_make_clean: false
 slurm_build_dir_cleanup: false
 slurm_config_dir: /etc/slurm
-slurmctl_config_dir: /sw/.slurm
+# Only used when slurm_conf_symlink is true (slurm.conf shared via NFS). Defaults to
+# the local config dir; set this to a path NFS-shared to all nodes (e.g. /sw/.slurm)
+# in config/group_vars/slurm-cluster.yml when you enable the symlink.
+slurmctl_config_dir: "{{ slurm_config_dir }}"
 slurm_sysconf_dir: /etc/sysconfig
 slurm_install_prefix: /usr/local
 slurm_cuda_prefix: /usr/local/cuda
@@ -36,8 +39,14 @@ slurm_allow_ssh_user: []
 slurm_db_username: slurm
 slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
 
+# sacctmgr accounting account new users are added to, and its Organization label.
+slurm_acct_account: compute-account
+slurm_acct_organization: deepops
+
 slurm_enable_ha: false
-slurm_ha_state_save_location: "/sw/slurm"
+# HA StateSaveLocation. Must be on storage shared by all controllers when HA is on;
+# set it to your shared path (e.g. /sw/slurm) in config/group_vars.
+slurm_ha_state_save_location: "{{ deepops_dir }}/slurm/state"
 
 is_controller: false
 is_compute: false

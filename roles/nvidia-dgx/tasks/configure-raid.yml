@@ -13,7 +13,7 @@
   ansible.builtin.command: /usr/bin/configure_raid_array.py -c -f
 
 - name: Restore SELinux label on RAID array
-  ansible.builtin.command: restorecon /raid
+  ansible.builtin.command: restorecon {{ dgx_raid_mount_path }}
   when:
     - ansible_os_family == 'RedHat'
     - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")

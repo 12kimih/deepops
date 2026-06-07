@@ -66,6 +66,15 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_scheduler_parameters: "bf_continue,bf_window=4320,bf_busy_nodes"
 #slurm_enable_preempt: true            # QOS preemption (REQUEUE frees GPUs cleanly)
 #slurm_topology_plugin: "topology/tree"  # multi-rack clusters (needs topology.conf)
+#slurm_acct_account: compute-account   # sacctmgr account new users are added to
+#slurm_acct_organization: deepops      # sacctmgr Organization label
+#slurmctl_config_dir: /sw/.slurm       # NFS-shared dir when slurm_conf_symlink: true
+#slurm_ha_state_save_location: /sw/slurm  # shared storage when slurm_enable_ha: true
+#slurm_exporter_container: "your-registry/prometheus-slurm-exporter:tag"  # custom build
+
+# --- Alertmanager Slack alerts (empty = no slack receiver) --------------------
+#alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
+#alertmanager_slack_channel: "#alerts"
 
 # --- job_submit.lua routing (option, set slurm_job_submit_plugins: "lua") ------
 #slurm_job_submit_plugins: "lua"
