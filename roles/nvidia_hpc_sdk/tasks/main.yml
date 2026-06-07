@@ -85,7 +85,7 @@
     - "z95_nvhpc.csh"
   when: hpcsdk_install_in_path
 
-- name: Add profile script to source modules
+- name: Register the HPC SDK modulefiles tree with Lmod (sorts before z00_lmod)
   ansible.builtin.template:
     src: "{{ item }}"
     dest: "/etc/profile.d/{{ item }}"
@@ -93,6 +93,14 @@
     group: "root"
     mode: "0644"
   with_items:
+    - "00-nvhpc-modulepath.sh"
+    - "00-nvhpc-modulepath.csh"
+  when: hpcsdk_install_as_modules
+
+- name: Remove the superseded z95 nvhpc modulepath snippets
+  ansible.builtin.file:
+    path: "/etc/profile.d/{{ item }}"
+    state: absent
+  with_items:
     - "z95_nvhpc_modules.sh"
     - "z95_nvhpc_modules.csh"
-  when: hpcsdk_install_as_modules
