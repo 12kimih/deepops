@@ -132,20 +132,11 @@ nfs_exports:
   - path: /sw
     options: "*(rw,sync,no_root_squash)"
 nfs_mounts:
-  # NFS *client* mount options, tuned for many GPU nodes under heavy random I/O:
-  #   vers=4.2  - modern protocol (COMPOUND ops, integrated locking); the client
-  #               negotiates down if the server is older. (man 5 nfs)
-  #   nconnect=4 - 4 TCP connections per mount to beat the single-flow bottleneck.
-  #               4 is the broadly-recommended sweet spot for a single NFS head
-  #               (gains plateau past 4-8 and >8 can saturate the link); raise to 8
-  #               only on 100GbE+/scale-out storage, max 16. Keep it identical on
-  #               every mount to the same server. Needs kernel >= 5.3.
-  #   rsize/wsize=1048576 - 1 MiB payload/RPC (fewer round-trips); try 262144 on
-  #               latency-sensitive backends.
-  #   hard,timeo=600,retrans=2 - retry indefinitely, no silent data loss.
-  #   noatime,_netdev,nofail - fstab hygiene (wait for network; boot if server down).
-  # The old "async" was a no-op here: async is a server /etc/exports option, not a
-  # client mount option. Add ",fsc" to enable FS-Cache (run the cachefilesd role).
+  # Client mount options below are a safe starting point -- tune per your network
+  # and storage. nconnect (parallel TCP connections) is the main lever: ~4 on
+  # 10/25GbE, 8-16 on 100GbE+; on InfiniBand consider proto=rdma instead. See
+  # docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`. Add ",fsc" for FS-Cache
+  # (cachefilesd role).
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'
     path: /home
@@ -159,7 +150,7 @@ nfs_mounts:
 # auto-sized defaults; override here only if needed. See
 # docs/slurm-cluster/slurm-nfs.md.
 #nfs_server_threads: 128     # nfsd thread count (default: 4 x vCPUs, floor 64)
-#nfs_tune_network: true      # raise TCP/socket buffers for 10GbE+ NFS (default true)
+#nfs_tune_network: true      # raise TCP/socket buffers for high-bandwidth NFS (default true)
 
 # Flags for enable/disable of NFS deployment
 #  - Set up an NFS server on nfs-server?

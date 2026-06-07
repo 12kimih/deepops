@@ -21,7 +21,7 @@ nfs_mounts: []
 # reads zero. (rpc.nfsd(8); NFS-HOWTO 5.6; kernel knfsd-stats)
 nfs_server_threads: "{{ [(ansible_processor_vcpus | default(16) | int) * 4, 64] | max }}"
 
-# Network/socket-buffer tuning for the NFS data path on 10GbE+ links (applied on
+# Network/socket-buffer tuning for the NFS data path on fast cluster networks (applied on
 # both NFS servers and clients). Bigger TCP buffers let a single high-bandwidth
 # flow stay full and absorb many concurrent clients; the NFS-HOWTO / IBM / RHEL NFS
 # tuning guides recommend raising these for high-bandwidth NFS. Set false to skip.

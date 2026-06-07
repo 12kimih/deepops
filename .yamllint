@@ -15,8 +15,10 @@ extends: default
 ignore: |
   /submodules/
   /roles/galaxy/
+  /.ansible/
   /.venv/
   /collections/
+  /config/
   **/templates/**
 
 rules:

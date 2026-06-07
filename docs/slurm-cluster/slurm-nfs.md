@@ -107,7 +107,7 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    `net.core.{r,w}mem_max=16M`, `tcp_{r,w}mem`, `netdev_max_backlog`). Set it false to
    opt out.
 
-5. **Jumbo frames (MTU 9000) -- often the top win on 10GbE+ networks.** This is a
+5. **Jumbo frames (MTU 9000) -- often a top win on high-bandwidth networks.** This is a
    network/NIC/switch setting (not a DeepOps var, since it lives in your netplan and
    switch config), but on a fast link it is frequently the single highest-ROI change: it
    cuts per-packet overhead and lets NFS approach line rate. Enable MTU 9000 on the
