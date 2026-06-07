@@ -1,0 +1,34 @@
+---
+# nis_server -- set up an NIS (YP) MASTER server (ypserv) so clients configured by
+# the nis_client role can bind to it. Opt-in: the authentication.yml playbook runs
+# this role only on the host where `nis_make_server` is true, and only when
+# `nis_domain` is defined.
+#
+# NOTE: this role is new and NIS-server setup is environment-sensitive (domain
+# resolution, the ypinit database build). Validate on your cluster after first run:
+#   ypwhich -m            # should list maps
+#   ypcat passwd          # should print NIS passwd entries
+# Refs: https://wiki.debian.org/BullseyeNis , man ypinit(8), man ypserv(8)
+
+# Required (shared with nis_client): the NIS domain this server is master for.
+# nis_domain: example.nis
+
+# Designate THIS host as the NIS master. Set true in host_vars for the server node
+# (e.g. config/host_vars/<master>.yml: nis_make_server: true). Default false so the
+# role is a no-op everywhere else.
+nis_make_server: false
+
+# /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client
+# networks may query this server, as "NETMASK NETWORK" lines. The default allows
+# localhost + the RFC1918 private ranges; TIGHTEN this to your actual cluster
+# subnet (e.g. "255.255.255.0 10.0.2.0") -- a wide-open server is a security risk.
+nis_server_securenets:
+  - "255.0.0.0       127.0.0.0"        # localhost (required)
+  - "255.0.0.0       10.0.0.0"         # 10.0.0.0/8    (RFC1918)
+  - "255.240.0.0     172.16.0.0"       # 172.16.0.0/12 (RFC1918)
+  - "255.255.0.0     192.168.0.0"      # 192.168.0.0/16 (RFC1918)
+
+# Also run yppasswdd (lets users change NIS passwords with yppasswd) and ypxfrd
+# (speeds map transfer to NIS SLAVE servers -- only needed if you run slaves).
+nis_server_enable_yppasswdd: true
+nis_server_enable_ypxfrd: false

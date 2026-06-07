@@ -1,0 +1,12 @@
+---
+# RHEL/Rocky/Alma: ypserv ships the server daemons; ypinit lives under
+# /usr/lib64/yp; ypserv reads /var/yp/securenets.
+nis_server_packages:
+  - ypserv
+  - yp-tools
+  - rpcbind
+nis_server_ypinit: /usr/lib64/yp/ypinit
+nis_server_securenets_path: /var/yp/securenets
+nis_server_service: ypserv
+nis_server_yppasswdd_service: yppasswdd
+nis_server_ypxfrd_service: ypxfrd
