@@ -17,7 +17,7 @@
 
 Kubeflow allows users to request specific resources (such as number of GPUs and CPUs), specify Docker images, and easily launch and develop through Jupyter models. Kubeflow makes it easy to create persistent home directories, mount data volumes, and share notebooks within a team.
 
-Kubeflow also offers a full deep learning [pipeline](https://www.kubeflow.org/docs/pipelines/overview/pipelines-overview/) platform that allows you to run, track, and version experiments. Pipelines can be used to deploy code to production and can include all steps in the training process (data prep, training, tuning, etc.) each done through different Docker images. For some examples reference the [examples](../examples) directory.
+Kubeflow also offers a full deep learning [pipeline](https://www.kubeflow.org/docs/pipelines/overview/pipelines-overview/) platform that allows you to run, track, and version experiments. Pipelines can be used to deploy code to production and can include all steps in the training process (data prep, training, tuning, etc.) each done through different Docker images. For some examples reference the [examples](../../workloads/examples) directory.
 
 Additionally Kubeflow offers [hyper-parameter tuning](https://github.com/kubeflow/katib) options.
 
