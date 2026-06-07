@@ -11,6 +11,7 @@
     owner: "root"
     group: "root"
     mode: "0644"
+  notify: Restart cachefilesd
 
 - name: Configure
   ansible.builtin.template:
@@ -19,12 +20,15 @@
     owner: "root"
     group: "root"
     mode: "0644"
+  notify: Restart cachefilesd
 
-# Service start not tested in molecule as we require a kernel module
+# state: started (not restarted) so re-runs with no config change are no-ops; the
+# Restart cachefilesd handler bounces it only when /etc/default or the conf change.
+# Not tested in molecule as cachefilesd requires a kernel module.
 - name: Start
   ansible.builtin.service:
     name: cachefilesd
-    state: restarted
+    state: started
     enabled: true
   tags:
     - molecule-notest

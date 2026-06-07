@@ -18,11 +18,19 @@
     state: absent
 
 - name: Enable httpd listen port in SELinux
-  ansible.builtin.command: semanage port -m -t http_port_t -p tcp {{ httpd_port }}
+  community.general.seport:
+    ports: "{{ httpd_port }}"
+    proto: tcp
+    setype: http_port_t
+    state: present
   when: ansible_os_family == 'RedHat'
 
+# Idempotent module form: `semanage permissive -a` errors when the domain is
+# already permissive, so a second run would fail the play.
 - name: Set httpd to permissive in SELinux
-  ansible.builtin.command: semanage permissive -a httpd_t
+  community.general.selinux_permissive:
+    domain: httpd_t
+    permissive: true
   when: ansible_os_family == 'RedHat'
 
 - name: Install Open OnDemand
