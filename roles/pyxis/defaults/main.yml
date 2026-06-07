@@ -19,10 +19,15 @@ pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 is_controller: false
 is_compute: false
 
+# pyxis builds a SPANK plugin against the deployed Slurm headers, so it needs a
+# compiler toolchain (build-essential / @Development Tools) in addition to the
+# column/hex helpers. https://github.com/NVIDIA/pyxis
 pyxis_ubuntu_deps:
+  - "build-essential"
   - "bsdmainutils"
 
 pyxis_el_deps:
+  - "@Development Tools"
   - "util-linux"
 
 # /run is default partition of pyxis runtime_path
