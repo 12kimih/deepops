@@ -411,14 +411,15 @@ hardware, real inventory, usernames, `/data0x` paths) stay as placeholders.
   the dcgm-exporter playbook honours `slurm_cluster_install_nvidia_driver`; a
   deprecated `{{ }}`-wrapped `when:` was unwrapped; spack/nvhpc gained selective-run
   tags; new `config.example/playbooks/ufw-disable.yml`.
-- **NFS random-IO bottleneck** (single NFS head + RAID5 + many GPU nodes,
+- **NFS random-IO bottleneck** (a single shared NFS head under many GPU clients,
   web-researched with citations): client mount options `async,vers=3` (the `async`
   was a silent no-op client-side, `vers=3` a downgrade) ->
   `rw,hard,vers=4.2,nconnect=8,rsize=1048576,wsize=1048576,...`; a new
-  `nfs_server_threads` (default 32) writes `/etc/nfs.conf` `[nfsd] threads` (the
+  `nfs_server_threads` (then a flat 32) writes `/etc/nfs.conf` `[nfsd] threads` (the
   Linux default of 8 starves many clients); and a guardrail to keep enroot
-  cache/data/runtime on node-local NVMe. The remaining lever (RAID5->RAID10) is
-  documented as operator hardware action. See `docs/slurm-cluster/slurm-nfs.md`.
+  cache/data/runtime on node-local NVMe. (Section 28 later re-bases these defaults on
+  a 100GbE+ fabric -- nconnect 16 + ESnet sysctls, auto-sized nfsd threads.) See
+  `docs/slurm-cluster/slurm-nfs.md`.
 - **Private-config management** (`docs/deepops/managing-cluster-config.md`): the
   recommended `config.example` (public placeholders) -> gitignored `config/` as its
   own private repo -> `ansible-vault` workflow, and how to pull upstream updates

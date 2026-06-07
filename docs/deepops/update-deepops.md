@@ -538,8 +538,8 @@ ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wise to use:
 
 ```bash
-slurm_pyxis_version: "0.11.1"
-enroot_version: "3.2.0"
+slurm_pyxis_version: "0.24.0"
+enroot_version: "4.2.0"
 ```
 
 Then re-run the Pyxis playbook:
