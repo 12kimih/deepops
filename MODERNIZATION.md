@@ -234,10 +234,12 @@ Boot-persistence / idempotency fixes:
   was removed.
 - **ood-wrapper EL8+ — DONE** (§11): `vars/redhat.yml` now uses base-OS `httpd` +
   `python3` instead of the EL7 SCL (`httpd24`, python2) packages.
-- **mofed** — STILL PENDING: needs a version bump (or migration to NVIDIA
-  DOCA-OFED) for Ubuntu 24.04+/EL9+; the pinned MLNX_OFED 5.6 (2022) and the dead
-  `mellanox.com` download host are 404 on every supported OS. `roce_backend` is
-  likewise pinned to an Ubuntu 18.04 MOFED 4.7 ISO. (Both are opt-in RDMA roles.)
+- **mofed — DONE** (§16-b, `73c627e8`): migrated to DOCA-OFED (the MLNX_OFED
+  successor) via NVIDIA's DOCA network repo + `apt/dnf install doca-ofed`,
+  release-aware, with a **validation-required** note (DOCA pins driver/firmware per
+  release, so the operator confirms the repo URL/version for their adapter+OS on the
+  DOCA downloads page; untestable here without IB hardware). `roce_backend`'s bundled
+  MLNX_OFED 4.7 / Ubuntu 18.04 ISO is flagged legacy and points at the `mofed` role.
 - **ufw firewall** — port as a parameterized firewall role (the source hardcoded
   subnets/ports).
 
@@ -373,3 +375,28 @@ Re-read each project's current install docs and fixed outdated/breaking prereqs:
   and stops installing REST-API deps the default build never uses.
 - **pyxis:** added an explicit compiler dep (`build-essential` / `@Development Tools`).
 - **nvidia-container-toolkit:** `gnupg` → `gnupg2` to match the install guide.
+
+## 17. MOFED → DOCA-OFED  (`73c627e8`)
+
+The `mofed` role pinned MLNX_OFED 5.6 (2022) and downloaded from the dead
+`www.mellanox.com` host (404 on every supported OS). MLNX_OFED's last standalone
+release was the 24.10 LTS; its successor is **DOCA-OFED**. Rewrote the role to add
+NVIDIA's DOCA network repository (release-aware `ubuntu<ver>` / `rhel<major.minor>`,
+`x86_64`/`arm64-sbsa`) with the Mellanox GPG key and `apt/dnf install doca-ofed`
+(idempotent; optional reboot), dropping the tarball + `mlnxofedinstall` build path.
+**Validation required:** DOCA pins driver/firmware per release and not every OS/arch
+is published for every version, so the operator confirms `mofed_repo_base_url` /
+version for their adapter+OS at developer.nvidia.com/doca-downloads — untestable
+here without IB hardware. `roce_backend`'s bundled MLNX_OFED 4.7 / Ubuntu 18.04 ISO
+is flagged legacy and points at the `mofed` role.
+
+---
+
+## Status
+
+Every item from the modernization brief is implemented, linted (yamllint 0;
+ansible-lint **production** clean except the two `kubespray_defaults` syntax-checks
+that need the kubespray submodule checked out), and verified by multi-agent
+file-by-file review until each pass converged. The only change that cannot be fully
+validated in this environment is the DOCA-OFED migration (§17), which needs RDMA/IB
+hardware and is marked accordingly.
