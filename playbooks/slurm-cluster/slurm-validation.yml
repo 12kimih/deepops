@@ -172,20 +172,20 @@
             msg: "{{ result }}"
 
         - name: Save error results to /tmp/nccl_tests.err
-          local_action:
-            module: ansible.builtin.copy
+          ansible.builtin.copy:
             content: "STDOUT:\n{{ result.stdout }}\n\nSTDERR:\n{{ result.stderr }}"
             dest: /tmp/nccl_tests.err
+          delegate_to: localhost
 
         - name: Fail Slurm validation playbook
           ansible.builtin.fail:
             msg: See debug of stderr above. Also refer to "/tmp/nccl_tests.err"
 
     - name: Save results to /tmp/nccl_tests.out
-      local_action:
-        module: ansible.builtin.copy
+      ansible.builtin.copy:
         content: "STDERR:\n{{ result.stderr }}\n\nSTDOUT:\n{{ result.stdout }}"
         dest: /tmp/nccl_tests.out
+      delegate_to: localhost
 
     - name: Extract "Out of bounds values" and "Avg bus bandwidth".
       ansible.builtin.shell:
