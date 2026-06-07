@@ -6,6 +6,15 @@
     mode: "0755"
   tags: pyxis
 
+# Only (re)build+install when the plugin is missing, so re-runs are a no-op and do
+# not bounce slurmd/slurmctld. Set slurm_pyxis_force_rebuild=true to force a rebuild
+# (e.g. after bumping slurm_pyxis_version).
+- name: Check for an installed pyxis plugin
+  ansible.builtin.stat:
+    path: "{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so"
+  register: pyxis_installed
+  tags: pyxis
+
 - name: Copy pyxis source
   ansible.builtin.unarchive:
     src: "{{ slurm_pyxis_tarball_url }}"
@@ -13,6 +22,7 @@
     dest: /usr/local/src/pyxis
     extra_opts:
       - --strip-components=1
+  when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   tags: pyxis
 
 - name: Clean pyxis source directory
@@ -24,6 +34,7 @@
   register: pyxis_make_clean
   failed_when: false
   changed_when: pyxis_make_clean.rc == 0
+  when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   tags: pyxis
 
 - name: Build pyxis
@@ -36,6 +47,7 @@
     CPPFLAGS: "-I {{ slurm_install_prefix }}/include/slurm"
   register: result
   changed_when: "result.stdout != \"make: Nothing to be done for 'all'.\""
+  when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   notify:
     - Restart slurmctld
     - Restart slurmd
@@ -53,6 +65,7 @@
   environment:
     CPPFLAGS: "-I {{ slurm_install_prefix }}/include/slurm"
   changed_when: true
+  when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   notify:
     - Restart slurmctld
     - Restart slurmd

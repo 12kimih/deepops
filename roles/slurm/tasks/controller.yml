@@ -1,5 +1,5 @@
 ---
-- name: Install dependencies
+- name: Install dependencies (Debian)
   ansible.builtin.apt:
     name: "{{ item }}"
     state: present
@@ -10,7 +10,7 @@
     - ssmtp
   when: ansible_os_family == "Debian"
 
-- name: Install dependencies
+- name: Install dependencies (RedHat)
   ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
@@ -36,15 +36,20 @@
     - ansible_os_family == "RedHat"
     - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
 
+# Boot-enable MariaDB on both families (slurmdbd + the mysql_user task depend on it,
+# and it must survive a reboot). On Debian the apt preset starts it but does not
+# guarantee enablement.
 - name: Start mariadb
   ansible.builtin.systemd:
     name: mariadb
     state: started
     enabled: true
-    daemon-reload: true
-  when: ansible_os_family == "RedHat"
+    daemon_reload: true
 
-- name: Setup slurm db user
+# community.mysql.mysql_user is the working module name (community.mysql 5.x ships
+# it); the fqcn[canonical] suggestion to use the future ansible.mysql redirect is
+# suppressed so this stays valid on the pinned collection.
+- name: Setup slurm db user  # noqa: fqcn[canonical]
   community.mysql.mysql_user:
     name: "{{ slurm_db_username }}"
     password: "{{ slurm_db_password }}"

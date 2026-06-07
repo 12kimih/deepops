@@ -8,5 +8,5 @@
       when: ansible_distribution == "Ubuntu"
 
     - name: Workaround to enable service in container
-      ansible.builtin.shell: printf '$!/bin/sh\nexit 0' > /usr/sbin/policy-rc.d
+      ansible.builtin.shell: printf '#!/bin/sh\nexit 0' > /usr/sbin/policy-rc.d
       when: ansible_distribution == "Ubuntu"

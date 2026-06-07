@@ -18,7 +18,7 @@
 
 - name: Setup munge
   ansible.builtin.include_tasks: munge.yml
-- name: Setup hwlock
+- name: Setup hwloc
   ansible.builtin.include_tasks: hwloc.yml
   tags: hwloc
   when: slurm_include_hwloc

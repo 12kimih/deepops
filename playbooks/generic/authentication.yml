@@ -1,8 +1,16 @@
 ---
+# Each directory/auth role runs only when its required config is provided, so the
+# playbook is a clean no-op with the default config and never trips a role's
+# "variable not defined" assert. Configure the relevant vars (in config/group_vars)
+# to enable a role.
 - hosts: all
   become: true
   roles:
-    - move-home-dirs
-    - kerberos_client
-    - nis_client
-    - autofs
+    - role: move-home-dirs
+      when: move_home_dirs_new_root is defined
+    - role: kerberos_client
+      when: kerberos_client_realm_name is defined
+    - role: nis_client
+      when: (nis_domain is defined) and (nis_server is defined)
+    - role: autofs
+      when: (autofs_mount is defined) and (autofs_map is defined)

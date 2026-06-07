@@ -6,6 +6,6 @@
       ansible.builtin.include_role:
         name: nvidia-k8s-gpu-feature-discovery
       run_once: true
-  environment: "{{proxy_env if proxy_env is defined else {}}}"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
   tags:
     - k8s_gpu_feature_discovery

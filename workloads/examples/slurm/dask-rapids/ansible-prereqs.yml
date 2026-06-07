@@ -50,7 +50,7 @@
   - name: Copy conda requirements to doc dir
     ansible.builtin.copy:
       src: "conda-requirements.yml"
-      dest: "{{ share_dir}}/conda-requirements.yml"
+      dest: "{{ share_dir }}/conda-requirements.yml"
       owner: root
       group: root
       mode: "0444"

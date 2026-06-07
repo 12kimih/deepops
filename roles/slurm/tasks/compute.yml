@@ -139,12 +139,15 @@
   tags:
     - config
 
+# state: started (not restarted) keeps re-runs idempotent; the "Restart slurmd"
+# notify handlers (slurm.conf/cgroup.conf/gres.conf/pmix changes) do the actual
+# restart only when something changed, instead of bouncing slurmd every run.
 - name: Start slurmd
   ansible.builtin.systemd:
     name: slurmd
-    state: restarted
+    state: started
     enabled: true
-    daemon-reload: true
+    daemon_reload: true
 
 - name: Install /etc/localusers
   ansible.builtin.template:
