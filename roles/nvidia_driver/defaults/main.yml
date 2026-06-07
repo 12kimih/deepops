@@ -56,8 +56,33 @@ nvidia_driver_purge_existing: true
 nvidia_driver_reboot: true
 nvidia_driver_reboot_timeout: 600
 
-# Run `nvidia-smi` after install to verify the driver loaded.
+# Run `nvidia-smi` and read /proc/driver/nvidia/version to verify the load.
 nvidia_driver_verify: true
+
+# --- Ubuntu install method -----------------------------------------------------
+# "ubuntu_repo" (default): the Canonical archive nvidia-driver-{branch}-server-open.
+#   Signed precompiled modules — Secure Boot works without MOK enrollment,
+#   SRU-qualified, no extra repo. Recommended for stock-kernel data-center fleets.
+#   https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
+# "nvidia_repo": NVIDIA's CUDA apt repo (cuda-keyring + nvidia-open / cuda-drivers),
+#   branch-pinned via nvidia-driver-pinning-{branch}. Use for newer point releases,
+#   a single repo shared with the CUDA toolkit, or non-stock kernels. NOTE: this
+#   path builds DKMS modules, which require MOK enrollment under Secure Boot.
+#   https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/ubuntu.html
+nvidia_driver_install_method: "ubuntu_repo"
+nvidia_driver_cuda_keyring_version: "1.1-1"
+nvidia_driver_ubuntu_repo_distro: "ubuntu{{ ansible_distribution_version | replace('.', '') }}"
+nvidia_driver_ubuntu_repo_arch: "{{ 'sbsa' if ansible_architecture == 'aarch64' else 'x86_64' }}"
+
+# --- Post-installation actions -------------------------------------------------
+# Enable the NVIDIA persistence daemon (recommended over the deprecated
+# `nvidia-smi -pm 1`). Pulled in by the driver packages; enabled here explicitly.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
+nvidia_driver_persistenced: true
+# NVSwitch HGX baseboards only: install + enable Fabric Manager (branch-matched to
+# nvidia_driver_branch, or the service will refuse to start). Off by default.
+# https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
+nvidia_driver_fabricmanager: false
 
 # RHEL/Rocky: repo architecture directory ("sbsa" for aarch64) and the
 # CodeReady Builder / CRB repository name (powertools on EL8, crb on EL9+).
