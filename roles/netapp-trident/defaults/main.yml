@@ -19,11 +19,11 @@ create_backends: false
 backends_to_create:
   - backendName: ontap-flexvol
     storageDriverName: ontap-nas # only 'ontap-nas' and 'ontap-nas-flexgroup' are supported when creating a backend via DeepOps
-    managementLIF: 10.61.188.40
-    dataLIF: 192.168.200.41
-    svm: ai221_data
+    managementLIF: 10.0.0.10
+    dataLIF: 10.0.0.11
+    svm: trident_svm
     username: admin
-    password: NetApp!23
+    password: CHANGE_ME
     storagePrefix: trident
     limitAggregateUsage: ""
     limitVolumeSize: ""
@@ -41,11 +41,11 @@ backends_to_create:
       tieringPolicy: none
   - backendName: ontap-flexgroup
     storageDriverName: ontap-nas-flexgroup # only 'ontap-nas' and 'ontap-nas-flexgroup' are supported when creating a backend via DeepOps
-    managementLIF: 10.61.188.40
-    dataLIF: 192.168.200.41
-    svm: ai221_data
+    managementLIF: 10.0.0.10
+    dataLIF: 10.0.0.11
+    svm: trident_svm
     username: admin
-    password: NetApp!23
+    password: CHANGE_ME
     storagePrefix: trident
     limitAggregateUsage: ""
     limitVolumeSize: ""

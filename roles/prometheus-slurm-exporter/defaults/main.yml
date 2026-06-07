@@ -1,7 +1,8 @@
 ---
-# Slurm exporter image. Uses the maintainer's build; pin a versioned tag instead
-# of :latest in production, since the systemd unit pulls the tag on every restart.
-slurm_exporter_container: "12kimih/prometheus-slurm-exporter:latest"
+# Slurm exporter image (generic upstream default). The systemd unit pulls the tag on
+# every restart, so pin a versioned tag in production; override in config/ to use a
+# different build.
+slurm_exporter_container: "deepops/prometheus-slurm-exporter:latest"
 # Port the slurm exporter serves on; single source of truth for its scrape target.
 slurm_exporter_port: 8080
 slurm_exporter_svc_name: "docker.slurm-exporter.service"
