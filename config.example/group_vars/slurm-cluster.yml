@@ -42,10 +42,10 @@ slurm_ha_state_save_location: "/sw/slurm"
 #    (Point them at an absolute path on the Ansible controller, e.g. under config/.)
 #
 #slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf.j2"
-#slurm_cgroup_conf_template: "/path/to/cgroup.conf"
-#slurm_gres_conf_template: "/path/to/gres.conf"
-#slurm_dbd_conf_template: "/path/to/slurmdbd.conf"
-#slurm_job_submit_template: "/path/to/job_submit.lua"
+#slurm_cgroup_conf_template: "{{ inventory_dir }}/files/slurm/cgroup.conf.j2"
+#slurm_gres_conf_template: "{{ inventory_dir }}/files/slurm/gres.conf.j2"
+#slurm_dbd_conf_template: "{{ inventory_dir }}/files/slurm/slurmdbd.conf.j2"
+#slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
 
 # --- Server-specific hardware (option 2) ------------------------------------
 # Literal lines that replace the auto-detected node/partition/gres sections.
@@ -65,16 +65,16 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  - "NodeName=h100-[01-08] AutoDetect=nvml"
 
 # --- AI/ML slurm.conf tunables (sensible defaults already set in the role) ----
-#slurm_accounting_tres: "gres/gpu,gres/gpu:b200,gres/gpu:h100"  # typed GPU billing
-#slurm_tres_billing_weights: "CPU=1.0,Mem=0.25G,GRES/gpu=2.0"  # GPU drives fairshare/limits billing
-#slurm_accounting_enforce: "associations,limits,qos,safe"  # after sacctmgr setup
-#slurm_scheduler_parameters: "bf_continue,bf_window=4320,bf_busy_nodes"  # backfill tuning
-#slurm_enable_preempt: true                         # QOS preemption (frees GPUs cleanly)
-#slurm_topology_plugin: "topology/tree"             # multi-rack (needs topology.conf)
-#slurm_acct_account: compute-account                # sacctmgr account for new users
-#slurm_acct_organization: deepops                   # sacctmgr Organization label
-#slurmctl_config_dir: /sw/.slurm                    # shared dir if slurm_conf_symlink
-#slurm_ha_state_save_location: /sw/slurm            # shared dir if slurm_enable_ha
+#slurm_accounting_tres: "gres/gpu,gres/gpu:b200,gres/gpu:h100"            # typed GPU billing
+#slurm_tres_billing_weights: "CPU=1.0,Mem=0.25G,GRES/gpu=2.0"             # GPU drives fairshare/limits billing
+#slurm_accounting_enforce: "associations,limits,qos,safe"                 # after sacctmgr setup
+#slurm_scheduler_parameters: "bf_continue,bf_window=4320,bf_busy_nodes"   # backfill tuning
+#slurm_enable_preempt: true                                               # QOS preemption (frees GPUs cleanly)
+#slurm_topology_plugin: "topology/tree"                                   # multi-rack (needs topology.conf)
+#slurm_acct_account: compute-account                                      # sacctmgr account for new users
+#slurm_acct_organization: deepops                                         # sacctmgr Organization label
+#slurmctl_config_dir: /sw/.slurm                                          # shared dir if slurm_conf_symlink
+#slurm_ha_state_save_location: /sw/slurm                                  # shared dir if slurm_enable_ha
 #slurm_exporter_container: "your-registry/prometheus-slurm-exporter:tag"  # custom exporter image
 
 # --- Alertmanager Slack alerts (empty = no slack receiver) --------------------
