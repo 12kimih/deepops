@@ -16,8 +16,14 @@
     mode: "0700"
   changed_when: false
 
-- name: Install Ubuntu packages
-  ansible.builtin.apt: name=nis,rpcbind state=present
+# Install the CLIENT packages directly, not the `nis` meta-package: on Ubuntu 20.04+
+# / Debian 11+ `nis` pulls in ypserv (the NIS *server*) too, which a client must not
+# run. ypbind-mt provides the ypbind.service client daemon; yp-tools gives ypwhich/ypcat.
+# https://wiki.debian.org/BullseyeNis
+- name: Install Debian/Ubuntu NIS client packages
+  ansible.builtin.apt:
+    name: [ypbind-mt, yp-tools, rpcbind]
+    state: present
   when: ansible_os_family == "Debian"
 
 - name: Install CentOS NIS packages
@@ -61,19 +67,17 @@
 - name: Make sure rpcbind is running
   ansible.builtin.service: name=rpcbind state=started enabled=true
 
-- name: Make sure ypbind is running on Debian
-  ansible.builtin.service: name=nis state=started enabled=true
-  when: ansible_os_family == "Debian"
-
-# ypbind will not successfull start on RedHat if there's no NIS server to
-# bind to, so we skip this in Molecule tests
-- name: Make sure ypbind is running on RedHat
+# The NIS client daemon is ypbind.service on BOTH families: ypbind-mt on Debian/
+# Ubuntu (there is no nis.service since Debian bullseye / Ubuntu 20.04) and ypbind on
+# the RHEL family. ypbind will not bind without a reachable NIS server, so the start
+# is skipped under molecule (no server in the container).
+# https://wiki.debian.org/BullseyeNis
+- name: Make sure the NIS client (ypbind) is running
   ansible.builtin.service:
     name: ypbind
     state: started
     enabled: true
     daemon_reload: true
-  when: ansible_os_family == "RedHat"
   tags:
     - molecule-notest
 
