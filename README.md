@@ -2,10 +2,16 @@
 
 Infrastructure automation tools for Kubernetes and Slurm clusters with NVIDIA GPUs.
 
+> **This repository is a modernized, continuously-maintained fork of
+> [NVIDIA DeepOps](https://github.com/NVIDIA/deepops)** -- see
+> [About this fork](#about-this-fork) below and the full, sectioned change log in
+> [MODERNIZATION.md](MODERNIZATION.md).
+
 ## Table of Contents
 
 - [DeepOps](#deepops)
   - [Table of Contents](#table-of-contents)
+  - [About this fork](#about-this-fork)
   - [Overview](#overview)
   - [Deployment Requirements](#deployment-requirements)
     - [Provisioning System](#provisioning-system)
@@ -18,6 +24,50 @@ Infrastructure automation tools for Kubernetes and Slurm clusters with NVIDIA GP
   - [Copyright and License](#copyright-and-license)
   - [Issues](#issues)
   - [Contributing](#contributing)
+
+## About this fork
+
+This fork keeps the upstream DeepOps architecture but modernizes the pieces that had
+drifted, focused on a **multi-user GPU + Slurm cluster** kept current and reproducible:
+
+- **In-tree NVIDIA roles** (driver / CUDA / container-toolkit / DCGM) replacing the
+  EOL Galaxy roles. The driver and GPU roles are gated on GPU *detection*, so
+  CPU-only and login nodes are skipped cleanly.
+- **OS matrix:** Ubuntu 22.04 / 24.04 / 26.04 and RHEL-family 8 / 9 / 10; legacy
+  paths (16.04/18.04, CentOS 7, the MLNX_OFED ISO installer, ntpd) removed.
+- **Current stack:** Slurm 25.11.x, enroot 4.2.0, pyxis 0.24.0,
+  nvidia-container-toolkit 1.19.1, PMIx 5.0.10 / OpenMPI 5.0.10, DOCA-OFED, and a
+  current Prometheus / Grafana / DCGM monitoring stack.
+- **CUDA as Lmod modules** (per-version, from the official runfiles into a shared
+  `/sw` tree) via the `nvidia_cuda_toolkit` role -- an alternative to the
+  system-wide CUDA install. See [choosing roles/playbooks](docs/deepops/choosing-roles-and-playbooks.md).
+- **10GbE NFS tuning**, full **idempotency + reboot-persistence** across all node
+  types, and an Lmod / profile.d best-practice cleanup.
+- **Server-agnostic code + a `config/` overlay:** all role/playbook code is generic;
+  every site-specific value (inventory, `NodeName=` lines, NFS exports, secrets)
+  lives in a gitignored `config/` overlay, so the public repo stays clean.
+
+### How to use it
+
+The entry points are unchanged from upstream DeepOps:
+
+```bash
+cp -rfp config.example config        # your private, gitignored site config (or run scripts/setup.sh)
+vi config/inventory                  # real hostnames / IPs
+vi config/group_vars/*.yml           # node/partition/gres, NFS, etc.
+ansible-playbook -l slurm-cluster playbooks/slurm-cluster.yml
+```
+
+Helpful docs: [managing private cluster config](docs/deepops/managing-cluster-config.md)
+(the `config/` + ansible-vault workflow) and
+[MODERNIZATION.md](MODERNIZATION.md) (every change since the fork, and why).
+
+### Staying current with upstream
+
+This fork tracks NVIDIA DeepOps via an `upstream` git remote; absorb their updates
+with `git fetch upstream && git merge upstream/master` (`config/` is gitignored, so
+it is never touched). Upstream role names were left unchanged so those merges stay
+conflict-free.
 
 ## Overview
 

@@ -19,9 +19,19 @@ This makes it easy to install multiple versions of the same software package and
 DeepOps installs the Lmod tool for managing your Environment Modules.
 The [Lmod documentation](https://lmod.readthedocs.io/en/latest/) provides more information on using Lmod and writing Modules.
 
-DeepOps also provides tooling for managing Environment Modules with two different frameworks: EasyBuild and Spack.
-These tools provide a selection of tested build recipes for common development tools and scientific software packages,
-making it easier to install software without a tedious manual build process.
+DeepOps also provides tooling for managing Environment Modules with two general build
+frameworks -- EasyBuild and Spack -- plus a dedicated `nvidia_cuda_toolkit` role for CUDA.
+The two build frameworks provide a selection of tested build recipes for common
+development tools and scientific software packages, making it easier to install software
+without a tedious manual build process.
+
+For **CUDA specifically**, the `nvidia_cuda_toolkit` role
+(`playbooks/slurm-cluster/nvidia-cuda-toolkit.yml`) installs the latest patch of each
+CUDA minor (11.8 .. 13.3) from the official NVIDIA runfiles into a shared `/sw/cuda/<version>`
+tree and generates one Lmod modulefile per version, so users `module load cuda/<version>`
+on any node (the host driver is never touched). This is the per-version, modules-based
+alternative to the system-wide `nvidia_cuda` install -- see
+[Choosing between similar roles and playbooks](../deepops/choosing-roles-and-playbooks.md).
 
 ## Installing Spack
 

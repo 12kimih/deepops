@@ -26,10 +26,10 @@ git clone https://github.com/NVIDIA/deepops.git
 
 ```bash
 cd deepops
-git checkout tags/22.07
+git checkout <release-tag>   # e.g. 26.05
 ```
 
-3. Pick one of the [Deployment Options](/README.md#deployment-options) mentioned in the main [README](/README.md), following the installation instructions.
+3. Pick one of the [Deployment Options](/README.md#deployment-requirements) mentioned in the main [README](/README.md), following the installation instructions.
 
 ## Configuration
 
