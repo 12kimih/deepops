@@ -19,18 +19,24 @@ local GPU_TYPE_TO_PARTITION = {
 -- [2] Detect a GPU request from --gres=gpu[:type][:count] and the modern
 -- --gpus / --gpus-per-node (tres_per_job / tres_per_node = "gres/gpu[:type]=count").
 local function detect_gpu(job_desc)
-    local sources = { job_desc.gres, job_desc.tres_per_node, job_desc.tres_per_job }
+    -- Build a dense list: a table literal with a nil at index 1 (e.g. gres unset,
+    -- only --gpus given) stops ipairs early, so collect non-empty fields first.
+    local sources = {}
+    for _, key in ipairs({ "gres", "tres_per_node", "tres_per_job" }) do
+        local s = job_desc[key]
+        if s ~= nil and s ~= "" then
+            sources[#sources + 1] = s
+        end
+    end
     local want, gtype, count = false, nil, 0
     for _, s in ipairs(sources) do
-        if s ~= nil and s ~= "" then
-            for token in string.gmatch(s, "[^,]+") do
-                if string.find(token, "gpu") then
-                    want = true
-                    local c = string.match(token, "[:=](%d+)$")
-                    count = c and tonumber(c) or (count > 0 and count or 1)
-                    local t = string.match(token, "gpu:([%a%d_]+)[:=]%d+$") or string.match(token, "gpu:([%a%d_]+)$")
-                    if t and not string.match(t, "^%d+$") then gtype = t end
-                end
+        for token in string.gmatch(s, "[^,]+") do
+            if string.find(token, "gpu") then
+                want = true
+                local c = string.match(token, "[:=](%d+)$")
+                count = c and tonumber(c) or (count > 0 and count or 1)
+                local t = string.match(token, "gpu:([%a%d_]+)[:=]%d+$") or string.match(token, "gpu:([%a%d_]+)$")
+                if t and not string.match(t, "^%d+$") then gtype = t end
             end
         end
     end
@@ -57,9 +63,10 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
     if part ~= nil then
         job_desc.partition = part
     elseif DEFAULT_GPU_PARTITION ~= "" then
-        -- Unspecified/unknown GPU type: route to the default partition and pin the
-        -- default type. Write a BARE gpu:<type>:<count> gres (NOT gres/gpu:... which
-        -- is the TRES-billing name and is invalid in a --gres string).
+        -- Unspecified/unknown GPU type: route to the default partition. For --gres
+        -- requests also pin the default type by rewriting to a BARE gpu:<type>:<count>
+        -- (NOT gres/gpu:... which is the TRES-billing name, invalid in --gres). For
+        -- the --gpus form the partition itself constrains the type.
         job_desc.partition = DEFAULT_GPU_PARTITION
         if DEFAULT_GPU_TYPE ~= "" and job_desc.gres ~= nil and job_desc.gres ~= "" then
             local rebuilt = {}
