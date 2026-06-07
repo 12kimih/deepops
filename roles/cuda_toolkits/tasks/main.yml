@@ -1,0 +1,24 @@
+---
+# Registering the site modulefiles tree with Lmod runs on every node; the
+# download+install path runs only where the playbook sets
+# cuda_toolkits_do_install (the host that owns the shared software tree).
+
+- name: Register the site modulefiles tree with Lmod (LMOD_SITE_MODULEPATH)
+  ansible.builtin.template:
+    src: "site-modulepath.sh.j2"
+    dest: "{{ cuda_site_profile }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Remove superseded CUDA modulepath profile snippets
+  ansible.builtin.file:
+    path: "/etc/profile.d/{{ item }}"
+    state: absent
+  loop:
+    - z15_lmod_cuda.sh
+    - z15_lmod_cuda.csh
+
+- name: Install CUDA toolkits from the official runfiles
+  ansible.builtin.import_tasks: install.yml
+  when: cuda_toolkits_do_install | bool

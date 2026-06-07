@@ -1,0 +1,17 @@
+-- -*- lua -*-
+-- NVIDIA CUDA Toolkit {{ item.version }} (managed by the deepops cuda_toolkits role)
+-- Lean, standard environment: CUDA_HOME, PATH (bin), LD_LIBRARY_PATH (lib64).
+-- CPATH / LIBRARY_PATH are intentionally NOT set -- injecting them into the
+-- global compiler search path causes cross-version header/lib conflicts; nvcc
+-- already finds its own headers and libraries.
+whatis("Name        : CUDA")
+whatis("Version     : {{ item.version }}")
+whatis("Description : NVIDIA CUDA Toolkit {{ item.version }} (official runfile, toolkit only)")
+help([[ NVIDIA CUDA Toolkit {{ item.version }}. Sets CUDA_HOME, PATH (bin), LD_LIBRARY_PATH (lib64). ]])
+
+family("cuda")    -- loading another cuda version auto-swaps this one
+
+local root = "{{ cuda_install_root }}/{{ item.version }}"
+setenv("CUDA_HOME", root)
+prepend_path("PATH",            pathJoin(root, "bin"))
+prepend_path("LD_LIBRARY_PATH", pathJoin(root, "lib64"))

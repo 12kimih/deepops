@@ -1,0 +1,85 @@
+---
+# Download + install the toolkits, then generate one Lmod modulefile per
+# installed version. Runs only on the software-tree host.
+
+- name: Assert the install host is x86_64 (CUDA runfiles are x86_64 only)
+  ansible.builtin.assert:
+    that: ansible_architecture == "x86_64"
+    fail_msg: "CUDA runfiles are x86_64 only (this host is {{ ansible_architecture }})."
+
+- name: Ensure wget is installed (used to fetch the runfiles)
+  ansible.builtin.package:
+    name: wget
+    state: present
+
+- name: Ensure the CUDA install, module, and cache directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ cuda_install_root }}"
+    - "{{ cuda_modroot }}/cuda"
+    - "{{ cuda_cache_dir }}/tmp"
+
+- name: Probe which toolkits are already installed (idempotency)
+  ansible.builtin.stat:
+    path: "{{ cuda_install_root }}/{{ item.version }}/bin/nvcc"
+  loop: "{{ cuda_versions }}"
+  loop_control:
+    label: "{{ item.version }}"
+  register: cuda_nvcc_pre
+
+- name: Build the list of toolkits still to install
+  ansible.builtin.set_fact:
+    cuda_to_install: "{{ cuda_nvcc_pre.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
+
+- name: Download the CUDA runfiles
+  ansible.builtin.get_url:
+    url: "{{ cuda_base_url }}/{{ item.version }}/local_installers/{{ item.runfile }}"
+    dest: "{{ cuda_cache_dir }}/{{ item.runfile }}"
+    mode: "0644"
+  loop: "{{ cuda_to_install }}"
+  loop_control:
+    label: "{{ item.version }}"
+
+# Official runfile options (CUDA Installation Guide, Advanced Options):
+#   --silent       non-interactive
+#   --toolkit      install the CUDA Toolkit only (no driver -- host driver safe)
+#   --toolkitpath  per-version install location
+#   --override     ignore compiler/toolkit detection checks (newer host gcc)
+#   --no-man-page  skip man pages
+#   --tmpdir       scratch dir (in case /tmp is small)
+- name: Install the CUDA toolkits (toolkit only -- driver untouched)
+  ansible.builtin.command:
+    cmd: >-
+      sh {{ cuda_cache_dir }}/{{ item.runfile }}
+      --silent --toolkit
+      --toolkitpath={{ cuda_install_root }}/{{ item.version }}
+      --override --no-man-page
+      --tmpdir={{ cuda_cache_dir }}/tmp
+    creates: "{{ cuda_install_root }}/{{ item.version }}/bin/nvcc"
+  loop: "{{ cuda_to_install }}"
+  loop_control:
+    label: "{{ item.version }}"
+
+- name: Re-probe installed toolkits (post-install, for modulefile generation)
+  ansible.builtin.stat:
+    path: "{{ cuda_install_root }}/{{ item.version }}/bin/nvcc"
+  loop: "{{ cuda_versions }}"
+  loop_control:
+    label: "{{ item.version }}"
+  register: cuda_nvcc_post
+
+- name: Record which toolkits are installed
+  ansible.builtin.set_fact:
+    cuda_installed: "{{ cuda_nvcc_post.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+
+- name: Generate one Lmod modulefile per installed toolkit
+  ansible.builtin.template:
+    src: "cuda.lua.j2"
+    dest: "{{ cuda_modroot }}/cuda/{{ item.version }}.lua"
+    mode: "0644"
+  loop: "{{ cuda_installed }}"
+  loop_control:
+    label: "{{ item.version }}"

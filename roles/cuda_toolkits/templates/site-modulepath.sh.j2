@@ -1,0 +1,15 @@
+# Register the site modulefiles tree with Lmod (managed by the deepops cuda_toolkits role).
+# Generic: {{ cuda_modroot }} may hold many packages, not only CUDA.
+#
+# Mechanism: LMOD_SITE_MODULEPATH -- the official Lmod way to add a site
+# MODULEPATH. It is read before Lmod init (z00_lmod.*), prepended to MODULEPATH,
+# and survives 'module reset'. No stdout is emitted here: a print during shell
+# startup would corrupt non-interactive sessions such as scp/rsync.
+#
+# Note: if a later /etc/profile.d script hard-assigns MODULEPATH to a literal
+# path (e.g. the lmod role's z00_lmod sets it to {{ cuda_modroot }}), point
+# cuda_modroot at that same tree so the modules are found either way.
+case ":${LMOD_SITE_MODULEPATH:-}:" in
+  *":{{ cuda_modroot }}:"*) : ;;
+  *) export LMOD_SITE_MODULEPATH="{{ cuda_modroot }}${LMOD_SITE_MODULEPATH:+:${LMOD_SITE_MODULEPATH}}" ;;
+esac
