@@ -1,7 +1,11 @@
 ---
 # defaults file for netapp-trident role
 
-# URL of the Trident installer package that you wish to download and use
+# URL of the Trident installer package that you wish to download and use.
+# Pinned to 21.01.x. Modern Trident (24.x/26.x) installs via the Trident operator /
+# Helm rather than this `tridentctl` tarball, and changed its CRDs/snapshot APIs, so
+# bumping needs the role re-architected + validation against a real NetApp backend.
+# Left as-is (opt-in, NetApp-only role). Latest upstream as of 2026-06 is 26.02.x.
 trident_version: "21.01.2"
 trident_installer_url: "https://github.com/NetApp/trident/releases/download/v{{ trident_version }}/trident-installer-{{ trident_version }}.tar.gz"
 
