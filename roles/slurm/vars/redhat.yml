@@ -24,10 +24,12 @@ slurm_build_deps:
 # slurmrestd REST API only (installed when slurm_build_slurmrestd=true).
 # http-parser-devel lives in EPEL on EL8/9 and is absent on EL10 (deprecated
 # upstream), so it is gated out of the default build to keep EL10 working.
+# libjwt-devel (EPEL) is for slurmrestd's JWT token auth (rest_auth/jwt) and auth/jwt.
 slurm_slurmrestd_deps:
   - http-parser-devel
   - json-c-devel
   - libyaml-devel
+  - libjwt-devel
 
 slurm_pmix_deps:
   - "@Development Tools"
