@@ -30,7 +30,9 @@
     state: absent
   when:
     - "'enroot' in ansible_facts.packages"
-    - ansible_facts.packages['enroot'][0]['version'] != enroot_version_string
+    # rpm reports the version without the packaging release (e.g. "4.2.0", not
+    # "4.2.0-1"), so compare against enroot_version to stay idempotent.
+    - ansible_facts.packages['enroot'][0]['version'] != enroot_version
 
 - name: RHEL | install enroot from the release .rpm
   ansible.builtin.dnf:

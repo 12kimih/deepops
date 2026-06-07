@@ -49,6 +49,7 @@
     argv:
       - make
       - install
+      - "prefix={{ slurm_install_prefix }}"
   environment:
     CPPFLAGS: "-I {{ slurm_install_prefix }}/include/slurm"
   changed_when: true
