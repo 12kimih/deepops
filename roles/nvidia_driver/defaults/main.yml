@@ -79,6 +79,13 @@ nvidia_driver_ubuntu_repo_arch: "{{ 'sbsa' if ansible_architecture == 'aarch64' 
 # `nvidia-smi -pm 1`). Pulled in by the driver packages; enabled here explicitly.
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
 nvidia_driver_persistenced: true
+# Optional systemd drop-in for nvidia-persistenced. NOT needed on current drivers
+# (535/550/570/580+): the daemon enables persistence mode by default and the
+# packaged unit already runs as --user nvidia-persistenced, so --persistence-mode
+# is redundant. Enable only to force the flag regardless of a distro default, or
+# to add --verbose state-transition logging.
+# https://github.com/NVIDIA/nvidia-persistenced/blob/main/init/systemd/nvidia-persistenced.service.template
+nvidia_driver_persistenced_dropin: false
 # NVSwitch HGX baseboards only: install + enable Fabric Manager (branch-matched to
 # nvidia_driver_branch, or the service will refuse to start). Off by default.
 # https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html

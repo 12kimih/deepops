@@ -39,6 +39,34 @@
     - nvidia_driver_persistenced | bool
     - nvidia_driver_module_loaded | bool
 
+# Optional drop-in (opt-in): force --persistence-mode and/or add --verbose. The
+# empty ExecStart= reset is required because ExecStart is a systemd list directive.
+- name: Create the nvidia-persistenced systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/nvidia-persistenced.service.d
+    state: directory
+    mode: "0755"
+  when:
+    - nvidia_driver_persistenced | bool
+    - nvidia_driver_persistenced_dropin | bool
+    - nvidia_driver_module_loaded | bool
+
+- name: Deploy the nvidia-persistenced systemd drop-in
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
+  notify: Reload systemd and restart nvidia-persistenced
+  when:
+    - nvidia_driver_persistenced | bool
+    - nvidia_driver_persistenced_dropin | bool
+    - nvidia_driver_module_loaded | bool
+
 # NVSwitch HGX baseboards require Fabric Manager, branch-matched to the driver.
 # https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
 - name: Enable NVIDIA Fabric Manager

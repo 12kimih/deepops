@@ -1,0 +1,6 @@
+---
+- name: Reload systemd and restart nvidia-persistenced
+  ansible.builtin.systemd:
+    name: nvidia-persistenced
+    daemon_reload: true
+    state: restarted
