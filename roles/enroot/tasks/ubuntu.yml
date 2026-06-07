@@ -1,9 +1,17 @@
 ---
-# Ubuntu 23.10+/24.04 restrict unprivileged user namespaces via AppArmor. The
-# enroot .deb installs a scoped profile (/etc/apparmor.d/enroot) that re-grants
-# userns creation to enroot-nsenter only, so the global restriction stays on.
-# Only disable it globally as an explicit escape hatch for trusted/dev nodes.
-# https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+# Ubuntu 23.10+/24.04 enable kernel.apparmor_restrict_unprivileged_userns=1 by
+# default, blocking the unprivileged user namespaces enroot/pyxis rely on
+# (enroot-nsenter is transitioned into the capability-denying 'unprivileged_userns'
+# profile -> EPERM). enroot's .deb ships a SCOPED AppArmor profile
+# (/etc/apparmor.d/enroot, loaded via dh_apparmor) that grants `allow userns create`
+# to /usr/bin/enroot-nsenter ONLY, so the host-wide restriction stays ON -- the
+# supported, security-preserving fix. Upstream: the sysctl "must be disabled
+# (equal to 0) UNLESS {datadir}/enroot/apparmor.profile is installed" (the .deb
+# installs it), so we do NOT disable it by default. The task below is an opt-in
+# escape hatch that strips userns hardening host-wide (every unprivileged process,
+# ~3.4x more reachable kernel attack surface) -- for trusted/dev nodes only.
+#   https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+#   https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
 - name: Ubuntu | disable AppArmor unprivileged userns restriction (escape hatch)
   ansible.posix.sysctl:
     name: kernel.apparmor_restrict_unprivileged_userns
