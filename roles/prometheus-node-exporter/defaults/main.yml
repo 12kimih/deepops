@@ -1,5 +1,7 @@
 ---
 node_exporter_container: "quay.io/prometheus/node-exporter:v1.11.1"
+# Port node-exporter serves on; single source of truth for its scrape target.
+node_exporter_port: 9100
 node_exporter_prom_dir: "/run/prometheus"
 node_exporter_svc_name: "docker.node-exporter.service"
 node_exporter_state: started

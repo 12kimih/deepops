@@ -7,7 +7,7 @@ alerting:
   alertmanagers:
   - scheme: http
     static_configs:
-    - targets: ['localhost:9093']
+    - targets: ['localhost:{{ alertmanager_port | default(9093) }}']
 
 # Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
 rule_files:
@@ -21,4 +21,4 @@ scrape_configs:
         - {{ prometheus_cfg_endpoint_dir }}/*.yml
   - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['localhost:{{ prometheus_port | default(9090) }}']
