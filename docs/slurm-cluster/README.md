@@ -189,6 +189,46 @@ Now that Slurm is installed, try a ["Hello World" example using MPI](../../workl
 
 Read through the [slurm usage guide](slurm-usage.md) and [Open OnDemand guide](ood.md) for more information.
 
+## Customizing the Slurm configuration
+
+The `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, and (optional)
+`job_submit.lua` files are generated from templates in the `slurm` role that
+follow Slurm 25.11.x best practice for AI/ML GPU clusters (each option is cited
+inline to the [official 25.11.6 docs](https://slurm.schedmd.com/archive/slurm-25.11.6/slurm.conf.html)).
+There are three levels of customization, from least to most invasive — set all of
+these in your git-untracked `config/group_vars/slurm-cluster.yml`:
+
+1. **Tunables** — individual options exposed as variables with sensible defaults
+   (e.g. `slurm_scheduler_parameters`, fairshare/priority weights,
+   `slurm_accounting_tres`, `slurm_accounting_enforce`, `slurm_enable_preempt`).
+2. **Literal hardware overrides** — inject hand-tuned node/partition/gres lines
+   while keeping the best-practice base. This is the common case for a fixed
+   cluster: set `slurm_nodes_raw`, `slurm_partitions_raw`, and/or `slurm_gres_raw`
+   to lists of literal `NodeName=` / `PartitionName=` / gres lines. Leaving them
+   empty (the default) auto-detects CPUs/GPUs/memory from gathered facts.
+3. **Full-file templates** — for total control, point `slurm_conf_template`,
+   `slurm_cgroup_conf_template`, `slurm_gres_conf_template`,
+   `slurm_dbd_conf_template`, or `slurm_job_submit_template` at your own file on
+   the Ansible controller (e.g. under `config/files/slurm/`).
+
+Optional submit-time routing of GPU jobs to per-GPU-type partitions is available
+by setting `slurm_job_submit_plugins: "lua"` and the
+`slurm_gpu_type_partition_map` / `slurm_default_gpu_*` / `slurm_job_submit_cpu_partitions`
+variables; the bundled `job_submit.lua` is a safe no-op until configured.
+
+Because `config/` is git-ignored by DeepOps, keep your server-specific settings
+and secrets there and manage that directory as a separate **private** repo:
+
+```sh
+cp -r config.example config
+cd config && git init && git remote add origin git@github.com:yourorg/deepops-config.git
+ansible-vault encrypt group_vars/slurm-cluster.yml   # encrypts slurm_password etc.
+```
+
+See the comments in
+[`config.example/group_vars/slurm-cluster.yml`](../../config.example/group_vars/slurm-cluster.yml)
+for ready-to-copy examples.
+
 ## Prolog and Epilog
 
 The default Slurm deployment includes a collection of prolog and epilog scripts that should be modified to suit a particular system.
