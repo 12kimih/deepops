@@ -28,3 +28,22 @@ nvidia_container_toolkit_restart_docker: true
 # package does not auto-enable docker, so every docker-based service (DCGM/Slurm
 # exporters, registry, ...) would be dead after reboot without this.
 nvidia_container_toolkit_enable_docker: true
+
+# Daemon-wide docker defaults for NGC/PyTorch/NCCL workloads launched via bare
+# `docker run`: the NGC deep-learning containers need a large /dev/shm and unlimited
+# memlock (pinned GPU memory) + a big stack (docker's 64 MiB shm default breaks
+# multi-GPU NCCL). Merged into /etc/docker/daemon.json before nvidia-ctk adds its
+# runtime block. Slurm+pyxis/enroot and k8s set these through their own mechanisms,
+# so this only affects plain `docker run`. Set false to leave docker's defaults alone.
+nvidia_container_toolkit_set_docker_tuning: true
+nvidia_container_toolkit_docker_tuning:
+  default-shm-size: "1G"
+  default-ulimits:
+    memlock:
+      Name: memlock
+      Hard: -1
+      Soft: -1
+    stack:
+      Name: stack
+      Hard: 67108864
+      Soft: 67108864
