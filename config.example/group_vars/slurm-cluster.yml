@@ -189,7 +189,8 @@ sm_install_host: "slurm-master[0]"
 ################################################################################
 # NVIDIA HPC SDK                                                               #
 ################################################################################
-slurm_install_hpcsdk: true
+# Off by default (Spack is likewise opt-in via playbooks/slurm-cluster/spack-modules.yml).
+slurm_install_hpcsdk: false
 
 # Select the version of HPC SDK to download
 #hpcsdk_major_version: ""

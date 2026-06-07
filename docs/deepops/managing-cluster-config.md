@@ -1,17 +1,17 @@
 # Managing private cluster config in a public DeepOps fork
 
 If you maintain a **public** DeepOps fork but run a **private** cluster, your
-site‑specific settings (real inventory/IPs, `NodeName=` hardware lines, NFS exports,
+site-specific settings (real inventory/IPs, `NodeName=` hardware lines, NFS exports,
 usernames, secrets) must never be committed to the public repo. DeepOps is already
-wired for exactly this — no `.gitignore` or `ansible.cfg` changes are needed.
+wired for exactly this -- no `.gitignore` or `ansible.cfg` changes are needed.
 
 How it works (already in the repo):
 
-- `.gitignore` ignores `/config*/` but keeps `!/config.example/` — so `config/` is
+- `.gitignore` ignores `/config*/` but keeps `!/config.example/` -- so `config/` is
   invisible to git while the `config.example/` **template** is tracked.
-- `ansible.cfg` points `inventory = ./config/inventory,...` and has a ready‑to‑enable
+- `ansible.cfg` points `inventory = ./config/inventory,...` and has a ready-to-enable
   `#vault_password_file = ./config/.vault-pass`.
-- `scripts/setup.sh` copies `config.example` → `config` only if `config/` is absent.
+- `scripts/setup.sh` copies `config.example` -> `config` only if `config/` is absent.
 
 > **Golden rule:** edit real values only under `config/`. Keep `config.example/`
 > generic (placeholders + commented examples). Anything you put in `config.example/`
@@ -19,7 +19,7 @@ How it works (already in the repo):
 
 ## Recommended pattern: `config/` as its own private repo + ansible-vault
 
-This is DeepOps' documented recommendation and keeps your real config version‑controlled
+This is DeepOps' documented recommendation and keeps your real config version-controlled
 and backed up while staying invisible to the public fork.
 
 ### 1. Create the working config from the template
@@ -52,11 +52,11 @@ vim group_vars/all.yml
 git add -A && git commit -m "Real prod cluster" && git push
 ```
 
-For server‑specific Slurm hardware (NodeName/partition/gres lines), use the
+For server-specific Slurm hardware (NodeName/partition/gres lines), use the
 `slurm_nodes_raw` / `slurm_partitions_raw` / `slurm_gres_raw` overrides documented in
 [the Slurm guide](../slurm-cluster/README.md#customizing-the-slurm-configuration).
 
-### 4. Secrets via ansible-vault (encrypted values, grep‑able names)
+### 4. Secrets via ansible-vault (encrypted values, grep-able names)
 
 ```bash
 cd <deepops>
@@ -74,7 +74,7 @@ Keep plaintext vars that *reference* vault values, and a separate encrypted file
 the actual secrets:
 
 ```yaml
-# config/group_vars/all.yml (plaintext — safe to read/grep)
+# config/group_vars/all.yml (plaintext -- safe to read/grep)
 slurm_db_password: "{{ vault_slurm_db_password }}"
 ```
 
@@ -99,7 +99,7 @@ Inventory and the vault password resolve automatically from `ansible.cfg`.
 ## Pulling upstream DeepOps updates without clobbering `config/`
 
 `config/` is gitignored, so `git pull` / `rebase` / `checkout` physically cannot touch or
-stage it — only the `config.example/` template changes upstream.
+stage it -- only the `config.example/` template changes upstream.
 
 ```bash
 cd <deepops>
@@ -120,7 +120,7 @@ upstream template edits never overwrite your live config.
   already wires for you.
 - **git submodule** for `config/`: pins an exact config commit to a code commit, but adds
   clone/update friction and can leak the private repo URL via `.gitmodules`.
-- **SOPS / git‑crypt** instead of ansible‑vault: fine if you already use them, but
-  ansible‑vault is built in and needs no extra tooling.
-- **git subtree**: vendors full history *into* the repo — the opposite of keeping config
+- **SOPS / git-crypt** instead of ansible-vault: fine if you already use them, but
+  ansible-vault is built in and needs no extra tooling.
+- **git subtree**: vendors full history *into* the repo -- the opposite of keeping config
   out of a public repo; avoid for this use case.

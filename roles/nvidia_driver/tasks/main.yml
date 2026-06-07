@@ -20,7 +20,7 @@
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
 
 # The steps below need the kernel module loaded. That holds unless a fresh install
-# was made AND the reboot was suppressed (nvidia_driver_reboot=false) — then the
+# was made AND the reboot was suppressed (nvidia_driver_reboot=false) -- then the
 # operator must reboot manually first, so skip persistence/verify in that case.
 - name: Determine whether the NVIDIA kernel module is loaded
   ansible.builtin.set_fact:

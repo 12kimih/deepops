@@ -195,18 +195,18 @@ The `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, and (optional)
 `job_submit.lua` files are generated from templates in the `slurm` role that
 follow Slurm 25.11.x best practice for AI/ML GPU clusters (each option is cited
 inline to the [official 25.11.6 docs](https://slurm.schedmd.com/archive/slurm-25.11.6/slurm.conf.html)).
-There are three levels of customization, from least to most invasive — set all of
+There are three levels of customization, from least to most invasive -- set all of
 these in your git-untracked `config/group_vars/slurm-cluster.yml`:
 
-1. **Tunables** — individual options exposed as variables with sensible defaults
+1. **Tunables** -- individual options exposed as variables with sensible defaults
    (e.g. `slurm_scheduler_parameters`, fairshare/priority weights,
    `slurm_accounting_tres`, `slurm_accounting_enforce`, `slurm_enable_preempt`).
-2. **Literal hardware overrides** — inject hand-tuned node/partition/gres lines
+2. **Literal hardware overrides** -- inject hand-tuned node/partition/gres lines
    while keeping the best-practice base. This is the common case for a fixed
    cluster: set `slurm_nodes_raw`, `slurm_partitions_raw`, and/or `slurm_gres_raw`
    to lists of literal `NodeName=` / `PartitionName=` / gres lines. Leaving them
    empty (the default) auto-detects CPUs/GPUs/memory from gathered facts.
-3. **Full-file templates** — for total control, point `slurm_conf_template`,
+3. **Full-file templates** -- for total control, point `slurm_conf_template`,
    `slurm_cgroup_conf_template`, `slurm_gres_conf_template`,
    `slurm_dbd_conf_template`, or `slurm_job_submit_template` at your own file on
    the Ansible controller (e.g. under `config/files/slurm/`).
