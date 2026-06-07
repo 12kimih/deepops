@@ -2,27 +2,31 @@
 slurm_pam_lib_dir: /lib/x86_64-linux-gnu/security
 
 # Build dependencies per the Slurm 25.11.x admin quickstart. libdbus-1-dev and
-# libbpf-dev are needed for the cgroup/v2 plugin; libjson-c-dev/libhttp-parser-dev/
-# libyaml-dev enable the REST API; libnuma-dev, liblua5.4-dev and libreadline-dev
-# enable NUMA affinity, Lua plugins (job_submit) and interactive scontrol.
+# libbpf-dev are needed for the cgroup/v2 plugin; libnuma-dev, liblua5.4-dev and
+# libreadline-dev enable NUMA affinity, Lua plugins (job_submit) and interactive
+# scontrol. default-libmysqlclient-dev provides mysql.h for the accounting store
+# (the old libmariadbclient-dev-compat transitional package was removed on Ubuntu
+# 24.04/26.04, so it must not be used).
 # https://slurm.schedmd.com/archive/slurm-25.11.6/quickstart_admin.html
 slurm_build_deps:
   - build-essential
   - libmunge-dev
-  - libmariadb-dev
-  - libmariadbclient-dev-compat
+  - default-libmysqlclient-dev
   - libpam0g-dev
   - libdbus-1-dev
   - libbpf-dev
   - libnuma-dev
+  - liblua5.4-dev
+  - libreadline-dev
+  - python3
+  - wget
+
+# slurmrestd REST API only (installed when slurm_build_slurmrestd=true). Add
+# libjwt-dev as well if JWT auth (auth/jwt) is configured.
+slurm_slurmrestd_deps:
   - libjson-c-dev
   - libhttp-parser-dev
   - libyaml-dev
-  - liblua5.4-dev
-  - libreadline-dev
-  - python3-minimal
-  - ruby-dev
-  - wget
 
 slurm_pmix_deps:
   - build-essential
