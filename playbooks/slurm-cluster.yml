@@ -68,6 +68,14 @@
     hostlist: "{{ nfs_client_group | default('slurm-nfs-client') }}"
   when: slurm_enable_nfs_client_nodes
 
+# Authentication / directory services. Each role inside is gated on its own config
+# (NIS master via nis_make_server, NIS clients via nis_domain+nis_server, Kerberos,
+# autofs, move-home-dirs), so this is a clean no-op unless you configure one of them
+# in config/group_vars. Runs after NFS (so /home is mounted) and before Slurm.
+- name: Configure authentication (NIS server + client, Kerberos, autofs, home dirs)
+  import_playbook: generic/authentication.yml
+  when: slurm_install_authentication | default(true)
+
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml hostlist=slurm-node
   when: install_dcgm|default(false)

@@ -10,6 +10,9 @@
       when: move_home_dirs_new_root is defined
     - role: kerberos_client
       when: kerberos_client_realm_name is defined
+    # Run the NIS master setup before the clients so they have a server to bind to.
+    - role: nis_server
+      when: (nis_make_server | default(false) | bool) and (nis_domain is defined)
     - role: nis_client
       when: (nis_domain is defined) and (nis_server is defined)
     - role: autofs
