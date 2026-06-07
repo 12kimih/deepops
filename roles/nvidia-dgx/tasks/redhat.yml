@@ -1,16 +1,13 @@
 ---
 - name: Include Red Hat DGX variables
-  include_vars: redhat.yml
+  ansible.builtin.include_vars: redhat.yml
 
-- name: Check for supported Red Hat family DGX Software Stack version
-  fail:
-    msg: "Role supports Red Hat family major versions 7, 8, and 9 only"
-  when: ansible_distribution_major_version not in ['7', '8', '9']
+# Legacy EL7 (DGX-1/DGX-2 yum/python2 stack) is no longer supported and was removed.
+- name: Check for a supported Red Hat family DGX Software Stack version
+  ansible.builtin.fail:
+    msg: "This role supports Red Hat family major versions 8, 9, and 10"
+  when: ansible_distribution_major_version | int < 8
 
-- name: Run legacy EL7 DGX tasks
-  include_tasks: redhat-legacy-el7.yml
-  when: ansible_distribution_major_version == '7'
-
-- name: Run EL8 and EL9 DGX Software Stack tasks
-  include_tasks: redhat-el8-plus.yml
-  when: ansible_distribution_major_version in ['8', '9']
+- name: Run EL8+ DGX Software Stack tasks
+  ansible.builtin.include_tasks: redhat-el8-plus.yml
+  when: ansible_distribution_major_version | int >= 8
