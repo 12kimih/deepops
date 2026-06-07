@@ -44,6 +44,9 @@ chrony_config_server:
 # Set hostname based on inventory file
 deepops_set_hostname: true
 
+# Default system locale applied to every node by the locale role (sets LANG=).
+#locale_lang: "en_US.UTF-8"
+
 ################################################################################
 # SOFTWARE                                                                     #
 ################################################################################

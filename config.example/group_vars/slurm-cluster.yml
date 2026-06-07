@@ -155,6 +155,12 @@ nfs_mounts:
     path: /sw
     options: rw,hard,vers=4.2,nconnect=4,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
 
+# NFS performance tuning (applies on server + clients). The nfs role ships
+# auto-sized defaults; override here only if needed. See
+# docs/slurm-cluster/slurm-nfs.md.
+#nfs_server_threads: 128     # nfsd thread count (default: 4 x vCPUs, floor 64)
+#nfs_tune_network: true      # raise TCP/socket buffers for 10GbE+ NFS (default true)
+
 # Flags for enable/disable of NFS deployment
 #  - Set up an NFS server on nfs-server?
 slurm_enable_nfs_server: true
@@ -190,9 +196,12 @@ sm_module_path: "{{ sm_module_root }}/all"
 # Spack-specific
 spack_install_dir: "{{ sm_prefix }}/spack"
 spack_build_packages: false
+# Illustrative only (spack_build_packages is false by default). CUDA itself is now
+# provided by the cuda_toolkits role as Lmod modules, so use Spack for other
+# libraries; pick specs that resolve in your Spack version.
 spack_default_packages:
-- "cuda@10.2.89"
-- "openmpi@3.1.6 +cuda +pmi schedulers=auto"
+- "fftw@3.3.10"
+- "openblas@0.3.28"
 
 # Which host should we run installs on for software going into the NFS share?
 sm_install_host: "slurm-master[0]"
@@ -312,6 +321,9 @@ slurm_enable_monitoring: true
 # Inventory host groups where cluster monitoring services will be installed
 # (Prometheus, Grafana, etc)
 slurm_monitoring_group: "slurm-master"
+
+# Grafana web UI port (role default 3000). Override if 3000 is taken.
+#grafana_port: 59001
 
 ################################################################################
 # Logging with rsyslog                                                         #
