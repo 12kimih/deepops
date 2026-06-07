@@ -1,0 +1,6 @@
+---
+# System-wide locale applied to every node so multibyte (UTF-8) text renders
+# consistently and shells never fall back to C/POSIX (which garbles UTF-8, e.g.
+# Korean shows up as mojibake). C.UTF-8 is always available and needs no language
+# pack; set a full locale like en_US.UTF-8 for language-specific collation/messages.
+locale_lang: "en_US.UTF-8"

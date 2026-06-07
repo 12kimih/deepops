@@ -67,12 +67,13 @@ For the available NFS options, see the manpages for your Linux distribution: `ma
 
 ## Performance tuning for random I/O
 
-A single NFS head serving `/home` to many GPU nodes commonly becomes a **random-I/O
-bottleneck** under job load: one server is a single network/metadata chokepoint, a
-wide RAID5 group pays a 4x read-modify-write penalty on every small random write, and
-hot job I/O runs directly against the share. No single knob fixes this -- separating hot
-I/O from NFS is the durable fix -- but the DeepOps defaults now apply the high-ROI
-config quick-wins. In priority order:
+A single NFS server can become a **random-I/O bottleneck** under job load: it is one
+network/metadata chokepoint, parity RAID (RAID5/6) pays a read-modify-write penalty on
+small random writes, and hot job I/O run directly against the share competes with every
+other node. No single knob fixes this -- separating hot I/O from NFS is the durable fix
+-- but DeepOps ships sensible defaults and exposes the knobs below; **tune them for your
+hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong in
+`config/`, never in the role defaults). In priority order:
 
 1. **Keep hot I/O on node-local NVMe, not NFS.** Container import/unpack and dataset
    small-file reads are latency-bound random I/O that melts a single NFS head. The
@@ -95,21 +96,44 @@ config quick-wins. In priority order:
 
 3. **Server `nfsd` thread count.** The Linux default is only **8** threads -- far too few
    for many clients under random I/O (each thread serves one RPC and blocks on disk).
-   Set `nfs_server_threads` (default `32`; busy servers run 64-256). Verify with
+   `nfs_server_threads` auto-sizes to 4x the server's CPUs with a floor of 64 (busy
+   servers run 64-256; override with a fixed number if you prefer). Verify with
    `cat /proc/fs/nfsd/threads` and size it by watching `sockets-enqueued` grow in
    `/proc/fs/nfsd/pool_stats` under load. Do **not** use the `/proc/net/rpc/nfsd` `th`
    histogram -- it was removed in kernel 2.6.32 and always reads zero. (`rpc.nfsd(8)`)
 
-4. **Server socket buffers / exports.** Raise `net.core.{r,w}mem_max` and
-   `netdev_max_backlog` and restart NFS; consider MTU 9000 end-to-end. `no_subtree_check`
-   is already the default. Use export `async` only for reproducible scratch (biggest
-   throughput lever, but a crash loses unflushed data).
+4. **Server/client socket buffers.** DeepOps now raises the TCP buffers for the NFS
+   data path automatically (`nfs_tune_network: true` -> `/etc/sysctl.d/30-nfs-tuning.conf`:
+   `net.core.{r,w}mem_max=16M`, `tcp_{r,w}mem`, `netdev_max_backlog`). Set it false to
+   opt out.
 
-5. **Hardware (operator action, not a DeepOps setting): RAID5 -> RAID10.** A 17-disk
-   RAID5 pays 4 physical I/Os per random write and has a slow, risky rebuild. RAID10 (or
-   ZFS mirror vdevs + NVMe SLOG + a metadata special vdev) gives far better random-write
-   IOPS. For 8 nodes, tuned NFS + local NVMe staging is usually enough; only graduate to
-   a parallel filesystem (BeeGFS/Lustre/WekaFS) if GPUs are provably starved.
+5. **Jumbo frames (MTU 9000) -- often the top win on 10GbE+ networks.** This is a
+   network/NIC/switch setting (not a DeepOps var, since it lives in your netplan and
+   switch config), but on a fast link it is frequently the single highest-ROI change: it
+   cuts per-packet overhead and lets NFS approach line rate. Enable MTU 9000 on the
+   storage NIC, every client NIC, AND the switch -- a mismatch causes fragmentation and
+   makes things *worse*.
+
+6. **Per-export options (set in `nfs_exports` `options`).** Keep `/home` (user data)
+   `sync` for integrity. For a reproducible `/scratch` or `/data` export, use
+   `async,no_wdelay` -- `async` is the single biggest throughput lever (a crash loses
+   unflushed data, acceptable for scratch) and `no_wdelay` suits the small random writes
+   of an NVMe backend. `no_subtree_check` is already the default. Example:
+   `nfs_exports: [{path: /scratch, options: "*(rw,async,no_wdelay,no_root_squash)"}]`.
+
+7. **Storage and network topology (your hardware, configured outside DeepOps).**
+   General principles to apply to whatever you run:
+   - Parity RAID (RAID5/6) pays a read-modify-write penalty on small random writes;
+     RAID10 (or ZFS mirror vdevs + a metadata special vdev) is far better for random I/O
+     on a spinning-disk home.
+   - Match expectations to your **network**: if the storage is faster than the link
+     (e.g. an NVMe array on a 10/25GbE network), NFS is *network-bound* -- the array's
+     value over NFS is then low latency + high IOPS, not raw bandwidth, so even a parity
+     RAID is fine because the link caps throughput well below the array.
+   - For bandwidth-bound jobs, stage to **node-local** NVMe (keep enroot/`TMPDIR` local).
+     To exceed a single link, bond multiple NICs (LACP + `nconnect`) or move to a faster
+     fabric; graduate to a parallel filesystem (BeeGFS/Lustre/WekaFS) only if GPUs are
+     provably starved.
 
 ## Configuring a separate NFS server
 

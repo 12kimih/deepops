@@ -1,0 +1,54 @@
+---
+- name: Install the locales package (Debian)
+  ansible.builtin.apt:
+    name: locales
+    state: present
+  when: ansible_os_family == "Debian"
+  tags:
+    - locale
+
+# C.UTF-8 is built in and needs no generation; a full locale (e.g. en_US.UTF-8) does.
+- name: Generate the locale (Debian)
+  community.general.locale_gen:
+    name: "{{ locale_lang }}"
+    state: present
+  when:
+    - ansible_os_family == "Debian"
+    - not locale_lang.startswith('C.')
+  tags:
+    - locale
+
+- name: Install the matching glibc langpack (RHEL/Rocky)
+  ansible.builtin.dnf:
+    name: "glibc-langpack-{{ locale_lang.split('_')[0] | lower }}"
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - not locale_lang.startswith('C.')
+  tags:
+    - locale
+
+# Write the login-session default LANG. /etc/default/locale is read by PAM on
+# Debian/Ubuntu; /etc/locale.conf is the systemd file used on RHEL/Rocky. Takes
+# effect on the next login (existing sessions keep their locale).
+- name: Set the default LANG (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/default/locale
+    regexp: '^LANG='
+    line: "LANG={{ locale_lang }}"
+    create: true
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+  tags:
+    - locale
+
+- name: Set the default LANG (RHEL/Rocky)
+  ansible.builtin.lineinfile:
+    path: /etc/locale.conf
+    regexp: '^LANG='
+    line: "LANG={{ locale_lang }}"
+    create: true
+    mode: "0644"
+  when: ansible_os_family == "RedHat"
+  tags:
+    - locale
