@@ -132,7 +132,7 @@ sftp_chroot: false
 # Set false to skip the system-wide CUDA toolkit install (e.g. when CUDA is
 # provided per-version through Lmod/environment modules). In the slurm-cluster
 # playbook the toolkit is additionally gated by slurm_cluster_install_cuda.
-nvidia_cuda_install: true
+nvidia_cuda_install: false
 
 # DGX-specific vars may be used to target specific models,
 # because available versions for DGX may differ from the generic repo
