@@ -1,12 +1,12 @@
 # Install NVIDIA CUDA toolkits from the official runfiles into the shared
 # software tree and expose each one as an Lmod module on every node.
 #
-#   ansible-playbook playbooks/slurm-cluster/cuda-toolkits.yml
+#   ansible-playbook playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
 #
 # The driver is never touched (runfile installed with --toolkit only). The
 # toolkits install once on the host that owns the shared tree (the NFS server by
 # default); because /sw is shared, `module avail cuda` then lists them on every
-# node. Trim roles/cuda_toolkits/defaults/main.yml's cuda_versions (or override
+# node. Trim roles/nvidia_cuda_toolkit/defaults/main.yml's cuda_versions (or override
 # it in config/group_vars/) to choose which toolkits to install.
 ---
 - name: Ensure Lmod is present on all nodes
@@ -19,11 +19,11 @@
   hosts: "{{ hostlist | default('all') }}"
   become: true
   roles:
-    - cuda_toolkits
+    - nvidia_cuda_toolkit
 
 - name: Install CUDA toolkits and generate modulefiles on the software-tree host
   hosts: "{{ cuda_install_hosts | default(nfs_server_group | default('slurm-master[0]')) }}"
   become: true
   roles:
-    - role: cuda_toolkits
-      cuda_toolkits_do_install: true
+    - role: nvidia_cuda_toolkit
+      nvidia_cuda_toolkit_install: true

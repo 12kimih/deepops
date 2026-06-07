@@ -1,17 +1,17 @@
 ---
-# roles/cuda_toolkits -- install NVIDIA CUDA toolkits from the official runfiles
+# roles/nvidia_cuda_toolkit -- install NVIDIA CUDA toolkits from the official runfiles
 # into a shared (NFS) software tree and expose each one as an Lmod module.
 #
 # The host GPU driver is never touched: the runfile is invoked with --toolkit
 # only. The heavy download+install path runs on ONE host (the node that owns the
 # shared software tree); because that tree is shared, the modules become visible
-# on every node that mounts it. See playbooks/slurm-cluster/cuda-toolkits.yml.
+# on every node that mounts it. See playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
 
 # Whether the download+install path runs on this host. The playbook turns this
 # on only for the software-tree host; everywhere else the role just registers
 # the modulefiles tree with Lmod (the profile.d snippet). Override with -e or in
 # config/ if your software tree lives on a different host.
-cuda_toolkits_do_install: false
+nvidia_cuda_toolkit_install: false
 
 # Install + module layout. Reuses the lmod role's sm_* vars so CUDA lands in the
 # same tree Lmod already searches (sm_module_path is placed on MODULEPATH by the
