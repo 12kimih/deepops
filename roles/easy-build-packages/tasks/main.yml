@@ -1,12 +1,12 @@
+---
 #
 # install software modules using EasyBuild:
 #
----
 - name: "Ubuntu pre-install tasks"
   ansible.builtin.include_tasks: ubuntu-pre-install.yml
   when: ansible_distribution == 'Ubuntu'
 
-- name: "Redhat family pre-install tasks"
+- name: "RedHat family pre-install tasks"
   ansible.builtin.include_tasks: redhat-pre-install.yml
   when: ansible_os_family == 'RedHat'
 

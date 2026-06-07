@@ -1,12 +1,12 @@
 ---
-- name: Install dependencies
+- name: Install dependencies (Debian)
   ansible.builtin.apt:
     name: "{{ item }}"
   with_items:
     - linux-tools-{{ ansible_kernel }} # for cpupower, used in prolog+epilog
   when: ansible_os_family == "Debian"
 
-- name: Install dependencies
+- name: Install dependencies (RedHat)
   ansible.builtin.dnf:
     name: "{{ item }}"
   with_items:

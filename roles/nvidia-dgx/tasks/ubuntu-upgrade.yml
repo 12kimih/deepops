@@ -1,10 +1,10 @@
 ---
 # OTA upgrade stuff
-- name: perform OTA upgrade to latest release (this takes a while)
-  apt:
+- name: Perform OTA upgrade to latest release (this takes a while)
+  ansible.builtin.apt:
     upgrade: full
     update_cache: true
     dpkg_options: "force-confdef,force-confold"
 
-- name: reboot after full OTA upgrade
-  reboot:
+- name: Reboot after full OTA upgrade
+  ansible.builtin.reboot:

@@ -5,8 +5,8 @@
   roles:
   - andrewrothstein.miniconda
   tasks:
-  - name: ensure git is installed
-    package:
+  - name: Ensure git is installed
+    ansible.builtin.package:
       name: "git"
       state: present
 
@@ -18,16 +18,16 @@
   - nvidia-ml
 
   tasks:
-  - name: ensure cuda is installed (Ubuntu)
-    package:
+  - name: Ensure CUDA is installed (Ubuntu)
+    ansible.builtin.package:
       name: "{{ item }}"
       state: present
     with_items:
     - "cuda=10.0*"      # CUDA 10.0 currently needed
     when: (ansible_os_family == "Debian") and (ansible_local['gpus']['count'])
 
-  - name: ensure cuda is installed (RHEL)
-    package:
+  - name: Ensure CUDA is installed (RHEL)
+    ansible.builtin.package:
       name: "{{ item }}"
       state: present
     with_items:
@@ -40,22 +40,22 @@
   vars:
     share_dir: "/usr/share/deepops"
   tasks:
-  - name: create a doc directory for these files
-    file:
+  - name: Create a doc directory for these files
+    ansible.builtin.file:
       path: "{{ share_dir }}"
       mode: "0777"
       owner: root
       group: root
       state: directory
-  - name: copy conda requirements to doc dir
-    copy:
+  - name: Copy conda requirements to doc dir
+    ansible.builtin.copy:
       src: "conda-requirements.yml"
       dest: "{{ share_dir}}/conda-requirements.yml"
       owner: root
       group: root
       mode: "0444"
-  - name: copy scripts to doc dir
-    copy:
+  - name: Copy scripts to doc dir
+    ansible.builtin.copy:
       src: "{{ item }}"
       dest: "{{ share_dir }}/{{ item }}"
       owner: root
