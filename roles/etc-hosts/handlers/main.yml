@@ -1,0 +1,6 @@
+---
+# roles/etc-hosts/handlers/main.yml
+- name: Restart hosts
+  ansible.builtin.service:
+    name: hostsd
+    state: restarted

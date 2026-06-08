@@ -1,0 +1,50 @@
+---
+# roles/etc-hosts/tasks/main.yml -- in-tree copy of DeepOps.hosts (was the
+# DeepOps/ansible-role-hosts galaxy role), with a configurable internal-subnet
+# address preference in templates/etc_hosts.j2.
+- name: Gather facts again
+  ansible.builtin.setup:
+
+- name: Register hosts list if an ansible group limit is specified
+  ansible.builtin.set_fact:
+    hosts_add_ansible_managed_hosts_groups:
+      - "{{ ansible_limit }}"
+  when: ansible_limit is defined
+
+- name: Install user-defined custom hosts file
+  ansible.builtin.copy:
+    src: "{{ hosts_file_src }}"
+    dest: "{{ hosts_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: "{{ host_file_backup }}"
+  tags: hosts
+  when: hosts_file_src is defined
+
+- name: Install custom hosts file
+  ansible.builtin.template:
+    src: etc_hosts.j2
+    dest: "{{ hosts_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: "{{ host_file_backup }}"
+  tags: hosts
+  when: hosts_file_src is not defined
+
+- name: Render custom hosts template
+  ansible.builtin.set_fact:
+    custom_hosts: "{{ lookup('template', 'custom_hosts.j2') }}"
+  tags: hosts
+  when: (hosts_file_src is not defined) and (hosts_entries | length > 0)
+
+- name: Add the managed block to {{ hosts_file }}
+  ansible.builtin.blockinfile:
+    path: "{{ hosts_file }}"
+    owner: root
+    group: root
+    content: "{{ custom_hosts }}"
+    marker: "# {{ hosts_custom_hosts_marker }} {mark}"
+  tags: hosts
+  when: (hosts_file_src is not defined) and (hosts_entries | length > 0)
