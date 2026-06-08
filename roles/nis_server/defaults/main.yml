@@ -21,7 +21,7 @@ nis_make_server: false
 # /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client
 # networks may query this server, as "NETMASK NETWORK" lines. The default allows
 # localhost + the RFC1918 private ranges; TIGHTEN this to your actual cluster
-# subnet (e.g. "255.255.255.0 10.0.2.0") -- a wide-open server is a security risk.
+# subnet (e.g. "255.255.255.0 192.0.2.0") -- a wide-open server is a security risk.
 nis_server_securenets:
   - "255.0.0.0       127.0.0.0"        # localhost (required)
   - "255.0.0.0       10.0.0.0"         # 10.0.0.0/8    (RFC1918)

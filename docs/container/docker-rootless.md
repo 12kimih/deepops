@@ -16,7 +16,7 @@ having to convert to another container format.
 
 ## Installing Rootless Docker
 
-An ansible role and playbook are provided to install rootless docker [docker-rootless.yml](../../playbooks/container/docker-rootless.yml). The default install location is set via variable `rootlessdocker_install_dir` with default setting of `/sw/software/rootless_docker`. Set the variable to a different value (use `--extra-vars "rootlessdocker_install_dir=<somepath>"`) if a different install location is desired. Run the playbook via ansible command:
+An ansible role and playbook are provided to install rootless docker [docker-rootless.yml](../../playbooks/container/docker-rootless.yml). The default install location is set via variable `rootlessdocker_install_dir` with default setting of `/sw/software/rootless-docker`. Set the variable to a different value (use `--extra-vars "rootlessdocker_install_dir=<somepath>"`) if a different install location is desired. Run the playbook via ansible command:
 
 ```bash
 ansible-playbook -K --limit slurm-cluster playbooks/container/docker-rootless.yml

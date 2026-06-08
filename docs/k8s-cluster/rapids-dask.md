@@ -20,7 +20,7 @@ Dask has tight kubernetes integration that allows you to scale up/down your Dask
 
 If Kubeflow has already been installed using the [DeepOps Kubeflow Deployment Guide](kubeflow.md) there are no additional K8S setup steps required.
 
-When deploying through Kubeflow, it is necessary to ensure that a proper Docker image, entrypoint, and cmd have been specified; or Kubeflow will not properly start Jupyter and the service will immediately fail. See the [Dask Kubernetes](../examples/k8s/dask-rapids/docker/Dockerfile) Dockerfile for an example.
+When deploying through Kubeflow, it is necessary to ensure that a proper Docker image, entrypoint, and cmd have been specified; or Kubeflow will not properly start Jupyter and the service will immediately fail. See the [Dask Kubernetes](../../workloads/examples/k8s/dask-rapids/docker/Dockerfile) Dockerfile for an example.
 
 ### Stand-alone
 
@@ -28,17 +28,20 @@ Deploy Kubernetes by following the [DeepOps Kubernetes Deployment Guide](README.
 
 Deploy the [LoadBalancer](ingress.md#on-prem-loadbalancer)
 
-Deploy Dask:
+Deploy Dask (the example deploy script and its config live under
+[`workloads/examples/k8s/dask-rapids`](../../workloads/examples/k8s/dask-rapids)):
 
 ```bash
-# Optionally, Modify chart configuration
+cd workloads/examples/k8s/dask-rapids
+
+# Optionally, modify the chart configuration
 vi config/helm/rapids-dask.yml
 
 # Optionally, modify the K8S resources
 vi config/k8s/rapids-dask-sa.yml
 
 # Deploy
-./scripts/k8s/deploy_rapids_dask.sh
+./deploy.sh
 ```
 
 > For more configuration options, see: https://github.com/rmccorm4/charts/tree/update-stable-dask/stable/dask
