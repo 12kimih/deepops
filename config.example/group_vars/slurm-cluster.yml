@@ -64,18 +64,26 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  - "NodeName=b200-[01-16] AutoDetect=nvml"
 #  - "NodeName=h100-[01-08] AutoDetect=nvml"
 
-# --- AI/ML slurm.conf tunables (sensible defaults already set in the role) ----
-#slurm_accounting_tres: "gres/gpu,gres/gpu:b200,gres/gpu:h100"            # typed GPU billing
-#slurm_tres_billing_weights: "CPU=1.0,Mem=0.25G,GRES/gpu=2.0"             # GPU drives fairshare/limits billing
-#slurm_accounting_enforce: "associations,limits,qos,safe"                 # after sacctmgr setup
-#slurm_scheduler_parameters: "bf_continue,bf_window=4320,bf_busy_nodes"   # backfill tuning
-#slurm_enable_preempt: true                                               # QOS preemption (frees GPUs cleanly)
-#slurm_topology_plugin: "topology/tree"                                   # multi-rack (needs topology.conf)
-#slurm_acct_account: compute-account                                      # sacctmgr account for new users
-#slurm_acct_organization: deepops                                         # sacctmgr Organization label
-#slurmctl_config_dir: /sw/.slurm                                          # shared dir if slurm_conf_symlink
-#slurm_ha_state_save_location: /sw/slurm                                  # shared dir if slurm_enable_ha
-#slurm_exporter_container: "your-registry/prometheus-slurm-exporter:tag"  # custom exporter image
+# --- AI/ML slurm.conf tunables (role defaults are sensible; override here) -----
+#slurm_accounting_tres: "gres/gpu,gres/gpu:h100,gres/gpu:b200"  # typed GPU billing -- one gres/gpu:<type> per GPU model
+#slurm_tres_billing_weights: "CPU=1.0,Mem=0.25G,GRES/gpu=2.0"  # global GPU billing weights (or per-partition TRESBillingWeights)
+#slurm_accounting_enforce: "associations,limits,qos"  # enforce associations/limits/QOS (after sacctmgr; add 'safe')
+#slurm_scheduler_parameters: ""  # backfill scheduler tuning (empty = default backfill)
+#slurm_enable_preempt: true  # QOS preemption (PreemptType=preempt/qos, PreemptMode=REQUEUE)
+#slurm_min_job_age: 300  # completed-job in-memory retention (seconds)
+#slurm_return_to_service: 1  # DOWN node returns: 0=manual, 1=if non-responsive, 2=always
+#slurm_prolog_flags: "Alloc,Serial,Contain"  # Serial = run prolog/epilog serially per node; Contain implies Alloc
+#slurm_select_type_parameters: "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK"  # cons_tres select; CR_ONE_TASK_PER_CORE = one task per core
+#slurm_priority_flags: "DEPTH_OBLIVIOUS"  # DEPTH_OBLIVIOUS = depth-insensitive fairshare
+#slurm_priority_decay_halflife: "7-0"  # fairshare usage half-life (e.g. 3-0 = 3 days)
+#slurm_priority_weight_fairshare: 100000  # fairshare weight (its ratio to PriorityWeightQOS=10000 matters)
+#slurm_dbd_commit_delay: 1  # slurmdbd: batch DB commits (recommended for high throughput)
+#slurm_topology_plugin: "topology/tree"  # multi-rack clusters (needs topology.conf)
+#slurm_acct_account: compute-account  # sacctmgr account new users are added to
+#slurm_acct_organization: deepops  # sacctmgr Organization label
+#slurmctl_config_dir: /sw/.slurm  # NFS-shared dir when slurm_conf_symlink: true
+#slurm_ha_state_save_location: /sw/slurm  # shared storage when slurm_enable_ha: true
+#slurm_exporter_container: "your-registry/prometheus-slurm-exporter:tag"  # custom slurm exporter image
 
 # --- Alertmanager Slack alerts (empty = no slack receiver) --------------------
 #alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
