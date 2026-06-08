@@ -47,7 +47,9 @@
   ansible.builtin.shell: |
     . /etc/profile.d/00-modulepath.sh &&
     . /etc/profile.d/lmod.sh          &&
-    . /etc/profile.d/z01_eb.sh         &&
+    . /etc/profile.d/z01_eb.sh        &&
+    module purge                      &&
+    module load EasyBuild             &&
     eb --parallel=16 "{{ item }}" --robot
   with_items:
     - "{{ eb_files | sort() }}"
