@@ -63,7 +63,7 @@
     - "{{ slurm_config_dir }}/shared"
     - "{{ slurm_config_dir }}/shared/bin"
     - /var/log/slurm
-    - /var/spool/slurm/d
+    - /var/spool/slurmd
   tags:
     - prolog
     - epilog
