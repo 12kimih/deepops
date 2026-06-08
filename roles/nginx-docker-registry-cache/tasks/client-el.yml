@@ -36,6 +36,9 @@
         group: "root"
         mode: "0644"
       register: download_ca_cert
+      until: download_ca_cert is succeeded
+      retries: 5
+      delay: 10
     - name: Update CA cert bundle
       ansible.builtin.command: update-ca-trust
       when: download_ca_cert.changed

@@ -16,6 +16,10 @@
     dest: "{{ sm_files_path }}"
     update: true
     version: "{{ sm_files_repo_version }}"
+  register: eb_easyconfigs_download
+  until: eb_easyconfigs_download is succeeded
+  retries: 5
+  delay: 10
   when: sm_install_default
 
 - name: "Check the sm_files_path is reachable"

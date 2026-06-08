@@ -16,6 +16,10 @@
     repo: https://github.com/NVIDIA/cuda-samples.git
     clone: true
     dest: "{{ gpu_test_cuda_dir }}"
+  register: cuda_samples_download
+  until: cuda_samples_download is succeeded
+  retries: 5
+  delay: 10
   when: gpu_test_build
   ignore_errors: true
 

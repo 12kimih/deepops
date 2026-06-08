@@ -40,6 +40,9 @@
     group: root
     mode: "0644"
   register: nvidia_container_toolkit_key
+  until: nvidia_container_toolkit_key is succeeded
+  retries: 5
+  delay: 10
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Ubuntu | install NVIDIA Container Toolkit GPG keyring

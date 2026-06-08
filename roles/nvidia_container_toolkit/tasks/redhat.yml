@@ -13,6 +13,9 @@
     group: root
     mode: "0644"
   register: nvidia_container_toolkit_yum_repo
+  until: nvidia_container_toolkit_yum_repo is succeeded
+  retries: 5
+  delay: 10
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Red Hat | install NVIDIA Container Toolkit
