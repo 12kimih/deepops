@@ -56,10 +56,14 @@
 - name: Install software
   import_playbook: generic/software.yml
 
+# NOTE (local fork change): default is the whole [slurm-nfs] GROUP, not slurm-nfs[0],
+# so multiple NFS servers (e.g. master=/home,/sw + gpu8=/scratch) are all set up in one
+# run. nfs_server_group from group_vars is NOT visible here (import_playbook hostlist is
+# resolved before group_vars load) -- drive NFS hosts via the [slurm-nfs] inventory group.
 - name: Set up NFS filesystem | Install nfs-server
   import_playbook: generic/nfs-server.yml
   vars:
-    hostlist: "{{ nfs_server_group | default('slurm-nfs[0]') }}"
+    hostlist: "{{ nfs_server_group | default('slurm-nfs') }}"
   when: slurm_enable_nfs_server
 
 - name: Set up NFS filesystem | Install nfs-client
