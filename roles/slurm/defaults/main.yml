@@ -170,7 +170,9 @@ hwloc_version: 2.13.0
 hwloc_tag: "v{{ hwloc_version.split('.')[0] }}.{{ hwloc_version.split('.')[1] }}"
 hwloc_src_url: "https://download.open-mpi.org/release/hwloc/{{ hwloc_tag }}/hwloc-{{ hwloc_version }}.tar.gz"
 hwloc_install_prefix: /opt/deepops/hwloc
-hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-static --disable-cairo --disable-libxml2 --enable-netloc --enable-plugins"
+# Netloc was removed from hwloc in 2.10.0, so --enable-netloc is a dead flag on
+# the pinned 2.13.0 (ignored with a warning). Slurm only needs the topology lib.
+hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-static --disable-cairo --disable-libxml2 --enable-plugins"
 hwloc_force_rebuild: false
 
 slurm_include_pmix: true

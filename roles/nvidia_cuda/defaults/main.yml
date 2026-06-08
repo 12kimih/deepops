@@ -29,7 +29,10 @@ nvidia_driver_rhel_cuda_repo_baseurl: "https://developer.download.nvidia.com/com
 nvidia_driver_rhel_cuda_repo_gpgkey: "https://developer.download.nvidia.com/compute/cuda/repos/{{ _rhel_repo_dir }}/D42D0685.pub"
 
 # Ubuntu
-old_nvidia_driver_ubuntu_cuda_repo_gpgkey_id: "7fa2af80"
+# Network repo per the official CUDA Installation Guide: install the
+# cuda-keyring package (developer.download.nvidia.com/compute/cuda/repos/
+# <distro>/<arch>/), then apt-get update + install. The old apt-key method
+# (and its 7fa2af80 key id) is deprecated and no longer used.
 nvidia_driver_ubuntu_cuda_repo_baseurl: "https://developer.download.nvidia.com/compute/cuda/repos/{{ _ubuntu_repo_dir }}"
 nvidia_driver_ubuntu_cuda_keyring_package: "cuda-keyring_1.1-1_all.deb"
 nvidia_driver_ubuntu_cuda_keyring_url: "{{ nvidia_driver_ubuntu_cuda_repo_baseurl }}/{{ nvidia_driver_ubuntu_cuda_keyring_package }}"
