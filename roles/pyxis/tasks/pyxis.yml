@@ -82,6 +82,13 @@
     - Restart slurmd
   tags: pyxis
 
+- name: Create plugstack.conf.d directory
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/plugstack.conf.d"
+    state: directory
+    mode: "0755"
+  tags: pyxis
+
 - name: Copy pyxis plugstack file
   ansible.builtin.template:
     src: etc/slurm/plugstack.conf.d/pyxis.conf
