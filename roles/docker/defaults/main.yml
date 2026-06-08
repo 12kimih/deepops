@@ -1,0 +1,31 @@
+---
+# Install Docker CE from Docker's official repository, following the official docs:
+#   Ubuntu: https://docs.docker.com/engine/install/ubuntu/
+#   Debian: https://docs.docker.com/engine/install/debian/
+#   RHEL:   https://docs.docker.com/engine/install/rhel/ (centos repo for EL clones)
+#
+# The full Docker Engine package set per the docs (engine + CLI + containerd + the
+# buildx and compose plugins).
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Wait up to this many seconds for the apt/dpkg lock instead of failing immediately --
+# unattended-upgrades on a freshly booted node often holds it (the classic
+# "dpkg frontend lock was locked by another process" error).
+docker_apt_lock_timeout: 300
+
+# Debian/Ubuntu apt repo (deb822 .sources, the current official format).
+docker_apt_keyring: /etc/apt/keyrings/docker.asc
+docker_apt_sources: /etc/apt/sources.list.d/docker.sources
+
+# RHEL-family dnf repo. The centos repo works on RHEL/Rocky/Alma/CentOS; override to
+# .../rhel/docker-ce.repo for a Red Hat subscription host if you prefer.
+docker_rh_repo_url: "https://download.docker.com/linux/centos/docker-ce.repo"
+
+# Manage + start the docker service after install.
+docker_service_enabled: true
+docker_service_state: started
