@@ -32,58 +32,14 @@ hosts_add_ansible_managed_hosts_groups: ["slurm-cluster"]
 slurm_enable_ha: false
 slurm_ha_state_save_location: "/sw/slurm"
 
-# Slurm configuration is auto-generated from templates in the `slurm` role.
-# There are three levels of customization, from least to most invasive:
-#
-# 1) Tunables (below) tweak individual slurm.conf options.
-# 2) The *_raw lists inject literal, hand-tuned node/partition/gres lines while
-#    keeping the role's best-practice base (the common case for fixed hardware).
-# 3) The *_conf_template vars point at your OWN template file for total control.
-#    (Point them at an absolute path on the Ansible controller, e.g. under config/.)
-#
+# Slurm config files. For full control, point these at your own complete templates
+# under config/files/slurm/ (the role renders them verbatim); otherwise the role
+# generates them from gathered facts and roles/slurm/defaults/main.yml.
 #slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf.j2"
 #slurm_cgroup_conf_template: "{{ inventory_dir }}/files/slurm/cgroup.conf.j2"
 #slurm_gres_conf_template: "{{ inventory_dir }}/files/slurm/gres.conf.j2"
 #slurm_dbd_conf_template: "{{ inventory_dir }}/files/slurm/slurmdbd.conf.j2"
 #slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
-
-# --- Server-specific hardware (option 2) ------------------------------------
-# Literal lines that replace the auto-detected node/partition/gres sections.
-# Leave empty ([]) to auto-detect CPUs/GPUs/memory from gathered facts.
-# Keep these in your git-untracked config/ (see the private-repo note at the end).
-# Examples are realistic modern 8-GPU AI nodes; adjust NodeAddr, CPU/RealMemory,
-# the gpu Type, and counts to your hardware. Mix node types freely (one line each).
-#slurm_nodes_raw:
-#  - "NodeName=b200-[01-16] NodeAddr=10.0.0.[1-16] CPUs=112 Boards=1 SocketsPerBoard=2 CoresPerSocket=56 ThreadsPerCore=1 RealMemory=2063000 Gres=gpu:b200:8 State=UNKNOWN"
-#  - "NodeName=h100-[01-08] NodeAddr=10.0.1.[1-8] CPUs=112 Boards=1 SocketsPerBoard=2 CoresPerSocket=56 ThreadsPerCore=1 RealMemory=2063000 Gres=gpu:h100:8 State=UNKNOWN"
-#  # other GPU types use the same shape -- change Gres=gpu:<type>:<count> (e.g. h200, b300, l40s)
-#slurm_partitions_raw:
-#  - "PartitionName=b200 Nodes=b200-[01-16] Default=YES State=UP DefCpuPerGPU=14 DefMemPerCPU=16000 MaxTime=7-00:00:00 OverSubscribe=NO"
-#  - "PartitionName=h100 Nodes=h100-[01-08] State=UP DefCpuPerGPU=14 DefMemPerCPU=16000 MaxTime=7-00:00:00 OverSubscribe=NO"
-#slurm_gres_raw:
-#  - "NodeName=b200-[01-16] AutoDetect=nvml"
-#  - "NodeName=h100-[01-08] AutoDetect=nvml"
-
-# --- AI/ML slurm.conf tunables (role defaults are sensible; override here) -----
-#slurm_accounting_tres: "gres/gpu,gres/gpu:h100,gres/gpu:b200"  # typed GPU billing -- one gres/gpu:<type> per GPU model
-#slurm_tres_billing_weights: "CPU=1.0,Mem=0.25G,GRES/gpu=2.0"  # global GPU billing weights (or per-partition TRESBillingWeights)
-#slurm_accounting_enforce: "associations,limits,qos"  # enforce associations/limits/QOS (after sacctmgr; add 'safe')
-#slurm_scheduler_parameters: ""  # backfill scheduler tuning (empty = default backfill)
-#slurm_enable_preempt: true  # QOS preemption (PreemptType=preempt/qos, PreemptMode=REQUEUE)
-#slurm_min_job_age: 300  # completed-job in-memory retention (seconds)
-#slurm_return_to_service: 1  # DOWN node returns: 0=manual, 1=if non-responsive, 2=always
-#slurm_prolog_flags: "Alloc,Serial,Contain"  # Serial = run prolog/epilog serially per node; Contain implies Alloc
-#slurm_select_type_parameters: "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK"  # cons_tres select; CR_ONE_TASK_PER_CORE = one task per core
-#slurm_priority_flags: "DEPTH_OBLIVIOUS"  # DEPTH_OBLIVIOUS = depth-insensitive fairshare
-#slurm_priority_decay_halflife: "7-0"  # fairshare usage half-life (e.g. 3-0 = 3 days)
-#slurm_priority_weight_fairshare: 100000  # fairshare weight (its ratio to PriorityWeightQOS=10000 matters)
-#slurm_dbd_commit_delay: 1  # slurmdbd: batch DB commits (recommended for high throughput)
-#slurm_topology_plugin: "topology/tree"  # multi-rack clusters (needs topology.conf)
-#slurm_acct_account: compute-account  # sacctmgr account new users are added to
-#slurm_acct_organization: deepops  # sacctmgr Organization label
-#slurmctl_config_dir: /sw/.slurm  # NFS-shared dir when slurm_conf_symlink: true
-#slurm_ha_state_save_location: /sw/slurm  # shared storage when slurm_enable_ha: true
-#slurm_exporter_container: "your-registry/prometheus-slurm-exporter:tag"  # custom slurm exporter image
 
 # --- Alertmanager Slack alerts (empty = no slack receiver) --------------------
 #alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
