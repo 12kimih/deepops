@@ -76,50 +76,10 @@ slurm_dbd_conf_template: "etc/slurm/slurmdbd.conf"
 # (config.example/files/slurm/job_submit.lua is a starting point). Empty = none.
 slurm_job_submit_template: ""
 
-# --- Server-specific overrides (set these in config/group_vars/slurm-cluster.yml) ---
-# Literal lines that replace the auto-detected node/partition/gres sections, so a
-# site can hand-tune hardware without editing the role. Empty = auto-generate.
-# For TOTAL control, point slurm_conf_template (above) at your own template file.
-slurm_nodes_raw: []        # literal NodeName= lines (override CPU/GPU auto-detect)
-slurm_partitions_raw: []   # literal PartitionName= lines (replace the batch default)
-slurm_gres_raw: []         # literal gres.conf lines (per-NodeName AutoDetect/Type/MIG/MPS)
-
-# --- slurm.conf tunables (best-practice defaults for an AI/ML GPU cluster) ---
-# https://slurm.schedmd.com/archive/slurm-25.11.6/slurm.conf.html
-slurm_select_type_parameters: "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK"
-# Empty by default so a fresh cluster runs before sacctmgr associations/QOS exist.
-# Once accounts/QOS are set up, set "associations,limits,qos,safe" to enforce them.
-slurm_accounting_enforce: ""
-slurm_accounting_tres: "gres/gpu"   # add gres/gpu:<type> entries for mixed fleets
-slurm_scheduler_parameters: "bf_continue,bf_window=4320,bf_resolution=120,bf_max_job_test=1000,default_queue_depth=500,bf_busy_nodes"
-slurm_health_check_node_state: "IDLE"
-slurm_default_mem_per_cpu: 0        # 0 = unlimited; set a value to bound --mem-less jobs
-# slurm_default_cpu_per_gpu: 8      # CPUs per GPU for GPU-only requests (optional)
-# slurm_prolog_flags: "Contain"    # override the computed PrologFlags (optional)
-
-# Multifactor priority + fairshare. Fairshare + QOS weights always render; Age,
-# Partition and TRES weights are OPT-IN (set them in config/group_vars to render).
-# PriorityWeightTRES="GRES/gpu=1000" makes GPU-hours drive fairshare, but is redundant
-# when partitions already set per-partition TRESBillingWeights -- leave it unset then.
-slurm_enable_fairshare: true
-# slurm_priority_flags: "DEPTH_OBLIVIOUS"      # opt-in (classic-fairshare depth fix)
-slurm_priority_decay_halflife: "7-0"
-slurm_priority_weight_fairshare: 100000
-slurm_priority_weight_qos: 10000
-# slurm_priority_weight_age: 1000              # opt-in
-# slurm_priority_weight_partition: 10000       # opt-in (needs partition PriorityTier)
-# slurm_priority_weight_tres: "GRES/gpu=1000"  # opt-in (redundant with TRESBillingWeights)
-slurm_min_job_age: 300                          # completed-job in-memory retention (seconds)
-
-# QOS preemption (REQUEUE frees GPUs cleanly). Off by default.
-slurm_enable_preempt: false
-slurm_preempt_type: "preempt/qos"
-slurm_preempt_mode: "REQUEUE"
-
-# Optional plugins (empty = disabled). "lua" deploys job_submit.lua;
-# "topology/tree" needs a topology.conf.
+# job_submit plugin (empty = none; "lua" deploys the job_submit.lua you supply via
+# slurm_job_submit_template). All other slurm.conf tuning belongs in your own complete
+# template under config/files/slurm/ (slurm_conf_template), not in role variables.
 slurm_job_submit_plugins: ""
-slurm_topology_plugin: ""
 
 # Build the slurmrestd REST API (pulls extra dev headers; off by default).
 slurm_build_slurmrestd: false
