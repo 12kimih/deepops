@@ -328,7 +328,7 @@ slurm_enable_monitoring: true
 slurm_monitoring_group: "slurm-master"
 
 # Grafana web UI port (role default 3000). Override if 3000 is taken.
-#grafana_port: 59001
+#grafana_port: 3001
 
 ################################################################################
 # Logging with rsyslog                                                         #

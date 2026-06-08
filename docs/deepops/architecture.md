@@ -23,8 +23,7 @@ Template folder for `config` folder generated after running `scripts/setup.sh`.
 │   ├── group_vars
 │   ├── helm
 │   ├── host_vars
-│   ├── playbooks
-│   └── pxe
+│   └── playbooks
 ```
 
 ## docs
@@ -69,12 +68,15 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── autofs
 │   ├── cachefilesd
 │   ├── dns-config
+│   ├── docker
 │   ├── docker-login
 │   ├── docker-rootless
 │   ├── easy-build
 │   ├── easy-build-packages
 │   ├── enroot
+│   ├── etc-hosts
 │   ├── facts
+│   ├── galaxy
 │   ├── grafana
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client

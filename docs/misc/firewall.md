@@ -46,7 +46,7 @@ These ports will need to be open to any hosts that will need to open the service
 This port range can also be configured using the `--service-node-port-range` flag.
 If you want to specify a particular port for a given service, in order to control specific access, you can do that using the `nodePort` field in your service configuration.
 
-Pre-configured NodePorts for [DeepOps default service specs](/services) include:
+Pre-configured NodePorts for [DeepOps default service specs](/workloads/services) include:
 
 - `tcp/30500`: Prometheus
 - `tcp/30400`: AlertManager

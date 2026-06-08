@@ -18,7 +18,7 @@
     ufw_cluster_subnet: "10.0.0.0/8"     # CHANGE to your internal cluster CIDR
     ufw_docker_subnet: "172.17.0.0/16"   # Docker default bridge
     ufw_ssh_port: "22"
-    ufw_extra_tcp_ports: []              # e.g. ["59000:59001"] for Grafana/monitoring
+    ufw_extra_tcp_ports: []              # e.g. ["3000", "9090"] for Grafana/Prometheus
   tasks:
     - name: Ensure UFW is installed
       ansible.builtin.package:
