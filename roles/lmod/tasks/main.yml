@@ -74,14 +74,3 @@
     - {src: "00-modulepath.csh.j2", dest: "00-modulepath.csh"}
   tags:
     - configuration
-
-- name: Remove the legacy z00_lmod override scripts (superseded by the distro Lmod init)
-  become: true
-  ansible.builtin.file:
-    path: "/etc/profile.d/{{ item }}"
-    state: absent
-  loop:
-    - z00_lmod.sh
-    - z00_lmod.csh
-  tags:
-    - configuration

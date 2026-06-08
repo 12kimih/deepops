@@ -6,16 +6,6 @@
 # is NOT under a registered MODULEPATH, register that tree yourself. The download+install
 # path runs only where the playbook sets nvidia_cuda_toolkit_install.
 
-- name: Remove superseded CUDA modulepath profile snippets (now registered by the lmod role)
-  ansible.builtin.file:
-    path: "/etc/profile.d/{{ item }}"
-    state: absent
-  loop:
-    - z15_lmod_cuda.sh
-    - z15_lmod_cuda.csh
-    - 00-site-modulepath.sh
-    - 00-site-modulepath.csh
-
 - name: Install CUDA toolkits from the official runfiles
   ansible.builtin.import_tasks: install.yml
   when: nvidia_cuda_toolkit_install | bool
