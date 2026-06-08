@@ -234,6 +234,10 @@
         force: true
         checksum: "sha256:https://dl.k8s.io/release/{{ kubectl_ver }}/bin/{{ kubectl_os }}/{{ kubectl_arch }}/kubectl.sha256"
       environment: "{{ proxy_env if proxy_env is defined else {} }}"
+      register: kubectl_host_download
+      until: kubectl_host_download is succeeded
+      retries: 5
+      delay: 10
       delegate_to: localhost
       run_once: true
       when: local_uname.stdout != remote_uname.stdout

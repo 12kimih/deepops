@@ -27,6 +27,10 @@
     repo: "{{ spack_repo }}"
     dest: "{{ spack_install_dir }}"
     version: "{{ spack_version }}"
+  register: spack_clone_download
+  until: spack_clone_download is succeeded
+  retries: 5
+  delay: 10
 
 - name: Set up spack profile scripts
   ansible.builtin.template:

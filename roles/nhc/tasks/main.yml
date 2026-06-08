@@ -48,6 +48,10 @@
     dest: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
     mode: "0644"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  register: nhc_src_download
+  until: nhc_src_download is succeeded
+  retries: 5
+  delay: 10
   when: nhc_build
 
 - name: Extract nhc src
@@ -55,6 +59,10 @@
     src: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
     dest: "{{ nhc_build_dir }}/"
     remote_src: true
+  register: nhc_extract_download
+  until: nhc_extract_download is succeeded
+  retries: 5
+  delay: 10
   when: nhc_build
 
 - name: Configure nhc

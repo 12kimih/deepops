@@ -85,6 +85,10 @@
     dest: "{{ openmpi_build_dir }}"
     extra_opts:
       - --strip-components=1
+  register: openmpi_src_download
+  until: openmpi_src_download is succeeded
+  retries: 5
+  delay: 10
   when: openmpi_build
 
 - name: Uninstall old openmpi version

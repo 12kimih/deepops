@@ -39,6 +39,10 @@
     url: "{{ cuda_base_url }}/{{ item.version }}/local_installers/{{ item.runfile }}"
     dest: "{{ cuda_cache_dir }}/{{ item.runfile }}"
     mode: "0644"
+  register: cuda_runfile_download
+  until: cuda_runfile_download is succeeded
+  retries: 5
+  delay: 10
   loop: "{{ cuda_to_install }}"
   loop_control:
     label: "{{ item.version }}"
