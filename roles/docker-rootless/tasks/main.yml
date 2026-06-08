@@ -46,11 +46,6 @@
     - "00-rootlessdocker-modulepath.sh"
     - "00-rootlessdocker-modulepath.csh"
 
-- name: Remove the superseded z96 rootless docker modulepath snippet
-  ansible.builtin.file:
-    path: "/etc/profile.d/z96_rootlessdocker_modules.sh"
-    state: absent
-
 - name: Check if rootless docker already installed successfully
   ansible.builtin.stat:
     path: "{{ rootlessdocker_install_dir }}/config/install_success"
