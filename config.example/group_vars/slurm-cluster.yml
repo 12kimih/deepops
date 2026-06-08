@@ -237,8 +237,8 @@ slurm_install_hpcsdk: false
 #hpcsdk_major_version: ""
 #hpcsdk_minor_version: ""
 #hpcsdk_file_cuda: ""
-#hpcsdk_default_cuda: ""
 #hpcsdk_arch: "x86_64"
+#hpcsdk_default_cuda: ""
 
 # In a Slurm cluster, default to setting up HPC SDK as modules rather than in
 # the default user environment
