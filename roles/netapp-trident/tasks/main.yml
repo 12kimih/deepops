@@ -7,6 +7,10 @@
     dest: "{{ deepops_dir }}"
     remote_src: true
     creates: "{{ deepops_dir }}/trident-installer/tridentctl"
+  register: trident_installer_download
+  until: trident_installer_download is succeeded
+  retries: 5
+  delay: 10
 
 - name: Copy namespace config file to control node
   ansible.builtin.template:

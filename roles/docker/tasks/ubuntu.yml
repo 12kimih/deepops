@@ -28,6 +28,10 @@
     url: "{{ _docker_repo_url }}/gpg"
     dest: "{{ docker_apt_keyring }}"
     mode: "0644"
+  register: docker_gpg_download
+  until: docker_gpg_download is succeeded
+  retries: 5
+  delay: 10
 
 # The repo Architectures field uses `dpkg --print-architecture` (e.g. amd64/arm64).
 - name: Determine the dpkg architecture

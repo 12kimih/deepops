@@ -47,6 +47,10 @@
     dest: "{{ item.dest }}"
     mode: "u=rwx,g=rwx,o=rx"
     force: true
+  register: eb_bootstrap_download
+  until: eb_bootstrap_download is succeeded
+  retries: 5
+  delay: 10
   with_items:
     - url: "{{ eb_bootstrap_url }}"
       dest: "/tmp"

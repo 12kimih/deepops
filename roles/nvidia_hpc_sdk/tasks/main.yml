@@ -37,6 +37,10 @@
     url: "{{ hpcsdk_download_url }}"
     dest: "{{ hpcsdk_dest_download_path }}"
     mode: "0444"
+  register: hpcsdk_download
+  until: hpcsdk_download is succeeded
+  retries: 5
+  delay: 10
 
 - name: Extract archive
   when: not nvhpc_localrc.stat.exists
@@ -45,6 +49,10 @@
     dest: "{{ hpcsdk_temp_dir }}"
     remote_src: true
     creates: "{{ hpcsdk_temp_dir }}/{{ hpcsdk_download_name }}/install"
+  register: hpcsdk_extract
+  until: hpcsdk_extract is succeeded
+  retries: 5
+  delay: 10
 
 - name: Run the installer
   when: not nvhpc_localrc.stat.exists

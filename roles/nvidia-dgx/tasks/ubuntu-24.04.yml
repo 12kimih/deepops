@@ -24,12 +24,20 @@
     url: "{{ dgx_os7_repo_files_url }}"
     dest: "{{ dgx_os7_repo_archive.path }}"
     mode: "0644"
+  register: dgx_os7_repo_files_download
+  until: dgx_os7_repo_files_download is succeeded
+  retries: 5
+  delay: 10
 
 - name: Install DGX OS 7 repository files
   unarchive:
     src: "{{ dgx_os7_repo_archive.path }}"
     dest: /
     remote_src: true
+  register: dgx_os7_repo_install_download
+  until: dgx_os7_repo_install_download is succeeded
+  retries: 5
+  delay: 10
 
 - name: Remove temporary DGX OS 7 repository archive
   file:

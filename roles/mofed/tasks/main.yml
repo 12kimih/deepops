@@ -18,6 +18,10 @@
     url: "{{ mofed_repo_gpg_key }}"
     dest: /usr/share/keyrings/mellanox-doca.asc
     mode: "0644"
+  register: mofed_doca_gpg_download
+  until: mofed_doca_gpg_download is succeeded
+  retries: 5
+  delay: 10
   when: ansible_distribution == "Ubuntu"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
