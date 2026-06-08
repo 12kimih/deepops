@@ -66,7 +66,7 @@
   ansible.builtin.copy:
     dest: "{{ nis_server_securenets_path }}"
     content: |
-      # {{ ansible_managed }}
+      # Ansible managed -- edits will be overwritten (roles/nis_server).
       # NETMASK         NETWORK   -- hosts/networks allowed to query this NIS server.
       {% for line in nis_server_securenets %}
       {{ line }}
