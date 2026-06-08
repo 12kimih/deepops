@@ -71,7 +71,7 @@
     mode: "0755"
   with_items:
     - "{{ slurm_config_dir }}"
-    - /var/spool/slurm/ctld
+    - /var/spool/slurmctld
     - /var/log/slurm
 
 - name: Create slurm directories for nfs sharing
