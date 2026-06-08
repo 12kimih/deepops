@@ -139,6 +139,27 @@
   tags:
     - config
 
+# A SPANK plugin marked `required` in plugstack.conf MUST exist before slurmd starts or
+# slurmd aborts initialization ("cannot open spank_pyxis.so"). A slurm rebuild wipes
+# {{ slurm_install_prefix }}/lib/slurm, deleting the pyxis plugin that the separate, later
+# pyxis play installed on a prior run -- leaving a dangling plugstack entry. Drop it so
+# slurmd can start; the pyxis play (it runs after slurm) rebuilds the plugin against the
+# new slurm and redeploys the conf + restarts slurmd. https://slurm.schedmd.com/spank.html
+- name: Check for the pyxis SPANK plugin
+  ansible.builtin.stat:
+    path: "{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so"
+  register: slurm_pyxis_plugin
+  tags:
+    - config
+
+- name: Drop a dangling pyxis plugstack entry when its plugin is missing
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/plugstack.conf.d/pyxis.conf"
+    state: absent
+  when: not slurm_pyxis_plugin.stat.exists
+  tags:
+    - config
+
 # state: started (not restarted) keeps re-runs idempotent; the "Restart slurmd"
 # notify handlers (slurm.conf/cgroup.conf/gres.conf/pmix changes) do the actual
 # restart only when something changed, instead of bouncing slurmd every run.
