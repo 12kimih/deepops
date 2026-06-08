@@ -28,11 +28,16 @@
     cmd: "dnf config-manager --set-enabled {{ nvidia_driver_rhel_crb_repo }}"
   changed_when: false
 
+# Per the official guide, kernel-devel is pinned to the running kernel while
+# kernel-headers is the unversioned arch package (a single version that tracks
+# the userspace ABI, not the running kernel). Pinning kernel-headers to
+# ansible_kernel can fail to resolve when no matching version is published.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/red-hat-enterprise-linux.html
 - name: Install matching kernel headers and development packages (RHEL/Rocky)
   ansible.builtin.dnf:
     name:
       - "kernel-devel-{{ ansible_kernel }}"
-      - "kernel-headers-{{ ansible_kernel }}"
+      - "kernel-headers"
     state: present
 
 # Gather installed packages so the purge can be skipped when the target driver is
