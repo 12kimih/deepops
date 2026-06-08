@@ -181,6 +181,10 @@ sm_install_host: "slurm-master[0]"
 # so `module avail` finds them with no extra MODULEPATH wiring):
 #cuda_prefix: "{{ sm_prefix }}"
 #cuda_modroot: "{{ sm_module_path }}"
+# Restrict the heavy toolkit download+install to the host(s) that own the shared /sw tree.
+# Defaults to nfs_server_group; set when nfs_server_group has several hosts but only one
+# serves /sw (e.g. a separate /scratch server), so the install does not also run there.
+#cuda_install_hosts: "slurm-master[0]"
 
 ################################################################################
 # NVIDIA HPC SDK                                                               #
