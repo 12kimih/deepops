@@ -155,6 +155,10 @@
     extra_opts:
       - --strip-components=1
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  register: slurm_download
+  until: slurm_download is succeeded
+  retries: 5
+  delay: 10
   when: slurm_build
 
 - name: Clean src dir

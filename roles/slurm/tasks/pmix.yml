@@ -95,6 +95,10 @@
     extra_opts:
       - --strip-components=1
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  register: pmix_download
+  until: pmix_download is succeeded
+  retries: 5
+  delay: 10
   when: pmix_build
 
 - name: Clean pmix src dir
