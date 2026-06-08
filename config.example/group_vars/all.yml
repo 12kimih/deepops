@@ -8,6 +8,15 @@
 #
 
 ################################################################################
+# Ansible                                                                      #
+################################################################################
+# Pin the Python Ansible uses on the managed nodes to the system interpreter, instead
+# of letting it auto-discover a per-user Python (e.g. a uv or pip --user install that
+# happens to be first on the SSH login's PATH). Keeps module deps in one predictable
+# place -- community.docker tasks (registry, monitoring) need requests + docker there.
+#ansible_python_interpreter: /usr/bin/python3
+
+################################################################################
 # /etc/hosts                                                                   #
 ################################################################################
 # When generating /etc/hosts (the etc-hosts role, run by hosts.yml), prefer an address
