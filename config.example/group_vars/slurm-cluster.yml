@@ -147,11 +147,11 @@ nfs_exports:
   - path: /sw      # shared software (Spack / EasyBuild / CUDA modules)
     options: "*(rw,sync,no_root_squash,no_subtree_check)"
 nfs_mounts:
-  # Client mount options below default to a 100GbE+ fabric: nconnect=16
-  # parallel TCP connections reach ~line rate on a single 100G NIC (NetApp). Lower
-  # nconnect to ~4 on 10/25GbE. On a NetApp/ONTAP filer cap rsize/wsize at 262144;
-  # on an InfiniBand fabric consider proto=rdma. See docs/slurm-cluster/slurm-nfs.md
-  # and `man 5 nfs`. Add ",fsc" for FS-Cache (cachefilesd role).
+  # Client mount options below are a starting point -- tune per your network and
+  # storage. nconnect (parallel TCP connections) is the main lever: ~4 on 10/25GbE,
+  # 8-16 on 100GbE+. On a NetApp/ONTAP filer cap rsize/wsize at 262144; on an
+  # InfiniBand fabric consider proto=rdma. Add ",fsc" for FS-Cache (cachefilesd role).
+  # See docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`.
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'
     path: /home
@@ -237,6 +237,7 @@ slurm_install_hpcsdk: false
 #hpcsdk_major_version: ""
 #hpcsdk_minor_version: ""
 #hpcsdk_file_cuda: ""
+#hpcsdk_default_cuda: ""
 #hpcsdk_arch: "x86_64"
 
 # In a Slurm cluster, default to setting up HPC SDK as modules rather than in
