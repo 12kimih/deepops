@@ -1,0 +1,18 @@
+---
+# In-tree Docker CE install (replaces the kubespray submodule's docker role), so the
+# install follows Docker's current official instructions and is not tied to kubespray.
+- name: Install Docker on Debian/Ubuntu
+  ansible.builtin.include_tasks: ubuntu.yml
+  when: ansible_os_family == "Debian"
+
+- name: Install Docker on the RHEL family
+  ansible.builtin.include_tasks: redhat.yml
+  when: ansible_os_family == "RedHat"
+
+- name: Ensure the Docker service is enabled and running
+  ansible.builtin.systemd:
+    name: docker
+    state: "{{ docker_service_state }}"
+    enabled: "{{ docker_service_enabled }}"
+  tags:
+    - molecule-notest

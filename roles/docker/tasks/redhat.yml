@@ -1,0 +1,20 @@
+---
+# Follows https://docs.docker.com/engine/install/centos/ (works on RHEL/Rocky/Alma):
+# dnf-plugins-core + the official docker-ce.repo, then install the Engine + plugins.
+- name: Install dnf-plugins-core
+  ansible.builtin.dnf:
+    name: dnf-plugins-core
+    state: present
+
+- name: Add the Docker CE dnf repository
+  ansible.builtin.get_url:
+    url: "{{ docker_rh_repo_url }}"
+    dest: /etc/yum.repos.d/docker-ce.repo
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install Docker Engine + plugins
+  ansible.builtin.dnf:
+    name: "{{ docker_packages }}"
+    state: present

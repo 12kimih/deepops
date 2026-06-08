@@ -1,0 +1,59 @@
+---
+# Follows https://docs.docker.com/engine/install/ubuntu/ (and .../debian/) verbatim:
+# official GPG key in /etc/apt/keyrings/docker.asc + a deb822 docker.sources repo.
+- name: Set the Docker repo URL for this distro
+  ansible.builtin.set_fact:
+    _docker_repo_url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}"
+
+# "sudo apt-get install ca-certificates curl"
+- name: Install repository prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+    lock_timeout: "{{ docker_apt_lock_timeout }}"
+
+# "sudo install -m 0755 -d /etc/apt/keyrings"
+- name: Create the apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+# "sudo curl -fsSL .../gpg -o /etc/apt/keyrings/docker.asc && sudo chmod a+r ..."
+- name: Add Docker's official GPG key
+  ansible.builtin.get_url:
+    url: "{{ _docker_repo_url }}/gpg"
+    dest: "{{ docker_apt_keyring }}"
+    mode: "0644"
+
+# The repo Architectures field uses `dpkg --print-architecture` (e.g. amd64/arm64).
+- name: Determine the dpkg architecture
+  ansible.builtin.command: dpkg --print-architecture
+  register: _docker_dpkg_arch
+  changed_when: false
+
+# The deb822 repo, with the suite = this release's codename ($VERSION_CODENAME).
+- name: Add the Docker apt repository (deb822)
+  ansible.builtin.copy:
+    dest: "{{ docker_apt_sources }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ _docker_repo_url }}
+      Suites: {{ ansible_distribution_release }}
+      Components: stable
+      Architectures: {{ _docker_dpkg_arch.stdout }}
+      Signed-By: {{ docker_apt_keyring }}
+
+# "sudo apt-get update" then install. lock_timeout rides out unattended-upgrades.
+- name: Install Docker Engine + plugins
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+    lock_timeout: "{{ docker_apt_lock_timeout }}"
