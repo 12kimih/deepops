@@ -105,7 +105,8 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
 
 4. **Server/client socket buffers.** DeepOps now raises the TCP buffers for the NFS
    data path automatically (`nfs_tune_network: true` -> `/etc/sysctl.d/30-nfs-tuning.conf`:
-   `net.core.{r,w}mem_max=16M`, `tcp_{r,w}mem`, `netdev_max_backlog`). Set it false to
+   `net.core.{r,w}mem_max=2147483647` (~2 GiB, the ESnet 100G ceiling), 1 GiB
+   `tcp_{r,w}mem` autotune ceilings, `netdev_max_backlog=300000`). Set it false to
    opt out.
 
 5. **Jumbo frames (MTU 9000) -- often a top win on high-bandwidth networks.** This is a

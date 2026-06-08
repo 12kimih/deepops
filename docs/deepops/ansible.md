@@ -131,7 +131,7 @@ Show host vars: `ansible all -m debug -a 'var=hostvars'`
 
 _SSH Connection_
 
-Ansible is configured by default in DeepOps to use SSH multiplexing to speed up connections. If a target system changes and you have a persistent connection (the default length is 30m), you may need to clean up the control socket to prevent connection errors:
+Ansible is configured by default in DeepOps to use SSH multiplexing to speed up connections. If a target system changes and you have a persistent connection (`ControlPersist` is set to 5m in `ansible.cfg`), you may need to clean up the control socket to prevent connection errors:
 
 ```bash
 find ~/.ssh -type s -delete
