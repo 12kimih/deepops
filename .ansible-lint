@@ -8,6 +8,12 @@
 # octal modes) -- stay enforced in CI and cannot regress.
 profile: production
 
+# Don't auto-install requirements.yml at lint time. The galaxy roles are already
+# vendored under roles/galaxy/ (on roles_path via ansible.cfg) and the collections
+# come from the pip-installed ansible, so the network install only added a flaky
+# GitHub-download step that timed out in CI ("failed to download ... read timed out").
+offline: true
+
 # Exclude external/vendored roles and hardware-specific roles
 exclude_paths:
   - roles/galaxy/
