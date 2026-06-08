@@ -4,14 +4,16 @@ slurm_pam_lib_dir: /lib/x86_64-linux-gnu/security
 # Build dependencies per the Slurm 25.11.x admin quickstart. libdbus-1-dev and
 # libbpf-dev are needed for the cgroup/v2 plugin; libnuma-dev, liblua5.4-dev and
 # libreadline-dev enable NUMA affinity, Lua plugins (job_submit) and interactive
-# scontrol. default-libmysqlclient-dev provides mysql.h for the accounting store
-# (the old libmariadbclient-dev-compat transitional package was removed on Ubuntu
-# 24.04/26.04, so it must not be used).
+# scontrol. libmariadb-dev provides the MariaDB client dev headers (mysql-compatible,
+# incl. mysql.h) for the accounting store -- it exists on 24.04 and coexists with an
+# already-installed MariaDB. Do NOT use default-libmysqlclient-dev: it pulls
+# libmysqlclient-dev (MySQL) which Conflicts/Breaks an installed libmariadb-dev. The old
+# libmariadbclient-dev-compat transitional package was also removed on 24.04, so omit it.
 # https://slurm.schedmd.com/archive/slurm-25.11.6/quickstart_admin.html
 slurm_build_deps:
   - build-essential
   - libmunge-dev
-  - default-libmysqlclient-dev
+  - libmariadb-dev
   - libpam0g-dev
   - libdbus-1-dev
   - libbpf-dev
