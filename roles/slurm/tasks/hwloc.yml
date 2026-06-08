@@ -84,6 +84,10 @@
     extra_opts:
       - --strip-components=1
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  register: hwloc_download
+  until: hwloc_download is succeeded
+  retries: 5
+  delay: 10
   when: hwloc_build
 
 - name: Clean hwloc src dir
