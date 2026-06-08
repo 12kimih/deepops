@@ -1,6 +1,11 @@
 # ansible
 *.retry
 
+# ansible run logs (keep the logs/ dir via .gitkeep, ignore the logs themselves)
+*.log
+/logs/*
+!/logs/.gitkeep
+
 # misc.
 .*.swp
 
