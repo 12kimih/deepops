@@ -93,7 +93,7 @@
     - "z95_nvhpc.csh"
   when: hpcsdk_install_in_path
 
-- name: Register the HPC SDK modulefiles tree with Lmod (sorts before z00_lmod)
+- name: Register the HPC SDK modulefiles tree with Lmod (sorts before lmod.sh)
   ansible.builtin.template:
     src: "{{ item }}"
     dest: "/etc/profile.d/{{ item }}"
