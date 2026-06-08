@@ -1,0 +1,13 @@
+---
+# Applies to the [nis-master] inventory group -- the ONE node that runs the NIS master
+# (ypserv). The nis_server role (run by authentication.yml, which slurm-cluster.yml
+# imports) installs ypserv, sets the NIS domain, writes securenets, and builds the maps
+# with `ypinit -m` (skipped if /var/yp/<domain> already exists, so an existing manual
+# database is preserved). Clients bind to it via nis_domain/nis_server in group_vars/all.yml.
+#nis_make_server: true
+
+# Which client networks may query this NIS server ("NETMASK NETWORK" lines).
+# Role default = localhost + RFC1918; TIGHTEN to your actual cluster subnet.
+#nis_server_securenets:
+#  - "255.0.0.0       127.0.0.0"
+#  - "255.255.255.0   10.0.0.0"

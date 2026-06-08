@@ -249,15 +249,8 @@ golang_gopath: /opt/go/packages
 # CLIENTS: set nis_domain + nis_server (the master's hostname/IP) to bind nodes to NIS.
 #nis_domain: example.com
 #nis_server: 10.0.0.1
-# MASTER SERVER (ypserv): designate the ONE node that runs NIS by putting it in a
-# [nis-master] inventory group, then set these in group_vars/nis-master.yml (or in
-# that host's host_vars). The role installs ypserv, builds the database (ypinit -m),
-# and serves the maps. Restrict who may query it via nis_server_securenets
-# ("NETMASK NETWORK" lines; role default = localhost + RFC1918 -- TIGHTEN to your subnet).
-#nis_make_server: true             # put in group_vars/nis-master.yml or host_vars/<master>.yml
-#nis_server_securenets:
-#  - "255.0.0.0       127.0.0.0"
-#  - "255.255.255.0   10.0.0.0"
+# MASTER SERVER (ypserv): configure it in group_vars/nis-master.yml (a one-host
+# [nis-master] inventory group). See that file.
 
 # Kerberos configuration
 # Playbook: authentication
