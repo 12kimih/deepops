@@ -1,7 +1,7 @@
 ---
 # Install the NVIDIA MIG Manager tooling on all MIG-capable nodes
 # Copy over the custom MIG config to all nodes and apply them
-# Cluster-wide config is set in group_vars/config.yml by mig_manager_profile
+# Cluster-wide config is set in config/group_vars/all.yml by mig_manager_profile
 # Per-node config can be configured in the inventory file
 
 # Check if MIG capabilities and software on nodes

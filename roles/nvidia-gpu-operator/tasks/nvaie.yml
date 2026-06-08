@@ -57,7 +57,7 @@
   ansible.builtin.command: /usr/local/bin/helm repo update
   changed_when: false
 
-# TODO: This is no longer the cae # XXX: This currently installs into the default namespace, as per the GPU Operator docs
+# Installs into the gpu_operator_namespace (created if missing), not the default namespace.
 # https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html
 - name: Install nvidia gpu operator
   ansible.builtin.command: /usr/local/bin/helm upgrade --install "{{ gpu_operator_release_name }}" "{{ gpu_operator_nvaie_chart_name }}" --version "{{
