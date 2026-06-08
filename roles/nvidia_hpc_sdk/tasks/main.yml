@@ -104,11 +104,3 @@
     - "00-nvhpc-modulepath.sh"
     - "00-nvhpc-modulepath.csh"
   when: hpcsdk_install_as_modules
-
-- name: Remove the superseded z95 nvhpc modulepath snippets
-  ansible.builtin.file:
-    path: "/etc/profile.d/{{ item }}"
-    state: absent
-  with_items:
-    - "z95_nvhpc_modules.sh"
-    - "z95_nvhpc_modules.csh"
