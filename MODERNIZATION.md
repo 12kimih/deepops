@@ -69,8 +69,9 @@ and handler renames whose `notify:` callers weren't updated (case-sensitive).
   (open/proprietary), `nvidia_driver_server_branch`, or full override via
   `nvidia_driver_package` / `nvidia_driver_rhel_*`. Optional purge-before-install,
   reboot-if-changed, `nvidia-smi` verify. Multi-OS, doc URLs cited inline.
-- CUDA: `nvidia_cuda_install` (default true) gates the toolkit; the slurm flow
-  keeps `slurm_cluster_install_cuda`.
+- CUDA: `nvidia_cuda_install` (default false -- system CUDA is served as Lmod
+  modules instead, see section 20) gates the toolkit; the slurm flow keeps
+  `slurm_cluster_install_cuda`.
 
 **Why:** The old path listed **both** the dkms and no-dkms `-open` packages and
 the Galaxy role installed each package in a separate `apt` loop -> no coherent
@@ -127,15 +128,14 @@ that is known to work. *(Note: a follow-up docs audit of post-install actions --
 
 ## 4. SLURM 25.11.x compliance  (`5ddd33a3`, `4922b2cb`)
 
-- **cgroup.conf -> cgroup/v2:** `CgroupPlugin=autodetect`, add `ConstrainSwapSpace`,
-  drop the removed `CgroupAutomount` and v1-only Kmem keys.
 - **build deps:** add the cgroup/v2 (`dbus`, `bpf`) and REST-API (`json-c`,
   `http-parser`, `yaml`) libraries plus NUMA, Lua, readline for Ubuntu and EL.
-- **slurm.conf:** cite the 25.11.6 docs/configurator; canonical
-  `TaskPlugin=task/affinity,task/cgroup`. (Already free of the removed
-  `CryptoType`/`FastSchedule`/`cons_res`.)
-- **slurmdbd.conf / gres.conf:** add 25.11.6 doc-reference headers; already
-  compliant (`auth/munge` + `accounting_storage/mysql`; `AutoDetect=nvml`).
+- **slurm.conf / cgroup.conf / slurmdbd.conf / gres.conf:** the role's
+  `etc/slurm/*` templates are kept at the upstream DeepOps baseline (already free
+  of the removed `CryptoType`/`FastSchedule`/`cons_res`; `auth/munge` +
+  `accounting_storage/mysql`; `AutoDetect=nvml`). Full site control of the four
+  files is via complete templates under `config/files/slurm/` pointed to by the
+  `slurm_*_conf_template` vars.
 - **Why:** cgroup/v1 is deprecated in 25.11 and `dbus`/`bpf` are build-time
   requirements for the v2 plugin; the REST/Lua libs were missing.
 - **Refs:** `https://slurm.schedmd.com/archive/slurm-25.11.6/{cgroup.conf,quickstart_admin,slurm.conf,slurmdbd.conf,gres.conf}.html`
@@ -308,31 +308,30 @@ disable (a user's manual workaround) strips userns hardening host-wide and remai
 an opt-in escape hatch (`enroot_apparmor_global_disable`, default false). Expanded
 the inline citations (upstream requirements + the Ubuntu 23.10 blog).
 
-## 14. Slurm 25.11.6 config overhaul + flexibility  (`8247cef2`, `e987d556`, `5db2a738`)
+## 14. Slurm 25.11.6 config flexibility  (`8247cef2`, `e987d556`, `5db2a738`, `2c74689e`)
 
-Driven by a research pass over the official 25.11.6 man pages + AI/ML cluster
-trends; **every doc-backed option is cited inline** to the SchedMD anchors.
+The four `etc/slurm/*` templates in the role (slurm.conf, cgroup.conf, gres.conf,
+slurmdbd.conf) are kept at the **upstream DeepOps baseline** -- an earlier overhaul
+that hard-coded site tunables into them was reverted (`2c74689e`) so the in-tree
+templates stay generic and merge-clean. Full per-file site control is instead via
+**complete templates under `config/files/slurm/`**, selected by the
+`slurm_*_conf_template` vars (`slurm_cgroup_conf_template`, `slurm_gres_conf_template`,
+`slurm_dbd_conf_template`), which default to the baseline templates and can be
+repointed at the git-untracked `config/` overlay.
 
-- **slurm.conf** rebuilt on the official 25.11.6 configurator structure merged with
-  DeepOps templating: `TaskPlugin=task/cgroup,task/affinity` (recommended order);
-  `PrologFlags` drops redundant `Alloc` + throughput-penalty `Serial`;
-  `SelectTypeParameters` drops `CR_ONE_TASK_PER_CORE`; multifactor priority +
-  fairshare with non-zero weights incl. `PriorityWeightTRES=GRES/gpu` (fairshare
-  was inert before); backfill `SchedulerParameters`; `ReturnToService=2`;
-  `HealthCheckNodeState` var; typed `AccountingStorageTRES`; optional/default-off
-  `JobSubmitPlugins=lua`, QOS `Preempt`, `TopologyPlugin`. `AccountingStorageEnforce`
-  is exposed but **empty by default** (a fresh cluster runs before sacctmgr
-  associations exist).
-- **cgroup.conf:** add `SignalChildrenProcesses=yes` (cleanly kills multi-process
-  GPU jobs) + dependency notes (CR_*_Memory, Ubuntu `swapaccount=1`).
-- **gres.conf:** add a `slurm_gres_raw` branch (MIG/MPS/mixed types) + optional
-  `Type=` in the manual fallback; corrected header.
-- **slurmdbd.conf:** `DbdHost` = the slurm-master; fixed stale port/purge/archive
-  comments to the 25.11 names (`Purge*After`, `Archive*`) with month units;
-  `DebugLevel` var; documented `PrivateData`/`CommitDelay`.
-- **Flexibility:** `slurm_nodes_raw` / `slurm_partitions_raw` / `slurm_gres_raw`
-  inject literal hardware lines from the git-untracked `config/`; the existing
-  `slurm_*_conf_template` vars remain a full-file escape hatch; ~25 new tunables.
+- **slurm.conf** stays on the baseline structure: `TaskPlugin=affinity,cgroup`;
+  `PrologFlags=Alloc,Serial` (+ `Contain` when `slurm_contain_ssh`);
+  `SelectType=select/cons_tres` with `CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK,CR_ONE_TASK_PER_CORE`;
+  multifactor priority left commented; `ReturnToService` and `HealthCheckProgram`/
+  `HealthCheckNodeState=IDLE` from the existing vars; `AccountingStorageTRES=gres/gpu`
+  when `slurm_manage_gpus`.
+- **cgroup.conf:** baseline `CgroupAutomount=yes` + `ConstrainCores/Devices/RAMSpace`.
+- **gres.conf:** `AutoDetect=nvml` when `slurm_autodetect_nvml`, else the
+  per-GPU manual fallback derived from node topology facts.
+- **slurmdbd.conf:** baseline `DbdHost=localhost`, `StorageType=accounting_storage/mysql`,
+  the example archive/purge comments, `DebugLevel=4`.
+- **Flexibility:** the `slurm_*_conf_template` vars are the full-file escape hatch
+  for sites that need custom node/partition/gres lines or scheduling policy.
   Documented in `config.example/group_vars/slurm-cluster.yml` and the
   [Slurm guide](docs/slurm-cluster/README.md), incl. the private-config-repo workflow.
 
@@ -366,9 +365,10 @@ cluster, generalizing anything server-specific into config:
 Re-read each project's current install docs and fixed outdated/breaking prereqs:
 
 - **Slurm (Ubuntu):** `libmariadbclient-dev-compat` was **removed on Ubuntu
-  24.04/26.04** (apt failure) -> replaced the mariadb pair with
-  `default-libmysqlclient-dev`; dropped unused `ruby-dev`; `python3-minimal` ->
-  `python3`.
+  24.04/26.04** (apt failure) -> dropped it and kept `libmariadb-dev` for the
+  MariaDB client dev headers (NOT `default-libmysqlclient-dev`, which pulls MySQL's
+  `libmysqlclient-dev` and Conflicts/Breaks an installed `libmariadb-dev`); dropped
+  unused `ruby-dev`; `python3-minimal` -> `python3`.
 - **Slurm (both OS):** moved the slurmrestd-only headers into a new
   `slurm_slurmrestd_deps` installed only when `slurm_build_slurmrestd=true` -- this
   keeps EL10 working (`http-parser-devel` is EPEL-only on EL8/9 and absent on EL10)
@@ -431,8 +431,10 @@ An 18-agent final sweep (deepops<->reference-config parity, per-program docs com
 login/compute idempotency + reboot persistence, and a consistency/corruption
 file-by-file scan over 661 files) surfaced 8 critical issues, all fixed:
 
-- **slurm.conf:** removed `AccountingStorageUser` -- not a valid 25.11.6 keyword and
-  a fatal slurmctld parse error (the DB user comes from `slurmdbd.conf` StorageUser).
+- **requirements.yml / community.mysql, authentication gating, idempotency, reboot
+  persistence, lint-corruption recovery** (below). (The earlier
+  `AccountingStorageUser` removal no longer applies: `2c74689e` reverted slurm.conf
+  to the upstream baseline, which retains `AccountingStorageUser={{ slurm_db_username }}`.)
 - **requirements.yml:** added `community.mysql` (the `mysql_user` task had no
   collection declared, so it would fail to resolve on a clean install).
 - **authentication.yml:** each directory role (move-home-dirs/kerberos/nis/autofs)
@@ -462,17 +464,24 @@ Playbook: `playbooks/slurm-cluster/nvidia-cuda-toolkit.yml`.
 
 ## 21. profile.d / Lmod best-practice overhaul  (`a43200bc`, `1b55c3f8`, `cc74da53`)
 
-- **`z00_lmod.{sh,csh}` now consume `LMOD_SITE_MODULEPATH`.** The custom DeepOps
-  z00_lmod hard-set `MODULEPATH` and sourced `init/bash` directly, so it silently
-  ignored `LMOD_SITE_MODULEPATH` (Lmod's official site hook). Replicated the prepend
-  loop from Lmod's stock `profile.in`, so per-role snippets that register a
-  modulefiles tree actually land on `MODULEPATH` and survive `module reset`.
-- **All site-registration snippets unified** on the `00-*` + `LMOD_SITE_MODULEPATH`
-  pattern (sorted before z00_lmod): cuda (`00-site-modulepath`), nvhpc
-  (`z95_nvhpc_modules` -> `00-nvhpc-modulepath`, which also fixed a doubled MANPATH
-  and two csh syntax bugs), rootless-docker (`z96_*` -> `00-rootlessdocker-*`).
-- **sh/csh parity** for every profile.d script; **`z01_eb.csh`** fixed (bash
-  `unset $(...)` is invalid in csh -> `foreach`/`unsetenv`; EBROOT match anchored).
+- **Lmod init is left to the distro; the role only sets `LMOD_SITE_MODULEPATH`.** The
+  `lmod` role no longer ships a custom `z00_lmod.{sh,csh}` (which hard-set `MODULEPATH`
+  and sourced `init/bash` directly). It now deploys `00-modulepath.{sh,csh}`, which
+  only export `LMOD_SITE_MODULEPATH={{ sm_module_path }}` (Lmod's official site hook).
+  The distro Lmod package's `/etc/profile.d/lmod.sh` does the `module`-command init and
+  prepends every `LMOD_SITE_MODULEPATH` entry to `MODULEPATH` (preserved across
+  `module reset`). The `00-` prefix sorts before `lmod.sh` so the variable is set first.
+- **Site-registration snippets unified** on the `00-*` + `LMOD_SITE_MODULEPATH`
+  pattern (sorted before `lmod.sh`): `nvidia_cuda_toolkit` ships **no** modulepath
+  snippet at all (the shared tree `sm_module_path` is registered once by the `lmod`
+  role, and `cuda_modroot` defaults to `sm_module_path`); nvhpc ships
+  `00-nvhpc-modulepath.{sh,csh}` (modules mode, `hpcsdk_install_as_modules`) or
+  `z95_nvhpc.{sh,csh}` (in-path/compiler-PATH mode, `hpcsdk_install_in_path`);
+  rootless-docker ships `00-rootlessdocker-modulepath.{sh,csh}` (was
+  `z96_rootlessdocker_modules.sh`).
+- **easy-build `z01_eb.{sh,csh}`** now only set the `EASYBUILD_*` env (prefix +
+  modules tool); the build-time `module purge`/`module load EasyBuild` is done by the
+  build step, not a login script. **sh/csh parity** for every profile.d script.
 Grounded in lmod.readthedocs.io/.../090_configuring_lmod.html and Lmod's init/profile.in.
 
 ## 22. MPI stack -- PMIx 5.0.10 + OpenMPI 5.0.10  (`16226705`, `075c9489`)
@@ -504,8 +513,9 @@ Scrubbed real-looking NetApp creds from the committed example; made the logging 
 overridable; documented the new tunables (`nfs_server_threads`, `nfs_tune_network`,
 `grafana_port`, `locale_lang`) and de-staled the spack example. The gitignored
 `config/` overlay is built to replicate a real site's cluster (real inventory,
-`slurm_nodes_raw`/`partitions_raw`/`gres_raw`, NFS exports/mounts, job_submit
-routing, ports) and diffed against `config.example`. Default install posture set to:
+full-file Slurm templates under `config/files/slurm/` via `slurm_*_conf_template`,
+NFS exports/mounts, job_submit routing, ports) and diffed against `config.example`.
+Default install posture set to:
 driver **on** (branch 595, GPU-gated), system CUDA **off** (served as Lmod modules),
 HPC SDK **off**, spack build **off**. node_exporter now mounts the host rootfs
 (`--path.rootfs=/host`) so its filesystem metrics describe the node, not the container.
@@ -561,12 +571,11 @@ Values verified against ESnet, NetApp ONTAP, RHEL, and NVIDIA DGX BasePOD docs.
 `job_submit.lua` is no longer generated from routing vars -- users supply their own
 (`config.example/files/slurm/job_submit.lua` is a starting point) and the role
 copies it **verbatim** (`copy`, not `template` -- lua `{{` table literals would break
-Jinja) with an assert when the lua plugin is enabled. Added optional per-partition
-`TRESBillingWeights` (`slurm_tres_billing_weights`) so GPU usage -- not CPU count --
-drives fairshare / GrpTRESMins billing (the one gap the 2026 AI/ML standard-practice
-review found). config.example node/partition/gres + tunables examples generalized to
-modern 8-GPU nodes (B200 baseline, comments kept general). `MaxTime` INFINITE->UNLIMITED
-(the documented `MaxTime` keyword + default).
+Jinja) with an assert when the lua plugin is enabled. config.example
+node/partition/gres + tunables examples generalized to modern 8-GPU nodes (B200
+baseline, comments kept general); the partition `MaxTime` example (config.example
+`slurm_max_job_timelimit`) uses the documented `UNLIMITED` keyword (the role's
+baseline template default is `INFINITE` when the var is unset).
 
 ## 30. enroot CLI permissions  (`20dca8f0`)
 
