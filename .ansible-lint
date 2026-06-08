@@ -15,6 +15,12 @@ exclude_paths:
   - roles/nvidia-dgx-firmware/
   - roles/nvidia-gpu-tests/
   - submodules/
+  # Molecule scenarios are test scaffolding (hosts: all playbooks). The standalone
+  # `ansible-lint roles/` job syntax-checks them, which fails in CI without the full
+  # molecule/galaxy/collections environment (collection version skew between the
+  # pip-bundled and project-required community.* versions). They are exercised by
+  # `molecule test` (the molecule workflow) instead.
+  - roles/*/molecule/
 
 # Pre-existing, higher-risk issues that are NOT auto-fixable and are being
 # addressed incrementally as each subsystem is modernized. These are the only
