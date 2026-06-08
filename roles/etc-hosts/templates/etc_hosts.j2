@@ -24,12 +24,12 @@ ff02::2  ip6-allrouters
 {% endif %}
 
 {% if hosts_add_ansible_managed_hosts %}
-# 
+#
 # Hosts managed by Ansible
 #
 {% for group in hosts_add_ansible_managed_hosts_groups %}
 {% for host in groups[group]|sort %}
-{% if 'ansible_interfaces' in hostvars[host] %}
+{% if 'ansible_interfaces' in hostvars[host] -%}
 # {{ host }}
 {% set my_interfaces = hostvars[host]['ansible_interfaces']|select('match', '(?!^(' + hosts_exclude_interfaces|join('|') + ')).*')|default(None) -%}
   {% if hosts_network_interface[host] is defined -%}
@@ -42,16 +42,13 @@ ff02::2  ip6-allrouters
   {% for interface in my_interfaces|sort -%}
     {% set interface_facts = hostvars[host]['ansible_' + interface] -%}
     {% set primary_addr = interface_facts.get(hosts_ip_protocol, {}).get('address', None) -%}
-    {%- if hosts_internal_subnet_prefix is defined and hosts_internal_subnet_prefix %}
-    {# Prefer an address on the internal cluster subnet (e.g. a secondary IP on the
-       interface) so /etc/hosts resolves nodes to their cluster network rather than a
-       management/public NIC. Set hosts_internal_subnet_prefix (e.g. "10.0.") to enable. #}
-    {% set _secondaries = interface_facts.get(hosts_ip_protocol + '_secondaries', []) -%}
-    {% set _internal = (_secondaries | selectattr('address', 'match', '^' + (hosts_internal_subnet_prefix | regex_escape)) | list | first) | default(None) -%}
-    {% set addr = _internal.address if _internal else primary_addr -%}
-    {%- else %}
-    {% set addr = primary_addr -%}
-    {%- endif %}
+    {% set secondaries_list = interface_facts.get(hosts_ip_protocol + '_secondaries', []) -%}
+    {% if hosts_internal_subnet_prefix is defined and hosts_internal_subnet_prefix -%}
+        {% set internal_secondary = (secondaries_list | selectattr('address', 'match', '^' + (hosts_internal_subnet_prefix | regex_escape)) | list | first) | default(None) -%}
+        {% set addr = internal_secondary.address if internal_secondary else primary_addr -%}
+    {% else -%}
+        {% set addr = primary_addr -%}
+    {% endif -%}
     {% if addr -%}
 {% if interface == di -%}
 {% if hosts_interface_domain[host][interface] is defined -%}
@@ -74,9 +71,9 @@ ff02::2  ip6-allrouters
 {% endif -%}
     {% endif -%}
   {% endfor -%}
-{% else %}
+{% else -%}
 # {{ host }} (skipped: facts not gathered, host unreachable?)
-{% endif %}
+{% endif -%}
 {% endfor -%}
 {% endfor -%}
 {% endif -%}
