@@ -1,5 +1,5 @@
 ---
-# roles/etc-hosts/handlers/main.yml
+# roles/hosts/handlers/main.yml
 - name: Restart hosts
   ansible.builtin.service:
     name: hostsd

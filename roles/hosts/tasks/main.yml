@@ -1,5 +1,5 @@
 ---
-# roles/etc-hosts/tasks/main.yml -- in-tree copy of DeepOps.hosts (was the
+# roles/hosts/tasks/main.yml -- in-tree copy of DeepOps.hosts (was the
 # DeepOps/ansible-role-hosts galaxy role), with a configurable internal-subnet
 # address preference in templates/etc_hosts.j2.
 - name: Gather facts again
