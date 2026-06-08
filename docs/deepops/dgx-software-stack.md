@@ -12,13 +12,15 @@ The role has two implementation paths:
 
 | Base OS | DGX software path | Notes |
 | ------- | ----------------- | ----- |
-| Ubuntu 18.04 | DGX OS 4 legacy packages | Existing legacy role path. |
-| Ubuntu 20.04 | DGX OS 5 legacy packages | Existing legacy role path. |
 | Ubuntu 22.04 | DGX OS 6 software stack | Uses the official DGX OS 6 repository archive and system-specific packages. |
 | Ubuntu 24.04 | DGX OS 7 software stack | Uses the official DGX OS 7 repository archive and unified `nvidia-system-*` packages. |
-| Red Hat Enterprise Linux 7 | Legacy DGX EL7 packages | Existing legacy role path. |
+| Ubuntu 26.04 | DGX OS 7 software stack | No dedicated DGX OS yet; follows the DGX OS 7 (24.04) path. |
 | Red Hat Enterprise Linux 8 / Rocky Linux 8 | DGX Software for RHEL 8 | Uses the official NVIDIA repository setup RPM and DGX configuration groups. |
 | Red Hat Enterprise Linux 9 / Rocky Linux 9 | DGX Software for RHEL 9 | Uses the official NVIDIA repository setup RPM and DGX configuration groups. |
+| Red Hat Enterprise Linux 10 / Rocky Linux 10 | DGX Software for RHEL family | Uses the official NVIDIA repository setup RPM and DGX configuration groups. |
+
+The legacy DGX OS 4/5 (Ubuntu 18.04/20.04) and RHEL 7 paths have been removed; the
+role now fails on Ubuntu older than 22.04 and on RHEL-family majors older than 8.
 
 The EL8 work addresses GitHub issue
 [#1120](https://github.com/NVIDIA/deepops/issues/1120).

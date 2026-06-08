@@ -88,6 +88,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nginx-docker-registry-cache
 │   ├── nhc
 │   ├── nis_client
+│   ├── nis_server
 │   ├── nvidia-dcgm-exporter
 │   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware

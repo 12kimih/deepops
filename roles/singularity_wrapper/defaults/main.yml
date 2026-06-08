@@ -1,5 +1,5 @@
 ---
-# vars for lecorguille.singularity
+# vars for abims_sbr.singularity
 singularity_version: "4.4.2"
 singularity_conf_path: "/etc/singularity/singularity.conf"
 bind_paths: []
