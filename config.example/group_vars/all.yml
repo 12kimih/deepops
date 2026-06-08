@@ -8,6 +8,15 @@
 #
 
 ################################################################################
+# /etc/hosts                                                                   #
+################################################################################
+# When generating /etc/hosts (the etc-hosts role, run by hosts.yml), prefer an address
+# on this internal subnet prefix (e.g. "10.0.") -- useful when nodes have a secondary
+# IP on the cluster network and hostnames should resolve to it, not a management/public
+# NIC. Unset = use the interface's primary address.
+# hosts_internal_subnet_prefix: "10.0."
+
+################################################################################
 # PROXY
 ################################################################################
 # Proxy Variables needed for scripts, ansible, etc.
