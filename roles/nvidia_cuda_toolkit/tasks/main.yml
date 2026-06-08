@@ -1,26 +1,20 @@
 ---
-# Registering the site modulefiles tree with Lmod runs on every node; the
-# download+install path runs only where the playbook sets
-# nvidia_cuda_toolkit_install (the host that owns the shared software tree).
+# The shared module tree (sm_module_path) is registered with Lmod ONCE, by the lmod role
+# (LMOD_SITE_MODULEPATH). CUDA modulefiles land in cuda_modroot, which defaults to
+# sm_module_path, so this role no longer ships its own profile.d snippet -- it just drops
+# modulefiles into the already-registered tree. If you override cuda_modroot to a path that
+# is NOT under a registered MODULEPATH, register that tree yourself. The download+install
+# path runs only where the playbook sets nvidia_cuda_toolkit_install.
 
-- name: Register the site modulefiles tree with Lmod (LMOD_SITE_MODULEPATH)
-  ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
-    owner: root
-    group: root
-    mode: "0644"
-  loop:
-    - {src: "site-modulepath.sh.j2", dest: "{{ cuda_site_profile }}"}
-    - {src: "site-modulepath.csh.j2", dest: "{{ cuda_site_profile_csh }}"}
-
-- name: Remove superseded CUDA modulepath profile snippets
+- name: Remove superseded CUDA modulepath profile snippets (now registered by the lmod role)
   ansible.builtin.file:
     path: "/etc/profile.d/{{ item }}"
     state: absent
   loop:
     - z15_lmod_cuda.sh
     - z15_lmod_cuda.csh
+    - 00-site-modulepath.sh
+    - 00-site-modulepath.csh
 
 - name: Install CUDA toolkits from the official runfiles
   ansible.builtin.import_tasks: install.yml

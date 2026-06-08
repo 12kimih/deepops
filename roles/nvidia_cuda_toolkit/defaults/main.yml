@@ -15,7 +15,7 @@ nvidia_cuda_toolkit_install: false
 
 # Install + module layout. Reuses the lmod role's sm_* vars so CUDA lands in the
 # same tree Lmod already searches (sm_module_path is placed on MODULEPATH by the
-# lmod role's z00_lmod profile script), which is why no extra registration is
+# lmod role's 00-modulepath profile script), which is why no extra registration is
 # needed on a stock DeepOps slurm cluster.
 cuda_prefix: "{{ sm_prefix | default('/sw') }}"
 cuda_install_root: "{{ cuda_prefix }}/cuda"                        # toolkit -> <root>/<version>
@@ -24,13 +24,6 @@ cuda_modroot: "{{ sm_module_path | default('/sw/modules/all') }}"  # module  -> 
 # Runfile download cache (reused across runs; kept off /tmp in case it is small).
 cuda_cache_dir: "/var/tmp/cuda_runfiles"
 cuda_base_url: "https://developer.download.nvidia.com/compute/cuda"
-
-# profile.d snippets (sh + csh) that register the site modulefiles tree with Lmod
-# using LMOD_SITE_MODULEPATH (the official Lmod site mechanism: read before Lmod
-# init and preserved across `module reset`). Generic -- the tree may hold more
-# than just CUDA. The 00- prefix sorts them before z00_lmod.
-cuda_site_profile: "/etc/profile.d/00-site-modulepath.sh"
-cuda_site_profile_csh: "/etc/profile.d/00-site-modulepath.csh"
 
 # CUDA toolkits to install: the latest patch of each minor from 11.8 to 13.3.
 # Each entry needs the exact runfile name (the embedded driver version is not

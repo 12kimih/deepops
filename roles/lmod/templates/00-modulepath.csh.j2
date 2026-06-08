@@ -1,0 +1,10 @@
+#!/usr/bin/env csh
+# Register the cluster's shared software-module tree with Lmod via LMOD_SITE_MODULEPATH.
+# The distro Lmod init (/etc/profile.d/lmod.csh, from Lmod's profile.in) reads this before
+# setting MODULEPATH, prepends it, and preserves it across `module reset`. Sorts before
+# lmod.csh (00- prefix). https://lmod.readthedocs.io/en/latest/090_configuring_lmod.html
+if ( ! $?LMOD_SITE_MODULEPATH ) then
+    setenv LMOD_SITE_MODULEPATH "{{ sm_module_path }}"
+else
+    setenv LMOD_SITE_MODULEPATH "{{ sm_module_path }}:${LMOD_SITE_MODULEPATH}"
+endif

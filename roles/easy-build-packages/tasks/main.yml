@@ -45,8 +45,9 @@
 
 - name: "Install the selected easybuild modules"
   ansible.builtin.shell: |
-    . /etc/profile.d/z00_lmod.sh &&
-    . /etc/profile.d/z01_eb.sh   &&
+    . /etc/profile.d/00-modulepath.sh &&
+    . /etc/profile.d/lmod.sh          &&
+    . /etc/profile.d/z01_eb.sh         &&
     eb --parallel=16 "{{ item }}" --robot
   with_items:
     - "{{ eb_files | sort() }}"

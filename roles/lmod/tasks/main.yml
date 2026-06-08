@@ -54,52 +54,34 @@
     state: directory
     mode: "0755"
 
-- name: "Configure sh profile"
+# Register the shared software-module tree with Lmod via LMOD_SITE_MODULEPATH (the official
+# site hook). The distro lmod package's /etc/profile.d/lmod.sh -- generated from Lmod's
+# init/profile.in -- initialises the `module` command and prepends every LMOD_SITE_MODULEPATH
+# entry to MODULEPATH (preserved across `module reset`). Our 00- snippet sorts before lmod.sh
+# so the variable is set first. This replaces the old custom z00_lmod.sh, which re-implemented
+# Lmod init and hard-set MODULEPATH -- redundant now that we rely on the distro init.
+# https://lmod.readthedocs.io/en/latest/090_configuring_lmod.html
+- name: Register the shared module tree with Lmod (LMOD_SITE_MODULEPATH)
   become: true
   ansible.builtin.template:
-    src: templates/z00_lmod.sh
-    dest: /etc/profile.d
+    src: "{{ item.src }}"
+    dest: "/etc/profile.d/{{ item.dest }}"
     owner: root
     group: root
-    mode: "0755"
+    mode: "0644"
+  loop:
+    - {src: "00-modulepath.sh.j2", dest: "00-modulepath.sh"}
+    - {src: "00-modulepath.csh.j2", dest: "00-modulepath.csh"}
   tags:
     - configuration
 
-- name: "Configure csh profile"
+- name: Remove the legacy z00_lmod override scripts (superseded by the distro Lmod init)
   become: true
-  ansible.builtin.template:
-    src: templates/z00_lmod.csh
-    dest: /etc/profile.d
-    owner: root
-    group: root
-    mode: "0755"
+  ansible.builtin.file:
+    path: "/etc/profile.d/{{ item }}"
+    state: absent
+  loop:
+    - z00_lmod.sh
+    - z00_lmod.csh
   tags:
     - configuration
-
-- name: "Unset previous lmod setup"
-  ansible.builtin.shell: unset MODULEPATH_ROOT
-  register: unset_lmod_bash
-  args:
-    executable: /bin/bash
-  changed_when: unset_lmod_bash.rc != 0
-
-- name: "Unset previous lmod setup"
-  ansible.builtin.shell: unsetenv MODULEPATH_ROOT
-  register: unset_lmod_csh
-  args:
-    executable: /bin/csh
-  changed_when: unset_lmod_csh.rc != 0
-
-- name: "Auto load lmod"
-  ansible.builtin.shell: . /etc/profile.d/z00_lmod.sh
-  register: load_lmod_bash
-  args:
-    executable: /bin/bash
-  changed_when: load_lmod_bash.rc != 0
-
-- name: "Auto load lmod"
-  ansible.builtin.shell: source /etc/profile.d/z00_lmod.csh
-  register: load_lmod_csh
-  args:
-    executable: /bin/csh
-  changed_when: load_lmod_csh.rc != 0

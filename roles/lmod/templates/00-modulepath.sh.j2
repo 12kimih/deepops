@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Register the cluster's shared software-module tree ({{ sm_module_path }}) with Lmod via
+# LMOD_SITE_MODULEPATH -- the official Lmod site hook. The distro Lmod package ships
+# /etc/profile.d/lmod.sh (generated from Lmod's init/profile.in) which initialises the
+# `module` command AND loops over LMOD_SITE_MODULEPATH, prepending each entry to MODULEPATH
+# via `addto`, so the tree lands on MODULEPATH and survives `module reset`/`module purge`.
+# This file sorts before lmod.sh (00- prefix) so the variable is set before init reads it,
+# per Lmod's guidance to define the modulepath before init runs and NOT to edit MODULEPATH
+# in a later /etc/profile.d file. https://lmod.readthedocs.io/en/latest/090_configuring_lmod.html
+# No stdout here: a print during shell startup corrupts non-interactive sessions (scp/rsync).
+case ":${LMOD_SITE_MODULEPATH:-}:" in
+  *":{{ sm_module_path }}:"*) : ;;
+  *) export LMOD_SITE_MODULEPATH="{{ sm_module_path }}${LMOD_SITE_MODULEPATH:+:${LMOD_SITE_MODULEPATH}}" ;;
+esac
