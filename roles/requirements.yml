@@ -20,7 +20,7 @@ roles:
     name: DeepOps.users
     version: "e67df1db28bf099aa06d0ab250478963532b4d29"
 
-  # DeepOps.hosts (ansible-role-hosts) is now in-tree as roles/etc-hosts.
+  # DeepOps.hosts (ansible-role-hosts) is now in-tree as roles/hosts.
 
   - src: andrewrothstein.miniconda
     version: "v6.1.9"

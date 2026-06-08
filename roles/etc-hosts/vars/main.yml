@@ -1,4 +1,0 @@
-# roles/etc-hosts/vars/main.yml
----
-
-hosts_file: /etc/hosts

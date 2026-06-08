@@ -19,7 +19,7 @@
 ################################################################################
 # /etc/hosts                                                                   #
 ################################################################################
-# When generating /etc/hosts (the etc-hosts role, run by hosts.yml), prefer an address
+# When generating /etc/hosts (the hosts role, run by hosts.yml), prefer an address
 # on this internal subnet prefix (e.g. "10.0.") -- useful when nodes have a secondary
 # IP on the cluster network and hostnames should resolve to it, not a management/public
 # NIC. Unset = use the interface's primary address.

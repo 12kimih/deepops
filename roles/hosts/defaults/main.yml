@@ -1,4 +1,4 @@
-# roles/etc-hosts/defaults/main.yml
+# roles/hosts/defaults/main.yml
 ---
 
 hosts_playbook_version: "1.0.1"

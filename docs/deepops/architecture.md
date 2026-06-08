@@ -74,7 +74,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── easy-build
 │   ├── easy-build-packages
 │   ├── enroot
-│   ├── etc-hosts
+│   ├── hosts
 │   ├── facts
 │   ├── galaxy
 │   ├── grafana
