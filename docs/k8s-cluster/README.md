@@ -126,7 +126,7 @@ Run the following script to create an administrative user and print out the dash
 
 The default behavior of DeepOps is to setup an NFS server on the first `kube_control_plane` node. This temporary NFS server is used by the `nfs-client-provisioner` which is installed as the default StorageClass of a standard DeepOps deployment.
 
-To use an existing nfs server server update the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s_cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s_cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
+To use an existing NFS server, update the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s_cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s_cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
 
 To manually install or re-install the `nfs-client-provisioner` run:
 
