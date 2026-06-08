@@ -1,0 +1,115 @@
+---
+# OPTIONAL firewall hardening -- the counterpart to ufw-disable.yml. Sets UFW to
+# default-deny incoming, then allows only: SSH to the head node, ALL traffic from the
+# internal cluster subnet (so Slurm/munge/NFS/etc. between nodes keep working), the
+# Docker bridge, and any extra ports you expose (e.g. Grafana/monitoring).
+#
+# CUSTOMIZE the vars below for your site, then run:
+#   ansible-playbook -i config/inventory config/playbooks/ufw-enable.yml
+#
+# WARNING: a wrong subnet or SSH rule can lock you out. ufw_cluster_subnet MUST cover
+# the host you run Ansible from -- compute nodes allow no external SSH, only the
+# internal subnet. Test on one node, keep a console/out-of-band path, and run
+# ufw-disable.yml to revert.
+- name: Harden the head node with UFW (allows external SSH)
+  hosts: slurm-master
+  become: true
+  vars:
+    ufw_cluster_subnet: "10.0.0.0/8"     # CHANGE to your internal cluster CIDR
+    ufw_docker_subnet: "172.17.0.0/16"   # Docker default bridge
+    ufw_ssh_port: "22"
+    ufw_extra_tcp_ports: []              # e.g. ["59000:59001"] for Grafana/monitoring
+  tasks:
+    - name: Ensure UFW is installed
+      ansible.builtin.package:
+        name: ufw
+        state: present
+
+    - name: Reset UFW to a clean slate
+      ansible.builtin.command: ufw --force reset
+      changed_when: true
+
+    - name: Default deny incoming
+      community.general.ufw:
+        direction: incoming
+        policy: deny
+
+    - name: Allow SSH
+      community.general.ufw:
+        rule: allow
+        port: "{{ ufw_ssh_port }}"
+        proto: tcp
+        comment: SSH
+
+    - name: Allow the internal cluster subnet (Slurm/munge/NFS/etc.)
+      community.general.ufw:
+        rule: allow
+        src: "{{ ufw_cluster_subnet }}"
+        comment: internal cluster subnet
+
+    - name: Allow the Docker bridge network
+      community.general.ufw:
+        rule: allow
+        src: "{{ ufw_docker_subnet }}"
+        comment: Docker bridge
+
+    - name: Allow extra exposed TCP ports
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+        comment: extra exposed port
+      loop: "{{ ufw_extra_tcp_ports }}"
+
+    - name: Enable and start the UFW service
+      ansible.builtin.systemd:
+        name: ufw
+        state: started
+        enabled: true
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+
+- name: Harden compute nodes with UFW (no external SSH)
+  hosts: slurm-node
+  become: true
+  vars:
+    ufw_cluster_subnet: "10.0.0.0/8"     # CHANGE to your internal cluster CIDR
+    ufw_docker_subnet: "172.17.0.0/16"   # Docker default bridge
+  tasks:
+    - name: Ensure UFW is installed
+      ansible.builtin.package:
+        name: ufw
+        state: present
+
+    - name: Reset UFW to a clean slate
+      ansible.builtin.command: ufw --force reset
+      changed_when: true
+
+    - name: Default deny incoming
+      community.general.ufw:
+        direction: incoming
+        policy: deny
+
+    - name: Allow the internal cluster subnet (Slurm/munge/NFS + SSH from the head node)
+      community.general.ufw:
+        rule: allow
+        src: "{{ ufw_cluster_subnet }}"
+        comment: internal cluster subnet
+
+    - name: Allow the Docker bridge network
+      community.general.ufw:
+        rule: allow
+        src: "{{ ufw_docker_subnet }}"
+        comment: Docker bridge
+
+    - name: Enable and start the UFW service
+      ansible.builtin.systemd:
+        name: ufw
+        state: started
+        enabled: true
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
