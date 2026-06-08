@@ -7,24 +7,73 @@
   ansible.builtin.include_tasks: redhat.yml
   when: ansible_os_family == 'RedHat'
 
+# A reboot is needed when this run installed/upgraded the driver, OR when the kernel
+# module currently RUNNING does not match the one now ON DISK. The second case is the
+# important one for re-runs: once the package is installed, a later run's apt task reports
+# no change (changed=false), so gating the reboot on install.changed ALONE would never
+# re-fire it -- a node whose earlier reboot was skipped or interrupted then stays stuck on
+# the old module and nvidia-persistenced fails with a version mismatch. Comparing the
+# loaded vs on-disk module versions catches that pending reboot on every run.
+- name: Read the running NVIDIA kernel module version
+  ansible.builtin.command: cat /proc/driver/nvidia/version
+  register: nvidia_driver_loaded_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Read the on-disk NVIDIA kernel module version
+  ansible.builtin.command: modinfo -F version nvidia
+  register: nvidia_driver_ondisk_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine whether the NVIDIA driver needs a reboot
+  ansible.builtin.set_fact:
+    nvidia_driver_reboot_needed: >-
+      {{ (nvidia_driver_install is defined and nvidia_driver_install.changed) or
+         ((nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0 and
+          (nvidia_driver_ondisk_version.stdout | trim)
+            not in (nvidia_driver_loaded_version.stdout | default(''))) }}
+
 - name: Reboot to load the new NVIDIA kernel module
   ansible.builtin.reboot:
     msg: "Rebooting to load the new NVIDIA driver"
     reboot_timeout: "{{ nvidia_driver_reboot_timeout }}"
   when:
     - nvidia_driver_reboot | bool
-    - nvidia_driver_install is defined
-    - nvidia_driver_install.changed
+    - nvidia_driver_reboot_needed | bool
 
 # Post-installation actions, run after the reboot so the new module is loaded.
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
 
-# The steps below need the kernel module loaded. That holds unless a fresh install
-# was made AND the reboot was suppressed (nvidia_driver_reboot=false) -- then the
-# operator must reboot manually first, so skip persistence/verify in that case.
-- name: Determine whether the NVIDIA kernel module is loaded
+# Re-read the loaded version AFTER the possible reboot and confirm it now matches the
+# on-disk module. Persistence/verify run only when the module is genuinely loaded and
+# current, so a still-pending reboot (nvidia_driver_reboot=false, or a module that fails
+# to load) skips them with a clear warning instead of a cryptic systemd failure.
+- name: Re-read the running NVIDIA kernel module version (after any reboot)
+  ansible.builtin.command: cat /proc/driver/nvidia/version
+  register: nvidia_driver_loaded_version_post
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine whether the NVIDIA kernel module is loaded and current
   ansible.builtin.set_fact:
-    nvidia_driver_module_loaded: "{{ not (nvidia_driver_install is defined and nvidia_driver_install.changed and not (nvidia_driver_reboot | bool)) }}"
+    nvidia_driver_module_loaded: >-
+      {{ (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0 and
+         (nvidia_driver_ondisk_version.stdout | trim)
+           in (nvidia_driver_loaded_version_post.stdout | default('')) }}
+
+- name: Warn that a manual reboot is needed (NVIDIA module not loaded/current)
+  ansible.builtin.debug:
+    msg: >-
+      The on-disk NVIDIA module ({{ nvidia_driver_ondisk_version.stdout | default('?') | trim }})
+      is not the one running on {{ inventory_hostname }}. Reboot it (or set
+      nvidia_driver_reboot=true) so the new driver loads; skipping persistence/verify.
+  when:
+    - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0
+    - not (nvidia_driver_module_loaded | bool)
 
 # NVIDIA recommends the persistence daemon over the legacy `nvidia-smi -pm 1`
 # ("the daemon approach provides a more elegant and robust solution"; legacy
