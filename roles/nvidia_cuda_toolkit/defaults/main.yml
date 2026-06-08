@@ -7,10 +7,10 @@
 # shared software tree); because that tree is shared, the modules become visible
 # on every node that mounts it. See playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
 
-# Whether the download+install path runs on this host. The playbook turns this
-# on only for the software-tree host; everywhere else the role just registers
-# the modulefiles tree with Lmod (the profile.d snippet). Override with -e or in
-# config/ if your software tree lives on a different host.
+# Whether the download+install path runs on this host. The playbook turns this on only for
+# the software-tree host (the one that owns /sw); everywhere else the role is a near no-op
+# (the shared module tree is registered once by the lmod role, not here). Override with -e
+# or in config/ if your software tree lives on a different host.
 nvidia_cuda_toolkit_install: false
 
 # Install + module layout. Reuses the lmod role's sm_* vars so CUDA lands in the
