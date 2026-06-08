@@ -192,24 +192,22 @@ Read through the [slurm usage guide](slurm-usage.md) and [Open OnDemand guide](o
 ## Customizing the Slurm configuration
 
 The `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, and (optional)
-`job_submit.lua` files are generated from templates in the `slurm` role that
-follow Slurm 25.11.x best practice for AI/ML GPU clusters (each option is cited
-inline to the [official 25.11.6 docs](https://slurm.schedmd.com/archive/slurm-25.11.6/slurm.conf.html)).
-There are three levels of customization, from least to most invasive -- set all of
-these in your git-untracked `config/group_vars/slurm-cluster.yml`:
+`job_submit.lua` files come from templates in the `slurm` role. By default the role
+generates them from gathered facts; to take full control, drop your own **complete**
+template files under `config/files/slurm/` and point the role at them in your
+git-untracked `config/group_vars/slurm-cluster.yml`:
 
-1. **Tunables** -- individual options exposed as variables with sensible defaults
-   (e.g. `slurm_scheduler_parameters`, fairshare/priority weights,
-   `slurm_accounting_tres`, `slurm_accounting_enforce`, `slurm_enable_preempt`).
-2. **Literal hardware overrides** -- inject hand-tuned node/partition/gres lines
-   while keeping the best-practice base. This is the common case for a fixed
-   cluster: set `slurm_nodes_raw`, `slurm_partitions_raw`, and/or `slurm_gres_raw`
-   to lists of literal `NodeName=` / `PartitionName=` / gres lines. Leaving them
-   empty (the default) auto-detects CPUs/GPUs/memory from gathered facts.
-3. **Full-file templates** -- for total control, point `slurm_conf_template`,
-   `slurm_cgroup_conf_template`, `slurm_gres_conf_template`,
-   `slurm_dbd_conf_template`, or `slurm_job_submit_template` at your own file on
-   the Ansible controller (e.g. under `config/files/slurm/`).
+```yaml
+slurm_conf_template:        "{{ inventory_dir }}/files/slurm/slurm.conf.j2"
+slurm_cgroup_conf_template: "{{ inventory_dir }}/files/slurm/cgroup.conf.j2"
+slurm_gres_conf_template:   "{{ inventory_dir }}/files/slurm/gres.conf.j2"
+slurm_dbd_conf_template:    "{{ inventory_dir }}/files/slurm/slurmdbd.conf.j2"
+```
+
+Each file is rendered verbatim (Jinja still works, e.g. `{{ slurm_db_password }}` from
+the vault), so your whole cluster config -- node/partition/gres lines and every
+`slurm.conf` option -- lives in one place you control, instead of scattered across role
+variables. These files are server-specific, so keep them in `config/` (git-ignored).
 
 Optional submit-time routing (e.g. GPU jobs to per-GPU-type partitions) is available
 by setting `slurm_job_submit_plugins: "lua"` and pointing `slurm_job_submit_template`

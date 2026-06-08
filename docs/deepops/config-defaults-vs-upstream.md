@@ -48,14 +48,10 @@ These are additive -- upstream had no equivalent default:
   `nfs_mounts` (client, tuned for a 100GbE+ fabric: `nconnect=16`, 1 MiB rsize/wsize,
   vers 4.2). Lower `nconnect` to ~4 on 10/25GbE. The role also ships 100G socket-buffer
   sysctls (ESnet values).
-- **Server-specific hardware** -- `slurm_nodes_raw` / `slurm_partitions_raw` /
-  `slurm_gres_raw` examples (modern 8-GPU nodes) to inject literal node/partition/gres
-  lines while keeping the role's best-practice base.
-- **AI/ML slurm.conf tunables** -- `slurm_accounting_tres` (typed GPU billing),
-  `slurm_tres_billing_weights`, `slurm_scheduler_parameters` (backfill), QOS preemption,
-  topology, sacctmgr account/org.
-- **job_submit.lua** -- bring-your-own Lua submit filter (`config.example/files/slurm/job_submit.lua`
-  is a starting point) instead of routing vars.
+- **Slurm config** -- the `slurm` role tracks upstream; full site control is via complete
+  templates under `config/files/slurm/` pointed to by `slurm_conf_template` (and the
+  cgroup/gres/dbd equivalents), rendered verbatim. `config.example/files/slurm/job_submit.lua`
+  is a ready-to-edit Lua submit filter (DeepOps generates none).
 
 ## enroot (group_vars/all.yml) -- simplified
 

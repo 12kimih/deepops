@@ -47,13 +47,14 @@ the two repos are fully independent.
 ```bash
 cd <deepops>/config
 vim inventory                      # real hostnames / IPs
-vim group_vars/slurm-cluster.yml   # slurm_nodes_raw / slurm_partitions_raw, real NFS exports, ...
+vim group_vars/slurm-cluster.yml   # real NFS exports, secrets, *_conf_template paths, ...
 vim group_vars/all.yml
 git add -A && git commit -m "Real prod cluster" && git push
 ```
 
-For server-specific Slurm hardware (NodeName/partition/gres lines), use the
-`slurm_nodes_raw` / `slurm_partitions_raw` / `slurm_gres_raw` overrides documented in
+For the full Slurm config (node/partition/gres lines plus every `slurm.conf` option),
+put complete template files under `config/files/slurm/` and point `slurm_conf_template`
+(and the cgroup/gres/dbd equivalents) at them, as documented in
 [the Slurm guide](../slurm-cluster/README.md#customizing-the-slurm-configuration).
 
 ### 4. Secrets via ansible-vault (encrypted values, grep-able names)
