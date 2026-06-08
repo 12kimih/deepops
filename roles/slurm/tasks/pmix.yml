@@ -3,7 +3,7 @@
   ansible.builtin.set_fact:
     pmix_build: true
 
-# Read the clean version (e.g. "3.2.5") from pmix_info instead of decoding the
+# Read the clean version (e.g. "5.0.10") from pmix_info instead of decoding the
 # PMIX_NUMERIC_VERSION hex header, which the old `tr -d 'x0'` parsed incorrectly
 # and so always rebuilt.
 - name: Check installed pmix version
