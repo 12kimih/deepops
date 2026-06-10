@@ -1,9 +1,16 @@
 ---
-# Verify that PCIe Access Control Services (ACS) is disabled on every PCI device,
-# so NVIDIA NCCL can use direct GPU peer-to-peer (P2P) over PCIe. Reads back the
-# ACS Control register written by disable-acs.yml and reports any device where
-# ACS is still enabled. Also confirms the persistent disable-acs systemd unit is
-# enabled and active so the setting survives reboots.
+# Verify NCCL GPU peer-to-peer (P2P) enablement on every compute node:
+#   1. PCIe ACS is disabled on all PCI devices (ground truth: ACS Control register
+#      readback) and the persistent disable-acs unit is enabled/active.
+#   2. IOMMU/VT-d posture (read-only audit): BIOS VT-d state via the DMAR ACPI
+#      table, and the kernel intel_iommu/iommu setting actually in effect.
+# The play FAILS only if ACS is still enabled somewhere; the IOMMU section is
+# informational so you can audit BIOS VT-d/ACS consistency across the fleet
+# without rebooting into firmware setup.
+#
+# Reading the BIOS ACS *toggle* directly is not portable (needs vendor BMC tools:
+# racadm/sum/ilorest). Instead infer it: when intel_iommu=off the kernel does not
+# touch ACS, so if disable-acs.service has NOT run yet ACSCtl == BIOS ACS state.
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   gather_facts: false
@@ -39,6 +46,31 @@
       changed_when: false
       failed_when: false
 
+    - name: Detect BIOS VT-d / IOMMU via the DMAR ACPI table
+      ansible.builtin.stat:
+        path: /sys/firmware/acpi/tables/DMAR
+        get_checksum: false
+        get_mime: false
+        get_attributes: false
+      register: dmar_table
+
+    - name: Read the kernel IOMMU setting in effect
+      ansible.builtin.shell: |
+        set -o pipefail
+        cmd=$(cat /proc/cmdline)
+        intel=$(printf '%s' "$cmd"  | grep -o 'intel_iommu=[^ ]*' || true)
+        amd=$(printf '%s'   "$cmd"  | grep -o 'amd_iommu=[^ ]*'   || true)
+        mode=$(printf '%s' " $cmd"  | grep -oE ' iommu=[^ ]*' | tr -d ' ' || true)
+        groups=$(ls /sys/kernel/iommu_groups/ 2>/dev/null | wc -l)
+        printf '%s %s %s groups=%s' \
+          "${intel:-intel_iommu=unset}" "${amd:-}" "${mode:-}" "$groups"
+      args:
+        executable: /bin/bash
+      register: iommu_kernel
+      changed_when: false
+      failed_when: false
+
+    # ---- Report ----
     - name: Report PCI devices where ACS is still enabled
       ansible.builtin.debug:
         msg: "{{ acs_state.stdout_lines }}"
@@ -49,9 +81,22 @@
         msg: "OK - ACS disabled on all PCI devices on {{ inventory_hostname }}"
       when: (acs_state.stdout | trim) == ''
 
-    - name: Report disable-acs systemd unit state
+    - name: Report IOMMU / VT-d posture (read-only audit)
       ansible.builtin.debug:
-        msg: "disable-acs.service -> {{ acs_unit.stdout | trim }}"
+        msg:
+          - "VT-d in BIOS (DMAR ACPI table): {{ 'ON' if dmar_table.stat.exists else 'OFF (firmware default / disabled)' }}"
+          - "kernel IOMMU: {{ iommu_kernel.stdout | trim }}"
+          - "disable-acs.service: {{ acs_unit.stdout | trim }}"
+          - "ACS effective state: {{ 'DISABLED (P2P ready)' if (acs_state.stdout | trim) == '' else 'ENABLED on some devices' }}"
+          - >-
+            BIOS ACS (inferred): {{
+              'DISABLED by BIOS' if ((acs_state.stdout | trim) == ''
+                and 'intel_iommu=off' in iommu_kernel.stdout
+                and acs_unit.stdout is not search('active=active'))
+              else 'ENABLED by BIOS' if ((acs_state.stdout | trim) != ''
+                and 'intel_iommu=off' in iommu_kernel.stdout)
+              else 'indeterminate (OS unit and/or active IOMMU also affect ACSCtl)'
+            }}
 
     - name: Warn if the disable-acs unit will not persist across reboots
       ansible.builtin.debug:
