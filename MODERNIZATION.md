@@ -189,6 +189,9 @@ Ported from the operator's private playbooks, rewritten in DeepOps style
 (`hostlist` default, FQCN, `proxy_env`):
 - `playbooks/utilities/disable-acs.yml` -- persistent oneshot unit disabling PCIe
   ACS for NVIDIA NCCL GPU P2P (reapplied every boot).
+- `playbooks/utilities/verify-acs.yml` -- reads back the ACS Control register on
+  every PCI device and checks the disable-acs unit is enabled/active; fails if ACS
+  is still on anywhere.
 - `playbooks/nvidia-software/nvidia-vulkan.yml` -- Vulkan runtime/tools/Mesa.
 - `playbooks/utilities/apt-upgrade.yml` -- hostlist-parameterized dist-upgrade.
 - `playbooks/utilities/reboot.yml` -- rolling reboot (`reboot_serial`).
