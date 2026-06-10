@@ -1,0 +1,72 @@
+---
+# Verify that PCIe Access Control Services (ACS) is disabled on every PCI device,
+# so NVIDIA NCCL can use direct GPU peer-to-peer (P2P) over PCIe. Reads back the
+# ACS Control register written by disable-acs.yml and reports any device where
+# ACS is still enabled. Also confirms the persistent disable-acs systemd unit is
+# enabled and active so the setting survives reboots.
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  gather_facts: false
+  tags:
+    - nvidia
+    - verify-acs
+  tasks:
+    - name: Read the ACS Control register from every PCI device
+      ansible.builtin.shell: |
+        set -o pipefail
+        offenders=""
+        for dev in $(lspci -d '*:*:*' | awk '{print $1}'); do
+          val=$(setpci -s "$dev" ECAP_ACS+0x6.w 2>/dev/null) || continue
+          if [ -n "$val" ] && [ "$val" != "0000" ]; then
+            offenders="${offenders}${dev} ACSCtl=0x${val} $(lspci -s "$dev" | cut -d' ' -f2-)\n"
+          fi
+        done
+        printf '%b' "$offenders"
+      args:
+        executable: /bin/bash
+      register: acs_state
+      changed_when: false
+      failed_when: false
+
+    - name: Check the disable-acs systemd unit is enabled and active
+      ansible.builtin.shell: |
+        printf 'enabled=%s active=%s' \
+          "$(systemctl is-enabled disable-acs.service 2>/dev/null || echo missing)" \
+          "$(systemctl is-active  disable-acs.service 2>/dev/null || echo inactive)"
+      args:
+        executable: /bin/bash
+      register: acs_unit
+      changed_when: false
+      failed_when: false
+
+    - name: Report PCI devices where ACS is still enabled
+      ansible.builtin.debug:
+        msg: "{{ acs_state.stdout_lines }}"
+      when: (acs_state.stdout | trim) != ''
+
+    - name: Report ACS all-clear
+      ansible.builtin.debug:
+        msg: "OK - ACS disabled on all PCI devices on {{ inventory_hostname }}"
+      when: (acs_state.stdout | trim) == ''
+
+    - name: Report disable-acs systemd unit state
+      ansible.builtin.debug:
+        msg: "disable-acs.service -> {{ acs_unit.stdout | trim }}"
+
+    - name: Warn if the disable-acs unit will not persist across reboots
+      ansible.builtin.debug:
+        msg: >-
+          WARNING - disable-acs.service is not enabled+active on
+          {{ inventory_hostname }}; ACS may be re-enabled on next reboot. Run
+          playbooks/utilities/disable-acs.yml to install the persistent unit.
+      when: acs_unit.stdout is not search('enabled=enabled active=active')
+
+    - name: Fail if ACS is still enabled on any PCI device
+      ansible.builtin.assert:
+        that:
+          - (acs_state.stdout | trim) == ''
+        fail_msg: >-
+          PCIe ACS is still enabled on one or more devices - NCCL GPU P2P will be
+          degraded. See the per-device report above.
+        success_msg: "PCIe ACS is disabled on every PCI device."
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
