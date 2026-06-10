@@ -192,8 +192,8 @@ Ported from the operator's private playbooks, rewritten in DeepOps style
 - `playbooks/utilities/verify-acs.yml` -- reads back the ACS Control register on
   every PCI device and checks the disable-acs unit is enabled/active; fails if ACS
   is still on anywhere. Also a read-only IOMMU/VT-d audit (BIOS VT-d via the DMAR
-  ACPI table, kernel intel_iommu state, inferred BIOS ACS) for fleet-wide
-  consistency checks without rebooting into firmware.
+  ACPI table, kernel intel_iommu state) for fleet-wide consistency checks without
+  rebooting into firmware.
 - `playbooks/nvidia-software/nvidia-vulkan.yml` -- Vulkan runtime/tools/Mesa.
 - `playbooks/utilities/apt-upgrade.yml` -- hostlist-parameterized dist-upgrade.
 - `playbooks/utilities/reboot.yml` -- rolling reboot (`reboot_serial`).
