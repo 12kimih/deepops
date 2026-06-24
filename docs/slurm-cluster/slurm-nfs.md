@@ -97,8 +97,10 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
 
 3. **Server `nfsd` thread count.** The Linux default is only **8** threads -- far too few
    for many clients under random I/O (each thread serves one RPC and blocks on disk).
-   `nfs_server_threads` auto-sizes to 4x the server's CPUs with a floor of 64 (busy
-   servers run 64-256; override with a fixed number if you prefer). Verify with
+   `nfs_server_threads` defaults to a fixed **64** -- set it explicitly in `config/`
+   (busy servers run 64-256; raise it if the server is thread-starved). We do not
+   auto-size to CPU count: very high counts (e.g. 192) can fail to start with ENOMEM
+   on a busy, long-running server. Verify with
    `cat /proc/fs/nfsd/threads` and size it by watching `sockets-enqueued` grow in
    `/proc/fs/nfsd/pool_stats` under load. Do **not** use the `/proc/net/rpc/nfsd` `th`
    histogram -- it was removed in kernel 2.6.32 and always reads zero. (`rpc.nfsd(8)`)
