@@ -116,10 +116,9 @@ nfs_mounts:
     path: /sw
     options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
 
-# NFS performance tuning (applies on server + clients). The nfs role ships
-# auto-sized defaults; override here only if needed. See
-# docs/slurm-cluster/slurm-nfs.md.
-#nfs_server_threads: 128     # nfsd thread count (default: 4 x vCPUs, floor 64)
+# NFS performance tuning (applies on server + clients). Defaults shown below;
+# adjust for your hardware. See docs/slurm-cluster/slurm-nfs.md.
+nfs_server_threads: 64       # nfsd (kernel NFS server) thread count; raise if clients see slow I/O under load
 #nfs_tune_network: true      # raise TCP/socket buffers for high-bandwidth NFS (default true)
 
 # Flags for enable/disable of NFS deployment

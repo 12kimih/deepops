@@ -11,15 +11,18 @@ nfs_mounts: []
 # few for many concurrent clients under heavy random I/O: each nfsd thread serves
 # one RPC at a time and blocks on disk, so too few threads serializes clients and
 # the server bottlenecks while CPU/disk sit idle. The NFS-HOWTO rule of thumb is
-# 4-8 threads per CPU core; busy servers run 64-256. We therefore auto-size to
-# 4 x the server's logical CPUs with a floor of 64 (so a 16-core head gets 64, a
-# 32-core 128, a 64-core 256) - override nfs_server_threads to a fixed number if
-# you prefer. Tune empirically by watching `sockets-enqueued` in
+# 4-8 threads per CPU core; busy servers run 64-256. We ship a fixed default of 64
+# (a safe baseline for most head nodes) and let you set it explicitly in config/ -
+# raise it if a busy server is thread-starved. We deliberately do NOT auto-size to
+# CPU count: on large hosts that yields very high counts (e.g. 4 x 48 vCPUs = 192)
+# that can fail to start with ENOMEM on a busy/long-running server, because each
+# thread reserves rsize/wsize-sized buffers that need contiguous pages under memory
+# fragmentation. Tune empirically by watching `sockets-enqueued` in
 # /proc/fs/nfsd/pool_stats under load (a growing value = too few threads); verify
 # the live count with `cat /proc/fs/nfsd/threads`. Do NOT use the
 # /proc/net/rpc/nfsd "th" histogram - it was removed in kernel 2.6.32 and always
 # reads zero. (rpc.nfsd(8); NFS-HOWTO 5.6; kernel knfsd-stats)
-nfs_server_threads: "{{ [(ansible_processor_vcpus | default(16) | int) * 4, 64] | max }}"
+nfs_server_threads: 64
 
 # Network/socket-buffer tuning for the NFS data path, sized for a 100GbE+ cluster
 # fabric as the GENERAL default. Lower these in config/ for slower

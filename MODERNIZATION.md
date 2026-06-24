@@ -423,7 +423,9 @@ hardware, real inventory, usernames, `/data0x` paths) stay as placeholders.
   `nfs_server_threads` (then a flat 32) writes `/etc/nfs.conf` `[nfsd] threads` (the
   Linux default of 8 starves many clients); and a guardrail to keep enroot
   cache/data/runtime on node-local NVMe. (Section 28 later re-bases these defaults on
-  a 100GbE+ fabric -- nconnect 16 + ESnet sysctls, auto-sized nfsd threads.) See
+  a 100GbE+ fabric -- nconnect 16 + ESnet sysctls, auto-sized nfsd threads; the
+  auto-sizing was since dropped for a fixed default of 64 set in `config/`, since
+  high auto-sized counts could fail to start with ENOMEM on busy servers.) See
   `docs/slurm-cluster/slurm-nfs.md`.
 - **Private-config management** (`docs/deepops/managing-cluster-config.md`): the
   recommended `config.example` (public placeholders) -> gitignored `config/` as its
