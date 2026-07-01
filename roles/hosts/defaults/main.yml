@@ -50,6 +50,8 @@ hosts_exclude_interfaces:
  - lo
  - docker
  - nodelocaldns
+ - br-           # docker / CNI user-defined bridges (br-<hash>)
+ - veth          # container veth pairs
 
 # Backup of previous host
 host_file_backup: no
