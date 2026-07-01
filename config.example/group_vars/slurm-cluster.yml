@@ -118,7 +118,7 @@ nfs_mounts:
 
 # NFS performance tuning (applies on server + clients). Defaults shown below;
 # adjust for your hardware. See docs/slurm-cluster/slurm-nfs.md.
-nfs_server_threads: 64       # nfsd (kernel NFS server) thread count; raise if clients see slow I/O under load
+nfs_server_threads: 128      # nfsd (kernel NFS server) thread count; lower on small servers, raise toward 256 on large busy ones
 #nfs_tune_network: true      # raise TCP/socket buffers for high-bandwidth NFS (default true)
 
 # Auto-recover nfs-server if a START fails (e.g. rpc.nfsd ENOMEM when a package
