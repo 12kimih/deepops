@@ -11,9 +11,10 @@ nfs_mounts: []
 # few for many concurrent clients under heavy random I/O: each nfsd thread serves
 # one RPC at a time and blocks on disk, so too few threads serializes clients and
 # the server bottlenecks while CPU/disk sit idle. The NFS-HOWTO rule of thumb is
-# 4-8 threads per CPU core; busy servers run 64-256. We ship a fixed default of 64
-# (a safe baseline for most head nodes) and let you set it explicitly in config/ -
-# raise it if a busy server is thread-starved. We deliberately do NOT auto-size to
+# 4-8 threads per CPU core; busy servers run 64-256. We ship a fixed default of 128
+# (a solid baseline for a multi-core server under concurrent client load) and let you
+# set it explicitly in config/ - lower it on small or lightly-loaded servers, raise it
+# toward 256 on large, busy ones. We deliberately do NOT auto-size to
 # CPU count: on large hosts that yields very high counts (e.g. 4 x 48 vCPUs = 192)
 # that can fail to start with ENOMEM on a busy/long-running server, because each
 # thread reserves rsize/wsize-sized buffers that need contiguous pages under memory
@@ -22,7 +23,7 @@ nfs_mounts: []
 # the live count with `cat /proc/fs/nfsd/threads`. Do NOT use the
 # /proc/net/rpc/nfsd "th" histogram - it was removed in kernel 2.6.32 and always
 # reads zero. (rpc.nfsd(8); NFS-HOWTO 5.6; kernel knfsd-stats)
-nfs_server_threads: 64
+nfs_server_threads: 128
 
 # Auto-recovery for nfs-server.service. That unit is Type=oneshot, so systemd ignores
 # Restart=; instead we install an OnFailure= drop-in pointing at a small helper unit
