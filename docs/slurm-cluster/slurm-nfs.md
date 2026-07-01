@@ -139,6 +139,26 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
      fabric; graduate to a parallel filesystem (BeeGFS/Lustre/WekaFS) only if GPUs are
      provably starved.
 
+## NFS server auto-recovery
+
+`nfs-server.service` is a `Type=oneshot` unit, so systemd ignores `Restart=` on it: a
+failed *start* -- for example `rpc.nfsd` exiting with `ENOMEM` when a package upgrade
+restarts the NFS stack -- otherwise leaves the server down until an operator intervenes.
+
+DeepOps installs a small safety net (enabled by default) that turns a failed start into
+a brief, self-healing event: an `OnFailure=` drop-in on `nfs-server.service` starts a
+helper unit (`nfs-server-restart.service`) that waits, then retries
+`systemctl restart nfs-server`. It is bounded, so a *persistent* failure still stops
+(rather than flapping forever) for an operator to notice. Tune or disable it in
+`config/group_vars/slurm-cluster.yml`:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `nfs_server_autorestart` | `true` | Enable the `OnFailure` auto-recovery. |
+| `nfs_server_autorestart_retries` | `10` | Max retries before giving up (`StartLimitBurst`). |
+| `nfs_server_autorestart_delay` | `30` | Seconds between retries (`ExecStartPre` sleep). |
+| `nfs_server_autorestart_interval` | `600` | Rate-limit window in seconds; must exceed `retries * delay`. |
+
 ## Configuring a separate NFS server
 
 If your site already has an NFS server, you may wish to use your existing server rather than setting up the Slurm control node to serve NFS.

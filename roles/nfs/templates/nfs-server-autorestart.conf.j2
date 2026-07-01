@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# deepops nfs role -- make a failed nfs-server START self-heal.
+# nfs-server.service is Type=oneshot, so Restart= is ignored; OnFailure= starts the
+# helper unit, which retries the restart (bounded). The retry cadence/cap live in
+# nfs-server-restart.service (see nfs_server_autorestart* in the nfs role defaults).
+[Unit]
+OnFailure=nfs-server-restart.service

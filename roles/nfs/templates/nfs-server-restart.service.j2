@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# deepops nfs role -- auto-recovery helper for nfs-server.service.
+#
+# nfs-server.service is Type=oneshot, so its own Restart= is ignored by systemd.
+# Instead nfs-server.service carries OnFailure=nfs-server-restart.service (installed
+# as a drop-in by this role), so a FAILED start of nfs-server starts this unit, which
+# waits and then restarts nfs-server. A bounded StartLimit stops it after a few tries
+# so a persistent failure surfaces to an operator instead of flapping forever.
+[Unit]
+Description=Auto-recover nfs-server after a failed start (ENOMEM safety net)
+After=nfs-server.service
+# Single retry cap: this helper is started once per nfs-server failure. After
+# {{ nfs_server_autorestart_retries }} starts within {{ nfs_server_autorestart_interval }}s systemd rate-limits it and it stops,
+# bounding recovery to {{ nfs_server_autorestart_retries }} retries ({{ nfs_server_autorestart_delay }}s apart, ~{{ (nfs_server_autorestart_retries | int) * (nfs_server_autorestart_delay | int) }}s total).
+# Interval must exceed retries*delay or the window resets mid-sequence (cap never bites).
+StartLimitIntervalSec={{ nfs_server_autorestart_interval }}
+StartLimitBurst={{ nfs_server_autorestart_retries }}
+
+[Service]
+Type=oneshot
+# Delay between retries (acts like RestartSec): let memory pressure / package-upgrade
+# churn settle before retrying the start.
+ExecStartPre=/usr/bin/sleep {{ nfs_server_autorestart_delay }}
+ExecStart=/usr/bin/systemctl restart nfs-server.service

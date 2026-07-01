@@ -4,6 +4,10 @@
     name: rpcbind
     state: restarted
 
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
 - name: Restart nfs
   ansible.builtin.service:
     name: "{{ nfs_server_daemon }}"

@@ -24,6 +24,21 @@ nfs_mounts: []
 # reads zero. (rpc.nfsd(8); NFS-HOWTO 5.6; kernel knfsd-stats)
 nfs_server_threads: 64
 
+# Auto-recovery for nfs-server.service. That unit is Type=oneshot, so systemd ignores
+# Restart=; instead we install an OnFailure= drop-in pointing at a small helper unit
+# (nfs-server-restart.service) that retries `systemctl restart nfs-server` a bounded
+# number of times. This turns a transient FAILED start -- classically rpc.nfsd exiting
+# ENOMEM when a package upgrade bounces the NFS stack -- from an indefinite outage into
+# a brief, self-healing blip, while still giving up after a few tries so a persistent
+# failure is surfaced instead of flapping. Behavior: on a failed start, retry every
+# _delay seconds, up to _retries times (~_retries*_delay s total), then stop. The unit
+# enforces _interval > _retries*_delay (else the StartLimit window resets mid-sequence
+# and the cap never bites).
+nfs_server_autorestart: true
+nfs_server_autorestart_retries: 10     # StartLimitBurst on the helper (max retries)
+nfs_server_autorestart_delay: 30       # seconds between retries (helper ExecStartPre sleep)
+nfs_server_autorestart_interval: 600   # StartLimitIntervalSec window; must exceed retries*delay
+
 # Network/socket-buffer tuning for the NFS data path, sized for a 100GbE+ cluster
 # fabric as the GENERAL default. Lower these in config/ for slower
 # fabrics if you prefer -- but the values are safe ceilings (TCP autotunes within

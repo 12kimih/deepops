@@ -55,6 +55,72 @@
   tags:
     - nfs
 
+# nfs-server.service is Type=oneshot, so systemd ignores Restart=. To make a failed
+# START self-heal (classically rpc.nfsd ENOMEM when a package upgrade bounces the NFS
+# stack) we point nfs-server's OnFailure= at a small helper unit that retries the
+# restart a bounded number of times. Tunables: nfs_server_autorestart* (defaults/main.yml).
+- name: Validate nfsd auto-restart timing (interval must exceed retries*delay)
+  ansible.builtin.assert:
+    that:
+      - (nfs_server_autorestart_interval | int) > (nfs_server_autorestart_retries | int) * (nfs_server_autorestart_delay | int)
+    fail_msg: >-
+      nfs_server_autorestart_interval ({{ nfs_server_autorestart_interval }}s) must exceed
+      nfs_server_autorestart_retries * nfs_server_autorestart_delay
+      ({{ nfs_server_autorestart_retries }} * {{ nfs_server_autorestart_delay }} =
+      {{ (nfs_server_autorestart_retries | int) * (nfs_server_autorestart_delay | int) }}s),
+      or the StartLimit window resets mid-sequence and the retry cap never applies.
+  when:
+    - nfs_exports|length
+    - nfs_server_autorestart | bool
+  tags:
+    - nfs
+
+- name: Ensure nfs-server.service drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/nfs-server.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - nfs_exports|length
+    - nfs_server_autorestart | bool
+  tags:
+    - nfs
+
+# The canonical unit is nfs-server.service on both Debian (nfs-kernel-server is an
+# alias symlink to it) and RHEL, so the drop-in and helper target that name directly.
+- name: Install nfsd auto-restart safety-net units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: nfs-server-restart.service.j2
+      dest: /etc/systemd/system/nfs-server-restart.service
+    - src: nfs-server-autorestart.conf.j2
+      dest: /etc/systemd/system/nfs-server.service.d/auto-restart.conf
+  when:
+    - nfs_exports|length
+    - nfs_server_autorestart | bool
+  notify: Reload systemd
+  tags:
+    - nfs
+
+- name: Remove nfsd auto-restart units when disabled
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/nfs-server.service.d/auto-restart.conf
+    - /etc/systemd/system/nfs-server-restart.service
+  when: not (nfs_server_autorestart | bool)
+  notify: Reload systemd
+  tags:
+    - nfs
+
 - name: Ensure nfs server is running
   ansible.builtin.service:
     name: "{{ nfs_server_daemon }}"

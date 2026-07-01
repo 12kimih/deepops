@@ -121,6 +121,13 @@ nfs_mounts:
 nfs_server_threads: 64       # nfsd (kernel NFS server) thread count; raise if clients see slow I/O under load
 #nfs_tune_network: true      # raise TCP/socket buffers for high-bandwidth NFS (default true)
 
+# Auto-recover nfs-server if a START fails (e.g. rpc.nfsd ENOMEM when a package
+# upgrade bounces the NFS stack): retry every _delay s, up to _retries times, then stop.
+#nfs_server_autorestart: true
+#nfs_server_autorestart_retries: 10
+#nfs_server_autorestart_delay: 30
+#nfs_server_autorestart_interval: 600   # must exceed retries*delay
+
 # Flags for enable/disable of NFS deployment
 #  - Set up an NFS server on nfs-server?
 slurm_enable_nfs_server: true
