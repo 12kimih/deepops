@@ -40,7 +40,10 @@ ff02::2  ip6-allrouters
     {% set di = hostvars[host]['ansible_default_' + hosts_ip_protocol]['interface']|default(None) -%}
   {% endif -%}
   {% for interface in my_interfaces|sort -%}
-    {% set interface_facts = hostvars[host]['ansible_' + interface] -%}
+    {# look facts up by raw interface name via ansible_facts: injected ansible_* vars
+       sanitize '-'/'.' to '_' (e.g. a docker bridge br-<hash> or VLAN eno1.100),
+       so 'ansible_' + interface would be undefined. Default guards any gap. #}
+    {% set interface_facts = hostvars[host]['ansible_facts'].get(interface, {}) -%}
     {% set primary_addr = interface_facts.get(hosts_ip_protocol, {}).get('address', None) -%}
     {% set secondaries_list = interface_facts.get(hosts_ip_protocol + '_secondaries', []) -%}
     {% if hosts_internal_subnet_prefix is defined and hosts_internal_subnet_prefix -%}
