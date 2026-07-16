@@ -1,0 +1,26 @@
+---
+# Target GPU power limit in watts, applied to *every* NVIDIA GPU on the node with
+# `nvidia-smi -pl <watts>`. There is deliberately no usable default: the safe/useful
+# value is card-specific (e.g. an RTX PRO 6000 defaults to 600W and is happy at 450W,
+# an H100 SXM is 700W, an L40S is 350W, ...). You MUST set it, and the role asserts it
+# is inside every GPU's supported Min/Max range before doing anything.
+#
+# Set it wherever it makes sense for your layout:
+#   * cluster-wide  -> config/group_vars/all.yml
+#   * per group     -> config/group_vars/slurm-node.yml    (nvidia_power_limit_watts: 450)
+#   * per host      -> config/host_vars/gpu1.yml           (nvidia_power_limit_watts: 400)
+#   * ad hoc        -> -e nvidia_power_limit_watts=450 on the command line
+# Per-host/per-group values are how you cap only *specific* compute nodes.
+nvidia_power_limit_watts: ""    # e.g. 450
+
+# Also enable persistence mode (`nvidia-smi -pm 1`). This keeps the driver initialized
+# even when no client (CUDA app, nvidia-smi) is attached, which makes the power cap --
+# and clocks, ECC, etc. -- apply more reliably and reduces per-job GPU init latency.
+# Applied as a best-effort ExecStartPre so a card that does not support it will not
+# block the cap from being set.
+nvidia_power_limit_persistence_mode: true
+
+# Name of the systemd unit installed under /etc/systemd/system/. It re-applies the cap
+# on every boot (nvidia-smi resets the power limit to the card default across a reboot
+# or driver reload), so the setting survives reboots.
+nvidia_power_limit_service_name: "nvidia-power-limit.service"

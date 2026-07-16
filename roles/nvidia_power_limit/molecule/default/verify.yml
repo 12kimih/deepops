@@ -1,0 +1,21 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Stat the installed systemd unit
+      ansible.builtin.stat:
+        path: /etc/systemd/system/nvidia-power-limit.service
+      register: unit
+
+    - name: Read the installed systemd unit
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/nvidia-power-limit.service
+      register: unit_contents
+
+    - name: Assert the unit was installed with the requested cap
+      ansible.builtin.assert:
+        that:
+          - unit.stat.exists
+          - "'nvidia-smi -pl 450' in (unit_contents.content | b64decode)"
+          - "'nvidia-smi -pm 1' in (unit_contents.content | b64decode)"
+        fail_msg: "nvidia-power-limit.service was not installed with the expected ExecStart"
