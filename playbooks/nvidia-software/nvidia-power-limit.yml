@@ -1,0 +1,31 @@
+---
+# Set (and persist across reboots) the NVIDIA GPU power limit on compute nodes.
+#
+# nvidia-smi resets the power limit to the card default on every boot, so this installs
+# a small oneshot systemd unit (nvidia-power-limit.service) that re-applies the cap --
+# and, optionally, persistence mode -- at boot. See roles/nvidia_power_limit.
+#
+# Target only *specific* nodes with -e hostlist=... (a group or comma-separated hosts),
+# and set the wattage per group/host or on the command line. Examples:
+#
+#   # cap two named nodes at 450W
+#   ansible-playbook -l gpu1,gpu2 playbooks/nvidia-software/nvidia-power-limit.yml \
+#       -e nvidia_power_limit_watts=450
+#
+#   # cap a whole group, wattage taken from config/group_vars/slurm-node.yml
+#   ansible-playbook playbooks/nvidia-software/nvidia-power-limit.yml -e hostlist=slurm-node
+#
+# The GPU gate (ansible_local.gpus.count) mirrors nvidia-dcgm.yml / nvidia-driver.yml so
+# a CPU-only head/login node in the target set is skipped instead of failing the run.
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  tasks:
+    - name: Install custom facts module (provides ansible_local.gpus.count)
+      ansible.builtin.include_role:
+        name: facts
+
+    - name: Configure the GPU power limit on GPU nodes only
+      ansible.builtin.include_role:
+        name: nvidia_power_limit
+      when: ansible_local['gpus']['count'] | int > 0
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"

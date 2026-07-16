@@ -1,0 +1,9 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart nvidia-power-limit
+  ansible.builtin.systemd:
+    name: "{{ nvidia_power_limit_service_name }}"
+    state: restarted

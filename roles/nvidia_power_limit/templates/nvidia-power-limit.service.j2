@@ -1,0 +1,23 @@
+# {{ ansible_managed }}
+# deepops nvidia_power_limit role -- pin the GPU power cap across reboots.
+#
+# nvidia-smi resets the power limit to the card default on every boot / driver reload,
+# so this oneshot unit re-applies it late in boot. RemainAfterExit=yes so the unit shows
+# "active" after the cap is set (the process itself exits immediately), which lets a
+# `systemctl restart` re-apply a changed value.
+[Unit]
+Description=Set NVIDIA GPU power limit to {{ nvidia_power_limit_watts }}W (deepops)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+{% if nvidia_power_limit_persistence_mode %}
+# Best-effort (leading '-'): keep the driver initialized so the cap sticks reliably.
+# A failure here (card without persistence support) must not block the -pl below.
+ExecStartPre=-/usr/bin/nvidia-smi -pm 1
+{% endif %}
+ExecStart=/usr/bin/nvidia-smi -pl {{ nvidia_power_limit_watts }}
+
+[Install]
+WantedBy=multi-user.target
