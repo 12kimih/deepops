@@ -17,19 +17,28 @@ local GPU_TYPE_TO_PARTITION = {         -- map each GPU type to its partition (a
     ["h200"] = "h200",
 }
 
--- [2] Detect a GPU request from --gres=gpu[:type][:count] and the modern
--- --gpus / --gpus-per-node (tres_per_job / tres_per_node = "gres/gpu[:type]=count").
+-- [2] Detect a GPU request. GPUs can be asked for five ways, each landing in a
+-- different job_desc field (job_submit plugin API):
+--   --gres            -> gres            (per node,  "gpu[:type]:count")
+--   --gpus / -G       -> tres_per_job    (job total, "gres/gpu[:type]=count")
+--   --gpus-per-node   -> tres_per_node   (per node)
+--   --gpus-per-task   -> tres_per_task   (per task)   [also --tres-per-task=gres/gpu...]
+--   --gpus-per-socket -> tres_per_socket (per socket)
+-- We scan all five so a GPU job is never mistaken for a CPU job. "multi" flags a
+-- request naming two different GPU types (e.g. --gpus-per-node=a100:1,h100:1),
+-- which no single partition can satisfy when each partition holds one GPU type.
 local function detect_gpu(job_desc)
     -- Build a dense list: a table literal with a nil at index 1 (e.g. gres unset,
     -- only --gpus given) stops ipairs early, so collect non-empty fields first.
     local sources = {}
-    for _, key in ipairs({ "gres", "tres_per_node", "tres_per_job" }) do
+    for _, key in ipairs({ "gres", "tres_per_node", "tres_per_job",
+                           "tres_per_task", "tres_per_socket" }) do
         local s = job_desc[key]
         if s ~= nil and s ~= "" then
             sources[#sources + 1] = s
         end
     end
-    local want, gtype, count = false, nil, 0
+    local want, gtype, count, multi = false, nil, 0, false
     for _, s in ipairs(sources) do
         for token in string.gmatch(s, "[^,]+") do
             if string.find(token, "gpu") then
@@ -37,11 +46,14 @@ local function detect_gpu(job_desc)
                 local c = string.match(token, "[:=](%d+)$")
                 count = c and tonumber(c) or (count > 0 and count or 1)
                 local t = string.match(token, "gpu:([%a%d_]+)[:=]%d+$") or string.match(token, "gpu:([%a%d_]+)$")
-                if t and not string.match(t, "^%d+$") then gtype = t end
+                if t and not string.match(t, "^%d+$") then
+                    if gtype ~= nil and gtype ~= t then multi = true end
+                    gtype = t
+                end
             end
         end
     end
-    return want, gtype, count
+    return want, gtype, count, multi
 end
 
 -- [3] Submit hook
@@ -51,7 +63,7 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
         return slurm.SUCCESS
     end
 
-    local want_gpu, gpu_type, gpu_count = detect_gpu(job_desc)
+    local want_gpu, gpu_type, gpu_count, gpu_multi = detect_gpu(job_desc)
 
     if not want_gpu then
         if CPU_PARTITIONS ~= "" then
@@ -60,14 +72,36 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
         return slurm.SUCCESS
     end
 
-    local part = gpu_type and GPU_TYPE_TO_PARTITION[gpu_type] or nil
-    if part ~= nil then
+    -- Two or more distinct GPU types in one job: if each partition holds a single
+    -- type, none can satisfy it. Reject rather than let the job pend forever.
+    if gpu_multi then
+        slurm.log_user("Error: multiple GPU types requested in one job; submit separate " ..
+                       "jobs (each partition here has a single GPU type).")
+        return slurm.ERROR
+    end
+
+    -- An explicitly named GPU type must be one we know. Reject an unknown type instead
+    -- of silently downgrading it to the default -- that surprises --gres jobs (silent
+    -- swap) and makes --gpus jobs pend forever against a partition lacking that type.
+    if gpu_type ~= nil then
+        local part = GPU_TYPE_TO_PARTITION[gpu_type]
+        if part == nil then
+            local valid = {}
+            for t in pairs(GPU_TYPE_TO_PARTITION) do valid[#valid + 1] = t end
+            table.sort(valid)
+            slurm.log_user("Error: unknown GPU type '%s'. Valid types: %s.",
+                           gpu_type, table.concat(valid, ", "))
+            return slurm.ERROR
+        end
         job_desc.partition = part
-    elseif DEFAULT_GPU_PARTITION ~= "" then
-        -- Unspecified/unknown GPU type: route to the default partition. For --gres
-        -- requests also pin the default type by rewriting to a BARE gpu:<type>:<count>
-        -- (NOT gres/gpu:... which is the TRES-billing name, invalid in --gres). For
-        -- the --gpus form the partition itself constrains the type.
+        return slurm.SUCCESS
+    end
+
+    -- No GPU type given: route to the default partition. For --gres requests also pin
+    -- the default type by rewriting to a BARE gpu:<type>:<count> (NOT gres/gpu:... which
+    -- is the TRES-billing name, invalid in --gres). For the --gpus/--gpus-per-* forms the
+    -- partition itself constrains the type.
+    if DEFAULT_GPU_PARTITION ~= "" then
         job_desc.partition = DEFAULT_GPU_PARTITION
         if DEFAULT_GPU_TYPE ~= "" and job_desc.gres ~= nil and job_desc.gres ~= "" then
             local rebuilt = {}
