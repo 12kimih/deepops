@@ -41,7 +41,9 @@ local function detect_gpu(job_desc)
     local want, gtype, count, multi = false, nil, 0, false
     for _, s in ipairs(sources) do
         for token in string.gmatch(s, "[^,]+") do
-            if string.find(token, "gpu") then
+            -- Match "gpu" only as a whole gres name (gpu:, gres/gpu=, or bare gpu),
+            -- never as a substring of some other name like a "mygpu" license/gres.
+            if string.find(token, "%f[%a]gpu%f[%A]") then
                 want = true
                 local c = string.match(token, "[:=](%d+)$")
                 count = c and tonumber(c) or (count > 0 and count or 1)
@@ -106,7 +108,7 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
         if DEFAULT_GPU_TYPE ~= "" and job_desc.gres ~= nil and job_desc.gres ~= "" then
             local rebuilt = {}
             for token in string.gmatch(job_desc.gres, "[^,]+") do
-                if string.find(token, "gpu") then
+                if string.find(token, "%f[%a]gpu%f[%A]") then
                     table.insert(rebuilt, "gpu:" .. DEFAULT_GPU_TYPE .. ":" .. tostring(gpu_count))
                 else
                     table.insert(rebuilt, token)
