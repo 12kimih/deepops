@@ -164,3 +164,18 @@
   loop_control:
     label: "{{ item.1 }} -> {{ item.0.name }}"
   notify: Rebuild NIS maps
+
+# --- Netgroups published through the netgroup maps -----------------------------
+# Unlike a group, a netgroup is matched by name, so it escapes both the GID_MIN export
+# filter and the numeric-gid path Slurm uses. See nis_export_netgroups in
+# defaults/main.yml. Membership here is DECLARATIVE -- the file is rendered whole, so
+# removing a user from the list removes their access on the next run.
+- name: Publish the NIS netgroups
+  ansible.builtin.template:
+    src: netgroup.j2
+    dest: /etc/netgroup
+    owner: root
+    group: root
+    mode: "0644"
+  when: nis_export_netgroups | length > 0
+  notify: Rebuild NIS maps

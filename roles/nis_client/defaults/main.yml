@@ -1,0 +1,21 @@
+---
+# nis_client -- bind this host to an NIS (YP) domain. Required vars (no defaults, the
+# role asserts them): nis_domain and nis_server.
+
+# The nsswitch.conf databases this role owns, as regexp/line pairs.
+#
+# Keep every database NIS actually serves in this list. One left out is not "left at
+# the default" -- it keeps whatever each node's OS install or some package happened to
+# write, so the same lookup silently resolves differently per node. That asymmetry is
+# what makes group and netgroup membership behave inconsistently across a cluster.
+#
+# `files` before `nis` means a LOCAL entry shadows the directory one, which is usually
+# what you want for system accounts but is also how a stray local group ends up
+# overriding a cluster-wide one. `netgroup` has no `files` backend on glibc, so it is
+# nis-only by design.
+nis_client_nsswitch:
+  - { regexp: "^passwd", line: "passwd: files nis" }
+  - { regexp: "^group", line: "group: files nis" }
+  - { regexp: "^shadow", line: "shadow: files nis" }
+  - { regexp: "^automount", line: "automount: files nis" }
+  - { regexp: "^netgroup", line: "netgroup: nis" }

@@ -1,0 +1,60 @@
+---
+# cluster_sudoers -- grant administrator sudo through a NIS NETGROUP, so the answer to
+# "can this person sudo here" is the same on every node and by every path.
+# Opt-in: the role is a no-op while cluster_sudoers_netgroup is empty.
+#
+# WHY A NETGROUP AND NOT A GROUP
+#
+# Two different mechanisms decide a user's groups, and they disagree. A Slurm job
+# carries the numeric gid list resolved on the SUBMIT node (send_gids, on by default
+# since 20.11); a direct SSH login resolves groups on the node itself. So membership
+# in `sudo` on the head node grants sudo inside jobs on every compute node but not
+# over SSH to those same nodes -- and membership on a compute node does the reverse.
+#
+# A group cannot fix this. `sudo` is gid 27, below GID_MIN, so /var/yp/Makefile never
+# exports it and NIS cannot make the number consistent. A netgroup is matched by NAME
+# through innetgr(3), so it is subject to neither the GID_MIN filter nor the numeric
+# gid path. One definition on the NIS master, one rule per node, same answer
+# everywhere. Publish it with nis_export_netgroups in the nis_server role.
+#
+# BREAK-GLASS: the stock `%sudo ALL=(ALL:ALL) ALL` rule in /etc/sudoers is left alone,
+# so a LOCAL account that is in the local sudo group and has a local password entry
+# still has sudo if NIS is unreachable. Confirm you have such an account before
+# relying on the netgroup rule -- if NIS goes down and no local path exists, nobody
+# can sudo anywhere.
+cluster_sudoers_netgroup: ""
+
+# NOPASSWD is the default because on a NIS cluster that does not serve the shadow map
+# there is no password hash for directory users on nodes without a local passwd entry
+# -- PAM has nothing to check, so a password-requiring rule can never succeed there.
+# The tradeoff is that a stolen SSH key becomes root on the node. Serving shadow
+# through NIS is NOT the alternative: NIS is unauthenticated and the map is readable
+# by anything that can reach the server, which turns every hash into a cracking
+# target.
+cluster_sudoers_nopasswd: true
+
+# The privilege granted. Narrow this if the admins only need specific commands --
+# `ALL=(ALL:ALL) NOPASSWD:ALL` is unrestricted root.
+cluster_sudoers_privilege: "ALL=(ALL:ALL)"
+
+# Filename under /etc/sudoers.d. Must not contain a dot or end in '~': sudo silently
+# SKIPS such files, so the rule would look installed but never apply.
+cluster_sudoers_file: cluster-admins
+
+# Refuse to install a rule whose netgroup does not resolve on this node. A rule that
+# matches nobody is worse than a failed play -- it looks like sudo is configured while
+# granting nothing.
+cluster_sudoers_require_netgroup: true
+
+# Drop-ins in /etc/sudoers.d that this role did not write are always REPORTED. Set
+# prune to true to delete them as well. Off by default because a drop-in may belong to
+# another component (Open OnDemand writes one, for example).
+#
+# This matters: `playbooks/bootstrap/bootstrap-sudo.yml` grants permanent passwordless
+# root to whoever runs it, on every host it touches, as /etc/sudoers.d/<their-name>.
+# Those files outlive the person's need for them and are invisible to any group audit.
+cluster_sudoers_prune: false
+
+# Never reported or pruned. README ships with the sudo package.
+cluster_sudoers_keep:
+  - README

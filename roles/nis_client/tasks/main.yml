@@ -52,16 +52,18 @@
     mode: "0644"
   notify: "Restart nis"
 
+# Every database NIS serves must be listed, or nodes drift: a database left unmanaged
+# keeps whatever the OS install or another package left behind, and then the same
+# lookup resolves differently depending on which node it runs on. `netgroup` has no
+# `files` backend on glibc, so it is nis-only by design.
 - name: Configure nsswitch.conf
   ansible.builtin.lineinfile:
     dest: /etc/nsswitch.conf
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
-  with_items:
-    - { regexp: "^passwd", line: "passwd: files nis" }
-    - { regexp: "^group", line: "group: files nis" }
-    - { regexp: "^shadow", line: "shadow: files nis" }
-    - { regexp: "^automount", line: "automount: files nis" }
+  loop: "{{ nis_client_nsswitch }}"
+  loop_control:
+    label: "{{ item.line }}"
   notify: "Restart nis"
 
 - name: Make sure rpcbind is running
