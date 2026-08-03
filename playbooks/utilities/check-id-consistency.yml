@@ -38,15 +38,21 @@
         label: "{{ item.name }}"
       register: check_id_resolved
 
+    # `fail_key: false` reports a missing group as a null value rather than an error,
+    # so coerce it to an empty list and length-check before indexing -- assert stops at
+    # the first false condition, which keeps the missing case a clean failure message
+    # instead of a template error.
     - name: Assert each published group resolves to its pinned GID
+      vars:
+        check_id_entry: "{{ (item.ansible_facts.getent_group | default({})).get(item.item.name) or [] }}"
       ansible.builtin.assert:
         that:
-          - item.item.name in (item.ansible_facts.getent_group | default({}))
-          - (item.ansible_facts.getent_group[item.item.name][1] | int) == (item.item.gid | int)
+          - (check_id_entry | length) >= 2
+          - (check_id_entry[1] | int) == (item.item.gid | int)
         fail_msg: >-
           Group '{{ item.item.name }}' does not resolve to gid {{ item.item.gid }} on
-          {{ inventory_hostname }} (got
-          {{ (item.ansible_facts.getent_group | default({})).get(item.item.name, ['', 'MISSING'])[1] }}).
+          {{ inventory_hostname }}
+          (got {{ (check_id_entry | length >= 2) | ternary(check_id_entry[1] | default(''), 'no such group') }}).
           Either the NIS maps were not rebuilt on the master (`make -C /var/yp`), this
           node is not bound to NIS (`ypwhich`), or a LOCAL group of the same name
           shadows the NIS one -- nsswitch resolves `files` before `nis`.
