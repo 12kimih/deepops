@@ -124,12 +124,12 @@
     (((cluster_sudoers_check.stdout | default('')) ~ ' ' ~ (cluster_sudoers_check.stderr | default('')))
      | lower) is search('syntax error|parse error|unknown defaults entry')
 
-- name: Report sudoers files visudo objects to that still parse
+- name: Report sudoers files that parse but are not mode 0440
   ansible.builtin.debug:
     msg: >-
       visudo -c on {{ inventory_hostname }} reported:
       {{ cluster_sudoers_check.stderr_lines | join('; ') }}.
-      sudo reads a sudoers file whose mode is not 0440 as long as it is not group- or
-      world-writable, so this does not break sudo. Fix with `chmod 0440` on the files
-      named, or remove them if they are unmanaged leftovers.
+      Sudoers files must be 0440 root:root. A wider mode leaves the rule readable by
+      every user on the node, which for a NOPASSWD rule discloses who has unattended
+      root. Fix with `chmod 0440`, or remove the file if it is an unmanaged leftover.
   when: (cluster_sudoers_check.stderr | default('') | trim | length) > 0
