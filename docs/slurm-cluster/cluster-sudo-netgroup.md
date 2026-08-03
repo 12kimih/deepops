@@ -25,10 +25,22 @@ Making the group consistent is not possible. `sudo` is gid 27 — below `GID_MIN
 never be published. Editing `/etc/group` on each node by hand fixes only the SSH path,
 because job credentials never consult it.
 
-There is a second, independent problem. If NIS does not serve the `shadow` map, a
-directory user has **no password hash** on any node without a local `passwd` entry.
-PAM has nothing to check, so a password-requiring sudo rule can never succeed there,
-no matter what groups the user is in.
+There is a second, independent thing to check. If NIS does not serve the `shadow` map
+— and most sites deliberately do not, since NIS is unauthenticated and the map would
+be readable by anything that can reach the server — then a directory user's password
+hash has to come from a **local** `/etc/shadow` entry on each node.
+
+Whether one exists is not something to assume. A node can have a local `shadow` entry
+even with **no** local `/etc/passwd` entry, because `getspnam()` looks up by name
+independently of `getpwnam()`. Check it rather than reasoning about it:
+
+```sh
+passwd -S      # 7 fields => a shadow entry was found; 2 fields => none
+```
+
+Where those entries do exist they are per-node copies with nothing keeping them in
+step — `passwd` updates only the node it ran on — so the same account can drift to
+different passwords on different nodes.
 
 ## The fix: a netgroup
 
@@ -62,11 +74,11 @@ NIS master gives every node the same answer by every path.
    +cluster_admins ALL=(ALL:ALL) NOPASSWD:ALL
    ```
 
-`NOPASSWD` is the default because of the missing shadow map described above. The
-tradeoff is real: a stolen SSH key becomes root on the node. **Serving `shadow`
-through NIS is not the alternative** — NIS is unauthenticated and the map is readable
-by anything that can reach the server, which turns every hash into an offline-cracking
-target.
+The rule **requires a password by default** (`cluster_sudoers_nopasswd: false`). The
+sudo prompt is the one check that still holds when an SSH key is stolen, so it is not
+given up unless it has to be. Set `cluster_sudoers_nopasswd: true` only where the
+`passwd -S` check above shows there is no hash to compare against — otherwise the rule
+grants passwordless root for no reason.
 
 ## Safety
 

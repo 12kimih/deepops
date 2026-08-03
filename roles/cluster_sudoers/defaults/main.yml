@@ -24,14 +24,25 @@
 # can sudo anywhere.
 cluster_sudoers_netgroup: ""
 
-# NOPASSWD is the default because on a NIS cluster that does not serve the shadow map
-# there is no password hash for directory users on nodes without a local passwd entry
-# -- PAM has nothing to check, so a password-requiring rule can never succeed there.
-# The tradeoff is that a stolen SSH key becomes root on the node. Serving shadow
-# through NIS is NOT the alternative: NIS is unauthenticated and the map is readable
-# by anything that can reach the server, which turns every hash into a cracking
-# target.
-cluster_sudoers_nopasswd: true
+# Require a password by default. The sudo prompt is the one check that still holds
+# when an SSH key is stolen, and NOPASSWD gives that up.
+#
+# Set this true only where the password genuinely cannot be checked. That can happen
+# on a NIS cluster which does not serve the shadow map: the hash then has to come from
+# a LOCAL /etc/shadow entry on each node, and if provisioning left none, PAM has
+# nothing to compare against and a password-requiring rule can never succeed. Do not
+# assume either way -- a node can have a local shadow entry even with no local
+# /etc/passwd entry, since getspnam() looks up by name independently. Check as the
+# user, on a compute node:
+#
+#   passwd -S      # 7 fields => a shadow entry was found; 2 fields => none
+#
+# Where those local entries do exist, note they are per-node copies with nothing
+# keeping them in step: `passwd` updates only the node it ran on, so one account can
+# drift to different passwords on different nodes. Serving shadow through NIS is not
+# the fix either -- NIS is unauthenticated and the map is readable by anything that
+# can reach the server, which turns every hash into an offline-cracking target.
+cluster_sudoers_nopasswd: false
 
 # The privilege granted. Narrow this if the admins only need specific commands --
 # `ALL=(ALL:ALL) NOPASSWD:ALL` is unrestricted root.
