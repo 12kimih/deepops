@@ -33,14 +33,6 @@ cluster_sudoers_netgroup: ""
 # reasoning about which file or map holds what; as the user, on the node:
 #
 #   sudo -v        # prompts and returns 0 => a password-requiring rule works here
-#
-# On a NIS cluster, "the hash is not there" is easy to conclude wrongly. `ypcat shadow`
-# answers "No such map in server's domain" for an UNPRIVILEGED caller even when the map
-# exists, because ypserv is normally configured to serve shadow.byname only to requests
-# from a privileged port (see nis_server_ypserv_rules in the nis_server role). PAM's
-# helper runs as root and gets the map; a shell prompt does not. Check as root:
-#
-#   sudo getent shadow <user>
 cluster_sudoers_nopasswd: false
 
 # The privilege granted. Narrow this if the admins only need specific commands --

@@ -40,11 +40,6 @@ nis_server_enable_ypxfrd: false
 # setting makes ypserv answer for a map only when the request comes from a privileged
 # port (< 1024), which in practice means a root process. PAM's setuid-root helper
 # qualifies, an ordinary user shell does not.
-#
-# A consequence worth knowing before debugging authentication: `ypcat shadow` run as a
-# normal user reports "No such map in server's domain" even when the map exists and is
-# being served correctly. That is the restriction working, not a missing map. Query it
-# as root (`sudo getent shadow <user>`) to see the truth.
 nis_server_manage_ypserv_conf: true
 
 nis_server_ypserv_options:
