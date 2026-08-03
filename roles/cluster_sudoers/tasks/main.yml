@@ -112,10 +112,24 @@
   when: cluster_sudoers_prune | bool
 
 # Catch a broken /etc/sudoers, or a drop-in this role does not own, before the play
-# ends.
+# ends. Only a parse error is fatal: visudo also exits non-zero for a drop-in whose
+# mode is not 0440, which sudo itself still reads as long as the file is not group- or
+# world-writable. Those are reported by the next task instead.
 - name: Verify the whole sudoers configuration still parses
   ansible.builtin.command:
     cmd: visudo -c
   register: cluster_sudoers_check
   changed_when: false
-  failed_when: cluster_sudoers_check.rc != 0
+  failed_when: >-
+    (((cluster_sudoers_check.stdout | default('')) ~ ' ' ~ (cluster_sudoers_check.stderr | default('')))
+     | lower) is search('syntax error|parse error|unknown defaults entry')
+
+- name: Report sudoers files visudo objects to that still parse
+  ansible.builtin.debug:
+    msg: >-
+      visudo -c on {{ inventory_hostname }} reported:
+      {{ cluster_sudoers_check.stderr_lines | join('; ') }}.
+      sudo reads a sudoers file whose mode is not 0440 as long as it is not group- or
+      world-writable, so this does not break sudo. Fix with `chmod 0440` on the files
+      named, or remove them if they are unmanaged leftovers.
+  when: (cluster_sudoers_check.stderr | default('') | trim | length) > 0
