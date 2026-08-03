@@ -55,6 +55,15 @@
   changed_when: false
   failed_when: false
 
+- name: Ensure the docker.socket drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.socket.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: docker_socket_group_unit.rc == 0
+
 - name: Align the docker.socket unit group with the daemon configuration
   ansible.builtin.copy:
     content: |
