@@ -64,9 +64,10 @@ group that is designed to be cluster-wide:
          - alice
    ```
 
-   The role asserts each GID is `>= GID_MIN`. Membership is **additive** — to remove
-   someone, run
-   `gpasswd -d <user> <group>` on the master and re-run so the maps are rebuilt.
+   The role asserts each GID is `>= GID_MIN`. Membership is **declarative** — deleting
+   a name here revokes that person's access on the next run. Set
+   `nis_export_groups_exclusive: false` to make the list additive instead, for a group
+   other tooling also writes to.
 
 3. Chown the socket to it on every node (`config/group_vars/slurm-cluster.yml`):
 

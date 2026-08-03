@@ -185,9 +185,6 @@
     label: "{{ item.name }} (gid {{ item.gid }})"
   notify: Rebuild NIS maps
 
-# Membership is ADDITIVE: this adds users to the group but never removes them, so a
-# user deleted from `members` stays in the group until removed by hand on this node
-# (`gpasswd -d <user> <group>`, then re-run the role to rebuild the maps).
 - name: Add members to the NIS-exported cluster groups
   ansible.builtin.user:
     name: "{{ item.1 }}"
@@ -196,6 +193,45 @@
   loop: "{{ nis_export_groups | subelements('members', {'skip_missing': true}) }}"
   loop_control:
     label: "{{ item.1 }} -> {{ item.0.name }}"
+  notify: Rebuild NIS maps
+
+# `ansible.builtin.user` can only add, so removals are computed from the group's
+# current membership and applied with gpasswd. Only the groups listed in
+# nis_export_groups are read, so accounts outside them are never touched.
+- name: Read the current membership of the NIS-exported cluster groups
+  ansible.builtin.getent:
+    database: group
+    key: "{{ item.name }}"
+    fail_key: false
+  loop: "{{ nis_export_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: nis_group_members
+  when: nis_export_groups_exclusive | bool
+
+- name: Determine which members are no longer listed
+  vars:
+    # getent_group[name] is [password, gid, "a,b,c"]; absent groups give null.
+    nis_group_entry: >-
+      {{ ((item.1.ansible_facts | default({})).getent_group | default({})).get(item.0.name) or ['', '', ''] }}
+  ansible.builtin.set_fact:
+    nis_group_removals: >-
+      {{ (nis_group_removals | default([]))
+         + ([item.0.name] | product(nis_group_entry[2] | default('') | split(',')
+                                    | reject('equalto', '')
+                                    | difference(item.0.members | default([]))) | list) }}
+  loop: "{{ nis_export_groups | zip(nis_group_members.results | default([])) | list }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+  when: nis_export_groups_exclusive | bool
+
+- name: Remove members no longer listed for the NIS-exported cluster groups
+  ansible.builtin.command:
+    cmd: "gpasswd -d {{ item.1 }} {{ item.0 }}"
+  loop: "{{ nis_group_removals | default([]) }}"
+  loop_control:
+    label: "{{ item.1 }} -> {{ item.0 }}"
+  changed_when: true
   notify: Rebuild NIS maps
 
 # --- Netgroups published through the netgroup maps -----------------------------

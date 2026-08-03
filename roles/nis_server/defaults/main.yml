@@ -85,6 +85,18 @@ nis_server_ypserv_protected_maps:
 # rebuilt. This role asserts the range.
 nis_export_groups: []
 
+# Whether `members` is the complete membership or only a set of additions.
+#
+#   true   the listed members are the membership. Removing a name from the list
+#          revokes that person's access on the next run, matching how
+#          nis_export_netgroups already behaves.
+#   false  members are only ever added; a name removed from the list keeps its
+#          membership until someone runs `gpasswd -d` on this node.
+#
+# Users outside `members` are never touched either way, so a group that other
+# tooling also writes to should set this false.
+nis_export_groups_exclusive: true
+
 # Netgroups to define on this node and publish through the netgroup maps. Each entry
 # is {name, users}; empty by default, so /etc/netgroup is left alone.
 #

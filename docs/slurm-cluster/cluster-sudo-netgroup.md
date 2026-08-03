@@ -51,7 +51,6 @@ NIS master gives every node the same answer by every path.
 
    The `nis_server` role renders `/etc/netgroup` and rebuilds the maps. Membership is
    **declarative** — deleting a name here revokes that person's sudo on the next run.
-   (`nis_export_groups`, by contrast, only ever adds.)
 
 2. Name it once in `config/group_vars/all.yml`:
 
