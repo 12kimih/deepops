@@ -90,6 +90,22 @@
 
 # The canonical unit is nfs-server.service on both Debian (nfs-kernel-server is an
 # alias symlink to it) and RHEL, so the drop-in and helper target that name directly.
+#
+# systemd creates a unit's drop-in directory only when something writes into it, and
+# no package ships this one, so create it before the template lands.
+- name: Create the nfs-server drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/nfs-server.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - nfs_exports|length
+    - nfs_server_autorestart | bool
+  tags:
+    - nfs
+
 - name: Install nfsd auto-restart safety-net units
   ansible.builtin.template:
     src: "{{ item.src }}"

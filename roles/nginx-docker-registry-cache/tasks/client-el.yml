@@ -1,4 +1,13 @@
 ---
+- name: Create the docker.service drop-in directory
+  ansible.builtin.file:
+    path: "{{ nginx_docker_cache_docker_config_dest | dirname }}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  when: nginx_docker_cache_dockerd_clients
+
 - name: Configure docker to use nginx proxy via http
   ansible.builtin.template:
     src: "{{ nginx_docker_cache_docker_config_src }}"
