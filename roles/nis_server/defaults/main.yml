@@ -33,6 +33,41 @@ nis_server_securenets:
 nis_server_enable_yppasswdd: true
 nis_server_enable_ypxfrd: false
 
+# --- ypserv access rules (/etc/ypserv.conf) -----------------------------------
+# Manage the access rules rather than leaving them to whatever the package shipped.
+# NIS does no authentication of its own, so these rules are the only thing standing
+# between the password hashes and anyone who can reach the server: the `port` security
+# setting makes ypserv answer for a map only when the request comes from a privileged
+# port (< 1024), which in practice means a root process. PAM's setuid-root helper
+# qualifies, an ordinary user shell does not.
+#
+# A consequence worth knowing before debugging authentication: `ypcat shadow` run as a
+# normal user reports "No such map in server's domain" even when the map exists and is
+# being served correctly. That is the restriction working, not a missing map. Query it
+# as root (`sudo getent shadow <user>`) to see the truth.
+nis_server_manage_ypserv_conf: true
+
+nis_server_ypserv_options:
+  files: 30
+  slp: "no"
+  slp_timeout: 3600
+  xfr_check_port: "yes"
+
+# ypserv applies the FIRST matching rule, so map-specific entries must precede the
+# catch-all. The role asserts that every map in nis_server_ypserv_protected_maps is
+# restricted and is listed before any `*` map rule.
+nis_server_ypserv_rules:
+  - { host: "*", domain: "*", map: "shadow.byname", security: "port" }
+  - { host: "*", domain: "*", map: "passwd.adjunct.byname", security: "port" }
+  - { host: "*", domain: "*", map: "*", security: "none" }
+
+# Maps that must never be served to unprivileged callers. Overriding this to drop a
+# map is how hashes end up world-readable, so the assertion exists to make that a
+# deliberate act rather than an oversight.
+nis_server_ypserv_protected_maps:
+  - shadow.byname
+  - passwd.adjunct.byname
+
 # Cluster-wide groups to define on this node and publish through the NIS group map.
 # Each entry is {name, gid, members}; empty by default, so nothing is exported.
 #
