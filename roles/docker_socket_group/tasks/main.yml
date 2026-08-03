@@ -45,9 +45,9 @@
   failed_when: docker_socket_group_daemon_json.rc not in [0, 10]
   notify: Restart docker
 
-# Belt and braces: if docker.socket is ever switched to real socket activation
-# (`-H fd://`), systemd owns the socket and SocketGroup= wins over daemon.json. Keep
-# the two in agreement so that change cannot silently revert socket ownership.
+# If docker.socket is switched to socket activation (`-H fd://`), systemd owns the
+# socket and SocketGroup= takes precedence over daemon.json. Keep the two in
+# agreement so ownership holds under either startup mode.
 - name: Check whether the docker.socket unit exists
   ansible.builtin.command:
     cmd: systemctl cat docker.socket

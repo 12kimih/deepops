@@ -1,36 +1,28 @@
 ---
-# cluster_sudoers -- grant administrator sudo through a NIS NETGROUP, so the answer to
-# "can this person sudo here" is the same on every node and by every path.
+# cluster_sudoers -- grant administrator sudo through a NIS NETGROUP.
 # Opt-in: the role is a no-op while cluster_sudoers_netgroup is empty.
 #
 # WHY A NETGROUP AND NOT A GROUP
 #
-# Two different mechanisms decide a user's groups, and they disagree. A Slurm job
-# carries the numeric gid list resolved on the SUBMIT node (send_gids, on by default
-# since 20.11); a direct SSH login resolves groups on the node itself. So membership
-# in `sudo` on the head node grants sudo inside jobs on every compute node but not
-# over SSH to those same nodes -- and membership on a compute node does the reverse.
+# Two mechanisms resolve a user's groups. A Slurm job carries the numeric gid list
+# resolved on the SUBMIT node (send_gids, on by default since 20.11); a direct SSH
+# login resolves groups on the node itself. Membership in `sudo` on the head node
+# therefore grants sudo inside jobs on every compute node but not over SSH to those
+# same nodes, and membership on a compute node does the reverse.
 #
-# A group cannot fix this. `sudo` is gid 27, below GID_MIN, so /var/yp/Makefile never
-# exports it and NIS cannot make the number consistent. A netgroup is matched by NAME
-# through innetgr(3), so it is subject to neither the GID_MIN filter nor the numeric
-# gid path. One definition on the NIS master, one rule per node, same answer
-# everywhere. Publish it with nis_export_netgroups in the nis_server role.
+# The group cannot be made consistent either: `sudo` is gid 27, below GID_MIN, so
+# /var/yp/Makefile does not export it. A netgroup is matched by NAME through
+# innetgr(3), so neither the GID_MIN filter nor the numeric gid path applies. Publish
+# it with nis_export_netgroups in the nis_server role.
 #
-# BREAK-GLASS: the stock `%sudo ALL=(ALL:ALL) ALL` rule in /etc/sudoers is left alone,
-# so a LOCAL account that is in the local sudo group and has a local password entry
-# still has sudo if NIS is unreachable. Confirm you have such an account before
-# relying on the netgroup rule -- if NIS goes down and no local path exists, nobody
-# can sudo anywhere.
+# The stock `%sudo ALL=(ALL:ALL) ALL` rule in /etc/sudoers is left alone, so a LOCAL
+# account in the local sudo group with a local password keeps sudo when NIS is
+# unreachable.
 cluster_sudoers_netgroup: ""
 
-# Require a password by default. The sudo prompt is the one check that still holds
-# when an SSH key is stolen, and NOPASSWD gives that up.
-#
-# Set this true only where the password genuinely cannot be checked -- a node with no
-# reachable hash for directory users, where PAM has nothing to compare against and a
-# password-requiring rule can never succeed. Confirm by behaviour rather than by
-# reasoning about which file or map holds what; as the user, on the node:
+# Require a password. Set true only where the password cannot be checked -- a node
+# with no reachable hash for directory users, where a password-requiring rule can
+# never succeed. Check as the user, on the node:
 #
 #   sudo -v        # prompts and returns 0 => a password-requiring rule works here
 cluster_sudoers_nopasswd: false
@@ -39,37 +31,31 @@ cluster_sudoers_nopasswd: false
 # `ALL=(ALL:ALL) NOPASSWD:ALL` is unrestricted root.
 cluster_sudoers_privilege: "ALL=(ALL:ALL)"
 
-# Filename under /etc/sudoers.d. Must not contain a dot or end in '~': sudo silently
-# SKIPS such files, so the rule would look installed but never apply.
+# Filename under /etc/sudoers.d. sudo skips any name containing a dot or ending in
+# '~', so the role asserts the name is one sudo will read.
 cluster_sudoers_file: cluster-admins
 
-# Refuse to install a rule whose netgroup does not resolve on this node. A rule that
-# matches nobody is worse than a failed play -- it looks like sudo is configured while
-# granting nothing.
+# Fail rather than install a rule whose netgroup does not resolve on the node, since
+# such a rule grants nothing.
 cluster_sudoers_require_netgroup: true
 
 # Drop-ins in /etc/sudoers.d that this role did not write are always REPORTED. Set
-# prune to true to delete them as well.
+# prune to true to delete them as well. `playbooks/bootstrap/bootstrap-sudo.yml`
+# leaves one per host for whoever ran it, granting passwordless root outside any
+# group.
 #
-# This matters: `playbooks/bootstrap/bootstrap-sudo.yml` grants permanent passwordless
-# root to whoever runs it, on every host it touches, as /etc/sudoers.d/<their-name>.
-# Those files outlive the person's need for them and are invisible to any group audit
-# -- nothing in `getent group sudo` reveals them.
-#
-# A drop-in that a PACKAGE owns is never reported or pruned: it belongs to that
-# component and removing it would break it. Ownership is asked of dpkg/rpm rather than
-# matched against a list of names, so components installed later are protected without
-# anyone remembering to add them here.
+# A drop-in owned by a PACKAGE is never reported or pruned. Ownership is asked of
+# dpkg/rpm rather than matched against a list of names, so components installed later
+# are covered without being listed here.
 cluster_sudoers_prune: false
 
-# Additionally never reported or pruned -- for files no package owns but that must
-# still survive. Names are exact basenames.
+# Additionally never reported or pruned -- files no package owns that must survive.
+# Exact basenames.
 #
-#   README              ships with the sudo package (listed as belt and braces)
-#   root                root's own grant; root does not need it, and deleting a file
-#                       called `root` out of sudoers.d has no upside
-#   90-cloud-init-users cloud-init's grant for the default cloud user -- removing it
-#                       is a classic way to lock yourself out of a cloud image
+#   README              ships with the sudo package
+#   root                root's own grant
+#   90-cloud-init-users cloud-init's grant for the default cloud user, which is the
+#                       only sudo path on a stock cloud image
 cluster_sudoers_keep:
   - README
   - root

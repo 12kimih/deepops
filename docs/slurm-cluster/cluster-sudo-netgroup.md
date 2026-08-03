@@ -65,18 +65,15 @@ NIS master gives every node the same answer by every path.
    +cluster_admins ALL=(ALL:ALL) ALL
    ```
 
-The rule **requires a password by default** (`cluster_sudoers_nopasswd: false`). The
-sudo prompt is the one check that still holds when an SSH key is stolen, so it is not
-given up unless it has to be. Set `cluster_sudoers_nopasswd: true` only where the
-`passwd -S` check above shows there is no hash to compare against — otherwise the rule
-grants passwordless root for no reason.
+The rule **requires a password by default** (`cluster_sudoers_nopasswd: false`). Set
+`cluster_sudoers_nopasswd: true` only where the `sudo -v` check above fails.
 
 ## Safety
 
 Every rule is checked with `visudo -cf` *before* it is installed, and the whole
 configuration is re-checked with `visudo -c` at the end of the run. The role also
-refuses to install a rule whose netgroup does not resolve on that node, since a rule
-matching nobody looks configured while granting nothing.
+fails rather than install a rule whose netgroup does not resolve on that node, since
+such a rule grants nothing.
 
 Run it against one node first and confirm sudo still works there:
 
@@ -99,33 +96,27 @@ exists, nobody can sudo anywhere.
 content: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }} ALL=(ALL) NOPASSWD:ALL"
 ```
 
-Those files outlive the person's need for them, grant root independently of any group,
-and are invisible to a group audit — nothing in `getent group sudo` reveals them.
+Such a file grants root independently of any group, so `getent group sudo` does not
+show it.
 
-`cluster_sudoers` therefore **reports** every drop-in it did not write, on every run.
-Set `cluster_sudoers_prune: true` to delete them, after reviewing the reported list.
+`cluster_sudoers` **reports** every drop-in it did not write, on every run. Set
+`cluster_sudoers_prune: true` to delete them, after reviewing the reported list.
 
 Two things are never touched:
 
 - **Anything a package owns.** Ownership is asked of `dpkg`/`rpm` rather than matched
   against a list of names, so a drop-in installed by a component (Open OnDemand ships
-  one) is protected without anyone remembering to list it — including components
-  installed later.
-- **`cluster_sudoers_keep`**, for files no package owns but that must survive anyway.
-  The defaults are `README`, `root` — root does not need its own grant and deleting a
-  file called `root` out of sudoers.d has no upside — and `90-cloud-init-users`, whose
-  removal is a classic way to lock yourself out of a cloud image.
+  one) is covered without being listed.
+- **`cluster_sudoers_keep`**, for files no package owns that must survive. The defaults
+  are `README`, `root` and `90-cloud-init-users` — the last being the only sudo path on
+  a stock cloud image.
 
-The report separates two findings that look alike but are not:
+The report separates two categories:
 
 | | meaning |
 |---|---|
-| **active** | no package owns it and sudo honours it — an unaudited grant |
+| **active** | no package owns it and sudo honours it |
 | **inert** | sudo **skips** it, because the name contains a dot or ends in `~` |
-
-A `.dpkg-old` backup or an editor leftover falls in the second column: clutter, not
-risk. The same rule is why a rule written to a badly named file silently never
-applies — which is what the role asserts about `cluster_sudoers_file` up front.
 
 To audit by hand:
 

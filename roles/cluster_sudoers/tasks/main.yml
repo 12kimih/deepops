@@ -1,6 +1,5 @@
 ---
-# sudo skips any file in sudoers.d containing a dot or ending in '~', so a bad name
-# produces a rule that looks installed and silently never applies.
+# sudo skips any file in sudoers.d containing a dot or ending in '~'.
 - name: Assert the sudoers filename is one sudo will actually read
   ansible.builtin.assert:
     that:
@@ -71,8 +70,7 @@
 
 # Unmanaged = present, not ours, not explicitly kept, and owned by no package.
 # `inert` are the ones sudo SKIPS -- it ignores any name containing a dot or ending
-# in '~' -- so they grant nothing and are only clutter. Worth separating, because
-# "there is a stray file" and "someone has unaudited root" are different findings.
+# in '~' -- so they grant nothing.
 - name: Classify the sudoers drop-ins
   ansible.builtin.set_fact:
     cluster_sudoers_unmanaged: "{{ cluster_sudoers_unmanaged_names }}"
@@ -86,8 +84,7 @@
          | map('regex_replace', '^no ', '') | list
          | difference([cluster_sudoers_file]) | difference(cluster_sudoers_keep) | sort }}
 
-# Surfaced on every run, whether or not pruning is on: a standing NOPASSWD grant that
-# no group audit would reveal is exactly the thing that should not stay quiet.
+# Reported on every run, whether or not pruning is on.
 - name: Report unmanaged sudoers drop-ins that actually grant sudo
   ansible.builtin.debug:
     msg: >-
@@ -114,8 +111,8 @@
   loop: "{{ cluster_sudoers_unmanaged }}"
   when: cluster_sudoers_prune | bool
 
-# Catch a broken /etc/sudoers or a drop-in this role does not own before the play
-# ends -- better to fail here, while someone is watching, than at the next `sudo`.
+# Catch a broken /etc/sudoers, or a drop-in this role does not own, before the play
+# ends.
 - name: Verify the whole sudoers configuration still parses
   ansible.builtin.command:
     cmd: visudo -c
