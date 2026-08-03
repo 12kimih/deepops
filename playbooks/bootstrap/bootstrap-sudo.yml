@@ -26,10 +26,16 @@
       become_method: "{{ method }}"
       environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
+    # 0440 root:root is the mode sudoers files are required to have: visudo rejects
+    # anything else, and the default 0644 would leave a NOPASSWD rule world-readable.
     - name: "Grant password-less sudo to user \"{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}\""
       ansible.builtin.copy:
-        content: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }} ALL=(ALL) NOPASSWD:ALL"
+        content: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }} ALL=(ALL) NOPASSWD:ALL\n"
         dest: "/etc/sudoers.d/{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -cf %s"
       become: true
       become_method: "{{ method }}"
 

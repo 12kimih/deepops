@@ -39,9 +39,12 @@
 
 - name: Grant sudo to temporary user
   ansible.builtin.copy:
-    content: "{{ tmp_user }} ALL=(ALL) NOPASSWD:ALL"
+    content: "{{ tmp_user }} ALL=(ALL) NOPASSWD:ALL\n"
     dest: "/etc/sudoers.d/{{ tmp_user }}"
-    mode: "0700"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
 
 # Useful for slurm clusters
 - name: Grant SSH access to temporary user
