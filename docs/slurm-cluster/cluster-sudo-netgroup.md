@@ -27,30 +27,10 @@ because job credentials never consult it.
 
 There is a second, independent thing to check: whether a password can be verified on the
 compute nodes at all. If it cannot, a password-requiring sudo rule can never succeed
-there no matter what the netgroup says.
-
-On a NIS cluster this is easy to get wrong. `ypcat shadow` answers
-
-```
-No such map shadow. Reason: No such map in server's domain
-```
-
-for an **unprivileged** caller even when the map exists and is being served. `ypserv`
-is normally configured to answer for `shadow.byname` only when the request comes from a
-privileged port, so root sees the map and a shell prompt does not:
-
-```
-*  :  *  :  shadow.byname          : port
-*  :  *  :  passwd.adjunct.byname  : port
-```
-
-PAM's `unix_chkpwd` helper is setuid root, so it binds from a privileged port and gets
-the hash; that is why password authentication works on nodes whose local `/etc/shadow`
-holds no entry for the user at all. Check as root, and confirm by behaviour:
+there no matter what the netgroup says. Confirm by behaviour, as the user, on the node:
 
 ```sh
-sudo getent shadow <user>    # the authoritative answer, privileged
-sudo -v                      # prompts and returns 0 => the rule will work here
+sudo -v        # prompts and returns 0 => a password-requiring rule works here
 ```
 
 ## The fix: a netgroup
