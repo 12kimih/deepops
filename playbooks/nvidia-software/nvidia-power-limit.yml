@@ -9,7 +9,7 @@
 # and set the wattage per group/host or on the command line. Examples:
 #
 #   # cap two named nodes at 450W
-#   ansible-playbook -l gpu1,gpu2 playbooks/nvidia-software/nvidia-power-limit.yml \
+#   ansible-playbook -l <host1>,<host2> playbooks/nvidia-software/nvidia-power-limit.yml \
 #       -e nvidia_power_limit_watts=450
 #
 #   # cap a whole group, wattage taken from config/group_vars/slurm-node.yml

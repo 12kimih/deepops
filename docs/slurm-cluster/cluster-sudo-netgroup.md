@@ -28,19 +28,14 @@ because job credentials never consult it.
 There is a second, independent thing to check. If NIS does not serve the `shadow` map
 — and most sites deliberately do not, since NIS is unauthenticated and the map would
 be readable by anything that can reach the server — then a directory user's password
-hash has to come from a **local** `/etc/shadow` entry on each node.
+hash has to come from somewhere else on each node. Whether it does is a property of how
+the nodes were provisioned, not something to deduce from `/etc/passwd`.
 
-Whether one exists is not something to assume. A node can have a local `shadow` entry
-even with **no** local `/etc/passwd` entry, because `getspnam()` looks up by name
-independently of `getpwnam()`. Check it rather than reasoning about it:
+Confirm it by behaviour, as the user, on the node:
 
 ```sh
-passwd -S      # 7 fields => a shadow entry was found; 2 fields => none
+sudo -v        # prompts and returns 0 => a password-requiring rule works here
 ```
-
-Where those entries do exist they are per-node copies with nothing keeping them in
-step — `passwd` updates only the node it ran on — so the same account can drift to
-different passwords on different nodes.
 
 ## The fix: a netgroup
 
@@ -71,7 +66,7 @@ NIS master gives every node the same answer by every path.
 3. `cluster_sudoers` then installs one rule per node:
 
    ```
-   +cluster_admins ALL=(ALL:ALL) NOPASSWD:ALL
+   +cluster_admins ALL=(ALL:ALL) ALL
    ```
 
 The rule **requires a password by default** (`cluster_sudoers_nopasswd: false`). The

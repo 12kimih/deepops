@@ -20,11 +20,12 @@
     state: present
   when: docker_socket_group_create_local | bool
 
-# dockerd is not socket-activated in this tree (docker.service runs `dockerd $DOCKER_OPTS`
-# with no `-H fd://`), so it creates and chowns /run/docker.sock itself and the unit's
-# SocketGroup= never applies. The daemon-level `group` key is the lever that works
-# either way. Merge it in rather than rewriting the file, which also carries the
-# NVIDIA runtime block and the NGC shm/ulimit tuning written by other roles.
+# Which knob owns the socket depends on how dockerd was started. Under systemd socket
+# activation (`-H fd://`) the unit's SocketGroup= wins; started any other way, dockerd
+# creates and chowns /run/docker.sock itself and only the daemon-level `group` key
+# applies. Set the daemon key here and the unit below, so ownership holds either way.
+# Merge rather than rewrite: daemon.json also carries the NVIDIA runtime block and the
+# NGC shm/ulimit tuning written by other roles.
 # Idempotent: only writes, and only reports changed, when the value actually differs.
 # https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 - name: Set the socket group in the Docker daemon configuration

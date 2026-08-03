@@ -4,13 +4,11 @@
 # Two mechanisms decide whether someone can sudo on a compute node, and they disagree
 # unless something keeps them in step: a Slurm job carries the numeric gid list
 # resolved on the SUBMIT node (send_gids), while a direct SSH login resolves groups on
-# the node itself. On top of that, a NIS cluster that does not serve the shadow map
-# has no password hash for directory users on nodes without a local passwd entry, so
-# password-based sudo cannot succeed there at all.
+# the node itself. Membership granted on one side is invisible to the other.
 #
 # A NIS netgroup is matched by name rather than by a numeric gid, so it is immune to
-# both effects: publish it once on the NIS master (nis_export_netgroups) and every node
-# answers the same way. This playbook installs the matching sudoers rule.
+# both: publish it once on the NIS master (nis_export_netgroups) and every node answers
+# the same way. This playbook installs the matching sudoers rule.
 #
 # No-op until cluster_sudoers_netgroup is set in config/group_vars.
 #

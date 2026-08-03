@@ -236,9 +236,9 @@ docker_iptables_enabled: true
 # has a local password, on every node. That is the break-glass path if NIS becomes
 # unreachable; the stock `%sudo` rule is deliberately left in place for it.
 #cluster_sudoers_netgroup: cluster_admins
-# Require a password for sudo (the role default). Set true ONLY where there is no
-# hash to check against -- verify with `passwd -S` on a compute node as the user:
-# 7 fields means a shadow entry was found, 2 fields means none.
+# Require a password for sudo (the role default). Set true ONLY where a password
+# cannot be checked at all -- confirm by behaviour with `sudo -v` on a compute node as
+# the user, rather than by reasoning about which file holds the hash.
 #cluster_sudoers_nopasswd: false
 # Remove sudoers drop-ins this role did not write. They are always reported; set this
 # to actually delete them. bootstrap-sudo.yml leaves one behind for whoever ran it,

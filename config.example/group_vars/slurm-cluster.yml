@@ -312,9 +312,9 @@ slurm_monitoring_group: "slurm-master"
 #grafana_port: 3001
 
 # Slurm Prometheus exporter image (role default deepops/prometheus-slurm-exporter:latest).
-# That upstream image is stale and crash-loops against current Slurm (25.x); this build
-# tracks it. Override here so it survives porting (config/ is gitignored).
-slurm_exporter_container: "12kimih/prometheus-slurm-exporter:latest"
+# That upstream image is stale and crash-loops against current Slurm (25.x), so point
+# this at a maintained build of your own.
+#slurm_exporter_container: "<registry>/prometheus-slurm-exporter:latest"
 
 ################################################################################
 # Logging with rsyslog                                                         #
