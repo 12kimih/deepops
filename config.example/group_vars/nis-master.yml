@@ -18,8 +18,9 @@
 # node-local group with a per-node GID silently grants a DIFFERENT group on the
 # compute node instead of failing. GIDs must be >= GID_MIN (/etc/login.defs, normally
 # 1000) or /var/yp/Makefile drops them from the map without warning -- the role
-# asserts this. Membership is additive; remove a member with
-# `gpasswd -d <user> <group>` on the master, then re-run to rebuild the maps.
+# asserts this. Membership is declarative: deleting a name from `members` revokes that
+# person's access on the next run. Set nis_export_groups_exclusive: false to make the
+# list additive instead, for a group other tooling also writes to.
 #nis_export_groups:
 #  - name: "{{ cluster_docker_group_name }}"
 #    gid: "{{ cluster_docker_group_gid }}"
@@ -35,7 +36,7 @@
 #
 # Membership here is DECLARATIVE -- /etc/netgroup is rendered whole, so deleting a
 # name from this list revokes their access on the next run. That is the difference
-# from nis_export_groups above, which is additive.
+# from nis_export_groups above, which manages only the groups it lists.
 #nis_export_netgroups:
 #  - name: "{{ cluster_sudoers_netgroup }}"
 #    users:
