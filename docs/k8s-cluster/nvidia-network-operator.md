@@ -140,7 +140,7 @@ This playbook is developed and tested in following environments:
   ```
 
 5. Deploy NVIDIA Network Operator
-   Before runnng the playbook, please update "roles/nvidia-network-operator/vars/main.yml" file according to your hardware and network configuration, this is what we used in our value.yaml file:
+   Before runnng the playbook, please update "roles/nvidia-network-operator/vars/main.yaml" file according to your hardware and network configuration, this is what we used in our value.yaml file:
 
    ```yaml
    num_vf: 8
