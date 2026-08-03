@@ -1,0 +1,35 @@
+---
+# docker_socket_group -- chown the Docker daemon's unix socket to a cluster-wide
+# group instead of the package-default `docker` group. Opt-in: the role is a no-op
+# until docker_socket_group is set.
+#
+# THE PROBLEM THIS SOLVES
+# The `docker` group is created by the Docker package with a distro-assigned system
+# GID (< 1000), and nothing keeps that number the same across nodes. Slurm resolves a
+# job's supplementary groups on the submit/controller node and ships the resulting
+# *numeric* GID list into the job (send_gids, on by default since 20.11); the compute
+# node renders those numbers through its own group database without re-resolving
+# them. So `usermod -aG docker <user>` on a compute node has no effect inside a job,
+# and being in `docker` on the submit node grants whatever group holds that same
+# number on the compute node -- which may be something else entirely.
+#
+# System GIDs also cannot be published through NIS: /var/yp/Makefile filters the
+# group map to GID >= GID_MIN (normally 1000), so `docker` at e.g. 998 is silently
+# never exported. The fix is to point dockerd at a group whose GID is pinned and
+# inside the exportable range, published cluster-wide (see nis_export_groups in the
+# nis_server role), and to chown the socket to THAT group on every node.
+#
+# Set both to enable; keep them identical to the values the group is published with.
+# docker_socket_group: dockerusers
+# docker_socket_group_gid: 4000
+
+# Also create the group locally with the same pinned GID. dockerd resolves the group
+# name when it creates the socket, which on boot can be before the NIS client has
+# bound -- a local entry with the same GID makes startup independent of NIS.
+docker_socket_group_create_local: true
+
+# Restart dockerd so the new socket ownership takes effect.
+# WARNING: this stops running containers on the node. Leave true for the change to
+# apply on the same run; set false to stage the config and bounce dockerd yourself
+# during a maintenance window.
+docker_socket_group_restart: true
