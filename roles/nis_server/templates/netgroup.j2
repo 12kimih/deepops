@@ -1,0 +1,15 @@
+{{ ansible_managed | comment }}
+#
+# NIS netgroup source. `make` in /var/yp turns this into the netgroup,
+# netgroup.byhost and netgroup.byuser maps.
+#
+# Each member is a (host,user,domain) triple. Leaving host and domain empty makes it
+# a USER netgroup, which is what sudoers `+name` and innetgr(3) match on.
+#
+# Netgroups are matched by NAME, not by a numeric id, so unlike a group they are not
+# subject to the GID_MIN filter in /var/yp/Makefile and they do not depend on every
+# node agreeing about what a number means.
+{% for ng in nis_export_netgroups %}
+
+{{ ng.name }} {% for u in ng.users %}(,{{ u }},){{ " " if not loop.last else "" }}{% endfor %}
+{% endfor %}

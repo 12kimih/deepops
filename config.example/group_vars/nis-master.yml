@@ -26,3 +26,18 @@
 #    members:
 #      - alice
 #      - bob
+
+# Netgroups published through the netgroup maps. Use these, not a group, for anything
+# that must give the same answer inside a Slurm job and over a direct SSH login:
+# a netgroup is matched by NAME, so it is subject to neither the GID_MIN export filter
+# nor the numeric-gid list Slurm ships into jobs. Administrator sudo is the main case
+# (see cluster_sudoers_netgroup in group_vars/all.yml).
+#
+# Membership here is DECLARATIVE -- /etc/netgroup is rendered whole, so deleting a
+# name from this list revokes their access on the next run. That is the difference
+# from nis_export_groups above, which is additive.
+#nis_export_netgroups:
+#  - name: "{{ cluster_sudoers_netgroup }}"
+#    users:
+#      - alice
+#      - bob

@@ -1,0 +1,89 @@
+---
+# sudo skips any file in sudoers.d containing a dot or ending in '~', so a bad name
+# produces a rule that looks installed and silently never applies.
+- name: Assert the sudoers filename is one sudo will actually read
+  ansible.builtin.assert:
+    that:
+      - "'.' not in cluster_sudoers_file"
+      - not cluster_sudoers_file.endswith('~')
+      - (cluster_sudoers_file | trim | length) > 0
+    fail_msg: >-
+      cluster_sudoers_file '{{ cluster_sudoers_file }}' would be ignored by sudo --
+      it must not contain '.' or end in '~'.
+
+# innetgr(3) is what sudoers `+netgroup` uses, and it reads the same nsswitch path
+# getent does. If the netgroup does not resolve here, the rule would match nobody.
+- name: Resolve the administrator netgroup on this node
+  ansible.builtin.command:
+    cmd: "getent netgroup {{ cluster_sudoers_netgroup }}"
+  register: cluster_sudoers_netgroup_lookup
+  changed_when: false
+  failed_when: false
+
+- name: Assert the administrator netgroup resolves
+  ansible.builtin.assert:
+    that:
+      - cluster_sudoers_netgroup_lookup.rc == 0
+      - (cluster_sudoers_netgroup_lookup.stdout | trim | length) > 0
+    fail_msg: >-
+      Netgroup '{{ cluster_sudoers_netgroup }}' does not resolve on
+      {{ inventory_hostname }}, so `+{{ cluster_sudoers_netgroup }}` would match
+      nobody. Publish it first (nis_export_netgroups on the NIS master, then the maps
+      are rebuilt), check `nsswitch.conf` has a `netgroup:` line, and confirm this
+      node is bound with `ypwhich`.
+  when: cluster_sudoers_require_netgroup | bool
+
+# `validate` runs visudo against the candidate file BEFORE it is installed, so a
+# malformed rule fails this task instead of breaking sudo on the node. Mode 0440
+# because sudo refuses any sudoers file that is group- or world-WRITABLE.
+- name: Install the administrator sudoers rule
+  ansible.builtin.copy:
+    content: |
+      # Ansible managed -- edits will be overwritten (roles/cluster_sudoers).
+      # Membership lives in the NIS netgroup '{{ cluster_sudoers_netgroup }}', not in a
+      # local group, so jobs and SSH logins get the same answer.
+      +{{ cluster_sudoers_netgroup }} {{ cluster_sudoers_privilege }} {{ 'NOPASSWD:ALL' if cluster_sudoers_nopasswd | bool else 'ALL' }}
+    dest: "/etc/sudoers.d/{{ cluster_sudoers_file }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: List the drop-ins present in /etc/sudoers.d
+  ansible.builtin.find:
+    paths: /etc/sudoers.d
+    file_type: file
+  register: cluster_sudoers_present
+
+- name: Identify drop-ins this role does not manage
+  ansible.builtin.set_fact:
+    cluster_sudoers_unmanaged: >-
+      {{ cluster_sudoers_present.files | map(attribute='path') | map('basename') | list
+         | difference([cluster_sudoers_file]) | difference(cluster_sudoers_keep) | sort }}
+
+# Surfaced on every run, whether or not pruning is on: a standing NOPASSWD grant that
+# no group audit would reveal is exactly the thing that should not stay quiet.
+- name: Report unmanaged sudoers drop-ins
+  ansible.builtin.debug:
+    msg: >-
+      Unmanaged sudoers drop-ins on {{ inventory_hostname }}:
+      {{ cluster_sudoers_unmanaged | join(', ') }}.
+      Each grants sudo independently of any group. Review them, then set
+      cluster_sudoers_prune=true to remove them.
+  when: cluster_sudoers_unmanaged | length > 0
+
+- name: Remove unmanaged sudoers drop-ins
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/{{ item }}"
+    state: absent
+  loop: "{{ cluster_sudoers_unmanaged }}"
+  when: cluster_sudoers_prune | bool
+
+# Catch a broken /etc/sudoers or a drop-in this role does not own before the play
+# ends -- better to fail here, while someone is watching, than at the next `sudo`.
+- name: Verify the whole sudoers configuration still parses
+  ansible.builtin.command:
+    cmd: visudo -c
+  register: cluster_sudoers_check
+  changed_when: false
+  failed_when: cluster_sudoers_check.rc != 0

@@ -35,6 +35,22 @@ slurm_password: ReplaceWithASecurePasswordInTheVault
 slurm_user_uid: 22078
 slurm_user_home: /local/slurm
 
+# The slurm user's primary group, pinned to a fixed gid for the same reason the uid
+# is pinned. Leaving the gid to the OS makes each node pick the next free number, so
+# the same name means a different number per node -- and numbers, not names, are what
+# travel: Slurm ships the numeric gid list resolved on the submit node into every job
+# (send_gids), and NFS with AUTH_SYS sends numeric uid/gid over the wire. Divergence
+# then breaks ownership whenever state is shared or copied numerically
+# (`tar --numeric-owner`, `rsync -a`, a spool directory moved onto NFS).
+#
+# NOTE: applying this to an EXISTING cluster changes the slurm user's primary group
+# on nodes that drifted, so restart slurmd/slurmctld afterwards. Set
+# slurm_manage_user_gid: false to keep the current behaviour and only pin new nodes
+# by hand.
+slurm_groupname: slurm
+slurm_user_gid: 22078
+slurm_manage_user_gid: true
+
 slurm_allow_ssh_user: []
 slurm_db_username: slurm
 slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault

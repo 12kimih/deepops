@@ -56,3 +56,21 @@ nis_server_enable_ypxfrd: false
 # map without a warning, so clients never see it no matter how often the maps are
 # rebuilt. This role asserts the range instead of letting it fail silently.
 nis_export_groups: []
+
+# Netgroups to define on this node and publish through the netgroup maps. Each entry
+# is {name, users}; empty by default, so /etc/netgroup is left alone.
+#
+#   nis_export_netgroups:
+#     - name: cluster_admins
+#       users: [alice, bob]
+#
+# A netgroup is matched by NAME, so it sidesteps both problems a group has here: it is
+# not subject to the GID_MIN export filter, and it does not depend on every node
+# agreeing what a number means. That makes it the right mechanism for anything that
+# must mean the same thing whether it is evaluated inside a Slurm job (where the gid
+# list comes from the submit node) or on a direct SSH login (where it comes from the
+# node itself) -- sudoers `+netgroup` being the main example.
+#
+# WARNING: this manages /etc/netgroup as a whole. Any hand-written entries in that
+# file are replaced once this list is non-empty.
+nis_export_netgroups: []
