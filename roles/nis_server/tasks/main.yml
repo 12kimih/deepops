@@ -117,3 +117,50 @@
   failed_when: false
   tags:
     - molecule-notest
+
+# --- Cluster groups published through the NIS group map -----------------------
+# See nis_export_groups in defaults/main.yml for why the GID has to be pinned and
+# why it has to be >= GID_MIN.
+- name: Read GID_MIN (the NIS group-map export threshold)
+  ansible.builtin.command:
+    cmd: awk '$1 == "GID_MIN" { print $2 }' /etc/login.defs
+  register: nis_gid_min
+  changed_when: false
+  when: nis_export_groups | length > 0
+
+- name: Assert exported group GIDs fall inside the NIS map range
+  ansible.builtin.assert:
+    that:
+      - item.gid | int >= ((nis_gid_min.stdout | trim) | default('1000', true) | int)
+    fail_msg: >-
+      Group '{{ item.name }}' has gid {{ item.gid }}, below GID_MIN
+      ({{ (nis_gid_min.stdout | trim) | default('1000', true) }}). /var/yp/Makefile
+      drops such groups from the group map, so NIS clients would never see it.
+      Choose a gid >= GID_MIN.
+  loop: "{{ nis_export_groups }}"
+  loop_control:
+    label: "{{ item.name }} (gid {{ item.gid }})"
+  when: nis_export_groups | length > 0
+
+- name: Create the NIS-exported cluster groups
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid }}"
+    state: present
+  loop: "{{ nis_export_groups }}"
+  loop_control:
+    label: "{{ item.name }} (gid {{ item.gid }})"
+  notify: Rebuild NIS maps
+
+# Membership is ADDITIVE: this adds users to the group but never removes them, so a
+# user deleted from `members` stays in the group until removed by hand on this node
+# (`gpasswd -d <user> <group>`, then re-run the role to rebuild the maps).
+- name: Add members to the NIS-exported cluster groups
+  ansible.builtin.user:
+    name: "{{ item.1 }}"
+    groups: "{{ item.0.name }}"
+    append: true
+  loop: "{{ nis_export_groups | subelements('members', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1 }} -> {{ item.0.name }}"
+  notify: Rebuild NIS maps
