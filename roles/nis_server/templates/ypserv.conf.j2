@@ -1,0 +1,27 @@
+{{ ansible_managed | comment }}
+#
+# ypserv access rules. man ypserv.conf(5)
+#
+# Options.
+{% for k, v in nis_server_ypserv_options.items() %}
+{{ "%-16s" | format(k ~ ":") }} {{ v }}
+{% endfor %}
+
+# Access rules, as: host : domain : map : security
+#
+# ypserv applies the FIRST rule that matches, so specific map rules must come before
+# any catch-all. `security` is one of:
+#
+#   none   answer anyone that securenets allows
+#   port   answer only requests from a privileged port (< 1024), i.e. from root
+#   deny   never answer
+#   des    require DES authentication
+#
+# `port` is what keeps the password hashes out of reach of ordinary users: NIS itself
+# does no authentication, so without it anyone able to reach the server could dump
+# every hash with `ypcat shadow`. With it, PAM's setuid-root helper still gets the map
+# while a user shell does not -- which is also why `ypcat shadow` reporting "No such
+# map in server's domain" to a normal user does NOT mean the map is missing.
+{% for r in nis_server_ypserv_rules %}
+{{ "%-28s" | format(r.host) }} : {{ "%-7s" | format(r.domain) }} : {{ "%-22s" | format(r.map) }} : {{ r.security }}
+{% endfor %}
