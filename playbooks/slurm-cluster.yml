@@ -169,12 +169,17 @@
   tags:
     - pyxis
 
-# Runs after authentication.yml has published the group through NIS, so the compute
-# nodes can resolve it. No-op unless docker_socket_group is set in config/group_vars.
+# Both run after authentication.yml has published the group and the netgroup through
+# NIS, so the compute nodes can resolve them. No-ops unless configured.
 - name: Point the Docker socket at a cluster-wide group
   import_playbook: container/docker-socket-group.yml
   tags:
     - docker-socket-group
+
+- name: Grant administrator sudo through the cluster netgroup
+  import_playbook: generic/cluster-sudoers.yml
+  tags:
+    - cluster-sudoers
 
 - name: Ensure that nv_peer_mem is loaded
   import_playbook: nvidia-software/nvidia-peer-memory.yml

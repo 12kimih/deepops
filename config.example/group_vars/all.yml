@@ -221,6 +221,25 @@ docker_iptables_enabled: true
 #   for h in <all nodes>; do ssh $h "getent group <gid> || echo $h free"; done
 #cluster_docker_group_name: dockerusers
 #cluster_docker_group_gid: 4000
+
+# NIS netgroup whose members get administrator sudo on every node.
+# Playbook: slurm-cluster (generic/cluster-sudoers.yml), authentication
+#
+# A group cannot do this job. Slurm ships the numeric gid list resolved on the submit
+# node into jobs (send_gids) while a direct SSH login resolves groups on the node, so
+# `sudo` group membership gives two different answers depending on how you arrived --
+# and `sudo` is gid 27, below GID_MIN, so NIS cannot make the number consistent
+# either. A netgroup is matched by NAME through innetgr(3), so neither problem
+# applies. Define the members with nis_export_netgroups in group_vars/nis-master.yml.
+#
+# BEFORE ENABLING: confirm a LOCAL account exists that is in the local sudo group and
+# has a local password, on every node. That is the break-glass path if NIS becomes
+# unreachable; the stock `%sudo` rule is deliberately left in place for it.
+#cluster_sudoers_netgroup: cluster_admins
+# Remove sudoers drop-ins this role did not write. They are always reported; set this
+# to actually delete them. bootstrap-sudo.yml leaves one behind for whoever ran it,
+# granting permanent passwordless root that no group audit would show.
+#cluster_sudoers_prune: false
 # Docker daemon logins
 #   Note: example only! you should put these in an Ansible Vault file for security!
 #
