@@ -1,0 +1,19 @@
+---
+# Chown the Docker daemon socket to a cluster-wide group so that `docker` works from
+# inside a Slurm job. Slurm resolves supplementary groups on the submit/controller
+# node and ships the resulting NUMERIC GIDs into the job (send_gids, on by default
+# since 20.11), so membership in a node-local `docker` group -- whose system GID
+# differs per node and cannot be published through NIS -- has no effect inside a job.
+# Pair this with nis_export_groups (roles/nis_server) which publishes the group under
+# one pinned GID cluster-wide.
+#
+# No-op until docker_socket_group is set in config/group_vars.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  become_method: sudo
+  tags:
+    - docker-socket-group
+  roles:
+    - role: docker_socket_group
+      when: docker_socket_group is defined
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"

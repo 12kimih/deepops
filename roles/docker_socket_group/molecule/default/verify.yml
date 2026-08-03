@@ -1,0 +1,28 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read the docker socket group entry
+      ansible.builtin.getent:
+        database: group
+        key: "dockerusers"
+
+    - name: The group exists with the pinned GID
+      ansible.builtin.assert:
+        that:
+          - getent_group["dockerusers"][1] | int == 4000
+        fail_msg: >-
+          dockerusers has gid {{ getent_group["dockerusers"][1] }}, expected 4000.
+          The GID must be pinned so it is identical on every node.
+
+    - name: Read the Docker daemon configuration
+      ansible.builtin.slurp:
+        src: /etc/docker/daemon.json
+      register: docker_socket_group_daemon_cfg
+
+    - name: The daemon configuration names the socket group
+      ansible.builtin.assert:
+        that:
+          - (docker_socket_group_daemon_cfg.content | b64decode | from_json).group == "dockerusers"
+        fail_msg: "/etc/docker/daemon.json does not set group=dockerusers"

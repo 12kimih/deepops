@@ -1,0 +1,26 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: docker-socket-group-ubuntu-2204
+    image: geerlingguy/docker-ubuntu2204-ansible
+    cgroupns_mode: host
+    pre_build_image: true
+    privileged: true
+provisioner:
+  name: ansible
+  ansible_args:
+    - -vv
+  inventory:
+    group_vars:
+      all:
+        docker_socket_group: "dockerusers"
+        docker_socket_group_gid: 4000
+        # dockerd is not installed in the test container, so never fire the restart
+        # handler; the scenario only checks that the group and the daemon
+        # configuration are written correctly.
+        docker_socket_group_restart: false
+verifier:
+  name: ansible

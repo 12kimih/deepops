@@ -1,0 +1,56 @@
+---
+# Verify that every group published through NIS resolves to its pinned GID on every
+# node. Read-only; changes nothing. Fails the play on the first mismatch so it can
+# gate a maintenance run.
+#
+#   ansible-playbook playbooks/utilities/check-id-consistency.yml
+#
+# WHY THIS INVARIANT MATTERS
+# Slurm resolves a job's supplementary groups on the submit/controller node and ships
+# the resulting NUMERIC GID list into the job (send_gids, on by default since 20.11).
+# The compute node never re-resolves the names -- it renders those numbers through its
+# own group database. NFS with AUTH_SYS does the same with UIDs. So when two nodes
+# disagree about what a number means, access does NOT fail closed: the job silently
+# holds whatever group that number happens to name on the compute node.
+#
+# The same asymmetry makes `usermod -aG <group> <user>` on a compute node a no-op
+# inside jobs -- that node's group file is never consulted for job credentials. Groups
+# that must be meaningful inside a job therefore have to be published through NIS with
+# a pinned GID (nis_export_groups in roles/nis_server), which is exactly what this
+# playbook checks has actually taken effect everywhere.
+- hosts: "{{ hostlist | default('all') }}"
+  become: false
+  gather_facts: false
+  tags:
+    - check-id-consistency
+  tasks:
+    - name: Skip when no groups are published through NIS
+      ansible.builtin.meta: end_host
+      when: (nis_export_groups | default([])) | length == 0
+
+    - name: Resolve each published group on this node
+      ansible.builtin.getent:
+        database: group
+        key: "{{ item.name }}"
+        fail_key: false
+      loop: "{{ nis_export_groups }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: check_id_resolved
+
+    - name: Assert each published group resolves to its pinned GID
+      ansible.builtin.assert:
+        that:
+          - item.item.name in (item.ansible_facts.getent_group | default({}))
+          - (item.ansible_facts.getent_group[item.item.name][1] | int) == (item.item.gid | int)
+        fail_msg: >-
+          Group '{{ item.item.name }}' does not resolve to gid {{ item.item.gid }} on
+          {{ inventory_hostname }} (got
+          {{ (item.ansible_facts.getent_group | default({})).get(item.item.name, ['', 'MISSING'])[1] }}).
+          Either the NIS maps were not rebuilt on the master (`make -C /var/yp`), this
+          node is not bound to NIS (`ypwhich`), or a LOCAL group of the same name
+          shadows the NIS one -- nsswitch resolves `files` before `nis`.
+        success_msg: "{{ item.item.name }} = gid {{ item.item.gid }}"
+      loop: "{{ check_id_resolved.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"

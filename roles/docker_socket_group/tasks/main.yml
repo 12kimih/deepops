@@ -1,0 +1,72 @@
+---
+# Point dockerd's unix socket at a cluster-wide group. See defaults/main.yml for why
+# the package-default `docker` group cannot work inside a Slurm job.
+- name: Assert the socket group is fully specified
+  ansible.builtin.assert:
+    that:
+      - docker_socket_group is defined
+      - (docker_socket_group | trim | length) > 0
+      - docker_socket_group_gid is defined
+    fail_msg: >-
+      docker_socket_group is enabled but docker_socket_group / docker_socket_group_gid
+      are not both set. The GID must be pinned explicitly so that it is identical on
+      every node -- Slurm ships numeric GIDs into jobs, so a per-node GID silently
+      grants the wrong group instead of failing.
+
+- name: Create the Docker socket group locally with the pinned GID
+  ansible.builtin.group:
+    name: "{{ docker_socket_group }}"
+    gid: "{{ docker_socket_group_gid }}"
+    state: present
+  when: docker_socket_group_create_local | bool
+
+# dockerd is not socket-activated in this tree (docker.service runs `dockerd $DOCKER_OPTS`
+# with no `-H fd://`), so it creates and chowns /run/docker.sock itself and the unit's
+# SocketGroup= never applies. The daemon-level `group` key is the lever that works
+# either way. Merge it in rather than rewriting the file, which also carries the
+# NVIDIA runtime block and the NGC shm/ulimit tuning written by other roles.
+# Idempotent: only writes, and only reports changed, when the value actually differs.
+# https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
+- name: Set the socket group in the Docker daemon configuration
+  ansible.builtin.command:
+    cmd: >-
+      python3 -c 'import json, pathlib, sys;
+      p = pathlib.Path("/etc/docker/daemon.json");
+      want = {{ {"group": docker_socket_group} | to_json }};
+      text = p.read_text().strip() if p.exists() else "";
+      data = json.loads(text) if text else {};
+      changed = any(data.get(k) != v for k, v in want.items());
+      data.update(want);
+      (p.write_text(json.dumps(data, indent=2) + chr(10)) if changed else None);
+      sys.exit(10 if changed else 0)'
+  register: docker_socket_group_daemon_json
+  changed_when: docker_socket_group_daemon_json.rc == 10
+  failed_when: docker_socket_group_daemon_json.rc not in [0, 10]
+  notify: Restart docker
+
+# Belt and braces: if docker.socket is ever switched to real socket activation
+# (`-H fd://`), systemd owns the socket and SocketGroup= wins over daemon.json. Keep
+# the two in agreement so that change cannot silently revert socket ownership.
+- name: Check whether the docker.socket unit exists
+  ansible.builtin.command:
+    cmd: systemctl cat docker.socket
+  register: docker_socket_group_unit
+  changed_when: false
+  failed_when: false
+
+- name: Align the docker.socket unit group with the daemon configuration
+  ansible.builtin.copy:
+    content: |
+      # Ansible managed -- edits will be overwritten (roles/docker_socket_group).
+      # Kept in sync with the `group` key in /etc/docker/daemon.json so socket
+      # ownership is the same whether or not dockerd is socket-activated.
+      [Socket]
+      SocketGroup={{ docker_socket_group }}
+    dest: /etc/systemd/system/docker.socket.d/10-socket-group.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: docker_socket_group_unit.rc == 0
+  notify:
+    - Reload systemd
+    - Restart docker

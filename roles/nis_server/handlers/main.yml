@@ -4,3 +4,13 @@
     name: "{{ nis_server_service | default('ypserv') }}"
     state: restarted
     enabled: true
+
+# The maps are generated from the source files in YPPWDDIR (/etc/passwd, /etc/group,
+# ...); edits to those files do not reach NIS clients until the maps are rebuilt.
+# `make` in /var/yp regenerates only the maps whose source changed.
+# https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypmake(8)
+- name: Rebuild NIS maps
+  ansible.builtin.command:
+    cmd: make
+    chdir: /var/yp
+  changed_when: true

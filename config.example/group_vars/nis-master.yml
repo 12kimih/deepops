@@ -11,3 +11,18 @@
 #nis_server_securenets:
 #  - "255.0.0.0       127.0.0.0"
 #  - "255.255.255.0   10.0.0.0"
+
+# Groups defined on the NIS master and published through the group map, so that one
+# group name means one GID on every node. Anything that has to be meaningful inside a
+# Slurm job belongs here: Slurm ships NUMERIC GIDs into jobs (send_gids), so a
+# node-local group with a per-node GID silently grants a DIFFERENT group on the
+# compute node instead of failing. GIDs must be >= GID_MIN (/etc/login.defs, normally
+# 1000) or /var/yp/Makefile drops them from the map without warning -- the role
+# asserts this. Membership is additive; remove a member with
+# `gpasswd -d <user> <group>` on the master, then re-run to rebuild the maps.
+#nis_export_groups:
+#  - name: "{{ cluster_docker_group_name }}"
+#    gid: "{{ cluster_docker_group_gid }}"
+#    members:
+#      - alice
+#      - bob

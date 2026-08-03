@@ -32,3 +32,27 @@ nis_server_securenets:
 # (speeds map transfer to NIS SLAVE servers -- only needed if you run slaves).
 nis_server_enable_yppasswdd: true
 nis_server_enable_ypxfrd: false
+
+# Cluster-wide groups to define on this node and publish through the NIS group map.
+# Each entry is {name, gid, members}; empty by default, so nothing is exported.
+#
+#   nis_export_groups:
+#     - name: dockerusers
+#       gid: 4000
+#       members: [alice, bob]
+#
+# WHY the GID must be pinned here rather than left to the OS:
+# Slurm resolves a job's supplementary groups on the SUBMIT/controller node and ships
+# the resulting *numeric* GID list into the job (send_gids, on by default since
+# 20.11). The compute node never re-resolves them -- it just renders those numbers
+# through its own group database. So a node-local group whose GID differs between
+# nodes does not fail closed; it silently grants whatever OTHER group happens to hold
+# that number on the compute node. Publishing the group through NIS under one fixed
+# GID is what makes the name mean the same thing everywhere.
+#
+# WHY the GID must be >= GID_MIN:
+# /var/yp/Makefile filters the group map to GID >= MINGID (taken from GID_MIN in
+# /etc/login.defs, normally 1000). A group numbered below that is dropped from the
+# map without a warning, so clients never see it no matter how often the maps are
+# rebuilt. This role asserts the range instead of letting it fail silently.
+nis_export_groups: []

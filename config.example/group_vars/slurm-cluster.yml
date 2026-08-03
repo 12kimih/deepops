@@ -284,6 +284,21 @@ slurm_enable_container_registry: true
 docker_insecure_registries: "{{ groups['slurm-master'] | map('regex_replace', '^(.*)$', '\\1:5000') | list + ['registry.local:31500'] }}"
 docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*)$', 'http://\\1:5000') | list }}"
 
+# Group that owns /run/docker.sock on every node, so `docker` works from inside a
+# Slurm job. Must be the SAME group the NIS master publishes (nis_export_groups in
+# group_vars/nis-master.yml) -- both read the values defined in group_vars/all.yml.
+# Leave unset to keep the package-default `docker` group, which does NOT work from
+# inside a job; see cluster_docker_group_name in group_vars/all.yml for why.
+#
+# NOTE: docker grants root-equivalent access on the node, and containers started
+# through dockerd live outside the job's cgroup -- they survive scancel and their
+# GPU/CPU/memory are not charged to the allocation. Prefer enroot/pyxis
+# (srun --container-image=...) for anything that fits in a single container.
+#docker_socket_group: "{{ cluster_docker_group_name }}"
+#docker_socket_group_gid: "{{ cluster_docker_group_gid }}"
+# Applying the change restarts dockerd, which stops running containers on the node.
+#docker_socket_group_restart: true
+
 ################################################################################
 # Monitoring stack                                                             #
 ################################################################################
