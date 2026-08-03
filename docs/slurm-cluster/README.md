@@ -16,6 +16,7 @@ Instructions for deploying a GPU cluster with Slurm
   - [Installing Open on Demand](#installing-open-on-demand)
   - [Pyxis, Enroot, and Singularity](#pyxis-enroot-and-singularity)
   - [Large deployments](#large-deployments)
+  - [Identity across the cluster](#identity-across-the-cluster)
 
 ## Requirements
 
@@ -283,3 +284,20 @@ See the documentation on [software modules](./software-modules.md) for informati
 
 To minimize the requirements for the cluster management services, DeepOps deploys a single Slurm head node for cluster management, shared filesystems, and user login. However, for larger deployments, it often makes sense to run these functions on multiple separate machines.
 For instructions on separating these functions, see the [large deployment guide](./large-deployments.md).
+
+## Identity across the cluster
+
+Slurm resolves a job's supplementary groups on the submit node and ships the resulting
+**numeric** GIDs into the job, while a direct SSH login resolves them on the node
+itself. Anything that depends on group membership therefore has to be made consistent
+deliberately, or it will behave differently depending on how the user arrived:
+
+- [Docker access from inside Slurm jobs](./docker-in-slurm-jobs.md) — why adding a user
+  to the `docker` group on a compute node has no effect inside a job, and how to
+  publish a socket group that does work.
+- [Administrator sudo on a Slurm + NIS cluster](./cluster-sudo-netgroup.md) — why `sudo`
+  group membership gives two different answers on the same node, and how a NIS netgroup
+  avoids it.
+
+`playbooks/utilities/check-id-consistency.yml` asserts that every group published
+through NIS resolves to its pinned GID on every node.

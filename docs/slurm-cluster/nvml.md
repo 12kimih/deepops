@@ -166,8 +166,8 @@ ansible-playbook -b -l slurm-cluster playbooks/slurm-cluster.yml
 Because we are using MIG, we will need to use a custom Slurm config to specify the number and type of MIG instances. To do this, we first copy the `slurm.conf` from the DGX node to our DeepOps repo:
 
 ```
-$ scp user@dgx01:/etc/slurm/slurm.conf config/files/slurm.conf
-$ scp user@dgx01:/etc/nhc/nhc.conf config/files/nhc.conf
+$ scp user@dgx01:/etc/slurm/slurm.conf config/files/slurm/slurm.conf
+$ scp user@dgx01:/etc/nhc/nhc.conf config/files/slurm/nhc.conf
 ```
 
 Edit the `slurm.conf` to specify the GPUs on the node according to our configured MIG instances. Note that because we have 8 physical GPUs on the node, we have 8x 3g.40gb instances, 8x 2g.20gb instances, and 16x 1g.10gb instances:
@@ -189,8 +189,8 @@ NHC does not yet support MIG, so we just disable the GPU check:
 We edit `config/group_vars/slurm-cluster.yml` to specify our custom files:
 
 ```
-slurm_conf_template: "../../config/files/slurm.conf"
-nhc_config_template: "../../config/files/nhc.conf"
+slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf"
+nhc_config_template: "{{ inventory_dir }}/files/slurm/nhc.conf"
 ```
 
 Then run Ansible to push this configuration back out to the cluster:

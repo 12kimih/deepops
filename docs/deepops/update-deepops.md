@@ -151,12 +151,12 @@ In particular,
   You can determine this version by running:
 
   ```bash
-  grep -E "^helm_version:" submodules/kubespray/roles/download/defaults/main.yml
+  grep -E "^helm_version:" submodules/kubespray/roles/kubespray_defaults/defaults/main/download.yml
   helm_version: "v3.5.4"
   ```
 
 - Make sure the `kube_version` you are using appears in the list of supported versions in `kubectl_checksums`.
-  You can verify your supported version appears in the list by checking the `kubectl_checksums` variable in the `submodules/kubespray/roles/download/defaults/main.yml` file.
+  You can verify your supported version appears in the list by checking the `kubectl_checksums` variable in the `submodules/kubespray/roles/kubespray_defaults/defaults/main/download.yml` file.
 
 Additionally, please note that Kubespray can only upgrade between one minor version of Kubernetes at a time.
 This means that you may need to upgrade multiple times between your current version and your desired version of Kubernetes.
