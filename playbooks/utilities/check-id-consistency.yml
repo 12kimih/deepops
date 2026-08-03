@@ -23,17 +23,27 @@
   gather_facts: false
   tags:
     - check-id-consistency
+  vars:
+    # nis_export_groups is declared for the NIS master (group_vars/nis-master.yml), so
+    # it is undefined on the nodes this playbook exists to check. Read it out of the
+    # master's hostvars, which is where the cluster-wide answer lives.
+    check_id_from_master: >-
+      {{ (groups['nis-master'] | default([]))
+         | map('extract', hostvars, 'nis_export_groups') | select('defined') | list }}
+    check_id_groups: >-
+      {{ nis_export_groups if nis_export_groups is defined
+         else (check_id_from_master | first | default([])) }}
   tasks:
     - name: Skip when no groups are published through NIS
       ansible.builtin.meta: end_host
-      when: (nis_export_groups | default([])) | length == 0
+      when: (check_id_groups | length) == 0
 
     - name: Resolve each published group on this node
       ansible.builtin.getent:
         database: group
         key: "{{ item.name }}"
         fail_key: false
-      loop: "{{ nis_export_groups }}"
+      loop: "{{ check_id_groups }}"
       loop_control:
         label: "{{ item.name }}"
       register: check_id_resolved
