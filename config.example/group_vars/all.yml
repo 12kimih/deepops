@@ -240,10 +240,13 @@ docker_iptables_enabled: true
 # to actually delete them. bootstrap-sudo.yml leaves one behind for whoever ran it,
 # granting permanent passwordless root that no group audit would show.
 #cluster_sudoers_prune: false
-# Drop-ins that belong to other components and must survive pruning. README ships with
-# the sudo package; add any component-owned file present on your nodes.
+# Files no package owns but that must still survive pruning (package-owned drop-ins
+# are protected automatically -- ownership is asked of dpkg/rpm). Defaults cover the
+# sudo package's README, root's own grant, and cloud-init's default-user grant.
 #cluster_sudoers_keep:
 #  - README
+#  - root
+#  - 90-cloud-init-users
 # Docker daemon logins
 #   Note: example only! you should put these in an Ansible Vault file for security!
 #
