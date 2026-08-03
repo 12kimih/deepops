@@ -16,8 +16,8 @@
 # The same asymmetry makes `usermod -aG <group> <user>` on a compute node a no-op
 # inside jobs -- that node's group file is never consulted for job credentials. Groups
 # that must be meaningful inside a job therefore have to be published through NIS with
-# a pinned GID (nis_export_groups in roles/nis_server), which is exactly what this
-# playbook checks has actually taken effect everywhere.
+# a pinned GID (nis_export_groups in roles/nis_server). This playbook checks that it
+# took effect on every node.
 - hosts: "{{ hostlist | default('all') }}"
   become: false
   gather_facts: false

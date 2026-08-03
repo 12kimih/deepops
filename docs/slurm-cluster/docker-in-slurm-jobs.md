@@ -64,8 +64,8 @@ group that is designed to be cluster-wide:
          - alice
    ```
 
-   The role asserts each GID is `>= GID_MIN` rather than letting the map silently drop
-   it. Membership is **additive** — to remove someone, run
+   The role asserts each GID is `>= GID_MIN`. Membership is **additive** — to remove
+   someone, run
    `gpasswd -d <user> <group>` on the master and re-run so the maps are rebuilt.
 
 3. Chown the socket to it on every node (`config/group_vars/slurm-cluster.yml`):
@@ -111,12 +111,11 @@ group of the same name shadows the NIS one — `nsswitch.conf` resolves `files` 
 
 Membership in the socket group is **root-equivalent on that node**: a container that
 bind-mounts `/` escapes trivially. Publishing it cluster-wide makes that a standing
-grant on every node, which is a policy decision, not just plumbing.
+grant on every node.
 
 Containers started through dockerd are also **outside the job's cgroup**. They are
 children of the daemon, not of `slurmstepd`, so they survive `scancel` and the end of
-the allocation, and their GPU, CPU and memory usage is not charged to the job. On a
-shared cluster this is how orphaned containers end up holding GPUs.
+the allocation, and their GPU, CPU and memory usage is not charged to the job.
 
 Enroot and Pyxis have neither problem — they are rootless, scoped to the job, and
 GPU-aware:

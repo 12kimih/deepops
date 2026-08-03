@@ -78,8 +78,7 @@
 
 # --- ypserv access rules -------------------------------------------------------
 # Assert before writing: a protected map that is unrestricted, or listed after a
-# catch-all that ypserv would match first, means every password hash is readable by
-# anything securenets lets through. Fail the play rather than serve that.
+# catch-all that ypserv matches first, is served to anything securenets allows.
 - name: Assert the protected maps are restricted and ordered ahead of any catch-all
   vars:
     nis_ypserv_maps: "{{ nis_server_ypserv_rules | map(attribute='map') | list }}"

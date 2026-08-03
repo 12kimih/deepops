@@ -35,11 +35,10 @@ nis_server_enable_ypxfrd: false
 
 # --- ypserv access rules (/etc/ypserv.conf) -----------------------------------
 # Manage the access rules rather than leaving them to whatever the package shipped.
-# NIS does no authentication of its own, so these rules are the only thing standing
-# between the password hashes and anyone who can reach the server: the `port` security
-# setting makes ypserv answer for a map only when the request comes from a privileged
-# port (< 1024), which in practice means a root process. PAM's setuid-root helper
-# qualifies, an ordinary user shell does not.
+# NIS does no authentication of its own; these rules are what restrict access to the
+# maps. The `port` security setting makes ypserv answer for a map only when the
+# request comes from a privileged port (< 1024), i.e. a root process. PAM's
+# setuid-root helper qualifies; an ordinary user shell does not.
 nis_server_manage_ypserv_conf: true
 
 nis_server_ypserv_options:
@@ -56,9 +55,8 @@ nis_server_ypserv_rules:
   - { host: "*", domain: "*", map: "passwd.adjunct.byname", security: "port" }
   - { host: "*", domain: "*", map: "*", security: "none" }
 
-# Maps that must never be served to unprivileged callers. Overriding this to drop a
-# map is how hashes end up world-readable, so the assertion exists to make that a
-# deliberate act rather than an oversight.
+# Maps that must not be served to unprivileged callers. The role asserts each of
+# these is restricted; dropping one from this list removes that check.
 nis_server_ypserv_protected_maps:
   - shadow.byname
   - passwd.adjunct.byname
@@ -84,7 +82,7 @@ nis_server_ypserv_protected_maps:
 # /var/yp/Makefile filters the group map to GID >= MINGID (taken from GID_MIN in
 # /etc/login.defs, normally 1000). A group numbered below that is dropped from the
 # map without a warning, so clients never see it no matter how often the maps are
-# rebuilt. This role asserts the range instead of letting it fail silently.
+# rebuilt. This role asserts the range.
 nis_export_groups: []
 
 # Netgroups to define on this node and publish through the netgroup maps. Each entry
