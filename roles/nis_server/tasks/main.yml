@@ -76,6 +76,40 @@
     mode: "0644"
   notify: Restart ypserv
 
+# --- ypserv access rules -------------------------------------------------------
+# Assert before writing: a protected map that is unrestricted, or listed after a
+# catch-all that ypserv would match first, means every password hash is readable by
+# anything securenets lets through. Fail the play rather than serve that.
+- name: Assert the protected maps are restricted and ordered ahead of any catch-all
+  vars:
+    nis_ypserv_maps: "{{ nis_server_ypserv_rules | map(attribute='map') | list }}"
+    nis_ypserv_catchall: >-
+      {{ nis_ypserv_maps.index('*') if '*' in nis_ypserv_maps else (nis_ypserv_maps | length) }}
+    nis_ypserv_rule: >-
+      {{ (nis_server_ypserv_rules | selectattr('map', 'eq', item) | list | first) | default({}) }}
+  ansible.builtin.assert:
+    that:
+      - item in nis_ypserv_maps
+      - nis_ypserv_rule.security | default('none') in ['port', 'deny', 'des']
+      - (nis_ypserv_maps.index(item) | int) < (nis_ypserv_catchall | int)
+    fail_msg: >-
+      nis_server_ypserv_rules does not protect '{{ item }}'. It must appear with
+      security port/deny/des AND before the catch-all `*` rule, because ypserv applies
+      the first match -- otherwise the map is served to any unprivileged caller
+      securenets allows, which publishes every password hash.
+  loop: "{{ nis_server_ypserv_protected_maps }}"
+  when: nis_server_manage_ypserv_conf | bool
+
+- name: Configure ypserv access rules
+  ansible.builtin.template:
+    src: ypserv.conf.j2
+    dest: /etc/ypserv.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: nis_server_manage_ypserv_conf | bool
+  notify: Restart ypserv
+
 - name: Ensure rpcbind and ypserv are enabled and running
   ansible.builtin.service:
     name: "{{ item }}"

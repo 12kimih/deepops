@@ -27,17 +27,20 @@ cluster_sudoers_netgroup: ""
 # Require a password by default. The sudo prompt is the one check that still holds
 # when an SSH key is stolen, and NOPASSWD gives that up.
 #
-# Set this true only where the password genuinely cannot be checked. That can happen on
-# a NIS cluster which does not serve the shadow map: the hash then has to come from
-# somewhere else on each node, and if nothing provides one, PAM has nothing to compare
-# against and a password-requiring rule can never succeed. Confirm by behaviour rather
-# than by reasoning about which file holds what -- as the user, on the node:
+# Set this true only where the password genuinely cannot be checked -- a node with no
+# reachable hash for directory users, where PAM has nothing to compare against and a
+# password-requiring rule can never succeed. Confirm by behaviour rather than by
+# reasoning about which file or map holds what; as the user, on the node:
 #
 #   sudo -v        # prompts and returns 0 => a password-requiring rule works here
 #
-# Serving shadow through NIS is not the way to fix a missing hash: NIS is
-# unauthenticated and the map is readable by anything that can reach the server, which
-# turns every hash into an offline-cracking target.
+# On a NIS cluster, "the hash is not there" is easy to conclude wrongly. `ypcat shadow`
+# answers "No such map in server's domain" for an UNPRIVILEGED caller even when the map
+# exists, because ypserv is normally configured to serve shadow.byname only to requests
+# from a privileged port (see nis_server_ypserv_rules in the nis_server role). PAM's
+# helper runs as root and gets the map; a shell prompt does not. Check as root:
+#
+#   sudo getent shadow <user>
 cluster_sudoers_nopasswd: false
 
 # The privilege granted. Narrow this if the admins only need specific commands --
