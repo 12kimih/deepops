@@ -47,14 +47,28 @@ cluster_sudoers_file: cluster-admins
 cluster_sudoers_require_netgroup: true
 
 # Drop-ins in /etc/sudoers.d that this role did not write are always REPORTED. Set
-# prune to true to delete them as well. Off by default because a drop-in may belong to
-# another component (Open OnDemand writes one, for example).
+# prune to true to delete them as well.
 #
 # This matters: `playbooks/bootstrap/bootstrap-sudo.yml` grants permanent passwordless
 # root to whoever runs it, on every host it touches, as /etc/sudoers.d/<their-name>.
-# Those files outlive the person's need for them and are invisible to any group audit.
+# Those files outlive the person's need for them and are invisible to any group audit
+# -- nothing in `getent group sudo` reveals them.
+#
+# A drop-in that a PACKAGE owns is never reported or pruned: it belongs to that
+# component and removing it would break it. Ownership is asked of dpkg/rpm rather than
+# matched against a list of names, so components installed later are protected without
+# anyone remembering to add them here.
 cluster_sudoers_prune: false
 
-# Never reported or pruned. README ships with the sudo package.
+# Additionally never reported or pruned -- for files no package owns but that must
+# still survive. Names are exact basenames.
+#
+#   README              ships with the sudo package (listed as belt and braces)
+#   root                root's own grant; root does not need it, and deleting a file
+#                       called `root` out of sudoers.d has no upside
+#   90-cloud-init-users cloud-init's grant for the default cloud user -- removing it
+#                       is a classic way to lock yourself out of a cloud image
 cluster_sudoers_keep:
   - README
+  - root
+  - 90-cloud-init-users

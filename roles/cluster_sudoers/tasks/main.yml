@@ -49,28 +49,63 @@
     mode: "0440"
     validate: "visudo -cf %s"
 
-- name: List the drop-ins present in /etc/sudoers.d
-  ansible.builtin.find:
-    paths: /etc/sudoers.d
-    file_type: file
-  register: cluster_sudoers_present
+# A drop-in installed by a package belongs to that component and removing it would
+# break it, so ownership is asked of the package manager rather than guessed from a
+# hardcoded list of names. Prints "<yes|no> <basename>" per file.
+- name: List sudoers drop-ins and whether a package owns each
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      for f in /etc/sudoers.d/*; do
+        [ -f "$f" ] || continue
+        owned=no
+        if command -v dpkg-query >/dev/null 2>&1; then
+          dpkg-query -S "$f" >/dev/null 2>&1 && owned=yes
+        elif command -v rpm >/dev/null 2>&1; then
+          rpm -qf "$f" >/dev/null 2>&1 && owned=yes
+        fi
+        echo "$owned $(basename "$f")"
+      done
+  register: cluster_sudoers_dropins
+  changed_when: false
 
-- name: Identify drop-ins this role does not manage
+# Unmanaged = present, not ours, not explicitly kept, and owned by no package.
+# `inert` are the ones sudo SKIPS -- it ignores any name containing a dot or ending
+# in '~' -- so they grant nothing and are only clutter. Worth separating, because
+# "there is a stray file" and "someone has unaudited root" are different findings.
+- name: Classify the sudoers drop-ins
   ansible.builtin.set_fact:
-    cluster_sudoers_unmanaged: >-
-      {{ cluster_sudoers_present.files | map(attribute='path') | map('basename') | list
+    cluster_sudoers_unmanaged: "{{ cluster_sudoers_unmanaged_names }}"
+    cluster_sudoers_inert: >-
+      {{ cluster_sudoers_unmanaged_names | select('search', '[.]|~$') | list }}
+    cluster_sudoers_active: >-
+      {{ cluster_sudoers_unmanaged_names | reject('search', '[.]|~$') | list }}
+  vars:
+    cluster_sudoers_unmanaged_names: >-
+      {{ cluster_sudoers_dropins.stdout_lines | select('match', '^no ')
+         | map('regex_replace', '^no ', '') | list
          | difference([cluster_sudoers_file]) | difference(cluster_sudoers_keep) | sort }}
 
 # Surfaced on every run, whether or not pruning is on: a standing NOPASSWD grant that
 # no group audit would reveal is exactly the thing that should not stay quiet.
-- name: Report unmanaged sudoers drop-ins
+- name: Report unmanaged sudoers drop-ins that actually grant sudo
   ansible.builtin.debug:
     msg: >-
       Unmanaged sudoers drop-ins on {{ inventory_hostname }}:
-      {{ cluster_sudoers_unmanaged | join(', ') }}.
-      Each grants sudo independently of any group. Review them, then set
-      cluster_sudoers_prune=true to remove them.
-  when: cluster_sudoers_unmanaged | length > 0
+      {{ cluster_sudoers_active | join(', ') }}.
+      No package owns these and each grants sudo independently of any group, so they
+      are invisible to a group audit. Review them, then set cluster_sudoers_prune=true
+      to remove them.
+  when: cluster_sudoers_active | length > 0
+
+- name: Report sudoers drop-ins that sudo ignores
+  ansible.builtin.debug:
+    msg: >-
+      Inert drop-ins on {{ inventory_hostname }}:
+      {{ cluster_sudoers_inert | join(', ') }}.
+      sudo skips any name containing a dot or ending in '~', so these grant nothing --
+      they are leftovers (a .dpkg-old backup, an editor file) rather than a risk.
+  when: cluster_sudoers_inert | length > 0
 
 - name: Remove unmanaged sudoers drop-ins
   ansible.builtin.file:

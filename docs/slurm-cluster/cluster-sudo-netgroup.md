@@ -100,19 +100,35 @@ Those files outlive the person's need for them, grant root independently of any 
 and are invisible to a group audit — nothing in `getent group sudo` reveals them.
 
 `cluster_sudoers` therefore **reports** every drop-in it did not write, on every run.
-Set `cluster_sudoers_prune: true` to delete them, after reviewing the reported list —
-some belong to other components (Open OnDemand writes one). Add those to
-`cluster_sudoers_keep`.
+Set `cluster_sudoers_prune: true` to delete them, after reviewing the reported list.
+
+Two things are never touched:
+
+- **Anything a package owns.** Ownership is asked of `dpkg`/`rpm` rather than matched
+  against a list of names, so a drop-in installed by a component (Open OnDemand ships
+  one) is protected without anyone remembering to list it — including components
+  installed later.
+- **`cluster_sudoers_keep`**, for files no package owns but that must survive anyway.
+  The defaults are `README`, `root` — root does not need its own grant and deleting a
+  file called `root` out of sudoers.d has no upside — and `90-cloud-init-users`, whose
+  removal is a classic way to lock yourself out of a cloud image.
+
+The report separates two findings that look alike but are not:
+
+| | meaning |
+|---|---|
+| **active** | no package owns it and sudo honours it — an unaudited grant |
+| **inert** | sudo **skips** it, because the name contains a dot or ends in `~` |
+
+A `.dpkg-old` backup or an editor leftover falls in the second column: clutter, not
+risk. The same rule is why a rule written to a badly named file silently never
+applies — which is what the role asserts about `cluster_sudoers_file` up front.
 
 To audit by hand:
 
 ```sh
 ansible all -m command -a 'ls /etc/sudoers.d/'
 ```
-
-Note that sudo **ignores** any file whose name contains a dot or ends in `~`, so a
-leftover like `ood.dpkg-old` is inert — and, for the same reason, a rule written to a
-badly named file silently never applies.
 
 ## Related
 
