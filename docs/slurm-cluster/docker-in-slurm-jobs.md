@@ -21,9 +21,9 @@ Two consequences follow, and both are silent:
    re-logging in does not help, because the node was never the source.
 
 2. **A GID that means different things on different nodes grants the wrong group.**
-   Access does not fail closed. If the submit node says the user is in gid 999 and gid
-   999 is `nvidia-dcgm` on the compute node, the job holds `nvidia-dcgm` — no error,
-   no warning.
+   Access does not fail closed. The number arrives, the compute node renders it through
+   its own group database, and the job ends up holding whatever group happens to own
+   that number there — no error, no warning.
 
 The `docker` group is especially prone to this. It is created by the Docker package
 with a distro-assigned **system** GID, which depends on the order packages were

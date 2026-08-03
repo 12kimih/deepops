@@ -8,7 +8,7 @@
 # Set it wherever it makes sense for your layout:
 #   * cluster-wide  -> config/group_vars/all.yml
 #   * per group     -> config/group_vars/slurm-node.yml    (nvidia_power_limit_watts: 450)
-#   * per host      -> config/host_vars/gpu1.yml           (nvidia_power_limit_watts: 400)
+#   * per host      -> config/host_vars/<hostname>.yml     (nvidia_power_limit_watts: 400)
 #   * ad hoc        -> -e nvidia_power_limit_watts=450 on the command line
 # Per-host/per-group values are how you cap only *specific* compute nodes.
 nvidia_power_limit_watts: ""    # e.g. 450
