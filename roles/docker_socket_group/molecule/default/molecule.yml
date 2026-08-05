@@ -19,8 +19,9 @@ provisioner:
         docker_socket_group: "dockerusers"
         docker_socket_group_gid: 4000
         # dockerd is not installed in the test container, so never fire the restart
-        # handler; the scenario only checks that the group and the daemon
-        # configuration are written correctly.
+        # handlers; the scenario only checks that the group and the daemon
+        # configuration are written correctly. The live-socket check is skipped for
+        # the same reason -- there is no socket to stat.
         docker_socket_group_restart: false
 verifier:
   name: ansible

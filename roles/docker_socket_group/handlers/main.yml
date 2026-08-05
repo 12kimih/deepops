@@ -3,9 +3,28 @@
   ansible.builtin.systemd:
     daemon_reload: true
 
-# Restarting dockerd is what actually re-creates /run/docker.sock with the new group
-# ownership. It also stops running containers -- gated so the change can be staged
-# and applied during a maintenance window instead.
+# Handlers run in the order they are defined here, not the order they were notified,
+# so the socket unit is always re-bound before the daemon is restarted.
+#
+# Under socket activation systemd owns the socket and applies SocketGroup= only when
+# the unit re-binds. `daemon-reload` re-reads the unit but does NOT re-create a socket
+# that is already listening, and restarting docker.service does not restart
+# docker.socket -- so without this handler the drop-in written by the role stays inert
+# until the node reboots. `try-restart` re-binds only a socket that is already running,
+# so a node that does not use socket activation is never switched over to it.
+# man systemctl(1), man systemd.socket(5)
+- name: Restart the docker socket unit
+  ansible.builtin.command:
+    cmd: systemctl try-restart docker.socket
+  changed_when: true
+  when:
+    - docker_socket_group_restart | bool
+    - ((docker_socket_group_unit | default({})).rc | default(1)) == 0
+
+# Restarting dockerd is what re-creates the socket with the new group ownership when
+# the daemon owns it, and what makes it pick up the file descriptor systemd re-bound
+# above when systemd owns it. It also stops running containers -- gated so the change
+# can be staged and applied during a maintenance window instead.
 - name: Restart docker
   ansible.builtin.systemd:
     name: docker
