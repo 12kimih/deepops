@@ -28,8 +28,19 @@
 # bound -- a local entry with the same GID makes startup independent of NIS.
 docker_socket_group_create_local: true
 
-# Restart dockerd so the new socket ownership takes effect.
+# The socket whose ownership decides who may talk to the daemon. The role compares
+# the group that owns this file against docker_socket_group on every run, so that a
+# node whose configuration is already correct but whose daemon was never bounced is
+# still repaired -- see tasks/main.yml.
+docker_socket_group_socket_path: /run/docker.sock
+
+# Restart docker.socket and then dockerd so the new socket ownership takes effect.
+# Both are restarted because either one can own the socket: under socket activation
+# (`dockerd -H fd://`) systemd creates it and SocketGroup= decides, and a daemon
+# started any other way creates and chowns it itself from the `group` key.
 # WARNING: this stops running containers on the node. Leave true for the change to
-# apply on the same run; set false to stage the config and bounce dockerd yourself
-# during a maintenance window.
+# apply on the same run; set false to stage the config and bounce the daemon yourself
+# during a maintenance window -- re-running the role later with this set back to true
+# applies it, because the live-socket check notifies the restart even when no
+# configuration file changed.
 docker_socket_group_restart: true
