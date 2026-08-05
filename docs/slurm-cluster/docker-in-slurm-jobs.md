@@ -78,10 +78,24 @@ group that is designed to be cluster-wide:
 
    The `docker_socket_group` role writes `group` into `/etc/docker/daemon.json`,
    creates the group locally with the same GID (so dockerd can resolve the name at
-   boot even before the NIS client has bound), and keeps `docker.socket`'s
-   `SocketGroup=` in agreement. Applying it **restarts dockerd**, which stops running
-   containers on the node; set `docker_socket_group_restart: false` to stage the
-   config and bounce the daemon during a maintenance window instead.
+   boot even before the NIS client has bound), and drops a `SocketGroup=` override
+   into `docker.socket`. Both are written because which one decides depends on how the
+   daemon was started: under socket activation (`dockerd -H fd://`) systemd creates the
+   socket and `SocketGroup=` wins, while a daemon started any other way creates and
+   chowns the socket itself and only the `group` key applies.
+
+   Applying the change **restarts `docker.socket` and then dockerd**, which stops
+   running containers on the node. The socket unit needs a restart of its own:
+   `systemctl daemon-reload` re-reads the unit but does not re-create a socket that is
+   already listening, and restarting `docker.service` does not restart `docker.socket`,
+   so on a socket-activated node the override would otherwise sit unused until the next
+   reboot. Set `docker_socket_group_restart: false` to stage the configuration and
+   bounce both during a maintenance window instead.
+
+   On every run the role also compares the group that owns the live socket against the
+   configured one and restarts if they differ. Without that check the role would act
+   only when a configuration file changed, so a node that was staged, or whose handlers
+   never ran, would report `ok` forever while its socket kept the old group.
 
 `playbooks/slurm-cluster.yml` runs this after `authentication.yml`, so the group is
 published before the nodes are asked to resolve it. Both pieces are no-ops until
@@ -94,8 +108,7 @@ ansible-playbook playbooks/utilities/check-id-consistency.yml
 ```
 
 asserts the published groups resolve to their pinned GID on every node. Then, from a
-**new** job (existing jobs and login sessions keep the credentials they were created
-with):
+**new** job:
 
 ```sh
 srun --pty bash
@@ -103,10 +116,48 @@ id -nG            # must list the cluster group
 docker ps
 ```
 
-If `id -nG` still does not show it, check in this order: the maps were rebuilt on the
-master (`ypcat group | grep <name>`), the node is bound (`ypwhich`), and no **local**
-group of the same name shadows the NIS one — `nsswitch.conf` resolves `files` before
-`nis`.
+### Existing sessions do not pick up new membership
+
+A process's supplementary groups are fixed when it is created and are never re-read.
+Adding someone to the group therefore has no effect on anything already running:
+existing jobs, existing login sessions, and — most easily missed — the shells of a
+long-lived `tmux` or `screen` server, which inherit the credentials that server was
+started with however recently the shell itself was opened. The same applies in reverse:
+removing someone from the group does not close the sessions they already have.
+
+The two forms of `id` tell the cases apart, because only the second re-resolves the
+name through the name service:
+
+```sh
+id -nG            # the running process's own credentials
+id -nG <user>     # <user> looked up fresh
+```
+
+If they disagree, the configuration is fine and the session merely predates the change.
+Log out and back in, or pick up the new list in place:
+
+```sh
+newgrp <group>    # nested shell with the group list re-resolved
+```
+
+### If the group is missing from `id -nG <user>` too
+
+Check in this order: the maps were rebuilt on the master (`ypcat group | grep <name>`),
+the node is bound (`ypwhich`), and no **local** group of the same name shadows the NIS
+one — `nsswitch.conf` resolves `files` before `nis`, so `getent group <name>` on a
+client can report an empty member list while the NIS map is correct.
+
+### If the group is present but `docker ps` is still refused
+
+Look at the socket rather than the group:
+
+```sh
+stat -c '%G %a' /run/docker.sock    # must be the cluster group, mode 660
+```
+
+A wrong group here means the daemon was never restarted after the configuration was
+written. Re-running the playbook with `docker_socket_group_restart: true` repairs it —
+the role checks the live socket, not just the configuration files.
 
 ## Before reaching for this
 

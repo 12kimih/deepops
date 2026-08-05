@@ -79,4 +79,34 @@
   when: docker_socket_group_unit.rc == 0
   notify:
     - Reload systemd
+    - Restart the docker socket unit
+    - Restart docker
+
+# Everything above is idempotent on content: once daemon.json and the drop-in name the
+# target group, nothing is notified and the daemon is never restarted. That alone
+# cannot converge a node whose configuration is already right but whose live socket is
+# not -- a run staged with docker_socket_group_restart set to false, a run that failed
+# before its handlers, or a socket reverted by hand. Such a node reports `ok` on every
+# later run while access stays broken, because the role would only ever react to a
+# configuration file changing. Compare the live socket against the target instead, and
+# notify the restart when they disagree, so re-running the role is a real repair.
+- name: Read the group that currently owns the Docker socket
+  ansible.builtin.stat:
+    path: "{{ docker_socket_group_socket_path }}"
+  register: docker_socket_group_socket_stat
+
+# gr_name is absent when the owning GID has no name, which is also a mismatch.
+- name: Restart the daemon when the live socket is owned by the wrong group
+  ansible.builtin.debug:
+    msg: >-
+      {{ docker_socket_group_socket_path }} is owned by group
+      '{{ docker_socket_group_socket_stat.stat.gr_name | default("") }}',
+      expected '{{ docker_socket_group }}'.
+  changed_when: true
+  when:
+    - docker_socket_group_socket_stat.stat.exists
+    - (docker_socket_group_socket_stat.stat.gr_name | default("")) != docker_socket_group
+  notify:
+    - Reload systemd
+    - Restart the docker socket unit
     - Restart docker
