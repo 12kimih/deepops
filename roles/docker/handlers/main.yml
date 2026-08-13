@@ -1,0 +1,14 @@
+---
+# Named for what triggers it rather than just "Restart docker": handler names are
+# global to a play, and roles/nvidia_container_toolkit and roles/docker_socket_group
+# each define a handler by that name for their own change to the same daemon.json.
+# A shared name would let whichever role was loaded last answer everyone's notify.
+#
+# Restarting the daemon is what makes a changed daemon.json take effect, and it stops
+# every running container on the node. docker_daemon_options_restart gates it so the
+# file can be staged now and applied in a maintenance window.
+- name: Restart docker to apply daemon options
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  when: docker_daemon_options_restart | bool

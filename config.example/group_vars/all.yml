@@ -203,6 +203,35 @@ docker_storage_options: -s overlay2
 # See https://github.com/kubernetes-sigs/kubespray/issues/2002
 docker_iptables_enabled: true
 
+# Daemon-wide options merged into /etc/docker/daemon.json (roles/docker), for the
+# keys nvidia_container_toolkit and docker_socket_group do not already own.
+#
+# The usual reason to set this is the bridge-network address pool. Docker's built-in
+# default is roughly 32 networks and every compose project claims one, so a host
+# running many stacks at once fails with "all predefined address pools have been
+# fully subnetted" long before it runs out of CPU or memory. A pool yields
+# 2^(size - base prefix) networks, so a /16 split at size 26 gives 1024 of them with
+# 62 usable addresses each.
+#
+# The base must not overlap anything the host routes; the role checks it against the
+# live routing table and fails rather than write a colliding pool. Changing this
+# restarts docker, which stops every running container on the node -- set
+# docker_daemon_options_restart to false to stage the file for a maintenance window.
+#docker_daemon_options:
+#  default-address-pools:
+#    - base: "10.200.0.0/16"
+#      size: 26
+
+# Kernel ceilings a container host reaches before it runs out of CPU or memory:
+# inotify instances per UID, and the three ARP table thresholds (all three have to
+# move together). roles/docker raises these by default at values sized for a few
+# hundred concurrent containers; override for more, as below for about a thousand.
+#docker_sysctls:
+#  fs.inotify.max_user_instances: "8192"
+#  net.ipv4.neigh.default.gc_thresh1: "4096"
+#  net.ipv4.neigh.default.gc_thresh2: "8192"
+#  net.ipv4.neigh.default.gc_thresh3: "16384"
+
 # Cluster-wide group granting access to the Docker daemon socket.
 # Playbook: slurm-cluster (container/docker-socket-group.yml), authentication
 #
