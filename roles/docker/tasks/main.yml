@@ -25,7 +25,7 @@
   ansible.builtin.command:
     cmd: >-
       python3 -c 'import ipaddress, subprocess, sys;
-      pools = {{ (docker_daemon_options["default-address-pools"] | default([])) | map(attribute="base") | list | to_json }};
+      pools = {{ docker_daemon_options.get("default-address-pools", []) | map(attribute="base") | list | to_json }};
       out = subprocess.run(["ip", "-4", "route", "show"], capture_output=True, text=True).stdout;
       routes = [line.split()[0] for line in out.splitlines() if "/" in line.split()[0]];
       bad = ["%s overlaps %s" % (p, r) for p in pools for r in routes
@@ -35,7 +35,7 @@
   register: docker_pool_overlap
   changed_when: false
   check_mode: false
-  when: (docker_daemon_options["default-address-pools"] | default([])) | length > 0
+  when: docker_daemon_options.get("default-address-pools", []) | length > 0
 
 - name: Assert no configured address pool overlaps a routed prefix
   ansible.builtin.assert:
@@ -46,7 +46,7 @@
       {{ inventory_hostname }} already routes: {{ docker_pool_overlap.stdout | trim }}.
       Docker would hand those addresses to containers and take them away from whatever
       uses them today. Choose a base outside every prefix in `ip route`.
-  when: (docker_daemon_options["default-address-pools"] | default([])) | length > 0
+  when: docker_daemon_options.get("default-address-pools", []) | length > 0
 
 # Merge, never rewrite: nvidia_container_toolkit and docker_socket_group own their own
 # keys in this file. Idempotent -- only writes, and only reports changed, when a value
@@ -61,7 +61,8 @@
       data = json.loads(text) if text else {};
       changed = any(data.get(k) != v for k, v in want.items());
       data.update(want);
-      (p.parent.mkdir(parents=True, exist_ok=True) or p.write_text(json.dumps(data, indent=2) + chr(10))) if changed else None;
+      p.parent.mkdir(parents=True, exist_ok=True);
+      (p.write_text(json.dumps(data, indent=2) + chr(10)) if changed else None);
       sys.exit(10 if changed else 0)'
   register: docker_daemon_options_result
   changed_when: docker_daemon_options_result.rc == 10
