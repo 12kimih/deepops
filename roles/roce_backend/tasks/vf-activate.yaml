@@ -11,7 +11,6 @@
     echo {{ num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs
   args:
     executable: /bin/bash
-    warn: false
   when: result.rc > 0
   tags: roce_host
 
