@@ -21,13 +21,24 @@
 # from whatever was using it, and the damage shows up later as a network timeout
 # somewhere else rather than as a docker error. Compare against the live routing table
 # before writing anything.
+#
+# Docker's own bridges are skipped, or the check would fail on every run after the
+# first: once a pool is in use, docker has carved networks out of it and each one adds
+# a route, which the naive comparison then reports as the pool colliding with itself.
+# Only routes on interfaces docker did not create can represent a real conflict.
+# Matching is by interface name -- docker0 for the default bridge, br-<12 hex digits>
+# for user-defined networks -- so a foreign prefix stays visible even when it sits
+# inside a configured pool.
 - name: Check the configured address pools against the host routing table
   ansible.builtin.command:
     cmd: >-
-      python3 -c 'import ipaddress, subprocess, sys;
+      python3 -c 'import ipaddress, re, subprocess, sys;
       pools = {{ docker_daemon_options.get("default-address-pools", []) | map(attribute="base") | list | to_json }};
       out = subprocess.run(["ip", "-4", "route", "show"], capture_output=True, text=True).stdout;
-      routes = [line.split()[0] for line in out.splitlines() if "/" in line.split()[0]];
+      fields = [line.split() for line in out.splitlines()];
+      routes = [f[0] for f in fields if f and "/" in f[0]
+                and not re.fullmatch("docker[0-9]+|br-[0-9a-f]{12}",
+                                     f[f.index("dev") + 1] if "dev" in f else "")];
       bad = ["%s overlaps %s" % (p, r) for p in pools for r in routes
              if ipaddress.ip_network(p).overlaps(ipaddress.ip_network(r, strict=False))];
       print("; ".join(bad));
