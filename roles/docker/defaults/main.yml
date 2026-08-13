@@ -29,3 +29,63 @@ docker_rh_repo_url: "https://download.docker.com/linux/centos/docker-ce.repo"
 # Manage + start the docker service after install.
 docker_service_enabled: true
 docker_service_state: started
+
+# Daemon-wide options merged into /etc/docker/daemon.json. Empty leaves the file
+# alone. MERGED, not rewritten: nvidia_container_toolkit writes the NVIDIA runtime
+# and the NGC shm/ulimit defaults into the same file and docker_socket_group writes
+# the socket group, so a whole-file template would silently drop whichever role ran
+# first.
+#
+# The usual reason to set this is the bridge-network address pool. Docker's built-in
+# default is 172.17.0.0/12 split at /16 plus 192.168.0.0/16 split at /20, roughly 32
+# networks in total. Every compose project claims one, so a host running many stacks
+# at once fails with "all predefined address pools have been fully subnetted" long
+# before it runs out of CPU or memory. A pool yields 2^(size - base prefix) networks:
+#
+#   base 10.200.0.0/16, size 24  ->  256 networks of 254 usable addresses
+#   base 10.200.0.0/16, size 26  -> 1024 networks of  62 usable addresses
+#
+# docker_daemon_options:
+#   default-address-pools:
+#     - base: "10.200.0.0/16"
+#       size: 26
+#
+# The base must not overlap anything the host routes. Picking a range that collides
+# breaks reachability for whatever already lived there, and it shows up later as a
+# network timeout rather than as a docker error, so the role checks the host's own
+# routing table before writing.
+# https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
+docker_daemon_options: {}
+
+# Restart docker when a daemon option changed. The restart stops every running
+# container on the node, so set this false to stage the file and restart during a
+# maintenance window instead.
+docker_daemon_options_restart: true
+
+# Kernel limits a container host reaches long before it runs out of CPU or memory.
+# Both are ceilings: raising them permits more and costs nothing while unused. The
+# kernel defaults predate routine container density, which is why container-oriented
+# distributions raise them as a matter of course.
+#
+#   fs.inotify.max_user_instances     inotify instances per UID (kernel default 128).
+#                                     Runtimes, systemd units and build tools each
+#                                     take one, and exhaustion surfaces as unrelated
+#                                     tools reporting "too many open files".
+#   net.ipv4.neigh.default.gc_thresh1 ARP garbage-collection floor, pressure
+#                                /2   threshold and hard cap (kernel defaults
+#                                /3   128/512/1024). Every container veth adds
+#                                     neighbour entries; overflow appears as
+#                                     "neighbour table overflow" with dropped
+#                                     packets. All three have to move together --
+#                                     raising only gc_thresh3 leaves the collector
+#                                     pruning aggressively from gc_thresh2 up.
+#
+# Sized here for a few hundred concurrent containers. A host that runs more should
+# raise them further (gc_thresh 4096/8192/16384 covers ~1000 containers). Written to
+# /etc/sysctl.d/90-docker.conf, so the values survive a reboot.
+docker_tune_kernel: true
+docker_sysctls:
+  fs.inotify.max_user_instances: "1024"
+  net.ipv4.neigh.default.gc_thresh1: "1024"
+  net.ipv4.neigh.default.gc_thresh2: "4096"
+  net.ipv4.neigh.default.gc_thresh3: "8192"

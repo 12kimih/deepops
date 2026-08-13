@@ -16,3 +16,70 @@
     enabled: "{{ docker_service_enabled }}"
   tags:
     - molecule-notest
+
+# An address pool overlapping a prefix the host already routes takes that prefix away
+# from whatever was using it, and the damage shows up later as a network timeout
+# somewhere else rather than as a docker error. Compare against the live routing table
+# before writing anything.
+- name: Check the configured address pools against the host routing table
+  ansible.builtin.command:
+    cmd: >-
+      python3 -c 'import ipaddress, subprocess, sys;
+      pools = {{ (docker_daemon_options["default-address-pools"] | default([])) | map(attribute="base") | list | to_json }};
+      out = subprocess.run(["ip", "-4", "route", "show"], capture_output=True, text=True).stdout;
+      routes = [line.split()[0] for line in out.splitlines() if "/" in line.split()[0]];
+      bad = ["%s overlaps %s" % (p, r) for p in pools for r in routes
+             if ipaddress.ip_network(p).overlaps(ipaddress.ip_network(r, strict=False))];
+      print("; ".join(bad));
+      sys.exit(0)'
+  register: docker_pool_overlap
+  changed_when: false
+  check_mode: false
+  when: (docker_daemon_options["default-address-pools"] | default([])) | length > 0
+
+- name: Assert no configured address pool overlaps a routed prefix
+  ansible.builtin.assert:
+    that:
+      - (docker_pool_overlap.stdout | trim | length) == 0
+    fail_msg: >-
+      docker_daemon_options.default-address-pools collides with a prefix
+      {{ inventory_hostname }} already routes: {{ docker_pool_overlap.stdout | trim }}.
+      Docker would hand those addresses to containers and take them away from whatever
+      uses them today. Choose a base outside every prefix in `ip route`.
+  when: (docker_daemon_options["default-address-pools"] | default([])) | length > 0
+
+# Merge, never rewrite: nvidia_container_toolkit and docker_socket_group own their own
+# keys in this file. Idempotent -- only writes, and only reports changed, when a value
+# actually differs.
+- name: Apply the daemon-wide Docker options
+  ansible.builtin.command:
+    cmd: >-
+      python3 -c 'import json, pathlib, sys;
+      p = pathlib.Path("/etc/docker/daemon.json");
+      want = {{ docker_daemon_options | to_json }};
+      text = p.read_text().strip() if p.exists() else "";
+      data = json.loads(text) if text else {};
+      changed = any(data.get(k) != v for k, v in want.items());
+      data.update(want);
+      (p.parent.mkdir(parents=True, exist_ok=True) or p.write_text(json.dumps(data, indent=2) + chr(10))) if changed else None;
+      sys.exit(10 if changed else 0)'
+  register: docker_daemon_options_result
+  changed_when: docker_daemon_options_result.rc == 10
+  failed_when: docker_daemon_options_result.rc not in [0, 10]
+  when: docker_daemon_options | length > 0
+  notify: Restart docker to apply daemon options
+
+- name: Raise the kernel limits a container host runs into
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/90-docker.conf
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ docker_sysctls | dict2items }}"
+  when:
+    - docker_tune_kernel | bool
+    - ansible_virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
+  tags:
+    - molecule-notest
