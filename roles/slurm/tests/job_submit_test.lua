@@ -52,93 +52,93 @@ end
 local function submit(d) LOG = {} return slurm_job_submit(d, {}, 1000) end
 local function modify(d, rec) LOG = {} return slurm_job_modify(d, rec or {}, {}, 1000) end
 
--- Two GPU types, one partition each: the most common shape, and the one the
--- reported quota bypass happened on.
+-- Two GPU types, one partition each: the most common cluster shape, and the one the
+-- section A bypass applies to.
 local TWO_TYPES = [[
-local CPU_PARTITIONS        = "cpu,gpu-l40,gpu-pro6000"
-local DEFAULT_GPU_TYPE      = "l40"
-local DEFAULT_GPU_PARTITION = "gpu-l40"
-local GPU_TYPE_TO_PARTITION = { ["l40"] = "gpu-l40", ["pro6000"] = "gpu-pro6000" }
+local CPU_PARTITIONS        = "cpu,gpu-a100,gpu-h100"
+local DEFAULT_GPU_TYPE      = "a100"
+local DEFAULT_GPU_PARTITION = "gpu-a100"
+local GPU_TYPE_TO_PARTITION = { ["a100"] = "gpu-a100", ["h100"] = "gpu-h100" }
 local STRICT_GPU_TYPE = true]]
 
 local t
 
 print("== A. quota bypass: explicit partition + untyped GPU request ==")
 with_site(TWO_TYPES)
-t = {partition = "gpu-l40", gres = "gpu:4"}
+t = {partition = "gpu-a100", gres = "gpu:4"}
 check("A1 --partition + --gres=gpu:N", submit(t), slurm.SUCCESS)
-check("A1 type stamped on", t.gres, "gpu:l40:4")
-check("A1 partition respected", t.partition, "gpu-l40")
-t = {partition = "gpu-pro6000", gres = "gpu:2"}
+check("A1 type stamped on", t.gres, "gpu:a100:4")
+check("A1 partition respected", t.partition, "gpu-a100")
+t = {partition = "gpu-h100", gres = "gpu:2"}
 check("A2 other type's partition", submit(t), slurm.SUCCESS)
-check("A2 stamped with that type", t.gres, "gpu:pro6000:2")
-t = {partition = "gpu-l40", tres_per_node = "gres/gpu=4"}
+check("A2 stamped with that type", t.gres, "gpu:h100:2")
+t = {partition = "gpu-a100", tres_per_node = "gres/gpu=4"}
 check("A3 --gpus-per-node", submit(t), slurm.SUCCESS)
-check("A3 stamped", t.tres_per_node, "gres/gpu:l40=4")
-t = {partition = "gpu-l40", tres_per_job = "gres/gpu=8"}
+check("A3 stamped", t.tres_per_node, "gres/gpu:a100=4")
+t = {partition = "gpu-a100", tres_per_job = "gres/gpu=8"}
 check("A4 --gpus / -G", submit(t), slurm.SUCCESS)
-check("A4 stamped", t.tres_per_job, "gres/gpu:l40=8")
-t = {partition = "gpu-pro6000", tres_per_task = "gres/gpu=1"}
+check("A4 stamped", t.tres_per_job, "gres/gpu:a100=8")
+t = {partition = "gpu-h100", tres_per_task = "gres/gpu=1"}
 check("A5 --gpus-per-task", submit(t), slurm.SUCCESS)
-check("A5 stamped", t.tres_per_task, "gres/gpu:pro6000=1")
-t = {partition = "gpu-l40", tres_per_socket = "gres/gpu=2"}
+check("A5 stamped", t.tres_per_task, "gres/gpu:h100=1")
+t = {partition = "gpu-a100", tres_per_socket = "gres/gpu=2"}
 check("A6 --gpus-per-socket", submit(t), slurm.SUCCESS)
-check("A6 stamped", t.tres_per_socket, "gres/gpu:l40=2")
+check("A6 stamped", t.tres_per_socket, "gres/gpu:a100=2")
 
 print("== B. default routing when no partition was given ==")
 t = {gres = "gpu:4"}
 check("B1 untyped gres", submit(t), slurm.SUCCESS)
-check("B1 default partition", t.partition, "gpu-l40")
-check("B1 default type stamped", t.gres, "gpu:l40:4")
+check("B1 default partition", t.partition, "gpu-a100")
+check("B1 default type stamped", t.gres, "gpu:a100:4")
 t = {tres_per_job = "gres/gpu=4"}
 check("B2 untyped --gpus", submit(t), slurm.SUCCESS)
-check("B2 default partition", t.partition, "gpu-l40")
-check("B2 stamped", t.tres_per_job, "gres/gpu:l40=4")
-t = {gres = "gpu:pro6000:2"}
+check("B2 default partition", t.partition, "gpu-a100")
+check("B2 stamped", t.tres_per_job, "gres/gpu:a100=4")
+t = {gres = "gpu:h100:2"}
 check("B3 typed request routes by type", submit(t), slurm.SUCCESS)
-check("B3 partition from type", t.partition, "gpu-pro6000")
-check("B3 request untouched", t.gres, "gpu:pro6000:2")
+check("B3 partition from type", t.partition, "gpu-h100")
+check("B3 request untouched", t.gres, "gpu:h100:2")
 t = {cpus_per_task = 8}
 check("B4 CPU-only job", submit(t), slurm.SUCCESS)
-check("B4 gets CPU partitions", t.partition, "cpu,gpu-l40,gpu-pro6000")
+check("B4 gets CPU partitions", t.partition, "cpu,gpu-a100,gpu-h100")
 t = {partition = "cpu", cpus_per_task = 8}
 check("B5 CPU-only with own partition", submit(t), slurm.SUCCESS)
 check("B5 untouched", t.partition, "cpu")
 
 print("== C. already-typed requests are never rewritten ==")
-t = {partition = "gpu-l40", gres = "gpu:l40:4"}
+t = {partition = "gpu-a100", gres = "gpu:a100:4"}
 check("C1 typed gres", submit(t), slurm.SUCCESS)
-check("C1 unchanged", t.gres, "gpu:l40:4")
-t = {partition = "gpu-pro6000", tres_per_node = "gres/gpu:pro6000=2"}
+check("C1 unchanged", t.gres, "gpu:a100:4")
+t = {partition = "gpu-h100", tres_per_node = "gres/gpu:h100=2"}
 check("C2 typed tres_per_node", submit(t), slurm.SUCCESS)
-check("C2 unchanged", t.tres_per_node, "gres/gpu:pro6000=2")
+check("C2 unchanged", t.tres_per_node, "gres/gpu:h100=2")
 
 print("== D. requests that cannot be satisfied are rejected at submit ==")
-t = {partition = "gpu-l40", gres = "gpu:h100:4"}
+t = {partition = "gpu-a100", gres = "gpu:v100:4"}
 check("D1 unknown GPU type", submit(t), slurm.ERROR)
 check("D1 message lists valid types", LOG[1],
-      "Error: unknown GPU type 'h100'. Valid types: l40, pro6000.")
-t = {gres = "gpu:l40:1", tres_per_node = "gres/gpu:pro6000=1"}
+      "Error: unknown GPU type 'v100'. Valid types: a100, h100.")
+t = {gres = "gpu:a100:1", tres_per_node = "gres/gpu:h100=1"}
 check("D2 two GPU types in one job", submit(t), slurm.ERROR)
-t = {partition = "cpu,gpu-l40,gpu-pro6000", gres = "gpu:1"}
+t = {partition = "cpu,gpu-a100,gpu-h100", gres = "gpu:1"}
 check("D3 untyped across mixed partitions", submit(t), slurm.ERROR)
 t = {partition = "cpu", gres = "gpu:1"}
 check("D4 GPU request on a GPU-less partition", submit(t), slurm.ERROR)
 
 print("== E. every GPU token keeps its own count ==")
-t = {partition = "gpu-l40", gres = "gpu:4", tres_per_task = "gres/gpu=1"}
+t = {partition = "gpu-a100", gres = "gpu:4", tres_per_task = "gres/gpu=1"}
 check("E1 two GPU flags on one job", submit(t), slurm.SUCCESS)
-check("E1 gres count preserved", t.gres, "gpu:l40:4")
-check("E1 per-task count preserved", t.tres_per_task, "gres/gpu:l40=1")
-t = {partition = "gpu-l40", tres_per_task = "cpu=4,gres/gpu=2"}
+check("E1 gres count preserved", t.gres, "gpu:a100:4")
+check("E1 per-task count preserved", t.tres_per_task, "gres/gpu:a100=1")
+t = {partition = "gpu-a100", tres_per_task = "cpu=4,gres/gpu=2"}
 check("E2 --tres-per-task with cpu", submit(t), slurm.SUCCESS)
-check("E2 only the gpu token touched", t.tres_per_task, "cpu=4,gres/gpu:l40=2")
-t = {partition = "gpu-l40", gres = "gpu:2,shard:8"}
+check("E2 only the gpu token touched", t.tres_per_task, "cpu=4,gres/gpu:a100=2")
+t = {partition = "gpu-a100", gres = "gpu:2,shard:8"}
 check("E3 gres with another resource", submit(t), slurm.SUCCESS)
-check("E3 other resource untouched", t.gres, "gpu:l40:2,shard:8")
-t = {partition = "gpu-l40", gres = "gpu"}
+check("E3 other resource untouched", t.gres, "gpu:a100:2,shard:8")
+t = {partition = "gpu-a100", gres = "gpu"}
 check("E4 bare 'gpu' means one", submit(t), slurm.SUCCESS)
-check("E4 stamped as 1", t.gres, "gpu:l40:1")
+check("E4 stamped as 1", t.gres, "gpu:a100:1")
 
 print("== F. resources whose name merely contains 'gpu' are not GPU requests ==")
 t = {partition = "cpu", gres = "mygpu:2"}
@@ -147,27 +147,27 @@ check("F1 untouched", t.gres, "mygpu:2")
 check("F1 partition untouched", t.partition, "cpu")
 t = {gres = "gpufoo:1"}
 check("F2 gpufoo", submit(t), slurm.SUCCESS)
-check("F2 treated as a CPU job", t.partition, "cpu,gpu-l40,gpu-pro6000")
+check("F2 treated as a CPU job", t.partition, "cpu,gpu-a100,gpu-h100")
 
 print("== G. scontrol update cannot strip the type back off ==")
 t = {tres_per_node = "gres/gpu=4"}
-check("G1 update to an untyped request", modify(t, {partition = "gpu-l40"}), slurm.SUCCESS)
-check("G1 re-stamped from the job's partition", t.tres_per_node, "gres/gpu:l40=4")
+check("G1 update to an untyped request", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
+check("G1 re-stamped from the job's partition", t.tres_per_node, "gres/gpu:a100=4")
 t = {gres = "gpu:2"}
-check("G2 update on a pro6000 job", modify(t, {partition = "gpu-pro6000"}), slurm.SUCCESS)
-check("G2 stamped", t.gres, "gpu:pro6000:2")
-t = {partition = "gpu-pro6000", gres = "gpu:2"}
-check("G3 update moves partition too", modify(t, {partition = "gpu-l40"}), slurm.SUCCESS)
-check("G3 uses the new partition", t.gres, "gpu:pro6000:2")
-t = {gres = "gpu:l40:4"}
-check("G4 already typed", modify(t, {partition = "gpu-l40"}), slurm.SUCCESS)
-check("G4 unchanged", t.gres, "gpu:l40:4")
+check("G2 update on an h100 job", modify(t, {partition = "gpu-h100"}), slurm.SUCCESS)
+check("G2 stamped", t.gres, "gpu:h100:2")
+t = {partition = "gpu-h100", gres = "gpu:2"}
+check("G3 update moves partition too", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
+check("G3 uses the new partition", t.gres, "gpu:h100:2")
+t = {gres = "gpu:a100:4"}
+check("G4 already typed", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
+check("G4 unchanged", t.gres, "gpu:a100:4")
 t = {time_limit = 120}
-check("G5 non-GPU update is a no-op", modify(t, {partition = "gpu-l40"}), slurm.SUCCESS)
+check("G5 non-GPU update is a no-op", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
 t = {gres = "gpu:4"}
 check("G6 untypeable partition", modify(t, {partition = "cpu"}), slurm.ERROR)
-t = {gres = "gpu:h100:4"}
-check("G7 unknown type", modify(t, {partition = "gpu-l40"}), slurm.ERROR)
+t = {gres = "gpu:v100:4"}
+check("G7 unknown type", modify(t, {partition = "gpu-a100"}), slurm.ERROR)
 
 print("== H. several partitions may hold the same GPU type ==")
 with_site([[

@@ -1,9 +1,10 @@
 ---
 # Target GPU power limit in watts, applied to *every* NVIDIA GPU on the node with
-# `nvidia-smi -pl <watts>`. There is deliberately no usable default: the safe/useful
-# value is card-specific (e.g. an RTX PRO 6000 defaults to 600W and is happy at 450W,
-# an H100 SXM is 700W, an L40S is 350W, ...). You MUST set it, and the role asserts it
-# is inside every GPU's supported Min/Max range before doing anything.
+# `nvidia-smi -pl <watts>`. There is deliberately no usable default: the range is
+# card-specific (an H100 SXM defaults to 700W, an L40S to 350W, ...) and the useful
+# value depends on the site's power and cooling budget. You MUST set it, and the role
+# asserts it is inside every GPU's supported Min/Max range before doing anything.
+# Read the range a card actually supports with: nvidia-smi -q -d POWER
 #
 # Set it wherever it makes sense for your layout:
 #   * cluster-wide  -> config/group_vars/all.yml

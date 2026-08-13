@@ -68,7 +68,7 @@
         daemon_reload: true
 
     # Apply a changed cap during this run (the handler restarts the oneshot unit) so
-    # the new limit is already live when we read it back below.
+    # the new limit is already live for the read-back below.
     - name: Apply any pending power-limit change now
       ansible.builtin.meta: flush_handlers
 

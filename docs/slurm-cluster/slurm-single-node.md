@@ -470,7 +470,7 @@ login-session:srun --mpi=pmi2 --ntasks=2 --gpus-per-task=1 \
   all_reduce_perf -b 1M -e 4G -f 2 -g 1
 ```
 
-The pyxis+enroot is invoked via option “ --container-image=deepops/nccl-tests-tf20.06-ubuntu18.04:latest”
+The pyxis+enroot is invoked via option `--container-image=deepops/nccl-tests-tf20.06-ubuntu18.04:latest`
 to run the “all_reduce_perf” nccl test. Refer to enroot and pyxis documentation
 for further details.
 
