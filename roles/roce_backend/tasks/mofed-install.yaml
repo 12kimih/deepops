@@ -29,7 +29,6 @@
         /mnt/iso/mlnxofedinstall --all -q
       args:
         executable: /bin/bash
-        warn: false
       when: (not ofed_installed.stat.exists) or (mofed_version not in current_mofed_version.stdout)
       register: install_mofed
       changed_when: install_mofed.rc == 0
