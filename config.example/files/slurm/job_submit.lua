@@ -19,24 +19,30 @@
 -- cannot silently reopen the hole.
 
 -- [1] Site configuration -- EDIT THESE for your cluster (or set "" to disable a rule).
-local CPU_PARTITIONS        = "cpu"     -- partition(s) for CPU-only jobs ("" = leave unset)
-local DEFAULT_GPU_TYPE      = "b200"    -- GPU type assumed when a GPU job omits the type
-local DEFAULT_GPU_PARTITION = "b200"    -- partition for GPU jobs of unknown/default type
-local GPU_TYPE_TO_PARTITION = {         -- map each GPU type to its partition (add your own)
+--   CPU_PARTITIONS         partition(s) for CPU-only jobs ("" = leave unset).
+--   DEFAULT_GPU_TYPE       GPU type assumed when a GPU job omits the type.
+--   DEFAULT_GPU_PARTITION  partition for GPU jobs of unknown/default type.
+--   GPU_TYPE_TO_PARTITION  each GPU type (from Gres=gpu:<type>:N) to its partition.
+--                          Several partitions may hold one type, for sites with
+--                          short/long/debug queues: give a list, and the FIRST entry
+--                          is where type-routed jobs go while the rest are recognised
+--                          on input so an untyped job naming one can still be typed.
+--   STRICT_GPU_TYPE        what to do when a GPU job omits the type AND its partition
+--                          cannot pin one down, because that partition holds several
+--                          GPU types, or holds none, or is not listed here.
+--                          true  -- reject at submit, naming the usable partitions.
+--                          false -- let it through untyped.
+--                          Keep this true if any QoS or association carries a typed
+--                          GPU limit: Slurm checks those against the REQUESTED TRES,
+--                          so an untyped request is invisible to them (see header).
+local CPU_PARTITIONS        = "cpu"
+local DEFAULT_GPU_TYPE      = "b200"
+local DEFAULT_GPU_PARTITION = "b200"
+local GPU_TYPE_TO_PARTITION = {
     ["b200"] = "b200",
-    -- Several partitions may hold one type (short/long/debug queues). List them all:
-    -- the FIRST is where type-routed jobs are sent, the rest are only recognised on
-    -- input. Without this, an untyped job naming "h100-short" could not be typed.
     ["h100"] = { "h100", "h100-short" },
     ["h200"] = "h200",
 }
--- What to do when a GPU job omits the type AND its partition cannot pin one down --
--- because the partition holds several GPU types, or holds none, or is not listed above.
---   true  -- reject at submit, with a message telling the user to name the type.
---   false -- let it through untyped.
--- Keep this true if ANY QoS or association carries a typed GPU limit (gres/gpu:<type>).
--- Slurm checks those limits against the REQUESTED TRES, so an untyped request is
--- invisible to them and starts no matter how full the QoS is (see the header).
 local STRICT_GPU_TYPE = true
 
 -- Derived once at load, from the [1] block above.
