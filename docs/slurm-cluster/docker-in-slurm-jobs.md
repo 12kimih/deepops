@@ -9,7 +9,7 @@ this repo solves it.
 Slurm resolves a job's supplementary groups on the **submit/controller** node and
 ships the resulting **numeric** GID list into the job. This is the `send_gids`
 behaviour, on by default since Slurm 20.11 and disabled only with
-`LaunchParameters=disable_send_gids`. The compute node never re-resolves the names —
+`LaunchParameters=disable_send_gids`. The compute node never re-resolves the names --
 `slurmstepd` applies the numbers it was given and the node's own group database is
 consulted only to render those numbers back into names.
 
@@ -23,7 +23,7 @@ Two consequences follow, and both are silent:
 2. **A GID that means different things on different nodes grants the wrong group.**
    Access does not fail closed. The number arrives, the compute node renders it through
    its own group database, and the job ends up holding whatever group happens to own
-   that number there — no error, no warning.
+   that number there -- no error, no warning.
 
 The `docker` group is especially prone to this. It is created by the Docker package
 with a distro-assigned **system** GID, which depends on the order packages were
@@ -64,7 +64,7 @@ group that is designed to be cluster-wide:
          - alice
    ```
 
-   The role asserts each GID is `>= GID_MIN`. Membership is **declarative** — deleting
+   The role asserts each GID is `>= GID_MIN`. Membership is **declarative** -- deleting
    a name here revokes that person's access on the next run. Set
    `nis_export_groups_exclusive: false` to make the list additive instead, for a group
    other tooling also writes to.
@@ -120,7 +120,7 @@ docker ps
 
 A process's supplementary groups are fixed when it is created and are never re-read.
 Adding someone to the group therefore has no effect on anything already running:
-existing jobs, existing login sessions, and — most easily missed — the shells of a
+existing jobs, existing login sessions, and -- most easily missed -- the shells of a
 long-lived `tmux` or `screen` server, which inherit the credentials that server was
 started with however recently the shell itself was opened. The same applies in reverse:
 removing someone from the group does not close the sessions they already have.
@@ -144,7 +144,7 @@ newgrp <group>    # nested shell with the group list re-resolved
 
 Check in this order: the maps were rebuilt on the master (`ypcat group | grep <name>`),
 the node is bound (`ypwhich`), and no **local** group of the same name shadows the NIS
-one — `nsswitch.conf` resolves `files` before `nis`, so `getent group <name>` on a
+one -- `nsswitch.conf` resolves `files` before `nis`, so `getent group <name>` on a
 client can report an empty member list while the NIS map is correct.
 
 ### If the group is present but `docker ps` is still refused
@@ -156,7 +156,7 @@ stat -c '%G %a' /run/docker.sock    # must be the cluster group, mode 660
 ```
 
 A wrong group here means the daemon was never restarted after the configuration was
-written. Re-running the playbook with `docker_socket_group_restart: true` repairs it —
+written. Re-running the playbook with `docker_socket_group_restart: true` repairs it --
 the role checks the live socket, not just the configuration files.
 
 ## Before reaching for this
@@ -169,7 +169,7 @@ Containers started through dockerd are also **outside the job's cgroup**. They a
 children of the daemon, not of `slurmstepd`, so they survive `scancel` and the end of
 the allocation, and their GPU, CPU and memory usage is not charged to the job.
 
-Enroot and Pyxis have neither problem — they are rootless, scoped to the job, and
+Enroot and Pyxis have neither problem -- they are rootless, scoped to the job, and
 GPU-aware:
 
 ```sh

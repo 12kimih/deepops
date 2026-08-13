@@ -15,12 +15,12 @@ A user's supplementary groups are resolved in two different places:
 
 So `sudo` group membership on the head node grants sudo *inside jobs* on every compute
 node but not over SSH to those same nodes, and membership on a compute node does the
-reverse. Whenever the two member lists drift apart — and nothing keeps them in step —
+reverse. Whenever the two member lists drift apart -- and nothing keeps them in step --
 some people hold root inside jobs on every compute node while having no sudo at all
 over SSH, and others the other way around. Neither state is visible from looking at
 one node.
 
-Making the group consistent is not possible. `sudo` is gid 27 — below `GID_MIN` — and
+Making the group consistent is not possible. `sudo` is gid 27 -- below `GID_MIN` -- and
 `/var/yp/Makefile` filters the NIS group map to `GID >= GID_MIN`, so the group can
 never be published. Editing `/etc/group` on each node by hand fixes only the SSH path,
 because job credentials never consult it.
@@ -50,7 +50,7 @@ NIS master gives every node the same answer by every path.
    ```
 
    The `nis_server` role renders `/etc/netgroup` and rebuilds the maps. Membership is
-   **declarative** — deleting a name here revokes that person's sudo on the next run.
+   **declarative** -- deleting a name here revokes that person's sudo on the next run.
 
 2. Name it once in `config/group_vars/all.yml`:
 
@@ -107,7 +107,7 @@ Two things are never touched:
   against a list of names, so a drop-in installed by a component (Open OnDemand ships
   one) is covered without being listed.
 - **`cluster_sudoers_keep`**, for files no package owns that must survive. The defaults
-  are `README`, `root` and `90-cloud-init-users` — the last being the only sudo path on
+  are `README`, `root` and `90-cloud-init-users` -- the last being the only sudo path on
   a stock cloud image.
 
 The report separates two categories:
@@ -125,8 +125,8 @@ ansible all -m command -a 'ls /etc/sudoers.d/'
 
 ## Related
 
-- [Docker access from inside Slurm jobs](docker-in-slurm-jobs.md) — the same
+- [Docker access from inside Slurm jobs](docker-in-slurm-jobs.md) -- the same
   numeric-GID mechanism, solved with a published group rather than a netgroup, because
   the Docker socket needs an actual GID to be owned by.
-- `playbooks/utilities/check-id-consistency.yml` — asserts published groups resolve to
+- `playbooks/utilities/check-id-consistency.yml` -- asserts published groups resolve to
   their pinned GID on every node.

@@ -292,10 +292,10 @@ Slurm resolves a job's supplementary groups on the submit node and ships the res
 itself. Anything that depends on group membership therefore has to be made consistent
 deliberately, or it will behave differently depending on how the user arrived:
 
-- [Docker access from inside Slurm jobs](./docker-in-slurm-jobs.md) — why adding a user
+- [Docker access from inside Slurm jobs](./docker-in-slurm-jobs.md) -- why adding a user
   to the `docker` group on a compute node has no effect inside a job, and how to
   publish a socket group that does work.
-- [Administrator sudo on a Slurm + NIS cluster](./cluster-sudo-netgroup.md) — why `sudo`
+- [Administrator sudo on a Slurm + NIS cluster](./cluster-sudo-netgroup.md) -- why `sudo`
   group membership gives two different answers on the same node, and how a NIS netgroup
   avoids it.
 
