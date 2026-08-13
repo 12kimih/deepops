@@ -115,9 +115,17 @@
 # ends. Only a parse error is fatal: visudo also exits non-zero for a drop-in whose
 # mode is not 0440, which sudo itself still reads as long as the file is not group- or
 # world-writable. Those are reported by the next task instead.
+#
+# LC_ALL=C because the test below matches visudo's MESSAGE TEXT, not its exit status
+# (the two failure kinds share exit 1 and can only be told apart by what it prints).
+# Under a translated locale those strings are translated too, so the match would stop
+# firing and a genuinely broken sudoers file would be reported as healthy. The locale
+# role sets a login-session LANG, which makes that reachable rather than theoretical.
 - name: Verify the whole sudoers configuration still parses
   ansible.builtin.command:
     cmd: visudo -c
+  environment:
+    LC_ALL: C
   register: cluster_sudoers_check
   changed_when: false
   failed_when: >-
