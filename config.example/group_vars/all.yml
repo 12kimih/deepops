@@ -210,22 +210,23 @@ docker_iptables_enabled: true
 # default is roughly 32 networks and every compose project claims one, so a host
 # running many stacks at once fails with "all predefined address pools have been
 # fully subnetted" long before it runs out of CPU or memory. A pool yields
-# 2^(size - base prefix) networks, so a /16 split at size 26 gives 1024 of them with
-# 62 usable addresses each.
+# 2^(size - base prefix) networks: a /16 split at size 24 gives 256 of them with 254
+# usable addresses each, and the same /16 at size 26 gives 1024 with 62 each.
 #
-# The base must not overlap anything the host routes; the role checks it against the
-# live routing table and fails rather than write a colliding pool. Changing this
-# restarts docker, which stops every running container on the node -- set
-# docker_daemon_options_restart to false to stage the file for a maintenance window.
+# Pick the base from this site's own addressing plan. It must not overlap anything
+# the host routes, and the role checks it against the live routing table and fails
+# rather than write a colliding pool. Changing this restarts docker, which stops every
+# running container on the node -- set docker_daemon_options_restart to false to stage
+# the file for a maintenance window instead.
 #docker_daemon_options:
 #  default-address-pools:
-#    - base: "10.200.0.0/16"
-#      size: 26
+#    - base: "10.99.0.0/16"
+#      size: 24
 
 # Kernel ceilings a container host reaches before it runs out of CPU or memory:
 # inotify instances per UID, and the three ARP table thresholds (all three have to
 # move together). roles/docker raises these by default at values sized for a few
-# hundred concurrent containers; override for more, as below for about a thousand.
+# hundred concurrent containers; the values below carry about a thousand.
 #docker_sysctls:
 #  fs.inotify.max_user_instances: "8192"
 #  net.ipv4.neigh.default.gc_thresh1: "4096"
