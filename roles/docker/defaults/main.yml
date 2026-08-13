@@ -42,13 +42,13 @@ docker_service_state: started
 # at once fails with "all predefined address pools have been fully subnetted" long
 # before it runs out of CPU or memory. A pool yields 2^(size - base prefix) networks:
 #
-#   base 10.200.0.0/16, size 24  ->  256 networks of 254 usable addresses
-#   base 10.200.0.0/16, size 26  -> 1024 networks of  62 usable addresses
+#   base 10.99.0.0/16, size 24  ->  256 networks of 254 usable addresses
+#   base 10.99.0.0/16, size 26  -> 1024 networks of  62 usable addresses
 #
 # docker_daemon_options:
 #   default-address-pools:
-#     - base: "10.200.0.0/16"
-#       size: 26
+#     - base: "10.99.0.0/16"
+#       size: 24
 #
 # The base must not overlap anything the host routes. Picking a range that collides
 # breaks reachability for whatever already lived there, and it shows up later as a

@@ -9,8 +9,8 @@
 # Which client networks may query this NIS server ("NETMASK NETWORK" lines).
 # Role default = localhost + RFC1918; TIGHTEN to your actual cluster subnet.
 #nis_server_securenets:
-#  - "255.0.0.0       127.0.0.0"
-#  - "255.255.255.0   10.0.0.0"
+#  - "255.0.0.0       127.0.0.0"   # localhost
+#  - "255.255.255.0   10.0.0.0"   # the cluster's internal subnet
 
 # Groups defined on the NIS master and published through the group map, so that one
 # group name means one GID on every node. Anything that has to be meaningful inside a
