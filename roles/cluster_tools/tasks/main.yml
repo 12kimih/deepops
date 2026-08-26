@@ -9,6 +9,7 @@
   loop: "{{ cluster_tools_scripts }}"
   register: cluster_tools_shadowed
   changed_when: false
+  check_mode: false
   loop_control:
     label: "{{ item.dest }}"
 

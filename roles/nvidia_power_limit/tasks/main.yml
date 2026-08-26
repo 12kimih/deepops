@@ -26,6 +26,7 @@
   register: nvidia_power_limit_smi
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Skip nodes without an NVIDIA driver
   ansible.builtin.debug:
@@ -47,6 +48,7 @@
           --format=csv,noheader,nounits
       register: nvidia_power_limit_state
       changed_when: false
+      check_mode: false
 
     - name: Enforce the configured power limit
       when: nvidia_power_limit_watts | int > 0
@@ -102,6 +104,7 @@
               --format=csv,noheader,nounits
           register: nvidia_power_limit_state
           changed_when: false
+          check_mode: false
 
         # Covers what the unit alone cannot: the unit file was already correct, so no
         # handler fired, but a card drifted (manual nvidia-smi -pl, driver reload).
@@ -157,6 +160,7 @@
         cmd: nvidia-smi --query-gpu=power.limit --format=csv,noheader
       register: nvidia_power_limit_enforced
       changed_when: false
+      check_mode: false
 
     - name: Show the enforced power limit
       ansible.builtin.debug:
