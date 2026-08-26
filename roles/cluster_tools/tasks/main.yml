@@ -73,3 +73,31 @@
         path: "{{ cluster_tools_motd_dir }}/{{ cluster_tools_motd_file }}"
         state: absent
       when: (cluster_tools_motd | trim | length) == 0
+
+# systemd re-applies a slice's resource-control properties on daemon-reload, so a
+# changed limit reaches sessions that are already open.
+- name: Create the user slice drop-in directory
+  ansible.builtin.file:
+    path: "{{ cluster_tools_user_slice_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: cluster_tools_user_slice_limits | length > 0
+
+- name: Publish the per-user resource limits
+  ansible.builtin.template:
+    src: user-slice-limits.conf.j2
+    dest: "{{ cluster_tools_user_slice_dir }}/{{ cluster_tools_user_slice_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: cluster_tools_user_slice_limits | length > 0
+  notify: Reload systemd
+
+- name: Remove the per-user resource limits
+  ansible.builtin.file:
+    path: "{{ cluster_tools_user_slice_dir }}/{{ cluster_tools_user_slice_file }}"
+    state: absent
+  when: cluster_tools_user_slice_limits | length == 0
+  notify: Reload systemd

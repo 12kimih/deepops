@@ -30,3 +30,14 @@ cluster_tools_profile_file: z10-cluster-tools.sh
 cluster_tools_motd: ""
 cluster_tools_motd_dir: /etc/update-motd.d
 cluster_tools_motd_file: 20-cluster-tools
+
+# Per-user resource limits, written as a drop-in on systemd's user-.slice so they apply
+# to every login session. Set it on the LOGIN nodes only: a shell that a user opens on
+# a compute node is normally adopted into their job's cgroup, so a limit here would
+# either do nothing or fight the job's own accounting.
+#
+# Keys are [Slice] directives (CPUQuota, MemoryMax, TasksMax, ...); see systemd.resource-control(5).
+# Emptying it removes the drop-in, so a node dropped from the config is cleaned up.
+cluster_tools_user_slice_limits: {}
+cluster_tools_user_slice_dir: /etc/systemd/system/user-.slice.d
+cluster_tools_user_slice_file: 50-limits.conf

@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# Per-user resource limits for the nodes people log in to (roles/cluster_tools).
+# Slurm jobs are unaffected: they run under slurmd, and an SSH session adopted into a
+# job by pam_slurm_adopt lands in the job's cgroup rather than the user slice.
+[Slice]
+{% for name, value in cluster_tools_user_slice_limits | dictsort %}
+{{ name }}={{ value }}
+{% endfor %}
