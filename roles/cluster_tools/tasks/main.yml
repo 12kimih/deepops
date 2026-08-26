@@ -78,13 +78,13 @@
         owner: root
         group: root
         mode: "0755"
-      when: (cluster_tools_motd | trim | length) > 0
+      when: (cluster_tools_motd_title | trim | length) > 0
 
     - name: Remove the login banner
       ansible.builtin.file:
         path: "{{ cluster_tools_motd_dir }}/{{ cluster_tools_motd_file }}"
         state: absent
-      when: (cluster_tools_motd | trim | length) == 0
+      when: (cluster_tools_motd_title | trim | length) == 0
 
 # systemd re-applies a slice's resource-control properties on daemon-reload, so a
 # changed limit reaches sessions that are already open.

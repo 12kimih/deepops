@@ -1,6 +1,36 @@
 #!/bin/sh
 # {{ ansible_managed }}
 # Printed once per login by update-motd (roles/cluster_tools).
-cat <<'__CLUSTER_TOOLS_MOTD__'
-{{ cluster_tools_motd }}
-__CLUSTER_TOOLS_MOTD__
+{% set p = cluster_tools_palettes[cluster_tools_motd_flavour] %}
+{% set rows = cluster_tools_motd_commands + cluster_tools_motd_links %}
+{% set w = rows | map(attribute='name') | map('length') | max %}
+{# the rule spans exactly the widest row: 3 leading spaces + name + 2 - the 2 of its own indent #}
+{% set width = 3 + w + (rows | map(attribute='text') | map('length') | max) %}
+{% if cluster_tools_motd_color %}
+# A=title  N=command names  L=paths and URLs  T=descriptions  U=rules
+e=$(printf '\033')
+A="${e}[1;38;2;{{ p.accent }}m"
+N="${e}[38;2;{{ p.name }}m"
+L="${e}[38;2;{{ p.link }}m"
+T="${e}[38;2;{{ p.text }}m"
+U="${e}[38;2;{{ p.rule }}m"
+R="${e}[0m"
+{% else %}
+A= N= L= T= U= R=
+{% endif %}
+
+cat <<BANNER
+
+  ${A}▎{{ cluster_tools_motd_title }}${R}
+  ${U}{{ '─' * width }}${R}
+{% for c in cluster_tools_motd_commands %}
+   ${N}{{ "%-*s"|format(w, c.name) }}${R}  ${T}{{ c.text }}${R}
+{% endfor %}
+{% if cluster_tools_motd_links %}
+  ${U}{{ '─' * width }}${R}
+{% for c in cluster_tools_motd_links %}
+   ${L}{{ "%-*s"|format(w, c.name) }}${R}  ${T}{{ c.text }}${R}
+{% endfor %}
+{% endif %}
+
+BANNER
