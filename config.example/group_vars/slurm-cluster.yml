@@ -282,6 +282,14 @@ slurm_cluster_configure_gpu_power_limit: true
 # inherited, so batch scripts and remote commands get the same output.
 #cluster_tools_environment:
 #  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
+#  # COLORTERM is how a terminal advertises 24-bit colour, and sshd forwards nothing
+#  # but LANG and LC_* -- so it is lost on every hop and colour-aware tools fall back
+#  # to their 256-colour approximation on the compute nodes. Asserting it here is a
+#  # claim made on the client's behalf: a terminal that cannot do 24-bit (macOS
+#  # Terminal.app, a VT console) gets sequences it will drop, losing colour rather
+#  # than gaining it. The honest fix is SendEnv/AcceptEnv COLORTERM on both ends,
+#  # after which the client's own value wins and this line stops mattering.
+#  COLORTERM: truecolor
 
 # Login banner -- what people see when they SSH in. One short line each; slurm-help
 # carries the detail.
