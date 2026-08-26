@@ -1,0 +1,29 @@
+---
+# Catppuccin palettes (https://catppuccin.com/palette), as "r;g;b" for SGR 38;2.
+# Only the roles the banner uses. Same flavours the sq command ships with, so a login
+# screen and the tool it points at read as one thing.
+cluster_tools_palettes:
+  mocha:
+    accent: "203;166;247"   # mauve    -- title
+    name: "137;180;250"     # blue     -- command names
+    link: "137;220;235"     # sky      -- paths and URLs
+    text: "166;173;200"     # subtext0 -- descriptions
+    rule: "69;71;90"        # surface1 -- rules
+  macchiato:
+    accent: "198;160;246"
+    name: "138;173;244"
+    link: "145;215;227"
+    text: "165;173;203"
+    rule: "73;77;100"
+  frappe:
+    accent: "202;158;230"
+    name: "140;170;238"
+    link: "153;209;219"
+    text: "165;173;206"
+    rule: "81;87;109"
+  latte:
+    accent: "136;57;239"
+    name: "30;102;245"
+    link: "4;165;229"
+    text: "108;111;133"
+    rule: "188;192;204"
