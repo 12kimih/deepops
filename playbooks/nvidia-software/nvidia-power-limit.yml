@@ -5,15 +5,17 @@
 # a small oneshot systemd unit (nvidia-power-limit.service) that re-applies the cap --
 # and, optionally, persistence mode -- at boot. See roles/nvidia_power_limit.
 #
-# Target only *specific* nodes with -e hostlist=... (a group or comma-separated hosts),
-# and set the wattage per group/host or on the command line. Examples:
+# The role converges in both directions: a node with no nvidia_power_limit_watts has any
+# cap REMOVED and its GPUs put back on their default limit. Running this over a whole
+# group is therefore declarative, and slurm-cluster.yml runs it that way. Cap specific
+# nodes by setting the wattage per host or group:
 #
-#   # cap two named nodes at 450W
+#   # config/host_vars/<node>:  nvidia_power_limit_watts: 450
+#   ansible-playbook playbooks/nvidia-software/nvidia-power-limit.yml
+#
+#   # one-off, not written to config (undone by the next cluster run)
 #   ansible-playbook -l <host1>,<host2> playbooks/nvidia-software/nvidia-power-limit.yml \
 #       -e nvidia_power_limit_watts=450
-#
-#   # cap a whole group, wattage taken from config/group_vars/slurm-node.yml
-#   ansible-playbook playbooks/nvidia-software/nvidia-power-limit.yml -e hostlist=slurm-node
 #
 # The GPU gate (ansible_local.gpus.count) mirrors nvidia-dcgm.yml / nvidia-driver.yml so
 # a CPU-only head/login node in the target set is skipped instead of failing the run.
