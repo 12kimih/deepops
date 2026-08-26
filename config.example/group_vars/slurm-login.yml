@@ -1,0 +1,12 @@
+---
+# Variables for the login nodes -- the hosts in [slurm-login].
+
+# Per-user resource limits, applied to every login session through systemd's
+# user-.slice (roles/cluster_tools). Keeps one user's editor, notebook or stray build
+# from taking the whole login node; real work belongs in a Slurm job. Nodes outside
+# this group have the drop-in removed. Keys are [Slice] directives -- see
+# systemd.resource-control(5).
+#cluster_tools_user_slice_limits:
+#  CPUQuota: "1200%"   # 12 cores
+#  MemoryMax: 64G
+#  TasksMax: 4096
