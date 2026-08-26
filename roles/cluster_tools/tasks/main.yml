@@ -51,6 +51,18 @@
     state: absent
   when: cluster_tools_environment | length == 0
 
+- name: Publish the shared examples
+  ansible.builtin.copy:
+    src: "{{ cluster_tools_examples_src }}/"
+    dest: "{{ cluster_tools_examples_dest }}/"
+    owner: root
+    group: root
+    mode: "0644"
+    directory_mode: "0755"
+  when:
+    - (cluster_tools_examples_src | length) > 0
+    - (cluster_tools_examples_dest | length) > 0
+
 - name: Check for update-motd.d
   ansible.builtin.stat:
     path: "{{ cluster_tools_motd_dir }}"

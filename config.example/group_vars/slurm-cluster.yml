@@ -289,6 +289,11 @@ slurm_cluster_configure_gpu_power_limit: true
 #    qos          the QoS levels you may submit against
 #    slurm-help   how to submit jobs, and the cluster rules
 
+# A directory copied onto a shared filesystem for users to read and copy from. Set it
+# on the one host that exports the share -- see config/host_vars/<head node>.
+#cluster_tools_examples_src: "{{ inventory_dir }}/files/slurm/examples"
+#cluster_tools_examples_dest: /sw/examples
+
 ################################################################################
 # Enroot & Pyxis                                                               #
 ################################################################################
