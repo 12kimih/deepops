@@ -1,6 +1,10 @@
 # {{ ansible_managed }}
 # Site shell defaults (roles/cluster_tools). Exported rather than aliased so job
 # scripts and remote commands see the same values.
+#
+# Each is a DEFAULT, not an override: a value the session already carries -- one the
+# client forwarded over SSH, say -- is left alone. A terminal knows its own
+# capabilities better than this file does.
 {% for name, value in cluster_tools_environment | dictsort %}
-export {{ name }}={{ value | string | quote }}
+[ -n {{ '"${' ~ name ~ ':-}"' }} ] || export {{ name }}={{ value | string | quote }}
 {% endfor %}
