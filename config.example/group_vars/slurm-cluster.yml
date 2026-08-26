@@ -285,7 +285,9 @@ slurm_cluster_configure_gpu_power_limit: true
 
 # Printed once per login. Keep it short -- the details belong in slurm-help.
 #cluster_tools_motd: |
-#  Run `slurm-help` for how to use the cluster.
+#    sq           queue + CPU/memory/GPU use, your own jobs marked
+#    qos          the QoS levels you may submit against
+#    slurm-help   how to submit jobs, and the cluster rules
 
 ################################################################################
 # Enroot & Pyxis                                                               #
