@@ -162,6 +162,12 @@
   import_playbook: utilities/gpu-clocks.yml
   when: allow_user_set_gpu_clocks
 
+# Declarative: nodes with nvidia_power_limit_watts get the cap, nodes without have any
+# cap removed. Turn the whole step off with slurm_cluster_configure_gpu_power_limit.
+- name: Configure the GPU power limit
+  import_playbook: nvidia-software/nvidia-power-limit.yml hostlist=slurm-node
+  when: slurm_cluster_configure_gpu_power_limit | default(true)
+
 - name: Install Enroot and Pyxis
   import_playbook: container/pyxis.yml
   when:
