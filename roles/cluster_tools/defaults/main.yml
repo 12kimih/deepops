@@ -28,6 +28,13 @@ cluster_tools_profile_file: z10-cluster-tools.sh
 # only. Emptying it removes the fragment. Debian/Ubuntu mechanism -- a node without
 # update-motd.d is skipped.
 cluster_tools_motd: ""
+
+# A directory published verbatim onto a shared filesystem -- worked examples, job
+# templates, anything users copy from. Set it on the ONE host that owns the share, so
+# a single node writes it instead of every node writing the same NFS path. Nothing is
+# deleted from the destination: it also holds files this role did not put there.
+cluster_tools_examples_src: ""
+cluster_tools_examples_dest: ""
 cluster_tools_motd_dir: /etc/update-motd.d
 cluster_tools_motd_file: 20-cluster-tools
 
