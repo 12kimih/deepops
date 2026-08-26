@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Site shell defaults (roles/cluster_tools). Exported rather than aliased so job
+# scripts and remote commands see the same values.
+{% for name, value in cluster_tools_environment | dictsort %}
+export {{ name }}={{ value | string | quote }}
+{% endfor %}

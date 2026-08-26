@@ -1,0 +1,6 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Printed once per login by update-motd (roles/cluster_tools).
+cat <<'__CLUSTER_TOOLS_MOTD__'
+{{ cluster_tools_motd }}
+__CLUSTER_TOOLS_MOTD__
