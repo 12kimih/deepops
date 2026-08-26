@@ -123,11 +123,14 @@
             path: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
           register: nvidia_power_limit_unit
 
+        # daemon_reload so a unit file that was dropped in but never loaded is still
+        # known to systemd when it is stopped.
         - name: Stop and disable the GPU power-limit service
           ansible.builtin.systemd:
             name: "{{ nvidia_power_limit_service_name }}"
             state: stopped
             enabled: false
+            daemon_reload: true
           when: nvidia_power_limit_unit.stat.exists
 
         - name: Remove the GPU power-limit systemd unit
