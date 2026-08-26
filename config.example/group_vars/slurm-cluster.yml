@@ -283,11 +283,17 @@ slurm_cluster_configure_gpu_power_limit: true
 #cluster_tools_environment:
 #  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
 
-# Printed once per login. Keep it short -- the details belong in slurm-help.
-#cluster_tools_motd: |
-#    sq           queue + CPU/memory/GPU use, your own jobs marked
-#    qos          the QoS levels you may submit against
-#    slurm-help   how to submit jobs, and the cluster rules
+# Login banner -- what people see when they SSH in. One short line each; slurm-help
+# carries the detail.
+#cluster_tools_motd_title: "my cluster"
+#cluster_tools_motd_commands:
+#  - { name: sq,         text: "queue and node usage, your own jobs marked" }
+#  - { name: qos,        text: "the QoS levels you may submit against" }
+#  - { name: sinfo,      text: "partition and node state" }
+#  - { name: slurm-help, text: "how to submit jobs, and the cluster rules" }
+#cluster_tools_motd_links:
+#  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
+#  - { name: dashboard,    text: "http://dsail-cluster.snu.ac.kr:59001" }
 
 # A directory copied onto a shared filesystem for users to read and copy from. Set it
 # on the one host that exports the share -- see config/host_vars/<head node>.

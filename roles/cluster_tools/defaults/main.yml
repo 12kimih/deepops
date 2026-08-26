@@ -23,11 +23,23 @@ cluster_tools_scripts: []
 cluster_tools_environment: {}
 cluster_tools_profile_file: z10-cluster-tools.sh
 
-# Login banner. Installed as an update-motd.d fragment so it prints once per login
-# instead of on every interactive shell, and for every login shell rather than bash
-# only. Emptying it removes the fragment. Debian/Ubuntu mechanism -- a node without
+# Login banner: a title, the commands people should know about, and where to find
+# things. Installed as an update-motd.d fragment so it prints once per login instead
+# of on every interactive shell, and for every login shell rather than bash only. An
+# empty title removes the fragment. Debian/Ubuntu mechanism -- a node without
 # update-motd.d is skipped.
-cluster_tools_motd: ""
+#
+# Both lists take {name, text}. Keep each text to one short line: this is read at
+# every login, and the detail belongs behind one of the commands it lists.
+cluster_tools_motd_title: ""
+cluster_tools_motd_commands: []
+cluster_tools_motd_links: []
+
+# Catppuccin flavour for the banner -- mocha, macchiato, frappe or latte, the same
+# flavours sq ships with. Emitted as 24-bit colour; turn the colour off for a terminal
+# that cannot render it.
+cluster_tools_motd_flavour: mocha
+cluster_tools_motd_color: true
 
 # A directory published verbatim onto a shared filesystem -- worked examples, job
 # templates, anything users copy from. Set it on the ONE host that owns the share, so
