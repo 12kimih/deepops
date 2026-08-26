@@ -1,0 +1,32 @@
+---
+# cluster_tools -- publish the site's own commands, shell defaults and login banner.
+# Opt-in: every setting below is empty, so the role is a no-op until config fills it in.
+#
+# Commands are installed into PATH as executables rather than declared as aliases in
+# /etc/bash.bashrc. An alias exists only inside an interactive bash, so the same name
+# behaves differently in a job script, over `ssh <node> <cmd>`, and under a non-bash
+# login shell -- and /etc/bash.bashrc belongs to the bash package, so local edits there
+# collide with every upgrade.
+cluster_tools_bin_dir: /usr/local/bin
+
+# Commands to publish: a list of {src, dest}. src is copied VERBATIM -- shell scripts
+# routinely contain sequences Jinja would eat, `${#var}` opening a comment among them --
+# so anything site-specific belongs in cluster_tools_environment, not in a template.
+# dest is a bare command NAME (no extension) under cluster_tools_bin_dir; a name that
+# already resolves elsewhere in PATH is refused rather than left to shadow it.
+cluster_tools_scripts: []
+
+# Environment published through /etc/profile.d. This is where a tool's own default
+# belongs (SINFO_FORMAT, SQUEUE_FORMAT, ...): unlike an alias, the environment is
+# inherited by job scripts and remote commands, so the output is the same everywhere.
+# Emptying it removes the file.
+cluster_tools_environment: {}
+cluster_tools_profile_file: z10-cluster-tools.sh
+
+# Login banner. Installed as an update-motd.d fragment so it prints once per login
+# instead of on every interactive shell, and for every login shell rather than bash
+# only. Emptying it removes the fragment. Debian/Ubuntu mechanism -- a node without
+# update-motd.d is skipped.
+cluster_tools_motd: ""
+cluster_tools_motd_dir: /etc/update-motd.d
+cluster_tools_motd_file: 20-cluster-tools

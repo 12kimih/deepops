@@ -1,0 +1,13 @@
+---
+# Publish the site's own commands, shell defaults and login banner on every node.
+#
+# The commands land in PATH as executables and the defaults in /etc/profile.d, so they
+# reach job scripts and `ssh <node> <cmd>` as well as an interactive prompt. No-op
+# until cluster_tools_scripts is set in config/group_vars.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - cluster-tools
+  roles:
+    - cluster_tools
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"

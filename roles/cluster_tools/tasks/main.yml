@@ -1,0 +1,74 @@
+---
+# A published name that also resolves elsewhere in PATH would shadow the real command
+# for every user -- which is what `alias squeue=/sw/scripts/squeue.sh` did. Catch it
+# here instead of at someone's prompt.
+- name: Look for existing commands the published names would shadow
+  ansible.builtin.shell:
+    cmd: "type -aP {{ item.dest | quote }} | grep -v '^{{ cluster_tools_bin_dir }}/' || true"
+    executable: /bin/bash
+  loop: "{{ cluster_tools_scripts }}"
+  register: cluster_tools_shadowed
+  changed_when: false
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Assert no published command shadows an existing one
+  ansible.builtin.assert:
+    that:
+      - (item.stdout | trim | length) == 0
+    fail_msg: >-
+      '{{ item.item.dest }}' already resolves to {{ item.stdout_lines | join(', ') }}
+      on {{ inventory_hostname }}. Publishing it under {{ cluster_tools_bin_dir }}
+      would shadow that command for every user -- give it a distinct name.
+  loop: "{{ cluster_tools_shadowed.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.dest }}"
+
+- name: Publish the cluster commands
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ cluster_tools_bin_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ cluster_tools_scripts }}"
+  loop_control:
+    label: "{{ cluster_tools_bin_dir }}/{{ item.dest }}"
+
+- name: Publish the shell environment defaults
+  ansible.builtin.template:
+    src: profile.sh.j2
+    dest: "/etc/profile.d/{{ cluster_tools_profile_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: cluster_tools_environment | length > 0
+
+- name: Remove the shell environment defaults
+  ansible.builtin.file:
+    path: "/etc/profile.d/{{ cluster_tools_profile_file }}"
+    state: absent
+  when: cluster_tools_environment | length == 0
+
+- name: Check for update-motd.d
+  ansible.builtin.stat:
+    path: "{{ cluster_tools_motd_dir }}"
+  register: cluster_tools_motd_dir_stat
+
+- name: Configure the login banner
+  when: cluster_tools_motd_dir_stat.stat.isdir | default(false)
+  block:
+    - name: Publish the login banner
+      ansible.builtin.template:
+        src: motd.j2
+        dest: "{{ cluster_tools_motd_dir }}/{{ cluster_tools_motd_file }}"
+        owner: root
+        group: root
+        mode: "0755"
+      when: (cluster_tools_motd | trim | length) > 0
+
+    - name: Remove the login banner
+      ansible.builtin.file:
+        path: "{{ cluster_tools_motd_dir }}/{{ cluster_tools_motd_file }}"
+        state: absent
+      when: (cluster_tools_motd | trim | length) == 0
