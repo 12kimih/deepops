@@ -188,6 +188,11 @@
   tags:
     - cluster-sudoers
 
+- name: Publish the site's commands, shell defaults and login banner
+  import_playbook: slurm-cluster/cluster-tools.yml
+  tags:
+    - cluster-tools
+
 - name: Ensure that nv_peer_mem is loaded
   import_playbook: nvidia-software/nvidia-peer-memory.yml
   tags:

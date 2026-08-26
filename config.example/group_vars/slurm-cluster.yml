@@ -258,6 +258,36 @@ allow_user_set_gpu_clocks: false
 slurm_cluster_configure_gpu_power_limit: true
 
 ################################################################################
+# Cluster Tools (site commands, shell defaults, login banner)                  #
+################################################################################
+# roles/cluster_tools publishes your own commands into PATH on every node, shell
+# defaults through /etc/profile.d, and a login banner through update-motd.d. Prefer
+# all three to aliases in /etc/bash.bashrc: an alias exists only inside an interactive
+# bash, so a job script and `ssh <node> <cmd>` never see it, and /etc/bash.bashrc
+# belongs to the bash package so local edits there collide with every upgrade.
+#
+# dest is a bare command name. Do NOT reuse the name of a real command (squeue, sinfo):
+# the role refuses a name that already resolves elsewhere in PATH, because a wrapper
+# installed under that name makes the command behave differently from a script.
+#cluster_tools_scripts:
+#  - src: "{{ inventory_dir }}/files/slurm/squeue.sh"
+#    dest: sq
+#  - src: "{{ inventory_dir }}/files/slurm/slurm-help.sh"
+#    dest: slurm-help
+#  - src: "{{ inventory_dir }}/files/slurm/qos.sh"
+#    dest: qos
+
+# Change a Slurm command's default output through its own environment variable rather
+# than by wrapping the command (see `man sinfo`, `man squeue`). The environment is
+# inherited, so batch scripts and remote commands get the same output.
+#cluster_tools_environment:
+#  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
+
+# Printed once per login. Keep it short -- the details belong in slurm-help.
+#cluster_tools_motd: |
+#  Run `slurm-help` for how to use the cluster.
+
+################################################################################
 # Enroot & Pyxis                                                               #
 ################################################################################
 slurm_install_enroot: true
