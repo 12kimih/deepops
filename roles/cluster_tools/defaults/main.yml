@@ -19,7 +19,8 @@ cluster_tools_scripts: []
 # Environment published through /etc/profile.d. This is where a tool's own default
 # belongs (SINFO_FORMAT, SQUEUE_FORMAT, ...): unlike an alias, the environment is
 # inherited by job scripts and remote commands, so the output is the same everywhere.
-# Emptying it removes the file.
+# Each entry is a default -- a value the session already carries wins. Emptying it
+# removes the file.
 cluster_tools_environment: {}
 cluster_tools_profile_file: z10-cluster-tools.sh
 
