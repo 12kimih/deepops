@@ -66,7 +66,7 @@
               {{ item.split(',')[0] | trim }}'s supported power range
               ({{ item.split(',')[3] | trim }} - {{ item.split(',')[4] | trim }} W) on
               {{ inventory_hostname }}. Check the range with: nvidia-smi -q -d POWER
-          loop: "{{ nvidia_power_limit_state.stdout_lines }}"
+          loop: "{{ nvidia_power_limit_state.stdout_lines | default([]) }}"
           when:
             - item.split(',')[3] | trim | regex_search('^[0-9.]+$')
             - item.split(',')[4] | trim | regex_search('^[0-9.]+$')
@@ -96,13 +96,16 @@
         - name: Apply any pending power-limit change now
           ansible.builtin.meta: flush_handlers
 
+        # A separate register: re-using nvidia_power_limit_state would clobber the
+        # outer read on any host that skips this branch, and a loop is templated
+        # before its when is evaluated, so the skipped branch would still fail.
         - name: Re-read the enforced power limits
           ansible.builtin.command:
             cmd: >-
               nvidia-smi
               --query-gpu=index,power.limit,power.default_limit,power.min_limit,power.max_limit
               --format=csv,noheader,nounits
-          register: nvidia_power_limit_state
+          register: nvidia_power_limit_recheck
           changed_when: false
           check_mode: false
 
@@ -111,7 +114,7 @@
         - name: Enforce the cap on any GPU that drifted from it
           ansible.builtin.command:
             cmd: nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ nvidia_power_limit_watts | int }}
-          loop: "{{ nvidia_power_limit_state.stdout_lines }}"
+          loop: "{{ nvidia_power_limit_recheck.stdout_lines | default([]) }}"
           when:
             - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
             - (item.split(',')[1] | trim | float) != (nvidia_power_limit_watts | float)
@@ -147,7 +150,7 @@
         - name: Reset each GPU to its default power limit
           ansible.builtin.command:
             cmd: nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
-          loop: "{{ nvidia_power_limit_state.stdout_lines }}"
+          loop: "{{ nvidia_power_limit_state.stdout_lines | default([]) }}"
           when:
             - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
             - item.split(',')[2] | trim | regex_search('^[0-9.]+$')
@@ -167,4 +170,4 @@
         msg: >-
           {{ inventory_hostname }}:
           {{ 'capped at ' ~ nvidia_power_limit_watts ~ 'W' if nvidia_power_limit_watts | int > 0 else 'uncapped (card defaults)' }},
-          enforced GPU power limit(s) = {{ nvidia_power_limit_enforced.stdout_lines | join(', ') }}
+          enforced GPU power limit(s) = {{ nvidia_power_limit_enforced.stdout_lines | default([]) | join(', ') }}
