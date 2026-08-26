@@ -2,8 +2,8 @@
 # Target GPU power limit in watts, applied to *every* NVIDIA GPU on the node with
 # `nvidia-smi -pl <watts>`. There is deliberately no usable default: the range is
 # card-specific (an H100 SXM defaults to 700W, an L40S to 350W, ...) and the useful
-# value depends on the site's power and cooling budget. You MUST set it, and the role
-# asserts it is inside every GPU's supported Min/Max range before doing anything.
+# value depends on the site's power and cooling budget. The role asserts the value is
+# inside every GPU's supported Min/Max range before doing anything.
 # Read the range a card actually supports with: nvidia-smi -q -d POWER
 #
 # Set it wherever it makes sense for your layout:
@@ -12,13 +12,19 @@
 #   * per host      -> config/host_vars/<hostname>.yml     (nvidia_power_limit_watts: 400)
 #   * ad hoc        -> -e nvidia_power_limit_watts=450 on the command line
 # Per-host/per-group values are how you cap only *specific* compute nodes.
+#
+# LEFT EMPTY the role REMOVES the cap: it deletes the systemd unit and puts every GPU
+# back on its own default limit. A run over a whole group is therefore declarative, so
+# an ad-hoc `-e nvidia_power_limit_watts=...` value does not survive -- write it into
+# config/ or the next cluster run undoes it.
 nvidia_power_limit_watts: ""    # e.g. 450
 
 # Also enable persistence mode (`nvidia-smi -pm 1`). This keeps the driver initialized
 # even when no client (CUDA app, nvidia-smi) is attached, which makes the power cap --
 # and clocks, ECC, etc. -- apply more reliably and reduces per-job GPU init latency.
 # Applied as a best-effort ExecStartPre so a card that does not support it will not
-# block the cap from being set.
+# block the cap from being set. Removing a cap does not turn persistence mode back off:
+# it is not a cap, and DCGM and other tooling on the node rely on it.
 nvidia_power_limit_persistence_mode: true
 
 # Name of the systemd unit installed under /etc/systemd/system/. It re-applies the cap

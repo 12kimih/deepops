@@ -1,16 +1,26 @@
 ---
-- name: Assert a GPU power limit was specified
+# The role converges in BOTH directions: a watts value installs and enforces the cap,
+# an empty one removes it and puts every GPU back on its own default limit. Running it
+# over a whole group is therefore declarative -- the nodes named in config get the cap
+# and every other node is cleaned up, including one capped by an earlier ad-hoc
+# `-e nvidia_power_limit_watts=...` run.
+#
+# Persistence mode is not undone on the removal path: it is not a cap, and DCGM and
+# other tooling on the node rely on it.
+
+- name: Assert the configured power limit is a positive integer
   ansible.builtin.assert:
     that:
       - nvidia_power_limit_watts | int > 0
     fail_msg: >-
-      nvidia_power_limit_watts must be set to a positive integer number of watts
-      (e.g. 450). Set it in config/group_vars, config/host_vars, or pass
-      -e nvidia_power_limit_watts=<watts>. See roles/nvidia_power_limit/defaults/main.yml.
+      nvidia_power_limit_watts must be a positive integer number of watts (e.g. 450), or
+      left empty to remove any cap from this node. Got: "{{ nvidia_power_limit_watts }}".
+      A typo would otherwise read as "no cap" and silently un-cap the node.
+  when: nvidia_power_limit_watts | default('') | string | trim | length > 0
 
 # Gate on a working driver rather than just GPU presence: a node can have an NVIDIA
 # card (lspci) but no driver yet, in which case nvidia-smi is absent and there is
-# nothing to cap. Skip cleanly instead of failing the run.
+# nothing to cap or reset.  Skip cleanly instead of failing the run.
 - name: Check for nvidia-smi
   ansible.builtin.command: which nvidia-smi
   register: nvidia_power_limit_smi
@@ -27,50 +37,117 @@
 - name: Configure the GPU power limit
   when: nvidia_power_limit_smi.rc == 0
   block:
-    - name: Query the supported GPU power-limit range
+    # "index, current, default, min, max" per GPU. Every decision below is made per
+    # GPU against this, so nothing is written unless a card is off target.
+    - name: Read the current and supported GPU power limits
       ansible.builtin.command:
-        cmd: nvidia-smi --query-gpu=power.min_limit,power.max_limit --format=csv,noheader,nounits
-      register: nvidia_power_limit_range
+        cmd: >-
+          nvidia-smi
+          --query-gpu=index,power.limit,power.default_limit,power.min_limit,power.max_limit
+          --format=csv,noheader,nounits
+      register: nvidia_power_limit_state
       changed_when: false
 
-    # nvidia-smi -pl silently refuses (non-zero) a value outside a card's Min/Max
-    # Power Limit, which would leave the boot service failing forever. Catch it here,
-    # per GPU, with a clear message instead.
-    - name: Assert the requested limit is within every GPU's supported range
-      ansible.builtin.assert:
-        that:
-          - nvidia_power_limit_watts | int >= (item.split(',')[0] | trim | float)
-          - nvidia_power_limit_watts | int <= (item.split(',')[1] | trim | float)
-        fail_msg: >-
-          Requested {{ nvidia_power_limit_watts }}W is outside a GPU's supported power
-          range (min, max = [{{ item }}] W) on {{ inventory_hostname }}. Check the range
-          with: nvidia-smi -q -d POWER
-      loop: "{{ nvidia_power_limit_range.stdout_lines }}"
-      loop_control:
-        label: "GPU range (min, max) = [{{ item }}] W"
+    - name: Enforce the configured power limit
+      when: nvidia_power_limit_watts | int > 0
+      block:
+        # nvidia-smi -pl silently refuses (non-zero) a value outside a card's Min/Max
+        # Power Limit, which would leave the boot service failing forever. Catch it
+        # here, per GPU, with a clear message instead.
+        - name: Assert the requested limit is within every GPU's supported range
+          ansible.builtin.assert:
+            that:
+              - nvidia_power_limit_watts | int >= (item.split(',')[3] | trim | float)
+              - nvidia_power_limit_watts | int <= (item.split(',')[4] | trim | float)
+            fail_msg: >-
+              Requested {{ nvidia_power_limit_watts }}W is outside GPU
+              {{ item.split(',')[0] | trim }}'s supported power range
+              ({{ item.split(',')[3] | trim }} - {{ item.split(',')[4] | trim }} W) on
+              {{ inventory_hostname }}. Check the range with: nvidia-smi -q -d POWER
+          loop: "{{ nvidia_power_limit_state.stdout_lines }}"
+          when:
+            - item.split(',')[3] | trim | regex_search('^[0-9.]+$')
+            - item.split(',')[4] | trim | regex_search('^[0-9.]+$')
+          loop_control:
+            label: "GPU {{ item.split(',')[0] | trim }}"
 
-    - name: Install the GPU power-limit systemd unit
-      ansible.builtin.template:
-        src: nvidia-power-limit.service.j2
-        dest: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
-        owner: root
-        group: root
-        mode: "0644"
-      notify:
-        - Reload systemd
-        - Restart nvidia-power-limit
+        - name: Install the GPU power-limit systemd unit
+          ansible.builtin.template:
+            src: nvidia-power-limit.service.j2
+            dest: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+            owner: root
+            group: root
+            mode: "0644"
+          notify:
+            - Reload systemd
+            - Restart nvidia-power-limit
 
-    - name: Enable and start the GPU power-limit service
-      ansible.builtin.systemd:
-        name: "{{ nvidia_power_limit_service_name }}"
-        enabled: true
-        state: started
-        daemon_reload: true
+        - name: Enable and start the GPU power-limit service
+          ansible.builtin.systemd:
+            name: "{{ nvidia_power_limit_service_name }}"
+            enabled: true
+            state: started
+            daemon_reload: true
 
-    # Apply a changed cap during this run (the handler restarts the oneshot unit) so
-    # the new limit is already live for the read-back below.
-    - name: Apply any pending power-limit change now
-      ansible.builtin.meta: flush_handlers
+        # Apply a changed cap during this run (the handler restarts the oneshot unit)
+        # so the drift check below sees the new value.
+        - name: Apply any pending power-limit change now
+          ansible.builtin.meta: flush_handlers
+
+        - name: Re-read the enforced power limits
+          ansible.builtin.command:
+            cmd: >-
+              nvidia-smi
+              --query-gpu=index,power.limit,power.default_limit,power.min_limit,power.max_limit
+              --format=csv,noheader,nounits
+          register: nvidia_power_limit_state
+          changed_when: false
+
+        # Covers what the unit alone cannot: the unit file was already correct, so no
+        # handler fired, but a card drifted (manual nvidia-smi -pl, driver reload).
+        - name: Enforce the cap on any GPU that drifted from it
+          ansible.builtin.command:
+            cmd: nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ nvidia_power_limit_watts | int }}
+          loop: "{{ nvidia_power_limit_state.stdout_lines }}"
+          when:
+            - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
+            - (item.split(',')[1] | trim | float) != (nvidia_power_limit_watts | float)
+          loop_control:
+            label: "GPU {{ item.split(',')[0] | trim }}: {{ item.split(',')[1] | trim }}W -> {{ nvidia_power_limit_watts }}W"
+
+    - name: Remove any power limit left on this node
+      when: nvidia_power_limit_watts | int <= 0
+      block:
+        - name: Look for a power-limit unit left behind by an earlier run
+          ansible.builtin.stat:
+            path: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+          register: nvidia_power_limit_unit
+
+        - name: Stop and disable the GPU power-limit service
+          ansible.builtin.systemd:
+            name: "{{ nvidia_power_limit_service_name }}"
+            state: stopped
+            enabled: false
+          when: nvidia_power_limit_unit.stat.exists
+
+        - name: Remove the GPU power-limit systemd unit
+          ansible.builtin.file:
+            path: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+            state: absent
+          notify: Reload systemd
+
+        # Removing the unit only stops the cap coming back at boot; the running driver
+        # keeps its limit until reset here, per GPU against that card's own default.
+        - name: Reset each GPU to its default power limit
+          ansible.builtin.command:
+            cmd: nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
+          loop: "{{ nvidia_power_limit_state.stdout_lines }}"
+          when:
+            - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
+            - item.split(',')[2] | trim | regex_search('^[0-9.]+$')
+            - (item.split(',')[1] | trim | float) != (item.split(',')[2] | trim | float)
+          loop_control:
+            label: "GPU {{ item.split(',')[0] | trim }}: {{ item.split(',')[1] | trim }}W -> default {{ item.split(',')[2] | trim }}W"
 
     - name: Read back the enforced power limit
       ansible.builtin.command:
@@ -81,5 +158,6 @@
     - name: Show the enforced power limit
       ansible.builtin.debug:
         msg: >-
-          {{ inventory_hostname }}: enforced GPU power limit(s) =
-          {{ nvidia_power_limit_enforced.stdout_lines | join(', ') }}
+          {{ inventory_hostname }}:
+          {{ 'capped at ' ~ nvidia_power_limit_watts ~ 'W' if nvidia_power_limit_watts | int > 0 else 'uncapped (card defaults)' }},
+          enforced GPU power limit(s) = {{ nvidia_power_limit_enforced.stdout_lines | join(', ') }}

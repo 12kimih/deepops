@@ -1,8 +1,9 @@
 ---
-# There are no real GPUs in CI, so drop in a stub nvidia-smi that answers the two
+# There are no real GPUs in CI, so drop in a stub nvidia-smi that answers the
 # --query-gpu reads the role makes and accepts -pl / -pm. This lets the converge
 # exercise the real code path (validate range -> template unit -> enable/start ->
-# read back) instead of just the "no driver, skip" branch.
+# read back) instead of just the "no driver, skip" branch. The stub reports a GPU
+# already at 450W so a second converge has nothing to change.
 - name: Prepare
   hosts: all
   tasks:
@@ -13,7 +14,7 @@
         content: |
           #!/bin/bash
           case "$*" in
-            *power.min_limit*) echo "100.00, 600.00" ;;
+            *power.min_limit*) echo "0, 450.00, 600.00, 100.00, 600.00" ;;
             *power.limit*)     echo "450.00 W" ;;
             *) : ;;
           esac

@@ -1,0 +1,44 @@
+---
+# Start from a node that IS capped -- a stub GPU sitting at 450W with a 600W default,
+# plus the unit an earlier run (or an ad-hoc -e) would have left behind. The converge
+# then has something real to undo. The stub logs its arguments so the verify can tell
+# whether the reset actually reached the card.
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install stub nvidia-smi
+      ansible.builtin.copy:
+        dest: /usr/bin/nvidia-smi
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          echo "$*" >> /var/log/nvidia-smi-stub.log
+          case "$*" in
+            *power.min_limit*) echo "0, 450.00, 600.00, 100.00, 600.00" ;;
+            *power.limit*)     echo "450.00 W" ;;
+            *) : ;;
+          esac
+          exit 0
+
+    - name: Install a leftover power-limit unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/nvidia-power-limit.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Set NVIDIA GPU power limit to 450W (deepops)
+          After=multi-user.target
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/usr/bin/nvidia-smi -pl 450
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable the leftover unit
+      ansible.builtin.systemd:
+        name: nvidia-power-limit.service
+        enabled: true
+        daemon_reload: true
