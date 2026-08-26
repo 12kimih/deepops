@@ -41,12 +41,12 @@ cluster_tools_motd_links: []
 cluster_tools_motd_flavour: mocha
 cluster_tools_motd_color: true
 
-# A directory published verbatim onto a shared filesystem -- worked examples, job
-# templates, anything users copy from. Set it on the ONE host that owns the share, so
-# a single node writes it instead of every node writing the same NFS path. Nothing is
-# deleted from the destination: it also holds files this role did not put there.
-cluster_tools_examples_src: ""
-cluster_tools_examples_dest: ""
+# Directories published verbatim onto a shared filesystem -- worked examples, the
+# usage docs, anything users read or copy from. A list of {src, dest}. Set it on the
+# ONE host that owns the share, so a single node writes it instead of every node
+# writing the same NFS path. Nothing is deleted from a destination: it also holds
+# files this role did not put there.
+cluster_tools_shared_dirs: []
 cluster_tools_motd_dir: /etc/update-motd.d
 cluster_tools_motd_file: 20-cluster-tools
 
