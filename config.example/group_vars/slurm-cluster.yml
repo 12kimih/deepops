@@ -292,13 +292,15 @@ slurm_cluster_configure_gpu_power_limit: true
 #  - { name: sinfo,      text: "partition and node state" }
 #  - { name: slurm-help, text: "how to submit jobs, and the cluster rules" }
 #cluster_tools_motd_links:
+#  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
 #  - { name: dashboard,    text: "http://dsail-cluster.snu.ac.kr:59001" }
 
-# A directory copied onto a shared filesystem for users to read and copy from. Set it
-# on the one host that exports the share -- see config/host_vars/<head node>.
-#cluster_tools_examples_src: "{{ inventory_dir }}/files/slurm/examples"
-#cluster_tools_examples_dest: /sw/examples
+# Directories copied onto a shared filesystem for users to read and copy from. Set
+# them on the one host that exports the share -- see config/host_vars/<head node>.
+#cluster_tools_shared_dirs:
+#  - { src: "{{ inventory_dir }}/files/slurm/examples", dest: /sw/examples }
+#  - { src: "{{ inventory_dir }}/docs", dest: /sw/docs }
 
 ################################################################################
 # Enroot & Pyxis                                                               #
