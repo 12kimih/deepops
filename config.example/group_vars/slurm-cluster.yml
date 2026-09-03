@@ -118,6 +118,10 @@ nfs_mounts:
     server: '{{ groups["slurm-master"][0] }}'
     path: /sw
 
+# Detach the NFS mounts at shutdown so a server rebooting alongside its clients cannot
+# stall them. See roles/nfs/templates/nfs-detach-on-shutdown.service.j2.
+#nfs_detach_on_shutdown: true
+
 # NFS performance tuning (applies on server + clients). Defaults shown below;
 # adjust for your hardware. Very high nfsd thread counts can fail to start with
 # ENOMEM. See docs/slurm-cluster/slurm-nfs.md.
