@@ -20,13 +20,10 @@
     state: present
   when: docker_socket_group_create_local | bool
 
-# Which knob owns the socket depends on how dockerd was started. Under systemd socket
-# activation (`-H fd://`) the unit's SocketGroup= wins; started any other way, dockerd
-# creates and chowns /run/docker.sock itself and only the daemon-level `group` key
-# applies. Set the daemon key here and the unit below, so ownership holds either way.
-# Merge rather than rewrite: daemon.json also carries the NVIDIA runtime block and the
-# NGC shm/ulimit tuning written by other roles.
-# Idempotent: only writes, and only reports changed, when the value actually differs.
+# Which knob owns the socket depends on how dockerd was started: under socket activation
+# (`-H fd://`) the unit's SocketGroup= wins, otherwise dockerd chowns the socket from the
+# daemon-level `group` key. Set both, so ownership holds either way. Merge rather than
+# rewrite -- other roles also write daemon.json.
 # https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 - name: Set the socket group in the Docker daemon configuration
   ansible.builtin.command:
@@ -45,9 +42,6 @@
   failed_when: docker_socket_group_daemon_json.rc not in [0, 10]
   notify: Restart docker
 
-# If docker.socket is switched to socket activation (`-H fd://`), systemd owns the
-# socket and SocketGroup= takes precedence over daemon.json. Keep the two in
-# agreement so ownership holds under either startup mode.
 - name: Check whether the docker.socket unit exists
   ansible.builtin.command:
     cmd: systemctl cat docker.socket
@@ -82,14 +76,9 @@
     - Restart the docker socket unit
     - Restart docker
 
-# Everything above is idempotent on content: once daemon.json and the drop-in name the
-# target group, nothing is notified and the daemon is never restarted. That alone
-# cannot converge a node whose configuration is already right but whose live socket is
-# not -- a run staged with docker_socket_group_restart set to false, a run that failed
-# before its handlers, or a socket reverted by hand. Such a node reports `ok` on every
-# later run while access stays broken, because the role would only ever react to a
-# configuration file changing. Compare the live socket against the target instead, and
-# notify the restart when they disagree, so re-running the role is a real repair.
+# Configuration alone cannot converge a node whose files are already right but whose live
+# socket is not -- handlers that never ran, or a socket changed by hand. Compare the live
+# socket too, so re-running the role is a real repair.
 - name: Read the group that currently owns the Docker socket
   ansible.builtin.stat:
     path: "{{ docker_socket_group_socket_path }}"
