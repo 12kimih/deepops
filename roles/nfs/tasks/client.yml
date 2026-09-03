@@ -50,6 +50,28 @@
   tags:
     - nfs
 
+# Enabled but never restarted: the payload is all in ExecStop, so bouncing this on a
+# live node would unmount the shares under its users. A template change lands on the
+# next boot, which is the only time the unit does anything.
+- name: Install the shutdown-time NFS detach unit
+  ansible.builtin.template:
+    src: nfs-detach-on-shutdown.service.j2
+    dest: /etc/systemd/system/nfs-detach-on-shutdown.service
+    mode: "0644"
+  when: nfs_detach_on_shutdown | bool
+  tags:
+    - nfs
+
+- name: Enable the shutdown-time NFS detach unit
+  ansible.builtin.systemd:
+    name: nfs-detach-on-shutdown.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: nfs_detach_on_shutdown | bool
+  tags:
+    - nfs
+
 - name: RedHat | Install management prereq
   ansible.builtin.dnf:
     name: "python3-libsemanage"
