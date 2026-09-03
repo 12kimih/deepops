@@ -1,16 +1,29 @@
 ---
-# Reboot the targeted hosts and wait for them to return. Pass `-e hostlist=...`
-# to target a subset; reboot_serial controls the rolling-reboot batch size
-# (e.g. `-e reboot_serial=1` to reboot one node at a time).
+# Reboot the targeted hosts and wait for them to return.
+#
+#   -e hostlist=...      target a subset
+#   -e reboot_serial=N   rolling batch size (default 100%)
+#   -e reboot_timeout=N  seconds to wait for a node (default 1800)
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   serial: "{{ reboot_serial | default('100%') }}"
   tags:
     - reboot
+  vars:
+    # ansible.cfg inherits ConnectionAttempts=100 from kubespray, which lets one SSH
+    # probe block for the whole reboot_timeout. The reboot module only re-checks its
+    # deadline between probes, so it never sees the node come back. ServerAliveInterval
+    # drops a control master the reboot left stale.
+    ansible_ssh_args: >-
+      -o ControlMaster=auto -o ControlPersist=5m
+      -o ServerAliveInterval=10 -o ServerAliveCountMax=3
+      -o UserKnownHostsFile=/dev/null
   tasks:
     - name: Reboot and wait for the host to come back
       ansible.builtin.reboot:
         msg: "Reboot initiated by Ansible"
         pre_reboot_delay: 5
-        reboot_timeout: 600
+        post_reboot_delay: 15
+        # A GPU server can spend several minutes in POST and memory training.
+        reboot_timeout: "{{ reboot_timeout | default(1800) }}"
         connect_timeout: 5
