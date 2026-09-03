@@ -29,4 +29,4 @@ ssh -v \
 	-l vagrant \
 	-i "${HOME}/.ssh/id_rsa" \
 	"10.0.0.6${GPU01}" \
-        "mount | grep nfs | grep home"
+        "ls /home >/dev/null && mount | grep nfs | grep home"

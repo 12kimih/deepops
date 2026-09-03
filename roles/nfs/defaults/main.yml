@@ -7,6 +7,22 @@ nfs_is_client: false
 nfs_exports: []
 nfs_mounts: []
 
+# Client mount options for any nfs_mounts entry that does not carry its own `options`,
+# so a site tunes one string instead of repeating it per mount.
+#
+# x-systemd.automount is what makes the mount survive a reboot of the whole cluster.
+# A plain fstab entry is attempted once, at boot: a client that reaches remote-fs.target
+# before its server is serving fails the mount, and `nofail` then lets the boot continue
+# with the share missing and nothing ever retrying it. An automount entry is instead
+# established without contacting the server and mounted on first access, so the order
+# nodes boot in stops mattering -- including the case where two nodes export to each
+# other and neither can be "first". A failed attempt is retried on the next access.
+#
+# _netdev keeps the unit in remote-fs.target (and after the network), nofail keeps a
+# dead server from holding up the boot. Sized for a 100GbE+ fabric; see
+# docs/slurm-cluster/slurm-nfs.md for the tuning knobs and `man 5 nfs`.
+nfs_mount_options: "rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail,x-systemd.automount"
+
 # Number of nfsd (kernel NFS server) threads. The Linux default is only 8, far too
 # few for many concurrent clients under heavy random I/O: each nfsd thread serves
 # one RPC at a time and blocks on disk, so too few threads serializes clients and

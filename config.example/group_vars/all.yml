@@ -101,13 +101,13 @@ deepops_set_hostname: true
 #    options: "*(rw,sync,no_root_squash)"
 
 # NFS Client
-# This config will mount an NFS share on hosts
+# This config will mount an NFS share on hosts. An entry without `options` is mounted
+# with nfs_mount_options (see roles/nfs/defaults/main.yml).
 # Playbook: nfs-client.yml
 #nfs_mounts:
 #  - mountpoint: /mnt/shared
 #    server: '{{ groups["slurm-master"][0] }}'
 #    path: /export/shared
-#    options: async,vers=3
 
 # Extra Packages for Enterprise Linux (RHEL/CentOS)
 epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
