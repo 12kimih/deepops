@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# Detaches this node's NFS mounts on the way down, so its shutdown does not depend on
+# its servers still answering. A node that mounts from a peer rebooting alongside it
+# otherwise blocks in uninterruptible sleep on a `hard` mount and never reaches the
+# reboot, ending up powered on with its network already gone. Unit ordering cannot fix
+# that -- the fault is on the other node -- so stop talking to the server instead: a
+# lazy detach unhooks the mount without sending a packet.
+[Unit]
+Description=Detach NFS mounts before shutdown
+Documentation=man:umount(8)
+# Shutdown order is startup order reversed, so After= here means this stops before the
+# mounts do. Default dependencies supply Before=shutdown.target.
+After=remote-fs.target
+
+[Service]
+# The work is in ExecStop; RemainAfterExit keeps the unit active until shutdown.
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+# Triggers first: while one is armed, anything that stats the mountpoint re-arms a
+# mount against the departing server.
+ExecStop=-/usr/bin/umount --lazy --force --all --types autofs
+ExecStop=-/usr/bin/umount --lazy --force --all --types nfs,nfs4
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -23,6 +23,11 @@ nfs_mounts: []
 # docs/slurm-cluster/slurm-nfs.md for the tuning knobs and `man 5 nfs`.
 nfs_mount_options: "rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail,x-systemd.automount"
 
+# Install a unit that lazily detaches the NFS mounts at shutdown, so a server rebooting
+# alongside its clients cannot stall them. Lets the mounts stay `hard`; `soft` would
+# trade the hang for silent write corruption.
+nfs_detach_on_shutdown: true
+
 # Number of nfsd (kernel NFS server) threads. The Linux default is only 8, far too
 # few for many concurrent clients under heavy random I/O: each nfsd thread serves
 # one RPC at a time and blocks on disk, so too few threads serializes clients and

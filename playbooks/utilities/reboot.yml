@@ -1,9 +1,10 @@
 ---
 # Reboot the targeted hosts and wait for them to return.
 #
-#   -e hostlist=...      target a subset
-#   -e reboot_serial=N   rolling batch size (default 100%)
-#   -e reboot_timeout=N  seconds to wait for a node (default 1800)
+#   -e hostlist=...              target a subset
+#   -e reboot_serial=N           rolling batch size (default 100%)
+#   -e reboot_timeout=N          seconds to wait for a node (default 1800)
+#   -e reboot_detach_nfs=false   skip the pre-reboot unmount
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   serial: "{{ reboot_serial | default('100%') }}"
@@ -18,6 +19,22 @@
       -o ControlMaster=auto -o ControlPersist=5m
       -o ServerAliveInterval=10 -o ServerAliveCountMax=3
       -o UserKnownHostsFile=/dev/null
+  pre_tasks:
+    # Lets the whole cluster reboot in one batch: a node holding a hard mount from a
+    # peer that goes down with it blocks in D state and never reaches the reboot. The
+    # nfs role installs the same detach as a shutdown unit; this covers nodes without it.
+    - name: Detach the shared filesystems before the reboot
+      ansible.builtin.shell:
+        cmd: |
+          # Triggers first, or the umount re-arms a mount against a dying server.
+          systemctl stop '*.automount' 2>/dev/null || true
+          umount -l -f -a -t nfs,nfs4 2>/dev/null || true
+          exit 0
+      changed_when: false
+      when: reboot_detach_nfs | default(true) | bool
+      tags:
+        - reboot
+
   tasks:
     - name: Reboot and wait for the host to come back
       ansible.builtin.reboot:
