@@ -101,20 +101,22 @@ nfs_exports:
     options: "*(rw,sync,no_root_squash,no_subtree_check)"
   - path: /sw      # shared software (Spack / EasyBuild / CUDA modules)
     options: "*(rw,sync,no_root_squash,no_subtree_check)"
+# Client mount options, applied to every nfs_mounts entry that does not set its own
+# `options`. A starting point -- tune per your network and storage. nconnect (parallel
+# TCP connections) is the main lever: ~4 on 10/25GbE, 8-16 on 100GbE+. On a NetApp/ONTAP
+# filer cap rsize/wsize at 262144; on an InfiniBand fabric consider proto=rdma. Add
+# ",fsc" for FS-Cache (cachefilesd role). Keep x-systemd.automount: it defers the mount
+# to first access instead of attempting it once at boot, so a node that boots before its
+# NFS server no longer comes up with the share missing and nothing retrying it.
+# See docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`.
+nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail,x-systemd.automount
 nfs_mounts:
-  # Client mount options below are a starting point -- tune per your network and
-  # storage. nconnect (parallel TCP connections) is the main lever: ~4 on 10/25GbE,
-  # 8-16 on 100GbE+. On a NetApp/ONTAP filer cap rsize/wsize at 262144; on an
-  # InfiniBand fabric consider proto=rdma. Add ",fsc" for FS-Cache (cachefilesd role).
-  # See docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`.
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'
     path: /home
-    options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
   - mountpoint: /sw
     server: '{{ groups["slurm-master"][0] }}'
     path: /sw
-    options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
 
 # NFS performance tuning (applies on server + clients). Defaults shown below;
 # adjust for your hardware. Very high nfsd thread counts can fail to start with
@@ -168,7 +170,7 @@ spack_build_packages: false
 # single example spec -- `cuda` with no version lets Spack pick its newest. (CUDA
 # is also available as Lmod modules via the nvidia_cuda_toolkit role.)
 spack_default_packages:
-- "cuda"
+  - "cuda"
 
 # Which host should we run installs on for software going into the NFS share?
 sm_install_host: "slurm-master[0]"

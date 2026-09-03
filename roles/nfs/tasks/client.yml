@@ -9,15 +9,44 @@
   tags:
     - nfs
 
+# An automount entry is written to fstab but deliberately not mounted here: mounting it
+# now would both defeat the deferred mount and fail against a server that is not up yet,
+# which is a state this role has to stay able to configure. systemd owns it from the
+# fstab entry on. Every other entry keeps the eager mount.
 - name: Configure /etc/fstab on clients
+  vars:
+    nfs_client_opts: "{{ item.options | default(nfs_mount_options) }}"
   ansible.posix.mount:
     name: "{{ item.mountpoint }}"
     src: "{{ item.server }}:{{ item.path }}"
-    opts: "{{ item.options }}"
+    opts: "{{ nfs_client_opts }}"
     fstype: nfs
-    state: mounted
+    state: "{{ 'present' if 'x-systemd.automount' in nfs_client_opts else 'mounted' }}"
   with_items: "{{ nfs_mounts }}"
   when: nfs_mounts|length
+  register: nfs_client_fstab
+  tags:
+    - nfs
+
+# systemd-fstab-generator only re-reads /etc/fstab on daemon-reload, so without this the
+# entries written above stay invisible until the node reboots.
+- name: Regenerate the mount units from /etc/fstab
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: nfs_client_fstab is changed
+  tags:
+    - nfs
+
+# Puts a newly generated automount unit in place without waiting for a reboot: starting
+# an already-active target still enqueues the units it wants. remote-fs.target only
+# Wants= its mounts, so an entry whose mountpoint is currently mounted the eager way --
+# systemd refuses to lay an automount over a live mount point -- leaves the target
+# succeeding and converts on the next boot rather than failing the run.
+- name: Activate the generated mount units
+  ansible.builtin.command:
+    cmd: systemctl start remote-fs.target
+  when: nfs_mounts|length
+  changed_when: false
   tags:
     - nfs
 

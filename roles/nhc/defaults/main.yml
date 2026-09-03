@@ -18,3 +18,9 @@ nhc_sysconfig_template: "sysconfig_nhc.j2"
 
 nhc_force_reinstall: false
 nhc_config: "nhc.conf.j2"
+
+# Shared filesystems NHC asserts are mounted read-write, so that a node which lost one
+# is drained instead of collecting failed jobs. Derived from the NFS client mounts to
+# keep the check list in step with what the nfs role actually mounts; set it explicitly
+# to check a filesystem DeepOps does not manage.
+nhc_check_mounts: "{{ nfs_mounts | default([]) | map(attribute='mountpoint') | list }}"
