@@ -1,12 +1,8 @@
 ---
-# The role converges in BOTH directions: a watts value installs and enforces the cap,
-# an empty one removes it and puts every GPU back on its own default limit. Running it
-# over a whole group is therefore declarative -- the nodes named in config get the cap
-# and every other node is cleaned up, including one capped by an earlier ad-hoc
-# `-e nvidia_power_limit_watts=...` run.
-#
-# Persistence mode is not undone on the removal path: it is not a cap, and DCGM and
-# other tooling on the node rely on it.
+# Converges in both directions: a watts value enforces the cap, an empty one removes it
+# and restores each GPU's default limit, so running the role over a group is declarative.
+# Persistence mode is left alone on the removal path -- it is not a cap, and other tooling
+# on the node relies on it.
 
 - name: Assert the configured power limit is a positive integer
   ansible.builtin.assert:
