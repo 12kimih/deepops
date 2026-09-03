@@ -1,0 +1,61 @@
+---
+- name: Install ipmitool
+  ansible.builtin.apt:
+    name: ipmitool
+    state: present
+  when: ansible_os_family == "Debian"
+  tags:
+    - bmc
+
+- name: Install ipmitool
+  ansible.builtin.dnf:
+    name: ipmitool
+    state: present
+  when: ansible_os_family == "RedHat"
+  tags:
+    - bmc
+
+# ipmi_si drives the KCS interface; ipmi_devintf exports it as /dev/ipmi0.
+- name: Load the in-band IPMI modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+    persistent: present
+  loop:
+    - ipmi_si
+    - ipmi_devintf
+  failed_when: false
+  tags:
+    - bmc
+
+- name: Look for the in-band IPMI device
+  ansible.builtin.stat:
+    path: /dev/ipmi0
+  register: bmc_device
+  tags:
+    - bmc
+
+# A VM, a container, or a board without a BMC has no /dev/ipmi0. Skip rather
+# than fail, so the role stays safe to run across a mixed inventory.
+- name: Configure the BMC
+  when: bmc_device.stat.exists
+  tags:
+    - bmc
+  block:
+    - name: Resolve the BMC user ID
+      ansible.builtin.include_tasks: user_id.yml
+      when: bmc_password | length > 0
+
+    - name: Configure the BMC LAN channel
+      ansible.builtin.include_tasks: lan.yml
+      when: bmc_ipaddr | length > 0
+
+    - name: Set the BMC password
+      ansible.builtin.include_tasks: password.yml
+      when: bmc_password | length > 0
+
+- name: Configure this host's leg on the BMC network
+  ansible.builtin.include_tasks: mgmt_network.yml
+  when: bmc_mgmt_address | length > 0
+  tags:
+    - bmc

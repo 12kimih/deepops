@@ -1,0 +1,23 @@
+---
+# Every setting below is inert until a site fills it in: an empty value means
+# "leave that alone", so the role is safe to run against any inventory.
+
+bmc_channel: 1
+bmc_user_name: ADMIN
+
+# BMC LAN. bmc_ipaddr is per-host (host_vars); the rest are usually site-wide.
+bmc_ipsrc: static
+bmc_ipaddr: ""
+bmc_netmask: ""
+bmc_gateway: ""
+
+# Set from the host over KCS, which needs no BMC credentials -- this is how a
+# board whose factory password exists only on a sticker gets a known one. Vault
+# it. Newer BMCs require the 20-byte wire format; older ones take 16.
+bmc_password: ""
+bmc_password_format: 20
+
+# This host's leg on the BMC network, written as its own netplan file. Empty
+# leaves host networking untouched.
+bmc_mgmt_interface: ""
+bmc_mgmt_address: ""

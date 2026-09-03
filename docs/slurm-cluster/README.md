@@ -305,3 +305,13 @@ deliberately, or it will behave differently depending on how the user arrived:
 
 `playbooks/utilities/check-id-consistency.yml` asserts that every group published
 through NIS resolves to its pinned GID on every node.
+
+## Out-of-band management
+
+A node whose OS has stopped -- hung in a shutdown, halted at a boot prompt -- answers
+nothing on the cluster network, and Ansible cannot reach it. Its BMC can, so configuring
+one before it is needed is what keeps a bad reboot from becoming a trip to the rack.
+
+`playbooks/utilities/bmc.yml` configures each node's BMC from the node itself, and
+`playbooks/utilities/power.yml` drives chassis power from the control node afterwards.
+See [out-of-band management](../deepops/bmc.md).

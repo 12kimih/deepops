@@ -1,0 +1,35 @@
+---
+# Out-of-band chassis power control. Runs from the control node against each
+# host's bmc_ipaddr, so it reaches a node whose OS is gone. Reads the same
+# bmc_* variables the bmc role does; see docs/deepops/bmc.md.
+#
+#   -e power_action=status|on|off|cycle|reset|soft   (default status)
+#   -e hostlist=...                                  target a subset
+- hosts: "{{ hostlist | default('all') }}"
+  gather_facts: false
+  vars:
+    power_action: status
+  tags:
+    - power
+  tasks:
+    - name: Require a BMC address and credentials
+      ansible.builtin.assert:
+        that:
+          - bmc_ipaddr | default('') | length > 0
+          - bmc_password | default('') | length > 0
+          - bmc_user_name is defined
+          - power_action in ["status", "on", "off", "cycle", "reset", "soft", "diag"]
+        fail_msg: "Set bmc_ipaddr, bmc_password and bmc_user_name -- see docs/deepops/bmc.md"
+
+    - name: "Chassis power {{ power_action }}"
+      ansible.builtin.command:
+        argv: ["ipmitool", "-I", "lanplus", "-H", "{{ bmc_ipaddr }}", "-U", "{{ bmc_user_name }}", "-E", "chassis", "power", "{{ power_action }}"]
+      environment:
+        IPMI_PASSWORD: "{{ bmc_password }}"
+      delegate_to: localhost
+      register: power_result
+      changed_when: power_action != "status"
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: "{{ power_result.stdout | trim }}"

@@ -1,0 +1,15 @@
+---
+# Fully configured on purpose: a container has no BMC, so this exercises the
+# guard that keeps the role a no-op on a host without one.
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    bmc_ipaddr: 192.0.2.10
+    bmc_netmask: 255.255.255.0
+    bmc_gateway: 192.0.2.1
+    bmc_password: molecule-test
+  tasks:
+    - name: "Include bmc"
+      ansible.builtin.include_role:
+        name: "bmc"

@@ -1,0 +1,44 @@
+---
+# `lan print` is the only readable source of truth for these settings, so every
+# change below is gated on what it reports.
+- name: Read the current BMC LAN configuration
+  ansible.builtin.command: "ipmitool -I open lan print {{ bmc_channel }}"
+  register: bmc_lan
+  changed_when: false
+  check_mode: false
+  tags:
+    - bmc
+
+- name: Note the current LAN settings
+  ansible.builtin.set_fact:
+    bmc_lan_now:
+      ipsrc: "{{ (bmc_lan.stdout | regex_search('^IP Address Source\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      ipaddr: "{{ (bmc_lan.stdout | regex_search('^IP Address\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      netmask: "{{ (bmc_lan.stdout | regex_search('^Subnet Mask\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      gateway: "{{ (bmc_lan.stdout | regex_search('^Default Gateway IP\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+  tags:
+    - bmc
+
+# Source first: a BMC ignores a static address while the channel is still DHCP.
+- name: Set the BMC address source
+  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} ipsrc {{ bmc_ipsrc }}"
+  when: (bmc_ipsrc | lower) not in (bmc_lan_now.ipsrc | lower)
+  changed_when: true
+  tags:
+    - bmc
+
+- name: Set the BMC LAN address
+  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} {{ item.key }} {{ item.value }}"
+  loop:
+    - {key: "ipaddr", value: "{{ bmc_ipaddr }}", now: "{{ bmc_lan_now.ipaddr }}"}
+    - {key: "netmask", value: "{{ bmc_netmask }}", now: "{{ bmc_lan_now.netmask }}"}
+    - {key: "defgw ipaddr", value: "{{ bmc_gateway }}", now: "{{ bmc_lan_now.gateway }}"}
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - bmc_ipsrc == "static"
+    - item.value | length > 0
+    - item.value != item.now
+  changed_when: true
+  tags:
+    - bmc

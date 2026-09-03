@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+# This host's leg on the BMC network. Kept in its own file so the site's
+# existing netplan configuration is never rewritten.
+network:
+  version: 2
+  ethernets:
+    {{ bmc_mgmt_interface }}:
+      dhcp4: false
+      addresses: [{{ bmc_mgmt_address }}]
