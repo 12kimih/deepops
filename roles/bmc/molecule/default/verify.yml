@@ -1,0 +1,27 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Check ipmitool is installed
+      ansible.builtin.command: ipmitool -V
+      changed_when: false
+
+    - name: Look for a BMC
+      ansible.builtin.stat:
+        path: /dev/ipmi0
+      register: bmc_device
+
+    - name: A host without a BMC is left alone
+      ansible.builtin.assert:
+        that: not bmc_device.stat.exists
+        success_msg: "No /dev/ipmi0, so BMC configuration was correctly skipped"
+
+    - name: Host networking is untouched when bmc_mgmt_address is unset
+      ansible.builtin.stat:
+        path: /etc/netplan/60-bmc-mgmt.yaml
+      register: bmc_netplan_file
+
+    - name: Check no netplan file was written
+      ansible.builtin.assert:
+        that: not bmc_netplan_file.stat.exists

@@ -1,0 +1,23 @@
+---
+# bmc_user_name is the single source of truth; the numeric ID that the KCS
+# commands take is derived from it rather than configured twice.
+- name: List the BMC users
+  ansible.builtin.command: "ipmitool -I open user list {{ bmc_channel }}"
+  register: bmc_user_list
+  changed_when: false
+  check_mode: false
+  tags:
+    - bmc
+
+- name: Note the ID of {{ bmc_user_name }}
+  ansible.builtin.set_fact:
+    bmc_user_id: "{{ (bmc_user_list.stdout | regex_search('^\\s*(\\d+)\\s+' ~ bmc_user_name ~ '\\s', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+  tags:
+    - bmc
+
+- name: Require that the user exists
+  ansible.builtin.assert:
+    that: bmc_user_id | length > 0
+    fail_msg: "No BMC user named {{ bmc_user_name }} on channel {{ bmc_channel }}"
+  tags:
+    - bmc

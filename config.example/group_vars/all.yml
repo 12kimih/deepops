@@ -421,6 +421,20 @@ mig_manager_config: /etc/nvidia-mig-manager/config.yml
 mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 
 ################################################################################
+# BMC / IPMI                                                                   #
+################################################################################
+# Out-of-band management. The bmc role configures each host's own BMC over the
+# in-band KCS interface, so the factory password is never needed to get started.
+# bmc_ipaddr is per-host and belongs in host_vars. See docs/deepops/bmc.md.
+#bmc_channel: 1
+#bmc_user_name: ADMIN
+#bmc_ipsrc: static
+#bmc_netmask: 255.255.255.0
+#bmc_gateway: 10.0.0.1
+# Vault it: ansible-vault encrypt_string 'secret' --name bmc_password
+#bmc_password: ""
+
+################################################################################
 # Container registry                                                           #
 ################################################################################
 standalone_container_registry_cache_enable: true

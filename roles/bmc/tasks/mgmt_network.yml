@@ -1,0 +1,25 @@
+---
+- name: Require an interface for the BMC network address
+  ansible.builtin.assert:
+    that: bmc_mgmt_interface | length > 0
+    fail_msg: "bmc_mgmt_address is set but bmc_mgmt_interface is not"
+  tags:
+    - bmc
+
+- name: Look for netplan
+  ansible.builtin.stat:
+    path: /etc/netplan
+  register: bmc_netplan
+  tags:
+    - bmc
+
+# netplan only; a host that manages networking another way is left alone.
+- name: Configure the interface facing the BMC network
+  ansible.builtin.template:
+    src: netplan-bmc-mgmt.yaml.j2
+    dest: /etc/netplan/60-bmc-mgmt.yaml
+    mode: "0600"
+  when: bmc_netplan.stat.isdir | default(false)
+  notify: Apply netplan
+  tags:
+    - bmc
