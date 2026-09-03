@@ -104,6 +104,13 @@ Consequences worth knowing:
   eager way stays mounted -- systemd will not lay an automount over a live mount point --
   and converts on the next boot. To convert without rebooting, unmount it and re-run the
   play, or `systemctl start $(systemd-escape -p --suffix=automount /home)`.
+- **A shutdown must not depend on the servers.** An automount trigger re-arms the moment
+  anything touches the path, so a node whose server is rebooting alongside it can block on
+  a `hard` mount and never reach the reboot -- left powered on, off the network, and out
+  of reach. `nfs_detach_on_shutdown` (default true) installs a unit that lazily detaches
+  the triggers and then the mounts on the way down; a lazy detach sends no packets, so a
+  server that has already gone cannot stall it. `playbooks/utilities/reboot.yml` does the
+  same before it reboots, covering nodes that do not have the unit yet.
 - **`x-systemd.idle-timeout=` is deliberately not set.** Unmounting an idle share also
   clears its handle after a server reboot, but it makes every `/proc/mounts`-based check
   and monitor racy. Add it per site if you want it, and check the monitoring first.

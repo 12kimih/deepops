@@ -306,6 +306,19 @@ deliberately, or it will behave differently depending on how the user arrived:
 `playbooks/utilities/check-id-consistency.yml` asserts that every group published
 through NIS resolves to its pinned GID on every node.
 
+## Rebooting the cluster
+
+`playbooks/utilities/reboot.yml` reboots the targeted hosts and waits for each to come
+back. `-e reboot_serial=N` reboots in batches of N instead of all at once, and
+`-e reboot_timeout=N` sets how long a node has to return -- the default 1800s allows for
+BIOS POST and memory training on a GPU server.
+
+Before rebooting, the play detaches every NFS mount. Without that, a node holding a
+`hard` mount from a server rebooting alongside it blocks in uninterruptible sleep during
+its own shutdown and never reaches the reboot; see
+[Slurm and NFS](./slurm-nfs.md). Nodes carrying the `nfs_detach_on_shutdown` unit are
+already protected on every reboot path, including `scontrol reboot`.
+
 ## Out-of-band management
 
 A node whose OS has stopped -- hung in a shutdown, halted at a boot prompt -- answers
