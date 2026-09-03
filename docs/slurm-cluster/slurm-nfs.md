@@ -7,6 +7,7 @@ Slurm cluster configuration for NFS filesystems
   - [Configuring NFS shares from the Slurm control node](#configuring-nfs-shares-from-the-slurm-control-node)
     - [Exports from the Slurm control node](#exports-from-the-slurm-control-node)
     - [NFS mounts on the clients](#nfs-mounts-on-the-clients)
+  - [Mounting reliably at boot](#mounting-reliably-at-boot)
   - [Performance tuning for random I/O](#performance-tuning-for-random-io)
   - [Configuring a separate NFS server](#configuring-a-separate-nfs-server)
   - [Disabling NFS](#disabling-nfs)
@@ -49,21 +50,66 @@ For documentation on the available NFS export options, see the manpages for your
 ### NFS mounts on the clients
 
 ```yaml
+nfs_mount_options: "<nfs mount options>"
 nfs_mounts:
   - mountpoint: "<absolute path of directory to mount share on clients>"
     server: "<hostname of NFS server>"
     path: "<path of the export from the server>"
-    options: "<nfs mount options>"
   - mountpoint: "<absolute path of another directory to mount share on clients>"
     server: "<hostname of NFS server>"
     path: "<path of the export from the server>"
-    options: "<nfs mount options>"
+    options: "<nfs mount options for this mount only>"
 ```
 
 As above, you can add as many additional mounts to the list as you wish.
 
-The `options` field for each mount specifies the NFS options used to mount the filesystem.
-For the available NFS options, see the manpages for your Linux distribution: `man 5 nfs`.
+`nfs_mount_options` is the single place to tune the client mount options: every entry
+that does not set its own `options` is mounted with it, so a cluster tunes one string
+instead of repeating it per mount. An entry that does set `options` overrides it
+completely -- use that only for a mount that genuinely differs (a filer that needs a
+smaller `rsize`, a share on a different fabric). For the available NFS options, see the
+manpages for your Linux distribution: `man 5 nfs`.
+
+## Mounting reliably at boot
+
+A plain `/etc/fstab` entry is attempted exactly once, at boot. When a whole cluster
+powers on together, a client regularly reaches `remote-fs.target` before its NFS server
+is serving; the mount fails, `nofail` lets the boot continue, and nothing ever retries --
+so the node comes up with `/home` missing and only `root` (whose home is local) can log
+in. Boot ordering cannot fix this in general either: a head node serving `/home` and a
+storage node serving `/scratch` mount each other, so neither of them can go first.
+
+The default `nfs_mount_options` therefore carries **`x-systemd.automount`**.
+`systemd-fstab-generator` then creates an `.automount` unit instead of pulling the
+`.mount` into `remote-fs.target`: the trigger is established without contacting the
+server, the share is mounted on first access, and a failed attempt is retried on the
+next access. Boot order stops mattering. This is the same kernel `autofs` mechanism the
+`autofs` daemon uses -- see `roles/autofs` and `autofs_map` in `group_vars/all.yml` for
+the map-driven alternative, which is worth the extra moving parts only once homes are
+spread over several servers or come from LDAP/NIS maps.
+
+Consequences worth knowing:
+
+- **The mount is absent from `/proc/mounts` until something touches the path.** NHC's
+  shared-filesystem checks account for this: `nhc_check_mounts` emits a `check_file_test`
+  that walks into the directory (triggering the automount) before `check_fs_mount_rw`
+  asserts it. A hand-written check that only reads `/proc/mounts` would drain every
+  freshly booted node. See [Node Health Check](README.md#node-health-check).
+- **`RequiresMountsFor=` does not belong on `slurmd`.** It depends on the `.mount` unit,
+  which would force the eager mount back and reintroduce the boot race. Upstream
+  `slurmd.service` already orders itself `After=remote-fs.target`, which the generated
+  automount units are part of, and NHC drains a node whose share is genuinely gone.
+- **Ansible no longer mounts an automount entry itself**; it writes the fstab entry,
+  reloads systemd, and starts `remote-fs.target`. A share that is currently mounted the
+  eager way stays mounted -- systemd will not lay an automount over a live mount point --
+  and converts on the next boot. To convert without rebooting, unmount it and re-run the
+  play, or `systemctl start $(systemd-escape -p --suffix=automount /home)`.
+- **`x-systemd.idle-timeout=` is deliberately not set.** Unmounting an idle share also
+  clears its handle after a server reboot, but it makes every `/proc/mounts`-based check
+  and monitor racy. Add it per site if you want it, and check the monitoring first.
+
+To go back to eager mounts, drop `x-systemd.automount` from `nfs_mount_options`; the
+role then mounts those entries directly again.
 
 ## Performance tuning for random I/O
 
@@ -82,8 +128,8 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    local `/tmp` (or a mounted NVMe scratch via `TMPDIR`/`sbcast`), compute locally,
    copy results back.
 
-2. **Client mount options.** The default `nfs_mounts` options are now
-   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
+2. **Client mount options.** The default `nfs_mount_options` is now
+   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail,x-systemd.automount`.
    `vers=4.2` uses COMPOUND ops; `nconnect=16` opens 16 TCP connections per mount to beat
    the single-flow limit. **The default targets a 100GbE+ fabric** -- NetApp shows
    `nconnect` reaching ~line rate (~11 GB/s) on a single 100G NIC at 16 connections. On
