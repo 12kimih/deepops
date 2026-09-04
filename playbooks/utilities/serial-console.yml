@@ -1,0 +1,12 @@
+---
+# Put the console on the BMC's serial-over-LAN, so a node that stops before the network
+# is up can still be seen and driven from another machine. Takes effect at the next boot.
+#
+# Deliberately not imported by playbooks/slurm-cluster.yml: it rewrites the boot loader
+# configuration. Run it when you mean to. See docs/deepops/bmc.md.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - serial_console
+  tags:
+    - serial_console
