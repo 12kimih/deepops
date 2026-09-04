@@ -163,9 +163,11 @@ IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sol activ
 IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sel list
 ```
 
-Serial-over-LAN only shows something if the node's kernel writes to the serial console.
-Adding `console=ttyS0,115200` to the kernel command line is worth doing before you need
-it, or SOL will be blank at exactly the wrong moment.
+Serial-over-LAN only shows something if the node's kernel writes to the serial console,
+and the GRUB menu only appears there if GRUB is told to use it too. `roles/serial_console`
+does both -- run `playbooks/utilities/serial-console.yml` and reboot, or SOL will be blank
+at exactly the wrong moment. Which port SOL is wired to is a BIOS setting the OS cannot
+read, so confirm it by attaching during a boot.
 
 ## When the BMC addresses are unknown
 
