@@ -1,7 +1,10 @@
 ---
 # Configure each host's own BMC over the in-band KCS interface, which needs no
 # BMC credentials. Pass `-e hostlist=...` to target a subset.
-# See docs/deepops/bmc.md.
+#
+# Deliberately not imported by playbooks/slurm-cluster.yml: this writes firmware
+# settings rather than OS state, and a wrong bmc_ipaddr puts a BMC out of reach.
+# Run it when you mean to. See docs/deepops/bmc.md.
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   roles:
