@@ -1,7 +1,6 @@
 ---
-# Generated to a scratch path first: a config that fails to build must not overwrite the
-# grub.cfg the node currently boots from.
+# grub-mkconfig builds to grub.cfg.new and syntax-checks it before moving it into place,
+# so a configuration that fails to build never replaces the one the node boots from.
 - name: Update grub
-  ansible.builtin.shell:
-    cmd: grub-mkconfig -o /tmp/grub.cfg.validate && update-grub
+  ansible.builtin.command: "{{ serial_console_grub_update }}"
   changed_when: true

@@ -8,21 +8,14 @@
         src: /etc/default/grub
       register: grub_defaults
 
-    - name: The serial console block is present and coherent
+    - name: The serial console block is present, coherent and removable
       ansible.builtin.assert:
         that:
           - "'console=ttyS1,115200n8' in content"
           - "'GRUB_TERMINAL=\"console serial\"' in content"
           - "'--unit=1' in content"
           - "'GRUB_TIMEOUT_STYLE=menu' in content"
+          - "'# BEGIN ANSIBLE MANAGED -- serial console' in content"
+          - "'# END ANSIBLE MANAGED -- serial console' in content"
       vars:
         content: "{{ grub_defaults.content | b64decode }}"
-
-    - name: The original file was kept
-      ansible.builtin.stat:
-        path: /etc/default/grub.before-serial-console
-      register: grub_backup
-
-    - name: Check the backup exists
-      ansible.builtin.assert:
-        that: grub_backup.stat.exists

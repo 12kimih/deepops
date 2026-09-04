@@ -1,15 +1,11 @@
 ---
-# Serial console over the BMC's SOL. Without it a node that stops before the network is
-# up can only be power-cycled remotely -- the boot messages, the GRUB menu and a rescue
-# shell all need a console, and SOL is the only one reachable from another machine.
-#
-# Which port SOL is wired to is a BIOS setting, not something the OS can read: check by
-# enabling this, rebooting one node and running `ipmitool ... sol activate`. A blank
-# screen means the other port.
+# Serial console over the BMC's SOL: the only console another machine can reach on a node
+# that stops before the network is up. Which port SOL is wired to is a BIOS setting the OS
+# cannot read -- confirm by attaching during a boot, a blank screen means the other one.
 serial_console_port: ttyS1
 serial_console_speed: 115200
 
-# GRUB's own menu, so a stuck node can be booted with different kernel arguments from
-# SOL. A hidden zero-second menu cannot be caught over a serial line.
+# GRUB's own menu on the serial line too, so a stuck node can be booted with different
+# kernel arguments. A hidden zero-second menu cannot be caught over a serial line.
 serial_console_grub_menu: true
 serial_console_grub_timeout: 5
