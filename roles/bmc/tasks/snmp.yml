@@ -1,0 +1,10 @@
+---
+# v1/v2c authenticates with this string alone and sends it in clear, and the shipped
+# default is the first thing any scanner tries.
+- name: Set the BMC SNMP community
+  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} snmp {{ bmc_snmp_community }}"
+  when: bmc_snmp_community != bmc_lan_now.snmp
+  changed_when: true
+  no_log: true
+  tags:
+    - bmc
