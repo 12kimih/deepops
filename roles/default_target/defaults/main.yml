@@ -1,0 +1,4 @@
+---
+# The target the node boots into. A headless server has no use for graphical.target and
+# the display manager it pulls in; set it to graphical.target on a node that does.
+default_target: multi-user.target

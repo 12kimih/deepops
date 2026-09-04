@@ -1,0 +1,13 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Read the default target
+      ansible.builtin.command: systemctl get-default
+      register: target
+      changed_when: false
+
+    - name: It is the configured one
+      ansible.builtin.assert:
+        that: target.stdout | trim == 'multi-user.target'
