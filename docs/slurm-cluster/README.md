@@ -319,6 +319,12 @@ its own shutdown and never reaches the reboot; see
 [Slurm and NFS](./slurm-nfs.md). Nodes carrying the `nfs_detach_on_shutdown` unit are
 already protected on every reboot path, including `scontrol reboot`.
 
+## When a node will not finish booting
+
+Two failure modes have taken every node of a cluster off the network at once, and neither
+announces itself as what it is. [Boot failures](../deepops/boot-failures.md) records what
+each looks like on the console, why it happens, and how to tell them apart.
+
 ## Out-of-band management
 
 A node whose OS has stopped -- hung in a shutdown, halted at a boot prompt -- answers
