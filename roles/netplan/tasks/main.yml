@@ -1,0 +1,58 @@
+---
+- name: Configure networking
+  when: netplan_config | length > 0
+  tags:
+    - netplan
+  block:
+    # netplan reads every file in the directory, so a bad one cannot be validated in
+    # isolation: write it, ask netplan to build, and put the old file back if it refuses.
+    - name: Configure netplan
+      ansible.builtin.template:
+        src: netplan.yaml.j2
+        dest: "{{ netplan_file }}"
+        backup: true
+        mode: "0600"
+      register: netplan_written
+      notify: Apply netplan
+
+    - name: Check netplan accepts it
+      ansible.builtin.command: netplan generate
+      changed_when: false
+  rescue:
+    - name: Restore the previous configuration
+      ansible.builtin.copy:
+        src: "{{ netplan_written.backup_file }}"
+        dest: "{{ netplan_file }}"
+        remote_src: true
+        mode: "0600"
+      when: netplan_written.backup_file is defined
+
+    - name: Remove the configuration this role added
+      ansible.builtin.file:
+        path: "{{ netplan_file }}"
+        state: absent
+      when: netplan_written.backup_file is not defined
+
+    - name: Report that the configuration was rejected
+      ansible.builtin.fail:
+        msg: "netplan rejected {{ netplan_file }}; the previous configuration is back in place"
+
+- name: Keep the other network manager out of the way
+  when: netplan_conflicting_manager | length > 0
+  tags:
+    - netplan
+  block:
+    - name: Look for it
+      ansible.builtin.command: "systemctl cat {{ netplan_conflicting_manager }}.service"
+      register: netplan_other_manager
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Mask it
+      ansible.builtin.systemd:
+        name: "{{ netplan_conflicting_manager }}"
+        state: stopped
+        enabled: false
+        masked: true
+      when: netplan_other_manager.rc == 0

@@ -421,6 +421,15 @@ mig_manager_config: /etc/nvidia-mig-manager/config.yml
 mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 
 ################################################################################
+# Node networking                                                              #
+################################################################################
+# netplan_config is per-host and belongs in host_vars; an empty one leaves the
+# host's networking alone. netplan_conflicting_manager names the manager to mask
+# so it cannot compete with the renderer. See docs/deepops/netplan.md.
+#netplan_file: /etc/netplan/01-netcfg.yaml
+#netplan_conflicting_manager: NetworkManager
+
+################################################################################
 # Serial console                                                               #
 ################################################################################
 # Puts the console on the BMC's serial-over-LAN so a node that stops before the
