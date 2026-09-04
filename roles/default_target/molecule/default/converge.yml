@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: "Include default_target"
+      ansible.builtin.include_role:
+        name: "default_target"
