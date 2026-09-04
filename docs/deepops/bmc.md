@@ -92,6 +92,10 @@ policy -- 8 to 20 characters with mixed case, a digit and a symbol is a safe tar
 ansible-playbook playbooks/utilities/bmc.yml
 ```
 
+This playbook is deliberately **not** imported by `playbooks/slurm-cluster.yml`. It
+writes firmware settings rather than OS state, and a wrong `bmc_ipaddr` moves a BMC out
+of reach, so it is run on purpose rather than as a side effect of a cluster deploy.
+
 The control node also needs a route to the management network. Set
 `bmc_mgmt_interface` and `bmc_mgmt_address` on it and the role writes
 `/etc/netplan/60-bmc-mgmt.yaml`, leaving the site's own netplan files untouched.
