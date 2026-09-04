@@ -159,9 +159,17 @@ a playbook. Pass the same `-C` the role uses, or ipmitool negotiates its own and
 that does not offer it answers `invalid role`:
 
 ```bash
-IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sol activate   # ~. to exit
+IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sol activate
 IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sel list
 ```
+
+SOL leaves on `~.`, typed at the start of a line -- but so does ssh, and ssh sees it
+first. Reaching the console over one ssh hop means `~~.`, or connect with `ssh -e none`
+so the escape passes through. Run it inside tmux as well: a dropped ssh session takes
+`ipmitool` with it, and a console is most needed exactly when the node is mid-boot.
+
+A session killed that way can leave the payload held, which the next `sol activate`
+reports as already active. `sol deactivate` clears it.
 
 Serial-over-LAN only shows something if the node's kernel writes to the serial console,
 and the GRUB menu only appears there if GRUB is told to use it too. `roles/serial_console`
