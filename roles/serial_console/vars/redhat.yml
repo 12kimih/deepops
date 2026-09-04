@@ -1,0 +1,2 @@
+---
+serial_console_grub_update: grub2-mkconfig -o /boot/grub2/grub.cfg
