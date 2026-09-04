@@ -23,9 +23,10 @@
 # docker_socket_group: dockerusers
 # docker_socket_group_gid: 4000
 
-# Also create the group locally with the same pinned GID. dockerd resolves the group
-# name when it creates the socket, which on boot can be before the NIS client has
-# bound -- a local entry with the same GID makes startup independent of NIS.
+# Also publish the group in the local files with the same pinned GID. dockerd resolves
+# the group name when it creates the socket, which on boot is routinely before the
+# directory client has bound: without a local entry docker.socket fails at every boot
+# and nothing retries it. Pinning the GID makes the local entry a harmless shadow.
 docker_socket_group_create_local: true
 
 # The socket whose ownership decides who may talk to the daemon. The role compares

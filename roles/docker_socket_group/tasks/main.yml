@@ -13,11 +13,17 @@
       every node -- Slurm ships numeric GIDs into jobs, so a per-node GID silently
       grants the wrong group instead of failing.
 
-- name: Create the Docker socket group locally with the pinned GID
-  ansible.builtin.group:
-    name: "{{ docker_socket_group }}"
-    gid: "{{ docker_socket_group_gid }}"
+# Written to the file rather than through ansible.builtin.group: that module resolves
+# the group through NSS, so on a directory client it sees the published entry and
+# creates nothing -- exactly the case this is here to cover. The GID is pinned to the
+# published one, so the local entry shadows the directory entry harmlessly.
+- name: Publish the Docker socket group in the local files
+  ansible.builtin.lineinfile:
+    path: /etc/group
+    regexp: "^{{ docker_socket_group }}:"
+    line: "{{ docker_socket_group }}:x:{{ docker_socket_group_gid }}:"
     state: present
+    mode: "0644"
   when: docker_socket_group_create_local | bool
 
 # Which knob owns the socket depends on how dockerd was started: under socket activation
