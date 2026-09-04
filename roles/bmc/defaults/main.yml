@@ -17,6 +17,9 @@ bmc_gateway: ""
 bmc_password: ""
 bmc_password_format: 20
 
+# Chassis power action driven out-of-band by playbooks/utilities/power.yml.
+bmc_power_action: status
+
 # This host's leg on the BMC network, written as its own netplan file. Empty
 # leaves host networking untouched.
 bmc_mgmt_interface: ""

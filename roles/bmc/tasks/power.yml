@@ -1,0 +1,30 @@
+---
+# Out-of-band, so it reaches a node whose OS is gone. Runs from the control node against
+# the host's bmc_ipaddr; the password goes through the environment rather than argv.
+- name: Require a BMC address and credentials
+  ansible.builtin.assert:
+    that:
+      - bmc_ipaddr | length > 0
+      - bmc_password | length > 0
+      - bmc_power_action in ["status", "on", "off", "cycle", "reset", "soft", "diag"]
+    fail_msg: "Set bmc_ipaddr and bmc_password -- see docs/deepops/bmc.md"
+  tags:
+    - power
+
+- name: "Chassis power {{ bmc_power_action }}"
+  ansible.builtin.command:
+    argv: ["ipmitool", "-I", "lanplus", "-H", "{{ bmc_ipaddr }}", "-U", "{{ bmc_user_name }}", "-E", "chassis", "power", "{{ bmc_power_action }}"]
+  environment:
+    IPMI_PASSWORD: "{{ bmc_password }}"
+  delegate_to: localhost
+  become: false
+  register: bmc_power_result
+  changed_when: bmc_power_action != "status"
+  tags:
+    - power
+
+- name: Report
+  ansible.builtin.debug:
+    msg: "{{ bmc_power_result.stdout | trim }}"
+  tags:
+    - power

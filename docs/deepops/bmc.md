@@ -147,11 +147,11 @@ A second run of `bmc.yml` should report no changes.
 ## Power control
 
 ```bash
-ansible-playbook playbooks/utilities/power.yml -e power_action=status
-ansible-playbook playbooks/utilities/power.yml -e hostlist=gpu01 -e power_action=cycle
+ansible-playbook playbooks/utilities/power.yml -e bmc_power_action=status
+ansible-playbook playbooks/utilities/power.yml -e hostlist=gpu01 -e bmc_power_action=cycle
 ```
 
-`power_action` takes `status`, `on`, `off`, `cycle`, `reset`, `soft` or `diag`. The play
+`bmc_power_action` takes `status`, `on`, `off`, `cycle`, `reset`, `soft` or `diag`. The play
 runs from the control node against `bmc_ipaddr`, so it reaches a node whose OS is gone.
 
 For the console, use `ipmitool` directly -- it is interactive, so it does not belong in
