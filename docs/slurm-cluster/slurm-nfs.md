@@ -97,7 +97,8 @@ node never finishes booting, because `e2scrub_reap.service` -- `ProtectHome=read
 there for good. A whole cluster went down this way.
 
 So the default carries no `x-systemd.automount`. Set it per mount for a share nothing
-sandboxes, never for `/home`.
+sandboxes, never for `/home`. [Boot failures](../deepops/boot-failures.md) records what
+this looks like on a console.
 
 The boot race above is real and still unsolved here; `nofail` means a node that loses the
 race comes up without the share rather than not at all. If you need a retry, add one that
