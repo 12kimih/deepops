@@ -44,6 +44,42 @@ when they are not.
 Every value is empty by default, and an empty value means the role leaves that setting
 alone. Running it against a host with no BMC, or a VM, is a no-op.
 
+### When the account is named something else, or is missing
+
+`bmc_user_name` is what makes the role portable. It defaults to `ADMIN` because that is
+Supermicro's factory account; other vendors ship a different one.
+
+| Vendor | Factory account |
+| --- | --- |
+| Supermicro | `ADMIN` |
+| Dell iDRAC | `root` |
+| HPE iLO | `Administrator` |
+| ASRock Rack / ASUS | `admin` |
+
+If no account by that name exists, the role stops with a clear message rather than
+creating one. Creating a BMC account means choosing a free slot, setting its privilege
+and enabling it on the channel; getting that wrong locks out LAN access, and the failure
+only shows up once the host is unreachable. Do it once by hand, then let the role own the
+password from there:
+
+```bash
+ipmitool -I open user set name 4 svcadmin
+ipmitool -I open user set password 4 '<password>' 20
+ipmitool -I open user priv 4 4 1        # privilege 4 = ADMINISTRATOR, on channel 1
+ipmitool -I open user enable 4
+ipmitool -I open channel setaccess 1 4 link=on ipmi=on callin=on privilege=4
+```
+
+The anonymous account (user ID 1) is a separate question, and usually already answered:
+check it before changing it.
+
+```bash
+ipmitool -I open user list 1
+```
+
+`IPMI Msg: false` with no channel privilege means it cannot open a session, which is
+where most boards ship. Leave it alone in that state.
+
 ## How it stays idempotent
 
 - **LAN settings** are read back with `ipmitool lan print` and written only where they
