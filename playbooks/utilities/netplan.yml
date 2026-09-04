@@ -1,0 +1,15 @@
+---
+# Render each host's netplan configuration from host_vars. Ansible reaches the host over
+# the network this rewrites, so the play runs one host at a time and a configuration
+# netplan rejects is rolled back before it can reach a boot.
+#
+#   -e hostlist=...   target a subset
+#
+# Deliberately not imported by playbooks/slurm-cluster.yml. See docs/deepops/netplan.md.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  serial: 1
+  roles:
+    - netplan
+  tags:
+    - netplan

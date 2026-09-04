@@ -1,0 +1,13 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Look for a configuration file
+      ansible.builtin.stat:
+        path: /etc/netplan/01-netcfg.yaml
+      register: netplan_file
+
+    - name: A host with no netplan_config is left alone
+      ansible.builtin.assert:
+        that: not netplan_file.stat.exists
