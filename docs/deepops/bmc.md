@@ -155,10 +155,12 @@ ansible-playbook playbooks/utilities/power.yml -e hostlist=gpu01 -e bmc_power_ac
 runs from the control node against `bmc_ipaddr`, so it reaches a node whose OS is gone.
 
 For the console, use `ipmitool` directly -- it is interactive, so it does not belong in
-a playbook:
+a playbook. Pass the same `-C` the role uses, or ipmitool negotiates its own and a board
+that does not offer it answers `invalid role`:
 
 ```bash
-IPMI_PASSWORD=... ipmitool -I lanplus -H <bmc_ipaddr> -U ADMIN -E sol activate   # ~. to exit
+IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sol activate   # ~. to exit
+IPMI_PASSWORD=... ipmitool -I lanplus -C 3 -H <bmc_ipaddr> -U ADMIN -E sel list
 ```
 
 Serial-over-LAN only shows something if the node's kernel writes to the serial console.
