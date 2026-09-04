@@ -1,0 +1,29 @@
+---
+- name: Back up the current grub defaults
+  ansible.builtin.copy:
+    src: /etc/default/grub
+    dest: /etc/default/grub.before-serial-console
+    remote_src: true
+    force: false
+    mode: "0644"
+  tags:
+    - serial_console
+
+# Appended, so these assignments win over anything the file set earlier -- which is how
+# /etc/default/grub is read in the first place.
+- name: Configure the serial console in the grub defaults
+  ansible.builtin.blockinfile:
+    path: /etc/default/grub
+    marker: "# {mark} ANSIBLE MANAGED -- serial console"
+    block: |
+      GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} console=tty0 console={{ serial_console_port }},{{ serial_console_speed }}n8"
+      GRUB_TERMINAL="console serial"
+      GRUB_SERIAL_COMMAND="serial --speed={{ serial_console_speed }} --unit={{ serial_console_port | regex_replace('^ttyS', '') }} --word=8 --parity=no --stop=1"
+      {% if serial_console_grub_menu | bool %}
+      GRUB_TIMEOUT={{ serial_console_grub_timeout }}
+      GRUB_TIMEOUT_STYLE=menu
+      {% endif %}
+    mode: "0644"
+  notify: Update grub
+  tags:
+    - serial_console
