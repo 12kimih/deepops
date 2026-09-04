@@ -105,11 +105,11 @@ nfs_exports:
 # `options`. A starting point -- tune per your network and storage. nconnect (parallel
 # TCP connections) is the main lever: ~4 on 10/25GbE, 8-16 on 100GbE+. On a NetApp/ONTAP
 # filer cap rsize/wsize at 262144; on an InfiniBand fabric consider proto=rdma. Add
-# ",fsc" for FS-Cache (cachefilesd role). Keep x-systemd.automount: it defers the mount
-# to first access instead of attempting it once at boot, so a node that boots before its
-# NFS server no longer comes up with the share missing and nothing retrying it.
+# ",fsc" for FS-Cache (cachefilesd role). Do not add x-systemd.automount for /home: a
+# unit with ProtectHome= cannot namespace over an autofs /home and exits 226/NAMESPACE,
+# which takes networkd, logind, polkit and timedated down with it.
 # See docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`.
-nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail,x-systemd.automount
+nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
 nfs_mounts:
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'

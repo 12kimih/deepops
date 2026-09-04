@@ -79,44 +79,45 @@ so the node comes up with `/home` missing and only `root` (whose home is local) 
 in. Boot ordering cannot fix this in general either: a head node serving `/home` and a
 storage node serving `/scratch` mount each other, so neither of them can go first.
 
-The default `nfs_mount_options` therefore carries **`x-systemd.automount`**.
-`systemd-fstab-generator` then creates an `.automount` unit instead of pulling the
-`.mount` into `remote-fs.target`: the trigger is established without contacting the
-server, the share is mounted on first access, and a failed attempt is retried on the
-next access. Boot order stops mattering. This is the same kernel `autofs` mechanism the
-`autofs` daemon uses -- see `roles/autofs` and `autofs_map` in `group_vars/all.yml` for
-the map-driven alternative, which is worth the extra moving parts only once homes are
-spread over several servers or come from LDAP/NIS maps.
+`x-systemd.automount` looks like the answer and is not, at least not for `/home`.
+It makes `systemd-fstab-generator` create an `.automount` unit: the trigger is
+established without contacting the server and the share is mounted on first access, so
+boot order stops mattering. But a service with `ProtectHome=` cannot set up its mount
+namespace over an autofs `/home`. It fails with
+
+```
+Failed to set up mount namespacing: /home: No such device
+... Main process exited, code=exited, status=226/NAMESPACE
+```
+
+and `systemd-networkd`, `systemd-logind`, `polkit`, `systemd-timedated` and `chrony` all
+set `ProtectHome=`. They fail together, systemd restarts them, and they fail again. The
+node never finishes booting, because `e2scrub_reap.service` -- `ProtectHome=read-only`,
+`Type=oneshot`, so no start timeout -- is pulled in by `multi-user.target` and blocks
+there for good. A whole cluster went down this way.
+
+So the default carries no `x-systemd.automount`. Set it per mount for a share nothing
+sandboxes, never for `/home`.
+
+The boot race above is real and still unsolved here; `nofail` means a node that loses the
+race comes up without the share rather than not at all. If you need a retry, add one that
+does not put autofs on `/home` -- a `noauto` entry plus a unit that retries `mount`, or
+the `autofs` daemon with a wildcard map under `/home/<user>` rather than on `/home`
+itself (see `roles/autofs` and `autofs_map` in `group_vars/all.yml`).
 
 Consequences worth knowing:
 
-- **The mount is absent from `/proc/mounts` until something touches the path.** NHC's
-  shared-filesystem checks account for this: `nhc_check_mounts` emits a `check_file_test`
-  that walks into the directory (triggering the automount) before `check_fs_mount_rw`
-  asserts it. A hand-written check that only reads `/proc/mounts` would drain every
-  freshly booted node. See [Node Health Check](README.md#node-health-check).
-- **`RequiresMountsFor=` does not belong on `slurmd`.** It depends on the `.mount` unit,
-  which would force the eager mount back and reintroduce the boot race. Upstream
-  `slurmd.service` already orders itself `After=remote-fs.target`, which the generated
-  automount units are part of, and NHC drains a node whose share is genuinely gone.
-- **Ansible no longer mounts an automount entry itself**; it writes the fstab entry,
-  reloads systemd, and starts `remote-fs.target`. A share that is currently mounted the
-  eager way stays mounted -- systemd will not lay an automount over a live mount point --
-  and converts on the next boot. To convert without rebooting, unmount it and re-run the
-  play, or `systemctl start $(systemd-escape -p --suffix=automount /home)`.
-- **A shutdown must not depend on the servers.** An automount trigger re-arms the moment
-  anything touches the path, so a node whose server is rebooting alongside it can block on
-  a `hard` mount and never reach the reboot -- left powered on, off the network, and out
-  of reach. `nfs_detach_on_shutdown` (default true) installs a unit that lazily detaches
-  the triggers and then the mounts on the way down; a lazy detach sends no packets, so a
-  server that has already gone cannot stall it. `playbooks/utilities/reboot.yml` does the
-  same before it reboots, covering nodes that do not have the unit yet.
-- **`x-systemd.idle-timeout=` is deliberately not set.** Unmounting an idle share also
-  clears its handle after a server reboot, but it makes every `/proc/mounts`-based check
-  and monitor racy. Add it per site if you want it, and check the monitoring first.
-
-To go back to eager mounts, drop `x-systemd.automount` from `nfs_mount_options`; the
-role then mounts those entries directly again.
+- **A shutdown must not depend on the servers.** A node holding a `hard` mount from a
+  server rebooting alongside it blocks in uninterruptible sleep during its own shutdown
+  and never reaches the reboot -- left powered on, off the network, and out of reach.
+  `nfs_detach_on_shutdown` (default true) installs a unit that lazily detaches the mounts
+  on the way down; a lazy detach sends no packets, so a server that has already gone
+  cannot stall it. `playbooks/utilities/reboot.yml` does the same before it reboots,
+  covering nodes that do not have the unit yet.
+- **NHC walks into each mountpoint before reading `/proc/mounts`.** `nhc_check_mounts`
+  emits a `check_file_test` ahead of `check_fs_mount_rw`. Harmless for an eager mount,
+  and it keeps the check correct if a site does enable an automount elsewhere. See
+  [Node Health Check](README.md#node-health-check).
 
 ## Performance tuning for random I/O
 
