@@ -1,0 +1,11 @@
+---
+# The `network:` mapping, passed to netplan verbatim rather than re-modelled here, so any
+# netplan feature works without the role growing a knob for it. Per-host, in host_vars.
+# Empty leaves the node's networking alone.
+netplan_config: {}
+netplan_file: /etc/netplan/01-netcfg.yaml
+
+# The manager that must not compete with the renderer -- NetworkManager where netplan
+# renders to networkd, systemd-networkd where it renders to NetworkManager. Masked rather
+# than removed: masking is reversible and needs no package name. Empty disables the check.
+netplan_conflicting_manager: ""

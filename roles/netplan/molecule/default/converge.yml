@@ -1,0 +1,10 @@
+---
+# Empty on purpose: a host with no netplan_config must be left alone, which is what
+# makes the role safe to run across a mixed inventory.
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: "Include netplan"
+      ansible.builtin.include_role:
+        name: "netplan"
