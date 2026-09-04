@@ -421,6 +421,16 @@ mig_manager_config: /etc/nvidia-mig-manager/config.yml
 mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 
 ################################################################################
+# Serial console                                                               #
+################################################################################
+# Puts the console on the BMC's serial-over-LAN so a node that stops before the
+# network is up can still be driven remotely. Which port SOL is wired to is a
+# BIOS setting: confirm by attaching during a boot. Takes effect at the next one.
+#serial_console_port: ttyS1
+#serial_console_speed: 115200
+#serial_console_grub_timeout: 5
+
+################################################################################
 # BMC / IPMI                                                                   #
 ################################################################################
 # Out-of-band management. The bmc role configures each host's own BMC over the
