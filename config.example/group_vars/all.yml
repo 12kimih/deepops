@@ -442,6 +442,9 @@ mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 #bmc_netmask: 255.255.255.0
 #bmc_gateway: 10.0.0.1
 # Vault it: ansible-vault encrypt_string 'secret' --name bmc_password
+# Same, for the SNMP community: v1/v2c sends it in clear and the shipped default is
+# the first thing a scanner tries. Empty leaves it alone.
+#bmc_snmp_community: ""
 #bmc_password: ""
 
 ################################################################################

@@ -17,6 +17,10 @@ bmc_gateway: ""
 bmc_password: ""
 bmc_password_format: 20
 
+# SNMP community for the channel's v1/v2c agent, which authenticates with this string
+# alone and sends it in clear. Vault it; empty leaves the setting alone.
+bmc_snmp_community: ""
+
 # Chassis power action driven out-of-band by playbooks/utilities/power.yml.
 bmc_power_action: status
 

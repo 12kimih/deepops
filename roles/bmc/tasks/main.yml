@@ -46,9 +46,17 @@
       ansible.builtin.include_tasks: user_id.yml
       when: bmc_password | length > 0
 
+    - name: Read the BMC LAN channel
+      ansible.builtin.include_tasks: lan_facts.yml
+      when: (bmc_ipaddr | length > 0) or (bmc_snmp_community | length > 0)
+
     - name: Configure the BMC LAN channel
       ansible.builtin.include_tasks: lan.yml
       when: bmc_ipaddr | length > 0
+
+    - name: Set the BMC SNMP community
+      ansible.builtin.include_tasks: snmp.yml
+      when: bmc_snmp_community | length > 0
 
     - name: Set the BMC password
       ansible.builtin.include_tasks: password.yml
