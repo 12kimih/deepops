@@ -20,6 +20,12 @@ bmc_password_format: 20
 # Chassis power action driven out-of-band by playbooks/utilities/power.yml.
 bmc_power_action: status
 
+# RMCP+ cipher suite for out-of-band sessions. Pinned rather than negotiated: ipmitool
+# asks for the strongest suite it knows, and a BMC that does not offer it answers
+# "invalid role" instead of falling back. 3 (HMAC-SHA1 + AES-128) is the baseline every
+# IPMI 2.0 implementation supports; raise it to 17 on a fleet that offers it.
+bmc_cipher_suite: 3
+
 # This host's leg on the BMC network, written as its own netplan file. Empty
 # leaves host networking untouched.
 bmc_mgmt_interface: ""

@@ -184,6 +184,26 @@ Each responder's link-local address works as an `ipmitool -H` target when suffix
 the interface: `-H 'fe80::...%<iface>'`. The TLS certificate on port 443 names the
 vendor, which tells you which default credentials to try.
 
+## Cipher suites
+
+`bmc_cipher_suite` is pinned rather than negotiated because ipmitool asks for the
+strongest suite it knows and a BMC that does not offer it answers `invalid role` rather
+than falling back. Which suites a board offers is firmware- and model-dependent, and a
+mixed fleet will not agree:
+
+```bash
+ipmitool -I open lan print 1 | grep -E "Cipher Suites|Cipher Suite Priv"
+```
+
+`Cipher Suite Priv Max` maps **positionally onto the `RMCP+ Cipher Suites` list**, not
+onto suite numbers: with a list of `1,2,3,6,7,8,11,12,15,16,17`, a priv string of
+`aaaaaaaaXXXXXXX` means the first eight of those are administrator-capable and 15, 16
+and 17 are off. Read the two lines together or the string means nothing.
+
+Suite 3 (HMAC-SHA1 + AES-128) is the default here because it is the one every IPMI 2.0
+implementation offers. Raise it only after checking that every board in the fleet lists
+the suite you pick.
+
 ## Caveats
 
 - **Wrong passwords lock the account.** BMCs typically disable an account after three
