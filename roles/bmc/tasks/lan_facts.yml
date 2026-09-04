@@ -1,0 +1,21 @@
+---
+# `lan print` is the only readable source of truth for the channel's settings, and every
+# change the role makes to it is gated on what this reports.
+- name: Read the current BMC LAN configuration
+  ansible.builtin.command: "ipmitool -I open lan print {{ bmc_channel }}"
+  register: bmc_lan
+  changed_when: false
+  check_mode: false
+  tags:
+    - bmc
+
+- name: Note the current LAN settings
+  ansible.builtin.set_fact:
+    bmc_lan_now:
+      ipsrc: "{{ (bmc_lan.stdout | regex_search('^IP Address Source\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      ipaddr: "{{ (bmc_lan.stdout | regex_search('^IP Address\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      netmask: "{{ (bmc_lan.stdout | regex_search('^Subnet Mask\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      gateway: "{{ (bmc_lan.stdout | regex_search('^Default Gateway IP\\s*:\\s*(\\S+)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+      snmp: "{{ (bmc_lan.stdout | regex_search('^SNMP Community String\\s*:\\s*(\\S*)', '\\1', multiline=True) | default([], true)) | first | default('', true) }}"
+  tags:
+    - bmc
