@@ -13,7 +13,7 @@
 
 - name: "Chassis power {{ bmc_power_action }}"
   ansible.builtin.command:
-    argv: ["ipmitool", "-I", "lanplus", "-H", "{{ bmc_ipaddr }}", "-U", "{{ bmc_user_name }}", "-E", "chassis", "power", "{{ bmc_power_action }}"]
+    argv: ["ipmitool", "-I", "lanplus", "-C", "{{ bmc_cipher_suite }}", "-H", "{{ bmc_ipaddr }}", "-U", "{{ bmc_user_name }}", "-E", "chassis", "power", "{{ bmc_power_action }}"]
   environment:
     IPMI_PASSWORD: "{{ bmc_password }}"
   delegate_to: localhost
