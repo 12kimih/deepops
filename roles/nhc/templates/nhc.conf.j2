@@ -10,9 +10,9 @@
  {{ ansible_hostname }} || check_fs_mount_rw /
 
 {% if nhc_check_mounts | length > 0 %}
-# Check that the shared filesystems are mounted rw. The file test comes first and walks
-# into the directory, which triggers an x-systemd.automount entry nothing has accessed
-# yet -- /proc/mounts on its own reports such an entry missing on a freshly booted node.
+# Check that the shared filesystems are mounted rw. The file test walks into the
+# directory first, so a mount a site has put behind an automount is triggered rather
+# than reported missing by /proc/mounts on a freshly booted node.
 {% for mountpoint in nhc_check_mounts %}
  {{ ansible_hostname }} || check_file_test -d {{ mountpoint }}/.
  {{ ansible_hostname }} || check_fs_mount_rw -f {{ mountpoint }}
