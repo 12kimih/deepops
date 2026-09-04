@@ -1,16 +1,18 @@
 ---
-- name: Back up the current grub defaults
-  ansible.builtin.copy:
-    src: /etc/default/grub
-    dest: /etc/default/grub.before-serial-console
-    remote_src: true
-    force: false
-    mode: "0644"
+- name: Gather OS specific variables
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_os_family | lower }}.yml"
+      paths:
+        - ../vars
+      skip: true
   tags:
+    - vars
     - serial_console
 
 # Appended, so these assignments win over anything the file set earlier -- which is how
-# /etc/default/grub is read in the first place.
+# /etc/default/grub is read. Removing the block reverts the node.
 - name: Configure the serial console in the grub defaults
   ansible.builtin.blockinfile:
     path: /etc/default/grub
@@ -23,6 +25,7 @@
       GRUB_TIMEOUT={{ serial_console_grub_timeout }}
       GRUB_TIMEOUT_STYLE=menu
       {% endif %}
+    backup: true
     mode: "0644"
   notify: Update grub
   tags:
