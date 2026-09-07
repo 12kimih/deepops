@@ -9,6 +9,13 @@
 # collide with every upgrade.
 cluster_tools_bin_dir: /usr/local/bin
 
+# Shell libraries the published commands source, as a list of {src, dest}. Same shape as
+# cluster_tools_scripts, but dest lands under cluster_tools_lib_dir and is not executable:
+# a library is sourced, never run, so it claims no name in PATH. Use one for anything
+# several commands must agree on, instead of a copy each that drifts apart.
+cluster_tools_libs: []
+cluster_tools_lib_dir: /usr/local/lib/cluster-tools
+
 # Commands to publish: a list of {src, dest}. src is copied VERBATIM -- shell scripts
 # routinely contain sequences Jinja would eat, `${#var}` opening a comment among them --
 # so anything site-specific belongs in cluster_tools_environment, not in a template.

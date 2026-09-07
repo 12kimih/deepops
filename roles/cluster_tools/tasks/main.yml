@@ -1,4 +1,25 @@
 ---
+# Libraries first: a command must never reach a node ahead of what it sources.
+- name: Create the cluster library directory
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: cluster_tools_libs | length > 0
+
+- name: Publish the cluster libraries
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ cluster_tools_lib_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ cluster_tools_libs }}"
+  loop_control:
+    label: "{{ cluster_tools_lib_dir }}/{{ item.dest }}"
+
 # A published name that also resolves elsewhere in PATH would shadow the real command
 # for every user -- which is what `alias squeue=/sw/scripts/squeue.sh` did. Catch it
 # here instead of at someone's prompt.

@@ -283,6 +283,13 @@ slurm_cluster_configure_gpu_power_limit: true
 #  - src: "{{ inventory_dir }}/files/slurm/qos.sh"
 #    dest: qos
 
+# Shell libraries the commands above source, published to cluster_tools_lib_dir and not
+# executable: sourced, never run, so they claim no name in PATH. Use one for anything
+# several commands must agree on, instead of a copy each that drifts apart.
+#cluster_tools_libs:
+#  - src: "{{ inventory_dir }}/files/slurm/lib/cluster-theme.sh"
+#    dest: cluster-theme.sh
+
 # Change a Slurm command's default output through its own environment variable rather
 # than by wrapping the command (see `man sinfo`, `man squeue`). The environment is
 # inherited, so batch scripts and remote commands get the same output.
@@ -302,13 +309,13 @@ slurm_cluster_configure_gpu_power_limit: true
 #cluster_tools_motd_title: "my cluster"
 #cluster_tools_motd_commands:
 #  - { name: sq,         text: "queue and node usage, your own jobs marked" }
-#  - { name: qos,        text: "the QoS levels you may submit against" }
+#  - { name: qos,        text: "your QoS: what it preempts, how full its quota is" }
 #  - { name: sinfo,      text: "partition and node state" }
 #  - { name: slurm-help, text: "how to submit jobs, and the cluster rules" }
 #cluster_tools_motd_links:
 #  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
-#  - { name: dashboard,    text: "http://dsail-cluster.snu.ac.kr:59001" }
+#  - { name: dashboard,    text: "http://your-cluster.example.edu:3000" }
 
 # Directories copied onto a shared filesystem for users to read and copy from. Set
 # them on the one host that exports the share -- see config/host_vars/<head node>.
