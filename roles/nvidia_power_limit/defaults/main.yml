@@ -31,3 +31,9 @@ nvidia_power_limit_persistence_mode: true
 # on every boot (nvidia-smi resets the power limit to the card default across a reboot
 # or driver reload), so the setting survives reboots.
 nvidia_power_limit_service_name: "nvidia-power-limit.service"
+
+# Node-side home of the wattage. The unit reads it as an EnvironmentFile, so the number
+# lives in exactly one place on the node, and anything else that changes a GPU's power
+# limit can read the cap back instead of guessing -- the Slurm prolog/epilog does, to
+# avoid handing an exclusive job the card maximum on a capped node. Removed with the cap.
+nvidia_power_limit_conf_file: "/etc/nvidia-power-limit.conf"

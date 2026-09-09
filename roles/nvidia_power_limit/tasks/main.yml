@@ -69,6 +69,19 @@
           loop_control:
             label: "GPU {{ item.split(',')[0] | trim }}"
 
+        # Written before the unit, which refuses to start without it. It also carries the
+        # wattage, so a changed cap shows up here rather than in the unit file.
+        - name: Write the node's GPU power-limit configuration
+          ansible.builtin.template:
+            src: nvidia-power-limit.conf.j2
+            dest: "{{ nvidia_power_limit_conf_file }}"
+            owner: root
+            group: root
+            mode: "0644"
+          notify:
+            - Reload systemd
+            - Restart nvidia-power-limit
+
         - name: Install the GPU power-limit systemd unit
           ansible.builtin.template:
             src: nvidia-power-limit.service.j2
@@ -135,10 +148,15 @@
             daemon_reload: true
           when: nvidia_power_limit_unit.stat.exists
 
-        - name: Remove the GPU power-limit systemd unit
+        # The conf file goes with the unit: left behind, it would keep telling the Slurm
+        # prolog/epilog that this node is capped.
+        - name: Remove the GPU power-limit unit and configuration
           ansible.builtin.file:
-            path: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+            path: "{{ item }}"
             state: absent
+          loop:
+            - "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+            - "{{ nvidia_power_limit_conf_file }}"
           notify: Reload systemd
 
         # Removing the unit only stops the cap coming back at boot; the running driver

@@ -7,6 +7,11 @@
         path: /etc/systemd/system/nvidia-power-limit.service
       register: unit
 
+    - name: Stat the power-limit configuration
+      ansible.builtin.stat:
+        path: /etc/nvidia-power-limit.conf
+      register: conf
+
     - name: Read the stub nvidia-smi log
       ansible.builtin.slurp:
         src: /var/log/nvidia-smi-stub.log
@@ -16,5 +21,8 @@
       ansible.builtin.assert:
         that:
           - not unit.stat.exists
+          - not conf.stat.exists
           - "'-pl 600' in (smi_log.content | b64decode)"
-        fail_msg: "the power cap was not fully removed (unit present, or no reset to the default limit)"
+        fail_msg: >-
+          the power cap was not fully removed (unit or conf file present, or no reset to
+          the default limit)

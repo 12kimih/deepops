@@ -37,6 +37,13 @@
           [Install]
           WantedBy=multi-user.target
 
+    - name: Install the leftover power-limit configuration
+      ansible.builtin.copy:
+        dest: /etc/nvidia-power-limit.conf
+        mode: "0644"
+        content: |
+          NVIDIA_POWER_LIMIT_WATTS=450
+
     - name: Enable the leftover unit
       ansible.builtin.systemd:
         name: nvidia-power-limit.service
