@@ -20,43 +20,41 @@
 
 -- [1] Site configuration -- EDIT THESE for your cluster (or set "" to disable a rule).
 --   CPU_PARTITIONS         partition(s) for CPU-only jobs ("" = leave unset).
---   DEFAULT_GPU_TYPE       GPU type assumed when a GPU job omits the type.
---   DEFAULT_GPU_PARTITION  partition for GPU jobs of unknown/default type.
---   GPU_TYPE_TO_PARTITION  each GPU type (from Gres=gpu:<type>:N) to its partition.
---                          Several partitions may hold one type, for sites with
---                          short/long/debug queues: give a list, and the FIRST entry
---                          is where type-routed jobs go while the rest are recognised
---                          on input so an untyped job naming one can still be typed.
---   STRICT_GPU_TYPE        what to do when a GPU job omits the type AND its partition
---                          cannot pin one down, because that partition holds several
---                          GPU types, or holds none, or is not listed here.
+--   GPU_TYPE_TO_PARTITION  each GPU type (from Gres=gpu:<type>:N) to the partition(s)
+--                          holding it. Give a list where one type is split across
+--                          several -- per-partition defaults, short/long queues -- and
+--                          a job routed by type is offered all of them, for Slurm to
+--                          start wherever it fits first.
+--   DEFAULT_GPU_TYPE       type assumed when a GPU job names none and its partition
+--                          implies none. It routes through the map above like any
+--                          other type, so the partitions of a type are declared once.
+--                          "" = no default (see STRICT_GPU_TYPE).
+--   STRICT_GPU_TYPE        what to do when a GPU job's type cannot be pinned down:
+--                          its partition holds several GPU types, or holds none, or is
+--                          not listed here, and no default applies.
 --                          true  -- reject at submit, naming the usable partitions.
 --                          false -- let it through untyped.
 --                          Keep this true if any QoS or association carries a typed
 --                          GPU limit: Slurm checks those against the REQUESTED TRES,
 --                          so an untyped request is invisible to them (see header).
 local CPU_PARTITIONS        = "cpu"
-local DEFAULT_GPU_TYPE      = "b200"
-local DEFAULT_GPU_PARTITION = "b200"
 local GPU_TYPE_TO_PARTITION = {
     ["b200"] = "b200",
     ["h100"] = { "h100", "h100-short" },
     ["h200"] = "h200",
 }
-local STRICT_GPU_TYPE = true
+local DEFAULT_GPU_TYPE      = "b200"
+local STRICT_GPU_TYPE       = true
 
 -- Derived once at load, from the [1] block above.
---   GPU_TYPE_PARTITION  type      -> the partition to route that type to
+--   GPU_TYPE_PARTITION    type      -> the partition list to route that type to
 --   PARTITION_TO_GPU_TYPE partition -> the single GPU type it holds
+-- A lone partition is normalised to a one-entry list so both forms take one code path.
 local GPU_TYPE_PARTITION, PARTITION_TO_GPU_TYPE = {}, {}
 for gtype, parts in pairs(GPU_TYPE_TO_PARTITION) do
-    if type(parts) == "table" then
-        GPU_TYPE_PARTITION[gtype] = parts[1]
-        for _, part in ipairs(parts) do PARTITION_TO_GPU_TYPE[part] = gtype end
-    else
-        GPU_TYPE_PARTITION[gtype] = parts
-        PARTITION_TO_GPU_TYPE[parts] = gtype
-    end
+    if type(parts) ~= "table" then parts = { parts } end
+    GPU_TYPE_PARTITION[gtype] = table.concat(parts, ",")
+    for _, part in ipairs(parts) do PARTITION_TO_GPU_TYPE[part] = gtype end
 end
 
 local function sorted_keys(t)
@@ -175,17 +173,19 @@ local function gpu_type_of_partition(partition)
     return found
 end
 
--- Untyped request whose partition pins no single GPU type. Under STRICT_GPU_TYPE this
--- is a submit-time error; otherwise the request is left untyped and merely noted.
+-- An untyped request no partition and no site default can pin a type onto. Under
+-- STRICT_GPU_TYPE this is a submit-time error; otherwise it is left untyped and noted.
 local function handle_untypeable(partition, count)
+    local why = (partition ~= nil and partition ~= "")
+        and string.format("partition '%s' does not pin one", partition)
+        or "no partition was named and no default type is set"
     if not STRICT_GPU_TYPE then
-        slurm.log_user("Note: GPU type unspecified and partition '%s' does not pin one; " ..
-                       "leaving the request untyped.", partition)
+        slurm.log_user("Note: GPU type unspecified and %s; leaving the request untyped.", why)
         return slurm.SUCCESS
     end
-    slurm.log_user("Error: cannot infer the GPU type for partition '%s'. Name the type " ..
-                   "explicitly (e.g. --gres=gpu:%s:%d), or submit to one of: %s.",
-                   partition, DEFAULT_GPU_TYPE, count > 0 and count or 1,
+    slurm.log_user("Error: GPU type unspecified and %s. Name it explicitly " ..
+                   "(e.g. --gres=gpu:<type>:%d, types: %s), or submit to one of: %s.",
+                   why, count > 0 and count or 1, sorted_keys(GPU_TYPE_TO_PARTITION),
                    sorted_keys(PARTITION_TO_GPU_TYPE))
     return slurm.ERROR
 end
@@ -202,13 +202,15 @@ local function reject_multi_type()
     return slurm.ERROR
 end
 
--- [3] Submit hook
+-- [3] Submit hook. Resolve the GPU type first, then route on it -- one lookup, so a
+-- typed request, one typed by its partition and one falling back to the site default
+-- all reach their partitions the same way.
 function slurm_job_submit(job_desc, part_list, submit_uid)
     local has_partition = job_desc.partition ~= nil and job_desc.partition ~= ""
     local want_gpu, gpu_type, gpu_count, gpu_multi = detect_gpu(job_desc)
 
+    -- CPU-only work has no type to carry; it only needs a partition if it named none.
     if not want_gpu then
-        -- Respect an explicit --partition; only set a default when none was given.
         if not has_partition and CPU_PARTITIONS ~= "" then
             job_desc.partition = CPU_PARTITIONS
         end
@@ -221,38 +223,33 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
         return reject_multi_type()
     end
 
-    -- An explicitly named GPU type must be one we know. Reject an unknown type instead
-    -- of silently downgrading it to the default -- that surprises --gres jobs (silent
-    -- swap) and makes --gpus jobs pend forever against a partition lacking that type.
-    if gpu_type ~= nil then
-        local part = GPU_TYPE_PARTITION[gpu_type]
-        if part == nil then
-            return reject_unknown_type(gpu_type)
+    -- Untyped request: take the type from the partition it named, else from the site
+    -- default. Every path out of this block carries a type or has been rejected -- an
+    -- untyped request is invisible to the typed GrpTRES limits (see the header), so
+    -- letting one through is exactly the bug this structure exists to prevent.
+    if gpu_type == nil then
+        if has_partition then
+            gpu_type = gpu_type_of_partition(job_desc.partition)
+        elseif DEFAULT_GPU_TYPE ~= "" then
+            gpu_type = DEFAULT_GPU_TYPE
+            slurm.log_user("Note: GPU type unspecified; defaulting to %s. " ..
+                           "Use --gres=gpu:<type>:N to be explicit.", gpu_type)
         end
-        if not has_partition then
-            job_desc.partition = part
-        end
-        return slurm.SUCCESS
-    end
-
-    -- No GPU type given. Every path from here must end with the type stamped on, the
-    -- explicit-partition path included: an untyped request is invisible to the typed
-    -- GrpTRES limits (see the header). Returning early here is exactly the bug this
-    -- structure exists to prevent.
-    if has_partition then
-        local implied = gpu_type_of_partition(job_desc.partition)
-        if implied == nil then
+        if gpu_type == nil then
             return handle_untypeable(job_desc.partition, gpu_count)
         end
-        stamp_gpu_type(job_desc, implied)
-        return slurm.SUCCESS
+        stamp_gpu_type(job_desc, gpu_type)
     end
 
-    if DEFAULT_GPU_PARTITION ~= "" and DEFAULT_GPU_TYPE ~= "" then
-        job_desc.partition = DEFAULT_GPU_PARTITION
-        stamp_gpu_type(job_desc, DEFAULT_GPU_TYPE)
-        slurm.log_user("Note: GPU type unspecified; defaulting to %s. Use --gres=gpu:<type>:N to be explicit.",
-                       DEFAULT_GPU_TYPE)
+    -- A named type must be one we know. Reject an unknown one instead of silently
+    -- downgrading it to the default -- that surprises --gres jobs (silent swap) and
+    -- makes --gpus jobs pend forever against a partition lacking that type.
+    local partition = GPU_TYPE_PARTITION[gpu_type]
+    if partition == nil then
+        return reject_unknown_type(gpu_type)
+    end
+    if not has_partition then
+        job_desc.partition = partition
     end
     return slurm.SUCCESS
 end
@@ -277,15 +274,17 @@ function slurm_job_modify(job_desc, job_rec, part_list, modify_uid)
         return slurm.SUCCESS
     end
 
-    -- Fall back to the job's current partition when the update does not change it.
+    -- Fall back to the job's current partition when the update does not change it. No
+    -- default-type fallback here: the submit hook already gave the job a partition, and
+    -- stamping a type that partition does not hold would leave it pending forever.
     local partition = job_desc.partition
     if partition == nil or partition == "" then
         partition = job_rec ~= nil and job_rec.partition or nil
     end
-    if partition == nil or partition == "" then
-        return handle_untypeable("(unset)", gpu_count)
+    local implied = nil
+    if partition ~= nil and partition ~= "" then
+        implied = gpu_type_of_partition(partition)
     end
-    local implied = gpu_type_of_partition(partition)
     if implied == nil then
         return handle_untypeable(partition, gpu_count)
     end
