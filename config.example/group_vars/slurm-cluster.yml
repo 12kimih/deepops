@@ -259,8 +259,9 @@ allow_user_set_gpu_clocks: false
 # slurm-cluster.yml runs roles/nvidia_power_limit over [slurm-node]. It is declarative:
 # a node with nvidia_power_limit_watts set gets that cap (a systemd unit re-applies it
 # at boot), a node without has any cap REMOVED and its GPUs put back on their default
-# limit. Cap specific nodes from config/host_vars/<node>. Set this false to leave GPU
-# power limits alone entirely.
+# limit. Cap specific nodes from config/host_vars/<node>. The cap also bounds the Slurm
+# prolog/epilog, so an exclusive job cannot raise a capped node to the card maximum. Set
+# this false to leave GPU power limits alone entirely.
 slurm_cluster_configure_gpu_power_limit: true
 
 ################################################################################

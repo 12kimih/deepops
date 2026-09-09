@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# deepops nvidia_power_limit role -- the GPU power cap enforced on this node, in watts.
+#
+# Read as an EnvironmentFile by {{ nvidia_power_limit_service_name }} and parsed by the
+# Slurm prolog/epilog helper (set_gpu_power_levels.sh), so both agree on one number.
+# Change it from config/ and re-run the role; editing it here is undone by the next run.
+NVIDIA_POWER_LIMIT_WATTS={{ nvidia_power_limit_watts | int }}

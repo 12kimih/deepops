@@ -12,10 +12,24 @@
         src: /etc/systemd/system/nvidia-power-limit.service
       register: unit_contents
 
-    - name: Assert the unit was installed with the requested cap
+    - name: Read the installed power-limit configuration
+      ansible.builtin.slurp:
+        src: /etc/nvidia-power-limit.conf
+      register: conf_contents
+
+    - name: Assert the unit was installed and reads the cap from the conf file
       ansible.builtin.assert:
         that:
           - unit.stat.exists
-          - "'nvidia-smi -pl 450' in (unit_contents.content | b64decode)"
+          - "'EnvironmentFile=/etc/nvidia-power-limit.conf' in (unit_contents.content | b64decode)"
+          - "'nvidia-smi -pl ${NVIDIA_POWER_LIMIT_WATTS}' in (unit_contents.content | b64decode)"
           - "'nvidia-smi -pm 1' in (unit_contents.content | b64decode)"
         fail_msg: "nvidia-power-limit.service was not installed with the expected ExecStart"
+
+    - name: Assert the conf file carries the requested cap
+      ansible.builtin.assert:
+        that:
+          - "'NVIDIA_POWER_LIMIT_WATTS=450' in (conf_contents.content | b64decode)"
+        fail_msg: >-
+          /etc/nvidia-power-limit.conf does not hold the requested cap, so the unit and
+          the Slurm prolog/epilog would both miss it

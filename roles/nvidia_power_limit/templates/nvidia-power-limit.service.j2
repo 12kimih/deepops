@@ -5,19 +5,24 @@
 # so this oneshot unit re-applies it late in boot. RemainAfterExit=yes so the unit shows
 # "active" after the cap is set (the process itself exits immediately), which lets a
 # `systemctl restart` re-apply a changed value.
+#
+# The wattage comes from the EnvironmentFile rather than being baked in here, so the node
+# holds one copy of it and the Slurm prolog/epilog helper can read the same number.
 [Unit]
-Description=Set NVIDIA GPU power limit to {{ nvidia_power_limit_watts }}W (deepops)
+Description=Set the NVIDIA GPU power limit (deepops)
 After=multi-user.target
+ConditionPathExists={{ nvidia_power_limit_conf_file }}
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+EnvironmentFile={{ nvidia_power_limit_conf_file }}
 {% if nvidia_power_limit_persistence_mode %}
 # Best-effort (leading '-'): keep the driver initialized so the cap sticks reliably.
 # A failure here (card without persistence support) must not block the -pl below.
 ExecStartPre=-/usr/bin/nvidia-smi -pm 1
 {% endif %}
-ExecStart=/usr/bin/nvidia-smi -pl {{ nvidia_power_limit_watts }}
+ExecStart=/usr/bin/nvidia-smi -pl ${NVIDIA_POWER_LIMIT_WATTS}
 
 [Install]
 WantedBy=multi-user.target

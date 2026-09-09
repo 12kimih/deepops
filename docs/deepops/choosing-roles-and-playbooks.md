@@ -40,7 +40,7 @@ Different layers; the monitoring stack uses the exporter.
 
 ## GPU power limit (persists across reboots)
 
-- `playbooks/nvidia-software/nvidia-power-limit.yml` (`nvidia_power_limit` role) -- caps the GPU **power draw** (`nvidia-smi -pl`) and installs a `nvidia-power-limit.service` systemd unit so the cap is re-applied on every boot (nvidia-smi otherwise resets it to the card default). Set the wattage with `nvidia_power_limit_watts` in `config/group_vars`/`config/host_vars` (per group/host) or `-e`, and target specific nodes with `-l`/`-e hostlist=`. Unlike the clock playbooks above, this is a persistent, GPU-gated systemd setting, not a one-shot runtime command.
+- `playbooks/nvidia-software/nvidia-power-limit.yml` (`nvidia_power_limit` role) -- caps the GPU **power draw** (`nvidia-smi -pl`) and installs a `nvidia-power-limit.service` systemd unit so the cap is re-applied on every boot (nvidia-smi otherwise resets it to the card default). Set the wattage with `nvidia_power_limit_watts` in `config/group_vars`/`config/host_vars` (per group/host) or `-e`, and target specific nodes with `-l`/`-e hostlist=`. Unlike the clock playbooks above, this is a persistent, GPU-gated systemd setting, not a one-shot runtime command. The wattage lands in `/etc/nvidia-power-limit.conf`, which the systemd unit reads and the Slurm prolog/epilog helper (`set_gpu_power_levels.sh`) clamps against, so an exclusive job cannot raise a capped node to the card maximum.
 
 ## Container registries (three different deploy targets)
 
