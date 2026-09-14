@@ -1,12 +1,12 @@
 # Mirror Apt Repos
 
-Set up offline repositoriy mirrors for Aptitude
+Set up offline repository mirrors for APT
 
 ## Table of Contents
 
 - [Mirror Apt Repos](#mirror-apt-repos)
   - [Table of Contents](#table-of-contents)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Identifying package repositories to mirror](#identifying-package-repositories-to-mirror)
     - [Ubuntu repositories](#ubuntu-repositories)
     - [Docker repository](#docker-repository)
@@ -80,18 +80,6 @@ This is `bionic` for Ubuntu 18.04, `focal` for Ubuntu 20.04, `jammy` for Ubuntu 
 
 #### APT Configuration
 
-**Ubuntu 18.04**
-
-```bash
-deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804
-```
-
-**Ubuntu 20.04**
-
-```bash
-deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004
-```
-
 **Ubuntu 22.04**
 
 ```bash
@@ -105,18 +93,6 @@ deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64 /
 ```
 
 #### GPG Key Validation
-
-**Ubuntu 18.04**
-
-```bash
-https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
-```
-
-**Ubuntu 20.04**
-
-```bash
-https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
-```
 
 **Ubuntu 22.04**
 
@@ -148,9 +124,9 @@ https://nvidia.github.io/libnvidia-container/gpgkey
 
 The following DEB files are not installed from an APT repository, but installed ad-hoc from direct URLs or file paths.
 
-- _NVIDIA DCGM_: Requires registration, download from [DCGM site](https://developer.nvidia.com/dcgm)
+- _CUDA keyring_: `cuda-keyring_1.1-1_all.deb` from the CUDA repository, installed by the DCGM role (and by the driver role with `nvidia_driver_install_method: nvidia_repo`); DCGM itself comes from the CUDA repository
 - _NVIDIA Enroot_: Download from [Enroot releases](https://github.com/NVIDIA/enroot/releases/)
-- _TurboVNC_: Download from [TurboVNC](https://downloads.sourceforge.net/project/turbovnc/2.2.4/turbovnc_2.2.4_amd64.deb)
+- _TurboVNC_ (Open OnDemand desktops, `ood_url_turbovnc_pkg`): Download from [TurboVNC](https://downloads.sourceforge.net/project/turbovnc/2.2.4/turbovnc_2.2.4_amd64.deb)
 
 ## Downloading package repositories on a machine with Internet access
 
@@ -254,14 +230,16 @@ You should use the mechanism that gives you the best performance and ease-of-use
 One common way to accomplish this transfer is to bundle the downloaded files into an ISO file, which can then be moved to the offline environment or to a DVD or external USB drive.
 
 ```bash
-sudo yum install genisoimage
-sudo genisoimage -o /tmp/packages.iso /var/repos
+sudo apt install genisoimage
+sudo genisoimage -R -J -o /tmp/packages.iso /var/repos
 ```
+
+(`-R -J` keep the long file names; a plain ISO 9660 image truncates them.)
 
 ## Create mirrors on offline network
 
-One the repository contents have been transferred to the offline network, they need to be made available as repositories for package installs.
-Your offline enviroment may already have a package server, and there are many free and commercial solutions to do this!
+Once the repository contents have been transferred to the offline network, they need to be made available as repositories for package installs.
+Your offline environment may already have a package server, and there are many free and commercial solutions to do this!
 
 If you don't already have a package server, the following process shows a minimal approach using an Apache httpd server.
 
@@ -307,7 +285,7 @@ Lines added to `/etc/apt/sources.list.d/cuda-compute-repo.list`:
 deb http://repo-server/cuda/repos/ubuntu2404/x86_64/ /
 ```
 
-Lines add to `/etc/apt/sources.list.d/nvidia-container-toolkit.list`:
+Lines added to `/etc/apt/sources.list.d/nvidia-container-toolkit.list`:
 
 ```
 deb  [trusted=yes] http://repo-server/libnvidia-container/stable/deb/amd64 /

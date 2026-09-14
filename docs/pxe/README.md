@@ -1,7 +1,7 @@
 # OS provisioning via PXE
 
 - [OS provisioning via PXE](#os-provisioning-via-pxe)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
 
 ## Introduction
 

@@ -3,7 +3,7 @@
 RAPIDS with Dask
 
 - [RAPIDS Dask](#rapids-dask)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Installation](#installation)
     - [Kubeflow](#kubeflow)
     - [Stand-alone](#stand-alone)
@@ -26,19 +26,24 @@ When deploying through Kubeflow, it is necessary to ensure that a proper Docker 
 
 Deploy Kubernetes by following the [DeepOps Kubernetes Deployment Guide](README.md)
 
-Deploy the [LoadBalancer](ingress.md#on-prem-loadbalancer)
+Deploy the [LoadBalancer](ingress.md#load-balancer)
 
 Deploy Dask (the example deploy script and its config live under
 [`workloads/examples/k8s/dask-rapids`](../../workloads/examples/k8s/dask-rapids)):
+
+> This example is unmaintained and does not run on a current cluster as is: `deploy.sh` installs the
+> retired `stable/dask` Helm chart and uses `kubectl get --export`, removed in Kubernetes 1.18. It also
+> reads `config/helm/rapids-dask.yml` and `config/k8s/rapids-dask-sa.yml` relative to the working
+> directory, while the bundled copies are in `helm/` and `k8s/`.
 
 ```bash
 cd workloads/examples/k8s/dask-rapids
 
 # Optionally, modify the chart configuration
-vi config/helm/rapids-dask.yml
+vi helm/rapids-dask.yml
 
 # Optionally, modify the K8S resources
-vi config/k8s/rapids-dask-sa.yml
+vi k8s/rapids-dask-sa.yml
 
 # Deploy
 ./deploy.sh

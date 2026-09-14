@@ -13,6 +13,8 @@ Centralized logging is provided by Filebeat, Elasticsearch and Kibana.
 
 The following procedure walks through installation of a centralized logging stack using the Helm repositories provided by [Elastic NV](https://www.elastic.co/).
 
+> Elastic no longer maintains these Helm charts and recommends [Elastic Cloud on Kubernetes (ECK)](https://www.elastic.co/guide/en/cloud-on-k8s/current/index.html) for new deployments.
+
 Our centralized logging solution requires that all hosts be configured with the same timezone and synchronized clocks.
 This should be done automatically in our Kubernetes deployment process, but can be enforced manually by running the Chrony playbook:
 
