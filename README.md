@@ -61,8 +61,8 @@ Helpful docs: [managing private cluster config](docs/deepops/managing-cluster-co
 
 This fork tracks NVIDIA DeepOps via an `upstream` git remote; absorb their updates
 with `git fetch upstream && git merge upstream/master` (`config/` is gitignored, so
-it is never touched). Upstream role names were left unchanged so those merges stay
-conflict-free.
+it is never touched). Upstream role names were left unchanged, which keeps those merges
+reviewable; files this fork rewrote still conflict and are resolved by hand.
 
 ## Overview
 

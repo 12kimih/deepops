@@ -9,8 +9,8 @@ How it works (already in the repo):
 
 - `.gitignore` ignores `/config*/` but keeps `!/config.example/` -- so `config/` is
   invisible to git while the `config.example/` **template** is tracked.
-- `ansible.cfg` points `inventory = ./config/inventory,...` and has a ready-to-enable
-  `#vault_password_file = ./config/.vault-pass`.
+- `ansible.cfg` points `inventory = ./config/inventory,...` and sets
+  `vault_password_file = ./config/.vault-pass`, read only when a vaulted value is used.
 - `scripts/setup.sh` copies `config.example` -> `config` only if `config/` is absent.
 
 > **Golden rule:** edit real values only under `config/`. Keep `config.example/`
@@ -65,7 +65,7 @@ cd <deepops>
 chmod 600 config/.vault-pass
 ```
 
-Enable it by uncommenting in `ansible.cfg`:
+`ansible.cfg` already reads it from there:
 
 ```ini
 vault_password_file = ./config/.vault-pass
@@ -106,7 +106,7 @@ stage it -- only the `config.example/` template changes upstream.
 cd <deepops>
 git remote add upstream https://github.com/NVIDIA/deepops.git   # one-time
 git fetch upstream --tags
-git diff master <release-tag> -- config.example/   # spot new/changed template params
+git diff HEAD upstream/master -- config.example/   # spot new/changed template params
 git merge upstream/master                          # update your fork
 ```
 
