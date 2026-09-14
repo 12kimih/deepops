@@ -4,8 +4,9 @@
 #   ansible-playbook playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
 #
 # The driver is never touched (runfile installed with --toolkit only). The
-# toolkits install once on the host that owns the shared tree (the NFS server by
-# default); because /sw is shared, `module avail cuda` then lists them on every
+# toolkits install once on the host that owns the shared tree -- slurm-master[0]
+# unless you pass -e cuda_install_hosts=<host> (group_vars cannot pick a play's
+# hosts); because that tree is shared, `module avail cuda` then lists them on every
 # node. Trim roles/nvidia_cuda_toolkit/defaults/main.yml's cuda_versions (or override
 # it in config/group_vars/) to choose which toolkits to install.
 ---

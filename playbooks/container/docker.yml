@@ -2,7 +2,8 @@
 # Install the Docker engine in-tree (roles/docker), following Docker's official
 # instructions (https://docs.docker.com/engine/install/), instead of the kubespray
 # submodule's container-engine/docker role (which used the deprecated apt_key + .list
-# method). Used by the Slurm monitoring stack (prometheus/grafana/exporters) and
+# method). Imported by the Slurm monitoring stack (prometheus/grafana/alertmanager/
+# exporters), the container registry, registry cache and docker-login playbooks, and
 # ngc-ready. Kubernetes uses its own container runtime (containerd by default) set up
 # by kubespray, not this playbook.
 - hosts: "{{ hostlist | default('all') }}"
