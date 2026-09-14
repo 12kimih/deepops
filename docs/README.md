@@ -49,4 +49,5 @@ Examples are included in the [/workloads/examples](/workloads/examples) director
 
 ## Docs
 
-The rest of the docs are in the [/docs](/docs) directory.
+The rest of the docs are in the [/docs](/docs) directory. Once a cluster is deployed,
+[utility playbooks](./deepops/utilities.md) lists the playbooks for operating it.

@@ -337,3 +337,8 @@ one before it is needed is what keeps a bad reboot from becoming a trip to the r
 `playbooks/utilities/bmc.yml` configures each node's BMC from the node itself, and
 `playbooks/utilities/power.yml` drives chassis power from the control node afterwards.
 See [out-of-band management](../deepops/bmc.md).
+
+## Utility playbooks
+
+[Utility playbooks](../deepops/utilities.md) lists every playbook for running the cluster
+after it is deployed -- power, reboots, NFS, GPU caps and the rest.
