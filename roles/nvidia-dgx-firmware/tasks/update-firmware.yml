@@ -43,7 +43,7 @@
   when:
     - reboot_required | default(false)
 
-# TODO: This script does not handle the case of a chassis-levl power cycle being required with ipmitool
+# TODO: This script does not handle the case of a chassis-level power cycle being required with ipmitool
 
 - name: Register power cycle required
   when: fw_update_json.FirmwareLoadAction is defined and fw_update_json.FirmwareLoadAction == "DC Power Cycle"

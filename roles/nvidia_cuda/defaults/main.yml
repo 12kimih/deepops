@@ -1,10 +1,10 @@
 ---
-# Install the system-wide CUDA toolkit. Set to false to skip it entirely, e.g.
+# Install the system-wide CUDA toolkit (off by default). Leave false to skip it, e.g.
 # when CUDA is provided per-version through Lmod/environment modules instead.
 nvidia_cuda_install: false
 
 # 'cuda-toolkit' is the generic package and will pull the latest version
-# if you want a specific version, use i.e. cuda-toolkit=12.2.0-1
+# if you want a specific version, use e.g. cuda-toolkit=12.2.0-1
 cuda_version: cuda-toolkit
 
 # DGX-specific vars may be used to target specific models,
@@ -13,7 +13,7 @@ cuda_dgx_1_version: "{{ cuda_version }}"
 cuda_dgx_2_version: "{{ cuda_version }}"
 cuda_dgx_a100_version: "{{ cuda_version }}"
 
-# To install a specific CUDA package on DGX, define cuda_dgx_override.
+# To install a specific CUDA package on DGX, define cuda_dgx_override_version.
 # We override DGX version separately because DGX OS may release at a different
 # cadence than the toolkit repository.
 #cuda_dgx_override_version: "{{ cuda_version }}"

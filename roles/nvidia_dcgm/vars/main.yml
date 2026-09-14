@@ -1,6 +1,6 @@
 ---
 dcgm_is_dgx: false
-# NVIDIA publishes the data-center apt repo per OS release. A brand-new LTS (e.g.
+# NVIDIA publishes the CUDA apt repo (which carries DCGM) per OS release. A brand-new LTS (e.g.
 # 26.04) may not have a path yet; override nvidia_dcgm_ubuntu_repo_release (e.g.
 # "24.04") in group_vars until upstream publishes it.
 _ubuntu_repo_dir: "{{ ansible_distribution | lower }}{{ (nvidia_dcgm_ubuntu_repo_release | default(ansible_distribution_version)) | replace('.', '') }}/{{ ansible_architecture }}"

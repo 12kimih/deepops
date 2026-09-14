@@ -8,7 +8,7 @@
   command: "docker rmi -f {{ firmware_update_repo }}:{{ firmware_update_tag }}"
   ignore_errors: true
 
-- name: Remove firmware image tarbal
+- name: Remove firmware image tarball
   command: "rm {{ fw_dir }}/{{ firmware_update_container }}"
   ignore_errors: true
 
