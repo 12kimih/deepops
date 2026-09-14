@@ -3,7 +3,7 @@
 Recommendations for deploying Slurm on large clusters
 
 - [Large Deployments](#large-deployments)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Cache container pulls from external registries](#cache-container-pulls-from-external-registries)
   - [Manually generate static files for cluster-wide configuration](#manually-generate-static-files-for-cluster-wide-configuration)
   - [Separate specific functions on different hardware](#separate-specific-functions-on-different-hardware)
@@ -46,7 +46,7 @@ These include:
 
 | File                                           | Ansible variable                     | Function                                      | How to configure                                                                                                                          |
 | ---------------------------------------------- | ------------------------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `/etc/hosts`                                   | `hosts_file_src`                     | List of hosts and IP addresses in the cluster | [hosts file manual](https://man7.org/linux/man-pages/man5/hosts.5.html)                                                                   |
+| `/etc/hosts`                                   | `slurm_configure_etc_hosts`          | List of hosts and IP addresses in the cluster | Set it `false` and manage the file yourself ([hosts file manual](https://man7.org/linux/man-pages/man5/hosts.5.html))                    |
 | `/etc/slurm/slurm.conf`                        | `slurm_conf_template`                | Slurm scheduler configuration                 | [Slurm configurator](https://slurm.schedmd.com/configurator.easy.html)                                                                    |
 | `/etc/nhc/nhc.conf`                            | `nhc_config_template`                | Node Health Check configuration               | [NHC documentation](https://github.com/mej/nhc/blob/master/README.md)                                                                     |
 | `/etc/prometheus/endpoints/node-exporter.yml`  | `node_exporter_conf_template`        | Prometheus endpoints for node-exporter        | [Sample targets config](https://prometheus.io/docs/prometheus/latest/getting_started/#configure-prometheus-to-monitor-the-sample-targets) |
@@ -92,9 +92,9 @@ login02
 
 ### Separate monitoring node
 
-The Slurm monitoring services are deployed to whichever hosts are specified in the variable `slurm_monitoring_group`.
-This should be the name of an Ansible inventory hostgroup with one node.
-In the default configuration, we run the monitoring services on the Slurm controller node.
+The Slurm monitoring services are deployed to the hosts in the `slurm-metric` inventory group, which by default is the Slurm controller node.
+`slurm_monitoring_group` picks a different group only when passed with `-e`, since a play's hosts are resolved before group variables exist.
+Set it in `group_vars` as well when you move the services, though: the slurm exporter role reads it there to tell Prometheus which hosts to scrape.
 
 Note that in order to correctly monitor Slurm, the monitoring node must have Slurm installed and have access to the cluster.
 As with the login nodes, the easiest way to do this is to add the monitoring node to the `slurm-cluster` group, but not to `slurm-master` or `slurm-node`.
@@ -118,8 +118,7 @@ metric02
 ### Separate NFS server
 
 Our Slurm cluster deployment relies on a shared NFS filesystem across the cluster.
-One machine is used to run the NFS server, and all other machines in the cluster are NFS clients.
-By default, the NFS server is the first host in the `slurm-master` group.
+The NFS servers are the hosts in the `slurm-nfs` inventory group, and the clients are the hosts in `slurm-nfs-client` -- by default, the compute nodes.
 
 To change this topology, you can use the `slurm-nfs` and `slurm-nfs-client` host groups.
 For example, to specify a separate NFS server from the cluster head node, change this:

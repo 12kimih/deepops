@@ -96,10 +96,10 @@ cat config/inventory
 
 # Review and edit configuration under config/group_vars/*.yml
 cat config/group_vars/all.yml
-cat config/group_vars/all.yml
+cat config/group_vars/slurm-cluster.yml
 ```
 
-After creating an inventory file all `ansbile` and `ansible-playbook` commands must be run in the `./deepops` directory or the inventory file must be provided with the `-i` flag (`-i config/inventory`).
+After creating an inventory file all `ansible` and `ansible-playbook` commands must be run in the `./deepops` directory or the inventory file must be provided with the `-i` flag (`-i config/inventory`).
 
 _Run Commands_
 

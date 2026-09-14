@@ -9,7 +9,7 @@
 
 The [`nvidia-dgx-firmware`](../../roles/nvidia-dgx-firmware) role has been built to perform several administrative tasks cluster-wide.
 
-1. Upgrade the the DGX firmware (_DGX only clusters_)
+1. Upgrade the DGX firmware (_DGX only clusters_)
 2. Run system diagnostics and collect a log bundle (_DGX and non-DGX clusters_)
 
 While documentation exists to [run system health checks](https://docs.nvidia.com/dgx/dgx1-fw-container-release-notes/index.html) and update [DGX firmware](https://docs.nvidia.com/dgx/dgx1-fw-container-release-notes/index.html), this role and document is meant to give guidance on performing these operations cluster-wide using `Ansible` for automation.
@@ -53,7 +53,7 @@ firmware_update_tag: 21.11.4
 firmware_update_container: "nvfw-dgxa100_21.11.4_211111.tar.gz"
 ```
 
-2. Change the `nv_mgmt_interface` variable to reflect the systems being collected from. The example interface names below should be true in most cases, but make sure to use specify the actual network interface in use on the systems being updated.
+2. Change the `nv_mgmt_interface` variable to reflect the systems being collected from. The example interface names below should be true in most cases, but make sure to specify the actual network interface in use on the systems being updated.
 
 ```yml
 # The OS/mgmt interface on the server
@@ -88,7 +88,7 @@ This tool can be used to:
 - Debug a known issue
 - Generate a report bundle for NVIDIA support
 
-Setting `dcgmi_stress` to true will run the dcgm diagnostic at a level of instead of `3` the default of `1`. This can be used as a light system stress test and may take up to 20 minutes to complete. `nvsm dump health` can also take up to 15 minutes to complete and may be disabled by setting `nvsm_dump_health` to `false`. These tests can potentially be disruptive or fail to complete if there are existing issues, it is not recommended to run them while the nodes are in use, see [the official docs](https://docs.nvidia.com/datacenter/nvsm/nvsm-user-guide/index.html) for additional details.
+Setting `dcgm_stress` to true runs the DCGM diagnostic at level `3` instead of the default `1`. This can be used as a light system stress test and may take up to 20 minutes to complete. `nvsm dump health` can also take up to 15 minutes to complete and may be disabled by setting `nvsm_dump_health` to `false`. These tests can potentially be disruptive or fail to complete if there are existing issues, it is not recommended to run them while the nodes are in use, see [the official docs](https://docs.nvidia.com/datacenter/nvsm/nvsm-user-guide/index.html) for additional details.
 
 Because this is a debugging tool Ansible will continue executing tasks on all hosts even if some of the tasks fail. It will execute each step with "best-effort" to gather as much health information as possible. This role is designed to be executed against a homogeneous cluster of DGX systems (all DGX-1, all DGX-2, or all DGX A100), but the majority of the functionality will be effective on any GPU cluster. If running on a non-DGX cluster there will be errors and warnings for the DGX specific tasks.
 
@@ -100,7 +100,7 @@ Run the diagnostics playbook:
 # NOTE: If SSH requires a password, add: `-k`
 # NOTE: If sudo on remote machine requires a password, add: `-K`
 # NOTE: If SSH user is different than current user, add: `-u ubuntu`
-# NOTE: We specify the connection type as paramikio_ssh to collect stdout from the firmware container
+# NOTE: We specify the connection type as paramiko_ssh to collect stdout from the firmware container
 # NOTE: Forks is specified as the number of nodes in the batch (40), allowing each DGX to run commands in parallel
 # Collect diagnostic info
 ansible-playbook -l slurm-node --connection=paramiko_ssh --forks 40 playbooks/nvidia-dgx/nvidia-dgx-diag.yml
@@ -167,7 +167,7 @@ Run the firmware update playbook:
 # NOTE: If SSH requires a password, add: `-k`
 # NOTE: If sudo on remote machine requires a password, add: `-K`
 # NOTE: If SSH user is different than current user, add: `-u ubuntu`
-# NOTE: We specify the connection type as paramikio_ssh to collect stdout from the firmware container
+# NOTE: We specify the connection type as paramiko_ssh to collect stdout from the firmware container
 
 # Update all firmware
 ansible-playbook -l slurm-node --connection=paramiko_ssh --forks 40 playbooks/nvidia-dgx/nvidia-dgx-fw-update.yml
@@ -176,7 +176,7 @@ ansible-playbook -l slurm-node --connection=paramiko_ssh --forks 40 playbooks/nv
 ansible slurm-node --forks 40 -ba "ipmitool mc reset cold"
 ```
 
-Updating firmware might require rebooting the systems, depending on what portion of the firmware is being updated. This is done automatically by the playbooks. However, certain components require a system power cycle. This can be disruptive and must be done manually. Follow the guidance in playbook output to safely shutdown these nodes and power cycle them through the BMC. If the Playbook output does not end with a message indictating a power cycle is needed, this step may be skipped.
+Updating firmware might require rebooting the systems, depending on what portion of the firmware is being updated. This is done automatically by the playbooks. However, certain components require a system power cycle. This can be disruptive and must be done manually. Follow the guidance in playbook output to safely shutdown these nodes and power cycle them through the BMC. If the Playbook output does not end with a message indicating a power cycle is needed, this step may be skipped.
 
 > Note, power cycling an entire datacenter's worth of DGX nodes may trigger a datacenter power alarm or trip a breaker. It is recommended to power cycle systems in batches with a several minute delay in-between or to alert the operations team when performing these actions.
 

@@ -7,6 +7,7 @@ Instructions for deploying a GPU cluster with Slurm
   - [Installation Steps](#installation-steps)
   - [Slurm Validation](#slurm-validation)
   - [Using Slurm](#using-slurm)
+  - [Customizing the Slurm configuration](#customizing-the-slurm-configuration)
   - [Prolog and Epilog](#prolog-and-epilog)
   - [Node Health Check](#node-health-check)
   - [Monitoring Slurm](#monitoring-slurm)
@@ -17,6 +18,10 @@ Instructions for deploying a GPU cluster with Slurm
   - [Pyxis, Enroot, and Singularity](#pyxis-enroot-and-singularity)
   - [Large deployments](#large-deployments)
   - [Identity across the cluster](#identity-across-the-cluster)
+  - [Rebooting the cluster](#rebooting-the-cluster)
+  - [When a node will not finish booting](#when-a-node-will-not-finish-booting)
+  - [Out-of-band management](#out-of-band-management)
+  - [Utility playbooks](#utility-playbooks)
 
 ## Requirements
 
@@ -61,13 +66,13 @@ Instructions for deploying a GPU cluster with Slurm
 
 4. If running on a cluster where you intend to configure [Multi-Instance GPU](https://www.nvidia.com/en-us/technologies/multi-instance-gpu/), consult the [Slurm NVML documentation](./nvml.md).
 
-4. Verify the configuration.
+5. Verify the configuration.
 
    ```bash
    ansible all -m raw -a "hostname"
    ```
 
-5. Install Slurm.
+6. Install Slurm.
 
    ```bash
    # NOTE: If SSH requires a password, add: `-k`

@@ -13,7 +13,7 @@ Additionally, for performance reasons, we typically test DeepOps in an environme
 Because of this, we don't currently maintain a comprehensive list of network ports used by the software that DeepOps deploys.
 The best way to obtain a comprehensive list of open ports is to deploy first in a test environment
 (e.g., using the [virtual cluster functionality](../../virtual)),
-and check what ports are required for the particular set of software you wise to deploy.
+and check what ports are required for the particular set of software you wish to deploy.
 
 This page documents a subset of commonly required ports, either by linking to documentation for the software components (e.g., Slurm and Kubernetes),
 listing known ports for major services such as NFS,

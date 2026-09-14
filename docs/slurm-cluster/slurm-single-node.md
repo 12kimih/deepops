@@ -73,7 +73,7 @@ The general requirements and procedure for Slurm setup via deepops is documented
    chmod 600 ~/.ssh/authorized_keys
    ```
 
-   Technicaly it is possible to setup a multinode Slurm with one of the compute nodes functioning as both a login and compute node. The config above just needs to list the additional nodes.
+   Technically it is possible to setup a multinode Slurm with one of the compute nodes functioning as both a login and compute node. The config above just needs to list the additional nodes.
 
    Example:
 
@@ -270,7 +270,7 @@ One suggestion is to add the following snippet or something similar to one's
 `.bashrc`.
 
 ```bash
-if [ ! -z "${Slurm_JOB_ID+x}" ]; then
+if [ ! -z "${SLURM_JOB_ID+x}" ]; then
     export PS1="slurm-${PS1}"
 fi
 ```
@@ -307,7 +307,7 @@ JobId=106 JobName=bash
    . . .
 ```
 
-DeepOps deploys Slurm with “pam \_slurm_adopt” such that ssh sessions are
+DeepOps deploys Slurm with `pam_slurm_adopt` such that ssh sessions are
 permitted and adopted to allocated nodes. What that means is once a user has a
 Slurm job, additional ssh sessions will be adopted to the job. Proceeding with
 the above example let us assume that job 106 is running. If the testuser were
@@ -481,7 +481,7 @@ recommended. Example:
 ```bash
 cat test-allreduce.sh
 #!/bin/bash
-if [ "$Slurm_PROCID" -eq "0" ]; then
+if [ "$SLURM_PROCID" -eq "0" ]; then
 mpirun all_reduce_perf -b 1M -e 4G -f 2 -g 1
 fi
 ```
@@ -494,7 +494,7 @@ login-session:srun --ntasks=2 --gpus-per-task=1 --no-container-remap-root \
   test-allreduce.sh
 ```
 
-The reason for `[ "$Slurm_PROCID" -eq "0" ]` is that srun and mpirun are redundant,
+The reason for `[ "$SLURM_PROCID" -eq "0" ]` is that srun and mpirun are redundant,
 so you have to invoke either one or the other. That is “srun mpirun” will call
 mpirun multiple times which is not what one wants. Note in the example script
 “test-allreduce.sh” one does not have to pass any parameters to mpirun as these
@@ -517,7 +517,7 @@ with enroot):
 ```bash
 login-session:srun --ntasks=2 --gpus-per-task=1 \
   singularity exec --nv docker://deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
-    ${PWD}/test_allreduce.sh
+    ${PWD}/test-allreduce.sh
 ```
 
 Refer to singularity documentation for further details. Building containers with

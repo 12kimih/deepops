@@ -21,7 +21,7 @@ Updating a cluster deployed with DeepOps
           - [On DGX](#on-dgx)
           - [On Ubuntu](#on-ubuntu)
           - [On RHEL](#on-rhel)
-        - [Updating the NVIDIA Container Runtime](#updating-the-nvidia-container-runtime)
+        - [Updating the NVIDIA Container Toolkit](#updating-the-nvidia-container-toolkit)
         - [Updating NVIDIA GPU Feature Discovery](#updating-nvidia-gpu-feature-discovery)
         - [Updating the NVIDIA GPU Device Plugin](#updating-the-nvidia-gpu-device-plugin)
     - [Updating the monitoring stack](#updating-the-monitoring-stack)
@@ -97,7 +97,7 @@ The DeepOps configuration files sometimes change from one release to the next. Y
 To identify any configuration changes between releases you may run:
 
 ```bash
-git diff 21.06 21.09 -- config.example/
+git diff <old-tag> <new-tag> -- config.example/
 ```
 
 ## Updating Kubernetes clusters
@@ -113,7 +113,7 @@ Performing these component-based upgrades does not require updating the DeepOps 
 ### Re-deploying the full cluster
 
 **Warning:** re-deploying the cluster will remove any persistent volumes stored on the cluster.
-By default, persistent volumes are stored on the first Kubernetes management node under `/export/deepops_nfs` as defined by the Ansible variables `k8s_nfs_server` and `k8s_nfs_export_path`, and exported using the NFS client provisioner. As a result of running the below `reset.yml`, all PVs stored in this directory will be moved to `/export_deepops_nfs/archived_<pv_uuuid>`; however it is advised that you manually ensure your critical data is backed up on external storage before trying this procedure.
+By default, persistent volumes are stored on the first Kubernetes management node under `/export/deepops_nfs` as defined by the Ansible variables `k8s_nfs_server` and `k8s_nfs_export_path`, and exported using the NFS client provisioner. As a result of running the below `reset.yml`, all PVs stored in this directory will be moved to `/export_deepops_nfs/archived_<pv_uuid>`; however it is advised that you manually ensure your critical data is backed up on external storage before trying this procedure.
 
 In some instances, you may want to start fresh with a newly-deployed Kubernetes cluster, rather than upgrading existing components.
 
@@ -142,7 +142,7 @@ And re-deploy any desired workloads.
 #### Updating Kubernetes
 
 For updating Kubernetes itself to a new revision, we recommend following the upgrade instructions provided by Kubespray for the particular version of DeepOps in use.
-For example, DeepOps 21.09 uses Kubespray v2.16.0, with upgrade instructions found [here](https://github.com/kubernetes-sigs/kubespray/blob/release-2.16/docs/upgrades.md).
+Find the Kubespray release the submodule pins with `git -C submodules/kubespray describe --tags`, and follow that release's upgrade documentation.
 
 When performing an update, it's important to make sure that your configured versions align with the supported versions in the version of Kubespray you are using.
 In particular,
@@ -240,7 +240,7 @@ helm list -aA
 Verify the Pods are all in a Ready or Completed state by running:
 
 ```bash
-kubectl get pods -aA
+kubectl get pods -A
 ```
 
 #### Updating the NVIDIA GPU Operator
@@ -250,7 +250,7 @@ The [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) automates the 
 To update to a new version of the GPU operator, set the following parameter in your DeepOps configuration:
 
 ```bash
-gpu_operator_chart_version: "1.8.2"
+gpu_operator_chart_version: "v26.3.2"
 ```
 
 Substituting in your desired version.
@@ -279,25 +279,20 @@ To update the driver on a DGX system, we recommend following the instructions in
 
 ###### On Ubuntu
 
-On Ubuntu, the default behavior in DeepOps is to use the LTS release branch distributed through the Ubuntu repositories. In this mode, the driver is generally pinned to a particular release branch such as 580.
-
-To upgrade to the latest driver within your current release branch, run:
+On Ubuntu, DeepOps installs the `-server-open` driver package for one release branch (`nvidia_driver_branch`) from the Ubuntu archive. Updates within that branch arrive as ordinary package upgrades:
 
 ```bash
-ansible-playbook playbooks/nvidia-software/nvidia-driver.yml -e nvidia_driver_package_state="latest" [-l <list-of-nodes>]
+ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
+ansible-playbook playbooks/utilities/reboot.yml -e hostlist=<list-of-nodes>
 ```
 
-To upgrade the driver to a new release branch, set the following parameter in your DeepOps configuration:
+To move to a new release branch, set it in your DeepOps configuration:
 
 ```bash
-nvidia_driver_branch: "580"
+nvidia_driver_branch: "<branch>"
 ```
 
-Some newer GPUs require NVIDIA open kernel modules. To install the Ubuntu open kernel module packages for the selected branch, set:
-
-```bash
-nvidia_driver_kernel_modules: "open"
-```
+Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, recommended for Turing and newer GPUs); set `"proprietary"` for older ones.
 
 Then run:
 
@@ -307,18 +302,14 @@ ansible-playbook playbooks/nvidia-software/nvidia-driver.yml [-l <list-of-nodes>
 
 ###### On RHEL
 
-On RHEL and related distros, DeepOps uses the driver distributed in the CUDA repository. To upgrade to the latest driver, run:
+On RHEL and related distros, DeepOps installs the driver module stream for `nvidia_driver_branch` from NVIDIA's CUDA repository. Updates within the stream arrive with `sudo dnf upgrade` on each node, followed by a reboot; to change branch, set `nvidia_driver_branch` and re-run `playbooks/nvidia-software/nvidia-driver.yml`.
+
+##### Updating the NVIDIA Container Toolkit
+
+The NVIDIA Container Toolkit is pinned by `nvidia_container_toolkit_version` (empty installs the latest). Set the version in your DeepOps configuration and re-run:
 
 ```bash
-ansible-playbook playbooks/nvidia-software/nvidia-driver.yml -e nvidia_driver_package_state="latest" [-l <list-of-nodes>]
-```
-
-##### Updating the NVIDIA Container Runtime
-
-To update the NVIDIA container runtime to the latest release, run the following command on each node:
-
-```bash
-sudo apt-get install nvidia-container-runtime
+ansible-playbook playbooks/container/nvidia-docker.yml [-l <list-of-nodes>]
 ```
 
 ##### Updating NVIDIA GPU Feature Discovery
@@ -328,7 +319,7 @@ Updating GFD should typically be non-disruptive, and does not need to be run on 
 To update to a new version of GFD, set the following variable in your DeepOps configuration:
 
 ```bash
-k8s_gpu_feature_discovery_chart_version: "0.4.1"
+k8s_gpu_feature_discovery_chart_version: "0.19.2"
 ```
 
 substituting your desired version of the feature discovery chart.
@@ -346,7 +337,7 @@ Updating the GPU Device Plugin should typically be non-disruptive, and does not 
 To update to a new version, set the following variable in your DeepOps configuration:
 
 ```bash
-k8s_gpu_plugin_chart_version: "0.9.0"
+k8s_gpu_plugin_chart_version: "0.19.2"
 ```
 
 substituting your desired version of the device plugin chart.
@@ -394,11 +385,10 @@ For major version upgrades, see the instructions documented in the [README for t
 
 #### On Ubuntu
 
-To update the underlying OS packages on the nodes, run the following on each node:
+To update the underlying OS packages on the nodes, run the upgrade playbook against them, then reboot any node that asks for it (`/var/run/reboot-required`):
 
 ```bash
-sudo apt-get update
-sudo apt-get full-upgrade
+ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 ```
 
 #### On RHEL
@@ -406,7 +396,7 @@ sudo apt-get full-upgrade
 To update the underlying OS packages on the nodes, run the following on each node:
 
 ```bash
-sudo yum update
+sudo dnf upgrade
 ```
 
 ## Updating Slurm clusters
@@ -423,12 +413,12 @@ Performing these component-based upgrades does not require updating the DeepOps 
 
 #### Updating Slurm
 
-**Important:** Slurm generally supports upgrading within two major releases without loss of state information or accounting data. E.g., you can upgrade to 21.08 from 20.11 or 20.02, but not prior releases. We recommend consulting the release notes for your desired version of Slurm before running an upgrade.
+**Important:** Slurm generally supports upgrading within two major releases without loss of state information or accounting data. E.g., you can upgrade to 25.11 from 25.05 or 24.11, but not from earlier releases. We recommend consulting the release notes for your desired version of Slurm before running an upgrade.
 
 To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version:
 
 ```bash
-slurm_version: 21.08.0
+slurm_version: 25.11.6
 ```
 
 Then re-run the Slurm playbook:
@@ -449,25 +439,20 @@ To update the driver on a DGX system, we recommend following the instructions in
 
 ##### On Ubuntu
 
-On Ubuntu, the default behavior in DeepOps is to use the LTS release branch distributed through the Ubuntu repositories. In this mode, the driver is generally pinned to a particular release branch such as 580.
-
-To upgrade to the latest driver within your current release branch, run:
+On Ubuntu, DeepOps installs the `-server-open` driver package for one release branch (`nvidia_driver_branch`) from the Ubuntu archive. Updates within that branch arrive as ordinary package upgrades:
 
 ```bash
-ansible-playbook playbooks/nvidia-software/nvidia-driver.yml -e nvidia_driver_package_state="latest" [-l <list-of-nodes>]
+ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
+ansible-playbook playbooks/utilities/reboot.yml -e hostlist=<list-of-nodes>
 ```
 
-To upgrade the driver to a new release branch, set the following parameter in your DeepOps configuration:
+To move to a new release branch, set it in your DeepOps configuration:
 
 ```bash
-nvidia_driver_branch: "580"
+nvidia_driver_branch: "<branch>"
 ```
 
-Some newer GPUs require NVIDIA open kernel modules. To install the Ubuntu open kernel module packages for the selected branch, set:
-
-```bash
-nvidia_driver_kernel_modules: "open"
-```
+Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, recommended for Turing and newer GPUs); set `"proprietary"` for older ones.
 
 Then run:
 
@@ -477,45 +462,41 @@ ansible-playbook playbooks/nvidia-software/nvidia-driver.yml [-l <list-of-nodes>
 
 ##### On RHEL
 
-On RHEL and related distros, DeepOps uses the driver distributed in the CUDA repository. To upgrade to the latest driver, run:
-
-```bash
-ansible-playbook playbooks/nvidia-software/nvidia-driver.yml -e nvidia_driver_package_state="latest" [-l <list-of-nodes>]
-```
+On RHEL and related distros, DeepOps installs the driver module stream for `nvidia_driver_branch` from NVIDIA's CUDA repository. Updates within the stream arrive with `sudo dnf upgrade` on each node, followed by a reboot; to change branch, set `nvidia_driver_branch` and re-run `playbooks/nvidia-software/nvidia-driver.yml`.
 
 #### Updating the CUDA toolkit
 
-To upgrade to a new version of the CUDA toolkit, edit your DeepOps configuration and specify the name of the new toolkit package you wish to install. For example,
+CUDA is served as per-version Lmod modules by default. To add a version, list it in `cuda_versions` in your DeepOps configuration and re-run:
 
 ```bash
-cuda_version: "cuda-toolkit-11-3"
+ansible-playbook playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
 ```
 
-Then re-run the CUDA toolkit playbook:
-
-```bash
-ansible-playbook playbooks/nvidia-software/nvidia-cuda.yml
-```
+For the single system-wide toolkit instead (`nvidia_cuda_install: true`), set the package in `cuda_version`, for example `cuda-toolkit-13-2`, and re-run `playbooks/nvidia-software/nvidia-cuda.yml`.
 
 #### Updating the monitoring stack (excluding dcgm-exporter)
 
-The monitoring stack on a Slurm cluster deployed with DeepOps is container-based. For most of these, we use the "latest" tag by default. So in order to upgrade, all you typically need to do is run "docker pull" for the container in question and then restart the service.
+The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by a variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `slurm_exporter_container` and `node_exporter_container`. Each systemd unit pulls its image when it starts, so an upgrade is a new tag in your DeepOps configuration, a re-run of the playbook, and a restart of the unit.
 
-On the monitoring host, the commands to use are:
+From the provisioning node:
 
 ```bash
-docker pull prom/prometheus
-systemctl restart docker.prometheus
-docker pull grafana/grafana
-systemctl restart docker.grafana
-docker pull deepops/prometheus-slurm-exporter
-systemctl restart docker.slurm-exporter
+ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/prometheus.yml
+ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/grafana.yml
+ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/alertmanager.yml
+ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/prometheus-slurm-exporter.yml
+ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
 ```
 
-On the compute nodes, the commands to use are:
+Then restart the units whose image changed -- on the monitoring host:
 
 ```bash
-docker pull quay.io/prometheus/node-exporter
+systemctl restart docker.prometheus docker.grafana docker.alertmanager docker.slurm-exporter
+```
+
+and on every node, for the node exporter:
+
+```bash
 systemctl restart docker.node-exporter
 ```
 
@@ -555,9 +536,9 @@ The NVIDIA HPC SDK is installed in versioned directories, so that new versions a
 To install a newer HPC SDK, first configure the version variables in your DeepOps configuration:
 
 ```bash
-hpcsdk_major_version: "21"
-hpcsdk_minor_version: "9"
-hpcsdk_file_cuda: "11.4"
+hpcsdk_major_version: "26"
+hpcsdk_minor_version: "3"
+hpcsdk_file_cuda: "13.1"
 hpcsdk_arch: "x86_64"
 ```
 
@@ -573,11 +554,10 @@ Note that we typically install the HPC SDK in an NFS-shared directory, so this p
 
 #### On Ubuntu
 
-To update the underlying OS packages on the nodes, run the following on each node:
+To update the underlying OS packages on the nodes, run the upgrade playbook against them, then reboot any node that asks for it (`/var/run/reboot-required`):
 
 ```bash
-sudo apt-get update
-sudo apt-get full-upgrade
+ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 ```
 
 #### On RHEL
@@ -585,5 +565,5 @@ sudo apt-get full-upgrade
 To update the underlying OS packages on the nodes, run the following on each node:
 
 ```bash
-sudo yum update
+sudo dnf upgrade
 ```
