@@ -1,7 +1,6 @@
 ---
 # Catppuccin palettes (https://catppuccin.com/palette), as "r;g;b" for SGR 38;2.
-# Only the roles the banner uses. Same flavours the sq command ships with, so a login
-# screen and the tool it points at read as one thing.
+# Only the colours the banner uses.
 cluster_tools_palettes:
   mocha:
     accent: "203;166;247"   # mauve    -- title

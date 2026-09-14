@@ -21,7 +21,7 @@
     label: "{{ cluster_tools_lib_dir }}/{{ item.dest }}"
 
 # A published name that also resolves elsewhere in PATH would shadow the real command
-# for every user -- which is what `alias squeue=/sw/scripts/squeue.sh` did. Catch it
+# for every user, as an `alias squeue=/path/to/squeue.sh` does. Catch it
 # here instead of at someone's prompt.
 - name: Look for existing commands the published names would shadow
   ansible.builtin.shell:

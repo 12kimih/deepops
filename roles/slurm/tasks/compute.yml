@@ -210,7 +210,7 @@
     - slurm_enable_pam_slurm_adopt
     - not slurm_restrict_node_access
 
-- name: Comment out pam_systemd.so as it conflicts with pam_slurm_adapt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
+- name: Comment out pam_systemd.so as it conflicts with pam_slurm_adopt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
   ansible.builtin.replace:
     path: /etc/pam.d/common-session
     regexp: "^([^#].*pam_systemd.so.*)"
@@ -221,7 +221,7 @@
   tags:
     - config
 
-- name: Comment out pam_systemd.so in RHEL as it conflicts with pam_slurm_adapt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
+- name: Comment out pam_systemd.so in RHEL as it conflicts with pam_slurm_adopt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
   ansible.builtin.replace:
     path: /etc/pam.d/password-auth
     regexp: "^([^#].*pam_systemd.so.*)"
