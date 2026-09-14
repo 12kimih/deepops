@@ -1,17 +1,15 @@
 #!/bin/bash
 #
-# Launch a HPL Burn-in test based.
+# Launch an HPL burn-in experiment through Slurm.
 #
-# ./launch_experiment_slurm.sh <nodes per job>
+# ./launch_hpl_experiment.sh -s <system> -c <nodes per job> --cruntime <runtime>
 #
-# - Right now systems supported are dgx1v_16G, dgx1v_32G, dgx2, and dgxa100
-# - Eventually the code should (somewhat) support generic systems.
+# - Supported systems: dgx1v_16G, dgx1v_32G, dgx2, dgxa100_40G, dgxa100_80G
+# - Other systems need a syscfg file passed as -s; that path is not finished.
 #
 # -- Requirements
-# - OpenMPI 4.0.4 and UCX 1.9 must be on the PATH and LD_LIBRARY_PATH
-# - The correct cuda version should be installed and on the PATH and LD_LIBRARY_PATH
-# - run the install_hplbit_deps.sh script to do the above.
-# - Slurm Cluster Manager setup with PMIx and hwloc is required.
+# - HPL runs inside the NGC hpc-benchmarks container (Singularity or Enroot).
+# - Slurm with PMI2 (srun --mpi=pmi2) and hwloc.
 #  
 #
 
@@ -43,7 +41,7 @@ Launch an HPL Burnin test.
 
 Required Options:
     -s|--sys <SYSCFG>
-        * Set to the system type on which to run.  Ex: dgx1v, dgx2, dgxa100, or a path to a script file with custom system settings
+        * Set to the system type on which to run: dgx1v_16G, dgx1v_32G, dgx2, dgxa100_40G, dgxa100_80G, or a path to a script file with custom system settings
     -c|--count <Count>
         * Set to the number of nodes to use per job
 
@@ -53,7 +51,9 @@ Other Options:
     -p|--part <Slurm Partition>
         * Set the Slurm partition to use.  Default is ${partition}."
     -a|-A|--account <Slurm Account>
-        * Set the Slurm accoutn to use.  Default is None."
+        * Set the Slurm account to use.  Default is None."
+    -t|--walltime <HH:MM:SS>
+        * Set the wall time of each job.  Default is ${walltime}.
     -m|--maxnodes <Number_of_nodes>
         * Set the maximum number of nodes to use per experiment.  This is used for testing.  Default is all of them."
     --mpiopts <Options>
@@ -65,7 +65,7 @@ Other Options:
     --container <container URL>
         * Set container to use
     --cruntime <container runtime>
-	* Specify container runtime.  Options are singularity, enroot, and bare (bare-metal)
+	* Specify container runtime.  Options are singularity, enroot, and bare (bare-metal, not supported yet).  Default is ${cruntime}.
     --hplai 
         * Run HPL-AI benchmark
     --nores
@@ -432,7 +432,7 @@ wait
 rm -f ${HFILE}
 rm -f ${MACHINEFILE}
 
-# Now watch and wait on the experimet
+# Now watch and wait on the experiment
 # Group jobs into running, waiting
 
 total_jobs=${#jobid_list[@]}

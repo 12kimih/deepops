@@ -8,7 +8,7 @@ cd "${ROOT_DIR}"
 
 DCGM_EXPORTER_PORT=9400
 
-# Run DCGM metric checks against all nodes in the group passed in (kube-node or slurm-node)
+# Group name passed by callers (kube_node or slurm-node); unused, the checks below query the GPU VMs by IP
 group="${1}"
 
 # DCGM-exporter takes some time to initialize after it has started up

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 #
-# verify_hpl_experiment.sh <DIRECTORY> (SYSTEM)
+# verify_hpl_experiment.py <DIRECTORY>
 #
-#  This script will do two things.
-#    1) It will verify the performance against a reference, if the reference is available
-#    2) It will verify performance based on jitter of all of the results.
+#  This script checks that every job completed and passed HPL's residual check,
+#  and flags jobs that ran more than 5% slower than the fastest one.
 #
 # In the event there are failed jobs, the nodes and failure counts will be reported.
 
@@ -153,9 +152,9 @@ for fn in glob.glob(expdir + "/*.out", recursive=False):
 
         file.close()
 
-# Vaidate each case and make sure they all have the same settings
+# Validate each case and make sure they all have the same settings
 if fncnt == 0:
-    print("ERROR: No cases were found.  Either this is an invalid experiment directory or something we wrong.  Please check")
+    print("ERROR: No cases were found.  Either this is an invalid experiment directory or something went wrong.  Please check")
     print("")
     exit(1)
 

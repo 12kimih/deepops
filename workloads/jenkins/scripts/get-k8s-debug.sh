@@ -11,7 +11,7 @@ export KFCTL=${ROOT_DIR}/config/kfctl
 #  Collect all the standard debug
 ${ROOT_DIR}/scripts/k8s/debug.sh
 
-# Iterate over each .log file and pring to screen, ignoring the tar
+# Iterate over each .log file and print to screen, ignoring the tar
 for logfile in $(ls ./config/${logdir}/*log); do
     cat ${logfile}
 done

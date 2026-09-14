@@ -6,7 +6,7 @@ metadata:
   namespace: rook-ceph
 spec:
   cephVersion:
-    # For the latest ceph images, see https://hub.docker.com/r/ceph/ceph/tags
+    # For the latest ceph images, see https://quay.io/repository/ceph/ceph?tab=tags
     image: ceph/ceph:v14.2
   dataDirHostPath: /var/lib/rook
   mon:

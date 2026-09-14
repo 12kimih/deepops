@@ -1,5 +1,5 @@
 ---
-# Anaconda on all hosts
+# Miniconda on all hosts
 - hosts: all
   become: true
   roles:

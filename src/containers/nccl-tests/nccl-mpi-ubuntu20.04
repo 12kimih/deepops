@@ -54,14 +54,14 @@ RUN apt-get update && apt-get install -y --allow-downgrades --allow-change-held-
 
 RUN ln -s /usr/bin/python${PYTHON_VERSION} /usr/bin/python
 
-# pinning pip to 21.0.0 as 22.0.0 cannot fetch pytorch packages from html linl
+# pinning pip to 21.0.0 as 22.0.0 cannot fetch pytorch packages from html link
 # https://github.com/pytorch/pytorch/issues/72045
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py && \
     rm get-pip.py && \
     pip install --no-cache-dir -U --force pip~=21.0.0
 
-# Install recent CMake.
+# Install CMake 3.13.
 RUN pip install --no-cache-dir -U cmake~=3.13.0
 
 # Install PyTorch, TensorFlow, Keras and MXNet
@@ -102,7 +102,7 @@ RUN sed -i 's/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g' /etc/ssh/ssh_config &&
     echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config && \
     sed -i 's/#\(StrictModes \).*/\1no/g' /etc/ssh/sshd_config
 
-## Install Mellano OFED
+## Install Mellanox OFED
 ENV MOFED_VERSION 5.5-1.0.3.2
 ENV MOFED_DIR MLNX_OFED_LINUX-${MOFED_VERSION}-ubuntu20.04-x86_64
 ENV MOFED_SITE_PLACE MLNX_OFED-${MOFED_VERSION}

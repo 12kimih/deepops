@@ -30,7 +30,7 @@ if [[ "${strategy}" != *"mixed"* ]] || [[ "${product}" == "" ]]; then # Using *m
   fi
 fi
 
-# Occassionally this gpu-test fails and/or hangs. To ease debugging of this we run a describe several seconds into the launch.
+# Occasionally this gpu-test fails and/or hangs. To ease debugging of this we run a describe several seconds into the launch.
 sleep 10 && kubectl describe pods gpu-test &
 timeout 300 kubectl run gpu-test --rm -t -i --restart=Never --image=nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04 --limits=nvidia.com/gpu=1 -- nvidia-smi
 

@@ -1,5 +1,5 @@
 ---
-# kubectl apply -f tests/nbody.yml
+# kubectl apply -f workloads/examples/k8s/nbody.yml
 # kubectl scale deploy/cuda-nbody --replicas=2
 apiVersion: apps/v1
 kind: Deployment

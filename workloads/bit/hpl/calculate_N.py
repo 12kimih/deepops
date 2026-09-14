@@ -9,7 +9,7 @@ def print_help():
     print("calculate_N.py -- A script to calculate a range of N values near maximum Memory Use")
     print("")
     print("Example:")
-    print("    ./calculate.py --mem 32768 --nb 192 --ranks 8")
+    print("    ./calculate_N.py --mem 32768 --nb 192 --ranks 8")
     print("")
     print("")
     print("Options:")

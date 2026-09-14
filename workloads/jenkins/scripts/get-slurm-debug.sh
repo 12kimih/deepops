@@ -12,7 +12,7 @@ ${ROOT_DIR}/scripts/slurm/debug.sh
 # The debug script will create a time-stamped log dir
 logdir=$(ls -Art ./config | grep log_ | tail -n 1)
 
-# Iterate over each .log file and pring to screen, ignoring the tar
+# Iterate over each .log file and print to screen, ignoring the tar
 for logfile in $(ls ./config/${logdir}/*log); do
     cat ${logfile}
 done

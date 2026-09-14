@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Get a list of changed python scripts that are staged for commit.
-Run shellcheck on only those files.
+Run pylint on only those files.
 """
 
 
@@ -15,7 +15,7 @@ def get_changed_paths():
     git_diff = subprocess.check_output("git diff --name-only --cached".split())
     paths = []
     for f in git_diff.split("\n"):
-        # Add playbook files
+        # Add Python files
         if re.match(r".*(\.py)$", f):
             paths.append(f)
     return paths

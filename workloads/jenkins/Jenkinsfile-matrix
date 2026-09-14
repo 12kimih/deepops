@@ -1,13 +1,13 @@
 // This Jenkins file is meant to allow a customized set of deployment tasks to be manually triggered
 // The primary use case for Jenkinsfile is quick smoke tests against a specific deployment configuration
 //
-// TODO: This should acts as a wrapper around the exising Jenkinsfile-nightly tests, but instead it runs a simplified test suite
+// TODO: This should act as a wrapper around the existing Jenkinsfile-nightly tests, but instead it runs a simplified test suite
 //
 // Use case 1: Allow a user to run the nightly tests on a single combination of deployment options
 // Use case 2: Allow a user to specify a group of deployment options and run them in parallel
 
 // Configuration options defaults
-// The assumption is that if Jenkins passess through 'all' each option must be tested
+// The assumption is that if Jenkins passes through 'all' each option must be tested
 //   Otherwise, the default in Jenkins should match the default here and that is used
 Map matrix_axes = [
   DEEPOPS_VAGRANT_OS: ['centos', 'ubuntu'],

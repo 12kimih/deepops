@@ -87,7 +87,7 @@ echo "NV_GPUCLOCK: ${NV_GPUCLOCK}"
 
 LOCAL_MPIOPTS="--mca btl_openib_warn_default_gid_prefix 0"
 
-# Echo write nodelist
+# Print the nodelist
 echo "HOSTLIST: $(scontrol show hostname $SLURM_NODELIST | paste -s -d,)" 
 echo "" 
 

@@ -23,7 +23,7 @@ RUN source "$NVM_DIR/nvm.sh" && \
     conda install -y -c conda-forge ipyvolume==0.5.2 && conda clean -yac * && \
     jupyter labextension install ipyvolume
 
-# Install toc to build table of ontents in Jupyter, not available through Conda
+# Install toc to build table of contents in Jupyter, not available through Conda
 RUN source "$NVM_DIR/nvm.sh" && \
     jupyter labextension install @jupyterlab/toc
 
