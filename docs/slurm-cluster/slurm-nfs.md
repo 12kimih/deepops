@@ -101,10 +101,14 @@ sandboxes, never for `/home`. [Boot failures](../deepops/boot-failures.md) recor
 this looks like on a console.
 
 The boot race above is real and still unsolved here; `nofail` means a node that loses the
-race comes up without the share rather than not at all. If you need a retry, add one that
-does not put autofs on `/home` -- a `noauto` entry plus a unit that retries `mount`, or
-the `autofs` daemon with a wildcard map under `/home/<user>` rather than on `/home`
-itself (see `roles/autofs` and `autofs_map` in `group_vars/all.yml`).
+race comes up without the share rather than not at all. Once the servers are up,
+`playbooks/utilities/nfs-mount.yml` mounts what is missing: for every NFS entry in a
+host's `/etc/fstab` that is not mounted, it waits for the server to answer on port 2049
+and starts the entry's mount unit. It reads fstab rather than `nfs_mounts`, so it mounts
+only what the host was set up to mount. An automatic retry must not put autofs on `/home`
+either -- use a `noauto` entry plus a unit that retries `mount`, or the `autofs` daemon
+with a wildcard map under `/home/<user>` rather than on `/home` itself (see
+`roles/autofs` and `autofs_map` in `group_vars/all.yml`).
 
 Consequences worth knowing:
 
@@ -138,7 +142,7 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    copy results back.
 
 2. **Client mount options.** The default `nfs_mount_options` is now
-   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail,x-systemd.automount`.
+   `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.
    `vers=4.2` uses COMPOUND ops; `nconnect=16` opens 16 TCP connections per mount to beat
    the single-flow limit. **The default targets a 100GbE+ fabric** -- NetApp shows
    `nconnect` reaching ~line rate (~11 GB/s) on a single 100G NIC at 16 connections. On

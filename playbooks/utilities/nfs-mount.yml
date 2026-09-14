@@ -1,0 +1,19 @@
+---
+# Mount the NFS entries in each host's fstab that are not mounted, once their servers are
+# up. Boot tries each mount once, and nofail lets a node that came up before its server
+# finish booting without the share. See docs/slurm-cluster/slurm-nfs.md.
+#
+#   -e hostlist=...                target a subset
+#   -e nfs_mount_wait_timeout=N    seconds to wait for a server (default 300)
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  gather_facts: false
+  tags:
+    - nfs_mount
+  tasks:
+    - name: Mount the shared filesystems
+      ansible.builtin.include_role:
+        name: nfs
+        tasks_from: mount.yml
+      tags:
+        - nfs_mount

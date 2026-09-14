@@ -1,0 +1,68 @@
+---
+# Mount the NFS entries in this host's fstab that are not mounted. Boot tries each once,
+# and nofail lets a node that came up before its server finish booting without it. fstab,
+# not nfs_mounts, is the list: it holds what this host was actually set up to mount.
+
+# Tables only, never a stat: a stat on a hard mount whose server is gone does not return.
+- name: Read the NFS entries in fstab
+  ansible.builtin.command: findmnt --fstab --json --types nfs,nfs4 --output TARGET,SOURCE,OPTIONS
+  register: nfs_mount_fstab
+  changed_when: false
+  failed_when: nfs_mount_fstab.rc not in [0, 1]
+  check_mode: false
+  tags:
+    - nfs_mount
+
+- name: Read the mounts in place
+  ansible.builtin.command: findmnt --kernel --list --noheadings --output TARGET
+  register: nfs_mount_kernel
+  changed_when: false
+  check_mode: false
+  tags:
+    - nfs_mount
+
+# An occupied mountpoint is left alone: a hard mount recovers once its server is back.
+- name: Select the entries that are not mounted
+  ansible.builtin.set_fact:
+    nfs_mount_pending: >-
+      {{ (nfs_mount_fstab.stdout | default('{}', true) | from_json).filesystems | default([])
+         | rejectattr('target', 'in', nfs_mount_kernel.stdout_lines)
+         | rejectattr('options', 'search', '(^|,)noauto(,|$)')
+         | list }}
+  tags:
+    - nfs_mount
+
+# Errors ignored so one absent server does not hold back the shares of the others.
+- name: Wait for each server to serve NFS
+  ansible.builtin.wait_for:
+    host: "{{ item.source | regex_replace(':/.*$', '') | trim('[]') }}"
+    port: 2049
+    timeout: "{{ nfs_mount_wait_timeout }}"
+  loop: "{{ nfs_mount_pending }}"
+  loop_control:
+    label: "{{ item.source }}"
+  register: nfs_mount_wait
+  ignore_errors: true
+  tags:
+    - nfs_mount
+
+# Through the entry's mount unit, so systemd tracks the mount and its start timeout bounds
+# a server that answers but does not serve the export.
+- name: Mount the entries whose server answered
+  ansible.builtin.command:
+    argv: [systemctl, start, "{{ item.item.target }}"]
+  loop: "{{ nfs_mount_wait.results | reject('failed') | list }}"
+  loop_control:
+    label: "{{ item.item.target }}"
+  changed_when: true
+  tags:
+    - nfs_mount
+
+- name: Fail on the entries whose server never answered
+  ansible.builtin.fail:
+    msg: "{{ item.item.source }} did not serve NFS within {{ nfs_mount_wait_timeout }}s; {{ item.item.target }} is not mounted"
+  loop: "{{ nfs_mount_wait.results | select('failed') | list }}"
+  loop_control:
+    label: "{{ item.item.target }}"
+  tags:
+    - nfs_mount
