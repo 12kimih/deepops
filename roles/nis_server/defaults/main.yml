@@ -4,8 +4,8 @@
 # this role only on the host where `nis_make_server` is true, and only when
 # `nis_domain` is defined.
 #
-# NOTE: this role is new and NIS-server setup is environment-sensitive (domain
-# resolution, the ypinit database build). Validate on your cluster after first run:
+# NOTE: NIS-server setup is environment-sensitive (domain resolution, the ypinit
+# database build). Validate on your cluster after first run:
 #   ypwhich -m            # should list maps
 #   ypcat passwd          # should print NIS passwd entries
 # Refs: https://wiki.debian.org/BullseyeNis , man ypinit(8), man ypserv(8)
@@ -13,9 +13,9 @@
 # Required (shared with nis_client): the NIS domain this server is master for.
 # nis_domain: example.nis
 
-# Designate THIS host as the NIS master. Set true in host_vars for the server node
-# (e.g. config/host_vars/<master>.yml: nis_make_server: true). Default false so the
-# role is a no-op everywhere else.
+# Designate THIS host as the NIS master. Set true for the server node only, e.g. in
+# group_vars/nis-master.yml (the [nis-master] inventory group) or that host's
+# host_vars. Default false so the role is a no-op everywhere else.
 nis_make_server: false
 
 # /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client

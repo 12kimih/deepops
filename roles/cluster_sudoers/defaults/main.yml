@@ -20,7 +20,7 @@
 # unreachable.
 cluster_sudoers_netgroup: ""
 
-# Require a password. Set true only where the password cannot be checked -- a node
+# false requires a password. Set true only where the password cannot be checked -- a node
 # with no reachable hash for directory users, where a password-requiring rule can
 # never succeed. Check as the user, on the node:
 #
