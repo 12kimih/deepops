@@ -1,6 +1,5 @@
 ---
 ansible_become: true
-kubeadm_enabled: true
 kube_api_anonymous_auth: true
 kube_kubeadm_apiserver_extra_args:
   service-account-issuer: "kubernetes.default.svc"
@@ -9,7 +8,6 @@ kube_kubeadm_apiserver_extra_args:
 kubectl_localhost: false
 kubeconfig_localhost: true
 helm_enabled: true
-tiller_node_selectors: "node-role.kubernetes.io/control-plane=''"
 
 ## Container runtime
 ## docker for docker, crio for cri-o and containerd for containerd.
@@ -17,7 +15,9 @@ container_manager: containerd
 
 artifacts_dir: "{{ inventory_dir }}/artifacts"
 
-# Reset Flex Volume path to the default. Kubespray changes the path, which breaks Rook
+# Point the kubelet's FlexVolume plugin directory at the upstream default path (Kubespray
+# passes --volume-plugin-dir only when this is set). Older Rook releases looked for their
+# FlexVolume driver there.
 # see: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-storage/flexvolume.md
 kubelet_flexvolumes_plugins_dir: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
 
@@ -25,24 +25,11 @@ kubelet_flexvolumes_plugins_dir: /usr/libexec/kubernetes/kubelet-plugins/volume/
 # Docker configuration.
 deepops_gpu_operator_enabled: true
 
-# Install NVIDIA Driver and nvidia-docker on node (true), not as part of GPU Operator (driver container, nvidia-toolkit) (false)
+# Install the NVIDIA driver and Container Toolkit on the node (true), not as part of GPU Operator (driver container, nvidia-toolkit) (false)
 gpu_operator_preinstalled_nvidia_software: true
 
 # Set the MIG labeling and use strategy to none, single, or mixed. See https://github.com/NVIDIA/k8s-device-plugin
 k8s_gpu_mig_strategy: "mixed"
-
-# When set to true, enables the PodSecurityPolicy admission controller and
-# defines two policies: privileged (applying to all resources in kube-system
-# namespace and kubelet) and restricted (applying all other namespaces).
-# Addons deployed in kube-system namespaces are handled.
-#podsecuritypolicy_enabled: false
-
-# Pin the version of kubespray dashboard https://github.com/kubernetes/dashboard/releases/tag/v2.0.3
-dashboard_enabled: true
-dashboard_image_tag: "v2.0.3"
-dashboard_image_repo: "kubernetesui/dashboard"
-dashboard_metrics_scraper_tag: "v1.0.4"
-dashboard_metrics_scraper_repo: "kubernetesui/metrics-scraper"
 
 # Ensure hosts file generation only runs across k8s cluster
 hosts_add_ansible_managed_hosts_groups: ["k8s_cluster"]
@@ -57,7 +44,7 @@ k8s_nfs_export_path: '/export/deepops_nfs'
 
 # NFS Server
 # This config will create an NFS server and share the given exports
-# Playbook: nfs-server.yml, nfs-provisioner-client.yml
+# Playbooks: nfs-client-provisioner.yml, generic/nfs-server.yml
 nfs_exports:
   - path: '{{ k8s_nfs_export_path }}'
     options: "*(rw,sync,no_root_squash)"
@@ -81,8 +68,8 @@ docker_registry_mirrors: "{{ groups['kube_control_plane'] | map('regex_replace',
 # The previous "native" workaround for cri-tools #436/#710 is no longer needed.
 containerd_snapshotter: "overlayfs"
 
-# Work-around for https://github.com/kubernetes-sigs/kubespray/issues/8529
-nerdctl_extra_flags: " --insecure-registry"
+# Pull images with crictl rather than Kubespray's containerd default, nerdctl
+# (work-around for https://github.com/kubernetes-sigs/kubespray/issues/8529)
 image_command_tool: "crictl"
 
 ################################################################################
