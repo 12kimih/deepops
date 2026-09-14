@@ -3,7 +3,7 @@
 [Kubeflow](https://www.kubeflow.org/docs/) is a K8s native tool that eases the Deep Learning and Machine Learning lifecycle.
 
 - [Kubeflow](#kubeflow)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Installation](#installation)
   - [Login information](#login-information)
   - [Other usage](#other-usage)
@@ -23,13 +23,13 @@ Additionally Kubeflow offers [hyper-parameter tuning](https://github.com/kubeflo
 
 Kubeflow is an [open source project](https://github.com/kubeflow/kubeflow) and is regularly evolving and adding [new features](https://github.com/kubeflow/kubeflow/blob/master/ROADMAP.md).
 
-As part of the Kubeflow installation, the MPI Operator will also be installed. This will add the `MPIJob` CustomResourceDefinition to the cluster, enabling multi-pod or multi-node workloads. See [here](https://github.com/kubeflow/mpi-operator/tree/master/) for details and examples.
+`deploy_kubeflow.sh` does not install the standalone [MPI Operator](https://github.com/kubeflow/mpi-operator); that step is disabled pending [#737](https://github.com/NVIDIA/deepops/issues/737).
 
 ## Installation
 
 Deploy Kubernetes by following the [DeepOps Kubernetes Deployment Guide](README.md)
 
-Kubeflow requires a DefaultStorageClass to be defined. By default DeepOps installs the `nfs-client-provisioner` using the [nfs-client-provisioner.yml playbook](../../playbooks/k8s-cluster/nfs-client-provisioner.yml). This playbook can re run manually. As an NFS alternative [Ceph](../../scripts/k8s/deploy_rook.sh), [Trident](../../playbooks/k8s-cluster/netapp-trident.yml) or an alternative StorageClass can be used.
+Kubeflow requires a DefaultStorageClass to be defined. By default DeepOps installs the `nfs-client-provisioner` using the [nfs-client-provisioner.yml playbook](../../playbooks/k8s-cluster/nfs-client-provisioner.yml). This playbook can be re-run manually. As an NFS alternative [Ceph](../../scripts/k8s/deploy_rook.sh), [Trident](../../playbooks/k8s-cluster/netapp-trident.yml) or an alternative StorageClass can be used.
 
 Deploy Kubeflow:
 
@@ -39,11 +39,9 @@ Deploy Kubeflow:
 
 See the [install docs](https://www.kubeflow.org/docs/started/k8s/overview/) for additional install configuration options.
 
-A local checkout of the [Kubeflow manifests](https://github.com/kubeflow/manifests) will be saved to `./config/kubeflow-install/manifests`.
+A local checkout of the [Kubeflow manifests](https://github.com/kubeflow/manifests) (`KUBEFLOW_MANIFESTS_VERSION`, default `v1.7.0`) will be saved to `./config/kubeflow-install/manifests`.
 
-The services can be reached from the following address:
-
-- Kubeflow: http://\<kube_control_plane\>:31380
+Kubeflow is exposed through the NodePort of the `istio-ingressgateway` service; `./scripts/k8s/deploy_kubeflow.sh -p` prints the URL.
 
 ## Login information
 
@@ -60,9 +58,10 @@ For the most up-to-date usage information run `./scripts/k8s/deploy_kubeflow.sh 
 Usage:
 -h    This message.
 -p    Print out the connection info for Kubeflow.
+-c    Only clone the Kubeflow manifests repo, but do not deploy Kubeflow.
 -d    Delete Kubeflow from your system (skipping the CRDs and istio-system namespace that may have been installed with Kubeflow.
--x    Install Kubeflow with multi-user auth (this utilizes Dex, the default is no multi-user auth).
--c    Specify a different Kubeflow config to install with (this option is deprecated).
+-D    Deprecated, same as -d. Previously 'Fully Delete Kubeflow from your system along with all Kubeflow CRDs the istio-system namespace. WARNING, do not use this option if other components depend on istio.'
+-x    Deprecated, multi-user auth is now the default.
 -w    Wait for Kubeflow homepage to respond (also polls for various Kubeflow Deployments to have an available status).
 ```
 
@@ -74,8 +73,12 @@ To uninstall and re-install Kubeflow run:
 
 ```bash
 ./scripts/k8s/deploy_kubeflow.sh -d
+# The deploy refuses to overwrite an existing manifests checkout
+rm -rf ./config/kubeflow-install/manifests
 ./scripts/k8s/deploy_kubeflow.sh
 ```
+
+`-d` deletes the `kubeflow`, `knative-eventing` and `knative-serving` namespaces; it leaves `istio-system` and `cert-manager` in place because other applications commonly use them.
 
 ### Modifying Kubeflow configuration
 
@@ -87,13 +90,18 @@ To modify the Kubeflow manifests, you can first clone the manifests directory wi
 
 And then make changes as needed in the manifests directory at `./config/kubeflow-install/manifests`.
 
-Then deploy Kubeflow as usual.
+The script will not deploy over an existing checkout, so apply the edited manifests yourself with [kustomize](https://github.com/kubernetes-sigs/kustomize) v5 (the script uses v5.1.0, `KUSTOMIZE_URL`):
+
+```bash
+cd ./config/kubeflow-install/manifests
+while ! kustomize build example | kubectl apply -f -; do sleep 10; done
+```
 
 ## Debugging common issues
 
 ### No DefaultStorageClass defined or ready
 
-A common issue with Kubeflow installation is that no DefaultStorageClass has been defined or that Ceph has been not been deployed correctly.
+A common issue with Kubeflow installation is that no DefaultStorageClass has been defined or that Ceph has not been deployed correctly.
 
 This can be identified if most of the Kubeflow Pods are running and the MySQL pod and several others remain in a Pending state. The GUI may also load and throw a "Profile Error". Run the following to debug further:
 

@@ -144,7 +144,7 @@ To configure DHCP on the internal network VLAN, do the following:
 1. In the header of the page, click the "Subnets" link
 1. On the Subnets page, you should see one or more "fabrics" listed. These are the available networks which can be used to run DHCP and provision servers with MAAS.
 1. Look for the fabric whose subnet matches your internal network (`192.168.1.0/24` in our two-VM example). Then, in this row, click the "untagged" link in the "VLAN" column.
-1. This should take you to the page for the Default VLAN on your internal network. The second panel in this page will be for DCHP, and there should be a button all the way to the right labeled "Enable DHCP".
+1. This should take you to the page for the Default VLAN on your internal network. The second panel in this page will be for DHCP, and there should be a button all the way to the right labeled "Enable DHCP".
    Click it.
 1. On the DHCP configuration page, you will be asked for the configuration of the "Reserved dynamic range". On a real network, you should ensure that the gateway IP is correct, and that the IPs in this range don't overlap with any IPs your site is using. For our example, we will accept the defaults and click "Configure DHCP".
 
@@ -205,7 +205,7 @@ If using IPMI or VM power control, MAAS will send signals to turn the machine on
 
 At this point, the machine will PXE boot from the MAAS server and begin installing the OS to the local disk.
 After the installation completes, the machine should show as "Deployed" in the MAAS web interface.
-And at this point your should be able to log in using the SSH key you configured in MAAS!
+And at this point you should be able to log in using the SSH key you configured in MAAS!
 
 ### Releasing and reinstalling the machine
 
@@ -221,8 +221,10 @@ then commission them and provision them by selecting them as a group in the Mach
 
 ## Creating a DGX OS image installable by MAAS
 
-The official NVIDIA DGX OS version 5.0 and higher is installable by MAAS by creating a custom OS image.
-The code is located in the `submodules/packer-maas` directory. For more information, see: https://github.com/DeepOps/packer-maas/tree/master/dgxos5
+NVIDIA DGX OS 5 is installable by MAAS by creating a custom OS image.
+The code is located in the `submodules/packer-maas/dgxos5` directory. For more information, see: https://github.com/DeepOps/packer-maas/tree/master/dgxos5
+
+There is no image recipe for later DGX OS releases. For DGX OS 7, deploy Ubuntu 24.04 with MAAS and then install the [DGX Software Stack](../deepops/dgx-software-stack.md).
 
 ## Dynamic Inventory
 
@@ -271,9 +273,10 @@ The script maps MAAS tags directly to Ansible groups. To assign a machine to
 the `[slurm-master]` group, tag it `slurm-master` in MAAS. A machine can
 have multiple tags and will appear in all corresponding groups.
 
-DeepOps parent groups (`slurm-cluster`, `k8s-cluster`, etc.) are
+DeepOps parent groups (`slurm-cluster`, `k8s_cluster`, etc.) are
 automatically created with the correct `children` relationships, so you
-only need to tag leaf groups.
+only need to tag leaf groups. The old tag names `kube-master`, `kube-node`
+and `k8s-cluster` are still accepted.
 
 **Recommended tags** (matching DeepOps inventory groups):
 
@@ -306,8 +309,8 @@ ansible-playbook -i scripts/maas_inventory.py playbooks/k8s-cluster.yml
 
 ### Configuration Reference
 
-Configuration is loaded from environment variables or `config/maas-inventory.yml`.
-Environment variables take precedence.
+Configuration is loaded from environment variables or `config/maas-inventory.yml`
+(set `MAAS_INVENTORY_CONFIG` to read another file). Environment variables take precedence.
 
 | Config Key | Env Variable | Required | Description |
 |-----------|-------------|----------|-------------|
@@ -325,6 +328,8 @@ The script exposes MAAS metadata as Ansible host variables:
 |----------|---------|-------------|
 | `maas_system_id` | `4fcb8q` | MAAS machine ID |
 | `maas_fqdn` | `node01.maas` | Fully qualified domain name |
+| `maas_status` | `Deployed` | MAAS machine status |
+| `maas_power_state` | `on` | Power state reported by MAAS |
 | `maas_os` | `ubuntu` | Operating system |
 | `maas_distro` | `noble` | Distribution series |
 | `maas_tags` | `["slurm-master", "virtual"]` | All tags on the machine |
@@ -344,4 +349,4 @@ You can use either approach:
   MAAS. Better for environments where machines are frequently provisioned
   or reassigned.
 
-Both can be combined by passing multiple `-i` flags to `ansible-playbook`.
+Both can be combined by passing multiple `-i` flags to `ansible-playbook`; this repository's `ansible.cfg` already lists both.

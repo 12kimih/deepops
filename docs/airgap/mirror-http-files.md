@@ -27,7 +27,7 @@ sudo apt install apache2
 sudo mkdir /var/www/html/downloads
 ```
 
-Then, for any files you need to make available for download, simply copy these files to `/var/www/html/downlaods`.
+Then, for any files you need to make available for download, simply copy these files to `/var/www/html/downloads`.
 
 ## Configuring DeepOps
 

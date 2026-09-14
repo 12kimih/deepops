@@ -64,7 +64,7 @@ sudo genisoimage -o /tmp/images.iso /tmp/images
 
 ## Set up a container registry on the offline network
 
-One the container images have been transferred to the offline network, they need to be pushed to a container registry for use on your offline cluster.
+Once the container images have been transferred to the offline network, they need to be pushed to a container registry for use on your offline cluster.
 Your offline environment may already have a container registry, and there are many free and commercial solutions for running a registry.
 
 If you don't already have a container registry, we recommend using the official [Docker Registry](https://hub.docker.com/_/registry) image to deploy a new registry.

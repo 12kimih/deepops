@@ -3,12 +3,12 @@
 Documentation for setting up clusters in air-gapped environments
 
 - [Air-Gap Support](#air-gap-support)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Setting up mirrors](#setting-up-mirrors)
   - [Using mirrors to deploy offline](#using-mirrors-to-deploy-offline)
   - [Dependency documentation](#dependency-documentation)
 
-## Introduction 
+## Introduction
 DeepOps supports a number of configuration values for specifying alternate sources and URLs for downloading software. These configuration values can be used to run DeepOps playbooks in environments without an Internet connection, assuming that the environment has an alternative mirror available to supply this software. We currently don't supply our own automation to set up offline mirrors, but we do provide some basic documentation to illustrate how to set these mirrors up and use them.
 
 ## Setting up mirrors

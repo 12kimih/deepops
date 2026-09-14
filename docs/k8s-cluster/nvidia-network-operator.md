@@ -12,7 +12,7 @@ Deploy NVIDIA Network Operator with DeepOps
 
 ## Overview
 
-NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage networking related components in Kuberenets cluster. One of the key components is SR-IOV, which partitions a single PCIe hardware into multiple Virtual Functions (VFs) and attach them directly to Kubernetes pods without going through the virtualization layer on the hosts, thus enables the high performance communication between workloads. High performance networking in Kuberentes also requires a few other components, such as multus-CNI, device drivers and plugins, etc, NVIDIA network operator aims to manage all those necessary components automatically under one operator frame work to simply the deployment, operation and management of NVIDIA networking for Kubernetes.
+NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage networking related components in a Kubernetes cluster. One of the key components is SR-IOV, which partitions a single PCIe hardware into multiple Virtual Functions (VFs) and attach them directly to Kubernetes pods without going through the virtualization layer on the hosts, thus enables the high performance communication between workloads. High performance networking in Kubernetes also requires a few other components, such as Multus CNI, device drivers and plugins, etc, NVIDIA network operator aims to manage all those necessary components automatically under one operator framework to simplify the deployment, operation and management of NVIDIA networking for Kubernetes.
 
 Here are the key components that NVIDIA network operator try to deploy together:
 
@@ -20,10 +20,9 @@ Here are the key components that NVIDIA network operator try to deploy together:
 - Multus CNI
 - SR-IOV CNI for kubernetes
 - SR-IOV device plugin for kubernetes
-- Multus CNI
 - Helm chart for NVIDIA network operator
 
-This playbook also install the latest Kubeflow/MPI-Operator, currently version v2beta1, for multi-node MPI jobs.
+This playbook also installs the Kubeflow MPI Operator (`mpi_operator_version`, currently v2beta1) for multi-node MPI jobs.
 
 Currently only InfiniBand networking is supported in this implementation, RoCE networking support will be added shortly.
 
@@ -36,7 +35,7 @@ This playbook is developed and tested in following environments:
 - Ansible 2.9.27 (deployed by DeepOps)
 - Kubernetes v1.21.6 (deployed by DeepOps)
 - Helm version v3.6.3 (deployed by DeepOps)
-- NVIDIA network opertor v1.1.0
+- NVIDIA network operator v1.1.0 (the role now deploys `nvidia_network_operator_version`, currently 26.1.1)
 - InfiniBand networking. (Ethernet networking support will be added in the future.)
 
 ## Deployment Steps
@@ -61,7 +60,7 @@ This playbook is developed and tested in following environments:
 
    Kubernetes installation is done by DeepOps Ansible playbooks, For more information on Ansible and why we use it, consult the [Ansible Guide](../deepops/ansible.md).
 
-- Install and configure DeepOps on managemet node:
+- Install and configure DeepOps on management node:
 
   ```bash
   git clone https://github.com/NVIDIA/deepops.git
@@ -74,7 +73,7 @@ This playbook is developed and tested in following environments:
 
   > NOTE: Be warned that `/etc/hostname` and `/etc/hosts` on each host will be modified to the name(s) specified in the inventory file, so it is best to use the actual names of the hosts.
 
-  When modifying the inventory, if the hosts are not accessible from the management node by their hostname, supply an an `ansible_host` with its IP address. Example of the inventory file:
+  When modifying the inventory, if the hosts are not accessible from the management node by their hostname, supply an `ansible_host` with its IP address. Example of the inventory file:
 
   ```bash
   # in config/inventory...
@@ -97,7 +96,7 @@ This playbook is developed and tested in following environments:
 
   ```bash
   # The default user is `nvidia` with password `deepops`
-  # Modify this user/password in config/group_vars/all.yaml as desired
+  # Modify this user/password in config/group_vars/all.yml as desired
   vi config/group_vars/all.yml
   ```
 
@@ -126,7 +125,7 @@ This playbook is developed and tested in following environments:
   ansible-playbook -l k8s_cluster playbooks/k8s-cluster.yml
   ```
 
-  Please refer to [DeepOps Kubernetes Deployment Guidehere](https://github.com/NVIDIA/deepops/blob/master/docs/kubernetes-cluster.md) for more information.
+  Please refer to the [DeepOps Kubernetes Deployment Guide](README.md) for more information.
 
   Verify that Kubernetes clustering is working with "kubectl get nodes" command:
 
@@ -140,7 +139,7 @@ This playbook is developed and tested in following environments:
   ```
 
 5. Deploy NVIDIA Network Operator
-   Before runnng the playbook, please update "roles/nvidia-network-operator/vars/main.yaml" file according to your hardware and network configuration, this is what we used in our value.yaml file:
+   Before running the playbook, please update "roles/nvidia-network-operator/vars/main.yaml" file according to your hardware and network configuration, this is what we used in that file:
 
    ```yaml
    num_vf: 8
@@ -173,7 +172,7 @@ The cluster is ready to run multi-node workload in the cluster, One last thing i
 
 ### Using SR-IOV interfaces
 
-Below is what is the section of the job file looks like after adding relevant SR-IOV interface configuration. The Dockerfile used to build the "docker.io/deepops/mpi-nccl-test" container is also available in this DeepOps git repository.
+Below is what is the section of the job file looks like after adding relevant SR-IOV interface configuration. Dockerfiles for similar NCCL test images are in [src/containers/nccl-tests](../../src/containers/nccl-tests).
 
 ```yaml
 apiVersion: kubeflow.org/v2beta1
@@ -234,7 +233,7 @@ nvidia@mgmt01:~$ kubectl create -f nccl-test.yaml
 
 ### NCCL AllReduce Test Result
 
-Below is a NCCL allreduce test result run on between on a DGX A100 Kubernetes cluster between 2 nodes with 8 x 200G HCA (ConnectX-6 HDR) interfaces each. NCCL deliveries near line rate performance: NCCL bandwidth 188.53 GB/s between 8 interfaces translats to 188.53 Gbps/interfaces, 94.27% of theoretical maximum performance.
+Below is a NCCL allreduce test result run on between on a DGX A100 Kubernetes cluster between 2 nodes with 8 x 200G HCA (ConnectX-6 HDR) interfaces each. NCCL delivers near line rate performance: a bus bandwidth of 188.53 GB/s across 8 interfaces translates to 188.53 Gbps per interface, 94.27% of theoretical maximum performance.
 
 ```console
 #

@@ -3,7 +3,7 @@
 Setting up offline mirrors for RPM repositories
 
 - [Mirror RPM Repos](#mirror-rpm-repos)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Identifying package repositories to mirror](#identifying-package-repositories-to-mirror)
   - [Downloading package repositories on a machine with Internet access](#downloading-package-repositories-on-a-machine-with-internet-access)
   - [Transferring repositories to offline network](#transferring-repositories-to-offline-network)
@@ -11,7 +11,7 @@ Setting up offline mirrors for RPM repositories
 
 ## Introduction
 
-Most of the software necessary to run GPU-enabled applications on RHEL or CentOS servers is available via RPM repositories.
+Most of the software necessary to run GPU-enabled applications on RHEL-family servers (RHEL, Rocky Linux, AlmaLinux) is available via RPM repositories.
 In order to deploy this software in an offline environment, the most straightforward path is to mirror the repositories in your offline network.
 
 ## Identifying package repositories to mirror
@@ -33,7 +33,6 @@ These repo files provide the following repository IDs, which will be needed by `
 
 - epel
 - cuda-rhel8-x86_64 or cuda-rhel9-x86_64
-- libnvidia-container
 - nvidia-container-toolkit
 - docker-ce-stable
 
@@ -42,17 +41,17 @@ we recommend configuring a server with Internet access with the necessary softwa
 
 ## Downloading package repositories on a machine with Internet access
 
-On a RHEL or CentOS machine with Internet access, install the `yum-utils` and `createrepo` packages:
+On a RHEL-family machine with Internet access, install the `dnf-plugins-core` package, which provides `dnf reposync`:
 
 ```bash
-sudo yum install yum-utils createrepo
+sudo dnf install dnf-plugins-core
 ```
 
 Then install the EPEL repository if your workload requires EPEL packages.
 For example, on EL9:
 
 ```bash
-sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 ```
 
 Then, for each of the other repo files, install the file into the `/etc/yum.repos.d` directory.
@@ -71,7 +70,7 @@ This command will use the repository ID from the repo file to identify the repos
 In this example, we're downloading our packages to the local path `/var/repos`, but you may substitute a different path where you want to download packages:
 
 ```bash
-sudo reposync -l --repoid=docker-ce-stable --downloadcomps --download-metadata --download_path=/var/repos
+sudo dnf reposync --repoid=docker-ce-stable --downloadcomps --download-metadata --download-path=/var/repos
 ```
 
 Repeat this for each repository ID you wish to mirror.
@@ -80,14 +79,12 @@ At this point, you should have one subdirectory for each of the repositories you
 
 ```bash
 ls /var/repos/
-docker-ce-stable  libnvidia-container  nvidia-container-toolkit
+docker-ce-stable  nvidia-container-toolkit
 ```
 
-For each of these directories, run the `createrepo` command to generate repository metadata:
+Because of `--download-metadata`, each directory is already a usable repository; there is no need to run `createrepo_c` on it.
 
-```bash
-sudo createrepo /var/repos/docker-ce-stable
-```
+Also download each repository's GPG key (the `gpgkey` URL in its repo file), so that the offline hosts can verify the packages.
 
 ## Transferring repositories to offline network
 
@@ -99,14 +96,16 @@ You should use the mechanism that gives you the best performance and ease-of-use
 One common way to accomplish this transfer is to bundle the downloaded files into an ISO file, which can then be moved to the offline environment or "burned" to a DVD or external USB drive.
 
 ```bash
-sudo yum install genisoimage
-sudo genisoimage -o /tmp/packages.iso /var/repos
+sudo dnf install xorriso
+sudo xorriso -as mkisofs -R -J -o /tmp/packages.iso /var/repos
 ```
+
+(`-R -J` keep the long file names; a plain ISO 9660 image truncates them.)
 
 ## Create mirrors on offline network
 
-One the repository contents have been transferred to the offline network, they need to be made available as repositories for package installs.
-Your offline enviroment may already have a package server, and there are many free and commercial solutions to do this!
+Once the repository contents have been transferred to the offline network, they need to be made available as repositories for package installs.
+Your offline environment may already have a package server, and there are many free and commercial solutions to do this!
 
 If you don't already have a package server, the following process shows a minimal approach using an Apache httpd server.
 
@@ -114,8 +113,8 @@ First, in the offline network, pick a machine to use as your package server.
 We will assume the use of the Apache httpd server and that the web root is `/var/www/html`:
 
 ```bash
-sudo yum install httpd
-sudo systemctl start httpd
+sudo dnf install httpd
+sudo systemctl enable --now httpd
 sudo mkdir /var/www/html/repos
 ```
 
@@ -130,6 +129,8 @@ For example, a new repo file for the docker-ce-stable repository might look like
 name=Docker CE
 baseurl=http://<my-package-server>/repos/docker-ce-stable
 enabled=1
+gpgcheck=1
+gpgkey=http://<my-package-server>/repos/keys/docker-ce.gpg
 ```
 
 You can then add these repo files to `/etc/yum.repos.d` on any machine where you want to install these packages.

@@ -61,7 +61,7 @@ Instructions for deploying a GPU cluster with Kubernetes
    # (optional) Modify `config/group_vars/*.yml` to set configuration parameters
    ```
 
-   Note that as part of the kubernetes deployment process, the default behavior is to also deploy the [NVIDIA k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) for GPU support. The [GPU Operator](https://github.com/NVIDIA/gpu-operator) is an alternative all-in-one deployment method, which will deploy the [device plugin](https://github.com/NVIDIA/k8s-device-plugin) and optionally includes GPU tooling such as driver containers, [GPU Feature Discovery](https://github.com/NVIDIA/gpu-feature-discovery), [DCGM-Exporter](https://github.com/NVIDIA/dcgm-exporter) and [MIG Manager](https://github.com/NVIDIA/mig-parted). The default behavior of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) in DeepOps is to deploy host-level drivers and NVIDIA software. To leverage driver containers as part of the GPU Operator, disable the `gpu_operator_preinstalled_nvidia_software` flag. To enable the GPU Operator in DeepOps...
+   Note that as part of the kubernetes deployment process, the default behavior is to also deploy the [NVIDIA k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) for GPU support. The [GPU Operator](https://github.com/NVIDIA/gpu-operator) is an alternative all-in-one deployment method, which will deploy the [device plugin](https://github.com/NVIDIA/k8s-device-plugin) and optionally includes GPU tooling such as driver containers, [GPU Feature Discovery](https://github.com/NVIDIA/k8s-device-plugin) (now part of the device plugin repository), [DCGM-Exporter](https://github.com/NVIDIA/dcgm-exporter) and [MIG Manager](https://github.com/NVIDIA/mig-parted). The default behavior of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) in DeepOps is to deploy host-level drivers and NVIDIA software. To leverage driver containers as part of the GPU Operator, disable the `gpu_operator_preinstalled_nvidia_software` flag. To enable the GPU Operator in DeepOps...
 
    ```bash
    vi config/group_vars/k8s_cluster.yml
@@ -88,7 +88,7 @@ Instructions for deploying a GPU cluster with Kubernetes
    ansible-playbook -l k8s_cluster playbooks/k8s-cluster.yml
    ```
 
-   More information on Kubespray can be found in the official [Getting Started Guide](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/getting-started.md)
+   More information on Kubespray can be found in the official [Getting Started Guide](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/getting_started/getting-started.md)
 
 6. Verify that the Kubernetes cluster is running.
 
@@ -126,7 +126,7 @@ Run the following script to create an administrative user and print out the dash
 
 The default behavior of DeepOps is to setup an NFS server on the first `kube_control_plane` node. This temporary NFS server is used by the `nfs-client-provisioner` which is installed as the default StorageClass of a standard DeepOps deployment.
 
-To use an existing NFS server, update the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s_cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s_cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
+To use an existing NFS server, set the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s_cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s_cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
 
 To manually install or re-install the `nfs-client-provisioner` run:
 
@@ -181,7 +181,7 @@ Deploy NetApp Astra Trident for services that require persistent storage (such a
    +----------------+----------------+
    | SERVER VERSION | CLIENT VERSION |
    +----------------+----------------+
-   | 22.01.0        | 22.01.0        |
+   | 21.01.2        | 21.01.2        |
    +----------------+----------------+
    ```
 
@@ -233,9 +233,7 @@ For more information about our syslog forwarding functionality, please see the [
 
 Follow the [ELK logging Guide](logging.md) to setup logging in the cluster.
 
-The service can be reached from the following address:
-
-- Kibana: http://\<kube_control_plane\>:30700
+Kibana is deployed as a ClusterIP service; the guide shows how to expose it through a NodePort.
 
 ### Container Registry
 
@@ -257,7 +255,7 @@ For more information on Kubeflow, please refer to the [official documentation](h
 
 ### NVIDIA Network Operator
 
-NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage networking related components in Kuberenets cluster. High performance networking in Kuberentes requires many components, such as multus-CNI, device drivers and plugins to be installed correctly, NVIDIA network operator aims to manage all those necessary components automatically under one operator frame work to simply the deployment, operation and management of NVIDIA networking for Kubernetes. To deploy NVIDIA network operator, please refer to the [NVIDIA Network Operator Deployment Guide in DeepOps](nvidia-network-operator.md), for more information on NVIDIA network operator, please refer to its [github](https://github.com/Mellanox/network-operator) page and this [solution guide](https://docs.nvidia.com/networking/display/COKAN10/Network+Operator).
+NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage networking related components in a Kubernetes cluster. High performance networking in Kubernetes requires many components, such as Multus CNI, device drivers and plugins to be installed correctly, NVIDIA network operator aims to manage all those necessary components automatically under one operator framework to simplify the deployment, operation and management of NVIDIA networking for Kubernetes. To deploy NVIDIA network operator, please refer to the [NVIDIA Network Operator Deployment Guide in DeepOps](nvidia-network-operator.md), for more information on NVIDIA network operator, please refer to its [github](https://github.com/Mellanox/network-operator) page and this [solution guide](https://docs.nvidia.com/networking/display/COKAN10/Network+Operator).
 
 ## Cluster Maintenance
 
@@ -276,7 +274,7 @@ Then run the Kubespray `scale.yml` playbook...
 ansible-playbook -l k8s_cluster submodules/kubespray/scale.yml
 ```
 
-More information on this topic may be found in the [Kubespray docs](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/getting-started.md#adding-nodes).
+More information on this topic may be found in the [Kubespray docs](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/getting_started/getting-started.md#adding-nodes).
 
 ### Removing Nodes
 
@@ -291,7 +289,7 @@ ansible-playbook submodules/kubespray/remove-node.yml --extra-vars "node=nodenam
 
 This will drain `nodename0` & `nodename1`, stop Kubernetes services, delete certificates, and finally execute the kubectl command to delete the nodes.
 
-More information on this topic may be found in the [Kubespray docs](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/getting-started.md#remove-nodes).
+More information on this topic may be found in the [Kubespray docs](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/getting_started/getting-started.md#remove-nodes).
 
 ### Reset the Cluster
 
@@ -303,4 +301,4 @@ ansible-playbook submodules/kubespray/reset.yml
 
 ### Upgrading the Cluster
 
-Refer to the [Kubespray Upgrade docs](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/upgrades.md) for instructions on how to upgrade the cluster.
+Refer to the [Kubespray Upgrade docs](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/operations/upgrades.md) for instructions on how to upgrade the cluster.

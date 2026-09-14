@@ -3,7 +3,7 @@
 Load Balancer and Ingress
 
 - [Ingress](#ingress)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Load Balancer](#load-balancer)
   - [Ingress controller](#ingress-controller)
 
@@ -19,7 +19,7 @@ DeepOps provides scripts you can run to configure a simple Load Balancer and/or 
 
 ## Load Balancer
 
-Modify `config/helm/metallb.yml` to configure the IP range that the load balancer will hand out.
+Modify the `IPAddressPool` in `config/helm/metallb-resources.yml` to configure the IP range that the load balancer will hand out (`config/helm/metallb.yml` holds the chart values).
 
 Run the script to deploy the load balancer:
 
@@ -27,15 +27,16 @@ Run the script to deploy the load balancer:
 ./scripts/k8s/deploy_loadbalancer.sh
 ```
 
-This script will set up a software-based L2 Load Balancer using [MetalLb](https://metallb.universe.tf/)
+This script will set up a software-based L2 Load Balancer using [MetalLB](https://metallb.universe.tf/)
 
 ## Ingress controller
 
-By default the Ingress controller will be assigned an external IP managed by the Load Balancer.
+When MetalLB is installed, the script deploys the Ingress controller with
+`workloads/examples/k8s/ingress-loadbalancer.yml`, so it is assigned an external IP managed by the Load Balancer.
 
-If you do not have control over your subnet to assign IPs to the load balancer, you can expose
-ingress routes on specific ports and access them via the IP of any management node. To do this,
-modify `workloads/examples/k8s/ingress-nodeport.yml` and set the service type to `NodePort`.
+Without MetalLB (for example, when you do not control IP assignment on your subnet), it uses
+`workloads/examples/k8s/ingress-nodeport.yml` instead, exposing ingress routes on node ports reachable
+via the IP of any node. To use your own chart values, set `HELM_INGRESS_CONFIG` to their path.
 
 Run the script to deploy the Ingress controller:
 

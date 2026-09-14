@@ -22,15 +22,16 @@ In order to deploy this configuration without Internet access, you will need to 
 
 The following Apt repositories will need to be mirrored in the offline environment:
 
-- Ubuntu distribution repositories
+- Ubuntu distribution repositories (these also provide the NVIDIA driver packages)
 - Docker CE repository
-- NVIDIA container runtime repositories
+- NVIDIA Container Toolkit repository
+- NVIDIA CUDA repository (needed for DCGM, or with `nvidia_driver_install_method: nvidia_repo`)
 
 For instructions on mirroring these repositories, see the [doc on Apt mirrors](./mirror-apt-repos.md).
 
 The following files may need to be downloaded and made available in an HTTP mirror:
 
-- DCGM package (optional)
+- The `cuda-keyring` package (only when using the CUDA repository)
 
 For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./mirror-http-files.md).
 
@@ -46,16 +47,16 @@ For instructions on setting up a Docker registry mirror, see the [doc on Docker 
 
 The following RPM repositories will need to be mirrored in the offline environment:
 
-- Enterprise Linux distribution repositories (RHEL or CentOS, depending on your distro)
+- Enterprise Linux distribution repositories (RHEL, Rocky Linux or AlmaLinux, depending on your distro)
 - Docker CE repository
-- NVIDIA container runtime repositories
+- NVIDIA Container Toolkit repository
+- NVIDIA CUDA repository (NVIDIA driver and DCGM)
 
 For instructions on mirroring these repositories, see the [doc on RPM mirrors](./mirror-rpm-repos.md).
 
 The following files may need to be downloaded and made available in an HTTP mirror:
 
 - EPEL package (found [here](https://fedoraproject.org/wiki/EPEL))
-- DCGM package (optional)
 
 For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./mirror-http-files.md).
 
@@ -76,19 +77,19 @@ To deploy the NGC-Ready playbook offline, you will need to configure your server
 DeepOps does not configure the location of your Linux distribution's package repositories (e.g., Ubuntu or CentOS repositories).
 Instead, you will need to configure your servers to use your offline package mirrors directly.
 
-On Ubuntu servers, you should edit the `/etc/apt/sources.list` file to replace references to the Ubuntu distribution servers with your own mirror.
+On Ubuntu 24.04 servers, you should edit `/etc/apt/sources.list.d/ubuntu.sources` (`/etc/apt/sources.list` on older releases) to replace references to the Ubuntu distribution servers with your own mirror.
 For example,
 
 _Replace this..._
 
 ```bash
-deb http://us.archive.ubuntu.com/ubuntu bionic main restricted
+URIs: http://archive.ubuntu.com/ubuntu/
 ```
 
 _With this..._
 
 ```bash
-deb http://<your-mirror-server>/ubuntu bionic main restricted
+URIs: http://<your-mirror-server>/ubuntu/
 ```
 
 On Enterprise Linux servers, you should edit the appropriate repo files in `/etc/yum.repos.d` and replace references to the upstream distribution servers with your own mirror.
@@ -99,29 +100,29 @@ For example,
 _Replace this..._
 
 ```
-[base]
-name=CentOS-$releasever - Base
-mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os&infra=$infra
-#baseurl=http://mirror.centos.org/centos/$releasever/os/$basearch/
+[baseos]
+name=Rocky Linux $releasever - BaseOS
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever
+#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
 gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
 ```
 
 _With this..._
 
 ```bash
-[base]
-name=CentOS-$releasever - Base
-baseurl=http://<your-mirror-server>/centos/$releasever/os/$basearch/
+[baseos]
+name=Rocky Linux $releasever - BaseOS
+baseurl=http://<your-mirror-server>/rocky/$releasever/BaseOS/$basearch/os/
 gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
 ```
 
 In all cases, you should edit the URLs appropriately to ensure they can download from the paths exported from your mirrors.
 
 ### Configure DeepOps to use your mirrors for non-distribution package repositories
 
-The NGC-Ready playbook depends on the Docker CE and NVIDIA container runtime package repositories.
+The NGC-Ready playbook depends on the Docker CE and NVIDIA Container Toolkit package repositories.
 DeepOps sets up these repositories automatically during the installation.
 
 To configure alternate URLs for these repositories, set the following variables in your DeepOps configuration:
@@ -129,18 +130,18 @@ To configure alternate URLs for these repositories, set the following variables 
 **Ubuntu**
 
 ```bash
-docker_ubuntu_repo_base_url: "http://<your-package-mirror>/<your-path-to-docker-repo>"
-docker_ubuntu_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-docker-gpgkey>"
-
 nvidia_container_toolkit_repo_base_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container>"
 nvidia_container_toolkit_repo_gpg_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container-gpgkey>"
 ```
 
+The Docker role has no variable for the Ubuntu repository: it always adds `https://download.docker.com/linux/ubuntu` (and its `/gpg` key) to `/etc/apt/sources.list.d/docker.sources`.
+Make that host name resolve to your mirror, or install Docker yourself and set `docker_install: false`.
+
 **Enterprise Linux**
 
 ```bash
-docker_rh_repo_base_url: "http://<your-package-mirror>/<your-path-to-docker-repo>"
-docker_rh_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-docker-gpgkey>"
+# A .repo file whose baseurl points at your Docker CE mirror
+docker_rh_repo_url: "http://<your-package-mirror>/<your-path-to-docker-ce.repo>"
 
 nvidia_container_toolkit_rpm_repo_url: "http://<your-package-mirror>/<your-path-to-nvidia-container-toolkit.repo>"
 ```
@@ -157,18 +158,21 @@ For example,
 epel_package: "http://<your-http-mirror>/<your-path>/epel-release.rpm"
 ```
 
-If installing NVIDIA DCGM, you will need to provide a local file path for your downloaded DCGM package.
+NVIDIA DCGM installs from the CUDA repository.
 
 **Ubuntu**
 
 ```bash
-dcgm_deb_package: "/path/to/datacenter-gpu-manager.deb"
+nvidia_driver_ubuntu_cuda_keyring_url: "http://<your-http-mirror>/<your-path>/cuda-keyring_1.1-1_all.deb"
 ```
+
+The `cuda-keyring` package also adds an APT source pointing at `developer.download.nvidia.com`; replace it with your CUDA mirror on the offline hosts.
 
 **Enterprise Linux**
 
 ```bash
-dcgm_rpm_package: "/path/to/datacenter-gpu-manager.rpm"
+nvidia_driver_rhel_cuda_repo_baseurl: "http://<your-package-mirror>/<your-path-to-cuda-repo>/"
+nvidia_driver_rhel_cuda_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-cuda-repo>/D42D0685.pub"
 ```
 
 ### Configure DeepOps to use your mirrors for container image pulls
