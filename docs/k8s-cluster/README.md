@@ -114,11 +114,15 @@ The following components are completely optional and can be installed on an exis
 
 ### Kubernetes Dashboard
 
-Run the following script to create an administrative user and print out the dashboard URL and access token:
+Kubespray no longer ships the dashboard addon, so install the [Kubernetes Dashboard](https://github.com/kubernetes/dashboard) yourself first.
+Then run the following script to create an administrative user and print out the dashboard URL and access token:
 
 ```bash
 ./scripts/k8s/deploy_dashboard_user.sh
 ```
+
+The script expects the dashboard service as `kubernetes-dashboard` in the `kube-system` namespace.
+On Kubernetes 1.24 and later it prints no token, because service-account token secrets are no longer created automatically; create one with `kubectl -n kube-system create token admin-user`.
 
 ### Persistent Storage
 
@@ -181,7 +185,7 @@ Deploy NetApp Astra Trident for services that require persistent storage (such a
    +----------------+----------------+
    | SERVER VERSION | CLIENT VERSION |
    +----------------+----------------+
-   | 21.01.2        | 21.01.2        |
+   | 22.01.0        | 22.01.0        |
    +----------------+----------------+
    ```
 
