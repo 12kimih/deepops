@@ -10,7 +10,7 @@ pwd
 #
 # Additionally, the "DEEPOPS_FULL_INSTALL" flag may be set.
 # This flag should be set if 2 GPUs are allocated
-# If this flag is blank or not set, everything involving GPU01, MGMT02, and MGMT03 will be ignored.
+# If this flag is blank or not set, everything involving GPU02, MGMT02, and MGMT03 will be ignored.
 # If this flag is set to true, we will calculate the IPs and other information for these nodes.
 #
 # This information is later used to grep & sed files, and to ssh to/access the cluster.

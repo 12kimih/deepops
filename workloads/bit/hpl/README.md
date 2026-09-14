@@ -87,7 +87,7 @@ Where:
    --container 
         * Specify an alternate container URI or a local file (.sqsh for enroot, .sif for singularity)
    --cruntime <runtime> 
-        * Specify the container runtime: singularity, enroot or bare (bare-metal)
+        * Specify the container runtime: singularity (the default) or enroot. `bare` is accepted but exits as not supported yet
    -h|--help
         * Provide a full list of options
 ```

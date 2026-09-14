@@ -86,7 +86,7 @@ RUN mkdir /tmp/openmpi && \
 # Install Horovod
 RUN HOROVOD_GPU_OPERATIONS=NCCL pip install horovod
 
-## Install Mellano OFED
+## Install Mellanox OFED
 ENV MOFED_DIR MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64
 ENV MOFED_SITE_PLACE MLNX_OFED-5.2-2.2.0.0
 ENV MOFED_IMAGE MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64.tgz

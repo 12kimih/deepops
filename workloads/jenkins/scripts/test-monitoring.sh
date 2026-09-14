@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install monitoring with persistance, verify it deletes, re-install without persistance, verify DCGM metrics, verify it deletes
+# Install monitoring with persistence, verify it deletes, re-install without persistence, verify DCGM metrics, verify it deletes
 # We disable/re-enable "-e" in this script because polling will error until service come up and we want to collect output and debug
 set -ex
 source workloads/jenkins/scripts/jenkins-common.sh
@@ -132,7 +132,7 @@ fi
 
 # When deploying the GPU Operator, DCGM is not made available via port 9400 and is instead a K8s service
 if [ "$(kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter  -o name)" == "" ]; then
-  bash -x ./workloads/jenkins/scripts/test-dcgm-metrics.sh slurm-node # We use slurm-node here because it is GPU only, kube-node includes the mgmt plane
+  bash -x ./workloads/jenkins/scripts/test-dcgm-metrics.sh slurm-node # We use slurm-node here because it is GPU only, kube_node includes the control plane
 else
   kubectl get svc -A # TODO: Look into if there is a trivial way we can verify DCGM metrics, not high priority because we check Prometheus above
 fi

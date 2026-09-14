@@ -1,6 +1,6 @@
 #!/bin/bash -ex
 
-# In order for this deployment to properly work across your cluster you will need to build the customer Docker image and push it out to your local Docker repository
+# In order for this deployment to properly work across your cluster you will need to build the custom Docker image and push it out to your local Docker repository
 
 # This script will create a dask cluster including 1 Jupyter container,  1 Dask  scheduler, and N Dask workers.
 # The Dask workers can be scaled from  the K8S command line using `kubectl scale` commands or through jupyter using dask_kubernetes commands
@@ -24,7 +24,7 @@ function help_me() {
   echo "-h    This message."
   echo "-n    Kubernetes namespace"
   echo "-d    Docker image name"
-  echo "-p    Push the Docker image after building it"
+  echo "-p    Push the Docker image after building it (not wired up: set DOCKER_PUSH to push to registry.local)"
   echo "-b    Build the Docker image, default is to pull from DockerHub"
   echo "-c    The number of Pods already running in this namespace (if deploying to existing namespace)"
 }

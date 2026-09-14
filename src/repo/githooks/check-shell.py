@@ -15,7 +15,7 @@ def get_changed_shell_paths():
     git_diff = subprocess.check_output("git diff --name-only --cached".split())
     paths = []
     for f in git_diff.split("\n"):
-        # Add playbook files
+        # Add shell scripts
         if re.match(r".*(\.sh|\.bash)$", f):
             paths.append(f)
     return paths
