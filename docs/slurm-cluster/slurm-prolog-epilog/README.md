@@ -7,7 +7,7 @@ These are not intended to be "drop in" solutions.  These scripts will need to be
  - prolog-dcgmstats
  - epilog-dcgmstats
 
-DCGM utilies must be installed.  https://developer.nvidia.com/data-center-gpu-manager-dcgm
+DCGM utilities must be installed.  https://developer.nvidia.com/data-center-gpu-manager-dcgm
 
 
 These two scripts will collect GPU stats during a job.
@@ -37,7 +37,7 @@ CPU cores.
 ## DCGM Health Checks
  - prolog-dcgmhealth
 
-DCGM utilies must be installed.  https://developer.nvidia.com/data-center-gpu-manager-dcgm
+DCGM utilities must be installed.  https://developer.nvidia.com/data-center-gpu-manager-dcgm
 
 
 This script will run a quick (few seconds) health check of the GPUs on a node.  If the health check fails it will put the node into a drain state. Output from the health check will be written to /tmp/dcgm.out on the compute nodes.
@@ -88,7 +88,7 @@ Successfully ran diagnostic for group.
 
 This script will reset the application clocks on the GPUs, activate accounting, and clear the current logs. 
 Inside this script there is a section that is commented out.  That commented out section would execute a 
-reset of the gpu.  That is an action is is not always guaranteed to succeed and should be done with caution. 
+reset of the gpu.  That action is not always guaranteed to succeed and should be done with caution. 
 
 ## GPU Check
  - prolog-lspci
@@ -97,10 +97,21 @@ This script will check that lspci sees all the GPUs that a node should have acco
 **This script requires that slurm be configured with GPUs as a consumable resource (gres).  If this check fails the node will be put into a drain state. The job will fail and depending upon the slurm configuration it may or may not
  be requeued.  An interactive job will fail and not be requeued.**
  
-## General cleanup
-  - epilog-cleanup
- 
-This script will run some non-gpu specific cleanup tasks.  Kill user processes, sync cached writes, and drop caches.
-It will also check for processes running on the GPUs.  If processes are found it will send them SIGKILL.
-**If the processes are still running after 5 seconds the node will be drained.**
+## Hyperthreading
+ - hyperthreadingoff
+ - hyperthreadingon
 
+These take the second sibling of every hyperthread pair offline when a job's `--comment`
+contains `nohyperthreading`, and bring every CPU back online when it contains
+`hyperthreading`.
+
+## Mount check
+ - prolog-checkmounts
+
+This script checks that each path in `MOUNTS` is mounted, and prints the `scontrol` command
+that would drain the node when one is missing -- it only echoes it. Edit `MOUNTS` for your
+site before using it.
+
+The prolog/epilog the `slurm` role deploys already covers general cleanup: it kills a
+user's leftover processes, clears their `/tmp` and `/dev/shm` files, and drains a node
+whose GPU processes will not die (`roles/slurm/templates/etc/slurm/epilog.d/`).

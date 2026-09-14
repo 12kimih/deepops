@@ -81,7 +81,7 @@ These packages have been installed and tested with the following Linux distribut
    # in config/inventory...
 
    [all]
-   login-node ansible_host_192.168.2.100
+   login-node ansible_host=192.168.2.100
    worker-node-01 ansible_host=192.168.2.1
    worker-node-02 ansible_host=192.168.2.2
 

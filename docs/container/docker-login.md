@@ -76,7 +76,7 @@ So, for example:
 machine auth.docker.io login <username> password <password>
 ```
 
-For more information, see the [Enroot documentation](https://github.com/NVIDIA/enroot/blob/master/doc/cmd/import.md#description).
+For more information, see the [Enroot documentation](https://github.com/NVIDIA/enroot/blob/main/doc/cmd/import.md#description).
 
 ## System containers using private registries
 

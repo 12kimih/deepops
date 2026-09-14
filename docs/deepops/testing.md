@@ -21,7 +21,7 @@ The linting process can also be executed manually in a checkout of the DeepOps r
 by running `./scripts/deepops/ansible-lint-roles.sh`.
 
 Note that the linting script can be configured to skip a subset of roles,
-by providing a regex of roles to skip in the envionment variable `ANSIBLE_LINT_EXCLUDE`.
+by providing a regex of roles to skip in the environment variable `ANSIBLE_LINT_EXCLUDE`.
 (For example, `ANSIBLE_LINT_EXCLUDE='role-1|role-2|role-3'`.)
 This can be useful for excluding specific roles that have known issues or are still in development.
 
@@ -55,7 +55,7 @@ A short description of the historical Jenkins test matrix is outlined below. The
 | Ubuntu 18.04                                        | x                                         | x                                                      | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | Ubuntu 20.04                                        |                                           | x                                                      | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | Ubuntu 22.04                                        |                                           |                                                        |                                                                         | setup.sh and Molecule GitHub Actions |
-| Ubuntu 24.04                                        |                                           |                                                        |                                                                         | setup.sh and Molecule GitHub Actions |
+| Ubuntu 24.04                                        |                                           |                                                        |                                                                         | setup.sh GitHub Action              |
 | CentOS 7                                            |                                           | x                                                      | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | CentOS 8                                            |                                           |                                                        | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | DGX OS                                              |                                           |                                                        |                                                                         | Syntax-checked only; full validation requires DGX hardware |
@@ -95,10 +95,10 @@ A short description of the historical Jenkins test matrix is outlined below. The
 
 A subset of the Ansible roles in DeepOps have tests defined using [Ansible Molecule](https://molecule.readthedocs.io/en/latest/).
 This testing mechanism allows the roles to be tested individually, providing additional test signal to identify issues which do not appear in the end-to-end tests.
-These tests are run automatically for each pull request using [Github Actions](https://github.com/NVIDIA/deepops/actions).
+The roles listed in [`.github/workflows/molecule.yml`](../../.github/workflows/molecule.yml) are tested automatically for each pull request.
 
-Molecule testing runs the Ansible role in quesiton inside a Docker container.
-As such, not all roles will be easy to test witth this mechanism.
+Molecule testing runs the Ansible role in question inside a Docker container.
+As such, not all roles will be easy to test with this mechanism.
 Roles which mostly involve installing software, configuring services, or executing scripts should generally be possible to test.
 Roles which rely on the presence of specific hardware (such as GPUs), which reboot the nodes they act on, or which make changes to kernel configuration are going to be harder to test with Molecule.
 
@@ -123,7 +123,7 @@ molecule init scenario -r <your-role> --driver-name docker
 ```
 
 4. In the file `molecule/default/molecule.yml`, define the list of platforms to be tested.
-   DeepOps currently uses Ubuntu 22.04 and Ubuntu 24.04 for setup and Molecule GitHub Actions.
+   The existing scenarios use Ubuntu 22.04; the setup workflow runs on Ubuntu 22.04 and 24.04.
    Add Red Hat family images only for roles that explicitly support them, and validate the image choice for that role.
    Keep Ubuntu 18.04, Ubuntu 20.04, CentOS 7, and CentOS 8 scenarios in separately named legacy test scenarios when maintaining older compatibility paths.
    To test the current Ubuntu stacks, the following `platforms` stanza can be used.
@@ -154,7 +154,7 @@ galaxy_info:
 
 6. Once this is done, verify that your role executes successfully in the Molecule environment by running `molecule test`. If you run into any issues, consult the [Molecule documentation](https://molecule.readthedocs.io/en/latest/index.html) for help resolving them.
 
-7. (optional) In addition to testing successful execution, you can add additional tests which will be run after your role completes in a file `molecule/default/verify.yml`. This is an Ansible playbook that will run in the same environment as your playbook ran. For a simple example of such a verify playbook, see the [Enroot role](https://github.com/NVIDIA/ansible-role-enroot/blob/master/molecule/default/verify.yml).
+7. (optional) In addition to testing successful execution, you can add additional tests which will be run after your role completes in a file `molecule/default/verify.yml`. This is an Ansible playbook that will run in the same environment as your playbook ran. For a simple example of such a verify playbook, see the [default_target role](../../roles/default_target/molecule/default/verify.yml).
 
 8. Once you're confident that your new tests are all passing, add your role to the `deepops-role` section in the `.github/workflows/molecule.yml` file.
 
