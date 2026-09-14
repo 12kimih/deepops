@@ -9,7 +9,7 @@ cd "${ROOT_DIR}"
 # Before deploying Kubeflow, clean up any unused Docker images to ensure we have sufficient space
 ansible k8s-cluster -i "${VIRT_DIR}/config/inventory" -b -m shell -a "docker image prune -a --force"
 
-# Deploy Kubflow
+# Deploy Kubeflow
 bash -x ./scripts/k8s/deploy_kubeflow.sh
 
 # Wait for Kubeflow to be up

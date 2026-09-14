@@ -19,7 +19,7 @@ internalRegistryPort: 5000
 
 # NodePort for accessing Jupyter notebooks launched by the Deep Learning
 # Example you're launching. If you want to launch multiple examples
-# simultaenously, you should ensure each is using a unique port.
+# simultaneously, you should ensure each is using a unique port.
 jupyterNodePort: 30888
 
 # Resource request for the Deep Learning Example Pod (by default, 1 GPU)

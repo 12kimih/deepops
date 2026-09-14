@@ -17,9 +17,9 @@ def test_kubeflow_op():
       )                 
 kfp.compiler.Compiler().compile(test_kubeflow_op, 'kubeflow-test.yml')
 
-# Connect to Kubeflow and create job, this simply rungs RAPIDS and prints out a message                 
+# Connect to Kubeflow and create job, this simply runs a busybox container that prints a message                 
 while True:
-    time.sleep(30) # Occassionally Kubeflow fails to respond even when all deployments are up. I don't know why, sometimes it is a 403, sometimes a 500, and sometimes it works. So we will just wait and re-try until the test/script times out.
+    time.sleep(30) # Occasionally Kubeflow fails to respond even when all deployments are up. I don't know why, sometimes it is a 403, sometimes a 500, and sometimes it works. So we will just wait and re-try until the test/script times out.
     try:
         print("Submitting Kubeflow pipeline")
         run_result = kfp.Client(host="10.0.0.2:31380").create_run_from_pipeline_package('kubeflow-test.yml', arguments={})

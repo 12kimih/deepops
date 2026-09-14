@@ -1,8 +1,8 @@
 #
 # Server Inventory File
 #
-# Uncomment and change the IP addresses in this file to match your environment
-# Define per-group or per-host configuration in group_vars/*.yml
+# Inventory for the Vagrant virtual cluster; addresses match the Vagrantfiles.
+# cluster_up.sh copies it to virtual/config/inventory.
 
 ######
 # ALL NODES

@@ -53,7 +53,7 @@ case "$ID" in
 
     # Install Vagrant
     if ! which vagrant >/dev/null 2>&1; then
-      # install vagrant (frozen at 2.2.3 to avoid various issues)
+      # install vagrant (pinned to 2.2.14 to avoid various issues)
       pushd "$(mktemp -d)"
       wget https://releases.hashicorp.com/vagrant/2.2.14/vagrant_2.2.14_x86_64.rpm -O vagrant.rpm
       #sudo rpm -i vagrant.rpm
@@ -109,7 +109,7 @@ case "$ID" in
 
     # Install Vagrant
     if ! which vagrant >/dev/null 2>&1; then
-      # install vagrant (frozen at 2.2.3 to avoid various issues)
+      # install vagrant (pinned to 2.2.14 to avoid various issues)
       pushd "$(mktemp -d)"
       wget https://releases.hashicorp.com/vagrant/2.2.14/vagrant_2.2.14_x86_64.deb -O vagrant.deb
       sudo dpkg -i vagrant.deb

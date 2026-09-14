@@ -14,10 +14,10 @@ sudo pip3 install kfp
 kubectl get pods -n kubeflow # Do this for debug purposes
 
 # Run the Kubeflow pipeline test, this will build a pipeline that launches an NGC container
-# For some reason the initial pipeline creation hangs sometime (and doesn't timeout or error out or provide any logging) so we run this twice until success or timeout
+# For some reason the initial pipeline creation hangs sometime (and doesn't timeout or error out or provide any logging) so the script retries until it succeeds or the job times out
 python3 workloads/jenkins/scripts/test-kubeflow-pipeline.py
 kubectl get pods -n kubeflow # Do this for debug purposes
 
-# Delete Kubflow and view namespaces
+# Delete Kubeflow and view namespaces
 ./scripts/k8s/deploy_kubeflow.sh -d
 kubectl get ns
