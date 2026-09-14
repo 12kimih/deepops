@@ -1,6 +1,6 @@
 ---
-# Debian/Ubuntu: ypserv ships the server daemons; ypbind-mt/yp-tools provide client
-# tools. ypinit lives under /usr/lib/yp; ypserv reads /etc/ypserv.securenets.
+# Debian/Ubuntu: ypserv ships the server daemons; yp-tools provides the client tools
+# (ypwhich, ypcat). ypinit lives under /usr/lib/yp; ypserv reads /etc/ypserv.securenets.
 nis_server_packages:
   - ypserv
   - yp-tools

@@ -4,7 +4,7 @@
 {% set p = cluster_tools_palettes[cluster_tools_motd_flavour] %}
 {% set rows = cluster_tools_motd_commands + cluster_tools_motd_links %}
 {% set w = rows | map(attribute='name') | map('length') | max %}
-{# the rule spans exactly the widest row: 3 leading spaces + name + 2 - the 2 of its own indent #}
+{# the rule spans exactly the widest row: 3 leading spaces + name + 2 + text, minus the rule's own 2-space indent #}
 {% set width = 3 + w + (rows | map(attribute='text') | map('length') | max) %}
 {% if cluster_tools_motd_color %}
 # A=title  N=command names  L=paths and URLs  T=descriptions  U=rules

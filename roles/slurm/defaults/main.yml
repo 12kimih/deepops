@@ -103,9 +103,10 @@ slurm_build_slurmrestd: false
 # Flags for sharing slurm.conf among compute and control nodes
 slurm_conf_symlink: false
 
-# Controls the ability of the partition to execute more than one job at a time on each resource (node, socket or core depending upon the value of SelectTypeParameters). If resources are to be over-subscribed, avoiding memory over-subscription is very important. SelectTypeParameters should be configured to treat memory as a consumable resource and the --mem option should be used for job allocations. Sharing of resources is typically useful only when using gang scheduling (PreemptMode=suspend,gang). Possible values for OverSubscribe are "EXCLUSIVE", "FORCE", "YES", and "NO". Note that a value of "YES" or "FORCE" can negatively impact performance for systems with many thousands of running jobs. The default value is "NO". For more information see the following web pages:
-# Sets partition OverSubscribe
-# To avoid sharing nodes, set to "EXCLUSIVE"
+# Controls the ability of the partition to execute more than one job at a time on each resource (node, socket or core depending upon the value of SelectTypeParameters). If resources are to be over-subscribed, avoiding memory over-subscription is very important. SelectTypeParameters should be configured to treat memory as a consumable resource and the --mem option should be used for job allocations. Sharing of resources is typically useful only when using gang scheduling (PreemptMode=suspend,gang). Possible values for OverSubscribe are "EXCLUSIVE", "FORCE", "YES", and "NO". Note that a value of "YES" or "FORCE" can negatively impact performance for systems with many thousands of running jobs. The default value is "NO".
+# The bundled slurm.conf template does not read this: it sets the partition's
+# OverSubscribe=NO when slurm_manage_gpus is true and EXCLUSIVE otherwise. A custom
+# slurm_conf_template may use it.
 slurm_oversubscribe: "NO"
 
 # Maximum run time limit for jobs. Format is minutes, minutes:seconds, hours:minutes:seconds, days-hours, days-hours:minutes, days-hours:minutes:seconds or "UNLIMITED". Time resolution is one minute and second values are rounded up to the next minute. This limit does not apply to jobs executed by SlurmUser or user root.
@@ -146,8 +147,8 @@ hwloc_version: 2.13.0
 hwloc_tag: "v{{ hwloc_version.split('.')[0] }}.{{ hwloc_version.split('.')[1] }}"
 hwloc_src_url: "https://download.open-mpi.org/release/hwloc/{{ hwloc_tag }}/hwloc-{{ hwloc_version }}.tar.gz"
 hwloc_install_prefix: /opt/deepops/hwloc
-# Netloc was removed from hwloc in 2.10.0, so --enable-netloc is a dead flag on
-# the pinned 2.13.0 (ignored with a warning). Slurm only needs the topology lib.
+# Netloc was removed from hwloc in 2.10.0, so --enable-netloc is no longer passed.
+# Slurm only needs the topology lib.
 hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-static --disable-cairo --disable-libxml2 --enable-plugins"
 hwloc_force_rebuild: false
 
@@ -157,7 +158,7 @@ slurm_include_pmix: true
 # 22.05+ supports PMIx v2-v5, so 25.11 links 5.0.x cleanly. Keep this in step
 # with openmpi_version -- OpenMPI compiles against these PMIx headers when built
 # --with-pmix=<prefix>. libevent (a PMIx build dep) comes from slurm_pmix_deps;
-# hwloc is the role-built one below.
+# hwloc is the role-built one (hwloc_install_prefix).
 # https://slurm.schedmd.com/mpi_guide.html  https://openpmix.org/downloads.html
 pmix_version: 5.0.10
 pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{ pmix_version }}.tar.bz2"

@@ -43,9 +43,8 @@ cluster_tools_motd_title: ""
 cluster_tools_motd_commands: []
 cluster_tools_motd_links: []
 
-# Catppuccin flavour for the banner -- mocha, macchiato, frappe or latte, the same
-# flavours sq ships with. Emitted as 24-bit colour; turn the colour off for a terminal
-# that cannot render it.
+# Catppuccin flavour for the banner -- mocha, macchiato, frappe or latte. Emitted as
+# 24-bit colour; turn the colour off for a terminal that cannot render it.
 cluster_tools_motd_flavour: mocha
 cluster_tools_motd_color: true
 

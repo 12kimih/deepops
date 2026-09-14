@@ -5,10 +5,10 @@
     recurse: true
     state: directory
 
-# The uid was already pinned; the gid was not, so each node let the OS pick whatever
-# number happened to be free when the role first ran, and nodes provisioned at
-# different times end up disagreeing. Pin the group too -- see slurm_user_gid in
-# defaults/main.yml for why numeric agreement matters.
+# Pin the group's gid as well as the user's uid. Left to the OS, each node picks
+# whatever number is free when the role first runs, so nodes provisioned at different
+# times disagree -- see slurm_user_gid in defaults/main.yml for why numeric agreement
+# matters.
 - name: Create slurm group
   ansible.builtin.group:
     name: "{{ slurm_groupname }}"
