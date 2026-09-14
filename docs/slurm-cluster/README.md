@@ -319,6 +319,9 @@ its own shutdown and never reaches the reboot; see
 [Slurm and NFS](./slurm-nfs.md). Nodes carrying the `nfs_detach_on_shutdown` unit are
 already protected on every reboot path, including `scontrol reboot`.
 
+A node that comes back before its NFS server boots without that share, and nothing
+retries it. `playbooks/utilities/nfs-mount.yml` mounts it once the server is up.
+
 ## When a node will not finish booting
 
 Two failure modes have taken every node of a cluster off the network at once, and neither
