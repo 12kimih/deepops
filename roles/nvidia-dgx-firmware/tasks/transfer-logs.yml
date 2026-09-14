@@ -25,7 +25,7 @@
     - "dcgm_diag_1.log"
   when: run_diagnostics
 
-# These files are generated when the user reqeuests a firmware update
+# These files are generated when the user requests a firmware update
 - name: Copy over all log files, etc. - from firmware update
   ignore_errors: true
   fetch:

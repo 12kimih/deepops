@@ -3,7 +3,7 @@
 # Run diagnostics across the cluster (will cause pre and post-update diagnostics if run with update_firmware)
 run_diagnostics: true
 
-# Update the DGX firmware (will also execute post update diagnostics)
+# Update the DGX firmware (then re-checks the versions; diagnostics follow run_diagnostics)
 update_firmware: false
 
 # Copy the firmware container and load it into Docker on all nodes

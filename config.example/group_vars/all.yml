@@ -144,12 +144,12 @@ sftp_chroot: false
 ################################################################################
 # NVIDIA GPU configuration
 # Playbook: nvidia-cuda
-# Install latest version by default,
-# if you want a specific version, use i.e. cuda-toolkit=12.2.0-1
+# cuda_version picks the package: cuda-toolkit is the latest, and a specific version
+# looks like cuda-toolkit=12.2.0-1
 # cuda_version: cuda-toolkit
-# Set false to skip the system-wide CUDA toolkit install (e.g. when CUDA is
-# provided per-version through Lmod/environment modules). In the slurm-cluster
-# playbook the toolkit is additionally gated by slurm_cluster_install_cuda.
+# Set true to install the system-wide CUDA toolkit; leave false when CUDA is provided
+# per-version through Lmod/environment modules. In the slurm-cluster playbook the
+# toolkit is additionally gated by slurm_cluster_install_cuda.
 nvidia_cuda_install: false
 
 # DGX-specific vars may be used to target specific models,
