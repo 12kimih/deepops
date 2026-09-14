@@ -67,7 +67,7 @@ module avail
 
 Once the rootless docker module is loaded scripts "start_rootless_docker.sh"
 and "stop_rootless_docker.sh" will become available (added via PATH). Use
-these scripts to start an stop rootless docker daemon. The commands below
+these scripts to start and stop rootless docker daemon. The commands below
 illustrate how to start and run a rootless docker container on Slurm.
 
 ```bash
@@ -75,9 +75,9 @@ srun --ntasks=1 --gpus-per-task=1 --cpus-per-task=5 --gres-flags=enforce-binding
 
 module load rootless-docker
 
-start_rootless_docker.sh # specify --quiet option to hide rootles docker messages
+start_rootless_docker.sh # specify --quiet option to hide rootless docker messages
 
-docker run --gpus all -it --rm nvcr.io/nvidia/cuda:11.0-base-ubuntu18.04
+docker run --gpus all -it --rm nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
 
 root@445bf5cca686:/# echo NGPUS: $(nvidia-smi -L | wc -l)
 NGPUS: 1

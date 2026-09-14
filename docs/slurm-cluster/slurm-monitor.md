@@ -5,19 +5,20 @@
   - [Exporters](#exporters)
   - [Grafana](#grafana)
   - [Prometheus](#prometheus)
+  - [Alertmanager](#alertmanager)
 
 ## Introduction
 
 By default DeepOps deploys a monitoring stack alongside Slurm. This can be disabled by setting `slurm_enable_monitoring` to `false`.
 
-DeepOps runs a `dcgm-exporter` container on all DGX nodes. This container exports various GPU utilization and metadata to a Prometheus database running on the `slurm-metric` nodes. The `slurm-metric` nodes also run a Grafana server that connects to the Prometheus database to visualize the data. Ad-hoc metric queries can be made against the Prometheus server, but monitoring is typically done through the dashboard on Grafana.
+DeepOps runs a `dcgm-exporter` container on every GPU node. This container exports various GPU utilization and metadata to a Prometheus database running on the `slurm-metric` nodes. The `slurm-metric` nodes also run a Grafana server that connects to the Prometheus database to visualize the data. Ad-hoc metric queries can be made against the Prometheus server, but monitoring is typically done through the dashboard on Grafana.
 
 ## Exporters
 
 A `node-exporter` and `dcgm-exporter` should be running on every node listed under `slurm-node`:
 
 ```bash
-# View the DCGM Exporter container on a DGX node
+# View the DCGM Exporter container on a GPU node
 $ sudo docker ps
 CONTAINER ID        IMAGE                              COMMAND                  CREATED             STATUS
 PORTS                    NAMES
@@ -77,7 +78,7 @@ The Slurm dashboard provides the following information about running jobs and th
 
 Grafana allows you to view custom time-slices, set the polling duration, and many other dashboard customizations.
 
-For more information on creating custom dashboards and the available GPU metrics provided by Prometheus refer to the GPU Monitoring Tools [Readme](https://github.com/NVIDIA/gpu-monitoring-tools) or [Grafana home page](https://grafana.com/).
+For more information on creating custom dashboards and the available GPU metrics provided by Prometheus refer to the [DCGM Exporter README](https://github.com/NVIDIA/dcgm-exporter) or [Grafana home page](https://grafana.com/).
 
 ## Prometheus
 

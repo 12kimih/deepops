@@ -45,17 +45,18 @@ The role follows the DGX OS 6 guide:
    serial-over-LAN, logrotate, and additional DGX OS administration/development
    packages.
 
-The default driver branch is `550`, matching the DGX OS 6 examples. Override it
-when needed:
+The default driver branch is `550`, matching the DGX OS 6 examples. The settings on
+this page live in the role's `vars/`, which take precedence over `config/group_vars`,
+so override them on the command line:
 
-```yaml
-dgx_os6_driver_branch: "580"
+```bash
+-e dgx_os6_driver_branch=580
 ```
 
 Disruptive package upgrades are opt-in:
 
-```yaml
-dgx_os6_upgrade_packages: true
+```bash
+-e '{"dgx_os6_upgrade_packages": true}'
 ```
 
 ## Red Hat Enterprise Linux 8 and 9
@@ -75,22 +76,22 @@ build a matching NVIDIA kernel module: `525-dkms` on most EL8 systems,
 open-kernel-module stream by default. Override the branch when a validated DGX
 release note calls for another stream:
 
-```yaml
-dgx_redhat_driver_branch: "580"
+```bash
+-e dgx_redhat_driver_branch=580
 ```
 
 RHEL subscription repository management is enabled by default only when
 `ansible_distribution == 'RedHat'`. Disable it if subscriptions are managed
 outside DeepOps:
 
-```yaml
-dgx_redhat_manage_subscription_repos: false
+```bash
+-e '{"dgx_redhat_manage_subscription_repos": false}'
 ```
 
 Disruptive `dnf update --nobest` behavior is opt-in:
 
-```yaml
-dgx_redhat_upgrade_packages: true
+```bash
+-e '{"dgx_redhat_upgrade_packages": true}'
 ```
 
 ## Ubuntu 24.04 / DGX OS 7
@@ -109,8 +110,8 @@ The role follows the DGX OS 7 guide:
 
 Disruptive package upgrades are opt-in:
 
-```yaml
-dgx_os7_upgrade_packages: true
+```bash
+-e '{"dgx_os7_upgrade_packages": true}'
 ```
 
 ## Validation

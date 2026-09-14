@@ -3,7 +3,7 @@
 Centralized logging with syslog
 
 - [Syslog](#syslog)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Using an external syslog server](#using-an-external-syslog-server)
 
 ## Introduction
@@ -21,6 +21,6 @@ On Slurm clusters, the Slurm daemon logs are additionally ingested by rsyslog an
 If your site already includes a syslog server, you can forward your logs there using the following variables:
 
 - On Slurm: set `slurm_enable_rsyslog_server: false` and `slurm_enable_rsyslog_client: true`
-- On Kubernetes: set `kube_enable_rsyslog_server: false` and `slurm_enable_rsyslog_client: true`
+- On Kubernetes: set `kube_enable_rsyslog_server: false` and `kube_enable_rsyslog_client: true`
 - Set `rsyslog_client_tcp_host` to the hostname or IP address of your syslog server
 - Set `rsyslog_client_tcp_port` to the port your syslog server listens on for TCP logs

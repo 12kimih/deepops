@@ -225,7 +225,10 @@ To configure DeepOps to use your existing server, you should set the following c
 
 - Set `slurm_enable_nfs_server` to `false`
 
-- Set `nfs_client_group` to `"slurm-cluster"`
+- Put every host that mounts the shares in the `[slurm-nfs-client]` inventory group, e.g.
+  as `[slurm-nfs-client:children]` listing `slurm-master` and `slurm-node`. The
+  `nfs_client_group` variable is honoured only when passed with `-e`: a play's hosts are
+  resolved before group variables exist.
 
 - Configure the `nfs_mounts` variable as shown below, repeating the list item for each NFS export
 

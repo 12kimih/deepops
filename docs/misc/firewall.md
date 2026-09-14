@@ -1,7 +1,7 @@
 # Firewall
 
 - [Firewall](#firewall)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Kubernetes](#kubernetes)
     - [Control plane services](#control-plane-services)
     - [Worker node services](#worker-node-services)
@@ -29,8 +29,8 @@ the [Kubernetes documentation](https://kubernetes.io/docs/setup/independent/inst
   - Also needs to be open to any hosts that need to access the cluster via `kubectl`
 - `tcp/2379-2380`: etcd API, open to control plane nodes
 - `tcp/10250`: Kubelet API, open to self and control plane nodes
-- `tcp/10251`: kube-scheduler, open to self
-- `tcp/10252`: kube-controller-manager, open to self
+- `tcp/10259`: kube-scheduler, open to self
+- `tcp/10257`: kube-controller-manager, open to self
 
 ### Worker node services
 
