@@ -1,10 +1,9 @@
-# Installs NVIDIA Mellanox OFED, a collection of software packages to enable
-# high-speed networking with InfiniBand or RoCE on NVIDIA Mellanox networking
-# adapters.
+# Installs NVIDIA DOCA-OFED (the successor to MLNX_OFED): the kernel drivers,
+# libraries and tools for high-speed networking with InfiniBand or RoCE on NVIDIA
+# networking adapters.
 #
-# This playbook automates the software installation process outlined in the
-# MLNX_OFED documentation, here:
-# https://community.mellanox.com/s/article/howto-install-mlnx-ofed-driver
+# This playbook automates the host installation outlined in the DOCA documentation:
+# https://docs.nvidia.com/doca/sdk/doca-host-installation-and-upgrade/index.html
 ---
 - hosts: "{{ hostlist | default('all') }}"
   become: true

@@ -1,12 +1,13 @@
 ---
 # This playbook is used to setup the nfs-client-provisioner
-# If the cluster already has an nfs server setup run with --skip-tags="nfs_server,nfs_mkdir"
-#   Otherwhise an NFS server will be configured on kube_control_plane[0]
-# After settting up an NFS server, nfs software is installed on all nodes
+# By default an NFS server is configured on kube_control_plane[0]. If the cluster already
+#   has one, set k8s_deploy_nfs_server: false (and k8s_nfs_mkdir: false when the export
+#   directory already exists) and point k8s_nfs_server/k8s_nfs_export_path at it
+# After setting up an NFS server, nfs software is installed on all nodes
 # Lastly, the nfs-client-provisioner is helm installed using the role
 #
 # The default NFS configuration of this playbook is not meant for production systems
-#   For production deployments please configur NFS with storage-partner guidance
+#   For production deployments please configure NFS with storage-partner guidance
 #
 # Install the required NFS software on all nodes and then helm install the nfs-client
 - hosts: kube_control_plane[0]

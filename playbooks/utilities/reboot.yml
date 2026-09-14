@@ -11,7 +11,7 @@
   tags:
     - reboot
   vars:
-    # ansible.cfg inherits ConnectionAttempts=100 from kubespray, which lets one SSH
+    # ansible.cfg sets ConnectionAttempts=100 (carried over from kubespray), which lets one SSH
     # probe block for the whole reboot_timeout. The reboot module only re-checks its
     # deadline between probes, so it never sees the node come back. ServerAliveInterval
     # drops a control master the reboot left stale.

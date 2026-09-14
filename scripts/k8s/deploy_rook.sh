@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # Upgrading:
-# `helm update`
-# `helm search rook` # get latest version number
-# `helm upgrade --namespace rook-ceph rook-ceph rook-release/rook-ceph --version v0.9.0-174.g3b14e51`
+# `helm repo update`
+# `helm search repo rook-release/rook-ceph --versions` # get latest version number
+# `helm upgrade --namespace rook-ceph rook-ceph rook-release/rook-ceph --version <version>`
 
 # Get absolute path for script and root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -39,7 +39,7 @@ function help_me() {
   echo "Usage:"
   echo "-h    This message."
   echo "-p    Print out the connection info for Rook-Ceph."
-  echo "-d    Delete Rook from your system (this delete any created volumes)."
+  echo "-d    Delete Rook from your system (this deletes any created volumes)."
   echo "-w    Poll for rook-ceph to reach a healthy and initialized state."
   echo "-u    Create a new dashboard user (default username: 'admin' password: 'deepops', set with env variables DEEPOPS_ROOK_USER/DEEPOPS_ROOK_PASS)."
   echo "-x    Install Rook-Ceph, but do not set it as the Default StorageClass."

@@ -47,7 +47,7 @@ kubectl -n ${CLUSTER_VERIFY_NS} wait --for=condition=complete --timeout=600s job
 
 echo "executing ..."
 
-# Count all the containers in a RUNNING state, these were the success containers
+# Collect the pods that reached Completed; these are the successful runs
 pods_output=$(kubectl -n ${CLUSTER_VERIFY_NS} get pods | grep ${job_name} | awk '$3 ~/Completed/ {print $1}' )
 
 if [ -z "$pods_output" ]; then

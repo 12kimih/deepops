@@ -1,5 +1,5 @@
 ---
-# This playbook updates the firwmware on DGX nodes
+# This playbook updates the firmware on DGX nodes
 # Refer to the README in roles/nvidia-dgx-firmware for more info
 # NOTE: forcing use of the paramiko ssh plugin since running fw
 # update container with interactive `-it` flag requires tty and

@@ -14,7 +14,7 @@
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml
 
-- name: Install NVIDIA container runtime
+- name: Install the NVIDIA Container Toolkit
   import_playbook: container/nvidia-docker.yml
 
 - name: Install NVIDIA DCGM

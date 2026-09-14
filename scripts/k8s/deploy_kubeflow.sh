@@ -204,7 +204,7 @@ function tear_down() {
     kubectl delete namespace "${ns}"
   done
 
-  # There is an issues in the kfctl delete command that does not properly clean up and leaves NSs in a terminating state, this is a bit hacky but resolves it
+  # Deleted namespaces can hang in Terminating; -Z clears their finalizers (a bit hacky, but it resolves it)
   if [ "${KUBEFLOW_EXTRA_FULL_DELETE}" == "true" ]; then
     echo "Removing finalizers from all namespaces: ${namespaces}"
     fix_terminating_ns ${namespaces}
@@ -222,7 +222,7 @@ function poll_url() {
   # It typically takes ~5 minutes for all pods and services to start, so we poll for ten minutes here
   time=0
   while [ ${time} -lt ${KUBEFLOW_TIMEOUT} ]; do
-    # XXX: This validates that the webapp is responding, it does not guarentee functionality
+    # XXX: This validates that the webapp is responding, it does not guarantee functionality
     curl -s --raw -L "${kf_url}" && \
       echo "Kubeflow homepage is up" && break
     let time=$time+15
@@ -253,7 +253,7 @@ function print_info() {
   echo
   echo "To remove (excluding CRDs, istio, auth, and cert-manager), run: ${0} -d"
   echo
-  echo "To perform a full uninstall : ${0} -D"
+  echo "istio-system and cert-manager are left in place; delete them manually if nothing else uses them"
   echo
   echo "Kubeflow Dashboard (HTTP NodePort): ${kf_url}"
   echo

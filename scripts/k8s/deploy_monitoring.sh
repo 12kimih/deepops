@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # For additional information on the GPU Monitoring tools see:
-# https://github.com/NVIDIA/gpu-monitoring-tools
+# https://github.com/NVIDIA/dcgm-exporter
 # https://ngc.nvidia.com/catalog/helm-charts/nvidia:gpu-operator
 # https://ngc.nvidia.com/catalog/containers/nvidia:k8s:dcgm-exporter
 # https://github.com/prometheus-community/helm-charts
@@ -226,7 +226,7 @@ function print_monitoring() {
 
 
 function install_dependencies() {
-    # kubect/K8s
+    # kubectl/K8s
     kubectl version
     if [ $? -ne 0 ] ; then
         echo "Unable to talk to Kubernetes API"
@@ -235,7 +235,7 @@ function install_dependencies() {
 
     # Install/initialize Helm if needed
     ./scripts/k8s/install_helm.sh
-    # StorageClasse (for volumes and MySQL DB)
+    # StorageClass (for volumes and MySQL DB)
     kubectl get storageclass 2>&1 | grep "(default)" >/dev/null 2>&1
     if [ $? -ne 0 ] ; then
         echo "No storageclass found"

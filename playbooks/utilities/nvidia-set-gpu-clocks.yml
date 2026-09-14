@@ -1,5 +1,6 @@
 ---
-# set gpu clocks on all worker nodes
+# Lock the GPU clocks to gpu_clock_lock, or reset them when gpu_clock_reset is true
+# (both set in config/group_vars/all.yml)
 - hosts: all
   gather_facts: false
   become: true

@@ -2,7 +2,7 @@
 - name: Install NVIDIA driver on GPU servers
   import_playbook: ../nvidia-software/nvidia-driver.yml
 
-- name: Install NVIDIA container runtime on GPU servers
+- name: Install the NVIDIA Container Toolkit on GPU servers
   import_playbook: nvidia-docker.yml
   vars:
     nvidia_docker_skip_docker_reload: true

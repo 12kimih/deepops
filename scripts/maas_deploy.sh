@@ -15,7 +15,7 @@
 # Configuration:
 #   Reads config/maas-inventory.yml (same config as maas_inventory.py).
 #   Environment variables override config file values:
-#     MAAS_API_URL, MAAS_API_KEY, MAAS_MACHINES, MAAS_SSH_USER,
+#     MAAS_API_URL, MAAS_API_KEY, MAAS_MACHINES, MAAS_SSH_USER, MAAS_NETWORK,
 #     MAAS_SSH_BASTION (or MAAS_SSH_PROXY for full ProxyCommand override)
 #
 # Examples:
@@ -516,7 +516,7 @@ do_deploy() {
     echo "=== All machines deployed and accessible ==="
     echo ""
     echo "You can now run:"
-    echo "  source .venv/bin/activate"
+    echo "  source /opt/deepops/env/bin/activate"
     echo "  ansible -m ping all"
     [[ "$PROFILE" == "k8s" ]] && echo "  ansible-playbook playbooks/k8s-cluster.yml"
     [[ "$PROFILE" == "slurm" ]] && echo "  ansible-playbook playbooks/slurm-cluster.yml"
