@@ -192,7 +192,9 @@ nvidia_driver_purge_existing: true
 # Docker configuration
 # Playbook: docker, nvidia-docker, k8s_cluster
 #
-# For supported Docker versions, see: submodules/kubespray/roles/container-engine/docker/vars/*
+# docker_install gates the in-tree roles/docker. docker_dns_servers_strict,
+# docker_storage_options, docker_options and docker_iptables_enabled are kubespray's,
+# read only when kubespray itself installs Docker.
 docker_install: true
 # docker_version: 'latest'
 docker_dns_servers_strict: false
@@ -349,23 +351,10 @@ golang_gopath: /opt/go/packages
 
 
 ################################################################################
-# MONITORING                                                                   #
-################################################################################
-# Collectd
-# Playbook: collectd
-#collectd_network_server: "deepops-mgmt.example.com"
-#collectd_network_port: "30300"
-#collectd_python_module_path: "/usr/lib/collectd/dcgm"
-#collectd_python_modules: []
-#collectd_config_dir: "/etc/collectd/collectd.conf.d"
-#with_dcgm_collectd: false
-
-
-################################################################################
 # MAAS                                                                         #
 ################################################################################
 # MAAS (Metal as a Service): Node provisioning/PXE service
-# Playbook: maas, maas_management
+# Playbook: provisioning/maas.yml
 maas_adminusers:
   - username: 'admin'
     email: 'admin@{{ maas_dns_domain }}'

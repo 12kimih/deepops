@@ -109,7 +109,8 @@ that is known to work. *(Note: a follow-up docs audit of post-install actions --
   radius. A global-disable escape hatch is available for trusted nodes.
 - RHEL: enables unprivileged userns on the kernel cmdline (grubby) if missing.
 - Per-user runtime/cache/data dirs are created `0700` by the existing Slurm
-  prolog (not world-writable tmpfiles).
+  prolog. Their parents are provisioned sticky-1777 by tmpfiles.d since section 30, so
+  the CLI works outside jobs too.
 - **Why:** the old `nvidia.enroot` v0.5.0 was an EOL 3.x release with no handling
   for the unprivileged-userns restriction modern Ubuntu enables by default --
   this is the "enroot fails after install on Ubuntu 24.04" problem. Verified
@@ -167,7 +168,8 @@ A file-by-file review of 80 OS-conditional files found and fixed real breakage:
   DNS never applied on 22.04/24.04/26.04. Now disabled on 18.04+ and the resolv.conf
   stub symlink is replaced before templating.
 - **nis_client:** the restart handler was gated to Ubuntu 14.04 and never fired
-  on modern Ubuntu -> config changes weren't applied. Now a single `nis` handler.
+  on modern Ubuntu -> config changes weren't applied. Now a single handler, which
+  restarts `ypbind` (section 34).
 - **docker-rootless:** persist `br_netfilter` via `/etc/modules-load.d` (read on
   both Debian and RHEL) instead of `/etc/modules` (Debian-only).
 - **ood-wrapper:** install `python3-passlib` on Ubuntu + EL8/9/10 (was EL8-only
@@ -245,8 +247,8 @@ Boot-persistence / idempotency fixes:
   release, so the operator confirms the repo URL/version for their adapter+OS on the
   DOCA downloads page; untestable here without IB hardware). `roce_backend`'s bundled
   MLNX_OFED 4.7 / Ubuntu 18.04 ISO is flagged legacy and points at the `mofed` role.
-- **ufw firewall** -- port as a parameterized firewall role (the source hardcoded
-  subnets/ports).
+- **ufw firewall -- DONE as a playbook** (section 40): `config.example/playbooks/ufw-enable.yml`
+  takes the subnets and ports as vars; it was not made a role.
 
 ---
 
@@ -316,7 +318,8 @@ the inline citations (upstream requirements + the Ubuntu 23.10 blog).
 ## 14. Slurm 25.11.6 config flexibility  (`8247cef2`, `e987d556`, `5db2a738`, `2c74689e`)
 
 The four `etc/slurm/*` templates in the role (slurm.conf, cgroup.conf, gres.conf,
-slurmdbd.conf) are kept at the **upstream DeepOps baseline** -- an earlier overhaul
+slurmdbd.conf) are kept at the **upstream DeepOps baseline** (spool directories aside,
+section 35) -- an earlier overhaul
 that hard-coded site tunables into them was reverted (`2c74689e`) so the in-tree
 templates stay generic and merge-clean. Full per-file site control is instead via
 **complete templates under `config/files/slurm/`**, selected by the
@@ -345,7 +348,8 @@ repointed at the git-untracked `config/` overlay.
 Selectively merged the good parts of a production-tested Ubuntu Slurm
 cluster, generalizing anything server-specific into config:
 
-- **`job_submit.lua`** (net-new): a generalized, Jinja-parameterized port of a
+- **`job_submit.lua`** (net-new; superseded by sections 29 and 35, where the file is
+  user-supplied and copied verbatim): a generalized, Jinja-parameterized port of a
   real GPU-type->partition routing plugin. Site config (CPU partitions,
   gpu-type->partition map, default type/partition) comes from Ansible vars, so it is
   a safe no-op with the empty defaults. Improvements over the source: respects an
@@ -363,7 +367,8 @@ cluster, generalizing anything server-specific into config:
   parent may be a shared/systemd-managed path).
 - **Server-specific values NOT copied** (NodeName hardware lines, NodeAddr, specific
   Gres types, user allowlists, NFS exports, hpcsdk versions): these stay as
-  placeholders / `*_raw` overrides the operator fills in under `config/`.
+  placeholders the operator fills in under `config/` -- since section 35 in complete
+  templates under `config/files/slurm/`, the `*_raw` override vars having been dropped.
 
 ## 16. Prerequisite-package modernization  (`a20f1670`)
 
@@ -424,7 +429,7 @@ hardware, real inventory, usernames, `/data0x` paths) stay as placeholders.
   Linux default of 8 starves many clients); and a guardrail to keep enroot
   cache/data/runtime on node-local NVMe. (Section 28 later re-bases these defaults on
   a 100GbE+ fabric -- nconnect 16 + ESnet sysctls, auto-sized nfsd threads; the
-  auto-sizing was since dropped for a fixed default of 64 set in `config/`, since
+  auto-sizing was since dropped for a fixed default, now 128 (section 36), since
   high auto-sized counts could fail to start with ENOMEM on busy servers.) See
   `docs/slurm-cluster/slurm-nfs.md`.
 - **Private-config management** (`docs/deepops/managing-cluster-config.md`): the
@@ -612,6 +617,116 @@ fork point). Dropped the unused `geerlingguy.ntp` galaxy dependency (matching th
 docs). Documented the deferred OOD/Trident/registry major bumps in their role
 defaults. Removed `scripts/deepops/config-diff.sh` by preference, plus
 assorted doc cleanups.
+
+## 33. In-tree Docker CE and /etc/hosts  (`e01abe67`, `30a7bdd7`, `3094aecc`, `e505029b`)
+
+- **Docker CE** is installed by a new in-tree `roles/docker` following docs.docker.com
+  (a deb822 `docker.sources` plus keyring on Debian/Ubuntu, `docker-ce.repo` on RHEL, apt
+  `lock_timeout` so unattended-upgrades cannot fail the run), replacing kubespray's
+  container-engine role and its deprecated `apt_key` method. Kubernetes keeps containerd
+  through kubespray.
+- **Daemon options and kernel ceilings:** `docker_daemon_options` is merged into
+  `daemon.json` -- address pools are checked against the live routing table, so a
+  colliding pool fails at the node -- and `docker_sysctls` raises the inotify and ARP-table
+  limits a container host exhausts long before CPU or memory.
+- **`hosts`** is in-tree (was the `DeepOps.hosts` Galaxy role), with
+  `hosts_internal_subnet_prefix` to resolve nodes to their cluster-network address.
+
+## 34. NIS server and identity consistency  (`c27aec6e`, `8f7df760`, `c0955b1f`, `31d17df1`, `f622d219`, `4c6041a6`)
+
+Slurm ships a job's supplementary groups as numeric GIDs resolved on the submit node, so
+anything group-based has to mean the same number on every node.
+
+- **`nis_server`** (new, multi-OS): ypserv, securenets, `ypinit -m`, and managed
+  `ypserv.conf` access rules, asserting that protected maps are served only to privileged
+  ports and ordered before the catch-all. `nis_export_groups` publishes groups with pinned
+  GIDs (asserted `>= GID_MIN`, membership declarative) and `nis_export_netgroups` publishes
+  netgroups. `authentication.yml` runs it before `nis_client`, and `slurm-cluster.yml`
+  imports `authentication.yml`.
+- **`nis_client`** starts `ypbind.service` -- current Debian/Ubuntu have no `nis.service` --
+  and installs the client packages only.
+- **`docker_socket_group`** (new) gives `/run/docker.sock` a NIS-published group, created
+  locally with the same GID so docker does not wait on NIS at boot.
+- **`cluster_sudoers`** (new) grants administrator sudo through a NIS netgroup, matched by
+  name rather than GID, validated with `visudo`, and reports (optionally prunes) drop-ins it
+  did not write. The slurm GID can be pinned alongside the UID.
+- **`utilities/check-id-consistency.yml`** asserts every published group resolves to its
+  pinned GID on every node.
+
+## 35. Slurm config overlay and job_submit hardening  (`b6e3ea45`, `d738998e`, `2eefc1d5`, `226dfb9b`, `b283b2f3`, `d7543fe0`)
+
+- **Spool directories:** the role and its baseline template use `/var/spool/slurmd` and
+  `/var/spool/slurmctld`, so the directories it creates match a site's own `slurm.conf`.
+- **config.example** dropped the long tunables list and the `*_raw` node/partition/gres
+  blocks; full control is the `slurm_*_conf_template` pointers to complete files.
+- **`job_submit.lua`** stamps the GPU type onto every GPU request -- in all five request
+  fields, and on `scontrol update` -- because typed QoS limits are checked against the
+  requested TRES and an untyped request would escape them. Unknown or mixed types are
+  rejected, a type maps to every partition holding it, and `DEFAULT_GPU_TYPE` routes through
+  the same map. `roles/slurm/tests/job_submit_test.lua` exercises the plugin.
+- **NFS servers:** `slurm-cluster.yml` sets up every `[slurm-nfs]` host rather than only the
+  first. The group has to come from the inventory: a play's hosts are resolved before group
+  variables exist, so `nfs_server_group` in `group_vars` is ignored.
+
+## 36. NFS operations  (`01637660`, `506499d6`, `7a512922`, `cae388ca`, `8f53c2c8`, `87c55d4b`, `615943c5`)
+
+- **nfsd threads:** a fixed default, now 128, instead of auto-sizing to CPU count, which
+  produced counts that failed to start with ENOMEM on busy servers.
+- **Self-healing server:** `nfs-server.service` is `Type=oneshot` and ignores `Restart=`, so
+  an `OnFailure=` drop-in starts a helper that retries a bounded number of times.
+- **Client mount options** moved into one `nfs_mount_options` that every entry inherits.
+  `x-systemd.automount` was tried for the boot race (a client up before its server) and
+  removed: a unit with `ProtectHome=` cannot namespace over an autofs `/home`, and every node
+  of a cluster failed to boot (recorded in `docs/deepops/boot-failures.md`). NHC checks the
+  shared mountpoints (`nhc_check_mounts`, derived from `nfs_mounts`).
+- **Shutdown detach:** `nfs-detach-on-shutdown.service` lazily unmounts before shutdown, so
+  a `hard` mount from a peer rebooting alongside cannot hang the node in D state;
+  `utilities/reboot.yml` does the same before it reboots.
+- **`utilities/nfs-mount.yml`** mounts, on demand, the fstab NFS entries a node booted
+  without, once their servers answer.
+
+## 37. GPU power limit  (`64beee04`, `a064c770`, `ac1990fd`)
+
+New `nvidia_power_limit` role and `nvidia-software/nvidia-power-limit.yml`: a persistent
+GPU power cap (`nvidia-power-limit.service`, because nvidia-smi resets the limit at boot),
+validated against each card's range. It converges both ways -- a host without
+`nvidia_power_limit_watts` has its cap removed -- and `slurm-cluster.yml` runs it over
+`[slurm-node]`. The wattage lives in `/etc/nvidia-power-limit.conf`, read by both the unit
+and the Slurm prolog/epilog helper, so an exclusive job cannot lift a capped node to the
+card maximum.
+
+## 38. Site tooling: cluster_tools  (`8de5ca17`, `0d40c84f`, `0a43a980`, `38537464`, `83827cef`, `14d04ede`, `78cb6343`)
+
+New `cluster_tools` role publishes a site's own commands into PATH (refusing a name that
+would shadow a real command), the shell libraries they source, environment defaults through
+`/etc/profile.d`, a login banner through `update-motd.d` rendered from structured data, and
+per-user resource limits on login nodes (a `user-.slice` drop-in) -- each removed again when
+its setting is emptied -- plus directories copied onto a shared filesystem, which are never
+pruned.
+
+## 39. Out-of-band management and node bring-up  (`7cf9a1b9`, `39a03cd0`, `14a91fc7`, `45185853`, `2e54ff44`, `0c31b8bf`, `97d3b0e4`, `4cbda963`)
+
+- **`bmc`** configures each host's BMC in-band over KCS, needing no BMC credentials: address,
+  password (checked with `ipmitool user test`, so re-runs stay clean), SNMP community, and the
+  control node's leg on the management network. `utilities/power.yml` drives chassis power
+  from the control node with a pinned RMCP+ cipher suite, since ipmitool's negotiation fails
+  on BMCs that do not offer its first choice.
+- **`serial_console`** puts the kernel and GRUB console on the BMC's serial-over-LAN.
+- **`default_target`** boots headless nodes into `multi-user.target`.
+- **`netplan`** renders node networking from `netplan_config` in host_vars, one host at a
+  time, restoring the previous file when netplan rejects the new one.
+- **`utilities/reboot.yml`** overrides the inherited `ConnectionAttempts=100` so the reboot
+  module can see a node come back, and waits 1800s by default.
+- `docs/deepops/boot-failures.md` records the two failures that took a cluster down, and
+  `docs/deepops/utilities.md` indexes the playbooks for operating one.
+
+## 40. Housekeeping  (`c6ebda7c`, `f6c7c112`)
+
+- `ansible.cfg` sets `vault_password_file = ./config/.vault-pass`, read only when a vaulted
+  value is used, and `config.example/playbooks/ufw-enable.yml` is a generalized firewall
+  playbook to pair with `ufw-disable.yml`.
+- `move-home-dirs` is opt-in (`move_home_dirs_enable`) rather than running on every
+  `authentication.yml`.
 
 ## Status
 
