@@ -10,14 +10,18 @@ The steps outlined below were tested using a virtual DeepOps cluster with one lo
 where each compute node has been allocated 8 CPU cores and a single NVIDIA Tesla P4 GPU.
 Any cluster hardware should work to duplicate this example, provided that each compute node you use for the benchmark includes at least one CUDA-capable GPU.
 
+> **Note:** this example is unmaintained. `ansible-prereqs.yml` targets a `slurm-workers` group (DeepOps
+> names its compute nodes `slurm-node`), uses an `nvidia-ml` role that no longer exists, and pins CUDA 10.0.
+> Its `andrewrothstein.miniconda` role is a Galaxy role listed in `roles/requirements.yml`.
+
 ## Assumptions
 
 These instructions assume that:
 
 * You have already set up a Slurm cluster using DeepOps.
-    * If you haven't configured a cluster yet, see the [Slurm deployment guide](/docs/slurm-cluster.md) for deploying on physical hardware, or the [virtual guide](/virtual/README.md) to set up a virtual DeepOps cluster.
+    * If you haven't configured a cluster yet, see the [Slurm deployment guide](/docs/slurm-cluster/README.md) for deploying on physical hardware, or the [virtual guide](/virtual/README.md) to set up a virtual DeepOps cluster.
 * You have privileges to run Ansible on this cluster.
-    * If you don't have these privileges, talk to your system administrator to see if they can set up the system dependencies. The only system dependencies for this example are captured in the Ansible playbook, `examples/slurm/dask-rapids/ansible-prereqs.yml`.
+    * If you don't have these privileges, talk to your system administrator to see if they can set up the system dependencies. The only system dependencies for this example are captured in the Ansible playbook, `workloads/examples/slurm/dask-rapids/ansible-prereqs.yml`.
 * All compute nodes in your cluster have at least one CUDA-capable GPU.
 * All nodes (compute and login) in your cluster have access to a shared NFS filesystem.
     * In many clusters `/home` is shared for easy use by users, but we will use `/shared` below to make the use of this filesystem explicit. If your path is different, just adjust the commands below as needed.
@@ -28,7 +32,7 @@ These instructions assume that:
 1. From your DeepOps provisioning node, run the provided `ansible-prereqs.yml` Ansible playbook to ensure all system-level dependencies are present.
     This playbook will also copy the scripts from this directory to `/usr/share/deepops`.
     ```
-    $ ansible-playbook -l slurm-cluster -i <path_to_inventory_file> examples/slurm/dask-rapids/ansible-prereqs.yml
+    $ ansible-playbook -l slurm-cluster -i <path_to_inventory_file> workloads/examples/slurm/dask-rapids/ansible-prereqs.yml
     ```
 1. To install Dask, Rapids, and supporting libraries, I'll create a custom Python environment using the [Anaconda Python Distribution](https://www.anaconda.com/distribution/). I'll install this environment in the NFS filesystem (`/shared`) to make it visible to all the compute nodes.
     ```

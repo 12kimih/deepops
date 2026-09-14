@@ -24,9 +24,9 @@ existing /etc/hosts file which makes this depend on /etc/hosts already being cor
 If `hosts_network_interface` is not set, `ansible_hostname` and `ansible_fqdn` will be named according to the interface providing the default route.
 In cases where `hosts_network_interface` is not set and there is no default route, only the interface-based names will be generated.
 
-`hosts_network_interface` can alternatively be set as an array with unique values per host.
+`hosts_network_interface` can alternatively be set as a mapping of host name to interface (e.g. `{ head: eth0 }`); hosts not listed use the default-route interface.
 
-The network interfaces lo, docker, and nodelocaldns are automatically excluded.  The variable `hosts_exclude_interfaces` can
+The network interfaces lo, docker, nodelocaldns, br- and veth are automatically excluded.  The variable `hosts_exclude_interfaces` can
 be used to change the excluded interfaces.
 
 `hosts_interface_domain` allows including a different FQDN for specific interfaces, either cluster wide or per-host
@@ -49,10 +49,14 @@ None of the variables below are required. When not set, the default setting is a
 | `hosts_file_snippets`                    | []                                   | A list of files containing host file snippets to be added to the hosts file verbatim.                             |
 | `hosts_ip_protocol`                      | `ipv4`                               | When adding Ansible managed hosts, this specifies the IP protocol (`ipv4` or `ipv6`)                              |
 | `hosts_network_interface`                | ''                                   | When adding Ansible managed hosts, this specifies the network interface for which the IP address is used for the default name |
-| `hosts_file_backup`                      | no                                   | If yes, backup of host file is created with timestamp                                                             |
+| `hosts_default_domain`                   | ''                                   | Domain used for the FQDN of the default interface entry (otherwise `ansible_fqdn`)                                |
+| `hosts_interface_domain`                 | ''                                   | Domain per interface, or per host per interface, for the interface entries                                        |
+| `hosts_exclude_interfaces`               | [lo, docker, nodelocaldns, br-, veth]| Interface name prefixes left out of the hosts file                                                                |
+| `hosts_internal_subnet_prefix`           |                                      | Prefer the address with this prefix (e.g. `10.0.`) when an interface has several                                  |
+| `host_file_backup`                       | no                                   | If yes, backup of host file is created with timestamp                                                             |
 |                                          |                                      |                                                                                                                   |
 
-(†) When setting `hosts_add_ansible_managed_hosts`, an entry for the current host will also be added. Consequently, `hosts_add_default_ipv4` doesn't need to be set.
+(†) When setting `hosts_add_ansible_managed_hosts`, an entry for the current host will also be added.
 
 Individual hosts file entries can be added with `hosts_entries`, a list of dicts with keys `name`, `ip` and (optional) `aliases`. Example:
 

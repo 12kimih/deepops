@@ -6,13 +6,13 @@ When working in smaller homogeneous clusters that only have one GPU type or MIG 
 
 ## Using NodeSelectors
 
-Using a `NodeSelector` guarentees that a Pod will only deploy with a GPU that meets the requested criteria. This can include a specific GPU type by specifying the `nvidia.com/gpu.product` label, the GPU architecture by specifying the `nvidia.com/gpu.family`, or the available GPU memory by specifying the `nvidia.com/gpu.memory` label.
+Using a `NodeSelector` guarantees that a Pod will only deploy with a GPU that meets the requested criteria. This can include a specific GPU type by specifying the `nvidia.com/gpu.product` label, the GPU architecture by specifying the `nvidia.com/gpu.family`, or the available GPU memory by specifying the `nvidia.com/gpu.memory` label.
 
 When using `mig-strategy=single` or deploying into a cluster with multiple GPU types, specifying a `NodeSelector` is mandatory for consistent results.
 
-For more information on selecting nodes, see the Kubernetes documenaiton on [Node Selectors](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) and [Node Affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/).
+For more information on selecting nodes, see the Kubernetes documentation on [Node Selectors](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) and [Node Affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/).
 
-For more information on the labels available, see the [GPU Feature Discovery repo](https://github.com/NVIDIA/gpu-feature-discovery).
+For more information on the labels available, see the [GPU Feature Discovery documentation](https://github.com/NVIDIA/k8s-device-plugin) (now part of the device plugin repository).
 
 Request a V100 running in a DGX:
 ```sh
@@ -45,11 +45,11 @@ affinity:
 
 ## Using Resource Limits
 
-Requesing a resource limit is how the Pod tells Kubernetes it needs a GPU. This is required and the Pod will always get exactly how many GPUs are requested.
+Requesting a resource limit is how the Pod tells Kubernetes it needs a GPU. This is required and the Pod will always get exactly how many GPUs are requested.
 
-It is not possible to request a partial GPU or share a GPU without using MIG on the NVIDIA Ampere and newer GPUs.
+It is not possible to request a partial GPU or share a GPU unless MIG (NVIDIA Ampere and newer GPUs) or the device plugin's time-slicing or MPS sharing is configured.
 
-If MIG is not being used, a GPU is requests by specifying `nvidia.com/gpu` in the resource limits. This stays the same if MIG is being used with `mig-strategy=single`, but must be combined with a `NodeSelector`. If MIG is being used with `mig-strategy=mixed`, then a MIG device is requesting by using one of the `nvidia.com/mig-<compute>g-<memory>gb` profiles listed below.
+If MIG is not being used, a GPU is requested by specifying `nvidia.com/gpu` in the resource limits. This stays the same if MIG is being used with `mig-strategy=single`, but must be combined with a `NodeSelector`. If MIG is being used with `mig-strategy=mixed`, then a MIG device is requested by using one of the `nvidia.com/mig-<compute>g-<memory>gb` profiles listed below.
 
 For more information on the MIG strategies, see the [GPU Device Plugin documentation](https://github.com/NVIDIA/k8s-device-plugin#deployment-via-helm).
 

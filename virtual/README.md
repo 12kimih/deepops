@@ -14,8 +14,8 @@ path for current GPU clusters. Useful for...
 
 The host machine should have enough resources to fulfill the minimum VM needs...
 
-Total: 8 vCPU, 22 GB RAM, 96 GB Storage
-* virtual-login01: 2 vCPU, 2GB RAM and 32GB Storage
+Total: 10 vCPU, 26 GB RAM, 96 GB Storage
+* virtual-login01: 4 vCPU, 6GB RAM and 32GB Storage
 * virtual-mgmt01: 4 vCPU, 4GB RAM and 32GB Storage
 * virtual-gpu01: 2 vCPU, 16GB RAM and 32GB Storage
 
@@ -43,8 +43,8 @@ Also, using VMs and optionally GPU passthrough assumes that the host machine has
 
    ```sh
    # NOTE: The default VM OS is Ubuntu 20.04. If you wish the VMs to spawn CentOS,
-   #       configure the DEEPOPS_VAGRANT_FILE variable accordingly...
-   #       export DEEPOPS_VAGRANT_FILE=$(pwd)/Vagrantfile-centos
+   #       set DEEPOPS_VAGRANT_OS and DEEPOPS_OS_VERSION accordingly...
+   #       export DEEPOPS_VAGRANT_OS=centos DEEPOPS_OS_VERSION=8
    # NOTE: virtual-gpu01 requires GPU passthrough, by default it is not enabled
    # NOTE: 3 VMs are started by default: virtual-mgmt01, virtual-login01, virtual-gpu01
    # NOTE: 6 VMs are started if the environment variable DEEPOPS_FULL_INSTALL is set:
@@ -80,7 +80,7 @@ Also, using VMs and optionally GPU passthrough assumes that the host machine has
 
 ### Kubernetes
 
-Consult the [Kubernetes Usage Guide](/docs/kubernetes-usage.md) for examples of how to use Kubernetes.
+Consult the [Kubernetes Usage Guide](/docs/k8s-cluster/kubernetes-usage.md) for examples of how to use Kubernetes.
 
 ### Connecting to the VMs
 
@@ -169,7 +169,7 @@ export DEEPOPS_OS_VERSION=8
 
 ### Increase CPUs, memory, and GPUs
 
-In the Vagrantfile of choice (Vagrantfile-<os_type>), make the following modifications...
+In the Vagrantfile of choice (Vagrantfile-<os><version>), make the following modifications...
 
 1. Increase the memory and cpus for the `virtual-mgmt01` VM. Suggested - v.memory = 16384, v.cpus = 8.
 2. Comment out the `virtual-login01` VM. Unless you are running slurm, this is not necessary and just takes up resources.
@@ -180,7 +180,7 @@ NOTE: The amount of CPUs and memory on the host system will vary. Change the amo
 
 ### Increase Disk Space
 
-1. Add v.machine_virtual_size = 100 to the Vagrantfile (Vagrantfile-<os_type>). This parameter should go under each libvirt section per node. The units are GBs, so in this case 100 GB are allocated per node.
+1. Add v.machine_virtual_size = 100 to the Vagrantfile (Vagrantfile-<os><version>). This parameter should go under each libvirt section per node. The units are GBs, so in this case 100 GB are allocated per node.
 2. `vagrant ssh` to each machine (ex: `vagrant ssh virtual-gpu01`)  and do the following...
 ```sh
 # run fdisk
@@ -203,9 +203,11 @@ df -h /
 The default configuration deploys a single management node and a single GPU node. To run multi-node Deep Learning jobs or to test our Kubernetes HA it's necessary to deploy multiple nodes.
 
 1. If using GPUs, ensure that 2 GPUs are available.
-2. If using GPUS, update the GPU BUS address for virtual-gpu01 and virtual-gpu02 in the "full" Vagrantfile of choice (Vagrantfile-<os_type>-full).
+2. If using GPUS, update the GPU BUS address for virtual-gpu01 and virtual-gpu02 in the "full" Vagrantfile of choice (Vagrantfile-<os><version>-full).
 3. Run `export DEEPOPS_FULL_INSTALL=true`.
 4. Continue with the standard installation steps.
+
+For a larger Slurm-only cluster, `export DEEPOPS_LARGE_SLURM=true` instead selects the `-large-slurm` Vagrantfiles.
 
 # Enabling Virtualization and GPU Passthrough
 
@@ -314,7 +316,7 @@ If the `Kernel driver in use` is not `vfio-pci` and instead the nvidia driver, i
 
 ```
 $ cat /etc/modprobe.d/nvidia.conf
-softdep nvidia_384 pre: vfio-pci
+softdep nvidia pre: vfio-pci
 ```
 
 One more check...

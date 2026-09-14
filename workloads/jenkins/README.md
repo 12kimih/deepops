@@ -34,6 +34,10 @@ Does all the same as `Jenkinsfile` does in addition to:
 * Installs Kubeflow
 * Does more robust checks against ceph installation
 
+## Jenkinsfile-matrix
+
+Manually triggered smoke tests for a chosen combination of deployment options (OS and version, Slurm or Kubernetes, single or multi-node, GPU Operator settings), optionally several combinations in parallel.
+
 ## Jenkinsfile-multi-nightly  
 
 This does everything `Jenkinsfile-nightly` does in addition to:

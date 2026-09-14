@@ -78,6 +78,7 @@ mofed_version: "4.7-3.2.9.0"
 mofed_site_place: "MLNX_OFED-4.7-3.2.9.0"
 mofed_file_name: "MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu18.04-x86_64.iso"
 ```
+This legacy MLNX_OFED ISO targets Ubuntu 18.04 and does not install on the currently supported OS releases; install DOCA-OFED with the `mofed` role instead.
 
 
 Dependencies
@@ -96,7 +97,7 @@ The Role installing following components:
 5. Universal SR-IOV CNI 
 6. Specific Network provisioning with NetworkAttachmentDefinition
 7. DHCP CNI for providing IP addresses for SR-IOV based NIC's in pod deployment from existing infrastructure  
-8. The latest version Kubeflow/MPI-Operator
+8. Kubeflow MPI Operator (its v1 manifest)
 
 
 
@@ -105,12 +106,12 @@ Role deployment
 
 With root user:
 ```
-ansible-playbook -l k8s-cluster playbooks/k8s-cluster/roce.yaml
+ansible-playbook -l k8s_cluster playbooks/k8s-cluster/roce.yaml
 ```
 
 With standard user:
 ```
-ansible-playbook -l k8s-cluster playbooks/k8s-cluster/roce.yaml -u "username" -k -K
+ansible-playbook -l k8s_cluster playbooks/k8s-cluster/roce.yaml -u "username" -k -K
 ```
 
 License

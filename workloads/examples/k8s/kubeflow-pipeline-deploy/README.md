@@ -1,6 +1,6 @@
 # NGC Triton Inference Server Kubeflow Pipeline
 
-This Kubeflow pipeline will deploy a Triton Inference Server into a Kubernetes cluster. Models are contained within and models directory in an NFS server.
+This Kubeflow pipeline will deploy a Triton Inference Server into a Kubernetes cluster. Models are stored in a models directory on an NFS server.
 
 This pipeline aids in the development and testing of end-to-end AI workloads. At the end of an AI training job, this pipeline can be executed to deploy a new Triton Inference Server. This will expose a new endpoint that can be integrated into other components of that application running in QA and development environments.
 
@@ -12,7 +12,7 @@ As part of this pipeline, the example Triton models are downloaded and served.
 
 * GPU enabled Kubernetes
 * [Kubeflow](../../../../docs/k8s-cluster/kubeflow.md)
-* [NFS Client Provisioner](../../../../playbooks/k8s-cluster/nfs-client-provisioner.yml) as installed by the default Deepops deployment or other default StorageClass.
+* [NFS Client Provisioner](../../../../playbooks/k8s-cluster/nfs-client-provisioner.yml) as installed by the default DeepOps deployment or other default StorageClass.
 
 ### Data Layout
 
@@ -27,7 +27,7 @@ This pipeline will create 3 `NodePorts` at 30800, 30801, and 30802 for communica
 
 ### Example models:
 
-This pipeline will download models that will work out of the box see [the Triton Inference Server guide](https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/run.html#example-model-repository) for additional details.
+This pipeline will download models that will work out of the box see [the Triton Inference Server repository](https://github.com/triton-inference-server/server) for additional details.
 
 This can be skipped by setting skip_examples to any non-blank value.
 
@@ -50,9 +50,9 @@ python3 triton.py
 
 ## Quickstart
 
-1. Deploy Kubernetes following [the DeepOps Kubernetes deployment guide](../../../../docs/kubernetes-cluster.md)
+1. Deploy Kubernetes following [the DeepOps Kubernetes deployment guide](../../../../docs/k8s-cluster/README.md)
 
-2. Deploy Kubeflow following [the DeepOps Kubeflow deployment guide](../../../../docs/kubeflow.md)
+2. Deploy Kubeflow following [the DeepOps Kubeflow deployment guide](../../../../docs/k8s-cluster/kubeflow.md)
 
 3. Compile the pipeline with `kfp`.
 ```sh
@@ -69,7 +69,7 @@ python3 triton.py
 ![execute](kubeflow-pipelines-2.PNG)
 ![configure](kubeflow-pipelines-3.PNG)
 
-6. Verify the Triton Inference server can be reached and has loaded th models.
+6. Verify the Triton Inference server can be reached and has loaded the models.
 
 ```sh
 curl <management IP>:30800/v2/models/densenet_onnx/versions/
@@ -81,7 +81,7 @@ Successful output will look like:
 
 ```
 
-7. Connect to your management server or worker node and run the [example client](https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/client_example.html#section-getting-the-client-examples)
+7. Connect to your management server or worker node and run the [example client](https://github.com/triton-inference-server/client)
 ```sh
 sudo docker run --net=host -it --rm nvcr.io/nvidia/tritonserver:21.04-py3-sdk /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 ```

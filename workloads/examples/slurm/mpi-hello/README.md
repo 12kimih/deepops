@@ -7,7 +7,7 @@ Many HPC applications are built on the Message Passing Interface (MPI) standard,
 This example demonstrates how to build and run simple "hello, world" MPI application on a Slurm cluster.
 It assumes that you have already deployed a cluster with a login node and at least one compute node, and that Slurm has already been set up and configured.
 It also assumes the presence of a shared NFS filesystem on all nodes in the cluster, which is given the path `/shared` in this example.
-If you haven't configured a Slurm cluster yet, see the [Slurm guide](/docs/slurm-cluster.md) for information on building a GPU-enabled Slurm cluster.
+If you haven't configured a Slurm cluster yet, see the [Slurm guide](/docs/slurm-cluster/README.md) for information on building a GPU-enabled Slurm cluster.
 
 1. **Install the OpenMPI packages:**
     On many clusters, MPI libraries and tools are built from source to take advantage of the specific cluster hardware.
@@ -15,11 +15,11 @@ If you haven't configured a Slurm cluster yet, see the [Slurm guide](/docs/slurm
     To install OpenMPI, run the `bootstrap-mpi.yml` Ansible playbook in this directory. 
     If you only want to install on a subset of nodes, use the `-l ${HOST_GROUP}` argument to restrict where this playbook is run.
     ```
-    $ ansible-playbook -i ${INVENTORY_FILE} [-l ${HOST_GROUP}] examples/slurm/mpi-hello/bootstrap-mpi.yml
+    $ ansible-playbook -i ${INVENTORY_FILE} [-l ${HOST_GROUP}] workloads/examples/slurm/mpi-hello/bootstrap-mpi.yml
     ```
 1. Upload the source code and job script to the shared filesystem on your login node:
     ```
-    $ scp examples/slurm/mpi-hello/mpi-hello.c login:/shared/
+    $ scp workloads/examples/slurm/mpi-hello/mpi-hello.c login:/shared/
     ```
 1. Log into your cluster and build the MPI application.
     ```
