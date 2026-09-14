@@ -18,7 +18,7 @@ Supporting MIG requires several administrative steps and open source projects.
 _Projects, included in GPU Operator v1.9.0+:_
 
 - [GPU Device Plugin](https://github.com/NVIDIA/k8s-device-plugin)
-- [GPU Feature Discovery](https://github.com/NVIDIA/gpu-feature-discovery)
+- [GPU Feature Discovery](https://github.com/NVIDIA/k8s-device-plugin) (now part of the device plugin repository)
 - [NVIDIA K8s MIG Manager](https://github.com/NVIDIA/mig-parted/tree/master/deployments/gpu-operator)
 
 _Admin Steps:_
@@ -36,7 +36,7 @@ There are some caveats depending on the state of your cluster and a node reboot 
 
 ## Configuring MIG Mode in Kubernetes
 
-By default, MIG support for Kubernetes is enabled in DeepOps. The default MIG strategy used is set to `mixed`. This can be controlled by the `k8s_gpu_mig_strategy`variable in `config/group_vars/k8s_cluster.yml. The "mixed" strategy is recommended for new deployments. For more information about strategies see the GPU Device Plugin [README](https://github.com/NVIDIA/k8s-device-plugin#deployment-via-helm).
+By default, MIG support for Kubernetes is enabled in DeepOps. The default MIG strategy used is set to `mixed`. This can be controlled by the `k8s_gpu_mig_strategy` variable in `config/group_vars/k8s_cluster.yml`. The "mixed" strategy is recommended for new deployments. For more information about strategies see the GPU Device Plugin [README](https://github.com/NVIDIA/k8s-device-plugin#deployment-via-helm).
 
 If DeepOps is being used to manage a Kubernetes cluster that was deployed using another method, MIG can be enabled by running:
 
@@ -83,7 +83,7 @@ metadata:
   name: gpu-pod
 spec:
   nodeSelector:
-    nvidia.com/gpu.product: A100-SXM4-40GB-MIG-1g.5g
+    nvidia.com/gpu.product: A100-SXM4-40GB-MIG-1g.5gb
   containers:
     - name: cuda-nbody-container
       image: nvcr.io/nvidia/k8s/cuda-sample:nbody

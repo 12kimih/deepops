@@ -10,7 +10,7 @@ Kubernetes Usage Guide
 
 ## Introduction
 
-Most of the following examples can be configured and executed through the Kubernetes Dashboard. For a basic run-through on how to leverage the Kubernetes Dashboard, please see the [official documentation](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/). The following examples `kubectl` on the master node instead.
+Most of the following examples can be configured and executed through the Kubernetes Dashboard. For a basic run-through on how to leverage the Kubernetes Dashboard, please see the [official documentation](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/). The following examples use `kubectl` on a control-plane node instead.
 
 ## Simple Commands
 
@@ -63,22 +63,21 @@ kubectl get pods --all-namespaces
 4. Delete the job (and the corresponding pod).
 
    ```bash
-   kubectl delete job cuda-job
+   kubectl delete job pytorch-job
    ```
 
 ## Using NGC Containers with Kubernetes and Launching Jobs
 
-[NVIDIA GPU Cloud (NGC)](https://docs.nvidia.com/ngc/ngc-introduction) manages a catalog of fully integrated and optimized DL framework containers that take full advantage of NVIDIA GPUs in both single and multi-GPU configurations. They include NVIDIA CUDA® Toolkit, DIGITS workflow, and the following DL frameworks: NVCaffe, Caffe2, Microsoft Cognitive Toolkit (CNTK), MXNet, PyTorch, TensorFlow, Theano, and Torch. These framework containers are delivered ready-to-run, including all necessary dependencies such as the CUDA runtime and NVIDIA libraries.
+[NVIDIA GPU Cloud (NGC)](https://docs.nvidia.com/ngc/ngc-introduction) hosts a catalog of GPU-optimized containers -- deep learning frameworks such as PyTorch and TensorFlow, plus HPC and inference software -- for single- and multi-GPU systems. They are delivered ready-to-run, including all necessary dependencies such as the CUDA runtime and NVIDIA libraries.
 
 To access the NGC container registry via Kubernetes, add a secret which will be employed when Kubernetes asks NGC to pull container images from it.
 
 1. Generate an NGC API Key, which will be used for the Kubernetes secret.
 
-   - Login to the NGC Registry at https://ngc.nvidia.com/
-   - Go to https://ngc.nvidia.com/configuration/api-key
-   - Click on GENERATE API KEY
+   - Sign in at https://ngc.nvidia.com/
+   - Open **Setup** from the account menu and generate an API key
 
-2. Using the NGC API Key, create a Kubernetes secret so that Kubernetes will be able to pull container images from the NGC registry. Create the secret by running the following command on the master (substitute the registered email account and secret in the appropriate locations).
+2. Using the NGC API Key, create a Kubernetes secret so that Kubernetes will be able to pull container images from the NGC registry. Create the secret by running the following command on a control-plane node (substitute the registered email account and secret in the appropriate locations).
 
    ```bash
    kubectl create secret docker-registry nvcr.dgxkey --docker-server=nvcr.io --docker-username=\$oauthtoken --docker-email=<email> --docker-password=<NGC API Key>
