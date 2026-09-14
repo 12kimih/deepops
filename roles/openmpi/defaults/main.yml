@@ -1,7 +1,8 @@
 ---
 # OpenMPI built from source for the Slurm cluster. 5.0.x is the current stable
-# series (5.0.10, Feb 2026); 4.0.x is EOL. Must move in step with pmix_version
-# because OpenMPI compiles against the PMIx headers (5.0.x needs PMIx >= 4.2.0).
+# series (5.0.10, Feb 2026); 4.0.x is EOL. When built against the external PMIx
+# (config.example's override below), it must move in step with pmix_version because
+# OpenMPI compiles against the PMIx headers (5.0.x needs PMIx >= 4.2.0).
 openmpi_version: 5.0.10
 openmpi_tag: "v{{ openmpi_version.split('.')[0] }}.{{ openmpi_version.split('.')[1] }}"
 openmpi_src_url: "https://download.open-mpi.org/release/open-mpi/{{ openmpi_tag }}/openmpi-{{ openmpi_version }}.tar.bz2"

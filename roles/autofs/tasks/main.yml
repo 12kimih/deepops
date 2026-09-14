@@ -11,7 +11,7 @@
   ansible.builtin.package:
     name: autofs
 
-- name: Configure /home
+- name: Configure /etc/auto.master
   ansible.builtin.template:
     src: templates/master.j2
     dest: /etc/auto.master

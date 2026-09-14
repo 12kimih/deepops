@@ -20,7 +20,7 @@ create_backends: false
 
 # List of backends to create
 # For more info on parameter values, refer to: https://netapp-trident.readthedocs.io/en/stable-v20.04/kubernetes/operations/tasks/backends/ontap.html
-# Note: Parameters other than those listed below are not avaible when creating a backend via DeepOps
+# Note: Parameters other than those listed below are not available when creating a backend via DeepOps
 #   If you wish to use other parameter values, you must create your backend manually.
 backends_to_create:
   - backendName: ontap-flexvol
@@ -119,7 +119,7 @@ volume_snapshot_classes_to_create:
     driver: csi.trident.netapp.io
     deletionPolicy: Delete
 
-# Denotes whether or not to copy tridenctl binary to localhost
+# Denotes whether or not to copy tridentctl binary to localhost
 copy_tridentctl_to_localhost: true
 # Directory that tridentctl will be copied to on localhost
 tridentctl_copy_to_directory: ./

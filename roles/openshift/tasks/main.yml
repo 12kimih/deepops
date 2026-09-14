@@ -15,7 +15,7 @@
     state: directory
     mode: "0755"
 
-- name: Install openshift python client for k8s_raw module
+- name: Install openshift python client for the kubernetes.core k8s modules
   ansible.builtin.pip:
     name: openshift
     virtualenv: "{{ deepops_venv }}"
@@ -28,12 +28,12 @@
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: Install EPEL for CentOS
+- name: Install EPEL (RHEL family)
   ansible.builtin.dnf:
     name: "{{ epel_package }}"
   when: ansible_os_family == "RedHat"
 
-- name: Install openshift python client for k8s_raw module
+- name: Install openshift python client for the kubernetes.core k8s modules
   ansible.builtin.dnf:
     name: python3-openshift
   when: ansible_os_family == 'RedHat'

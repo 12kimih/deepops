@@ -1,2 +1,3 @@
 ---
-# tasks file for roce_backend role in allhosts.yaml and k8smaster.yaml
+# Intentionally empty: playbooks/k8s-cluster/roce.yaml runs this role with
+# tasks_from: allhosts (all hosts) and tasks_from: k8smaster (control plane).

@@ -20,7 +20,7 @@ nginx_docker_cache_ca_client_name: "docker_registry_proxy.crt"
 nginx_docker_cache_hostgroup: "cache"
 nginx_docker_cache_proxy_url: "http://{{ groups[nginx_docker_cache_hostgroup][0] }}:3128"
 
-# Optional: pre-define CA certificate, key, and serial number file
+# Optional: pre-define the CA certificate and key
 #nginx_docker_cache_ca:
 # crt: "ca.crt"
 # key: "ca.key"

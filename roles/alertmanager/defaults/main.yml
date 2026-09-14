@@ -2,10 +2,11 @@
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_config_src: templates/alertmanager.yml.j2
 alertmanager_container: "prom/alertmanager:v0.32.2"
-# Port Alertmanager serves on; single source of truth for the Prometheus
-# alertmanagers target.
+# Port Alertmanager listens on. The container keeps its own default (9093, host
+# network); this only sets the Prometheus alertmanagers target, so change both together.
 alertmanager_port: 9093
-# Slack alerting (empty = the slack receiver is omitted). Set these in config/.
+# Slack alerting. Empty leaves the receiver without a Slack config, so alerts go nowhere.
+# Set these in config/.
 alertmanager_slack_api_url: ""
 alertmanager_slack_channel: "#alerts"
 alertmanager_svc_name: "docker.alertmanager.service"

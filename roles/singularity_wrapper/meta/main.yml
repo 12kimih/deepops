@@ -4,6 +4,6 @@ galaxy_info:
   namespace: deepops
   author: DeepOps Team
   company: NVIDIA
-  description: Wrap lecourguille.singularity role
+  description: Wrap the abims_sbr.singularity and gantsign.golang roles
   license: 3-Clause BSD
   min_ansible_version: 2.9

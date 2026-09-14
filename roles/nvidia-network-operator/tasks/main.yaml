@@ -1,5 +1,5 @@
 ---
-# Deploy network operator related tasks on master node
+# Deploy network operator related tasks on the Kubernetes control plane
 #
 
 - name: Label the nodes # noqa command-instead-of-shell
@@ -70,7 +70,7 @@
   ansible.builtin.include_tasks: sriovibnetwork.yaml
   with_items: "{{ intf_resources }}"
 
-- name: Install latest Kubeflow MPI-Operator
+- name: Install Kubeflow MPI Operator (v2beta1 manifest, mpi_raw_url)
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', '{{ mpi_raw_url }}/mpi-operator.yaml', split_lines=False) }}"

@@ -32,7 +32,7 @@
     group: "root"
     mode: "0600"
 
-- name: Create a docker gridd.conf license configmap
+- name: Create the licensing configmap (gridd.conf and NLS token)
   ansible.builtin.shell: set -o pipefail && kubectl create configmap licensing-config -n "{{ gpu_operator_namespace }}" --from-file="{{
     gpu_operator_grid_config_dir }}/gridd.conf" --from-file="{{ gpu_operator_grid_config_dir }}/client_configuration_token.tok" -o yaml --dry-run=client |
     kubectl apply -f -
@@ -44,10 +44,8 @@
     gpu_operator_registry_email }} -n {{ gpu_operator_namespace }} -o yaml --dry-run=client | kubectl apply -f -
   changed_when: false
 
-# While we would prefer to use the Ansible helm module, it's broken! :-(
-# See https://github.com/ansible/ansible/pull/57897
-# Unfortunately this will not be fixed until Ansible 2.10 which is not yet released.
-# So for now we will run /usr/local/bin/helm commands directly...
+# Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
+# module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
 - name: Install NVAIE gpu-operator helm repo
   ansible.builtin.command: /usr/local/bin/helm repo add nvaie "{{ gpu_operator_nvaie_helm_repo }}" --username='{{ gpu_operator_registry_username }}'
     --password="{{ gpu_operator_registry_password }}"

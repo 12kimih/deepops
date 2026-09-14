@@ -4,23 +4,23 @@ Setup environment to run rootless docker.
 Sets the XDG_RUNTIME_DIR to /var/tmp/xdg_runtime_dir_<userid>
 Sets the DOCKER_HOST to "unix://${XDG_RUNTIME_DIR}/docker.sock"
 Adds the following scripts to the path:
-  start_docker_rootless.sh
-  stop_docker_rootless.sh
+  start_rootless_docker.sh
+  stop_rootless_docker.sh
 
 
 Start rootless docker daemon by calling:
-  $ start_docker_rootless.sh
+  $ start_rootless_docker.sh
 
 Then use regular docker commands i.e. docker run, pull, push, etc.
 Specify "--gpus" option as needed.
 
 To stop/kill the rootless docker daemon call:
-  $ stop_docker_rootless.sh
+  $ stop_rootless_docker.sh
 
 Refer to help of the scripts.
-  $ start_docker_rootless.sh -h
+  $ start_rootless_docker.sh -h
 To run without verbose rootless docker messages run:
-  $ start_docker_rootless.sh --quiet
+  $ start_rootless_docker.sh --quiet
 
 ]])
 

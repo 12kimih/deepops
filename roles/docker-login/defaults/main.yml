@@ -7,7 +7,6 @@ docker_login_disable_log_password: true
 #- registry: docker.io
 #  username: myuser
 #  password: mypassword
-#  email: docker@docker.io
 #- registry: nvcr.io
 #  username: '$oauthtoken'
 #  password: mypassword
