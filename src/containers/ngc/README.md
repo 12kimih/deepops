@@ -59,7 +59,7 @@ As a quick-start, several pre-built Kubeflow containers with end-to-end AI workf
 
 * JupyterLab is exposed at port 8888
 * Tensorboard is exposed at port 6006
-* The RAPIDS container has a different jupyter startup command due to it's use of Conda.
+* The RAPIDS container has a different jupyter startup command due to its use of Conda.
 * The `WORKDIR` contains the built-in NGC tutorials and example code. This is /workspace in most cases (`/rapids` for RAPIDS containers).
 
 ## Included Frameworks
