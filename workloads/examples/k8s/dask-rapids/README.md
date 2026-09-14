@@ -16,12 +16,17 @@ Any cluster hardware should work to duplicate this example, provided that each c
 
 These instructions assume that:
 
-* You have already set up a [Kubernetes cluster using DeepOps](/docs/kubernetes-cluster.md).
-* Your cluster has a [MetalLB load balancer](/docs/ingress.md) configured for ingress.
+* You have already set up a [Kubernetes cluster using DeepOps](/docs/k8s-cluster/README.md).
+* Your cluster has a [MetalLB load balancer](/docs/k8s-cluster/ingress.md) configured for ingress.
 * You have privileges to run containers in your cluster.
 * All compute nodes in your cluster have at least one CUDA-capable GPU.
 * You have push access to a container registry, whether local or public.
     * DeepOps is capable of running a local container registry, but the configuration for the registry  is out of scope for this example. The example below uses the public [Docker Hub](https://hub.docker.com) registry.
+
+> **Note:** this example is unmaintained and does not run on a current cluster as is. `deploy.sh`
+> installs the retired `stable/dask` Helm chart and uses `kubectl get --export`, removed in Kubernetes
+> 1.18. It also reads `config/helm/rapids-dask.yml` and `config/k8s/rapids-dask-sa.yml` relative to the
+> working directory, while the bundled copies are in `helm/` and `k8s/`.
 
 ## Deploying a custom RAPIDS container
 
@@ -36,99 +41,41 @@ If you haven't used Docker Hub before, the [quickstart documentation](https://do
 
 ### Editing the deployment scripts
 
-We'll deploy the RAPIDS/Dask container in one step using the `deploy.sh` script.
-This script builds the image, pushes it to the registry, and deploys the container using Helm.
-To make sure we're pointing to the right registry, we'll need to edit this script and the deployment definition.
+We'll deploy the RAPIDS/Dask container with the `deploy.sh` script, which installs the Dask Helm chart with the values in `rapids-dask.yml`.
+To make sure we're pointing to the right registry, we'll build and push the image ourselves and point that file at it.
 
-1. In `deploy.sh`, replace the tag in the `docker build` command with a tag identifying your image in the registry.
-    In this case, I'm pushing to the Docker Hub repository `ajdecon/dask-rapids-example`.
-    So the change to the script looks like this:
+1. Build your image and push it to your registry.
+    `deploy.sh -b` can build the image from `RAPIDS_DASK_DOCKER_REPO`, but it pushes only when the `DOCKER_PUSH`
+    environment variable is set (its `-p` flag does not), and then only to `registry.local`.
     ```
-    @@ -30,7 +30,7 @@ function build_image() {
-       pushd tmp-rapids-build
-    
-       # Build the docker image
-    -  docker build -t dask-rapids
-    +  docker build -t ajdecon/deepops-example-k8s-dask-rapids .
-    
-       popd
-       rm -rf tmp-rapids-build
+    docker build -t ajdecon/deepops-example-k8s-dask-rapids .
+    docker push ajdecon/deepops-example-k8s-dask-rapids
     ```
-1. In the same script, replace the `TODO` comment for pushing the image with your `docker push` command.
-    ```
-    @@ -36,7 +36,7 @@ function build_image() {
-       rm -rf tmp-rapids-build
-    
-    
-    -  # TODO: Push the docker  image
-    +  docker push ajdecon/deepops-example-k8s-dask-rapids
-    
-     }
-    ```
-1. We also need to edit the Helm config for the RAPIDS deployment to point to the correct image.
-    Edit the `helm/rapids-dask.yml` file to point to the right image:
-    ```
-    --- a/examples/k8s/dask-rapids/helm/rapids-dask.yml
-    +++ b/examples/k8s/dask-rapids/helm/rapids-dask.yml
-    @@ -5,7 +5,7 @@
-     worker:
-       image:
-         # repository: nvcr.io/nvidia/rapidsai/rapidsai
-    -    repository: dask-rapids
-    +    repository: ajdecon/deepops-example-k8s-dask-rapids
-         tag: latest
-         env:
-       replicas: 3
-    @@ -17,14 +17,14 @@ worker:
-    
-     scheduler:
-       image:
-    -    repository: dask-rapids
-    +    repository: ajdecon/deepops-example-k8s-dask-rapids
-         tag: latest
-    
-     # By default we should be doing all Dask works on workers using calls to distributed.Client()
-     # If you would like to run/test your GPU code without using workers you may comment the resources section
-     jupyter:
-       image:
-    -    repository: dask-rapids
-    +    repository: ajdecon/deepops-example-k8s-dask-rapids
-         tag: latest
-       resources:
-         requests:
-    ```
+1. Point the `worker`, `scheduler` and `jupyter` image `repository` entries in `helm/rapids-dask.yml` at your image.
+    They currently name `ajdecon/deepops-example-k8s-dask-rapids`.
 
 ### Running the deployment
 
 At this point we can run the deployment:
 
 ```
-ubuntu@ivb120:~/src/deepops/examples/k8s/dask-rapids$ ./deploy.sh
+ubuntu@ivb120:~/src/deepops/workloads/examples/k8s/dask-rapids$ ./deploy.sh
 ....... (lots of Docker and Kubernetes output follows) ........
 ```
 
 The image build can take some time, so this is a good chance to get up and make a cup of coffee. ;-)
-When the script is completed, you should be able to run the following commands to get URLs for Jupyter and Dask:
+When the script is completed, it prints the Jupyter and Dask URLs (both the NodePort and the external IP).
+To look them up again later, list the services in the `rapids` namespace:
 
 ```
-export DASK_SCHEDULER=$(kubectl get svc --namespace rapids rapids-dask-scheduler -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-export DASK_SCHEDULER_UI_IP=$(kubectl get svc --namespace rapids rapids-dask-scheduler -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-export JUPYTER_NOTEBOOK_IP=$(kubectl get svc --namespace rapids rapids-dask-jupyter -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-echo http://$JUPYTER_NOTEBOOK_IP:80 -- Jupyter notebook
-
-echo http://$DASK_SCHEDULER_UI_IP:80  -- Dask dashboard
-
-echo http://$DASK_SCHEDULER:8786    -- Dask Client connection
+kubectl get svc --namespace rapids
 ```
 
 If you open your browser and go to the URL for Jupyter, you can log in with the default password `dask`.
 You'll then find yourself in JupyterLab session where you can interact with the RAPIDS and Dask libraries.
 If you open a terminal window (File -> New -> Terminal in the JupyterLab menu), you should even be able to run `nvidia-smi` to see your GPUs:
 
-![Screenshot of running nvidia-smi in JupyterLab](/examples/k8s/dask-rapids/jupyterlab-nvsmi.png "Screenshot of running nvidia-smi in JupyterLab")
+![Screenshot of running nvidia-smi in JupyterLab](jupyterlab-nvsmi.png "Screenshot of running nvidia-smi in JupyterLab")
 
 ## Running the benchmark
 
@@ -136,7 +83,7 @@ Once you have JupyterLab open, load the `ParallelSum.ipynb` notebook using the f
 This notebook will step through running a simple parallel sum benchmark on both the CPUs and GPUs in your cluster.
 Feel free to adjust the number of CPU cores or GPUs used and the parameters for the model to experiment with the calculation.
 
-![Screenshot of the parallel sum notebook](/examples/k8s/dask-rapids/parallel-sum.png "Screenshot of the parallel sum notebook")
+![Screenshot of the parallel sum notebook](parallel-sum.png "Screenshot of the parallel sum notebook")
 
 ## Experimenting further
 
@@ -145,6 +92,6 @@ as well as an end-to-end workflow example based on a Fannie Mae mortgage dataset
 Both directories can be accessed easily via JupyterLab.
 
 You can also experiment with the custom container by making changes to the `Dockerfile` used to create it,
-in `examples/k8s/dask-rapids/docker`.
+in `workloads/examples/k8s/dask-rapids/docker`.
 
 For more information on RAPIDS, check out [https://rapids.ai](https://rapids.ai).

@@ -2,13 +2,13 @@
 
 ## Kubernetes Services
 
-The [service](./services) directory contains several yaml files that are used to configure example kubernetes services. Many of these yaml files are used by the [deployment scripts](../../../scripts/k8s/) to configure tools such as Grafana, Prometheus, DCGM-Exporter, etc.
+The [services](./services) directory contains example YAML files for Kubernetes services (logging, ingress, exporters, NFS and so on). The [deployment scripts](../../../scripts/k8s/) do not use them; they read their manifests from [workloads/services/k8s](../../services/k8s/) and `config/helm`.
 
 ## Example workloads
 
 This directory contains several yaml files that can be used to deploy various verification workloads into the cluster. These are meant for quick verification of a platform (Kubeflow, Kubernetes, Docker, etc.). They are not meant to be used as benchmarking tools. For more information on appropriate benchmarking for a GPU cluster visit the NVIDIA Developer Zone [Deep Learning Product Performance page](https://developer.nvidia.com/deep-learning-performance-training-inference).
 
-[NGC](http://ngc.nvidia.com/) contains Docker images for various Deep Learning and Machine Learning frameworks. Many of these images contain example code and can easily be executed locally through Docker or deployed into Kuberenetes through `yaml` files or `kubectl run` commands.
+[NGC](http://ngc.nvidia.com/) contains Docker images for various Deep Learning and Machine Learning frameworks. Many of these images contain example code and can easily be executed locally through Docker or deployed into Kubernetes through `yaml` files or `kubectl run` commands.
 
 ### Local Docker workloads
 
@@ -19,7 +19,7 @@ To launch an interactive TensorFlow notebook run the below command and then acce
 ```sh
 docker run --rm -it --gpus all -p 30008:8888  nvcr.io/nvidia/tensorflow:21.03-tf1-py3  jupyter lab  --notebook-dir=/workspace --ip=0.0.0.0 --no-browser --allow-root --port=8888 --NotebookApp.token='' --NotebookApp.password='' --NotebookApp.allow_origin='*' --NotebookApp.base_url=${NB_PREFIX}
 ```
-> Note: Most NGC containers contain Jupyter, to run another container such as PyTorch swap out `nvidia/tensorflow:20.12-tf1-py3` for another Docker image (`nvcr.io/nvidia/pytorch:20.12-py3`). Most NGC containers provide example notebooks in `/workspace/nvidia-examples`.
+> Note: Most NGC containers contain Jupyter, to run another container such as PyTorch swap out `nvidia/tensorflow:21.03-tf1-py3` for another Docker image (`nvcr.io/nvidia/pytorch:20.12-py3`). Most NGC containers provide example notebooks in `/workspace/nvidia-examples`.
 
 #### Run a DL workload - Docker
 
@@ -88,18 +88,21 @@ kubectl delete -f tensorflow-job.yml
 The same ResNet workload can be run with a single `kubectl` command:
 
 ```sh
- kubectl run --rm -it --image=nvcr.io/nvidia/tensorflow:21.03-tf1-py3 --limits="nvidia.com/gpu=1" tensorflow-pod -- python /workspace/nvidia-examples/cnn/resnet.py --layers=50 --batch_size=64
+ kubectl run --rm -it --image=nvcr.io/nvidia/tensorflow:21.03-tf1-py3 --overrides='{"spec":{"containers":[{"name":"tensorflow-pod","resources":{"limits":{"nvidia.com/gpu":"1"}}}]}}' tensorflow-pod -- python /workspace/nvidia-examples/cnn/resnet.py --layers=50 --batch_size=64
 ```
 
 Alternatively, a bash prompt can be reached by not specifying a command.
 
 ```sh
- kubectl run --rm -it --image=nvcr.io/nvidia/tensorflow:21.03-tf1-py3 --limits="nvidia.com/gpu=1" tensorflow-pod
+ kubectl run --rm -it --image=nvcr.io/nvidia/tensorflow:21.03-tf1-py3 --overrides='{"spec":{"containers":[{"name":"tensorflow-pod","resources":{"limits":{"nvidia.com/gpu":"1"}}}]}}' tensorflow-pod
 ```
+
+`kubectl run` no longer has a `--limits` flag, so the GPU limit is passed through `--overrides`.
+
 
 #### Run a Multinode deep learning workload - Kubernetes
 
-This requires the MPI Operator to be installed as described in the Kubeflow install [here](../../../docs/k8s-cluster/kubeflow.md#kubeflow) and the official MPI Operator docs [here](https://github.com/kubeflow/mpi-operator/tree/master/).
+This requires the [MPI Operator](https://github.com/kubeflow/mpi-operator), which the DeepOps Kubeflow install does not deploy. `tensorflow-mpi-job.yml` still uses the old `kubeflow.org/v1alpha2` MPIJob API, while current MPI Operator releases serve `v2beta1`, so port the manifest first.
 
 Run the below kubectl command to create a multinode MPI job.
 
@@ -209,4 +212,4 @@ Test set: Average loss: 0.0407, Accuracy: 9866/10000 (99%)
 
 For example workloads to deploy into Kubeflow see the Kubeflow NGC integration [README](../../../src/containers/ngc/).
 
-Also see the several kubeflow-* folders that contain example Kubeflow pipelines and workloads.
+Also see the [kubeflow-pipeline-deploy](./kubeflow-pipeline-deploy) folder, which contains an example Kubeflow pipeline.
