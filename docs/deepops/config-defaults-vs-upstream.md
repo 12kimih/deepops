@@ -40,18 +40,31 @@ code). Values you set in your own gitignored `config/` always win over these.
 | pytorch | `pytorch:24.04-py3` | `pytorch:26.05-py3` |
 | tensorflow | `tensorflow:24.04-tf2-py3` | `tensorflow:25.02-tf2-py3` (the FINAL NGC TF release) |
 
-## New configuration that did not exist upstream (group_vars/slurm-cluster.yml)
+## New configuration that did not exist upstream
 
 These are additive -- upstream had no equivalent default:
 
-- **NFS** -- `nfs_exports` (server, `sync,no_root_squash,no_subtree_check`) and
-  `nfs_mounts` (client, tuned for a 100GbE+ fabric: `nconnect=16`, 1 MiB rsize/wsize,
-  vers 4.2). Lower `nconnect` to ~4 on 10/25GbE. The role also ships 100G socket-buffer
-  sysctls (ESnet values).
+- **NFS** (`group_vars/slurm-cluster.yml`) -- `nfs_exports` (server,
+  `sync,no_root_squash,no_subtree_check`), `nfs_mounts` (client) and the one
+  `nfs_mount_options` they inherit, tuned for a 100GbE+ fabric (`nconnect=16`, 1 MiB
+  rsize/wsize, vers 4.2; lower `nconnect` to ~4 on 10/25GbE). The role also ships 100G
+  socket-buffer sysctls (ESnet values), `nfs_server_threads`, a self-healing `nfs-server`
+  and `nfs_detach_on_shutdown`.
 - **Slurm config** -- the `slurm` role tracks upstream; full site control is via complete
   templates under `config/files/slurm/` pointed to by `slurm_conf_template` (and the
   cgroup/gres/dbd equivalents), rendered verbatim. `config.example/files/slurm/job_submit.lua`
   is a ready-to-edit Lua submit filter (DeepOps generates none).
+- **GPU power cap** -- `slurm_cluster_configure_gpu_power_limit`, and `nvidia_power_limit_watts`
+  per host.
+- **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner
+  and shared directories (`group_vars/slurm-cluster.yml`), and the login-node limits
+  (`group_vars/slurm-login.yml`).
+- **Identity** -- a NIS master (`group_vars/nis-master.yml`: `nis_export_groups`,
+  `nis_export_netgroups`), the docker socket group and the sudo netgroup
+  (`cluster_docker_group_*`, `cluster_sudoers_*` in `group_vars/all.yml`).
+- **Node operations** (`group_vars/all.yml`) -- `docker_daemon_options` / `docker_sysctls`,
+  `hosts_internal_subnet_prefix`, `ansible_python_interpreter`, and the netplan, serial
+  console and BMC settings behind the [utility playbooks](utilities.md).
 
 ## enroot (group_vars/all.yml) -- simplified
 

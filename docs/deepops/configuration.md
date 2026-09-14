@@ -115,7 +115,7 @@ You can do this with an Ansible variable by setting `openmpi_version: "3.1.6"`.
 At this point, the natural question is, "where can I find what variables are available to change?"
 The [example configuration files](../../config.example/group_vars) list the most common parameters you may want to change,
 as well as specifying their default values.
-In particlar, these files should contain all of the flags that enable or disable features in [k8s-cluster.yml](../../playbooks/k8s-cluster.yml) or [slurm-cluster.yml](../../playbooks/slurm-cluster.yml).
+In particular, these files should contain all of the flags that enable or disable features in [k8s-cluster.yml](../../playbooks/k8s-cluster.yml) or [slurm-cluster.yml](../../playbooks/slurm-cluster.yml).
 
 If you're interested in customizing the behavior of a particular Ansible role further, you may also want to check the `defaults` directory for that role.
 This contains the default values of the variables included with the role itself, and may contain variables that aren't listed in the example configuration.
@@ -131,7 +131,9 @@ config/group_vars/
 |-- all.yml
 |-- k8s_cluster.yml
 |-- netapp-trident.yml
-`-- slurm-cluster.yml
+|-- nis-master.yml
+|-- slurm-cluster.yml
+`-- slurm-login.yml
 ```
 
 So, for example, variables in the `all.yml` file will apply to all the hosts in your inventory;
@@ -171,12 +173,12 @@ This playbook can then be run with Ansible like any other DeepOps playbook:
 ansible-playbook config/playbooks/pingus.yml
 ```
 
-And can make use of variables in your `config` directory like other playboks.
+And can make use of variables in your `config` directory like other playbooks.
 
 ## Managing your configuration directory in Git
 
 We recommend creating a separate Git repository for managing your cluster configuration, so that you can track changes to your cluster independently of DeepOps changes and upgrades.
-(The DeepOps [`.gitignore` file](../../.gitignore) is set up to faciliate this by ignoring directories that start with the string `config`, except for `config.example`.)
+(The DeepOps [`.gitignore` file](../../.gitignore) is set up to facilitate this by ignoring directories that start with the string `config`, except for `config.example`.)
 
 A good practice is to start a new Git repository by copying the example configuration:
 
@@ -184,13 +186,14 @@ A good practice is to start a new Git repository by copying the example configur
 cp -R config.example/ config/
 cd config
 git init
-git commit -am "Start from the example configuration"
+git add -A
+git commit -m "Start from the example configuration"
 ```
 
 And then pushing this repository to a remote Git host, such as Github:
 
 ```bash
-cd config.my-cluster/
+cd config/
 git remote add origin <your-git-remote>
 git push -u origin main
 ```
@@ -199,13 +202,13 @@ Once you have a repository set up, you can use it to track changes as you config
 For example, if you change the version of Slurm being installed:
 
 ```bash
-cd config.my-cluster/group_vars/
+cd config/group_vars/
 
-# Edit your Slurm configuration to upgrade to version 20.11
+# Edit your Slurm configuration, e.g. pin slurm_version
 vim slurm-cluster.yml
 
 git add slurm-cluster.yml
-git commit -m "Update cluster to Slurm 20.11"
+git commit -m "Pin Slurm to 25.11.6"
 ```
 
 ## Keeping secrets out of Git with Ansible Vault
@@ -235,9 +238,9 @@ ansible-vault create config/group_vars/all/vault.yml
 #   slurm_db_password: "{{ vault_slurm_db_password }}"
 ```
 
-So that you don't have to type the vault password on every run, point Ansible at
-a password file by uncommenting and setting `vault_password_file` in
-[`ansible.cfg`](../../ansible.cfg):
+So that you don't have to type the vault password on every run,
+[`ansible.cfg`](../../ansible.cfg) already points Ansible at a password file, read only
+when a vaulted value is used:
 
 ```ini
 vault_password_file = ./config/.vault-pass

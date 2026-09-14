@@ -3,7 +3,7 @@
 # Slurm                                                                        #
 ################################################################################
 # Slurm job scheduler configuration
-# Playbook: slurm, slurm-cluster, slurm-perf, slurm-perf-cluster, slurm-validation
+# Playbook: slurm, slurm-cluster, slurm-validation
 # slurm_version: ""
 slurm_install_prefix: /usr/local
 pmix_install_prefix: /opt/deepops/pmix
@@ -73,12 +73,6 @@ slurm_allow_ssh_user: []
 slurm_login_on_compute: false
 
 ################################################################################
-# Kubespray - necessary configuration for Docker setup                         #
-################################################################################
-dns_mode: "none"
-dns_late: false
-
-################################################################################
 # Optional installs                                                            #
 ################################################################################
 slurm_configure_etc_hosts: true
@@ -141,7 +135,9 @@ slurm_enable_nfs_server: true
 #  - Mount NFS filesystems on nfs-clients?
 slurm_enable_nfs_client_nodes: true
 
-# Inventory host groups to use for NFS server or clients
+# Hosts to set up as NFS servers or clients. Honoured only when passed with -e: a play's
+# hosts are resolved before group_vars load, so from here these values are ignored and
+# the [slurm-nfs] and [slurm-nfs-client] inventory groups decide.
 nfs_server_group: "slurm-master[0]"
 nfs_client_group: "slurm-master[1:],slurm-node"
 
@@ -176,7 +172,8 @@ spack_build_packages: false
 spack_default_packages:
   - "cuda"
 
-# Which host should we run installs on for software going into the NFS share?
+# Which host should we run installs on for software going into the NFS share? Honoured
+# only with -e (see the NFS host groups above); from here slurm-login[0] is used.
 sm_install_host: "slurm-master[0]"
 
 # CUDA toolkits as Lmod modules (playbooks/slurm-cluster/nvidia-cuda-toolkit.yml).
@@ -194,9 +191,9 @@ sm_install_host: "slurm-master[0]"
 # so `module avail` finds them with no extra MODULEPATH wiring):
 #cuda_prefix: "{{ sm_prefix }}"
 #cuda_modroot: "{{ sm_module_path }}"
-# Restrict the heavy toolkit download+install to the host(s) that own the shared /sw tree.
-# Defaults to nfs_server_group; set when nfs_server_group has several hosts but only one
-# serves /sw (e.g. a separate /scratch server), so the install does not also run there.
+# Restrict the heavy toolkit download+install to the host(s) that own the shared /sw tree,
+# e.g. when a separate node serves /scratch. Honoured only with -e (see the NFS host
+# groups above); from here the playbook falls back to slurm-master[0].
 #cuda_install_hosts: "slurm-master[0]"
 
 ################################################################################
@@ -381,8 +378,9 @@ docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*
 ################################################################################
 slurm_enable_monitoring: true
 
-# Inventory host groups where cluster monitoring services will be installed
-# (Prometheus, Grafana, etc)
+# Where the monitoring services (Prometheus, Grafana, ...) are installed. Honoured only
+# with -e (see the NFS host groups above); from here the [slurm-metric] inventory group
+# decides, and this value only tells Prometheus which group runs the slurm exporter.
 slurm_monitoring_group: "slurm-master"
 
 # Grafana web UI port (role default 3000). Override if 3000 is taken.
