@@ -2,8 +2,9 @@
 # Publish the site's own commands, shell defaults and login banner on every node.
 #
 # The commands land in PATH as executables and the defaults in /etc/profile.d, so they
-# reach job scripts and `ssh <node> <cmd>` as well as an interactive prompt. No-op
-# until cluster_tools_scripts is set in config/group_vars.
+# reach job scripts and `ssh <node> <cmd>` as well as an interactive prompt. Each piece
+# is opt-in through its own cluster_tools_* variable in config/group_vars; with none set
+# it publishes nothing and removes the environment defaults, banner and per-user limits.
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   tags:

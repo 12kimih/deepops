@@ -15,7 +15,7 @@
     # String; Container to be created or one that might exist with nccl tests.
     #   If `compile_nccl_tests` is True, it must be a sqsh file.
     nccl_tests_container: "${HOME}/enroot_images/nccl_tests_slurm_val.sqsh"
-    # Bool; Compile and add NCCL tests to the base_container outputing to
+    # Bool; Compile and add NCCL tests to the base_container outputting to
     #   nccl_tests_container (will delete/overwrite if one already exists). If
     #   false assumes nccl_tests_container already has the NCCL tests and uses
     #   the nccl_tests_container.
@@ -25,7 +25,7 @@
     # Int; Number of GPUs per node. DGX-1 and DGX A100 Server have 8 GPUs.
     #   DGX-2 has 16 GPUs.
     num_gpus: 8
-    # String; Slurm parition to use
+    # String; Slurm partition to use
     partition: batch
     # Time string; Time limit for the Slurm job.
     timelimit: "10:00"

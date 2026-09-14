@@ -1,4 +1,8 @@
 #!/bin/bash
+# UNMAINTAINED: this script predates the current repository layout and does not run as is.
+# It calls scripts/k8s_inventory.sh, ./kubespray and playbooks/airgap/build-offline-cache.yml,
+# none of which exist any more, and passes Kubespray variables Kubespray no longer reads
+# (cephfs_provisioner_enabled, dashboard_enabled, download_run_one).
 set -ex
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"

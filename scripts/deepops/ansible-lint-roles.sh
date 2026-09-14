@@ -3,8 +3,8 @@
 # ansible-lint-roles.sh
 # Runs ansible-lint against the DeepOps roles using the project .ansible-lint config.
 #
-# Roles can be excluded by setting the ANSIBLE_LINT_EXCLUDE variable to a
-# regex matching the roles to skip (applied via exclude_paths in .ansible-lint)
+# Roles are excluded through exclude_paths in .ansible-lint; the ANSIBLE_LINT_EXCLUDE
+# variable is not read.
 
 # Determine current directory and root directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"

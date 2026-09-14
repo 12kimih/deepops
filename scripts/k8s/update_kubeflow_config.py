@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-'''Because there is currently no clean way to update this config through ks this script exists.
+'''LEGACY: Python 2 (urllib2), written for the old ksonnet/kfctl layout under KF_DIR. Nothing in
+DeepOps calls it, and deploy_kubeflow.sh no longer produces that layout.
+
+Because there is currently no clean way to update this config through ks this script exists.
 
 The purpose of this script is to dynamically update Kubeflow to point at the latest NGC containers.
 In addition to that it changes default resource requests to optimize for GPUs
