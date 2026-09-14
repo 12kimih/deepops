@@ -43,7 +43,7 @@ done
 
 function start_docker_rootless() {
     # Expects environment vars XDG_RUNTIME_DIR, DOCKER_HOST, and
-    # DOCKER_DATAROOT to be set. Also, rootless docker i.e. docker-rootless.sh
+    # DOCKER_DATAROOT to be set (the rootless-docker module sets them). Also, dockerd-rootless.sh
     # needs to be on the PATH.
 
     userid=$(id -u)
@@ -63,7 +63,7 @@ function start_docker_rootless() {
       --storage-driver vfs &
 {% endif %}
 
-    # Insure that docker daemon started.
+    # Ensure that docker daemon started.
     docker ps >/dev/null
     while [ $? -ne 0 ]; do
         docker ps >/dev/null

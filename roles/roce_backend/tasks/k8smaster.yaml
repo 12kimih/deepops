@@ -56,7 +56,7 @@
   tags:
     - roce_k8s
 
-# Update Multus to latest version
+# Deploy Multus (manifest from multus_ds)
 
 - name: Multus update
   kubernetes.core.k8s:
@@ -80,9 +80,9 @@
   tags:
     - roce_k8s
 
-# Install MPI Operator:latest
+# Install MPI Operator
 
-- name: Install Kubeflow MPI-Operator version v1alpha2
+- name: Install Kubeflow MPI Operator (v1 manifest)
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('url', 'https://raw.githubusercontent.com/kubeflow/mpi-operator/master/deploy/v1/mpi-operator.yaml', split_lines=False) }}"

@@ -75,7 +75,7 @@
     - Restart slurmd
   tags: pyxis
 
-# Needed for 17.11, but not for 19.05. Doesn't hurt either way.
+# Slurm reads only plugstack.conf; this include pulls in plugstack.conf.d/*.conf.
 - name: Copy top-level plugstack file
   ansible.builtin.template:
     src: etc/slurm/plugstack.conf

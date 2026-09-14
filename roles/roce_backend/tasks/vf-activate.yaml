@@ -22,7 +22,7 @@
   when: result.rc == 0
   tags: roce_host
 
-- name: For persistant VF activation
+- name: For persistent VF activation
   ansible.builtin.lineinfile:
     path: /etc/rc.local
     line: "echo {{ num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs"

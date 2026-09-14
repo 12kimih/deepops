@@ -4,8 +4,8 @@
 # Note that this isn't defined by default in this role, and must be defined for
 # forwarding to take place.
 #
-# The DeepOps configuration for Slurm or Kubernetes may define this at the
-# playbook level.
+# config.example sets it for Slurm and Kubernetes in group_vars/slurm-cluster.yml
+# and group_vars/k8s_cluster.yml.
 #
 # rsyslog_client_tcp_host: "10.0.0.1"
 
