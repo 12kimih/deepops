@@ -2,7 +2,7 @@
 # See GitHub for more information https://github.com/NVIDIA/gpu-operator
 
 # See https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html#considerations-to-install-gpu-operator-with-nvidia-vgpu-driver
-#  for additional details around buidling/pushing/using driver containers and setting gpu_operator_driver_version to the correct value
+#  for additional details around building/pushing/using driver containers and setting gpu_operator_driver_version to the correct value
 
 # Vars needed to install operator
 gpu_operator_helm_repo: "https://helm.ngc.nvidia.com/nvidia"
@@ -16,7 +16,7 @@ gpu_operator_chart_version: "v26.3.2"
 
 k8s_gpu_mig_strategy: "mixed"
 
-# Enable/Disalbe specific components of GPU Operator
+# Enable/Disable specific components of GPU Operator
 gpu_operator_enable_driver: true
 gpu_operator_enable_toolkit: true
 gpu_operator_enable_dcgm: false

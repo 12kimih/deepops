@@ -3,7 +3,8 @@
 # every restart, so pin a versioned tag in production; override in config/ to use a
 # different build.
 slurm_exporter_container: "deepops/prometheus-slurm-exporter:latest"
-# Port the slurm exporter serves on; single source of truth for its scrape target.
+# Port the slurm exporter listens on. The container keeps its image default (host network);
+# this only sets the scrape target.
 slurm_exporter_port: 8080
 slurm_exporter_svc_name: "docker.slurm-exporter.service"
 slurm_exporter_state: started

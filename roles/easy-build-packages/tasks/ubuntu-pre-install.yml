@@ -1,5 +1,5 @@
 #
-# install software modules using EasyBuild:
+# Build dependencies for the EasyBuild modules (Ubuntu):
 #
 ---
 - name: "Install depending software"

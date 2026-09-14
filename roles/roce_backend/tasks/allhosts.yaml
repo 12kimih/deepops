@@ -1,6 +1,6 @@
 ---
 # Tasks file for roce_backend role
-# Supported OS: Ubuntu 18.04
+# Supported OS: Ubuntu 18.04 (the legacy MLNX_OFED ISO in vars/main.yml)
 # # Install Mellanox OFED and VF activation
 - name: MOFED installation
   ansible.builtin.include_tasks: mofed-install.yaml
@@ -16,7 +16,7 @@
   tags:
     - roce_host
 
-- name: Create the file, if it does not present
+- name: Create /etc/rc.local if it is not present
   ansible.builtin.file:
     path: /etc/rc.local
     state: touch

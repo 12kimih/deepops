@@ -31,8 +31,8 @@
     - ansible_os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"
 
-# Only reload (permanent rules above used immediate: false) when a rule actually
-# changed, so an unchanged re-run does not bounce firewalld every time.
+# The rules above are permanent-only (immediate: false), so restart firewalld to load
+# them -- only when a rule changed, so an unchanged re-run does not bounce it.
 - name: Restart firewalld if it was running
   ansible.builtin.systemd:
     state: restarted
