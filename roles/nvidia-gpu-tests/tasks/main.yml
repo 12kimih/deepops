@@ -45,14 +45,14 @@
   ignore_errors: true
 
 # -r 1 for quick system validation test, 2 for medium extended validation, 3 for long HW diagnostics/stress
-- name: Run dcgm diag for up to 15 minutes
+- name: Run the DCGM diagnostics
   ansible.builtin.shell: "dcgmi diag -r {{ gpu_test_dcgm_level }}"
   register: dcgm
   ignore_errors: true
 
 # Note, this may fail to run depending on Ansible settings
 # We only look at the last few lines with relevant output
-- name: Run TF training job for up to 5 minutes
+- name: Run the TensorFlow training job
   become: true
   ansible.builtin.shell: "docker run --runtime=nvidia --rm -t nvcr.io/nvidia/tensorflow:18.07-py3 mpiexec --allow-run-as-root --bind-to socket -np {{ gpu_count.stdout }} python /opt/tensorflow/nvidia-examples/cnn/resnet.py --layers={{ gpu_test_tf_layers }} --precision=fp16 --batch_size={{ gpu_test_tf_batch_size }} | tail -n 12"
   register: tf

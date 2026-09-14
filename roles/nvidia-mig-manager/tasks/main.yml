@@ -25,7 +25,7 @@
     - has_mig_parted.rc != 0
     - ansible_os_family == "Debian"
 
-- name: Install MIG Manager (yum)
+- name: Install MIG Manager (dnf)
   ansible.builtin.dnf:
     name: "{{ mig_manager_url_rpm }}"
     state: present
