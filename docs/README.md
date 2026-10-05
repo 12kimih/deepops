@@ -37,7 +37,7 @@ To learn more about how to use this directory and customize your DeepOps cluster
 
 ## Modularity
 
-Each of the deployment options in DeepOps is highly modular and does not need to be deployed as-is. It’s strongly encouraged to read through the installation scripts and examine the playbooks to see which components should be disabled or replaced with custom components. Otherwise, the defaults are an opinionated approach to deploying the cluster for that deployment option.
+Each of the deployment options in DeepOps is highly modular and does not need to be deployed as-is. It's strongly encouraged to read through the installation scripts and examine the playbooks to see which components should be disabled or replaced with custom components. Otherwise, the defaults are an opinionated approach to deploying the cluster for that deployment option.
 
 ## Scripts
 

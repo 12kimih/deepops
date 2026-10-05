@@ -18,7 +18,7 @@ Install Ansible on any system which can access target nodes via SSH. This can be
 
 **Ansible is...**
 
-- Agentless (there’s nothing that needs to be installed on other nodes in the cluster)
+- Agentless (there's nothing that needs to be installed on other nodes in the cluster)
 - Idempotent (you can run the same playbook or task over and over again without repercussions - and tasks that do not require modification of the target nodes will result in Ansible skipping those tasks)
 - Easy to maintain & scale (rather than custom scripts)
 - Easy to read & use (via YAML playbooks, roles, and tasks)
