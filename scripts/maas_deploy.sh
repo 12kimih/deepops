@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# maas_deploy.sh — Deploy, tag, and manage MAAS VMs for testing
+# maas_deploy.sh: Deploy, tag, and manage MAAS VMs for testing
 #
 # Usage:
 #   ./scripts/maas_deploy.sh [OPTIONS] [distro_series]
@@ -38,7 +38,7 @@ STATUS_DEPLOYED=6
 STATUS_DEPLOYING=9
 STATUS_RELEASING=12
 
-# Known test tags — cleared before applying a profile
+# Known test tags, cleared before applying a profile
 KNOWN_TEST_TAGS=(
     kube_control_plane kube_node etcd
     slurm-master slurm-node slurm-nfs slurm-cache slurm-metric slurm-login
