@@ -25,7 +25,10 @@
 --                          holding it. Give a list where one type is split across
 --                          several -- per-partition defaults, short/long queues -- and
 --                          a job routed by type is offered all of them, for Slurm to
---                          start wherever it fits first.
+--                          start wherever it fits first. Order matters: with equal
+--                          PriorityTier they are tried in list order, and a job that
+--                          has to preempt does so in the first one tried, even while
+--                          a later one sits idle -- so list first what should fill first.
 --   DEFAULT_GPU_TYPE       type assumed when a GPU job names none and its partition
 --                          implies none. It routes through the map above like any
 --                          other type, so the partitions of a type are declared once.
