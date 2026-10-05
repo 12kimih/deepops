@@ -128,7 +128,7 @@ print("== D. requests that cannot be satisfied are rejected at submit ==")
 t = {partition = "gpu-a100", gres = "gpu:v100:4"}
 check("D1 unknown GPU type", submit(t), slurm.ERROR)
 check("D1 message lists valid types", LOG[1],
-      "unknown GPU type 'v100'. Valid types: a100, h100.")
+      "Unknown GPU type 'v100'. Valid types: a100, h100.")
 t = {gres = "gpu:a100:1", tres_per_node = "gres/gpu:h100=1"}
 check("D2 two GPU types in one job", submit(t), slurm.ERROR)
 t = {partition = "cpu,gpu-a100,gpu-h100", gres = "gpu:1"}
@@ -308,6 +308,7 @@ t = {partition = "l40-1", gres = "gres/gpu:l40:4", cpus_per_task = 16,
      bitflags = 32768}
 check("M1 --mem on a GPU job", submit(t), slurm.ERROR)
 check("M1 tells the user why", logged("^GPU jobs take memory"), true)
+check("M1 worded for a submission", logged("and submit again%.$"), true)
 check("M1 nothing rewritten before rejecting", t.partition, "l40-1")
 t = {partition = "l40-1", gres = "gres/gpu:l40:4", cpus_per_task = 16,
      tres_per_task = "cpu=16", min_cpus = 16, pn_min_cpus = 16, bitflags = 32768 + 16384}
@@ -356,12 +357,16 @@ t = {gres = "gpu:l40:4", num_tasks = 4}
 check("N1 -n = GPUs", submit(t), slurm.SUCCESS)
 t = {gres = "gpu:l40:4", num_tasks = 8}
 check("N2 -n > GPUs on one node", submit(t), slurm.ERROR)
+check("N2 message", LOG[1], "--ntasks=8 exceeds the 4 GPUs requested in total; GPU jobs " ..
+      "run at most one task per GPU. Request more GPUs, or more nodes with -N.")
 t = {gres = "gpu:l40:4", num_tasks = 8, min_nodes = 2}
 check("N3 -n 8 over -N 2", submit(t), slurm.SUCCESS)
 t = {gres = "gpu:l40:4", ntasks_per_node = 4, min_nodes = 2}
 check("N4 --ntasks-per-node = GPUs per node", submit(t), slurm.SUCCESS)
 t = {gres = "gpu:l40:4", ntasks_per_node = 5}
 check("N5 --ntasks-per-node > GPUs per node", submit(t), slurm.ERROR)
+check("N5 message", LOG[1], "--ntasks-per-node=5 exceeds the 4 GPUs requested per node; " ..
+      "GPU jobs run at most one task per GPU. Request more GPUs per node.")
 t = {tres_per_job = "gres/gpu:l40=4", ntasks_per_node = 4}
 check("N6 --gpus=4 with 4 tasks per node", submit(t), slurm.SUCCESS)
 t = {tres_per_job = "gres/gpu:l40=4", num_tasks = 6}
@@ -370,14 +375,26 @@ t = {gres = "gpu:l40:4", ntasks_per_tres = 1}
 check("N8 --ntasks-per-gpu=1", submit(t), slurm.SUCCESS)
 t = {gres = "gpu:l40:4", ntasks_per_tres = 2}
 check("N9 --ntasks-per-gpu=2", submit(t), slurm.ERROR)
+check("N9 message", LOG[1], "--ntasks-per-gpu=2 is not allowed; GPU jobs run at most " ..
+      "one task per GPU.")
 t = {tres_per_task = "gres/gpu:l40=1", num_tasks = 8}
 check("N10 --gpus-per-task: tasks never outnumber GPUs", submit(t), slurm.SUCCESS)
 t = {tres_per_socket = "gres/gpu:l40=2", ntasks_per_socket = 2}
 check("N11 --gpus-per-socket with matching tasks", submit(t), slurm.SUCCESS)
 t = {gres = "gpu:l40:4", ntasks_per_socket = 2}
 check("N12 --ntasks-per-socket without --gpus-per-socket", submit(t), slurm.ERROR)
+check("N12 message", LOG[1], "--ntasks-per-socket=2 cannot be checked against the GPU " ..
+      "count per socket. Request GPUs with --gpus-per-socket.")
+-- slurmctld hands Lua 5.3+ floats; messages must still print integers.
+t = {gres = "gpu:l40:4", num_tasks = 8.0, min_nodes = 1.0}
+check("N12b float inputs", submit(t), slurm.ERROR)
+check("N12b printed as integers", logged("^%-%-ntasks=8 exceeds the 4 GPUs"), true)
 t = {tres_per_socket = "gres/gpu:l40=2", num_tasks = 4}
 check("N13 -n with only --gpus-per-socket: uncheckable", submit(t), slurm.ERROR)
+t = {tres_per_job = "gres/gpu:l40=1", num_tasks = 2}
+check("N13b singular GPU", submit(t), slurm.ERROR)
+check("N13b message", LOG[1], "--ntasks=2 exceeds the 1 GPU requested in total; GPU jobs " ..
+      "run at most one task per GPU. Request more GPUs, or more nodes with -N.")
 t = {num_tasks = 64}
 check("N14 CPU job: any task count", submit(t), slurm.SUCCESS)
 
@@ -391,6 +408,7 @@ check("O2 root may pin it", modify(t, GPU_REC, 0), slurm.SUCCESS)
 check("O2 kept", t.partition, "l40-2")
 t = {min_mem_per_node = 200000}
 check("O3 user sets memory", modify(t, GPU_REC), slurm.ERROR)
+check("O3 worded for an update", logged("Their memory cannot be changed%.$"), true)
 t = {cpus_per_task = 32}
 check("O4 user sets -c", modify(t, GPU_REC), slurm.SUCCESS)
 check("O4 dropped", t.cpus_per_task, NO_VAL16)
