@@ -206,13 +206,13 @@ local function handle_untypeable(partition, count)
 end
 
 local function reject_unknown_type(gpu_type)
-    slurm.log_user("unknown GPU type '%s'. Valid types: %s.",
+    slurm.log_user("Unknown GPU type '%s'. Valid types: %s.",
                    gpu_type, sorted_keys(GPU_TYPE_TO_PARTITION))
     return slurm.ERROR
 end
 
 local function reject_multi_type()
-    slurm.log_user("multiple GPU types requested in one job; submit separate " ..
+    slurm.log_user("Multiple GPU types requested in one job; submit separate " ..
                    "jobs (each partition here has a single GPU type).")
     return slurm.ERROR
 end
@@ -249,10 +249,12 @@ local function gpu_count_in(s)
     return nil
 end
 
-local function reject_memory()
+-- on_update: the request is an scontrol update, not a submission.
+local function reject_memory(on_update)
     slurm.log_user("GPU jobs take memory from the partition default " ..
-                   "(DefMemPerCPU/DefMemPerGPU). Remove --mem, --mem-per-cpu " ..
-                   "and --mem-per-gpu and submit again.")
+                   "(DefMemPerCPU/DefMemPerGPU). %s", on_update and
+                   "Their memory cannot be changed." or
+                   "Remove --mem, --mem-per-cpu and --mem-per-gpu and submit again.")
     return slurm.ERROR
 end
 
@@ -262,11 +264,20 @@ local function wants_memory(job_desc)
 end
 
 -- Numbers from slurmctld arrive as floats under Lua 5.3+, hence %d, not "..".
-local function reject_tasks(opt, value, cap, scope)
-    local limit = cap and string.format("%d %s", cap, scope) or "unknown " .. scope
-    slurm.log_user("%s=%d exceeds the GPU count (%s); GPU jobs run at most " ..
-                   "one task per GPU. Request more GPUs, or more nodes with -N.",
-                   opt, value, limit)
+--   cap    the GPU count the tasks must not exceed, or nil when it cannot be known
+--   where  "in total", "per node" or "per socket"
+--   hint   what the user can change
+local function reject_tasks(opt, value, cap, where, hint)
+    if cap == nil then
+        slurm.log_user("%s=%d cannot be checked against the GPU count %s. Request " ..
+                       "GPUs with %s.", opt, value, where,
+                       where == "per socket" and "--gpus-per-socket" or
+                       "--gres or --gpus-per-node")
+    else
+        slurm.log_user("%s=%d exceeds the %d GPU%s requested %s; GPU jobs run at " ..
+                       "most one task per GPU. %s", opt, value, cap,
+                       cap == 1 and "" or "s", where, hint)
+    end
     return slurm.ERROR
 end
 
@@ -283,12 +294,15 @@ local function check_tasks(job_desc)
     local total = per_job or (per_node and per_node * nodes)
 
     if is_set(job_desc.ntasks_per_tres, slurm.NO_VAL16) and job_desc.ntasks_per_tres > 1 then
-        return reject_tasks("--ntasks-per-gpu", job_desc.ntasks_per_tres, 1, "per GPU")
+        slurm.log_user("--ntasks-per-gpu=%d is not allowed; GPU jobs run at most one " ..
+                       "task per GPU.", job_desc.ntasks_per_tres)
+        return slurm.ERROR
     end
     if is_set(job_desc.ntasks_per_socket, slurm.NO_VAL16) then
         if per_socket == nil or job_desc.ntasks_per_socket > per_socket then
             return reject_tasks("--ntasks-per-socket", job_desc.ntasks_per_socket,
-                                per_socket or 0, "per socket")
+                                per_socket, "per socket",
+                                "Request more GPUs with --gpus-per-socket.")
         end
     end
     -- --gpus-per-task fixes the GPU count at tasks x N, so tasks cannot outnumber it.
@@ -299,12 +313,13 @@ local function check_tasks(job_desc)
     if is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) then
         if per_node_cap == nil or job_desc.ntasks_per_node > per_node_cap then
             return reject_tasks("--ntasks-per-node", job_desc.ntasks_per_node,
-                                per_node_cap, "per node")
+                                per_node_cap, "per node", "Request more GPUs per node.")
         end
     end
     if is_set(job_desc.num_tasks, slurm.NO_VAL) then
         if total == nil or job_desc.num_tasks > total then
-            return reject_tasks("--ntasks", job_desc.num_tasks, total, "in total")
+            return reject_tasks("--ntasks", job_desc.num_tasks, total, "in total",
+                                "Request more GPUs, or more nodes with -N.")
         end
     end
     return slurm.SUCCESS
@@ -502,13 +517,13 @@ local function job_modify(job_desc, job_rec, part_list, modify_uid)
             return slurm.ERROR
         end
         if wants_memory(job_desc) then
-            return reject_memory()
+            return reject_memory(true)
         end
         if is_set(job_desc.num_tasks, slurm.NO_VAL) or
            is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) or
            is_set(job_desc.ntasks_per_tres, slurm.NO_VAL16) or
            is_set(job_desc.ntasks_per_socket, slurm.NO_VAL16) then
-            slurm.log_user("the task layout of a GPU job cannot be changed; " ..
+            slurm.log_user("The task layout of a GPU job cannot be changed; " ..
                            "submit it again instead.")
             return slurm.ERROR
         end
@@ -530,7 +545,7 @@ local function guarded(hook, ...)
     local ok, rc = pcall(hook, ...)
     if ok then return rc end
     slurm.log_error("job_submit.lua: %s", tostring(rc))
-    slurm.log_user("the submit policy failed internally; please report this " ..
+    slurm.log_user("The submit policy failed internally; please report this " ..
                    "to the cluster administrators.")
     return slurm.ERROR
 end
