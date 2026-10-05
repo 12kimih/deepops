@@ -53,7 +53,7 @@ Updating a cluster deployed with DeepOps
 
 DeepOps should be considered a deployment toolkit, rather than an integrated bundle of released software. Each new release of DeepOps brings new features in terms of software that can be deployed, or the configuration options supported by the Ansible playbooks.
 
-However, updating to a new DeepOps release doesn’t necessarily require updating the software components you have deployed to a cluster, and in most cases, you don’t need to update the DeepOps repository to install new software versions on your cluster.
+However, updating to a new DeepOps release doesn't necessarily require updating the software components you have deployed to a cluster, and in most cases, you don't need to update the DeepOps repository to install new software versions on your cluster.
 
 When updating a cluster deployed with DeepOps, we generally recommend updating individual components based on the particular features or bugfixes you want to track, rather than performing blanket updates. For example, you may want to upgrade the NVIDIA driver on a different schedule than Kubernetes.
 
@@ -63,13 +63,13 @@ Most of the component-based upgrades detailed below do not require updating the 
 
 Each release of DeepOps is a named tag of the Git repository, with versions using the YY.MM numbering scheme. So, for example, the March 2019 release of DeepOps is a tag named 19.03.
 
-If you don’t have a local clone of the DeepOps repository, you should clone one to your local provisioning host.
+If you don't have a local clone of the DeepOps repository, you should clone one to your local provisioning host.
 
 ```bash
 git clone https://github.com/NVIDIA/deepops
 ```
 
-Check out the git tag for the release you’re upgrading to:
+Check out the git tag for the release you're upgrading to:
 
 ```bash
 git checkout <YY.MM>
@@ -81,7 +81,7 @@ If you want to create a new branch to retain commits you create, you may do so (
 git checkout -b <new-branch-name>
 ```
 
-If you’ve made local changes to the DeepOps repository in your own branch, you can rebase your branch onto the release to port your changes to the new release.
+If you've made local changes to the DeepOps repository in your own branch, you can rebase your branch onto the release to port your changes to the new release.
 
 ```bash
 git checkout <your-branch>

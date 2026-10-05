@@ -43,7 +43,7 @@ None of the variables below are required. When not set, the default setting is a
 | :---                                     | :---                                 | :---                                                                                                              |
 | `hosts_file_src`                         |                                      | When defined, this path will be copied to the hosts file and all other settings are ignored                       |
 | `hosts_add_basic_ipv6`                   | false                                | If true, basic IPv6 entries are added (e.g. localhost6, ip6-localnet, etc.)                                       |
-| `hosts_add_ansible_managed_hosts`        | false                                | If true, an entry for hosts managed by Ansible is added. (†)                                                      |
+| `hosts_add_ansible_managed_hosts`        | false                                | If true, an entry for hosts managed by Ansible is added. (1)                                                      |
 | `hosts_add_ansible_managed_hosts_groups` | ['all']                              | Control which host entries are created when using `hosts_add_ansible_managed_hosts` |
 | `hosts_entries`                          | []                                   | A list of dicts with custom entries to be added to the hosts file. See below for an example.                      |
 | `hosts_file_snippets`                    | []                                   | A list of files containing host file snippets to be added to the hosts file verbatim.                             |
@@ -56,7 +56,7 @@ None of the variables below are required. When not set, the default setting is a
 | `host_file_backup`                       | no                                   | If yes, backup of host file is created with timestamp                                                             |
 |                                          |                                      |                                                                                                                   |
 
-(†) When setting `hosts_add_ansible_managed_hosts`, an entry for the current host will also be added.
+(1) When setting `hosts_add_ansible_managed_hosts`, an entry for the current host will also be added.
 
 Individual hosts file entries can be added with `hosts_entries`, a list of dicts with keys `name`, `ip` and (optional) `aliases`. Example:
 

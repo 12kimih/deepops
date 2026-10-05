@@ -22,15 +22,15 @@ A `node-exporter` and `dcgm-exporter` should be running on every node listed und
 $ sudo docker ps
 CONTAINER ID        IMAGE                              COMMAND                  CREATED             STATUS
 PORTS                    NAMES
-139fe402640f        quay.io/prometheus/node-exporter   "/bin/node_exporter …"   56 minutes ago      Up 56 minutes                                docker.node-exporter.service
-0da9e3f1a7c8        nvcr.io/nvidia/k8s/dcgm-exporter   "/usr/bin/dcgm-expor…"   56 minutes ago      Up 56 minutes       0.0.0.0:9400->9400/tcp   docker.dcgm-exporter.service
+139fe402640f        quay.io/prometheus/node-exporter   "/bin/node_exporter ..." 56 minutes ago      Up 56 minutes                                docker.node-exporter.service
+0da9e3f1a7c8        nvcr.io/nvidia/k8s/dcgm-exporter   "/usr/bin/dcgm-expor..." 56 minutes ago      Up 56 minutes       0.0.0.0:9400->9400/tcp   docker.dcgm-exporter.service
 ```
 
 ## Grafana
 
 The default configuration of Grafana comes with two dashboards. There is a dashboard to monitor Slurm usage and jobs and another GPU dashboard to monitor GPU utilization, power, etc.
 
-In order to gain access to Grafana visit the url at http://\<slurm-metric ip\>:3000/. Once the web page loads, the dashboards can be accessed by clicking the dashboards icon on the left and selecting manage. This will bring you to a page listing all available dashboards. Click on a dashboard’s name to view it.
+In order to gain access to Grafana visit the url at http://\<slurm-metric ip\>:3000/. Once the web page loads, the dashboards can be accessed by clicking the dashboards icon on the left and selecting manage. This will bring you to a page listing all available dashboards. Click on a dashboard's name to view it.
 
 ![Grafana Home](../img/slurm_monitoring_grafana01.png)
 
