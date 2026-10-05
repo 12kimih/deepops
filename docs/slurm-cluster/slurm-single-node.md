@@ -37,11 +37,11 @@ The general requirements and procedure for Slurm setup via deepops is documented
 
 3. Edit config and options.
 
-   After running the setup script in step 2, a copy of “config.example” directory will be made to “config” directory. When one of the compute nodes also functions as a login node a few special configurations have to be set.
+   After running the setup script in step 2, a copy of "config.example" directory will be made to "config" directory. When one of the compute nodes also functions as a login node a few special configurations have to be set.
 
    a. Configuring inventory `"config/inventory"`.
 
-   General configuration details can be found in the [configuration doc](../deepops/configuration.md). Let a host be named “gpu01” (example DGX-1 with 8 GPUs) with an ssh reachable ip address of “10.31.241.198”. If the deployment will be run locally on machine “gpu01” then ssh settings are optional. If the machine has a different hostname (i.e. not gpu01), then use the desired host name. Running the deployment will change the hostname to what is set in the inventory file.
+   General configuration details can be found in the [configuration doc](../deepops/configuration.md). Let a host be named "gpu01" (example DGX-1 with 8 GPUs) with an ssh reachable ip address of "10.31.241.198". If the deployment will be run locally on machine "gpu01" then ssh settings are optional. If the machine has a different hostname (i.e. not gpu01), then use the desired host name. Running the deployment will change the hostname to what is set in the inventory file.
 
    A single node config would look as follows:
 
@@ -108,16 +108,16 @@ The general requirements and procedure for Slurm setup via deepops is documented
    slurm_allow_ssh_user:
    - "user1"
    - "user2"
-   - "user3”
+   - "user3"
    ```
 
    The `slurm_login_on_compute` setting is to enable special settings on a compute node in order that it can function as a login node as well.
 
-   Note: After deployment new users have to be manually added to “/etc/localusers” and “/etc/slurm/localusers.backup” on the node that functions as a login node.
+   Note: After deployment new users have to be manually added to "/etc/localusers" and "/etc/slurm/localusers.backup" on the node that functions as a login node.
 
 4. Verify the configuration.
 
-   Check that ansible can run successfully and reach hosts. Run the hostname utility on “all” the nodes. The “all” refers to the section in the
+   Check that ansible can run successfully and reach hosts. Run the hostname utility on "all" the nodes. The "all" refers to the section in the
    `"config/inventory"` file.
 
    ```bash
@@ -125,7 +125,7 @@ The general requirements and procedure for Slurm setup via deepops is documented
    ```
 
    For non local setup do not set connection to local. This requires ssh config
-   to be set up properly in the “`config/inventory`”.
+   to be set up properly in the "`config/inventory`".
 
    ```bash
    ansible all -m raw -a "hostname"
@@ -187,7 +187,7 @@ The general requirements and procedure for Slurm setup via deepops is documented
 
    The admin users can access the GPUs that are restricted from regular ssh
    login sessions. This could be useful in situations when maybe GPU firmware
-   needs to be updated. Let “dgxuser” be an admin user, they would access GPUs
+   needs to be updated. Let "dgxuser" be an admin user, they would access GPUs
    via command:
 
    ```bash
@@ -243,7 +243,7 @@ DGX systems just one of the systems functions as a login node as well).
 
 ### Initial SSH to Login Node
 
-Let the ip address of the login system be “10.31.241.198” and user “testuser”.
+Let the ip address of the login system be "10.31.241.198" and user "testuser".
 They would ssh to the system as follows:
 
 ```bash
@@ -287,8 +287,8 @@ GPU 0: Tesla P100-SXM2-16GB (UUID: GPU-61ba3c7e-584a-7eb4-d993-2d0b0a43b24f)
 ```
 
 The job allocations details in Slurm can be viewed in another pane (such as one
-of the tmux panes in the login session without GPU access) via “squeue” command
-and details of the job can be viewed via “scontrol”.
+of the tmux panes in the login session without GPU access) via "squeue" command
+and details of the job can be viewed via "scontrol".
 
 ```bash
 login-session:squeue
@@ -367,7 +367,7 @@ compute-session:module load rootless-docker
 compute-session:start_rootless_docker.sh
 ```
 
-An option “--quiet” can be passed to the “start_rootless_docker.sh” script to
+An option "--quiet" can be passed to the "start_rootless_docker.sh" script to
 hide rootless docker messages. Pull/run a docker image:
 
 ```bash
@@ -443,9 +443,9 @@ with a few limitations. These limitations can make it challenging to run
 multi node Slurm jobs, therefore for multi node jobs on Slurm the recommended
 approach is via enroot or singularity.
 
-A user can explicitly stop the rootless docker daemon with “stop_rootless_docker.sh”
+A user can explicitly stop the rootless docker daemon with "stop_rootless_docker.sh"
 script, or just exit the Slurm session. Upon exit from a slurm session the
-processes in the session are killed therefore the user’s rootless docker
+processes in the session are killed therefore the user's rootless docker
 process will end.
 
 ```bash
@@ -455,7 +455,7 @@ exit
 login-session:$
 ```
 
-These scripts “start_rootless_docker.sh” and “stop_rootless_docker.sh” appear
+These scripts "start_rootless_docker.sh" and "stop_rootless_docker.sh" appear
 on a user's path upon loading the rootless docker module.
 
 ### Enroot and Singularity
@@ -471,7 +471,7 @@ login-session:srun --mpi=pmi2 --ntasks=2 --gpus-per-task=1 \
 ```
 
 The pyxis+enroot is invoked via option `--container-image=deepops/nccl-tests-tf20.06-ubuntu18.04:latest`
-to run the “all_reduce_perf” nccl test. Refer to enroot and pyxis documentation
+to run the "all_reduce_perf" nccl test. Refer to enroot and pyxis documentation
 for further details.
 
 Above, Slurm uses pmi2 to configure MPI. One does not need to call mpirun
@@ -495,15 +495,15 @@ login-session:srun --ntasks=2 --gpus-per-task=1 --no-container-remap-root \
 ```
 
 The reason for `[ "$SLURM_PROCID" -eq "0" ]` is that srun and mpirun are redundant,
-so you have to invoke either one or the other. That is “srun mpirun” will call
+so you have to invoke either one or the other. That is "srun mpirun" will call
 mpirun multiple times which is not what one wants. Note in the example script
-“test-allreduce.sh” one does not have to pass any parameters to mpirun as these
+"test-allreduce.sh" one does not have to pass any parameters to mpirun as these
 will typically be inferred from the environment. Calling mpirun approach could
 be useful, because certain binding options are not available to srun directly,
 but can be set via mpirun.
 
-Singularity could be used in a similar fashion to enroot. Don’t forget the
-“--nv” option for GPUs.
+Singularity could be used in a similar fashion to enroot. Don't forget the
+"--nv" option for GPUs.
 
 ```bash
 login-session:srun --mpi=pmi2 --ntasks=2 --gpus-per-task=1 \
@@ -521,6 +521,6 @@ login-session:srun --ntasks=2 --gpus-per-task=1 \
 ```
 
 Refer to singularity documentation for further details. Building containers with
-singularity is permitted to non-privileged users via the “--fakeroot” option.
+singularity is permitted to non-privileged users via the "--fakeroot" option.
 Enroot and singularity excel at running containerized multi node jobs, which is
 somewhat difficult and less convenient to do using docker on Slurm.
