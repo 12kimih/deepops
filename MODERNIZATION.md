@@ -728,6 +728,24 @@ pruned.
 - `move-home-dirs` is opt-in (`move_home_dirs_enable`) rather than running on every
   `authentication.yml`.
 
+## 41. job_submit: type-pinned GPU jobs, default-only sizing, fail-closed  (`69c5a938`)
+
+- **`FORCE_GPU_PARTITION`:** a GPU job is routed to every partition of its GPU type even
+  when it names one, so a job pinned to half of a split pool does not wait while the
+  other half is idle. CPU jobs keep their partition; `-w` still targets one node.
+- **`GPU_JOBS_USE_DEFAULTS`:** GPU jobs are sized by `DefCpuPerGPU` / `DefMemPerCPU`
+  only. CPU options are reset to unset; memory options are rejected because a Lua
+  double cannot carry `NO_VAL64` (it reaches slurmctld as `--mem=0`); tasks are capped
+  at one per GPU. `slurm_job_modify` applies the same rules to non-root updates.
+- **Fail-closed:** both hooks run under `pcall`. Slurm 25.11 logs a Lua runtime error
+  and accepts the job unchanged; 26.05 rejects it natively.
+- **Not solvable in the plugin:** a multi-partition job is preempted for in whichever
+  partition is evaluated first, with no look at idle nodes in the others (25.11 and
+  26.05 alike). Listing the partition whose nodes should fill first first in
+  `GPU_TYPE_TO_PARTITION` (equal `PriorityTier`) is the practical lever.
+- **Tests:** the site-block pattern in `job_submit_test.lua` had stopped matching, so
+  the suite aborted at its first case; fixed, and stale expectations corrected.
+
 ## Status
 
 Every item from the modernization brief is implemented, linted (yamllint 0;
