@@ -219,7 +219,11 @@ Optional submit-time routing (e.g. GPU jobs to per-GPU-type partitions) is avail
 by setting `slurm_job_submit_plugins: "lua"` and pointing `slurm_job_submit_template`
 at your own `job_submit.lua`. DeepOps does not generate one;
 `config.example/files/slurm/job_submit.lua` is a ready-to-edit starting point that
-routes by GPU type and sends CPU-only jobs to a CPU partition.
+routes by GPU type and sends CPU-only jobs to a CPU partition. Optionally it also
+pins GPU jobs to every partition of their type (`FORCE_GPU_PARTITION`) and sizes them
+by the partition defaults alone (`GPU_JOBS_USE_DEFAULTS`: CPU options dropped, memory
+options rejected, at most one task per GPU). Test a copy with
+`lua roles/slurm/tests/job_submit_test.lua <path>` before deploying it.
 
 Because `config/` is git-ignored by DeepOps, keep your server-specific settings
 and secrets there and manage that directory as a separate **private** repo:
