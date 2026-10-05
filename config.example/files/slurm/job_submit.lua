@@ -198,7 +198,7 @@ local function handle_untypeable(partition, count)
         slurm.log_user("Note: GPU type unspecified and %s; leaving the request untyped.", why)
         return slurm.SUCCESS
     end
-    slurm.log_user("Error: GPU type unspecified and %s. Name it explicitly " ..
+    slurm.log_user("GPU type unspecified and %s. Name it explicitly " ..
                    "(e.g. --gres=gpu:<type>:%d, types: %s), or submit to one of: %s.",
                    why, count > 0 and count or 1, sorted_keys(GPU_TYPE_TO_PARTITION),
                    sorted_keys(PARTITION_TO_GPU_TYPE))
@@ -206,13 +206,13 @@ local function handle_untypeable(partition, count)
 end
 
 local function reject_unknown_type(gpu_type)
-    slurm.log_user("Error: unknown GPU type '%s'. Valid types: %s.",
+    slurm.log_user("unknown GPU type '%s'. Valid types: %s.",
                    gpu_type, sorted_keys(GPU_TYPE_TO_PARTITION))
     return slurm.ERROR
 end
 
 local function reject_multi_type()
-    slurm.log_user("Error: multiple GPU types requested in one job; submit separate " ..
+    slurm.log_user("multiple GPU types requested in one job; submit separate " ..
                    "jobs (each partition here has a single GPU type).")
     return slurm.ERROR
 end
@@ -250,7 +250,7 @@ local function gpu_count_in(s)
 end
 
 local function reject_memory()
-    slurm.log_user("Error: GPU jobs take memory from the partition default " ..
+    slurm.log_user("GPU jobs take memory from the partition default " ..
                    "(DefMemPerCPU/DefMemPerGPU). Remove --mem, --mem-per-cpu " ..
                    "and --mem-per-gpu and submit again.")
     return slurm.ERROR
@@ -264,7 +264,7 @@ end
 -- Numbers from slurmctld arrive as floats under Lua 5.3+, hence %d, not "..".
 local function reject_tasks(opt, value, cap, scope)
     local limit = cap and string.format("%d %s", cap, scope) or "unknown " .. scope
-    slurm.log_user("Error: %s=%d exceeds the GPU count (%s); GPU jobs run at most " ..
+    slurm.log_user("%s=%d exceeds the GPU count (%s); GPU jobs run at most " ..
                    "one task per GPU. Request more GPUs, or more nodes with -N.",
                    opt, value, limit)
     return slurm.ERROR
@@ -335,7 +335,8 @@ local function drop_cpu_sizing(job_desc, report_min_cpus)
         for _, o in ipairs(dropped) do if o == opt then return end end
         dropped[#dropped + 1] = opt
     end
-    if is_set(job_desc.cpus_per_task, slurm.NO_VAL16) then
+    local cpus_per_task = job_desc.cpus_per_task
+    if is_set(cpus_per_task, slurm.NO_VAL16) then
         job_desc.cpus_per_task = slurm.NO_VAL16
         note("--cpus-per-task")
     end
@@ -348,9 +349,10 @@ local function drop_cpu_sizing(job_desc, report_min_cpus)
         job_desc.cpus_per_tres = ""
         note("--cpus-per-gpu")
     end
+    -- sbatch/srun/salloc copy -c into --mincpus, so only a differing value was asked for.
     if is_set(job_desc.pn_min_cpus, slurm.NO_VAL16) then
+        if job_desc.pn_min_cpus ~= cpus_per_task then note("--mincpus") end
         job_desc.pn_min_cpus = slurm.NO_VAL16
-        note("--mincpus")
     end
     if is_set(job_desc.max_cpus, slurm.NO_VAL) then
         job_desc.max_cpus = slurm.NO_VAL
@@ -495,7 +497,7 @@ local function job_modify(job_desc, job_rec, part_list, modify_uid)
     if GPU_JOBS_USE_DEFAULTS then
         -- A CPU job may carry any sizing; adding GPUs later would keep it.
         if want_gpu and not rec_gpu then
-            slurm.log_user("Error: GPUs cannot be added to a CPU job; submit a new " ..
+            slurm.log_user("GPUs cannot be added to a CPU job; submit a new " ..
                            "GPU job instead.")
             return slurm.ERROR
         end
@@ -506,7 +508,7 @@ local function job_modify(job_desc, job_rec, part_list, modify_uid)
            is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) or
            is_set(job_desc.ntasks_per_tres, slurm.NO_VAL16) or
            is_set(job_desc.ntasks_per_socket, slurm.NO_VAL16) then
-            slurm.log_user("Error: the task layout of a GPU job cannot be changed; " ..
+            slurm.log_user("the task layout of a GPU job cannot be changed; " ..
                            "submit it again instead.")
             return slurm.ERROR
         end
@@ -528,7 +530,7 @@ local function guarded(hook, ...)
     local ok, rc = pcall(hook, ...)
     if ok then return rc end
     slurm.log_error("job_submit.lua: %s", tostring(rc))
-    slurm.log_user("Error: the submit policy failed internally; please report this " ..
+    slurm.log_user("the submit policy failed internally; please report this " ..
                    "to the cluster administrators.")
     return slurm.ERROR
 end
