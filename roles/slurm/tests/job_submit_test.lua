@@ -128,7 +128,7 @@ print("== D. requests that cannot be satisfied are rejected at submit ==")
 t = {partition = "gpu-a100", gres = "gpu:v100:4"}
 check("D1 unknown GPU type", submit(t), slurm.ERROR)
 check("D1 message lists valid types", LOG[1],
-      "Error: unknown GPU type 'v100'. Valid types: a100, h100.")
+      "unknown GPU type 'v100'. Valid types: a100, h100.")
 t = {gres = "gpu:a100:1", tres_per_node = "gres/gpu:h100=1"}
 check("D2 two GPU types in one job", submit(t), slurm.ERROR)
 t = {partition = "cpu,gpu-a100,gpu-h100", gres = "gpu:1"}
@@ -307,10 +307,10 @@ t = {partition = "l40-1", gres = "gres/gpu:l40:4", cpus_per_task = 16,
      tres_per_task = "cpu=16", min_cpus = 16, min_mem_per_node = 131072,
      bitflags = 32768}
 check("M1 --mem on a GPU job", submit(t), slurm.ERROR)
-check("M1 tells the user why", logged("^Error: GPU jobs take memory"), true)
+check("M1 tells the user why", logged("^GPU jobs take memory"), true)
 check("M1 nothing rewritten before rejecting", t.partition, "l40-1")
 t = {partition = "l40-1", gres = "gres/gpu:l40:4", cpus_per_task = 16,
-     tres_per_task = "cpu=16", min_cpus = 16, bitflags = 32768 + 16384}
+     tres_per_task = "cpu=16", min_cpus = 16, pn_min_cpus = 16, bitflags = 32768 + 16384}
 check("M2 same job without --mem", submit(t), slurm.SUCCESS)
 check("M2 -c dropped", t.cpus_per_task, NO_VAL16)
 check("M2 -c dropped from tres_per_task", t.tres_per_task, "")
@@ -332,6 +332,7 @@ check("M7 --exclusive", submit(t), slurm.SUCCESS)
 check("M7 dropped", t.shared, NO_VAL16)
 t = {gres = "gpu:l40:1", pn_min_cpus = 40, max_cpus = 40}
 check("M8 --mincpus", submit(t), slurm.SUCCESS)
+check("M8 user is told", logged("ignored %-%-mincpus%.$"), true)
 check("M8 dropped", t.pn_min_cpus, NO_VAL16)
 check("M8 max_cpus dropped", t.max_cpus, NO_VAL)
 t = {tres_per_task = "cpu=8,gres/gpu=1", num_tasks = 4}
