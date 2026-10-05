@@ -1,7 +1,8 @@
--- job_submit.lua -- EXAMPLE Slurm submit-time site policy (default partition
--- routing by GPU type, and GPU-type stamping on every GPU request). DeepOps does
--- NOT generate this file -- copy it into your config/ (config/files/slurm/job_submit.lua),
--- EDIT the [1] block for your cluster, then enable it with:
+-- job_submit.lua -- EXAMPLE Slurm submit-time site policy (partition routing by GPU
+-- type, GPU-type stamping on every GPU request, and default-only sizing of GPU jobs).
+-- DeepOps does NOT generate this file -- copy it into your config/
+-- (config/files/slurm/job_submit.lua), EDIT the [1] block for your cluster, then
+-- enable it with:
 --     slurm_job_submit_plugins: "lua"
 --     slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
 -- It is copied verbatim and runs inside slurmctld holding locks -- keep it pure
@@ -37,6 +38,15 @@
 --                          Keep this true if any QoS or association carries a typed
 --                          GPU limit: Slurm checks those against the REQUESTED TRES,
 --                          so an untyped request is invisible to them (see header).
+--   FORCE_GPU_PARTITION    true  -- a GPU job always goes to every partition of its
+--                          type, whatever partition it named. A job that must land on
+--                          one node still can, with -w/--nodelist.
+--                          false -- a named partition is kept.
+--   GPU_JOBS_USE_DEFAULTS  true  -- GPU jobs are sized by the partition defaults
+--                          (DefCpuPerGPU, DefMemPerCPU/DefMemPerGPU) only: CPU options
+--                          are dropped, memory options rejected, and tasks may not
+--                          outnumber GPUs. CPU-only jobs keep every option.
+--                          false -- GPU jobs size themselves.
 local CPU_PARTITIONS        = "cpu"
 local GPU_TYPE_TO_PARTITION = {
     ["b200"] = "b200",
@@ -45,6 +55,8 @@ local GPU_TYPE_TO_PARTITION = {
 }
 local DEFAULT_GPU_TYPE      = "b200"
 local STRICT_GPU_TYPE       = true
+local FORCE_GPU_PARTITION   = true
+local GPU_JOBS_USE_DEFAULTS = true
 
 -- Derived once at load, from the [1] block above.
 --   GPU_TYPE_PARTITION    type      -> the partition list to route that type to
@@ -202,11 +214,178 @@ local function reject_multi_type()
     return slurm.ERROR
 end
 
+-- [2c] Default-only sizing of GPU jobs (GPU_JOBS_USE_DEFAULTS). Slurm applies
+-- DefCpuPerGPU only while the job sets no --cpus-per-task/--cpus-per-gpu, and
+-- DefMemPerCPU/DefMemPerGPU only while it sets no memory, re-deriving both for each
+-- partition it is tried in. So the policy is "leave those fields unset":
+--   CPU    -- reset to unset. Every CPU field is 16/32-bit, so its NO_VAL fits a
+--             Lua number exactly.
+--   memory -- rejected, never reset. Unset memory is NO_VAL64, which a Lua double
+--             cannot hold: it rounds to 2^64 and reaches slurmctld as 0, i.e.
+--             --mem=0, the whole node.
+--   tasks  -- each task takes at least one CPU, so -n above the GPU count would
+--             outgrow DefCpuPerGPU; capped at one task per GPU.
+
+-- JOB_CPUS_SET (slurm.h SLURM_BIT(15)): "-c was given". Not exported to Lua.
+local JOB_CPUS_SET = 32768
+
+local function is_set(v, unset)
+    return v ~= nil and v ~= unset
+end
+
+local function is_nonempty(s)
+    return s ~= nil and s ~= ""
+end
+
+-- GPU count in one request field, or nil when that field asks for no GPU.
+local function gpu_count_in(s)
+    if not is_nonempty(s) then return nil end
+    for token in string.gmatch(s, "[^,]+") do
+        if is_gpu_token(token) then return gpu_count_of_token(token) end
+    end
+    return nil
+end
+
+local function reject_memory()
+    slurm.log_user("Error: GPU jobs take memory from the partition default " ..
+                   "(DefMemPerCPU/DefMemPerGPU). Remove --mem, --mem-per-cpu " ..
+                   "and --mem-per-gpu and submit again.")
+    return slurm.ERROR
+end
+
+local function wants_memory(job_desc)
+    return job_desc.min_mem_per_node ~= nil or job_desc.min_mem_per_cpu ~= nil
+        or is_nonempty(job_desc.mem_per_tres)
+end
+
+-- Numbers from slurmctld arrive as floats under Lua 5.3+, hence %d, not "..".
+local function reject_tasks(opt, value, cap, scope)
+    local limit = cap and string.format("%d %s", cap, scope) or "unknown " .. scope
+    slurm.log_user("Error: %s=%d exceeds the GPU count (%s); GPU jobs run at most " ..
+                   "one task per GPU. Request more GPUs, or more nodes with -N.",
+                   opt, value, limit)
+    return slurm.ERROR
+end
+
+-- Tasks may not outnumber GPUs, per job and per node. Unset node count means one
+-- node, the same assumption Slurm makes when it estimates CPUs at submit.
+local function check_tasks(job_desc)
+    local nodes = 1
+    if is_set(job_desc.min_nodes, slurm.NO_VAL) and job_desc.min_nodes > 1 then
+        nodes = job_desc.min_nodes
+    end
+    local per_node = gpu_count_in(job_desc.gres) or gpu_count_in(job_desc.tres_per_node)
+    local per_job = gpu_count_in(job_desc.tres_per_job)
+    local per_socket = gpu_count_in(job_desc.tres_per_socket)
+    local total = per_job or (per_node and per_node * nodes)
+
+    if is_set(job_desc.ntasks_per_tres, slurm.NO_VAL16) and job_desc.ntasks_per_tres > 1 then
+        return reject_tasks("--ntasks-per-gpu", job_desc.ntasks_per_tres, 1, "per GPU")
+    end
+    if is_set(job_desc.ntasks_per_socket, slurm.NO_VAL16) then
+        if per_socket == nil or job_desc.ntasks_per_socket > per_socket then
+            return reject_tasks("--ntasks-per-socket", job_desc.ntasks_per_socket,
+                                per_socket or 0, "per socket")
+        end
+    end
+    -- --gpus-per-task fixes the GPU count at tasks x N, so tasks cannot outnumber it.
+    if gpu_count_in(job_desc.tres_per_task) ~= nil then
+        return slurm.SUCCESS
+    end
+    local per_node_cap = per_node or total
+    if is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) then
+        if per_node_cap == nil or job_desc.ntasks_per_node > per_node_cap then
+            return reject_tasks("--ntasks-per-node", job_desc.ntasks_per_node,
+                                per_node_cap, "per node")
+        end
+    end
+    if is_set(job_desc.num_tasks, slurm.NO_VAL) then
+        if total == nil or job_desc.num_tasks > total then
+            return reject_tasks("--ntasks", job_desc.num_tasks, total, "in total")
+        end
+    end
+    return slurm.SUCCESS
+end
+
+-- Remove "cpu=N" (-c, --tres-per-task=cpu=N) from tres_per_task, keeping the rest.
+local function drop_task_cpus(job_desc)
+    local s = job_desc.tres_per_task
+    if not is_nonempty(s) then return false end
+    local kept, changed = {}, false
+    for token in string.gmatch(s, "[^,]+") do
+        if string.match(token, "^cpu[:=]") then
+            changed = true
+        else
+            kept[#kept + 1] = token
+        end
+    end
+    if changed then job_desc.tres_per_task = table.concat(kept, ",") end
+    return changed
+end
+
+-- Reset every CPU-sizing field to unset and tell the user which options were ignored.
+-- min_cpus is always filled in by sbatch (tasks x cpus-per-task) and is recomputed
+-- from what is left, so it is only reported when the user set it on its own (modify).
+local function drop_cpu_sizing(job_desc, report_min_cpus)
+    local dropped = {}
+    local function note(opt)
+        for _, o in ipairs(dropped) do if o == opt then return end end
+        dropped[#dropped + 1] = opt
+    end
+    if is_set(job_desc.cpus_per_task, slurm.NO_VAL16) then
+        job_desc.cpus_per_task = slurm.NO_VAL16
+        note("--cpus-per-task")
+    end
+    if drop_task_cpus(job_desc) then note("--cpus-per-task") end
+    if job_desc.bitflags ~= nil and
+       math.floor(job_desc.bitflags / JOB_CPUS_SET) % 2 == 1 then
+        job_desc.bitflags = job_desc.bitflags - JOB_CPUS_SET
+    end
+    if is_nonempty(job_desc.cpus_per_tres) then
+        job_desc.cpus_per_tres = ""
+        note("--cpus-per-gpu")
+    end
+    if is_set(job_desc.pn_min_cpus, slurm.NO_VAL16) then
+        job_desc.pn_min_cpus = slurm.NO_VAL16
+        note("--mincpus")
+    end
+    if is_set(job_desc.max_cpus, slurm.NO_VAL) then
+        job_desc.max_cpus = slurm.NO_VAL
+    end
+    if is_set(job_desc.min_cpus, slurm.NO_VAL) then
+        job_desc.min_cpus = slurm.NO_VAL
+        if report_min_cpus then note("NumCPUs") end
+    end
+    -- --exclusive (shared=0, or =user/mcs/topo) allocates the whole node.
+    if is_set(job_desc.shared, slurm.NO_VAL16) then
+        job_desc.shared = slurm.NO_VAL16
+        note("--exclusive/--oversubscribe")
+    end
+    if #dropped > 0 then
+        slurm.log_user("Note: GPU jobs take CPUs from the partition default " ..
+                       "(DefCpuPerGPU); ignored %s.", table.concat(dropped, ", "))
+    end
+end
+
+-- Route a GPU job to every partition of its type. Under FORCE_GPU_PARTITION a named
+-- partition is overridden (and the user told); otherwise only an empty one is filled.
+local function route_gpu_job(job_desc, gpu_type)
+    local partition = GPU_TYPE_PARTITION[gpu_type]
+    local named = job_desc.partition
+    if not is_nonempty(named) then
+        job_desc.partition = partition
+    elseif FORCE_GPU_PARTITION and named ~= partition then
+        slurm.log_user("Note: GPU jobs are routed by GPU type; ignored partition " ..
+                       "'%s', using %s.", named, partition)
+        job_desc.partition = partition
+    end
+end
+
 -- [3] Submit hook. Resolve the GPU type first, then route on it -- one lookup, so a
 -- typed request, one typed by its partition and one falling back to the site default
 -- all reach their partitions the same way.
-function slurm_job_submit(job_desc, part_list, submit_uid)
-    local has_partition = job_desc.partition ~= nil and job_desc.partition ~= ""
+local function job_submit(job_desc, part_list, submit_uid)
+    local has_partition = is_nonempty(job_desc.partition)
     local want_gpu, gpu_type, gpu_count, gpu_multi = detect_gpu(job_desc)
 
     -- CPU-only work has no type to carry; it only needs a partition if it named none.
@@ -230,7 +409,9 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
     if gpu_type == nil then
         if has_partition then
             gpu_type = gpu_type_of_partition(job_desc.partition)
-        elseif DEFAULT_GPU_TYPE ~= "" then
+        end
+        if gpu_type == nil and DEFAULT_GPU_TYPE ~= "" and
+           (not has_partition or FORCE_GPU_PARTITION) then
             gpu_type = DEFAULT_GPU_TYPE
             slurm.log_user("Note: GPU type unspecified; defaulting to %s. " ..
                            "Use --gres=gpu:<type>:N to be explicit.", gpu_type)
@@ -244,50 +425,115 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
     -- A named type must be one we know. Reject an unknown one instead of silently
     -- downgrading it to the default -- that surprises --gres jobs (silent swap) and
     -- makes --gpus jobs pend forever against a partition lacking that type.
-    local partition = GPU_TYPE_PARTITION[gpu_type]
-    if partition == nil then
+    if GPU_TYPE_PARTITION[gpu_type] == nil then
         return reject_unknown_type(gpu_type)
     end
-    if not has_partition then
-        job_desc.partition = partition
+
+    -- Validate before rewriting anything, so a rejected job is reported as submitted.
+    if GPU_JOBS_USE_DEFAULTS then
+        if wants_memory(job_desc) then
+            return reject_memory()
+        end
+        local rc = check_tasks(job_desc)
+        if rc ~= slurm.SUCCESS then return rc end
+        drop_cpu_sizing(job_desc, false)
     end
+    route_gpu_job(job_desc, gpu_type)
     return slurm.SUCCESS
 end
 
 -- [4] Modify hook (scontrol update). A pending job's GPU request can be rewritten
 -- after submission, so the same normalisation has to run here -- otherwise
 -- "scontrol update job=N TresPerNode=gres/gpu:4" strips the type back off and walks
--- straight past the limits the submit hook just enforced. Partition is left alone:
--- this hook only ensures whatever GPU request survives is typed.
-function slurm_job_modify(job_desc, job_rec, part_list, modify_uid)
+-- straight past the limits the submit hook just enforced. job_desc holds only the
+-- fields being changed (the rest unset); job_rec is the job as it stands.
+-- root (sudo scontrol) is exempt from the sizing and partition rules, so an admin can
+-- still move or resize a job by hand; the type stamping applies to everyone.
+local function job_modify(job_desc, job_rec, part_list, modify_uid)
     local want_gpu, gpu_type, gpu_count, gpu_multi = detect_gpu(job_desc)
-    if not want_gpu then
+    if want_gpu then
+        if gpu_multi then
+            return reject_multi_type()
+        end
+        if gpu_type ~= nil then
+            if GPU_TYPE_PARTITION[gpu_type] == nil then
+                return reject_unknown_type(gpu_type)
+            end
+        else
+            -- Fall back to the job's current partition when the update does not
+            -- change it. No default-type fallback here: the submit hook already gave
+            -- the job a partition, and stamping a type that partition does not hold
+            -- would leave it pending forever.
+            local partition = job_desc.partition
+            if not is_nonempty(partition) then
+                partition = job_rec ~= nil and job_rec.partition or nil
+            end
+            if is_nonempty(partition) then
+                gpu_type = gpu_type_of_partition(partition)
+            end
+            if gpu_type == nil then
+                return handle_untypeable(partition, gpu_count)
+            end
+            stamp_gpu_type(job_desc, gpu_type)
+        end
+    end
+
+    if modify_uid == 0 then
         return slurm.SUCCESS
     end
-    if gpu_multi then
-        return reject_multi_type()
+    local rec_gpu, rec_type = false, nil
+    if job_rec ~= nil then
+        rec_gpu, rec_type = detect_gpu(job_rec)
     end
-    if gpu_type ~= nil then
-        if GPU_TYPE_PARTITION[gpu_type] == nil then
-            return reject_unknown_type(gpu_type)
-        end
+    if not want_gpu and not rec_gpu then
         return slurm.SUCCESS
     end
 
-    -- Fall back to the job's current partition when the update does not change it. No
-    -- default-type fallback here: the submit hook already gave the job a partition, and
-    -- stamping a type that partition does not hold would leave it pending forever.
-    local partition = job_desc.partition
-    if partition == nil or partition == "" then
-        partition = job_rec ~= nil and job_rec.partition or nil
+    if GPU_JOBS_USE_DEFAULTS then
+        -- A CPU job may carry any sizing; adding GPUs later would keep it.
+        if want_gpu and not rec_gpu then
+            slurm.log_user("Error: GPUs cannot be added to a CPU job; submit a new " ..
+                           "GPU job instead.")
+            return slurm.ERROR
+        end
+        if wants_memory(job_desc) then
+            return reject_memory()
+        end
+        if is_set(job_desc.num_tasks, slurm.NO_VAL) or
+           is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) or
+           is_set(job_desc.ntasks_per_tres, slurm.NO_VAL16) or
+           is_set(job_desc.ntasks_per_socket, slurm.NO_VAL16) then
+            slurm.log_user("Error: the task layout of a GPU job cannot be changed; " ..
+                           "submit it again instead.")
+            return slurm.ERROR
+        end
+        drop_cpu_sizing(job_desc, true)
     end
-    local implied = nil
-    if partition ~= nil and partition ~= "" then
-        implied = gpu_type_of_partition(partition)
+    if FORCE_GPU_PARTITION and is_nonempty(job_desc.partition) then
+        local t = gpu_type or rec_type or gpu_type_of_partition(job_desc.partition)
+        if t ~= nil and GPU_TYPE_PARTITION[t] ~= nil then
+            route_gpu_job(job_desc, t)
+        end
     end
-    if implied == nil then
-        return handle_untypeable(partition, gpu_count)
-    end
-    stamp_gpu_type(job_desc, implied)
     return slurm.SUCCESS
+end
+
+-- [5] Entry points. slurmctld logs a Lua runtime error and then ACCEPTS the job or
+-- update as it stands (fail-open), which would let a policy bug wave jobs through
+-- half-checked. Catch it here and reject instead.
+local function guarded(hook, ...)
+    local ok, rc = pcall(hook, ...)
+    if ok then return rc end
+    slurm.log_error("job_submit.lua: %s", tostring(rc))
+    slurm.log_user("Error: the submit policy failed internally; please report this " ..
+                   "to the cluster administrators.")
+    return slurm.ERROR
+end
+
+function slurm_job_submit(job_desc, part_list, submit_uid)
+    return guarded(job_submit, job_desc, part_list, submit_uid)
+end
+
+function slurm_job_modify(job_desc, job_rec, part_list, modify_uid)
+    return guarded(job_modify, job_desc, job_rec, part_list, modify_uid)
 end
