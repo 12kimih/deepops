@@ -603,7 +603,7 @@ deepops's already-correct scoped-AppArmor + userns sysctls + prolog/epilog lifec
 
 ## 31. NGC docker daemon defaults + slurmrestd JWT  (`4a106d37`, `fe5b947f`)
 
-Ported the daemon.json shm/ulimit tuning the comparison surfaced: NGC/NCCL bare
+Ported the daemon.json shm/ulimit tuning: NGC/NCCL bare
 `docker run` needs `default-shm-size=1G` + `default-ulimits` memlock=-1 /
 stack=67108864 (docker's 64 MiB shm breaks multi-GPU NCCL) -- the exact values are
 NVIDIA's (Frameworks / Triton / DeepLearningExamples docs). Merged into daemon.json
