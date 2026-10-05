@@ -23,7 +23,7 @@ echo "Running ansible-lint with project config (.ansible-lint)"
 echo "ansible-lint version: $(ansible-lint --version 2>&1 | head -1)"
 echo "==============================================================="
 
-# Run ansible-lint from project root — it picks up .ansible-lint config
+# Run ansible-lint from project root, where it picks up .ansible-lint config
 # which handles exclude_paths, skip_list, and profile settings
 ansible-lint -f pep8 roles/
 exit_code=$?

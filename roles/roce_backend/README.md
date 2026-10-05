@@ -24,10 +24,10 @@ The settable variables for the role must be provided in vars/main.yml.
 
 1. SR-IOV resources for high-performance POD network interfaces.
 Each section of sriov_resources must have: 
-	pf_name – physical adapter interface name
-	vlan_id – VLAN ID for virtual function interfaces
-	res_name – resource pool name 
-	network_name – network name for annotation in POD YAML configuration 
+	pf_name: physical adapter interface name
+	vlan_id: VLAN ID for virtual function interfaces
+	res_name: resource pool name 
+	network_name: network name for annotation in POD YAML configuration 
 
 Please configure SRIOV interfaces depending on your deployment.
 Below provided sriov_resources example for four interfaces.
