@@ -11,6 +11,7 @@
   - [Slurm](#slurm)
     - [Slurm services](#slurm-services)
     - [MPI traffic](#mpi-traffic)
+  - [Host firewall playbooks (UFW)](#host-firewall-playbooks-ufw)
 
 ## Introduction
 
@@ -106,3 +107,17 @@ In general, the best practice for an MPI compute cluster is to have a separate, 
 This is often best for performance as well, as it removes any source of contention or jitter for the application.
 
 If you are using a single network for both MPI and management traffic, you should generally allow all TCP and UDP traffic between the nodes in the cluster.
+
+## Host firewall playbooks (UFW)
+
+`config.example/playbooks/` has two optional playbooks for Ubuntu hosts:
+
+- `ufw-enable.yml` denies incoming traffic by default and allows the internal cluster subnet
+  (`ufw_cluster_subnet`) and the Docker bridge on every node. Only the head node also
+  allows SSH (`ufw_ssh_port`) and any extra TCP ports (`ufw_extra_tcp_ports`, a port or
+  `start:end` range each). It starts with `ufw --force reset`, so any rule not in these
+  variables is removed on each run.
+- `ufw-disable.yml` stops and disables UFW on all nodes.
+
+Ports published with `docker run -p` bypass UFW, because Docker writes its own iptables
+rules. Bind such ports to `127.0.0.1` or filter them in the `DOCKER-USER` chain.
