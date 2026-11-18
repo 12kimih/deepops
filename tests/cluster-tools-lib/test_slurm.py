@@ -1,5 +1,6 @@
 """Unit tests for clustertools.slurm (roles/cluster_tools_lib), no cluster needed."""
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -78,6 +79,56 @@ class ArrayTests(unittest.TestCase):
         ):
             with self.subTest(spec=spec):
                 self.assertEqual(slurm.array_tasks(spec), n)
+
+
+FIXTURES = Path(__file__).resolve().parents[1] / "cluster-tools/fixtures"
+FIXTURE_FILE = {
+    "nodes": "nodes",
+    "partitions": "partitions",
+    "jobs": "jobs",
+    "jobs_detail": "jobs",
+    "qos": "qos",
+    "associations": "assoc",
+}
+
+
+class SchemaTests(unittest.TestCase):
+    """FIELDS against every Slurm release we keep a fixture for. After an upgrade, a new
+    fixture that fails here names exactly the fields that release renamed."""
+
+    def releases(self):
+        found = sorted(FIXTURES.glob("slurm-*"))
+        self.assertTrue(found, "no fixtures")
+        return found
+
+    def test_every_fixture_has_every_field_the_tools_read(self):
+        for release in self.releases():
+            for kind, name in FIXTURE_FILE.items():
+                with self.subTest(release=release.name, kind=kind):
+                    data = json.loads((release / f"{name}.json").read_text())
+                    slurm.check(kind, data)
+                    self.assertTrue(data[slurm.QUERIES[kind][1]], "fixture has no records")
+
+    def test_every_query_has_fields_and_a_fixture(self):
+        self.assertEqual(set(slurm.QUERIES), set(slurm.FIELDS))
+        self.assertEqual(set(slurm.QUERIES), set(FIXTURE_FILE))
+
+    def test_a_renamed_field_is_named(self):
+        data = json.loads((self.releases()[0] / "jobs.json").read_text())
+        data["meta"]["slurm"]["release"] = "26.05.0"
+        data["jobs"][0]["user"] = data["jobs"][0].pop("user_name")  # as if renamed upstream
+        with self.assertRaises(slurm.SchemaError) as ctx:
+            slurm.check("jobs", data)
+        self.assertIn("Slurm 26.05.0 jobs lack user_name;", str(ctx.exception))
+
+    def test_an_error_inside_the_reply_is_raised(self):
+        data = {"meta": {}, "errors": [{"description": "Unable to contact slurm controller"}], "jobs": []}
+        with self.assertRaisesRegex(slurm.SchemaError, "Unable to contact slurm controller"):
+            slurm.check("jobs", data)
+
+    def test_a_missing_list_is_raised(self):
+        with self.assertRaisesRegex(slurm.SchemaError, "no 'nodes' list"):
+            slurm.check("nodes", {"meta": {}})
 
 
 class FailureTests(unittest.TestCase):
