@@ -127,7 +127,7 @@ power (PSU, BMC sensors, and chassis intrusion as a warning, since it is a latch
 
 The always-firing `Watchdog` alert proves the whole path works. Point
 `alertmanager_heartbeat_url` at an external check (for example a healthchecks.io ping
-URL with a 1 minute period and a few minutes of grace): Alertmanager pings it every minute,
+URL with a 2 minute period and 5 minutes of grace): Alertmanager pings it about every minute,
 and the external service alerts when the pings stop, which covers a dead monitoring host. Without the URL, Watchdog
 is dropped.
 

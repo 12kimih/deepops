@@ -15,11 +15,14 @@ route:
   group_interval: 5m
   repeat_interval: {{ alertmanager_repeat_interval }}
   routes:
+    # Heartbeat about once a minute. A repeat is only sent on a group_interval tick
+    # once repeat_interval has passed, so 1m/1m lands every second tick (2 minutes);
+    # 30s/30s sends on every other 30 s tick, i.e. about every 60 s.
     - matchers: ['alertname="Watchdog"']
       receiver: heartbeat
       group_wait: 0s
-      group_interval: 1m
-      repeat_interval: 1m
+      group_interval: 30s
+      repeat_interval: 30s
     - matchers: ['severity="critical"']
       receiver: slack-critical
       repeat_interval: {{ alertmanager_critical_repeat_interval }}
