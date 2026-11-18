@@ -15,7 +15,23 @@ DeepOps runs a `dcgm-exporter` container on every GPU node. This container expor
 
 ## Exporters
 
-A `node-exporter` and `dcgm-exporter` should be running on every node listed under `slurm-node`:
+Each exporter role writes its scrape targets to `/etc/prometheus/endpoints/` (file_sd), and
+Prometheus adds a `host` label (the target address without its port) so queries and alerts
+can join exporters:
+
+| Exporter | Runs on | Scrape targets | Port |
+|---|---|---|---|
+| `node-exporter` | all hosts | `node_exporter_host_group` (default `slurm-cluster`) | 9100 |
+| `dcgm-exporter` | GPU nodes | `slurm-node` | 9400 |
+| `ipmi-exporter` | hosts with `/dev/ipmi0` | `ipmi_exporter_host_group` (default `slurm-cluster`) | 9290 |
+| `slurm-exporter` | `slurm_monitoring_group` | the same group | 8080 |
+
+`ipmi-exporter` reads the BMC in-band and provides whole-system power draw
+(`ipmi_dcmi_power_consumption_watts`), PSU, fan and temperature sensors. The GPU dashboard
+falls back to it when a node has no ACPI power meter (`node_hwmon_power_average_watt`).
+Install it on its own with `playbooks/slurm-cluster/prometheus-ipmi-exporter.yml`.
+
+The node and GPU exporter containers look like this:
 
 ```bash
 # View the DCGM Exporter container on a GPU node
@@ -28,9 +44,15 @@ PORTS                    NAMES
 
 ## Grafana
 
-The default configuration of Grafana comes with two dashboards. There is a dashboard to monitor Slurm usage and jobs and another GPU dashboard to monitor GPU utilization, power, etc.
+Grafana ships three dashboards in the `Cluster` folder: the GPU dashboard, the Slurm
+dashboard, and Node Exporter Full (grafana.com 1860, revision 46) for per-host detail.
+The Prometheus datasource has the fixed uid `prometheus`.
 
-In order to gain access to Grafana visit the url at http://\<slurm-metric ip\>:3000/. Once the web page loads, the dashboards can be accessed by clicking the dashboards icon on the left and selecting manage. This will bring you to a page listing all available dashboards. Click on a dashboard's name to view it.
+Anonymous visitors get read-only access (`grafana_anonymous_role`). The admin password is
+`grafana_cfg_pass`, enforced on every run even on an existing database; vault a real one in
+`config/`.
+
+In order to gain access to Grafana visit the url at http://\<slurm-metric ip\>:3000/ (`grafana_port`). Once the web page loads, the dashboards can be accessed by clicking the dashboards icon on the left and selecting manage. This will bring you to a page listing all available dashboards. Click on a dashboard's name to view it.
 
 ![Grafana Home](../img/slurm_monitoring_grafana01.png)
 
@@ -88,19 +110,28 @@ In order to make ad-hoc queries Prometheus can be used. Visit Prometheus at http
 
 For more information on constructing Prometheus queries see the official [Prometheus getting started guide](https://prometheus.io/docs/prometheus/latest/querying/basics/).
 
+Data is kept for `prometheus_retention_time` (default `90d`) or until it reaches
+`prometheus_retention_size` (default `50GB`), whichever comes first. Config and rule changes
+are checked with `promtool` before they are written, then applied with a live reload.
+
 ## Alertmanager
 
-The Alertmanager handles alerts sent by client applications such as the Prometheus server, after adding alert rules from Prometheus, you can receive alerts via receivers like email, Slack, etc with Alertmanager.
+Prometheus evaluates the alert rules in `roles/prometheus/files/rules/`, grouped by area:
+targets (host and exporter down), host (disk, inodes, memory, clock, failed systemd units,
+ECC, RAID, NIC errors), GPU (XID, missing GPUs, row remapping, temperature, PCIe replays),
+power (PSU and BMC sensors) and the monitoring stack itself. Add site rules with
+`prometheus_extra_rule_files`. Check rule state at http://\<slurm-metric ip\>:9090/alerts.
 
-Describes how to configure Alertmanager.
+Alertmanager groups alerts by `alertname` and `host`, repeats unresolved ones every
+`alertmanager_repeat_interval` (critical: `alertmanager_critical_repeat_interval`), and
+suppresses every other alert on a host while `HostDown` fires for it. To send alerts to
+Slack, create an incoming webhook and set (vaulted) in `config/`:
 
-* Configure the desired [receiver](https://prometheus.io/docs/alerting/latest/configuration/#receiver) in Alertmanager configuration yml. (slack, email, etc)
-* Configure the desired [rules](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) in Prometheus alert rules yml.
-  * Alerting rules allow you to define alert conditions based on Prometheus expression language expressions and to send notifications about firing alerts to an external service.
-  * Visit http://\<slurm-metric ip\>:9090/alerts to check the status of rules 
-  ![Prometheus alert rules](../img/slurm_monitoring_alertmanager01.png)
+```yaml
+alertmanager_slack_api_url: "https://hooks.slack.com/services/..."
+alertmanager_slack_channel: "#alerts"
+alertmanager_slack_critical_mention: "<!subteam^S0123ABCD>"   # optional
+```
 
-Visit http://\<slurm-metric ip\>:9093 for checking and setting about alerting.
-![Alertmanager](../img/slurm_monitoring_alertmanager02.png)
-
-For more information on constructing Alertmanager alerting see the official [Alertmanager](https://prometheus.io/docs/alerting/latest/alertmanager/).
+The config is checked with `amtool` before it is written. Visit
+http://\<slurm-metric ip\>:9093 to view and silence alerts.
