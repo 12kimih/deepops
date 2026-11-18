@@ -154,5 +154,24 @@ class GuardTest(unittest.TestCase):
             self.assertEqual(self.guard("tree")[0], 2, bad)
 
 
+class HookManifestTest(unittest.TestCase):
+    """The published hooks (.pre-commit-hooks.yaml) and this repository's own local hooks
+    must run the guard the same way."""
+
+    def test_local_hooks_match_published_hooks(self):
+        import yaml
+        root = GUARD.parents[2]
+        published = {h["id"]: h for h in yaml.safe_load((root / ".pre-commit-hooks.yaml").read_text())}
+        config = yaml.safe_load((root / ".pre-commit-config.yaml").read_text())
+        local = {h["id"]: h for repo in config["repos"] if repo["repo"] == "local" for h in repo["hooks"]
+                 if h["id"].startswith("sensitive-guard")}
+        self.assertTrue(local)
+        for hook_id, hook in local.items():
+            self.assertIn(hook_id, published)
+            for key in ("entry", "pass_filenames", "always_run"):
+                self.assertEqual(hook.get(key), published[hook_id].get(key), f"{hook_id} {key}")
+            self.assertEqual(hook.get("stages", ["pre-commit"]), published[hook_id]["stages"], hook_id)
+
+
 if __name__ == "__main__":
     unittest.main()
