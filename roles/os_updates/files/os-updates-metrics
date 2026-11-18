@@ -26,7 +26,13 @@ publish() {
 if $publish_only; then publish; exit 0; fi
 
 now=$(date +%s)
-plan=$(apt-get -s -q -o Debug::NoLocking=1 dist-upgrade 2>/dev/null | grep '^Inst ' || true)
+# A package left half-installed or half-configured (an interrupted upgrade) makes
+# dpkg refuse every later change, security updates included, without telling anyone.
+dpkg_problems=$(dpkg --audit 2>/dev/null | grep -c '^ ' || true)
+# If apt cannot simulate the upgrade the counts below mean nothing: report that
+# instead of "0 pending".
+if sim=$(apt-get -s -q -o Debug::NoLocking=1 dist-upgrade 2>/dev/null); then apt_ok=1; else apt_ok=0; fi
+plan=$(printf '%s\n' "$sim" | grep '^Inst ' || true)
 all=$(printf '%s\n' "$plan" | grep -c '^Inst ' || true)
 security=$(printf '%s\n' "$plan" | grep -c -- '-security' || true)
 if [ "$security" -gt 0 ]; then
@@ -56,6 +62,12 @@ os_updates_reboot_required $reboot
 # HELP os_updates_reboot_required_since_seconds When the reboot was first asked for (0 = not asked).
 # TYPE os_updates_reboot_required_since_seconds gauge
 os_updates_reboot_required_since_seconds $reboot_since
+# HELP os_updates_dpkg_problems Packages dpkg --audit reports half-installed or half-configured.
+# TYPE os_updates_dpkg_problems gauge
+os_updates_dpkg_problems $dpkg_problems
+# HELP os_updates_apt_ok Whether apt could simulate the upgrade (0: the counts above are not valid).
+# TYPE os_updates_apt_ok gauge
+os_updates_apt_ok $apt_ok
 # HELP os_updates_metrics_timestamp_seconds When these metrics were measured.
 # TYPE os_updates_metrics_timestamp_seconds gauge
 os_updates_metrics_timestamp_seconds $now
