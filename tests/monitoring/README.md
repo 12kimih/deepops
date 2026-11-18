@@ -17,7 +17,7 @@ checks use the deployed version. Without promtool or docker the tests are skippe
 
 ## GPU Nodes dashboard checks
 
-The checks load `src/dashboards/gpu-dashboard.json`, check every exporter
+The checks load `src/dashboards/gpu-nodes.json`, check every exporter
 selector, and execute the variable queries and all panel expressions using
 `promtool test rules`. Fixtures cover Kubernetes exporters at different IPs
 (and non-default ports), Slurm hostname inventories with short OS hostnames,

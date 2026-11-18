@@ -1,0 +1,42 @@
+---
+# Install one role's dashboards into its own directory under the provisioning path and
+# remove any file there that the role no longer ships; Grafana then deletes that
+# dashboard too (the provider allows deletion). Each role owns only its directory, so
+# roles never remove each other's dashboards. Provisioned dashboards reload on their
+# own; no restart is needed.
+#   ansible.builtin.include_role:
+#     name: grafana
+#     tasks_from: dashboards
+#   vars:
+#     grafana_dashboard_set: slurm
+#     grafana_dashboard_files: ["{{ role_path }}/files/slurm-scheduler.json"]
+- name: Create the dashboard directory ({{ grafana_dashboard_set }})
+  ansible.builtin.file:
+    path: "{{ grafana_cfg_dashboard_path }}/{{ grafana_dashboard_set }}"
+    state: directory
+    owner: "{{ grafana_user_id }}"
+    mode: "0755"
+
+- name: Install dashboards ({{ grafana_dashboard_set }})
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ grafana_cfg_dashboard_path }}/{{ grafana_dashboard_set }}/{{ item | basename }}"
+    owner: "{{ grafana_user_id }}"
+    mode: "0644"
+  loop: "{{ grafana_dashboard_files }}"
+
+- name: Find installed dashboards ({{ grafana_dashboard_set }})
+  ansible.builtin.find:
+    paths: "{{ grafana_cfg_dashboard_path }}/{{ grafana_dashboard_set }}"
+    patterns: "*.json"
+  register: grafana_dashboard_installed
+
+- name: Remove dashboards no longer shipped ({{ grafana_dashboard_set }})
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ grafana_dashboard_installed.files | map(attribute='path') | reject('in', grafana_dashboard_wanted) }}"
+  vars:
+    grafana_dashboard_wanted: >-
+      {{ grafana_dashboard_files | map('basename')
+         | map('regex_replace', '^', grafana_cfg_dashboard_path ~ '/' ~ grafana_dashboard_set ~ '/') | list }}

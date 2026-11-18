@@ -3,9 +3,3 @@
   ansible.builtin.service:
     name: "{{ slurm_exporter_svc_name }}"
     state: restarted
-
-- name: Restart grafana
-  ansible.builtin.service:
-    name: "{{ grafana_svc_name }}"
-    state: restarted
-  failed_when: false

@@ -5,7 +5,9 @@ providers:
   - name: deepops
     folder: '{{ grafana_dashboard_folder }}'
     type: file
-    disableDeletion: true
+    # The files are the source of truth: a dashboard whose file is removed is deleted,
+    # and edits in the UI cannot be saved over a provisioned one.
+    disableDeletion: false
     allowUiUpdates: false
     options:
       path: {{ grafana_cfg_dashboard_path }}
