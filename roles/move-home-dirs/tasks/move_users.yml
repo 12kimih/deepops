@@ -8,12 +8,23 @@
     mode: "0755"
     state: directory
 
+# A fresh, private (0700) directory per run on the control host. A fixed /tmp path
+# could be created first by another user, whose key would then get passwordless sudo.
+- name: Create a private directory for the temporary user's key
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: -move-home-dirs
+  register: tmp_user_key_dir
+  delegate_to: 127.0.0.1
+  become: false
+  run_once: true
+
 - name: Set key path
   ansible.builtin.set_fact:
-    tmp_user_key_path: /tmp/ssh-key-for-ansible-move-home-dirs
+    tmp_user_key_path: "{{ tmp_user_key_dir.path }}/id_ed25519"
 
 - name: Generate key for temporary user
-  ansible.builtin.command: ssh-keygen -q -t rsa -f "{{ tmp_user_key_path }}" -C "" -N ""
+  ansible.builtin.command: ssh-keygen -q -t ed25519 -f "{{ tmp_user_key_path }}" -C "" -N ""
   args:
     creates: "{{ tmp_user_key_path }}"
   delegate_to: 127.0.0.1
@@ -32,51 +43,64 @@
     name: "{{ tmp_user }}"
     home: "{{ move_home_dirs_new_root }}/{{ tmp_user }}"
 
-- name: Add new key for temporary user
-  ansible.posix.authorized_key:
-    user: "{{ tmp_user }}"
-    key: "{{ lookup('file', tmp_user_key_path + '.pub') }}"
+# Everything that grants the temporary user access runs in a block whose `always`
+# takes it away again, so a failure part-way never leaves passwordless sudo behind.
+- name: Move the home directories as a temporary user
+  block:
+    - name: Add new key for temporary user
+      ansible.posix.authorized_key:
+        user: "{{ tmp_user }}"
+        key: "{{ lookup('file', tmp_user_key_path + '.pub') }}"
 
-- name: Grant sudo to temporary user
-  ansible.builtin.copy:
-    content: "{{ tmp_user }} ALL=(ALL) NOPASSWD:ALL\n"
-    dest: "/etc/sudoers.d/{{ tmp_user }}"
-    owner: root
-    group: root
-    mode: "0440"
-    validate: "visudo -cf %s"
+    - name: Grant sudo to temporary user
+      ansible.builtin.copy:
+        content: "{{ tmp_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        dest: "/etc/sudoers.d/{{ tmp_user }}"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -cf %s"
 
-# Useful for slurm clusters
-- name: Grant SSH access to temporary user
-  ansible.builtin.lineinfile:
-    path: /etc/localusers
-    line: "{{ tmp_user }}"
-    create: true
-    mode: "0644"
+    # Useful for slurm clusters
+    - name: Grant SSH access to temporary user
+      ansible.builtin.lineinfile:
+        path: /etc/localusers
+        line: "{{ tmp_user }}"
+        create: true
+        mode: "0644"
 
-- name: Move each user
-  ansible.builtin.include_tasks: move_user.yml
-  vars:
-    ansible_user: "{{ tmp_user }}"
-    ansible_ssh_private_key_file: "{{ tmp_user_key_path }}"
-  loop: "{{ user_list.stdout_lines }}"
-  loop_control:
-    loop_var: user
+    - name: Move each user
+      ansible.builtin.include_tasks: move_user.yml
+      vars:
+        ansible_user: "{{ tmp_user }}"
+        ansible_ssh_private_key_file: "{{ tmp_user_key_path }}"
+      loop: "{{ user_list.stdout_lines }}"
+      loop_control:
+        loop_var: user
 
-- name: Revoke SSH access from temporary user
-  ansible.builtin.lineinfile:
-    path: /etc/localusers
-    line: "{{ tmp_user }}"
-    state: absent
+  always:
+    - name: Revoke SSH access from temporary user
+      ansible.builtin.lineinfile:
+        path: /etc/localusers
+        line: "{{ tmp_user }}"
+        state: absent
 
-- name: Revoke sudo for temporary user
-  ansible.builtin.file:
-    path: "/etc/sudoers.d/{{ tmp_user }}"
-    state: absent
+    - name: Revoke sudo for temporary user
+      ansible.builtin.file:
+        path: "/etc/sudoers.d/{{ tmp_user }}"
+        state: absent
 
-- name: Delete temporary user
-  ansible.builtin.user:
-    name: "{{ tmp_user }}"
-    state: absent
-    remove: true
-    force: true
+    - name: Delete temporary user
+      ansible.builtin.user:
+        name: "{{ tmp_user }}"
+        state: absent
+        remove: true
+        force: true
+
+    - name: Remove the temporary user's key from the control host
+      ansible.builtin.file:
+        path: "{{ tmp_user_key_dir.path }}"
+        state: absent
+      delegate_to: 127.0.0.1
+      become: false
+      run_once: true
