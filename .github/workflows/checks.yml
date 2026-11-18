@@ -1,0 +1,33 @@
+---
+# Every repository check, from scripts/check.sh, with the pinned tool versions.
+name: checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install the tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.3
+          python3 -m pip install -r requirements-dev.txt
+
+      - name: Install the Galaxy requirements
+        run: ansible-galaxy collection install -r roles/requirements.yml -p collections
+
+      - name: Run every check
+        run: scripts/check.sh

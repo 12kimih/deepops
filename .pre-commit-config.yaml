@@ -2,14 +2,12 @@
 # pre-commit configuration for DeepOps
 # https://pre-commit.com
 #
-# One-time setup:
-#   pip install pre-commit
-#   pre-commit install
-# Run against the whole tree:
-#   pre-commit run --all-files
+# scripts/setup.sh installs the hook. The checks are scripts/check.sh --fast, run
+# with the tools of the DeepOps virtualenv, so their versions come from
+# requirements-dev.txt alone. CI runs the full scripts/check.sh.
 minimum_pre_commit_version: "3.5.0"
 
-# Vendored / generated / site-specific trees are never linted here.
+# Vendored / generated / site-specific trees are never checked here.
 exclude: |
   (?x)^(
     submodules/|
@@ -33,22 +31,11 @@ repos:
         args: ["--allow-multiple-documents"]
         exclude: '(\.j2$|/templates/)'
 
-  - repo: https://github.com/adrienverge/yamllint
-    rev: v1.38.0
-    hooks:
-      - id: yamllint
-        # Uses the project .yamllint; fails only on error-level rules.
-
-  # ansible-lint is pinned to the same versions as the CI job so local and CI
-  # results match. Runs once over the project (config-driven, see .ansible-lint).
   - repo: local
     hooks:
-      - id: ansible-lint
-        name: ansible-lint
-        entry: ansible-lint
-        language: python
-        additional_dependencies:
-          - "ansible-lint==26.1.1"
-          - "ansible==10.7.0"
+      - id: deepops-check
+        name: scripts/check.sh --fast
+        entry: scripts/check.sh --fast
+        language: system
         pass_filenames: false
         always_run: true
