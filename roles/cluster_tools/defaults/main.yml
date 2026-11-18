@@ -70,7 +70,7 @@ cluster_tools_motd_file: 20-cluster-tools
 # stops, disables and masks the timer and its service, sets ENABLED=0 for the banner
 # fragment, and clears a failed run, which on a host without internet access is
 # otherwise a permanently failed unit that alerts on systemd failures keep reporting.
-# Hosts without motd-news are skipped.
+# Hosts without the motd-news units are skipped.
 cluster_tools_motd_news: true
 
 # Per-user resource limits, written as a drop-in on systemd's user-.slice so they apply
