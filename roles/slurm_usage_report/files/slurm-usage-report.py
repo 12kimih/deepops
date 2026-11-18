@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Post a Slurm GPU usage report to Slack and notify owners of idle GPU jobs.
 
-Reads running jobs from scontrol, per-GPU utilisation from Prometheus (dcgm-exporter)
-and node state from sinfo. Posts a summary card with the detail in its thread, and
+Reads jobs and node state from Slurm's JSON output, per-GPU utilisation from
+Prometheus (dcgm-exporter). Posts a summary card with the detail in its thread, and
 mentions (or DMs) the owner of each job whose GPUs all stayed idle for the whole
 window. Can optionally cancel jobs idle for longer. Standard library only.
 """
@@ -50,90 +50,111 @@ def hostnames(nodelist):
     return _hostnames[nodelist]
 
 
-def seconds(runtime):
-    """Slurm '[D-]HH:MM:SS' or 'MM:SS' -> seconds."""
-    days, _, clock = runtime.rpartition("-")
-    parts = [int(p) for p in clock.split(":")]
-    while len(parts) < 3:
-        parts.insert(0, 0)
-    return int(days or 0) * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
-
-
 def duration(secs):
     days, rest = divmod(int(secs), 86400)
     clock = f"{rest // 3600}:{rest % 3600 // 60:02d}:{rest % 60:02d}"
     return f"{days}-{clock}" if days else clock
 
 
-def field(line, key):
-    m = re.search(rf"(?:^| ){key}=(\S*)", line)
-    return m.group(1) if m else ""
+# Slurm is read through its JSON output only: free-text fields such as job names are
+# plain values there, so they can never pose as other fields.
+GPU_DETAIL = re.compile(r"gpu(?::([^:,(]+))?(?::\d+)?\(IDX:([^)]+)\)")
+GPU_REQUESTED = re.compile(r"(?:^|,)gres/gpu=(\d+)")
+GPU_CONFIGURED = re.compile(r"gpu(?::[^:,(]+)?:(\d+)")
 
 
-def parse_jobs(text):
-    """Running jobs from `scontrol show job -d -o`, with the GPUs each holds."""
-    jobs = []
-    for line in text.splitlines():
-        if field(line, "JobState") != "RUNNING":
-            continue
-        gpus, types = [], set()
-        for nodes, gres in re.findall(r" Nodes=(\S+) CPU_IDs=\S+ Mem=\S+ GRES=(\S*)", line):
-            for gtype, spec in re.findall(r"gpu(?::([^:,(]+))?(?::\d+)?\(IDX:([^)]+)\)", gres):
-                if gtype:
-                    types.add(gtype)
-                gpus.extend((host, i) for host in hostnames(nodes) for i in expand_ranges(spec))
-        array, task = field(line, "ArrayJobId"), field(line, "ArrayTaskId")
-        jobs.append({
-            "id": field(line, "JobId"),
-            "label": f"{array}_{task}" if array and task else field(line, "JobId"),
-            "user": field(line, "UserId").split("(")[0],
-            "partition": field(line, "Partition"),
-            "qos": field(line, "QOS"),
-            "runtime": seconds(field(line, "RunTime")),
-            "gpus": gpus,
-            "gpu_type": ",".join(sorted(types)),
-        })
-    return jobs
+def num(value):
+    """Slurm JSON numbers: {"set", "infinite", "number"} objects or plain ints."""
+    if isinstance(value, dict):
+        return value["number"] if value.get("set") and not value.get("infinite") else None
+    return value
 
 
-def parse_nodes(text):
-    """{node: gpu count} from `sinfo -h -N -o %n|%G`; a node in several partitions counts once."""
-    nodes = {}
-    for line in text.splitlines():
-        name, gres = line.split("|", 1)
-        nodes[name] = sum(int(n) for n in re.findall(r"gpu(?::[^:,(]+)?:(\d+)", gres))
-    return nodes
+def job_label(job):
+    array, task = num(job.get("array_job_id")), num(job.get("array_task_id"))
+    return f"{array}_{task}" if array and task is not None else str(job["job_id"])
 
 
-def parse_reasons(text):
-    """[(node, state, since, user, reason)] from `sinfo -h -R -o %n|%T|%H|%u|%E`."""
-    return sorted(tuple(line.split("|", 4)) for line in text.splitlines())
+def job_gpus(job):
+    """[(host, index)] and GPU types from gres_detail, one entry per allocated node."""
+    hosts, details = hostnames(job.get("nodes") or ""), job.get("gres_detail") or []
+    if details and len(details) != len(hosts):
+        print(f"job {job['job_id']}: {len(details)} GRES entries for {len(hosts)} nodes; "
+              "GPUs not attributed", file=sys.stderr)
+        return [], set()
+    gpus, types = [], set()
+    for host, detail in zip(hosts, details):
+        for gtype, spec in GPU_DETAIL.findall(detail):
+            if gtype:
+                types.add(gtype)
+            gpus.extend((host, i) for i in expand_ranges(spec))
+    return gpus, types
 
 
-def parse_pending(text, now):
-    """Per user from `squeue -h -t PD -o %u|%D|%b|%V|%r`: jobs, GPUs, reasons, longest wait."""
-    users = defaultdict(lambda: {"jobs": 0, "gpus": 0, "reasons": Counter(), "wait": 0})
-    for line in text.splitlines():
-        user, nnodes, tres, submit, reason = line.split("|", 4)
-        per_node = sum(int(n) for n in re.findall(r"gpu(?::[^:,]+)?:(\d+)", tres))
-        entry = users[user]
-        entry["jobs"] += 1
-        entry["gpus"] += per_node * int(nnodes or 1)
-        entry["reasons"][reason] += 1
-        try:
-            entry["wait"] = max(entry["wait"], now - datetime.fromisoformat(submit).timestamp())
-        except ValueError:
-            pass
-    return dict(users)
+def parse_jobs(data, now):
+    """Running jobs with the GPUs each holds, and pending jobs per user, from
+    `scontrol -d --json show job`."""
+    running = []
+    pending = defaultdict(lambda: {"jobs": 0, "gpus": 0, "reasons": Counter(), "wait": 0})
+    for job in data["jobs"]:
+        state = job.get("job_state") or []
+        if "RUNNING" in state:
+            gpus, types = job_gpus(job)
+            running.append({
+                "id": str(job["job_id"]),
+                "label": job_label(job),
+                "user": job["user_name"],
+                "partition": job.get("partition", ""),
+                "qos": job.get("qos", ""),
+                "runtime": max(0, now - (num(job.get("start_time")) or now)),
+                "gpus": gpus,
+                "gpu_type": ",".join(sorted(types)),
+            })
+        elif "PENDING" in state:
+            entry = pending[job["user_name"]]
+            entry["jobs"] += 1
+            entry["gpus"] += sum(int(n) for n in GPU_REQUESTED.findall(job.get("tres_req_str") or ""))
+            entry["reasons"][job.get("state_reason") or "None"] += 1
+            submit = num(job.get("submit_time"))
+            if submit:
+                entry["wait"] = max(entry["wait"], now - submit)
+    return running, dict(pending)
+
+
+def node_state(flags):
+    """Short state of an unavailable node from its Slurm state flags, else None."""
+    if "DOWN" in flags:
+        return "down"
+    if "FAIL" in flags:
+        return "fail"
+    if "DRAIN" in flags:
+        busy = {"ALLOCATED", "MIXED", "COMPLETING"} & set(flags)
+        return "draining" if busy else "drained"
+    return None
+
+
+def parse_nodes(data):
+    """({node: gpu count}, [(node, state, since, user, reason)]) from `scontrol --json show nodes`."""
+    gpus, unavailable = {}, []
+    for node in data["nodes"]:
+        gpus[node["name"]] = sum(int(n) for n in GPU_CONFIGURED.findall(node.get("gres") or ""))
+        state = node_state(node.get("state") or [])
+        if state:
+            changed = num(node.get("reason_changed_at"))
+            since = datetime.fromtimestamp(changed).isoformat(timespec="seconds") if changed else ""
+            unavailable.append((node["name"], state, since, node.get("reason_set_by_user") or "",
+                                node.get("reason") or ""))
+    return gpus, sorted(unavailable)
+
+
+def slurm_json(*args):
+    return json.loads(run("scontrol", *args))
 
 
 def collect_slurm(now):
-    return {
-        "jobs": parse_jobs(run("scontrol", "show", "job", "-d", "-o")),
-        "nodes": parse_nodes(run("sinfo", "-h", "-N", "-o", "%n|%G")),
-        "reasons": parse_reasons(run("sinfo", "-h", "-R", "-o", "%n|%T|%H|%u|%E")),
-        "pending": parse_pending(run("squeue", "-h", "-t", "PD", "-o", "%u|%D|%b|%V|%r"), now),
-    }
+    jobs, pending = parse_jobs(slurm_json("-d", "--json", "show", "job"), now)
+    nodes, reasons = parse_nodes(slurm_json("--json", "show", "nodes"))
+    return {"jobs": jobs, "nodes": nodes, "reasons": reasons, "pending": pending}
 
 
 # --- Prometheus -----------------------------------------------------------------
