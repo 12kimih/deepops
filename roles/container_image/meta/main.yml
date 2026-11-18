@@ -1,0 +1,4 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: container_image

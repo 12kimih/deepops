@@ -11,7 +11,6 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
-ExecStartPre=/usr/bin/docker pull {{ node_exporter_container }}
 ExecStart=/usr/bin/docker run --rm --network host --pid=host --cpus={{ node_exporter_max_cpu }} --name %n \
   -v /:/host:ro,rslave \
   -v {{ node_exporter_prom_dir }}:{{ node_exporter_prom_dir }}:ro \

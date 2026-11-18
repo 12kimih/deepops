@@ -1,6 +1,8 @@
 ---
 nvidia_dcgm_container_version: "4.5.3-4.8.2-distroless"
-nvidia_dcgm_container: "nvcr.io/nvidia/k8s/dcgm-exporter:{{ nvidia_dcgm_container_version }}"
+# The digest pins exactly what runs; change it together with the version.
+nvidia_dcgm_container_digest: "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc"
+nvidia_dcgm_container: "nvcr.io/nvidia/k8s/dcgm-exporter:{{ nvidia_dcgm_container_version }}@{{ nvidia_dcgm_container_digest }}"
 # Host port the dcgm-exporter is published on; single source of truth for the
 # published port (-p) and its scrape target (the container listens on 9400).
 nvidia_dcgm_exporter_port: 9400

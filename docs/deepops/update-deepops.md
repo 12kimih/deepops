@@ -480,7 +480,9 @@ For the single system-wide toolkit instead (`nvidia_cuda_install: true`), set th
 
 #### Updating the monitoring stack (excluding dcgm-exporter)
 
-The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by a variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `slurm_exporter_container` and `node_exporter_container`. Each systemd unit pulls its image when it starts, so an upgrade is a new tag in your DeepOps configuration, a re-run of the playbook, and a restart of the unit.
+The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by tag and digest (`repo:tag@sha256:...`) in a variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `node_exporter_container`, `ipmi_exporter_container` and `nvidia_dcgm_container` (from `nvidia_dcgm_container_version` and `nvidia_dcgm_container_digest`). The playbooks pull the pinned image at deploy time (`roles/container_image`, which refuses an unpinned reference); the units only run the local image and never pull when they start, so a moved tag or a registry outage cannot change or break a restart. `slurm_exporter_container` is built locally from a Dockerfile whose base images are pinned the same way.
+
+To upgrade, set the new tag and its digest (`docker buildx imagetools inspect repo:tag` prints it) in your DeepOps configuration and re-run the playbook. The image reference is part of the unit file, so a new pin changes the unit and the playbook restarts the service.
 
 From the provisioning node:
 
@@ -492,24 +494,13 @@ ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/prometheus-slu
 ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
 ```
 
-Then restart the units whose image changed -- on the monitoring host:
-
-```bash
-systemctl restart docker.prometheus docker.grafana docker.alertmanager docker.slurm-exporter
-```
-
-and on every node, for the node exporter:
-
-```bash
-systemctl restart docker.node-exporter
-```
-
 #### Updating dcgm-exporter
 
-For the NVIDIA DCGM Exporter, we do pin a particular version of the container. To update to a newer version, edit your DeepOps configuration to specify a new container tag:
+For the NVIDIA DCGM Exporter, the version and its digest are pinned together. To update, set both in your DeepOps configuration:
 
 ```
 nvidia_dcgm_container_version: "4.5.3-4.8.2-distroless"
+nvidia_dcgm_container_digest: "sha256:<digest of that tag>"
 ```
 
 Then re-run the playbook:

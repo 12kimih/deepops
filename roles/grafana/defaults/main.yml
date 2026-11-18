@@ -3,7 +3,7 @@ grafana_config_dir: /etc/grafana
 grafana_config_template: templates/grafana.ini.j2
 grafana_data_dir: /var/lib/grafana
 grafana_user_id: 472
-grafana_container: "grafana/grafana:13.2.4"
+grafana_container: "grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f"
 grafana_svc_name: "docker.grafana.service"
 grafana_state: started
 grafana_enabled: true
