@@ -272,6 +272,7 @@
   slurm_accounting:
     spec: "{{ lookup('ansible.builtin.file', slurm_accounting_file) | from_yaml }}"
     sacctmgr: "{{ slurm_install_prefix }}/bin/sacctmgr"
+    prune: "{{ slurm_accounting_prune }}"
     priority_flags: "{{ (_slurm_priority.PriorityFlags | default('')).split(',') | select | list }}"
     priority_weights:
       qos: "{{ _slurm_priority.PriorityWeightQOS | default(0) }}"

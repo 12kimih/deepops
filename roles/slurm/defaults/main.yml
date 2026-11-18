@@ -110,6 +110,10 @@ slurm_job_submit_template: ""
 # config.example/files/slurm/accounting.yml); the controller converges the accounting
 # database to it with the slurm_accounting module. Empty = accounting is not managed.
 slurm_accounting_file: ""
+# Also delete the QoS, accounts and associations the file does not list. Off by default:
+# they are reported, and a run with -e slurm_accounting_prune=true --check --diff shows
+# exactly what would go.
+slurm_accounting_prune: false
 
 # job_submit plugin (empty = none; "lua" deploys the job_submit.lua you supply via
 # slurm_job_submit_template). All other slurm.conf tuning belongs in your own complete
