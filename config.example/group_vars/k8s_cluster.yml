@@ -57,8 +57,8 @@ nfs_exports:
 # Container registry                                                           #
 ################################################################################
 kube_enable_container_registry: false
-docker_insecure_registries: "{{ groups['kube_control_plane']|map('regex_replace', '^(.*)$', '\\1:5000')|list + ['registry.local:31500']}}"
-crio_insecure_registries: "{{ groups['kube_control_plane']|map('regex_replace', '^(.*)$', '\\1:5000')|list + ['registry.local:31500']}}"
+docker_insecure_registries: "{{ groups['kube_control_plane'] | map('regex_replace', '^(.*)$', '\\1:5000') | list + ['registry.local:31500'] }}"
+crio_insecure_registries: "{{ groups['kube_control_plane'] | map('regex_replace', '^(.*)$', '\\1:5000') | list + ['registry.local:31500'] }}"
 docker_registry_mirrors: "{{ groups['kube_control_plane'] | map('regex_replace', '^(.*)$', 'http://\\1:5000') | list }}"
 
 # TODO: The presence of an insecure local containerd registry in K8s v1.24+ seems to be causing an issue, add support for this back when the issue is fixed

@@ -13,7 +13,7 @@
     # ansible_local['gpus']['count'] comes from lspci, so it reports the GPUs the
     # node has even while the Slurm login setup hides them from ssh sessions.
     - name: install custom facts
-      include_role:
+      ansible.builtin.include_role:
         name: facts
 
     # nvidia-smi runs in a transient unit so the probe also works on nodes where
@@ -26,7 +26,7 @@
     # Only a real mode counts: 'grep -v N/A' also matched warnings and notices
     # nvidia-smi prints alongside the values.
     - name: check for MIG capable devices
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         mig_mode=$(systemd-run --wait --pipe --collect --quiet -- \
           nvidia-smi --query-gpu=mig.mode.current --format=csv,noheader) || exit 2
@@ -42,7 +42,7 @@
     # ansible_local['gpus']['count'] comes from lspci, so a node with no NVIDIA
     # hardware at all still passes through untouched.
     - name: fail when the MIG capability probe could not run
-      fail:
+      ansible.builtin.fail:
         msg: >-
           Could not read the MIG mode of the GPUs on this node.
           nvidia-smi is unavailable or did not answer, while lspci reports
@@ -71,7 +71,7 @@
     # isolation from the ssh cgroup. A failure here is left unhandled on purpose:
     # a MIG layout that could not be applied must not pass as applied.
     - name: Apply MIG configuration
-      command: >-
+      ansible.builtin.command: >-
         systemd-run --wait --pipe --collect --quiet --
         nvidia-mig-parted apply -f {{ mig_manager_config }}
         -c {{ mig_manager_profile }}
@@ -94,7 +94,7 @@
         - has_mig.rc == 0
 
     - name: Assert MIG configuration was applied
-      command: >-
+      ansible.builtin.command: >-
         systemd-run --wait --pipe --collect --quiet --
         nvidia-mig-parted assert -f {{ mig_manager_config }}
         -c {{ mig_manager_profile }}

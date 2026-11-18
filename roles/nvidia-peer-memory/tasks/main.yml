@@ -7,7 +7,7 @@
 # Driver R470.42.01 and later ship nvidia_peermem in-tree. On those
 # systems the out-of-tree nv_peer_mem DKMS module does not exist.
 - name: Check for in-tree nvidia_peermem module
-  command: modinfo nvidia_peermem
+  ansible.builtin.command: modinfo nvidia_peermem
   register: nvidia_peermem_info
   failed_when: false
   changed_when: false
@@ -25,22 +25,22 @@
     - nvidia_peermem_info.rc | default(1) == 0
   block:
     - name: Populate service facts
-      service_facts:
+      ansible.builtin.service_facts:
 
     - name: Stop and disable legacy nv_peer_mem service
-      service:
+      ansible.builtin.service:
         name: nv_peer_mem
         state: stopped
         enabled: false
       when: "'nv_peer_mem.service' in ansible_facts.services"
 
     - name: Unload legacy nv_peer_mem module
-      modprobe:
+      community.general.modprobe:
         name: nv_peer_mem
         state: absent
 
     - name: Load in-tree nvidia_peermem
-      modprobe:
+      community.general.modprobe:
         name: nvidia_peermem
         state: present
 

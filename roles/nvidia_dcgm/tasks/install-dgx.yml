@@ -3,11 +3,11 @@
 # unversioned 3.x metapackage from the CUDA repo; converge on the package
 # DGX OS expects and remove packages from the other series first.
 - name: gather package facts
-  package_facts:
+  ansible.builtin.package_facts:
     manager: auto
 
 - name: fail when this DGX OS release has no known DCGM package
-  fail:
+  ansible.builtin.fail:
     msg: >-
       No DCGM package is mapped for {{ ansible_distribution }}
       {{ ansible_distribution_version }} on DGX; set dcgm_dgx_pkg_name to
@@ -15,7 +15,7 @@
   when: dcgm_dgx_pkg_name | length == 0
 
 - name: collect installed DCGM packages from the other series
-  set_fact:
+  ansible.builtin.set_fact:
     dcgm_dgx_conflicting_pkgs: >-
       {{ (_dcgm_installed | reject('match', _dcgm_v4_re) | list)
          if (dcgm_dgx_pkg_name is match(_dcgm_v4_re))
@@ -25,13 +25,13 @@
     _dcgm_v4_re: '^datacenter-gpu-manager-4(-|$)'
 
 - name: remove DCGM packages from the other series
-  package:
+  ansible.builtin.package:
     name: "{{ dcgm_dgx_conflicting_pkgs }}"
     state: absent
   when: dcgm_dgx_conflicting_pkgs | length > 0
 
 - name: install the DCGM package shipped by DGX OS
-  package:
+  ansible.builtin.package:
     name: "{{ dcgm_dgx_pkg_name }}"
     state: present
   when: dcgm_dgx_pkg_name not in ansible_facts.packages

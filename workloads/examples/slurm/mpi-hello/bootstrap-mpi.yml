@@ -4,7 +4,7 @@
   become: true
   tasks:
   - name: install openmpi packages
-    apt:
+    ansible.builtin.apt:
       name: "{{ item }}"
     with_items:
     - openmpi-bin
