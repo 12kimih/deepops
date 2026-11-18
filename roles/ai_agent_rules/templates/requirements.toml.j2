@@ -1,0 +1,5 @@
+{{ ansible_managed | comment }}
+# Codex admin requirements; the developer instructions are the site's AI agent rules.
+# A JSON string written without ASCII escaping is a valid TOML basic string; with it,
+# characters outside the BMP become UTF-16 surrogate escapes, which TOML rejects.
+additional_developer_instructions = {{ ai_agent_rules_text | to_json(ensure_ascii=false) }}

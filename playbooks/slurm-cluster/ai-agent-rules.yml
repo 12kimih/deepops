@@ -1,6 +1,6 @@
 ---
 # Give AI coding agents on every node the site's agent rules (roles/ai_agent_rules).
-# No-op until ai_agent_rules_url is set in config/group_vars.
+# No-op until ai_agent_rules_url and its pinned ai_agent_rules_sha256 are set.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   tags:
