@@ -10,9 +10,9 @@ import os
 import pwd
 import sys
 
-from clustertools import slurm
-from clustertools.cli import Command, Opt, run_main
-from clustertools.render import Grid, width
+from . import slurm
+from .cli import Command, Opt, run_main
+from .render import Grid, width
 
 BAR = 6  # quota bar width; shrinks to fit, then goes
 BAR_MIN = 3

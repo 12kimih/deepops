@@ -1,20 +1,45 @@
 ---
-- name: Create the cluster Python library directory
+- name: Create the clustertools package directory
   ansible.builtin.file:
-    path: "{{ cluster_tools_lib_dir }}"
+    path: "{{ cluster_tools_lib_dir }}/clustertools"
     state: directory
     owner: root
     group: root
     mode: "0755"
 
+# The package is its modules, nothing else: a copy of the directory would also ship
+# the controller's __pycache__ (bytecode of whichever Python ran the tests there).
 - name: Publish the clustertools package
   ansible.builtin.copy:
-    src: clustertools
-    dest: "{{ cluster_tools_lib_dir }}/"
+    src: "{{ item }}"
+    dest: "{{ cluster_tools_lib_dir }}/clustertools/"
     owner: root
     group: root
     mode: "0644"
-    directory_mode: "0755"
+  loop: "{{ query('ansible.builtin.fileglob', 'clustertools/*.py') | sort }}"
+  loop_control:
+    label: "{{ item | basename }}"
+  register: cluster_tools_lib_package
+
+- name: Find what the package directory holds
+  ansible.builtin.find:
+    paths: "{{ cluster_tools_lib_dir }}/clustertools"
+    file_type: any
+    hidden: true
+  register: cluster_tools_lib_present
+
+# A module dropped from the package would otherwise stay importable on every node. Its
+# bytecode cache goes when the package changes; Python rebuilds what it needs.
+- name: Remove what is no longer part of the package
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cluster_tools_lib_present.files | map(attribute='path') | reject('in', cluster_tools_lib_wanted) | list }}"
+  when: item | basename != '__pycache__' or cluster_tools_lib_package is changed
+  vars:
+    cluster_tools_lib_wanted: >-
+      {{ query('ansible.builtin.fileglob', 'clustertools/*.py') | map('basename')
+         | map('regex_replace', '^', cluster_tools_lib_dir ~ '/clustertools/') | list }}
 
 - name: Create the site facts directory
   ansible.builtin.file:
