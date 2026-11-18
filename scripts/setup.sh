@@ -11,19 +11,19 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR="${SCRIPT_DIR}/.."
 
-# Configuration (Python package versions live in requirements.txt / requirements-dev.txt)
+# Configuration (Python package versions live in pyproject.toml / uv.lock)
 CONFIG_DIR="${CONFIG_DIR:-${ROOT_DIR}/config}"            # Default configuration directory location
 DEEPOPS_TAG="${1:-master}"                      # DeepOps branch to set up
-PIP="${PIP:-pip3}"                              # Pip binary to use
-PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"    # Python3 path
-VENV_DIR="${VENV_DIR:-/opt/deepops/env}"        # Path to python virtual environment to create
+VENV_DIR="${VENV_DIR:-/opt/deepops/env}"        # DeepOps environment (pyproject.toml / uv.lock)
+KUBESPRAY_VENV_DIR="${KUBESPRAY_VENV_DIR:-/opt/deepops/kubespray-env}"  # Kubespray's own environment
+KUBESPRAY_PYTHON="${KUBESPRAY_PYTHON:-3.13}"    # Newest Python the pinned Kubespray supports
 
 ###
 
 # Set distro-specific variables
 . /etc/os-release
-DEPS_DEB=(git virtualenv python3-virtualenv sshpass wget)
-DEPS_EL=(git python3-libselinux python3-virtualenv sshpass wget)
+DEPS_DEB=(git curl sshpass wget)
+DEPS_EL=(git curl python3-libselinux sshpass wget)
 EPEL_VERSION="$(echo ${VERSION_ID} | sed  's/^[^0-9]*//;s/[^0-9].*$//')"
 EPEL_URL="https://dl.fedoraproject.org/pub/epel/epel-release-latest-${EPEL_VERSION}.noarch.rpm"
 PROXY_USE=`grep -v ^# ${SCRIPT_DIR}/deepops/proxy.sh 2>/dev/null | grep -v ^$ | wc -l`
@@ -70,7 +70,7 @@ case "$ID" in
     *)
         # Not an error: this branch is an escape hatch. Everything after this
         # case is distro-agnostic, so the run continues and the hard gate on
-        # `virtualenv` below reports a genuine missing dependency. Keeping it
+        # uv bootstrap below reports a genuine missing dependency. Keeping it
         # non-fatal is what lets Rocky, AlmaLinux, Debian and friends work.
         echo "WARNING: no automatic dependency install for OS '${ID}' (ID_LIKE='${ID_LIKE:-none}')" >&2
         echo "If setup fails below, install these manually and re-run:" >&2
@@ -78,19 +78,6 @@ case "$ID" in
         echo "  DEB-based: ${DEPS_DEB[*]}" >&2
         ;;
 esac
-
-# Create virtual environment and install python dependencies
-if command -v virtualenv &> /dev/null ; then
-    sudo mkdir -p "${VENV_DIR}"
-    sudo chown -R $(id -u):$(id -g) "${VENV_DIR}"
-    deactivate nondestructive &> /dev/null
-    virtualenv -q --python="${PYTHON_BIN}" "${VENV_DIR}"
-    . "${VENV_DIR}/bin/activate"
-    as_user "${PIP} install -q --upgrade pip"
-else
-    echo "ERROR: Unable to create Python virtual environment, 'virtualenv' command not found"
-    exit 1
-fi
 
 # Clone DeepOps git repo if running standalone
 if ! (cd "${SCRIPT_DIR}/.." && grep -i deepops README.md >/dev/null 2>&1 ) ; then
@@ -105,14 +92,24 @@ if ! (cd "${SCRIPT_DIR}/.." && grep -i deepops README.md >/dev/null 2>&1 ) ; the
     fi
 fi
 
-# Install the pinned Python packages from the checkout (standalone runs have just cloned it)
+# Install the locked Python environment from the checkout (standalone runs have just cloned it)
 REPO_DIR="$( (cd "${SCRIPT_DIR}/.." && grep -qi deepops README.md 2>/dev/null) && cd "${SCRIPT_DIR}/.." && pwd || pwd)"
-if [ -f "${VENV_DIR}/bin/activate" ] ; then
-    . "${VENV_DIR}/bin/activate"
-    as_user "${PIP} install -q -r ${REPO_DIR}/requirements-dev.txt"
-    # Run the repository checks on every commit (see .pre-commit-config.yaml).
-    (cd "${REPO_DIR}" && git rev-parse --git-dir >/dev/null 2>&1 && pre-commit install >/dev/null) || true
+# uv provides the Python interpreter and the locked environment; its version is the one
+# pyproject.toml requires.
+export PATH="${HOME}/.local/bin:${PATH}"
+UV_VERSION="$(sed -n 's/^required-version = "==\(.*\)"/\1/p' "${REPO_DIR}/pyproject.toml" 2>/dev/null)"
+if ! command -v uv >/dev/null 2>&1 || { [ -n "${UV_VERSION}" ] && [ "$(uv --version | awk '{print $2}')" != "${UV_VERSION}" ]; } ; then
+    as_user "curl -LsSf https://astral.sh/uv/${UV_VERSION:+${UV_VERSION}/}install.sh | sh"
 fi
+command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
+sudo mkdir -p "${VENV_DIR}" "${KUBESPRAY_VENV_DIR}"
+sudo chown -R $(id -u):$(id -g) "${VENV_DIR}" "${KUBESPRAY_VENV_DIR}"
+deactivate nondestructive &> /dev/null
+
+(cd "${REPO_DIR}" && UV_PROJECT_ENVIRONMENT="${VENV_DIR}" uv sync --locked) || { echo "ERROR: uv sync failed" >&2; exit 1; }
+. "${VENV_DIR}/bin/activate"
+# Run the repository checks on every commit (see .pre-commit-config.yaml).
+(cd "${REPO_DIR}" && git rev-parse --git-dir >/dev/null 2>&1 && pre-commit install >/dev/null) || true
 
 # Copy default configuration
 if grep -i deepops README.md >/dev/null 2>&1 ; then
@@ -153,6 +150,13 @@ else
     echo "ERROR: Unable to update Git submodules, 'git' command not found"
 fi
 
+# Kubespray pins its own Ansible, so the Kubernetes playbooks run from a separate
+# environment built from the submodule's requirements.txt.
+if [ -f "${REPO_DIR}/submodules/kubespray/requirements.txt" ] ; then
+    uv venv -q --allow-existing --python "${KUBESPRAY_PYTHON}" "${KUBESPRAY_VENV_DIR}"
+    uv pip install -q --python "${KUBESPRAY_VENV_DIR}" -r "${REPO_DIR}/submodules/kubespray/requirements.txt"
+fi
+
 # Add Ansible virtual env to PATH when using Bash
 if [ -f "${VENV_DIR}/bin/activate" ] ; then
     . "${VENV_DIR}/bin/activate"
@@ -162,4 +166,5 @@ fi
 echo
 echo "*** Setup complete ***"
 echo "To use Ansible, run: source ${VENV_DIR}/bin/activate"
+echo "For the Kubernetes playbooks, run: source ${KUBESPRAY_VENV_DIR}/bin/activate"
 echo
