@@ -1,0 +1,9 @@
+---
+# Archives unattended-upgrades takes security fixes from, per distribution.
+_os_updates_apt_origins:
+  Ubuntu:
+    - "origin=Ubuntu,archive=${distro_codename}-security,label=Ubuntu"
+    - "origin=UbuntuESMApps,archive=${distro_codename}-apps-security"
+    - "origin=UbuntuESM,archive=${distro_codename}-infra-security"
+  Debian:
+    - "origin=Debian,codename=${distro_codename}-security,label=Debian-Security"

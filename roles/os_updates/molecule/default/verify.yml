@@ -1,0 +1,37 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read the effective apt configuration
+      ansible.builtin.command: apt-config dump
+      register: apt_config
+      changed_when: false
+
+    - name: Check that only security archives are allowed and nothing reboots
+      ansible.builtin.assert:
+        that:
+          - "'-security' in apt_config.stdout"
+          - "'-updates\"' not in apt_config.stdout"
+          - "'Unattended-Upgrade::Automatic-Reboot \"false\"' in apt_config.stdout"
+          - "'Package-Blacklist:: \"^linux' in apt_config.stdout"
+
+    - name: Dry-run an unattended upgrade
+      ansible.builtin.command: unattended-upgrade --dry-run --debug
+      register: dry_run
+      changed_when: false
+
+    - name: Check that unattended-upgrades read the policy
+      ansible.builtin.assert:
+        that:
+          - "'Allowed origins are' in dry_run.stdout + dry_run.stderr"
+          - "'-security' in dry_run.stdout + dry_run.stderr"
+
+    - name: Read the needrestart drop-in
+      ansible.builtin.slurp:
+        src: /etc/needrestart/conf.d/50-deepops.conf
+      register: needrestart_conf
+
+    - name: Check that needrestart only lists services
+      ansible.builtin.assert:
+        that: "\"$nrconf{restart} = 'l';\" in (needrestart_conf.content | b64decode)"

@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: os_updates
+  author: DeepOps
+  description: Keep unattended OS upgrades to security fixes and away from the GPU, scheduler and storage stack
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: Debian
+      versions: [bookworm]
+    - name: EL
+      versions: ["8", "9"]
+dependencies: []

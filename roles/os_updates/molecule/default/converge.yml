@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: Include os_updates
+      ansible.builtin.include_role:
+        name: os_updates

@@ -1,0 +1,10 @@
+---
+# Unattended OS upgrades take security fixes only, never the kernel, GPU,
+# scheduler, container or storage packages, and never restart services or reboot
+# (roles/os_updates).
+- hosts: all
+  become: true
+  tasks:
+    - name: Apply the OS update policy
+      ansible.builtin.include_role:
+        name: os_updates

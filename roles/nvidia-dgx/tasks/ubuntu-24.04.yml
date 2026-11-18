@@ -77,10 +77,10 @@
   when: dgx_os7_install_driver
 
 - name: Disable unattended upgrades for DGX OS 7
-  ansible.builtin.apt:
-    name: unattended-upgrades
-    state: absent
-    purge: true
+  ansible.builtin.include_role:
+    name: os_updates
+  vars:
+    os_updates_policy: "off"
   when: dgx_os7_disable_unattended_upgrades
 
 - name: Populate DGX OS 7 service facts
