@@ -18,6 +18,14 @@ step() {
 
 python=python3
 command -v ansible-playbook >/dev/null || { echo "Activate the DeepOps virtualenv first (scripts/setup.sh)." >&2; exit 2; }
+# Every other step assumes the tools uv.lock pins; an outdated environment would fail
+# them for reasons that have nothing to do with the change being checked.
+if command -v uv >/dev/null && [ -n "${VIRTUAL_ENV:-}" ] \
+        && ! UV_PROJECT_ENVIRONMENT="${VIRTUAL_ENV}" uv sync --locked --check -q 2>/dev/null; then
+    echo "The environment at ${VIRTUAL_ENV} does not match uv.lock. Update it with:" >&2
+    echo "  UV_PROJECT_ENVIRONMENT=${VIRTUAL_ENV} uv sync --locked   (or scripts/setup.sh)" >&2
+    exit 2
+fi
 
 step "ansible.cfg has only known settings" ansible-config validate
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .

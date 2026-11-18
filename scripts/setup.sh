@@ -106,7 +106,9 @@ sudo mkdir -p "${VENV_DIR}" "${KUBESPRAY_VENV_DIR}"
 sudo chown -R $(id -u):$(id -g) "${VENV_DIR}" "${KUBESPRAY_VENV_DIR}"
 deactivate nondestructive &> /dev/null
 
-(cd "${REPO_DIR}" && UV_PROJECT_ENVIRONMENT="${VENV_DIR}" uv sync --locked) || { echo "ERROR: uv sync failed" >&2; exit 1; }
+# Make it a uv venv in place first: uv sync replaces a directory that is not one by
+# deleting it, which fails halfway when its parent is root-owned.
+(cd "${REPO_DIR}" && uv venv -q --allow-existing "${VENV_DIR}" && UV_PROJECT_ENVIRONMENT="${VENV_DIR}" uv sync --locked) || { echo "ERROR: uv sync failed" >&2; exit 1; }
 . "${VENV_DIR}/bin/activate"
 # Run the repository checks on every commit (see .pre-commit-config.yaml).
 (cd "${REPO_DIR}" && git rev-parse --git-dir >/dev/null 2>&1 && pre-commit install >/dev/null) || true
