@@ -203,7 +203,7 @@ def _read_nodes(data, gres):
         tres, used = slurm.tres_str(n["tres"]), slurm.tres_str(n["tres_used"])
         mem_t = (slurm.num(n["real_memory"]) or 0) - (slurm.num(n["specialized_memory"]) or 0)
         nodes.append({
-            "name": n["name"], "state": vocab.node_state(n["state"]), "class": vocab.node_class(n["state"]),
+            "name": n["name"], "state": vocab.node_state(n["state"]), "class": vocab.node_class(n["state"]), "open": vocab.node_schedulable(n["state"]),
             "partitions": list(n["partitions"] or []),
             "cpu_total": slurm.num(n["effective_cpus"]) or slurm.num(n["cpus"]) or 0,
             "cpu_used": slurm.num(n["alloc_cpus"]) or 0,
@@ -343,7 +343,7 @@ def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title
         for k in ("cpu_total", "cpu_used", "mem_total", "mem_used", "gres_total", "gres_used"):
             a[k] += n[k]
         a["idle"] += n["class"] == "idle"
-        a["off"] += n["class"] not in vocab.OPEN_CLASSES
+        a["off"] += not n["open"]
         a["free"] += _free(n, has_gres)
         # The binding resource sets how full a node is: every GPU taken is full.
         occ = 1000 * n["cpu_used"] // n["cpu_total"] if n["cpu_total"] else 0
@@ -427,7 +427,7 @@ def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title
 
 def _free(n, has_gres):
     """What a node could still give a new job; nothing on one closed to work."""
-    if n["class"] not in vocab.OPEN_CLASSES:
+    if not n["open"]:
         return 0
     if has_gres:
         return max(0, n["gres_total"] - n["gres_used"])

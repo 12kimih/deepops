@@ -65,6 +65,24 @@ def node_class(state):
     return _BASE.get(flags[0], "down")
 
 
+def node_schedulable(state):
+    """Can a new job start on the node? The one definition every tool uses: the node's
+    class is open (idle, mix, alloc), so not down, failing, not responding, drained,
+    draining or in maintenance. A powered-down node counts, since Slurm powers it up
+    for a job; so does a reserved one, open to its reservation's jobs."""
+    return node_class(state) in OPEN_CLASSES
+
+
+def node_base(state):
+    """Slurm's base state, lower case: idle, mixed, allocated, down, future, unknown..."""
+    return _flags(state)[0].lower()
+
+
+def node_drain(state):
+    """Is the drain flag set? Slurm keeps it beside the base state (mixed+drain)."""
+    return bool({"DRAIN", "DRAINING", "DRAINED"} & set(_flags(state)))
+
+
 def node_state(state):
     """The full state, lower case and joined as scontrol prints it: mixed+drain."""
     return "+".join(f.lower() for f in _flags(state))

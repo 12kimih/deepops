@@ -110,5 +110,29 @@ class ReasonTests(unittest.TestCase):
                 self.assertIn(family, vocab.REASON_HELP)
 
 
+class SchedulableTests(unittest.TestCase):
+    def test_one_definition_of_where_a_job_can_start(self):
+        cases = {
+            ("IDLE",): (True, "idle", False), ("MIXED",): (True, "mixed", False),
+            ("ALLOCATED",): (True, "allocated", False), ("IDLE", "POWERED_DOWN"): (True, "idle", False),
+            ("IDLE", "RESERVED"): (True, "idle", False), ("IDLE", "DRAIN"): (False, "idle", True),
+            ("MIXED", "DRAIN"): (False, "mixed", True), ("IDLE", "MAINT"): (False, "idle", False),
+            ("IDLE", "NOT_RESPONDING"): (False, "idle", False), ("DOWN",): (False, "down", False),
+            ("FUTURE",): (False, "future", False), (): (False, "unknown", False),
+        }  # fmt: skip
+        for state, want in cases.items():
+            got = (
+                vocab.node_schedulable(list(state)),
+                vocab.node_base(list(state)),
+                vocab.node_drain(list(state)),
+            )
+            self.assertEqual(got, want, state)
+        # The same answer as the class sq counts free capacity by.
+        for state in cases:
+            self.assertEqual(
+                vocab.node_schedulable(list(state)), vocab.node_class(list(state)) in vocab.OPEN_CLASSES
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
