@@ -37,7 +37,7 @@
   ansible.builtin.template:
     src: backend.j2
     dest: "{{ deepops_dir }}/trident-installer/backend-{{ item.backendName }}.json"
-    mode: "0644"
+    mode: "0600"
   with_items: "{{ backends_to_create }}"
   when: create_backends
   run_once: true

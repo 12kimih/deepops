@@ -178,6 +178,8 @@
       ansible.builtin.copy:
         src: "{{ artifacts_dir }}/admin.conf"
         dest: "{{ lookup('env', 'HOME') + '/.kube/config' }}"
+        # Cluster-admin credentials: readable by the owner only.
+        mode: "0600"
         backup: true
       when: kubeconf.stat.exists
       delegate_to: localhost

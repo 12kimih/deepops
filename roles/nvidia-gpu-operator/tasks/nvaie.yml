@@ -39,18 +39,31 @@
     kubectl apply -f -
   changed_when: false
 
+# The secret is applied as a manifest on stdin, so the password is never on a command
+# line (readable by every local user through ps) and needs no shell quoting.
 - name: Create a docker secret for private GPU Operator containers
-  ansible.builtin.shell: set -o pipefail && kubectl create secret docker-registry registry-secret --docker-server='{{ gpu_operator_driver_registry }}'
-   --docker-username='{{ gpu_operator_registry_username }}' --docker-password={{ gpu_operator_registry_password }} --docker-email={{
-    gpu_operator_registry_email }} -n {{ gpu_operator_namespace }} -o yaml --dry-run=client | kubectl apply -f -
-  changed_when: false
+  ansible.builtin.command:
+    argv: [kubectl, apply, -f, "-"]
+    stdin: "{{ {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'kubernetes.io/dockerconfigjson',
+               'metadata': {'name': 'registry-secret', 'namespace': gpu_operator_namespace},
+               'data': {'.dockerconfigjson': {'auths': {gpu_operator_driver_registry: {
+                 'username': gpu_operator_registry_username, 'password': gpu_operator_registry_password,
+                 'email': gpu_operator_registry_email,
+                 'auth': (gpu_operator_registry_username ~ ':' ~ gpu_operator_registry_password) | b64encode}}}
+                 | to_json | b64encode}} | to_json }}"
+  register: gpu_operator_registry_secret
+  changed_when: "'unchanged' not in gpu_operator_registry_secret.stdout"
+  no_log: true
 
 # Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
 # module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
 - name: Install NVAIE gpu-operator helm repo
-  ansible.builtin.command: /usr/local/bin/helm repo add nvaie "{{ gpu_operator_nvaie_helm_repo }}" --username='{{ gpu_operator_registry_username }}'
-    --password="{{ gpu_operator_registry_password }}"
+  ansible.builtin.command:
+    argv: [/usr/local/bin/helm, repo, add, --force-update, nvaie, "{{ gpu_operator_nvaie_helm_repo }}",
+           "--username={{ gpu_operator_registry_username }}", --password-stdin]
+    stdin: "{{ gpu_operator_registry_password }}"
   changed_when: false
+  no_log: true
 
 - name: Update helm repos
   ansible.builtin.command: /usr/local/bin/helm repo update
