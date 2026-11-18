@@ -1,22 +1,22 @@
 ---
 collections:
   - name: ansible.posix
-    version: 2.1.0
+    version: 2.2.2
 
   - name: community.general
-    version: 12.3.0
+    version: 14.0.1
 
   - name: community.docker
-    version: 5.0.6
+    version: 5.4.0
 
-  - name: community.mysql
-    version: 5.0.2
+  - name: ansible.mysql
+    version: 5.2.1
 
   - name: devsec.hardening
-    version: 10.5.0
+    version: 11.0.0
 
 # First-party utility roles (hosts, chrony, users) and the NVIDIA driver, container
 # toolkit and enroot are in-tree roles, so only third-party roles are listed here.
 roles:
   - src: andrewrothstein.miniconda
-    version: "v6.1.9"
+    version: "v6.4.1"
