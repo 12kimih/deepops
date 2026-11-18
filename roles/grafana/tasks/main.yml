@@ -28,14 +28,28 @@
     - "{{ grafana_data_dir }}"
     - "{{ grafana_cfg_dashboard_path }}"
 
-# Provisioned dashboards reload on their own; no restart needed.
-- name: Copy dashboards
-  ansible.builtin.copy:
-    src: "../../../src/dashboards/{{ item }}"
-    dest: "{{ grafana_cfg_dashboard_path }}/{{ item }}"
-    owner: "{{ grafana_user_id }}"
-    mode: "0644"
-  loop: "{{ grafana_dashboards }}"
+# Earlier layouts put dashboards directly in the provisioning path; each role now owns
+# a subdirectory, so files left at the top level are stale.
+- name: Find dashboards from the old flat layout
+  ansible.builtin.find:
+    paths: "{{ grafana_cfg_dashboard_path }}"
+    patterns: "*.json"
+    recurse: false
+  register: grafana_flat_dashboards
+
+- name: Remove dashboards from the old flat layout
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ grafana_flat_dashboards.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install the deepops dashboards
+  ansible.builtin.include_tasks: dashboards.yml
+  vars:
+    grafana_dashboard_set: deepops
+    grafana_dashboard_files: "{{ grafana_dashboards | map('regex_replace', '^', role_path ~ '/../../src/dashboards/') | list }}"
 
 - name: Install datasource config
   ansible.builtin.template:
@@ -106,9 +120,11 @@
   no_log: true
   when: grafana_state != "stopped"
 
+# On stdin, not argv: every user on the host can read a process's arguments.
 - name: Reset the admin password
   ansible.builtin.command:
-    argv: [docker, exec, "{{ grafana_svc_name }}", grafana, cli, admin, reset-admin-password, "{{ grafana_cfg_pass }}"]
+    argv: [docker, exec, -i, "{{ grafana_svc_name }}", grafana, cli, admin, reset-admin-password, --password-from-stdin]
+    stdin: "{{ grafana_cfg_pass }}"
   no_log: true
   changed_when: true
   when: grafana_state != "stopped" and grafana_login.status == 401
