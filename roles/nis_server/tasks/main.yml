@@ -12,28 +12,32 @@
   ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"
 
 # On Debian, installing ypserv tries to start it before the database exists (it
-# would fail). Block daemon auto-start for the duration of the package install.
-- name: Block daemon auto-start during package install (Debian)
-  ansible.builtin.copy:
-    content: |
-      #!/bin/sh
-      exit 101
-    dest: /usr/sbin/policy-rc.d
-    mode: "0755"
-  when: ansible_facts.os_family == "Debian"
-  changed_when: false
+# would fail). Block daemon auto-start for the duration of the package install only,
+# removed in `always` so a failed install never leaves every later service start
+# blocked.
+- name: Install the NIS server packages without starting their daemons yet
+  block:
+    - name: Block daemon auto-start during package install (Debian)
+      ansible.builtin.copy:
+        content: |
+          #!/bin/sh
+          exit 101
+        dest: /usr/sbin/policy-rc.d
+        mode: "0755"
+      when: ansible_facts.os_family == "Debian"
+      changed_when: false
 
-- name: Install NIS server packages
-  ansible.builtin.package:
-    name: "{{ nis_server_packages }}"
-    state: present
-
-- name: Remove the daemon-start block (Debian)
-  ansible.builtin.file:
-    path: /usr/sbin/policy-rc.d
-    state: absent
-  when: ansible_facts.os_family == "Debian"
-  changed_when: false
+    - name: Install NIS server packages
+      ansible.builtin.package:
+        name: "{{ nis_server_packages }}"
+        state: present
+  always:
+    - name: Remove the daemon-start block (Debian)
+      ansible.builtin.file:
+        path: /usr/sbin/policy-rc.d
+        state: absent
+      when: ansible_facts.os_family == "Debian"
+      changed_when: false
 
 # The NIS domain must be set (kernel domainname) before ypinit/ypserv, and persist
 # across reboot.

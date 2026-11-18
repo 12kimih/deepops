@@ -7,30 +7,41 @@
     fail_msg: "Set nis_domain and nis_server in config/group_vars."
     quiet: true
 
-- name: Prevent daemons from starting when installing packages, particularly ypbind
-  ansible.builtin.copy:
-    src: policy-rc.d
-    dest: /usr/sbin/policy-rc.d
-    owner: root
-    group: root
-    mode: "0700"
-  changed_when: false
+# policy-rc.d (exit 101) keeps ypbind from starting half-configured during the install.
+# It blocks every service start on the host while present, so it is removed in
+# `always`: a failed install must not leave later upgrades unable to restart anything.
+- name: Install the NIS client packages without starting their daemons yet
+  block:
+    - name: Block daemon auto-start during the install
+      ansible.builtin.copy:
+        src: policy-rc.d
+        dest: /usr/sbin/policy-rc.d
+        owner: root
+        group: root
+        mode: "0700"
+      changed_when: false
 
-# Install the CLIENT packages directly, not the `nis` meta-package: on Ubuntu 20.04+
-# / Debian 11+ `nis` pulls in ypserv (the NIS *server*) too, which a client must not
-# run. ypbind-mt provides the ypbind.service client daemon; yp-tools gives ypwhich/ypcat.
-# https://wiki.debian.org/BullseyeNis
-- name: Install Debian/Ubuntu NIS client packages
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    name: [ypbind-mt, yp-tools, rpcbind]
-    state: present
-  when: ansible_facts.os_family == "Debian"
+    # Install the CLIENT packages directly, not the `nis` meta-package: on Ubuntu 20.04+
+    # / Debian 11+ `nis` pulls in ypserv (the NIS *server*) too, which a client must not
+    # run. ypbind-mt provides the ypbind.service client daemon; yp-tools gives ypwhich/ypcat.
+    # https://wiki.debian.org/BullseyeNis
+    - name: Install Debian/Ubuntu NIS client packages
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        name: [ypbind-mt, yp-tools, rpcbind]
+        state: present
+      when: ansible_facts.os_family == "Debian"
 
-- name: Install RHEL-family NIS client packages
-  ansible.builtin.dnf: name=ypbind state=present
-  when: ansible_facts.os_family == "RedHat"
+    - name: Install RHEL-family NIS client packages
+      ansible.builtin.dnf: name=ypbind state=present
+      when: ansible_facts.os_family == "RedHat"
+  always:
+    - name: Remove the daemon-start block
+      ansible.builtin.file:
+        path: /usr/sbin/policy-rc.d
+        state: absent
+      changed_when: false
 
 - name: Ensure rpcbind is running
   ansible.builtin.service: name=rpcbind state=started enabled=true
@@ -68,6 +79,12 @@
     label: "{{ item.line }}"
   notify: "Restart nis"
 
+- name: Remove name-service caches that would delay directory changes
+  ansible.builtin.package:
+    name: "{{ nis_client_remove_caches }}"
+    state: absent
+  when: nis_client_remove_caches | length > 0
+
 - name: Make sure rpcbind is running
   ansible.builtin.service: name=rpcbind state=started enabled=true
 
@@ -84,9 +101,3 @@
     daemon_reload: true
   tags:
     - molecule-notest
-
-- name: Remove file to prevent starting services at install time
-  ansible.builtin.file:
-    path: /usr/sbin/policy-rc.d
-    state: absent
-  changed_when: false
