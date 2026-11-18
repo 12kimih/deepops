@@ -1,0 +1,6 @@
+---
+- name: Restart slurm metrics timer
+  ansible.builtin.systemd:
+    name: "{{ slurm_metrics_svc_name }}.timer"
+    state: restarted
+    daemon_reload: true

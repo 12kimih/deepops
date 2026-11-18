@@ -45,8 +45,19 @@ PORTS                    NAMES
 
 ## Grafana
 
-Grafana ships three dashboards in the `Cluster` folder: the GPU dashboard, the Slurm
-dashboard, and Node Exporter Full (grafana.com 1860, revision 46) for per-host detail.
+Grafana provisions these dashboards into one folder (`grafana_dashboard_folder`; name it
+after the cluster). Names follow the monitoring-mixin form "Domain / View" and each has a
+fixed UID, so links survive renames:
+
+| Dashboard | UID | Shows | Installed by |
+|---|---|---|---|
+| GPU / Nodes | `gpu-nodes` | one GPU node: GPUs (DCGM), host resources, system power | `grafana` |
+| Slurm / GPU allocation | `slurm-gpu-allocation` | who holds which GPU, by user, account, type and node; GPUs busy with no job | `slurm_metrics` |
+| Slurm / Scheduler | `slurm-scheduler` | nodes, jobs and scheduler statistics | `prometheus-slurm-exporter` |
+| Node Exporter / Hosts | `node-exporter-hosts` | per-host detail (grafana.com 1860 "Node Exporter Full", revision 46) | `grafana` |
+
+Each role installs its dashboards into its own subdirectory and removes the ones it no
+longer ships; Grafana then deletes those, so the files are the only source of truth.
 The Prometheus datasource has the fixed uid `prometheus`.
 
 Anonymous visitors get read-only access (`grafana_anonymous_role`). The admin password is
@@ -61,28 +72,10 @@ In order to gain access to Grafana visit the url at http://\<slurm-metric ip\>:3
 
 ![Grafana Dashboards](../img/slurm_monitoring_grafana03.png)
 
-The GPU dashboard provides the following metrics:
-
-- System Load
-- GPU Power Usage (by GPU)
-- GPU Power Total
-- System Memory Usage
-- GPU Temperature (by GPU)
-- GPU Average Temperature
-- PCIe Throughput
-- Disk Usage
-- GPU Memory Usage
-- GPU Utilization (by GPU)
-- GPU Total Utilization
-- Ethernet Throughput
-- Disk Throughput
-- GPU Mem Copy Utilization
-- GPU Average Memory Copy Utilization
-- Kernel
-- Hostname
-- System Total Power Draw
-- GPU SM Clocks
-- GPU Memory Clocks
+GPU / Nodes shows GPU power, temperature, utilisation, memory-copy utilisation, memory and
+clocks per GPU and in total, beside the node's load, memory (as `free` splits it), disk,
+Ethernet, InfiniBand and NVLink traffic and system power. A gap in a line means no data,
+never zero.
 
 Metrics are displayed per-node. To view utilization across nodes click the server selection drop-down in the top left and type or select the desired node names.
 
@@ -90,7 +83,7 @@ Metrics are displayed per-node. To view utilization across nodes click the serve
 
 ![Grafana GPU Node Selection](../img/slurm_monitoring_grafana05.png)
 
-The Slurm dashboard provides the following information about running jobs and the Slurm job queue:
+Slurm / Scheduler provides the following information about running jobs and the Slurm job queue:
 
 - Nodes & Node Status
 - Slurm Jobs & Job State
@@ -98,6 +91,14 @@ The Slurm dashboard provides the following information about running jobs and th
 - Scheduler Threads & Backfill Depth Mean & Cycles
 
 ![Grafana Slurm Dashboard](../img/slurm_monitoring_grafana06.png)
+
+Slurm / GPU allocation comes from `roles/slurm_metrics`: a timer on the controller writes
+`slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job_id}` (1 per GPU a job
+holds) and `slurm_node_gpus{node,gpu_type}` every minute as a node_exporter text file. The
+recording rule `host_device:slurm_gpu_allocated:max` keys them like DCGM series, and the
+alert `GpuBusyWithoutJob` fires when a GPU stays busy for 15 minutes with no job holding it
+(a process outside Slurm, or one a finished job left behind). `SlurmGpuMetricsStale` warns
+when the file stops updating, which also pauses that alert.
 
 Grafana allows you to view custom time-slices, set the polling duration, and many other dashboard customizations.
 

@@ -1,0 +1,39 @@
+---
+# Slurm GPU allocation (roles/slurm_metrics) against what the GPUs report (DCGM).
+groups:
+  - name: slurm
+    rules:
+      # Allocation keyed like DCGM series: host is the Slurm node name, device the GPU's
+      # minor number (/dev/nvidiaN), which Slurm's GPU index follows. One definition for
+      # the alerts and the Slurm / GPU allocation dashboard.
+      - record: host_device:slurm_gpu_allocated:max
+        expr: |
+          label_replace(
+            label_replace(
+              max by (node, gpu, gpu_type, user, account, partition, job_id) (slurm_gpu_allocated),
+              "host", "$1", "node", "(.*)"),
+            "device", "nvidia$1", "gpu", "(.*)")
+      # Only while the allocation data is fresh, so a stale file never pages.
+      - alert: GpuBusyWithoutJob
+        expr: |
+          max by (host, gpu, device) (DCGM_FI_DEV_GPU_UTIL) > 0
+          unless on (host, device) host_device:slurm_gpu_allocated:max
+          and on () (time() - max(node_textfile_mtime_seconds{file=~".*slurm-gpu[.]prom"}) < 300)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} is {{ $value }}% busy with no Slurm job holding it"
+          description: >-
+            A process outside Slurm, or one left behind by a finished job. As root on the
+            host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a hung one.
+      - alert: SlurmGpuMetricsStale
+        expr: |
+          time() - node_textfile_mtime_seconds{file=~".*slurm-gpu[.]prom"} > 300
+          or node_textfile_scrape_error > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Slurm GPU allocation data on {{ $labels.host }} is stale or unreadable"
+          description: >-
+            `systemctl status slurm-gpu-metrics` and `journalctl -u slurm-gpu-metrics` on
+            the host say why; GpuBusyWithoutJob is off meanwhile.

@@ -1,0 +1,11 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Write Slurm GPU allocation every {{ slurm_metrics_interval }}
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec={{ slurm_metrics_interval }}
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

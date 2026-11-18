@@ -1,0 +1,9 @@
+---
+# Slurm data Slurm's own metrics lack (GPU allocation), for node_exporter on the
+# controller, and its dashboard.
+- hosts: "{{ hostlist | default('slurm-metric') }}"
+  become: true
+  tasks:
+    - name: Configure Slurm metrics
+      ansible.builtin.include_role:
+        name: slurm_metrics
