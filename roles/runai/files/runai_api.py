@@ -6,6 +6,7 @@ Called by the runai role (platform mode). Credentials come from the environment
 Prints one JSON object: {"values": {...}, "cluster_uid": "...", "created": bool}.
 Exit 0 ok, 1 API/HTTP failure, 2 bad input.
 """
+
 import argparse
 import http.client
 import json
@@ -98,8 +99,9 @@ class Client:
             raise ApiError("%s %s returned invalid JSON" % (method, path.split("?")[0]))
 
     def login(self, user, pw):
-        doc = self.request("POST", "/api/v2/token",
-                           form={"grant_type": "password", "username": user, "password": pw})
+        doc = self.request(
+            "POST", "/api/v2/token", form={"grant_type": "password", "username": user, "password": pw}
+        )
         self.bearer = doc.get("access_token", "")
         if not self.bearer:
             raise ApiError("login returned no access token")
@@ -144,8 +146,10 @@ def main(argv=None):
         else:
             uid = client.request("POST", "/api/v1/clusters", body={"name": args.cluster_name})["uuid"]
         info = client.request(
-            "GET", "/api/v1/clusters/%s/cluster-install-info?version=%s"
-            % (urllib.parse.quote(uid), urllib.parse.quote(args.chart_version)))
+            "GET",
+            "/api/v1/clusters/%s/cluster-install-info?version=%s"
+            % (urllib.parse.quote(uid), urllib.parse.quote(args.chart_version)),
+        )
         pairs = parse_set_args(info.get("installationStr", ""))
         if info.get("bootstrapToken"):
             pairs["controlPlane.bootstrapToken"] = info["bootstrapToken"]

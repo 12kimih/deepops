@@ -6,6 +6,7 @@ ansible_facts.ansible_local). Deriving that from an assumption once turned
 ansible_local into the nonexistent ansible_facts.local and broke every role
 that reads local facts, so this asks Ansible itself.
 """
+
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import json
@@ -27,12 +28,18 @@ def gathered_keys():
         play = Path(tmp) / "play.yml"
         play.write_text(
             "- hosts: localhost\n  connection: local\n  gather_facts: true\n  tasks:\n"
-            f"    - ansible.builtin.copy: {{content: '{{{{ ansible_facts.keys() | list | to_json }}}}', dest: '{out}'}}\n")
+            f"    - ansible.builtin.copy: {{content: '{{{{ ansible_facts.keys() | list | to_json }}}}', dest: '{out}'}}\n"
+        )
         (Path(tmp) / "ansible.cfg").write_text("[defaults]\n")
         env = dict(os.environ, ANSIBLE_CONFIG=str(Path(tmp) / "ansible.cfg"))
         playbook = Path(sys.executable).with_name("ansible-playbook")
-        subprocess.run([str(playbook), "-i", "localhost,", str(play)], env=env, check=True,
-                       capture_output=True, timeout=300)
+        subprocess.run(
+            [str(playbook), "-i", "localhost,", str(play)],
+            env=env,
+            check=True,
+            capture_output=True,
+            timeout=300,
+        )
         return set(json.loads(out.read_text()))
 
 
@@ -53,12 +60,12 @@ class FactNameTests(unittest.TestCase):
     def test_rewrites(self):
         cases = {
             "when: ansible_distribution == 'Ubuntu'": "when: ansible_facts.distribution == 'Ubuntu'",
-            "x: \"{{ ansible_local.gpus.count }}\"": "x: \"{{ ansible_facts.ansible_local.gpus.count }}\"",
-            "x: \"{{ ansible_facts.local.gpus }}\"": "x: \"{{ ansible_facts.ansible_local.gpus }}\"",
+            'x: "{{ ansible_local.gpus.count }}"': 'x: "{{ ansible_facts.ansible_local.gpus.count }}"',
+            'x: "{{ ansible_facts.local.gpus }}"': 'x: "{{ ansible_facts.ansible_local.gpus }}"',
             "x: \"{{ hostvars[h]['ansible_local'] }}\"": "x: \"{{ hostvars[h]['ansible_facts']['ansible_local'] }}\"",
             "x: \"{{ hostvars[h]['ansible_default_ipv4'] }}\"": "x: \"{{ hostvars[h]['ansible_facts']['default_ipv4'] }}\"",
             "  ansible.builtin.setup: filter=ansible_local": "  ansible.builtin.setup: filter=ansible_local",
-            "{% set m = hostvars[n][\"ansible_facts\"][\"local\"] %}": "{% set m = hostvars[n][\"ansible_facts\"][\"ansible_local\"] %}",
+            '{% set m = hostvars[n]["ansible_facts"]["local"] %}': '{% set m = hostvars[n]["ansible_facts"]["ansible_local"] %}',
         }
         for before, after in cases.items():
             with self.subTest(line=before):

@@ -1,4 +1,5 @@
 """Offline HTTP fixtures: never start vLLM, download weights, or use a GPU."""
+
 import contextlib
 import http.server
 import json
@@ -73,21 +74,39 @@ class VllmTests(unittest.TestCase):
         self.responses = {
             "/health": (200, b"", {}, 0),
             "/v1/models": (200, {"object": "list", "data": [{"id": "test-model", "object": "model"}]}, {}, 0),
-            "/v1/completions": (200, {
-                "id": "cmpl-test", "object": "text_completion", "model": "test-model",
-                "choices": [{"index": 0, "text": "generated fixture", "finish_reason": "length"}],
-                "usage": {"prompt_tokens": 5, "completion_tokens": 8, "total_tokens": 13},
-            }, {}, 0),
+            "/v1/completions": (
+                200,
+                {
+                    "id": "cmpl-test",
+                    "object": "text_completion",
+                    "model": "test-model",
+                    "choices": [{"index": 0, "text": "generated fixture", "finish_reason": "length"}],
+                    "usage": {"prompt_tokens": 5, "completion_tokens": 8, "total_tokens": 13},
+                },
+                {},
+                0,
+            ),
         }
 
     def run_validator(self, url, *extra, env=None):
-        args = [sys.executable, str(SCRIPT), "--json", "--base-url", url,
-                "--model", "test-model", "--cache-dir", str(self.cache),
-                "--repo-id", "example/model", "--revision", REVISION]
+        args = [
+            sys.executable,
+            str(SCRIPT),
+            "--json",
+            "--base-url",
+            url,
+            "--model",
+            "test-model",
+            "--cache-dir",
+            str(self.cache),
+            "--repo-id",
+            "example/model",
+            "--revision",
+            REVISION,
+        ]
         for name in ("config.json", "tokenizer.json", "model.safetensors"):
             args += ["--require-file", name]
-        run = subprocess.run(args + list(extra), capture_output=True, text=True,
-                             timeout=5, env=env)
+        run = subprocess.run(args + list(extra), capture_output=True, text=True, timeout=5, env=env)
         self.assertEqual(run.stderr, "", run.stderr)
         self.assertIn(run.returncode, (0, 1), run.stderr)
         result = json.loads(run.stdout)
@@ -99,13 +118,22 @@ class VllmTests(unittest.TestCase):
         with endpoint(self.responses) as (url, requests):
             result = self.run_validator(url)
         self.assertTrue(result["ok"])
-        self.assertEqual(result["checks"], {"cache": True, "health": True,
-                                            "model": True, "completion": True})
+        self.assertEqual(result["checks"], {"cache": True, "health": True, "model": True, "completion": True})
         self.assertEqual(result["errors"], [])
-        self.assertEqual([(r[0], r[1]) for r in requests], [
-            ("GET", "/health"), ("GET", "/v1/models"), ("POST", "/v1/completions")])
-        self.assertEqual(requests[-1][2], {"model": "test-model", "prompt": "The capital of France is",
-                                          "max_tokens": 8, "temperature": 0, "stream": False})
+        self.assertEqual(
+            [(r[0], r[1]) for r in requests],
+            [("GET", "/health"), ("GET", "/v1/models"), ("POST", "/v1/completions")],
+        )
+        self.assertEqual(
+            requests[-1][2],
+            {
+                "model": "test-model",
+                "prompt": "The capital of France is",
+                "max_tokens": 8,
+                "temperature": 0,
+                "stream": False,
+            },
+        )
         self.assertNotIn("generated fixture", json.dumps(result))
 
     def test_missing_cache_file_prevents_all_http(self):
@@ -140,8 +168,15 @@ class VllmTests(unittest.TestCase):
         self.assertEqual(len(requests), 1)
 
     def test_model_must_be_advertised_and_models_shape_valid(self):
-        for value in ({"data": [{"id": "other"}]}, {"data": []}, [], None,
-                      {"data": "test-model"}, {"data": [None]}, b"not json"):
+        for value in (
+            {"data": [{"id": "other"}]},
+            {"data": []},
+            [],
+            None,
+            {"data": "test-model"},
+            {"data": [None]},
+            b"not json",
+        ):
             with self.subTest(value=value):
                 self.responses["/v1/models"] = (200, value, {}, 0)
                 with endpoint(self.responses) as (url, requests):
@@ -152,13 +187,21 @@ class VllmTests(unittest.TestCase):
 
     def test_completion_must_prove_nonempty_output_for_expected_model(self):
         good = self.responses["/v1/completions"][1]
-        bad = [None, [], {}, {**good, "model": "other"}, {**good, "choices": []},
-               {**good, "choices": [None]}, {**good, "choices": [{"text": " "}]},
-               {**good, "choices": [{"text": 7}]},
-               {**good, "usage": {"completion_tokens": 0}},
-               {**good, "usage": {"completion_tokens": 9}},
-               {**good, "usage": {"completion_tokens": True}},
-               {**good, "usage": None}, b"broken json"]
+        bad = [
+            None,
+            [],
+            {},
+            {**good, "model": "other"},
+            {**good, "choices": []},
+            {**good, "choices": [None]},
+            {**good, "choices": [{"text": " "}]},
+            {**good, "choices": [{"text": 7}]},
+            {**good, "usage": {"completion_tokens": 0}},
+            {**good, "usage": {"completion_tokens": 9}},
+            {**good, "usage": {"completion_tokens": True}},
+            {**good, "usage": None},
+            b"broken json",
+        ]
         for value in bad:
             with self.subTest(value=value):
                 self.responses["/v1/completions"] = (200, value, {}, 0)
@@ -177,19 +220,33 @@ class VllmTests(unittest.TestCase):
 
     def test_proxies_are_ignored(self):
         with endpoint(self.responses) as (proxy, proxied):
-            env = {**os.environ, "http_proxy": proxy, "HTTP_PROXY": proxy,
-                   "https_proxy": proxy, "HTTPS_PROXY": proxy, "ALL_PROXY": proxy,
-                   "no_proxy": "", "NO_PROXY": ""}
+            env = {
+                **os.environ,
+                "http_proxy": proxy,
+                "HTTP_PROXY": proxy,
+                "https_proxy": proxy,
+                "HTTPS_PROXY": proxy,
+                "ALL_PROXY": proxy,
+                "no_proxy": "",
+                "NO_PROXY": "",
+            }
             with endpoint(self.responses) as (url, _):
                 result = self.run_validator(url, env=env)
         self.assertTrue(result["ok"])
         self.assertEqual(proxied, [])
 
     def test_only_bare_loopback_http_origins_accepted(self):
-        for url in ("http://example.com:8000", "https://127.0.0.1:8000", "file:///etc/passwd",
-                    "http://user:example@127.0.0.1:8000", "http://127.0.0.1:8000/path",
-                    "http://127.0.0.1:8000/?x=1", "http://127.0.0.1:8000/#fragment",
-                    "http://localhost:8000", "http://127.0.0.1:99999"):
+        for url in (
+            "http://example.com:8000",
+            "https://127.0.0.1:8000",
+            "file:///etc/passwd",
+            "http://user:example@127.0.0.1:8000",
+            "http://127.0.0.1:8000/path",
+            "http://127.0.0.1:8000/?x=1",
+            "http://127.0.0.1:8000/#fragment",
+            "http://localhost:8000",
+            "http://127.0.0.1:99999",
+        ):
             with self.subTest(url=url):
                 result = self.run_validator(url)
                 self.assertFalse(result["ok"])
@@ -244,8 +301,7 @@ class VllmTests(unittest.TestCase):
         self.assertEqual(result["errors"][0]["stage"], "health")
 
     def test_unknown_cli_flag_is_usage_error(self):
-        run = subprocess.run([sys.executable, str(SCRIPT), "--unknown"],
-                             capture_output=True, text=True)
+        run = subprocess.run([sys.executable, str(SCRIPT), "--unknown"], capture_output=True, text=True)
         self.assertEqual(run.returncode, 2)
         self.assertIn("usage:", run.stderr)
 

@@ -3,6 +3,7 @@
 This proves guards, permissions and idempotence, not NFS behavior. No mounts,
 remote hosts, users, packages or services are created by this fixture.
 """
+
 import getpass
 import grp
 import os
@@ -30,7 +31,8 @@ class ModelCachePlaybookTests(unittest.TestCase):
         self.play.update(hosts="all", gather_facts=False, connection="local")
         self.hosts = "localhost ansible_connection=local\n"
         self.site_vars = dict(
-            model_cache_mount=str(self.mount), model_cache_owner=getpass.getuser(),
+            model_cache_mount=str(self.mount),
+            model_cache_owner=getpass.getuser(),
             model_cache_group=grp.getgrgid(os.getgid()).gr_name,
             ansible_become=False,
         )
@@ -44,9 +46,13 @@ class ModelCachePlaybookTests(unittest.TestCase):
         path.write_text(yaml.safe_dump([play]))
         config = Path(self.temp.name) / "ansible.cfg"
         config.write_text("[defaults]\nretry_files_enabled = False\n")
-        env = dict(os.environ, ANSIBLE_CONFIG=str(config), ANSIBLE_NOCOLOR="1",
-                   ANSIBLE_LOCAL_TEMP=str(Path(self.temp.name) / "ansible-local"),
-                   ANSIBLE_REMOTE_TEMP=str(Path(self.temp.name) / "ansible-remote"))
+        env = dict(
+            os.environ,
+            ANSIBLE_CONFIG=str(config),
+            ANSIBLE_NOCOLOR="1",
+            ANSIBLE_LOCAL_TEMP=str(Path(self.temp.name) / "ansible-local"),
+            ANSIBLE_REMOTE_TEMP=str(Path(self.temp.name) / "ansible-remote"),
+        )
         inventory = Path(self.temp.name) / "inventory"
         inventory.mkdir(exist_ok=True)
         (inventory / "hosts").write_text(self.hosts)
@@ -68,7 +74,9 @@ class ModelCachePlaybookTests(unittest.TestCase):
         result = subprocess.run(
             ["sh", "-c", '. "$1"; printf "%s|%s" "$HF_HUB_CACHE" "$HF_HOME"', "sh", str(script)],
             env={"PATH": os.environ["PATH"], "HF_HOME": "/private/user-cache"},
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         self.assertEqual(result.stdout, str(self.root / "hub") + "|/private/user-cache")
         self.assertIn("changed=0", self.run_play())

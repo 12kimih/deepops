@@ -1,4 +1,5 @@
 """Offline documentation contracts; these do not test agent behavior or GPUs."""
+
 import pathlib
 import re
 import shlex
@@ -45,8 +46,7 @@ class ModelSkillDocsTest(unittest.TestCase):
         args = shlex.split(command.replace("\\\n", " "))
         self.assertEqual(args[:2], ["python3", "scripts/validation/validate_vllm.py"])
         # --help parses the real CLI without touching the cache or endpoint.
-        result = subprocess.run(args + ["--help"], cwd=ROOT,
-                                capture_output=True, text=True, timeout=10)
+        result = subprocess.run(args + ["--help"], cwd=ROOT, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         for flag in args[2:]:
             if flag.startswith("--"):

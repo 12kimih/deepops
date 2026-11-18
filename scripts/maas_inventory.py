@@ -45,8 +45,12 @@ from pathlib import Path
 GROUP_CHILDREN = {
     "k8s_cluster": ["kube_control_plane", "kube_node"],
     "slurm-cluster": [
-        "slurm-master", "slurm-node", "slurm-cache",
-        "slurm-nfs", "slurm-metric", "slurm-login",
+        "slurm-master",
+        "slurm-node",
+        "slurm-cache",
+        "slurm-nfs",
+        "slurm-metric",
+        "slurm-login",
     ],
     "slurm-cache": ["slurm-master"],
     "slurm-nfs-client": ["slurm-node"],
@@ -67,9 +71,7 @@ def build_oauth1_header(api_key):
     """Build OAuth1 Authorization header for MAAS API."""
     parts = api_key.split(":")
     if len(parts) != 3:
-        raise ValueError(
-            "MAAS_API_KEY must be in format consumer_key:token_key:token_secret"
-        )
+        raise ValueError("MAAS_API_KEY must be in format consumer_key:token_key:token_secret")
     consumer_key, token_key, token_secret = parts
     return (
         f'OAuth oauth_version="1.0", '
@@ -106,6 +108,7 @@ def load_config():
             if path.exists():
                 try:
                     import yaml
+
                     with open(path) as f:
                         file_config = yaml.safe_load(f) or {}
                     for key in config:
@@ -128,9 +131,13 @@ def load_config():
     # Detect unconfigured: empty values or placeholder templates from config.example
     api_url = config["api_url"]
     api_key = config["api_key"]
-    if (not api_url or not api_key
-            or "<" in api_url or "<" in api_key
-            or api_key == "CONSUMER_KEY:TOKEN_KEY:TOKEN_SECRET"):
+    if (
+        not api_url
+        or not api_key
+        or "<" in api_url
+        or "<" in api_key
+        or api_key == "CONSUMER_KEY:TOKEN_KEY:TOKEN_SECRET"
+    ):
         # Return gracefully so ansible doesn't fail when MAAS isn't configured.
         # This allows the dynamic inventory to coexist with static inventory
         # in ansible.cfg without errors for users who don't use MAAS.
@@ -217,9 +224,7 @@ def build_inventory(config):
         if config.get("ssh_user"):
             hostvars["ansible_user"] = config["ssh_user"]
         if config.get("ssh_bastion"):
-            hostvars["ansible_ssh_common_args"] = (
-                f'-o ProxyJump="{config["ssh_bastion"]}"'
-            )
+            hostvars["ansible_ssh_common_args"] = f'-o ProxyJump="{config["ssh_bastion"]}"'
 
         # MAAS metadata
         hostvars["maas_system_id"] = machine.get("system_id", "")
@@ -255,9 +260,7 @@ def build_inventory(config):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="MAAS Dynamic Inventory for DeepOps"
-    )
+    parser = argparse.ArgumentParser(description="MAAS Dynamic Inventory for DeepOps")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--list", action="store_true", help="List all hosts")
     group.add_argument("--host", help="Get variables for a specific host")

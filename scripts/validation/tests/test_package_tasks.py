@@ -7,6 +7,7 @@ os_updates molecule run found this). An install either sets update_cache
 is true when it just added a repository) or directly follows a task that
 refreshes the cache.
 """
+
 from pathlib import Path
 import unittest
 
@@ -42,8 +43,11 @@ def task_lists(data):
 
 
 def offenders():
-    files = [p for p in sorted(ROOT.glob("roles/*/tasks/**/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml"))
-             if "galaxy" not in p.parts]
+    files = [
+        p
+        for p in sorted(ROOT.glob("roles/*/tasks/**/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml"))
+        if "galaxy" not in p.parts
+    ]
     for path in files:
         try:
             data = yaml.safe_load(path.read_text())
@@ -58,7 +62,9 @@ def offenders():
 class PackageTaskTests(unittest.TestCase):
     def test_apt_installs_refresh_the_cache(self):
         found = list(offenders())
-        self.assertEqual(found, [], "add update_cache: true and cache_valid_time: 3600 to:\n" + "\n".join(found))
+        self.assertEqual(
+            found, [], "add update_cache: true and cache_valid_time: 3600 to:\n" + "\n".join(found)
+        )
 
 
 if __name__ == "__main__":

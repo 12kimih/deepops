@@ -5,6 +5,7 @@ Run as the model consumer on the selected Slurm compute host. Optional
 --gpu-smoke submits one bounded Pyxis container job and may pull its image.
 Exit codes: 0 ready, 1 not ready, 2 bad input. Training is never validated.
 """
+
 import argparse
 import json
 import math
@@ -32,17 +33,37 @@ def run(command, timeout):
 
 def new_result():
     return {
-        "schema_version": 1, "status": "not_ready", "ok": False,
-        "training_validated": False, "gpu_smoke_ran": False, "gpu_smoke_ok": False,
-        "checks": {name: False for name in ("scheduler", "local_node", "gpu_capacity", "container_support", "cache", "container_pin")},
+        "schema_version": 1,
+        "status": "not_ready",
+        "ok": False,
+        "training_validated": False,
+        "gpu_smoke_ran": False,
+        "gpu_smoke_ok": False,
+        "checks": {
+            name: False
+            for name in (
+                "scheduler",
+                "local_node",
+                "gpu_capacity",
+                "container_support",
+                "cache",
+                "container_pin",
+            )
+        },
         "errors": [],
     }
 
 
 def safe_relative(value):
-    return (isinstance(value, str) and bool(value) and value != "."
-            and not PurePosixPath(value).is_absolute() and ".." not in PurePosixPath(value).parts
-            and str(PurePosixPath(value)) == value and "\\" not in value)
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value != "."
+        and not PurePosixPath(value).is_absolute()
+        and ".." not in PurePosixPath(value).parts
+        and str(PurePosixPath(value)) == value
+        and "\\" not in value
+    )
 
 
 def check_arguments(args):
@@ -54,15 +75,27 @@ def check_arguments(args):
     if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
         raise BadInput("revision must be a full lowercase 40-character commit hash")
     parts = args.repo_id.split("/")
-    if (len(parts) not in (1, 2) or len(args.repo_id) > 96 or any(
+    if (
+        len(parts) not in (1, 2)
+        or len(args.repo_id) > 96
+        or any(
             not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", part)
-            or part.endswith((".", "-")) or ".." in part or "--" in part for part in parts)):
+            or part.endswith((".", "-"))
+            or ".." in part
+            or "--" in part
+            for part in parts
+        )
+    ):
         raise BadInput("repo-id must be a model name or namespace/model")
     if not args.require_file or not all(safe_relative(name) for name in args.require_file):
         raise BadInput("require-file must contain normalized relative model paths without traversal")
     # Pyxis/Enroot registry#repository syntax. Digest-only: mutable tags are not pins.
-    if not re.fullmatch(r"[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?#[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}", args.container_image):
-        raise BadInput("container-image must use registry#repository@sha256:<64 lowercase hex digits>, without credentials")
+    if not re.fullmatch(
+        r"[a-z0-9][a-z0-9.-]*(?::[0-9]{1,5})?#[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}", args.container_image
+    ):
+        raise BadInput(
+            "container-image must use registry#repository@sha256:<64 lowercase hex digits>, without credentials"
+        )
 
 
 def parse_record(output):
@@ -112,10 +145,15 @@ def cache_ready(args):
                 return False
             index = json.loads(raw)
             weights = index.get("weight_map") if isinstance(index, dict) else None
-            if (not isinstance(weights, dict) or not weights
-                    or not all(safe_relative(name) and name.endswith(".safetensors") for name in weights.values())):
+            if (
+                not isinstance(weights, dict)
+                or not weights
+                or not all(safe_relative(name) and name.endswith(".safetensors") for name in weights.values())
+            ):
                 return False
-            return validate_cache(args.cache_dir, args.repo_id, args.revision, sorted(required | set(weights.values())))["ok"]
+            return validate_cache(
+                args.cache_dir, args.repo_id, args.revision, sorted(required | set(weights.values()))
+            )["ok"]
         except (OSError, ValueError, UnicodeError, RecursionError):
             return False
     return True
@@ -140,38 +178,72 @@ def validate(args):
     node = parse_record(output) if rc == 0 else {}
     rc, output, _ = run(["scontrol", "show", "partition", "--oneliner", args.partition], args.timeout)
     partition = parse_record(output) if rc == 0 else {}
-    check("scheduler", node.get("NodeName") == args.node and bool(node.get("State"))
-          and partition.get("PartitionName") == args.partition and partition.get("State") == "UP"
-          and args.partition in node.get("Partitions", "").split(","),
-          "scheduler must return the selected node in the selected UP partition")
+    check(
+        "scheduler",
+        node.get("NodeName") == args.node
+        and bool(node.get("State"))
+        and partition.get("PartitionName") == args.partition
+        and partition.get("State") == "UP"
+        and args.partition in node.get("Partitions", "").split(","),
+        "scheduler must return the selected node in the selected UP partition",
+    )
     local_names = {socket.gethostname(), socket.gethostname().split(".")[0]}
-    check("local_node", node.get("NodeHostName") in local_names,
-          "run as the consumer on the selected compute host; remote runtime and cache are not verified")
+    check(
+        "local_node",
+        node.get("NodeHostName") in local_names,
+        "run as the consumer on the selected compute host; remote runtime and cache are not verified",
+    )
     configured = gpu_count(node.get("CfgTRES", ""))
     # Slurm emits an empty AllocTRES when nothing is allocated.
     allocated = gpu_count(node.get("AllocTRES", ""))
     if allocated is None and "AllocTRES" in node and not node["AllocTRES"]:
         allocated = 0
-    check("gpu_capacity", node.get("State") == "IDLE" and configured is not None and configured >= 1
-          and allocated == 0,
-          "selected node must be IDLE with at least one configured GPU and no allocated GPUs; mixed or flagged nodes are not accepted")
+    check(
+        "gpu_capacity",
+        node.get("State") == "IDLE" and configured is not None and configured >= 1 and allocated == 0,
+        "selected node must be IDLE with at least one configured GPU and no allocated GPUs; mixed or flagged nodes are not accepted",
+    )
     runtime_rc, runtime, _ = run(["enroot", "version"], args.timeout)
     plugin_rc, help_text, _ = run(["srun", "--help"], args.timeout)
-    check("container_support", runtime_rc == 0 and bool(runtime) and plugin_rc == 0
-          and "--container-image" in help_text and "--container-mounts" in help_text,
-          "local Enroot and Slurm Pyxis container options must be available; execution requires the optional probe")
-    check("cache", cache_ready(args),
-          "cache must contain readable nonempty config, tokenizer, and safetensors weights, including all indexed shards and explicitly required files")
+    check(
+        "container_support",
+        runtime_rc == 0
+        and bool(runtime)
+        and plugin_rc == 0
+        and "--container-image" in help_text
+        and "--container-mounts" in help_text,
+        "local Enroot and Slurm Pyxis container options must be available; execution requires the optional probe",
+    )
+    check(
+        "cache",
+        cache_ready(args),
+        "cache must contain readable nonempty config, tokenizer, and safetensors weights, including all indexed shards and explicitly required files",
+    )
     if args.gpu_smoke and not result["errors"]:
         result["gpu_smoke_ran"] = True
-        command = ["srun", "--nodes=1", "--ntasks=1", "--gpus=1", "--immediate=5", "--time=1",
-                   "--nodelist=" + args.node, "--partition=" + args.partition,
-                   "--container-image=" + args.container_image,
-                   "nvidia-smi", "--query-gpu=index,name", "--format=csv,noheader"]
+        command = [
+            "srun",
+            "--nodes=1",
+            "--ntasks=1",
+            "--gpus=1",
+            "--immediate=5",
+            "--time=1",
+            "--nodelist=" + args.node,
+            "--partition=" + args.partition,
+            "--container-image=" + args.container_image,
+            "nvidia-smi",
+            "--query-gpu=index,name",
+            "--format=csv,noheader",
+        ]
         rc, output, _ = run(command, args.timeout)
         result["gpu_smoke_ok"] = rc == 0 and bool(re.fullmatch(r"\d+,\s*[^\n,]+", output))
         if not result["gpu_smoke_ok"]:
-            result["errors"].append({"stage": "gpu_smoke", "message": "optional container job failed or did not report exactly one GPU"})
+            result["errors"].append(
+                {
+                    "stage": "gpu_smoke",
+                    "message": "optional container job failed or did not report exactly one GPU",
+                }
+            )
     result["ok"] = not result["errors"]
     result["status"] = "ready" if result["ok"] else "not_ready"
     return result
@@ -189,7 +261,11 @@ def main(argv=None):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--require-file", required=True, action="append")
     parser.add_argument("--timeout", type=float, default=30, help="Per-command bound, 0 < seconds <= 120")
-    parser.add_argument("--gpu-smoke", action="store_true", help="Opt in to one GPU container job; may pull the image, never trains")
+    parser.add_argument(
+        "--gpu-smoke",
+        action="store_true",
+        help="Opt in to one GPU container job; may pull the image, never trains",
+    )
     parser.add_argument("--json", action="store_true")
     try:
         args = parser.parse_args(argv)

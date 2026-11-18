@@ -4,6 +4,7 @@
 Only kubectl is replaced; the real script and common.sh run in a disposable
 checkout fragment, so neither the cluster nor the source manifest is modified.
 """
+
 import os
 from pathlib import Path
 import shutil
@@ -18,8 +19,11 @@ class VerifyGPU(unittest.TestCase):
     def run_script(self, capacities):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ("scripts/k8s/verify_gpu.sh", "scripts/common.sh",
-                         "workloads/examples/k8s/cluster-gpu-test-job.yml"):
+            for name in (
+                "scripts/k8s/verify_gpu.sh",
+                "scripts/common.sh",
+                "workloads/examples/k8s/cluster-gpu-test-job.yml",
+            ):
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, target)
@@ -28,7 +32,7 @@ class VerifyGPU(unittest.TestCase):
             binary = root / "bin"
             binary.mkdir()
             mock = binary / "kubectl"
-            mock.write_text('''#!/usr/bin/env bash
+            mock.write_text("""#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$CALLS"
 case "$*" in
   'describe nodes') printf '%s' "$CAPACITY" ;;
@@ -38,7 +42,7 @@ case "$*" in
     done ;;
   *' logs -f '*) echo 'GPU test output' ;;
 esac
-''')
+""")
             mock.chmod(0o755)
             capacity = "".join(
                 "Name: fixture-node\nCapacity:\n cpu: 8\n memory: 32Gi\n"
@@ -46,16 +50,26 @@ esac
                 + " pods: 110\nAllocatable:\n cpu: 8\n\n"
                 for value in capacities
             )
-            env = {**os.environ, "PATH": f"{binary}:/usr/bin:/bin",
-                   "CALLS": str(root / "calls"), "CAPACITY": capacity,
-                   "PODS": str(sum(value or 0 for value in capacities)),
-                   "DEEPOPS_CONFIG_DIR": str(root / "absent-config"),
-                   "DEEPOPS_VERSION": "test", "CLUSTER_VERIFY_EXPECTED_PODS": "",
-                   "CLUSTER_VERIFY_NS": "fixture-gpu-verify",
-                   "CLUSTER_VERIFY_JOB": str(manifest),
-                   "TESTS_DIR": str(manifest.parent)}
-            result = subprocess.run(["bash", str(root / "scripts/k8s/verify_gpu.sh")],
-                                    env=env, text=True, capture_output=True, timeout=10)
+            env = {
+                **os.environ,
+                "PATH": f"{binary}:/usr/bin:/bin",
+                "CALLS": str(root / "calls"),
+                "CAPACITY": capacity,
+                "PODS": str(sum(value or 0 for value in capacities)),
+                "DEEPOPS_CONFIG_DIR": str(root / "absent-config"),
+                "DEEPOPS_VERSION": "test",
+                "CLUSTER_VERIFY_EXPECTED_PODS": "",
+                "CLUSTER_VERIFY_NS": "fixture-gpu-verify",
+                "CLUSTER_VERIFY_JOB": str(manifest),
+                "TESTS_DIR": str(manifest.parent),
+            }
+            result = subprocess.run(
+                ["bash", str(root / "scripts/k8s/verify_gpu.sh")],
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=10,
+            )
             return result, (root / "calls").read_text().splitlines(), original, manifest.read_text()
 
     def test_zero_capacity_does_not_mutate_cluster_or_manifest(self):

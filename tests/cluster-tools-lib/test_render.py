@@ -1,4 +1,5 @@
 """Unit tests for clustertools.render (roles/cluster_tools_lib), no terminal needed."""
+
 import io
 import re
 import sys
@@ -58,18 +59,20 @@ class BarAndLoadTests(unittest.TestCase):
 
     def test_bar(self):
         self.assertEqual(self.t.bar(0, 10, 10), "-" * 10)
-        self.assertEqual(self.t.bar(1, 1000, 10), "#" + "-" * 9)   # any use shows
-        self.assertEqual(self.t.bar(20, 10, 4), "####")            # clamped
-        self.assertEqual(self.t.bar(3, 0, 4), "    ")              # no such resource
+        self.assertEqual(self.t.bar(1, 1000, 10), "#" + "-" * 9)  # any use shows
+        self.assertEqual(self.t.bar(20, 10, 4), "####")  # clamped
+        self.assertEqual(self.t.bar(3, 0, 4), "    ")  # no such resource
 
     def test_load_thresholds(self):
-        self.assertEqual([self.t.load(u, 100) for u in (0, 10, 50, 80, 95)],
-                         ["faint", "ok", "warn", "hot", "crit"])
+        self.assertEqual(
+            [self.t.load(u, 100) for u in (0, 10, 50, 80, 95)], ["faint", "ok", "warn", "hot", "crit"]
+        )
         self.assertEqual(self.t.load(1, 0), "faint")
 
     def test_tone_ladder(self):
-        self.assertEqual([self.t.tone(s) for s in (0, 1, 2, 3, 9)],
-                         ["text", "sub", "muted", "faint", "faint"])
+        self.assertEqual(
+            [self.t.tone(s) for s in (0, 1, 2, 3, 9)], ["text", "sub", "muted", "faint", "faint"]
+        )
 
 
 class GridTests(unittest.TestCase):
@@ -92,7 +95,7 @@ class GridTests(unittest.TestCase):
         self.assertEqual(g.widths(), [8])
         self.assertEqual(g.total(), 10)
         lines = [plain(x) for x in g.render("T").splitlines()]
-        self.assertEqual(lines[3], "  3/8 ##--")   # 1.5 of 4 rounds up
+        self.assertEqual(lines[3], "  3/8 ##--")  # 1.5 of 4 rounds up
         self.assertEqual(lines[4], "  12/16")
 
     def test_heading_widens_a_narrow_table(self):

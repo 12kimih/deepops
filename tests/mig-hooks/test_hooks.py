@@ -4,6 +4,7 @@
 Run using the project's Ansible Python environment:
   python tests/mig-hooks/test_hooks.py
 """
+
 import os
 from pathlib import Path
 import shlex
@@ -12,6 +13,7 @@ import unittest
 import yaml
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from ansible_yaml import canonical, render, same_name  # noqa: E402
 
@@ -23,8 +25,11 @@ DEFAULTS = yaml.safe_load((ROOT / "config.example/group_vars/all.yml").read_text
 
 class Hooks(unittest.TestCase):
     def render(self, values):
-        variables = {"mig_manager_config": "/etc/mig/config.yml",
-                     "mig_manager_profile": "all-disabled", **values}
+        variables = {
+            "mig_manager_config": "/etc/mig/config.yml",
+            "mig_manager_profile": "all-disabled",
+            **values,
+        }
         rendered = render(APPLY["command"], variables)
         return shlex.split(rendered)
 
@@ -41,9 +46,8 @@ class Hooks(unittest.TestCase):
         for path in ("/etc/mig/custom-hooks.yaml", "/missing/hooks file.yaml"):
             with self.subTest(path=path):
                 args = self.render({"mig_manager_hooks": path})
-                self.assertEqual(args[args.index("-k") + 1:], [path])
-                self.assertEqual(args[:6], ["systemd-run", "--wait", "--pipe",
-                                            "--collect", "--quiet", "--"])
+                self.assertEqual(args[args.index("-k") + 1 :], [path])
+                self.assertEqual(args[:6], ["systemd-run", "--wait", "--pipe", "--collect", "--quiet", "--"])
                 self.assertIn("apply", args)
 
 

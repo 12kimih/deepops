@@ -28,9 +28,7 @@ SMOKE_POD = "deepops-validate-cuda"
 def run(cmd, timeout=60, input_text=None):
     """Run a command, returning (rc, stdout, stderr) without raising."""
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, input=input_text
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=input_text)
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout after %ss" % timeout
@@ -135,8 +133,7 @@ def run_cuda_smoke(result, image, timeout):
     phase = ""
     while time.time() < deadline:
         rc, phase, _ = run(
-            ["kubectl", "-n", SMOKE_NAMESPACE, "get", "pod", SMOKE_POD,
-             "-o", "jsonpath={.status.phase}"]
+            ["kubectl", "-n", SMOKE_NAMESPACE, "get", "pod", SMOKE_POD, "-o", "jsonpath={.status.phase}"]
         )
         if phase in ("Succeeded", "Failed"):
             break
@@ -144,9 +141,7 @@ def run_cuda_smoke(result, image, timeout):
     rc, logs, _ = run(["kubectl", "-n", SMOKE_NAMESPACE, "logs", SMOKE_POD])
     if phase == "Succeeded" and rc == 0 and "GPU" in logs:
         result["cuda_smoke_ok"] = True
-        result["cuda_smoke_gpus"] = sum(
-            1 for line in logs.splitlines() if line.startswith("GPU ")
-        )
+        result["cuda_smoke_gpus"] = sum(1 for line in logs.splitlines() if line.startswith("GPU "))
         run(["kubectl", "delete", "namespace", SMOKE_NAMESPACE, "--ignore-not-found"], timeout=120)
     else:
         result["failures"].append(
@@ -156,15 +151,12 @@ def run_cuda_smoke(result, image, timeout):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate a DeepOps Kubernetes GPU deployment."
-    )
+    parser = argparse.ArgumentParser(description="Validate a DeepOps Kubernetes GPU deployment.")
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
     parser.add_argument(
         "--cuda-smoke",
         action="store_true",
-        help="run a CUDA pod requesting one GPU (creates and deletes namespace %s)"
-        % SMOKE_NAMESPACE,
+        help="run a CUDA pod requesting one GPU (creates and deletes namespace %s)" % SMOKE_NAMESPACE,
     )
     parser.add_argument(
         "--cuda-image",
@@ -221,9 +213,7 @@ def main():
         if total == 0:
             result["failures"].append("cluster reports zero nodes")
         elif ready < total:
-            result["failures"].append(
-                "%d of %d nodes are not Ready" % (total - ready, total)
-            )
+            result["failures"].append("%d of %d nodes are not Ready" % (total - ready, total))
         if gpus == 0 and not args.allow_no_gpus:
             result["failures"].append(
                 "no allocatable nvidia.com/gpu resources; check GPU Operator or device plugin"
@@ -231,8 +221,16 @@ def main():
 
     if result["api_reachable"]:
         rc, out, _ = run(
-            ["kubectl", "get", "pods", "--all-namespaces",
-             "-l", "app.kubernetes.io/managed-by in (gpu-operator)", "-o", "json"],
+            [
+                "kubectl",
+                "get",
+                "pods",
+                "--all-namespaces",
+                "-l",
+                "app.kubernetes.io/managed-by in (gpu-operator)",
+                "-o",
+                "json",
+            ],
             timeout=120,
         )
         pods_total = pods_ready = 0

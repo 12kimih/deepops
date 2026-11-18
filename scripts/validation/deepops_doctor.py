@@ -26,9 +26,7 @@ import sys
 def run(cmd, timeout=120, env=None):
     """Run a command, returning (rc, stdout, stderr) without raising."""
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, env=env
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout after %ss" % timeout
@@ -71,9 +69,7 @@ def count_inventory_hosts(inventory_json):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Preflight checks for a DeepOps provisioning environment."
-    )
+    parser = argparse.ArgumentParser(description="Preflight checks for a DeepOps provisioning environment.")
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
     parser.add_argument(
         "--inventory",
@@ -138,18 +134,14 @@ def main():
         checks,
         "config_dir_exists",
         os.path.isdir(config_dir),
-        config_dir
-        if os.path.isdir(config_dir)
-        else "copy config.example/ to config/ and edit the inventory",
+        config_dir if os.path.isdir(config_dir) else "copy config.example/ to config/ and edit the inventory",
     )
 
     inventory = args.inventory or os.path.join(config_dir, "inventory")
     hosts_total = 0
     groups = []
     if ansible_ok and config_ok and os.path.exists(inventory):
-        rc, out, err = run(
-            ["ansible-inventory", "-i", inventory, "--list"], timeout=120
-        )
+        rc, out, err = run(["ansible-inventory", "-i", inventory, "--list"], timeout=120)
         parsed_ok = False
         if rc == 0:
             try:
@@ -172,9 +164,7 @@ def main():
                 checks,
                 "inventory_has_hosts",
                 hosts_total > 0,
-                "%d host(s) defined" % hosts_total
-                if hosts_total
-                else "inventory defines no hosts",
+                "%d host(s) defined" % hosts_total if hosts_total else "inventory defines no hosts",
             )
     else:
         check(
@@ -185,9 +175,7 @@ def main():
         )
 
     if args.remote and hosts_total > 0:
-        rc, out, err = run(
-            ["ansible", "all", "-i", inventory, "-m", "ping", "-o"], timeout=300
-        )
+        rc, out, err = run(["ansible", "all", "-i", inventory, "-m", "ping", "-o"], timeout=300)
         reachable = out.count("SUCCESS")
         check(
             checks,
@@ -198,8 +186,15 @@ def main():
 
         rc, out, _ = run(
             [
-                "ansible", "all", "-i", inventory, "-m", "shell", "-o",
-                "-a", "lspci 2>/dev/null | grep -ci nvidia || true",
+                "ansible",
+                "all",
+                "-i",
+                inventory,
+                "-m",
+                "shell",
+                "-o",
+                "-a",
+                "lspci 2>/dev/null | grep -ci nvidia || true",
             ],
             timeout=300,
         )
@@ -213,8 +208,15 @@ def main():
 
         rc, out, _ = run(
             [
-                "ansible", "all", "-i", inventory, "-m", "shell", "-o",
-                "-a", "systemctl show ssh.service sshd.service -p DeviceAllow 2>/dev/null | grep -ci nvidiactl || true",
+                "ansible",
+                "all",
+                "-i",
+                inventory,
+                "-m",
+                "shell",
+                "-o",
+                "-a",
+                "systemctl show ssh.service sshd.service -p DeviceAllow 2>/dev/null | grep -ci nvidiactl || true",
             ],
             timeout=300,
         )

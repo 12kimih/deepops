@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check explicitly required model files locally; never download or load model code."""
+
 import argparse
 import json
 from pathlib import Path, PurePosixPath
@@ -24,16 +25,30 @@ def validate(cache_dir, repo_id, revision, required_files):
     }
     try:
         parts = repo_id.split("/")
-        if (len(parts) not in (1, 2) or len(repo_id) > 96
-                or any(not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", p)
-                       or p.endswith((".", "-")) or ".." in p or "--" in p for p in parts)):
+        if (
+            len(parts) not in (1, 2)
+            or len(repo_id) > 96
+            or any(
+                not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", p)
+                or p.endswith((".", "-"))
+                or ".." in p
+                or "--" in p
+                for p in parts
+            )
+        ):
             raise CacheError("repo_id must be a model name or namespace/model name")
         if not re.fullmatch(r"[0-9a-f]{40}", revision):
             raise CacheError("revision must be a full lowercase 40-character commit hash")
         for name in required_files:
             path = PurePosixPath(name)
-            if (not name or path.is_absolute() or ".." in path.parts
-                    or str(path) != name or name == "." or "\\" in name):
+            if (
+                not name
+                or path.is_absolute()
+                or ".." in path.parts
+                or str(path) != name
+                or name == "."
+                or "\\" in name
+            ):
                 raise CacheError("required files must be normalized relative paths without traversal")
         root = Path(cache_dir).resolve(strict=True)
         if not root.is_dir():
@@ -61,7 +76,9 @@ def validate(cache_dir, repo_id, revision, required_files):
         result["errors"].append(str(exc))
     except (OSError, RuntimeError, ValueError):
         # Do not echo OS exception paths: a malformed symlink can point at private data.
-        result["errors"].append("cache input missing, unreadable, or invalid; check the pinned snapshot and required files")
+        result["errors"].append(
+            "cache input missing, unreadable, or invalid; check the pinned snapshot and required files"
+        )
     return result
 
 
@@ -70,8 +87,12 @@ def main():
     parser.add_argument("--cache-dir", required=True, help="Explicit HF_HUB_CACHE directory")
     parser.add_argument("--repo-id", required=True, help="Model repository, e.g. namespace/model")
     parser.add_argument("--revision", required=True, help="Full immutable model commit hash")
-    parser.add_argument("--require-file", action="append", required=True,
-                        help="Required nonempty file relative to snapshot; repeat for every needed file")
+    parser.add_argument(
+        "--require-file",
+        action="append",
+        required=True,
+        help="Required nonempty file relative to snapshot; repeat for every needed file",
+    )
     parser.add_argument("--json", action="store_true", help="Emit schema-versioned JSON")
     args = parser.parse_args()
     result = validate(args.cache_dir, args.repo_id, args.revision, args.require_file)

@@ -12,7 +12,8 @@ import unittest
 
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location(
-    "validate_runai", os.path.join(SCRIPTS_DIR, "validate_runai.py"))
+    "validate_runai", os.path.join(SCRIPTS_DIR, "validate_runai.py")
+)
 vr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(vr)
 
@@ -21,21 +22,47 @@ def deploy(name, want=1, have=1):
     return {"metadata": {"name": name}, "spec": {"replicas": want}, "status": {"availableReplicas": have}}
 
 
-HEALTHY = {"items": [deploy(n) for n in
-                     ("kai-operator", "binder", "queue-controller", "admission", "kai-scheduler-default", "runai-scheduler-default")]}
+HEALTHY = {
+    "items": [
+        deploy(n)
+        for n in (
+            "kai-operator",
+            "binder",
+            "queue-controller",
+            "admission",
+            "kai-scheduler-default",
+            "runai-scheduler-default",
+        )
+    ]
+}
 
 
 def pod(name, node="n1", group="g1", pg="pg-" + "x"):
-    return {"metadata": {"name": name, "labels": {"runai-gpu-group": group} if group else {},
-                         "annotations": {"pod-group-name": pg} if pg else {}},
-            "spec": {"nodeName": node}}
+    return {
+        "metadata": {
+            "name": name,
+            "labels": {"runai-gpu-group": group} if group else {},
+            "annotations": {"pod-group-name": pg} if pg else {},
+        },
+        "spec": {"nodeName": node},
+    }
 
 
 class FakeKube:
     """Scripted stand-in for the Kube wrapper."""
 
-    def __init__(self, deployments=HEALTHY, crd=True, pods=None, phases=None, logs=None,
-                 apply_rc=0, ns_rc=0, namespaces=None, nodes=True):
+    def __init__(
+        self,
+        deployments=HEALTHY,
+        crd=True,
+        pods=None,
+        phases=None,
+        logs=None,
+        apply_rc=0,
+        ns_rc=0,
+        namespaces=None,
+        nodes=True,
+    ):
         self.deployments, self.crd, self.pods = deployments, crd, pods or {}
         self.phases, self.logged, self.apply_rc, self.ns_rc = phases or {}, logs or {}, apply_rc, ns_rc
         self.namespaces, self.nodes = namespaces or {"items": []}, nodes
@@ -50,8 +77,8 @@ class FakeKube:
             return self.namespaces, ""
         if "deployments" in args:
             return (self.deployments, "") if self.deployments is not None else (None, "forbidden")
-        if 'configmaps' in args:
-            return {'items': []}, ''
+        if "configmaps" in args:
+            return {"items": []}, ""
         if "crd" in args:
             return ({}, "") if self.crd else (None, "not found")
         if "pod" in args:
@@ -93,8 +120,11 @@ def args(*extra):
     return vr.parse_args(extra)
 
 
-GOOD_PODS = {"kai-whole-gpu": pod("kai-whole-gpu"), "kai-half-a": pod("kai-half-a"),
-             "kai-half-b": pod("kai-half-b")}
+GOOD_PODS = {
+    "kai-whole-gpu": pod("kai-whole-gpu"),
+    "kai-half-a": pod("kai-half-a"),
+    "kai-half-b": pod("kai-half-b"),
+}
 
 
 class TestParsers(unittest.TestCase):
@@ -104,9 +134,13 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(bad, ["binder (0/1 available)"])
 
     def test_missing_deployments_needs_a_scheduler_shard(self):
-        self.assertEqual(vr.missing_deployments(["kai-operator", "binder", "queue-controller", "admission"]),
-                         ["kai-scheduler-<shard>"])
-        self.assertEqual(vr.missing_deployments(list(vr.REQUIRED_DEPLOYMENTS) + ["kai-scheduler-default"]), [])
+        self.assertEqual(
+            vr.missing_deployments(["kai-operator", "binder", "queue-controller", "admission"]),
+            ["kai-scheduler-<shard>"],
+        )
+        self.assertEqual(
+            vr.missing_deployments(list(vr.REQUIRED_DEPLOYMENTS) + ["kai-scheduler-default"]), []
+        )
 
     def test_same_gpu_requires_node_and_group(self):
         self.assertTrue(vr.same_gpu([("n1", "g", "p"), ("n1", "g", "p")]))
@@ -117,10 +151,23 @@ class TestParsers(unittest.TestCase):
         self.assertFalse(vr.same_gpu([("n1", "g", "p")]))
 
     def test_leftovers(self):
-        ns = {"items": [{"metadata": {"name": n}} for n in
-                        ("default", "kai-scheduler", "runai", "runai-backend", "kai-resource-reservation", "runaix-ok")]}
-        rel = [{"name": "kai-scheduler", "namespace": "kai-scheduler", "chart": "kai-scheduler-v0.18.5"},
-               {"name": "gpu", "namespace": "g", "chart": "gpu-operator-v26.7.0"}]
+        ns = {
+            "items": [
+                {"metadata": {"name": n}}
+                for n in (
+                    "default",
+                    "kai-scheduler",
+                    "runai",
+                    "runai-backend",
+                    "kai-resource-reservation",
+                    "runaix-ok",
+                )
+            ]
+        }
+        rel = [
+            {"name": "kai-scheduler", "namespace": "kai-scheduler", "chart": "kai-scheduler-v0.18.5"},
+            {"name": "gpu", "namespace": "g", "chart": "gpu-operator-v26.7.0"},
+        ]
         found = vr.leftovers(ns, rel)
         self.assertIn("namespace/runai", found)
         self.assertIn("namespace/runai-backend", found)
@@ -138,8 +185,18 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(vr.cluster_connected([], "deepops"), (False, False))
 
     def test_pod_manifest_uses_kai_and_queue(self):
-        m = vr.pod_manifest("p", "ns", "img", ["a"], [], "kai-scheduler", "kai.scheduler/queue", "q",
-                            gpu_limit=1, annotations={"gpu-fraction": "0.5"})
+        m = vr.pod_manifest(
+            "p",
+            "ns",
+            "img",
+            ["a"],
+            [],
+            "kai-scheduler",
+            "kai.scheduler/queue",
+            "q",
+            gpu_limit=1,
+            annotations={"gpu-fraction": "0.5"},
+        )
         self.assertEqual(m["spec"]["schedulerName"], "kai-scheduler")
         self.assertEqual(m["metadata"]["labels"], {"kai.scheduler/queue": "q"})
         self.assertEqual(m["spec"]["containers"][0]["resources"]["limits"]["nvidia.com/gpu"], 1)
@@ -225,30 +282,41 @@ class TestMemoryEnforcement(unittest.TestCase):
         return dict(GOOD_PODS)
 
     def test_inside_ok_and_outside_refused_is_ok(self):
-        kube = FakeKube(pods=self.pods(), phases={"kai-mem-outside": "Failed"},
-                        logs={"kai-mem-inside": "ALLOC_OK 256", "kai-mem-outside": "ALLOC_FAILED alloc rc=2"})
+        kube = FakeKube(
+            pods=self.pods(),
+            phases={"kai-mem-outside": "Failed"},
+            logs={"kai-mem-inside": "ALLOC_OK 256", "kai-mem-outside": "ALLOC_FAILED alloc rc=2"},
+        )
         result = vr.validate(args("--memory-enforcement"), {}, kube)
         self.assertTrue(result["ok"], result["failures"])
         self.assertTrue(result["memory_enforcement_ok"])
         outside = [m for m in kube.applied if m["metadata"]["name"] == "kai-mem-outside"][0]
-        self.assertEqual(outside["metadata"]["annotations"][
-            "nvidia.com/container.gpu-workload.gpu-memory.limit"], "1024Mi")
+        self.assertEqual(
+            outside["metadata"]["annotations"]["nvidia.com/container.gpu-workload.gpu-memory.limit"], "1024Mi"
+        )
 
     def test_outside_allowed_to_allocate_is_not_ok(self):
-        kube = FakeKube(pods=self.pods(),
-                        logs={"kai-mem-inside": "ALLOC_OK 256", "kai-mem-outside": "ALLOC_OK 4096"})
+        kube = FakeKube(
+            pods=self.pods(), logs={"kai-mem-inside": "ALLOC_OK 256", "kai-mem-outside": "ALLOC_OK 4096"}
+        )
         result = vr.validate(args("--memory-enforcement"), {}, kube)
         self.assertFalse(result["ok"])
         self.assertFalse(result["memory_enforcement_ok"])
 
     def test_outside_killed_for_another_reason_is_not_proof(self):
-        kube = FakeKube(pods=self.pods(), phases={"kai-mem-outside": "Failed"},
-                        logs={"kai-mem-inside": "ALLOC_OK 256", "kai-mem-outside": "ImportError"})
+        kube = FakeKube(
+            pods=self.pods(),
+            phases={"kai-mem-outside": "Failed"},
+            logs={"kai-mem-inside": "ALLOC_OK 256", "kai-mem-outside": "ImportError"},
+        )
         self.assertFalse(vr.validate(args("--memory-enforcement"), {}, kube)["ok"])
 
     def test_inside_failing_is_not_ok(self):
-        kube = FakeKube(pods=self.pods(), phases={"kai-mem-inside": "Failed"},
-                        logs={"kai-mem-inside": "ALLOC_FAILED alloc rc=2"})
+        kube = FakeKube(
+            pods=self.pods(),
+            phases={"kai-mem-inside": "Failed"},
+            logs={"kai-mem-inside": "ALLOC_FAILED alloc rc=2"},
+        )
         self.assertFalse(vr.validate(args("--memory-enforcement"), {}, kube)["ok"])
 
     def test_off_by_default(self):
@@ -265,8 +333,11 @@ class TestPlatformAndUninstall(unittest.TestCase):
         orig = vr.https_request
         vr.https_request = lambda *a, **k: (200, b"")
         try:
-            result = vr.validate(args("--mode", "platform", "--platform-domain", "runai.lab.test", "--skip-gpu-jobs"),
-                                 {}, FakeKube(pods=GOOD_PODS))
+            result = vr.validate(
+                args("--mode", "platform", "--platform-domain", "runai.lab.test", "--skip-gpu-jobs"),
+                {},
+                FakeKube(pods=GOOD_PODS),
+            )
         finally:
             vr.https_request = orig
         self.assertFalse(result["ok"])
@@ -284,13 +355,19 @@ class TestPlatformAndUninstall(unittest.TestCase):
             if path == "/api/v2/token":
                 return 200, json.dumps({"access_token": "t"}).encode()
             if path == "/api/v1/clusters":
-                return 200, json.dumps({"clusters": [{"name": "deepops", "status": {"platform": clusters_status}}]}).encode()
+                return 200, json.dumps(
+                    {"clusters": [{"name": "deepops", "status": {"platform": clusters_status}}]}
+                ).encode()
             return 404, b""
+
         orig = vr.https_request
         vr.https_request = fake
         try:
-            result = vr.validate(args("--mode", "platform", "--platform-domain", "runai.lab.test", "--skip-gpu-jobs"),
-                                 {"RUNAI_USERNAME": "u", "RUNAI_PASSWORD": "p"}, FakeKube(pods=GOOD_PODS))
+            result = vr.validate(
+                args("--mode", "platform", "--platform-domain", "runai.lab.test", "--skip-gpu-jobs"),
+                {"RUNAI_USERNAME": "u", "RUNAI_PASSWORD": "p"},
+                FakeKube(pods=GOOD_PODS),
+            )
         finally:
             vr.https_request = orig
         return result
@@ -331,10 +408,31 @@ class TestPlatformAndUninstall(unittest.TestCase):
 
 
 class TestExposure(unittest.TestCase):
-    GW = {"items": [{"metadata": {"name": "runai-gateway", "namespace": "runai"}, "status": {"addresses": [{"type": "IPAddress", "value": "192.0.2.50"}]}}]}
-    SVC = {"items": [{"spec": {"type": "NodePort"}, "status": {"loadBalancer": {"ingress": [{"ip": "192.0.2.60"}]}}}]}
-    NODES = {"items": [{"status": {"addresses": [{"type": "InternalIP", "address": "192.0.2.10"},
-                                                  {"type": "Hostname", "address": "n1"}]}}]}
+    GW = {
+        "items": [
+            {
+                "metadata": {"name": "runai-gateway", "namespace": "runai"},
+                "status": {"addresses": [{"type": "IPAddress", "value": "192.0.2.50"}]},
+            }
+        ]
+    }
+    SVC = {
+        "items": [
+            {"spec": {"type": "NodePort"}, "status": {"loadBalancer": {"ingress": [{"ip": "192.0.2.60"}]}}}
+        ]
+    }
+    NODES = {
+        "items": [
+            {
+                "status": {
+                    "addresses": [
+                        {"type": "InternalIP", "address": "192.0.2.10"},
+                        {"type": "Hostname", "address": "n1"},
+                    ]
+                }
+            }
+        ]
+    }
 
     def test_classify(self):
         gw, ing = vr.gateway_addresses(self.GW), vr.ingress_addresses(self.SVC, self.NODES)
@@ -351,10 +449,19 @@ class TestExposure(unittest.TestCase):
     def _run(self, ip, *extra):
         class K(FakeKube):
             def get_json(self, a, timeout=60):
-                if 'ingresses' in a:
-                    return {'items': [{'spec': {'rules': [{'host': 'runai.lab.test'}]}}]}, ''
-                if 'httproutes.gateway.networking.k8s.io' in a:
-                    return {'items': [{'spec': {'hostnames': ['runai.lab.test'], 'parentRefs': [{'name': 'runai-gateway', 'namespace': 'runai'}]}}]}, ''
+                if "ingresses" in a:
+                    return {"items": [{"spec": {"rules": [{"host": "runai.lab.test"}]}}]}, ""
+                if "httproutes.gateway.networking.k8s.io" in a:
+                    return {
+                        "items": [
+                            {
+                                "spec": {
+                                    "hostnames": ["runai.lab.test"],
+                                    "parentRefs": [{"name": "runai-gateway", "namespace": "runai"}],
+                                }
+                            }
+                        ]
+                    }, ""
                 if "gateways.gateway.networking.k8s.io" in a:
                     return TestExposure.GW, ""
                 if "services" in a:
@@ -362,19 +469,34 @@ class TestExposure(unittest.TestCase):
                 if a[:2] == ["get", "nodes"]:
                     return TestExposure.NODES, ""
                 return FakeKube.get_json(self, a, timeout)
+
         orig = vr.https_request
 
         def fake(domain, rip, ca, method, path, body=None, headers=None, timeout=20):
             if path == "/api/v2/token":
                 return 200, json.dumps({"access_token": "t"}).encode()
             if path == "/api/v1/clusters":
-                return 200, json.dumps({"clusters": [{"name": "deepops", "status": {"platform": "Connected"}}]}).encode()
+                return 200, json.dumps(
+                    {"clusters": [{"name": "deepops", "status": {"platform": "Connected"}}]}
+                ).encode()
             return 200, b""
+
         vr.https_request = fake
         try:
-            return vr.validate(args("--mode", "platform", "--platform-domain", "runai.lab.test",
-                                    "--skip-gpu-jobs", "--resolve-ip", ip, *extra),
-                               {"RUNAI_USERNAME": "u", "RUNAI_PASSWORD": "p"}, K(pods=GOOD_PODS))
+            return vr.validate(
+                args(
+                    "--mode",
+                    "platform",
+                    "--platform-domain",
+                    "runai.lab.test",
+                    "--skip-gpu-jobs",
+                    "--resolve-ip",
+                    ip,
+                    *extra,
+                ),
+                {"RUNAI_USERNAME": "u", "RUNAI_PASSWORD": "p"},
+                K(pods=GOOD_PODS),
+            )
         finally:
             vr.https_request = orig
 
@@ -409,7 +531,9 @@ class TestExposure(unittest.TestCase):
         with self.assertRaises(SystemExit):
             args("--exposure", "gateway")
         with self.assertRaises(SystemExit):
-            args("--mode", "platform", "--platform-domain", "a.test", "--skip-gpu-jobs", "--exposure", "nginx")
+            args(
+                "--mode", "platform", "--platform-domain", "a.test", "--skip-gpu-jobs", "--exposure", "nginx"
+            )
 
 
 class TestPlatformProject(unittest.TestCase):
@@ -421,8 +545,9 @@ class TestPlatformProject(unittest.TestCase):
         self.addCleanup(setattr, vr, "new_project_namespace", orig)
         self.NS_DOC = {"metadata": {"name": self.NS, "uid": "uid-fake", "labels": {"runai/queue": "dv"}}}
 
-    def _run(self, create_status=201, delete_status=200, extra=(), ns_doc=None, existing=(),
-             wait_result="doc"):
+    def _run(
+        self, create_status=201, delete_status=200, extra=(), ns_doc=None, existing=(), wait_result="doc"
+    ):
         calls = []
 
         def fake(domain, ip, ca, method, path, body=None, headers=None, timeout=20):
@@ -432,30 +557,54 @@ class TestPlatformProject(unittest.TestCase):
             if path == "/api/v2/token":
                 return 200, json.dumps({"access_token": "t"}).encode()
             if path == "/api/v1/clusters":
-                return 200, json.dumps({"clusters": [{"name": "deepops", "uuid": "c1",
-                                                      "status": {"platform": "Connected"}}]}).encode()
+                return 200, json.dumps(
+                    {"clusters": [{"name": "deepops", "uuid": "c1", "status": {"platform": "Connected"}}]}
+                ).encode()
             if path == "/api/v1/node-pools":
-                return 200, json.dumps({"nodepools": [{"id": 7, "name": "default", "clusterId": "c1"}]}).encode()
+                return 200, json.dumps(
+                    {"nodepools": [{"id": 7, "name": "default", "clusterId": "c1"}]}
+                ).encode()
             if path == "/api/v1/org-unit/projects" and method == "POST":
                 return create_status, json.dumps({"id": "p1"}).encode()
             if path == "/api/v1/org-unit/projects/p1" and method == "DELETE":
                 return delete_status, b""
             return 404, b""
+
         orig = vr.https_request
         vr.https_request = fake
-        kube = FakeKube(pods={"kai-whole-gpu": pod("kai-whole-gpu"), "kai-half-a": pod("kai-half-a"),
-                              "kai-half-b": pod("kai-half-b")}, ns_rc=1 if existing else 0)
+        kube = FakeKube(
+            pods={
+                "kai-whole-gpu": pod("kai-whole-gpu"),
+                "kai-half-a": pod("kai-half-a"),
+                "kai-half-b": pod("kai-half-b"),
+            },
+            ns_rc=1 if existing else 0,
+        )
         kube_get = kube.get_json
         doc = self.NS_DOC if ns_doc is None else ns_doc
         kube.get_json = lambda a, timeout=60: (
-            (doc, "") if wait_result == "doc" else (None, "not found")) if a[:2] == ["get", "namespace"] \
+            ((doc, "") if wait_result == "doc" else (None, "not found"))
+            if a[:2] == ["get", "namespace"]
             else kube_get(a, timeout)
+        )
         orig_sleep, vr.time.sleep = vr.time.sleep, lambda s: None
         self.addCleanup(setattr, vr.time, "sleep", orig_sleep)
         try:
-            result = vr.validate(args("--mode", "platform", "--platform-domain", "runai.lab.test",
-                                      "--create-project", "dv", "--job-timeout", "10", *extra),
-                                 {"RUNAI_USERNAME": "u", "RUNAI_PASSWORD": "p"}, kube)
+            result = vr.validate(
+                args(
+                    "--mode",
+                    "platform",
+                    "--platform-domain",
+                    "runai.lab.test",
+                    "--create-project",
+                    "dv",
+                    "--job-timeout",
+                    "10",
+                    *extra,
+                ),
+                {"RUNAI_USERNAME": "u", "RUNAI_PASSWORD": "p"},
+                kube,
+            )
         finally:
             vr.https_request = orig
         return result, calls, kube
@@ -469,13 +618,18 @@ class TestPlatformProject(unittest.TestCase):
 
     def test_skip_fractions_needs_create_project(self):
         with self.assertRaises(SystemExit):
-            args("--mode", "platform", "--platform-domain", "runai.lab.test",
-                 "--skip-gpu-jobs", "--skip-fractions")
+            args(
+                "--mode",
+                "platform",
+                "--platform-domain",
+                "runai.lab.test",
+                "--skip-gpu-jobs",
+                "--skip-fractions",
+            )
 
     def test_platform_without_project_or_skip_is_rejected(self):
         with self.assertRaises(SystemExit):
-            args("--mode", "platform", "--platform-domain", "runai.lab.test",
-                 "--namespace", "runai-existing")
+            args("--mode", "platform", "--platform-domain", "runai.lab.test", "--namespace", "runai-existing")
 
     def test_no_kept_for_debugging_after_project_delete(self):
         # a failing GPU pod in the project path: the project and namespace are already gone
@@ -492,9 +646,11 @@ class TestPlatformProject(unittest.TestCase):
 
     def test_skipped_fractions_ok_depends_on_flag(self):
         orig = vr.run_in_project
+
         def no_skip(kube, result, a, env):
             orig(kube, result, a, env)
             result["fraction_job_skipped"] = False  # skip flag lost: must not count as ok
+
         vr.run_in_project = no_skip
         try:
             result, _, _ = self._run(extra=("--skip-fractions",))
@@ -514,7 +670,9 @@ class TestPlatformProject(unittest.TestCase):
         self.assertEqual([m for m, p, _ in calls if p.startswith("/api/v1/org-unit")], ["POST", "DELETE"])
         self.assertEqual(kube.applied[0]["metadata"]["namespace"], self.NS)
         self.assertEqual(kube.applied[0]["spec"]["schedulerName"], "runai-scheduler")
-        self.assertEqual(kube.applied[0]["metadata"]["labels"], {"runai/queue": "dv", "kai.scheduler/queue": "dv"})
+        self.assertEqual(
+            kube.applied[0]["metadata"]["labels"], {"runai/queue": "dv", "kai.scheduler/queue": "dv"}
+        )
 
     def test_project_is_bound_to_our_namespace(self):
         result, calls, kube = self._run()
@@ -554,13 +712,21 @@ class TestPlatformProject(unittest.TestCase):
         self.assertEqual([c for c in calls if c[0] == "POST" and "projects" in c[1]], [])
 
     def test_unlinked_namespace_skips_gpu_jobs(self):
-        bad = ({"metadata": {"name": self.NS, "uid": "uid-fake"}},
-               {"metadata": {"name": self.NS, "uid": "uid-fake", "labels": {"runai/queue": "other"}}},
-               {"metadata": {"name": self.NS, "labels": {"runai/queue": "dv"}}},
-               {"metadata": {"name": "elsewhere", "uid": "uid-fake", "labels": {"runai/queue": "dv"}}},
-               # Dwight's test: recent-timestamp look-alike with a foreign UID
-               {"metadata": {"name": self.NS, "uid": "foreign-uid",
-                             "creationTimestamp": "2999-01-01T00:00:00Z", "labels": {"runai/queue": "dv"}}})
+        bad = (
+            {"metadata": {"name": self.NS, "uid": "uid-fake"}},
+            {"metadata": {"name": self.NS, "uid": "uid-fake", "labels": {"runai/queue": "other"}}},
+            {"metadata": {"name": self.NS, "labels": {"runai/queue": "dv"}}},
+            {"metadata": {"name": "elsewhere", "uid": "uid-fake", "labels": {"runai/queue": "dv"}}},
+            # Dwight's test: recent-timestamp look-alike with a foreign UID
+            {
+                "metadata": {
+                    "name": self.NS,
+                    "uid": "foreign-uid",
+                    "creationTimestamp": "2999-01-01T00:00:00Z",
+                    "labels": {"runai/queue": "dv"},
+                }
+            },
+        )
         for doc in bad:
             result, calls, kube = self._run(ns_doc=doc)
             self.assertFalse(result["ok"])
@@ -588,8 +754,9 @@ class TestPlatformProject(unittest.TestCase):
         self.assertFalse(f(None, self.NS, "dv", "uid-fake"))
         self.assertFalse(f(self.NS_DOC, self.NS, "dv", ""))
         self.assertFalse(f(self.NS_DOC, self.NS, "dv", "other"))
-        self.assertFalse(f({"metadata": {"name": self.NS, "uid": 5, "labels": {"runai/queue": "dv"}}},
-                           self.NS, "dv", 5))
+        self.assertFalse(
+            f({"metadata": {"name": self.NS, "uid": 5, "labels": {"runai/queue": "dv"}}}, self.NS, "dv", 5)
+        )
 
     def test_create_failure_is_not_ok(self):
         result, _, _ = self._run(create_status=400)
@@ -615,6 +782,7 @@ class TestReadyWait(unittest.TestCase):
             if a[-1] == "deployments":
                 return next(seq, HEALTHY), ""
             return orig(a, timeout)
+
         kube.get_json = get_json
         sleeps = []
         ok = vr.wait_until_ready(kube, args("--ready-timeout", "300"), {}, sleep=sleeps.append, now=lambda: 0)
@@ -624,8 +792,9 @@ class TestReadyWait(unittest.TestCase):
     def test_gives_up_at_the_deadline(self):
         kube = FakeKube(deployments={"items": [deploy("binder", 1, 0)]})
         clock = iter(range(0, 10000, 100))
-        ok = vr.wait_until_ready(kube, args("--ready-timeout", "250"), {}, sleep=lambda s: None,
-                                 now=lambda: next(clock))
+        ok = vr.wait_until_ready(
+            kube, args("--ready-timeout", "250"), {}, sleep=lambda s: None, now=lambda: next(clock)
+        )
         self.assertFalse(ok)
 
     def test_default_is_off_for_kai_and_on_for_platform(self):
@@ -638,22 +807,45 @@ class TestPlatformNames(unittest.TestCase):
     def test_platform_scheduler_is_runai_scheduler(self):
         a = args("--mode", "platform", "--platform-domain", "runai.lab.test", "--skip-gpu-jobs")
         self.assertEqual(a.scheduler_name, "runai-scheduler")
-        self.assertEqual(vr.missing_deployments(list(vr.REQUIRED_DEPLOYMENTS) + ["runai-scheduler-default"],
-                                                scheduler_name="runai-scheduler"), [])
-        self.assertEqual(vr.missing_deployments(list(vr.REQUIRED_DEPLOYMENTS) + ["kai-scheduler-default"],
-                                                scheduler_name="runai-scheduler"), ["runai-scheduler-<shard>"])
+        self.assertEqual(
+            vr.missing_deployments(
+                list(vr.REQUIRED_DEPLOYMENTS) + ["runai-scheduler-default"], scheduler_name="runai-scheduler"
+            ),
+            [],
+        )
+        self.assertEqual(
+            vr.missing_deployments(
+                list(vr.REQUIRED_DEPLOYMENTS) + ["kai-scheduler-default"], scheduler_name="runai-scheduler"
+            ),
+            ["runai-scheduler-<shard>"],
+        )
 
     def test_cluster_connected_reads_state_or_platform_or_string(self):
         for status in ({"platform": "Connected"}, {"state": "Connected"}, "Connected"):
-            self.assertEqual(vr.cluster_connected({"clusters": [{"name": "d", "status": status}]}, "d"), (True, True))
-        self.assertEqual(vr.cluster_connected({"clusters": [{"name": "d", "status": {"state": "Disconnected"}}]}, "d"),
-                         (True, False))
+            self.assertEqual(
+                vr.cluster_connected({"clusters": [{"name": "d", "status": status}]}, "d"), (True, True)
+            )
+        self.assertEqual(
+            vr.cluster_connected({"clusters": [{"name": "d", "status": {"state": "Disconnected"}}]}, "d"),
+            (True, False),
+        )
 
     def test_status_summary_only_fixed_words(self):
         # alphabetic secrets, secret-looking key names and nested text must not survive
-        doc = {"clusters": [{"name": "d", "status": {
-            "state": "Waiting to connect", "platform": "hunter", "status": "SecretTokenAbcdefghijk",
-            "PasswordIsHunterTwo": "okvalue", "conditions": [{"message": "token abc"}]}}]}
+        doc = {
+            "clusters": [
+                {
+                    "name": "d",
+                    "status": {
+                        "state": "Waiting to connect",
+                        "platform": "hunter",
+                        "status": "SecretTokenAbcdefghijk",
+                        "PasswordIsHunterTwo": "okvalue",
+                        "conditions": [{"message": "token abc"}],
+                    },
+                }
+            ]
+        }
         out = vr.cluster_status_summary(doc, "d")
         self.assertEqual(out["state"], "Waiting to connect")
         self.assertEqual(out["platform"], "other_text_short")
@@ -671,17 +863,43 @@ class TestPlatformNames(unittest.TestCase):
         self.assertEqual(out, {"status": "other_text_long", "other_keys": 0})
 
     def test_status_summary_types_and_case(self):
-        doc = {"clusters": [{"name": "d", "status": {"platform": 7, "state": "connected",
-                                                     "status": True, "connected": None}}]}
+        doc = {
+            "clusters": [
+                {
+                    "name": "d",
+                    "status": {"platform": 7, "state": "connected", "status": True, "connected": None},
+                }
+            ]
+        }
         out = vr.cluster_status_summary(doc, "d")
-        self.assertEqual(out, {"platform": "type_int", "state": "Connected", "status": "bool_true",
-                               "connected": "null", "other_keys": 0})
+        self.assertEqual(
+            out,
+            {
+                "platform": "type_int",
+                "state": "Connected",
+                "status": "bool_true",
+                "connected": "null",
+                "other_keys": 0,
+            },
+        )
         self.assertEqual(vr.cluster_connected(doc, "d"), (True, True))
 
     def test_status_summary_one_nested_level_fixed_keys_only(self):
-        doc = {"clusters": [{"name": "d", "status": {
-            "platform": {"state": "Connected", "message": "token=abc and more", "secret": "hunter2"},
-            "state": {"state": {"deep": "x"}}}}]}
+        doc = {
+            "clusters": [
+                {
+                    "name": "d",
+                    "status": {
+                        "platform": {
+                            "state": "Connected",
+                            "message": "token=abc and more",
+                            "secret": "hunter2",
+                        },
+                        "state": {"state": {"deep": "x"}},
+                    },
+                }
+            ]
+        }
         out = vr.cluster_status_summary(doc, "d")
         self.assertEqual(out["platform"], {"state": "Connected", "n_keys": 3})
         self.assertEqual(out["state"], {"state": "type_dict", "n_keys": 1})
@@ -693,8 +911,10 @@ class TestPlatformNames(unittest.TestCase):
     def test_unknown_text_same_bucket_gives_identical_output(self):
         def summ(txt, nested=False):
             st = {"state": txt, "platform": {"state": txt}}
-            return json.dumps(vr.cluster_status_summary({"clusters": [{"name": "d", "status": st}]}, "d"),
-                              sort_keys=True)
+            return json.dumps(
+                vr.cluster_status_summary({"clusters": [{"name": "d", "status": st}]}, "d"), sort_keys=True
+            )
+
         # different secrets of the same length class must be indistinguishable in the report
         self.assertEqual(summ("hunter2abcdefghijk"), summ("zzzzzzzzzzzzzzzzzz"))
         self.assertEqual(summ("tok"), summ("pwd"))
@@ -703,7 +923,11 @@ class TestPlatformNames(unittest.TestCase):
             self.assertNotIn(bad, summ("hunter2abcdefghijk"))
 
     def test_separators_and_case_ignored_in_fixed_words(self):
-        doc = {"clusters": [{"name": "d", "status": {"state": "WaitingToConnect", "platform": "waiting_for-data"}}]}
+        doc = {
+            "clusters": [
+                {"name": "d", "status": {"state": "WaitingToConnect", "platform": "waiting_for-data"}}
+            ]
+        }
         out = vr.cluster_status_summary(doc, "d")
         self.assertEqual(out["state"], "Waiting to connect")
         self.assertEqual(out["platform"], "Waiting for data")
@@ -724,7 +948,10 @@ class TestPendingHints(unittest.TestCase):
         orig = vr.run
         secret = "Bearer SECRETTOKEN123 password=hunter2"
         vr.run = lambda cmd, timeout=60, input_text=None: (
-            0, "Unschedulable not enough GPU quota " + secret, "")
+            0,
+            "Unschedulable not enough GPU quota " + secret,
+            "",
+        )
         try:
             h = vr.pending_hints(object(), "ns", "kai-half-a")
         finally:
@@ -775,6 +1002,7 @@ class TestNamespaceOwnership(unittest.TestCase):
         def fake_delete(path, u, timeout=60):
             deletes.append((path, u))
             return delete_status, "x"
+
         orig, vr.run = vr.run, fake_run
         orig_d, vr.delete_with_uid = vr.delete_with_uid, fake_delete
         self.addCleanup(setattr, vr, "run", orig)
@@ -796,10 +1024,12 @@ class TestNamespaceOwnership(unittest.TestCase):
 
     def test_concurrent_creation_is_refused_and_not_owned(self):
         kube, cmds = self._kube(set())
+
         def racing(cmd, timeout=60, input_text=None):
             if cmd[:3] == ["kubectl", "get", "namespace"]:
                 return 0, "", ""  # looked free ...
             return 1, "", "AlreadyExists"  # ... but someone created it first
+
         vr.run = racing
         self.assertNotEqual(kube.ensure_namespace("raced")[0], 0)
         self.assertFalse(kube.delete_namespace("raced"))
@@ -807,7 +1037,9 @@ class TestNamespaceOwnership(unittest.TestCase):
 
     def test_unreadable_uid_means_not_owned(self):
         kube, cmds = self._kube(set())
-        vr.run = lambda cmd, timeout=60, input_text=None: (0, "not json", "") if cmd[:2] == ["kubectl", "create"] else (0, "", "")
+        vr.run = lambda cmd, timeout=60, input_text=None: (
+            (0, "not json", "") if cmd[:2] == ["kubectl", "create"] else (0, "", "")
+        )
         self.assertNotEqual(kube.ensure_namespace("x")[0], 0)
         self.assertFalse(kube.delete_namespace("x"))
         self.assertEqual(cmds.deletes, [])

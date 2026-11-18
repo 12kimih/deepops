@@ -5,6 +5,7 @@ Prometheus (dcgm-exporter). Posts a summary card with the detail in its thread, 
 mentions (or DMs) the owner of each job whose GPUs all stayed idle for the whole
 window. Can optionally cancel jobs idle for longer. Standard library only.
 """
+
 import argparse
 import json
 import re
@@ -20,14 +21,15 @@ from clustertools.slurm import GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_labe
 from clustertools.vocab import node_unavailable
 
 SLACK_API = "https://slack.com/api/"
-MAX_BLOCKS = 45      # Slack allows 50 blocks per message
-MAX_SECTION = 2900   # and 3000 characters per section text
+MAX_BLOCKS = 45  # Slack allows 50 blocks per message
+MAX_SECTION = 2900  # and 3000 characters per section text
 BAR_WIDTH = 10
 
 
 # --- Slurm ----------------------------------------------------------------------
 # Reading Slurm is clustertools.slurm's job (the cluster_tools_lib role): one reader for
 # every tool. What is left here is what this report makes of it.
+
 
 def duration(secs):
     days, rest = divmod(int(secs), 86400)
@@ -44,16 +46,18 @@ def parse_jobs(data, now):
         state = job.get("job_state") or []
         if "RUNNING" in state:
             gpus, types = job_gpus(job)
-            running.append({
-                "id": str(job["job_id"]),
-                "label": job_label(job),
-                "user": job["user_name"],
-                "partition": job.get("partition", ""),
-                "qos": job.get("qos", ""),
-                "runtime": max(0, now - (num(job.get("start_time")) or now)),
-                "gpus": gpus,
-                "gpu_type": ",".join(sorted(types)),
-            })
+            running.append(
+                {
+                    "id": str(job["job_id"]),
+                    "label": job_label(job),
+                    "user": job["user_name"],
+                    "partition": job.get("partition", ""),
+                    "qos": job.get("qos", ""),
+                    "runtime": max(0, now - (num(job.get("start_time")) or now)),
+                    "gpus": gpus,
+                    "gpu_type": ",".join(sorted(types)),
+                }
+            )
         elif "PENDING" in state:
             entry = pending[job["user_name"]]
             entry["jobs"] += 1
@@ -74,8 +78,9 @@ def parse_nodes(data):
         if state:
             changed = num(node.get("reason_changed_at"))
             since = datetime.fromtimestamp(changed).isoformat(timespec="seconds") if changed else ""
-            unavailable.append((node["name"], state, since, node.get("reason_set_by_user") or "",
-                                node.get("reason") or ""))
+            unavailable.append(
+                (node["name"], state, since, node.get("reason_set_by_user") or "", node.get("reason") or "")
+            )
     return gpus, sorted(unavailable)
 
 
@@ -86,6 +91,7 @@ def collect_slurm(now):
 
 
 # --- Prometheus -----------------------------------------------------------------
+
 
 class Prometheus:
     def __init__(self, url):
@@ -119,6 +125,7 @@ def collect_gpus(prom, window):
 
 # --- Analysis -------------------------------------------------------------------
 
+
 def analyze(jobs, gpu, window, threshold):
     """Annotate jobs with utilisation and idleness; return the idle ones.
 
@@ -132,8 +139,12 @@ def analyze(jobs, gpu, window, threshold):
         j["util"] = sum(recent) / len(recent) if recent else None
         j["mem_gib"] = sum(gpu["mem_gib"].get(g, 0) for g in j["gpus"])
         j["idle_gpus"] = sum(1 for v in peaks if v <= threshold)
-        j["idle"] = (bool(j["gpus"]) and j["runtime"] >= window and len(peaks) == len(j["gpus"])
-                     and j["idle_gpus"] == len(j["gpus"]))
+        j["idle"] = (
+            bool(j["gpus"])
+            and j["runtime"] >= window
+            and len(peaks) == len(j["gpus"])
+            and j["idle_gpus"] == len(j["gpus"])
+        )
         if j["idle"]:
             idle.append(j)
     return idle
@@ -151,6 +162,7 @@ def track_idle(idle, state, now, window, repeat, notify):
 
 
 # --- Rendering ------------------------------------------------------------------
+
 
 def bar(pct):
     if pct is None:
@@ -184,8 +196,10 @@ def render(report, cfg, who):
     pend_gpus = sum(p["gpus"] for p in pending.values())
     stamp = datetime.fromtimestamp(report["now"]).strftime("%Y-%m-%d %H:%M")
 
-    text = (f"GPU usage {stamp}: {alloc}/{total} GPUs allocated ({100 * alloc / total:.0f}%), "
-            f"avg util {avg:.0f}%, {len(idle)} idle jobs")
+    text = (
+        f"GPU usage {stamp}: {alloc}/{total} GPUs allocated ({100 * alloc / total:.0f}%), "
+        f"avg util {avg:.0f}%, {len(idle)} idle jobs"
+    )
     status = ":large_green_circle:" if not idle and not report["reasons"] else ":large_yellow_circle:"
     fields = [
         f"*Allocated*\n{alloc} / {total} GPU ({100 * alloc / total:.0f}%)",
@@ -198,7 +212,7 @@ def render(report, cfg, who):
     if cfg.get("dashboard_url"):
         footer += f"  |  <{cfg['dashboard_url']}|Grafana>"
     summary = [
-        {"type": "header", "text": {"type": "plain_text", "text": f"\U0001F4CA GPU usage  {stamp}"}},
+        {"type": "header", "text": {"type": "plain_text", "text": f"\U0001f4ca GPU usage  {stamp}"}},
         {"type": "section", "fields": [{"type": "mrkdwn", "text": f} for f in fields]},
         {"type": "context", "elements": [{"type": "mrkdwn", "text": f"{status}  {footer}"}]},
     ]
@@ -209,21 +223,37 @@ def render(report, cfg, who):
         lines = [f":zzz: *Idle GPU jobs*  _{rule}_"]
         for j in sorted(idle, key=lambda j: -len(j["gpus"])):
             hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
-            lines.append(f"• {who(j['user'], 'mention' in cfg['notify'] and j['notify'])}  "
-                         f"`{j['label']}`  {len(j['gpus'])}x {j['gpu_type'] or 'GPU'} on {hosts}  "
-                         f"running {duration(j['runtime'])}")
+            lines.append(
+                f"• {who(j['user'], 'mention' in cfg['notify'] and j['notify'])}  "
+                f"`{j['label']}`  {len(j['gpus'])}x {j['gpu_type'] or 'GPU'} on {hosts}  "
+                f"running {duration(j['runtime'])}"
+            )
         lines.append("_Cancel with `scancel <job>` if you no longer need it._")
         blocks.append(section("\n".join(lines)))
     if report["reasons"]:
         rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in report["reasons"]]
-        blocks.append(section(":warning: *Drain / down nodes*\n"
-                              + table(("NODE", "STATE", "SINCE", "BY", "REASON"), rows)))
+        blocks.append(
+            section(
+                ":warning: *Drain / down nodes*\n" + table(("NODE", "STATE", "SINCE", "BY", "REASON"), rows)
+            )
+        )
     if pending:
-        rows = [(u, p["jobs"], p["gpus"], duration(p["wait"]),
-                 ", ".join(f"{r.split(',')[0][:32]} ({c})" for r, c in p["reasons"].most_common(2)))
-                for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])]
-        blocks.append(section(":hourglass_flowing_sand: *Pending*\n"
-                              + table(("USER", "JOBS", "GPU", "LONGEST", "REASON"), rows)))
+        rows = [
+            (
+                u,
+                p["jobs"],
+                p["gpus"],
+                duration(p["wait"]),
+                ", ".join(f"{r.split(',')[0][:32]} ({c})" for r, c in p["reasons"].most_common(2)),
+            )
+            for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])
+        ]
+        blocks.append(
+            section(
+                ":hourglass_flowing_sand: *Pending*\n"
+                + table(("USER", "JOBS", "GPU", "LONGEST", "REASON"), rows)
+            )
+        )
 
     by_user = defaultdict(list)
     for j in jobs:
@@ -237,20 +267,35 @@ def render(report, cfg, who):
         rows = []
         for j in sorted(ujobs, key=lambda j: -j["runtime"]):
             hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
-            note = "idle" if j["idle"] else (f"{j['idle_gpus']}/{len(j['gpus'])} idle" if j["idle_gpus"] else "")
-            rows.append((j["label"], f"{len(j['gpus'])}x {j['gpu_type'] or 'gpu'}", hosts,
-                         duration(j["runtime"]), j["qos"], bar(j["util"]), f"{j['mem_gib']:.0f}G", note))
-        head = f"*{user}*  {n} GPU ({100 * n / total:.1f}%)  |  {len(ujobs)} job{'s' if len(ujobs) > 1 else ''}"
+            note = (
+                "idle" if j["idle"] else (f"{j['idle_gpus']}/{len(j['gpus'])} idle" if j["idle_gpus"] else "")
+            )
+            rows.append(
+                (
+                    j["label"],
+                    f"{len(j['gpus'])}x {j['gpu_type'] or 'gpu'}",
+                    hosts,
+                    duration(j["runtime"]),
+                    j["qos"],
+                    bar(j["util"]),
+                    f"{j['mem_gib']:.0f}G",
+                    note,
+                )
+            )
+        head = (
+            f"*{user}*  {n} GPU ({100 * n / total:.1f}%)  |  {len(ujobs)} job{'s' if len(ujobs) > 1 else ''}"
+        )
         body = table(("JOB", "GPU", "NODE", "TIME", "QOS", "UTIL", "MEM", ""), rows)
         if len(head) + len(body) > MAX_SECTION:  # a very long table is cut, not rejected by Slack
-            body = body[:MAX_SECTION - len(head) - 8] + "\n...\n```"
+            body = body[: MAX_SECTION - len(head) - 8] + "\n...\n```"
         blocks.append(section(f"{head}\n{body}"))
 
-    thread = [("GPU usage details", blocks[i:i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
+    thread = [("GPU usage details", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
     return (text, summary), thread
 
 
 # --- Slack ----------------------------------------------------------------------
+
 
 class Slack:
     def __init__(self, token, dry_run):
@@ -261,21 +306,26 @@ class Slack:
         if self.dry_run and method != "users.lookupByEmail":
             print(f"--- {method} {params.get('channel', '')} thread={params.get('thread_ts', '')}")
             for b in json.loads(params.get("blocks", "[]")):
-                print(b.get("text", {}).get("text")
-                      or " | ".join(f["text"] for f in b.get("fields", []))
-                      or " ".join(e["text"] for e in b.get("elements", []))
-                      or "-" * 40)
+                print(
+                    b.get("text", {}).get("text")
+                    or " | ".join(f["text"] for f in b.get("fields", []))
+                    or " ".join(e["text"] for e in b.get("elements", []))
+                    or "-" * 40
+                )
             if "blocks" not in params:
                 print(params.get("text", ""))
             print()
             return {"ok": True, "ts": "dry-run", "channel": {"id": "dry-run"}}
         data = urllib.parse.urlencode(params).encode()
-        req = urllib.request.Request(SLACK_API + method, data=data,
-                                     headers={"Authorization": f"Bearer {self.token}"})
+        req = urllib.request.Request(
+            SLACK_API + method, data=data, headers={"Authorization": f"Bearer {self.token}"}
+        )
         with urllib.request.urlopen(req, timeout=30) as resp:
             body = json.load(resp)
         if not body.get("ok") and body.get("error") != "users_not_found":
-            raise RuntimeError(f"Slack {method} failed: {body.get('error')} {body.get('response_metadata', '')}")
+            raise RuntimeError(
+                f"Slack {method} failed: {body.get('error')} {body.get('response_metadata', '')}"
+            )
         return body
 
     def channel(self, target):
@@ -309,12 +359,16 @@ def slack_id(user, cfg, slack, cache):
 
 # --- Main -----------------------------------------------------------------------
 
+
 def report_once():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--config", default="/etc/slurm-usage-report/config.json")
     ap.add_argument("--dry-run", action="store_true", help="print instead of posting")
-    ap.add_argument("--to", metavar="CHANNEL_OR_MEMBER",
-                    help="post a preview there instead; notifies, cancels and records nothing")
+    ap.add_argument(
+        "--to",
+        metavar="CHANNEL_OR_MEMBER",
+        help="post a preview there instead; notifies, cancels and records nothing",
+    )
     args = ap.parse_args()
     with open(args.config) as f:
         cfg = json.load(f)
@@ -330,10 +384,19 @@ def report_once():
     slack = Slack(cfg["slack_token"], args.dry_run)
     report = collect_slurm(now)
     gpu = collect_gpus(Prometheus(cfg["prometheus_url"]), window)
-    report.update(now=now, total_gpus=sum(report["nodes"].values()),
-                  idle=analyze(report["jobs"], gpu, window, cfg["idle_util_threshold"]))
-    track_idle(report["idle"], state.setdefault("idle", {}), now, window,
-               cfg["notify_repeat_hours"] * 3600, [] if preview else cfg["notify"])
+    report.update(
+        now=now,
+        total_gpus=sum(report["nodes"].values()),
+        idle=analyze(report["jobs"], gpu, window, cfg["idle_util_threshold"]),
+    )
+    track_idle(
+        report["idle"],
+        state.setdefault("idle", {}),
+        now,
+        window,
+        cfg["notify_repeat_hours"] * 3600,
+        [] if preview else cfg["notify"],
+    )
     cache = state.setdefault("users", {})
 
     def who(user, mention):
@@ -354,19 +417,38 @@ def report_once():
         if "dm" in cfg["notify"]:
             member = slack_id(j["user"], cfg, slack, cache)
             if member:
-                slack.post(slack.channel(member), cfg["dm_text"].format(
-                    job=j["label"], gpus=len(j["gpus"]), hours=f"{cfg['idle_hours']:g}",
-                    runtime=duration(j["runtime"])))
+                slack.post(
+                    slack.channel(member),
+                    cfg["dm_text"].format(
+                        job=j["label"],
+                        gpus=len(j["gpus"]),
+                        hours=f"{cfg['idle_hours']:g}",
+                        runtime=duration(j["runtime"]),
+                    ),
+                )
         j["state"]["notified"] = now
 
     if cfg["cancel_after_hours"] > 0:
-        cancelled = [j for j in report["idle"] if now - j["state"]["since"] >= cfg["cancel_after_hours"] * 3600]
+        cancelled = [
+            j for j in report["idle"] if now - j["state"]["since"] >= cfg["cancel_after_hours"] * 3600
+        ]
         for j in cancelled:
             subprocess.run(["scancel", j["id"]], check=False)
         if cancelled:
-            slack.post(channel, "Idle jobs cancelled", [section("\n".join(
-                f":no_entry: {who(j['user'], bool(cfg['notify']))}  `{j['label']}` was cancelled after "
-                f"{cfg['cancel_after_hours']:g}h with idle GPUs" for j in cancelled))], thread_ts=ts)
+            slack.post(
+                channel,
+                "Idle jobs cancelled",
+                [
+                    section(
+                        "\n".join(
+                            f":no_entry: {who(j['user'], bool(cfg['notify']))}  `{j['label']}` was cancelled after "
+                            f"{cfg['cancel_after_hours']:g}h with idle GPUs"
+                            for j in cancelled
+                        )
+                    )
+                ],
+                thread_ts=ts,
+            )
 
     with open(cfg["state_file"], "w") as f:
         json.dump(state, f)

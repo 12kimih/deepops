@@ -68,9 +68,7 @@ ALLOC_SCRIPT = (
 def run(cmd, timeout=60, input_text=None):
     """Run a command, returning (rc, stdout, stderr) without raising."""
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, input=input_text
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=input_text)
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout after %ss" % timeout
@@ -155,18 +153,76 @@ def cluster_connected(clusters_json, cluster_name):
 
 STATUS_KEYS = ("platform", "state", "status", "connected")
 STATUS_VALUES = (
-    "Connected", "Disconnected", "Waiting to connect", "Waiting", "Pending", "Unknown", "Error",
-    "Healthy", "Unhealthy", "Online", "Offline", "Running", "Ready", "Not ready", "Initializing",
-    "Degraded", "Missing prerequisites", "Missing runtime prerequisites", "Service issues",
-    "Unsupported version", "Waiting for data", "Installing", "Failed", "Active", "Inactive",
-    "True", "False", "OK", "Connecting", "Registered", "Created", "Waiting for cluster to connect",
-    "Waiting for the cluster to connect", "Cluster is not connected", "Not connected",
-    "Waiting for connection", "Waiting for cluster", "Cluster not connected", "Not installed",
-    "Installed", "Provisioning", "Provisioned", "Creating", "Updating", "Upgrading", "Deleting",
-    "Terminating", "Suspended", "Paused", "Stale", "No data", "No connection", "Connection lost",
-    "Heartbeat missing", "Stopped", "Partially connected", "Partially ready", "Reconnecting",
-    "Syncing", "Out of sync", "Synced", "Not synced", "Ready to connect", "Connection pending",
-    "Awaiting connection", "Not available", "Available", "Unavailable", "Conflict", "Blocked",
+    "Connected",
+    "Disconnected",
+    "Waiting to connect",
+    "Waiting",
+    "Pending",
+    "Unknown",
+    "Error",
+    "Healthy",
+    "Unhealthy",
+    "Online",
+    "Offline",
+    "Running",
+    "Ready",
+    "Not ready",
+    "Initializing",
+    "Degraded",
+    "Missing prerequisites",
+    "Missing runtime prerequisites",
+    "Service issues",
+    "Unsupported version",
+    "Waiting for data",
+    "Installing",
+    "Failed",
+    "Active",
+    "Inactive",
+    "True",
+    "False",
+    "OK",
+    "Connecting",
+    "Registered",
+    "Created",
+    "Waiting for cluster to connect",
+    "Waiting for the cluster to connect",
+    "Cluster is not connected",
+    "Not connected",
+    "Waiting for connection",
+    "Waiting for cluster",
+    "Cluster not connected",
+    "Not installed",
+    "Installed",
+    "Provisioning",
+    "Provisioned",
+    "Creating",
+    "Updating",
+    "Upgrading",
+    "Deleting",
+    "Terminating",
+    "Suspended",
+    "Paused",
+    "Stale",
+    "No data",
+    "No connection",
+    "Connection lost",
+    "Heartbeat missing",
+    "Stopped",
+    "Partially connected",
+    "Partially ready",
+    "Reconnecting",
+    "Syncing",
+    "Out of sync",
+    "Synced",
+    "Not synced",
+    "Ready to connect",
+    "Connection pending",
+    "Awaiting connection",
+    "Not available",
+    "Available",
+    "Unavailable",
+    "Conflict",
+    "Blocked",
 )
 
 
@@ -222,8 +278,20 @@ def cluster_status_summary(clusters_json, cluster_name):
     return {}
 
 
-def pod_manifest(name, namespace, image, command, args, scheduler, queue_label, queue,
-                 gpu_limit=0, annotations=None, container="gpu-workload", env=None):
+def pod_manifest(
+    name,
+    namespace,
+    image,
+    command,
+    args,
+    scheduler,
+    queue_label,
+    queue,
+    gpu_limit=0,
+    annotations=None,
+    container="gpu-workload",
+    env=None,
+):
     limits = {"nvidia.com/gpu": gpu_limit} if gpu_limit else {}
     spec = {
         "restartPolicy": "Never",
@@ -265,8 +333,9 @@ class Kube:
         deadline = time.time() + timeout
         phase = ""
         while time.time() < deadline:
-            rc, phase, _ = run(["kubectl", "-n", namespace, "get", "pod", pod,
-                                "-o", "jsonpath={.status.phase}"])
+            rc, phase, _ = run(
+                ["kubectl", "-n", namespace, "get", "pod", pod, "-o", "jsonpath={.status.phase}"]
+            )
             if rc == 0 and phase in phases:
                 return phase
             time.sleep(3)
@@ -284,8 +353,7 @@ class Kube:
 
     def namespace_exists(self, namespace):
         """True/False, or None if the answer is unknown (treated as 'exists')."""
-        rc, out, _ = run(["kubectl", "get", "namespace", namespace, "--ignore-not-found",
-                          "-o", "name"])
+        rc, out, _ = run(["kubectl", "get", "namespace", namespace, "--ignore-not-found", "-o", "name"])
         if rc != 0:
             return None
         return bool(out)
@@ -308,8 +376,10 @@ class Kube:
             return True
         if status == 404:
             return False
-        self.delete_note = ("namespace %s was NOT deleted (HTTP %s: %s); it is not the one this run "
-                            "created or could not be checked; leaving it alone" % (namespace, status, msg))
+        self.delete_note = (
+            "namespace %s was NOT deleted (HTTP %s: %s); it is not the one this run "
+            "created or could not be checked; leaving it alone" % (namespace, status, msg)
+        )
         return False
 
     def ensure_namespace(self, namespace):
@@ -320,10 +390,12 @@ class Kube:
         """
         if self.namespace_exists(namespace) is not False:
             return 1, "", "namespace %s already exists (or could not be checked); not touching it" % namespace
-        manifest = {"apiVersion": "v1", "kind": "Namespace",
-                    "metadata": {"name": namespace, "labels": {OWNER_LABEL: OWNER_VALUE}}}
-        rc, out, err = run(["kubectl", "create", "-f", "-", "-o", "json"],
-                           input_text=json.dumps(manifest))
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {"name": namespace, "labels": {OWNER_LABEL: OWNER_VALUE}},
+        }
+        rc, out, err = run(["kubectl", "create", "-f", "-", "-o", "json"], input_text=json.dumps(manifest))
         if rc != 0:
             return rc, out, err
         try:
@@ -344,8 +416,12 @@ def delete_with_uid(path, uid, timeout=60):
     Returns (http_status, message); status 0 means the delete was not attempted or not sent.
     """
     try:
-        proxy = subprocess.Popen(["kubectl", "proxy", "--port=0", "--address=127.0.0.1"],
-                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        proxy = subprocess.Popen(
+            ["kubectl", "proxy", "--port=0", "--address=127.0.0.1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
     except OSError as exc:
         return 0, "kubectl proxy: %s" % type(exc).__name__
     try:
@@ -354,8 +430,14 @@ def delete_with_uid(path, uid, timeout=60):
         if not m:
             return 0, "kubectl proxy did not start"
         conn = http.client.HTTPConnection("127.0.0.1", int(m.group(1)), timeout=timeout)
-        body = json.dumps({"apiVersion": "v1", "kind": "DeleteOptions",
-                           "propagationPolicy": "Background", "preconditions": {"uid": uid}})
+        body = json.dumps(
+            {
+                "apiVersion": "v1",
+                "kind": "DeleteOptions",
+                "propagationPolicy": "Background",
+                "preconditions": {"uid": uid},
+            }
+        )
         conn.request("DELETE", path, body, {"Content-Type": "application/json"})
         resp = conn.getresponse()
         resp.read()
@@ -415,15 +497,25 @@ def run_pod(kube, result, args, manifest, phases=("Succeeded", "Failed")):
     if rc != 0:
         result["failures"].append("could not create pod %s: %s" % (manifest["metadata"]["name"], err))
         return ""
-    return kube.wait_phase(manifest["metadata"]["namespace"], manifest["metadata"]["name"],
-                           phases, args.job_timeout)
+    return kube.wait_phase(
+        manifest["metadata"]["namespace"], manifest["metadata"]["name"], phases, args.job_timeout
+    )
 
 
 def check_whole_gpu(kube, result, args):
     result["gpu_job_ran"] = True
     name = "kai-whole-gpu"
-    manifest = pod_manifest(name, args.namespace, args.image, ["nvidia-smi"], ["-L"],
-                            args.scheduler_name, args.queue_label_key, args.queue, gpu_limit=1)
+    manifest = pod_manifest(
+        name,
+        args.namespace,
+        args.image,
+        ["nvidia-smi"],
+        ["-L"],
+        args.scheduler_name,
+        args.queue_label_key,
+        args.queue,
+        gpu_limit=1,
+    )
     phase = run_pod(kube, result, args, manifest)
     if not phase:
         return
@@ -440,11 +532,47 @@ def check_whole_gpu(kube, result, args):
 
 
 PENDING_HINT_WORDS = (
-    "gpu-fraction", "fraction", "annotation", "not supported", "unsupported", "not enabled", "disabled",
-    "sharing", "quota", "over quota", "insufficient", "not enough", "no nodes", "queue", "project",
-    "reservation", "reservation pod", "gpu", "memory", "node pool", "nodepool", "podgroup", "pod group",
-    "priority", "preempt", "reclaim", "deserved", "limit", "capacity", "available", "selector", "taint",
-    "affinity", "scheduler", "webhook", "admission", "denied", "invalid", "unknown", "mps", "nvfractions",
+    "gpu-fraction",
+    "fraction",
+    "annotation",
+    "not supported",
+    "unsupported",
+    "not enabled",
+    "disabled",
+    "sharing",
+    "quota",
+    "over quota",
+    "insufficient",
+    "not enough",
+    "no nodes",
+    "queue",
+    "project",
+    "reservation",
+    "reservation pod",
+    "gpu",
+    "memory",
+    "node pool",
+    "nodepool",
+    "podgroup",
+    "pod group",
+    "priority",
+    "preempt",
+    "reclaim",
+    "deserved",
+    "limit",
+    "capacity",
+    "available",
+    "selector",
+    "taint",
+    "affinity",
+    "scheduler",
+    "webhook",
+    "admission",
+    "denied",
+    "invalid",
+    "unknown",
+    "mps",
+    "nvfractions",
 )
 
 
@@ -452,17 +580,41 @@ def pending_hints(kube, namespace, pod):
     """Fixed-label hints about why a pod is Pending. Reads the pod's own events and conditions
     while its namespace still exists. Only labels from PENDING_HINT_WORDS and three counts are
     returned; no event or condition text is ever copied."""
-    rc, out, _ = run(["kubectl", "-n", namespace, "get", "events", "--field-selector",
-                      "involvedObject.name=" + pod, "-o",
-                      "jsonpath={range .items[*]}{.reason} {.message}{\"\\n\"}{end}"], timeout=60)
+    rc, out, _ = run(
+        [
+            "kubectl",
+            "-n",
+            namespace,
+            "get",
+            "events",
+            "--field-selector",
+            "involvedObject.name=" + pod,
+            "-o",
+            'jsonpath={range .items[*]}{.reason} {.message}{"\\n"}{end}',
+        ],
+        timeout=60,
+    )
     text = out.lower() if rc == 0 and isinstance(out, str) else ""
-    rc2, out2, _ = run(["kubectl", "-n", namespace, "get", "pod", pod, "-o",
-                        "jsonpath={range .status.conditions[*]}{.type} {.reason} {.message}{\"\\n\"}{end}"],
-                       timeout=60)
+    rc2, out2, _ = run(
+        [
+            "kubectl",
+            "-n",
+            namespace,
+            "get",
+            "pod",
+            pod,
+            "-o",
+            'jsonpath={range .status.conditions[*]}{.type} {.reason} {.message}{"\\n"}{end}',
+        ],
+        timeout=60,
+    )
     text += "\n" + (out2.lower() if rc2 == 0 and isinstance(out2, str) else "")
     labels = sorted(w.replace(" ", "-") for w in PENDING_HINT_WORDS if w in text)
-    return {"event_bytes": len(text.strip()), "lines": len([line for line in text.splitlines() if line.strip()]),
-            "labels": labels}
+    return {
+        "event_bytes": len(text.strip()),
+        "lines": len([line for line in text.splitlines() if line.strip()]),
+        "labels": labels,
+    }
 
 
 def check_fractions(kube, result, args):
@@ -470,16 +622,22 @@ def check_fractions(kube, result, args):
     names = ["kai-half-a", "kai-half-b"]
     for name in names:
         manifest = pod_manifest(
-            name, args.namespace, args.image, ["sh", "-c"], ["nvidia-smi -L && sleep 30"],
-            args.scheduler_name, args.queue_label_key, args.queue,
-            annotations={"gpu-fraction": "0.5"})
+            name,
+            args.namespace,
+            args.image,
+            ["sh", "-c"],
+            ["nvidia-smi -L && sleep 30"],
+            args.scheduler_name,
+            args.queue_label_key,
+            args.queue,
+            annotations={"gpu-fraction": "0.5"},
+        )
         rc, _, err = kube.apply(manifest)
         if rc != 0:
             result["failures"].append("could not create %s: %s" % (name, err))
             return
     for name in names:
-        phase = kube.wait_phase(args.namespace, name, ("Running", "Succeeded", "Failed"),
-                                args.job_timeout)
+        phase = kube.wait_phase(args.namespace, name, ("Running", "Succeeded", "Failed"), args.job_timeout)
         if phase not in ("Running", "Succeeded"):
             result["failures"].append("fractional pod %s did not start (phase=%s)" % (name, phase))
             if phase == "Pending":
@@ -491,7 +649,8 @@ def check_fractions(kube, result, args):
         placements.append(pod_placement(pod or {}))
     if not same_gpu(placements):
         result["failures"].append(
-            "half-GPU pods did not share one GPU (placements=%s)" % [list(p[:2]) for p in placements])
+            "half-GPU pods did not share one GPU (placements=%s)" % [list(p[:2]) for p in placements]
+        )
         return
     for name in names:
         phase = kube.wait_phase(args.namespace, name, ("Succeeded", "Failed"), args.job_timeout)
@@ -506,10 +665,18 @@ def memory_pod(name, args, request_mib, limit_mib, alloc_mib):
         "nvidia.com/container.gpu-workload.gpu-memory.request": "%dMi" % request_mib,
         "nvidia.com/container.gpu-workload.gpu-memory.limit": "%dMi" % limit_mib,
     }
-    return pod_manifest(name, args.namespace, args.memory_image, ["python3", "-c"],
-                        [ALLOC_SCRIPT, str(alloc_mib)], args.scheduler_name,
-                        args.queue_label_key, args.queue, annotations=ann,
-                        env={"NVIDIA_DRIVER_CAPABILITIES": "compute,utility"})
+    return pod_manifest(
+        name,
+        args.namespace,
+        args.memory_image,
+        ["python3", "-c"],
+        [ALLOC_SCRIPT, str(alloc_mib)],
+        args.scheduler_name,
+        args.queue_label_key,
+        args.queue,
+        annotations=ann,
+        env={"NVIDIA_DRIVER_CAPABILITIES": "compute,utility"},
+    )
 
 
 def check_memory_enforcement(kube, result, args):
@@ -527,7 +694,8 @@ def check_memory_enforcement(kube, result, args):
     else:
         result["failures"].append(
             "pod past its GPU-memory share was not refused (phase=%s, alloc_ok=%s)"
-            % (phase, "ALLOC_OK" in logs))
+            % (phase, "ALLOC_OK" in logs)
+        )
 
 
 class ResolvedHTTPS(http.client.HTTPSConnection):
@@ -544,6 +712,7 @@ class ResolvedHTTPS(http.client.HTTPSConnection):
 
 def socket_create(ip, port, timeout):
     import socket
+
     return socket.create_connection((ip, port), timeout)
 
 
@@ -558,7 +727,6 @@ def https_request(domain, ip, ca_file, method, path, body=None, headers=None, ti
         conn.close()
 
 
-
 def api_json(args, bearer, method, path, body=None):
     """One JSON call to the control plane; returns (status, parsed-or-{})."""
     headers = {"Authorization": "Bearer " + bearer, "Accept": "application/json"}
@@ -566,8 +734,9 @@ def api_json(args, bearer, method, path, body=None):
     if body is not None:
         data = json.dumps(body)
         headers["Content-Type"] = "application/json"
-    status, raw = https_request(args.platform_domain, args.resolve_ip, args.ca_file,
-                                method, path, data, headers)
+    status, raw = https_request(
+        args.platform_domain, args.resolve_ip, args.ca_file, method, path, data, headers
+    )
     try:
         return status, (json.loads(raw) if raw else {})
     except ValueError:
@@ -575,19 +744,34 @@ def api_json(args, bearer, method, path, body=None):
 
 
 def api_login(args, env):
-    form = urllib.parse.urlencode({"grant_type": "password", "username": env.get("RUNAI_USERNAME", ""),
-                                   "password": env.get("RUNAI_PASSWORD", "")})
+    form = urllib.parse.urlencode(
+        {
+            "grant_type": "password",
+            "username": env.get("RUNAI_USERNAME", ""),
+            "password": env.get("RUNAI_PASSWORD", ""),
+        }
+    )
     status, body = https_request(
-        args.platform_domain, args.resolve_ip, args.ca_file, "POST", "/api/v2/token", form,
-        {"Content-Type": "application/x-www-form-urlencoded"})
+        args.platform_domain,
+        args.resolve_ip,
+        args.ca_file,
+        "POST",
+        "/api/v2/token",
+        form,
+        {"Content-Type": "application/x-www-form-urlencoded"},
+    )
     return json.loads(body).get("access_token", "") if status == 200 else ""
 
 
 def project_body(name, cluster_id, pool_id, gpus, namespace=""):
     """Request body for ``POST /api/v1/org-unit/projects``."""
-    body = {"name": name, "clusterId": cluster_id,
-            "resources": [{"nodePool": {"id": pool_id},
-                           "gpu": {"deserved": gpus, "limit": None, "overQuotaWeight": 1}}]}
+    body = {
+        "name": name,
+        "clusterId": cluster_id,
+        "resources": [
+            {"nodePool": {"id": pool_id}, "gpu": {"deserved": gpus, "limit": None, "overQuotaWeight": 1}}
+        ],
+    }
     if namespace:  # bind the project to a namespace we already created (CRD: spec.namespace)
         body["requestedNamespace"] = namespace
     return body
@@ -622,8 +806,13 @@ def create_project(args, env, result, namespace=""):
     if not cluster_id or not pool_id:
         result["failures"].append("could not find the cluster or its node pool through the API")
         return bearer, ""
-    status, doc = api_json(args, bearer, "POST", "/api/v1/org-unit/projects",
-                           project_body(args.create_project, cluster_id, pool_id, 1, namespace))
+    status, doc = api_json(
+        args,
+        bearer,
+        "POST",
+        "/api/v1/org-unit/projects",
+        project_body(args.create_project, cluster_id, pool_id, 1, namespace),
+    )
     if status >= 300 or not doc.get("id"):
         result["failures"].append("project create failed (HTTP %d)" % status)
         return bearer, ""
@@ -643,7 +832,9 @@ def wait_namespace_gone(kube, namespace, timeout):
 
 def delete_project(args, bearer, project_id, result):
     try:
-        status, _ = api_json(args, bearer, "DELETE", "/api/v1/org-unit/projects/" + urllib.parse.quote(project_id))
+        status, _ = api_json(
+            args, bearer, "DELETE", "/api/v1/org-unit/projects/" + urllib.parse.quote(project_id)
+        )
         if status >= 300 and status != 404:
             result["failures"].append("project delete failed (HTTP %d); delete it by hand" % status)
         else:
@@ -699,7 +890,8 @@ def run_in_project(kube, result, args, env):
     project_ns = new_project_namespace(args.create_project)
     if kube.ensure_namespace(project_ns)[0] != 0:
         result["failures"].append(
-            "could not create our own project namespace %s; no project created" % project_ns)
+            "could not create our own project namespace %s; no project created" % project_ns
+        )
         return
     owned_uid = kube.owned_uid(project_ns)
     try:
@@ -709,8 +901,9 @@ def run_in_project(kube, result, args, env):
         if wait_project_link(kube, project_ns, args.create_project, owned_uid, args.job_timeout) is None:
             result["failures"].append(
                 "project %s is not bound to our namespace %s (it needs our UID and the %s=%s label "
-                "from Run:ai); GPU jobs skipped, nothing run" % (args.create_project, project_ns,
-                                                                PROJECT_LABEL, args.create_project))
+                "from Run:ai); GPU jobs skipped, nothing run"
+                % (args.create_project, project_ns, PROJECT_LABEL, args.create_project)
+            )
             return
         args.namespace = project_ns
         args.queue = args.create_project
@@ -731,11 +924,14 @@ def run_in_project(kube, result, args, env):
                 result["failures"].append(kube.delete_note)
             result["project_namespace_removed"] = wait_namespace_gone(kube, project_ns, 60)
             if not result["project_namespace_removed"]:
-                result["failures"].append("namespace %s still exists after cleanup; check it by hand" % project_ns)
+                result["failures"].append(
+                    "namespace %s still exists after cleanup; check it by hand" % project_ns
+                )
         else:
             result["failures"].append(
                 "project delete failed, so namespace %s was kept; delete project then namespace by hand"
-                % project_ns)
+                % project_ns
+            )
 
 
 def check_platform(result, args, env):
@@ -751,23 +947,34 @@ def check_platform(result, args, env):
         result["failures"].append("control-plane endpoint unreachable: %s" % type(exc).__name__)
         return
     if not user or not pw:
-        result["failures"].append(
-            "RUNAI_USERNAME and RUNAI_PASSWORD are required to check cluster status")
+        result["failures"].append("RUNAI_USERNAME and RUNAI_PASSWORD are required to check cluster status")
         return
     try:
-        form = urllib.parse.urlencode(
-            {"grant_type": "password", "username": user, "password": pw})
+        form = urllib.parse.urlencode({"grant_type": "password", "username": user, "password": pw})
         status, body = https_request(
-            args.platform_domain, args.resolve_ip, args.ca_file, "POST", "/api/v2/token", form,
-            {"Content-Type": "application/x-www-form-urlencoded"})
+            args.platform_domain,
+            args.resolve_ip,
+            args.ca_file,
+            "POST",
+            "/api/v2/token",
+            form,
+            {"Content-Type": "application/x-www-form-urlencoded"},
+        )
         bearer = json.loads(body).get("access_token", "") if status == 200 else ""
         if not bearer:
             result["failures"].append("API login failed (HTTP %d)" % status)
             return
         status, body = https_request(
-            args.platform_domain, args.resolve_ip, args.ca_file, "GET", "/api/v1/clusters",
-            headers={"Authorization": "Bearer " + bearer})
-        found, connected = cluster_connected(json.loads(body), args.cluster_name) if status == 200 else (False, False)
+            args.platform_domain,
+            args.resolve_ip,
+            args.ca_file,
+            "GET",
+            "/api/v1/clusters",
+            headers={"Authorization": "Bearer " + bearer},
+        )
+        found, connected = (
+            cluster_connected(json.loads(body), args.cluster_name) if status == 200 else (False, False)
+        )
         if status == 200:
             result["cluster_status"] = cluster_status_summary(json.loads(body), args.cluster_name)
     except (OSError, ssl.SSLError, http.client.HTTPException, ValueError) as exc:
@@ -802,8 +1009,9 @@ def ingress_addresses(services_json, nodes_json):
             for key in ("ip", "hostname"):
                 if isinstance(lb.get(key), str):
                     out.add(lb[key])
-    node_services = [s for s in (services_json or {}).get('items', [])
-                     if s.get('spec', {}).get('type') == 'NodePort']
+    node_services = [
+        s for s in (services_json or {}).get("items", []) if s.get("spec", {}).get("type") == "NodePort"
+    ]
     for item in (nodes_json or {}).get("items", []) if node_services else []:
         for addr in (item.get("status") or {}).get("addresses") or []:
             if addr.get("type") in ("InternalIP", "ExternalIP") and isinstance(addr.get("address"), str):
@@ -827,6 +1035,7 @@ def resolve_target(args):
     if args.resolve_ip:
         return args.resolve_ip
     import socket
+
     try:
         return socket.gethostbyname(args.platform_domain)
     except OSError:
@@ -840,40 +1049,66 @@ def check_exposure(kube, result, args):
     nodes, _ = kube.get_json(["get", "nodes"])
     ing_addrs, gw_addrs = set(), set()
     for namespace in (args.cp_namespace, args.cluster_namespace):
-        ing, _ = kube.get_json(['-n', namespace, 'get', 'ingresses'])
-        if any(args.platform_domain in [r.get('host') for r in i.get('spec', {}).get('rules', [])]
-               for i in (ing or {}).get('items', [])):
+        ing, _ = kube.get_json(["-n", namespace, "get", "ingresses"])
+        if any(
+            args.platform_domain in [r.get("host") for r in i.get("spec", {}).get("rules", [])]
+            for i in (ing or {}).get("items", [])
+        ):
             ing_addrs.update(ingress_addresses(svcs, nodes))
-        routes, _ = kube.get_json(['-n', namespace, 'get', 'httproutes.gateway.networking.k8s.io'])
-        for route in (routes or {}).get('items', []):
-            if args.platform_domain not in route.get('spec', {}).get('hostnames', []):
+        routes, _ = kube.get_json(["-n", namespace, "get", "httproutes.gateway.networking.k8s.io"])
+        for route in (routes or {}).get("items", []):
+            if args.platform_domain not in route.get("spec", {}).get("hostnames", []):
                 continue
-            for ref in route.get('spec', {}).get('parentRefs', []):
-                if ref.get('kind', 'Gateway') != 'Gateway' or ref.get('group', 'gateway.networking.k8s.io') != 'gateway.networking.k8s.io':
+            for ref in route.get("spec", {}).get("parentRefs", []):
+                if (
+                    ref.get("kind", "Gateway") != "Gateway"
+                    or ref.get("group", "gateway.networking.k8s.io") != "gateway.networking.k8s.io"
+                ):
                     continue
-                matches = {'items': [g for g in (gws or {}).get('items', [])
-                                    if g.get('metadata', {}).get('name') == ref.get('name')
-                                    and g.get('metadata', {}).get('namespace') == ref.get('namespace', namespace)]}
+                matches = {
+                    "items": [
+                        g
+                        for g in (gws or {}).get("items", [])
+                        if g.get("metadata", {}).get("name") == ref.get("name")
+                        and g.get("metadata", {}).get("namespace") == ref.get("namespace", namespace)
+                    ]
+                }
                 gw_addrs.update(gateway_addresses(matches))
     reached = classify_exposure(resolve_target(args), gw_addrs, ing_addrs)
     result["exposure_reached"] = reached
     if args.exposure and reached != args.exposure:
-        result["failures"].append("requested exposure is %s but the control plane was reached through: %s"
-                                  % (args.exposure, reached))
+        result["failures"].append(
+            "requested exposure is %s but the control plane was reached through: %s"
+            % (args.exposure, reached)
+        )
 
 
 def new_result(mode):
     return {
-        "schema_version": SCHEMA_VERSION, "ok": False, "mode": mode,
-        "api_reachable": False, "scheduler_ready": False,
-        "gpu_job_ran": False, "gpu_job_ok": False, "gpu_job_node": "",
-        "fraction_job_ran": False, "fraction_job_ok": False, "fraction_job_skipped": False,
-        "memory_enforcement_ran": False, "memory_enforcement_ok": False,
-        "platform_ran": False, "platform_api_ok": False, "platform_cluster_connected": False,
-        "project_created": False, "project_deleted": False,
-        "uninstalled_ran": False, "uninstalled_ok": False, "leftovers": [],
+        "schema_version": SCHEMA_VERSION,
+        "ok": False,
+        "mode": mode,
+        "api_reachable": False,
+        "scheduler_ready": False,
+        "gpu_job_ran": False,
+        "gpu_job_ok": False,
+        "gpu_job_node": "",
+        "fraction_job_ran": False,
+        "fraction_job_ok": False,
+        "fraction_job_skipped": False,
+        "memory_enforcement_ran": False,
+        "memory_enforcement_ok": False,
+        "platform_ran": False,
+        "platform_api_ok": False,
+        "platform_cluster_connected": False,
+        "project_created": False,
+        "project_deleted": False,
+        "uninstalled_ran": False,
+        "uninstalled_ok": False,
+        "leftovers": [],
         "cluster_status": {},
-        "exposure_requested": "", "exposure_reached": "",
+        "exposure_requested": "",
+        "exposure_reached": "",
         "failures": [],
     }
 
@@ -886,7 +1121,7 @@ def verify_uninstalled(kube, result):
         return
     rc, out, err = run(["helm", "list", "--all", "--all-namespaces", "-o", "json"], timeout=60)
     if rc != 0:
-        result['failures'].append('could not list Helm releases: %s' % err)
+        result["failures"].append("could not list Helm releases: %s" % err)
         return
     releases = []
     if rc == 0 and out:
@@ -896,19 +1131,19 @@ def verify_uninstalled(kube, result):
             result["failures"].append("could not parse helm list output")
             return
     result["leftovers"] = leftovers(ns, releases)
-    crds, err = kube.get_json(['get', 'crd'])
-    owners, owner_err = kube.get_json(['get', 'configmaps', '--all-namespaces'])
+    crds, err = kube.get_json(["get", "crd"])
+    owners, owner_err = kube.get_json(["get", "configmaps", "--all-namespaces"])
     if crds is None or owners is None:
-        result['failures'].append('could not inspect Gateway ownership: %s %s' % (err, owner_err))
+        result["failures"].append("could not inspect Gateway ownership: %s %s" % (err, owner_err))
         return
-    for crd in crds.get('items', []):
-        meta = crd.get('metadata', {})
-        if meta.get('annotations', {}).get('deepops.nvidia.com/runai-installed') == 'true':
-            result['leftovers'].append('crd/' + meta.get('name', ''))
-    for owner in owners.get('items', []):
-        meta = owner.get('metadata', {})
-        if meta.get('name') in ('deepops-runai-kgateway', 'deepops-runai-kgateway-crds'):
-            result['leftovers'].append('release-owner/%s/%s' % (meta.get('namespace', ''), meta['name']))
+    for crd in crds.get("items", []):
+        meta = crd.get("metadata", {})
+        if meta.get("annotations", {}).get("deepops.nvidia.com/runai-installed") == "true":
+            result["leftovers"].append("crd/" + meta.get("name", ""))
+    for owner in owners.get("items", []):
+        meta = owner.get("metadata", {})
+        if meta.get("name") in ("deepops-runai-kgateway", "deepops-runai-kgateway-crds"):
+            result["leftovers"].append("release-owner/%s/%s" % (meta.get("namespace", ""), meta["name"]))
     if result["leftovers"]:
         result["failures"].append("leftover objects: %s" % ", ".join(result["leftovers"]))
     else:
@@ -938,7 +1173,8 @@ def validate(args, env, kube=None):
         if kube.ensure_namespace(args.namespace)[0] != 0:
             result["failures"].append(
                 "could not create a fresh namespace %s (an existing namespace is never reused or "
-                "deleted; pick another --namespace or remove it yourself)" % args.namespace)
+                "deleted; pick another --namespace or remove it yourself)" % args.namespace
+            )
         else:
             check_whole_gpu(kube, result, args)
             check_fractions(kube, result, args)
@@ -948,12 +1184,22 @@ def validate(args, env, kube=None):
         check_platform(result, args, env)
     if args.mode == "platform" and result["platform_api_ok"]:
         check_exposure(kube, result, args)
-    ran_ok = (result["scheduler_ready"] and
-              (args.skip_gpu_jobs or (result["gpu_job_ok"] and (result["fraction_job_ok"] or result["fraction_job_skipped"]))) and
-              (not args.memory_enforcement or result["memory_enforcement_ok"]) and
-              (args.mode != "platform" or
-               (result["platform_api_ok"] and result["platform_cluster_connected"] and
-                (not args.create_project or (result["project_created"] and result["project_deleted"])))))
+    ran_ok = (
+        result["scheduler_ready"]
+        and (
+            args.skip_gpu_jobs
+            or (result["gpu_job_ok"] and (result["fraction_job_ok"] or result["fraction_job_skipped"]))
+        )
+        and (not args.memory_enforcement or result["memory_enforcement_ok"])
+        and (
+            args.mode != "platform"
+            or (
+                result["platform_api_ok"]
+                and result["platform_cluster_connected"]
+                and (not args.create_project or (result["project_created"] and result["project_deleted"]))
+            )
+        )
+    )
     result["ok"] = bool(ran_ok and not result["failures"])
     if result["ok"] and not args.skip_gpu_jobs:
         if not args.create_project:
@@ -970,42 +1216,69 @@ def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0], allow_abbrev=False)
     p.add_argument("--json", action="store_true", help="emit one JSON object")
     p.add_argument("--mode", choices=("kai", "platform"), default="kai")
-    p.add_argument("--verify-uninstalled", action="store_true",
-                   help="read-only: pass only if no kai-scheduler/runai* namespace or release remains")
+    p.add_argument(
+        "--verify-uninstalled",
+        action="store_true",
+        help="read-only: pass only if no kai-scheduler/runai* namespace or release remains",
+    )
     p.add_argument("--kai-namespace", default=KAI_NAMESPACE)
-    p.add_argument("--namespace", default="deepops-runai-validate",
-                   help="namespace for the test pods; must not exist yet, created and labelled by this run, deleted on success "
-                        "(kai mode only. Platform mode with --create-project ignores this and creates its own "
-                        "<project>-<8 hex> namespace, binds the new Run:ai project to it, and deletes only that exact namespace)")
+    p.add_argument(
+        "--namespace",
+        default="deepops-runai-validate",
+        help="namespace for the test pods; must not exist yet, created and labelled by this run, deleted on success "
+        "(kai mode only. Platform mode with --create-project ignores this and creates its own "
+        "<project>-<8 hex> namespace, binds the new Run:ai project to it, and deletes only that exact namespace)",
+    )
     p.add_argument("--queue", default="default-queue")
     p.add_argument("--queue-label-key", default="kai.scheduler/queue")
     p.add_argument("--scheduler-name", default="kai-scheduler")
     p.add_argument("--image", default="nvcr.io/nvidia/cuda:13.0.2-base-ubuntu24.04")
-    p.add_argument("--memory-image", default="python:3.12-slim",
-                   help="image with python3 for the GPU-memory check")
+    p.add_argument(
+        "--memory-image", default="python:3.12-slim", help="image with python3 for the GPU-memory check"
+    )
     p.add_argument("--job-timeout", type=int, default=300, help="seconds per pod (default 300)")
-    p.add_argument("--ready-timeout", type=int, default=None,
-                   help="wait up to this many seconds for the scheduler (and in platform mode the cluster link) "
-                        "to become ready before checking; 0 = check once (default 600 in platform mode, else 0)")
-    p.add_argument("--skip-fractions", action="store_true",
-                   help="platform mode with --create-project: do not run the half-GPU check "
-                        "(reported as fraction_job_skipped; fractional sharing is then not proven)")
+    p.add_argument(
+        "--ready-timeout",
+        type=int,
+        default=None,
+        help="wait up to this many seconds for the scheduler (and in platform mode the cluster link) "
+        "to become ready before checking; 0 = check once (default 600 in platform mode, else 0)",
+    )
+    p.add_argument(
+        "--skip-fractions",
+        action="store_true",
+        help="platform mode with --create-project: do not run the half-GPU check "
+        "(reported as fraction_job_skipped; fractional sharing is then not proven)",
+    )
     p.add_argument("--skip-gpu-jobs", action="store_true", help="scheduler health only")
-    p.add_argument("--memory-enforcement", action="store_true",
-                   help="also prove gpu-fractioning refuses allocations past a pod's share")
+    p.add_argument(
+        "--memory-enforcement",
+        action="store_true",
+        help="also prove gpu-fractioning refuses allocations past a pod's share",
+    )
     p.add_argument("--platform-domain", default="", help="control-plane FQDN (platform mode)")
     p.add_argument("--resolve-ip", default="", help="connect here instead of resolving the domain")
     p.add_argument("--ca-file", default="", help="CA bundle that signed the control-plane certificate")
-    p.add_argument("--create-project", default="",
-                   help="platform mode: create this throw-away Run:ai project through the API, run the "
-                        "GPU checks in its namespace, then delete it (needs RUNAI_USERNAME/RUNAI_PASSWORD)")
-    p.add_argument("--exposure", choices=EXPOSURES, default="",
-                   help="platform mode: fail unless the control plane is reached through this path "
-                        "(ingress or gateway). Without it the path is only reported (exposure_reached)")
-    p.add_argument("--ingress-namespace", default="haproxy-controller",
-                   help="namespace of the ingress controller's service (platform mode)")
-    p.add_argument('--cp-namespace', default='runai-backend', help='Run:ai control-plane route namespace')
-    p.add_argument('--cluster-namespace', default='runai', help='Run:ai cluster route namespace')
+    p.add_argument(
+        "--create-project",
+        default="",
+        help="platform mode: create this throw-away Run:ai project through the API, run the "
+        "GPU checks in its namespace, then delete it (needs RUNAI_USERNAME/RUNAI_PASSWORD)",
+    )
+    p.add_argument(
+        "--exposure",
+        choices=EXPOSURES,
+        default="",
+        help="platform mode: fail unless the control plane is reached through this path "
+        "(ingress or gateway). Without it the path is only reported (exposure_reached)",
+    )
+    p.add_argument(
+        "--ingress-namespace",
+        default="haproxy-controller",
+        help="namespace of the ingress controller's service (platform mode)",
+    )
+    p.add_argument("--cp-namespace", default="runai-backend", help="Run:ai control-plane route namespace")
+    p.add_argument("--cluster-namespace", default="runai", help="Run:ai cluster route namespace")
     p.add_argument("--cluster-name", default="deepops", help="Run:ai cluster name to look up")
     args = p.parse_args(argv)
     for label, value in (("namespace", args.namespace), ("kai-namespace", args.kai_namespace)):
@@ -1022,9 +1295,16 @@ def parse_args(argv):
         p.error("--create-project needs --mode platform and a valid Kubernetes name")
     if args.skip_fractions and not args.create_project:
         p.error("--skip-fractions needs --create-project (platform mode)")
-    if args.mode == "platform" and not args.create_project and not args.skip_gpu_jobs and not args.verify_uninstalled:
-        p.error("platform mode needs --create-project NAME (GPU checks run in a project this run "
-                "creates and deletes) or --skip-gpu-jobs; an existing project namespace is never reused")
+    if (
+        args.mode == "platform"
+        and not args.create_project
+        and not args.skip_gpu_jobs
+        and not args.verify_uninstalled
+    ):
+        p.error(
+            "platform mode needs --create-project NAME (GPU checks run in a project this run "
+            "creates and deletes) or --skip-gpu-jobs; an existing project namespace is never reused"
+        )
     if args.mode == "platform":  # the cluster chart puts its scheduler in the runai namespace
         if args.kai_namespace == KAI_NAMESPACE:
             args.kai_namespace = "runai"
@@ -1040,6 +1320,7 @@ def parse_args(argv):
 
 def main(argv=None):
     import os
+
     args = parse_args(sys.argv[1:] if argv is None else argv)
     if not shutil.which("kubectl"):
         print("error: kubectl not found in PATH", file=sys.stderr)

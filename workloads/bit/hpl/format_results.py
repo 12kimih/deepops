@@ -12,6 +12,7 @@ import subprocess
 import getopt
 import re
 
+
 def print_help():
 
     print("")
@@ -19,32 +20,33 @@ def print_help():
     print("")
     sys.exit(1)
 
+
 print("")
 
 try:
-    opts,args = getopt.getopt(sys.argv[1:],"d:",["d="])
+    opts, args = getopt.getopt(sys.argv[1:], "d:", ["d="])
 except getopt.GetoptError:
     print_help()
 
 dir = ""
-for opt,arg in opts:
-    if opt == '-h':
+for opt, arg in opts:
+    if opt == "-h":
         print_help()
-    elif opt in ("-d","--dir"):
-        expdir=arg
+    elif opt in ("-d", "--dir"):
+        expdir = arg
 
 if expdir == "":
     print("ERROR: Directory must be specified.")
     print_help()
 
 if not os.path.isdir(expdir):
-    print("ERROR: Specified path is not a directory.  DIR="+dir)
+    print("ERROR: Specified path is not a directory.  DIR=" + dir)
     print("ERROR: exiting")
     print("")
     sys.exit(1)
 
 # Create a results dictionary
-res={}
+res = {}
 
 # Now loop over all .out files found in dir
 for fn in os.listdir(expdir):
@@ -52,50 +54,50 @@ for fn in os.listdir(expdir):
         continue
 
     # For each file, find the HOSTLIST and performance metric
-    with open(expdir+"/"+fn,"r") as fp:
-        hosts=""
-        perf=""
+    with open(expdir + "/" + fn, "r") as fp:
+        hosts = ""
+        perf = ""
         for line in fp:
-            text=line.strip()
+            text = line.strip()
             # Matching: HOSTLIST node-001,node-002
-            if(re.match('HOSTLIST',text)):
+            if re.match("HOSTLIST", text):
                 if hosts != "":
-                    print("ERROR: Found HOSTLIST twice in "+fn)
-                hosts=text.split()[-1]
+                    print("ERROR: Found HOSTLIST twice in " + fn)
+                hosts = text.split()[-1]
 
-           ## Matching:  WR01C2C8      180224   144     4     4              50.27              7.763e+04
-            m=re.match(r'^W\w\d{2}\w\d\w\d (.*)$',text)
+            ## Matching:  WR01C2C8      180224   144     4     4              50.27              7.763e+04
+            m = re.match(r"^W\w\d{2}\w\d\w\d (.*)$", text)
             if m:
                 # Silently grab the last one
-                perf=text.split()[-1]
+                perf = text.split()[-1]
 
         # Compress nodelist
 
-        cmd=['scontrol','show','hostlist',hosts]
-        cout=subprocess.run(cmd,stdout=subprocess.PIPE)
-        chosts=cout.stdout.decode('utf-8').strip()
+        cmd = ["scontrol", "show", "hostlist", hosts]
+        cout = subprocess.run(cmd, stdout=subprocess.PIPE)
+        chosts = cout.stdout.decode("utf-8").strip()
 
         if chosts in res:
             res[chosts].append(perf)
         else:
-            res[chosts]=[perf]
+            res[chosts] = [perf]
 
 ## Now all the data have been read, lets print it out
 print("")
-print("Comma Separated Results for Experiment: "+expdir)
+print("Comma Separated Results for Experiment: " + expdir)
 print("")
 
 ## Print headers
-maxexp=0
-for k,v in sorted(res.items()):
-    count=len(res[k])
+maxexp = 0
+for k, v in sorted(res.items()):
+    count = len(res[k])
     if count > maxexp:
-        maxexp=count
+        maxexp = count
 
-print("Nodelist;",end="")
-for n in range(1,maxexp+1):
-    print("Exp %d;" % n,end="")
+print("Nodelist;", end="")
+for n in range(1, maxexp + 1):
+    print("Exp %d;" % n, end="")
 print("")
 
-for k,v in sorted(res.items()):
-    print("%s;%s" % (k,";".join(res[k])))
+for k, v in sorted(res.items()):
+    print("%s;%s" % (k, ";".join(res[k])))

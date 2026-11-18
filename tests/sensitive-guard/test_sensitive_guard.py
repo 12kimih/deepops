@@ -23,21 +23,25 @@ class GuardTest(unittest.TestCase):
         self.git("config", "user.name", "Test")
         site = self.repo / "config"
         site.mkdir()
-        (site / "vars.yml").write_text(textwrap.dedent("""\
+        (site / "vars.yml").write_text(
+            textwrap.dedent("""\
             other: 1
             user_map:
               alice01: U1
               'bob-x': U2
               shared: U3
             after: 2
-            """))
-        (site / "sensitive-patterns").write_text(textwrap.dedent(f"""\
+            """)
+        )
+        (site / "sensitive-patterns").write_text(
+            textwrap.dedent(f"""\
             # comment
             literal:{SITE_HOST}==>cluster.example.com
             regex:(?<![0-9A-Za-z])48123(?![0-9A-Za-z])==>3001
             keys:vars.yml:user_map==>user
             allow:shared
-            """))
+            """)
+        )
         (self.repo / ".gitignore").write_text("config/\n")
         self.commit("base", {"README": "hello\n"})
 
@@ -45,7 +49,9 @@ class GuardTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def git(self, *args):
-        return subprocess.run(["git", *args], cwd=self.repo, check=True, capture_output=True, text=True).stdout
+        return subprocess.run(
+            ["git", *args], cwd=self.repo, check=True, capture_output=True, text=True
+        ).stdout
 
     def commit(self, message, files):
         for name, content in files.items():
@@ -54,8 +60,14 @@ class GuardTest(unittest.TestCase):
         self.git("commit", "-q", "-m", message)
 
     def guard(self, *args, stdin=None, env=None):
-        run = subprocess.run([sys.executable, str(GUARD), *args], cwd=self.repo, input=stdin, text=True,
-                             capture_output=True, env={**os.environ, **(env or {})})
+        run = subprocess.run(
+            [sys.executable, str(GUARD), *args],
+            cwd=self.repo,
+            input=stdin,
+            text=True,
+            capture_output=True,
+            env={**os.environ, **(env or {})},
+        )
         return run.returncode, run.stdout + run.stderr
 
     def test_staged_clean_and_dirty(self):
@@ -136,7 +148,9 @@ class GuardTest(unittest.TestCase):
         (self.repo / "j.txt").write_text("port 48123\n")
         self.git("add", "j.txt")
         self.assertEqual(self.guard("--no-site", "staged")[0], 0)
-        self.assertEqual(self.guard("staged", env={"DEEPOPS_SENSITIVE_PATTERNS": str(self.repo / "nope")})[0], 0)
+        self.assertEqual(
+            self.guard("staged", env={"DEEPOPS_SENSITIVE_PATTERNS": str(self.repo / "nope")})[0], 0
+        )
         self.assertEqual(self.guard("--patterns", str(self.repo / "nope"), "staged")[0], 2)
 
     def test_replace_text(self):
@@ -145,7 +159,12 @@ class GuardTest(unittest.TestCase):
         lines = out.splitlines()
         self.assertEqual(lines[0], f"{SITE_HOST}==>cluster.example.com")
         self.assertEqual(lines[1], "regex:(?<![0-9A-Za-z])48123(?![0-9A-Za-z])==>3001")
-        self.assertTrue(lines[2].startswith("regex:") and "alice01" in lines[2] and lines[2].endswith("==>user") and "shared" not in lines[2])
+        self.assertTrue(
+            lines[2].startswith("regex:")
+            and "alice01" in lines[2]
+            and lines[2].endswith("==>user")
+            and "shared" not in lines[2]
+        )
         self.assertEqual(len(lines), 3)
 
     def test_bad_rule(self):
@@ -160,11 +179,17 @@ class HookManifestTest(unittest.TestCase):
 
     def test_local_hooks_match_published_hooks(self):
         import yaml
+
         root = GUARD.parents[2]
         published = {h["id"]: h for h in yaml.safe_load((root / ".pre-commit-hooks.yaml").read_text())}
         config = yaml.safe_load((root / ".pre-commit-config.yaml").read_text())
-        local = {h["id"]: h for repo in config["repos"] if repo["repo"] == "local" for h in repo["hooks"]
-                 if h["id"].startswith("sensitive-guard")}
+        local = {
+            h["id"]: h
+            for repo in config["repos"]
+            if repo["repo"] == "local"
+            for h in repo["hooks"]
+            if h["id"].startswith("sensitive-guard")
+        }
         self.assertTrue(local)
         for hook_id, hook in local.items():
             self.assertIn(hook_id, published)

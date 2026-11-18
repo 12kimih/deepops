@@ -40,6 +40,7 @@ def _templar(variables):
     """A templar over `variables`, trusted as Ansible trusts role defaults and vars files."""
     from ansible.parsing.dataloader import DataLoader
     from ansible.template import Templar
+
     return Templar(loader=DataLoader(), variables=_trusted(variables))
 
 
@@ -70,6 +71,7 @@ def condition(when, variables):
     if hasattr(templar, "evaluate_conditional"):
         return all(templar.evaluate_conditional(_trusted(w)) for w in whens)
     from ansible.playbook.conditional import Conditional  # ansible-core before 2.19
+
     check = Conditional(loader=templar._loader)
     check.when = whens
     return check.evaluate_conditional(templar, variables)
