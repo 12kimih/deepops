@@ -204,6 +204,14 @@ class Plan(unittest.TestCase):
         cmds, _ = plan(SPEC)
         self.assertFalse(any("maxsubmitjobs=-1" in c for cmd in cmds for c in cmd))
 
+    def test_root_account_is_converged_never_created(self):
+        s = copy(SPEC)
+        s["accounts"]["root"] = {"qos": ["normal"], "members": [{"user": "root", "fairshare": 1}]}
+        cmds, unmanaged = plan(s)
+        self.assertFalse(any(c[:2] == ["add", "account"] or "parent=" in " ".join(c) for c in cmds))
+        self.assertIn(["modify", "user", "where", "name=root", "account=root", "set", "fairshare=1"], cmds)
+        self.assertEqual(unmanaged["associations"], [])
+
     def test_time_parsing(self):
         self.assertEqual(acct.minutes("1-00:00:00"), 1440)
         self.assertEqual(acct.minutes("02:30:00"), 150)

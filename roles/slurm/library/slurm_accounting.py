@@ -55,6 +55,9 @@ QOS_FIELDS = "name,priority,preempt,preemptmode,flags,grptres,maxtrespu,maxwall,
 ASSOC_FIELDS = "account,user,parentname,fairshare,priority,qos,defaultqos,maxsubmit"
 ACCOUNT_FIELDS = "account,description,organization"
 BUILTIN_QOS = {"normal"}
+# Slurm's top account: it can be declared to set its attributes and members, but it is
+# never created, deleted or re-parented.
+ROOT = "root"
 
 
 # --- parsing sacctmgr -nP output -------------------------------------------------
@@ -171,7 +174,7 @@ def desired_accounts(spec):
     for name, a in (spec.get("accounts") or {}).items():
         a = a or {}
         out[name] = {
-            "parent": a.get("parent", "root"),
+            "parent": None if name == ROOT else a.get("parent", ROOT),
             "fairshare": fairshare(a.get("fairshare", 1)),
             "priority": priority(a.get("priority")),
             "qos": sorted(a["qos"]) if "qos" in a else None,
@@ -350,7 +353,9 @@ def plan(spec, cur_qos, cur_accounts, cur_users, cluster=None, prune=False):
 
     for name in ordered_accounts(want_accounts):
         want, have = want_accounts[name], cur_accounts.get(name)
-        if have is None:
+        if name == ROOT:
+            pass  # exists in every cluster; only its attributes below are converged
+        elif have is None:
             cmds.append(["add", "account", name, f"parent={want['parent']}", *where_cluster])
         elif want["parent"] != have["parent"]:
             cmds.append(
@@ -394,12 +399,12 @@ def plan(spec, cur_qos, cur_accounts, cur_users, cluster=None, prune=False):
 
     unmanaged = {
         "qos": sorted(set(cur_qos) - set(want_qos) - BUILTIN_QOS),
-        "accounts": sorted(set(cur_accounts) - set(want_accounts) - {"root"}),
+        "accounts": sorted(set(cur_accounts) - set(want_accounts) - {ROOT}),
         "associations": sorted(
             f"{u}@{a}"
             for u, assocs in cur_users.items()
             for a in assocs
-            if u != "root" and a not in want_users.get(u, {}).get("associations", {})
+            if (u, a) != (ROOT, ROOT) and a not in want_users.get(u, {}).get("associations", {})
         ),
     }
     if prune:
