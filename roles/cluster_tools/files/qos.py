@@ -263,12 +263,12 @@ def _me():
 def main(argv=None):
     def body():
         args, theme = COMMAND.parse(argv)
-        qos_data, assoc_data = slurm.sacctmgr("show", "qos"), slurm.sacctmgr("show", "assoc")
+        qos_data, assoc_data = slurm.load("qos"), slurm.load("associations")
         # A failed usage read leaves usage unknown and says why, rather than failing qos.
         jobs, usage_error = None, ""
         if args.usage:
             try:
-                jobs = slurm.scontrol("show", "jobs")
+                jobs = slurm.load("jobs")
             except slurm.FAILURES as e:
                 usage_error = slurm.failure(e)
         usage = args.usage and not usage_error

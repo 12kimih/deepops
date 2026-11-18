@@ -23,9 +23,9 @@ from clustertools.slurm import (
     failure,
     job_gpus,
     job_label,
+    load,
     num,
     run,
-    scontrol,
 )
 from clustertools.vocab import node_unavailable
 
@@ -94,8 +94,8 @@ def parse_nodes(data):
 
 
 def collect_slurm(now):
-    jobs, pending = parse_jobs(scontrol("-d", "show", "job"), now)
-    nodes, reasons = parse_nodes(scontrol("show", "nodes"))
+    jobs, pending = parse_jobs(load("jobs_detail"), now)
+    nodes, reasons = parse_nodes(load("nodes"))
     return {"jobs": jobs, "nodes": nodes, "reasons": reasons, "pending": pending}
 
 

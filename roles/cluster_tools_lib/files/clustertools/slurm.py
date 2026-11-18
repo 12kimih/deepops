@@ -41,14 +41,101 @@ def failure(error):
     return text.splitlines()[0] if text else f"{error.cmd[0]} exited with status {error.returncode}"
 
 
-def scontrol(*args):
-    """`scontrol --json ARGS` parsed, e.g. scontrol("show", "nodes")."""
-    return json.loads(run("scontrol", "--json", *args))
+# --- What the tools read --------------------------------------------------------
+# Every Slurm read the tools make, and the fields they rely on in it. One list, so a
+# Slurm upgrade is checked in one place: a release that renames a field fails load() with
+# that field's name, never with figures quietly read as zero, and tests check every
+# fixture (one per Slurm release) against the same list.
+
+QUERIES = {
+    "nodes": (("scontrol", "--json", "show", "nodes"), "nodes"),
+    "partitions": (("scontrol", "--json", "show", "partitions"), "partitions"),
+    "jobs": (("scontrol", "--json", "show", "jobs"), "jobs"),
+    "jobs_detail": (("scontrol", "-d", "--json", "show", "jobs"), "jobs"),
+    "qos": (("sacctmgr", "--json", "show", "qos"), "qos"),
+    "associations": (("sacctmgr", "--json", "show", "assoc"), "associations"),
+}
+_JOB_FIELDS = (
+    "job_id",
+    "name",
+    "user_name",
+    "account",
+    "partition",
+    "qos",
+    "job_state",
+    "state_reason",
+    "state_description",
+    "nodes",
+    "node_count",
+    "cpus",
+    "tres_req_str",
+    "tres_alloc_str",
+    "tres_per_node",
+    "array_job_id",
+    "array_task_id",
+    "array_task_string",
+    "time_limit",
+    "start_time",
+    "submit_time",
+    "priority",
+)
+FIELDS = {
+    "nodes": (
+        "name",
+        "state",
+        "partitions",
+        "cpus",
+        "alloc_cpus",
+        "effective_cpus",
+        "real_memory",
+        "alloc_memory",
+        "specialized_memory",
+        "gres",
+        "tres",
+        "tres_used",
+        "reason",
+        "reason_set_by_user",
+        "reason_changed_at",
+    ),
+    "partitions": ("name", "partition", "nodes"),
+    "jobs": _JOB_FIELDS,
+    "jobs_detail": (*_JOB_FIELDS, "gres_detail"),
+    "qos": ("name", "priority", "preempt", "flags", "limits"),
+    "associations": ("account", "user", "qos", "default", "is_default"),
+}
 
 
-def sacctmgr(*args):
-    """`sacctmgr --json ARGS` parsed, e.g. sacctmgr("show", "qos")."""
-    return json.loads(run("sacctmgr", "--json", *args))
+class SchemaError(ValueError):
+    """A Slurm reply without what the tools rely on: a new release renamed something."""
+
+
+def check(kind, data):
+    """DATA, a parsed reply to QUERIES[KIND], or SchemaError naming what is missing. An
+    error Slurm reported inside the reply is raised too: it would otherwise leave an
+    empty list that reads as an idle cluster."""
+    key = QUERIES[kind][1]
+    release = ((data.get("meta") or {}).get("slurm") or {}).get("release", "?")
+    errors = [e.get("description") or e.get("error") for e in data.get("errors") or []]
+    if errors:
+        raise SchemaError(f"Slurm {release} reported an error reading {kind}: {errors[0]}")
+    if not isinstance(data.get(key), list):
+        raise SchemaError(
+            f"Slurm {release} gave no '{key}' list for {kind}; "
+            "clustertools.slurm.QUERIES needs updating for this release"
+        )
+    for record in data[key]:
+        missing = [f for f in FIELDS[kind] if f not in record]
+        if missing:
+            raise SchemaError(
+                f"Slurm {release} {kind} lack {', '.join(missing)}; "
+                "clustertools.slurm.FIELDS needs updating for this release"
+            )
+    return data
+
+
+def load(kind):
+    """Read QUERIES[KIND] from Slurm, checked against FIELDS[KIND]."""
+    return check(kind, json.loads(run(*QUERIES[kind][0])))
 
 
 def cluster_name(data):
