@@ -10,13 +10,24 @@
         group: root
         mode: "0700"
 
-    - name: Install the report script
+    # The report is a module on the shared clustertools path, run through the same
+    # command wrapper as every other cluster tool.
+    - name: Install the report module
       ansible.builtin.copy:
-        src: slurm-usage-report.py
-        dest: "{{ slurm_usage_report_script }}"
+        src: slurm_usage_report.py
+        dest: "{{ cluster_tools_lib_dir }}/slurm_usage_report.py"
         owner: root
         group: root
-        mode: "0755"
+        mode: "0644"
+
+    - name: Install the report command
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: command
+      vars:
+        cluster_tools_lib_command:
+          dest: "{{ slurm_usage_report_script }}"
+          module: slurm_usage_report
 
     # Holds the bot token.
     - name: Install the report config

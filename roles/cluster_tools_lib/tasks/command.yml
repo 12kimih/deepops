@@ -1,0 +1,15 @@
+---
+# Install one command that runs a module from cluster_tools_lib_dir. Include it with
+#   ansible.builtin.include_role:
+#     name: cluster_tools_lib
+#     tasks_from: command
+#   vars:
+#     cluster_tools_lib_command: {dest: /usr/local/bin/NAME, module: MODULE}
+# MODULE is a module on cluster_tools_lib_dir that defines main() -> exit status.
+- name: Install a cluster command ({{ cluster_tools_lib_command.dest | basename }})
+  ansible.builtin.template:
+    src: command.j2
+    dest: "{{ cluster_tools_lib_command.dest }}"
+    owner: root
+    group: root
+    mode: "0755"

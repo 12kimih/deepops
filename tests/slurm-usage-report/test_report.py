@@ -1,12 +1,11 @@
-"""Unit tests for roles/slurm_usage_report/files/slurm-usage-report.py (no cluster needed)."""
-import importlib.util
+"""Unit tests for roles/slurm_usage_report/files/slurm_usage_report.py (no cluster needed)."""
+import sys
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "roles/slurm_usage_report/files/slurm-usage-report.py"
-spec = importlib.util.spec_from_file_location("report", SCRIPT)
-report = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(report)
+ROLES = Path(__file__).resolve().parents[2] / "roles"
+sys.path[:0] = [str(ROLES / "cluster_tools_lib/files"), str(ROLES / "slurm_usage_report/files")]
+import slurm_usage_report as report  # noqa: E402
 
 
 NOW = 1_800_000_000
@@ -35,10 +34,6 @@ def node(name, gres, state=("IDLE",), reason="", user="", changed=0):
 
 
 class ParseTests(unittest.TestCase):
-    def setUp(self):
-        report._hostnames.clear()
-        report.run = lambda *cmd: {"gpu[1-2]": "gpu1\ngpu2\n"}[cmd[-1]]
-
     def test_typed_typeless_array_and_multinode_jobs(self):
         data = {"jobs": [
             job(1, "alice", nodes="gpu1", gres=["gpu:a10:2(IDX:0-1)"]),

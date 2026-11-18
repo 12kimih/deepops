@@ -1,0 +1,17 @@
+---
+- name: Create the cluster Python library directory
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Publish the clustertools package
+  ansible.builtin.copy:
+    src: clustertools
+    dest: "{{ cluster_tools_lib_dir }}/"
+    owner: root
+    group: root
+    mode: "0644"
+    directory_mode: "0755"
