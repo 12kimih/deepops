@@ -30,12 +30,12 @@ class TextfileTests(unittest.TestCase):
         text = metrics.textfile(jobs, load("nodes"))
         allocated = [line for line in text.splitlines() if line.startswith("slurm_gpu_allocated{")]
         self.assertEqual(len(allocated), 4)
-        self.assertIn('slurm_gpu_allocated{host="gpu1",gpu="1",gpu_type="a10",user="alice",account="acct1",'
+        self.assertIn('slurm_gpu_allocated{node="gpu1",gpu="1",gpu_type="a10",user="alice",account="acct1",'
                       'partition="a10-1",job="1"} 1', text)  # fmt: skip
-        self.assertIn('host="gpu3",gpu="0",gpu_type="a30",user="bob"', text)
+        self.assertIn('node="gpu3",gpu="0",gpu_type="a30",user="bob"', text)
         self.assertIn('job="9_3"', text)
         self.assertNotIn("carol", text)
-        self.assertIn('slurm_node_gpus{host="gpu4",gpu_type="a30"} 7', text)
+        self.assertIn('slurm_node_gpus{node="gpu4",gpu_type="a30"} 7', text)
         self.assertIn("# TYPE slurm_gpu_allocated gauge", text)
 
     def test_label_values_are_escaped(self):
