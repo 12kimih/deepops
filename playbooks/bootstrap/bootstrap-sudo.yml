@@ -1,4 +1,14 @@
 ---
+# Grant whoever runs this passwordless sudo on every host: a one-time step for a NEW
+# node, before any directory or sudoers role has run. It is deliberately not part of
+# slurm-cluster.yml, k8s-cluster.yml or ngc-ready-server.yml: run there, it re-created
+# a personal NOPASSWD grant on every deploy, outside the administrator list, and kept
+# it after that person's access was revoked. Day-to-day deploys use -K.
+#
+#   ansible-playbook -K -l <new-node> playbooks/bootstrap/bootstrap-sudo.yml
+#
+# Remove the grant once the node is in the cluster: cluster_sudoers_prune deletes
+# drop-ins it did not write (roles/cluster_sudoers).
 - hosts: all
   tasks:
     - name: Run setup to get ansible user

@@ -267,10 +267,12 @@
   timeout: 600
   tags:
     - accounting
+    - people
   vars:
     _slurm_priority: "{{ lookup('ansible.builtin.template', slurm_conf_template) | regex_findall('(?m)^(Priority\\w+)=(\\S+)') | community.general.dict }}"
+    _slurm_spec: "{{ lookup('ansible.builtin.file', slurm_accounting_file) | from_yaml }}"
   slurm_accounting:
-    spec: "{{ lookup('ansible.builtin.file', slurm_accounting_file) | from_yaml }}"
+    spec: "{{ _slurm_spec | combine({'users': (_slurm_spec.users | default({})) | combine(slurm_accounting_users, recursive=true)}) }}"
     sacctmgr: "{{ slurm_install_prefix }}/bin/sacctmgr"
     prune: "{{ slurm_accounting_prune }}"
     priority_flags: "{{ (_slurm_priority.PriorityFlags | default('')).split(',') | select | list }}"

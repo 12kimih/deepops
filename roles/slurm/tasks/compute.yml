@@ -235,6 +235,26 @@
     enabled: true
     daemon_reload: true
 
+# The file used to add whoever ran the play as well, so access depended on who deployed
+# last and outlived removal from the list. It is now exactly slurm_allow_ssh_user;
+# this check keeps the connecting user from locking itself out.
+- name: Assert the deploying user may still log in to compute nodes
+  vars:
+    slurm_deploy_user: "{{ ansible_user | default(lookup('ansible.builtin.env', 'USER')) }}"
+  ansible.builtin.assert:
+    that: slurm_deploy_user in ['root'] + slurm_allow_ssh_user
+    fail_msg: >-
+      Ansible connects as {{ slurm_deploy_user }}, which is not in slurm_allow_ssh_user,
+      so pam_slurm_adopt would refuse its next login to {{ inventory_hostname }}. Add
+      it to slurm_allow_ssh_user (for a roster, give the person the admin role).
+    quiet: true
+  when:
+    - slurm_enable_pam_slurm_adopt
+    - slurm_restrict_node_access
+  tags:
+    - localusers
+    - people
+
 - name: Install /etc/localusers
   ansible.builtin.template:
     src: etc/localusers
@@ -245,6 +265,7 @@
     - /etc/localusers
   tags:
     - localusers
+    - people
 
 # A wrong -account line in /etc/pam.d/sshd locks operators out, and build.yml skips
 # the rebuild when the version already matches, so confirm the module is where

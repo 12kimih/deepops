@@ -1,0 +1,63 @@
+---
+# Accounts are read from the local files only: on a NIS master `getent` would also
+# answer from NIS, which is built from these same files and may be stale.
+- name: Read the local accounts
+  ansible.builtin.getent:
+    database: passwd
+    service: files
+  tags:
+    - people
+
+- name: Refuse to change an existing account's UID
+  ansible.builtin.assert:
+    that: >-
+      (ansible_facts.getent_passwd[item.key][1] | int) == (item.value.uid | int)
+    fail_msg: >-
+      {{ item.key }} has UID {{ ansible_facts.getent_passwd[item.key][1] }} here but
+      {{ item.value.uid }} in the roster. Changing it would orphan the account's files
+      on shared storage; fix the roster, or migrate the files and the UID by hand.
+    quiet: true
+  loop: "{{ people | dict2items | selectattr('key', 'in', ansible_facts.getent_passwd) }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - people
+
+- name: Create each active person's group
+  ansible.builtin.group:
+    name: "{{ item.key }}"
+    gid: "{{ item.value.uid }}"
+  loop: "{{ people | people_active | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} ({{ item.value.uid }})"
+  tags:
+    - people
+
+# `groups` is not managed here: supplementary groups come from the roles that own them
+# (nis_server for published groups, cluster_sudoers for the local sudo group).
+- name: Create or update each active person's account
+  ansible.builtin.user:
+    name: "{{ item.key }}"
+    uid: "{{ item.value.uid }}"
+    group: "{{ item.key }}"
+    comment: "{{ item.value.name | default(omit) }}"
+    shell: "{{ item.value.shell | default(people_default_shell) }}"
+    home: "{{ people_home_root }}/{{ item.key }}"
+    create_home: true
+  loop: "{{ people | people_active | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - people
+
+# Expiry blocks every login PAM checks, SSH keys included; a locked password alone
+# would not. Only accounts that exist are locked; a left person is never created.
+- name: Lock the accounts of people who have left
+  ansible.builtin.user:
+    name: "{{ item }}"
+    password_lock: true
+    expires: 1
+    shell: /usr/sbin/nologin
+  loop: "{{ people | people_left | select('in', ansible_facts.getent_passwd) | list }}"
+  tags:
+    - people

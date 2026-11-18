@@ -37,6 +37,9 @@
         owner: root
         group: root
         mode: "0600"
+      # The user map comes from the people roster.
+      tags:
+        - people
 
     - name: Install systemd units
       ansible.builtin.template:

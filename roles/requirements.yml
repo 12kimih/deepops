@@ -18,10 +18,7 @@ collections:
   - name: kubernetes.core
     version: 6.6.0
 
-  - name: devsec.hardening
-    version: 11.0.0
-
-# First-party utility roles (hosts, chrony, users) and the NVIDIA driver, container
+# First-party utility roles (hosts, chrony, people) and the NVIDIA driver, container
 # toolkit and enroot are in-tree roles, so only third-party roles are listed here.
 roles:
   - src: andrewrothstein.miniconda
