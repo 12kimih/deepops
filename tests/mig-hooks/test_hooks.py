@@ -9,13 +9,11 @@ from pathlib import Path
 import shlex
 import unittest
 
-from ansible.parsing.dataloader import DataLoader
-from ansible.template import Templar
 import yaml
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
-from ansible_yaml import canonical, same_name  # noqa: E402
+from ansible_yaml import canonical, render, same_name  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 PLAY = canonical(yaml.safe_load((ROOT / "playbooks/nvidia-software/nvidia-mig.yml").read_text()))[0]
@@ -27,7 +25,7 @@ class Hooks(unittest.TestCase):
     def render(self, values):
         variables = {"mig_manager_config": "/etc/mig/config.yml",
                      "mig_manager_profile": "all-disabled", **values}
-        rendered = Templar(loader=DataLoader(), variables=variables).template(APPLY["command"])
+        rendered = render(APPLY["command"], variables)
         return shlex.split(rendered)
 
     def test_example_defaults_do_not_require_an_unmanaged_file(self):
