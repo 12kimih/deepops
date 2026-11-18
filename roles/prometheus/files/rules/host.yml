@@ -99,3 +99,15 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "Network errors on {{ $labels.device }} of {{ $labels.host }}"
+      # A rolling upgrade leaves a mix for hours; days of it mean nodes were skipped.
+      - alert: KernelVersionsDiffer
+        expr: count(count by (release) (max by (host, release) (node_uname_info))) > 1
+        for: 7d
+        labels: {severity: warning}
+        annotations:
+          summary: "Hosts have run {{ $value }} different kernels for over 7 days"
+          description: >-
+            {{ range query "max by (host, release) (node_uname_info)" }}
+            {{- .Labels.host }}: {{ .Labels.release }}; {{ end }}
+            The rolling upgrade (playbooks/utilities/apt-upgrade.yml) brings them level;
+            playbooks/utilities/fleet-consistency.yml compares kernels, packages and sysctls.
