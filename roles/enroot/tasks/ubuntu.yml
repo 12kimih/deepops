@@ -7,21 +7,12 @@
 # to /usr/bin/enroot-nsenter ONLY, so the host-wide restriction stays ON -- the
 # supported, security-preserving fix. Upstream: the sysctl "must be disabled
 # (equal to 0) UNLESS {datadir}/enroot/apparmor.profile is installed" (the .deb
-# installs it), so we do NOT disable it by default. The task below is an opt-in
-# escape hatch that strips userns hardening host-wide (every unprivileged process,
-# ~3.4x more reachable kernel attack surface) -- for trusted/dev nodes only.
+# installs it), so we do NOT disable it by default. enroot_apparmor_global_disable
+# is an opt-in escape hatch that strips userns hardening host-wide (every
+# unprivileged process, ~3.4x more reachable kernel attack surface) -- for
+# trusted/dev nodes only. The AppArmor tasks follow the package install.
 #   https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
 #   https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
-- name: Ubuntu | disable AppArmor unprivileged userns restriction (escape hatch)
-  ansible.posix.sysctl:
-    name: kernel.apparmor_restrict_unprivileged_userns
-    value: "0"
-    state: present
-    sysctl_file: /etc/sysctl.d/90-enroot.conf
-    reload: true
-  failed_when: false  # key only exists on 23.10+ kernels
-  when: enroot_apparmor_global_disable | bool
-
 - name: Ubuntu | install enroot dependencies
   ansible.builtin.apt:
     name:
@@ -57,5 +48,78 @@
     deb: "{{ enroot_release_base_url }}/{{ item }}_{{ enroot_version_string }}_{{ _enroot_deb_arch }}.deb"
     state: "{{ enroot_package_state }}"
   loop: "{{ enroot_packages }}"
-  notify: Reload enroot AppArmor profile
+  register: enroot_install
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+# The rest only matters where the kernel restricts unprivileged user namespaces.
+- name: Ubuntu | check for the AppArmor user namespace restriction
+  ansible.builtin.stat:
+    path: /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+  register: enroot_userns_knob
+
+- name: Ubuntu | lift the user namespace restriction host-wide (escape hatch)
+  ansible.posix.sysctl:
+    name: kernel.apparmor_restrict_unprivileged_userns
+    value: "0"
+    state: present
+    sysctl_file: /etc/sysctl.d/90-enroot.conf
+    reload: true
+  when:
+    - enroot_userns_knob.stat.exists
+    - enroot_apparmor_global_disable | bool
+
+# Turning the escape hatch off must also undo it, not just stop applying it.
+- name: Ubuntu | remove the host-wide user namespace override
+  ansible.builtin.file:
+    path: /etc/sysctl.d/90-enroot.conf
+    state: absent
+  register: enroot_userns_override
+  when:
+    - enroot_userns_knob.stat.exists
+    - not enroot_apparmor_global_disable | bool
+
+# Deleting the file leaves the running value at 0: restore the kernel default, then
+# let any other sysctl.d file the site keeps have the last word.
+- name: Ubuntu | restore the user namespace restriction
+  ansible.builtin.shell: sysctl -w kernel.apparmor_restrict_unprivileged_userns=1 && sysctl --system
+  changed_when: true
+  when: enroot_userns_override is changed
+
+- name: Ubuntu | check for enroot's AppArmor profile
+  ansible.builtin.stat:
+    path: /etc/apparmor.d/enroot
+  register: enroot_apparmor_profile
+  when:
+    - enroot_userns_knob.stat.exists
+    - not enroot_apparmor_global_disable | bool
+
+- name: Ubuntu | fail without enroot's AppArmor profile
+  ansible.builtin.fail:
+    msg: >-
+      kernel.apparmor_restrict_unprivileged_userns is active but /etc/apparmor.d/enroot
+      (shipped by the enroot 4.x package) is missing, so enroot-nsenter cannot create
+      user namespaces. Install enroot 4.x, or set enroot_apparmor_global_disable: true
+      to lift the restriction host-wide instead.
+  when:
+    - enroot_userns_knob.stat.exists
+    - not enroot_apparmor_global_disable | bool
+    - not enroot_apparmor_profile.stat.exists
+
+# The kernel's profile list decides, so a profile that failed to load earlier or was
+# unloaded by hand is repaired on the next run, not only after a package change.
+- name: Ubuntu | check whether enroot's AppArmor profile is loaded
+  ansible.builtin.command: grep -q "^/usr/bin/enroot-nsenter " /sys/kernel/security/apparmor/profiles
+  register: enroot_apparmor_loaded
+  changed_when: false
+  failed_when: false
+  when:
+    - enroot_userns_knob.stat.exists
+    - not enroot_apparmor_global_disable | bool
+
+- name: Ubuntu | load enroot's AppArmor profile
+  ansible.builtin.command: apparmor_parser -r -W /etc/apparmor.d/enroot
+  changed_when: true
+  when:
+    - enroot_userns_knob.stat.exists
+    - not enroot_apparmor_global_disable | bool
+    - enroot_install is changed or enroot_apparmor_loaded.rc != 0
