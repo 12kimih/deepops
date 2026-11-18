@@ -1,0 +1,29 @@
+---
+# Hooks other repositories can use (pre-commit "repo:" pointing here). The rule list
+# comes from each repository's site file; see scripts/deepops/sensitive_guard.py.
+- id: sensitive-guard
+  name: sensitive data (staged lines)
+  entry: scripts/deepops/sensitive_guard.py staged
+  language: script
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
+- id: sensitive-guard-message
+  name: sensitive data (commit message)
+  entry: scripts/deepops/sensitive_guard.py message
+  language: script
+  stages: [commit-msg]
+- id: sensitive-guard-push
+  name: sensitive data (commits to push)
+  entry: scripts/deepops/sensitive_guard.py push
+  language: script
+  pass_filenames: false
+  always_run: true
+  stages: [pre-push]
+- id: sensitive-guard-tree
+  name: sensitive data (every tracked file)
+  entry: scripts/deepops/sensitive_guard.py tree
+  language: script
+  pass_filenames: false
+  always_run: true
+  stages: [manual]
