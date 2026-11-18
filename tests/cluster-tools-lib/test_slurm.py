@@ -59,6 +59,15 @@ class JobTests(unittest.TestCase):
             slurm.job_label({"job_id": 5, "array_job_id": value(4), "array_task_id": value(0)}), "4_0"
         )
 
+    def test_label_of_a_pending_array_record(self):
+        record = {
+            "job_id": 9,
+            "array_job_id": value(9),
+            "array_task_id": {"set": False},
+            "array_task_string": "0-11%1",
+        }
+        self.assertEqual(slurm.job_label(record), "9_[0-11%1]")
+
     def test_gpus_per_node_and_mismatch(self):
         job = {"job_id": 1, "nodes": "gpu[1-2]", "gres_detail": ["gpu:a10:1(IDX:5)", "gpu:a10:2(IDX:0-1)"]}
         self.assertEqual(slurm.job_gpus(job), ([("gpu1", 5), ("gpu2", 0), ("gpu2", 1)], {"a10"}))

@@ -73,6 +73,18 @@ class CliTests(unittest.TestCase):
             with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(run(argv)[0], 2)
 
+    def test_refused_options_say_why(self):
+        cmd = Command("demo", "x", [], refuse={"-o": "use squeue -o", "--format": "use squeue --format"})
+        self.assertIsNone(cmd.refused(["-m", "--", "-o"]))
+        for argv in (["-o", "%i"], ["-o%i"], ["--format=%i"], ["--format", "%i"]):
+            with self.subTest(argv=argv):
+                self.assertIsNotNone(cmd.refused(argv))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+            cmd.parse(["-o%i"], ENV)
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("-o: use squeue -o", err.getvalue())
+
     def test_completion_is_generated_from_the_options(self):
         code, script, _, _ = run(["--completion", "bash"])
         self.assertEqual(code, 0)

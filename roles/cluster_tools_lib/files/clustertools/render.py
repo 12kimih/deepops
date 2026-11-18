@@ -393,11 +393,12 @@ class Grid:
     Only single-piece cells are capped by maxw.
     """
 
-    def __init__(self, theme, headers, align=None, maxw=None, tail_header="", tail_width=0):
+    def __init__(self, theme, headers, align=None, maxw=None, tail_header="", tail_width=0, header_rule=True):
         self.t, self.headers = theme, list(headers)
         self.align = list(align or [])
         self.maxw = list(maxw or [])
         self.tail_header, self.tail_width = tail_header, tail_width
+        self.header_rule = header_rule
         self.rows = []
 
     def row(self, cells, gutter="", prefix="", tail=""):
@@ -408,6 +409,10 @@ class Grid:
 
     def rule(self):
         self.rows.append(("rule",))
+
+    def divider(self, label, style):
+        """A rule with a label in it, heading a group of rows: ── LABEL ─────."""
+        self.rows.append(("divider", label, style))
 
     def _pieces(self, cell, col):
         pieces = list(cell) if isinstance(cell, list) else [cell]
@@ -450,10 +455,16 @@ class Grid:
         if self.tail_header:
             head += " " + self.tail_header
         out.append(t.paint("head", head.rstrip()))
-        out.append(t.rule(total))
+        if self.header_rule:
+            out.append(t.rule(total))
         for r in self.rows:
             if r[0] == "rule":
                 out.append(t.rule(total))
+                continue
+            if r[0] == "divider":
+                g = t.g["rule"]
+                tail = g * max(0, total - width(r[1]) - 6)
+                out.append(f"  {t.paint('rule', g * 2)} {t.paint(r[2], r[1])} {t.paint('rule', tail)}")
                 continue
             if r[0] == "note":
                 out.append("    " + t.paint("faint", trunc(r[1], max(t.cols, total) - 4, t.g["ell"])))
