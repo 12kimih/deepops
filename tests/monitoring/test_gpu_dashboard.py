@@ -100,7 +100,7 @@ class GpuDashboardTests(unittest.TestCase):
                             expr = (expr.replace("$gpu_instance", gpu)
                                     .replace("$node_instance", node)
                                     .replace("$hostname", hostname)
-                                    .replace("$__interval", "1m"))
+                                    .replace("$__rate_interval", "1m"))
                             rules.append({"record": f'panel_{panel["id"]}_{index}', "expr": expr})
                 # Assert representative host/GPU panels select the chosen node.
                 for expr, value in ((f'node_load1{{instance="{node}"}}', 2),

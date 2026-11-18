@@ -1007,7 +1007,7 @@
         "lineColor": "rgb(31, 120, 193)",
         "show": false
       },
-      "tableColumn": "{instance=\"$hostname:9100\", job=\"cluster\", module=\"node-exporter\"}",
+      "tableColumn": "",
       "targets": [
         {
           "expr": "((node_memory_MemTotal_bytes{instance=\"$node_instance\"} - node_memory_MemFree_bytes{instance=\"$node_instance\"}  - node_memory_Buffers_bytes{instance=\"$node_instance\"} - node_memory_Cached_bytes{instance=\"$node_instance\"}) / node_memory_MemTotal_bytes{instance=\"$node_instance\"}) * 100",
@@ -1271,7 +1271,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(node_network_transmit_bytes_total{instance=\"$node_instance\",device=~\"en.*\"}[$__interval]))",
+          "expr": "sum(rate(node_network_transmit_bytes_total{instance=\"$node_instance\",device=~\"en.*|eth.*|bond.*\"}[$__rate_interval]))",
           "format": "time_series",
           "hide": false,
           "interval": ".5m",
@@ -1280,7 +1280,7 @@
           "refId": "B"
         },
         {
-          "expr": "sum(rate(node_network_receive_bytes_total{instance=\"$node_instance\",device=~\"en.*\"}[$__interval]))",
+          "expr": "sum(rate(node_network_receive_bytes_total{instance=\"$node_instance\",device=~\"en.*|eth.*|bond.*\"}[$__rate_interval]))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1384,7 +1384,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(node_disk_read_bytes_total{instance=\"$node_instance\"}[$__interval])",
+          "expr": "rate(node_disk_read_bytes_total{instance=\"$node_instance\"}[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1394,7 +1394,7 @@
           "refId": "E"
         },
         {
-          "expr": "rate(node_disk_written_bytes_total{instance=\"$node_instance\"}[$__interval])",
+          "expr": "rate(node_disk_written_bytes_total{instance=\"$node_instance\"}[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1402,16 +1402,6 @@
           "intervalFactor": 4,
           "legendFormat": "Write ({{device}})",
           "refId": "F"
-        },
-        {
-          "expr": "sum by (instance) (rate(node_disk_io_time_ms{instance=\"$node_instance\"}[$__interval]))",
-          "format": "time_series",
-          "hide": false,
-          "instant": false,
-          "interval": "",
-          "intervalFactor": 4,
-          "legendFormat": "I/O time",
-          "refId": "A"
         }
       ],
       "thresholds": [],
@@ -1695,7 +1685,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(node_infiniband_port_data_transmitted_bytes_total{instance=\"$node_instance\"}[$__interval]))",
+          "expr": "sum(rate(node_infiniband_port_data_transmitted_bytes_total{instance=\"$node_instance\"}[$__rate_interval]))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1704,7 +1694,7 @@
           "refId": "B"
         },
         {
-          "expr": "sum(rate(node_infiniband_port_data_received_bytes_total{instance=\"$node_instance\"}[$__interval]))",
+          "expr": "sum(rate(node_infiniband_port_data_received_bytes_total{instance=\"$node_instance\"}[$__rate_interval]))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2090,10 +2080,10 @@
         "lineColor": "rgb(31, 120, 193)",
         "show": false
       },
-      "tableColumn": "node_hwmon_power_average_watt{chip=\"lnxsybus:00_acpi000d:00\", instance=\"$node_instance\", job=\"cluster\", module=\"node-exporter\", sensor=\"power1\"}",
+      "tableColumn": "",
       "targets": [
         {
-          "expr": "node_hwmon_power_average_watt{instance=\"$node_instance\"}",
+          "expr": "node_hwmon_power_average_watt{instance=\"$node_instance\"} or sum(ipmi_dcmi_power_consumption_watts{host=\"$hostname\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A"
@@ -2165,7 +2155,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_hwmon_power_average_watt{instance=\"$node_instance\"}",
+          "expr": "node_hwmon_power_average_watt{instance=\"$node_instance\"} or sum(ipmi_dcmi_power_consumption_watts{host=\"$hostname\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Total",
