@@ -20,6 +20,7 @@ Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -118,7 +119,12 @@ def gen_role_variables(role):
 
 
 def gen_role_tree(_arg):
-    names = sorted(p.name for p in (ROOT / "roles").iterdir() if p.is_dir() and p.name != "galaxy")
+    # Tracked roles only, like every other check: a role another checkout has not
+    # committed yet must not make this page stale for everyone.
+    tracked = subprocess.run(
+        ["git", "ls-files", "roles"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.split()
+    names = sorted({Path(f).parts[1] for f in tracked if len(Path(f).parts) > 2} - {"galaxy"})
     branches = ["├──"] * (len(names) - 1) + ["└──"]
     tree = "\n".join(f"│   {b} {n}" for b, n in zip(branches, names))
     return f"```text\n├── roles\n{tree}\n```\n"
