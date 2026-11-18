@@ -9,10 +9,29 @@ report = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(report)
 
 
-def job_line(jid, user, state="RUNNING", runtime="03:00:00", details="", extra=""):
-    return (f"JobId={jid} {extra}JobName=train UserId={user}(1000) GroupId=lab(1000) "
-            f"Priority=1 Partition=a10 QOS=normal JobState={state} Reason=None RunTime={runtime} "
-            f"NumNodes=1 {details} TresPerNode=gres/gpu:4")
+NOW = 1_800_000_000
+
+
+def unset():
+    return {"set": False, "infinite": False, "number": 0}
+
+
+def value(n):
+    return {"set": True, "infinite": False, "number": n}
+
+
+def job(jid, user, state="RUNNING", nodes="", gres=(), name="train", **extra):
+    """One entry of `scontrol -d --json show job`, as Slurm 25.11 prints it."""
+    return {"job_id": jid, "name": name, "user_name": user, "partition": "a10", "qos": "normal",
+            "job_state": [state], "nodes": nodes, "gres_detail": list(gres),
+            "start_time": value(NOW - 3 * 3600), "submit_time": value(NOW - 7200),
+            "array_job_id": value(0), "array_task_id": unset(), "state_reason": "None",
+            "tres_req_str": "cpu=4,mem=16G,node=1", **extra}
+
+
+def node(name, gres, state=("IDLE",), reason="", user="", changed=0):
+    return {"name": name, "gres": gres, "state": list(state), "reason": reason,
+            "reason_set_by_user": user, "reason_changed_at": value(changed) if changed else unset()}
 
 
 class ParseTests(unittest.TestCase):
@@ -21,37 +40,69 @@ class ParseTests(unittest.TestCase):
         report.run = lambda *cmd: {"gpu[1-2]": "gpu1\ngpu2\n"}[cmd[-1]]
 
     def test_typed_typeless_array_and_multinode_jobs(self):
-        text = "\n".join([
-            job_line(1, "alice", details="Nodes=gpu1 CPU_IDs=0-3 Mem=100 GRES=gpu:a10:2(IDX:0-1)"),
-            job_line(2, "bob", details="Nodes=gpu3 CPU_IDs=0-3 Mem=100 GRES=gpu:3(IDX:0,2-3)",
-                     extra="ArrayJobId=10 ArrayTaskId=7 "),
-            job_line(3, "carol", details="Nodes=gpu[1-2] CPU_IDs=0-3 Mem=100 GRES=gpu:a10:1(IDX:5)"),
-            job_line(4, "dave", state="PENDING"),
-        ])
-        jobs = {j["id"]: j for j in report.parse_jobs(text)}
-        self.assertEqual(sorted(jobs), ["1", "2", "3"])
+        data = {"jobs": [
+            job(1, "alice", nodes="gpu1", gres=["gpu:a10:2(IDX:0-1)"]),
+            job(2, "bob", nodes="gpu3", gres=["gpu:3(IDX:0,2-3)"], array_job_id=value(10),
+                array_task_id=value(7)),
+            job(3, "carol", nodes="gpu[1-2]", gres=["gpu:a10:1(IDX:5)", "gpu:a10:1(IDX:6)"]),
+            job(5, "erin", nodes="gpu4", gres=["gpu:a10:1(IDX:0)"], array_job_id=value(20),
+                array_task_id=value(0)),
+            job(4, "dave", state="PENDING"),
+        ]}
+        running, _ = report.parse_jobs(data, NOW)
+        jobs = {j["id"]: j for j in running}
+        self.assertEqual(sorted(jobs), ["1", "2", "3", "5"])
         self.assertEqual(jobs["1"]["gpus"], [("gpu1", 0), ("gpu1", 1)])
         self.assertEqual(jobs["1"]["gpu_type"], "a10")
         self.assertEqual(jobs["2"]["gpus"], [("gpu3", 0), ("gpu3", 2), ("gpu3", 3)])
         self.assertEqual(jobs["2"]["label"], "10_7")
-        self.assertEqual(jobs["3"]["gpus"], [("gpu1", 5), ("gpu2", 5)])
+        self.assertEqual(jobs["5"]["label"], "20_0")
+        self.assertEqual(jobs["1"]["label"], "1")
+        self.assertEqual(jobs["3"]["gpus"], [("gpu1", 5), ("gpu2", 6)])
         self.assertEqual(jobs["1"]["runtime"], 3 * 3600)
 
-    def test_nodes_count_once_across_partitions(self):
-        text = "gpu1|gpu:a10:8(S:0-1)\ngpu1|gpu:a10:8(S:0-1)\ngpu2|gpu:a30:7(S:0-1)\nmaster|(null)"
-        self.assertEqual(report.parse_nodes(text), {"gpu1": 8, "gpu2": 7, "master": 0})
+    def test_job_name_cannot_pose_as_other_fields(self):
+        hostile = "x UserId=alice(1) QOS=high Nodes=gpu9 CPU_IDs=0 Mem=1 GRES=gpu:a10:8(IDX:0-7)"
+        running, _ = report.parse_jobs({"jobs": [job(7, "mallory", nodes="gpu1",
+                                                     gres=["gpu:a10:1(IDX:3)"], name=hostile)]}, NOW)
+        self.assertEqual(running[0]["user"], "mallory")
+        self.assertEqual(running[0]["qos"], "normal")
+        self.assertEqual(running[0]["gpus"], [("gpu1", 3)])
 
-    def test_pending_gpus_scale_with_nodes(self):
-        text = ("alice|2|gres/gpu:a10:4|2026-01-01T00:00:00|Priority\n"
-                "alice|1|N/A|2026-01-01T01:00:00|Resources, extra words\n")
-        p = report.parse_pending(text, now=report.datetime.fromisoformat("2026-01-01T02:00:00").timestamp())
-        self.assertEqual((p["alice"]["jobs"], p["alice"]["gpus"]), (2, 8))
-        self.assertEqual(p["alice"]["wait"], 7200)
+    def test_mismatched_gres_detail_attributes_nothing(self):
+        running, _ = report.parse_jobs({"jobs": [job(8, "u", nodes="gpu[1-2]",
+                                                     gres=["gpu:a10:1(IDX:0)"])]}, NOW)
+        self.assertEqual(running[0]["gpus"], [])
 
-    def test_runtime_formats(self):
-        self.assertEqual(report.seconds("1-02:03:04"), 93784)
-        self.assertEqual(report.seconds("05:06"), 306)
+    def test_pending_counts_total_requested_gpus(self):
+        data = {"jobs": [
+            job(11, "alice", state="PENDING", state_reason="Priority",
+                tres_req_str="cpu=8,node=2,billing=8,gres/gpu=8,gres/gpu:a10=8"),
+            job(12, "alice", state="PENDING", state_reason="Resources", submit_time=value(NOW - 600)),
+        ]}
+        _, pending = report.parse_jobs(data, NOW)
+        self.assertEqual((pending["alice"]["jobs"], pending["alice"]["gpus"]), (2, 8))
+        self.assertEqual(pending["alice"]["wait"], 7200)
+        self.assertEqual(pending["alice"]["reasons"], report.Counter({"Priority": 1, "Resources": 1}))
+
+    def test_nodes_and_unavailable_states(self):
+        data = {"nodes": [
+            node("gpu1", "gpu:a10:8(S:0-1)"),
+            node("gpu2", "gpu:a30:7(S:0-1)", ("IDLE", "DRAIN"), "maint", "root", NOW),
+            node("gpu3", "gpu:a30:8(S:0-1)", ("MIXED", "DRAIN"), "fan", "root", NOW),
+            node("gpu4", "gpu:a10:4(S:0-1)", ("DOWN", "NOT_RESPONDING"), "Not responding", "slurm", NOW),
+            node("cpu1", ""),
+        ]}
+        gpus, unavailable = report.parse_nodes(data)
+        self.assertEqual(gpus, {"gpu1": 8, "gpu2": 7, "gpu3": 8, "gpu4": 4, "cpu1": 0})
+        self.assertEqual([(n, s, u, r) for n, s, _, u, r in unavailable],
+                         [("gpu2", "drained", "root", "maint"), ("gpu3", "draining", "root", "fan"),
+                          ("gpu4", "down", "slurm", "Not responding")])
+        self.assertEqual(unavailable[0][2], report.datetime.fromtimestamp(NOW).isoformat(timespec="seconds"))
+
+    def test_duration(self):
         self.assertEqual(report.duration(93784), "1-2:03:04")
+        self.assertEqual(report.duration(306.9), "0:05:06")
 
 
 class IdleTests(unittest.TestCase):
