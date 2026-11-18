@@ -11,14 +11,15 @@ slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port | defaul
 # under idle_util_threshold percent for that whole time.
 slurm_usage_report_idle_hours: 2
 slurm_usage_report_idle_util_threshold: 0
-# none | dm | dm+mention (dm, then a mention in the report thread from the second
-# consecutive idle report on).
-slurm_usage_report_notify: dm
-slurm_usage_report_dm_repeat_hours: 6
+# How owners of idle jobs are notified: any of mention (in the report thread) and dm.
+# [] lists idle jobs without notifying anyone. Repeats every notify_repeat_hours.
+slurm_usage_report_notify: [mention]
+slurm_usage_report_notify_repeat_hours: 6
 slurm_usage_report_dm_text: >-
   Your job {job} ({gpus} GPU, running {runtime}) has had idle GPUs for {hours}h.
   If you no longer need it, please free the GPUs with `scancel {job}`.
-# Cancel jobs idle this long (0 = never). Announce the policy before enabling.
+# Cancel jobs idle this long (0 = never), announced in the report thread. Announce
+# the policy before enabling.
 slurm_usage_report_cancel_after_hours: 0
 
 # Slurm user -> Slack member ID or email. Users not listed are looked up as
