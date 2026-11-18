@@ -4,8 +4,9 @@ node_exporter_container: "quay.io/prometheus/node-exporter:v1.12.1"
 node_exporter_port: 9100
 # Hosts listed as scrape targets; the playbook installs the exporter on all hosts.
 node_exporter_host_group: slurm-cluster
-# Collectors beyond the defaults. systemd feeds the failed-unit alert.
-node_exporter_extra_collectors: [systemd]
+# Collectors beyond the defaults: systemd feeds the failed-unit alert, processes the
+# PID and thread limits.
+node_exporter_extra_collectors: [systemd, processes]
 node_exporter_prom_dir: "/run/prometheus"
 node_exporter_svc_name: "docker.node-exporter.service"
 node_exporter_state: started
