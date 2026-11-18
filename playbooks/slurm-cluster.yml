@@ -206,6 +206,11 @@
   tags:
     - cluster-tools
 
+- name: Give AI coding agents the site's agent rules
+  import_playbook: slurm-cluster/ai-agent-rules.yml
+  tags:
+    - ai-agent-rules
+
 - name: Ensure that nv_peer_mem is loaded
   import_playbook: nvidia-software/nvidia-peer-memory.yml
   tags:

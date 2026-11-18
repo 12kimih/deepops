@@ -1,0 +1,16 @@
+---
+# ai_agent_rules: give every AI coding agent on the cluster the site's agent rules,
+# through each tool's system-wide admin channel, never through users' own files:
+#   Claude Code  /etc/claude-code/CLAUDE.md  (managed memory, always loaded)
+#   Codex CLI    /etc/codex/requirements.toml additional_developer_instructions
+# The rules are one Markdown file published by the site's docs (its single source); a
+# timer refreshes it, so a rules change reaches the agents without a redeploy. A failed
+# download keeps the installed rules. No-op until a URL is set.
+ai_agent_rules_url: ""
+ai_agent_rules_schedule: daily
+ai_agent_rules_claude_file: /etc/claude-code/CLAUDE.md
+# This role owns the whole file; put other Codex admin requirements in the site's own
+# file only if this role is disabled.
+ai_agent_rules_codex_file: /etc/codex/requirements.toml
+ai_agent_rules_command: /usr/local/sbin/ai-agent-rules
+ai_agent_rules_svc_name: ai-agent-rules
