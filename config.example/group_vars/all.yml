@@ -86,6 +86,13 @@ deepops_set_hostname: true
 
 
 ################################################################################
+# NETWORK                                                                      #
+################################################################################
+# The cluster's internal network (CIDR): the one place it is written. NFS exports are
+# offered to it only (nfs_export_clients below).
+#cluster_subnet: "10.0.0.0/16"
+
+################################################################################
 # STORAGE                                                                      #
 ################################################################################
 # AutoFS configuration
@@ -94,11 +101,13 @@ deepops_set_hostname: true
 #autofs_map: "auto.home_linux"
 
 # NFS Server
-# This config will create an NFS server and share the given exports
+# This config will create an NFS server and share the given exports. options are the
+# exports(5) flags alone; every export is offered to nfs_export_clients.
 # Playbook: nfs-server.yml
 #nfs_exports:
 #  - path: /export/shared
-#    options: "*(rw,sync,no_root_squash)"
+#    options: "rw,sync,root_squash,no_subtree_check"
+#nfs_export_clients: ["{{ cluster_subnet }}"]
 
 # NFS Client
 # This config will mount an NFS share on hosts. An entry without `options` is mounted

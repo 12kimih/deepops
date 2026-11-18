@@ -51,7 +51,8 @@ k8s_nfs_export_path: '/export/deepops_nfs'
 # Playbooks: nfs-client-provisioner.yml, generic/nfs-server.yml
 nfs_exports:
   - path: '{{ k8s_nfs_export_path }}'
-    options: "*(rw,sync,no_root_squash)"
+    # no_root_squash: the NFS provisioner creates and chowns volume directories as root.
+    options: "rw,sync,no_root_squash,no_subtree_check"
 
 ################################################################################
 # Container registry                                                           #

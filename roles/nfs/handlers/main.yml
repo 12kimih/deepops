@@ -12,3 +12,11 @@
   ansible.builtin.service:
     name: "{{ nfs_server_daemon }}"
     state: restarted
+
+# exports(5) changes take effect with exportfs -ra, without restarting nfsd: a restart
+# drops every client's state and has hung nfsd before. Restart nfs is for nfsd's own
+# settings (threads in nfs.conf).
+- name: Reload NFS exports
+  ansible.builtin.command:
+    cmd: exportfs -ra
+  changed_when: true

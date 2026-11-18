@@ -121,14 +121,15 @@ slurm_cluster_install_nvidia_driver: true
 # - no_subtree_check: modern recommended default (reliability; the man page advises it).
 # - sync: data hits disk before the write is acked (crash-safe). Use async only for
 #   scratch/temporary data where throughput matters more than durability.
-# - no_root_squash: lets the head node's root manage these trees (common in HPC) but is
-#   a security risk if any client is untrusted -- prefer root_squash where you can.
-# - "*" exports to ANY host -- restrict to your cluster subnet (e.g. 10.0.0.0/16(...)).
+# - root_squash: root on a client is nobody on the export, so one compromised node is
+#   not root over everyone's files. These trees are written as root only on the server
+#   itself (accounts, software installs), never through the mount.
+# - Every export is offered to nfs_export_clients (the cluster subnet, group_vars/all.yml).
 nfs_exports:
   - path: /home    # shared home dirs
-    options: "*(rw,sync,no_root_squash,no_subtree_check)"
+    options: "rw,sync,root_squash,no_subtree_check"
   - path: /sw      # shared software (Spack / EasyBuild / CUDA modules)
-    options: "*(rw,sync,no_root_squash,no_subtree_check)"
+    options: "rw,sync,root_squash,no_subtree_check"
 # Client mount options, applied to every nfs_mounts entry that does not set its own
 # `options`. A starting point -- tune per your network and storage. nconnect (parallel
 # TCP connections) is the main lever: ~4 on 10/25GbE, 8-16 on 100GbE+. On a NetApp/ONTAP
