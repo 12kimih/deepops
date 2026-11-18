@@ -185,9 +185,27 @@
 - name: Configure the login banner
   when: cluster_tools_motd_dir_stat.stat.isdir | default(false)
   block:
+    # Drawn here, with the shared library and its palette, so a login only prints text.
+    - name: Draw the login banner
+      ansible.builtin.command:
+        argv:
+          - "{{ cluster_tools_lib_python }}"
+          - -I
+          - -c
+          - "import sys; sys.path.insert(0, sys.argv[1]); from clustertools.banner import main; sys.exit(main())"
+          - "{{ cluster_tools_lib_dir }}"
+        stdin: >-
+          {{ {'title': cluster_tools_motd_title, 'commands': cluster_tools_motd_commands,
+              'links': cluster_tools_motd_links, 'flavour': cluster_tools_motd_flavour,
+              'color': cluster_tools_motd_color | bool} | to_json }}
+      register: cluster_tools_banner
+      changed_when: false
+      check_mode: false
+      when: (cluster_tools_motd_title | trim | length) > 0
+
     - name: Publish the login banner
-      ansible.builtin.template:
-        src: motd.j2
+      ansible.builtin.copy:
+        content: "{{ cluster_tools_banner.stdout }}\n"
         dest: "{{ cluster_tools_motd_dir }}/{{ cluster_tools_motd_file }}"
         owner: root
         group: root
