@@ -3,5 +3,5 @@ set -ex
 
 command -v nvidia-smi || exit 0
 
-/etc/slurm/shared/bin/set_gpu_power_levels.sh max
-/etc/slurm/shared/bin/set_gpu_clocks.sh max
+{{ slurm_config_dir }}/shared/bin/set_gpu_power_levels.sh max
+{{ slurm_config_dir }}/shared/bin/set_gpu_clocks.sh max
