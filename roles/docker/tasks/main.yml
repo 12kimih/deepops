@@ -95,3 +95,67 @@
     - ansible_facts.virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
   tags:
     - molecule-notest
+
+- name: Prune unused images on a schedule
+  when: docker_image_prune_until | length > 0
+  block:
+    - name: Install the image prune service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker-image-prune.service
+        mode: "0644"
+        content: |
+          # Managed by roles/docker (docker_image_prune_until).
+          [Unit]
+          Description=Remove Docker images no container uses, older than {{ docker_image_prune_until }}
+          Requires=docker.service
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/docker image prune --all --force --filter until={{ docker_image_prune_until }}
+
+    - name: Install the image prune timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker-image-prune.timer
+        mode: "0644"
+        content: |
+          # Managed by roles/docker (docker_image_prune_schedule).
+          [Unit]
+          Description=Prune unused Docker images ({{ docker_image_prune_schedule }})
+
+          [Timer]
+          OnCalendar={{ docker_image_prune_schedule }}
+          RandomizedDelaySec=1h
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Enable the image prune timer
+      ansible.builtin.systemd:
+        name: docker-image-prune.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+# Turning it off removes it, not just stops adding it.
+- name: Remove the image prune timer when pruning is off
+  when: docker_image_prune_until | length == 0
+  block:
+    - name: Check for the image prune timer
+      ansible.builtin.stat:
+        path: /etc/systemd/system/docker-image-prune.timer
+      register: docker_image_prune_timer
+
+    - name: Stop and disable the image prune timer
+      ansible.builtin.systemd:
+        name: docker-image-prune.timer
+        enabled: false
+        state: stopped
+      when: docker_image_prune_timer.stat.exists
+
+    - name: Remove the image prune units
+      ansible.builtin.file:
+        path: "/etc/systemd/system/docker-image-prune.{{ item }}"
+        state: absent
+      loop: [service, timer]
