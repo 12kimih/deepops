@@ -4,6 +4,7 @@ apiVersion: 1
 providers:
   - name: deepops
     folder: '{{ grafana_dashboard_folder }}'
+    folderUid: '{{ grafana_dashboard_folder_uid }}'
     type: file
     # The files are the source of truth: a dashboard whose file is removed is deleted,
     # and edits in the UI cannot be saved over a provisioned one.

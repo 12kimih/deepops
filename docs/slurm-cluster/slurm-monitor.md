@@ -58,6 +58,11 @@ fixed UID, so links survive renames:
 
 Each role installs its dashboards into its own subdirectory and removes the ones it no
 longer ships; Grafana then deletes those, so the files are the only source of truth.
+The folder has a fixed UID (`grafana_dashboard_folder_uid`). File provisioning does not
+repair everything itself (it never moves a dashboard when the folder changes, renames the
+folder, or removes a dashboard it stopped managing), so the grafana role finishes with
+`grafana_reconcile.py`, which converges those and deletes `grafana_retired_dashboards`;
+`--check` shows what it would do.
 The Prometheus datasource has the fixed uid `prometheus`.
 
 Anonymous visitors get read-only access (`grafana_anonymous_role`). The admin password is
