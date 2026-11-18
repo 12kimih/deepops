@@ -14,15 +14,20 @@
          else ('nvidia-open' if (nvidia_driver_kernel_modules == 'open') else 'cuda-drivers') }}
 
 - name: Add the NVIDIA CUDA repository (RHEL/Rocky)
-  ansible.builtin.get_url:
-    url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel{{ ansible_distribution_major_version }}/{{ nvidia_driver_rhel_arch }}/cuda-rhel{{ ansible_distribution_major_version
-      }}.repo"
-    dest: "/etc/yum.repos.d/cuda-rhel{{ ansible_distribution_major_version }}.repo"
-    mode: "0644"
-  register: nvidia_cuda_repo_download
-  until: nvidia_cuda_repo_download is succeeded
-  retries: 5
-  delay: 10
+  ansible.builtin.yum_repository:
+    name: cuda
+    description: NVIDIA CUDA YUM Repo
+    baseurl: "{{ nvidia_driver_rhel_cuda_repo_baseurl }}"
+    gpgkey: "{{ nvidia_driver_rhel_cuda_repo_gpgkey }}"
+    gpgcheck: true
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+# Earlier versions of this role downloaded NVIDIA's .repo file; drop it so the repo
+# is not defined twice.
+- name: Remove the downloaded CUDA .repo file (RHEL/Rocky)
+  ansible.builtin.file:
+    path: "/etc/yum.repos.d/cuda-rhel{{ ansible_distribution_major_version }}.repo"
+    state: absent
 
 # CodeReady Builder / CRB provides build deps (e.g. dkms). On Rocky/Alma this is
 # enabled with dnf config-manager; on RHEL proper it is the codeready-builder

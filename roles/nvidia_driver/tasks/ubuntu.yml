@@ -67,7 +67,7 @@
 # --- Method: nvidia_repo (NVIDIA CUDA apt repo) ------------------------------
 - name: Install the cuda-keyring (Ubuntu, nvidia_repo)
   ansible.builtin.apt:
-    deb: "https://developer.download.nvidia.com/compute/cuda/repos/{{ nvidia_driver_ubuntu_repo_distro | trim }}/{{ nvidia_driver_ubuntu_repo_arch }}/cuda-keyring_{{ nvidia_driver_cuda_keyring_version }}_all.deb"
+    deb: "{{ nvidia_driver_ubuntu_cuda_keyring_url }}"
   when: nvidia_driver_install_method == 'nvidia_repo'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
