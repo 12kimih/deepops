@@ -13,14 +13,18 @@
       check_mode: false  # read-only; --check needs the result
       when: ansible_facts.os_family == 'Debian'
 
-    - name: Report the packages that will be removed
+    # apt may also install a package to satisfy an alternative the removed one met
+    # (removing a web server can pull in a text browser), so both are shown.
+    - name: Report the packages that will be removed or installed in their place
       ansible.builtin.debug:
         msg: >-
           {{ inventory_hostname }} will lose:
-          {{ host_baseline_plan.stdout | regex_findall('(?m)^Purg (\S+)') | join(', ') }}
+          {{ host_baseline_plan.stdout | regex_findall('(?m)^Purg (\S+)') | join(', ') }}{{
+          '; will gain: ' ~ (host_baseline_plan.stdout | regex_findall('(?m)^Inst (\S+)') | join(', '))
+          if host_baseline_plan.stdout is search('(?m)^Inst ') else '' }}
       when:
         - ansible_facts.os_family == 'Debian'
-        - host_baseline_plan.stdout is search('(?m)^Purg ')
+        - host_baseline_plan.stdout is search('(?m)^(Purg|Inst) ')
 
     - name: Remove the packages declared absent
       ansible.builtin.package:

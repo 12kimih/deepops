@@ -73,10 +73,9 @@ for f in /etc/munge/munge.key /etc/slurm/slurmdbd.conf /etc/slurm/slurm.conf /et
   [ -e "$f" ] && stat -c '%n %a %U:%G' "$f"
 done
 
-h "15 /home top-level directory modes (stat only; group- or world-readable homes)"
-if mountpoint -q /home || [ -d /home ]; then
-  stat -c '%a %U %n' /home/* 2>/dev/null | awk '$1 ~ /[1-7][0-7]$|[0-7][1-7][0-7]$/ {c++} END {print (c+0) " homes readable by group or others"}'
-fi
+h "15 /home top-level directories other users can enter or read (stat only)"
+# The group is the owner's own per-user group, so only the "other" bits matter.
+stat -c '%A %U %n' /home/* 2>/dev/null | awk 'substr($1, 8, 3) != "---" {c++; print "  " $0} END {print (c+0) " homes open to other users"}' | tail -6
 
 h "16 pending updates: security / total, reboot required, kernel"
 t apt-get -s -o Debug::NoLocking=1 upgrade | grep -c '^Inst.*-security' | sed 's/^/security: /'
