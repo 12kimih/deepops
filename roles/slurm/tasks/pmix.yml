@@ -19,6 +19,8 @@
 
 - name: Install pmix build dependencies
   ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
     name: "{{ item }}"
   with_items: "{{ slurm_pmix_deps }}"
   when: ansible_distribution == 'Ubuntu'

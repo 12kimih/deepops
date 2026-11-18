@@ -5,6 +5,8 @@
 - name: "Install needed packages"
   become: true
   ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
     name: python3-setuptools
     state: present
   when: ansible_os_family == "Debian"

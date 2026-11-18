@@ -1,6 +1,8 @@
 ---
 - name: Install ubuntu packages
   ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
     name: nfs-kernel-server
     state: present
   when: ansible_os_family == "Debian"

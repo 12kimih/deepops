@@ -15,6 +15,8 @@
 
 - name: Install the kerberos packages (Ubuntu)
   ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
     name: "{{ item }}"
     state: present
   with_items: "{{ kerberos_client_ubuntu_pkg }}"
