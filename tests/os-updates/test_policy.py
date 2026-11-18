@@ -20,7 +20,8 @@ SAMPLES = [
     "libnvidia-compute-620", "nvidia-container-toolkit", "cuda-toolkit-13-5", "libcudnn9-cuda-13",
     "libnccl2", "datacenter-gpu-manager-4-cuda13", "slurm-smd-slurmd", "munge", "libmunge2",
     "nfs-kernel-server", "nfs-common", "docker-ce", "containerd.io", "enroot",
-    "openssl", "libc6", "openssh-server", "curl", "python3.12", "tzdata", "libssl3t64",
+    "systemd", "systemd-sysv", "libsystemd0", "udev", "libc6", "libc6-dev", "glibc-common", "dbus",
+    "openssl", "openssh-server", "curl", "python3.12", "tzdata", "libssl3t64",
 ]
 
 
@@ -45,8 +46,14 @@ class HeldBackTests(unittest.TestCase):
 
     def test_security_fixes_still_flow(self):
         globs = load(ROLE / "defaults" / "main.yml")["os_updates_held_back"]
-        for name in ("openssl", "libc6", "openssh-server", "libssl3t64"):
+        for name in ("openssl", "openssh-server", "libssl3t64", "curl"):
             self.assertFalse(any(fnmatchcase(name, g) for g in globs), name)
+
+    def test_pid1_and_libc_are_held_back(self):
+        # Their upgrade re-executes systemd or restarts core daemons under running jobs.
+        globs = load(ROLE / "defaults" / "main.yml")["os_updates_held_back"]
+        for name in ("systemd", "libsystemd0", "udev", "libc6", "dbus"):
+            self.assertTrue(any(fnmatchcase(name, g) for g in globs), name)
 
     def test_only_security_archives(self):
         for distribution in ("Ubuntu", "Debian"):
