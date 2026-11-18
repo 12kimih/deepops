@@ -9,3 +9,7 @@ Type=oneshot
 ExecStart={{ slurm_backup_script }} %i {{ slurm_backup_config }}
 Nice=10
 IOSchedulingClass=idle
+
+# Only the publish instance is enabled, to republish the kept metrics at boot.
+[Install]
+WantedBy=multi-user.target

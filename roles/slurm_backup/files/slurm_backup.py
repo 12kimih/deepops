@@ -4,6 +4,7 @@
     slurm-backup backup CONFIG.json        daily: dump, archive, copy, prune, report
     slurm-backup restore-test CONFIG.json  monthly: load the newest dump into a scratch
                                            database and compare it with the live one
+    slurm-backup publish CONFIG.json       at boot: republish the kept metrics
 
 What is backed up: the accounting database (mariadb-dump, one consistent snapshot
 with --single-transaction), the StateSaveLocation tree (queued jobs, reservations)
@@ -11,7 +12,9 @@ and, where a destination asks for it, the MUNGE key. A SHA256SUMS file covers th
 set. Each destination keeps <daily> dated directories and <weekly> more taken on the
 weekly day; a destination owned by another user (an NFS export with root_squash) is
 written as that user. The last success per destination, and of the restore test, is
-written as node_exporter textfile metrics so a stale backup raises an alert.
+written as node_exporter textfile metrics so a stale backup raises an alert. They are
+kept in metrics_file (persistent; the textfile directory is usually tmpfs) and copied
+into the textfile directory, so they survive a reboot: an absent series never alerts.
 
 Standard library only; runs as root on the controller (mariadb root authenticates
 over the unix socket, so no password is ever on a command line).
@@ -88,16 +91,29 @@ def run_as(owner, argv, **kwargs):
     return subprocess.run(argv, check=True, **kwargs)
 
 
-def write_metrics(cfg, values):
-    """Merge values into the textfile (the other command's series are kept), atomically."""
-    out = Path(cfg["textfile_dir"])
-    out.mkdir(parents=True, exist_ok=True)
-    path = out / cfg["textfile"]
-    merged = parse_metrics("slurm_backup", path.read_text()) if path.exists() else {}
-    merged.update(values)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(metrics("slurm_backup", merged))
+def atomic_write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text)
+    tmp.chmod(0o644)
     os.replace(tmp, path)
+
+
+def publish(cfg):
+    """Copy the kept metrics into the textfile directory."""
+    kept = Path(cfg["metrics_file"])
+    if kept.exists():
+        atomic_write(Path(cfg["textfile_dir"]) / cfg["textfile"], kept.read_text())
+    return 0
+
+
+def write_metrics(cfg, values):
+    """Merge values into the kept metrics (the other command's series stay), then publish."""
+    kept = Path(cfg["metrics_file"])
+    merged = parse_metrics("slurm_backup", kept.read_text()) if kept.exists() else {}
+    merged.update(values)
+    atomic_write(kept, metrics("slurm_backup", merged))
+    publish(cfg)
 
 
 def build(cfg, staging):
@@ -233,11 +249,11 @@ def restore_test(cfg):
 
 
 def main(argv):
-    if len(argv) != 2 or argv[0] not in ("backup", "restore-test"):
+    commands = {"backup": backup, "restore-test": restore_test, "publish": publish}
+    if len(argv) != 2 or argv[0] not in commands:
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
-    cfg = json.loads(Path(argv[1]).read_text())
-    return backup(cfg) if argv[0] == "backup" else restore_test(cfg)
+    return commands[argv[0]](json.loads(Path(argv[1]).read_text()))
 
 
 if __name__ == "__main__":
