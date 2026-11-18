@@ -78,6 +78,10 @@ slurm_compute_group: slurm-node
 is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"
 is_compute: "{{ inventory_hostname in (groups[slurm_compute_group] | default([])) }}"
 
+# The systemd units that run sshd: the service, then the socket that starts it on
+# demand (Ubuntu 22.10+). Debian and Ubuntu name them ssh; upstream OpenSSH and RHEL sshd.
+ssh_units: "{{ ['sshd.service', 'sshd.socket'] if ansible_facts.os_family == 'RedHat' else ['ssh.service', 'ssh.socket'] }}"
+
 # Controls when a DOWN node will be returned to service. 2 lets nodes auto-recover
 # after a clean RebootProgram cycle (driver/firmware updates); 1 leaves them DOWN
 # on an unexpected reboot until manual review.

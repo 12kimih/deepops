@@ -3,6 +3,10 @@ nhc_version: "1.4.3"
 nhc_src_url: "https://github.com/mej/nhc/releases/download/{{ nhc_version }}/lbnl-nhc-{{ nhc_version }}.tar.xz"
 nhc_install_dir: "/usr"
 nhc_config_dir: "/etc"
+
+# The systemd units that run sshd: the service, then the socket that starts it on
+# demand (Ubuntu 22.10+). Debian and Ubuntu name them ssh; upstream OpenSSH and RHEL sshd.
+ssh_units: "{{ ['sshd.service', 'sshd.socket'] if ansible_facts.os_family == 'RedHat' else ['ssh.service', 'ssh.socket'] }}"
 nhc_libexec_dir: "/usr/libexec"
 nhc_build_dir: "/opt/deepops/build/nhc"
 nhc_sysconfig_dir: "/etc/sysconfig"
