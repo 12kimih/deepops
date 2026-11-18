@@ -15,11 +15,14 @@ import sys
 from . import render, slurm
 
 # Value completers: a single field per line from a standard Slurm command, so the
-# completion never parses free text and never needs this package to be importable.
+# completion never parses free text and never needs this package to be importable. They
+# run at every <TAB>, so each is bounded: a slow or rate-limiting slurmctld must cost a
+# missing suggestion, never a frozen shell.
+_TAB_BOUND = "timeout 3 "
 COMPLETERS = {
-    "partitions": "sinfo -h -o %R 2>/dev/null",
-    "nodes": "sinfo -h -N -o %N 2>/dev/null",
-    "users": "squeue -h -o %u 2>/dev/null | sort -u",
+    "partitions": _TAB_BOUND + "sinfo -h -o %R 2>/dev/null",
+    "nodes": _TAB_BOUND + "sinfo -h -N -o %N 2>/dev/null",
+    "users": _TAB_BOUND + "squeue -h -o %u 2>/dev/null | sort -u",
     "flavours": "printf '%s\\n' " + " ".join(render.FLAVOURS),
     "color": "printf '%s\\n' auto always never",
 }

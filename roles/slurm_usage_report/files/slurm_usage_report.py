@@ -9,7 +9,6 @@ window. Can optionally cancel jobs idle for longer. Standard library only.
 import argparse
 import json
 import re
-import subprocess
 import sys
 import time
 import urllib.parse
@@ -17,7 +16,17 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from clustertools.slurm import FAILURES, GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_label, num, scontrol
+from clustertools.slurm import (
+    FAILURES,
+    GPU_CONFIGURED,
+    GPU_REQUESTED,
+    failure,
+    job_gpus,
+    job_label,
+    num,
+    run,
+    scontrol,
+)
 from clustertools.vocab import node_unavailable
 
 SLACK_API = "https://slack.com/api/"
@@ -433,7 +442,10 @@ def report_once():
             j for j in report["idle"] if now - j["state"]["since"] >= cfg["cancel_after_hours"] * 3600
         ]
         for j in cancelled:
-            subprocess.run(["scancel", j["id"]], check=False)
+            try:
+                run("scancel", j["id"])
+            except FAILURES as e:  # announced below either way; the log says why it failed
+                print(f"slurm-usage-report: scancel {j['id']}: {failure(e)}", file=sys.stderr)
         if cancelled:
             slack.post(
                 channel,
