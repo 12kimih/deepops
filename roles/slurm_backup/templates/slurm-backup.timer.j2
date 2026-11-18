@@ -1,0 +1,11 @@
+# Managed by roles/slurm_backup.
+[Unit]
+Description=Slurm controller {{ item.command }} ({{ item.schedule }})
+
+[Timer]
+OnCalendar={{ item.schedule }}
+Persistent=true
+Unit=slurm-backup@{{ item.command }}.service
+
+[Install]
+WantedBy=timers.target

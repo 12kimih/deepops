@@ -1,0 +1,43 @@
+---
+# slurm_backup -- daily backups of the Slurm controller's irreplaceable state, kept in
+# more than one place, with a monthly restore test and freshness metrics.
+#
+# Backed up: the accounting database (one consistent mariadb-dump snapshot), the
+# StateSaveLocation tree, and the MUNGE key for destinations that ask for it. Each run
+# writes <dest>/daily/<date>/ with a SHA256SUMS file and, on the weekly day, the same
+# set under weekly/<date>/; older sets beyond the counts are deleted.
+#
+# The restore test loads the newest local dump into a scratch database, compares every
+# table with the live database and checks the archive and checksums. Both commands
+# write node_exporter textfile metrics (slurm_backup_last_success_timestamp_seconds,
+# slurm_backup_restore_test_last_success_timestamp_seconds, ...), so an alert can fire
+# when a backup goes stale.
+#
+# Runs on the controller only. Opt-in: no destinations, no backup.
+
+# Each destination: {path, owner, munge_key, daily, weekly}.
+#   owner      who writes there: root for a local disk; for an NFS export with
+#              root_squash, a service account the server lets write (the directory is
+#              created on prepare_host, the export's server).
+#   munge_key  copy the MUNGE key here (only where few can read it).
+#   daily, weekly  how many dated sets to keep (14 and 8 if unset).
+#   prepare_host   host that creates the directory (the NFS server), if not this one.
+slurm_backup_destinations: []
+
+slurm_backup_database: slurm_acct_db
+# Where slurmctld keeps its state. Empty = StateSaveLocation read from slurm.conf
+# (slurm_conf_template), so the path is written once.
+slurm_backup_state_dir: ""
+slurm_backup_munge_key: /etc/munge/munge.key
+
+# systemd OnCalendar expressions.
+slurm_backup_schedule: "*-*-* 03:15:00"
+slurm_backup_restore_test_schedule: "*-*-01 05:15:00"
+# ISO weekday (1 = Monday ... 7 = Sunday) whose daily set is also kept as a weekly one.
+slurm_backup_weekly_day: 7
+
+slurm_backup_script: /usr/local/sbin/slurm-backup
+slurm_backup_config: /etc/slurm-backup.json
+# node_exporter's textfile collector directory (roles/prometheus-node-exporter).
+slurm_backup_textfile_dir: "{{ node_exporter_prom_dir | default('/run/prometheus') }}"
+slurm_backup_textfile: slurm-backup.prom

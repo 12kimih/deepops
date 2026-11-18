@@ -1,0 +1,69 @@
+---
+- name: Back up the Slurm controller
+  when: slurm_backup_destinations | length > 0
+  vars:
+    slurm_backup_state: >-
+      {{ slurm_backup_state_dir
+         or (lookup('ansible.builtin.template', slurm_conf_template)
+             | regex_search('(?m)^StateSaveLocation=(\S+)', '\1') | default(['/var/spool/slurmctld'], true) | first) }}
+    slurm_backup_timers:
+      - {command: backup, schedule: "{{ slurm_backup_schedule }}"}
+      - {command: restore-test, schedule: "{{ slurm_backup_restore_test_schedule }}"}
+  block:
+    - name: Install the backup command
+      ansible.builtin.copy:
+        src: slurm_backup.py
+        dest: "{{ slurm_backup_script }}"
+        owner: root
+        group: root
+        mode: "0755"
+
+    # A destination on an NFS export with root_squash cannot be created by this host's
+    # root, so its directory is made on the export's server, owned by the writer.
+    - name: Create each destination directory
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.owner | default('root') }}"
+        mode: "0700"
+      delegate_to: "{{ item.prepare_host | default(inventory_hostname) }}"
+      loop: "{{ slurm_backup_destinations }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Write the backup configuration
+      ansible.builtin.copy:
+        dest: "{{ slurm_backup_config }}"
+        owner: root
+        group: root
+        mode: "0600"
+        content: "{{ {'database': slurm_backup_database, 'state_dir': slurm_backup_state,
+                      'munge_key': slurm_backup_munge_key, 'weekly_day': slurm_backup_weekly_day,
+                      'textfile_dir': slurm_backup_textfile_dir, 'textfile': slurm_backup_textfile,
+                      'destinations': slurm_backup_destinations} | to_nice_json }}\n"
+
+    - name: Install the backup service
+      ansible.builtin.template:
+        src: slurm-backup@.service.j2
+        dest: /etc/systemd/system/slurm-backup@.service
+        mode: "0644"
+
+    - name: Install the backup and restore-test timers
+      ansible.builtin.template:
+        src: slurm-backup.timer.j2
+        dest: "/etc/systemd/system/slurm-backup-{{ item.command }}.timer"
+        mode: "0644"
+      loop: "{{ slurm_backup_timers }}"
+      loop_control:
+        label: "{{ item.command }}"
+
+    - name: Enable the timers
+      ansible.builtin.systemd:
+        name: "slurm-backup-{{ item.command }}.timer"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop: "{{ slurm_backup_timers }}"
+      loop_control:
+        label: "{{ item.command }}"
