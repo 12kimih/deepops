@@ -178,6 +178,8 @@
 
 - name: Configure Ubuntu motd-news
   when: cluster_tools_motd_news_stat.stat.exists
+  vars:
+    _cluster_tools_motd_news_units: [motd-news.timer, motd-news.service]
   block:
     - name: Set whether the banner fragment shows motd-news
       ansible.builtin.lineinfile:
@@ -191,12 +193,13 @@
         state: stopped
         enabled: false
         masked: true
-      loop: [motd-news.timer, motd-news.service]
+      loop: "{{ _cluster_tools_motd_news_units }}"
       when: not cluster_tools_motd_news
 
     # Masking leaves a unit's last failure on record, and the failure is what alerts.
+    # Both units: the timer is left failed by the run it triggered.
     - name: Clear a failed motd-news run
-      ansible.builtin.command: systemctl reset-failed motd-news.service
+      ansible.builtin.command: "systemctl reset-failed {{ _cluster_tools_motd_news_units | join(' ') }}"
       changed_when: false
       failed_when: false
       when: not cluster_tools_motd_news
