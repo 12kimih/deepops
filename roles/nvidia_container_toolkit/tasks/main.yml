@@ -2,16 +2,16 @@
 - name: Verify supported distribution
   ansible.builtin.assert:
     that:
-      - ansible_distribution == "Ubuntu" or ansible_os_family == "RedHat"
+      - ansible_facts.distribution == "Ubuntu" or ansible_facts.os_family == "RedHat"
     fail_msg: "The nvidia_container_toolkit role supports Ubuntu and Red Hat family hosts only."
 
 - name: Ubuntu | install NVIDIA Container Toolkit
   ansible.builtin.include_tasks: ubuntu.yml
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
 
 - name: Red Hat | install NVIDIA Container Toolkit
   ansible.builtin.include_tasks: redhat.yml
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Docker | configure NVIDIA runtime
   ansible.builtin.include_tasks: docker.yml

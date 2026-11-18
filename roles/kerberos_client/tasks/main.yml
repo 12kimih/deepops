@@ -11,7 +11,7 @@
     name: "{{ item }}"
     state: present
   with_items: "{{ kerberos_client_redhat_pkg }}"
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Install the kerberos packages (Ubuntu)
   ansible.builtin.apt:
@@ -20,7 +20,7 @@
     name: "{{ item }}"
     state: present
   with_items: "{{ kerberos_client_ubuntu_pkg }}"
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
 
 - name: Copy the client configuration file
   ansible.builtin.template:

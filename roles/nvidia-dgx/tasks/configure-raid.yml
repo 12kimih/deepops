@@ -15,6 +15,6 @@
 - name: Restore SELinux label on RAID array
   ansible.builtin.command: restorecon {{ dgx_raid_mount_path }}
   when:
-    - ansible_os_family == 'RedHat'
-    - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
+    - ansible_facts.os_family == 'RedHat'
+    - (ansible_facts.selinux is defined) and (ansible_facts.selinux.status != "disabled")
   notify: Restart cachefilesd

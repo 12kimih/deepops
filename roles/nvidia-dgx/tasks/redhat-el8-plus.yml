@@ -4,32 +4,32 @@
     dgx_redhat_platform: "{{ item }}"
   loop: "{{ dgx_redhat_platforms }}"
   when:
-    - ansible_product_name is search(item.match)
-    - ansible_distribution_major_version in item.supported_major_versions
+    - ansible_facts.product_name is search(item.match)
+    - ansible_facts.distribution_major_version in item.supported_major_versions
 
 - name: Fail if Red Hat DGX platform package set is unknown
   ansible.builtin.fail:
-    msg: "Unsupported DGX model for EL{{ ansible_distribution_major_version }} DGX role path: {{ ansible_product_name }}"
+    msg: "Unsupported DGX model for EL{{ ansible_facts.distribution_major_version }} DGX role path: {{ ansible_facts.product_name }}"
   when: dgx_redhat_platform is not defined
 
 - name: Enable Red Hat subscription repositories for DGX Software Stack
   ansible.builtin.command: "subscription-manager repos --enable={{ item }}"
-  loop: "{{ dgx_redhat_subscription_repos[ansible_distribution_major_version] }}"
+  loop: "{{ dgx_redhat_subscription_repos[ansible_facts.distribution_major_version] }}"
   changed_when: false
   when:
     - dgx_redhat_manage_subscription_repos
-    - ansible_distribution == 'RedHat'
+    - ansible_facts.distribution == 'RedHat'
 
 - name: Enable Rocky Linux CRB repository for DGX Software Stack
   ansible.builtin.command: dnf config-manager --set-enabled crb
   changed_when: false
   when:
-    - ansible_distribution == 'Rocky'
-    - ansible_distribution_major_version == '9'
+    - ansible_facts.distribution == 'Rocky'
+    - ansible_facts.distribution_major_version == '9'
 
 - name: Install NVIDIA DGX repository setup package
   ansible.builtin.dnf:
-    name: "{{ dgx_redhat_repo_setup_rpms[ansible_distribution_major_version] }}"
+    name: "{{ dgx_redhat_repo_setup_rpms[ansible_facts.distribution_major_version] }}"
     state: present
     disable_gpg_check: true
 
@@ -44,10 +44,10 @@
 - name: Install kernel development packages for DGX driver builds
   ansible.builtin.dnf:
     name:
-      - "kernel-devel-{{ ansible_kernel }}"
-      - "kernel-headers-{{ ansible_kernel }}"
+      - "kernel-devel-{{ ansible_facts.kernel }}"
+      - "kernel-headers-{{ ansible_facts.kernel }}"
     state: present
-  when: ansible_distribution_major_version == '9' or 'dkms' in dgx_redhat_driver_branch
+  when: ansible_facts.distribution_major_version == '9' or 'dkms' in dgx_redhat_driver_branch
 
 - name: Install Red Hat DGX configuration group
   ansible.builtin.dnf:
@@ -64,7 +64,7 @@
     dgx_redhat_driver_profiles: >-
       {{
         [dgx_redhat_driver_profile, 'src']
-        if ansible_distribution_major_version == '8'
+        if ansible_facts.distribution_major_version == '8'
         and not dgx_redhat_use_open_kernel_modules
         and 'dkms' not in dgx_redhat_driver_stream
         else [dgx_redhat_driver_profile]

@@ -6,8 +6,8 @@
   vars:
     _mofed_vars:
       files:
-        - "{{ ansible_distribution | lower }}.yml"
-        - "rhel{{ ansible_distribution_major_version }}.yml"
+        - "{{ ansible_facts.distribution | lower }}.yml"
+        - "rhel{{ ansible_facts.distribution_major_version }}.yml"
         - "rhel8.yml"
       paths:
         - vars
@@ -22,7 +22,7 @@
   until: mofed_doca_gpg_download is succeeded
   retries: 5
   delay: 10
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Ubuntu | add the DOCA-OFED apt repository
@@ -30,7 +30,7 @@
     repo: "deb [signed-by=/usr/share/keyrings/mellanox-doca.asc] {{ mofed_repo_base_url }} ./"
     filename: mellanox-doca
     state: present
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
 
 # --- RHEL/Rocky: DOCA-OFED dnf repository ---
 - name: RHEL | add the DOCA-OFED dnf repository
@@ -40,13 +40,13 @@
     baseurl: "{{ mofed_repo_base_url }}"
     gpgcheck: true
     gpgkey: "{{ mofed_repo_gpg_key }}"
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: RHEL | install prerequisites
   ansible.builtin.dnf:
     name: "{{ mofed_pkg_prereqs }}"
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 # --- Install the OFED bundle (apt/dnf state=present is idempotent) ---
 - name: Install DOCA-OFED (Ubuntu)
@@ -55,7 +55,7 @@
     state: present
     update_cache: true
   register: mofed_install_ubuntu
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Install DOCA-OFED (RHEL/Rocky)
@@ -63,7 +63,7 @@
     name: "{{ mofed_package }}"
     state: present
   register: mofed_install_redhat
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Reboot to load the OFED kernel modules
   ansible.builtin.reboot:

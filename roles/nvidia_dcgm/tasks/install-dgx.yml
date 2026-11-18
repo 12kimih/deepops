@@ -9,8 +9,8 @@
 - name: Fail when this DGX OS release has no known DCGM package
   ansible.builtin.fail:
     msg: >-
-      No DCGM package is mapped for {{ ansible_distribution }}
-      {{ ansible_distribution_version }} on DGX; set dcgm_dgx_pkg_name to
+      No DCGM package is mapped for {{ ansible_facts.distribution }}
+      {{ ansible_facts.distribution_version }} on DGX; set dcgm_dgx_pkg_name to
       the package shipped by this DGX OS release.
   when: dcgm_dgx_pkg_name | length == 0
 

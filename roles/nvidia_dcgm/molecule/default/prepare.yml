@@ -9,11 +9,11 @@
         group: "root"
         state: "directory"
         mode: "0755"
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_facts.distribution == "Ubuntu"
 
     - name: Ensure dependencies are present for apt key management
       ansible.builtin.apt:
         update_cache: true
         name: "gpg-agent"
         state: present
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_facts.distribution == "Ubuntu"

@@ -36,7 +36,7 @@
       ansible.builtin.assert:
         that:
           - >-
-            ansible_mounts | selectattr('mount', 'equalto', model_cache_mount)
+            ansible_facts.mounts | selectattr('mount', 'equalto', model_cache_mount)
             | selectattr('fstype', 'in', ['nfs', 'nfs4']) | list | length == 1
         fail_msg: The configured mount must already be mounted as NFS; this playbook never mounts storage.
 

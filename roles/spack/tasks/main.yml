@@ -5,14 +5,14 @@
     name: "{{ item }}"
     state: "present"
   with_items: "{{ spack_ubuntu_deps }}"
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
 
 - name: Ensure development tools are installed (Red Hat)
   ansible.builtin.package:
     name: "{{ item }}"
     state: "present"
   with_items: "{{ spack_redhat_deps }}"
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Ensure install directory exists
   ansible.builtin.file:

@@ -11,7 +11,7 @@
       register: sudo
 
     # If sudo is installed, try `become_method=sudo`
-    - name: Use method "sudo" (requires password for "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}")
+    - name: Use method "sudo" (requires password for "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}")
       ansible.builtin.set_fact: method=sudo
       when: sudo.rc == 0
 
@@ -28,10 +28,10 @@
 
     # 0440 root:root is the mode sudoers files are required to have: visudo rejects
     # anything else, and the default 0644 would leave a NOPASSWD rule world-readable.
-    - name: "Grant password-less sudo to user \"{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}\""
+    - name: "Grant password-less sudo to user \"{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}\""
       ansible.builtin.copy:
-        content: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }} ALL=(ALL) NOPASSWD:ALL\n"
-        dest: "/etc/sudoers.d/{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
+        content: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }} ALL=(ALL) NOPASSWD:ALL\n"
+        dest: "/etc/sudoers.d/{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
         owner: root
         group: root
         mode: "0440"

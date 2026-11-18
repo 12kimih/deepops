@@ -26,7 +26,7 @@ SAMPLES = [
 
 def apt_patterns(distribution="Ubuntu"):
     variables = {**load(ROLE / "defaults" / "main.yml"), **load(ROLE / "vars" / "main.yml"),
-                 "ansible_distribution": distribution}
+                 "ansible_facts": {"distribution": distribution}}
     text = render((ROLE / "templates" / "52deepops-unattended-upgrades.j2").read_text(), variables)
     block = text.split("Package-Blacklist {", 1)[1].split("};", 1)[0]
     return re.findall(r'"(.+)";', block), text

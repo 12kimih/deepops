@@ -4,8 +4,8 @@
 
 - name: Assert the install host is x86_64 (CUDA runfiles are x86_64 only)
   ansible.builtin.assert:
-    that: ansible_architecture == "x86_64"
-    fail_msg: "CUDA runfiles are x86_64 only (this host is {{ ansible_architecture }})."
+    that: ansible_facts.architecture == "x86_64"
+    fail_msg: "CUDA runfiles are x86_64 only (this host is {{ ansible_facts.architecture }})."
 
 - name: Ensure wget is installed (used to fetch the runfiles)
   ansible.builtin.package:

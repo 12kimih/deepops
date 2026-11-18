@@ -4,7 +4,7 @@
 # # Install Mellanox OFED and VF activation
 - name: MOFED installation
   ansible.builtin.include_tasks: mofed-install.yaml
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
   tags:
     - roce_host
 

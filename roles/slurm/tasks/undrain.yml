@@ -9,7 +9,7 @@
   with_items:
     - "{{ groups[slurm_compute_group] }}"
   environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
   run_once: true
   tags:
     - never

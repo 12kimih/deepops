@@ -20,11 +20,11 @@
 
 - name: Install enroot (Ubuntu)
   ansible.builtin.include_tasks: ubuntu.yml
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
 
 - name: Install enroot (RHEL/Rocky)
   ansible.builtin.include_tasks: redhat.yml
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
 
 - name: Install enroot bash completion
   ansible.builtin.file:
@@ -62,7 +62,7 @@
   changed_when: false
   when:
     - enroot_tmpfiles is changed
-    - ansible_virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
+    - ansible_facts.virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
   tags:
     - molecule-notest
 

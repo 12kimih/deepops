@@ -17,7 +17,7 @@
     - name: Set registry hostname in /etc/hosts
       ansible.builtin.lineinfile:
         path: /etc/hosts
-        line: "{{ hostvars[groups['kube_control_plane'][0]]['ansible_host'] | default(hostvars[groups['kube_control_plane'][0]]['ansible_default_ipv4']['address'])
+        line: "{{ hostvars[groups['kube_control_plane'][0]]['ansible_host'] | default(hostvars[groups['kube_control_plane'][0]]['ansible_facts']['default_ipv4']['address'])
           }} {{ container_registry_hostname }}"
   tags:
     - container-registry

@@ -9,11 +9,11 @@
     - name: Install nfs utils (Ubuntu)
       ansible.builtin.package:
         name: nfs-common
-      when: ansible_os_family == "Debian"
+      when: ansible_facts.os_family == "Debian"
     - name: Install nfs utils (Red Hat / CentOS)
       ansible.builtin.package:
         name: nfs-utils
-      when: ansible_os_family == "RedHat"
+      when: ansible_facts.os_family == "RedHat"
 
 - name: "Deploy NetApp Trident"
   hosts: kube_control_plane
@@ -21,7 +21,7 @@
   vars_files:
     - ../../config/group_vars/netapp-trident.yml
   environment:
-    PATH: /usr/local/bin/:{{ ansible_env.PATH }}
+    PATH: /usr/local/bin/:{{ ansible_facts.env.PATH }}
   tasks:
     - name: Include netapp trident role
       run_once: true

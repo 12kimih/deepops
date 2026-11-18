@@ -55,9 +55,9 @@ function start_docker_rootless() {
 
     dockerd-rootless.sh --experimental \
       --data-root=${DOCKER_DATAROOT} \
-{% if ansible_distribution == "Ubuntu" %}
+{% if ansible_facts.distribution == "Ubuntu" %}
       --storage-driver overlay2 &
-{% elif ansible_os_family == "RedHat" and ansible_distribution_major_version == "8" %}
+{% elif ansible_facts.os_family == "RedHat" and ansible_facts.distribution_major_version == "8" %}
       --storage-driver fuse-overlayfs &
 {% else %}
       --storage-driver vfs &

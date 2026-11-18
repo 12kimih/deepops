@@ -6,7 +6,7 @@
   ansible.builtin.rpm_key:
     key: "{{ epel_key_url }}"
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: RedHat | add epel repo
   become: true
@@ -15,7 +15,7 @@
       - "{{ epel_package }}"
     state: present
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: "Install packages"
   become: true
@@ -26,7 +26,7 @@
       - tcsh
       - lmod
     state: present
-  when: ansible_os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
 
 - name: "Install packages"
   become: true
@@ -37,8 +37,8 @@
       - Lmod
     # Lmod ships from EPEL, whose packages expect CodeReady Builder enabled for their
     # dependencies -- named "powertools" on EL8 and "crb" on EL9+ (Rocky/Alma/CentOS Stream).
-    enablerepo: "{{ 'powertools' if ansible_distribution_major_version == '8' else 'crb' }}"
-  when: ansible_os_family == "RedHat"
+    enablerepo: "{{ 'powertools' if ansible_facts.distribution_major_version == '8' else 'crb' }}"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: "Mkdir software path"
   become: true

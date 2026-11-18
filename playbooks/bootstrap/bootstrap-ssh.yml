@@ -25,7 +25,7 @@
       ansible.builtin.setup: gather_subset=min
     - name: Add SSH public key to ansible user authorized keys
       ansible.posix.authorized_key:
-        user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
+        user: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
         state: present
         key: "{{ lookup('file', private_key + '.pub') }}"
       tags: ssh-public

@@ -12,14 +12,14 @@
       - "gcc"
       - "g++"
     state: present
-  when: ansible_distribution == "Ubuntu" and not nvhpc_localrc.stat.exists
+  when: ansible_facts.distribution == "Ubuntu" and not nvhpc_localrc.stat.exists
 
 - name: Install dependencies (rhel)
   ansible.builtin.dnf:
     name:
       - "gcc"
       - "gcc-c++"
-  when: ansible_os_family == "RedHat" and not nvhpc_localrc.stat.exists
+  when: ansible_facts.os_family == "RedHat" and not nvhpc_localrc.stat.exists
 
 - name: Ensure download and install directories exist
   when: not nvhpc_localrc.stat.exists

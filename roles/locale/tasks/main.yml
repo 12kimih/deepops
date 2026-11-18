@@ -5,7 +5,7 @@
     cache_valid_time: 3600
     name: locales
     state: present
-  when: ansible_os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
   tags:
     - locale
 
@@ -15,7 +15,7 @@
     name: "{{ locale_lang }}"
     state: present
   when:
-    - ansible_os_family == "Debian"
+    - ansible_facts.os_family == "Debian"
     - not locale_lang.startswith('C.')
   tags:
     - locale
@@ -25,7 +25,7 @@
     name: "glibc-langpack-{{ locale_lang.split('_')[0] | lower }}"
     state: present
   when:
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
     - not locale_lang.startswith('C.')
   tags:
     - locale
@@ -40,7 +40,7 @@
     line: "LANG={{ locale_lang }}"
     create: true
     mode: "0644"
-  when: ansible_os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
   tags:
     - locale
 
@@ -51,6 +51,6 @@
     line: "LANG={{ locale_lang }}"
     create: true
     mode: "0644"
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
   tags:
     - locale

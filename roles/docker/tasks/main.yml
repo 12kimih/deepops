@@ -3,11 +3,11 @@
 # install follows Docker's current official instructions and is not tied to kubespray.
 - name: Install Docker on Debian/Ubuntu
   ansible.builtin.include_tasks: ubuntu.yml
-  when: ansible_os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Install Docker on the RHEL family
   ansible.builtin.include_tasks: redhat.yml
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Ensure the Docker service is enabled and running
   ansible.builtin.systemd:
@@ -92,6 +92,6 @@
   loop: "{{ docker_sysctls | dict2items }}"
   when:
     - docker_tune_kernel | bool
-    - ansible_virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
+    - ansible_facts.virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
   tags:
     - molecule-notest

@@ -57,4 +57,4 @@
       {{ runai_platform_ingress_ip if runai_platform_ingress_ip | length > 0
          else ((runai_gw_addr.stdout | default('')) if runai_gateway_enabled | bool
          else ((runai_lb_addr.stdout | default('')) if runai_wait_ingress_lb | bool
-         else (ansible_default_ipv4.address | default('')))) }}
+         else (ansible_facts.default_ipv4.address | default('')))) }}

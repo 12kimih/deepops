@@ -7,7 +7,7 @@
     state: present
   with_items:
     - numactl
-  when: ansible_distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu"
 
 - name: Install dependencies (RHEL/Rocky)
   ansible.builtin.dnf:
@@ -16,7 +16,7 @@
   with_items:
     - psmisc
     - numactl
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 # The kernel arguments below only help on the legacy cgroup v1 hierarchy. On the
 # unified v2 hierarchy (cgroup.controllers present) the memory controller is on by
@@ -37,7 +37,7 @@
   when: not slurm_cgroup_v2.stat.exists
 
 - name: Update grub
-  when: update_grub.changed and ansible_os_family == "Debian"
+  when: update_grub.changed and ansible_facts.os_family == "Debian"
   block:
     - name: Update grub
       ansible.builtin.command: update-grub
@@ -48,7 +48,7 @@
         reboot_timeout: "{{ slurm_node_reboot_timeout }}"
 
 - name: Update grub
-  when: update_grub.changed and ansible_os_family == "RedHat"
+  when: update_grub.changed and ansible_facts.os_family == "RedHat"
   block:
     - name: Update grub
       ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -306,7 +306,7 @@
     regexp: "^([^#].*pam_systemd.so.*)"
     replace: "# \\1 # ANSIBLE MANAGED (ansible-role-slurm)"
   when:
-    - ansible_distribution == "Ubuntu"
+    - ansible_facts.distribution == "Ubuntu"
     - slurm_enable_pam_slurm_adopt
   tags:
     - config
@@ -317,7 +317,7 @@
     regexp: "^([^#].*pam_systemd.so.*)"
     replace: "# \\1 # ANSIBLE MANAGED (ansible-role-slurm)"
   when:
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
     - slurm_enable_pam_slurm_adopt
   tags:
     - config

@@ -80,7 +80,7 @@ deepops_set_hostname: true
 #  - wget
 #  - build-essential
 #  - linux-tools-generic
-#  - "{{ 'linux-headers-' + ansible_kernel }}"
+#  - "{{ 'linux-headers-' + ansible_facts.kernel }}"
 #software_remove_packages:
 #  - popularity-contest
 
@@ -110,7 +110,7 @@ deepops_set_hostname: true
 #    path: /export/shared
 
 # Extra Packages for Enterprise Linux (RHEL/CentOS)
-epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
+epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
 
 ################################################################################
 # USERS                                                                        #
@@ -350,7 +350,7 @@ maas_region_controller: '192.168.1.1'
 maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 # MAAS 3.7 is the current Ubuntu 24.04 line. Keep the 3.5 PPA when the MAAS
 # controller itself still runs Ubuntu 22.04.
-maas_repo: "{{ 'ppa:maas/3.7' if ansible_distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
+maas_repo: "{{ 'ppa:maas/3.7' if ansible_facts.distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
 
 maas_single_node_install: true
 

@@ -2,7 +2,7 @@
 - name: Check for DGX
   ansible.builtin.set_fact:
     dcgm_is_dgx: true
-  when: ansible_product_name is search("DGX")
+  when: ansible_facts.product_name is search("DGX")
 
 - name: DGX tasks
   ansible.builtin.include_tasks: install-dgx.yml
@@ -10,11 +10,11 @@
 
 - name: Ubuntu tasks
   ansible.builtin.include_tasks: install-ubuntu.yml
-  when: (ansible_distribution == "Ubuntu") and not dcgm_is_dgx
+  when: (ansible_facts.distribution == "Ubuntu") and not dcgm_is_dgx
 
 - name: Red Hat family tasks
   ansible.builtin.include_tasks: install-redhat.yml
-  when: (ansible_os_family == "RedHat") and not dcgm_is_dgx
+  when: (ansible_facts.os_family == "RedHat") and not dcgm_is_dgx
 
 - name: Populate service facts
   ansible.builtin.service_facts:

@@ -10,7 +10,7 @@
     - python3-pymysql
     - s-nail
     - ssmtp
-  when: ansible_os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Install dependencies (RedHat)
   ansible.builtin.dnf:
@@ -21,7 +21,7 @@
     - python3-PyMySQL
     - mailx
     - policycoreutils-python-utils
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Allow mysql to read libaio.so.1
   community.general.sefcontext:
@@ -29,14 +29,14 @@
     setype: mysqld_db_t
     state: present
   when:
-    - ansible_os_family == "RedHat"
-    - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
+    - ansible_facts.os_family == "RedHat"
+    - (ansible_facts.selinux is defined) and (ansible_facts.selinux.status != "disabled")
 
 - name: Apply new SELinux file context to filesystem
   ansible.builtin.command: restorecon -irv /lib64
   when:
-    - ansible_os_family == "RedHat"
-    - (ansible_selinux is defined) and (ansible_selinux.status != "disabled")
+    - ansible_facts.os_family == "RedHat"
+    - (ansible_facts.selinux is defined) and (ansible_facts.selinux.status != "disabled")
 
 # Boot-enable MariaDB on both families (slurmdbd + the mysql_user task depend on it,
 # and it must survive a reboot). On Debian the apt preset starts it but does not
@@ -59,7 +59,7 @@
     # Authenticate over the local MariaDB unix socket -- on Debian/Ubuntu
     # root@localhost uses unix_socket auth by default. Path is OS-specific.
     login_user: root
-    login_unix_socket: "{{ '/var/run/mysqld/mysqld.sock' if ansible_os_family == 'Debian' else '/var/lib/mysql/mysql.sock' }}"
+    login_unix_socket: "{{ '/var/run/mysqld/mysqld.sock' if ansible_facts.os_family == 'Debian' else '/var/lib/mysql/mysql.sock' }}"
     column_case_sensitive: true
   become: true
 
@@ -200,7 +200,7 @@
   failed_when: "create_cluster_result.rc != 0 and 'already exists' not in create_cluster_result.stdout"
   changed_when: "'already exists' not in create_cluster_result.stdout"
   environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
   run_once: true
 
 - name: Create account
@@ -216,7 +216,7 @@
     'Nothing added' not in create_account_result.stdout and
     'Already existing' not in create_account_result.stdout
   environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 
 - name: Create users
   ansible.builtin.command: sacctmgr -i create user {{ item }} account={{ slurm_acct_account }} adminlevel=None
@@ -233,13 +233,13 @@
   with_items:
     - "{{ user }}"
   environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 
 - name: Clear slurm state when downgrading
   ansible.builtin.command: slurmctld -i
   when: slurm_downgrade
   environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 
 - name: Wait for slurmctld to start
   ansible.builtin.pause:

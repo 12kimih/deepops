@@ -30,7 +30,7 @@
   roles:
     - role: slurm
       vars:
-        user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
+        user: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
         slurm_workflow_build: false
 
 # Set up slurm-login-on-compute if enabled
@@ -42,5 +42,5 @@
         name: slurm
         tasks_from: login-compute-setup
       vars:
-        user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }}"
+        user: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
       when: slurm_login_on_compute | default(false)

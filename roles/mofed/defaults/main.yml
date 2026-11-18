@@ -14,9 +14,9 @@ mofed_doca_version: "3.3.0"
 
 # Repo distro id (ubuntu<ver> / rhel<major.minor>) and arch (x86_64 / arm64-sbsa).
 mofed_repo_distro: >-
-  {{ ('ubuntu' ~ ansible_distribution_version) if ansible_distribution == 'Ubuntu'
-     else ('rhel' ~ ansible_distribution_version) }}
-mofed_repo_arch: "{{ 'arm64-sbsa' if ansible_architecture == 'aarch64' else 'x86_64' }}"
+  {{ ('ubuntu' ~ ansible_facts.distribution_version) if ansible_facts.distribution == 'Ubuntu'
+     else ('rhel' ~ ansible_facts.distribution_version) }}
+mofed_repo_arch: "{{ 'arm64-sbsa' if ansible_facts.architecture == 'aarch64' else 'x86_64' }}"
 mofed_repo_base_url: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_repo_distro | trim }}/{{ mofed_repo_arch }}"
 mofed_repo_gpg_key: "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
 

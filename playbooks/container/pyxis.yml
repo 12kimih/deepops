@@ -5,7 +5,7 @@
     - name: Set enroot DGX config fact
       ansible.builtin.set_fact:
         enroot_environ_config_files: "{{ enroot_environ_config_files_dgx }}"
-      when: ansible_product_name is search("DGX")
+      when: ansible_facts.product_name is search("DGX")
 
 # enroot and pyxis are installed on both login (slurm-master) and compute
 # (slurm-node) hosts so containers can be imported and launched from either.
