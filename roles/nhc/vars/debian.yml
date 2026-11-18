@@ -1,0 +1,6 @@
+---
+nhc_build_deps:
+  - build-essential
+
+# Debian and Ubuntu name the units ssh, and Ubuntu 22.10+ starts sshd from the socket.
+nhc_ssh_units: "ssh.service ssh.socket"
