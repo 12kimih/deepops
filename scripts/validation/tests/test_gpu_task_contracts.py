@@ -11,6 +11,7 @@ Run with: python3 -m unittest discover scripts/validation/tests
 
 import os
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -18,6 +19,8 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "lib"))
+from ansible_yaml import canonical, same_name  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 TRANSIENT_SERVICE = "systemd-run --wait --pipe --collect --quiet --"
@@ -34,27 +37,8 @@ GPU_TASK_PATHS = (
 )
 
 
-def canonical(value):
-    """The parsed YAML with module keys shortened (ansible.builtin.shell -> shell).
-
-    The fork writes fully qualified module names; the contracts below are about
-    behaviour, so they read either spelling.
-    """
-    if isinstance(value, dict):
-        return {(k.rsplit(".", 1)[-1] if isinstance(k, str) and k.count(".") == 2 else k): canonical(v)
-                for k, v in value.items()}
-    if isinstance(value, list):
-        return [canonical(v) for v in value]
-    return value
-
-
 def load(path):
     return canonical(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
-
-
-def same_name(a, b):
-    """Task names compare without regard to case (the fork capitalizes them)."""
-    return isinstance(a, str) and isinstance(b, str) and a.casefold() == b.casefold()
 
 
 def tasks(path):
