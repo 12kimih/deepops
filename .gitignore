@@ -11,6 +11,7 @@
 
 # virtualenv
 /.venv/
+/.venv-kubespray/
 
 # ansible-lint / ansible runtime cache
 /.ansible/
@@ -27,8 +28,11 @@ __pycache__/
 /admin.conf
 /config*/
 !/config.example/
+# Installed by scripts/deepops/galaxy.py (.*.new and .*.old only while it runs)
 /roles/galaxy/
-/collections/*
+/roles/.galaxy.*/
+/collections/
+/.collections.*/
 /k8s-config/
 /kubectl
 /tridentctl
