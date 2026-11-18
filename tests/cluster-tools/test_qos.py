@@ -104,6 +104,17 @@ class CommandTests(unittest.TestCase):
         self.assertIn("More: qos --help", run_tool("qos", "-h").stdout)
         self.assertIn("GrpTRES", run_tool("qos", "--help").stdout)
 
+    def test_unknown_usage_is_not_zero(self):
+        out = run_tool("qos", "--no-usage").stdout
+        self.assertRegex(out, r" -/14 ")
+        self.assertNotIn("Usage is every RUNNING job", out)
+
+    def test_failed_usage_read_is_reported_not_zero(self):
+        r = run_tool("qos", env={"FAKE_FAIL": "slurm_load_jobs error: Rate limit exceeded"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("live usage unavailable: slurm_load_jobs error: Rate limit exceeded", r.stdout)
+        self.assertRegex(r.stdout, r" -/14 ")
+
     def test_exit_codes(self):
         self.assertEqual(run_tool("qos", "--bogus").returncode, 2)
         missing = run_tool("qos", path=False)

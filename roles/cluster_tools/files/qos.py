@@ -8,6 +8,7 @@ itself, so a script reads the same figures a person sees.
 import json
 import os
 import pwd
+import subprocess
 import sys
 
 from clustertools import slurm
@@ -173,7 +174,10 @@ def _table(t, model, bar, caps):
             if q is None:
                 cells.append((dot, "faint"))
                 continue
-            u = q["used"] or 0
+            if q["used"] is None:  # unknown, never zero: 0/8 would read as free
+                cells.append([(f"{dot}/{q['limit']}", "faint")])
+                continue
+            u = q["used"]
             style = "faint" if q["limit"] == 0 else t.load(u, q["limit"])  # 0: barred, not full
             piece = [(f"{u}/{q['limit']}", style)]
             if bar:
@@ -237,6 +241,8 @@ def show(t, model, only_mine=False):
             parts.append(f"max {pu['submitted_jobs']} submitted/user")
         if parts:
             out.append(f"  {t.paint('part', r['name'])} {t.paint('sub', ', '.join(parts))}")
+    if model.get("usage_error"):
+        out.append("  " + t.paint("crit", f"live usage unavailable: {model['usage_error']}"))
     note("No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -T).")
     if model["usage"]:
         note(
@@ -259,8 +265,16 @@ def main(argv=None):
     def body():
         args, theme = COMMAND.parse(argv)
         qos_data, assoc_data = slurm.sacctmgr("show", "qos"), slurm.sacctmgr("show", "assoc")
-        jobs = slurm.scontrol("show", "jobs") if args.usage else None
-        model = build(qos_data, assoc_data, jobs, args.user or _me(), args.usage, args.mine, args.all)
+        # A failed usage read leaves usage unknown and says why, rather than failing qos.
+        jobs, usage_error = None, ""
+        if args.usage:
+            try:
+                jobs = slurm.scontrol("show", "jobs")
+            except subprocess.CalledProcessError as e:
+                usage_error = slurm.failure(e)
+        usage = args.usage and not usage_error
+        model = build(qos_data, assoc_data, jobs, args.user or _me(), usage, args.mine, args.all)
+        model["usage_error"] = usage_error
         if args.json:
             json.dump(model, sys.stdout, indent=1)
             sys.stdout.write("\n")
