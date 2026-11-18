@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 
-nodes=$(scontrol show node "${1}" | grep -oe "^NodeName=[a-z,A-Z,0-9,-]*" | cut -d= -f2)
+# Single-field Slurm output: node names and states only, never parsed from free text.
+nodes=$(scontrol show hostnames "${1}")
 
 shift
 
@@ -9,7 +10,7 @@ shift
 
 case "$1" in
     k8s)
-        for node in ${nodes} ; do 
+        for node in ${nodes} ; do
             echo "${node}: "
             sudo scontrol update node=${node} state=drain reason=k8s >/dev/null
             kubectl uncordon ${node} >/dev/null
@@ -17,11 +18,11 @@ case "$1" in
             echo -n "k8s: "
             kubectl get node ${node} | tail -1 | awk '{print $2}'
             echo -n "slurm: "
-            scontrol show node ${node} | grep -oe "State=[a-z,A-Z,+]*" | cut -d= -f2
+            sinfo -h -N -n "${node}" -o %T | head -n 1
         done
         ;;
     slurm)
-        for node in ${nodes} ; do 
+        for node in ${nodes} ; do
             echo "${node}: "
             kubectl cordon ${node} >/dev/null
             sudo scontrol update node=${node} state=idle reason=slurm >/dev/null
@@ -29,11 +30,11 @@ case "$1" in
             echo -n "k8s: "
             kubectl get node ${node} | tail -1 | awk '{print $2}'
             echo -n "slurm: "
-            scontrol show node ${node} | grep -oe "State=[a-z,A-Z,+]*" | cut -d= -f2
+            sinfo -h -N -n "${node}" -o %T | head -n 1
         done
         ;;
     state)
-        for node in ${nodes} ; do 
+        for node in ${nodes} ; do
             echo -n "${node}: "
             kubectl get node ${node} -o yaml | grep scheduler: | awk '{print $2}'
         done
