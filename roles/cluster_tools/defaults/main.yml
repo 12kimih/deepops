@@ -24,6 +24,13 @@ cluster_tools_commands: []
 cluster_tools_builtin: [qos]
 cluster_tools_completion_dir: /usr/share/bash-completion/completions
 
+# Commands this role published are listed in cluster_tools_manifest, and one dropped from
+# cluster_tools_scripts or cluster_tools_commands is removed on the next run. Name in
+# cluster_tools_retired any command published before that record existed; a name that is
+# absent is simply skipped.
+cluster_tools_manifest: "{{ cluster_tools_lib_dir }}/published-commands"
+cluster_tools_retired: []
+
 # Commands to publish: a list of {src, dest}. src is copied VERBATIM -- shell scripts
 # routinely contain sequences Jinja would eat, `${#var}` opening a comment among them --
 # so anything site-specific belongs in cluster_tools_environment, not in a template.
