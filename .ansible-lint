@@ -52,3 +52,10 @@ skip_list:
   - schema[requirements]         # non-standard requirements.yml entries
   - yaml[line-length]            # long lines (> 160 chars)
   - ignore-errors                # pre-existing ignore_errors usage
+
+# .yamllint decides how strict YAML layout is (these are warnings there, so yamllint
+# itself passes); report them here the same way instead of failing on them.
+warn_list:
+  - yaml[indentation]
+  - yaml[colons]
+  - yaml[commas]

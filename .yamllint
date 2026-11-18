@@ -51,7 +51,8 @@ rules:
     level: warning
   comments:
     min-spaces-from-content: 1
-    require-starting-space: true
+    # "#var: value" is how config.example ships a setting switched off.
+    require-starting-space: false
     level: warning
   # ansible-lint requires comments-indentation disabled for compatibility with
   # its `yaml` rule, so leave it off here too.

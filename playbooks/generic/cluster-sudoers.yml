@@ -19,7 +19,7 @@
 #   ansible-playbook -l <one-node> playbooks/generic/cluster-sudoers.yml
 - hosts: "{{ hostlist | default('all') }}"
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tags:
     - cluster-sudoers
   roles:

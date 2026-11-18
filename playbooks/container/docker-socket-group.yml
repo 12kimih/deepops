@@ -10,7 +10,7 @@
 # No-op until docker_socket_group is set in config/group_vars.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tags:
     - docker-socket-group
   roles:

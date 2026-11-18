@@ -2,7 +2,7 @@
 # Playbook for installation SR-IOV DP with CNI and corresponded prerequisites
 - hosts: all
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tasks:
     - ansible.builtin.include_role:
         name: roce_backend
@@ -10,7 +10,7 @@
 
 - hosts: kube_node
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tasks:
     - name: Install docker-py
       ansible.builtin.pip:
@@ -28,7 +28,7 @@
 
 - hosts: kube_control_plane
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tasks:
     - ansible.builtin.include_role:
         name: roce_backend

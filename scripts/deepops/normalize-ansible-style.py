@@ -10,6 +10,8 @@ Rules (all line based, so comments and layout survive):
   casing   task, play and handler names, and notify/listen entries, start upper case
   truthy   yes/no/True/False values become true/false
   octal    bare `mode: 0644` becomes `mode: "0644"`
+  plugins  `become_method: sudo` becomes `become_method: ansible.builtin.sudo`
+  roles    a play's `roles:` entries are written `- role: X`, not `- name: X`
   jinja    `{{x|f}}` becomes `{{ x | f }}`, outside quoted strings
   layout   a `---` document start and no trailing blanks everywhere; in Ansible
            files and role defaults/vars/meta, sequences indented under their key
@@ -46,7 +48,7 @@ COLLECTION = {
     "docker_container": "community.docker", "docker_volume": "community.docker",
     "docker_login": "community.docker", "docker_image": "community.docker",
     "docker_network": "community.docker",
-    "mysql_user": "community.mysql", "mysql_db": "community.mysql",
+    "mysql_user": "ansible.mysql", "mysql_db": "ansible.mysql",
 }
 # Keys that mark a list item as a task (or play), besides a module key.
 TASK_MARKERS = {"block", "hosts", "import_playbook", "include_tasks", "import_tasks",
@@ -159,11 +161,47 @@ def space_jinja(expr):
 CONDITION_KEYS = ("when", "failed_when", "changed_when", "until")
 
 
+def jinja_spans(line):
+    """(start, end) of each {{ ... }} body, matching braces and skipping quoted text."""
+    spans, i = [], 0
+    while True:
+        i = line.find("{{", i)
+        if i < 0:
+            return spans
+        j, depth, quote = i + 2, 0, None
+        while j < len(line) - 1:
+            c = line[j]
+            if quote:
+                if c == "\\":
+                    j += 1
+                elif c == quote:
+                    quote = None
+            elif c in "'\"":
+                quote = c
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                if depth == 0 and line[j + 1] == "}":
+                    break
+                depth -= 1
+            j += 1
+        else:
+            return spans
+        spans.append((i + 2, j))
+        i = j + 2
+
+
 def fix_jinja(line):
     if line.lstrip().startswith("#"):
         return line
-    line = line.replace("{}}}", "{} }}")
-    return re.sub(r"\{\{(?!-)(.*?)(?<!-)\}\}", lambda m: "{{" + space_jinja(m.group(1)) + "}}", line)
+    out, last = [], 0
+    for start, end in jinja_spans(line):
+        body = line[start:end]
+        if body.startswith("-") or body.endswith("-"):
+            continue
+        out.append(line[last:start] + space_jinja(body))
+        last = end
+    return "".join(out) + line[last:]
 
 
 def indent_sequences(lines):
@@ -218,6 +256,26 @@ def fix_conditions(lines):
                     break
                 if not mm.group(2).lstrip().startswith(("'", '"', ">", "|", "{{")):
                     lines[k] = mm.group(1) + space_jinja(mm.group(2)).strip()
+    return lines
+
+
+def fix_roles(lines):
+    """`roles:` list entries name their role with `role:`, the key the playbook schema requires."""
+    for n, line in enumerate(lines):
+        m = re.match(r"^(\s*)roles:\s*$", line)
+        if not m:
+            continue
+        col = len(m.group(1))
+        for k in range(n + 1, len(lines)):
+            s = lines[k]
+            if not s.strip() or s.lstrip().startswith("#"):
+                continue
+            ind = len(s) - len(s.lstrip())
+            if ind < col or (ind == col and not s.lstrip().startswith("- ")):
+                break
+            mm = re.match(r"^(\s*)- name:(\s.*)$", s)
+            if mm and len(mm.group(1)) <= col + 2:
+                lines[k] = mm.group(1) + "- role:" + mm.group(2)
     return lines
 
 
@@ -276,12 +334,16 @@ def normalize(text, path):
                     lines[n] = mm.group(1) + cap(mm.group(2))
     if ansible:
         lines = fix_conditions(lines)
+        lines = fix_roles(lines)
     for n, line in enumerate(lines):
         if ansible or layout:
             line = double_quote(line)
         line = re.sub(r"^(\s*(?:- )?[\w.]+:\s+)(yes|Yes|YES|True|TRUE)(\s*(?:#.*)?)$", r"\1true\3", line)
         line = re.sub(r"^(\s*(?:- )?[\w.]+:\s+)(no|No|NO|False|FALSE)(\s*(?:#.*)?)$", r"\1false\3", line)
         line = re.sub(r"^(\s*(?:- )?mode:\s+)(0[0-7]{3})(\s*(?:#.*)?)$", r'\1"\2"\3', line)
+        if ansible:
+            line = re.sub(r"^(\s*(?:- )?become_method:\s+)(sudo|su|runas|doas|pbrun|pfexec|ksu|dzdo|machinectl|sesu|enable)(\s*(?:#.*)?)$",
+                          r"\1ansible.builtin.\2\3", line)
         lines[n] = fix_jinja(line) if ansible else line
     return "\n".join(lines)
 
