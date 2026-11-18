@@ -370,9 +370,6 @@ install_dcgm: true
 #
 # DeepOps specific config
 deepops_dir: /opt/deepops
-# Directory for python virtualenv
-# Roles: K8s GPU operator, GPU plugin, OpenShift/K8s
-deepops_venv: '{{ deepops_dir }}/venv'
 
 # Disable cloud-init
 deepops_disable_cloud_init: true
