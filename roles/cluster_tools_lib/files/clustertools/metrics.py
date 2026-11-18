@@ -1,12 +1,12 @@
 """metrics: GPU allocation from Slurm as Prometheus metrics, for node_exporter.
 
 Slurm's own exporters report jobs and nodes, not which GPU each job holds. This writes:
-  slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job} 1 per allocated GPU
+  slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job_id} 1 per allocated GPU
   slurm_node_gpus{node,gpu_type}                                    GPUs configured
 so a dashboard can show who holds which GPU, and an alert can compare DCGM utilisation
-with allocation (a busy GPU no job holds). The label is `node`, as in Slurm's own metrics:
-the scrape target already carries `host`, and a scraped `host` would be renamed
-exported_host.
+with allocation (a busy GPU no job holds). Label names avoid those the scrape attaches
+itself, which would be renamed exported_*: `job` and `instance` (Prometheus's own) and
+`host` (this site's target label). Hence `node`, as in Slurm's own metrics, and `job_id`.
 
 `metrics PATH` writes the text file atomically (a temporary file in the same directory,
 fsync, rename), which node_exporter's textfile collector needs so it never reads half a
@@ -51,7 +51,7 @@ def textfile(jobs_data, nodes_data):
             labels = {
                 "node": host, "gpu": index, "gpu_type": gpu_type, "user": job["user_name"],
                 "account": job.get("account") or "", "partition": job.get("partition") or "",
-                "job": slurm.job_label(job),
+                "job_id": slurm.job_label(job),
             }  # fmt: skip
             lines.append(_series("slurm_gpu_allocated", labels, 1))
     lines += ["# HELP slurm_node_gpus GPUs configured on a node, by type.", "# TYPE slurm_node_gpus gauge"]
@@ -88,3 +88,7 @@ def main(argv=None):
     return run_main(
         "metrics", lambda: write(argv[0], textfile(slurm.load("jobs_detail"), slurm.load("nodes")))
     )
+
+
+if __name__ == "__main__":
+    sys.exit(main())
