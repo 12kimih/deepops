@@ -69,20 +69,49 @@
   loop: "{{ cluster_tools_commands }}"
   when: cluster_tools_completion_dir_stat.stat.isdir | default(false)
 
-# A name a site script now publishes is left alone: that file is the script's.
-- name: Remove built-in commands no longer published
+# The role records what it published, so a command dropped from the config leaves the
+# hosts on the next run, as every other setting here does. Only names in that record, or
+# named in cluster_tools_retired (published before the record existed), are removed.
+- name: Look for the record of published commands
+  ansible.builtin.stat:
+    path: "{{ cluster_tools_manifest }}"
+  register: cluster_tools_manifest_stat
+
+- name: Read the record of published commands
+  ansible.builtin.slurp:
+    src: "{{ cluster_tools_manifest }}"
+  register: cluster_tools_manifest_read
+  when: cluster_tools_manifest_stat.stat.exists
+
+- name: Remove commands no longer published
   ansible.builtin.file:
     path: >-
       {{ {'command': cluster_tools_bin_dir ~ '/' ~ item.0,
           'completion': cluster_tools_completion_dir ~ '/' ~ item.0,
           'module': cluster_tools_lib_dir ~ '/' ~ item.0 ~ '.py'}[item.1] }}
     state: absent
+  vars:
+    _cluster_tools_recorded: >-
+      {{ (cluster_tools_manifest_read.content | b64decode).split()
+         if cluster_tools_manifest_stat.stat.exists else [] }}
   loop: >-
-    {{ cluster_tools_builtin | difference(cluster_tools_commands)
+    {{ (_cluster_tools_recorded + cluster_tools_retired) | unique
        | difference(cluster_tools_scripts | map(attribute='dest'))
+       | difference(cluster_tools_commands)
        | product(['command', 'completion', 'module']) | list }}
   loop_control:
     label: "{{ item.0 }} {{ item.1 }}"
+
+- name: Record the published commands
+  ansible.builtin.copy:
+    content: |
+      {% for name in (cluster_tools_scripts | map(attribute='dest') | list + cluster_tools_commands) | sort %}
+      {{ name }}
+      {% endfor %}
+    dest: "{{ cluster_tools_manifest }}"
+    owner: root
+    group: root
+    mode: "0644"
 
 # A published name that also resolves elsewhere in PATH would shadow the real command
 # for every user, as an `alias squeue=/path/to/squeue.sh` does. Catch it
