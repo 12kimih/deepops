@@ -217,11 +217,11 @@ For examples of how to run BERT multi-node training jobs using this configuratio
 
 ### Setup.sh fails due to unsupported ansible version
 
-DeepOps pins Ansible and its other Python tools in `requirements.txt` (installed by `setup.sh`). If `setup.sh` fails to install them, install the pinned set directly into the DeepOps virtualenv:
+DeepOps pins Ansible and its other Python tools in `pyproject.toml` and `uv.lock` (installed by `setup.sh` with [uv](https://docs.astral.sh/uv/), which also provides the Python interpreter). If `setup.sh` fails to install them, install the locked set directly:
 
 ```bash
 # on the provisioning node, from the DeepOps checkout
-pip install -r requirements.txt
+UV_PROJECT_ENVIRONMENT=/opt/deepops/env uv sync --locked
 ```
 
 ### Connection to hosts via ansible refused/blocked

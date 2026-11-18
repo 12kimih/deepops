@@ -1,0 +1,24 @@
+---
+# Weekly pull requests for new releases of what this repository pins. CI
+# (scripts/check.sh) gates each one. Versions inside roles (images, packages,
+# Slurm) are tracked in docs/deepops/versions.md and bumped by hand against the
+# vendor's release notes.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python-tools:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
