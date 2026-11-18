@@ -14,7 +14,7 @@ ExecStartPre=-/usr/bin/docker rm %n
 {% if not slurm_exporter_build_image %}
 ExecStartPre=/usr/bin/docker pull {{ slurm_exporter_container }}
 {% endif %}
-ExecStart=/usr/bin/docker run --rm --network host --name %n{% for tool in ['sdiag', 'sinfo', 'squeue', 'sshare'] %} -v {{ slurm_install_prefix }}/bin/{{ tool }}:/usr/local/bin/{{ tool }}:ro{% endfor %} -v /etc/slurm:/etc/slurm:ro -v {{ slurm_install_prefix }}/lib:{{ slurm_install_prefix }}/lib:ro -v /etc/hosts:/etc/hosts:ro -v /var/run/munge:/var/run/munge:ro {{ slurm_exporter_container }}
+ExecStart=/usr/bin/docker run --rm --network host --name %n{% for tool in ['sdiag', 'sinfo', 'squeue', 'sshare'] %} -v {{ slurm_install_prefix }}/bin/{{ tool }}:/usr/local/bin/{{ tool }}:ro{% endfor %} -v {{ slurm_config_dir }}:{{ slurm_config_dir }}:ro -v {{ slurm_install_prefix }}/lib:{{ slurm_install_prefix }}/lib:ro -v /etc/hosts:/etc/hosts:ro -v /var/run/munge:/var/run/munge:ro {{ slurm_exporter_container }}
 
 [Install]
 WantedBy=multi-user.target
