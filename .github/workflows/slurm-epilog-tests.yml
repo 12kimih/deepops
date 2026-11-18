@@ -1,9 +1,8 @@
 ---
-name: test slurm epilog cleanup scripts
-# The slurm role is excluded from the molecule CI because it needs systemd
-# services a container cannot run. tests/slurm-epilog/run-tests.sh covers the
-# epilog cleanup guards without Slurm, so run it whenever those scripts or the
-# tests change.
+name: test slurm epilog cleanup scripts as root
+# The epilog cleanup guards, as root in a privileged container: the mount-boundary
+# cases need root and a real mount, which scripts/check.sh (run by checks.yml)
+# cannot give them.
 on:
   push:
     paths:
@@ -18,43 +17,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Every case that needs neither root nor a real mount: the last-user-job
-  # gate, the deletion guards and the mount-point pattern cases.
-  unprivileged:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: check out repo
-        uses: actions/checkout@v4
-
-      - name: set up python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: install dependencies
-        run: python3 -m pip install jinja2
-
-      - name: run epilog tests
-        run: |
-          set -o pipefail
-          bash tests/slurm-epilog/run-tests.sh 2>&1 | tee epilog-tests.log
-
-      - name: write job summary
-        if: always()
-        run: |
-          {
-            echo '### slurm-epilog tests (unprivileged)'
-            echo
-            echo 'The mount-boundary cases need root and a real mount; they skip here and run in the `privileged` job.'
-            echo
-            echo '```'
-            cat epilog-tests.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
+  # The unprivileged cases run with every other check in checks.yml (scripts/check.sh).
   # The four mount-boundary cases mount tmpfs and bind mounts under the fixture,
   # so they need root and CAP_SYS_ADMIN. A privileged container gives the
   # harness both; `nobody` is the unprivileged account it borrows for ownership.

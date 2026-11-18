@@ -30,14 +30,15 @@ Install Ansible on any system which can access target nodes via SSH. This can be
 - Control machine with supported OS to run Ansible
 - [Passwordless](#passwordless-configuration-using-ssh-keys) (SSH key) access from Ansible system to Universal GPU servers
 
-A script is provided to install Ansible on Ubuntu and RHEL/CentOS machines. Ansible can also be installed on Mac OS and Windows (WSL).
+`scripts/setup.sh` prepares the control machine on Ubuntu and RHEL-family systems. It installs [uv](https://docs.astral.sh/uv/), which provides the Python interpreter, then the locked environment in `.venv`, the Galaxy collections and roles, and Kubespray's environment in `.venv-kubespray`.
 
 ```bash
-# Install Ansible and required roles from Ansible Galaxy
 ./scripts/setup.sh
 ```
 
-See the official [Ansible documentation](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) for more detailed installation information.
+The versions are set in one place each: Python tools in `pyproject.toml` and `uv.lock`, collections and Galaxy roles in `roles/requirements.yml` (installed by `scripts/deepops/galaxy.py`).
+
+Commands in these docs are written as plain `ansible-playbook ...`. Run them through uv, `uv run ansible-playbook ...`, which first brings `.venv` in line with `uv.lock`; for an interactive shell, `source .venv/bin/activate` works too. The Kubernetes playbooks run from Kubespray's own environment instead: `source .venv-kubespray/bin/activate`.
 
 ### Passwordless configuration using SSH keys
 

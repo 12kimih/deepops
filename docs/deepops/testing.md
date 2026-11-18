@@ -13,16 +13,12 @@ DeepOps Testing, CI/CD, and Validation
 
 ## Linting
 
-`ansible-lint` is automatically run for each role in the `roles/` directory using a [Github action](../../.github/workflows/ansible-lint-roles.yml).
-This action runs `ansible-lint` once over the `roles/` directory with the project [`.ansible-lint`](../../.ansible-lint) configuration.
-If the Github action reports success, all roles should have passed linting.
-
-The linting process can also be executed manually in a checkout of the DeepOps repo,
-by running `./scripts/deepops/ansible-lint-roles.sh`.
-
-To skip roles that have known issues or are still in development, list them under
-`exclude_paths` in `.ansible-lint`. (The workflow still sets an `ANSIBLE_LINT_EXCLUDE`
-variable, but nothing reads it.)
+`scripts/check.sh` runs every repository check: the style normalizer, generated docs,
+yamllint, `ansible-lint` with the project [`.ansible-lint`](../../.ansible-lint)
+configuration, playbook syntax checks and the unit suites. CI runs it in
+[checks.yml](../../.github/workflows/checks.yml), and the pre-commit hook runs
+`scripts/check.sh --fast` on each commit. To skip roles that have known issues or are
+still in development, list them under `exclude_paths` in `.ansible-lint`.
 
 ## DeepOps end-to-end testing
 

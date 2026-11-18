@@ -221,7 +221,7 @@ DeepOps pins Ansible and its other Python tools in `pyproject.toml` and `uv.lock
 
 ```bash
 # on the provisioning node, from the DeepOps checkout
-UV_PROJECT_ENVIRONMENT=/opt/deepops/env uv sync --locked
+uv sync --locked
 ```
 
 ### Connection to hosts via ansible refused/blocked

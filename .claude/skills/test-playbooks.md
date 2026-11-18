@@ -4,13 +4,13 @@ description: Test Ansible playbooks across Ubuntu versions on target machines
 ---
 
 ## Prerequisites
-- Virtualenv activated (`source .venv/bin/activate` or `source /opt/deepops/env/bin/activate`)
+- `scripts/setup.sh` has run; run Ansible as `uv run ansible-playbook ...` (Kubernetes playbooks: `source .venv-kubespray/bin/activate` first)
 - Target machines provisioned and accessible via SSH
 - Inventory configured: either `config/inventory` (static) or `config/maas-inventory.yml` (MAAS dynamic)
 
 ## Steps
-1. Verify connectivity: `ansible -m ping all`
-2. Run playbook: `ansible-playbook playbooks/<playbook>.yml`
+1. Verify connectivity: `uv run ansible -m ping all`
+2. Run playbook: `uv run ansible-playbook playbooks/<playbook>.yml`
 3. Verify results (check playbook output, run smoke tests on targets)
 4. To test another OS version: reprovision targets with the new OS, re-run playbook, verify again
 

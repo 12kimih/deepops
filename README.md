@@ -47,13 +47,14 @@ changed and why.
 The entry points are unchanged from upstream DeepOps:
 
 ```bash
-cp -rfp config.example config        # your private, gitignored site config (or run scripts/setup.sh)
+scripts/setup.sh                     # uv, the locked .venv, Galaxy collections; copies config.example to config
 vi config/inventory                  # real hostnames / IPs
 vi config/group_vars/*.yml           # node/partition/gres, NFS, etc.
-ansible-playbook -l slurm-cluster playbooks/slurm-cluster.yml
+uv run ansible-playbook -l slurm-cluster playbooks/slurm-cluster.yml
 ```
 
-Helpful docs: [managing private cluster config](docs/deepops/managing-cluster-config.md)
+How the environment works (and how the Kubernetes playbooks differ):
+[docs/deepops/ansible.md](docs/deepops/ansible.md#requirements). Helpful docs: [managing private cluster config](docs/deepops/managing-cluster-config.md)
 (the `config/` + ansible-vault workflow) and
 [MODERNIZATION.md](MODERNIZATION.md) (every change since the fork, and why).
 
