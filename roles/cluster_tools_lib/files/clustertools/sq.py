@@ -211,6 +211,10 @@ def _read_nodes(data, gres):
     return nodes, gres
 
 
+def _parts(text):
+    return sorted({p for p in (text or "").split(",") if p}, key=_natural)
+
+
 def _read_jobs(data, gres, now):
     jobs = []
     for j in data["jobs"]:
@@ -221,7 +225,9 @@ def _read_jobs(data, gres, now):
         jobs.append({
             "id": j["job_id"], "label": slurm.job_label(j), "array": slurm.num(j["array_job_id"]) or "",
             "name": j["name"] or "", "user": j["user_name"], "account": j["account"] or "",
-            "partition": j["partition"] or "", "partitions": [p for p in (j["partition"] or "").split(",") if p],
+            # One canonical spelling of a job's partitions: Slurm keeps the order the user
+            # gave, and "a,b" and "b,a" are one set, to group and to read.
+            "partition": ",".join(_parts(j["partition"])), "partitions": _parts(j["partition"]),
             "qos": j["qos"] or "", "state": vocab.job_code(j["job_state"]), "active": vocab.job_active(j["job_state"]),
             "holds": holds, "nodes": j["nodes"] or "", "hosts": slurm.hostnames(j["nodes"] or ""),
             "node_count": slurm.num(j["node_count"]) or 0, "cpus": slurm.num(j["cpus"]) or 0,
