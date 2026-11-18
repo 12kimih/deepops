@@ -16,13 +16,16 @@ ExecStart=/usr/bin/docker run --rm --network host --pid=host --cpus={{ node_expo
   -v /:/host:ro,rslave \
   -v {{ node_exporter_prom_dir }}:{{ node_exporter_prom_dir }}:ro \
 {% if 'systemd' in node_exporter_extra_collectors %}
+{# Docker's default AppArmor profile blocks D-Bus, which the collector needs. #}
   -v /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro \
+  --security-opt apparmor=unconfined \
 {% endif %}
   {{ node_exporter_container }} \
   --path.rootfs=/host \
   --web.listen-address=:{{ node_exporter_port }} \
   --collector.textfile.directory={{ node_exporter_prom_dir }}{% for c in node_exporter_extra_collectors %} \
-  --collector.{{ c }}{% endfor %}
+  --collector.{{ c }}{% endfor %}{% if 'systemd' in node_exporter_extra_collectors %} \
+  --collector.systemd.unit-include='{{ node_exporter_systemd_unit_include }}'{% endif %}
 
 [Install]
 WantedBy=multi-user.target
