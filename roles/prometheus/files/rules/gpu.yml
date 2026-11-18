@@ -14,11 +14,11 @@ groups:
         annotations:
           summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} fell off the bus (XID 79)"
       - alert: GpuMissing
-        expr: count by (instance) (DCGM_FI_DEV_GPU_TEMP) < on (instance) group_left max_over_time(count by (instance) (DCGM_FI_DEV_GPU_TEMP)[1d:10m])
+        expr: count by (instance, host) (DCGM_FI_DEV_GPU_TEMP) < on (instance) group_left max_over_time(count by (instance) (DCGM_FI_DEV_GPU_TEMP)[7d:30m])
         for: 10m
         labels: {severity: critical}
         annotations:
-          summary: "{{ $labels.host }} reports fewer GPUs than it did in the last day"
+          summary: "{{ $labels.host }} reports fewer GPUs than it did in the last 7 days"
       - alert: GpuRowRemapFailure
         expr: DCGM_FI_DEV_ROW_REMAP_FAILURE > 0
         labels: {severity: critical}

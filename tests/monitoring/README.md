@@ -1,4 +1,11 @@
-# GPU Nodes dashboard checks
+# Monitoring checks
+
+`test_alert_rules.py` runs `alert-rules.test.yml` through `promtool test rules`: synthetic
+series against the shipped alert rules in `roles/prometheus/files/rules/`. Add a case with
+every new rule, and check each metric's meaning against the exporter's `# HELP` text (the
+IPMI chassis fault states, for one, use 1 for "no fault").
+
+## GPU Nodes dashboard checks
 
 Run without a cluster using Python 3 and Prometheus's `promtool`:
 
