@@ -8,7 +8,7 @@
     model_cache_path: "{{ model_cache_root | default(model_cache_mount ~ '/hf-cache') }}"
   tasks:
     - name: Require one explicit cache writer and site configuration
-      assert:
+      ansible.builtin.assert:
         that:
           - ansible_play_hosts_all | length == 1
           - model_cache_mount is defined
@@ -17,7 +17,7 @@
         fail_msg: Configure one model-cache-warmer host, model_cache_mount, model_cache_owner and model_cache_group.
 
     - name: Validate dedicated cache path
-      assert:
+      ansible.builtin.assert:
         that:
           - model_cache_mount is match('^/[A-Za-z0-9_/-]+$')
           - model_cache_mount != '/'
@@ -33,7 +33,7 @@
         fail_msg: Use a dedicated direct child of the existing shared mount; paths must be normalized.
 
     - name: Refuse to populate a local directory when shared storage is absent
-      assert:
+      ansible.builtin.assert:
         that:
           - >-
             ansible_mounts | selectattr('mount', 'equalto', model_cache_mount)
@@ -43,7 +43,7 @@
     - name: Inspect cache directories without following symlinks
       become: true
       become_user: "{{ model_cache_owner }}"
-      stat:
+      ansible.builtin.stat:
         path: "{{ item }}"
         follow: false
       loop:
@@ -52,7 +52,7 @@
       register: model_cache_directories
 
     - name: Refuse redirected or non-directory cache paths
-      assert:
+      ansible.builtin.assert:
         that:
           - not item.stat.exists or (item.stat.isdir | default(false) and not item.stat.islnk | default(false))
         fail_msg: Existing cache paths must be real directories, not links or files.
@@ -63,7 +63,7 @@
     - name: Create writer-owned cache directories with read-only group access
       become: true
       become_user: "{{ model_cache_owner }}"
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         owner: "{{ model_cache_owner }}"
@@ -76,7 +76,7 @@
     - name: Write explicit opt-in cache environment
       become: true
       become_user: "{{ model_cache_owner }}"
-      copy:
+      ansible.builtin.copy:
         dest: "{{ model_cache_path }}/environment.sh"
         owner: "{{ model_cache_owner }}"
         group: "{{ model_cache_group }}"

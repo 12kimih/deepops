@@ -1,12 +1,12 @@
 ---
 - name: Add the OS specific variables
-  include_vars: "{{ ansible_os_family|lower }}.yml"
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
 
 - name: Installation
-  include_tasks: "{{ ansible_os_family|lower }}.yml"
+  ansible.builtin.include_tasks: "{{ ansible_os_family | lower }}.yml"
 
 - name: Copy the chrony.conf template file
-  template:
+  ansible.builtin.template:
     src: chrony.conf.j2
     dest: "{{ chrony_config_location }}"
     mode: "0644"
@@ -16,15 +16,15 @@
     - restart chrony
 
 - name: Start and enable chrony service
-  service:
+  ansible.builtin.service:
     name: "{{ chrony_service_name }}"
     state: "{{ chrony_service_state }}"
     enabled: "{{ chrony_service_enabled }}"
 
 - name: Ensure tzdata package is installed
-  package:
+  ansible.builtin.package:
     name: "{{ chrony_tzdata_package }}"
     state: present
 
 - name: Set timezone
-  timezone: name="{{ chrony_timezone }}"
+  community.general.timezone: name="{{ chrony_timezone }}"

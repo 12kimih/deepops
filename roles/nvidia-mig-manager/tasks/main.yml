@@ -12,7 +12,7 @@
 # nvidia-smi prints alongside the values.
 - name: check for MIG capable devices
   become: true
-  shell: |
+  ansible.builtin.shell: |
     set -o pipefail
     mig_mode=$(systemd-run --wait --pipe --collect --quiet -- \
       nvidia-smi --query-gpu=mig.mode.current --format=csv,noheader) || exit 2
@@ -27,7 +27,7 @@
 # nothing and reporting it as converged hides a broken driver. The lspci fact
 # keeps nodes with no NVIDIA hardware out of this.
 - name: fail when the MIG capability probe could not run
-  fail:
+  ansible.builtin.fail:
     msg: >-
       Could not read the MIG mode of the GPUs on this node.
       nvidia-smi is unavailable or did not answer, while lspci reports
@@ -38,7 +38,7 @@
     - ansible_local['gpus']['count'] | default(0) | int > 0
 
 - name: check for NVIDIA MIG parted
-  shell: which nvidia-mig-parted  # noqa command-instead-of-shell
+  ansible.builtin.shell: which nvidia-mig-parted  # noqa command-instead-of-shell
   register: has_mig_parted
   failed_when: false
   changed_when: false
