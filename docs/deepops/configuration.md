@@ -106,9 +106,9 @@ This feature can be disabled by setting `slurm_enable_container_registry: false`
 
 Many of the Ansible roles in DeepOps are parameterized, allowing you to change values such as component versions, download URLs, or filesystem paths.
 
-For example, the [OpenMPI role](../../roles/openmpi) installs OpenMPI 5.0.10 by default.
-However, some applications still don't work with more recent versions of OpenMPI, and you may want to install OpenMPI 3.1.6 instead.
-You can do this with an Ansible variable by setting `openmpi_version: "3.1.6"`.
+For example, the [OpenMPI role](../../roles/openmpi) installs the OpenMPI release set by `openmpi_version` in its defaults.
+However, some applications still don't work with more recent versions of OpenMPI, and you may want to install an older release instead.
+You can do this with an Ansible variable by setting `openmpi_version: "<older version>"`.
 
 ### Finding variables to change
 
