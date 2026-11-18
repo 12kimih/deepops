@@ -19,3 +19,10 @@ nis_client_nsswitch:
   - { regexp: "^shadow", line: "shadow: files nis" }
   - { regexp: "^automount", line: "automount: files nis" }
   - { regexp: "^netgroup", line: "netgroup: nis" }
+
+# Name-service caches to remove. nscd keeps passwd, group and netgroup answers for up to
+# an hour, so a group, sudo or access change made in the directory reaches a node that
+# much later: a revoked admin kept sudo, a new docker member stayed out. The directory
+# answers fast enough for a cluster this size; a later SSSD client brings its own cache
+# with explicit invalidation, and its docs say not to run nscd beside it.
+nis_client_remove_caches: [nscd, unscd]
