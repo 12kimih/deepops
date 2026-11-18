@@ -20,6 +20,32 @@ configuration, playbook syntax checks and the unit suites. CI runs it in
 `scripts/check.sh --fast` on each commit. To skip roles that have known issues or are
 still in development, list them under `exclude_paths` in `.ansible-lint`.
 
+### Secrets and site data
+
+[`scripts/deepops/sensitive_guard.py`](../../scripts/deepops/sensitive_guard.py) keeps
+secrets and site-specific facts out of history. `pre-commit install` (run by
+`scripts/setup.sh`) wires it into three hooks: staged lines (pre-commit), the commit
+message (commit-msg) and every commit a push would publish (pre-push).
+
+- Built-in rules catch generic secret formats (private keys, Slack, GitHub and AWS
+  tokens, webhooks).
+- Site rules live in the site's private config repository, `config/sensitive-patterns`
+  (copy [`config.example/sensitive-patterns`](../../config.example/sensitive-patterns)),
+  so the list itself is never published. Each rule names its generic replacement.
+- Findings print the place and the rule, never the matched text. Mark a deliberate
+  line with `sensitive-guard: allow`.
+
+```bash
+scripts/deepops/sensitive_guard.py tree                       # every tracked file
+scripts/deepops/sensitive_guard.py history main ^upstream/master   # our commits
+scripts/deepops/sensitive_guard.py replace-text > rules.txt   # git filter-repo --replace-text input
+```
+
+If something did reach a pushed commit, rewrite only your own commits with
+`git filter-repo --replace-text rules.txt --refs <first-bad>^..main` (the range keeps
+upstream commits and their signatures intact), force-push with lease, and ask GitHub
+Support to purge cached views of the old commits.
+
 ## DeepOps end-to-end testing
 
 Public DeepOps pull requests are validated with GitHub Actions for setup, linting, CodeQL, and selected Molecule role tests. Those checks catch many packaging and role-regression issues, but they do not replace deployment validation on real GPU systems.
