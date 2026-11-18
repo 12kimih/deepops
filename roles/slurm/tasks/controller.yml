@@ -204,7 +204,11 @@
     PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
   run_once: true
 
+# Without an accounting file (slurm_accounting_file), one flat account holds the users
+# named in slurm_acct_users. With a file, the slurm_accounting module below owns every
+# account and association, and these two tasks would fight it.
 - name: Create account
+  when: slurm_accounting_file | length == 0
   ansible.builtin.command: sacctmgr -i add account {{ slurm_acct_account }} Description="Compute Accounts" Organization="{{ slurm_acct_organization }}"
   register: create_account_result
   failed_when: >
@@ -220,6 +224,7 @@
     PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 
 - name: Create users
+  when: slurm_accounting_file | length == 0
   ansible.builtin.command: sacctmgr -i create user {{ item }} account={{ slurm_acct_account }} adminlevel=None
   register: create_user_result
   failed_when: >
@@ -231,8 +236,7 @@
     'Nothing new added' not in create_user_result.stdout and
     'Nothing added' not in create_user_result.stdout and
     'Already existing' not in create_user_result.stdout
-  with_items:
-    - "{{ user }}"
+  loop: "{{ slurm_acct_users }}"
   environment:
     PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 

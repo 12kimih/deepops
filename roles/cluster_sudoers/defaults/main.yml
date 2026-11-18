@@ -1,6 +1,7 @@
 ---
 # cluster_sudoers -- grant administrator sudo through a NIS NETGROUP.
-# Opt-in: the role is a no-op while cluster_sudoers_netgroup is empty.
+# Opt-in: while cluster_sudoers_netgroup is empty the role only removes its own rule,
+# so turning it off revokes what turning it on granted.
 #
 # WHY A NETGROUP AND NOT A GROUP
 #

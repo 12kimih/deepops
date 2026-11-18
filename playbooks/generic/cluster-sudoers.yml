@@ -10,7 +10,8 @@
 # both: publish it once on the NIS master (nis_export_netgroups) and every node answers
 # the same way. This playbook installs the matching sudoers rule.
 #
-# No-op until cluster_sudoers_netgroup is set in config/group_vars.
+# Until cluster_sudoers_netgroup is set in config/group_vars this only makes sure no
+# rule of ours is left behind: emptying it again removes the rule.
 #
 # SAFETY: every rule is checked with `visudo -cf` before it is installed, and the
 # whole configuration is re-checked at the end. Even so, run this against ONE node
@@ -24,5 +25,4 @@
     - cluster-sudoers
   roles:
     - role: cluster_sudoers
-      when: (cluster_sudoers_netgroup | default('')) | length > 0
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
