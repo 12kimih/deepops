@@ -129,6 +129,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── prometheus-slurm-exporter
 │   ├── pyxis
 │   ├── roce_backend
+│   ├── root_access
 │   ├── rsyslog_client
 │   ├── rsyslog_server
 │   ├── runai

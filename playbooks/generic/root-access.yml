@@ -1,0 +1,14 @@
+---
+# Break-glass root SSH from the controller only (roles/root_access). The listed hosts
+# themselves are left alone. No-op until root_access_from_hosts is set.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - root-access
+  tasks:
+    - name: Apply the break-glass root access
+      ansible.builtin.include_role:
+        name: root_access
+      when:
+        - root_access_from_hosts | default([]) | length > 0
+        - inventory_hostname not in root_access_from_hosts

@@ -201,6 +201,11 @@
     - cluster-sudoers
     - people
 
+- name: Allow break-glass root SSH from the controller only
+  import_playbook: generic/root-access.yml
+  tags:
+    - root-access
+
 - name: Publish the site's commands, shell defaults and login banner
   import_playbook: slurm-cluster/cluster-tools.yml
   tags:

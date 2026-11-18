@@ -1,0 +1,14 @@
+---
+# root_access -- the break-glass path: root on a named host (normally the controller)
+# may SSH in as root here, and nothing else can.
+#
+# Root's public keys are read live from each listed host's /root/.ssh/*.pub, so a key
+# rotated there reaches every node on the next run and no copy of it lives in config.
+# /root/.ssh/authorized_keys on the targets is rendered whole: a key added by hand
+# disappears on the next run. Each key carries from="<that host's address>", so the
+# private key is useless anywhere but on its own host, which is reached only through
+# its own account login.
+#
+# Opt-in: with an empty list the role changes nothing (it cannot know whether keys in
+# the file were someone's only way in, so turning it off does not empty the file).
+root_access_from_hosts: []
