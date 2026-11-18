@@ -334,3 +334,15 @@
     state: absent
   when: cluster_tools_user_slice_limits | length == 0
   notify: Reload systemd
+
+# cron's PAM stack has no pam_systemd, so a cron job runs in cron.service, outside
+# every user's slice and its limits: a server started from @reboot ran unlimited
+# there. With pam_systemd, each job gets a session in its owner's slice, like a login.
+- name: Put cron jobs under their owner's slice and limits
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/cron
+    regexp: '^session\s+optional\s+pam_systemd\.so'
+    line: "session    optional   pam_systemd.so"
+    insertafter: "^@include common-session-noninteractive"
+    state: "{{ 'present' if cluster_tools_user_slice_limits | length > 0 else 'absent' }}"
+  when: ansible_facts.os_family == 'Debian'
