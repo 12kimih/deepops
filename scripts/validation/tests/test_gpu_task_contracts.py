@@ -34,6 +34,29 @@ GPU_TASK_PATHS = (
 )
 
 
+def canonical(value):
+    """The parsed YAML with module keys shortened (ansible.builtin.shell -> shell).
+
+    The fork writes fully qualified module names; the contracts below are about
+    behaviour, so they read either spelling.
+    """
+    if isinstance(value, dict):
+        return {(k.rsplit(".", 1)[-1] if isinstance(k, str) and k.count(".") == 2 else k): canonical(v)
+                for k, v in value.items()}
+    if isinstance(value, list):
+        return [canonical(v) for v in value]
+    return value
+
+
+def load(path):
+    return canonical(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
+
+
+def same_name(a, b):
+    """Task names compare without regard to case (the fork capitalizes them)."""
+    return isinstance(a, str) and isinstance(b, str) and a.casefold() == b.casefold()
+
+
 def tasks(path):
     """Every command/shell task in a playbook or task file, flattened."""
     found = []
@@ -48,7 +71,7 @@ def tasks(path):
             for child in value:
                 visit(child)
 
-    visit(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
+    visit(load(path))
     return found
 
 
@@ -81,12 +104,12 @@ def all_tasks(path):
             for child in value:
                 visit(child)
 
-    visit(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
+    visit(load(path))
     return found
 
 
 def task_named(path, name):
-    matches = [task for task in all_tasks(path) if task.get("name") == name]
+    matches = [task for task in all_tasks(path) if same_name(task.get("name"), name)]
     assert len(matches) == 1, f"{path}: {name}"
     return matches[0]
 
@@ -151,17 +174,11 @@ class MigApplyFailureContract(unittest.TestCase):
         # whose capability was never established.
         for name, family in (
             ("Install MIG Manager (apt)", "Debian"),
-            ("Install MIG Manager (yum)", "RedHat"),
+            ("Install MIG Manager (dnf)", "RedHat"),
         ):
             with self.subTest(name=name):
-                tasks_by_name = {
-                    task["name"]: task
-                    for task in yaml.safe_load(
-                        (ROOT / MIG_ROLE).read_text(encoding="utf-8")
-                    )
-                }
                 self.assertEqual(
-                    set(tasks_by_name[name]["when"]),
+                    set(task_named(MIG_ROLE, name)["when"]),
                     {
                         "has_mig.rc == 0",
                         "has_mig_parted.rc != 0",
