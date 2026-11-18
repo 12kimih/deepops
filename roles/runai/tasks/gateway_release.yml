@@ -20,6 +20,6 @@
 - name: "{{ runai_gw_release }} | record ownership of new release"
   ansible.builtin.command:
     argv: ["{{ runai_kubectl }}", apply, --filename, '-']
-    stdin: "{{ {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'deepops-runai-' ~ runai_gw_release, 'namespace': runai_gateway_controller_namespace}, 'data': {'release': runai_gw_release}} | to_json }}"
+    stdin: "{{ {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'deepops-runai-' ~ runai_gw_release, 'namespace': runai_gateway_controller_namespace}, 'data': {'release': runai_gw_release }} | to_json }}"
   changed_when: true
   when: runai_gw_release not in runai_gw_releases_before

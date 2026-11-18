@@ -3,66 +3,66 @@
 - hosts: all
   become: true
   roles:
-  - andrewrothstein.miniconda
+    - andrewrothstein.miniconda
   tasks:
-  - name: Ensure git is installed
-    ansible.builtin.package:
-      name: "git"
-      state: present
+    - name: Ensure git is installed
+      ansible.builtin.package:
+        name: "git"
+        state: present
 
-# CUDA components just on workers
+  # CUDA components just on workers
 - hosts: slurm-workers
   become: true
   roles:
-  - facts
-  - nvidia-ml
+    - facts
+    - nvidia-ml
 
   tasks:
-  - name: Ensure CUDA is installed (Ubuntu)
-    ansible.builtin.package:
-      name: "{{ item }}"
-      state: present
-    with_items:
-    - "cuda=10.0*"      # CUDA 10.0 currently needed
-    when: (ansible_os_family == "Debian") and (ansible_local['gpus']['count'])
+    - name: Ensure CUDA is installed (Ubuntu)
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - "cuda=10.0*"      # CUDA 10.0 currently needed
+      when: (ansible_os_family == "Debian") and (ansible_local['gpus']['count'])
 
-  - name: Ensure CUDA is installed (RHEL)
-    ansible.builtin.package:
-      name: "{{ item }}"
-      state: present
-    with_items:
-    - "cuda-10-0"
-    when: (ansible_os_family == "RedHat") and (ansible_local['gpus']['count'])
+    - name: Ensure CUDA is installed (RHEL)
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - "cuda-10-0"
+      when: (ansible_os_family == "RedHat") and (ansible_local['gpus']['count'])
 
-# Pre-copy scripts to all nodes
+  # Pre-copy scripts to all nodes
 - hosts: all
   become: true
   vars:
     share_dir: "/usr/share/deepops"
   tasks:
-  - name: Create a doc directory for these files
-    ansible.builtin.file:
-      path: "{{ share_dir }}"
-      mode: "0777"
-      owner: root
-      group: root
-      state: directory
-  - name: Copy conda requirements to doc dir
-    ansible.builtin.copy:
-      src: "conda-requirements.yml"
-      dest: "{{ share_dir }}/conda-requirements.yml"
-      owner: root
-      group: root
-      mode: "0444"
-  - name: Copy scripts to doc dir
-    ansible.builtin.copy:
-      src: "{{ item }}"
-      dest: "{{ share_dir }}/{{ item }}"
-      owner: root
-      group: root
-      mode: "0555"
-    with_items:
-    - launch-dask-cuda-worker.sh
-    - launch-dask-scheduler.sh
-    - run.sh
-    - sum.py
+    - name: Create a doc directory for these files
+      ansible.builtin.file:
+        path: "{{ share_dir }}"
+        mode: "0777"
+        owner: root
+        group: root
+        state: directory
+    - name: Copy conda requirements to doc dir
+      ansible.builtin.copy:
+        src: "conda-requirements.yml"
+        dest: "{{ share_dir }}/conda-requirements.yml"
+        owner: root
+        group: root
+        mode: "0444"
+    - name: Copy scripts to doc dir
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ share_dir }}/{{ item }}"
+        owner: root
+        group: root
+        mode: "0555"
+      with_items:
+        - launch-dask-cuda-worker.sh
+        - launch-dask-scheduler.sh
+        - run.sh
+        - sum.py

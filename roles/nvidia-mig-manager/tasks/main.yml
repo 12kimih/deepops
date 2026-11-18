@@ -10,7 +10,7 @@
 #   2 - the query itself failed, which is an error rather than an answer
 # Only a real mode counts: 'grep -v N/A' also matched warnings and notices
 # nvidia-smi prints alongside the values.
-- name: check for MIG capable devices
+- name: Check for MIG capable devices
   become: true
   ansible.builtin.shell: |
     set -o pipefail
@@ -26,7 +26,7 @@
 # A node whose GPUs cannot be queried is not a node without MIG: installing
 # nothing and reporting it as converged hides a broken driver. The lspci fact
 # keeps nodes with no NVIDIA hardware out of this.
-- name: fail when the MIG capability probe could not run
+- name: Fail when the MIG capability probe could not run
   ansible.builtin.fail:
     msg: >-
       Could not read the MIG mode of the GPUs on this node.
@@ -37,7 +37,7 @@
     - has_mig.rc == 2
     - ansible_local['gpus']['count'] | default(0) | int > 0
 
-- name: check for NVIDIA MIG parted
+- name: Check for NVIDIA MIG parted
   ansible.builtin.shell: which nvidia-mig-parted  # noqa command-instead-of-shell
   register: has_mig_parted
   failed_when: false

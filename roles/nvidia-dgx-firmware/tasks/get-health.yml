@@ -1,18 +1,18 @@
 ---
 - name: Run NVSM human-readable health show
-  shell: "nvsm show health > {{ fw_dir }}/nvsm-show-health.log"
+  ansible.builtin.shell: "nvsm show health > {{ fw_dir }}/nvsm-show-health.log"
   become: true
 
 - name: Run NVSM dump health
-  shell: "nvsm dump health"
+  ansible.builtin.shell: "nvsm dump health"
   become: true
   when: nvsm_dump_health
 
 - name: Run quick DCGM diagnostic
-  shell: "dcgmi diag -r 1 > {{ fw_dir }}/dcgm_diag_1.log"
+  ansible.builtin.shell: "dcgmi diag -r 1 > {{ fw_dir }}/dcgm_diag_1.log"
   become: true
 
 - name: Run full DCGM diagnostic
-  shell: "dcgmi diag -r 3 > {{ fw_dir }}/dcgm_diag_3.log"
+  ansible.builtin.shell: "dcgmi diag -r 3 > {{ fw_dir }}/dcgm_diag_3.log"
   become: true
   when: dcgm_stress

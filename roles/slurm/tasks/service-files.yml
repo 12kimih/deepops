@@ -28,7 +28,7 @@
 # "Command not found: scontrol" and every Pyxis container refuses to start.
 # The unconditional "start slurmd" task in compute.yml restarts the unit with
 # daemon-reload after this file, so the drop-in is active on every convergence.
-- name: create slurmd systemd override directory
+- name: Create slurmd systemd override directory
   ansible.builtin.file:
     path: /etc/systemd/system/slurmd.service.d
     state: directory
@@ -37,7 +37,7 @@
     mode: "0755"
   when: is_compute
 
-- name: put slurm_install_prefix clients on the slurmd PATH
+- name: Put slurm_install_prefix clients on the slurmd PATH
   ansible.builtin.copy:
     dest: /etc/systemd/system/slurmd.service.d/10-slurm-path.conf
     owner: root

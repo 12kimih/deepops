@@ -1,17 +1,17 @@
 ---
 - name: Get current time
-  include_tasks: get-time.yml
+  ansible.builtin.include_tasks: get-time.yml
 
 # nvsm does not allow you to specify a dump location, so we search /tmp for the last dump
 - name: Get name of the latest dumpfile from nvsm
-  shell: "ls -taA1 /tmp | grep nvsm-health.*tar.* | head -n 1"
+  ansible.builtin.shell: "ls -taA1 /tmp | grep nvsm-health.*tar.* | head -n 1"
   register: nvsm_dump_file
   ignore_errors: true
 
 # These files are generated when the user requests diagnostics (occurs during firmware update in default playbook)
 - name: Copy over all log files, etc. - from diagnostics
   ignore_errors: true
-  fetch:
+  ansible.builtin.fetch:
     src: "{{ fw_dir }}/{{ item }}"
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-{{ item }}"
     flat: true
@@ -28,7 +28,7 @@
 # These files are generated when the user requests a firmware update
 - name: Copy over all log files, etc. - from firmware update
   ignore_errors: true
-  fetch:
+  ansible.builtin.fetch:
     src: "{{ fw_dir }}/{{ item }}"
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-{{ item }}"
     flat: true
@@ -40,7 +40,7 @@
 # These files are only generated when the firmware is actually updated
 - name: Copy over all log files, etc. - from firmware update output
   ignore_errors: true
-  fetch:
+  ansible.builtin.fetch:
     src: "{{ fw_dir }}/{{ item }}"
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-{{ item }}"
     flat: true
@@ -50,7 +50,7 @@
 
 - name: Copy over all log files, etc. - stress tests
   ignore_errors: true
-  fetch:
+  ansible.builtin.fetch:
     src: "{{ fw_dir }}/{{ item }}"
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-{{ item }}"
     flat: true
@@ -59,7 +59,7 @@
   when: dcgm_stress
 
 - name: Copy NVSM dump health tarball from /tmp to local machine
-  fetch:
+  ansible.builtin.fetch:
     src: "/tmp/{{ nvsm_dump_file.stdout }}"
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-nvsm-dump-health.xz"
     flat: true
@@ -67,23 +67,22 @@
   when: nvsm_dump_file.stdout != ''
 
 - name: Copy /var/log/syslog to local machine
-  fetch:
+  ansible.builtin.fetch:
     src: /var/log/syslog
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-syslog"
     flat: true
   ignore_errors: true
 
 - name: Copy /var/log/dmesg to local machine
-  fetch:
+  ansible.builtin.fetch:
     src: /var/log/dmesg
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-dmesg"
     flat: true
   ignore_errors: true
 
 - name: Copy /var/log/nvidia-fw.log to local machine
-  fetch:
+  ansible.builtin.fetch:
     src: /var/log/nvidia-fw.log
     dest: "{{ local_log_directory }}/logs/{{ inventory_hostname }}/{{ inventory_hostname }}-{{ current_time.stdout }}-nvidia-fw.log"
     flat: true
   ignore_errors: true
-

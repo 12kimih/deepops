@@ -13,7 +13,7 @@
 - hosts: kube_node
   become: true
   tasks:
-  - name: Install cowsay
-    ansible.builtin.package:
-      name: cowsay
-      state: present
+    - name: Install cowsay
+      ansible.builtin.package:
+        name: cowsay
+        state: present
