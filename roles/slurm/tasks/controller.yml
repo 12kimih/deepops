@@ -46,11 +46,9 @@
     enabled: true
     daemon_reload: true
 
-# community.mysql.mysql_user is the working module name (community.mysql 5.x ships
-# it); the fqcn[canonical] suggestion to use the future ansible.mysql redirect is
-# suppressed so this stays valid on the pinned collection.
-- name: Setup slurm db user  # noqa: fqcn[canonical]
-  community.mysql.mysql_user:
+# The MySQL modules moved to ansible.mysql; community.mysql 5.x only redirects there.
+- name: Setup slurm db user
+  ansible.mysql.mysql_user:
     name: "{{ slurm_db_username }}"
     password: "{{ slurm_db_password }}"
     host: localhost
