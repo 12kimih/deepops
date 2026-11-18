@@ -13,7 +13,7 @@ import shlex
 import subprocess
 import sys
 
-from . import render
+from . import render, slurm
 
 # Value completers: a single field per line from a standard Slurm command, so the
 # completion never parses free text and never needs this package to be importable.
@@ -245,8 +245,9 @@ def run_main(name, body):
         print(f"{name}: {e.filename} not found; run this on a Slurm client.", file=sys.stderr)
         return 127
     except subprocess.CalledProcessError as e:
-        msg = (e.stderr or "").strip() or f"{e.cmd[0]} exited with status {e.returncode}"
-        print(f"{name}: {msg}", file=sys.stderr)
+        print(f"{name}: {slurm.failure(e)}", file=sys.stderr)
+        if slurm.rate_limited(e):
+            print(f"{name}: slurmctld is rate limiting your requests; run it again shortly.", file=sys.stderr)
         return 1
     except ValueError as e:  # json.JSONDecodeError among them
         print(f"{name}: unreadable Slurm output: {e}", file=sys.stderr)

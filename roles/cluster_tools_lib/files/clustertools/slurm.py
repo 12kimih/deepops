@@ -21,6 +21,17 @@ def run(*cmd):
     return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
 
 
+def failure(error):
+    """The first line Slurm wrote about a failed call (CalledProcessError)."""
+    text = (error.stderr or "").strip()
+    return text.splitlines()[0] if text else f"{error.cmd[0]} exited with status {error.returncode}"
+
+
+def rate_limited(error):
+    """Did slurmctld refuse the call because this user sent too many requests?"""
+    return bool(re.search(r"rate.?limit", error.stderr or "", re.IGNORECASE))
+
+
 def scontrol(*args):
     """`scontrol --json ARGS` parsed, e.g. scontrol("show", "nodes")."""
     return json.loads(run("scontrol", "--json", *args))
