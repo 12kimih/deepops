@@ -4,8 +4,12 @@
     name: nvidia_cuda
   when: slurm_autodetect_nvml | default(false)
 
+# The includes below are tagged always: an untagged include is skipped under --tags,
+# and the tasks it holds (such as the `config` ones) would never be reached. Each
+# included task still answers to its own tags.
 - name: Setup role
   ansible.builtin.include_tasks: setup-role.yml
+  tags: always
 - name: Setup build
   ansible.builtin.include_tasks: build.yml
   tags: build
@@ -18,14 +22,17 @@
 - name: Setup slurm controller
   ansible.builtin.include_tasks: controller.yml
   when: is_controller
+  tags: always
 
 - name: Setup slurm on compute nodes
   ansible.builtin.include_tasks: compute.yml
   when: is_compute
+  tags: always
 
 - name: Setup slurm on other nodes
   ansible.builtin.include_tasks: misc-node.yml
   when: (not is_compute) and (not is_controller)
+  tags: always
 
 - name: Apply shm fix
   ansible.builtin.include_tasks: shmfix.yml
@@ -40,6 +47,7 @@
 - name: Setup undrain
   ansible.builtin.include_tasks: undrain.yml
   when: is_compute
+  tags: always
 
 - name: Cleanup
   ansible.builtin.include_tasks: build-cleanup.yml

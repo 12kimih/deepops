@@ -159,6 +159,7 @@
 - name: Include prolog/epilog
   ansible.builtin.include_tasks: prolog_epilog.yml
   when: slurm_enable_prolog_epilog
+  tags: always
 
 - name: Configure slurm.conf
   ansible.builtin.template:
