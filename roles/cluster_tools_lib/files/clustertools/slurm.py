@@ -96,7 +96,24 @@ def hostnames(nodelist):
     return names
 
 
-# --- Jobs -------------------------------------------------------------------------
+# --- Jobs ---------------------------------------------------------------------------
+
+def array_tasks(spec):
+    """How many tasks a pending array record stands for (ArrayTaskId 1-100:2%10). Slurm
+    keeps an array's unstarted tasks as one record; each is a job to the scheduler and
+    to every limit. The %N throttle does not change the count."""
+    count = 0
+    for part in (spec or "").split("%")[0].split(","):
+        m = re.fullmatch(r"(\d+)-(\d+)(?::(\d+))?", part)
+        if m:
+            step = int(m.group(3) or 1) or 1
+            count += (int(m.group(2)) - int(m.group(1))) // step + 1
+        elif part.isdigit():
+            count += 1
+    return max(count, 1)
+
+
+# --- Job GPUs -------------------------------------------------------------------------
 
 GPU_DETAIL = re.compile(r"gpu(?::([^:,(]+))?(?::\d+)?\(IDX:([^)]+)\)")
 GPU_REQUESTED = re.compile(r"(?:^|,)gres/gpu=(\d+)")

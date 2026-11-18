@@ -202,11 +202,13 @@ def show(t, model, only_mine=False):
             out.append(f"  {t.paint('part', r['name'])} {t.paint('sub', ', '.join(parts))}")
     note("No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -T).")
     if model["usage"]:
-        note("Usage is every RUNNING job on that QoS, cluster-wide: the same sum its quota is checked against.")
+        note("Usage is every RUNNING job on that QoS, cluster-wide: "
+             "the same sum its quota is checked against.")
     if any(q["limit"] == 0 for r in rows for q in r["gpu"].values()):
         note("A limit of 0 is not a full quota: that QoS may not use that GPU type at all.")
     if model["hidden"]:
-        note(f"{model['hidden']} QoS that no user holds {'is' if model['hidden'] == 1 else 'are'} hidden; --all shows them.")
+        verb = "is" if model["hidden"] == 1 else "are"
+        note(f"{model['hidden']} QoS that no user holds {verb} hidden; --all shows them.")
     note("A job pending on QOSGrpGRES is waiting for its own QoS's quota, not for the cluster.")
     return "\n".join(out) + "\n\n"
 

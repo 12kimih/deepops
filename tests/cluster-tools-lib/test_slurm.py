@@ -49,6 +49,14 @@ class JobTests(unittest.TestCase):
         self.assertEqual(slurm.job_gpus(job), ([], set()))
 
 
+class ArrayTests(unittest.TestCase):
+    def test_task_counts(self):
+        for spec, n in (("1-10%2", 10), ("1-9:2", 5), ("3,5,7-8", 4), ("", 1), ("39%2", 1),
+                        ("0-11%1", 12), ("4", 1)):
+            with self.subTest(spec=spec):
+                self.assertEqual(slurm.array_tasks(spec), n)
+
+
 class TresTests(unittest.TestCase):
     def test_list_and_string(self):
         self.assertEqual(slurm.tres_list([{"type": "gres", "name": "gpu:a10", "count": 6},
