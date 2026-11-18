@@ -6,13 +6,6 @@
   tags:
     - roce_k8s
 
-- name: Check for module openshift
-  community.general.python_requirements_facts:
-    dependencies:
-      - openshift
-  tags:
-    - roce_k8s
-
 # Create configmap for SRIOV device plugin
 
 - name: Create configmap
