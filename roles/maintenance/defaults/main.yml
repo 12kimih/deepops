@@ -38,3 +38,9 @@ maintenance_reboot_timeout: 1800
 maintenance_verify_units: "{{ ['slurmd'] if inventory_hostname in groups['slurm-node'] | default([]) else [] }}"
 maintenance_verify_gpus: "{{ inventory_hostname in groups['slurm-node'] | default([]) }}"
 maintenance_verify_nhc: true
+
+# Kernel policy settings every host must share; consistency.yml fails when they differ.
+# The user-namespace restriction is the one a site most often changes by hand on one
+# node. (Not user.max_*_namespaces: their defaults scale with memory.)
+maintenance_consistency_sysctls:
+  - kernel.apparmor_restrict_unprivileged_userns

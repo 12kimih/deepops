@@ -1,0 +1,17 @@
+---
+# Are the hosts level? The running kernel, every package two or more of them have and
+# the kernel policy sysctls (roles/maintenance consistency.yml) must agree; fails
+# listing each difference and the hosts on each side. Read-only.
+#
+#   ansible-playbook -K playbooks/utilities/fleet-consistency.yml
+#   ansible-playbook -K playbooks/utilities/fleet-consistency.yml -e hostlist=slurm-node
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  gather_facts: false
+  tags:
+    - fleet-consistency
+  tasks:
+    - name: Compare the hosts
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: consistency

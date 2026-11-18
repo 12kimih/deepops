@@ -13,6 +13,9 @@
 # A node that was already drained (by an admin or a health check) is upgraded but left
 # drained. Run it at least monthly: security fixes to the held-back stacks only land
 # here.
+#
+# A last play compares the upgraded hosts (fleet-consistency.yml) and fails on any
+# kernel, package or kernel-policy difference left between them.
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   serial: "{{ maintenance_serial | default(1) }}"
@@ -28,3 +31,14 @@
                 else ['upgrade', 'reboot', 'verify'] }}"
       loop_control:
         loop_var: step
+
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  gather_facts: false
+  tags:
+    - apt-upgrade
+  tasks:
+    - name: Check the upgraded hosts are level
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: consistency
