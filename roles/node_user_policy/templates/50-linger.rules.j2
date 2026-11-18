@@ -1,0 +1,8 @@
+// Managed by roles/node_user_policy. Only root may turn lingering on: a lingering
+// user's services run outside any session or Slurm job. Admins use sudo.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.login1.set-self-linger" ||
+        action.id == "org.freedesktop.login1.set-user-linger") {
+        return subject.user == "root" ? polkit.Result.YES : polkit.Result.NO;
+    }
+});

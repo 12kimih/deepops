@@ -1,0 +1,22 @@
+---
+# node_user_policy -- what users may leave running on a node outside a Slurm job.
+#
+# Two systemd/cron features let a process outlive the user's session, and on a compute
+# node escape the job's cgroup with it: GPU and CPU isolation, accounting, and the
+# cleanup when the job ends.
+#
+#   linger   `loginctl enable-linger` (allowed to every user by default polkit policy)
+#            starts user@UID.service at boot, outside any job, and its services run
+#            forever.
+#   crontab  a user's crontab on a node runs there regardless of jobs.
+#
+# Users not in node_user_policy_linger_users have their linger disabled, and only root
+# may enable it (polkit), so an admin uses sudo. Opt-in: off until enabled.
+node_user_policy_manage_linger: false
+node_user_policy_linger_users: []
+
+# Who may have a crontab on this host (/etc/cron.allow; root is always added).
+# null leaves cron open to everyone (the login node, where cron jobs run under the
+# per-user limits); a list closes it (compute nodes). Switching back to null removes
+# the file again.
+node_user_policy_cron_users: null

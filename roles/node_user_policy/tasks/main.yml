@@ -1,0 +1,50 @@
+---
+- name: Restrict lingering
+  when: node_user_policy_manage_linger | bool
+  block:
+    - name: Allow only root to enable lingering
+      ansible.builtin.template:
+        src: 50-linger.rules.j2
+        dest: /etc/polkit-1/rules.d/50-linger.rules
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Find the users who linger
+      ansible.builtin.find:
+        paths: /var/lib/systemd/linger
+        file_type: file
+      register: node_user_policy_lingering
+
+    # disable-linger stops the user's manager too, so their services end now.
+    - name: Disable lingering for users not allowed to
+      ansible.builtin.command:
+        argv: [loginctl, disable-linger, "{{ item }}"]
+      loop: "{{ node_user_policy_lingering.files | map(attribute='path') | map('basename')
+                | reject('in', node_user_policy_linger_users) | list }}"
+      changed_when: true
+
+- name: Remove the lingering rule when the policy is off
+  ansible.builtin.file:
+    path: /etc/polkit-1/rules.d/50-linger.rules
+    state: absent
+  when: not node_user_policy_manage_linger | bool
+
+- name: Limit crontabs to the allowed users
+  ansible.builtin.copy:
+    dest: /etc/cron.allow
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by roles/node_user_policy: only these users may have a crontab here.
+      {% for user in ['root'] + (node_user_policy_cron_users | default([], true)) | unique %}
+      {{ user }}
+      {% endfor %}
+  when: node_user_policy_cron_users is not none
+
+- name: Leave cron open when no allow list is set
+  ansible.builtin.file:
+    path: /etc/cron.allow
+    state: absent
+  when: node_user_policy_cron_users is none
