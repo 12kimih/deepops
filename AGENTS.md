@@ -165,3 +165,10 @@ Run before pushing: `scripts/check.sh` (every check CI runs; the pre-commit hook
 runs `scripts/check.sh --fast`). Public CI runs lint,
 setup, and molecule checks on every PR. Deployment-affecting changes need
 GPU-backed validation evidence in the PR body.
+
+This repository is public and site-agnostic. Never commit a site's facts (hostnames,
+addresses, ports, hardware and partition names, accounts, member IDs) or secrets, in
+code, tests, docs or commit messages; use generic placeholders. The sensitive-guard
+hooks enforce this on commit, commit message and push, with the site's private rule
+list in `config/sensitive-patterns` (template: `config.example/sensitive-patterns`).
+`scripts/setup.sh` installs the hooks; see `docs/deepops/testing.md`.

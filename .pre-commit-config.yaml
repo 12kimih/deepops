@@ -6,6 +6,9 @@
 # runs itself under uv, so the tool versions come from pyproject.toml / uv.lock
 # alone. CI runs the full scripts/check.sh.
 minimum_pre_commit_version: "3.5.0"
+# `pre-commit install` sets up all three; hooks run at pre-commit unless they say so.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
 
 # Vendored / generated / site-specific trees are never checked here.
 exclude: |
@@ -39,3 +42,23 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      # Secrets and site data never enter history. Site rules come from the private
+      # config repo (config/sensitive-patterns); see scripts/deepops/sensitive_guard.py.
+      - id: sensitive-guard
+        name: sensitive data (staged lines)
+        entry: scripts/deepops/sensitive_guard.py staged
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: sensitive-guard-message
+        name: sensitive data (commit message)
+        entry: scripts/deepops/sensitive_guard.py message
+        language: system
+        stages: [commit-msg]
+      - id: sensitive-guard-push
+        name: sensitive data (commits to push)
+        entry: scripts/deepops/sensitive_guard.py push
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

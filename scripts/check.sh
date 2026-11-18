@@ -2,7 +2,7 @@
 # Every repository check, in one place: pre-commit, CI and people all run this.
 #   scripts/check.sh          everything
 #   scripts/check.sh --fast   the quick subset pre-commit runs on each commit (style,
-#                             generated docs, yamllint); CI runs everything
+#                             generated docs, yamllint, sensitive data); CI runs everything
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -32,6 +32,7 @@ step "generated docs are current" "${python}" scripts/docs/generate.py --check
 # is the one list of what is not ours.
 mapfile -d '' yaml_files < <(git ls-files -z --cached --others --exclude-standard -- '*.yml' '*.yaml')
 step "yamllint" yamllint --no-warnings "${yaml_files[@]}"
+step "no secrets or site data in tracked files" "${python}" scripts/deepops/sensitive_guard.py tree
 
 if ! "${fast}"; then
     step "unit tests (scripts/validation/tests)" "${python}" -m unittest discover -s scripts/validation/tests -q

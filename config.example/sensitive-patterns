@@ -1,0 +1,19 @@
+# Site facts that must never enter the public deepops repository (code, tests, docs,
+# commit messages). Read by deepops scripts/deepops/sensitive_guard.py: its git hooks
+# block matches, and `replace-text` turns this file into git-filter-repo input to scrub
+# history. Rules apply in order; each REPLACEMENT is the generic value to use instead.
+#
+#   literal:TEXT==>REPLACEMENT
+#   regex:PATTERN==>REPLACEMENT        Python re, (?i) for case-insensitive
+#   keys:VARS_FILE:VARIABLE==>REPL     keys of a YAML mapping, as words
+#   allow:WORD                         drop a key that is also an ordinary word
+
+# Names and addresses
+#regex:(?i)login\.mycluster\.example\.org==>cluster.example.com
+#regex:(?<![0-9A-Za-z.])22022(?![0-9A-Za-z])==>2222
+
+# Hardware and partitions
+#regex:\bmygpu\b==>a10
+
+# People: cluster accounts and chat member IDs
+#keys:group_vars/slurm-cluster.yml:slurm_usage_report_user_map==>user1
