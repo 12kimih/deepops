@@ -50,6 +50,16 @@ slurm_ha_state_save_location: "/sw/slurm"
 # Slack app bot token (xoxb-) for bot posts and DMs.
 #slack_bot_token: ""
 
+# Hourly GPU usage report and idle-GPU nudges (roles/slurm_usage_report); needs
+# slack_bot_token. notify: none | dm | dm+mention. cancel_after_hours 0 = never.
+# user_map: Slurm user -> Slack member ID (profile > Copy member ID) or email.
+#slurm_usage_report_channel: "#gpu-usage"
+#slurm_usage_report_notify: dm
+#slurm_usage_report_cancel_after_hours: 0
+#slurm_usage_report_user_map:
+#  alice: U0123ABCD
+#  bob: bob@example.org
+
 # --- job_submit.lua (optional Lua submit filter) -----------------------------
 # DeepOps ships no routing template -- write your OWN job_submit.lua, drop it in
 # config/files/slurm/, and point Slurm at it (used verbatim). Docs:

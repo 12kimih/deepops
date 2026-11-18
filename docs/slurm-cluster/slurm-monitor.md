@@ -6,6 +6,7 @@
   - [Grafana](#grafana)
   - [Prometheus](#prometheus)
   - [Alertmanager](#alertmanager)
+  - [Slack usage report](#slack-usage-report)
 
 ## Introduction
 
@@ -135,3 +136,28 @@ alertmanager_slack_critical_mention: "<!subteam^S0123ABCD>"   # optional
 
 The config is checked with `amtool` before it is written. Visit
 http://\<slurm-metric ip\>:9093 to view and silence alerts.
+
+## Slack usage report
+
+`playbooks/slurm-cluster/slurm-usage-report.yml` installs a systemd timer on the
+monitoring host that posts a GPU usage report to Slack every hour
+(`slurm_usage_report_schedule`). The top-level message is one line (GPUs allocated,
+average utilisation, idle jobs, drained nodes, pending jobs); the thread lists idle jobs,
+drain/down nodes with reasons, pending jobs per user, and every running GPU job per user
+with its utilisation and GPU memory.
+
+A job counts as idle when it has run for `slurm_usage_report_idle_hours` and every GPU it
+holds stayed at or under `slurm_usage_report_idle_util_threshold` percent the whole time
+(DCGM `DCGM_FI_DEV_GPU_UTIL`). With `slurm_usage_report_notify: dm` its owner gets a direct
+message (repeated every `slurm_usage_report_dm_repeat_hours`); `dm+mention` also mentions
+them in the report thread from the second consecutive idle report.
+`slurm_usage_report_cancel_after_hours` cancels idle jobs after that long (0 = never).
+
+The role needs a Slack app bot token (`slack_bot_token`, scopes `chat:write`, `im:write`,
+`users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack
+members through `slurm_usage_report_user_map`, or by email with
+`slurm_usage_report_email_domain`. Preview a report without posting:
+
+```bash
+sudo /usr/local/libexec/slurm-usage-report --dry-run
+```
