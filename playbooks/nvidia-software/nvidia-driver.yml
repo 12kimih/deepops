@@ -20,6 +20,6 @@
       ansible.builtin.include_role:
         name: nvidia_driver
       when: >-
-        (ansible_facts.local['gpus']['count'] | int > 0 and not is_dgx.stat.exists)
+        (ansible_facts.ansible_local['gpus']['count'] | int > 0 and not is_dgx.stat.exists)
         or (nvidia_driver_force_install | default(false) | bool)
   environment: "{{ proxy_env if proxy_env is defined else {} }}"

@@ -180,7 +180,7 @@ class MigApplyFailureContract(unittest.TestCase):
                     set(guard["when"]),
                     {
                         "has_mig.rc == 2",
-                        "ansible_facts.local['gpus']['count'] | default(0) | int > 0",
+                        "ansible_facts.ansible_local['gpus']['count'] | default(0) | int > 0",
                     },
                 )
 

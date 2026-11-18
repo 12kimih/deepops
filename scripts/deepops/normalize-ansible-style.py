@@ -295,6 +295,15 @@ def double_quote(line):
 FACT_NAMES = [l.strip() for l in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ansible-fact-names.txt"))
               if l.strip() and not l.startswith("#")]
 _FACT = "|".join(sorted(map(re.escape, FACT_NAMES), key=len, reverse=True))
+# Facts that ansible_facts stores under their prefixed name (custom facts.d facts).
+PREFIXED_FACTS = ["local"]
+_PREFIXED = "|".join(PREFIXED_FACTS)
+# Not one already under ansible_facts (["ansible_facts"]["ansible_local"]).
+PREFIXED_ITEM = re.compile(r"""(?<!\["ansible_facts"\])(?<!\['ansible_facts'\])\[(['"])ansible_(""" + _PREFIXED + r""")\1\]""")
+PREFIXED_BARE = re.compile(r"(?<![\w.'\"])(?<!filter=)(?<!filter: )ansible_(" + _PREFIXED + r")\b(?!:(\s|$))")
+# ansible_facts.local / ['ansible_facts']['local'] read a key that does not exist.
+PREFIXED_WRONG_ATTR = re.compile(r"\bansible_facts\.(" + _PREFIXED + r")\b")
+PREFIXED_WRONG_ITEM = re.compile(r"""(\[(['"])ansible_facts\2\])\[(['"])(""" + _PREFIXED + r""")\3\]""")
 FACT_ITEM = re.compile(r"""\[(['"])ansible_(""" + _FACT + r""")\1\]""")
 FACT_ATTR = re.compile(r"\.ansible_(" + _FACT + r")\b")
 # Not a YAML key that defines the variable (ansible_x:), and not a setup filter,
@@ -306,8 +315,13 @@ def fix_facts(text):
     """Read facts from ansible_facts, not from the deprecated top-level ansible_<fact>.
 
     hostvars[h]['ansible_x'] -> hostvars[h]['ansible_facts']['x'],
-    hostvars[h].ansible_x -> hostvars[h].ansible_facts.x, ansible_x -> ansible_facts.x
+    hostvars[h].ansible_x -> hostvars[h].ansible_facts.x, ansible_x -> ansible_facts.x;
+    local facts keep their prefix: ansible_local -> ansible_facts.ansible_local
     """
+    text = PREFIXED_WRONG_ATTR.sub(r"ansible_facts.ansible_\1", text)
+    text = PREFIXED_WRONG_ITEM.sub(r"\1[\3ansible_\4\3]", text)
+    text = PREFIXED_ITEM.sub(lambda m: f"[{m.group(1)}ansible_facts{m.group(1)}][{m.group(1)}ansible_{m.group(2)}{m.group(1)}]", text)
+    text = PREFIXED_BARE.sub(r"ansible_facts.ansible_\1", text)
     text = FACT_ITEM.sub(lambda m: f"[{m.group(1)}ansible_facts{m.group(1)}][{m.group(1)}{m.group(2)}{m.group(1)}]", text)
     text = FACT_ATTR.sub(r".ansible_facts.\1", text)
     return FACT_BARE.sub(r"ansible_facts.\1", text)

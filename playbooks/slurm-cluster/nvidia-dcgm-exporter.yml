@@ -18,7 +18,7 @@
     - name: Set GPU fact
       ansible.builtin.set_fact:
         has_gpus: true
-      when: ansible_facts.local['gpus']['count']
+      when: ansible_facts.ansible_local['gpus']['count']
     - name: Configure dcgm exporter
       ansible.builtin.include_role:
         name: nvidia-dcgm-exporter

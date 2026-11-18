@@ -31,11 +31,11 @@
     msg: >-
       Could not read the MIG mode of the GPUs on this node.
       nvidia-smi is unavailable or did not answer, while lspci reports
-      {{ ansible_facts.local['gpus']['count'] }} NVIDIA GPU(s).
+      {{ ansible_facts.ansible_local['gpus']['count'] }} NVIDIA GPU(s).
       Install the driver on this node, or exclude it from this play.
   when:
     - has_mig.rc == 2
-    - ansible_facts.local['gpus']['count'] | default(0) | int > 0
+    - ansible_facts.ansible_local['gpus']['count'] | default(0) | int > 0
 
 - name: Check for NVIDIA MIG parted
   ansible.builtin.shell: which nvidia-mig-parted  # noqa command-instead-of-shell

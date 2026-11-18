@@ -19,7 +19,7 @@
       ansible.builtin.include_role:
         name: nvidia_driver
       when:
-        - ansible_facts.local['gpus']['count'] | int > 0
+        - ansible_facts.ansible_local['gpus']['count'] | int > 0
         - not is_dgx.stat.exists
         - cuda_playbook_install_driver | default(true) | bool
       tags:

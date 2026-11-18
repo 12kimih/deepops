@@ -1,7 +1,7 @@
 # {{ ansible_managed }}
 
 # Check number of CPU cores
- {{ ansible_facts.hostname }} || check_hw_cpuinfo {{ ansible_facts.local.topology.cpu_topology.sockets }} {{ ansible_facts.local.topology.cpu_topology.physical_cores }} {{ ansible_facts.local.topology.cpu_topology.logical_cpus }}
+ {{ ansible_facts.hostname }} || check_hw_cpuinfo {{ ansible_facts.ansible_local.topology.cpu_topology.sockets }} {{ ansible_facts.ansible_local.topology.cpu_topology.physical_cores }} {{ ansible_facts.ansible_local.topology.cpu_topology.logical_cpus }}
 
 # Check memory
  {{ ansible_facts.hostname }} || check_hw_physmem {{ (ansible_facts.memtotal_mb * 0.95) | round | int }}m {{ (ansible_facts.memtotal_mb * 1.05) | round | int }}m
@@ -29,17 +29,17 @@
 # Check that the expected services are up. systemd is asked rather than ps: a
 # socket-activated sshd has no process until the first login, and a hung systemd
 # fails the check instead of leaving a node that can no longer manage services.
-{% for units in [nhc_ssh_units, 'slurmd.service'] %}
+{% for units in [ssh_units | join(' '), 'slurmd.service'] %}
  {{ ansible_facts.hostname }} || check_cmd_status -t 10 -r 0 systemctl is-active --quiet {{ units }}
 {% endfor %}
 
-{% if ansible_facts.local.gpus.count > 0 %}
+{% if ansible_facts.ansible_local.gpus.count > 0 %}
 #############################################################################
 # GPU-specific checks                                                       #
 #############################################################################
 
 # Check GPU count
- {{ ansible_facts.hostname }} || check_nv_gpu_count {{ ansible_facts.local.gpus.count }}
+ {{ ansible_facts.hostname }} || check_nv_gpu_count {{ ansible_facts.ansible_local.gpus.count }}
 
 # Optional: run Data Center GPU Manager diagnostic as health check.
 # Requires that DCGM be installed.

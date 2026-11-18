@@ -16,23 +16,23 @@ from ansible_yaml import render  # noqa: E402
 
 ROLE = ROOT / "roles" / "nhc"
 FACTS = {"hostname": "node1", "memtotal_mb": 1000, "interfaces": ["lo", "eth0"],
-         "local": {"gpus": {"count": 0},
+         "ansible_local": {"gpus": {"count": 0},
                    "topology": {"cpu_topology": {"sockets": 2, "physical_cores": 8, "logical_cpus": 16}}}}
 
 
-def conf(varfile):
+def conf(varfile, family):
     variables = {**(yaml.safe_load((ROLE / "defaults" / "main.yml").read_text()) or {}),
-                 **yaml.safe_load((ROLE / "vars" / "main.yml").read_text()),
                  **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
-                 "ansible_managed": "", "ansible_facts": FACTS}
+                 "ansible_managed": "", "ansible_facts": {**FACTS, "os_family": family}}
     return render((ROLE / "templates" / "nhc.conf.j2").read_text(), variables)
 
 
 class NhcConf(unittest.TestCase):
     def test_services_are_checked_through_systemd(self):
-        for varfile, ssh in (("debian.yml", "ssh.service ssh.socket"), ("redhat.yml", "sshd.service sshd.socket")):
-            with self.subTest(family=varfile):
-                text = conf(varfile)
+        for varfile, family, ssh in (("debian.yml", "Debian", "ssh.service ssh.socket"),
+                                     ("redhat.yml", "RedHat", "sshd.service sshd.socket")):
+            with self.subTest(family=family):
+                text = conf(varfile, family)
                 self.assertNotIn("check_ps_service", text)
                 self.assertIn(f"systemctl is-active --quiet {ssh}", text)
                 self.assertIn("systemctl is-active --quiet slurmd.service", text)
