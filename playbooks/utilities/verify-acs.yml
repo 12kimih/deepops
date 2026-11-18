@@ -29,6 +29,7 @@
         executable: /bin/bash
       register: acs_state
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
       failed_when: false
 
     - name: Check the disable-acs systemd unit is enabled and active
@@ -40,6 +41,7 @@
         executable: /bin/bash
       register: acs_unit
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
       failed_when: false
 
     - name: Detect BIOS VT-d / IOMMU via the DMAR ACPI table
@@ -64,6 +66,7 @@
         executable: /bin/bash
       register: iommu_kernel
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
       failed_when: false
 
     # ---- Report ----

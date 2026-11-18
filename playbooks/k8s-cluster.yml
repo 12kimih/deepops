@@ -215,12 +215,14 @@
       delegate_to: localhost
       run_once: true
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
 
     - name: Detect remote platform
       ansible.builtin.command: uname -sm
       register: remote_uname
       run_once: true
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
 
     - name: Copy kubectl binary to ansible host (matching platform)
       ansible.builtin.fetch:
@@ -243,6 +245,7 @@
       register: kubectl_ver_json
       run_once: true
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
       when: local_uname.stdout != remote_uname.stdout
 
     - name: Download kubectl for ansible host platform

@@ -17,6 +17,7 @@
     - name: Check for presence of sudo
       ansible.builtin.command: which sudo
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
       failed_when: false
       register: sudo
 

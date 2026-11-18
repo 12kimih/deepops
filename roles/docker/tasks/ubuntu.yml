@@ -38,6 +38,7 @@
   ansible.builtin.command: dpkg --print-architecture
   register: _docker_dpkg_arch
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 # The deb822 repo, with the suite = this release's codename ($VERSION_CODENAME).
 - name: Add the Docker apt repository (deb822)

@@ -5,7 +5,12 @@
 - name: Set nodes to idle
   ansible.builtin.command: "scontrol update node={{ item }} state=idle"
   register: undrain_nodes_result
-  ignore_errors: true
+  # scontrol refuses a node that is already idle ("Invalid node state"); that is the
+  # wanted state, not a failure. Anything else fails the task.
+  failed_when:
+    - undrain_nodes_result.rc != 0
+    - "'Invalid node state' not in undrain_nodes_result.stderr"
+  changed_when: undrain_nodes_result.rc == 0
   with_items:
     - "{{ groups[slurm_compute_group] }}"
   environment:
@@ -14,4 +19,3 @@
   tags:
     - never
     - undrain
-  changed_when: false

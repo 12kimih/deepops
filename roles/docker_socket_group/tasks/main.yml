@@ -53,6 +53,7 @@
     cmd: systemctl cat docker.socket
   register: docker_socket_group_unit
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   failed_when: false
 
 - name: Ensure the docker.socket drop-in directory exists

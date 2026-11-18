@@ -159,6 +159,7 @@
     cmd: awk '$1 == "GID_MIN" { print $2 }' /etc/login.defs
   register: nis_gid_min
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   when: nis_export_groups | length > 0
 
 - name: Assert exported group GIDs fall inside the NIS map range

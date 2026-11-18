@@ -36,6 +36,7 @@
       register: has_mig
       failed_when: false
       changed_when: false
+      check_mode: false  # read-only; --check needs the result
 
     # A node whose GPUs cannot be queried is not a node without MIG: skipping it
     # silently would report a MIG layout as converged that was never looked at.

@@ -22,6 +22,7 @@
   register: has_mig
   failed_when: false
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 # A node whose GPUs cannot be queried is not a node without MIG: installing
 # nothing and reporting it as converged hides a broken driver. The lspci fact
@@ -42,6 +43,7 @@
   register: has_mig_parted
   failed_when: false
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 # Install NVIDIA MIG Manager Systemd service
 - name: Install MIG Manager (apt)
