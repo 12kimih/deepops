@@ -133,3 +133,23 @@ tests:
             exp_annotations:
               summary: "apt on n2 cannot plan an upgrade, so its pending-update counts mean nothing"
               description: "`apt-get -s dist-upgrade` on the host shows why (broken sources, held or conflicting packages)."
+
+  - name: different kernels for a week warn, listing each host's kernel
+    interval: 1h
+    input_series:
+      - series: 'node_uname_info{host="n1", instance="n1:9100", release="6.8.0-2"}'
+        values: '1x200'
+      - series: 'node_uname_info{host="n2", instance="n2:9100", release="6.8.0-1"}'
+        values: '1x200'
+    alert_rule_test:
+      - eval_time: 6d
+        alertname: KernelVersionsDiffer
+        exp_alerts: []
+      - eval_time: 8d
+        alertname: KernelVersionsDiffer
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "Hosts have run 2 different kernels for over 7 days"
+              description: "n1: 6.8.0-2; n2: 6.8.0-1;  The rolling upgrade (playbooks/utilities/apt-upgrade.yml)
+                brings them level; playbooks/utilities/fleet-consistency.yml compares kernels, packages and sysctls."
