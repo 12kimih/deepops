@@ -148,10 +148,11 @@ http://\<slurm-metric ip\>:9093 to view and silence alerts.
 
 `playbooks/slurm-cluster/slurm-usage-report.yml` installs a systemd timer on the
 monitoring host that posts a GPU usage report to Slack every hour
-(`slurm_usage_report_schedule`). The top-level message is one line (GPUs allocated,
-average utilisation, idle jobs, drained nodes, pending jobs); the thread lists idle jobs,
-drain/down nodes with reasons, pending jobs per user, and every running GPU job per user
-with its utilisation and GPU memory.
+(`slurm_usage_report_schedule`). The top-level message is a summary card (GPUs allocated,
+average utilisation, idle jobs, pending jobs, drained nodes, and a link to
+`slurm_usage_report_dashboard_url`); the thread lists idle jobs, drain/down nodes with
+reasons, pending jobs per user, and every running GPU job per user as a table with a
+utilisation bar and GPU memory.
 
 A job counts as idle when it has run for `slurm_usage_report_idle_hours` and every GPU it
 holds stayed at or under `slurm_usage_report_idle_util_threshold` percent the whole time
@@ -165,8 +166,10 @@ says so in the report thread.
 The role needs a Slack app bot token (`slack_bot_token`, scopes `chat:write`, `im:write`,
 `users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack
 members through `slurm_usage_report_user_map`, or by email with
-`slurm_usage_report_email_domain`. Preview a report without posting:
+`slurm_usage_report_email_domain`. Preview a report without notifying anyone, either
+printed or posted to one person's DM (or any channel):
 
 ```bash
 sudo /usr/local/libexec/slurm-usage-report --dry-run
+sudo /usr/local/libexec/slurm-usage-report --to U0123ABCD
 ```
