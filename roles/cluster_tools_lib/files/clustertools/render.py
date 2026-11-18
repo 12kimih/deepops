@@ -335,6 +335,22 @@ class Theme:
         return "  " + self.paint("rule", self.g["rule"] * max(0, cols - 2))
 
 
+def _terminfo_depth(term, fd):
+    """24 or 16 when terminfo says so for TERM, else None. No curses module (a minimal
+    Python) or no terminfo entry for TERM is None too; anything else is a bug and raised."""
+    try:
+        import curses
+    except ImportError:
+        return None
+    try:
+        curses.setupterm(term, fd)
+    except curses.error:
+        return None
+    if curses.tigetflag("RGB") > 0 or curses.tigetflag("Tc") > 0:
+        return 24
+    return 16 if 0 < curses.tigetnum("colors") < 256 else None
+
+
 def detect(flavour=None, color_when="auto", ascii=False, wide=False, stream=None, env=None):
     """The Theme for STREAM (stdout by default) from the command line and environment.
 
@@ -354,16 +370,7 @@ def detect(flavour=None, color_when="auto", ascii=False, wide=False, stream=None
 
     depth = 24 if env.get("COLORTERM") in ("truecolor", "24bit") else 256
     if color and depth != 24:
-        try:
-            import curses
-
-            curses.setupterm(env.get("TERM"), stream.fileno() if tty else -1)
-            if curses.tigetflag("RGB") > 0 or curses.tigetflag("Tc") > 0:
-                depth = 24
-            elif 0 < curses.tigetnum("colors") < 256:
-                depth = 16
-        except Exception:  # no terminfo entry: keep 256
-            pass
+        depth = _terminfo_depth(env.get("TERM"), stream.fileno() if tty else -1) or depth
 
     ctype = env.get("LC_ALL") or env.get("LC_CTYPE") or env.get("LANG") or ""
     ascii = ascii or "utf" not in ctype.lower()
