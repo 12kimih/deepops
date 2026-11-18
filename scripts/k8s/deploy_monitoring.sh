@@ -310,18 +310,25 @@ function install_dependencies() {
 function poll_monitoring_url() {
     print_monitoring
 
-    while true; do
-        curl -s --raw -L "${prometheus_url}"     | grep Prometheus && \
-        curl -s --raw -L "${grafana_url}"      | grep Grafana && \
-        curl -s --raw -L "${alertmanager_url}" | grep Alertmanager && \
+    # Bounded: a service that never comes up must end in an error, not in a poll that
+    # runs for ever, and a stalled request must not hang it either.
+    local limit=${MONITORING_POLL_TIMEOUT:-600}
+    local deadline=$((SECONDS + limit))
+    while ((SECONDS < deadline)); do
+        curl -s --max-time 10 --raw -L "${prometheus_url}"     | grep Prometheus && \
+        curl -s --max-time 10 --raw -L "${grafana_url}"      | grep Grafana && \
+        curl -s --max-time 10 --raw -L "${alertmanager_url}" | grep Alertmanager && \
         echo "Monitoring URLs are all responding" && \
-        break
+        return 0
         sleep 10
     done
+    echo "ERROR: monitoring URLs did not all respond within ${limit}s (set MONITORING_POLL_TIMEOUT to wait longer)." >&2
+    echo "       Check: kubectl -n monitoring get pods; kubectl get ingress -A" >&2
+    exit 1
 }
 
 
-get_opts ${@}
+get_opts "${@}"
 
 # Install deps
 install_dependencies

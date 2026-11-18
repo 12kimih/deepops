@@ -178,6 +178,16 @@ class IdleTests(unittest.TestCase):
         self.assertEqual([j["id"] for j in idle], ["all-idle"])
         self.assertEqual(jobs[3]["idle_gpus"], 1)
 
+    def test_unknown_gpu_memory_is_not_zero(self):
+        gpu = {"util_max": {}, "util": {}, "mem_gib": {("n", 0): 12.0}}
+        jobs = [
+            self.job("known", 60, [("n", 0)]),
+            self.job("partly", 60, [("n", 0), ("n", 1)]),
+            self.job("unknown", 60, [("n", 9)]),
+        ]
+        report.analyze(jobs, gpu, window=7200, threshold=0)
+        self.assertEqual([report.gib(j) for j in jobs], ["12G", "12G+", "n/a"])
+
     def test_owner_notified_once_then_after_repeat(self):
         state, j = {}, self.job("1", 7200, [("n", 0)])
         report.track_idle([j], state, now=1000, window=7200, repeat=3600, notify=["mention"])
@@ -213,6 +223,7 @@ class RenderTests(unittest.TestCase):
                         "partition": "p",
                         "util": 50.0,
                         "mem_gib": 10.0,
+                        "mem_known": 1,
                         "idle": False,
                         "idle_gpus": 0,
                     }

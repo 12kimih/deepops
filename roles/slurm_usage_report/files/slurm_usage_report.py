@@ -146,7 +146,10 @@ def analyze(jobs, gpu, window, threshold):
         peaks = [gpu["util_max"][g] for g in j["gpus"] if g in gpu["util_max"]]
         recent = [gpu["util"][g] for g in j["gpus"] if g in gpu["util"]]
         j["util"] = sum(recent) / len(recent) if recent else None
-        j["mem_gib"] = sum(gpu["mem_gib"].get(g, 0) for g in j["gpus"])
+        # Unknown is not zero: None when no GPU reports memory, and the count of GPUs that do.
+        mem = [gpu["mem_gib"][g] for g in j["gpus"] if g in gpu["mem_gib"]]
+        j["mem_gib"] = sum(mem) if mem else None
+        j["mem_known"] = len(mem)
         j["idle_gpus"] = sum(1 for v in peaks if v <= threshold)
         j["idle"] = (
             bool(j["gpus"])
@@ -180,6 +183,13 @@ def bar(pct):
     return "█" * filled + "░" * (BAR_WIDTH - filled) + f" {pct:3.0f}%"
 
 
+def gib(job):
+    """GPU memory in use: 'n/a' without data, a trailing '+' when some GPUs lack it."""
+    if job["mem_gib"] is None:
+        return "n/a"
+    return f"{job['mem_gib']:.0f}G" + ("+" if job["mem_known"] < len(job["gpus"]) else "")
+
+
 def table(header, rows):
     """A fixed-width table in a code block; Slack renders it monospaced."""
     widths = [max(len(str(c)) for c in col) for col in zip(header, *rows)]
@@ -199,7 +209,8 @@ def render(report, cfg, who):
     jobs, idle, total = report["jobs"], report["idle"], max(report["total_gpus"], 1)
     alloc = sum(len(j["gpus"]) for j in jobs)
     utils = [j["util"] for j in jobs if j["util"] is not None for _ in j["gpus"]]
-    avg = sum(utils) / len(utils) if utils else 0
+    # Unknown is not zero: with no utilisation data (no jobs, or Prometheus down) say so.
+    avg = f"{sum(utils) / len(utils):.0f}%" if utils else "n/a"
     pending = report["pending"]
     pend_jobs = sum(p["jobs"] for p in pending.values())
     pend_gpus = sum(p["gpus"] for p in pending.values())
@@ -207,12 +218,12 @@ def render(report, cfg, who):
 
     text = (
         f"GPU usage {stamp}: {alloc}/{total} GPUs allocated ({100 * alloc / total:.0f}%), "
-        f"avg util {avg:.0f}%, {len(idle)} idle jobs"
+        f"avg util {avg}, {len(idle)} idle jobs"
     )
     status = ":large_green_circle:" if not idle and not report["reasons"] else ":large_yellow_circle:"
     fields = [
         f"*Allocated*\n{alloc} / {total} GPU ({100 * alloc / total:.0f}%)",
-        f"*Average utilisation*\n{avg:.0f}%",
+        f"*Average utilisation*\n{avg}",
         f"*Idle jobs*\n{len(idle)}" + (" :zzz:" if idle else ""),
         f"*Pending*\n{pend_jobs} jobs, {pend_gpus} GPU",
         f"*Drain / down*\n{len(report['reasons'])} nodes" + (" :warning:" if report["reasons"] else ""),
@@ -287,7 +298,7 @@ def render(report, cfg, who):
                     duration(j["runtime"]),
                     j["qos"],
                     bar(j["util"]),
-                    f"{j['mem_gib']:.0f}G",
+                    gib(j),
                     note,
                 )
             )
