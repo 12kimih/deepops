@@ -69,9 +69,7 @@
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": []
         },
         "tooltip": {
           "mode": "multi",
@@ -129,7 +127,7 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "spanNulls": false,
             "showPoints": "never",
             "stacking": {
@@ -322,9 +320,7 @@
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": []
         },
         "tooltip": {
           "mode": "multi",
@@ -387,11 +383,10 @@
       "fieldConfig": {
         "defaults": {
           "unit": "celsius",
-          "min": 0,
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "spanNulls": false,
             "showPoints": "never",
             "stacking": {
@@ -721,7 +716,7 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "spanNulls": false,
             "showPoints": "never",
             "stacking": {
@@ -1006,7 +1001,7 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "spanNulls": false,
             "showPoints": "never",
             "stacking": {
@@ -1327,7 +1322,7 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "spanNulls": false,
             "showPoints": "never",
             "stacking": {
