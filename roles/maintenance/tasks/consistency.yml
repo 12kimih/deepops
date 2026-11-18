@@ -1,0 +1,45 @@
+---
+# Hosts that should be identical: the same running kernel, the same version of every
+# package two or more of them have, the same maintenance_consistency_sysctls. Run on
+# all the hosts at once (no serial); the comparison runs once, over every host in the
+# play, and fails listing each difference and where it is.
+- name: Read the running kernel  # facts may predate the maintenance reboot
+  ansible.builtin.command:
+    argv: [uname, -r]
+  register: maintenance_kernel
+  changed_when: false
+  check_mode: false
+
+- name: Read the installed packages
+  ansible.builtin.package_facts:
+
+# One line per key, in order; a key this kernel lacks reads as "unset".
+- name: Read the sysctls that must agree
+  ansible.builtin.command:
+    argv: "{{ ['sh', '-c', 'for k; do sysctl -n \"$k\" 2>/dev/null || echo unset; done', 'sh'] + maintenance_consistency_sysctls }}"
+  register: maintenance_sysctl
+  changed_when: false
+  check_mode: false
+
+- name: Record this host's state
+  ansible.builtin.set_fact:
+    maintenance_fleet_state:
+      kernel: "{{ maintenance_kernel.stdout }}"
+      packages: "{{ dict(ansible_facts.packages | dict2items | map(attribute='key')
+                    | zip(ansible_facts.packages | dict2items | map(attribute='value')
+                          | map('map', attribute='version') | map('join', ','))) }}"
+      sysctl: "{{ dict(maintenance_consistency_sysctls | zip(maintenance_sysctl.stdout_lines | default([]))) }}"
+
+- name: Compare the hosts
+  run_once: true
+  vars:
+    _hosts: "{{ ansible_play_hosts | select('in', hostvars) | list }}"
+    _drift: "{{ dict(_hosts | zip(_hosts | map('extract', hostvars, 'maintenance_fleet_state'))) | fleet_drift }}"
+  ansible.builtin.assert:
+    that: _drift | length == 0
+    quiet: true
+    fail_msg: |-
+      {{ _drift | length }} differences between {{ _hosts | join(', ') }}:
+      {{ _drift[:60] | join('\n') }}{{ '\n...' if _drift | length > 60 else '' }}
+      Bring them level with playbooks/utilities/apt-upgrade.yml (and the role that owns
+      a differing sysctl).

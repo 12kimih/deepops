@@ -17,6 +17,7 @@ os_updates_held_back:
   - "udev"
   - "libudev*"
   - "libc6*"
+  - "libc-*"   # libc-bin, libc-dev-bin, libc-l10n: same glibc source as libc6
   - "glibc*"
   - "dbus*"
   - "*nvidia*"
