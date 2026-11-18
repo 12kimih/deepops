@@ -47,7 +47,7 @@ or may have additional instructions related to specific updates in this release.
 firmware_update_repo: nvfw-dgxa100
 
 # The Docker tag
-firmware_update_tag: 21.11.4
+firmware_update_tag: <tag>
 
 # The tarball name
 firmware_update_container: "nvfw-dgxa100_21.11.4_211111.tar.gz"

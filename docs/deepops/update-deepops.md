@@ -250,10 +250,10 @@ The [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) automates the 
 To update to a new version of the GPU operator, set the following parameter in your DeepOps configuration:
 
 ```bash
-gpu_operator_chart_version: "v26.3.2"
+gpu_operator_chart_version: "<version>"
 ```
 
-Substituting in your desired version.
+Substituting in your desired version. The current default is in `roles/nvidia-gpu-operator/defaults/main.yml`.
 
 Then re-run the GPU operator playbook:
 
@@ -319,10 +319,10 @@ Updating GFD should typically be non-disruptive, and does not need to be run on 
 To update to a new version of GFD, set the following variable in your DeepOps configuration:
 
 ```bash
-k8s_gpu_feature_discovery_chart_version: "0.19.2"
+k8s_gpu_feature_discovery_chart_version: "<version>"
 ```
 
-substituting your desired version of the feature discovery chart.
+substituting your desired version of the feature discovery chart. The current default is in `roles/nvidia-k8s-gpu-feature-discovery/defaults/main.yml`.
 
 Then run:
 
@@ -337,10 +337,10 @@ Updating the GPU Device Plugin should typically be non-disruptive, and does not 
 To update to a new version, set the following variable in your DeepOps configuration:
 
 ```bash
-k8s_gpu_plugin_chart_version: "0.19.2"
+k8s_gpu_plugin_chart_version: "<version>"
 ```
 
-substituting your desired version of the device plugin chart.
+substituting your desired version of the device plugin chart. The current default is in `roles/nvidia-k8s-gpu-device-plugin/defaults/main.yml`.
 
 Then run:
 
