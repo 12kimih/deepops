@@ -231,9 +231,14 @@ GPU_CONFIGURED = re.compile(r"gpu(?::[^:,(]+)?:(\d+)")
 
 
 def job_label(job):
-    """The job as squeue names it: ARRAY_TASK for an array task (task 0 included)."""
+    """The job as squeue names it: ARRAY_TASK for an array task (task 0 included), and
+    ARRAY_[TASKS] for the record holding an array's tasks that have not started."""
     array, task = num(job.get("array_job_id")), num(job.get("array_task_id"))
-    return f"{array}_{task}" if array and task is not None else str(job["job_id"])
+    if array and task is not None:
+        return f"{array}_{task}"
+    if array and job.get("array_task_string"):
+        return f"{array}_[{job['array_task_string']}]"
+    return str(job["job_id"])
 
 
 def job_gpus(job):

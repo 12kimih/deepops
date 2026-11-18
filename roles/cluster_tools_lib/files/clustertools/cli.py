@@ -73,6 +73,8 @@ class Opt:
             kw["action"] = self.action or "store_true"
             if self.const is not None:
                 kw["const"] = self.const
+            if self.default is not None:
+                kw["default"] = self.default
         parser.add_argument(*self.flags, **kw)
 
     def label(self):
@@ -121,13 +123,41 @@ class Command:
     """NAME and SUMMARY head the help; OPTIONS are Opt; ENV names the defaults variable;
     MACHINE is the option whose output scripts read, which ignores ENV defaults; NOTES
     are extra paragraphs for --help, as text or as a function returning text; THEME_ENV
-    pins a flavour for this command only, after $CLUSTER_THEME."""
+    pins a flavour for this command only, after $CLUSTER_THEME; REFUSE maps options this
+    command deliberately does not take (another tool's) to the reason and what to use."""
 
-    def __init__(self, name, summary, options, env=None, machine=None, notes=(), usage=None, theme_env=None):
+    def __init__(
+        self,
+        name,
+        summary,
+        options,
+        env=None,
+        machine=None,
+        notes=(),
+        usage=None,
+        theme_env=None,
+        refuse=None,
+    ):
         self.name, self.summary, self.options = name, summary, list(options) + STYLE
         self.env, self.machine, self.notes = env, machine, list(notes)
         self.theme_env = theme_env
+        self.refuse = dict(refuse or {})
         self.usage = usage or f"{name} [OPTIONS]"
+
+    def refused(self, argv):
+        """The first refused option in ARGV and why, or None. A long option matches with
+        or without =VALUE, a short one also with its value attached (-o%i)."""
+        for word in argv:
+            if word == "--":
+                break
+            for flag, why in self.refuse.items():
+                if (
+                    word == flag
+                    or word.startswith(flag + "=")
+                    or (len(flag) == 2 and not word.startswith("--") and word.startswith(flag))
+                ):
+                    return flag, why
+        return None
 
     def parser(self):
         p = argparse.ArgumentParser(prog=self.name, add_help=False, allow_abbrev=False)
@@ -195,6 +225,9 @@ class Command:
         argv = list(sys.argv[1:] if argv is None else argv)
         if self.env and env.get(self.env) and not (self.machine and self.machine in argv):
             argv = shlex.split(env[self.env]) + argv
+        refused = self.refused(argv)
+        if refused:
+            self.parser().error(f"{refused[0]}: {refused[1]}")
         args = self.parser().parse_args(argv)
         if args._brief or args._full:
             sys.stdout.write(self.help(full=args._full))
