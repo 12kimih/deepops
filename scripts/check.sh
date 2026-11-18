@@ -30,6 +30,7 @@ step "Galaxy collections and roles match roles/requirements.yml" "${python}" scr
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
 step "people rosters are valid (config.example, and config if present)" "${python}" scripts/deepops/people.py check
+step "config mirrors config.example, nothing set goes unread, docs name real paths" "${python}" scripts/deepops/config_lint.py
 # Linters judge the files git tracks, staged ones included (git add a new file to have it
 # checked): what CI checks and what a commit contains, never another session's
 # half-written file in a shared working tree. .gitignore keeps the rest out.
