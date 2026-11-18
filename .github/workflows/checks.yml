@@ -18,14 +18,13 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install the tools
+      - name: Install Lua for the job_submit.lua tests
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends lua5.3
-          uv sync --locked
 
-      - name: Install the Galaxy requirements
-        run: uv run ansible-galaxy collection install -r roles/requirements.yml -p collections
+      - name: Install the Galaxy collections and roles
+        run: uv run --locked scripts/deepops/galaxy.py
 
       - name: Run every check
-        run: uv run scripts/check.sh
+        run: scripts/check.sh

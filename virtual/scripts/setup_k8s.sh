@@ -13,6 +13,9 @@ ROOT_DIR="${SCRIPT_DIR}/../.."
 # Move working directory to root of DeepOps repo
 cd "${ROOT_DIR}" || exit 1
 
+# Kubespray pins its own Ansible; scripts/setup.sh builds its environment.
+. .venv-kubespray/bin/activate
+
 # Set the K8s Ansible config directory (same as for Slurm)
 K8S_CONFIG_DIR="${VIRT_DIR}/config"
 

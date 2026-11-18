@@ -8,18 +8,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "ansible"
-version = "15.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "ansible-core" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/72/77/28dd806b927720bed87c6e61ec0d6b87a6cf72a2e203d6b44985de367ef1/ansible-15.0.0.tar.gz", hash = "sha256:28718fc080a750eb4fabaa87e837ce8fbf692f8ce7e929f93f8d29dfc8530c43", size = 51847942, upload-time = "2026-11-17T17:42:09.05Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/91/6480bccd0fa2c9f59adfd0f6aec75604d999dc781ac32d5343215f139293/ansible-15.0.0-py3-none-any.whl", hash = "sha256:c15fa794d926523f0794625ccc4021fe5d799eed1fd60be110e20922fc9086e1", size = 51902233, upload-time = "2026-11-17T17:42:04.303Z" },
-]
-
-[[package]]
 name = "ansible-compat"
 version = "26.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -361,7 +349,6 @@ name = "deepops-control-node"
 version = "0"
 source = { virtual = "." }
 dependencies = [
-    { name = "ansible" },
     { name = "ansible-core" },
     { name = "jinja2" },
     { name = "jmespath" },
@@ -388,7 +375,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ansible", specifier = "==15.0.0" },
     { name = "ansible-core", specifier = "==2.22.0" },
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "jmespath", specifier = "==1.1.0" },

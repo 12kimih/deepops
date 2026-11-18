@@ -18,8 +18,9 @@ jobs:
       - name: run setup.sh
         run: ./scripts/setup.sh </dev/null
 
-      - name: verify ansible in venv
+      - name: verify the environments setup.sh built
         run: |
-          source /opt/deepops/env/bin/activate
-          ansible --version
-          python3 -c "from packaging.version import Version; print('packaging OK')"
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run --locked ansible --version
+          uv run --locked scripts/deepops/galaxy.py --check
+          .venv-kubespray/bin/ansible --version

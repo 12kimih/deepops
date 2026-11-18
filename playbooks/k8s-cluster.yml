@@ -19,7 +19,7 @@
           Kubespray needs ansible-core >= {{ kubespray_ansible.minimal_ansible_version }} and
           < {{ kubespray_ansible.maximal_ansible_version }}, this is {{ ansible_version.string }}.
           Run the Kubernetes playbooks from the Kubespray environment:
-          source /opt/deepops/kubespray-env/bin/activate
+          source .venv-kubespray/bin/activate (scripts/setup.sh builds it)
 
 # Set facts depending on container runtime
 # Use GPU operator when container runtime is not docker

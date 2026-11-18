@@ -33,36 +33,22 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - name: install dependencies
-        run: |
-          cd "${{ github.repository }}"
-          uv sync --locked
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      # Galaxy downloads from GitHub occasionally time out; the cache lets most runs
+      # skip them, and galaxy.py retries the rest.
       - name: cache galaxy roles and collections
         uses: actions/cache@v4
         with:
           path: |
             ${{ github.workspace }}/${{ github.repository }}/roles/galaxy
-            ~/.ansible/collections
+            ${{ github.workspace }}/${{ github.repository }}/collections
           key: molecule-galaxy-${{ hashFiles(format('{0}/roles/requirements.yml', github.repository)) }}
-          restore-keys: molecule-galaxy-
+      - name: install the galaxy collections and roles
+        run: cd "${{ github.repository }}" && uv run --locked scripts/deepops/galaxy.py
       - name: run molecule test
         env:
+          # Molecule runs from the role, outside the reach of the repository's ansible.cfg.
           ANSIBLE_ROLES_PATH: "${{ github.workspace }}/${{ github.repository }}/roles/galaxy:${{ github.workspace }}/${{ github.repository }}/roles"
+          ANSIBLE_COLLECTIONS_PATH: "${{ github.workspace }}/${{ github.repository }}/collections"
         run: |
-          cd "${{ github.repository }}/roles"
-          # Galaxy downloads from GitHub occasionally time out. The cache above makes most
-          # runs skip them entirely (no --force, so already-present roles are reused); for a
-          # cold cache we retry with increasing backoff before failing the job.
-          ok=0
-          for attempt in 1 2 3 4 5; do
-            if ansible-galaxy role install -r ./requirements.yml \
-               && ansible-galaxy collection install -r ./requirements.yml; then
-              ok=1; break
-            fi
-            echo "::warning::ansible-galaxy install failed (attempt ${attempt}/5); retrying in $((attempt * 20))s"
-            sleep "$((attempt * 20))"
-          done
-          [ "$ok" = 1 ] || { echo "::error::ansible-galaxy install failed after 5 attempts"; exit 1; }
-          cd "${{ matrix.deepops-role }}"
-          molecule test
+          cd "${{ github.repository }}/roles/${{ matrix.deepops-role }}"
+          uv run --locked molecule test
