@@ -15,12 +15,8 @@ cd "${ROOT_DIR}"
 # Ensure Ansible Galaxy dependencies are present
 bash -x ./scripts/setup.sh
 
-# Use ansible install in virtualenv
-if [ -d env ] ; then
-    . env/bin/activate
-else
-    echo "WARNING: virtual env not detected, using system python install"
-fi
+# Use the locked DeepOps environment setup.sh just built
+. .venv/bin/activate
 
 export DEEPOPS_CONFIG_DIR="${VIRT_DIR}/config"
 

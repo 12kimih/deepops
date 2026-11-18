@@ -1,14 +1,16 @@
-# Python tools for the DeepOps control node. This file and uv.lock are the one place
-# their versions are set: scripts/setup.sh, CI and the pre-commit hook all run
-# `uv sync --locked`. uv also provides the interpreter, so the control node's own
-# Python version does not matter. Kubespray runs from its own environment, built
-# from submodules/kubespray/requirements.txt (see scripts/setup.sh).
+# The DeepOps control-node environment. This file and uv.lock are the one place its
+# Python and tool versions are set; uv provides the interpreter, so the host's own
+# Python does not matter. Run everything through uv, which keeps .venv equal to
+# uv.lock before each command:
+#   uv run ansible-playbook ...      uv run scripts/check.sh
+# Collections and Galaxy roles are pinned in roles/requirements.yml (ansible-core
+# ships none); scripts/deepops/galaxy.py installs them. Kubespray pins its own
+# Ansible and runs from .venv-kubespray (see scripts/setup.sh).
 [project]
 name = "deepops-control-node"
 version = "0"
 requires-python = "==3.14.*"
 dependencies = [
-  "ansible==15.0.0",
   "ansible-core==2.22.0",
   "Jinja2==3.1.6",
   "MarkupSafe==3.0.4",

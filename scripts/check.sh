@@ -16,18 +16,16 @@ step() {
     if "$@"; then echo "    ok"; else echo "    FAILED"; failed+=("${name}"); fi
 }
 
-python=python3
-command -v ansible-playbook >/dev/null || { echo "Activate the DeepOps virtualenv first (scripts/setup.sh)." >&2; exit 2; }
-# Every other step assumes the tools uv.lock pins; an outdated environment would fail
-# them for reasons that have nothing to do with the change being checked.
-if command -v uv >/dev/null && [ -n "${VIRTUAL_ENV:-}" ] \
-        && ! UV_PROJECT_ENVIRONMENT="${VIRTUAL_ENV}" uv sync --locked --check -q 2>/dev/null; then
-    echo "The environment at ${VIRTUAL_ENV} does not match uv.lock. Update it with:" >&2
-    echo "  UV_PROJECT_ENVIRONMENT=${VIRTUAL_ENV} uv sync --locked   (or scripts/setup.sh)" >&2
-    exit 2
+# Run under uv, which first makes .venv match uv.lock, so the tools are always the
+# pinned ones however this script was started.
+if [ -z "${DEEPOPS_CHECK_UV:-}" ]; then
+    command -v uv >/dev/null || { echo "uv is required; run scripts/setup.sh." >&2; exit 2; }
+    DEEPOPS_CHECK_UV=1 exec uv run --locked -- scripts/check.sh "$@"
 fi
+python=python3
 
 step "ansible.cfg has only known settings" ansible-config validate
+step "Galaxy collections and roles match roles/requirements.yml" "${python}" scripts/deepops/galaxy.py --check
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
 step "yamllint" yamllint --no-warnings .

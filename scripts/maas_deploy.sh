@@ -516,10 +516,9 @@ do_deploy() {
     echo "=== All machines deployed and accessible ==="
     echo ""
     echo "You can now run:"
-    echo "  source /opt/deepops/env/bin/activate"
-    echo "  ansible -m ping all"
-    [[ "$PROFILE" == "k8s" ]] && echo "  ansible-playbook playbooks/k8s-cluster.yml"
-    [[ "$PROFILE" == "slurm" ]] && echo "  ansible-playbook playbooks/slurm-cluster.yml"
+    echo "  uv run ansible -m ping all"
+    [[ "$PROFILE" == "k8s" ]] && echo "  source .venv-kubespray/bin/activate && ansible-playbook playbooks/k8s-cluster.yml"
+    [[ "$PROFILE" == "slurm" ]] && echo "  uv run ansible-playbook playbooks/slurm-cluster.yml"
 }
 
 # --- Main ---------------------------------------------------------------------

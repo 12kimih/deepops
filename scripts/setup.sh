@@ -11,11 +11,10 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR="${SCRIPT_DIR}/.."
 
-# Configuration (Python package versions live in pyproject.toml / uv.lock)
+# Configuration (Python and tool versions live in pyproject.toml / uv.lock, collections
+# and Galaxy roles in roles/requirements.yml)
 CONFIG_DIR="${CONFIG_DIR:-${ROOT_DIR}/config}"            # Default configuration directory location
 DEEPOPS_TAG="${1:-master}"                      # DeepOps branch to set up
-VENV_DIR="${VENV_DIR:-/opt/deepops/env}"        # DeepOps environment (pyproject.toml / uv.lock)
-KUBESPRAY_VENV_DIR="${KUBESPRAY_VENV_DIR:-/opt/deepops/kubespray-env}"  # Kubespray's own environment
 KUBESPRAY_PYTHON="${KUBESPRAY_PYTHON:-3.13}"    # Newest Python the pinned Kubespray supports
 
 ###
@@ -94,24 +93,18 @@ fi
 
 # Install the locked Python environment from the checkout (standalone runs have just cloned it)
 REPO_DIR="$( (cd "${SCRIPT_DIR}/.." && grep -qi deepops README.md 2>/dev/null) && cd "${SCRIPT_DIR}/.." && pwd || pwd)"
-# uv provides the Python interpreter and the locked environment; its version is the one
-# pyproject.toml requires.
+# uv provides the Python interpreter and the locked environment (.venv); its own
+# version is the one pyproject.toml requires.
 export PATH="${HOME}/.local/bin:${PATH}"
 UV_VERSION="$(sed -n 's/^required-version = "==\(.*\)"/\1/p' "${REPO_DIR}/pyproject.toml" 2>/dev/null)"
 if ! command -v uv >/dev/null 2>&1 || { [ -n "${UV_VERSION}" ] && [ "$(uv --version | awk '{print $2}')" != "${UV_VERSION}" ]; } ; then
     as_user "curl -LsSf https://astral.sh/uv/${UV_VERSION:+${UV_VERSION}/}install.sh | sh"
 fi
 command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
-sudo mkdir -p "${VENV_DIR}" "${KUBESPRAY_VENV_DIR}"
-sudo chown -R $(id -u):$(id -g) "${VENV_DIR}" "${KUBESPRAY_VENV_DIR}"
-deactivate nondestructive &> /dev/null
-
-# Make it a uv venv in place first: uv sync replaces a directory that is not one by
-# deleting it, which fails halfway when its parent is root-owned.
-(cd "${REPO_DIR}" && uv venv -q --allow-existing "${VENV_DIR}" && UV_PROJECT_ENVIRONMENT="${VENV_DIR}" uv sync --locked) || { echo "ERROR: uv sync failed" >&2; exit 1; }
-. "${VENV_DIR}/bin/activate"
+cd "${REPO_DIR}"
+uv sync --locked || { echo "ERROR: uv sync failed" >&2; exit 1; }
 # Run the repository checks on every commit (see .pre-commit-config.yaml).
-(cd "${REPO_DIR}" && git rev-parse --git-dir >/dev/null 2>&1 && pre-commit install >/dev/null) || true
+(git rev-parse --git-dir >/dev/null 2>&1 && uv run pre-commit install >/dev/null) || true
 
 # Copy default configuration
 if grep -i deepops README.md >/dev/null 2>&1 ; then
@@ -123,27 +116,9 @@ if grep -i deepops README.md >/dev/null 2>&1 ; then
     fi
 fi
 
-# Install Ansible Galaxy roles
-if command -v ansible-galaxy &> /dev/null ; then
-    echo "Updating Ansible Galaxy roles..."
-    initial_dir="$(pwd)"
-    roles_path="${ROOT_DIR}/roles/galaxy"
-    collections_path="${ROOT_DIR}/collections"
-
-    cd "${ROOT_DIR}"
-    as_user ansible-galaxy collection install -p "${collections_path}" --force -r "roles/requirements.yml" >/dev/null
-    as_user ansible-galaxy role install -p "${roles_path}" --force -r "roles/requirements.yml" >/dev/null
-
-    # Install any user-defined config requirements
-    if [ -d "${CONFIG_DIR}" ] && [ -f "${CONFIG_DIR}/requirements.yml" ] ; then
-        cd "${CONFIG_DIR}"
-        as_user ansible-galaxy collection install -p "${collections_path}" --force -i -r "requirements.yml" >/dev/null
-        as_user ansible-galaxy role install -p "${roles_path}" --force -i -r "requirements.yml" >/dev/null
-    fi
-    cd "${initial_dir}"
-else
-    echo "ERROR: Unable to install Ansible Galaxy roles, 'ansible-galaxy' command not found"
-fi
+# Install the Galaxy collections and roles (roles/requirements.yml, then config/requirements.yml)
+echo "Installing Ansible Galaxy collections and roles..."
+CONFIG_DIR="${CONFIG_DIR}" uv run scripts/deepops/galaxy.py >/dev/null || { echo "ERROR: Galaxy install failed" >&2; exit 1; }
 
 # Update submodules
 if command -v git &> /dev/null ; then
@@ -153,20 +128,17 @@ else
 fi
 
 # Kubespray pins its own Ansible, so the Kubernetes playbooks run from a separate
-# environment built from the submodule's requirements.txt.
-if [ -f "${REPO_DIR}/submodules/kubespray/requirements.txt" ] ; then
-    uv venv -q --allow-existing --python "${KUBESPRAY_PYTHON}" "${KUBESPRAY_VENV_DIR}"
-    uv pip install -q --python "${KUBESPRAY_VENV_DIR}" -r "${REPO_DIR}/submodules/kubespray/requirements.txt"
+# environment, rebuilt from the submodule's requirements.txt on every run.
+if [ -f submodules/kubespray/requirements.txt ] ; then
+    uv venv -q --clear --python "${KUBESPRAY_PYTHON}" .venv-kubespray
+    uv pip install -q --python .venv-kubespray -r submodules/kubespray/requirements.txt
 fi
 
-# Add Ansible virtual env to PATH when using Bash
-if [ -f "${VENV_DIR}/bin/activate" ] ; then
-    . "${VENV_DIR}/bin/activate"
-    ansible localhost -m lineinfile -a "path=$HOME/.bashrc create=yes mode=0644 backup=yes line='source ${VENV_DIR}/bin/activate'"
-fi
+# Earlier versions activated /opt/deepops/env from ~/.bashrc; uv run replaces that.
+sed -i.bak '\|^source /opt/deepops/env/bin/activate$|d' "${HOME}/.bashrc" 2>/dev/null || true
 
 echo
 echo "*** Setup complete ***"
-echo "To use Ansible, run: source ${VENV_DIR}/bin/activate"
-echo "For the Kubernetes playbooks, run: source ${KUBESPRAY_VENV_DIR}/bin/activate"
+echo "Run Ansible through uv, which keeps .venv equal to uv.lock:  uv run ansible-playbook ..."
+echo "For the Kubernetes playbooks:  source .venv-kubespray/bin/activate"
 echo

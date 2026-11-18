@@ -22,13 +22,9 @@ else
   SLURM_EXTRA_VARS="${SLURM_EXTRA_VARS:-${VIRT_DIR}/vars_files/virt_slurm.yml}"
 fi
 
-# Use ansible install in virtualenv
-# NOTE: Added here because this script is also called from Jenkinsfile and not just cluster_up.sh
-if [ -d env ] ; then
-    . env/bin/activate
-else
-    echo "WARNING: virtual env not detected, using system python install"
-fi
+# Use the locked DeepOps environment (also when called from the Jenkinsfile, not cluster_up.sh)
+export PATH="${HOME}/.local/bin:${PATH}"
+uv sync --locked -q && . .venv/bin/activate
 
 # Configure Slurm cluster
 ansible-playbook -vv \

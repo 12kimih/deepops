@@ -2,9 +2,9 @@
 # pre-commit configuration for DeepOps
 # https://pre-commit.com
 #
-# scripts/setup.sh installs the hook. The checks are scripts/check.sh --fast, run
-# with the tools of the DeepOps environment, so their versions come from
-# pyproject.toml / uv.lock alone. CI runs the full scripts/check.sh.
+# scripts/setup.sh installs the hook. The checks are scripts/check.sh --fast, which
+# runs itself under uv, so the tool versions come from pyproject.toml / uv.lock
+# alone. CI runs the full scripts/check.sh.
 minimum_pre_commit_version: "3.5.0"
 
 # Vendored / generated / site-specific trees are never checked here.
