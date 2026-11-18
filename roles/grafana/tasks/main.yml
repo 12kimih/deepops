@@ -1,71 +1,62 @@
 ---
-- name: Create config dir
+- name: Create config dirs
   ansible.builtin.file:
-    path: "{{ grafana_config_dir }}"
+    path: "{{ item }}"
     state: directory
-    owner: "root"
-    group: "root"
+    owner: root
+    group: root
     mode: "0755"
+  loop:
+    - "{{ grafana_config_dir }}"
+    - "{{ grafana_config_dir }}/provisioning"
+    - "{{ grafana_config_dir }}/provisioning/datasources"
+    - "{{ grafana_config_dir }}/provisioning/dashboards"
 
-- name: Create data dir
+- name: Create data dirs
   ansible.builtin.file:
-    path: "{{ grafana_data_dir }}"
-    state: directory
-    owner: "{{ grafana_user_id }}"
-    mode: "0755"
-
-- name: Create dashboard dir
-  ansible.builtin.file:
-    path: "{{ grafana_cfg_dashboard_path }}"
+    path: "{{ item }}"
     state: directory
     owner: "{{ grafana_user_id }}"
     mode: "0755"
+  loop:
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_cfg_dashboard_path }}"
 
-- name: Create provisioning dirs
-  ansible.builtin.file:
-    path: "{{ grafana_config_dir }}/provisioning/{{ item }}"
-    state: directory
-    owner: "{{ grafana_user_id }}"
-    mode: "0755"
-  with_items:
-    - datasources
-    - dashboards
-
+# Provisioned dashboards reload on their own; no restart needed.
 - name: Copy dashboards
   ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ grafana_cfg_dashboard_path }}"
+    src: "../../../src/dashboards/{{ item }}"
+    dest: "{{ grafana_cfg_dashboard_path }}/{{ item }}"
     owner: "{{ grafana_user_id }}"
     mode: "0644"
-  with_items:
-    - ../../../src/dashboards/gpu-dashboard.json
-  notify: Restart grafana
+  loop: "{{ grafana_dashboards }}"
 
 - name: Install datasource config
   ansible.builtin.template:
-    src: "templates/prometheus-datasource.yml.j2"
+    src: prometheus-datasource.yml.j2
     dest: "{{ grafana_config_dir }}/provisioning/datasources/prometheus-datasource.yml"
     owner: root
     group: root
     mode: "0644"
   notify: Restart grafana
 
-- name: Install dashboard config
+- name: Install dashboard provider config
   ansible.builtin.template:
-    src: "templates/prometheus-dashboard.yml.j2"
+    src: prometheus-dashboard.yml.j2
     dest: "{{ grafana_config_dir }}/provisioning/dashboards/prometheus-dashboard.yml"
     owner: root
     group: root
     mode: "0644"
   notify: Restart grafana
 
+# Holds the admin password; the container runs as uid 472, gid 0.
 - name: Install config file
   ansible.builtin.template:
     src: "{{ grafana_config_template }}"
     dest: "{{ grafana_config_dir }}/grafana.ini"
     owner: root
     group: root
-    mode: "0644"
+    mode: "0640"
   notify: Restart grafana
 
 - name: Install systemd unit file
@@ -83,4 +74,34 @@
     state: "{{ grafana_state }}"
     enabled: "{{ grafana_enabled }}"
     daemon_reload: true
-  notify: Restart grafana
+
+- name: Apply pending restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for grafana
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/health"
+  register: grafana_health
+  until: grafana_health.status == 200
+  retries: 30
+  delay: 2
+  when: grafana_state != "stopped"
+
+# grafana.ini sets the password only when the database is first created.
+- name: Check the admin password
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/user"
+    user: "{{ grafana_cfg_user }}"
+    password: "{{ grafana_cfg_pass }}"
+    force_basic_auth: true
+    status_code: [200, 401]
+  register: grafana_login
+  no_log: true
+  when: grafana_state != "stopped"
+
+- name: Reset the admin password
+  ansible.builtin.command:
+    argv: [docker, exec, "{{ grafana_svc_name }}", grafana, cli, admin, reset-admin-password, "{{ grafana_cfg_pass }}"]
+  no_log: true
+  changed_when: true
+  when: grafana_state != "stopped" and grafana_login.status == 401

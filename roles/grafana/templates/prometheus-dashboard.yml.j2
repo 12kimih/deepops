@@ -1,9 +1,11 @@
+{{ ansible_managed | comment }}
 apiVersion: 1
 
 providers:
-- name: 'default'
-  folder: ''
-  type: file
-  editable: true
-  options:
-    path: {{ grafana_cfg_dashboard_path }}
+  - name: deepops
+    folder: '{{ grafana_dashboard_folder }}'
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: {{ grafana_cfg_dashboard_path }}
