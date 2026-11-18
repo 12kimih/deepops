@@ -1,0 +1,27 @@
+---
+# How hosts update packages on their own: `security` (security fixes only, never the
+# held-back packages below, never a reboot), `off` (no unattended upgrades) or
+# `unmanaged` (leave the distribution's settings as they are).
+os_updates_policy: security
+
+# Packages unattended upgrades never touch (shell-style globs on the package name).
+# They change the kernel, GPU, scheduler, container or storage stack, so they are
+# upgraded in a maintenance window by the roles that own them.
+os_updates_held_back:
+  - "linux-*"
+  - "kernel*"
+  - "*nvidia*"
+  - "cuda*"
+  - "libcudnn*"
+  - "libnccl*"
+  - "datacenter-gpu-manager*"
+  - "slurm*"
+  - "*munge*"
+  - "nfs-*"
+  - "docker-ce*"
+  - "containerd*"
+  - "enroot*"
+
+# Whether needrestart may restart services after an upgrade. When false it only lists
+# them, so an upgrade never restarts nfs-server, slurmctld or similar under running jobs.
+os_updates_restart_services: false

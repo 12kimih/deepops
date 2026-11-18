@@ -1,0 +1,36 @@
+---
+- name: Install dnf-automatic
+  ansible.builtin.dnf:
+    name: dnf-automatic
+    state: present
+  when: os_updates_policy == "security"
+
+- name: Limit dnf-automatic to security fixes
+  community.general.ini_file:
+    path: /etc/dnf/automatic.conf
+    section: "{{ item.section }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - {section: commands, option: upgrade_type, value: security}
+    - {section: commands, option: apply_updates, value: "yes"}
+    - {section: commands, option: reboot, value: never}
+    # [base] overrides dnf.conf for dnf-automatic only; a manual dnf still upgrades them.
+    - {section: base, option: excludepkgs, value: "{{ os_updates_held_back | join(',') }}"}
+  when: os_updates_policy == "security"
+
+- name: Run dnf-automatic on its timer
+  ansible.builtin.systemd_service:
+    name: dnf-automatic.timer
+    enabled: true
+    state: started
+  when: os_updates_policy == "security"
+
+- name: Remove dnf-automatic
+  ansible.builtin.dnf:
+    name: dnf-automatic
+    state: absent
+  when: os_updates_policy == "off"

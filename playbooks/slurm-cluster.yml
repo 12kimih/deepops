@@ -24,6 +24,9 @@
   import_playbook: generic/chrony-client.yml
   when: chrony_install | default(true)
 
+- name: Apply the OS update policy
+  import_playbook: generic/os-updates.yml
+
 - name: Set up a local cluster container registry
   import_playbook: container/standalone-container-registry.yml
   vars:

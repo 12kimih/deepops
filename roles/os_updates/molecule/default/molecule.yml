@@ -1,0 +1,17 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: os-updates-ubuntu-2404
+    image: geerlingguy/docker-ubuntu2404-ansible
+    pre_build_image: true
+    # apt and unattended-upgrades need no init system, so no privileges either.
+    command: sleep infinity
+provisioner:
+  name: ansible
+  ansible_args:
+    - -vv
+verifier:
+  name: ansible

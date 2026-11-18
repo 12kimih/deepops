@@ -18,6 +18,7 @@ jobs:
           - nhc
           - nvidia_dcgm
           - openmpi
+          - os_updates
           - mofed
           - spack
           # Excluded from Docker CI (require systemd services that can't
