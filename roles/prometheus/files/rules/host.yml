@@ -59,6 +59,15 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.name }} failed on {{ $labels.host }}"
+      # PID 1 can hang (e.g. after a daemon-reexec) while running daemons keep working, so
+      # nothing else notices; the systemd collector is then the first thing to fail.
+      - alert: HostSystemdUnresponsive
+        expr: node_scrape_collector_success{collector="systemd"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "systemd on {{ $labels.host }} is not answering"
+          description: "node-exporter cannot read unit states from systemd (PID 1), so units cannot be started or stopped and failed-unit alerts are blind. Drain the node and reboot it."
       - alert: HostMemoryUncorrectableErrors
         expr: increase(node_edac_uncorrectable_errors_total[1h]) > 0
         labels: {severity: critical}

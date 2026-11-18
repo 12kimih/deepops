@@ -19,10 +19,10 @@ tests:
       - eval_time: 4m
         alertname: HostDown
         exp_alerts:
-          - exp_labels: {severity: critical, module: node-exporter, host: n1, instance: "n1:9100"}
+          - exp_labels: {severity: critical, host: n1}
             exp_annotations:
               summary: "n1 is unreachable"
-              description: "node-exporter on n1 has not answered for 3 minutes. The host is down, hung or off the network."
+              description: "No exporter on n1 has answered for 3 minutes. The host is down, hung or off the network."
       - eval_time: 15m
         alertname: ExporterDown
         exp_alerts: []
@@ -41,7 +41,45 @@ tests:
           - exp_labels: {severity: warning, module: dcgm-exporter, host: n1, instance: "n1:9400"}
             exp_annotations:
               summary: "dcgm-exporter down on n1"
-              description: "The dcgm-exporter target has failed to scrape for 10 minutes while the host itself is up."
+              description: "The dcgm-exporter target has failed to scrape for 10 minutes while other targets on n1 answer."
+
+  - name: node-exporter alone down is an exporter problem, not a host outage
+    interval: 1m
+    input_series:
+      - series: 'up{module="node-exporter", host="n1", instance="n1:9100"}'
+        values: '0x15'
+      - series: 'up{module="dcgm-exporter", host="n1", instance="n1:9400"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: HostDown
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: ExporterDown
+        exp_alerts:
+          - exp_labels: {severity: warning, module: node-exporter, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "node-exporter down on n1"
+              description: "The node-exporter target has failed to scrape for 10 minutes while other targets on n1 answer. A hung collector is the usual cause: check that systemd answers with `timeout 5 systemctl is-system-running`."
+
+  - name: HostSystemdUnresponsive fires when the systemd collector fails
+    interval: 1m
+    input_series:
+      - series: 'node_scrape_collector_success{host="n1", instance="n1:9100", collector="systemd"}'
+        values: '1x3 0x12'
+      - series: 'node_scrape_collector_success{host="n1", instance="n1:9100", collector="cpu"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HostSystemdUnresponsive
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HostSystemdUnresponsive
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", collector: systemd}
+            exp_annotations:
+              summary: "systemd on n1 is not answering"
+              description: "node-exporter cannot read unit states from systemd (PID 1), so units cannot be started or stopped and failed-unit alerts are blind. Drain the node and reboot it."
 
   - name: chassis fault states are inverted (1 = no fault)
     interval: 1m

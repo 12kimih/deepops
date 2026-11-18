@@ -118,7 +118,8 @@ are checked with `promtool` before they are written, then applied with a live re
 ## Alertmanager
 
 Prometheus evaluates the alert rules in `roles/prometheus/files/rules/`, grouped by area:
-targets (host and exporter down), host (disk, inodes, memory, clock, failed systemd units,
+targets (a host is down only when none of its exporters answer; one silent exporter is
+an exporter alert), host (disk, inodes, memory, clock, failed or unresponsive systemd,
 ECC, RAID, NIC errors), GPU (XID, missing GPUs, row remapping, temperature, PCIe replays),
 power (PSU and BMC sensors) and the monitoring stack itself. Add site rules with
 `prometheus_extra_rule_files`. Check rule state at http://\<slurm-metric ip\>:9090/alerts.
@@ -126,8 +127,8 @@ power (PSU and BMC sensors) and the monitoring stack itself. Add site rules with
 
 The always-firing `Watchdog` alert proves the whole path works. Point
 `alertmanager_heartbeat_url` at an external check (for example a healthchecks.io ping
-URL with a 5 minute period): Alertmanager pings it every minute, and the external service
-alerts when the pings stop, which covers a dead monitoring host. Without the URL, Watchdog
+URL with a 1 minute period and a few minutes of grace): Alertmanager pings it every minute,
+and the external service alerts when the pings stop, which covers a dead monitoring host. Without the URL, Watchdog
 is dropped.
 
 Alertmanager groups alerts by `alertname` and `host`, repeats unresolved ones every

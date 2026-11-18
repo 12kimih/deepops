@@ -2,17 +2,24 @@
 groups:
   - name: targets
     rules:
+      # A host is down only when none of its targets answer. node-exporter alone failing
+      # is an exporter problem (e.g. a collector hung on systemd), not an outage, and must
+      # not raise a critical alert that also inhibits every other alert of the host.
       - alert: HostDown
-        expr: up{module="node-exporter"} == 0
+        expr: max by (host) (up) == 0
         for: 3m
         labels: {severity: critical}
         annotations:
           summary: "{{ $labels.host }} is unreachable"
-          description: "node-exporter on {{ $labels.host }} has not answered for 3 minutes. The host is down, hung or off the network."
+          description: "No exporter on {{ $labels.host }} has answered for 3 minutes. The host is down, hung or off the network."
       - alert: ExporterDown
-        expr: up{module!="node-exporter"} == 0 unless on (host) up{module="node-exporter"} == 0
+        expr: up == 0 unless on (host) (max by (host) (up) == 0)
         for: 10m
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.module }} down on {{ $labels.host }}"
-          description: "The {{ $labels.module }} target has failed to scrape for 10 minutes while the host itself is up."
+          description: >-
+            The {{ $labels.module }} target has failed to scrape for 10 minutes while other
+            targets on {{ $labels.host }} answer.{{ if eq $labels.module "node-exporter" }}
+            A hung collector is the usual cause: check that systemd answers with
+            `timeout 5 systemctl is-system-running`.{{ end }}
