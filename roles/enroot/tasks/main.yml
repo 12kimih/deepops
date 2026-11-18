@@ -31,7 +31,6 @@
     path: /etc/bash_completion.d/enroot.bash_completion
     src: /usr/share/enroot/bash_completion
     state: link
-  failed_when: false
 
 - name: Configure /etc/enroot/enroot.conf
   ansible.builtin.blockinfile:
