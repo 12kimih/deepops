@@ -2,22 +2,39 @@
 - name: Install the AI agent rules
   when: ai_agent_rules_url | length > 0
   block:
-    - name: Install the refresh module
-      ansible.builtin.copy:
-        src: ai_agent_rules.py
-        dest: "{{ cluster_tools_lib_dir }}/ai_agent_rules.py"
-        owner: root
-        group: root
-        mode: "0644"
+    - name: Require a pinned hash with the URL
+      ansible.builtin.assert:
+        that: ai_agent_rules_sha256 is match('^[0-9a-f]{64}$')
+        fail_msg: >-
+          Set ai_agent_rules_sha256 to the SHA-256 of the reviewed rules file; the cluster
+          installs only the version an admin approved.
+        quiet: true
 
-    - name: Install the refresh command
-      ansible.builtin.include_role:
-        name: cluster_tools_lib
-        tasks_from: command
+    # Downloaded once, on the controller, and only accepted if it matches the pin.
+    - name: Fetch the approved rules
+      ansible.builtin.get_url:
+        url: "{{ ai_agent_rules_url }}"
+        dest: "{{ ai_agent_rules_download }}"
+        checksum: "sha256:{{ ai_agent_rules_sha256 }}"
+        mode: "0644"
+      delegate_to: localhost
+      run_once: true
+      become: false
       vars:
-        cluster_tools_lib_command:
-          dest: "{{ ai_agent_rules_command }}"
-          module: ai_agent_rules
+        ai_agent_rules_download: "{{ lookup('env', 'TMPDIR') | default('/tmp', true) }}/ai-agent-rules-{{ ai_agent_rules_sha256 }}.md"
+      register: ai_agent_rules_fetch
+
+    - name: Read the rules
+      ansible.builtin.set_fact:
+        ai_agent_rules_text: "{{ lookup('ansible.builtin.file', ai_agent_rules_fetch.dest, rstrip=false) }}"
+
+    - name: Check it is the rules file
+      ansible.builtin.assert:
+        that:
+          - ai_agent_rules_text.startswith(ai_agent_rules_marker)
+          - ai_agent_rules_text | length <= ai_agent_rules_max_bytes
+        fail_msg: "{{ ai_agent_rules_url }} is not an agent rules file, or exceeds {{ ai_agent_rules_max_bytes }} bytes."
+        quiet: true
 
     - name: Create the agents' admin config dirs
       ansible.builtin.file:
@@ -30,27 +47,18 @@
         - "{{ ai_agent_rules_claude_file | dirname }}"
         - "{{ ai_agent_rules_codex_file | dirname }}"
 
-    - name: Install systemd units
-      ansible.builtin.template:
-        src: "ai-agent-rules.{{ item }}.j2"
-        dest: "/etc/systemd/system/{{ ai_agent_rules_svc_name }}.{{ item }}"
+    - name: Install the rules for Claude Code
+      ansible.builtin.copy:
+        content: "{{ ai_agent_rules_text }}"
+        dest: "{{ ai_agent_rules_claude_file }}"
         owner: root
         group: root
         mode: "0644"
-      loop: [service, timer]
-      notify: Restart agent rules timer
 
-    # Install the rules now rather than at the first timer run.
-    - name: Fetch and install the rules
-      ansible.builtin.command: >-
-        {{ ai_agent_rules_command }} --url {{ ai_agent_rules_url | quote }}
-        --claude {{ ai_agent_rules_claude_file }} --codex {{ ai_agent_rules_codex_file }}
-      register: ai_agent_rules_run
-      changed_when: "'installed' in ai_agent_rules_run.stdout"
-
-    - name: Enable the refresh timer
-      ansible.builtin.systemd:
-        name: "{{ ai_agent_rules_svc_name }}.timer"
-        state: started
-        enabled: true
-        daemon_reload: true
+    - name: Install the rules for Codex
+      ansible.builtin.template:
+        src: requirements.toml.j2
+        dest: "{{ ai_agent_rules_codex_file }}"
+        owner: root
+        group: root
+        mode: "0644"

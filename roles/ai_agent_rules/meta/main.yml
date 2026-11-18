@@ -1,7 +1,4 @@
 ---
-dependencies:
-  - role: cluster_tools_lib
-
 galaxy_info:
   namespace: deepops
   role_name: ai_agent_rules

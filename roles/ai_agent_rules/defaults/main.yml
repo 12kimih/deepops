@@ -3,14 +3,20 @@
 # through each tool's system-wide admin channel, never through users' own files:
 #   Claude Code  /etc/claude-code/CLAUDE.md  (managed memory, always loaded)
 #   Codex CLI    /etc/codex/requirements.toml additional_developer_instructions
-# The rules are one Markdown file published by the site's docs (its single source); a
-# timer refreshes it, so a rules change reaches the agents without a redeploy. A failed
-# download keeps the installed rules. No-op until a URL is set.
+#
+# The rules are one Markdown file the site docs publish. What the cluster installs is
+# pinned by its SHA-256 here, so a change to the published file (by mistake or by
+# whoever can push to the docs) reaches no agent until an admin reviews it and updates
+# the pin. To approve a new version:
+#   curl -fsSL "$URL" -o rules.md   # read it, then
+#   sha256sum rules.md              # put the hash in ai_agent_rules_sha256 and redeploy
+# The download happens on the Ansible controller at deploy time; nodes fetch nothing.
+# No-op until both are set.
 ai_agent_rules_url: ""
-ai_agent_rules_schedule: daily
+ai_agent_rules_sha256: ""
 ai_agent_rules_claude_file: /etc/claude-code/CLAUDE.md
-# This role owns the whole file; put other Codex admin requirements in the site's own
-# file only if this role is disabled.
+# This role owns the whole file: Codex admin requirements belong in this role.
 ai_agent_rules_codex_file: /etc/codex/requirements.toml
-ai_agent_rules_command: /usr/local/sbin/ai-agent-rules
-ai_agent_rules_svc_name: ai-agent-rules
+# The file must start with this line, and stay under Codex's instruction limit.
+ai_agent_rules_marker: "<!-- cluster-agent-rules -->"
+ai_agent_rules_max_bytes: 24000
