@@ -107,6 +107,49 @@
         state: absent
       when: (cluster_tools_motd_title | trim | length) == 0
 
+- name: Check for Ubuntu motd-news
+  ansible.builtin.stat:
+    path: /etc/default/motd-news
+  register: cluster_tools_motd_news_stat
+
+- name: Configure Ubuntu motd-news
+  when: cluster_tools_motd_news_stat.stat.exists
+  block:
+    - name: Set whether the banner fragment shows motd-news
+      ansible.builtin.lineinfile:
+        path: /etc/default/motd-news
+        regexp: "^ENABLED="
+        line: "ENABLED={{ 1 if cluster_tools_motd_news else 0 }}"
+
+    - name: Stop and mask the motd-news units
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        masked: true
+      loop: [motd-news.timer, motd-news.service]
+      when: not cluster_tools_motd_news
+
+    # Masking leaves a unit's last failure on record, and the failure is what alerts.
+    - name: Clear a failed motd-news run
+      ansible.builtin.command: systemctl reset-failed motd-news.service
+      changed_when: false
+      failed_when: false
+      when: not cluster_tools_motd_news
+
+    - name: Restore the motd-news units
+      ansible.builtin.systemd_service:
+        name: "{{ item.name }}"
+        masked: false
+        enabled: "{{ item.enabled | default(omit) }}"
+        state: "{{ item.state | default(omit) }}"
+      loop:
+        - { name: motd-news.service }
+        - { name: motd-news.timer, enabled: true, state: started }
+      loop_control:
+        label: "{{ item.name }}"
+      when: cluster_tools_motd_news
+
 # systemd re-applies a slice's resource-control properties on daemon-reload, so a
 # changed limit reaches sessions that are already open.
 - name: Create the user slice drop-in directory
