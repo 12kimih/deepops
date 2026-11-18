@@ -97,6 +97,15 @@ class TableTests(unittest.TestCase):
                 for line in body:
                     self.assertRegex(line, rf"^. ((\|  |   )?(\|- |`- )|{titles}|total|-+$)", line)
 
+    def test_one_partition_set_is_one_group(self):
+        # The fixture has the same pending sets written in both orders.
+        why = model()["pending"]
+        spellings = {r["partition"] for r in why}
+        self.assertIn("a30-1,a30-2", spellings)
+        self.assertNotIn("a30-2,a30-1", spellings)
+        keys = [(r["code"], r["partition"], r["user"]) for r in why]
+        self.assertEqual(len(keys), len(set(keys)))
+
     def test_detail_goes_in_a_column(self):
         why = out("-W", "-d", "--no-queue", "--no-resources", "--no-users", "--ascii", "--wide")
         self.assertIn("DETAIL", why.split("\n")[1])
