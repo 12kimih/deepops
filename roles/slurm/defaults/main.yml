@@ -103,11 +103,10 @@ slurm_build_slurmrestd: false
 # Flags for sharing slurm.conf among compute and control nodes
 slurm_conf_symlink: false
 
-# Controls the ability of the partition to execute more than one job at a time on each resource (node, socket or core depending upon the value of SelectTypeParameters). If resources are to be over-subscribed, avoiding memory over-subscription is very important. SelectTypeParameters should be configured to treat memory as a consumable resource and the --mem option should be used for job allocations. Sharing of resources is typically useful only when using gang scheduling (PreemptMode=suspend,gang). Possible values for OverSubscribe are "EXCLUSIVE", "FORCE", "YES", and "NO". Note that a value of "YES" or "FORCE" can negatively impact performance for systems with many thousands of running jobs. The default value is "NO".
-# The bundled slurm.conf template does not read this: it sets the partition's
-# OverSubscribe=NO when slurm_manage_gpus is true and EXCLUSIVE otherwise. A custom
-# slurm_conf_template may use it.
-slurm_oversubscribe: "NO"
+# Partition OverSubscribe value used by the bundled slurm.conf template ("NO",
+# "EXCLUSIVE", "YES" or "FORCE"; see OverSubscribe in slurm.conf(5)). Default: "NO"
+# when slurm_manage_gpus is true, otherwise "EXCLUSIVE".
+slurm_oversubscribe: "{{ (slurm_manage_gpus == true) | ternary('NO', 'EXCLUSIVE') }}"
 
 # Maximum run time limit for jobs. Format is minutes, minutes:seconds, hours:minutes:seconds, days-hours, days-hours:minutes, days-hours:minutes:seconds or "UNLIMITED". Time resolution is one minute and second values are rounded up to the next minute. This limit does not apply to jobs executed by SlurmUser or user root.
 # Sets: MaxTime={{ slurm_max_job_timelimit }}
@@ -127,6 +126,19 @@ slurm_enable_prolog_epilog: true
 
 # Useful to delete old files (e.g. from previous versions of deepops)
 slurm_clear_old_prolog_epilog: false
+
+# How the epilog's "last job of the user" cleanup (scripts 40-lastuserjob-*
+# through 50-lastuserjob-*) decides what to remove when a job ends.
+#   job:  (default) job-scoped. The cleanup also checks the node's own cgroups
+#         and never touches processes of another job of the same user; files and
+#         enroot directories are removed only when the user has no other job on
+#         the node. Requires cgroup process tracking (ProctrackType=proctrack/cgroup,
+#         the default in this role); cgroup v1 and v2 are both understood.
+#   user: DEPRECATED. The 26.09 behaviour, rendered byte-for-byte: the cleanup
+#         is decided by squeue alone and kills every process the user owns.
+#         Kept for one release train as an escape hatch; removed in 27.01.
+# See docs/slurm-cluster/epilog-job-scoped-cleanup.md
+slurm_epilog_cleanup_scope: job
 
 # Fileglob patterns used to copy prolog and epilog files
 prolog_fileglob:

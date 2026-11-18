@@ -21,6 +21,8 @@ DeepOps provides scripts you can run to configure a simple Load Balancer and/or 
 
 Modify the `IPAddressPool` in `config/helm/metallb-resources.yml` to configure the IP range that the load balancer will hand out (`config/helm/metallb.yml` holds the chart values).
 
+With IPVS kube-proxy (Kubespray's default), MetalLB L2 requires `kube_proxy_strict_arp: true` before deployment; see [strict ARP setup and existing-cluster steps](runai.md#reaching-the-control-plane-loadbalancer-or-gateway-api).
+
 Run the script to deploy the load balancer:
 
 ```bash

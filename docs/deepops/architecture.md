@@ -114,7 +114,6 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia_driver
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia_power_limit
-│   ├── ood-wrapper
 │   ├── openmpi
 │   ├── openshift
 │   ├── prometheus
@@ -125,7 +124,6 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── rsyslog_client
 │   ├── rsyslog_server
 │   ├── serial_console
-│   ├── singularity_wrapper
 │   ├── slurm
 │   ├── spack
 │   └── standalone-container-registry

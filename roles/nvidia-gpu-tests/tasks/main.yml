@@ -48,7 +48,7 @@
 - name: Run the DCGM diagnostics
   ansible.builtin.shell: "dcgmi diag -r {{ gpu_test_dcgm_level }}"
   register: dcgm
-  ignore_errors: true
+  ignore_errors: "{{ not (gpu_test_dcgm_fail_on_error | bool) }}"
 
 # Note, this may fail to run depending on Ansible settings
 # We only look at the last few lines with relevant output

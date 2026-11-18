@@ -24,10 +24,10 @@ The settable variables for the role must be provided in vars/main.yml.
 
 1. SR-IOV resources for high-performance POD network interfaces.
 Each section of sriov_resources must have: 
-	pf_name: physical adapter interface name
-	vlan_id: VLAN ID for virtual function interfaces
-	res_name: resource pool name 
-	network_name: network name for annotation in POD YAML configuration 
+	pf_name - physical adapter interface name
+	vlan_id - VLAN ID for virtual function interfaces
+	res_name - resource pool name 
+	network_name - network name for annotation in POD YAML configuration 
 
 Please configure SRIOV interfaces depending on your deployment.
 Below provided sriov_resources example for four interfaces.
@@ -71,14 +71,15 @@ dev_id: "101c"
 
 num_vf: 8
 
-5. Mellanox Ofed version, site place and image name - mofed_version, mofed_site_place, mofed_file_name.
+5. NVIDIA OFED version, site place and image name - mofed_version, mofed_site_place, mofed_file_name.
+
+For new Kubernetes RDMA/RoCE deployments, prefer NVIDIA Network Operator coverage with DOCA-OFED driver management. This DeepOps role remains a legacy direct-host install path for environments that still need it, so verify the OFED package against your exact operating system and kernel before using it in production.
 ```
-#Mellanox OFED parameters
-mofed_version: "4.7-3.2.9.0"
-mofed_site_place: "MLNX_OFED-4.7-3.2.9.0"
-mofed_file_name: "MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu18.04-x86_64.iso"
+# NVIDIA OFED parameters
+mofed_version: "24.10-4.1.4.0"
+mofed_site_place: "MLNX_OFED-24.10-4.1.4.0"
+mofed_file_name: "MLNX_OFED_LINUX-{{ mofed_version }}-ubuntu{{ ansible_distribution_version }}-{{ ansible_architecture }}.iso"
 ```
-This legacy MLNX_OFED ISO targets Ubuntu 18.04 and does not install on the currently supported OS releases; install DOCA-OFED with the `mofed` role instead.
 
 
 Dependencies
@@ -97,7 +98,7 @@ The Role installing following components:
 5. Universal SR-IOV CNI 
 6. Specific Network provisioning with NetworkAttachmentDefinition
 7. DHCP CNI for providing IP addresses for SR-IOV based NIC's in pod deployment from existing infrastructure  
-8. Kubeflow MPI Operator (its v1 manifest)
+8. The latest version Kubeflow/MPI-Operator
 
 
 

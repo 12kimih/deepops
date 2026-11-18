@@ -28,4 +28,4 @@
 
     - name: Set user password
       ansible.builtin.include_role:
-        name: DeepOps.users
+        name: deepops_users

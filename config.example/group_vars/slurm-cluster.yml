@@ -78,7 +78,6 @@ slurm_login_on_compute: false
 slurm_configure_etc_hosts: true
 slurm_cluster_install_cuda: false
 slurm_cluster_install_nvidia_driver: true
-slurm_cluster_install_singularity: false
 
 ################################################################################
 # NFS                                                                          #
@@ -91,7 +90,7 @@ slurm_cluster_install_singularity: false
 #   a security risk if any client is untrusted -- prefer root_squash where you can.
 # - "*" exports to ANY host -- restrict to your cluster subnet (e.g. 10.0.0.0/16(...)).
 nfs_exports:
-  - path: /home    # shared home dirs (needed for Open OnDemand)
+  - path: /home    # shared home dirs
     options: "*(rw,sync,no_root_squash,no_subtree_check)"
   - path: /sw      # shared software (Spack / EasyBuild / CUDA modules)
     options: "*(rw,sync,no_root_squash,no_subtree_check)"
@@ -230,21 +229,6 @@ openmpi_install_prefix: "/usr/local"
 # --with-pmix. (On OpenMPI 4.x add back --with-pmi/--with-slurm and use a
 # libevent path instead of =external.)
 openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }} --with-libevent=external"
-
-################################################################################
-# Open OnDemand                                                                #
-################################################################################
-install_open_ondemand: false
-# OOD Linux-host adapter requires `slurm_cluster_install_singularity` to be true
-ood_install_linuxhost_adapter: false
-
-servername: '{{ ansible_fqdn }}'
-httpd_port: 9050
-httpd_listen_addr_port:
-  - 9050
-httpd_use_rewrites: false
-node_uri: /node
-rnode_uri: /rnode
 
 ################################################################################
 # Allow the User Permission to Set GPU Clocks                                  #

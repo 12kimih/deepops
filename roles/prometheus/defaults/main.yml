@@ -2,7 +2,7 @@
 prometheus_config_dir: /etc/prometheus
 prometheus_config_src: templates/prometheus.yml.j2
 prometheus_alert_rules_src: templates/alert_rules.yml.j2
-prometheus_container: "prom/prometheus:v3.12.0"
+prometheus_container: "prom/prometheus:v3.15.0"
 # Port Prometheus listens on. The container keeps its own default (9090, host network);
 # this only sets its self-scrape target and the Grafana datasource URL.
 prometheus_port: 9090

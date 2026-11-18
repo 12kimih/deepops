@@ -43,6 +43,43 @@
     - slurm-dashboard.json
   notify: Restart grafana
 
+- name: Create image build dir
+  ansible.builtin.file:
+    path: "{{ slurm_exporter_build_dir }}"
+    state: directory
+    mode: "0755"
+  when: slurm_exporter_build_image
+
+- name: Copy image build context
+  ansible.builtin.copy:
+    src: docker/Dockerfile
+    dest: "{{ slurm_exporter_build_dir }}/Dockerfile"
+    mode: "0644"
+  register: slurm_exporter_dockerfile
+  when: slurm_exporter_build_image
+
+- name: Copy exporter source
+  ansible.builtin.copy:
+    src: exporter/
+    dest: "{{ slurm_exporter_build_dir }}/exporter/"
+    mode: "0644"
+  register: slurm_exporter_source
+  when: slurm_exporter_build_image
+
+- name: Check for existing exporter image
+  ansible.builtin.command: docker image inspect {{ slurm_exporter_container }}
+  register: slurm_exporter_image_check
+  failed_when: false
+  changed_when: false
+  when: slurm_exporter_build_image
+
+- name: Build exporter image
+  ansible.builtin.command: docker build -t {{ slurm_exporter_container }} {{ slurm_exporter_build_dir }}
+  when: >
+    slurm_exporter_build_image and
+    (slurm_exporter_image_check.rc != 0 or slurm_exporter_dockerfile.changed or slurm_exporter_source.changed)
+  notify: Restart slurm-exporter
+
 - name: Install systemd unit file
   ansible.builtin.template:
     src: templates/docker.slurm-exporter.service.j2
