@@ -1,6 +1,6 @@
 # Activate NVIDIA MPS if requested
 # Server will start automatically, no need to start explicitly
-scontrol show job $SLURM_JOBID | grep Comment | grep -i mps | grep -v mps-per-gpu > /dev/null
+squeue -h -j "$SLURM_JOBID" -o %k | grep -i mps | grep -v mps-per-gpu > /dev/null
 if [ $? -eq 0 ]; then
     NUM_GPUS=$(/usr/sbin/lspci -n -d 10de: | wc -l)
     case $NUM_GPUS in

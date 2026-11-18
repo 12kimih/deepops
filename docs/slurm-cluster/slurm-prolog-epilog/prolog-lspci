@@ -1,7 +1,7 @@
 #
 # Check that all GPUs are present
 #
-NUMGPUS=`scontrol -a show nodes $HOSTNAME | grep "Gres=gpu" | cut -d : -f 2`
+NUMGPUS=$(sinfo -h -N -n "$HOSTNAME" -o %G | head -n 1 | grep -oE 'gpu(:[^:,(]+)?:[0-9]+' | awk -F: '{n += $NF} END {print n + 0}')
 if [ $NUMGPUS -gt 0 ]; then
         PCIGPUSFOUND=`lspci | grep "3D controller: NVIDIA Corporation" | wc -l`
         if [ $PCIGPUSFOUND -ne $NUMGPUS ]; then
