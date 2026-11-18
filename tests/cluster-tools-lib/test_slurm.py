@@ -49,5 +49,25 @@ class JobTests(unittest.TestCase):
         self.assertEqual(slurm.job_gpus(job), ([], set()))
 
 
+class TresTests(unittest.TestCase):
+    def test_list_and_string(self):
+        self.assertEqual(slurm.tres_list([{"type": "gres", "name": "gpu:a10", "count": 6},
+                                          {"type": "cpu", "name": "", "count": 8}]),
+                         {"gres/gpu:a10": 6, "cpu": 8})
+        tres = slurm.tres_str("cpu=8,gres/gpu:a10=4,gres/gpu=2")
+        self.assertEqual((tres["gres/gpu"], tres["gres/gpu:a10"]), ("2", "4"))
+        self.assertEqual(slurm.tres_str(""), {})
+
+    def test_memory_units(self):
+        for text, mib in (("960G", 983040), ("1.50T", 1572864), ("512M", 512), ("2048K", 2),
+                          ("515616", 515616), ("", 0), ("x", 0)):
+            with self.subTest(text=text):
+                self.assertEqual(slurm.mem_mib(text), mib)
+
+    def test_cluster_name(self):
+        self.assertEqual(slurm.cluster_name({"meta": {"slurm": {"cluster": "c1"}}}), "c1")
+        self.assertEqual(slurm.cluster_name({}), "")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,2375 @@
+{
+ "jobs": [
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83790,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job1",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794983755,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct15",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83811,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job2",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 1035,
+    "set": true
+   },
+   "qos": "high_t4",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008060,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 10080,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user7"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83819,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job3",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 1001,
+    "set": true
+   },
+   "qos": "high_t5",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008066,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 4320,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83823,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job4",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-2,a10-1",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794983620,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:4",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=4,gres/gpu=4,gres/gpu:a10=4",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 83964,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83970,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job5",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "high_t3",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794984006,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 60,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 83844,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "39%2",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83844,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job6",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "high_t3",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 360,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 83846,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "39%2",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83846,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job7",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 360,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct10",
+   "array_job_id": {
+    "infinite": false,
+    "number": 84111,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "0-5",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84111,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job8",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 71,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "ReqNodeNotAvail, May be reserved for other job",
+   "state_reason": "ReqNodeNotAvail",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794984286,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user8"
+  },
+  {
+   "account": "acct15",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84114,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job9",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 35,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "ReqNodeNotAvail, May be reserved for other job",
+   "state_reason": "ReqNodeNotAvail",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794984446,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user7"
+  },
+  {
+   "account": "acct5",
+   "array_job_id": {
+    "infinite": false,
+    "number": 84148,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "0-1%2",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84148,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job10",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 1552,
+    "set": true
+   },
+   "qos": "high_t1",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "Nodes required for job are DOWN, DRAINED or reserved for jobs in higher priority partitions",
+   "state_reason": "Resources",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794986485,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 360,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user49"
+  },
+  {
+   "account": "acct9",
+   "array_job_id": {
+    "infinite": false,
+    "number": 84151,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "0-3",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84151,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job11",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 1335,
+    "set": true
+   },
+   "qos": "high_t2",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "ReqNodeNotAvail, May be reserved for other job",
+   "state_reason": "ReqNodeNotAvail",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794987702,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 10080,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user44"
+  },
+  {
+   "account": "acct15",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84161,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job12",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 1145,
+    "set": true
+   },
+   "qos": "high_t4",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "Nodes required for job are DOWN, DRAINED or reserved for jobs in higher priority partitions",
+   "state_reason": "Resources",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794988858,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 5750,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user35"
+  },
+  {
+   "account": "acct15",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84163,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job13",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 1145,
+    "set": true
+   },
+   "qos": "high_t4",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "ReqNodeNotAvail, May be reserved for other job",
+   "state_reason": "ReqNodeNotAvail",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794988859,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 5750,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user35"
+  },
+  {
+   "account": "acct10",
+   "array_job_id": {
+    "infinite": false,
+    "number": 84169,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "0-11%1",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84169,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job14",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 71,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Dependency",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794991443,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:4",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=6,gres/gpu=4,gres/gpu:a30=4",
+   "user_name": "user8"
+  },
+  {
+   "account": "acct10",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84171,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job15",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 1071,
+    "set": true
+   },
+   "qos": "high_t2",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794991443,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 240,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:4",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=6,gres/gpu=4,gres/gpu:a30=4",
+   "user_name": "user8"
+  },
+  {
+   "account": "acct10",
+   "array_job_id": {
+    "infinite": false,
+    "number": 84172,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "0-11%1",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84172,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job16",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 1071,
+    "set": true
+   },
+   "qos": "high_t2",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Dependency",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794991443,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:4",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=6,gres/gpu=4,gres/gpu:a30=4",
+   "user_name": "user8"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83791,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job17",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982504,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83792,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job18",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982507,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83793,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job19",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794983756,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83794,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job20",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982294,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83796,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job21",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794983686,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83797,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job22",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982586,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83798,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job23",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982521,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83799,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job24",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008062,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83800,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job25",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008062,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83801,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job26",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008060,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83802,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job27",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008078,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83803,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job28",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008067,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct16",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83804,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job29",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 10,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008066,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:1",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=1,gres/gpu=1,gres/gpu:a30=1",
+   "user_name": "user20"
+  },
+  {
+   "account": "acct15",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83813,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job30",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 35,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008060,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=5504M,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user7"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83820,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job31",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982682,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83821,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job32",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-1,a30-2",
+   "priority": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794982979,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83822,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job33",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 1001,
+    "set": true
+   },
+   "qos": "high_t5",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "Priority",
+   "submit_time": {
+    "infinite": false,
+    "number": 1795008060,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 4320,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83824,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job34",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a30-2,a30-1",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794981943,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a30:2",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=3,gres/gpu=2,gres/gpu:a30=2",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct19",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83825,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job35",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "job requeued in held state",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979353,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 1440,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:4",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=4,gres/gpu=4,gres/gpu:a10=4",
+   "user_name": "user17"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83848,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job36",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 20,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83849,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job37",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 20,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83850,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job38",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 20,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 83851,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job39",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 20,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  },
+  {
+   "account": "acct13",
+   "array_job_id": {
+    "infinite": false,
+    "number": 83852,
+    "set": true
+   },
+   "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "array_task_string": "",
+   "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "gres_detail": [],
+   "job_id": 84071,
+   "job_state": [
+    "PENDING"
+   ],
+   "name": "job40",
+   "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+   },
+   "nodes": "",
+   "partition": "a10-1,a10-2",
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "qos": "low",
+   "start_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   },
+   "state_description": "",
+   "state_reason": "JobHeldUser",
+   "submit_time": {
+    "infinite": false,
+    "number": 1794979764,
+    "set": true
+   },
+   "time_limit": {
+    "infinite": false,
+    "number": 360,
+    "set": true
+   },
+   "tres_alloc_str": "",
+   "tres_per_node": "gres/gpu:a10:1",
+   "tres_req_str": "cpu=1,mem=6.50G,node=1,billing=1,gres/gpu=1,gres/gpu:a10=1",
+   "user_name": "user18"
+  }
+ ],
+ "meta": {
+  "slurm": {
+   "cluster": "testcluster",
+   "release": "25.11.6",
+   "version": {
+    "major": "25",
+    "micro": "6",
+    "minor": "11"
+   }
+  }
+ }
+}

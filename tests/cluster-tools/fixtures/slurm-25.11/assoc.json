@@ -1,0 +1,960 @@
+{
+ "associations": [
+  {
+   "account": "root",
+   "default": {
+    "qos": ""
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "normal"
+   ],
+   "user": ""
+  },
+  {
+   "account": "root",
+   "default": {
+    "qos": ""
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "normal"
+   ],
+   "user": "root"
+  },
+  {
+   "account": "acct1",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct1",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "hotfix",
+    "low"
+   ],
+   "user": "user14"
+  },
+  {
+   "account": "acct1",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "hotfix",
+    "low"
+   ],
+   "user": "user28"
+  },
+  {
+   "account": "acct2",
+   "default": {
+    "qos": ""
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "normal"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct2",
+   "default": {
+    "qos": ""
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "normal"
+   ],
+   "user": "root"
+  },
+  {
+   "account": "acct6",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct3",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct4",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct4",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user2"
+  },
+  {
+   "account": "acct4",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user10"
+  },
+  {
+   "account": "acct4",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user24"
+  },
+  {
+   "account": "acct5",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct5",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user1"
+  },
+  {
+   "account": "acct5",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user11"
+  },
+  {
+   "account": "acct5",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user22"
+  },
+  {
+   "account": "acct5",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user41"
+  },
+  {
+   "account": "acct5",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "user49"
+  },
+  {
+   "account": "acct7",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct8",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct8",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user5"
+  },
+  {
+   "account": "acct8",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user13"
+  },
+  {
+   "account": "acct8",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user14"
+  },
+  {
+   "account": "acct8",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user30"
+  },
+  {
+   "account": "acct8",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user39"
+  },
+  {
+   "account": "acct9",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct9",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user25"
+  },
+  {
+   "account": "acct9",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user32"
+  },
+  {
+   "account": "acct9",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user44"
+  },
+  {
+   "account": "acct9",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user45"
+  },
+  {
+   "account": "acct9",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user47"
+  },
+  {
+   "account": "acct10",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct10",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user8"
+  },
+  {
+   "account": "acct10",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user16"
+  },
+  {
+   "account": "acct10",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user34"
+  },
+  {
+   "account": "acct10",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "user36"
+  },
+  {
+   "account": "acct11",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user9"
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user15"
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user21"
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user23"
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user26"
+  },
+  {
+   "account": "acct12",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user46"
+  },
+  {
+   "account": "acct13",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct13",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user6"
+  },
+  {
+   "account": "acct13",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user18"
+  },
+  {
+   "account": "acct13",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user29"
+  },
+  {
+   "account": "acct13",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "user42"
+  },
+  {
+   "account": "acct14",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct15",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct15",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user7"
+  },
+  {
+   "account": "acct15",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user35"
+  },
+  {
+   "account": "acct15",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user37"
+  },
+  {
+   "account": "acct15",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user38"
+  },
+  {
+   "account": "acct16",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct16",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user4"
+  },
+  {
+   "account": "acct16",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user20"
+  },
+  {
+   "account": "acct16",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "user40"
+  },
+  {
+   "account": "acct17",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct18",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct18",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user3"
+  },
+  {
+   "account": "acct18",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user12"
+  },
+  {
+   "account": "acct18",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user27"
+  },
+  {
+   "account": "acct18",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user31"
+  },
+  {
+   "account": "acct18",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user48"
+  },
+  {
+   "account": "acct19",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": ""
+  },
+  {
+   "account": "acct19",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user17"
+  },
+  {
+   "account": "acct19",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user19"
+  },
+  {
+   "account": "acct19",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user28"
+  },
+  {
+   "account": "acct19",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user33"
+  },
+  {
+   "account": "acct19",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": true,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "user43"
+  }
+ ],
+ "meta": {
+  "slurm": {
+   "cluster": "testcluster",
+   "release": "25.11.6",
+   "version": {
+    "major": "25",
+    "micro": "6",
+    "minor": "11"
+   }
+  }
+ }
+}
