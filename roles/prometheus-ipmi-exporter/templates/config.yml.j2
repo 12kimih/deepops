@@ -1,0 +1,4 @@
+{{ ansible_managed | comment }}
+modules:
+  default:
+    collectors: {{ ipmi_exporter_collectors | to_json }}

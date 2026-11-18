@@ -1,0 +1,17 @@
+---
+ipmi_exporter_container: "quay.io/prometheuscommunity/ipmi-exporter:v1.10.1"
+ipmi_exporter_port: 9290
+# Hosts listed as scrape targets.
+ipmi_exporter_host_group: slurm-cluster
+ipmi_exporter_config_dir: /etc/ipmi-exporter
+# In-band collectors read through /dev/ipmi0. dcmi gives whole-system power draw.
+ipmi_exporter_collectors: [bmc, ipmi, chassis, dcmi, sel]
+ipmi_exporter_kernel_modules: [ipmi_devintf, ipmi_si]
+ipmi_exporter_svc_name: "docker.ipmi-exporter.service"
+ipmi_exporter_state: started
+ipmi_exporter_enabled: true
+ipmi_exporter_max_cpu: "0.2"
+
+prometheus_config_dir: /etc/prometheus
+prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
+ipmi_exporter_conf_template: "ipmi-exporter.yml.j2"

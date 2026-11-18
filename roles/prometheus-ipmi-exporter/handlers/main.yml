@@ -1,0 +1,5 @@
+---
+- name: Restart ipmi-exporter
+  ansible.builtin.service:
+    name: "{{ ipmi_exporter_svc_name }}"
+    state: restarted
