@@ -50,17 +50,19 @@ class TextfileTests(unittest.TestCase):
         text = metrics.textfile({"jobs": [running(1, 'a"b\\c', "gpu1", ["gpu:a10:1(IDX:0)"])]}, {"nodes": []})
         self.assertIn('user="a\\"b\\\\c"', text)
 
+    def test_each_gpu_carries_its_own_type_and_joins_its_node(self):
+        jobs = {"jobs": [running(1, "u", "gpu[1-2]", ["gpu:a10:1(IDX:0)", "gpu:a30:1(IDX:3)"]),
+                         running(2, "u", "gpu3", ["gpu:2(IDX:0-1)"])]}  # fmt: skip
+        nodes = {"nodes": [{"name": "gpu3", "gres": "gpu:2"}]}
+        text = metrics.textfile(jobs, nodes)
+        self.assertIn('node="gpu1",gpu="0",gpu_type="a10"', text)
+        self.assertIn('node="gpu2",gpu="3",gpu_type="a30"', text)
+        # Untyped: the same empty type on the allocation and the node, so the two join.
+        self.assertIn('node="gpu3",gpu="1",gpu_type=""', text)
+        self.assertIn('slurm_node_gpus{node="gpu3",gpu_type=""} 2', text)
+
 
 class WriteTests(unittest.TestCase):
-    def test_atomic_replace_leaves_no_temporary_file(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "slurm_gpu.prom"
-            path.write_text("old\n")
-            metrics.write(str(path), "new\n")
-            self.assertEqual(path.read_text(), "new\n")
-            self.assertEqual([p.name for p in Path(d).iterdir()], ["slurm_gpu.prom"])
-            self.assertEqual(path.stat().st_mode & 0o777, 0o644)
-
     def test_command_writes_and_keeps_the_old_file_on_failure(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "slurm_gpu.prom"
@@ -72,6 +74,14 @@ class WriteTests(unittest.TestCase):
             self.assertEqual(r.returncode, 1)
             self.assertEqual(path.read_text(), "previous\n")
             self.assertEqual(run_tool("metrics").returncode, 2)
+
+    def test_a_file_error_is_not_blamed_on_slurm(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "no-dir" / "slurm_gpu.prom")
+            r = run_tool("metrics", path)
+            self.assertEqual(
+                (r.returncode, r.stderr.strip()), (1, f"metrics: {path}: No such file or directory")
+            )
 
 
 if __name__ == "__main__":

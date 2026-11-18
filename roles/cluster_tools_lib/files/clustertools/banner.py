@@ -25,6 +25,15 @@ def script(title, commands=(), links=(), flavour=render.DEFAULT_FLAVOUR, color=T
     if not name:
         raise ValueError(f"unknown flavour {flavour!r}; choose one of {', '.join(render.FLAVOURS)}")
     t = render.Theme(name, color=color, depth=24, ascii=False)
+    # Each text is one printed line. A newline would let a line read BANNER, ending the
+    # here-document so the rest ran as shell; other control characters garble the screen.
+    for where, value in [("title", title)] + [
+        (r.get("name", "?"), r[k]) for r in [*commands, *links] for k in ("name", "text")
+    ]:
+        if not str(value).isprintable():
+            raise ValueError(
+                f"banner {where}: {value!r} holds a control character (a newline?); keep it to one line"
+            )
 
     def paint(part, text):
         return t.paint(t.c[_ROLES[part]] + (t.bold if part == "title" else ""), text)
@@ -42,7 +51,7 @@ def script(title, commands=(), links=(), flavour=render.DEFAULT_FLAVOUR, color=T
         lines.append(rule)
         lines += [f"   {paint('link', render.pad(c['name'], w))}  {paint('text', c['text'])}" for c in links]
     lines.append("")
-    # Every line is empty or indented, so none can read BANNER and end the here-document.
+    # Every line is empty or indented and none holds a newline, so none can read BANNER.
     body = "\n".join(lines)
     return "\n".join(
         [

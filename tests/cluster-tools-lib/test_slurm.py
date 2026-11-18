@@ -70,12 +70,58 @@ class JobTests(unittest.TestCase):
 
     def test_gpus_per_node_and_mismatch(self):
         job = {"job_id": 1, "nodes": "gpu[1-2]", "gres_detail": ["gpu:a10:1(IDX:5)", "gpu:a10:2(IDX:0-1)"]}
-        self.assertEqual(slurm.job_gpus(job), ([("gpu1", 5), ("gpu2", 0), ("gpu2", 1)], {"a10"}))
+        gpus, types = slurm.job_gpus(job)
+        self.assertEqual(gpus, [("gpu1", 5), ("gpu2", 0), ("gpu2", 1)])
+        self.assertEqual(set(types.values()), {"a10"})
         job["gres_detail"] = ["gpu:a10:1(IDX:5)"]
-        self.assertEqual(slurm.job_gpus(job), ([], set()))
+        self.assertEqual(slurm.job_gpus(job), ([], {}))
+
+    def test_each_gpu_has_its_own_type(self):
+        job = {
+            "job_id": 1,
+            "nodes": "gpu[1-2]",
+            "gres_detail": ["gpu:a10:1(IDX:0),gpu:a30:2(IDX:2,4)", "gpu:2(IDX:0-1)"],
+        }
+        gpus, types = slurm.job_gpus(job)
+        self.assertEqual(gpus, [("gpu1", 0), ("gpu1", 2), ("gpu1", 4), ("gpu2", 0), ("gpu2", 1)])
+        # An untyped GPU has no type; its count is never read as one.
+        self.assertEqual([types[g] for g in gpus], ["a10", "a30", "a30", "", ""])
+
+    def test_a_node_holding_none_is_skipped(self):
+        job = {"job_id": 1, "nodes": "gpu[1-2]", "gres_detail": ["gpu:a10:1(IDX:0)", "gpu:a10:0(IDX:N/A)"]}
+        self.assertEqual(slurm.job_gpus(job)[0], [("gpu1", 0)])
+
+
+class GresTests(unittest.TestCase):
+    def test_items_keep_commas_inside_parentheses(self):
+        self.assertEqual(
+            slurm.gres_items("gpu:a10:4(S:0-1),gpu:2,gpu:a30:1(IDX:0,2-3),mps:100"),
+            [
+                ("gpu", "a10", 4, "S:0-1"),
+                ("gpu", "", 2, ""),
+                ("gpu", "a30", 1, "IDX:0,2-3"),
+                ("mps", "", 100, ""),
+            ],
+        )
+        self.assertEqual(slurm.gres_items(""), [])
+
+    def test_node_gpus_by_type(self):
+        self.assertEqual(slurm.node_gpus("gpu:a10:4(S:0-1),gpu:a10:2,gpu:3,mps:100"), {"a10": 6, "": 3})
+        self.assertEqual(slurm.node_gpus(None), {})
+
+    def test_ranges_refuse_what_is_not_one(self):
+        with self.assertRaises(ValueError):
+            slurm.expand_ranges("N/A")
 
 
 class ArrayTests(unittest.TestCase):
+    def test_membership_follows_steps_and_ignores_the_throttle(self):
+        self.assertEqual(
+            [slurm.array_has("0-9:3%2", t) for t in (0, 3, 4, 9, 10)], [True, True, False, True, False]
+        )
+        self.assertTrue(slurm.array_has("1,5-6", 6))
+        self.assertFalse(slurm.array_has("", 0))
+
     def test_task_counts(self):
         for spec, n in (
             ("1-10%2", 10),
@@ -138,6 +184,31 @@ class SchemaTests(unittest.TestCase):
     def test_a_missing_list_is_raised(self):
         with self.assertRaisesRegex(slurm.SchemaError, "no 'nodes' list"):
             slurm.check("nodes", {"meta": {}})
+
+
+class ErrorTests(unittest.TestCase):
+    """Every Slurm failure is a slurm.Error carrying its line and exit status."""
+
+    def test_missing_client_is_127(self):
+        with self.assertRaises(slurm.Missing) as ctx:
+            slurm.run("no-such-slurm-client")
+        self.assertEqual((ctx.exception.status, str(ctx.exception)),
+                         (127, "no-such-slurm-client not found; run this on a Slurm client."))  # fmt: skip
+
+    def test_failed_client_names_itself(self):
+        with self.assertRaises(slurm.Failed) as ctx:
+            slurm.run("false")
+        self.assertEqual((ctx.exception.status, str(ctx.exception)), (1, "false: false exited with status 1"))
+
+    def test_unreadable_reply_is_a_schema_error(self):
+        saved = slurm.run
+        try:
+            for reply in ("not json", "[]"):
+                slurm.run = lambda *cmd, reply=reply: reply
+                with self.assertRaises(slurm.SchemaError):
+                    slurm.load("nodes")
+        finally:
+            slurm.run = saved
 
 
 class FailureTests(unittest.TestCase):

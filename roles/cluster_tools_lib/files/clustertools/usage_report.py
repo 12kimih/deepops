@@ -16,16 +16,18 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
+from clustertools.files import write_atomic
 from clustertools.slurm import (
-    FAILURES,
-    GPU_CONFIGURED,
-    GPU_REQUESTED,
-    failure,
+    Error,
+    Failed,
     job_gpus,
     job_label,
+    job_tasks,
     load,
+    node_gpus,
     num,
     run,
+    tres_str,
 )
 from clustertools.vocab import node_unavailable
 
@@ -64,14 +66,17 @@ def parse_jobs(data, now):
                     "qos": job.get("qos", ""),
                     "runtime": max(0, now - (num(job.get("start_time")) or now)),
                     "gpus": gpus,
-                    "gpu_type": ",".join(sorted(types)),
+                    "gpu_type": ",".join(sorted({t for t in types.values() if t})),
                 }
             )
         elif "PENDING" in state:
             entry = pending[job["user_name"]]
-            entry["jobs"] += 1
-            entry["gpus"] += sum(int(n) for n in GPU_REQUESTED.findall(job.get("tres_req_str") or ""))
-            entry["reasons"][job.get("state_reason") or "None"] += 1
+            # A pending array record is all its unstarted tasks, each asking for the
+            # record's request, as sq and the scheduler count them.
+            tasks = job_tasks(job)
+            entry["jobs"] += tasks
+            entry["gpus"] += tasks * int(tres_str(job.get("tres_req_str")).get("gres/gpu") or 0)
+            entry["reasons"][job.get("state_reason") or "None"] += tasks
             submit = num(job.get("submit_time"))
             if submit:
                 entry["wait"] = max(entry["wait"], now - submit)
@@ -82,7 +87,7 @@ def parse_nodes(data):
     """({node: gpu count}, [(node, state, since, user, reason)]) from `scontrol --json show nodes`."""
     gpus, unavailable = {}, []
     for node in data["nodes"]:
-        gpus[node["name"]] = sum(int(n) for n in GPU_CONFIGURED.findall(node.get("gres") or ""))
+        gpus[node["name"]] = sum(node_gpus(node.get("gres")).values())
         state = node_unavailable(node.get("state") or [])
         if state:
             changed = num(node.get("reason_changed_at"))
@@ -201,6 +206,14 @@ def table(header, rows):
 
 
 def section(text):
+    """A Slack section. Slack rejects one over 3000 characters, failing the whole post, so
+    a longer text is cut at a line, says how much was left out, and closes a code block
+    it cut open."""
+    if len(text) > MAX_SECTION:
+        kept = text[: MAX_SECTION - 40].rsplit("\n", 1)[0]
+        left = [ln for ln in text[len(kept) :].splitlines() if ln and ln != "```"]
+        fence = "\n```" if kept.count("```") % 2 else ""
+        text = f"{kept}\n... {len(left)} more lines{fence}"
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
@@ -305,10 +318,9 @@ def render(report, cfg, who):
         head = (
             f"*{user}*  {n} GPU ({100 * n / total:.1f}%)  |  {len(ujobs)} job{'s' if len(ujobs) > 1 else ''}"
         )
-        body = table(("JOB", "GPU", "NODE", "TIME", "QOS", "UTIL", "MEM", ""), rows)
-        if len(head) + len(body) > MAX_SECTION:  # a very long table is cut, not rejected by Slack
-            body = body[: MAX_SECTION - len(head) - 8] + "\n...\n```"
-        blocks.append(section(f"{head}\n{body}"))
+        blocks.append(
+            section(f"{head}\n{table(('JOB', 'GPU', 'NODE', 'TIME', 'QOS', 'UTIL', 'MEM', ''), rows)}")
+        )
 
     thread = [("GPU usage details", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
     return (text, summary), thread
@@ -423,40 +435,64 @@ def report_once():
         member = slack_id(user, cfg, slack, cache) if mention else ""
         return f"<@{member}> ({user})" if member else user
 
+    if preview:  # a preview notifies, cancels and records nothing
+        post_report(report, cfg, who, slack, args.to)
+        return
+    # From here the state is saved whatever fails: when each job turned idle and whom
+    # this run notified, so a failure is not followed by notifying everyone again.
+    try:
+        act(report, cfg, who, slack, cache, now)
+    finally:
+        write_atomic(cfg["state_file"], json.dumps(state), mode=0o600)
+
+
+def post_report(report, cfg, who, slack, to):
+    """The summary card and its thread; returns (channel, ts) of the card."""
     (text, summary), thread = render(report, cfg, who)
-    channel = slack.channel(args.to) if args.to else cfg["channel"]
+    channel = slack.channel(to) if to else cfg["channel"]
     ts = slack.post(channel, text, summary)
     for t, blocks in thread:
         slack.post(channel, t, blocks, thread_ts=ts)
-    if preview:
-        return
+    return channel, ts
 
+
+def act(report, cfg, who, slack, cache, now):
+    """Post the report, notify the owners of idle jobs and cancel those idle too long.
+    One failed notification or cancellation does not stop the rest; the run still
+    fails at the end, naming them."""
+    channel, ts = post_report(report, cfg, who, slack, None)
+    failures = []
     for j in report["idle"]:
         if not j["notify"]:
             continue
         if "dm" in cfg["notify"]:
-            member = slack_id(j["user"], cfg, slack, cache)
-            if member:
-                slack.post(
-                    slack.channel(member),
-                    cfg["dm_text"].format(
-                        job=j["label"],
-                        gpus=len(j["gpus"]),
-                        hours=f"{cfg['idle_hours']:g}",
-                        runtime=duration(j["runtime"]),
-                    ),
-                )
+            try:
+                member = slack_id(j["user"], cfg, slack, cache)
+                if member:
+                    slack.post(
+                        slack.channel(member),
+                        cfg["dm_text"].format(
+                            job=j["label"],
+                            gpus=len(j["gpus"]),
+                            hours=f"{cfg['idle_hours']:g}",
+                            runtime=duration(j["runtime"]),
+                        ),
+                    )
+            except (RuntimeError, OSError) as e:
+                failures.append(f"notifying {j['user']} of {j['label']}: {e}")
+                continue  # not marked notified: the next run tries again
         j["state"]["notified"] = now
 
     if cfg["cancel_after_hours"] > 0:
-        cancelled = [
-            j for j in report["idle"] if now - j["state"]["since"] >= cfg["cancel_after_hours"] * 3600
-        ]
-        for j in cancelled:
+        cancelled = []
+        for j in report["idle"]:
+            if now - j["state"]["since"] < cfg["cancel_after_hours"] * 3600:
+                continue
             try:
                 run("scancel", j["id"])
-            except FAILURES as e:  # announced below either way; the log says why it failed
-                print(f"slurm-usage-report: scancel {j['id']}: {failure(e)}", file=sys.stderr)
+                cancelled.append(j)
+            except Failed as e:
+                failures.append(f"scancel {j['id']}: {e}")
         if cancelled:
             slack.post(
                 channel,
@@ -472,15 +508,14 @@ def report_once():
                 ],
                 thread_ts=ts,
             )
-
-    with open(cfg["state_file"], "w") as f:
-        json.dump(state, f)
+    if failures:
+        raise RuntimeError("; ".join(failures))
 
 
 def main():
     try:
         report_once()
-    except (*FAILURES, RuntimeError, OSError, ValueError) as e:
+    except (Error, RuntimeError, OSError, ValueError) as e:
         print(f"slurm-usage-report: {e}", file=sys.stderr)
         return 1
     return 0

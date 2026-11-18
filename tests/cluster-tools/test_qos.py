@@ -118,13 +118,17 @@ class CommandTests(unittest.TestCase):
     def test_failed_usage_read_is_reported_not_zero(self):
         r = run_tool("qos", env={"FAKE_FAIL": "slurm_load_jobs error: Rate limit exceeded"})
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("live usage unavailable: slurm_load_jobs error: Rate limit exceeded", r.stdout)
+        self.assertIn(
+            "live usage unavailable: scontrol: slurm_load_jobs error: Rate limit exceeded", r.stdout
+        )
         self.assertRegex(r.stdout, r" -/14 ")
 
     def test_stalled_usage_read_is_bounded(self):
         r = run_tool("qos", env={"FAKE_SLEEP": "3", "CLUSTER_TOOLS_TIMEOUT": "1"})
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("live usage unavailable: no answer in 1 s (slurmctld slow, or rate limiting", r.stdout)
+        self.assertIn(
+            "live usage unavailable: scontrol: no answer in 1 s (slurmctld slow, or rate limiting", r.stdout
+        )
 
     def test_stalled_accounting_read_fails_in_one_line(self):
         r = run_tool("qos", env={"FAKE_DBD_SLEEP": "3", "CLUSTER_TOOLS_TIMEOUT": "1"})

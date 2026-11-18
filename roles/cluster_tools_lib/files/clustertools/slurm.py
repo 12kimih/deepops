@@ -24,13 +24,39 @@ import sys
 TIMEOUT = int(os.environ.get("CLUSTER_TOOLS_TIMEOUT") or 20)
 
 
+class Error(Exception):
+    """A Slurm read that did not give an answer. str() is one line on why, `status` the
+    exit status a command reports it with. Everything this module raises about Slurm is
+    one of these, so a caller catches Slurm's failures and nothing else: a file error
+    or a bug of its own is never reported as Slurm's."""
+
+    status = 1
+
+
+class Missing(Error):
+    """The Slurm client is not installed here."""
+
+    status = 127
+
+
+class Failed(Error):
+    """The client ran and failed, or did not answer in time."""
+
+
+class SchemaError(Error):
+    """A reply without what the tools rely on: an error inside it, unreadable JSON, or a
+    release that renamed something."""
+
+
 def run(*cmd):
-    """stdout of a Slurm client command. CalledProcessError when it fails,
-    TimeoutExpired when it has not answered within TIMEOUT seconds."""
-    return subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=TIMEOUT).stdout
-
-
-FAILURES = (subprocess.CalledProcessError, subprocess.TimeoutExpired)
+    """stdout of a Slurm client command; Missing, or Failed when it fails or has not
+    answered within TIMEOUT seconds."""
+    try:
+        return subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=TIMEOUT).stdout
+    except FileNotFoundError:
+        raise Missing(f"{cmd[0]} not found; run this on a Slurm client.") from None
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        raise Failed(f"{cmd[0]}: {failure(e)}") from None
 
 
 def failure(error):
@@ -105,10 +131,6 @@ FIELDS = {
 }
 
 
-class SchemaError(ValueError):
-    """A Slurm reply without what the tools rely on: a new release renamed something."""
-
-
 def check(kind, data):
     """DATA, a parsed reply to QUERIES[KIND], or SchemaError naming what is missing. An
     error Slurm reported inside the reply is raised too: it would otherwise leave an
@@ -135,7 +157,14 @@ def check(kind, data):
 
 def load(kind):
     """Read QUERIES[KIND] from Slurm, checked against FIELDS[KIND]."""
-    return check(kind, json.loads(run(*QUERIES[kind][0])))
+    cmd = QUERIES[kind][0]
+    try:
+        data = json.loads(run(*cmd))
+    except ValueError as e:
+        raise SchemaError(f"{cmd[0]}: unreadable JSON for {kind}: {e}") from None
+    if not isinstance(data, dict):
+        raise SchemaError(f"{cmd[0]}: the reply for {kind} is not a JSON object")
+    return check(kind, data)
 
 
 def cluster_name(data):
@@ -155,11 +184,13 @@ def num(value):
 
 
 def expand_ranges(spec):
-    """'0-2,5' -> [0, 1, 2, 5]"""
+    """'0-2,5' -> [0, 1, 2, 5]; ValueError for anything else."""
     out = []
     for part in spec.split(","):
-        lo, _, hi = part.partition("-")
-        out.extend(range(int(lo), int(hi or lo) + 1))
+        m = re.fullmatch(r"(\d+)(?:-(\d+))?", part)
+        if not m:
+            raise ValueError(f"not an index range: {spec!r}")
+        out.extend(range(int(m.group(1)), int(m.group(2) or m.group(1)) + 1))
     return out
 
 
@@ -208,26 +239,32 @@ def hostnames(nodelist):
 # --- Jobs ---------------------------------------------------------------------------
 
 
-def array_tasks(spec):
-    """How many tasks a pending array record stands for (ArrayTaskId 1-100:2%10). Slurm
-    keeps an array's unstarted tasks as one record; each is a job to the scheduler and
-    to every limit. The %N throttle does not change the count."""
-    count = 0
+def _array_ranges(spec):
+    """(first, last, step) for each part of an ArrayTaskId spec (1-100:2,200%10). The
+    %N throttle limits how many run at once, not which tasks exist."""
     for part in (spec or "").split("%")[0].split(","):
-        m = re.fullmatch(r"(\d+)-(\d+)(?::(\d+))?", part)
+        m = re.fullmatch(r"(\d+)(?:-(\d+)(?::(\d+))?)?", part)
         if m:
-            step = int(m.group(3) or 1) or 1
-            count += (int(m.group(2)) - int(m.group(1))) // step + 1
-        elif part.isdigit():
-            count += 1
-    return max(count, 1)
+            first = int(m.group(1))
+            yield first, int(m.group(2) or first), int(m.group(3) or 1) or 1
 
 
-# --- Job GPUs -------------------------------------------------------------------------
+def array_tasks(spec):
+    """How many tasks a pending array record stands for. Slurm keeps an array's
+    unstarted tasks as one record; each is a job to the scheduler and to every limit."""
+    return max(sum((last - first) // step + 1 for first, last, step in _array_ranges(spec)), 1)
 
-GPU_DETAIL = re.compile(r"gpu(?::([^:,(]+))?(?::\d+)?\(IDX:([^)]+)\)")
-GPU_REQUESTED = re.compile(r"(?:^|,)gres/gpu=(\d+)")
-GPU_CONFIGURED = re.compile(r"gpu(?::[^:,(]+)?:(\d+)")
+
+def array_has(spec, task):
+    """Is TASK (an int) among the tasks of the array record with SPEC?"""
+    return any(
+        first <= task <= last and (task - first) % step == 0 for first, last, step in _array_ranges(spec)
+    )
+
+
+def job_tasks(job):
+    """How many jobs a record of `show jobs` stands for: an array's pending tasks, else 1."""
+    return array_tasks(job["array_task_string"]) if job.get("array_task_string") else 1
 
 
 def job_label(job):
@@ -241,23 +278,62 @@ def job_label(job):
     return str(job["job_id"])
 
 
+# --- Generic resources (GRES) -------------------------------------------------------
+
+
+def gres_items(text):
+    """(name, type, count, extra) for each item of a GRES string: a node's gres
+    ("gpu:a10:4(S:0-1),gpu:2") or a job's gres_detail entry ("gpu:a10:2(IDX:0,2)").
+    Commas inside the parentheses belong to the item. type is "" for an untyped item,
+    count None when the item gives none."""
+    items, token, depth = [], "", 0
+    for c in (text or "") + ",":
+        depth += (c == "(") - (c == ")")
+        if c == "," and depth == 0:
+            if token:
+                items.append(token)
+            token = ""
+        else:
+            token += c
+    out = []
+    for item in items:
+        head, _, extra = item.partition("(")
+        name, *rest = head.split(":")
+        count = int(rest.pop()) if rest and rest[-1].isdigit() else None
+        out.append((name, ":".join(rest), count, extra.rstrip(")")))
+    return out
+
+
+def node_gpus(gres):
+    """{type: count} configured on a node, from its gres string; "" for untyped GPUs."""
+    counts = {}
+    for name, gtype, count, _ in gres_items(gres):
+        if name == "gpu" and count:
+            counts[gtype] = counts.get(gtype, 0) + count
+    return counts
+
+
 def job_gpus(job):
-    """([(host, index)], {gpu types}) from gres_detail, one entry per allocated node.
-    A detail list that does not match the node list attributes nothing rather than
-    guessing which node holds what."""
+    """([(host, index)], {(host, index): gpu type}) from gres_detail, which has one entry
+    per allocated node; IDX:N/A is a node where the job holds none. A detail list that
+    does not match the node list attributes nothing rather than guessing which node
+    holds what."""
     hosts, details = hostnames(job.get("nodes") or ""), job.get("gres_detail") or []
     if details and len(details) != len(hosts):
         print(
             f"job {job['job_id']}: {len(details)} GRES entries for {len(hosts)} nodes; GPUs not attributed",
             file=sys.stderr,
         )
-        return [], set()
-    gpus, types = [], set()
+        return [], {}
+    gpus, types = [], {}
     for host, detail in zip(hosts, details):
-        for gtype, spec in GPU_DETAIL.findall(detail):
-            if gtype:
-                types.add(gtype)
-            gpus.extend((host, i) for i in expand_ranges(spec))
+        for name, gtype, _, extra in gres_items(detail):
+            key, _, spec = extra.partition(":")
+            if name != "gpu" or key != "IDX" or spec == "N/A":
+                continue
+            for i in expand_ranges(spec):
+                gpus.append((host, i))
+                types[(host, i)] = gtype
     return gpus, types
 
 

@@ -225,7 +225,10 @@ class Command:
         env = os.environ if env is None else env
         argv = list(sys.argv[1:] if argv is None else argv)
         if self.env and env.get(self.env) and not (self.machine and self.machine in argv):
-            argv = shlex.split(env[self.env]) + argv
+            try:
+                argv = shlex.split(env[self.env]) + argv
+            except ValueError as e:  # an unbalanced quote
+                self.parser().error(f"${self.env}: {e}")
         refused = self.refused(argv)
         if refused:
             self.parser().error(f"{refused[0]}: {refused[1]}")
@@ -272,22 +275,20 @@ def swatch(theme):
 
 
 def run_main(name, body):
-    """Run BODY() -> exit status, with the failures every command shares: a missing
-    Slurm client is 127 with one clear line, a failing or silent one is 1 with one line
-    on why, unreadable output is 1, and Ctrl-C or a closed pipe end quietly."""
+    """Run BODY() -> exit status, with the failures every command shares, each as one
+    line: Slurm's (slurm.Error, with its own status: 127 for a missing client, else 1)
+    and a file's (1). Ctrl-C and a closed pipe end quietly. Anything else is a bug and
+    keeps its traceback, rather than being reported as Slurm's."""
     try:
         return body() or 0
-    except FileNotFoundError as e:
-        print(f"{name}: {e.filename} not found; run this on a Slurm client.", file=sys.stderr)
-        return 127
-    except slurm.FAILURES as e:
-        print(f"{name}: {e.cmd[0]}: {slurm.failure(e)}", file=sys.stderr)
-        return 1
-    except ValueError as e:  # json.JSONDecodeError among them
-        print(f"{name}: unreadable Slurm output: {e}", file=sys.stderr)
-        return 1
+    except slurm.Error as e:
+        print(f"{name}: {e}", file=sys.stderr)
+        return e.status
     except KeyboardInterrupt:
         return 130
     except BrokenPipeError:
         sys.stderr.close()  # `qos | head`: nothing left to say
         return 0
+    except OSError as e:
+        print(f"{name}: {e.filename}: {e.strerror}" if e.filename else f"{name}: {e}", file=sys.stderr)
+        return 1

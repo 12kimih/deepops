@@ -263,8 +263,8 @@ def main(argv=None):
         if args.usage:
             try:
                 jobs = slurm.load("jobs")
-            except slurm.FAILURES as e:
-                usage_error = slurm.failure(e)
+            except (slurm.Failed, slurm.SchemaError) as e:
+                usage_error = str(e)
         usage = args.usage and not usage_error
         model = build(qos_data, assoc_data, jobs, args.user or _me(), usage, args.mine, args.all)
         model["usage_error"] = usage_error
