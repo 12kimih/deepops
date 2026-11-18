@@ -66,11 +66,14 @@
 - name: Setup server
   ansible.builtin.include_tasks: server.yml
   when: nfs_is_server
+  tags: always
 
 - name: Setup firewall
   ansible.builtin.include_tasks: firewall.yml
   when: nfs_is_server
+  tags: always
 
 - name: Setup client
   ansible.builtin.include_tasks: client.yml
   when: nfs_is_client
+  tags: always
