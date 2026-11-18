@@ -70,6 +70,9 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── cachefilesd
 │   ├── cluster_sudoers
 │   ├── cluster_tools
+│   ├── deepops_chrony
+│   ├── deepops_hosts
+│   ├── deepops_users
 │   ├── default_target
 │   ├── dns-config
 │   ├── docker
@@ -80,13 +83,12 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── easy-build-packages
 │   ├── enroot
 │   ├── facts
-│   ├── galaxy
 │   ├── grafana
-│   ├── hosts
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
 │   ├── lmod
 │   ├── locale
+│   ├── maas-controller
 │   ├── mofed
 │   ├── move-home-dirs
 │   ├── netapp-trident
@@ -115,7 +117,6 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia_power_limit
 │   ├── openmpi
-│   ├── openshift
 │   ├── prometheus
 │   ├── prometheus-node-exporter
 │   ├── prometheus-slurm-exporter
@@ -123,6 +124,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── roce_backend
 │   ├── rsyslog_client
 │   ├── rsyslog_server
+│   ├── runai
 │   ├── serial_console
 │   ├── slurm
 │   ├── spack

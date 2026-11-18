@@ -19,7 +19,7 @@
 __pycache__/
 *.py[cod]
 
-# claude code
+# local, untracked notes
 /CLAUDE.md
 /tasks/
 
