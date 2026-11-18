@@ -34,7 +34,8 @@ class AirgapPinTests(unittest.TestCase):
         registry = yaml.safe_load(
             (ROOT / "roles/standalone-container-registry/defaults/main.yml").read_text()
         )["standalone_container_registry_image"]
-        expected = registry.removeprefix("registry:")
+        # The image is pinned as registry:<version>@sha256:<digest>; docs cite the version.
+        expected = registry.removeprefix("registry:").split("@", 1)[0]
         for path in (
             "skills/deploy-airgapped/SKILL.md",
             "docs/airgap/mirror-docker-images.md",

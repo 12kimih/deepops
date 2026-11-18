@@ -70,10 +70,15 @@ def gen_versions(_arg):
             if (
                 PIN.search(name)
                 and literal(value)
-                and re.match(r"^(v?\d|[0-9a-f]{12,}$|[\w./-]+:[\w.-]+$|[\w.-]+\.tar)", str(value))
+                and re.match(
+                    r"^(v?\d|[0-9a-f]{12,}$|[\w./-]+:[\w.-]+(@sha256:[0-9a-f]{64})?$|[\w.-]+\.tar)",
+                    str(value),
+                )
             ):
+                # Images are pinned by digest; a 12-character prefix identifies it in the table.
+                shown = re.sub(r"(@sha256:[0-9a-f]{12})[0-9a-f]{52}$", r"\1", str(value))
                 rows.append(
-                    f"| {role} | `{name}` | `{cell(value)}` | {('`' + cell(example[name]) + '`') if name in example and example[name] != str(value) else ''} |"
+                    f"| {role} | `{name}` | `{cell(shown)}` | {('`' + cell(example[name]) + '`') if name in example and example[name] != str(value) else ''} |"
                 )
     return "\n".join(rows) + "\n"
 

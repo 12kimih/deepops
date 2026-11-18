@@ -1,0 +1,21 @@
+---
+# Pull one container image at deploy time, pinned by digest (repo:tag@sha256:...): the
+# tag documents the version, the digest is what runs, so a moved tag can never change a
+# service. Services then start from the local image and never pull, so a registry
+# outage or a rewritten tag cannot break or alter a restart.
+#   ansible.builtin.include_role:
+#     name: container_image
+#   vars:
+#     container_image: "{{ prometheus_container }}"
+- name: Require a digest-pinned image
+  ansible.builtin.assert:
+    that: container_image is search('@sha256:[0-9a-f]{64}$')
+    fail_msg: >-
+      {{ container_image }} is not pinned by digest. Use repo:tag@sha256:<digest>
+      (docker buildx imagetools inspect repo:tag shows it); keep the digest when mirroring.
+    quiet: true
+
+- name: Pull {{ container_image }}
+  ansible.builtin.command: docker pull {{ container_image | quote }}
+  register: container_image_pull
+  changed_when: "'Downloaded newer image' in container_image_pull.stdout"

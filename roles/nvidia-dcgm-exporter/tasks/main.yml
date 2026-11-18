@@ -1,4 +1,10 @@
 ---
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ nvidia_dcgm_container }}"
+
 - name: Create config dir
   ansible.builtin.file:
     path: "{{ prometheus_config_dir }}"

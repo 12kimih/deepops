@@ -11,7 +11,6 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
-ExecStartPre=/usr/bin/docker pull {{ alertmanager_container }}
 ExecStart=/usr/bin/docker run --rm --network host --name %n \
   -v {{ alertmanager_config_dir }}:/etc/alertmanager:ro \
   -v {{ alertmanager_docker_volume_name }}:/alertmanager \

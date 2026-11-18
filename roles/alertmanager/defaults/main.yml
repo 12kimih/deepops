@@ -1,7 +1,7 @@
 ---
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_config_src: templates/alertmanager.yml.j2
-alertmanager_container: "prom/alertmanager:v0.34.1"
+alertmanager_container: "prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a"
 alertmanager_port: 9093
 # Slack incoming webhook. Empty leaves the receiver without Slack, so alerts go nowhere.
 alertmanager_slack_api_url: ""

@@ -11,7 +11,6 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
-ExecStartPre=/usr/bin/docker pull {{ ipmi_exporter_container }}
 ExecStart=/usr/bin/docker run --rm --network host --name %n --user 0 \
   --cpus={{ ipmi_exporter_max_cpu }} --device /dev/ipmi0 \
   -v {{ ipmi_exporter_config_dir }}:/config:ro \

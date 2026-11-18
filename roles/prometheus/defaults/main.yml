@@ -1,7 +1,7 @@
 ---
 prometheus_config_dir: /etc/prometheus
 prometheus_config_src: templates/prometheus.yml.j2
-prometheus_container: "prom/prometheus:v3.15.0"
+prometheus_container: "prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e"
 prometheus_port: 9090
 prometheus_svc_name: "docker.prometheus.service"
 prometheus_docker_volume_name: "deepops_prometheus_metrics"

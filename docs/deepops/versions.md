@@ -9,17 +9,17 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 <!-- BEGIN GENERATED: versions -->
 | Role | Variable | Default | config.example |
 |---|---|---|---|
-| alertmanager | `alertmanager_container` | `prom/alertmanager:v0.34.1` |  |
+| alertmanager | `alertmanager_container` | `prom/alertmanager:v0.34.1@sha256:e9733bafb1bd` |  |
 | deepops_hosts | `hosts_playbook_version` | `1.0.1` |  |
 | easy-build-packages | `sm_files_repo_version` | `4ef7ae6cc2284f69412a8db5e10dddd92024eeab` |  |
 | enroot | `enroot_version` | `4.2.0` |  |
-| grafana | `grafana_container` | `grafana/grafana:13.2.4` |  |
+| grafana | `grafana_container` | `grafana/grafana:13.2.4@sha256:dbbc38ea2110` |  |
 | k8s-internal-container-registry | `container_registry_version` | `2.1.0` |  |
 | mofed | `mofed_doca_version` | `3.3.0` |  |
 | netapp-trident | `trident_version` | `26.02.1` |  |
 | netapp-trident | `trident_helm_chart_version` | `100.2602.1` |  |
 | nfs-client-provisioner | `k8s_nfs_client_chart_version` | `4.0.18` |  |
-| nginx-docker-registry-cache | `nginx_docker_cache_image` | `rpardini/docker-registry-proxy:0.7.0` |  |
+| nginx-docker-registry-cache | `nginx_docker_cache_image` | `rpardini/docker-registry-proxy:0.7.0@sha256:413c340ea5f8` |  |
 | nhc | `nhc_version` | `1.4.3` |  |
 | nvidia-dcgm-exporter | `nvidia_dcgm_container_version` | `4.5.3-4.8.2-distroless` |  |
 | nvidia-dgx-firmware | `firmware_update_tag` | `21.11.2` |  |
@@ -34,9 +34,9 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | nvidia_hpc_sdk | `hpcsdk_major_version` | `26` |  |
 | nvidia_hpc_sdk | `hpcsdk_minor_version` | `3` |  |
 | openmpi | `openmpi_version` | `5.0.10` |  |
-| prometheus | `prometheus_container` | `prom/prometheus:v3.15.0` |  |
-| prometheus-ipmi-exporter | `ipmi_exporter_container` | `quay.io/prometheuscommunity/ipmi-exporter:v1.10.1` |  |
-| prometheus-node-exporter | `node_exporter_container` | `quay.io/prometheus/node-exporter:v1.12.1` |  |
+| prometheus | `prometheus_container` | `prom/prometheus:v3.15.0@sha256:efd719c99d83` |  |
+| prometheus-ipmi-exporter | `ipmi_exporter_container` | `quay.io/prometheuscommunity/ipmi-exporter:v1.10.1@sha256:0662cadaf268` |  |
+| prometheus-node-exporter | `node_exporter_container` | `quay.io/prometheus/node-exporter:v1.12.1@sha256:1b4e4438faca` |  |
 | prometheus-slurm-exporter | `slurm_exporter_container` | `deepops/prometheus-slurm-exporter:2.0.0` |  |
 | pyxis | `slurm_pyxis_version` | `0.24.0` |  |
 | runai | `runai_kai_chart_version` | `v0.18.5` |  |
@@ -50,5 +50,5 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | slurm | `hwloc_version` | `2.13.0` |  |
 | slurm | `pmix_version` | `5.0.10` |  |
 | spack | `spack_version` | `v1.2.2` |  |
-| standalone-container-registry | `standalone_container_registry_image` | `registry:3.1.2` |  |
+| standalone-container-registry | `standalone_container_registry_image` | `registry:3.1.2@sha256:82f6ff4a7f98` |  |
 <!-- END GENERATED: versions -->

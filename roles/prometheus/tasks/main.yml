@@ -19,10 +19,11 @@
     state: present
 
 # promtool ships in the same image; pulling first lets it validate files below.
-- name: Pull prometheus image
-  community.docker.docker_image:
-    name: "{{ prometheus_container }}"
-    source: pull
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ prometheus_container }}"
 
 - name: Install alert rules
   ansible.builtin.copy:
