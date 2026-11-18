@@ -45,18 +45,12 @@ The role follows the DGX OS 6 guide:
    serial-over-LAN, logrotate, and additional DGX OS administration/development
    packages.
 
-The default driver branch is `550`, matching the DGX OS 6 examples. The settings on
-this page live in the role's `vars/`, which take precedence over `config/group_vars`,
-so override them on the command line:
+The default driver branch is `550`, matching the DGX OS 6 examples. The switches on
+this page are role defaults (`roles/nvidia-dgx/defaults/main.yml`), so set them in
+`config/group_vars` like any other setting:
 
-```bash
--e dgx_os6_driver_branch=580
-```
-
-Disruptive package upgrades are opt-in:
-
-```bash
--e '{"dgx_os6_upgrade_packages": true}'
+```yaml
+dgx_os6_driver_branch: "580"
 ```
 
 ## Red Hat Enterprise Linux 8 and 9
@@ -88,11 +82,6 @@ outside DeepOps:
 -e '{"dgx_redhat_manage_subscription_repos": false}'
 ```
 
-Disruptive `dnf update --nobest` behavior is opt-in:
-
-```bash
--e '{"dgx_redhat_upgrade_packages": true}'
-```
 
 ## Ubuntu 24.04 / DGX OS 7
 
@@ -108,11 +97,20 @@ The role follows the DGX OS 7 guide:
    including Fabric Manager, NVLSM/NVSDM, or IMEX packages for the DGX platform
    that requires them.
 
-Disruptive package upgrades are opt-in:
+## Upgrading DGX systems
+
+The role installs the DGX software; it does not upgrade every package. Upgrade with
+the rolling maintenance playbook, which drains each node, finishes an interrupted
+dpkg, upgrades, reboots with the shared filesystems detached and checks the node
+before it takes jobs again:
 
 ```bash
--e '{"dgx_os7_upgrade_packages": true}'
+ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=<dgx group>
 ```
+
+On Red Hat, add `-e maintenance_dnf_nobest=true` for the guide's `dnf update --nobest`.
+The old switches (`dgx_os6_upgrade_packages`, `dgx_os7_upgrade_packages`,
+`dgx_redhat_upgrade_packages`, `dgx_full_upgrade`) are refused with this pointer.
 
 ## Validation
 

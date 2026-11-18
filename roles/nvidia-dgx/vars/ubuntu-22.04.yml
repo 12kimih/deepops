@@ -1,18 +1,4 @@
 ---
-dgx_os6_repo_files_url: https://repo.download.nvidia.com/baseos/ubuntu/jammy/dgx-repo-files.tgz
-
-dgx_os6_upgrade_packages: false
-dgx_os6_install_driver: true
-dgx_os6_install_container_runtime: true
-dgx_os6_install_nvsm: true
-dgx_os6_install_admin_packages: true
-dgx_os6_install_development_packages: true
-dgx_os6_disable_unattended_upgrades: true
-dgx_os6_install_ipmisol: true
-dgx_os6_install_logrotate: true
-
-dgx_os6_driver_branch: "550"
-
 dgx_os6_platforms:
   - match: "DGX-1"
     nvswitch: false

@@ -33,14 +33,6 @@
     state: present
     disable_gpg_check: true
 
-- name: Upgrade Red Hat DGX Software Stack packages
-  ansible.builtin.dnf:
-    name: "*"
-    state: latest
-    nobest: true
-  when: dgx_redhat_upgrade_packages
-  tags: skip_ansible_lint
-
 - name: Install kernel development packages for DGX driver builds
   ansible.builtin.dnf:
     name:

@@ -1,0 +1,10 @@
+---
+# Run by the "Reboot node" handler: every reboot goes through roles/maintenance.
+- name: Reboot through the maintenance role
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: reboot
+  vars:
+    maintenance_force_reboot: true
+    maintenance_reason: "apply the enroot kernel settings"
+    maintenance_reboot_timeout: "{{ enroot_reboot_timeout }}"

@@ -4,6 +4,19 @@
     msg: "Role supports DGX systems only"
   when: ansible_facts.product_name is not search("DGX")
 
+# Upgrading every package belongs to the rolling maintenance upgrade, which drains the
+# node, finishes an interrupted dpkg, upgrades, reboots with the shared filesystems
+# detached and checks the node before it takes jobs again. This role used to do it
+# itself, four ways, with none of that.
+- name: Refuse the retired upgrade switches
+  ansible.builtin.fail:
+    msg: >-
+      {{ item }} was removed: upgrade DGX systems with
+      playbooks/utilities/apt-upgrade.yml -e hostlist=<group>
+      (add -e maintenance_dnf_nobest=true on Red Hat, as the DGX guide does).
+  when: lookup('ansible.builtin.vars', item, default=false) | bool
+  loop: [dgx_full_upgrade, dgx_os6_upgrade_packages, dgx_os7_upgrade_packages, dgx_redhat_upgrade_packages]
+
 - name: Ubuntu tasks for DGX Software Stack
   ansible.builtin.include_tasks: ubuntu.yml
   when:
@@ -16,9 +29,3 @@
 - name: Configure raid array
   ansible.builtin.include_tasks: configure-raid.yml
   when: dgx_configure_raid_array
-
-- name: Perform full OS upgrade on Ubuntu
-  ansible.builtin.include_tasks: ubuntu-upgrade.yml
-  when:
-    - dgx_full_upgrade
-    - ansible_facts.distribution == 'Ubuntu'

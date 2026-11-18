@@ -1,4 +1,3 @@
 ---
 - name: Reboot node
-  ansible.builtin.reboot:
-    reboot_timeout: "{{ enroot_reboot_timeout }}"
+  ansible.builtin.include_tasks: reboot.yml  # a handler cannot include a role directly

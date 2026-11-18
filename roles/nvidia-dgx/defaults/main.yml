@@ -1,13 +1,7 @@
 ---
-nvidia_dgx_rhel_baseurl: "https://international.download.nvidia.com/dgx/repos/{{ dgx_repo_dir }}/"
-nvidia_dgx_rhel_gpgkey: "https://international.download.nvidia.com/dgx/repos/RPM-GPG-KEY-dgx-cosmos-support"
-epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
-epel_key_url: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}"
-
-nvidia_dgx_ubuntu_baseurl: "http://international.download.nvidia.com/dgx/repos"
-
-nvidia_dgx_os5_ubuntu_gpgkey: "https://repo.download.nvidia.com/baseos/GPG-KEY-dgx-cosmos-support"
-nvidia_dgx_os5_ubuntu_baseurl: "https://repo.download.nvidia.com/baseos/ubuntu"
+# Site switches. They live here, not in vars/, so config/group_vars can set them;
+# vars/ holds only the platform and package tables from NVIDIA's DGX guides.
+# Upgrading every package is not this role's job: use playbooks/utilities/apt-upgrade.yml.
 
 dgx_configure_raid_array: false
 nvidia_driver_skip_reboot: false
@@ -18,4 +12,38 @@ cachefilesd_cache_brun: 25%
 cachefilesd_cache_bcull: 10%
 cachefilesd_cache_dir_mode: 1775
 
-dgx_full_upgrade: false
+# --- DGX OS 6 (Ubuntu 22.04) ---------------------------------------------------
+dgx_os6_repo_files_url: https://repo.download.nvidia.com/baseos/ubuntu/jammy/dgx-repo-files.tgz
+
+dgx_os6_install_driver: true
+dgx_os6_install_container_runtime: true
+dgx_os6_install_nvsm: true
+dgx_os6_install_admin_packages: true
+dgx_os6_install_development_packages: true
+dgx_os6_disable_unattended_upgrades: true
+dgx_os6_install_ipmisol: true
+dgx_os6_install_logrotate: true
+
+dgx_os6_driver_branch: "550"
+
+# --- DGX OS 7 (Ubuntu 24.04) ---------------------------------------------------
+dgx_os7_repo_files_url: "https://repo.download.nvidia.com/baseos/ubuntu/noble/{{ 'arm64' if ansible_facts.architecture in ['aarch64', 'arm64'] else 'x86_64' }}/dgx-repo-files.tgz"
+
+dgx_os7_install_driver: true
+dgx_os7_disable_unattended_upgrades: true
+
+# --- Red Hat family (EL8, EL9) -------------------------------------------------
+dgx_repo_dir: "rhel{{ ansible_facts.distribution_major_version }}"
+
+dgx_extra_packages:
+  - dgx-conf-cachefilesd
+  - kernel-headers
+
+dgx_redhat_manage_subscription_repos: true
+dgx_redhat_install_driver: true
+dgx_redhat_install_container_runtime: true
+dgx_redhat_install_docker_ce: "{{ ansible_facts.distribution_major_version == '8' }}"
+dgx_redhat_install_cachefilesd: false
+dgx_redhat_driver_branch: "{{ '580' if ansible_facts.distribution_major_version == '9' else ('535-dkms' if dgx_redhat_platform.configuration_group == 'DGX H100 Configurations' else '525-dkms') }}"
+dgx_redhat_driver_package_branch: "{{ dgx_redhat_driver_branch | regex_replace('-dkms$', '') }}"
+dgx_redhat_use_open_kernel_modules: "{{ ansible_facts.distribution_major_version == '9' and dgx_redhat_platform.nvswitch | default(false) }}"

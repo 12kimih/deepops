@@ -1,20 +1,4 @@
 ---
-dgx_repo_dir: "rhel{{ ansible_facts.distribution_major_version }}"
-
-dgx_extra_packages:
-  - dgx-conf-cachefilesd
-  - kernel-headers
-
-dgx_redhat_manage_subscription_repos: true
-dgx_redhat_upgrade_packages: false
-dgx_redhat_install_driver: true
-dgx_redhat_install_container_runtime: true
-dgx_redhat_install_docker_ce: "{{ ansible_facts.distribution_major_version == '8' }}"
-dgx_redhat_install_cachefilesd: false
-dgx_redhat_driver_branch: "{{ '580' if ansible_facts.distribution_major_version == '9' else ('535-dkms' if dgx_redhat_platform.configuration_group == 'DGX H100 Configurations' else '525-dkms') }}"
-dgx_redhat_driver_package_branch: "{{ dgx_redhat_driver_branch | regex_replace('-dkms$', '') }}"
-dgx_redhat_use_open_kernel_modules: "{{ ansible_facts.distribution_major_version == '9' and dgx_redhat_platform.nvswitch | default(false) }}"
-
 dgx_redhat_repo_setup_rpms:
   "8": https://repo.download.nvidia.com/baseos/el/el-files/8/nvidia-repo-setup-21.06-1.el8.x86_64.rpm
   "9": https://repo.download.nvidia.com/baseos/el/el-files/9/nvidia-repo-setup-25.02-1.el9.x86_64.rpm
