@@ -257,7 +257,7 @@ Each is independent of Slurm and can stay in place if it is still useful.
 
 | Component | Flag | What to remove |
 |---|---|---|
-| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm`; the configured plugin is `/usr/local/src/pyxis/spank_pyxis.so`, independent of `slurm_install_prefix`. Review the Pyxis build/install paths and Enroot package manifest. Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
+| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm` (`plugstack.conf`, `plugstack.conf.d/pyxis.conf`); the plugin is installed as `{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so` from the source tree in `/usr/local/src/pyxis`. Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
 | Node Health Check | `slurm_install_nhc` | `/etc/nhc`, `/etc/sysconfig/nhc`, `/usr/sbin/nhc*`, `/usr/libexec/nhc`, `/opt/deepops/build/nhc` |
 | OpenMPI | `slurm_cluster_install_openmpi` (example inventory: off; unset: on) | Built into `/usr/local` from `/tmp/openmpi-build`; `cd` to that directory and `make uninstall` if it still exists |
 | Lmod / software modules | `slurm_install_lmod` | See `roles/lmod/defaults/main.yml` for `sm_software_path` and `sm_module_path`; profile scripts in `/etc/profile.d/` |
@@ -267,17 +267,14 @@ Each is independent of Slurm and can stay in place if it is still useful.
 | NFS | `slurm_enable_nfs_server`, `slurm_enable_nfs_client_nodes` | Exports and mounts configured by the NFS roles; see [Slurm and NFS](./slurm-nfs.md) |
 
 When retiring Enroot, restore the site's intended AppArmor policy, not just
-its files. For the scoped profile, unload `/etc/apparmor.d/enroot-nsenter`
-through the distribution's tooling before removing the profile file, only if
-no remaining workload needs it. If `pyxis_userns_allow_globally` was enabled,
-inspect `/etc/sysctl.d/60-enroot-userns.conf`: it sets
-`kernel.apparmor_restrict_unprivileged_userns=0` for the whole host. Back it up,
-remove only the unneeded DeepOps override, and restore and apply the site's
-intended value using the distribution's sysctl tooling. Check other sysctl
-files for overrides and verify the effective value with
+its files. The enroot package ships the scoped profile `/etc/apparmor.d/enroot`
+and removing the package removes it. If `enroot_apparmor_global_disable` was
+enabled, inspect `/etc/sysctl.d/90-enroot.conf`: it sets
+`kernel.apparmor_restrict_unprivileged_userns=0` for the whole host. Remove only
+that override, then restore and apply the site's intended value with the
+distribution's sysctl tooling, and verify it with
 `sysctl kernel.apparmor_restrict_unprivileged_userns` where the knob exists.
-Deleting the file alone does not restore the running kernel value. Review
-remaining user-namespace workloads before tightening the policy.
+Deleting the file alone does not restore the running kernel value.
 
 The NVIDIA driver, CUDA toolkit, container toolkit, Docker, chrony, and the
 `/etc/hosts` and hostname changes made by the generic playbooks are not Slurm
