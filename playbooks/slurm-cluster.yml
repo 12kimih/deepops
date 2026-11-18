@@ -124,6 +124,12 @@
     hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
   when: slurm_enable_monitoring
 
+- name: Install monitoring services | Install the Slack usage report
+  import_playbook: slurm-cluster/slurm-usage-report.yml
+  vars:
+    hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
+  when: slurm_enable_monitoring
+
 - name: Install monitoring exporters | Install prometheus slurm exporter
   import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
   vars:
