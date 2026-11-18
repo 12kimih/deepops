@@ -115,17 +115,3 @@ def job_gpus(job):
                 types.add(gtype)
             gpus.extend((host, i) for i in expand_ranges(spec))
     return gpus, types
-
-
-# --- Nodes ------------------------------------------------------------------------
-
-def node_state(flags):
-    """Short state of an unavailable node from its Slurm state flags, else None."""
-    if "DOWN" in flags:
-        return "down"
-    if "FAIL" in flags:
-        return "fail"
-    if "DRAIN" in flags:
-        busy = {"ALLOCATED", "MIXED", "COMPLETING"} & set(flags)
-        return "draining" if busy else "drained"
-    return None
