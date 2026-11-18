@@ -1,0 +1,42 @@
+---
+- name: Find root's public keys on the break-glass hosts
+  ansible.builtin.find:
+    paths: /root/.ssh
+    patterns: "*.pub"
+  delegate_to: "{{ item }}"
+  loop: "{{ root_access_from_hosts }}"
+  register: root_access_found
+  run_once: true
+
+- name: Read root's public keys on the break-glass hosts
+  ansible.builtin.slurp:
+    src: "{{ item.1.path }}"
+  delegate_to: "{{ item.0.item }}"
+  loop: "{{ root_access_found.results | subelements('files') }}"
+  loop_control:
+    label: "{{ item.0.item }}:{{ item.1.path }}"
+  register: root_access_keys
+  run_once: true
+
+- name: Refuse to render an authorized_keys without any key
+  ansible.builtin.assert:
+    that: root_access_keys.results | length > 0
+    fail_msg: >-
+      No /root/.ssh/*.pub on {{ root_access_from_hosts | join(', ') }}. Writing an empty
+      authorized_keys would remove the break-glass path; create root's key pair there
+      first (ssh-keygen -t ed25519 as root).
+    quiet: true
+
+# from= is the address each host's inventory entry connects from (ansible_host). Mode
+# 0600 root:root, as sshd's StrictModes requires.
+- name: Allow exactly the break-glass hosts' root keys
+  ansible.builtin.copy:
+    dest: /root/.ssh/authorized_keys
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      # Managed by roles/root_access: root on {{ root_access_from_hosts | join(', ') }} only.
+      {% for r in root_access_keys.results %}
+      from="{{ hostvars[r.item.0.item].ansible_host | default(r.item.0.item) }}" {{ r.content | b64decode | trim }}
+      {% endfor %}

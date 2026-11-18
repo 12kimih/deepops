@@ -278,6 +278,11 @@ docker_iptables_enabled: true
 #  - README
 #  - root
 #  - 90-cloud-init-users
+
+# Break-glass root SSH (roles/root_access, playbooks/generic/root-access.yml): root on
+# these hosts may SSH in as root everywhere else, and no other key may. Their keys are
+# read live from /root/.ssh/*.pub there and pinned to their address with from=.
+#root_access_from_hosts: "{{ groups['slurm-master'][:1] }}"
 # Docker daemon logins
 #   Note: example only! you should put these in an Ansible Vault file for security!
 #
