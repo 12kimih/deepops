@@ -24,9 +24,9 @@ QOS = "\n".join(
 )
 ASSOC = "\n".join(
     [
-        "root||||1||normal||",
-        "root|root|||0||normal||",
-        "lab||root|parent||low|low|500",
+        "root|||1||normal||",
+        "root|root||0||normal||",
+        "lab||root|parent||low|low|500",  # account|user|parent|fairshare|priority|qos|defaultqos|maxsubmit
         "a||lab|parent||high_a,low|low|",
         "a|alice||1||high_a,low|low|",
         "a|bob||1||high_a,low|low|",
