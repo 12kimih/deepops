@@ -65,5 +65,43 @@ class Repository(unittest.TestCase):
             self.assertEqual(cl.check_dead() + cl.check_doc_paths(), [])
 
 
+class Shadow(unittest.TestCase):
+    """Ansible 2.22 checked: all/ beside all.yml, all.yml beside all.yaml, and
+    host_vars/h/ beside h.yml each load only one of the two, silently."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        base = Path(self.tmp.name)
+        self.example, self.site = base / "example", base / "site"
+        for d in (self.example / "group_vars", self.site / "group_vars", self.site / "host_vars"):
+            d.mkdir(parents=True)
+        patch = mock.patch.multiple(cl, EXAMPLE=self.example, CONFIG=self.site)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_one_place_each_is_clean(self):
+        (self.site / "group_vars/all.yml").write_text("a: 1\n")
+        (self.site / "group_vars/slurm").mkdir()
+        (self.site / "host_vars/gpu1.yml").write_text("b: 1\n")
+        self.assertEqual(cl.check_shadow(), [])
+
+    def test_two_places_are_reported(self):
+        (self.site / "group_vars/all.yml").write_text("a: 1\n")
+        (self.site / "group_vars/all").mkdir()
+        (self.example / "group_vars/k8s.yml").write_text("")
+        (self.example / "group_vars/k8s.yaml").write_text("")
+        (self.site / "host_vars/gpu1").mkdir()
+        (self.site / "host_vars/gpu1.yml").write_text("")
+        found = cl.check_shadow()
+        self.assertEqual(len(found), 3, found)
+        self.assertTrue(any("config/group_vars: all/, all.yml" in f for f in found), found)
+        self.assertTrue(any("config.example/group_vars: k8s.yaml, k8s.yml" in f for f in found), found)
+
+    def test_this_repository_is_clean(self):
+        with mock.patch.multiple(cl, EXAMPLE=ROOT / "config.example", CONFIG=ROOT / "config"):
+            self.assertEqual(cl.check_shadow(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

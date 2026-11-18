@@ -2,7 +2,7 @@
 """Keep the example config, the site config and the docs honest.
 
     config_lint.py              run every check
-    config_lint.py CHECK ...    run some: drift, dead, doc-paths
+    config_lint.py CHECK ...    run some: drift, dead, doc-paths, shadow
 
 drift      config/ mirrors config.example/: in each group_vars and host_vars file both
            have, the comment lines match in order and the same variable names appear
@@ -13,6 +13,9 @@ dead       every variable config.example sets or shows is read somewhere: a role
            A setting nothing reads misleads whoever sets it.
 doc-paths  every repository path a document names (roles/..., playbooks/..., ...)
            exists, so a page never sends a reader to a file that is gone.
+shadow     no group or host has its variables in two places (all.yml beside all/, or
+           all.yml beside all.yaml): Ansible reads one and drops the other without a
+           word, so a whole file of settings can vanish when a directory appears.
 
 CONFIG_DIR selects the site config (default config/); drift is skipped without it.
 """
@@ -168,7 +171,32 @@ def check_doc_paths():
     return problems
 
 
-CHECKS = {"drift": check_drift, "dead": check_dead, "doc-paths": check_doc_paths}
+VAR_SUFFIXES = ("", ".yml", ".yaml", ".json")
+
+
+def check_shadow():
+    problems = []
+    for base in (EXAMPLE, CONFIG):
+        for kind in ("group_vars", "host_vars"):
+            entries = {}
+            for p in sorted((base / kind).glob("*")) if (base / kind).is_dir() else []:
+                stem = (
+                    p.name
+                    if p.is_dir()
+                    else next((p.name[: -len(s)] for s in VAR_SUFFIXES[1:] if p.name.endswith(s)), p.name)
+                )
+                entries.setdefault(stem, []).append(p.name + ("/" if p.is_dir() else ""))
+            for stem, found in entries.items():
+                if len(found) > 1:
+                    where = f"config/{kind}" if base == CONFIG else f"config.example/{kind}"
+                    problems.append(
+                        f"shadow: {where}: {', '.join(found)} hold {stem}'s variables twice; "
+                        "Ansible reads only one, so keep one"
+                    )
+    return problems
+
+
+CHECKS = {"drift": check_drift, "dead": check_dead, "doc-paths": check_doc_paths, "shadow": check_shadow}
 
 
 def main(argv):
