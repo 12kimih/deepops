@@ -89,3 +89,11 @@ docker_sysctls:
   net.ipv4.neigh.default.gc_thresh1: "1024"
   net.ipv4.neigh.default.gc_thresh2: "4096"
   net.ipv4.neigh.default.gc_thresh3: "8192"
+
+# Images no container uses, older than this, are removed weekly by a systemd timer
+# (docker image prune --all --filter until=...). Without it a node keeps every image
+# anyone ever pulled or built: months-old images that nobody vetted, and disk.
+# Images of running or stopped containers are never pruned. "" = no timer (and an
+# existing one is removed).
+docker_image_prune_until: "720h"
+docker_image_prune_schedule: weekly
