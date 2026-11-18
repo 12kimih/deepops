@@ -12,7 +12,7 @@
   - [Managing your configuration directory in Git](#managing-your-configuration-directory-in-git)
   - [Keeping secrets out of Git with Ansible Vault](#keeping-secrets-out-of-git-with-ansible-vault)
   - [Using multiple configuration directories for separate clusters](#using-multiple-configuration-directories-for-separate-clusters)
-  
+
 ## The DeepOps configuration directory
 
 When you first clone the DeepOps repository and run `scripts/setup.sh`, one of the first things that the setup script does is copy the [`config.example` directory](../../config.example) to a new directory called `config`.
@@ -228,20 +228,8 @@ Typical values that should be encrypted include:
 - Slack credentials (`alertmanager_slack_api_url`, `slack_bot_token`)
 
 Each secret is vaulted inline with `ansible-vault encrypt_string`, in the same
-group_vars file as its plaintext neighbours. Names stay readable and grep-able, and a
-diff shows which secret changed. Run it from the DeepOps root so `ansible.cfg` supplies
-the password file; `--prompt` reads the value without echo or shell history:
-
-```bash
-cd <deepops>
-ansible-vault encrypt_string --prompt --name slurm_db_password
-# paste the printed `slurm_db_password: !vault |` block into config/group_vars/<group>.yml
-```
-
-Read a value back with
-`ansible localhost -m debug -a var=slurm_db_password -e @config/group_vars/slurm-cluster.yml`.
-To change the vault password, re-encrypt every value (`ansible-vault rekey` only
-handles whole encrypted files).
+group_vars file as its plaintext neighbours; how to encrypt, read back and re-key a
+value is in [Managing private cluster config](managing-cluster-config.md#4-secrets-via-ansible-vault-encrypted-values-grep-able-names).
 
 So that you don't have to type the vault password on every run,
 [`ansible.cfg`](../../ansible.cfg) already points Ansible at a password file, read only

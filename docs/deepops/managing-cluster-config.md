@@ -81,8 +81,14 @@ ansible-vault encrypt_string --prompt --name slurm_db_password
 # paste the printed `slurm_db_password: !vault |` block into config/group_vars/<group>.yml
 ```
 
-Read a value back with
-`ansible localhost -m debug -a var=slurm_db_password -e @config/group_vars/slurm-cluster.yml`.
+Read a value back by decrypting its block (`debug` prints vaulted values as
+`$REDACTED$` since ansible-core 2.19):
+
+```bash
+sed -n '/^slurm_db_password: !vault/,/^[^ ]/p' config/group_vars/slurm-cluster.yml \
+  | sed '1d;$d' | tr -d ' ' | ansible-vault decrypt --output -
+```
+
 To change the vault password, re-encrypt every value (`ansible-vault rekey` only
 handles whole encrypted files).
 
