@@ -18,10 +18,10 @@
 
 - name: Patch lastuserjob epilog.
   ansible.builtin.blockinfile:
-    path: /etc/slurm/epilog.d/40-lastuserjob-processes
+    path: "{{ slurm_config_dir }}/epilog.d/40-lastuserjob-processes"
     block: |2
 
-      if grep -q -w "$SLURM_JOB_USER" /etc/slurm/localusers.backup ; then
+      if grep -q -w "$SLURM_JOB_USER" {{ slurm_config_dir }}/localusers.backup ; then
           exit 0  # don't revoke access for these users
       fi
 

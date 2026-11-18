@@ -19,5 +19,5 @@ then
     scontrol update nodename="$HOSTNAME" state=drain reason='Residual GPU processes found'
 fi
 
-/etc/slurm/shared/bin/set_gpu_power_levels.sh default
-/etc/slurm/shared/bin/set_gpu_clocks.sh default
+{{ slurm_config_dir }}/shared/bin/set_gpu_power_levels.sh default
+{{ slurm_config_dir }}/shared/bin/set_gpu_clocks.sh default
