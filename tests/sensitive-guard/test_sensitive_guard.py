@@ -30,6 +30,8 @@ class GuardTest(unittest.TestCase):
               alice01: U1
               'bob-x': U2
               shared: U3
+              carol9:
+                team: blue
             after: 2
             """)
         )
@@ -96,6 +98,14 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.guard("staged")[0], 0)
         (self.repo / "e.txt").write_text("job of alice01 and bob-x\n")
         self.git("add", "e.txt")
+        self.assertEqual(self.guard("staged")[0], 1)
+
+    def test_only_direct_keys_are_accounts(self):
+        (self.repo / "g.txt").write_text("the team is blue\n")
+        self.git("add", "g.txt")
+        self.assertEqual(self.guard("staged"), (0, ""))
+        (self.repo / "h.txt").write_text("ask carol9\n")
+        self.git("add", "h.txt")
         self.assertEqual(self.guard("staged")[0], 1)
 
     def test_builtin_secret_and_allow_pragma(self):
