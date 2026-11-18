@@ -75,11 +75,14 @@ class ShowTests(unittest.TestCase):
         self.assertTrue(any("░" in x for x in self.lines(200)))
         self.assertFalse(any("░" in x for x in self.lines(70)))
 
-    def test_yours_marked_and_notes(self):
-        text = "\n".join(self.lines(120))
+    def test_yours_marked_and_data_lines_only(self):
+        lines = self.lines(120)
+        text = "\n".join(lines)
         self.assertRegex(text, r"(?m)^▌ hotfix ")
         self.assertIn("user14 submits as low", text)
-        self.assertIn("1 QoS that no user holds is hidden", text)
+        self.assertIn("1 hidden (--all)", lines[0])  # a figure for the heading, not a sentence
+        # What the table means is --help's; below the table only facts about this data.
+        self.assertNotRegex(text, "MAX WALL means|Usage is every|QOSGrpGRES is waiting|limit of 0")
 
     def test_nobody(self):
         m = model("nobody")
@@ -99,6 +102,9 @@ class CommandTests(unittest.TestCase):
         data = json.loads(r.stdout)
         self.assertEqual(data["user"], "user1")
         self.assertGreater(len(data["qos"]), 2, "--json must ignore $QOS_OPTIONS")
+
+    def test_help_explains_the_table(self):
+        self.assertIn("A limit of 0 is not a full quota", run_tool("qos", "--help").stdout)
 
     def test_help_levels(self):
         self.assertIn("More: qos --help", run_tool("qos", "-h").stdout)

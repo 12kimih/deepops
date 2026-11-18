@@ -24,6 +24,12 @@ NOTES = [
     "hold at once (GrpTRES, a limit on the SUM of every running job using it, not per\n"
     "user). The last is why a job can wait on QOSGrpGRES while the cluster looks idle.",
     "GPU columns appear for every GPU type some QoS limits, and EXEMPT and GRACE only\nonce a QoS sets them.",
+    "Reading the table:\n"
+    "  A GPU figure is the QoS's usage against its quota: every RUNNING job on that QoS,\n"
+    "  cluster-wide, the same sum the quota is checked against. -/N is unknown usage.\n"
+    "  A limit of 0 is not a full quota: that QoS may not use that GPU type at all.\n"
+    "  No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -T).\n"
+    "  A job pending on QOSGrpGRES is waiting for its own QoS's quota, not for the cluster.",
 ]
 
 COMMAND = Command(
@@ -219,10 +225,9 @@ def show(t, model, only_mine=False):
     tally = [(f"{len(rows)} QoS", "sub")]
     if mine and not only_mine:
         tally.append((f"{mine} yours", "self"))
+    if model["hidden"]:
+        tally.append((f"{model['hidden']} hidden (--all)", "faint"))
     out = [g.render("QoS", tally), ""]
-
-    def note(text):
-        out.append("  " + t.paint("sub", text))
 
     if model["default_qos"]:
         out.append(
@@ -242,18 +247,7 @@ def show(t, model, only_mine=False):
             out.append(f"  {t.paint('part', r['name'])} {t.paint('sub', ', '.join(parts))}")
     if model.get("usage_error"):
         out.append("  " + t.paint("crit", f"live usage unavailable: {model['usage_error']}"))
-    note("No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -T).")
-    if model["usage"]:
-        note(
-            "Usage is every RUNNING job on that QoS, cluster-wide: the same sum its quota is checked against."
-        )
-    if any(q["limit"] == 0 for r in rows for q in r["gpu"].values()):
-        note("A limit of 0 is not a full quota: that QoS may not use that GPU type at all.")
-    if model["hidden"]:
-        verb = "is" if model["hidden"] == 1 else "are"
-        note(f"{model['hidden']} QoS that no user holds {verb} hidden; --all shows them.")
-    note("A job pending on QOSGrpGRES is waiting for its own QoS's quota, not for the cluster.")
-    return "\n".join(out) + "\n\n"
+    return "\n".join(out).rstrip() + "\n\n"
 
 
 def _me():

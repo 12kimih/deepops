@@ -639,17 +639,15 @@ def show_users(t, model):
 
 
 def show_why(t, model, detail=False):
+    """Why jobs wait, as a tree: family, then Slurm's code, then (-d) the partition and
+    user behind it, with Slurm's own detail for a code in a last column. Nothing is
+    written between the rows, so the tree and the figures stay unbroken; what a family
+    means is in `sq --help`."""
     rows = model["why"]
     if not rows:
         return t.section("WHY", 40, [("nothing pending", "faint")]) + "\n"
-    gl = model["gres"].upper()
-    heads = (
-        ["REASON"]
-        + (["USER"] if detail else [])
-        + ["JOBS", "NODES", "CPU"]
-        + ([gl] if model["has_gres"] else [])
-    )
-    g = Grid(t, heads, align=["l"] + (["l"] if detail else []) + ["r"] * 4, maxw=[34, 16] if detail else [34])
+    gl, has_gres = model["gres"].upper(), model["has_gres"]
+    figures = ("jobs", "nodes", "cpu") + (("gres",) if has_gres else ())
 
     def total(items):
         return {k: sum(i[k] for i in items) for k in ("jobs", "nodes", "cpu", "gres")}
@@ -657,45 +655,61 @@ def show_why(t, model, detail=False):
     def weight(item):
         return (-item[1]["gres"], -item[1]["nodes"], -item[1]["jobs"], item[0])
 
-    def row(prefix, label, label_style, figures, num_style, user="", user_style=""):
-        cells = [(label, label_style)] + ([(user, user_style)] if detail else [])
-        for k in ("jobs", "nodes", "cpu") + (("gres",) if model["has_gres"] else ()):
-            cells.append((str(figures[k]), num_style if figures[k] else "faint"))
-        g.row(cells, prefix=prefix, gutter=(t.g["self"], "self") if user and user == model["mine"] else "")
-
     families = {}
     for r in rows:
         families.setdefault(r["family"], []).append(r)
-    for fam, fam_rows in sorted(((f, total(rs)) for f, rs in families.items()), key=weight):
-        style = REASON_ROLE.get(fam, "sub")
-        row("", vocab.REASON_TITLE[fam], t.c[style] + t.bold, fam_rows, t.c["text"] + t.bold)
-        if fam in vocab.REASON_HELP:
-            g.note(vocab.REASON_HELP[fam])
-        codes = {}
-        for r in families[fam]:
-            codes.setdefault(r["code"], []).append(r)
-        code_list = sorted(((c, total(rs)) for c, rs in codes.items()), key=weight)
-        for i, (code, figs) in enumerate(code_list):
-            last = i == len(code_list) - 1
-            row(t.g["end"] if last else t.g["tee"], code, style, figs, "text")
-            if not detail:
-                continue
-            if model["why_details"].get(code):
-                g.note("   " + model["why_details"][code])
-            leaves = sorted(((f"{r['partition']}\x00{r['user']}", r) for r in codes[code]), key=weight)
-            for k, (_, leaf) in enumerate(leaves):
-                tee = t.g["end"] if k == len(leaves) - 1 else t.g["tee"]
-                own = leaf["user"] == model["mine"]
-                row((t.g["gap"] if last else t.g["pipe"]) + tee, leaf["partition"], "sub", leaf, "sub",
-                    leaf["user"], t.c["self"] + t.bold if own else "text")  # fmt: skip
-    g.rule()
-    s = t.c["sub"] + t.bold
-    row("", "total", s, total(rows), s)
+
+    def grid(detail_width):
+        heads = (
+            ["REASON"] + (["USER"] if detail else []) + ["JOBS", "NODES", "CPU"] + ([gl] if has_gres else [])
+        )
+        heads += ["DETAIL"] if detail_width else []
+        g = Grid(t, heads, align=["l"] + (["l"] if detail else []) + ["r"] * len(figures) + ["l"],
+                 maxw=([34, 16] if detail else [34]) + [0] * len(figures) + [detail_width])  # fmt: skip
+
+        def row(prefix, label, label_style, figs, num_style, user="", user_style="", note=""):
+            cells = [(label, label_style)] + ([(user, user_style)] if detail else [])
+            cells += [(str(figs[k]), num_style if figs[k] else "faint") for k in figures]
+            if detail_width:
+                cells.append((note, "faint"))
+            g.row(
+                cells, prefix=prefix, gutter=(t.g["self"], "self") if user and user == model["mine"] else ""
+            )
+
+        for fam, fam_figs in sorted(((f, total(rs)) for f, rs in families.items()), key=weight):
+            style = REASON_ROLE.get(fam, "sub")
+            row("", vocab.REASON_TITLE[fam], t.c[style] + t.bold, fam_figs, t.c["text"] + t.bold)
+            codes = {}
+            for r in families[fam]:
+                codes.setdefault(r["code"], []).append(r)
+            code_list = sorted(((c, total(rs)) for c, rs in codes.items()), key=weight)
+            for i, (code, figs) in enumerate(code_list):
+                last = i == len(code_list) - 1
+                row(t.g["end"] if last else t.g["tee"], code, style, figs, "text",
+                    note=model["why_details"].get(code, "") if detail else "")  # fmt: skip
+                if not detail:
+                    continue
+                leaves = sorted(((f"{r['partition']}\x00{r['user']}", r) for r in codes[code]), key=weight)
+                for k, (_, leaf) in enumerate(leaves):
+                    tee = t.g["end"] if k == len(leaves) - 1 else t.g["tee"]
+                    own = leaf["user"] == model["mine"]
+                    row((t.g["gap"] if last else t.g["pipe"]) + tee, leaf["partition"], "sub", leaf, "sub",
+                        leaf["user"], t.c["self"] + t.bold if own else "text")  # fmt: skip
+        g.rule()
+        s = t.c["sub"] + t.bold
+        row("", "total", s, total(rows), s)
+        return g
+
+    # The detail column takes what the window has left, and only when Slurm gave one.
+    width = 0
+    if detail and any(model["why_details"].get(r["code"]) for r in rows):
+        width = max(0, t.cols - grid(0).total() - 1)
+        width = width if width >= 12 else 0
     sums = total(rows)
     tally = [(f"{sums['jobs']} job{'s' * (sums['jobs'] != 1)} waiting", "warn")]
-    if model["has_gres"] and sums["gres"]:
+    if has_gres and sums["gres"]:
         tally.append((f"{sums['gres']} {model['gres']} requested", "sub"))
-    return g.render("WHY", tally) + "\n"
+    return grid(width).render("WHY", tally) + "\n"
 
 
 def show_resources(t, model, view="grouped", split=False, detail=False):
