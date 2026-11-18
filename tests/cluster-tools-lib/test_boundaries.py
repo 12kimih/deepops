@@ -14,8 +14,8 @@ ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
 from clustertools import cli, slurm  # noqa: E402
 
-# Code that ships with the cluster tools or imports their library.
-SOURCES = [*ROLES.glob("cluster_tools*/files/**/*.py"), *ROLES.glob("slurm_usage_report/files/**/*.py")]
+# All of the cluster's own Python: the clustertools package.
+SOURCES = list(ROLES.glob("cluster_tools_lib/files/**/*.py"))
 READER = ROLES / "cluster_tools_lib/files/clustertools/slurm.py"
 SLURM = ("scontrol", "squeue", "sinfo", "sacctmgr", "sacct", "scancel", "sprio", "sshare")
 

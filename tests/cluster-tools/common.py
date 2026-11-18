@@ -7,7 +7,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROLES = HERE.parents[1] / "roles"
-sys.path[:0] = [str(ROLES / "cluster_tools_lib/files"), str(ROLES / "cluster_tools/files")]
+LIB = str(ROLES / "cluster_tools_lib/files")
+sys.path.insert(0, LIB)
 FIXTURES = HERE / "fixtures/slurm-25.11"
 
 
@@ -42,6 +43,5 @@ def run_tool(module, *args, env=None, path=True):
         "USER": "user1",
         **(env or {}),
     }
-    paths = [str(ROLES / "cluster_tools_lib/files"), str(ROLES / "cluster_tools/files")]
-    code = f"import sys; sys.path[:0] = {paths!r}; import {module}; sys.exit({module}.main())"
+    code = f"import sys; sys.path.insert(0, {LIB!r}); from clustertools import {module}; sys.exit({module}.main())"
     return subprocess.run([sys.executable, "-I", "-c", code, *args], env=e, capture_output=True, text=True)
