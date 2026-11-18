@@ -1,0 +1,22 @@
+---
+groups:
+  - name: power
+    rules:
+      - alert: PowerSupplyFailed
+        expr: ipmi_sensor_state{type="Power Supply"} == 2
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Power supply {{ $labels.name }} on {{ $labels.host }} reports critical"
+      - alert: BmcSensorCritical
+        expr: ipmi_sensor_state{type!="Power Supply"} == 2
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.type }} sensor {{ $labels.name }} on {{ $labels.host }} is critical"
+      - alert: ChassisFault
+        expr: ipmi_chassis_cooling_fault_state == 1 or ipmi_chassis_drive_fault_state == 1
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Cooling or drive fault reported by the BMC of {{ $labels.host }}"

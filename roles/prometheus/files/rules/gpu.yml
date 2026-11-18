@@ -1,0 +1,51 @@
+---
+groups:
+  - name: gpu
+    rules:
+      - alert: GpuXidError
+        expr: DCGM_FI_DEV_XID_ERRORS > 0 and changes(DCGM_FI_DEV_XID_ERRORS[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "XID {{ $value }} on {{ $labels.host }} GPU {{ $labels.gpu }}"
+          description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
+      - alert: GpuFallenOffBus
+        expr: DCGM_FI_DEV_XID_ERRORS == 79
+        labels: {severity: critical}
+        annotations:
+          summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} fell off the bus (XID 79)"
+      - alert: GpuMissing
+        expr: count by (instance) (DCGM_FI_DEV_GPU_TEMP) < on (instance) group_left max_over_time(count by (instance) (DCGM_FI_DEV_GPU_TEMP)[1d:10m])
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.host }} reports fewer GPUs than it did in the last day"
+      - alert: GpuRowRemapFailure
+        expr: DCGM_FI_DEV_ROW_REMAP_FAILURE > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Row remapping failed on {{ $labels.host }} GPU {{ $labels.gpu }}"
+          description: "The GPU has run out of spare rows; RMA it."
+      - alert: GpuUncorrectableRemappedRows
+        expr: increase(DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS[1h]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "New uncorrectable remapped rows on {{ $labels.host }} GPU {{ $labels.gpu }}"
+          description: "Reset the GPU (drain the node first) so the remap takes effect."
+      - alert: GpuTemperatureHigh
+        expr: DCGM_FI_DEV_GPU_TEMP > 87
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} at {{ $value }}C"
+      - alert: GpuMemoryTemperatureHigh
+        expr: DCGM_FI_DEV_MEMORY_TEMP > 95
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "GPU {{ $labels.gpu }} memory on {{ $labels.host }} at {{ $value }}C"
+      - alert: GpuPcieReplaysHigh
+        expr: increase(DCGM_FI_DEV_PCIE_REPLAY_COUNTER[1h]) > 1000
+        labels: {severity: warning}
+        annotations:
+          summary: "PCIe replays on {{ $labels.host }} GPU {{ $labels.gpu }}"
+          description: "{{ $value }} in 1h; check the riser, slot or cabling."

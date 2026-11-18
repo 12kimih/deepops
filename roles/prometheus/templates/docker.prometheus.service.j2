@@ -12,7 +12,18 @@ RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
 ExecStartPre=/usr/bin/docker pull {{ prometheus_container }}
-ExecStart=/usr/bin/docker run --rm --network host --name %n -v {{ prometheus_config_dir }}:/etc/prometheus -v {{ prometheus_docker_volume_name }}:/prometheus {{ prometheus_container }}
+ExecStart=/usr/bin/docker run --rm --network host --name %n \
+  -v {{ prometheus_config_dir }}:/etc/prometheus:ro \
+  -v {{ prometheus_docker_volume_name }}:/prometheus \
+  {{ prometheus_container }} \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/prometheus \
+  --storage.tsdb.retention.time={{ prometheus_retention_time }} \
+{% if prometheus_retention_size %}
+  --storage.tsdb.retention.size={{ prometheus_retention_size }} \
+{% endif %}
+  --web.listen-address=:{{ prometheus_port }} \
+  --web.enable-lifecycle
 
 [Install]
 WantedBy=multi-user.target

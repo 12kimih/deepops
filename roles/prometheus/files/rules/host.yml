@@ -1,0 +1,92 @@
+---
+groups:
+  - name: host
+    rules:
+      - alert: HostDiskAlmostFull
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}
+            / node_filesystem_size_bytes < 0.10
+          and node_filesystem_readonly == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.host }} is over 90% full"
+          description: "{{ $value | humanizePercentage }} free."
+      - alert: HostDiskFull
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}
+            / node_filesystem_size_bytes < 0.03
+          and node_filesystem_readonly == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.host }} is over 97% full"
+          description: "{{ $value | humanizePercentage }} free. Writes will start failing."
+      - alert: HostDiskFillingUp
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}[6h], 24 * 3600) < 0
+          and node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.25
+          and node_filesystem_readonly == 0
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.host }} will fill within 24h"
+      - alert: HostInodesAlmostExhausted
+        expr: |
+          node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}
+            / node_filesystem_files < 0.05
+          and node_filesystem_readonly == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.host }} has under 5% inodes left"
+      - alert: HostMemoryExhausted
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.03
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has under 3% memory available"
+      - alert: HostClockNotSynchronised
+        expr: min_over_time(node_timex_sync_status[5m]) == 0 and node_timex_maxerror_seconds >= 16
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Clock on {{ $labels.host }} is not synchronised"
+          description: "Munge and Slurm reject credentials when clocks drift apart."
+      - alert: HostSystemdUnitFailed
+        expr: node_systemd_unit_state{state="failed"} == 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.name }} failed on {{ $labels.host }}"
+      - alert: HostMemoryUncorrectableErrors
+        expr: increase(node_edac_uncorrectable_errors_total[1h]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Uncorrectable ECC memory error on {{ $labels.host }}"
+          description: "Drain the node and replace the DIMM on controller {{ $labels.controller }}."
+      - alert: HostMemoryCorrectableErrorsHigh
+        expr: increase(node_edac_correctable_errors_total[24h]) > 100
+        labels: {severity: warning}
+        annotations:
+          summary: "Many correctable ECC memory errors on {{ $labels.host }}"
+          description: "{{ $value }} in 24h on controller {{ $labels.controller }}; the DIMM is likely failing."
+      - alert: HostRaidDegraded
+        expr: node_md_disks_required - ignoring(state) node_md_disks{state="active"} > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "RAID {{ $labels.device }} on {{ $labels.host }} is degraded"
+      - alert: HostRaidDiskFailed
+        expr: node_md_disks{state="failed"} > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "A disk in RAID {{ $labels.device }} on {{ $labels.host }} has failed"
+      - alert: HostNetworkErrors
+        expr: |
+          rate(node_network_receive_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m])
+            + rate(node_network_transmit_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) > 1
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Network errors on {{ $labels.device }} of {{ $labels.host }}"

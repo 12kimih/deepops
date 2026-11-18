@@ -1,0 +1,18 @@
+---
+groups:
+  - name: targets
+    rules:
+      - alert: HostDown
+        expr: up{module="node-exporter"} == 0
+        for: 3m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.host }} is unreachable"
+          description: "node-exporter on {{ $labels.host }} has not answered for 3 minutes. The host is down, hung or off the network."
+      - alert: ExporterDown
+        expr: up{module!="node-exporter"} == 0 unless on (host) up{module="node-exporter"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.module }} down on {{ $labels.host }}"
+          description: "The {{ $labels.module }} target has failed to scrape for 10 minutes while the host itself is up."
