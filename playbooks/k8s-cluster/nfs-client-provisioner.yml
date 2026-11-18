@@ -2,7 +2,8 @@
 # This playbook is used to setup the nfs-client-provisioner
 # By default an NFS server is configured on kube_control_plane[0]. If the cluster already
 #   has one, set k8s_deploy_nfs_server: false (and k8s_nfs_mkdir: false when the export
-#   directory already exists) and point k8s_nfs_server/k8s_nfs_export_path at it
+#   directory already exists) and point k8s_nfs_server/k8s_nfs_export_path at it, or
+#   skip those steps for one run with --skip-tags="nfs_server,nfs_mkdir"
 # After setting up an NFS server, nfs software is installed on all nodes
 # Lastly, the nfs-client-provisioner is helm installed using the role
 #
@@ -19,12 +20,16 @@
         state: directory
         mode: "u=rwx,g=rwx,o=rwx"
       when: k8s_nfs_mkdir and k8s_deploy_nfs_server
+      tags:
+        - nfs_mkdir
     - name: Deploy NFS server master
       ansible.builtin.include_role:
         name: nfs
       vars:
         nfs_is_server: true
       when: k8s_deploy_nfs_server
+      tags:
+        - nfs_server
 
 - hosts: "k8s_cluster"
   become: true
