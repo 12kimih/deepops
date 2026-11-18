@@ -1,6 +1,6 @@
 # Choosing between similar roles and playbooks
 
-A few DeepOps roles/playbooks cover the same *domain* but do genuinely different
+A few DeepOps roles and playbooks cover the same *domain* but do genuinely different
 jobs, so they are kept separate on purpose (collapsing them would remove a
 choice). This guide disambiguates the ones whose names look alike. None of these
 pairs are duplicates.

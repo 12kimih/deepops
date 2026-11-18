@@ -27,10 +27,8 @@ description: Prepare mirrors and transfer artifacts, configure DeepOps, deploy S
 - Run DeepOps commands from the repository root. Keep secrets out of archives
   and store site configuration in `config/`, never `config.example/`.
 
-DeepOps does not provide supported mirror-building automation. Do **not** run
-`scripts/airgap/build_offline_cache.sh`: it calls the removed
-`playbooks/airgap/build-offline-cache.yml` and cannot complete in this tree.
-Build and verify the mirrors explicitly as described below.
+DeepOps does not provide mirror-building automation; build and verify the
+mirrors explicitly as described below.
 
 ## 1. Freeze the deployment inputs
 
@@ -66,7 +64,7 @@ Build and verify the mirrors explicitly as described below.
    - direct-download archives referenced by enabled role defaults;
    - every container image and Helm chart used by the chosen Slurm or
      Kubernetes path;
-   - the initialized Kubespray submodule, Galaxy roles/collections, and Python
+   - the initialized Kubespray submodule, Galaxy roles and collections, and Python
      packages needed on the provisioning machine.
 
 ## 2. Build package mirrors on the connected side
@@ -173,47 +171,25 @@ reference host; distribution repositories remain a separate prerequisite.
    done
    ```
 
-   Enroot is also enabled by default, but its package filenames are owned by
-   the pinned `nvidia.enroot` Galaxy role rather than this repository. After
-   `./scripts/setup.sh`, use that installed role's real package list to
-   download the target-OS packages and generate the matching Ansible override.
-   Choose `enroot_deb_packages` for Ubuntu or `enroot_rpm_packages` for
-   Enterprise Linux; repeat for both when the inventory mixes OS families:
+   Enroot is also enabled by default. The in-tree `roles/enroot` downloads its
+   packages from `enroot_release_base_url` (NVIDIA's GitHub release by default),
+   so mirror the release files and point that variable at the mirror. The file
+   names follow `enroot_version` and `enroot_release` in
+   `roles/enroot/defaults/main.yml` (`enroot`, plus `enroot+caps` only with
+   `enroot_install_caps`); for Ubuntu on amd64:
 
    ```bash
-   test -s roles/galaxy/nvidia.enroot/defaults/main.yml
-   cat >/tmp/deepops-mirror-enroot.yml <<'EOF'
-   ---
-   - hosts: localhost
-     connection: local
-     gather_facts: true
-     become: true
-     vars_files:
-       - "{{ deepops_root }}/roles/galaxy/nvidia.enroot/defaults/main.yml"
-     tasks:
-       - name: Download the pinned Enroot packages
-         get_url:
-           url: "{{ item }}"
-           dest: "/var/repos/downloads/{{ item | basename }}"
-           mode: "0644"
-         loop: "{{ lookup('vars', enroot_package_list_var) }}"
-       - name: Write the matching offline override
-         copy:
-           dest: "/var/repos/downloads/{{ enroot_package_list_var }}-offline.yml"
-           mode: "0644"
-           content: |
-             {{ enroot_package_list_var }}:
-             {% for package_url in lookup('vars', enroot_package_list_var) %}
-               - "{{ offline_http_base }}/{{ package_url | basename }}"
-             {% endfor %}
-   EOF
-   ansible-playbook -i localhost, /tmp/deepops-mirror-enroot.yml \
-     -e "deepops_root=$(pwd)" \
-     -e enroot_package_list_var=enroot_deb_packages \
-     -e offline_http_base=http://package-server/downloads
+   v=$(awk -F'"' '/^enroot_version:/ {print $2}' roles/enroot/defaults/main.yml)
+   r=$(awk -F'"' '/^enroot_release:/ {print $2}' roles/enroot/defaults/main.yml)
+   sudo install -d -m 0755 "/var/repos/downloads/enroot"
+   sudo curl -fL "https://github.com/NVIDIA/enroot/releases/download/v${v}/enroot_${v}-${r}_amd64.deb" \
+     -o "/var/repos/downloads/enroot/enroot_${v}-${r}_amd64.deb"
    ```
 
-   Replace `package-server` before running the generator. Verify every file is
+   and set `enroot_release_base_url: "http://package-server/downloads/enroot"`.
+   Enterprise Linux uses `enroot-${v}-${r}.el8.<arch>.rpm` from the same release.
+
+   Replace `package-server` with the mirror host. Verify every file is
    nonempty. Use these exact overrides with the published paths:
 
    ```yaml
@@ -225,7 +201,7 @@ reference host; distribution repositories remain a separate prerequisite.
    hpcsdk_download_url: "http://package-server/downloads/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz"
    ```
 
-   Add the generated Enroot YAML list to `config/group_vars/all.yml`. On
+   Add `enroot_release_base_url` to `config/group_vars/all.yml`. On
    Enterprise Linux, also override `epel_package` and `epel_key_url`; several
    default roles import the EPEL key directly, so mirroring packages alone is
    insufficient.
@@ -956,9 +932,6 @@ the success gate.
 These branches follow from checked-in tasks, defaults, and validators; they are
 not claims that this complete procedure was live-tested in an air gap.
 
-- **`build_offline_cache.sh` fails because
-  `playbooks/airgap/build-offline-cache.yml` is missing:** this automation was
-  removed as broken/unsupported. Use the explicit mirror workflow above.
 - **Doctor reports `kubespray_submodule_initialized: false`, or Kubernetes
   fails on `kubespray_defaults` imports:** transfer an archive made after
   `git submodule update --init --recursive`; do not fetch from the isolated
