@@ -1,0 +1,6 @@
+# Commits that only reformat code. GitHub's blame view skips them automatically; for
+# local blame, run once:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+# Add a commit here only when it changes layout and nothing else.
+
+# style: format the repository's Python with ruff format
+33591ec207a983b37dbadee00e2bfcf285289313
