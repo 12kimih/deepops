@@ -1,4 +1,0 @@
----
-# The systemd units that provide sshd; NHC passes when any of them is active.
-# Upstream OpenSSH and RHEL name them sshd; Debian and Ubuntu override this.
-nhc_ssh_units: "sshd.service sshd.socket"
