@@ -1,5 +1,5 @@
 ---
-- name: restart maas-regiond
+- name: Restart maas-regiond
   ansible.builtin.service:
     name: maas-regiond
     state: restarted

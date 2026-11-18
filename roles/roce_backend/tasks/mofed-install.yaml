@@ -5,7 +5,7 @@
   changed_when: false
 
 - name: MOFED install
-  when: check_mlnx_adapter.stdout|int > 0
+  when: check_mlnx_adapter.stdout | int > 0
   block:
     - name: Check availability of Mellanox OFED
       ansible.builtin.stat:

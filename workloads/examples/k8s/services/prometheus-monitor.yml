@@ -524,7 +524,7 @@ data:
         #title: "{{ .CommonAnnotations.summary }}"
         #text: "<!channel> {{ .CommonAnnotations.description }}"
         text: "<!channel>"
-        send_resolved: True
+        send_resolved: true
 ---
 apiVersion: v1
 kind: Service

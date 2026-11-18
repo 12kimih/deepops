@@ -12,7 +12,7 @@
   tasks:
     # ansible_local['gpus']['count'] comes from lspci, so it reports the GPUs the
     # node has even while the Slurm login setup hides them from ssh sessions.
-    - name: install custom facts
+    - name: Install custom facts
       ansible.builtin.include_role:
         name: facts
 
@@ -25,7 +25,7 @@
     #   2 - the query itself failed, which is an error rather than an answer
     # Only a real mode counts: 'grep -v N/A' also matched warnings and notices
     # nvidia-smi prints alongside the values.
-    - name: check for MIG capable devices
+    - name: Check for MIG capable devices
       ansible.builtin.shell: |
         set -o pipefail
         mig_mode=$(systemd-run --wait --pipe --collect --quiet -- \
@@ -41,7 +41,7 @@
     # silently would report a MIG layout as converged that was never looked at.
     # ansible_local['gpus']['count'] comes from lspci, so a node with no NVIDIA
     # hardware at all still passes through untouched.
-    - name: fail when the MIG capability probe could not run
+    - name: Fail when the MIG capability probe could not run
       ansible.builtin.fail:
         msg: >-
           Could not read the MIG mode of the GPUs on this node.

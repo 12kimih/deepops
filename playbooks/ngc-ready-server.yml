@@ -19,7 +19,7 @@
 
 - name: Install NVIDIA DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
-  when: install_dcgm|default(false)
+  when: install_dcgm | default(false)
 
 - hosts: all
   become: true

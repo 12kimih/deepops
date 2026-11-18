@@ -2,70 +2,70 @@
 # Print some debug, make directories, and initialize
 - name: Print debug
   run_once: true
-  debug:
+  ansible.builtin.debug:
     msg: "run_diagnostics: {{ run_diagnostics }}, load_firmware: {{ load_firmware }}, update_firmware: {{ update_firmware }}
           Copying files to {{ fw_dir }} on DGX nodes, running container: {{ firmware_update_repo }}, tag: {{ firmware_update_tag }}"
 - name: Make firmware dir
-  file:
+  ansible.builtin.file:
     path: "{{ fw_dir }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
 - name: Copy Wrapper Script
-  copy:
+  ansible.builtin.copy:
     src: parse_manifest.py
     dest: "{{ fw_dir }}/parse_manifest.py"
-    mode: '0644'
+    mode: "0644"
     force: true
 
 - block:
   # Run some pre-flight diagnostics pre-firmware update in case things go wrong
-  - include_tasks: run-diagnostics.yml
+  - ansible.builtin.include_tasks: run-diagnostics.yml
     vars:
-      run_diagnostics_type: '-pre-check'
+      run_diagnostics_type: "-pre-check"
     when:
       - run_diagnostics
       - load_firmware or update_firmware
 
   # Verify the local container exists, then copy it over if necessary and verify it is loaded into Docker
-  - include_tasks: load-image.yml
+  - ansible.builtin.include_tasks: load-image.yml
     when: load_firmware
 
   # Shut down services and unload drivers
-  - name: stop system services
-    systemd:
+  - name: Stop system services
+    ansible.builtin.systemd:
       state: stopped
       enabled: false
       name: "{{ item }}"
     with_items: "{{ nv_services }}"
     when: update_firmware
 
-  - name: unload drivers
-    modprobe:
+  - name: Unload drivers
+    community.general.modprobe:
       state: absent
       name: "{{ item }}"
     with_items: "{{ nv_modules }}"
     when: update_firmware
 
   # Update the FW and reboot if necessary
-  - include_tasks: update-firmware.yml
+  - ansible.builtin.include_tasks: update-firmware.yml
     when: update_firmware
 
   # Run post-flight diagnostics
-  - include_tasks: run-diagnostics.yml
+  - ansible.builtin.include_tasks: run-diagnostics.yml
     vars:
-      run_diagnostics_type: '-post-check'
+      run_diagnostics_type: "-post-check"
     when: run_diagnostics
 
   always:
-  - include_tasks: transfer-logs.yml # In case of failure, this will pull whatever logs were captured; in case of success it will pull the later logs and some pre-flight checks may be overwritten
+    - ansible.builtin.include_tasks: transfer-logs.yml # In case of failure, this will pull whatever logs were captured; in case of success it will pull the later logs and some pre-flight checks may be overwritten
 
 - name: Clean up the loaded images and copied files
-  include_tasks: clean.yml
+  ansible.builtin.include_tasks: clean.yml
   when: clean_fw
 
 # Some FW component upgrades require cleanly shutting down the DGX and doing a full powercycle (typically SBIOS or BMC)
 # Rather than automating this step, we allow the operator to perform a manual powercycle when it is safe to do so
 - name: Tell user to manually power cycle chassis
   when: nv_fw_power_cycle_needed | default(false)
-  debug:
+  ansible.builtin.debug:
     msg: "It is necessary to manually power cycle this DGX using the BMC or ipmitool. Notify Datacenter Operations that the system will be restarted (if necessary), cleanly shutdown the DGX using the 'shutdown' command, and power cycle the server using the BMC IP and ipmitool. FW update message: {{ fw_update_json.Message }}"

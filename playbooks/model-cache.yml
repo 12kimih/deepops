@@ -68,7 +68,7 @@
         state: directory
         owner: "{{ model_cache_owner }}"
         group: "{{ model_cache_group }}"
-        mode: '2750'
+        mode: "2750"
       loop:
         - "{{ model_cache_path }}"
         - "{{ model_cache_path }}/hub"
@@ -80,7 +80,7 @@
         dest: "{{ model_cache_path }}/environment.sh"
         owner: "{{ model_cache_owner }}"
         group: "{{ model_cache_group }}"
-        mode: '0640'
+        mode: "0640"
         content: |
           # Source explicitly in the writer or consumer shell.
           # Keep HF_HOME, HF_TOKEN_PATH and HF_XET_CACHE private to each user.

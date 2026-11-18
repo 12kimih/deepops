@@ -3,11 +3,11 @@
 - hosts: all
   become: true
   tasks:
-  - name: install openmpi packages
-    ansible.builtin.apt:
-      name: "{{ item }}"
-    with_items:
-    - openmpi-bin
-    - libopenmpi-dev
-    - libpmi2-pmix
-    - libpmi-pmix-dev
+    - name: Install openmpi packages
+      ansible.builtin.apt:
+        name: "{{ item }}"
+      with_items:
+        - openmpi-bin
+        - libopenmpi-dev
+        - libpmi2-pmix
+        - libpmi-pmix-dev

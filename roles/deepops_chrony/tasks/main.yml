@@ -13,7 +13,7 @@
     owner: root
     group: root
   notify:
-    - restart chrony
+    - Restart chrony
 
 - name: Start and enable chrony service
   ansible.builtin.service:

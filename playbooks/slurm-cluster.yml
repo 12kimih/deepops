@@ -22,11 +22,11 @@
 
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
-  when: chrony_install|default(true)
+  when: chrony_install | default(true)
 
 - name: Set up a local cluster container registry
   import_playbook: container/standalone-container-registry.yml hostlist=slurm-master
-  when: slurm_enable_container_registry|default(true)
+  when: slurm_enable_container_registry | default(true)
 
 - name: Set up NGINX-based container caching | Install docker registry cache server
   import_playbook: container/nginx-docker-registry-cache-server.yml
@@ -42,7 +42,7 @@
 
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml
-  when: slurm_cluster_install_nvidia_driver|default(true)
+  when: slurm_cluster_install_nvidia_driver | default(true)
 
 # Install NVIDIA CUDA Toolkit
 #   Note: the CUDA playbook also installs the driver, so we pass the
@@ -51,7 +51,7 @@
   import_playbook: nvidia-software/nvidia-cuda.yml
   vars:
     cuda_playbook_install_driver: "{{ slurm_cluster_install_nvidia_driver }}"
-  when: slurm_cluster_install_cuda|default(true)
+  when: slurm_cluster_install_cuda | default(true)
 
 - name: Install software
   import_playbook: generic/software.yml
@@ -83,18 +83,18 @@
 
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml hostlist=slurm-node
-  when: install_dcgm|default(false)
+  when: install_dcgm | default(false)
 
 - name: Install Node Health Check
   import_playbook: slurm-cluster/nhc.yml hostlist=slurm-node
-  when: slurm_install_nhc|default(false)
+  when: slurm_install_nhc | default(false)
 
 - name: Install Slurm
   import_playbook: slurm-cluster/slurm.yml
 
 - name: Install OpenMPI
   import_playbook: slurm-cluster/openmpi.yml
-  when: slurm_cluster_install_openmpi|default(true)
+  when: slurm_cluster_install_openmpi | default(true)
 
 - name: Install Lmod
   import_playbook: slurm-cluster/lmod.yml
@@ -142,13 +142,13 @@
   import_playbook: generic/rsyslog-server.yml
   vars:
     hostlist: "{{ rsyslog_server_hostname | default('slurm-master[0]') }}"
-  when: slurm_enable_rsyslog_server|default(true)
+  when: slurm_enable_rsyslog_server | default(true)
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog client
   import_playbook: generic/rsyslog-client.yml
   vars:
     hostlist: "{{ rsyslog_client_group | default('slurm-node') }}"
-  when: slurm_enable_rsyslog_client|default(true)
+  when: slurm_enable_rsyslog_client | default(true)
 
 - name: Set Permissions to adjust GPU Clocks speeds
   import_playbook: utilities/gpu-clocks.yml

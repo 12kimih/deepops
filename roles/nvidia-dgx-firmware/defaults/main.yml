@@ -66,4 +66,3 @@ nv_modules:
   - nvidia_drm
   - nvidia_modeset
   - nvidia
-

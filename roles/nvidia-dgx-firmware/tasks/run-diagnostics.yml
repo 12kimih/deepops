@@ -1,16 +1,16 @@
 ---
 - name: Starting diagnostics step
-  debug:
+  ansible.builtin.debug:
     msg: "Starting now"
 
 - name: Check firmware
-  include_tasks: check-firmware.yml
+  ansible.builtin.include_tasks: check-firmware.yml
   ignore_errors: true
 
 - name: Get health
-  include_tasks: get-health.yml
+  ansible.builtin.include_tasks: get-health.yml
   ignore_errors: true
 
 - name: Get IB
-  include_tasks: get-ib.yml
+  ansible.builtin.include_tasks: get-ib.yml
   ignore_errors: true

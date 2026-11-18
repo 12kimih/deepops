@@ -2,7 +2,7 @@
 - name: Install CUDA when we require NVML support for autodetection
   ansible.builtin.include_role:
     name: nvidia_cuda
-  when: slurm_autodetect_nvml|default(false)
+  when: slurm_autodetect_nvml | default(false)
 
 - name: Setup role
   ansible.builtin.include_tasks: setup-role.yml

@@ -34,7 +34,7 @@
 - name: Set the default LANG (Debian)
   ansible.builtin.lineinfile:
     path: /etc/default/locale
-    regexp: '^LANG='
+    regexp: "^LANG="
     line: "LANG={{ locale_lang }}"
     create: true
     mode: "0644"
@@ -45,7 +45,7 @@
 - name: Set the default LANG (RHEL/Rocky)
   ansible.builtin.lineinfile:
     path: /etc/locale.conf
-    regexp: '^LANG='
+    regexp: "^LANG="
     line: "LANG={{ locale_lang }}"
     create: true
     mode: "0644"

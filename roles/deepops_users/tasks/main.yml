@@ -3,9 +3,9 @@
   ansible.builtin.lineinfile:
     path: /etc/sudoers
     state: present
-    regexp: '^%admin ALL='
-    line: '%admin ALL=(ALL) NOPASSWD: ALL'
-    validate: '/usr/sbin/visudo -cf %s'
+    regexp: "^%admin ALL="
+    line: "%admin ALL=(ALL) NOPASSWD: ALL"
+    validate: "/usr/sbin/visudo -cf %s"
   tags: ["users", "groups", "configuration"]
 
 - name: Creating groups
@@ -42,11 +42,11 @@
   ansible.posix.authorized_key:
     user: "{{ item.0.username }}"
     key: "{{ item.1 }}"
-    path: "{{ item.0.home | default('/home/' + item.0.username)  }}/.ssh/authorized_keys"
+    path: "{{ item.0.home | default('/home/' + item.0.username) }}/.ssh/authorized_keys"
   with_subelements:
     - "{{ users }}"
     - ssh_key
-    - skip_missing: yes
+    - skip_missing: true
   tags: ["users", "configuration"]
 
 - name: Setup user profiles
