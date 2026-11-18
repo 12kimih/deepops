@@ -34,3 +34,16 @@ os_updates_held_back:
 # Whether needrestart may restart services after an upgrade. When false it only lists
 # them, so an upgrade never restarts nfs-server, slurmctld or similar under running jobs.
 os_updates_restart_services: false
+
+# Packages an apt hold may pin (shell-style globs). Any other hold is released: a hold
+# set by hand once keeps a package back forever, even from the maintenance upgrade
+# (Docker was held on some nodes only, so their versions drifted). Pin a version
+# through the owning role instead. Debian family.
+os_updates_allowed_holds: []
+
+# Pending updates and whether a reboot is needed, as node_exporter textfile metrics
+# (os_updates_pending_packages{kind="security"|"all"}, os_updates_reboot_required),
+# refreshed daily, so updates that wait for a maintenance window cannot pile up unseen.
+# Debian family. false removes the timer.
+os_updates_metrics: true
+os_updates_metrics_textfile_dir: "{{ node_exporter_prom_dir | default('/run/prometheus') }}"
