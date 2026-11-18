@@ -25,7 +25,8 @@ people_default_shell: /bin/bash
 # Where home directories live; a new account's home is created from /etc/skel.
 people_home_root: /home
 
-# Mode of every active person's home directory, and of homes useradd creates
-# (HOME_MODE in /etc/login.defs). 0750 with the per-user group keeps one user's files
-# away from the others; share through a group directory instead.
+# The most an active person's home directory may allow (a stricter mode is kept), and
+# the mode useradd gives new homes (HOME_MODE in /etc/login.defs). 0750 with the
+# per-user group keeps one user's files away from the others; share through a group
+# directory instead.
 people_home_mode: "0750"

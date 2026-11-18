@@ -131,12 +131,14 @@
           [Install]
           WantedBy=timers.target
 
+    # Under --check the unit files above are not written, so there is nothing to enable.
     - name: Enable the image prune timer
       ansible.builtin.systemd:
         name: docker-image-prune.timer
         enabled: true
         state: started
         daemon_reload: true
+      when: not ansible_check_mode
 
 # Turning it off removes it, not just stops adding it.
 - name: Remove the image prune timer when pruning is off

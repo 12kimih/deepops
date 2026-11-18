@@ -50,15 +50,27 @@
   tags:
     - people
 
-# create_home sets the mode only on a home it creates, so existing homes are set here.
-- name: Set each active person's home directory mode
-  ansible.builtin.file:
+# create_home sets the mode only on a home it creates, so existing homes are checked
+# here. people_home_mode is a ceiling: a home with any permission beyond it is set to
+# it, while a stricter one (0700) is left as its owner chose.
+- name: Read the home directories' modes
+  ansible.builtin.stat:
     path: "{{ people_home_root }}/{{ item.key }}"
-    state: directory
-    mode: "{{ people_home_mode }}"
   loop: "{{ people | people_active | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
+  register: people_homes
+  tags:
+    - people
+
+- name: Take away permissions beyond the home mode
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    mode: "{{ people_home_mode }}"
+  loop: "{{ people_homes.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item.key }} ({{ item.stat.mode }})"
+  when: item.stat.mode | mode_exceeds(people_home_mode)
   tags:
     - people
 
