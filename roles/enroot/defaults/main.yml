@@ -46,7 +46,8 @@ enroot_max_mnt_namespaces: 65536
 # Ubuntu 23.10+/24.04 restricts unprivileged userns via AppArmor. enroot's .deb
 # installs a scoped profile that re-grants it to enroot-nsenter only, so the
 # global restriction can stay enabled. Set this true ONLY for a trusted/dev box
-# to disable the restriction system-wide instead (larger security blast radius).
+# to disable the restriction system-wide instead (larger security blast radius);
+# setting it back to false restores the restriction.
 enroot_apparmor_global_disable: false
 
 # RHEL/Rocky: enable unprivileged userns via kernel cmdline if missing (+ reboot).
