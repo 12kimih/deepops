@@ -4,7 +4,9 @@ global:
 {% endif %}
 route:
   receiver: 'slack-notifications'
-  repeat_interval: 2m
+  group_by: ['alertname', 'instance']
+  # Re-notify an unresolved alert every 4h, not every few minutes.
+  repeat_interval: 4h
 receivers:
   - name: 'slack-notifications'
 {% if alertmanager_slack_api_url %}

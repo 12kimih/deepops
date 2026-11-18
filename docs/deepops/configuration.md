@@ -224,19 +224,24 @@ Typical values that should be encrypted include:
 - `slurm_password` and `slurm_db_password` (Slurm and SlurmDBD database credentials)
 - `grafana_cfg_pass` (Grafana admin password)
 - Container registry credentials (`docker_login_registries`, `standalone_container_registry_cache_username`/`password`)
-- Any BMC/IPMI credentials used for provisioning
+- Any BMC/IPMI credentials used for provisioning (`bmc_password`)
+- Slack credentials (`alertmanager_slack_api_url`, `slack_bot_token`)
 
-A common pattern is to keep encrypted secrets in a dedicated vault file, for
-example `config/group_vars/all/vault.yml`:
+Each secret is vaulted inline with `ansible-vault encrypt_string`, in the same
+group_vars file as its plaintext neighbours. Names stay readable and grep-able, and a
+diff shows which secret changed. Run it from the DeepOps root so `ansible.cfg` supplies
+the password file; `--prompt` reads the value without echo or shell history:
 
 ```bash
-# Create (or edit) an encrypted vault file
-ansible-vault create config/group_vars/all/vault.yml
-
-# Reference the encrypted values from your normal (unencrypted) group_vars,
-# e.g. in config/group_vars/slurm-cluster.yml:
-#   slurm_db_password: "{{ vault_slurm_db_password }}"
+cd <deepops>
+ansible-vault encrypt_string --prompt --name slurm_db_password
+# paste the printed `slurm_db_password: !vault |` block into config/group_vars/<group>.yml
 ```
+
+Read a value back with
+`ansible localhost -m debug -a var=slurm_db_password -e @config/group_vars/slurm-cluster.yml`.
+To change the vault password, re-encrypt every value (`ansible-vault rekey` only
+handles whole encrypted files).
 
 So that you don't have to type the vault password on every run,
 [`ansible.cfg`](../../ansible.cfg) already points Ansible at a password file, read only
