@@ -1,5 +1,5 @@
 [Unit]
-Description=Alert Manager
+Description=Alertmanager
 After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
@@ -12,7 +12,14 @@ RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
 ExecStartPre=/usr/bin/docker pull {{ alertmanager_container }}
-ExecStart=/usr/bin/docker run --rm --network host --name %n -v {{ alertmanager_config_dir }}:/etc/alertmanager -v {{ alertmanager_docker_volume_name }}:/alertmanager {{ alertmanager_container }}
+ExecStart=/usr/bin/docker run --rm --network host --name %n \
+  -v {{ alertmanager_config_dir }}:/etc/alertmanager:ro \
+  -v {{ alertmanager_docker_volume_name }}:/alertmanager \
+  {{ alertmanager_container }} \
+  --config.file=/etc/alertmanager/alertmanager.yml \
+  --storage.path=/alertmanager \
+  --web.listen-address=:{{ alertmanager_port }} \
+  --cluster.listen-address=
 
 [Install]
 WantedBy=multi-user.target

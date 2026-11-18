@@ -1,0 +1,14 @@
+{{ define "slack.color" -}}
+{{ if eq .Status "resolved" }}good{{ else if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}
+{{- end }}
+
+{{ define "slack.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.host }} on {{ . }}{{ end }}
+{{- end }}
+
+{{ define "slack.text" -}}
+{{ range .Alerts -}}
+*{{ .Labels.severity | toUpper }}* {{ .Annotations.summary }}
+{{ with .Annotations.description }}{{ . }}
+{{ end }}{{ end }}
+{{- end }}
