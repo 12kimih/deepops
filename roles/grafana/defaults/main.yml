@@ -7,8 +7,20 @@ grafana_container: "grafana/grafana:13.2.4"
 grafana_svc_name: "docker.grafana.service"
 grafana_state: started
 grafana_enabled: true
-grafana_port: 3000   # Grafana HTTP port (upstream default; override per site)
+grafana_port: 3000
+# Public URL, used in links Grafana generates (e.g. "http://cluster.example:3000/").
+grafana_root_url: ""
 
 grafana_cfg_user: admin
+# Enforced on every run, also on an existing database. Vault a real one per site.
 grafana_cfg_pass: deepops
+# Anonymous visitors can view dashboards but not edit them.
+grafana_anonymous_enabled: true
+grafana_anonymous_role: Viewer
+
 grafana_cfg_dashboard_path: "{{ grafana_data_dir }}/dashboards"
+grafana_dashboard_folder: Cluster
+# Files under src/dashboards/ to provision (exporter roles may add their own).
+grafana_dashboards:
+  - gpu-dashboard.json
+  - node-exporter-full.json

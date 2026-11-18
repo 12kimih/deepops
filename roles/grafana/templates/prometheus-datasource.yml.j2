@@ -1,8 +1,19 @@
+{{ ansible_managed | comment }}
 apiVersion: 1
 
+# Recreated on every start so the fixed uid also replaces a datasource made without one.
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
 datasources:
-- name: Prometheus
-  type: prometheus
-  access: proxy
-  url: http://localhost:{{ prometheus_port | default(9090) }}
-  isDefault: true
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:{{ prometheus_port | default(9090) }}
+    isDefault: true
+    editable: false
+    jsonData:
+      # Lets $__rate_interval cover at least four scrapes.
+      timeInterval: "{{ prometheus_cfg_scrape_interval | default('15s') }}"

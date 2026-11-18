@@ -1,9 +1,23 @@
+{{ ansible_managed | comment(decoration='; ') }}
 [server]
 http_port = {{ grafana_port }}
+{% if grafana_root_url %}
+root_url = {{ grafana_root_url }}
+{% endif %}
 
 [security]
 admin_user = {{ grafana_cfg_user }}
 admin_password = {{ grafana_cfg_pass }}
+disable_gravatar = true
+
+[users]
+allow_sign_up = false
 
 [auth.anonymous]
-enabled = true
+enabled = {{ grafana_anonymous_enabled | bool | lower }}
+org_role = {{ grafana_anonymous_role }}
+
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+check_for_plugin_updates = false
