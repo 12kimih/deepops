@@ -54,16 +54,22 @@ function poll_ceph() {
   echo "The script will stop polling when Ceph setup is completed and the cluster is in a healthy state".
   echo ""; echo ""; echo ""
 
-  while true; do
+  # Bounded: a Ceph that never settles must end in an error, not in a poll that runs for ever.
+  local limit=${ROOK_POLL_TIMEOUT:-900}
+  local deadline=$((SECONDS + limit))
+  while ((SECONDS < deadline)); do
     rook_tools_pod=$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools -o name | cut -d \/ -f2 | sed -e 's/\\r$//g')
     kubectl -n rook-ceph exec -ti $rook_tools_pod -- ceph status # Run once to print output
     kubectl -n rook-ceph exec -ti $rook_tools_pod -- ceph status | grep "mds: cephfs" | grep "up:active" | grep "standby-replay" # Run again to check for completion
     if [ "${?}" == "0" ]; then
       echo "Ceph has completed setup."
-      break
+      return 0
     fi
     sleep 15
   done
+  echo "ERROR: Ceph did not reach a healthy state within ${limit}s (set ROOK_POLL_TIMEOUT to wait longer)." >&2
+  echo "       Check: kubectl -n rook-ceph get pods; kubectl -n rook-ceph get cephcluster" >&2
+  exit 1
 }
 
 

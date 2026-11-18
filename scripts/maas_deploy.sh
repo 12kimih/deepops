@@ -266,19 +266,25 @@ wait_for_status() {
     return 1
 }
 
+# maas_ssh IP COMMAND... -- every ssh this script makes, with one set of options: a
+# bounded connect, no prompt to hang on (keys only), and the bastion when configured.
+maas_ssh() {
+    local opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes)
+    if [[ -n "$MAAS_SSH_PROXY" ]]; then
+        opts+=(-o "ProxyCommand=${MAAS_SSH_PROXY}")
+    fi
+    # shellcheck disable=SC2029  # the command words are this script's own, joined by ssh
+    ssh "${opts[@]}" "${MAAS_SSH_USER}@$1" "${@:2}"
+}
+
 wait_for_ssh() {
     local ip="$1"
     local hostname="$2"
     local max_wait=120
     local elapsed=0
-    local ssh_opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=5)
-
-    if [[ -n "$MAAS_SSH_PROXY" ]]; then
-        ssh_opts+=(-o "ProxyCommand=${MAAS_SSH_PROXY}")
-    fi
 
     while [ $elapsed -lt $max_wait ]; do
-        if ssh "${ssh_opts[@]}" "${MAAS_SSH_USER}@${ip}" "true" 2>/dev/null; then
+        if maas_ssh "$ip" true 2>/dev/null; then
             return 0
         fi
         printf "."
@@ -495,17 +501,13 @@ do_deploy() {
     # Step 5: Verify SSH
     echo ""
     echo "--- Step 5: Verifying SSH connectivity ---"
-    local ssh_opts=(-o StrictHostKeyChecking=no)
-    if [[ -n "$MAAS_SSH_PROXY" ]]; then
-        ssh_opts+=(-o "ProxyCommand=${MAAS_SSH_PROXY}")
-    fi
     for i in "${!HOSTNAMES[@]}"; do
         local ip
         ip=$(get_ip "${SIDS[$i]}")
         printf "  Waiting for SSH on ${HOSTNAMES[$i]} (${ip})"
         wait_for_ssh "$ip" "${HOSTNAMES[$i]}"
         local os_info
-        os_info=$(ssh "${ssh_opts[@]}" "${MAAS_SSH_USER}@${ip}" "lsb_release -ds" 2>/dev/null || echo "unknown")
+        os_info=$(maas_ssh "$ip" lsb_release -ds 2>/dev/null || echo "unknown")
         echo " OK (${os_info})"
     done
 
