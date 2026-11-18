@@ -4,12 +4,12 @@
 ---
 - hosts: all
   roles:
-    - name: lmod
+    - role: lmod
 
 - hosts: slurm-master[0]
   roles:
-    - name: easy-build
+    - role: easy-build
 
 - hosts: slurm-master
   roles:
-    - name: easy-build-packages
+    - role: easy-build-packages

@@ -4,7 +4,7 @@
 - name: "Install NFS utils on worker nodes"
   hosts: kube_node
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tasks:
     - name: Install nfs utils (Ubuntu)
       ansible.builtin.package:

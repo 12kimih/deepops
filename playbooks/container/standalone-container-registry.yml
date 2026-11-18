@@ -4,6 +4,6 @@
 
 - hosts: "{{ hostlist | default('all') }}"
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   roles:
     - standalone-container-registry

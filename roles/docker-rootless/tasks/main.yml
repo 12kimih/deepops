@@ -21,7 +21,7 @@
     group: "root"
     state: directory
     mode: "0755"
-  with_filetree: "{{ role_path }}/templates/rootless-docker"
+  with_community.general.filetree: "{{ role_path }}/templates/rootless-docker"
   when: item.state == 'directory'
 
 - name: Copy over templates
@@ -32,7 +32,7 @@
     group: "root"
     mode: "{{ item.mode }}"
     force: false
-  with_filetree: "{{ role_path }}/templates/rootless-docker"
+  with_community.general.filetree: "{{ role_path }}/templates/rootless-docker"
   when: item.state == 'file'
 
 - name: Register the rootless docker modulefiles tree with Lmod (sorts before lmod.sh)

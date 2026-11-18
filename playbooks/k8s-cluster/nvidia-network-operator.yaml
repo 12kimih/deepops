@@ -3,7 +3,7 @@
 #
 - hosts: kube_control_plane[0]
   become: true
-  become_method: sudo
+  become_method: ansible.builtin.sudo
   tasks:
     - ansible.builtin.include_role:
         name: nvidia-network-operator

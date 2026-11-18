@@ -26,9 +26,9 @@
 - hosts: slurm-cluster
   become: true
   roles:
-    - name: enroot
+    - role: enroot
 
 - hosts: slurm-cluster
   become: true
   roles:
-    - name: pyxis
+    - role: pyxis
