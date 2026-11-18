@@ -25,6 +25,7 @@
     mode: "0600"
 
 - name: Add client_configuration_token.tok token file from template
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: "client_configuration_token.tok"
     dest: "{{ gpu_operator_grid_config_dir }}/client_configuration_token.tok"

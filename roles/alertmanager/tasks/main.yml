@@ -31,6 +31,7 @@
 
 # Holds the webhook secret: readable only by root and the container user (nobody).
 - name: Install config file
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: "{{ alertmanager_config_src }}"
     dest: "{{ alertmanager_config_dir }}/alertmanager.yml"

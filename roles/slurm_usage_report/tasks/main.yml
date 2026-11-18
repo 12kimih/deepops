@@ -31,6 +31,7 @@
 
     # Holds the bot token.
     - name: Install the report config
+      diff: false  # the file holds a secret; --diff would print it
       ansible.builtin.template:
         src: config.json.j2
         dest: "{{ slurm_usage_report_config_dir }}/config.json"

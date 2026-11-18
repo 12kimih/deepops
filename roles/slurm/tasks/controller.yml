@@ -149,6 +149,7 @@
     - config
 
 - name: Configure slurmdbd.conf
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: "{{ slurm_dbd_conf_template }}"
     dest: "{{ slurm_config_dir }}/slurmdbd.conf"

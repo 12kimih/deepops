@@ -33,6 +33,7 @@
   run_once: true
 
 - name: Copy backend config file(s) to control node
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: backend.j2
     dest: "{{ deepops_dir }}/trident-installer/backend-{{ item.backendName }}.json"

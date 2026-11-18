@@ -57,6 +57,7 @@
 
 # Holds the admin password; the container runs as uid 472, gid 0.
 - name: Install config file
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: "{{ grafana_config_template }}"
     dest: "{{ grafana_config_dir }}/grafana.ini"
