@@ -8,6 +8,9 @@ alertmanager_slack_api_url: ""
 alertmanager_slack_channel: "#alerts"
 # Prepended to critical alerts, e.g. "<!subteam^S0123ABCD>" for a user group or "<!channel>".
 alertmanager_slack_critical_mention: ""
+# External dead man's switch (e.g. a healthchecks.io ping URL) fed by the Watchdog
+# alert. Empty drops Watchdog.
+alertmanager_heartbeat_url: ""
 alertmanager_repeat_interval: 4h
 alertmanager_critical_repeat_interval: 1h
 alertmanager_svc_name: "docker.alertmanager.service"

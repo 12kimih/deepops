@@ -47,6 +47,9 @@ slurm_ha_state_save_location: "/sw/slurm"
 #alertmanager_slack_channel: "#alerts"
 # Prepended to critical alerts: "<!subteam^S0123ABCD>" for a user group, or "<!channel>".
 #alertmanager_slack_critical_mention: ""
+# Dead man's switch: ping URL of an external check (e.g. healthchecks.io, period 5m)
+# that alerts when the always-firing Watchdog alert stops arriving.
+#alertmanager_heartbeat_url: ""
 # Slack app bot token (xoxb-) for bot posts and DMs.
 #slack_bot_token: ""
 
