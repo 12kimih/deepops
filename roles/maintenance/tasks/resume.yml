@@ -1,0 +1,7 @@
+---
+- name: Return the node to Slurm
+  ansible.builtin.command:
+    argv: ["{{ maintenance_slurm_bin }}/scontrol", update, "nodename={{ inventory_hostname }}", state=resume]
+  delegate_to: "{{ maintenance_slurm_controller }}"
+  changed_when: true
+  when: maintenance_drained_here | default(false) | bool

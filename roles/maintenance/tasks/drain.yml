@@ -1,0 +1,32 @@
+---
+# A node someone else drained keeps its reason and is not resumed by this run.
+- name: Read the node's Slurm state
+  ansible.builtin.command:
+    argv: ["{{ maintenance_slurm_bin }}/scontrol", show, node, -o, "{{ inventory_hostname }}"]
+  delegate_to: "{{ maintenance_slurm_controller }}"
+  register: maintenance_node
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Note whether this run takes the node out
+  ansible.builtin.set_fact:
+    maintenance_drained_here: "{{ maintenance_node.stdout is not search('State=\\S*(DRAIN|DOWN)') }}"
+
+- name: Drain the node
+  ansible.builtin.command:
+    argv: ["{{ maintenance_slurm_bin }}/scontrol", update, "nodename={{ inventory_hostname }}", state=drain,
+           "reason={{ maintenance_reason }}"]
+  delegate_to: "{{ maintenance_slurm_controller }}"
+  changed_when: true
+  when: maintenance_drained_here | bool
+
+- name: Wait for the jobs on the node to finish
+  ansible.builtin.command:
+    argv: ["{{ maintenance_slurm_bin }}/squeue", -h, -t, "RUNNING,COMPLETING", -w, "{{ inventory_hostname }}", -o, "%i"]
+  delegate_to: "{{ maintenance_slurm_controller }}"
+  register: maintenance_jobs
+  until: maintenance_jobs.stdout | trim | length == 0
+  retries: "{{ (maintenance_drain_timeout | int) // (maintenance_drain_poll | int) }}"
+  delay: "{{ maintenance_drain_poll }}"
+  changed_when: false
+  when: not ansible_check_mode

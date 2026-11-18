@@ -1,7 +1,8 @@
 """Repository-wide rules for tasks that keep `--check --diff` previews correct and safe.
 
 1. A command/shell/script task that only reads (changed_when: false) and registers a
-   result must set check_mode: false. Under --check Ansible skips commands, so the
+   result must set check_mode: false, unless its `when` skips it under --check on
+   purpose (`not ansible_check_mode`). Under --check Ansible skips commands, so the
    registered result is empty and every task that reads it fails or decides wrongly.
 2. A template task whose template renders a secret must set diff: false, or a
    --diff preview prints the secret.
@@ -92,6 +93,7 @@ class TaskRules(unittest.TestCase):
             and str(task.get("changed_when", "")).lower() == "false"
             and "register" in task
             and "check_mode" not in task
+            and "ansible_check_mode" not in str(task.get("when", ""))
         ]
         self.assertEqual(offenders, [], "add check_mode: false to these read-only tasks")
 

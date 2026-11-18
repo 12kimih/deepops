@@ -1,0 +1,4 @@
+---
+- name: Use the maintenance role through its steps
+  ansible.builtin.fail:
+    msg: "Call one step with tasks_from: drain, upgrade, reboot, verify or resume."

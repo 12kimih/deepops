@@ -1,40 +1,26 @@
 ---
-# Reboot the targeted hosts and wait for them to return.
+# Reboot the targeted hosts and wait for them to return (roles/maintenance, reboot
+# step: shared filesystems are detached first).
 #
 #   -e hostlist=...              target a subset
 #   -e reboot_serial=N           rolling batch size (default 100%)
 #   -e reboot_timeout=N          seconds to wait for a node (default 1800)
 #   -e reboot_detach_nfs=false   skip the pre-reboot unmount
+#
+# To take nodes out of Slurm first and check them afterwards, use apt-upgrade.yml
+# (with -e maintenance_force_reboot=true for a reboot without upgrading anything new).
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   serial: "{{ reboot_serial | default('100%') }}"
   tags:
     - reboot
-  # ansible.cfg's single connection attempt and keepalives are what the reboot module
-  # needs: each probe returns quickly, so it re-checks its deadline and sees the node
-  # come back.
-  pre_tasks:
-    # Lets the whole cluster reboot in one batch: a node holding a hard mount from a
-    # peer that goes down with it blocks in D state and never reaches the reboot. The
-    # nfs role installs the same detach as a shutdown unit; this covers nodes without it.
-    - name: Detach the shared filesystems before the reboot
-      ansible.builtin.shell:
-        cmd: |
-          # Triggers first, or the umount re-arms a mount against a dying server.
-          systemctl stop '*.automount' 2>/dev/null || true
-          umount -l -f -a -t nfs,nfs4 2>/dev/null || true
-          exit 0
-      changed_when: false
-      when: reboot_detach_nfs | default(true) | bool
-      tags:
-        - reboot
-
   tasks:
-    - name: Reboot and wait for the host to come back
-      ansible.builtin.reboot:
-        msg: "Reboot initiated by Ansible"
-        pre_reboot_delay: 5
-        post_reboot_delay: 15
-        # A GPU server can spend several minutes in POST and memory training.
-        reboot_timeout: "{{ reboot_timeout | default(1800) }}"
-        connect_timeout: 5
+    - name: Reboot
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: reboot
+      vars:
+        maintenance_force_reboot: true
+        maintenance_detach_nfs: "{{ reboot_detach_nfs | default(true) }}"
+        maintenance_reboot_timeout: "{{ reboot_timeout | default(1800) }}"
+        maintenance_reason: reboot

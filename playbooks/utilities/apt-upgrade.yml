@@ -1,15 +1,30 @@
 ---
-# Update the apt cache and dist-upgrade OS packages (Ubuntu). Pair with
-# utilities/reboot.yml when a kernel/driver upgrade needs a reboot to take effect.
-- hosts: "{{ hostlist | default('all') }}"
+# Rolling maintenance upgrade (roles/maintenance): one node at a time, drain it in
+# Slurm and wait for its jobs, upgrade every package (the kernel, systemd, libc, GPU
+# and scheduler stacks that unattended upgrades hold back included), reboot if the
+# upgrade asks for it, check slurmd, the GPUs and NHC, and resume the node. A failed
+# node stops the run with that node still drained.
+#
+#   ansible-playbook -K playbooks/utilities/apt-upgrade.yml                  # compute nodes
+#   ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=master
+#   -e maintenance_serial=2           nodes per batch (default 1)
+#   -e maintenance_force_reboot=true  reboot every node, needed or not
+#
+# A node that was already drained (by an admin or a health check) is upgraded but left
+# drained. Run it at least monthly: security fixes to the held-back stacks only land
+# here.
+- hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
+  serial: "{{ maintenance_serial | default(1) }}"
+  max_fail_percentage: 0
   tags:
     - apt-upgrade
   tasks:
-    - name: Update apt cache and dist-upgrade (Ubuntu)
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600
-        upgrade: dist
-      when: ansible_facts.distribution == "Ubuntu"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+    - name: Take the node out, upgrade it and put it back
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: "{{ step }}"
+      loop: "{{ ['drain', 'upgrade', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
+                else ['upgrade', 'reboot', 'verify'] }}"
+      loop_control:
+        loop_var: step

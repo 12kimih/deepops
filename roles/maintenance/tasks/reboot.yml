@@ -1,0 +1,28 @@
+---
+- name: Check whether the upgrade asks for a reboot
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: maintenance_reboot_required
+
+- name: Reboot
+  when: maintenance_force_reboot | bool or maintenance_reboot_required.stat.exists
+  block:
+    # Triggers first, or the umount re-arms a mount against a dying server.
+    - name: Detach the shared filesystems before the reboot
+      ansible.builtin.shell:
+        cmd: |
+          systemctl stop '*.automount' 2>/dev/null || true
+          umount -l -f -a -t nfs,nfs4 2>/dev/null || true
+          exit 0
+      changed_when: false
+      when: maintenance_detach_nfs | bool
+
+    # ansible.cfg's single connection attempt and keepalives let the reboot module
+    # re-check its deadline between probes and see the node come back.
+    - name: Reboot and wait for the host to come back
+      ansible.builtin.reboot:
+        msg: "Reboot by Ansible: {{ maintenance_reason }}"
+        pre_reboot_delay: 5
+        post_reboot_delay: 15
+        reboot_timeout: "{{ maintenance_reboot_timeout }}"
+        connect_timeout: 5
