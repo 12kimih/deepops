@@ -10,9 +10,13 @@ from ansible.playbook.conditional import Conditional
 from ansible.template import Templar
 import yaml
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from ansible_yaml import canonical, same_name  # noqa: E402
+
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 ROLE = ROOT / "roles/slurm"
-TASKS = yaml.safe_load((ROLE / "tasks/build.yml").read_text())
+TASKS = canonical(yaml.safe_load((ROLE / "tasks/build.yml").read_text()))
 DEFAULTS = yaml.safe_load((ROLE / "defaults/main.yml").read_text())
 
 
@@ -35,7 +39,7 @@ class LuaBuild(unittest.TestCase):
                                  "slurm_configure_nvml": "./configure --site-option --with-nvml=/cuda"}
                     commands = []
                     for task in TASKS:
-                        if task.get("name") != "configure":
+                        if not same_name(task.get("name"), "configure"):
                             continue
                         active, templar = self.selected(task, variables)
                         if active:
@@ -57,7 +61,7 @@ class LuaBuild(unittest.TestCase):
                                  "ansible_os_family": family}
                     selected = []
                     for task in TASKS:
-                        if task.get("name") != "install lua build dependencies":
+                        if not same_name(task.get("name"), "install lua build dependencies"):
                             continue
                         active, templar = self.selected(task, variables)
                         if active:

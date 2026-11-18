@@ -13,9 +13,13 @@ from ansible.parsing.dataloader import DataLoader
 from ansible.template import Templar
 import yaml
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from ansible_yaml import canonical, same_name  # noqa: E402
+
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
-PLAY = yaml.safe_load((ROOT / "playbooks/nvidia-software/nvidia-mig.yml").read_text())[0]
-APPLY = next(task for task in PLAY["tasks"] if task.get("name") == "Apply MIG configuration")
+PLAY = canonical(yaml.safe_load((ROOT / "playbooks/nvidia-software/nvidia-mig.yml").read_text()))[0]
+APPLY = next(task for task in PLAY["tasks"] if same_name(task.get("name"), "Apply MIG configuration"))
 DEFAULTS = yaml.safe_load((ROOT / "config.example/group_vars/all.yml").read_text())
 
 
