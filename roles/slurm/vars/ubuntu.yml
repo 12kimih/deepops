@@ -14,9 +14,8 @@ slurm_pam_arch_map:
 slurm_pam_lib_dir: "/lib/{{ slurm_pam_arch_map.get(ansible_architecture, ansible_architecture + '-linux-gnu') }}/security"
 
 # Build dependencies per the Slurm 25.11.x admin quickstart. libdbus-1-dev and
-# libbpf-dev are needed for the cgroup/v2 plugin; libnuma-dev, liblua5.4-dev and
-# libreadline-dev enable NUMA affinity, Lua plugins (job_submit) and interactive
-# scontrol. libmariadb-dev provides the MariaDB client dev headers (mysql-compatible,
+# libbpf-dev are needed for the cgroup/v2 plugin; libnuma-dev and libreadline-dev
+# enable NUMA affinity and interactive scontrol (Lua comes from slurm_lua_deps). libmariadb-dev provides the MariaDB client dev headers (mysql-compatible,
 # incl. mysql.h) for the accounting store -- it exists on 24.04 and coexists with an
 # already-installed MariaDB. Do NOT use default-libmysqlclient-dev: it pulls
 # libmysqlclient-dev (MySQL) which Conflicts/Breaks an installed libmariadb-dev. The old
@@ -30,7 +29,6 @@ slurm_build_deps:
   - libdbus-1-dev
   - libbpf-dev
   - libnuma-dev
-  - liblua5.4-dev
   - libreadline-dev
   - python3
   - wget
@@ -53,3 +51,8 @@ slurm_pmix_deps:
 
 slurm_hwloc_deps:
   - build-essential
+
+# Installed only when slurm_build_lua is enabled. Lua 5.3 is available on
+# every Ubuntu release DeepOps targets and is supported by Slurm's configure.
+slurm_lua_deps:
+  - liblua5.3-dev
