@@ -329,17 +329,27 @@ slurm_cluster_configure_gpu_power_limit: true
 #  # after which the client's own value wins and this line stops mattering.
 #  COLORTERM: truecolor
 
+# Site facts Slurm cannot know (roles/cluster_tools_lib), set once here and read by the
+# cluster's commands, login banner and alerts; refer to them below rather than restating
+# a value. A key left empty is left out. dashboard_url derives from grafana_root_url.
+#cluster_info:
+#  name: "my-cluster"  # system ID, <org>-<kind>
+#  docs_url: "https://docs.example.edu/cluster/"  # public user docs
+#  dashboard_url: "{{ grafana_root_url | default('') }}"
+#  login_host: "cluster.example.edu"  # what users ssh to
+#  ssh_port: 22
+
 # Login banner -- what people see when they SSH in. One short line each; the guide
 # carries the detail.
 #cluster_tools_motd_title: "my cluster"
 #cluster_tools_motd_commands:
-#  - { name: sq,         text: "queue and node usage, your own jobs marked" }
+#  - { name: sq,         text: "your jobs, who holds what, why jobs wait, what is free" }
 #  - { name: qos,        text: "your QoS: what it preempts, how full its quota is" }
 #  - { name: sinfo,      text: "partition and node state" }
 #cluster_tools_motd_links:
 #  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
-#  - { name: dashboard,    text: "http://your-cluster.example.edu:3000" }
+#  - { name: dashboard,    text: "{{ cluster_info.dashboard_url }}" }
 
 # Ubuntu's motd-news fetches advertising from motd.ubuntu.com into the login banner. On
 # hosts without internet access each run fails and stays a failed systemd unit, so
