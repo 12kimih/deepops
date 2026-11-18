@@ -131,8 +131,9 @@
     - nvidia_driver_verify | bool
     - nvidia_driver_module_loaded | bool
 
+# A transient unit sees the GPUs even where the ssh service hides them (DeviceAllow).
 - name: Verify GPUs are visible with nvidia-smi
-  ansible.builtin.command: nvidia-smi
+  ansible.builtin.command: systemd-run --wait --pipe --collect --quiet -- nvidia-smi
   changed_when: false
   when:
     - nvidia_driver_verify | bool
