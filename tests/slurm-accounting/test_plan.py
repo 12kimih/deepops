@@ -192,6 +192,18 @@ class Plan(unittest.TestCase):
         s["qos"]["urgent"]["priority"] = 100000
         self.assertRegex(acct.check_qos_tiers(s, {"qos": 10000, "fairshare": 1000}, []), "overlap")
 
+    def test_descriptions_compare_without_case(self):
+        # sacctmgr stores QoS descriptions lowercased; a capitalised spec is not a change.
+        s = copy(SPEC)
+        s["qos"]["high_a"]["description"] = "High_A"
+        self.assertEqual(plan(s)[0], [])
+
+    def test_inherited_limits_are_not_cleared(self):
+        # Read with wopl, a child shows only limits set on it; an inherited one is blank
+        # and must stay so, since the spec does not set it on the child either.
+        cmds, _ = plan(SPEC)
+        self.assertFalse(any("maxsubmitjobs=-1" in c for cmd in cmds for c in cmd))
+
     def test_time_parsing(self):
         self.assertEqual(acct.minutes("1-00:00:00"), 1440)
         self.assertEqual(acct.minutes("02:30:00"), 150)

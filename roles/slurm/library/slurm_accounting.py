@@ -252,6 +252,11 @@ def fmt_minutes(value):
     return f"{d}-{rem // 60:02d}:{rem % 60:02d}:00"
 
 
+def same_text(want, have):
+    """Slurm stores QoS and account descriptions lowercased, so compare without case."""
+    return (want or "").casefold() == (have or "").casefold()
+
+
 def qos_changes(want, have):
     sets = []
     if have is None or want["priority"] != have["priority"]:
@@ -270,7 +275,9 @@ def qos_changes(want, have):
         sets.append(f"maxwall={fmt_minutes(want['max_wall'])}")
     if want["usage_factor"] != (have or {}).get("usage_factor", 1.0):
         sets.append(f"usagefactor={want['usage_factor']}")
-    if want["description"] is not None and want["description"] != (have or {}).get("description"):
+    if want["description"] is not None and not same_text(
+        want["description"], (have or {}).get("description")
+    ):
         sets.append(f"description={want['description']}")
     return sets
 
@@ -290,7 +297,7 @@ def assoc_sets(want, have, account_level):
         sets.append(f"defaultqos={want['default_qos']}")
     if account_level:
         for key in ("description", "organization"):
-            if want[key] is not None and want[key] != (have or {}).get(key):
+            if want[key] is not None and not same_text(want[key], (have or {}).get(key)):
                 sets.append(f"{key}={want[key]}")
     return sets
 
@@ -468,7 +475,9 @@ def main():
     where = [f"cluster={cluster}"] if cluster else []
     cur_qos = current_qos(read("show", "qos", f"format={QOS_FIELDS}"))
     cur_accounts, cur_users = current_assocs(
-        read("show", "assoc", *where, f"format={ASSOC_FIELDS}"),
+        # wopl: limits only where they are set, not propagated from parents; otherwise an
+        # inherited max_submit_jobs or priority reads as the child's own and gets cleared.
+        read("show", "assoc", *where, "wopl", f"format={ASSOC_FIELDS}"),
         read("show", "account", f"format={ACCOUNT_FIELDS}"),
     )
     default_accounts = {
