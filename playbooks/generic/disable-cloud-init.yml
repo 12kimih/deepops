@@ -27,8 +27,12 @@
         state: "touch"
       when: deepops_disable_cloud_init | default(true) and etc_cloud.stat.exists
 
+    # Only the units a host has: one without cloud-config is fine, any other failure is not.
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+      when: deepops_disable_cloud_init | default(true)
+
     - name: Disable all systemd services
-      ignore_errors: true
       ansible.builtin.service:
         name: "{{ item }}"
         state: stopped
@@ -37,4 +41,6 @@
         - "cloud-init"
         - "cloud-config"
         - "cloud-final"
-      when: deepops_disable_cloud_init | default(true)
+      when:
+        - deepops_disable_cloud_init | default(true)
+        - (item ~ '.service') in ansible_facts.services
