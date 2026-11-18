@@ -41,10 +41,12 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_dbd_conf_template: "{{ inventory_dir }}/files/slurm/slurmdbd.conf"
 
 # --- Slack (empty = disabled) -------------------------------------------------
-# Vault secrets: ansible-vault encrypt_string --stdin-name <var>
+# Vault secrets: ansible-vault encrypt_string --prompt --name <var>
 # Alertmanager incoming webhook; it posts to the channel chosen when it was created.
 #alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
 #alertmanager_slack_channel: "#alerts"
+# Prepended to critical alerts: "<!subteam^S0123ABCD>" for a user group, or "<!channel>".
+#alertmanager_slack_critical_mention: ""
 # Slack app bot token (xoxb-) for bot posts and DMs.
 #slack_bot_token: ""
 
@@ -373,6 +375,14 @@ slurm_monitoring_group: "slurm-master"
 
 # Grafana web UI port (role default 3000). Override if 3000 is taken.
 #grafana_port: 3001
+# Grafana admin password, enforced on every run (role default "deepops"). Vault it.
+# Public URL Grafana uses in the links it generates.
+#grafana_cfg_pass: ""
+#grafana_root_url: "http://cluster.example:3000/"
+
+# Prometheus TSDB retention; whichever limit is hit first wins (role defaults below).
+#prometheus_retention_time: 90d
+#prometheus_retention_size: 50GB
 
 # Slurm Prometheus exporter. By default the role builds the DeepOps-owned exporter
 # image locally (deepops/prometheus-slurm-exporter). To run an image from a registry
