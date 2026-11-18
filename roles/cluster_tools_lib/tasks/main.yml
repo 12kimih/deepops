@@ -15,3 +15,20 @@
     group: root
     mode: "0644"
     directory_mode: "0755"
+
+- name: Create the site facts directory
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_info_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Empty values are left out, so a reader never mistakes "" for a value.
+- name: Publish the site facts
+  ansible.builtin.copy:
+    content: "{{ cluster_info | dict2items | rejectattr('value', 'equalto', '') | items2dict | to_nice_json }}\n"
+    dest: "{{ cluster_tools_lib_info_file }}"
+    owner: root
+    group: root
+    mode: "0644"
