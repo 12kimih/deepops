@@ -14,6 +14,9 @@
       A typo would otherwise read as "no cap" and silently un-cap the node.
   when: nvidia_power_limit_watts | default('') | string | trim | length > 0
 
+# nvidia-smi runs in a transient unit throughout, so it sees the GPUs even where the
+# ssh service hides them (DeviceAllow, see slurm login-compute-setup).
+#
 # Gate on a working driver rather than just GPU presence: a node can have an NVIDIA
 # card (lspci) but no driver yet, in which case nvidia-smi is absent and there is
 # nothing to cap or reset.  Skip cleanly instead of failing the run.
@@ -39,6 +42,7 @@
     - name: Read the current and supported GPU power limits
       ansible.builtin.command:
         cmd: >-
+          systemd-run --wait --pipe --collect --quiet --
           nvidia-smi
           --query-gpu=index,power.limit,power.default_limit,power.min_limit,power.max_limit
           --format=csv,noheader,nounits
@@ -111,6 +115,7 @@
         - name: Re-read the enforced power limits
           ansible.builtin.command:
             cmd: >-
+              systemd-run --wait --pipe --collect --quiet --
               nvidia-smi
               --query-gpu=index,power.limit,power.default_limit,power.min_limit,power.max_limit
               --format=csv,noheader,nounits
@@ -122,7 +127,7 @@
         # handler fired, but a card drifted (manual nvidia-smi -pl, driver reload).
         - name: Enforce the cap on any GPU that drifted from it
           ansible.builtin.command:
-            cmd: nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ nvidia_power_limit_watts | int }}
+            cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ nvidia_power_limit_watts | int }}
           loop: "{{ nvidia_power_limit_recheck.stdout_lines | default([]) }}"
           when:
             - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
@@ -163,7 +168,7 @@
         # keeps its limit until reset here, per GPU against that card's own default.
         - name: Reset each GPU to its default power limit
           ansible.builtin.command:
-            cmd: nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
+            cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
           loop: "{{ nvidia_power_limit_state.stdout_lines | default([]) }}"
           when:
             - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
@@ -174,7 +179,7 @@
 
     - name: Read back the enforced power limit
       ansible.builtin.command:
-        cmd: nvidia-smi --query-gpu=power.limit --format=csv,noheader
+        cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi --query-gpu=power.limit --format=csv,noheader
       register: nvidia_power_limit_enforced
       changed_when: false
       check_mode: false
