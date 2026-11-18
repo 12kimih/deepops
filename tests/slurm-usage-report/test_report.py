@@ -1,12 +1,12 @@
-"""Unit tests for roles/slurm_usage_report/files/slurm_usage_report.py (no cluster needed)."""
+"""Unit tests for the Slurm usage report, clustertools.usage_report (no cluster needed)."""
 
 import sys
 import unittest
 from pathlib import Path
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
-sys.path[:0] = [str(ROLES / "cluster_tools_lib/files"), str(ROLES / "slurm_usage_report/files")]
-import slurm_usage_report as report  # noqa: E402
+sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
+from clustertools import usage_report as report  # noqa: E402
 
 
 NOW = 1_800_000_000

@@ -1,8 +1,10 @@
 ---
-# cluster_tools_lib -- the Python package the cluster's own commands share
-# (clustertools: reading Slurm, its vocabulary, terminal rendering). Roles that ship a
-# command list this role under meta dependencies and install the command with
-# tasks_from: command, so every command finds the package the same way.
+# cluster_tools_lib -- all of the cluster's own Python, as one package (clustertools):
+# reading Slurm, its vocabulary, rendering, and every program built on them (sq, qos,
+# the usage report). It is installed as one set, so a deploy of any role that depends on
+# this one can never leave a program behind the library it imports. Roles only wire a
+# program up: they list this role under meta dependencies and install its command with
+# tasks_from: command, plus their own units and config.
 #
 # The package lives outside the interpreter's site-packages on purpose: a path there
 # names the Python version, so an OS upgrade would silently drop the package from

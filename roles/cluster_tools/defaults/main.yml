@@ -18,9 +18,10 @@ cluster_tools_lib_dir: /usr/local/lib/cluster-tools
 
 # Built-in commands to publish, by name: any of sq (the queue, who holds what, why jobs
 # wait, and what each partition pool has left) and qos (the QoS a user may submit
-# against and how full each quota is). Each is a module under cluster_tools_lib_dir run through
-# the shared wrapper, with bash completion asked of the command itself, so it always
-# matches the installed version. Empty publishes none and removes what was published.
+# against and how full each quota is). Each is clustertools.<name>, installed by
+# cluster_tools_lib with the rest of the cluster's Python; this role adds the command
+# wrapper and bash completion asked of the command itself, so both always match the
+# installed version. Empty publishes none and removes what was published.
 cluster_tools_commands: []
 cluster_tools_builtin: [sq, qos]
 cluster_tools_completion_dir: /usr/share/bash-completion/completions

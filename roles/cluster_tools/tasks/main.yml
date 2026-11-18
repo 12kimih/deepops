@@ -65,15 +65,6 @@
       once: {{ cluster_tools_commands | intersect(cluster_tools_scripts | map(attribute='dest')) }}
       is also in cluster_tools_scripts.
 
-- name: Publish the built-in command modules
-  ansible.builtin.copy:
-    src: "{{ item }}.py"
-    dest: "{{ cluster_tools_lib_dir }}/{{ item }}.py"
-    owner: root
-    group: root
-    mode: "0644"
-  loop: "{{ cluster_tools_commands }}"
-
 - name: Publish the built-in commands
   ansible.builtin.include_role:
     name: cluster_tools_lib
@@ -81,7 +72,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ cluster_tools_bin_dir }}/{{ item }}"
-      module: "{{ item }}"
+      module: "clustertools.{{ item }}"
   loop: "{{ cluster_tools_commands }}"
 
 # bash-completion loads this on the first <TAB> after the command, and the command
@@ -122,8 +113,7 @@
   ansible.builtin.file:
     path: >-
       {{ {'command': cluster_tools_bin_dir ~ '/' ~ item.0,
-          'completion': cluster_tools_completion_dir ~ '/' ~ item.0,
-          'module': cluster_tools_lib_dir ~ '/' ~ item.0 ~ '.py'}[item.1] }}
+          'completion': cluster_tools_completion_dir ~ '/' ~ item.0}[item.1] }}
     state: absent
   vars:
     _cluster_tools_recorded: >-
@@ -133,7 +123,7 @@
     {{ (_cluster_tools_recorded + cluster_tools_retired) | unique
        | difference(cluster_tools_scripts | map(attribute='dest'))
        | difference(cluster_tools_commands)
-       | product(['command', 'completion', 'module']) | list }}
+       | product(['command', 'completion']) | list }}
   loop_control:
     label: "{{ item.0 }} {{ item.1 }}"
 
