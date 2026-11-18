@@ -1,0 +1,135 @@
+---
+# Cases that span days or weeks (backups, updates). promtool evaluates every rule at
+# evaluation_interval over the whole span, so these run hourly; the minute-level cases
+# are in alert-rules.test.yml.
+rule_files:
+  - ../../roles/prometheus/files/rules/*.yml
+evaluation_interval: 1h
+
+tests:
+  - name: a failed backup pages; a stale one pages unless it already failed
+    interval: 1h
+    input_series:
+      - series: 'slurm_backup_last_status{host="m", instance="m:9100", destination="/a"}'
+        values: '0x48'
+      - series: 'slurm_backup_last_success_timestamp_seconds{host="m", instance="m:9100", destination="/a"}'
+        values: '0x48'
+      - series: 'slurm_backup_last_status{host="m", instance="m:9100", destination="/b"}'
+        values: '1x48'
+      - series: 'slurm_backup_last_success_timestamp_seconds{host="m", instance="m:9100", destination="/b"}'
+        values: '0x48'
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: SlurmBackupFailed
+        exp_alerts:
+          - exp_labels: {severity: critical, host: m, instance: "m:9100", destination: /a}
+            exp_annotations:
+              summary: "The last Slurm backup to /a failed"
+              description: "`journalctl -u slurm-backup@backup` on m says why; the accounting database and controller state have no fresh copy there."
+      - eval_time: 30h
+        alertname: SlurmBackupStale
+        exp_alerts: []
+      - eval_time: 40h
+        alertname: SlurmBackupStale
+        exp_alerts:
+          - exp_labels: {severity: critical, host: m, instance: "m:9100", destination: /b}
+            exp_annotations:
+              summary: "No Slurm backup to /b has succeeded for 36 hours"
+              description: "The daily backup did not run or stopped before writing its result: `systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on m."
+
+  - name: restore test failure warns; a stale test warns after 40 days
+    interval: 1d
+    input_series:
+      - series: 'slurm_backup_restore_test_status{host="m", instance="m:9100"}'
+        values: '0x45'
+      - series: 'slurm_backup_restore_test_status{host="m2", instance="m2:9100"}'
+        values: '1x45'
+      - series: 'slurm_backup_restore_test_last_success_timestamp_seconds{host="m2", instance="m2:9100"}'
+        values: '0x45'
+    alert_rule_test:
+      - eval_time: 1d
+        alertname: SlurmBackupRestoreTestFailed
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100"}
+            exp_annotations:
+              summary: "The monthly Slurm backup restore test failed on m"
+              description: "A backup that does not restore is no backup: `journalctl -u slurm-backup@restore-test`."
+      - eval_time: 39d
+        alertname: SlurmBackupRestoreTestStale
+        exp_alerts: []
+      - eval_time: 41d
+        alertname: SlurmBackupRestoreTestStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m2, instance: "m2:9100"}
+            exp_annotations:
+              summary: "No Slurm backup restore test has passed on m2 for 40 days"
+              description: "The monthly restore test did not run: `systemctl list-timers slurm-backup*`."
+
+  - name: long-pending security updates and reboots warn; stale update metrics warn
+    interval: 1d
+    input_series:
+      - series: 'os_updates_security_pending_since_seconds{host="n1", instance="n1:9100"}'
+        values: '86400x20'
+      - series: 'os_updates_security_pending_since_seconds{host="n2", instance="n2:9100"}'
+        values: '0x20'
+      - series: 'os_updates_apt_ok{host="n1", instance="n1:9100"}'
+        values: '1x20'
+      - series: 'os_updates_reboot_required{host="n1", instance="n1:9100"}'
+        values: '1x20'
+      - series: 'os_updates_reboot_required_since_seconds{host="n1", instance="n1:9100"}'
+        values: '86400x20'
+      - series: 'os_updates_metrics_timestamp_seconds{host="n1", instance="n1:9100"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 14d
+        alertname: OsSecurityUpdatesPending
+        exp_alerts: []
+      - eval_time: 16d
+        alertname: OsSecurityUpdatesPending
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "Security updates have waited on n1 for over 14 days"
+              description: "Held-back packages need the rolling upgrade: `ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=n1`."
+      - eval_time: 16d
+        alertname: OsRebootPending
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "n1 has waited over 14 days for a reboot an update asked for"
+              description: "The update is not in effect until then: `ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=n1` drains the node, reboots it and puts it back."
+      - eval_time: 2d
+        alertname: OsUpdatesMetricsStale
+        exp_alerts: []
+      - eval_time: 4d
+        alertname: OsUpdatesMetricsStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "Update status from n1 is over 3 days old"
+              description: "The os-updates metrics timer stopped: `systemctl status os-updates-metrics.timer` on the host."
+
+  - name: a broken dpkg or apt warns after an hour
+    interval: 1h
+    input_series:
+      - series: 'os_updates_dpkg_problems{host="n1", instance="n1:9100"}'
+        values: '3x5'
+      - series: 'os_updates_apt_ok{host="n2", instance="n2:9100"}'
+        values: '0x5'
+      - series: 'os_updates_security_pending_since_seconds{host="n2", instance="n2:9100"}'
+        values: '0x5'
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: OsDpkgBroken
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "dpkg on n1 has 3 half-installed packages and refuses every package change"
+              description: "Security updates included. `dpkg --configure -a` on the host repairs it; the maintenance role's apt health step runs it."
+      - eval_time: 2h
+        alertname: OsAptBroken
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n2, instance: "n2:9100"}
+            exp_annotations:
+              summary: "apt on n2 cannot plan an upgrade, so its pending-update counts mean nothing"
+              description: "`apt-get -s dist-upgrade` on the host shows why (broken sources, held or conflicting packages)."

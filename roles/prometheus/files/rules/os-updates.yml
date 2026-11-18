@@ -10,6 +10,7 @@ groups:
         expr: |
           os_updates_security_pending_since_seconds > 0
           and time() - os_updates_security_pending_since_seconds > 14 * 86400
+          and on (instance) os_updates_apt_ok == 1
         labels: {severity: warning}
         annotations:
           summary: "Security updates have waited on {{ $labels.host }} for over 14 days"
@@ -33,3 +34,20 @@ groups:
         annotations:
           summary: "Update status from {{ $labels.host }} is over 3 days old"
           description: "The os-updates metrics timer stopped: `systemctl status os-updates-metrics.timer` on the host."
+      # Either one leaves the counts above meaningless and blocks every update.
+      - alert: OsDpkgBroken
+        expr: os_updates_dpkg_problems > 0
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "dpkg on {{ $labels.host }} has {{ $value }} half-installed packages and refuses every package change"
+          description: >-
+            Security updates included. `dpkg --configure -a` on the host repairs it; the
+            maintenance role's apt health step runs it.
+      - alert: OsAptBroken
+        expr: os_updates_apt_ok == 0
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "apt on {{ $labels.host }} cannot plan an upgrade, so its pending-update counts mean nothing"
+          description: "`apt-get -s dist-upgrade` on the host shows why (broken sources, held or conflicting packages)."
