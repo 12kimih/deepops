@@ -16,12 +16,23 @@
     - numactl
   when: ansible_os_family == "RedHat"
 
+# The kernel arguments below only help on the legacy cgroup v1 hierarchy. On the
+# unified v2 hierarchy (cgroup.controllers present) the memory controller is on by
+# default, swapaccount= no longer exists (Linux 6.1+), and Slurm needs no kernel
+# arguments, so v2 nodes are left alone instead of being edited and rebooted.
+# https://slurm.schedmd.com/cgroup_v2.html
+- name: Check for the unified cgroup v2 hierarchy
+  ansible.builtin.stat:
+    path: /sys/fs/cgroup/cgroup.controllers
+  register: slurm_cgroup_v2
+
 - name: Add cgroups to grub options
   ansible.builtin.lineinfile:
     dest: /etc/default/grub
     insertafter: "^GRUB_CMDLINE_LINUX=[^\\\\$]"
     line: 'GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} cgroup_enable=memory swapaccount=1"'
   register: update_grub
+  when: not slurm_cgroup_v2.stat.exists
 
 - name: Update grub
   when: update_grub.changed and ansible_os_family == "Debian"
