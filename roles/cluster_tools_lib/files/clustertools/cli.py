@@ -9,6 +9,7 @@ command line always has the last word. Python 3.9 or newer, standard library onl
 import argparse
 import os
 import shlex
+import subprocess
 import sys
 
 from . import render
@@ -189,3 +190,26 @@ def swatch(theme):
     out += ["", "  " + theme.paint("sub", "Set it for every cluster command with:")
             + f" export CLUSTER_THEME={theme.flavour}"]
     return "\n".join(out) + "\n"
+
+
+def run_main(name, body):
+    """Run BODY() -> exit status, with the failures every command shares: a missing
+    Slurm client is 127 with one clear line, a failing one is 1 with its own message,
+    unreadable output is 1, and Ctrl-C or a closed pipe end quietly."""
+    try:
+        return body() or 0
+    except FileNotFoundError as e:
+        print(f"{name}: {e.filename} not found; run this on a Slurm client.", file=sys.stderr)
+        return 127
+    except subprocess.CalledProcessError as e:
+        msg = (e.stderr or "").strip() or f"{e.cmd[0]} exited with status {e.returncode}"
+        print(f"{name}: {msg}", file=sys.stderr)
+        return 1
+    except ValueError as e:                # json.JSONDecodeError among them
+        print(f"{name}: unreadable Slurm output: {e}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+    except BrokenPipeError:
+        sys.stderr.close()                 # `qos | head`: nothing left to say
+        return 0

@@ -197,19 +197,24 @@ class Theme:
             return "warn"
         return "ok" if used > 0 else "faint"
 
-    def bar(self, used, total, cols, style=None):
-        """A utilisation bar of COLS columns, coloured by load unless STYLE fixes the
-        fill (a share rather than a load). No such resource (total 0) is blanks: having
-        none here differs from having none left, which an empty trough would claim."""
+    def bar_pieces(self, used, total, cols, style=None):
+        """A utilisation bar of COLS columns as (text, style) pieces, for a Grid cell:
+        coloured by load unless STYLE fixes the fill (a share rather than a load). No
+        such resource (total 0) is blanks: having none here differs from having none
+        left, which an empty trough would claim."""
         if cols <= 0:
-            return ""
+            return []
         if total <= 0:
-            return " " * cols
+            return [(" " * cols, "")]
         filled = min(cols, (used * cols + total // 2) // total)
         if filled == 0 and used > 0:
             filled = 1                                # any use at all must be visible
-        return (self.paint(style or self.load(used, total), self.g["bar_f"] * filled)
-                + self.paint("rule", self.g["bar_e"] * (cols - filled)))
+        return [(self.g["bar_f"] * filled, style or self.load(used, total)),
+                (self.g["bar_e"] * (cols - filled), "rule")]
+
+    def bar(self, used, total, cols, style=None):
+        """The same bar, painted."""
+        return "".join(self.paint(s, x) for x, s in self.bar_pieces(used, total, cols, style))
 
     def section(self, title, cols, tally=()):
         """A heading with a right-aligned tally of (text, style) items, set apart by
@@ -271,10 +276,12 @@ def detect(flavour=None, color_when="auto", ascii=False, wide=False, stream=None
 class Grid:
     """A table whose widths follow the plain text, so colour never disturbs alignment.
 
-    row(cells, gutter, prefix, tail): CELLS are (text, style) pairs; GUTTER a one-column
-    mark ("" for none, or a (text, style) pair); PREFIX tree glyphs before the first
-    cell; TAIL a rendered string of tail_width columns (a bar) after the last.
+    row(cells, gutter, prefix, tail): a cell is a (text, style) pair, or a list of them
+    for a cell built of differently styled pieces (a figure and its bar); GUTTER is a
+    one-column mark ("" for none, or a (text, style) pair); PREFIX tree glyphs before
+    the first cell; TAIL a rendered string of tail_width columns after the last.
     note(text): a faint line under the row before it, free to run to the window width.
+    Only single-piece cells are capped by maxw.
     """
 
     def __init__(self, theme, headers, align=None, maxw=None, tail_header="", tail_width=0):
@@ -293,29 +300,41 @@ class Grid:
     def rule(self):
         self.rows.append(("rule",))
 
-    def _cell(self, text, col):
+    def _pieces(self, cell, col):
+        pieces = list(cell) if isinstance(cell, list) else [cell]
+        pieces = [(str(text), style) for text, style in pieces]
         cap = self.maxw[col] if col < len(self.maxw) else 0
-        return trunc(str(text), cap, self.t.g["ell"]) if cap else str(text)
+        if cap and len(pieces) == 1:
+            pieces = [(trunc(pieces[0][0], cap, self.t.g["ell"]), pieces[0][1])]
+        return pieces
 
     def _align(self, col):
         return self.align[col] if col < len(self.align) else "l"
 
-    def render(self, title, tally=()):
-        t, n = self.t, len(self.headers)
+    def _cells(self, r):
+        n = len(self.headers)
+        return [self._pieces(r[1][c] if c < len(r[1]) else ("", ""), c) for c in range(n)]
+
+    def widths(self):
+        """The width of each column at the widest cell it holds."""
         widths = [width(h) for h in self.headers]
         for r in self.rows:
-            if r[0] != "row":
-                continue
-            for c in range(n):
-                text = self._cell(r[1][c][0] if c < len(r[1]) else "", c)
-                w = width(text) + (width(r[3]) if c == 0 else 0)
-                widths[c] = max(widths[c], w)
-        total = 2 + (n - 1) + sum(widths)
-        if self.tail_width:
-            total += 1 + self.tail_width
+            if r[0] == "row":
+                for c, pieces in enumerate(self._cells(r)):
+                    w = sum(width(t) for t, _ in pieces) + (width(r[3]) if c == 0 else 0)
+                    widths[c] = max(widths[c], w)
+        return widths
+
+    def total(self):
+        """Columns the table takes, from the margin to the end of its tail."""
+        total = 2 + (len(self.headers) - 1) + sum(self.widths())
+        return total + (1 + self.tail_width if self.tail_width else 0)
+
+    def render(self, title, tally=()):
+        t, widths = self.t, self.widths()
         # A narrow table still leaves its heading's title and tally apart.
         plain = "   ".join(x for x, _ in tally)
-        total = max(total, 2 + width(t.g["sec"]) + width(title) + 3 + width(plain))
+        total = max(self.total(), 2 + width(t.g["sec"]) + width(title) + 3 + width(plain))
 
         out = [t.section(title, total, tally)]
         head = "  " + " ".join(pad(h, widths[c], self._align(c)) for c, h in enumerate(self.headers))
@@ -330,18 +349,16 @@ class Grid:
             if r[0] == "note":
                 out.append("    " + t.paint("faint", trunc(r[1], max(t.cols, total) - 4, t.g["ell"])))
                 continue
-            _, cells, gutter, prefix, tail = r
+            gutter, prefix, tail = r[2], r[3], r[4]
             if isinstance(gutter, tuple):
                 gutter = t.paint(gutter[1], gutter[0])
             line = (gutter or " ") + " "
-            for c in range(n):
-                text, style = cells[c] if c < len(cells) else ("", "")
-                text = self._cell(text, c)
+            for c, pieces in enumerate(self._cells(r)):
+                room = widths[c] - (width(prefix) if c == 0 else 0)
                 if c == 0:
                     line += t.paint("rule", prefix)
-                    text = pad(text, widths[0] - width(prefix), self._align(0))
-                else:
-                    text = pad(text, widths[c], self._align(c))
-                line += t.paint(style, text) + " "
+                gap = " " * max(0, room - sum(width(x) for x, _ in pieces))
+                body = "".join(t.paint(style, x) for x, style in pieces)
+                line += (gap + body if self._align(c) == "r" else body + gap) + " "
             out.append(line + tail if tail else line.rstrip())
         return "\n".join(out)

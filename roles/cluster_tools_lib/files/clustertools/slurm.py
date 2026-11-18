@@ -25,6 +25,16 @@ def scontrol(*args):
     return json.loads(run("scontrol", "--json", *args))
 
 
+def sacctmgr(*args):
+    """`sacctmgr --json ARGS` parsed, e.g. sacctmgr("show", "qos")."""
+    return json.loads(run("sacctmgr", "--json", *args))
+
+
+def cluster_name(data):
+    """The cluster name any Slurm JSON reply carries in its meta block, or ""."""
+    return ((data.get("meta") or {}).get("slurm") or {}).get("cluster") or ""
+
+
 def num(value):
     """A Slurm JSON number: a {"set", "infinite", "number"} object or a plain int.
     Unset and infinite are None."""
@@ -115,3 +125,41 @@ def job_gpus(job):
                 types.add(gtype)
             gpus.extend((host, i) for i in expand_ranges(spec))
     return gpus, types
+
+
+# --- Trackable resources (TRES) -----------------------------------------------------
+
+def tres_list(items):
+    """{"gres/gpu:a10": 6, "cpu": 8} from a JSON TRES list ([{"type", "name", "count"}])."""
+    out = {}
+    for t in items or []:
+        key = f"{t.get('type')}/{t['name']}" if t.get("name") else t.get("type")
+        if key and t.get("count") is not None:
+            out[key] = t["count"]
+    return out
+
+
+def tres_str(text):
+    """{"cpu": "8", "mem": "64G", "gres/gpu": "2"} from a TRES string. Keys are whole,
+    so gres/gpu never answers for gres/gpu:a10."""
+    out = {}
+    for part in (text or "").split(","):
+        key, sep, value = part.partition("=")
+        if sep:
+            out[key] = value
+    return out
+
+
+_MEM_UNIT = {"K": 1 / 1024, "M": 1, "G": 1024, "T": 1024 ** 2, "P": 1024 ** 3}
+
+
+def mem_mib(value):
+    """MiB from a TRES memory value: plain MiB, or a number with a unit and possibly a
+    fraction (1.50T). Anything unreadable is 0."""
+    value = str(value or "")
+    mult = _MEM_UNIT.get(value[-1:], None)
+    number = value[:-1] if mult is not None else value
+    try:
+        return int(float(number) * (mult if mult is not None else 1))
+    except ValueError:
+        return 0

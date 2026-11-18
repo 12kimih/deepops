@@ -84,6 +84,17 @@ class GridTests(unittest.TestCase):
             self.assertEqual(lines[3], "  alpha  3")
             self.assertEqual(lines[4], "> b     12")
 
+    def test_multi_piece_cells_and_total(self):
+        t = render.Theme(color=True, ascii=True, cols=80)
+        g = render.Grid(t, ["GPU"], align=["l"])
+        g.row([[("3/8", "warn"), (" ", "")] + t.bar_pieces(3, 8, 4)])
+        g.row([("12/16", "ok")])
+        self.assertEqual(g.widths(), [8])
+        self.assertEqual(g.total(), 10)
+        lines = [plain(x) for x in g.render("T").splitlines()]
+        self.assertEqual(lines[3], "  3/8 ##--")   # 1.5 of 4 rounds up
+        self.assertEqual(lines[4], "  12/16")
+
     def test_heading_widens_a_narrow_table(self):
         t = render.Theme(color=False, ascii=True)
         g = render.Grid(t, ["A"])

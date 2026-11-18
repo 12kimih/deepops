@@ -1,0 +1,231 @@
+{
+ "meta": {
+  "slurm": {
+   "cluster": "testcluster",
+   "release": "25.11.6",
+   "version": {
+    "major": "25",
+    "micro": "6",
+    "minor": "11"
+   }
+  }
+ },
+ "nodes": [
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 96,
+   "effective_cpus": 92,
+   "gres": "gpu:a10:8(S:0-1)",
+   "gres_used": "gpu:a10:0(IDX:N/A)",
+   "name": "gpu1",
+   "partitions": [
+    "a10-2"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=92,mem=515616M,billing=8,gres/gpu=8,gres/gpu:a10=8",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 96,
+   "effective_cpus": 92,
+   "gres": "gpu:a30:8(S:0-1)",
+   "gres_used": "gpu:a30:0(IDX:N/A)",
+   "name": "gpu2",
+   "partitions": [
+    "a30-1"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=92,mem=515616M,billing=12,gres/gpu=8,gres/gpu:a30=8",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 96,
+   "effective_cpus": 92,
+   "gres": "gpu:a10:8(S:0-1)",
+   "gres_used": "gpu:a10:0(IDX:N/A)",
+   "name": "gpu3",
+   "partitions": [
+    "a10-2"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=92,mem=515616M,billing=8,gres/gpu=8,gres/gpu:a10=8",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 96,
+   "effective_cpus": 92,
+   "gres": "gpu:a30:7(S:0-1)",
+   "gres_used": "gpu:a30:0(IDX:N/A)",
+   "name": "gpu4",
+   "partitions": [
+    "a30-1"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=92,mem=515616M,billing=10,gres/gpu=7,gres/gpu:a30=7",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 96,
+   "effective_cpus": 92,
+   "gres": "gpu:a10:8(S:0-1)",
+   "gres_used": "gpu:a10:0(IDX:N/A)",
+   "name": "gpu5",
+   "partitions": [
+    "a10-2"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=92,mem=515616M,billing=8,gres/gpu=8,gres/gpu:a10=8",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 144,
+   "effective_cpus": 140,
+   "gres": "gpu:a30:8(S:0-1)",
+   "gres_used": "gpu:a30:0(IDX:N/A)",
+   "name": "gpu6",
+   "partitions": [
+    "a30-2"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=140,mem=515616M,billing=12,gres/gpu=8,gres/gpu:a30=8",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 144,
+   "effective_cpus": 140,
+   "gres": "gpu:a30:8(S:0-1)",
+   "gres_used": "gpu:a30:0(IDX:N/A)",
+   "name": "gpu7",
+   "partitions": [
+    "a30-2"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=140,mem=515616M,billing=12,gres/gpu=8,gres/gpu:a30=8",
+   "tres_used": ""
+  },
+  {
+   "alloc_cpus": 0,
+   "alloc_memory": 0,
+   "cpus": 80,
+   "effective_cpus": 76,
+   "gres": "gpu:a10:4(S:0-1)",
+   "gres_used": "gpu:a10:0(IDX:N/A)",
+   "name": "gpu8",
+   "partitions": [
+    "a10-1"
+   ],
+   "real_memory": 515616,
+   "reason": "maintenance",
+   "reason_changed_at": {
+    "infinite": false,
+    "number": 1794984252,
+    "set": true
+   },
+   "reason_set_by_user": "root",
+   "specialized_memory": 8192,
+   "state": [
+    "IDLE",
+    "DRAIN"
+   ],
+   "tres": "cpu=76,mem=515616M,billing=4,gres/gpu=4,gres/gpu:a10=4",
+   "tres_used": ""
+  }
+ ]
+}

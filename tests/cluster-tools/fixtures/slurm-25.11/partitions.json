@@ -1,0 +1,59 @@
+{
+ "meta": {
+  "slurm": {
+   "cluster": "testcluster",
+   "release": "25.11.6",
+   "version": {
+    "major": "25",
+    "micro": "6",
+    "minor": "11"
+   }
+  }
+ },
+ "partitions": [
+  {
+   "name": "a10-1",
+   "nodes": {
+    "configured": "gpu8"
+   },
+   "partition": {
+    "state": [
+     "UP"
+    ]
+   }
+  },
+  {
+   "name": "a10-2",
+   "nodes": {
+    "configured": "gpu[1,3,5]"
+   },
+   "partition": {
+    "state": [
+     "UP"
+    ]
+   }
+  },
+  {
+   "name": "a30-1",
+   "nodes": {
+    "configured": "gpu[2,4]"
+   },
+   "partition": {
+    "state": [
+     "UP"
+    ]
+   }
+  },
+  {
+   "name": "a30-2",
+   "nodes": {
+    "configured": "gpu[6-7]"
+   },
+   "partition": {
+    "state": [
+     "UP"
+    ]
+   }
+  }
+ ]
+}

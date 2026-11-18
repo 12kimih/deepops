@@ -16,6 +16,14 @@ cluster_tools_bin_dir: /usr/local/bin
 cluster_tools_libs: []
 cluster_tools_lib_dir: /usr/local/lib/cluster-tools
 
+# Built-in commands to publish, by name: any of qos (the QoS a user may submit against
+# and how full each quota is). Each is a module under cluster_tools_lib_dir run through
+# the shared wrapper, with bash completion asked of the command itself, so it always
+# matches the installed version. Empty publishes none and removes what was published.
+cluster_tools_commands: []
+cluster_tools_builtin: [qos]
+cluster_tools_completion_dir: /usr/share/bash-completion/completions
+
 # Commands to publish: a list of {src, dest}. src is copied VERBATIM -- shell scripts
 # routinely contain sequences Jinja would eat, `${#var}` opening a comment among them --
 # so anything site-specific belongs in cluster_tools_environment, not in a template.

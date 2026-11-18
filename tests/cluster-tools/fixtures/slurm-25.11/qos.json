@@ -1,0 +1,1161 @@
+{
+ "meta": {
+  "slurm": {
+   "cluster": "testcluster",
+   "release": "25.11.6",
+   "version": {
+    "major": "25",
+    "micro": "6",
+    "minor": "11"
+   }
+  }
+ },
+ "qos": [
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": []
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "normal",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": []
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": false,
+        "number": 1440,
+        "set": true
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "low",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": [
+       {
+        "count": 6,
+        "id": 1004,
+        "name": "gpu:a10",
+        "type": "gres"
+       },
+       {
+        "count": 8,
+        "id": 1005,
+        "name": "gpu:a30",
+        "type": "gres"
+       }
+      ]
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "high_t5",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [
+     "low"
+    ],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 10000,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": [
+       {
+        "count": 6,
+        "id": 1004,
+        "name": "gpu:a10",
+        "type": "gres"
+       },
+       {
+        "count": 3,
+        "id": 1005,
+        "name": "gpu:a30",
+        "type": "gres"
+       }
+      ]
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "high_t4",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [
+     "low"
+    ],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 10000,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": []
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "hotfix",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [
+     "low",
+     "high_t5",
+     "high_t4",
+     "high_t2",
+     "high_t1",
+     "high_t3"
+    ],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 100000,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": [
+       {
+        "count": 14,
+        "id": 1004,
+        "name": "gpu:a10",
+        "type": "gres"
+       },
+       {
+        "count": 8,
+        "id": 1005,
+        "name": "gpu:a30",
+        "type": "gres"
+       }
+      ]
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "high_t2",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [
+     "low"
+    ],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 10000,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": [
+       {
+        "count": 0,
+        "id": 1004,
+        "name": "gpu:a10",
+        "type": "gres"
+       },
+       {
+        "count": 6,
+        "id": 1005,
+        "name": "gpu:a30",
+        "type": "gres"
+       }
+      ]
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "high_t1",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [
+     "low"
+    ],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 10000,
+    "set": true
+   }
+  },
+  {
+   "flags": [],
+   "limits": {
+    "factor": {
+     "infinite": true,
+     "number": 0.0,
+     "set": false
+    },
+    "grace_time": 0,
+    "max": {
+     "accruing": {
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "active_jobs": {
+      "accruing": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      }
+     },
+     "jobs": {
+      "active_jobs": {
+       "per": {
+        "account": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        },
+        "user": {
+         "infinite": true,
+         "number": 0,
+         "set": false
+        }
+       }
+      },
+      "count": {
+       "infinite": true,
+       "number": 0,
+       "set": false
+      },
+      "per": {
+       "account": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "user": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     },
+     "tres": {
+      "minutes": {
+       "per": {
+        "account": [],
+        "job": [],
+        "qos": [],
+        "user": []
+       },
+       "total": []
+      },
+      "per": {
+       "account": [],
+       "job": [],
+       "node": [],
+       "user": []
+      },
+      "total": [
+       {
+        "count": 2,
+        "id": 1004,
+        "name": "gpu:a10",
+        "type": "gres"
+       },
+       {
+        "count": 6,
+        "id": 1005,
+        "name": "gpu:a30",
+        "type": "gres"
+       }
+      ]
+     },
+     "wall_clock": {
+      "per": {
+       "job": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       },
+       "qos": {
+        "infinite": true,
+        "number": 0,
+        "set": false
+       }
+      }
+     }
+    },
+    "min": {
+     "priority_threshold": {
+      "infinite": true,
+      "number": 0,
+      "set": false
+     },
+     "tres": {
+      "per": {
+       "job": []
+      }
+     }
+    }
+   },
+   "name": "high_t3",
+   "preempt": {
+    "exempt_time": {
+     "infinite": true,
+     "number": 0,
+     "set": false
+    },
+    "list": [
+     "low"
+    ],
+    "mode": [
+     "DISABLED"
+    ]
+   },
+   "priority": {
+    "infinite": false,
+    "number": 10000,
+    "set": true
+   }
+  }
+ ]
+}
