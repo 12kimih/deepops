@@ -1,0 +1,136 @@
+---
+# promtool test rules: each case feeds synthetic series to the shipped alert rules.
+rule_files:
+  - ../../roles/prometheus/files/rules/*.yml
+evaluation_interval: 1m
+
+tests:
+  - name: host down fires and hides that host's exporter alerts
+    interval: 1m
+    input_series:
+      - series: 'up{module="node-exporter", host="n1", instance="n1:9100"}'
+        values: '0x15'
+      - series: 'up{module="dcgm-exporter", host="n1", instance="n1:9400"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: HostDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: HostDown
+        exp_alerts:
+          - exp_labels: {severity: critical, module: node-exporter, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "n1 is unreachable"
+              description: "node-exporter on n1 has not answered for 3 minutes. The host is down, hung or off the network."
+      - eval_time: 15m
+        alertname: ExporterDown
+        exp_alerts: []
+
+  - name: exporter down on a live host
+    interval: 1m
+    input_series:
+      - series: 'up{module="node-exporter", host="n1", instance="n1:9100"}'
+        values: '1x15'
+      - series: 'up{module="dcgm-exporter", host="n1", instance="n1:9400"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ExporterDown
+        exp_alerts:
+          - exp_labels: {severity: warning, module: dcgm-exporter, host: n1, instance: "n1:9400"}
+            exp_annotations:
+              summary: "dcgm-exporter down on n1"
+              description: "The dcgm-exporter target has failed to scrape for 10 minutes while the host itself is up."
+
+  - name: chassis fault states are inverted (1 = no fault)
+    interval: 1m
+    input_series:
+      - series: 'ipmi_chassis_cooling_fault_state{host="n1"}'
+        values: '1x5 0x5'
+      - series: 'ipmi_chassis_drive_fault_state{host="n1"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ChassisFault
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: ChassisFault
+        exp_alerts:
+          - exp_labels: {severity: critical, host: n1}
+            exp_annotations:
+              summary: "Cooling or drive fault reported by the BMC of n1"
+
+  - name: BMC sensors of every type, PSU separately
+    interval: 1m
+    input_series:
+      - series: 'ipmi_temperature_state{host="n1", name="CPU1 Temp"}'
+        values: '2x10'
+      - series: 'ipmi_sensor_state{host="n1", name="PS1 Status", type="Power Supply"}'
+        values: '2x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: BmcSensorCritical
+        exp_alerts:
+          - exp_labels: {severity: critical, host: n1, name: "CPU1 Temp"}
+            exp_annotations:
+              summary: "BMC sensor CPU1 Temp on n1 is critical"
+      - eval_time: 3m
+        alertname: PowerSupplyFault
+        exp_alerts:
+          - exp_labels: {severity: critical, host: n1, name: "PS1 Status", type: "Power Supply"}
+            exp_annotations:
+              summary: "Power supply PS1 Status on n1 reports a fault"
+              description: "A failed or unplugged PSU leaves the server without redundancy."
+
+  - name: a GPU disappearing keeps alerting
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_TEMP{instance="n1:9400", host="n1", gpu="0"}'
+        values: '40x300'
+      - series: 'DCGM_FI_DEV_GPU_TEMP{instance="n1:9400", host="n1", gpu="1"}'
+        values: '40x30 _x270'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: GpuMissing
+        exp_alerts: []
+      - eval_time: 5h
+        alertname: GpuMissing
+        exp_alerts:
+          - exp_labels: {severity: critical, instance: "n1:9400", host: n1}
+            exp_annotations:
+              summary: "n1 reports fewer GPUs than it did in the last 7 days"
+
+  - name: disk alerts skip network filesystems
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{host="n1", mountpoint="/", fstype="ext4"}'
+        values: '1x10'
+      - series: 'node_filesystem_size_bytes{host="n1", mountpoint="/", fstype="ext4"}'
+        values: '100x10'
+      - series: 'node_filesystem_readonly{host="n1", mountpoint="/", fstype="ext4"}'
+        values: '0x10'
+      - series: 'node_filesystem_avail_bytes{host="n1", mountpoint="/home", fstype="nfs4"}'
+        values: '1x10'
+      - series: 'node_filesystem_size_bytes{host="n1", mountpoint="/home", fstype="nfs4"}'
+        values: '100x10'
+      - series: 'node_filesystem_readonly{host="n1", mountpoint="/home", fstype="nfs4"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HostDiskFull
+        exp_alerts:
+          - exp_labels: {severity: critical, host: n1, mountpoint: "/", fstype: ext4}
+            exp_annotations:
+              summary: "/ on n1 is over 97% full"
+              description: "1% free. Writes will start failing."
+
+  - name: watchdog always fires
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels: {severity: none}
+            exp_annotations:
+              summary: "Heartbeat of the alerting pipeline; not a problem"

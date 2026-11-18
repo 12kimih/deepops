@@ -2,21 +2,36 @@
 groups:
   - name: power
     rules:
-      - alert: PowerSupplyFailed
-        expr: ipmi_sensor_state{type="Power Supply"} == 2
+      # ipmi_*_state: 0 nominal, 1 warning, 2 critical.
+      - alert: PowerSupplyFault
+        expr: ipmi_sensor_state{type="Power Supply"} > 0
         for: 2m
         labels: {severity: critical}
         annotations:
-          summary: "Power supply {{ $labels.name }} on {{ $labels.host }} reports critical"
+          summary: "Power supply {{ $labels.name }} on {{ $labels.host }} reports a fault"
+          description: "A failed or unplugged PSU leaves the server without redundancy."
       - alert: BmcSensorCritical
-        expr: ipmi_sensor_state{type!="Power Supply"} == 2
+        expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!="Power Supply"} == 2'
         for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "BMC sensor {{ $labels.name }} on {{ $labels.host }} is critical"
+      - alert: BmcSensorWarning
+        expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!="Power Supply"} == 1'
+        for: 15m
         labels: {severity: warning}
         annotations:
-          summary: "{{ $labels.type }} sensor {{ $labels.name }} on {{ $labels.host }} is critical"
+          summary: "BMC sensor {{ $labels.name }} on {{ $labels.host }} is in warning"
+      # The chassis fault states are inverted: 1 = no fault, 0 = fault.
       - alert: ChassisFault
-        expr: ipmi_chassis_cooling_fault_state == 1 or ipmi_chassis_drive_fault_state == 1
+        expr: ipmi_chassis_cooling_fault_state == 0 or ipmi_chassis_drive_fault_state == 0
         for: 2m
         labels: {severity: critical}
         annotations:
           summary: "Cooling or drive fault reported by the BMC of {{ $labels.host }}"
+      - alert: BmcUnreadable
+        expr: ipmi_up{collector=~"bmc|ipmi"} == 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "ipmi-exporter cannot read the {{ $labels.collector }} data of {{ $labels.host }}"

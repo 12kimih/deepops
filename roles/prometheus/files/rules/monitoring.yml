@@ -2,6 +2,13 @@
 groups:
   - name: monitoring
     rules:
+      # Always firing. Alertmanager sends it to an external heartbeat check, which
+      # alerts when it stops arriving: the whole monitoring path is down.
+      - alert: Watchdog
+        expr: vector(1)
+        labels: {severity: none}
+        annotations:
+          summary: "Heartbeat of the alerting pipeline; not a problem"
       - alert: PrometheusRuleEvaluationFailing
         expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
         labels: {severity: warning}
