@@ -1,0 +1,87 @@
+---
+# Make a directory hold exactly a set of files: install each, remove anything else. A
+# copy or a glob only adds, so a file dropped from the source (a prolog part, an alert
+# rule, a module) would stay on the host and keep running. Every file in the directory
+# must come through this role.
+#   - name: Collect the prolog parts  # resolve globs here, in the caller's role
+#     ansible.builtin.set_fact:
+#       slurm_prolog_sources: "{{ query('ansible.builtin.fileglob', *prolog_fileglob) | sort }}"
+#   - ansible.builtin.include_role:
+#       name: managed_dir
+#     vars:
+#       managed_dir_path: "{{ slurm_config_dir }}/prolog.d"
+#       managed_dir_sources: "{{ slurm_prolog_sources }}"
+#       managed_dir_template: true
+# Afterwards managed_dir_changed says whether anything was installed or removed.
+- name: Require a directory and absolute sources
+  ansible.builtin.assert:
+    that:
+      - managed_dir_path is match('/')
+      - managed_dir_sources | reject('match', '/') | list == []
+      - managed_dir_sources | map('basename') | unique | length == managed_dir_sources | length
+    fail_msg: >-
+      managed_dir needs an absolute managed_dir_path and absolute, distinctly named
+      sources: resolve globs with a set_fact in the calling role, since a relative path
+      would be looked up in managed_dir itself.
+    quiet: true
+
+- name: Create {{ managed_dir_path }}
+  ansible.builtin.file:
+    path: "{{ managed_dir_path }}"
+    state: directory
+    owner: "{{ managed_dir_owner }}"
+    group: "{{ managed_dir_group }}"
+    mode: "{{ managed_dir_dir_mode }}"
+
+- name: Install the managed files into {{ managed_dir_path }}
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ managed_dir_path }}/{{ item | basename }}"
+    owner: "{{ managed_dir_owner }}"
+    group: "{{ managed_dir_group }}"
+    mode: "{{ managed_dir_mode }}"
+    validate: "{{ managed_dir_validate or omit }}"
+  loop: "{{ managed_dir_sources }}"
+  loop_control:
+    label: "{{ item | basename }}"
+  register: managed_dir_copied
+  notify: "{{ managed_dir_notify }}"
+  when: not managed_dir_template | bool
+
+- name: Render the managed files into {{ managed_dir_path }}
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ managed_dir_path }}/{{ item | basename }}"
+    owner: "{{ managed_dir_owner }}"
+    group: "{{ managed_dir_group }}"
+    mode: "{{ managed_dir_mode }}"
+    validate: "{{ managed_dir_validate or omit }}"
+  loop: "{{ managed_dir_sources }}"
+  loop_control:
+    label: "{{ item | basename }}"
+  register: managed_dir_rendered
+  notify: "{{ managed_dir_notify }}"
+  when: managed_dir_template | bool
+
+- name: Find the files present in {{ managed_dir_path }}
+  ansible.builtin.find:
+    paths: "{{ managed_dir_path }}"
+    file_type: any
+    hidden: true
+  register: managed_dir_found
+
+- name: Remove unmanaged files from {{ managed_dir_path }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ managed_dir_found.files | map(attribute='path') | reject('in', managed_dir_wanted) | list }}"
+  when: item | basename not in managed_dir_keep or managed_dir_installed is changed
+  register: managed_dir_removed
+  notify: "{{ managed_dir_notify }}"
+  vars:
+    managed_dir_installed: "{{ managed_dir_rendered if managed_dir_template | bool else managed_dir_copied }}"
+    managed_dir_wanted: "{{ managed_dir_sources | map('basename') | map('regex_replace', '^', managed_dir_path ~ '/') | list }}"
+
+- name: Report whether anything changed in {{ managed_dir_path }}
+  ansible.builtin.set_fact:
+    managed_dir_changed: "{{ (managed_dir_rendered if managed_dir_template | bool else managed_dir_copied) is changed or managed_dir_removed is changed }}"
