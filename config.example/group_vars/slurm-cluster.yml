@@ -54,10 +54,10 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slack_bot_token: ""
 
 # Hourly GPU usage report and idle-GPU nudges (roles/slurm_usage_report); needs
-# slack_bot_token. notify: none | dm | dm+mention. cancel_after_hours 0 = never.
+# slack_bot_token. notify: any of mention, dm ([] = list only). cancel_after_hours 0 = never.
 # user_map: Slurm user -> Slack member ID (profile > Copy member ID) or email.
 #slurm_usage_report_channel: "#gpu-usage"
-#slurm_usage_report_notify: dm
+#slurm_usage_report_notify: [mention]
 #slurm_usage_report_cancel_after_hours: 0
 #slurm_usage_report_user_map:
 #  alice: U0123ABCD

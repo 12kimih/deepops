@@ -245,10 +245,13 @@ def main():
     for jid in list(idle_state):
         if jid not in seen_ids:
             del idle_state[jid]
+    # Owners are notified when a job first turns idle, then every notify_repeat_hours,
+    # not on every report.
+    repeat = cfg["notify_repeat_hours"] * 3600
     for j in idle:
-        s = idle_state.setdefault(j["id"], {"since": now - window, "runs": 0, "dm": 0})
-        s["runs"] += 1
+        s = idle_state.setdefault(j["id"], {"since": now - window, "notified": 0})
         j["state"] = s
+        j["notify"] = bool(cfg["notify"]) and now - s["notified"] >= repeat
 
     def who(user, mention):
         member = slack_id(user, cfg, slack, user_cache) if mention else ""
@@ -261,10 +264,10 @@ def main():
 
     lines = []
     if idle:
-        mention = cfg["notify"] == "dm+mention"
+        mention = "mention" in cfg["notify"]
         lines.append(f"*Idle for {cfg['idle_hours']:g}h+ (GPU util <= {threshold:g}%)*")
         for j in sorted(idle, key=lambda j: -len(j["gpus"])):
-            tag = who(j["user"], mention and j["state"]["runs"] >= 2)
+            tag = who(j["user"], mention and j["notify"])
             lines.append(f"- {tag} job {j['id']} / {len(j['gpus'])} GPU / {duration(j['runtime'])} / {j['partition']}")
         lines.append("")
     if reasons:
@@ -298,24 +301,25 @@ def main():
     for text in chunks(lines):
         slack.post(cfg["channel"], text, thread_ts=ts)
 
-    if cfg["notify"] != "none" and not args.dry_run:
+    if not args.dry_run:
         for j in idle:
-            s = j["state"]
-            if now - s["dm"] < cfg["dm_repeat_hours"] * 3600:
+            if not j["notify"]:
                 continue
-            member = slack_id(j["user"], cfg, slack, user_cache)
-            if member:
-                slack.dm(member, cfg["dm_text"].format(job=j["id"], gpus=len(j["gpus"]),
-                                                       hours=f"{cfg['idle_hours']:g}", runtime=duration(j["runtime"])))
-                s["dm"] = now
-
-    if cfg["cancel_after_hours"] > 0 and not args.dry_run:
-        for j in idle:
-            if now - j["state"]["since"] >= cfg["cancel_after_hours"] * 3600:
-                subprocess.run(["scancel", j["id"]], check=False)
+            if "dm" in cfg["notify"]:
                 member = slack_id(j["user"], cfg, slack, user_cache)
                 if member:
-                    slack.dm(member, f"Job {j['id']} was cancelled after {cfg['cancel_after_hours']:g}h with idle GPUs.")
+                    slack.dm(member, cfg["dm_text"].format(job=j["id"], gpus=len(j["gpus"]),
+                                                           hours=f"{cfg['idle_hours']:g}", runtime=duration(j["runtime"])))
+            j["state"]["notified"] = now
+
+    if cfg["cancel_after_hours"] > 0 and not args.dry_run:
+        cancelled = [j for j in idle if now - j["state"]["since"] >= cfg["cancel_after_hours"] * 3600]
+        for j in cancelled:
+            subprocess.run(["scancel", j["id"]], check=False)
+        if cancelled:
+            slack.post(cfg["channel"], "\n".join(
+                f":no_entry: {who(j['user'], bool(cfg['notify']))} job {j['id']} was cancelled after "
+                f"{cfg['cancel_after_hours']:g}h with idle GPUs" for j in cancelled), thread_ts=ts)
 
     if not args.dry_run:
         with open(cfg["state_file"], "w") as f:
