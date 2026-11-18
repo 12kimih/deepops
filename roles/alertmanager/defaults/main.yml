@@ -11,6 +11,8 @@ alertmanager_slack_critical_mention: ""
 # External dead man's switch (e.g. a healthchecks.io ping URL) fed by the Watchdog
 # alert. Empty drops Watchdog.
 alertmanager_heartbeat_url: ""
+# Linked from each Slack alert title; empty drops the link.
+alertmanager_dashboard_url: "{{ grafana_root_url | default('') }}"
 alertmanager_repeat_interval: 4h
 alertmanager_critical_repeat_interval: 1h
 alertmanager_svc_name: "docker.alertmanager.service"

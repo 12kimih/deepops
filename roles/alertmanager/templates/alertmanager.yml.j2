@@ -50,6 +50,10 @@ receivers:
         color: '{{ template "slack.color" . }}'
         title: '{{ template "slack.title" . }}'
 {% endraw %}
-        text: '{% if mention %}{{ mention }} {% endif %}{% raw %}{{ template "slack.text" . }}{% endraw %}'
+{% if alertmanager_dashboard_url %}
+        title_link: '{{ alertmanager_dashboard_url }}'
+{% endif %}
+        footer: 'Alertmanager'
+        text: '{% if mention %}{% raw %}{{ if eq .Status "firing" }}{% endraw %}{{ mention }} {% raw %}{{ end }}{% endraw %}{% endif %}{% raw %}{{ template "slack.text" . }}{% endraw %}'
 {% endif %}
 {% endfor %}
