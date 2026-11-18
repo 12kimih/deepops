@@ -11,6 +11,7 @@
   register: nvidia_peermem_info
   failed_when: false
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   when:
     - ansible_facts.ansible_local['gpus']['count']
     - is_dgx.stat.exists

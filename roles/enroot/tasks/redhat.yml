@@ -49,6 +49,7 @@
     cmd: cat /proc/cmdline
   register: enroot_kernel_cmdline
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 - name: RHEL | enable unprivileged userns on the kernel cmdline
   ansible.builtin.command:

@@ -17,6 +17,7 @@
     cmd: "getent netgroup {{ cluster_sudoers_netgroup }}"
   register: cluster_sudoers_netgroup_lookup
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   failed_when: false
 
 - name: Assert the administrator netgroup resolves
@@ -101,6 +102,7 @@
       done
   register: cluster_sudoers_dropins
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 # Unmanaged = present, not ours, not explicitly kept, and owned by no package.
 # `inert` are the ones sudo SKIPS -- it ignores any name containing a dot or ending
@@ -162,6 +164,7 @@
     LC_ALL: C
   register: cluster_sudoers_check
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   failed_when: >-
     (((cluster_sudoers_check.stdout | default('')) ~ ' ' ~ (cluster_sudoers_check.stderr | default('')))
      | lower) is search('syntax error|parse error|unknown defaults entry')

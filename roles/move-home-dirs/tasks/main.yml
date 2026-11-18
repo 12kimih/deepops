@@ -5,6 +5,7 @@
   args:
     executable: /bin/bash
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   register: user_list
 
 - name: Skip if no work to do

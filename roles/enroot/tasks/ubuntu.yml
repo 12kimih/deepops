@@ -111,6 +111,7 @@
   ansible.builtin.command: grep -q "^/usr/bin/enroot-nsenter " /sys/kernel/security/apparmor/profiles
   register: enroot_apparmor_loaded
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
   failed_when: false
   when:
     - enroot_userns_knob.stat.exists

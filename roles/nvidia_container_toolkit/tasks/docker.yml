@@ -54,6 +54,7 @@
   register: nvidia_container_toolkit_docker_runtime
   failed_when: false
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 - name: Docker | configure NVIDIA runtime
   ansible.builtin.command:
