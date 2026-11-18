@@ -15,6 +15,11 @@ route:
   group_interval: 5m
   repeat_interval: {{ alertmanager_repeat_interval }}
   routes:
+    - matchers: ['alertname="Watchdog"']
+      receiver: heartbeat
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
     - matchers: ['severity="critical"']
       receiver: slack-critical
       repeat_interval: {{ alertmanager_critical_repeat_interval }}
@@ -29,6 +34,12 @@ inhibit_rules:
     equal: [alertname, host]
 
 receivers:
+  - name: heartbeat
+{% if alertmanager_heartbeat_url %}
+    webhook_configs:
+      - url: '{{ alertmanager_heartbeat_url }}'
+        send_resolved: false
+{% endif %}
 {% for name, mention in [('slack', ''), ('slack-critical', alertmanager_slack_critical_mention)] %}
   - name: {{ name }}
 {% if alertmanager_slack_api_url %}
