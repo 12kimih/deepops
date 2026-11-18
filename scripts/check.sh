@@ -28,12 +28,18 @@ step "ansible.cfg has only known settings" ansible-config validate
 step "Galaxy collections and roles match roles/requirements.yml" "${python}" scripts/deepops/galaxy.py --check
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
-# The repository's YAML is what git sees (tracked, or new and not ignored): .gitignore
-# is the one list of what is not ours.
-mapfile -d '' yaml_files < <(git ls-files -z --cached --others --exclude-standard -- '*.yml' '*.yaml')
+# Linters judge the files git tracks, staged ones included (git add a new file to have it
+# checked): what CI checks and what a commit contains, never another session's
+# half-written file in a shared working tree. .gitignore keeps the rest out.
+tracked() {
+    local f
+    while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\0' "$f"; done < <(git ls-files -z --cached -- "$@")
+}
+mapfile -d '' yaml_files < <(tracked '*.yml' '*.yaml')
+mapfile -d '' py_files < <(tracked '*.py' '*.pyi')
 step "yamllint" yamllint --no-warnings "${yaml_files[@]}"
-step "ruff" ruff check
-step "ruff format (run: uv run ruff format)" ruff format --check
+step "ruff" ruff check --force-exclude "${py_files[@]}"
+step "ruff format (run: uv run ruff format)" ruff format --check --force-exclude "${py_files[@]}"
 step "no secrets or site data in tracked files" "${python}" scripts/deepops/sensitive_guard.py tree
 
 if ! "${fast}"; then
