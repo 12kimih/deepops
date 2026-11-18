@@ -1,10 +1,10 @@
 ---
-- name: Assert that variables are defined
-  ansible.builtin.fail:
-    msg: "Variable '{{ item }}' is not defined"
-  when: item not in vars
-  with_items:
-    - dns_config_servers
+- name: Assert that the required variables are defined
+  ansible.builtin.assert:
+    that:
+      - dns_config_servers is defined
+    fail_msg: "Set dns_config_servers in config/group_vars."
+    quiet: true
 
 # systemd-resolved manages /etc/resolv.conf as a symlink to a stub resolver on
 # Ubuntu 18.04+ (including 22.04/24.04/26.04). Disable it so a static

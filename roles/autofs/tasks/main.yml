@@ -1,11 +1,11 @@
 ---
-- name: Assert that variables are defined
-  ansible.builtin.fail:
-    msg: "Variable '{{ item }}' is not defined"
-  when: item not in vars
-  with_items:
-    - autofs_mount
-    - autofs_map
+- name: Assert that the required variables are defined
+  ansible.builtin.assert:
+    that:
+      - autofs_mount is defined
+      - autofs_map is defined
+    fail_msg: "Set autofs_mount and autofs_map in config/group_vars."
+    quiet: true
 
 - name: Install packages
   ansible.builtin.package:
