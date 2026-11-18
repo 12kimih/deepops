@@ -1,14 +1,6 @@
 ---
-# Libraries first: a command must never reach a node ahead of what it sources.
-- name: Create the cluster library directory
-  ansible.builtin.file:
-    path: "{{ cluster_tools_lib_dir }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  when: cluster_tools_libs | length > 0
-
+# Libraries first: a command must never reach a node ahead of what it sources. Their
+# directory is cluster_tools_lib's (a dependency of this role), created there.
 - name: Publish the cluster libraries
   ansible.builtin.copy:
     src: "{{ item.src }}"
@@ -19,6 +11,49 @@
   loop: "{{ cluster_tools_libs }}"
   loop_control:
     label: "{{ cluster_tools_lib_dir }}/{{ item.dest }}"
+
+# Recorded like the commands below, so a library dropped from the config leaves the hosts.
+- name: Look for the record of published libraries
+  ansible.builtin.stat:
+    path: "{{ cluster_tools_lib_manifest }}"
+  register: cluster_tools_lib_manifest_stat
+
+- name: Read the record of published libraries
+  ansible.builtin.slurp:
+    src: "{{ cluster_tools_lib_manifest }}"
+  register: cluster_tools_lib_manifest_read
+  when: cluster_tools_lib_manifest_stat.stat.exists
+
+- name: Remove libraries no longer published
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_dir }}/{{ item }}"
+    state: absent
+  vars:
+    _cluster_tools_recorded_libs: >-
+      {{ (cluster_tools_lib_manifest_read.content | b64decode).split()
+         if cluster_tools_lib_manifest_stat.stat.exists else [] }}
+  loop: >-
+    {{ (_cluster_tools_recorded_libs + cluster_tools_retired_libs) | unique
+       | difference(cluster_tools_libs | map(attribute='dest')) | list }}
+
+# Nothing published, no record: copy refuses empty content, and none is the truth.
+- name: Record the published libraries
+  ansible.builtin.copy:
+    content: |
+      {% for name in cluster_tools_libs | map(attribute='dest') | sort %}
+      {{ name }}
+      {% endfor %}
+    dest: "{{ cluster_tools_lib_manifest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: cluster_tools_libs | length > 0
+
+- name: Remove the record of published libraries
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_manifest }}"
+    state: absent
+  when: cluster_tools_libs | length == 0
 
 - name: Assert the built-in commands are known and not also site scripts
   ansible.builtin.assert:
@@ -112,6 +147,13 @@
     owner: root
     group: root
     mode: "0644"
+  when: (cluster_tools_scripts + cluster_tools_commands) | length > 0
+
+- name: Remove the record of published commands
+  ansible.builtin.file:
+    path: "{{ cluster_tools_manifest }}"
+    state: absent
+  when: (cluster_tools_scripts + cluster_tools_commands) | length == 0
 
 # A published name that also resolves elsewhere in PATH would shadow the real command
 # for every user, as an `alias squeue=/path/to/squeue.sh` does. Catch it
