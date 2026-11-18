@@ -31,6 +31,10 @@ cluster_tools_completion_dir: /usr/share/bash-completion/completions
 # absent is simply skipped.
 cluster_tools_manifest: "{{ cluster_tools_lib_dir }}/published-commands"
 cluster_tools_retired: []
+# The same for cluster_tools_libs: a dropped library is removed; name in
+# cluster_tools_retired_libs any published before the record existed.
+cluster_tools_lib_manifest: "{{ cluster_tools_lib_dir }}/published-libs"
+cluster_tools_retired_libs: []
 
 # Commands to publish: a list of {src, dest}. src is copied VERBATIM -- shell scripts
 # routinely contain sequences Jinja would eat, `${#var}` opening a comment among them --
