@@ -5,6 +5,9 @@
    registered result is empty and every task that reads it fails or decides wrongly.
 2. A template task whose template renders a secret must set diff: false, or a
    --diff preview prints the secret.
+4. A play's hosts (`hosts:`, and the `hostlist` a playbook import passes) name inventory
+   groups and may template only `hostlist`: they are resolved before group_vars
+   load, so any other variable there silently ignores what config sets.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -110,6 +113,23 @@ class TaskRules(unittest.TestCase):
             if not line.lstrip().startswith("#") and pattern.search(line)
         ]
         self.assertEqual(offenders, [], "the internal vars dictionary is deprecated")
+
+    def test_play_hosts_use_only_hostlist(self):
+        offenders = []
+        for path in sorted(ROOT.glob("playbooks/**/*.yml")):
+            data = yaml.safe_load(path.read_text())
+            for play in data if isinstance(data, list) else []:
+                if not isinstance(play, dict):
+                    continue
+                values = [play.get("hosts"), (play.get("vars") or {}).get("hostlist")]
+                for value in filter(None, values):
+                    names = set(re.findall(r"\{\{(.*?)\}\}", str(value)))
+                    code = [re.sub(r"'[^']*'|\"[^\"]*\"", "", expr) for expr in names]
+                    words = {w for expr in code for w in re.findall(r"[A-Za-z_]\w*", expr)}
+                    stray = words - {"hostlist", "default", "groups", "join"}
+                    if stray:
+                        offenders.append(f"{path.relative_to(ROOT)}: {value}")
+        self.assertEqual(offenders, [], "play hosts must be inventory groups or hostlist")
 
 
 if __name__ == "__main__":

@@ -46,7 +46,7 @@ The following variables are the most common configuration you may want to adjust
 | `nginx_docker_cache_registry_string`       | `"registry.k8s.io quay.io k8s.gcr.io gcr.io nvcr.io"` | Space-separated list of registries to proxy; `k8s.gcr.io` is retained for older clusters while current Kubernetes images use `registry.k8s.io` |
 | `nginx_docker_cache_manifests`             | `"false"`                                | Flag to determine whether to cache image manifests                            |
 | `nginx_docker_cache_manifest_default_time` | "1h"                                     | If manifests are cached, time to cache them                                   |
-| `nginx_docker_cache_hostgroup`             | `"cache"`                                | Ansible inventory host group where proxy is deployed                          |
+| `nginx_docker_cache_hostgroup`             | `"slurm-cache"`                          | Inventory group the proxy runs on (slurm-cluster.yml deploys it to `slurm-cache`) |
 | `nginx_docker_cache_dockerd_clients`       | `true`                                   | Flag to determine whether `dockerd` should be configured to use the proxy     |
 | `nginx_docker_cache_ca`                    | not configured by default                | Specifies file paths for CA certificate and key, if you supply these yourself |
 

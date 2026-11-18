@@ -81,9 +81,8 @@ image_command_tool: "crictl"
 ################################################################################
 kube_enable_rsyslog_server: true
 kube_enable_rsyslog_client: true
-rsyslog_server_hostname: "{{ groups['kube_control_plane'][0] }}"
-rsyslog_client_tcp_host: "{{ rsyslog_server_hostname }}"
-rsyslog_client_group: "k8s_cluster"
+# The server is kube_control_plane[0]; the clients are [k8s_cluster].
+rsyslog_client_tcp_host: "{{ groups['kube_control_plane'][0] }}"
 
 ################################################################################
 # Run:ai / KAI Scheduler (optional, off by default)                            #

@@ -93,8 +93,7 @@ login02
 ### Separate monitoring node
 
 The Slurm monitoring services are deployed to the hosts in the `slurm-metric` inventory group, which by default is the Slurm controller node.
-`slurm_monitoring_group` picks a different group only when passed with `-e`, since a play's hosts are resolved before group variables exist.
-Set it in `group_vars` as well when you move the services, though: the slurm exporter role reads it there to tell Prometheus which hosts to scrape.
+To move them, put the monitoring host in `slurm-metric`; Prometheus scrapes the slurm exporter on the same group.
 
 Note that in order to correctly monitor Slurm, the monitoring node must have Slurm installed and have access to the cluster.
 As with the login nodes, the easiest way to do this is to add the monitoring node to the `slurm-cluster` group, but not to `slurm-master` or `slurm-node`.

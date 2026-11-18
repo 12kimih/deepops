@@ -169,11 +169,7 @@ slurm_enable_nfs_server: true
 #  - Mount NFS filesystems on nfs-clients?
 slurm_enable_nfs_client_nodes: true
 
-# Hosts to set up as NFS servers or clients. Honoured only when passed with -e: a play's
-# hosts are resolved before group_vars load, so from here these values are ignored and
-# the [slurm-nfs] and [slurm-nfs-client] inventory groups decide.
-nfs_server_group: "slurm-master[0]"
-nfs_client_group: "slurm-master[1:],slurm-node"
+# NFS servers and clients are the [slurm-nfs] and [slurm-nfs-client] inventory groups.
 
 # Flags for sharing slurm.conf among compute and control nodes
 slurm_conf_symlink: false
@@ -206,9 +202,7 @@ spack_build_packages: false
 spack_default_packages:
   - "cuda"
 
-# Which host should we run installs on for software going into the NFS share? Honoured
-# only with -e (see the NFS host groups above); from here slurm-login[0] is used.
-sm_install_host: "slurm-master[0]"
+# Software for the NFS share is installed on slurm-login[0].
 
 # CUDA toolkits as Lmod modules (playbooks/slurm-cluster/nvidia-cuda-toolkit.yml).
 # Installs CUDA toolkits from the official runfiles into {{ sm_prefix }}/cuda and
@@ -225,10 +219,8 @@ sm_install_host: "slurm-master[0]"
 # so `module avail` finds them with no extra MODULEPATH wiring):
 #cuda_prefix: "{{ sm_prefix }}"
 #cuda_modroot: "{{ sm_module_path }}"
-# Restrict the heavy toolkit download+install to the host(s) that own the shared /sw tree,
-# e.g. when a separate node serves /scratch. Honoured only with -e (see the NFS host
-# groups above); from here the playbook falls back to slurm-master[0].
-#cuda_install_hosts: "slurm-master[0]"
+# The toolkits install on slurm-master[0], which owns the shared /sw tree; another host
+# only with -e hostlist=<host> on playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
 
 ################################################################################
 # NVIDIA HPC SDK                                                               #
@@ -292,24 +284,16 @@ slurm_cluster_configure_gpu_power_limit: true
 # dest is a bare command name. Do NOT reuse the name of a real command (squeue, sinfo):
 # the role refuses a name that already resolves elsewhere in PATH, because a wrapper
 # installed under that name makes the command behave differently from a script.
-#cluster_tools_scripts:
-#  - src: "{{ inventory_dir }}/files/slurm/squeue.sh"
-#    dest: sq
-#  - src: "{{ inventory_dir }}/files/slurm/qos.sh"
-#    dest: qos
+#cluster_tools_scripts: []
 
-# Commands published before the role recorded what it publishes, to remove from every
-# host (for example a command a site has retired).
+# The cluster commands the role ships (Python, on the shared clustertools library):
+# sq (queue, users, why jobs wait, pools) and qos (the QoS you may use, quotas).
+#cluster_tools_commands: [sq, qos]
+
+# Commands and libraries published before the role recorded what it publishes, to remove
+# from every host (for example a command a site has retired).
 #cluster_tools_retired: []
-
-# Shell libraries the commands above source, published to cluster_tools_lib_dir and not
-# executable: sourced, never run, so they claim no name in PATH. Use one for anything
-# several commands must agree on, instead of a copy each that drifts apart.
-#cluster_tools_libs:
-#  - src: "{{ inventory_dir }}/files/slurm/lib/cluster-theme.sh"
-#    dest: cluster-theme.sh
-#  - src: "{{ inventory_dir }}/files/slurm/lib/cluster-slurm.sh"
-#    dest: cluster-slurm.sh
+#cluster_tools_retired_libs: []
 
 # Change a Slurm command's default output through its own environment variable rather
 # than by wrapping the command (see `man sinfo`, `man squeue`). The environment is
@@ -411,10 +395,8 @@ docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*
 ################################################################################
 slurm_enable_monitoring: true
 
-# Where the monitoring services (Prometheus, Grafana, ...) are installed. Honoured only
-# with -e (see the NFS host groups above); from here the [slurm-metric] inventory group
-# decides, and this value only tells Prometheus which group runs the slurm exporter.
-slurm_monitoring_group: "slurm-master"
+# The monitoring services (Prometheus, Grafana, exporters) run on the [slurm-metric]
+# inventory group.
 
 # Grafana web UI port (role default 3000). Override if 3000 is taken.
 #grafana_port: 3001
@@ -438,6 +420,5 @@ slurm_monitoring_group: "slurm-master"
 ################################################################################
 slurm_enable_rsyslog_server: true
 slurm_enable_rsyslog_client: true
-rsyslog_server_hostname: "{{ groups['slurm-master'][0] }}"
-rsyslog_client_tcp_host: "{{ rsyslog_server_hostname }}"
-rsyslog_client_group: "slurm-cluster"
+# The server is slurm-master[0]; the clients are [slurm-node].
+rsyslog_client_tcp_host: "{{ groups['slurm-master'][0] }}"

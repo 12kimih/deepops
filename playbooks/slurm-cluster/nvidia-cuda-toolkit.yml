@@ -5,8 +5,8 @@
 #
 # The driver is never touched (runfile installed with --toolkit only). The
 # toolkits install once on the host that owns the shared tree -- slurm-master[0]
-# unless you pass -e cuda_install_hosts=<host> (group_vars cannot pick a play's
-# hosts); because that tree is shared, `module avail cuda` then lists them on every
+# unless you pass -e hostlist=<host> (group_vars cannot pick a play's hosts);
+# because that tree is shared, `module avail cuda` then lists them on every
 # node. Trim roles/nvidia_cuda_toolkit/defaults/main.yml's cuda_versions (or override
 # it in config/group_vars/) to choose which toolkits to install.
 ---
@@ -23,7 +23,7 @@
     - nvidia_cuda_toolkit
 
 - name: Install CUDA toolkits and generate modulefiles on the software-tree host
-  hosts: "{{ cuda_install_hosts | default(nfs_server_group | default('slurm-master[0]')) }}"
+  hosts: "{{ hostlist | default('slurm-master[0]') }}"
   become: true
   roles:
     - role: nvidia_cuda_toolkit

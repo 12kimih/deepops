@@ -24,4 +24,4 @@ grafana_data_dir: /var/lib/grafana
 grafana_cfg_dashboard_path: "{{ grafana_data_dir }}/dashboards"
 grafana_user_id: 472
 
-slurm_exporter_host_group: "{{ slurm_monitoring_group | default('slurm-master') }}"
+slurm_exporter_host_group: slurm-metric

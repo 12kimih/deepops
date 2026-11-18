@@ -25,7 +25,7 @@ can join exporters:
 | `node-exporter` | all hosts | `node_exporter_host_group` (default `slurm-cluster`) | 9100 |
 | `dcgm-exporter` | GPU nodes | `slurm-node` | 9400 |
 | `ipmi-exporter` | hosts with `/dev/ipmi0` | `ipmi_exporter_host_group` (default `slurm-cluster`) | 9290 |
-| `slurm-exporter` | `slurm_monitoring_group` | the same group | 8080 |
+| `slurm-exporter` | `slurm-metric` | `slurm_exporter_host_group` (default `slurm-metric`) | 8080 |
 
 `ipmi-exporter` reads the BMC in-band and provides whole-system power draw
 (`ipmi_dcmi_power_consumption_watts`), PSU, fan and temperature sensors. The GPU dashboard

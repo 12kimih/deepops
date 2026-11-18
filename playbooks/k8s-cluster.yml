@@ -345,11 +345,11 @@
 - name: Setup rsyslog server
   import_playbook: generic/rsyslog-server.yml
   vars:
-    hostlist: "{{ rsyslog_server_hostname | default('kube_control_plane[0]') }}"
+    hostlist: kube_control_plane[0]
   when: kube_enable_rsyslog_server | default(true)
 
 - name: Setup rsyslog client
   import_playbook: generic/rsyslog-client.yml
   vars:
-    hostlist: "{{ rsyslog_client_group | default('k8s_cluster') }}"
+    hostlist: k8s_cluster
   when: kube_enable_rsyslog_client | default(true)

@@ -33,13 +33,13 @@
 - name: Set up NGINX-based container caching | Install docker registry cache server
   import_playbook: container/nginx-docker-registry-cache-server.yml
   vars:
-    hostlist: "{{ nginx_docker_cache_hostgroup | default('slurm-cache') }}"
+    hostlist: slurm-cache
   when: slurm_enable_nginx_docker_cache | default(false)
 
 - name: Set up NGINX-based container caching | Install docker registry cache client
   import_playbook: container/nginx-docker-registry-cache-client.yml
   vars:
-    hostlist: "{{ nginx_docker_cache_clients | default('slurm-node') }}"
+    hostlist: slurm-node
   when: slurm_enable_nginx_docker_cache | default(false)
 
 - name: Install NVIDIA driver
@@ -58,21 +58,21 @@
 - name: Install software
   import_playbook: generic/software.yml
 
-# NOTE (local fork change): default is the whole [slurm-nfs] GROUP, not slurm-nfs[0],
-# so a cluster that exports different filesystems from different servers gets all of
-# them set up in one run. nfs_server_group from group_vars is NOT visible here
-# (import_playbook hostlist is resolved before group_vars load) -- drive the NFS hosts
-# via the [slurm-nfs] inventory group.
+# Every play's hosts are an inventory group named here: a play's hosts are resolved
+# before group_vars load, so a group_vars variable could not choose them (only -e can,
+# with hostlist on the component playbook). NFS servers are the whole [slurm-nfs]
+# group, so a cluster exporting different filesystems from different servers sets them
+# all up in one run.
 - name: Set up NFS filesystem | Install nfs-server
   import_playbook: generic/nfs-server.yml
   vars:
-    hostlist: "{{ nfs_server_group | default('slurm-nfs') }}"
+    hostlist: slurm-nfs
   when: slurm_enable_nfs_server
 
 - name: Set up NFS filesystem | Install nfs-client
   import_playbook: generic/nfs-client.yml
   vars:
-    hostlist: "{{ nfs_client_group | default('slurm-nfs-client') }}"
+    hostlist: slurm-nfs-client
   when: slurm_enable_nfs_client_nodes
 
 # Authentication / directory services. Each role inside is gated on its own config
@@ -111,37 +111,37 @@
 - name: Install the NVIDIA HPC SDK
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml
   vars:
-    hostlist: "{{ sm_install_host | default('slurm-login[0]') }}"
+    hostlist: slurm-login[0]
   when: slurm_install_hpcsdk
 
 - name: Install monitoring services | Install prometheus
   import_playbook: slurm-cluster/prometheus.yml
   vars:
-    hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
+    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring services | Install grafana
   import_playbook: slurm-cluster/grafana.yml
   vars:
-    hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
+    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring services | Install alert manager
   import_playbook: slurm-cluster/alertmanager.yml
   vars:
-    hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
+    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring services | Install the Slack usage report
   import_playbook: slurm-cluster/slurm-usage-report.yml
   vars:
-    hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
+    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring exporters | Install prometheus slurm exporter
   import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
   vars:
-    hostlist: "{{ slurm_monitoring_group | default('slurm-metric') }}"
+    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring exporters | Install prometheus node exporter
@@ -159,13 +159,13 @@
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
   vars:
-    hostlist: "{{ rsyslog_server_hostname | default('slurm-master[0]') }}"
+    hostlist: slurm-master[0]
   when: slurm_enable_rsyslog_server | default(true)
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog client
   import_playbook: generic/rsyslog-client.yml
   vars:
-    hostlist: "{{ rsyslog_client_group | default('slurm-node') }}"
+    hostlist: slurm-node
   when: slurm_enable_rsyslog_client | default(true)
 
 - name: Set Permissions to adjust GPU Clocks speeds
