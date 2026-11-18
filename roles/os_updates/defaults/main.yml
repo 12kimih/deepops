@@ -5,11 +5,20 @@
 os_updates_policy: security
 
 # Packages unattended upgrades never touch (shell-style globs on the package name).
-# They change the kernel, GPU, scheduler, container or storage stack, so they are
-# upgraded in a maintenance window by the roles that own them.
+# They change the kernel, GPU, scheduler, container or storage stack, or (systemd,
+# libc, dbus) their upgrade re-executes PID 1 or restarts core daemons under running
+# jobs; a daemon-reexec from an unattended upgrade can leave systemd hung. They are
+# upgraded in a maintenance window, with a reboot.
 os_updates_held_back:
   - "linux-*"
   - "kernel*"
+  - "systemd*"
+  - "libsystemd*"
+  - "udev"
+  - "libudev*"
+  - "libc6*"
+  - "glibc*"
+  - "dbus*"
   - "*nvidia*"
   - "cuda*"
   - "libcudnn*"
