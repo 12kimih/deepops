@@ -1,0 +1,10 @@
+---
+# Daily Slurm controller backups with a monthly restore test (roles/slurm_backup).
+# No-op until slurm_backup_destinations is set. Run one now with
+#   sudo systemctl start slurm-backup@backup.service
+- hosts: "{{ hostlist | default('slurm-master[0]') }}"
+  become: true
+  tags:
+    - slurm-backup
+  roles:
+    - role: slurm_backup

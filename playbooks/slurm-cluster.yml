@@ -105,6 +105,11 @@
 - name: Install Slurm
   import_playbook: slurm-cluster/slurm.yml
 
+- name: Back up the Slurm controller daily, with a monthly restore test
+  import_playbook: slurm-cluster/slurm-backup.yml
+  tags:
+    - slurm-backup
+
 - name: Install OpenMPI
   import_playbook: slurm-cluster/openmpi.yml
   when: slurm_cluster_install_openmpi | default(true)

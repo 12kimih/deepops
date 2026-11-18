@@ -78,6 +78,16 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_job_submit_plugins: "lua"
 #slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
 
+# --- Backups of the controller (roles/slurm_backup) --------------------------
+# Daily: accounting database dump, StateSaveLocation and (where munge_key) the MUNGE
+# key, with SHA256SUMS, kept 14 daily / 8 weekly per destination; a monthly restore
+# test loads the dump into a scratch database. Use two disks: a local one (root only,
+# holds the MUNGE key) and an NFS export, written as `owner` because root_squash maps
+# this host's root to nobody there (its directory is made on prepare_host, the server).
+#slurm_backup_destinations:
+#  - {path: /backup/slurm, munge_key: true}
+#  - {path: /scratch/.slurm-backup, owner: slurm, prepare_host: nfs-server-host}
+
 # --- Accounting as code (QoS, accounts, members) ----------------------------
 # Declare QoS and the account tree in one file; slurm.yml (tag accounting) applies it
 # with sacctmgr, previewable with --check --diff. Who is in which account comes from
