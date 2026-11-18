@@ -8,6 +8,9 @@
 4. A play's hosts (`hosts:`, and the `hostlist` a playbook import passes) name inventory
    groups and may template only `hostlist`: they are resolved before group_vars
    load, so any other variable there silently ignores what config sets.
+5. A `when` condition is a boolean: ansible-core 2.19+ fails the task on one that
+   yields a number or a string (`x | length`, `x | default('')`), so it must compare
+   (`| length > 0`) or cast (`| bool`).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -130,6 +133,17 @@ class TaskRules(unittest.TestCase):
                     if stray:
                         offenders.append(f"{path.relative_to(ROOT)}: {value}")
         self.assertEqual(offenders, [], "play hosts must be inventory groups or hostlist")
+
+    def test_conditions_are_boolean(self):
+        bare = re.compile(r"\|\s*length\s*$|\|\s*default\((['\"])[^'\"]*\1\)\s*$")
+        offenders = []
+        for path in task_files():
+            for task in tasks(path):
+                conditions = task.get("when")
+                for cond in conditions if isinstance(conditions, list) else [conditions]:
+                    if isinstance(cond, str) and bare.search(cond.strip()):
+                        offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}: {cond}")
+        self.assertEqual(offenders, [], "compare or cast these conditions to a boolean")
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@
     option: threads
     value: "{{ nfs_server_threads }}"
     mode: "0644"
-  when: nfs_exports | length
+  when: nfs_exports | length > 0
   notify: Restart nfs
   tags:
     - nfs
@@ -72,7 +72,7 @@
       {{ (nfs_server_autorestart_retries | int) * (nfs_server_autorestart_delay | int) }}s),
       or the StartLimit window resets mid-sequence and the retry cap never applies.
   when:
-    - nfs_exports | length
+    - nfs_exports | length > 0
     - nfs_server_autorestart | bool
   tags:
     - nfs
@@ -85,7 +85,7 @@
     group: root
     mode: "0755"
   when:
-    - nfs_exports | length
+    - nfs_exports | length > 0
     - nfs_server_autorestart | bool
   tags:
     - nfs
@@ -103,7 +103,7 @@
     group: root
     mode: "0755"
   when:
-    - nfs_exports | length
+    - nfs_exports | length > 0
     - nfs_server_autorestart | bool
   tags:
     - nfs
@@ -121,7 +121,7 @@
     - src: nfs-server-autorestart.conf.j2
       dest: /etc/systemd/system/nfs-server.service.d/auto-restart.conf
   when:
-    - nfs_exports | length
+    - nfs_exports | length > 0
     - nfs_server_autorestart | bool
   notify: Reload systemd
   tags:
@@ -144,6 +144,6 @@
     name: "{{ nfs_server_daemon }}"
     state: started
     enabled: true
-  when: nfs_exports | length
+  when: nfs_exports | length > 0
   tags:
     - nfs

@@ -5,7 +5,7 @@
     state: directory
     mode: "0755"
   with_items: "{{ nfs_mounts }}"
-  when: nfs_mounts | length
+  when: nfs_mounts | length > 0
   tags:
     - nfs
 
@@ -23,7 +23,7 @@
     fstype: nfs
     state: "{{ 'present' if 'x-systemd.automount' in nfs_client_opts else 'mounted' }}"
   with_items: "{{ nfs_mounts }}"
-  when: nfs_mounts | length
+  when: nfs_mounts | length > 0
   register: nfs_client_fstab
   tags:
     - nfs
@@ -45,7 +45,7 @@
 - name: Activate the generated mount units
   ansible.builtin.command:
     cmd: systemctl start remote-fs.target
-  when: nfs_mounts | length
+  when: nfs_mounts | length > 0
   changed_when: false
   tags:
     - nfs
