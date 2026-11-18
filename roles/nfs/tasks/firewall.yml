@@ -5,14 +5,14 @@
   tags:
     - nfs
   when:
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
 
 - name: Gather service facts
   ansible.builtin.service_facts:
   tags:
     - nfs
   when:
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
 
 - name: Configure firewall to allow NFS server
   ansible.posix.firewalld:
@@ -28,7 +28,7 @@
   tags:
     - nfs
   when:
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"
 
 # The rules above are permanent-only (immediate: false), so restart firewalld to load
@@ -43,7 +43,7 @@
     - Restart rpcbind
     - Restart nfs
   when:
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"
     - "'firewalld.service' in ansible_facts.services"
     - ansible_facts.services['firewalld.service']['state'] == "running"

@@ -3,8 +3,8 @@
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
     - files:
-        - "{{ ansible_distribution | lower }}.yml"
-        - "{{ ansible_os_family | lower }}.yml"
+        - "{{ ansible_facts.distribution | lower }}.yml"
+        - "{{ ansible_facts.os_family | lower }}.yml"
       paths:
         - ../vars
       skip: true
@@ -43,14 +43,14 @@
     cache_valid_time: 3600
     name: "{{ item }}"
   with_items: "{{ openmpi_deps }}"
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
 
 - name: Install openmpi build dependencies
   ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items: "{{ openmpi_deps }}"
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
 
 - name: Remove openmpi packages
   ansible.builtin.apt:
@@ -60,7 +60,7 @@
     - openmpi-bin
     - openmpi-common
     - libopenmpi-dev
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
   failed_when: false
 
 - name: Remove openmpi packages
@@ -70,7 +70,7 @@
   with_items:
     - openmpi
     - openmpi-devel
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
   failed_when: false
 
 - name: Make openmpi build directory

@@ -13,7 +13,8 @@
     runai_tls_cert: /dev/null
     runai_tls_key: /dev/null
     runai_platform_address_timeout: 10
-    ansible_default_ipv4: {address: 192.0.2.10}
+    # Stands in for gathered facts (gather_facts is off).
+    ansible_facts: {default_ipv4: {address: 192.0.2.10}}
   tasks:
     - name: Install exposure (gateway)
       ansible.builtin.include_role: {name: runai, tasks_from: "{{ item }}", public: true}

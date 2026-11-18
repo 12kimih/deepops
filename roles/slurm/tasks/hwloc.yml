@@ -20,14 +20,14 @@
     cache_valid_time: 3600
     name: "{{ item }}"
   with_items: "{{ slurm_hwloc_deps }}"
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
 
 - name: Install hwloc build dependencies
   ansible.builtin.dnf:
     name: "{{ item }}"
     state: present
   with_items: "{{ slurm_hwloc_deps }}"
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
 
 - name: Remove hwloc packages
   ansible.builtin.apt:
@@ -37,7 +37,7 @@
     - hwloc
     - libhwloc-dev
     - libhwloc5
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
   failed_when: false
 
 - name: Remove hwloc packages
@@ -48,7 +48,7 @@
     - hwloc-devel
     - hwloc-libs
     - hwloc
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
   failed_when: false
 
 - name: When building, try to uninstall first before downloading source

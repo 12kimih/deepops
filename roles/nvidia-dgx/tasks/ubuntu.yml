@@ -5,12 +5,12 @@
 - name: Check for a supported Ubuntu DGX Software Stack version
   ansible.builtin.fail:
     msg: "This role supports Ubuntu 22.04, 24.04, and 26.04"
-  when: ansible_distribution_version is version('22.04', '<')
+  when: ansible_facts.distribution_version is version('22.04', '<')
 
 - name: Run DGX OS 6 tasks (Ubuntu 22.04)
   ansible.builtin.include_tasks: ubuntu-22.04.yml
-  when: ansible_distribution_version == '22.04'
+  when: ansible_facts.distribution_version == '22.04'
 
 - name: Run DGX OS 7 tasks (Ubuntu 24.04 and later)
   ansible.builtin.include_tasks: ubuntu-24.04.yml
-  when: ansible_distribution_version is version('24.04', '>=')
+  when: ansible_facts.distribution_version is version('24.04', '>=')

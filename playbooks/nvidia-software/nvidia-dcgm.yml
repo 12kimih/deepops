@@ -6,10 +6,10 @@
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   tasks:
-    - name: Install custom facts module (provides ansible_local.gpus.count)
+    - name: Install custom facts module (provides ansible_facts.local.gpus.count)
       ansible.builtin.include_role:
         name: facts
     - name: Configure DCGM on GPU nodes only
       ansible.builtin.include_role:
         name: nvidia_dcgm
-      when: ansible_local['gpus']['count'] | int > 0
+      when: ansible_facts.local['gpus']['count'] | int > 0

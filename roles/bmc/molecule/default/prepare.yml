@@ -5,4 +5,4 @@
     - name: Ensure apt cache is updated
       ansible.builtin.apt:
         update_cache: true
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_facts.distribution == "Ubuntu"

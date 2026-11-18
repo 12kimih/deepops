@@ -6,11 +6,11 @@
   ansible.builtin.set_fact:
     dgx_os7_platform: "{{ item }}"
   loop: "{{ dgx_os7_platforms }}"
-  when: ansible_product_name is search(item.match)
+  when: ansible_facts.product_name is search(item.match)
 
 - name: Fail if DGX OS 7 platform package set is unknown
   ansible.builtin.fail:
-    msg: "Unsupported DGX model for Ubuntu 24.04 DGX OS 7 role path: {{ ansible_product_name }}"
+    msg: "Unsupported DGX model for Ubuntu 24.04 DGX OS 7 role path: {{ ansible_facts.product_name }}"
   when: dgx_os7_platform is not defined
 
 - name: Create temporary DGX OS 7 repository archive path

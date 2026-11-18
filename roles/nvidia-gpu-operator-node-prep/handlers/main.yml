@@ -1,15 +1,15 @@
 ---
 - name: Update-initramfs (Debian)
   ansible.builtin.command: update-initramfs -u
-  when: ansible_os_family == "Debian"
+  when: ansible_facts.os_family == "Debian"
   listen: Update-initramfs
 
 - name: Backup initramfs (RedHat)
   ansible.builtin.shell: mv /boot/initramfs-$(uname -r).img /boot/initramfs-$(uname -r).img.bak
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
   listen: Update-initramfs
 
 - name: Update-initramfs (RedHat)
   ansible.builtin.shell: dracut /boot/initramfs-$(uname -r).img $(uname -r)
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
   listen: Update-initramfs

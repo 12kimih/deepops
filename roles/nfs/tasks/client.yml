@@ -76,11 +76,11 @@
   ansible.builtin.dnf:
     name: "python3-libsemanage"
     state: present
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: RedHat | Enable nfs home directory usage
   ansible.posix.seboolean:
     name: "use_nfs_home_dirs"
     state: true
     persistent: true
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"

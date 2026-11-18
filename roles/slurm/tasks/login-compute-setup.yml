@@ -1,7 +1,7 @@
 ---
 - name: Hide GPUs for regular user logins via sshd.service.
   vars:
-    ssh_unit: "{{ 'sshd.service' if ansible_os_family == 'RedHat' else 'ssh.service' }}"
+    ssh_unit: "{{ 'sshd.service' if ansible_facts.os_family == 'RedHat' else 'ssh.service' }}"
   ansible.builtin.shell: |
     set -o pipefail
     deviceprop=$(systemctl show {{ ssh_unit }} -p DeviceAllow | grep -i nvidiactl)

@@ -5,15 +5,15 @@
     cache_valid_time: 3600
     name: "{{ item }}"
   with_items:
-    - linux-tools-{{ ansible_kernel }} # for cpupower, used in prolog+epilog
-  when: ansible_os_family == "Debian"
+    - linux-tools-{{ ansible_facts.kernel }} # for cpupower, used in prolog+epilog
+  when: ansible_facts.os_family == "Debian"
 
 - name: Install dependencies (RedHat)
   ansible.builtin.dnf:
     name: "{{ item }}"
   with_items:
     - kernel-tools # for cpupower, used in prolog+epilog
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts.os_family == "RedHat"
 
 - name: Delete old prolog files
   ansible.builtin.file:

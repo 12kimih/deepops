@@ -12,6 +12,8 @@ Rules (all line based, so comments and layout survive):
   octal    bare `mode: 0644` becomes `mode: "0644"`
   plugins  `become_method: sudo` becomes `become_method: ansible.builtin.sudo`
   roles    a play's `roles:` entries are written `- role: X`, not `- name: X`
+  facts    `ansible_distribution` becomes `ansible_facts.distribution` (also in .j2
+           templates): top-level fact variables are deprecated in ansible-core 2.22
   jinja    `{{x|f}}` becomes `{{ x | f }}`, outside quoted strings
   layout   a `---` document start and no trailing blanks everywhere; in Ansible
            files and role defaults/vars/meta, sequences indented under their key
@@ -290,7 +292,34 @@ def double_quote(line):
     return re.sub(r"^(\s*)((?:- )?(?:[\w.\-]+:\s+)?)'([^']*)'(\s*(?:#.*)?)$", swap, line)
 
 
+FACT_NAMES = [l.strip() for l in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ansible-fact-names.txt"))
+              if l.strip() and not l.startswith("#")]
+_FACT = "|".join(sorted(map(re.escape, FACT_NAMES), key=len, reverse=True))
+FACT_ITEM = re.compile(r"""\[(['"])ansible_(""" + _FACT + r""")\1\]""")
+FACT_ATTR = re.compile(r"\.ansible_(" + _FACT + r")\b")
+# Not a YAML key that defines the variable (ansible_x:), and not a setup filter,
+# which names facts as strings (filter=ansible_local).
+FACT_BARE = re.compile(r"(?<![\w.'\"])(?<!filter=)(?<!filter: )ansible_(" + _FACT + r")\b(?!:(\s|$))")
+
+
+def fix_facts(text):
+    """Read facts from ansible_facts, not from the deprecated top-level ansible_<fact>.
+
+    hostvars[h]['ansible_x'] -> hostvars[h]['ansible_facts']['x'],
+    hostvars[h].ansible_x -> hostvars[h].ansible_facts.x, ansible_x -> ansible_facts.x
+    """
+    text = FACT_ITEM.sub(lambda m: f"[{m.group(1)}ansible_facts{m.group(1)}][{m.group(1)}{m.group(2)}{m.group(1)}]", text)
+    text = FACT_ATTR.sub(r".ansible_facts.\1", text)
+    return FACT_BARE.sub(r"ansible_facts.\1", text)
+
+
+def is_template(path):
+    return path.endswith(".j2") or bool(TEMPLATES.search(path))
+
+
 def normalize(text, path):
+    if is_template(path):
+        return fix_facts(text)
     lines = [l.rstrip() for l in text.split("\n")]
     while lines and not lines[-1]:
         lines.pop()
@@ -346,7 +375,7 @@ def normalize(text, path):
             line = re.sub(r"^(\s*(?:- )?become_method:\s+)(sudo|su|runas|doas|pbrun|pfexec|ksu|dzdo|machinectl|sesu|enable)(\s*(?:#.*)?)$",
                           r"\1ansible.builtin.\2\3", line)
         lines[n] = fix_jinja(line) if ansible else line
-    return "\n".join(lines)
+    return fix_facts("\n".join(lines))
 
 
 def targets(paths):
@@ -361,10 +390,11 @@ def targets(paths):
             yield p
             continue
         listed = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard",
-                                 "--", f"{p}/*.yml", f"{p}/*.yaml"],
+                                 "--", f"{p}/*.yml", f"{p}/*.yaml", f"{p}/*.j2", f"{p}/**/templates/**"],
                                 capture_output=True, text=True, check=True).stdout
         for f in sorted(set(listed.split("\0")) - {""}):
-            if os.path.isfile(f) and not TEMPLATES.search(f):
+            # Templates are not YAML until rendered; only their Jinja is normalized.
+            if os.path.isfile(f) and (is_template(f) or not TEMPLATES.search(f)):
                 yield os.path.relpath(f)
 
 

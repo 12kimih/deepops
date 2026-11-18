@@ -1,11 +1,11 @@
 ---
 - name: Install the NVIDIA driver (Ubuntu)
   ansible.builtin.include_tasks: ubuntu.yml
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
 
 - name: Install the NVIDIA driver (RHEL/Rocky)
   ansible.builtin.include_tasks: redhat.yml
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
 
 # A reboot is needed when this run installed the driver, or when the running module does
 # not match the one on disk. The second case matters on re-runs: apt reports no change, so

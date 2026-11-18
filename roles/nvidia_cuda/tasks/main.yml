@@ -14,14 +14,14 @@
   ansible.builtin.include_tasks: install-ubuntu.yml
   when:
     - nvidia_cuda_install | bool
-    - ansible_distribution == "Ubuntu"
+    - ansible_facts.distribution == "Ubuntu"
     - not is_dgx.stat.exists
 
 - name: RedHat family install tasks
   ansible.builtin.include_tasks: install-redhat.yml
   when:
     - nvidia_cuda_install | bool
-    - ansible_os_family == "RedHat"
+    - ansible_facts.os_family == "RedHat"
     - not is_dgx.stat.exists
 
 - name: Add profile script to set environment for toolkit

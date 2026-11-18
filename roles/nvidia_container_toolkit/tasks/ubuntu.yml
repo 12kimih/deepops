@@ -1,7 +1,7 @@
 ---
 - name: Ubuntu | set package architecture
   ansible.builtin.set_fact:
-    nvidia_container_toolkit_deb_arch: "{{ _nvidia_container_toolkit_arch_map.get(ansible_architecture, ansible_architecture) }}"
+    nvidia_container_toolkit_deb_arch: "{{ _nvidia_container_toolkit_arch_map.get(ansible_facts.architecture, ansible_facts.architecture) }}"
   vars:
     _nvidia_container_toolkit_arch_map:
       aarch64: arm64

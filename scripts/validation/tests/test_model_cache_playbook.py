@@ -33,12 +33,15 @@ class ModelCachePlaybookTests(unittest.TestCase):
             model_cache_mount=str(self.mount), model_cache_owner=getpass.getuser(),
             model_cache_group=grp.getgrgid(os.getgid()).gr_name,
             ansible_become=False,
-            ansible_mounts=[{"mount": str(self.mount), "fstype": "nfs4"}],
         )
+        # Stands in for gathered facts. Play vars, because Ansible sets ansible_facts
+        # itself over an inventory variable of that name.
+        self.facts = {"mounts": [{"mount": str(self.mount), "fstype": "nfs4"}]}
 
     def run_play(self, success=True, check=False):
         path = Path(self.temp.name) / "fixture.yml"
-        path.write_text(yaml.safe_dump([self.play]))
+        play = {**self.play, "vars": {**self.play.get("vars", {}), "ansible_facts": self.facts}}
+        path.write_text(yaml.safe_dump([play]))
         config = Path(self.temp.name) / "ansible.cfg"
         config.write_text("[defaults]\nretry_files_enabled = False\n")
         env = dict(os.environ, ANSIBLE_CONFIG=str(config), ANSIBLE_NOCOLOR="1",
@@ -76,12 +79,12 @@ class ModelCachePlaybookTests(unittest.TestCase):
         self.assertFalse(self.root.exists())
 
     def test_absent_mount_fails_before_creating_cache(self):
-        self.site_vars["ansible_mounts"] = []
+        self.facts["mounts"] = []
         self.run_play(success=False)
         self.assertFalse(self.root.exists())
 
     def test_local_filesystem_fails(self):
-        self.site_vars["ansible_mounts"][0]["fstype"] = "ext4"
+        self.facts["mounts"][0]["fstype"] = "ext4"
         self.run_play(success=False)
         self.assertFalse(self.root.exists())
 

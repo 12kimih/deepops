@@ -1,12 +1,12 @@
 ---
 - name: Apt install pciutils
   ansible.builtin.apt: name=pciutils update_cache=true
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts.os_family == 'Debian'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Dnf install pciutils
   ansible.builtin.dnf: name=pciutils update_cache=true
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts.os_family == 'RedHat'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Create fact directory

@@ -26,7 +26,7 @@
     - name: Force an apt update on Ubuntu
       ansible.builtin.apt:
         update_cache: true
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_facts.distribution == "Ubuntu"
 
     - name: Install python 3 libraries if python 3 is present
       ansible.builtin.package:
@@ -34,4 +34,4 @@
           - python3-setuptools
           - python3-pip
         state: present
-      when: ansible_python.version.major == 3
+      when: ansible_facts.python.version.major == 3

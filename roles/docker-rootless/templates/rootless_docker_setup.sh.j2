@@ -1,6 +1,6 @@
 #!/bin/bash
 
-{% if ansible_os_family == "RedHat" %}
+{% if ansible_facts.os_family == "RedHat" %}
 
 mun=$(sysctl -n user.max_user_namespaces 2>/dev/null || echo 0 )
 

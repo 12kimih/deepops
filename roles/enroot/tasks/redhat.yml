@@ -1,7 +1,7 @@
 ---
 - name: RHEL | install EPEL repository
   ansible.builtin.dnf:
-    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
+    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
     state: present
     disable_gpg_check: true
 
@@ -36,7 +36,7 @@
 
 - name: RHEL | install enroot from the release .rpm
   ansible.builtin.dnf:
-    name: "{{ enroot_release_base_url }}/{{ item }}-{{ enroot_version_string }}.el{{ _enroot_rpm_el }}.{{ ansible_architecture }}.rpm"
+    name: "{{ enroot_release_base_url }}/{{ item }}-{{ enroot_version_string }}.el{{ _enroot_rpm_el }}.{{ ansible_facts.architecture }}.rpm"
     state: "{{ enroot_package_state }}"
     disable_gpg_check: true
   loop: "{{ enroot_packages }}"

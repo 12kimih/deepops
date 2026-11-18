@@ -10,7 +10,7 @@
   vars:
     mig_manager_reboot_timeout: 900
   tasks:
-    # ansible_local['gpus']['count'] comes from lspci, so it reports the GPUs the
+    # ansible_facts.local['gpus']['count'] comes from lspci, so it reports the GPUs the
     # node has even while the Slurm login setup hides them from ssh sessions.
     - name: Install custom facts
       ansible.builtin.include_role:
@@ -39,18 +39,18 @@
 
     # A node whose GPUs cannot be queried is not a node without MIG: skipping it
     # silently would report a MIG layout as converged that was never looked at.
-    # ansible_local['gpus']['count'] comes from lspci, so a node with no NVIDIA
+    # ansible_facts.local['gpus']['count'] comes from lspci, so a node with no NVIDIA
     # hardware at all still passes through untouched.
     - name: Fail when the MIG capability probe could not run
       ansible.builtin.fail:
         msg: >-
           Could not read the MIG mode of the GPUs on this node.
           nvidia-smi is unavailable or did not answer, while lspci reports
-          {{ ansible_local['gpus']['count'] }} NVIDIA GPU(s).
+          {{ ansible_facts.local['gpus']['count'] }} NVIDIA GPU(s).
           Install the driver on this node, or exclude it from this play.
       when:
         - has_mig.rc == 2
-        - ansible_local['gpus']['count'] | default(0) | int > 0
+        - ansible_facts.local['gpus']['count'] | default(0) | int > 0
 
     - name: Install MIG Manager
       ansible.builtin.include_role:

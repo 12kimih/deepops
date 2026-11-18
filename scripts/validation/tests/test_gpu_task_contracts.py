@@ -166,7 +166,7 @@ class MigApplyFailureContract(unittest.TestCase):
                     {
                         "has_mig.rc == 0",
                         "has_mig_parted.rc != 0",
-                        f'ansible_os_family == "{family}"',
+                        f'ansible_facts.os_family == "{family}"',
                     },
                 )
 
@@ -180,7 +180,7 @@ class MigApplyFailureContract(unittest.TestCase):
                     set(guard["when"]),
                     {
                         "has_mig.rc == 2",
-                        "ansible_local['gpus']['count'] | default(0) | int > 0",
+                        "ansible_facts.local['gpus']['count'] | default(0) | int > 0",
                     },
                 )
 

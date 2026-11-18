@@ -4,14 +4,14 @@
 {% if hosts_network_interface -%}
 {% set def_interface = hosts_network_interface -%}
 {% else -%}
-{% set def_interface = ansible_default_ipv4['interface']|default(None) -%}
+{% set def_interface = ansible_facts.default_ipv4['interface']|default(None) -%}
 {% endif -%}
 
 # Localhost
 {% if def_interface and hosts_add_ansible_managed_hosts -%}
 127.0.0.1  localhost.localdomain  localhost
 {% else -%}
-127.0.0.1  localhost.localdomain  localhost {{ ansible_fqdn }} {{ansible_hostname }}
+127.0.0.1  localhost.localdomain  localhost {{ ansible_facts.fqdn }} {{ansible_facts.hostname }}
 {% endif -%}
 
 {% if hosts_add_basic_ipv6 %}
@@ -29,9 +29,9 @@ ff02::2  ip6-allrouters
 #
 {% for group in hosts_add_ansible_managed_hosts_groups %}
 {% for host in groups[group]|sort %}
-{% if 'ansible_interfaces' in hostvars[host] -%}
+{% if 'interfaces' in hostvars[host]['ansible_facts'] | default({}) -%}
 # {{ host }}
-{% set my_interfaces = hostvars[host]['ansible_interfaces']|select('match', '(?!^(' + hosts_exclude_interfaces|join('|') + ')).*')|default(None) -%}
+{% set my_interfaces = hostvars[host]['ansible_facts']['interfaces']|select('match', '(?!^(' + hosts_exclude_interfaces|join('|') + ')).*')|default(None) -%}
   {% if hosts_network_interface[host] is defined -%}
       {% set di = hosts_network_interface[host] -%}
   {% elif ((hosts_network_interface is not mapping) and hosts_network_interface) -%}
@@ -61,7 +61,7 @@ ff02::2  ip6-allrouters
 {% elif hosts_default_domain -%}
 {{ addr }}    {{ host }}.{{ hosts_default_domain }} {{ host }}-{{ interface }}  {{ host }}
 {% else -%}
-{{ addr }}    {{ hostvars[host]['ansible_fqdn'] }} {{ host }}-{{ interface }}  {{ host }}
+{{ addr }}    {{ hostvars[host]['ansible_facts']['fqdn'] }} {{ host }}-{{ interface }}  {{ host }}
 {% endif -%}
 {% else -%}
 {% if hosts_interface_domain[host][interface] is defined -%}

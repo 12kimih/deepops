@@ -48,8 +48,8 @@ class LuaBuild(unittest.TestCase):
             for enabled in (False, True):
                 with self.subTest(distro=distro, enabled=enabled):
                     variables = {**DEFAULTS, **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
-                                 "slurm_build_lua": enabled, "ansible_distribution": distro,
-                                 "ansible_os_family": family}
+                                 "slurm_build_lua": enabled,
+                                 "ansible_facts": {"distribution": distro, "os_family": family}}
                     selected = []
                     for task in TASKS:
                         if not same_name(task.get("name"), "install lua build dependencies"):

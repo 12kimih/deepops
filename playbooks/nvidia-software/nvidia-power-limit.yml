@@ -17,17 +17,17 @@
 #   ansible-playbook -l <host1>,<host2> playbooks/nvidia-software/nvidia-power-limit.yml \
 #       -e nvidia_power_limit_watts=450
 #
-# The GPU gate (ansible_local.gpus.count) mirrors nvidia-dcgm.yml / nvidia-driver.yml so
+# The GPU gate (ansible_facts.local.gpus.count) mirrors nvidia-dcgm.yml / nvidia-driver.yml so
 # a CPU-only head/login node in the target set is skipped instead of failing the run.
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   tasks:
-    - name: Install custom facts module (provides ansible_local.gpus.count)
+    - name: Install custom facts module (provides ansible_facts.local.gpus.count)
       ansible.builtin.include_role:
         name: facts
 
     - name: Configure the GPU power limit on GPU nodes only
       ansible.builtin.include_role:
         name: nvidia_power_limit
-      when: ansible_local['gpus']['count'] | int > 0
+      when: ansible_facts.local['gpus']['count'] | int > 0
   environment: "{{ proxy_env if proxy_env is defined else {} }}"

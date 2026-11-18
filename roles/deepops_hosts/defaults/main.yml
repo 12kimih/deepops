@@ -29,7 +29,7 @@ hosts_ip_protocol: "ipv4"
 hosts_network_interface: ""
 
 # If hosts_default_domain is set, the default interface entry in the hosts file
-# will have the default domain used for it.  Otherwise, ansible_fqdn will be used
+# will have the default domain used for it.  Otherwise, ansible_facts.fqdn will be used
 # for the default entry
 hosts_default_domain: ""
 

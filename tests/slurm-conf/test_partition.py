@@ -19,11 +19,11 @@ ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents
 ROLE = ROOT / "roles/slurm"
 DEFAULTS = yaml.safe_load((ROLE / "defaults/main.yml").read_text())
 TEMPLATE = (ROLE / "templates" / DEFAULTS["slurm_conf_template"]).read_text()
-FACTS = {"ansible_local": {
+FACTS = {"ansible_facts": {"local": {
     "memory": {"total_mb": 1000},
     "topology": {"cpu_topology": {"sockets": "1", "cores_per_socket": "4",
                                   "threads_per_core": "2", "logical_cpus": "8"},
-                 "gpu_topology": ["0-7"]}}}
+                 "gpu_topology": ["0-7"]}}}}
 
 
 class Partition(unittest.TestCase):

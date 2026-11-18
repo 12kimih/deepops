@@ -29,25 +29,25 @@
         name: python3-docker
         state: present
         update_cache: true
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_facts.distribution == "Ubuntu"
     - name: Enable EPEL repo
       ansible.builtin.package:
         name:
           - "{{ epel_package }}"
         state: present
-      when: ansible_os_family == 'RedHat'
+      when: ansible_facts.os_family == 'RedHat'
     - name: Install package dependencies
       ansible.builtin.package:
         name:
           - python3-pip
         state: present
-      when: ansible_os_family == "RedHat"
+      when: ansible_facts.os_family == "RedHat"
     - name: Install python3 dependencies
       ansible.builtin.pip:
         name:
           - docker
         state: present
-      when: ansible_os_family == "RedHat"
+      when: ansible_facts.os_family == "RedHat"
     - name: Pull CUDA container
       community.docker.docker_container:
         name: gpu-test-pull

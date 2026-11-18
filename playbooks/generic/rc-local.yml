@@ -9,12 +9,12 @@
         insertbefore: BOF
         mode: "0755"
         create: true
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_facts.distribution == "Ubuntu"
     - name: Manage /etc/rc.d/rc.local permissions on RHEL/CentOS
       ansible.builtin.file:
         path: /etc/rc.d/rc.local
         mode: "0755"
-      when: ansible_os_family == "RedHat"
+      when: ansible_facts.os_family == "RedHat"
     - name: Manage /etc/rc.local contents
       ansible.builtin.blockinfile:
         path: /etc/rc.local
