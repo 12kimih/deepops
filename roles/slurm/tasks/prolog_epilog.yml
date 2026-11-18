@@ -40,30 +40,6 @@
   tags: epilog
   when: slurm_clear_old_prolog_epilog
 
-- name: Create prolog directories
-  ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/{{ item }}"
-    state: directory
-    owner: slurm
-    group: slurm
-    mode: "0755"
-  with_items:
-    - prolog.d/
-  tags:
-    - prolog
-
-- name: Create epilog directories
-  ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/{{ item }}"
-    state: directory
-    owner: slurm
-    group: slurm
-    mode: "0755"
-  with_items:
-    - epilog.d/
-  tags:
-    - epilog
-
 - name: Copy prolog script
   ansible.builtin.template:
     src: etc/slurm/prolog.sh
@@ -72,14 +48,28 @@
   tags:
     - prolog
 
-- name: Copy prolog parts
-  ansible.builtin.template:
-    src: "{{ item }}"
-    dest: "{{ slurm_config_dir }}/prolog.d/"
-    owner: slurm
-    group: slurm
-    mode: "0755"
-  with_fileglob: "{{ prolog_fileglob }}"
+# Every job runs each part, so a part dropped from the sources must leave the node
+# too. A relative glob is the role's own; resolve it here, not inside managed_dir.
+- name: Collect the prolog parts
+  ansible.builtin.set_fact:
+    slurm_prolog_parts: >-
+      {{ query('ansible.builtin.fileglob', *(prolog_fileglob | map('regex_replace', '^(?!/)', role_path ~ '/')))
+         | sort }}
+  tags:
+    - prolog
+
+- name: Install the prolog parts
+  ansible.builtin.include_role:
+    name: managed_dir
+    apply:
+      tags: [prolog]
+  vars:
+    managed_dir_path: "{{ slurm_config_dir }}/prolog.d"
+    managed_dir_sources: "{{ slurm_prolog_parts }}"
+    managed_dir_template: true
+    managed_dir_owner: slurm
+    managed_dir_group: slurm
+    managed_dir_mode: "0755"
   tags:
     - prolog
 
@@ -91,13 +81,27 @@
   tags:
     - epilog
 
-- name: Copy epilog parts
-  ansible.builtin.template:
-    src: "{{ item }}"
-    dest: "{{ slurm_config_dir }}/epilog.d/"
-    owner: slurm
-    group: slurm
-    mode: "0755"
-  with_fileglob: "{{ epilog_fileglob }}"
+# Every job runs each part, so a part dropped from the sources must leave the node
+# too. A relative glob is the role's own; resolve it here, not inside managed_dir.
+- name: Collect the epilog parts
+  ansible.builtin.set_fact:
+    slurm_epilog_parts: >-
+      {{ query('ansible.builtin.fileglob', *(epilog_fileglob | map('regex_replace', '^(?!/)', role_path ~ '/')))
+         | sort }}
+  tags:
+    - epilog
+
+- name: Install the epilog parts
+  ansible.builtin.include_role:
+    name: managed_dir
+    apply:
+      tags: [epilog]
+  vars:
+    managed_dir_path: "{{ slurm_config_dir }}/epilog.d"
+    managed_dir_sources: "{{ slurm_epilog_parts }}"
+    managed_dir_template: true
+    managed_dir_owner: slurm
+    managed_dir_group: slurm
+    managed_dir_mode: "0755"
   tags:
     - epilog

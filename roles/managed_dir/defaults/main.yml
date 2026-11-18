@@ -1,0 +1,14 @@
+---
+# managed_dir -- a directory that holds exactly a given set of files. See tasks/main.yml.
+managed_dir_path: ""
+managed_dir_sources: []  # controller paths; resolve globs in the caller (see tasks/main.yml)
+managed_dir_template: false  # true renders each source as a Jinja template
+managed_dir_owner: root
+managed_dir_group: root
+managed_dir_mode: "0644"
+managed_dir_dir_mode: "0755"
+managed_dir_validate: ""  # a command with %s, run on each file before it is installed
+managed_dir_notify: []  # handlers to notify when anything was installed or removed
+# Names a program creates in the directory itself (a bytecode cache): removed only when
+# the managed files changed, so a converged run stays unchanged.
+managed_dir_keep: []

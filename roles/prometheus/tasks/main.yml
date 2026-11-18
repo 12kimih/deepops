@@ -25,30 +25,16 @@
   vars:
     container_image: "{{ prometheus_container }}"
 
+# promtool checks each rule file before it is installed; a rule file dropped from the
+# sources is removed.
 - name: Install alert rules
-  ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ prometheus_config_dir }}/rules/{{ item | basename }}"
-    owner: root
-    group: root
-    mode: "0644"
-    validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check rules /check.yml"
-  loop: "{{ prometheus_rule_sources }}"
-  notify: Reload prometheus
-
-- name: Find installed rule files
-  ansible.builtin.find:
-    paths: "{{ prometheus_config_dir }}/rules"
-  register: prometheus_rule_files
-
-- name: Remove rule files no longer managed
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop: "{{ prometheus_rule_files.files | map(attribute='path') | reject('in', prometheus_rule_paths) }}"
+  ansible.builtin.include_role:
+    name: managed_dir
   vars:
-    prometheus_rule_paths: "{{ prometheus_rule_sources | map('basename') | map('regex_replace', '^', prometheus_config_dir ~ '/rules/') }}"
-  notify: Reload prometheus
+    managed_dir_path: "{{ prometheus_config_dir }}/rules"
+    managed_dir_sources: "{{ prometheus_rule_sources }}"
+    managed_dir_validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check rules /check.yml"
+    managed_dir_notify: [Reload prometheus]
 
 - name: Install config file
   ansible.builtin.template:

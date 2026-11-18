@@ -94,6 +94,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── locale
 │   ├── maas-controller
 │   ├── maintenance
+│   ├── managed_dir
 │   ├── mofed
 │   ├── move-home-dirs
 │   ├── netapp-trident

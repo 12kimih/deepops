@@ -44,8 +44,13 @@
       register: update_grub_cmd
       changed_when: update_grub_cmd.rc == 0
     - name: Reboot after updating grub config
-      ansible.builtin.reboot:
-        reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: reboot
+      vars:
+        maintenance_force_reboot: true
+        maintenance_reason: "apply the cgroup kernel options"
+        maintenance_reboot_timeout: "{{ slurm_node_reboot_timeout }}"
 
 - name: Update grub
   when: update_grub.changed and ansible_facts.os_family == "RedHat"
@@ -55,8 +60,13 @@
       register: grub2_mkconfig_cmd
       changed_when: grub2_mkconfig_cmd.rc == 0
     - name: Reboot after updating grub config
-      ansible.builtin.reboot:
-        reboot_timeout: "{{ slurm_node_reboot_timeout }}"
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: reboot
+      vars:
+        maintenance_force_reboot: true
+        maintenance_reason: "apply the cgroup kernel options"
+        maintenance_reboot_timeout: "{{ slurm_node_reboot_timeout }}"
 
 - name: Create sysconfig dir
   ansible.builtin.file:
@@ -74,7 +84,6 @@
   with_items:
     - "{{ slurm_config_dir }}"
     - "{{ slurm_config_dir }}/shared"
-    - "{{ slurm_config_dir }}/shared/bin"
     - /var/log/slurm
     - /var/spool/slurmd
   tags:
@@ -105,13 +114,23 @@
     - prolog
     - epilog
 
-- name: Copy shared scripts
-  ansible.builtin.template:
-    src: "{{ item }}"
-    dest: "{{ slurm_config_dir }}/shared/bin/"
-    mode: "0755"
-  with_fileglob:
-    - templates/etc/slurm/shared/bin/*
+- name: Collect the shared prolog and epilog scripts
+  ansible.builtin.set_fact:
+    slurm_shared_scripts: "{{ query('ansible.builtin.fileglob', role_path ~ '/templates/etc/slurm/shared/bin/*') | sort }}"
+  tags:
+    - prolog
+    - epilog
+
+- name: Install the shared prolog and epilog scripts
+  ansible.builtin.include_role:
+    name: managed_dir
+    apply:
+      tags: [prolog, epilog]
+  vars:
+    managed_dir_path: "{{ slurm_config_dir }}/shared/bin"
+    managed_dir_sources: "{{ slurm_shared_scripts }}"
+    managed_dir_template: true
+    managed_dir_mode: "0755"
   tags:
     - prolog
     - epilog
