@@ -32,6 +32,14 @@ class ProgramTests(unittest.TestCase):
                 self.assertTrue(callable(module.main))
                 self.assertIn('if __name__ == "__main__":', Path(module.__file__).read_text())
 
+    def test_modules_are_imported_never_run_as_files(self):
+        # Commands reach a module through its wrapper or `python3 -m`; a shebang or an
+        # execute bit invites running the file itself, where package imports break.
+        for path in sorted(Path(clustertools.__file__).parent.glob("*.py")):
+            with self.subTest(module=path.name):
+                self.assertFalse(path.read_text().startswith("#!"))
+                self.assertFalse(path.stat().st_mode & 0o111, "execute bit set")
+
 
 if __name__ == "__main__":
     unittest.main()

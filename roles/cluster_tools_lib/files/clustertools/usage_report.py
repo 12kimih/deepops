@@ -16,8 +16,8 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from clustertools.files import write_atomic
-from clustertools.slurm import (
+from .files import write_atomic
+from .slurm import (
     Error,
     Failed,
     job_gpus,
@@ -29,7 +29,7 @@ from clustertools.slurm import (
     run,
     tres_str,
 )
-from clustertools.vocab import node_unavailable
+from .vocab import node_unavailable
 
 SLACK_API = "https://slack.com/api/"
 MAX_BLOCKS = 45  # Slack allows 50 blocks per message

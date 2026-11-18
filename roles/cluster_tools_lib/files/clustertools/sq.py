@@ -16,9 +16,9 @@ import sys
 import time
 from fnmatch import fnmatchcase
 
-from clustertools import render, slurm, vocab
-from clustertools.cli import Command, Opt, run_main
-from clustertools.render import Grid, width
+from . import render, slurm, vocab
+from .cli import Command, Opt, run_main
+from .render import Grid, width
 
 MIN_INTERVAL = 2  # slurmctld's per-user rate limit enforces; this only guards
 MAX_BACKOFF = 60  # the longest wait while Slurm fails or does not answer
