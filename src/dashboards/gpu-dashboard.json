@@ -1809,7 +1809,7 @@
       "type": "stat",
       "targets": [
         {
-          "expr": "node_hwmon_power_average_watt{instance=\"$node_instance\"} or sum(ipmi_dcmi_power_consumption_watts{host=\"$hostname\"})",
+          "expr": "sum(ipmi_dcmi_power_consumption_watts{host=\"$hostname\"}) or sum(node_hwmon_power_average_watt{instance=\"$node_instance\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A"
@@ -1903,7 +1903,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_hwmon_power_average_watt{instance=\"$node_instance\"} or sum(ipmi_dcmi_power_consumption_watts{host=\"$hostname\"})",
+          "expr": "sum(ipmi_dcmi_power_consumption_watts{host=\"$hostname\"}) or sum(node_hwmon_power_average_watt{instance=\"$node_instance\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Total",
