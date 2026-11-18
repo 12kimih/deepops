@@ -1,4 +1,9 @@
 ---
+- name: Make sure the package manager can work
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: apt_health
+
 - name: Install unattended-upgrades
   ansible.builtin.apt:
     name: unattended-upgrades

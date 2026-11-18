@@ -1,4 +1,7 @@
 ---
+- name: Make sure the package manager can work
+  ansible.builtin.include_tasks: apt_health.yml
+
 - name: Upgrade every package, the held-back stacks included (Ubuntu)
   ansible.builtin.apt:
     update_cache: true

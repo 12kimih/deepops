@@ -2,6 +2,11 @@
 - name: Remove the packages declared absent
   when: host_baseline_absent_packages | length > 0
   block:
+    - name: Make sure the package manager can work
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: apt_health
+
     # apt-get -s resolves the wildcards and the reverse dependencies without changing
     # anything. Only installed packages count, so a clean host reports nothing.
     - name: Work out what removing them would take with them (Debian)
