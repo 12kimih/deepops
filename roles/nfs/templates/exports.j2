@@ -9,5 +9,10 @@
 # /srv/nfs4/homes  gss/krb5i(rw,sync,no_subtree_check)
 #
 {% for export in nfs_exports %}
+{% if '(' in export.options %}
 {{ export.path }} {{ export.options }}
+{% else %}
+{{ export.path }} {% for client in (export.clients | default(nfs_export_clients)) %}{{ client }}({{ export.options }}){{ ' ' if not loop.last else '' }}{% endfor %}
+
+{% endif %}
 {% endfor %}

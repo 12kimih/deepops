@@ -15,7 +15,7 @@
     state: "directory"
     mode: "0755"
   with_items: "{{ nfs_exports }}"
-  notify: Restart nfs
+  notify: Reload NFS exports
   tags:
     - nfs
 
@@ -37,7 +37,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Restart nfs
+  notify: Reload NFS exports
   register: nfs_exports_copy
   tags:
     - nfs

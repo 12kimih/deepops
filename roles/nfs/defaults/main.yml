@@ -4,7 +4,15 @@ nfs_idmapd_domain: localdomain
 nfs_is_server: false
 nfs_is_client: false
 
+# Each export is {path, options, clients}: options are the exports(5) flags alone
+# ("rw,sync,root_squash,no_subtree_check") and clients defaults to nfs_export_clients,
+# so who may mount is set once. An options string that already holds "client(...)"
+# is written as is.
 nfs_exports: []
+
+# Hosts or networks every export is offered to unless an entry sets its own clients.
+# "*" is any host that can reach the server; set the cluster's subnet instead.
+nfs_export_clients: ["*"]
 nfs_mounts: []
 
 # Client mount options for any nfs_mounts entry that does not carry its own `options`,
