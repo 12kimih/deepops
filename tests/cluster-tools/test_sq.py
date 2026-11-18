@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 import scenario
+from clustertools import vocab
 from common import HERE, LIB, run_tool
 
 TMP = tempfile.TemporaryDirectory()
@@ -84,6 +85,23 @@ class TableTests(unittest.TestCase):
         text = out("-Q", "--ascii", "--no-resources", "--no-users")
         self.assertRegex(text, r"\(QOSMaxGRESPerJob\)")
         self.assertRegex(text, r"(?m)^> +90010 ")
+
+    def test_why_is_an_unbroken_tree(self):
+        """Every line of the WHY table is a row of it: family, code, leaf, rule or total.
+        A sentence between rows breaks the tree lines and the columns."""
+        for args in ([], ["-d"]):
+            with self.subTest(args=args):
+                text = out("-W", "--no-queue", "--no-resources", "--no-users", "--ascii", "--wide", *args)
+                body = text.split("\n")[3:-2]  # after heading, header and rule; before the blank
+                titles = "|".join(vocab.REASON_TITLE.values())
+                for line in body:
+                    self.assertRegex(line, rf"^. ((\|  |   )?(\|- |`- )|{titles}|total|-+$)", line)
+
+    def test_detail_goes_in_a_column(self):
+        why = out("-W", "-d", "--no-queue", "--no-resources", "--no-users", "--ascii", "--wide")
+        self.assertIn("DETAIL", why.split("\n")[1])
+        self.assertRegex(why, r"ReqNodeNotAvail .+ReqNodeNotAvail, May be reserved")
+        self.assertNotIn("higher-priority jobs are ahead", why)  # family help is --help's
 
     def test_why_groups_codes_into_families(self):
         text = out("-W", "--no-queue", "--no-resources", "--no-users")

@@ -389,7 +389,9 @@ class Grid:
     for a cell built of differently styled pieces (a figure and its bar); GUTTER is a
     one-column mark ("" for none, or a (text, style) pair); PREFIX tree glyphs before
     the first cell; TAIL a rendered string of tail_width columns after the last.
-    note(text): a faint line under the row before it, free to run to the window width.
+    rule() and divider() separate groups of rows. Free text has no place between rows:
+    it breaks the tree lines and the columns a reader follows. Explanations belong in a
+    column, a heading's tally, or the command's --help.
     Only single-piece cells are capped by maxw.
     """
 
@@ -403,9 +405,6 @@ class Grid:
 
     def row(self, cells, gutter="", prefix="", tail=""):
         self.rows.append(("row", list(cells), gutter, prefix, tail))
-
-    def note(self, text):
-        self.rows.append(("note", text))
 
     def rule(self):
         self.rows.append(("rule",))
@@ -465,9 +464,6 @@ class Grid:
                 g = t.g["rule"]
                 tail = g * max(0, total - width(r[1]) - 6)
                 out.append(f"  {t.paint('rule', g * 2)} {t.paint(r[2], r[1])} {t.paint('rule', tail)}")
-                continue
-            if r[0] == "note":
-                out.append("    " + t.paint("faint", trunc(r[1], max(t.cols, total) - 4, t.g["ell"])))
                 continue
             gutter, prefix, tail = r[2], r[3], r[4]
             if isinstance(gutter, tuple):
