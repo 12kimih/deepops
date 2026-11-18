@@ -10,18 +10,28 @@ groups:
         annotations:
           summary: "Power supply {{ $labels.name }} on {{ $labels.host }} reports a fault"
           description: "A failed or unplugged PSU leaves the server without redundancy."
+      # Power supplies and chassis intrusion have their own alerts below.
       - alert: BmcSensorCritical
-        expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!="Power Supply"} == 2'
+        expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!~"Power Supply|Physical Security"} == 2'
         for: 5m
         labels: {severity: critical}
         annotations:
           summary: "BMC sensor {{ $labels.name }} on {{ $labels.host }} is critical"
       - alert: BmcSensorWarning
-        expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!="Power Supply"} == 1'
+        expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!~"Power Supply|Physical Security"} == 1'
         for: 15m
         labels: {severity: warning}
         annotations:
           summary: "BMC sensor {{ $labels.name }} on {{ $labels.host }} is in warning"
+      # Intrusion is a latched security event, not a hardware failure: it stays set after
+      # the cover was opened until someone clears it in the BMC.
+      - alert: ChassisIntrusion
+        expr: ipmi_sensor_state{type="Physical Security"} > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Chassis intrusion reported by the BMC of {{ $labels.host }}"
+          description: "The cover was opened, or an old intrusion event was never cleared. Check the node, then clear the event in the BMC."
       # The chassis fault states are inverted: 1 = no fault, 0 = fault.
       - alert: ChassisFault
         expr: ipmi_chassis_cooling_fault_state == 0 or ipmi_chassis_drive_fault_state == 0
