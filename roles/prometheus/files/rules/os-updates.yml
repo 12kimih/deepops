@@ -1,0 +1,35 @@
+---
+# Operating system updates (roles/os_updates textfile metrics). Unattended upgrades
+# apply security fixes daily but hold back the kernel, libc, systemd, GPU and scheduler
+# stacks; those land with the rolling maintenance upgrade,
+# playbooks/utilities/apt-upgrade.yml.
+groups:
+  - name: os-updates
+    rules:
+      - alert: OsSecurityUpdatesPending
+        expr: |
+          os_updates_security_pending_since_seconds > 0
+          and time() - os_updates_security_pending_since_seconds > 14 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "Security updates have waited on {{ $labels.host }} for over 14 days"
+          description: >-
+            Held-back packages need the rolling upgrade:
+            `ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist={{ $labels.host }}`.
+      - alert: OsRebootPending
+        expr: |
+          time() - os_updates_reboot_required_since_seconds > 14 * 86400
+          and on (instance) os_updates_reboot_required == 1
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has waited over 14 days for a reboot an update asked for"
+          description: >-
+            The update is not in effect until then:
+            `ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist={{ $labels.host }}`
+            drains the node, reboots it and puts it back.
+      - alert: OsUpdatesMetricsStale
+        expr: time() - os_updates_metrics_timestamp_seconds > 3 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "Update status from {{ $labels.host }} is over 3 days old"
+          description: "The os-updates metrics timer stopped: `systemctl status os-updates-metrics.timer` on the host."
