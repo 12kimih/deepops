@@ -8,9 +8,12 @@ import os
 from pathlib import Path
 import unittest
 
-from ansible.parsing.dataloader import DataLoader
-from ansible.template import Templar
+import sys
+
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from ansible_yaml import render  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 ROLE = ROOT / "roles/slurm"
@@ -28,7 +31,7 @@ class Partition(unittest.TestCase):
         variables = {**DEFAULTS,
                      "groups": {"slurm-master": ["login01"], "slurm-node": ["node01"]},
                      "hostvars": {"node01": FACTS}, **overrides}
-        rendered = Templar(loader=DataLoader(), variables=variables).template(TEMPLATE)
+        rendered = render(TEMPLATE, variables)
         lines = [line for line in rendered.splitlines() if line.startswith("PartitionName=")]
         self.assertEqual(len(lines), 1, rendered)
         return dict(field.split("=", 1) for field in lines[0].split())
