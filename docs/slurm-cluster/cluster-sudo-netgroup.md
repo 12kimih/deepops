@@ -82,21 +82,20 @@ ansible-playbook -l <one-node> playbooks/generic/cluster-sudoers.yml
 
 **Break-glass.** The stock `%sudo ALL=(ALL:ALL) ALL` rule in `/etc/sudoers` is left
 untouched, so a **local** account that is in the local `sudo` group *and* has a local
-password entry keeps sudo even if NIS is unreachable. Confirm such an account exists on
-every node before relying on the netgroup rule. If NIS goes down and no local path
-exists, nobody can sudo anywhere.
+password entry keeps sudo even if NIS is unreachable. Set `cluster_sudoers_local_group:
+sudo` and `cluster_sudoers_local_members` (normally the netgroup's member list) and the
+role keeps that group to exactly the listed administrators who have a local account on
+each node; someone taken off the list loses it on the next run. Confirm at least one
+such account exists on every node: if NIS goes down and no local path exists, nobody
+can sudo anywhere.
 
 ## Unmanaged drop-ins
 
 `playbooks/bootstrap/bootstrap-sudo.yml` grants permanent passwordless root to
-**whoever runs it**, on every host it touches, as `/etc/sudoers.d/<their-name>`:
-
-```yaml
-content: "{{ ansible_env.SUDO_USER | default(ansible_env.USER) }} ALL=(ALL) NOPASSWD:ALL"
-```
-
-Such a file grants root independently of any group, so `getent group sudo` does not
-show it.
+**whoever runs it**, on every host it touches, as `/etc/sudoers.d/<their-name>`. Such a
+file grants root independently of any group, so `getent group sudo` does not show it.
+It is therefore run by hand on a new node only, never as part of the cluster deploy
+playbooks, and the grant is removed once the node is in the cluster.
 
 `cluster_sudoers` **reports** every drop-in it did not write, on every run. Set
 `cluster_sudoers_prune: true` to delete them, after reviewing the reported list.

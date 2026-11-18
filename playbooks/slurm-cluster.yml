@@ -7,9 +7,6 @@
 - name: Set up SSH keys if needed
   import_playbook: bootstrap/bootstrap-ssh.yml
 
-- name: Set up passwordless sudo if needed
-  import_playbook: bootstrap/bootstrap-sudo.yml
-
 - name: Disable cloud-init
   import_playbook: generic/disable-cloud-init.yml
   when: deepops_disable_cloud_init
@@ -85,6 +82,8 @@
 - name: Configure authentication (NIS server + client, Kerberos, autofs, home dirs)
   import_playbook: generic/authentication.yml
   when: slurm_install_authentication | default(true)
+  tags:
+    - people
 
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
@@ -200,6 +199,7 @@
   import_playbook: generic/cluster-sudoers.yml
   tags:
     - cluster-sudoers
+    - people
 
 - name: Publish the site's commands, shell defaults and login banner
   import_playbook: slurm-cluster/cluster-tools.yml

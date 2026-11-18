@@ -6,6 +6,10 @@
 # database is preserved). Clients bind to it via nis_domain/nis_server in group_vars/all.yml.
 #nis_make_server: true
 
+# Create and lock the people roster's accounts here (roles/people, run by
+# authentication.yml just before nis_server publishes them). See PEOPLE in all.yml.
+#people_manage_accounts: true
+
 # Which client networks may query this NIS server ("NETMASK NETWORK" lines).
 # Role default = localhost + RFC1918; TIGHTEN to your actual cluster subnet.
 #nis_server_securenets:
@@ -18,15 +22,14 @@
 # node-local group with a per-node GID silently grants a DIFFERENT group on the
 # compute node instead of failing. GIDs must be >= GID_MIN (/etc/login.defs, normally
 # 1000) or /var/yp/Makefile drops them from the map without warning -- the role
-# asserts this. Membership is declarative: deleting a name from `members` revokes that
-# person's access on the next run. Set nis_export_groups_exclusive: false to make the
-# list additive instead, for a group other tooling also writes to.
+# asserts this. Membership is declarative and comes from the people roster: taking
+# the role away there revokes that person's access on the next run. Set
+# nis_export_groups_exclusive: false to make the list additive instead, for a group
+# other tooling also writes to.
 #nis_export_groups:
 #  - name: "{{ cluster_docker_group_name }}"
 #    gid: "{{ cluster_docker_group_gid }}"
-#    members:
-#      - alice
-#      - bob
+#    members: "{{ people | people_with_role('docker') }}"
 
 # Netgroups published through the netgroup maps. Use these, not a group, for anything
 # that must give the same answer inside a Slurm job and over a direct SSH login:
@@ -34,11 +37,9 @@
 # nor the numeric-gid list Slurm ships into jobs. Administrator sudo is the main case
 # (see cluster_sudoers_netgroup in group_vars/all.yml).
 #
-# Membership here is DECLARATIVE -- /etc/netgroup is rendered whole, so deleting a
-# name from this list revokes their access on the next run. That is the difference
-# from nis_export_groups above, which manages only the groups it lists.
+# Membership here is DECLARATIVE -- /etc/netgroup is rendered whole, so taking the
+# admin role away in the people roster revokes their access on the next run. That is
+# the difference from nis_export_groups above, which manages only the groups it lists.
 #nis_export_netgroups:
 #  - name: "{{ cluster_sudoers_netgroup }}"
-#    users:
-#      - alice
-#      - bob
+#    users: "{{ cluster_admins }}"

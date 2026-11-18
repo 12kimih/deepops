@@ -113,31 +113,20 @@ deepops_set_hostname: true
 epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
 
 ################################################################################
-# USERS                                                                        #
+# PEOPLE                                                                       #
 ################################################################################
-# User management
-# Playbook: users, user-password
-# create user `nvidia` with password `deepops` on all nodes
-users:
-  - username: nvidia
-    name: nvidia
-    password: $6$IrxI27V4ogJFfgTV$RvNskQFvXZzE9AFsIokuXKwDAyqs9Jd03Trfi7DsHoCyllK79/zhAciZPENt4.2uRNMR0gE6.mRD/o9jP7WcZ.
-    groups: ['sudo']
-    uid: 10007
-    home: /home/nvidia
-
-
-################################################################################
-# SSH HARDENING                                                                #
-#   devsec.hardening role called from users playbook                           #
-################################################################################
-
-ssh_client_hardening: false
-ssh_server_password_login: true
-ssh_use_pam: true
-ssh_max_auth_retries: 10
-sftp_enabled: true
-sftp_chroot: false
+# Users and their access come from one roster, people.yml next to the inventory
+# (format and rules: config.example/people.yml). Every per-person list (the admin
+# netgroup and local sudo group, compute-node SSH, the Docker group, Slurm
+# associations, chat IDs) is derived from it here, in nis-master.yml and in
+# slurm-cluster.yml. Change people.yml, check it, then apply it everywhere:
+#   uv run scripts/deepops/people.py check
+#   uv run ansible-playbook -K playbooks/slurm-cluster.yml --tags people
+# people_check validates the roster wherever it is used.
+#people_roster: "{{ lookup('ansible.builtin.file', inventory_dir ~ '/people.yml') | from_yaml | people_check }}"
+#people: "{{ people_roster.people }}"
+# Administrators: sudo on every node and SSH to compute nodes without a job.
+#cluster_admins: "{{ people | people_with_role('admin') }}"
 
 ################################################################################
 # NVIDIA                                                                       #
@@ -262,19 +251,25 @@ docker_iptables_enabled: true
 # `sudo` group membership gives two different answers depending on how you arrived --
 # and `sudo` is gid 27, below GID_MIN, so NIS cannot make the number consistent
 # either. A netgroup is matched by NAME through innetgr(3), so neither problem
-# applies. Define the members with nis_export_netgroups in group_vars/nis-master.yml.
+# applies. The members are cluster_admins (PEOPLE above), published by
+# nis_export_netgroups in group_vars/nis-master.yml.
 #
 # BEFORE ENABLING: confirm a LOCAL account exists that is in the local sudo group and
 # has a local password, on every node. That is the break-glass path if NIS becomes
 # unreachable; the stock `%sudo` rule is deliberately left in place for it.
+# cluster_sudoers_local_group keeps that local group to exactly the administrators
+# who have a local account on each node.
 #cluster_sudoers_netgroup: cluster_admins
 # Require a password for sudo (the role default). Set true ONLY where a password
 # cannot be checked at all -- confirm by behaviour with `sudo -v` on a compute node as
 # the user, rather than by reasoning about which file holds the hash.
 #cluster_sudoers_nopasswd: false
+# Local sudo group and the administrators it is kept to.
+#cluster_sudoers_local_group: sudo
+#cluster_sudoers_local_members: "{{ cluster_admins }}"
 # Remove sudoers drop-ins this role did not write. They are always reported; set this
-# to actually delete them. bootstrap-sudo.yml leaves one behind for whoever ran it,
-# granting permanent passwordless root that no group audit would show.
+# to actually delete them. bootstrap-sudo.yml (run by hand on a new node only) leaves
+# one behind for whoever ran it, granting passwordless root that no group audit shows.
 #cluster_sudoers_prune: false
 # Files no package owns but that must still survive pruning (package-owned drop-ins
 # are protected automatically -- ownership is asked of dpkg/rpm). Defaults cover the

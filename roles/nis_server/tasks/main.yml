@@ -122,7 +122,7 @@
 
 # Build the NIS database once. ypinit -m reads the list of NIS servers from stdin;
 # empty stdin (immediate EOF) accepts THIS host as the sole master. Idempotent via
-# `creates`. Rebuild maps after passwd/group changes with `make -C /var/yp`.
+# `creates`. The last task of this role keeps the maps current afterwards.
 # https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypinit(8)
 - name: Initialize the NIS master database (first run only)
   ansible.builtin.command:
@@ -183,7 +183,6 @@
   loop: "{{ nis_export_groups }}"
   loop_control:
     label: "{{ item.name }} (gid {{ item.gid }})"
-  notify: Rebuild NIS maps
 
 - name: Add members to the NIS-exported cluster groups
   ansible.builtin.user:
@@ -193,7 +192,6 @@
   loop: "{{ nis_export_groups | subelements('members', {'skip_missing': true}) }}"
   loop_control:
     label: "{{ item.1 }} -> {{ item.0.name }}"
-  notify: Rebuild NIS maps
 
 # `ansible.builtin.user` can only add, so removals are computed from the group's
 # current membership and applied with gpasswd. Only the groups listed in
@@ -232,7 +230,6 @@
   loop_control:
     label: "{{ item.1 }} -> {{ item.0 }}"
   changed_when: true
-  notify: Rebuild NIS maps
 
 # --- Netgroups published through the netgroup maps -----------------------------
 # Unlike a group, a netgroup is matched by name, so it escapes both the GID_MIN export
@@ -247,4 +244,19 @@
     group: root
     mode: "0644"
   when: nis_export_netgroups | length > 0
-  notify: Rebuild NIS maps
+
+# The maps are generated from the source files (/etc/passwd, /etc/group, /etc/netgroup,
+# ...); a source edit reaches NIS clients only once they are rebuilt. Run on every
+# pass rather than as a handler, so a change made outside this role (useradd, passwd,
+# the people role) is published too. `make` rebuilds only the maps whose source
+# changed and prints "Updating <map>" for each.
+# https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypmake(8)
+- name: Bring the NIS maps up to date with their source files
+  ansible.builtin.command:
+    cmd: make
+    chdir: /var/yp
+  register: nis_make
+  changed_when: "'Updating' in nis_make.stdout"
+  # Needs the database ypinit builds, which molecule skips.
+  tags:
+    - molecule-notest

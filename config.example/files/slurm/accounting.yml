@@ -1,8 +1,13 @@
 ---
-# Slurm QoS, accounts and their members, declared in one place. Point
-# slurm_accounting_file at this file (group_vars/slurm-cluster.yml); slurm.yml with
-# --tags accounting makes the accounting database match it, and --check --diff shows
-# the sacctmgr commands first. Entities missing here are reported, not deleted.
+# Slurm QoS and accounts, declared in one place. Point slurm_accounting_file at this
+# file (group_vars/slurm-cluster.yml); slurm.yml with --tags accounting makes the
+# accounting database match it, and --check --diff shows the sacctmgr commands first.
+# Entities missing here are reported, not deleted.
+#
+# Who belongs to which account comes from people.yml (slurm_accounting_users, merged
+# in as this spec's users). Without a roster, list them here instead: an account's
+# members: [name, {user: name, qos: [...]}], and users.<name>.default_account for
+# someone in several accounts.
 #
 # This example: two teams under one parent, a preemptible default tier, a high tier
 # per team with its own GPU quota, and an urgent tier for administrators. Pair it with
@@ -43,20 +48,13 @@ accounts:
     parent: lab
     fairshare: parent
     qos: [high_a, low]
-    members: [alice, bob]
   team-b:
     parent: lab
     fairshare: parent
     qos: [high_b, low]
-    members: [carol]
   admin:
     fairshare: parent
     priority: 5000                 # first within any tier; team quotas still apply
     max_submit_jobs: 500
     qos: [low]
     default_qos: low
-    members:
-      - {user: alice, qos: [high_a, low, urgent]}
-
-users:
-  alice: {default_account: team-a}   # needed for a user in several accounts

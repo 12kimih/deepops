@@ -1,0 +1,55 @@
+---
+# People roster: the one place users and their access are recorded.
+#
+# Every per-person list elsewhere is derived from this file with the filters in
+# plugins/filter/people.py (see group_vars/all.yml, nis-master.yml and
+# slurm-cluster.yml): the sudo netgroup, the local sudo group, job-less SSH to compute
+# nodes, the Docker socket group, Slurm associations and chat IDs. Change access here,
+# never in those lists.
+#
+# Check before committing:  uv run scripts/deepops/people.py check
+#
+# Person keys: uid (required, unique, >= 1000), name, shell, accounts (Slurm account ->
+# association options such as qos), default_account (needed with several accounts),
+# roles, status (active, the default, or left), plus the attributes declared below.
+#
+# Someone who leaves becomes `status: left` with no roles or accounts. The entry
+# stays: it keeps the UID reserved and the deploy locks the account (files are kept).
+
+# Each role grants exactly one kind of access; requires names a role it implies.
+roles:
+  admin:
+    description: sudo on every node and SSH to compute nodes without a job
+  docker:
+    description: the Docker daemon socket, which is root-equivalent
+    requires: admin
+
+# Extra per-person keys this site uses, and which of them every active Slurm user
+# must set.
+attributes: [slack]
+member_keys: [slack]
+
+people:
+  alice:
+    uid: 1001
+    name: Alice Example
+    shell: /bin/bash
+    slack: U0ALICE01
+    accounts:
+      admin: {qos: [high_a, low, urgent]}
+      team-a: {}
+    default_account: team-a
+    roles: [admin, docker]
+  bob:
+    uid: 1002
+    slack: U0BOB0002
+    accounts:
+      team-a: {}
+  dave:
+    uid: 1004
+    slack: U0DAVE004
+    accounts:
+      team-b: {}
+  carol:
+    uid: 1003
+    status: left

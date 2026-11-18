@@ -48,6 +48,40 @@
     mode: "0440"
     validate: "visudo -cf %s"
 
+# Local files only: the group exists for when NIS cannot answer, so only accounts that
+# exist without NIS can use it.
+- name: Read the local accounts and the local sudo group
+  ansible.builtin.getent:
+    database: "{{ item }}"
+    service: files
+  loop: [passwd, group]
+  when: cluster_sudoers_local_group | length > 0
+
+# gpasswd -M sets the whole member list; the role computes it so the run is exact.
+# The change is announced first because a command shows nothing under --check.
+- name: Keep the local sudo group to the administrators with a local account
+  when: cluster_sudoers_local_group | length > 0
+  vars:
+    cluster_sudoers_local_have: >-
+      {{ (ansible_facts.getent_group[cluster_sudoers_local_group][2] | default('')).split(',')
+         | select | sort }}
+    cluster_sudoers_local_want: >-
+      {{ cluster_sudoers_local_members | select('in', ansible_facts.getent_passwd) | sort }}
+  block:
+    - name: Report the local sudo group change
+      ansible.builtin.debug:
+        msg: >-
+          {{ cluster_sudoers_local_group }} on {{ inventory_hostname }}:
+          {{ cluster_sudoers_local_have | join(',') or '(empty)' }} ->
+          {{ cluster_sudoers_local_want | join(',') or '(empty)' }}
+      when: cluster_sudoers_local_have != cluster_sudoers_local_want
+
+    - name: Set the local sudo group's members
+      ansible.builtin.command:
+        argv: [gpasswd, -M, "{{ cluster_sudoers_local_want | join(',') }}", "{{ cluster_sudoers_local_group }}"]
+      changed_when: true
+      when: cluster_sudoers_local_have != cluster_sudoers_local_want
+
 # A drop-in installed by a package belongs to that component and removing it would
 # break it, so ownership is asked of the package manager rather than guessed from a
 # hardcoded list of names. Prints "<yes|no> <basename>" per file.

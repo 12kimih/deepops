@@ -1,5 +1,4 @@
 root
-{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}
 {% for user in slurm_allow_ssh_user %}
 {{ user }}
 {% endfor %}

@@ -1,0 +1,14 @@
+---
+# Create and lock the people roster's accounts (roles/people) on the given hosts.
+#
+# With a directory service the accounts live on its master only, and authentication.yml
+# runs the role there (people_manage_accounts). Use this playbook where there is none,
+# so every node gets the same accounts with the same UIDs:
+#
+#   ansible-playbook -K playbooks/generic/people.yml
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - people
+  roles:
+    - role: people

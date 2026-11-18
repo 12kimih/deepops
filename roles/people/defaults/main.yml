@@ -1,0 +1,26 @@
+---
+# people -- create and lock the user accounts a people roster declares (see
+# config.example/people.yml and plugins/filter/people.py).
+#
+# Run it on the host whose passwd/group files are the account source: the NIS master,
+# whose maps the nis_server role then publishes. Every other access list (sudo, group
+# members, Slurm associations) is derived from the same roster elsewhere; this role
+# only owns the accounts themselves.
+#
+# Active people get an account with the roster's UID, a per-user group with GID = UID,
+# the name as the comment and the shell. Someone who has left is locked (password
+# locked, account expired, nologin shell), never deleted, so their files keep an owner
+# and the UID is not reused. Passwords are not managed: a new account starts locked
+# until an administrator sets one (`passwd <user>`).
+#
+# A UID that differs from the roster fails the run instead of being changed: usermod -u
+# would leave every file the account owns on shared storage with a stale owner.
+
+# login -> person, as validated by people_check. Opt-in: empty does nothing.
+people: {}
+
+# Shell for a person who does not set one.
+people_default_shell: /bin/bash
+
+# Where home directories live; a new account's home is created from /etc/skel.
+people_home_root: /home

@@ -17,8 +17,16 @@
 #
 # The stock `%sudo ALL=(ALL:ALL) ALL` rule in /etc/sudoers is left alone, so a LOCAL
 # account in the local sudo group with a local password keeps sudo when NIS is
-# unreachable.
+# unreachable. See cluster_sudoers_local_group below to keep that group in step.
 cluster_sudoers_netgroup: ""
+
+# The local group the stock `%sudo` rule grants, kept to exactly the administrators who
+# have a LOCAL account on this node: the path that still works when NIS is down (a
+# directory-only account cannot even log in then). Membership is exact, so someone
+# taken off cluster_sudoers_local_members loses it on the next run. Usually the same
+# list as the netgroup's members. Empty name = the group is left alone.
+cluster_sudoers_local_group: ""
+cluster_sudoers_local_members: []
 
 # false requires a password. Set true only where the password cannot be checked -- a node
 # with no reachable hash for directory users, where a password-requiring rule can
@@ -40,9 +48,9 @@ cluster_sudoers_file: cluster-admins
 cluster_sudoers_require_netgroup: true
 
 # Drop-ins in /etc/sudoers.d that this role did not write are always REPORTED. Set
-# prune to true to delete them as well. `playbooks/bootstrap/bootstrap-sudo.yml`
-# leaves one per host for whoever ran it, granting passwordless root outside any
-# group.
+# prune to true to delete them as well. `playbooks/bootstrap/bootstrap-sudo.yml` (run
+# by hand on a new node) leaves one per host for whoever ran it, granting
+# passwordless root outside any group.
 #
 # A drop-in owned by a PACKAGE is never reported or pruned. Ownership is asked of
 # dpkg/rpm rather than matched against a list of names, so components installed later

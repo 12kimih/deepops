@@ -58,6 +58,10 @@ slurm_groupname: slurm
 slurm_user_gid: 22078
 slurm_manage_user_gid: true
 
+# Users who may SSH to a compute node without a job there (pam_slurm_adopt with
+# slurm_restrict_node_access), besides root: /etc/localusers. The list is the whole
+# answer, the same whoever runs the play; the user Ansible connects as must be on it
+# (or be root), or the next run could not log in, and the play stops to say so.
 slurm_allow_ssh_user: []
 slurm_db_username: slurm
 slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
@@ -114,6 +118,10 @@ slurm_accounting_file: ""
 # they are reported, and a run with -e slurm_accounting_prune=true --check --diff shows
 # exactly what would go.
 slurm_accounting_prune: false
+# Per-user memberships merged into the file's `users`: login -> {accounts, default_account}.
+# Lets them come from a people roster (the people_accounting filter) instead of being
+# listed per account in the file.
+slurm_accounting_users: {}
 
 # job_submit plugin (empty = none; "lua" deploys the job_submit.lua you supply via
 # slurm_job_submit_template). All other slurm.conf tuning belongs in your own complete

@@ -10,6 +10,10 @@
       when: move_home_dirs_enable | default(false) | bool
     - role: kerberos_client
       when: kerberos_client_realm_name is defined
+    # Accounts from the people roster, on the host that is the account source (the NIS
+    # master). Before nis_server, whose last task publishes the changed files.
+    - role: people
+      when: people_manage_accounts | default(false) | bool
     # Run the NIS master setup before the clients so they have a server to bind to.
     - role: nis_server
       when: (nis_make_server | default(false) | bool) and (nis_domain is defined)

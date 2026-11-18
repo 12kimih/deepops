@@ -145,6 +145,27 @@ class Plan(unittest.TestCase):
         cmds, _ = acct.plan(s, *current())
         self.assertIn(("default", "alice", "a"), cmds)
 
+    def test_members_given_per_user_plan_the_same(self):
+        s = copy(SPEC)
+        del s["accounts"]["a"]["members"]
+        s["users"] = {"alice": {"accounts": {"a": None}}, "bob": {"accounts": {"a": {}}}}
+        self.assertEqual(plan(s), plan(SPEC))
+        s["users"]["bob"]["accounts"]["a"] = {"qos": ["low"]}
+        cmds, _ = plan(s)
+        self.assertEqual(cmds, [["modify", "user", "where", "name=bob", "account=a", "set", "qos=low"]])
+
+    def test_per_user_member_of_an_undeclared_account_is_refused(self):
+        s = copy(SPEC)
+        s["users"] = {"carol": {"accounts": {"nope": {}}}}
+        with self.assertRaisesRegex(ValueError, "account nope is not declared"):
+            plan(s)
+
+    def test_same_association_in_both_forms_is_refused(self):
+        s = copy(SPEC)
+        s["users"] = {"alice": {"accounts": {"a": {}}}}
+        with self.assertRaisesRegex(ValueError, "listed twice"):
+            plan(s)
+
     def test_undefined_qos_is_refused(self):
         s = copy(SPEC)
         s["accounts"]["a"]["qos"] = ["high_a", "low", "nope"]

@@ -15,5 +15,5 @@
 # Hardware and partitions
 #regex:\bmygpu\b==>a10
 
-# People: cluster accounts and chat member IDs
-#keys:group_vars/slurm-cluster.yml:slurm_usage_report_user_map==>user1
+# People: cluster accounts (people.yml, those who left included) and chat member IDs
+#keys:people.yml:people==>user1

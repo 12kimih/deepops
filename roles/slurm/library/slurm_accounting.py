@@ -20,8 +20,11 @@ options:
         C(parent). C(members) lists user names, or {user, fairshare, priority, qos,
         default_qos} for a member that differs from the account; a member without
         C(qos) or C(default_qos) inherits the account's, as Slurm does."
-      - "C(users): name -> {default_account}, needed only for a user who is a member
-        of several accounts."
+      - "C(users): name -> {accounts, default_account}. C(accounts) maps account ->
+        member options (as in an account's C(members)), so membership can be given per
+        user instead of per account, for example derived from a people roster. Both
+        forms may be mixed; listing a user in the same account twice is an error.
+        C(default_account) is needed for a user in several accounts."
     type: dict
     required: true
   cluster:
@@ -201,11 +204,20 @@ def inherited(account, key, accounts, current_accounts):
 
 
 def members(spec):
-    """(user, account, options) for every account's members; a member is a name or a dict."""
+    """(user, account, options) for every association the spec declares.
+
+    From an account's members (a name or a dict) and from users.<name>.accounts.
+    """
     for account, a in (spec.get("accounts") or {}).items():
         for m in (a or {}).get("members") or []:
             opts = {"user": m} if isinstance(m, str) else dict(m)
             yield opts.pop("user"), account, opts
+    declared = spec.get("accounts") or {}
+    for user, u in (spec.get("users") or {}).items():
+        for account, opts in ((u or {}).get("accounts") or {}).items():
+            if account not in declared:
+                raise ValueError(f"users.{user}.accounts: account {account} is not declared")
+            yield user, account, dict(opts or {})
 
 
 def desired_users(spec, accounts, current_accounts):

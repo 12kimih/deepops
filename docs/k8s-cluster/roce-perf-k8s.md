@@ -176,18 +176,19 @@ add switch PFC, ECN configuration
    > Note: If a user with the same username, uid, and password exists on each node, skip this step. It is critical for the user to exist with the same uid across all nodes.
 
    ```bash
-   # The default user is `nvidia` with password `deepops`
-   # Modify this user/password as desired
-   vi config/group_vars/all.yml
+   # Add the user (login name and a fixed UID) to the people roster;
+   # config.example/people.yml shows the format
+   vi config/people.yml
+   uv run scripts/deepops/people.py check
    ```
 
-   Run the users playbook to create/modify the user across all nodes.
+   Create the account with the same UID on every node, then give it a password with
+   `passwd` (or install an SSH key).
 
    ```bash
    # NOTE: If SSH requires a password, add: `-k`
-   # NOTE: If sudo on remote machine requires a password, add: `-K`
    # NOTE: If SSH user is different than current user, add: `-u <user>`
-   ansible-playbook -b playbooks/generic/users.yml
+   ansible-playbook -K playbooks/generic/people.yml
    ```
 
 7. Verify the configuration
