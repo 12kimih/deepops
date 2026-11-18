@@ -3,12 +3,14 @@
 {{- end }}
 
 {{ define "slack.title" -}}
-[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.host }} on {{ . }}{{ end }}
+{{ if eq .Status "resolved" }}:white_check_mark: Resolved{{ else if eq .CommonLabels.severity "critical" }}:red_circle: Critical{{ else }}:large_orange_circle: Warning{{ end -}}
+: {{ .CommonLabels.alertname }}{{ with .CommonLabels.host }} on {{ . }}{{ end }}
+{{- if gt (len .Alerts) 1 }} ({{ len .Alerts }}){{ end }}
 {{- end }}
 
 {{ define "slack.text" -}}
 {{ range .Alerts -}}
-*{{ .Labels.severity | toUpper }}* {{ .Annotations.summary }}
+{{ if eq .Status "resolved" }}~{{ .Annotations.summary }}~{{ else }}*{{ .Annotations.summary }}*{{ end }}
 {{ with .Annotations.description }}{{ . }}
-{{ end }}{{ end }}
+{{ end }}{{ end -}}
 {{- end }}
