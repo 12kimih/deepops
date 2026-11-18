@@ -226,7 +226,7 @@ def main() -> int:
         if len(opts.args) != 1:
             parser.error("message takes the message file")
         text = Path(opts.args[0]).read_text(errors="replace")
-        scan.text("commit message", "\n".join(l for l in text.splitlines() if not l.startswith("#")))
+        scan.text("commit message", "\n".join(line for line in text.splitlines() if not line.startswith("#")))
     elif opts.mode == "push":
         for revs in push_revs():
             scan.commits(revs)

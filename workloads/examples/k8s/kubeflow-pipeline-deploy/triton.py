@@ -67,7 +67,7 @@ def triton_pipeline(skip_examples):
 
     # Mount Volumes
     for name, container_op in op_dict.items():
-        if name == 'triton_service' or type(container_op) == triton_ops.TritonVolume:
+        if name == 'triton_service' or isinstance(container_op, triton_ops.TritonVolume):
             continue
 
         container_op.add_volume(k8s_client.V1Volume(persistent_volume_claim=k8s_client.V1PersistentVolumeClaimVolumeSource(

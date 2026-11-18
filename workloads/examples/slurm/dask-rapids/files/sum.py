@@ -1,13 +1,11 @@
 # pylint: disable-all
-import os, sys, argparse, time
+import sys
+import argparse
+import time
 import cupy
-import dask
 import dask.array as da
 from dask_cuda import LocalCUDACluster
-from dask.distributed import Client, LocalCluster, wait
-from dask.delayed import delayed
-from dask.diagnostics import ProgressBar
-from multiprocessing.pool import ThreadPool
+from dask.distributed import Client, LocalCluster
 import socket
 
 def create_data(rs, xdim, ydim, x_chunk_size, y_chunk_size):
@@ -44,19 +42,19 @@ def main():
 
     if args.use_distributed_dask:
         print('Using Distributed Dask')
-        client = Client(sched_uri)
+        _client = Client(sched_uri)   # held: the default client for the run
     elif args.use_gpus_only:
         print('Using GPUs and Local Dask')
         cluster = LocalCUDACluster(ip=sched_ip, n_workers=args.n_gpus)
-        client = Client(cluster)
+        _client = Client(cluster)   # held: the default client for the run
     elif args.use_cpus_only:
         print('Using CPUs and Local Dask')
         cluster = LocalCluster(ip=sched_ip, n_workers=args.n_cpu_sockets, threads_per_worker=args.n_cpu_cores_per_socket)
-        client = Client(cluster)
+        _client = Client(cluster)   # held: the default client for the run
     else:
         print("Exiting...")
         sys.exit(-1)
-        
+
     start = time.time()
     if args.use_gpus_only:
         print('Allocating and initializing arrays using GPU memory with CuPY')

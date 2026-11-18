@@ -461,7 +461,7 @@ def pending_hints(kube, namespace, pod):
                        timeout=60)
     text += "\n" + (out2.lower() if rc2 == 0 and isinstance(out2, str) else "")
     labels = sorted(w.replace(" ", "-") for w in PENDING_HINT_WORDS if w in text)
-    return {"event_bytes": len(text.strip()), "lines": len([l for l in text.splitlines() if l.strip()]),
+    return {"event_bytes": len(text.strip()), "lines": len([line for line in text.splitlines() if line.strip()]),
             "labels": labels}
 
 

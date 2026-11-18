@@ -141,11 +141,13 @@ def space_jinja(expr):
         if quote:
             out.append(c)
             if c == "\\" and i + 1 < len(expr):
-                out.append(expr[i + 1]); i += 1
+                out.append(expr[i + 1])
+                i += 1
             elif c == quote:
                 quote = None
         elif c in "'\"":
-            quote = c; out.append(c)
+            quote = c
+            out.append(c)
         elif c == "|" and not (i + 1 < len(expr) and expr[i + 1] == "|") and not (out and out[-1] == "|"):
             while out and out[-1] == " ":
                 out.pop()
@@ -239,8 +241,8 @@ TEMPLATES = re.compile(r"(^|/)templates/")
 def is_ansible(path, lines):
     if re.search(r"(^|/)(tasks|handlers|playbooks)/", path) or re.search(r"(^|/)molecule/.*/(converge|prepare|verify|side_effect)\.ya?ml$", path):
         return True
-    body = [l for l in lines if l.strip() and not l.lstrip().startswith("#") and l != "---"]
-    return bool(body) and body[0].startswith("- ") and any(re.match(r"^\s*-?\s*hosts:", l) for l in body)
+    body = [line for line in lines if line.strip() and not line.lstrip().startswith("#") and line != "---"]
+    return bool(body) and body[0].startswith("- ") and any(re.match(r"^\s*-?\s*hosts:", line) for line in body)
 
 
 def fix_conditions(lines):
@@ -292,8 +294,8 @@ def double_quote(line):
     return re.sub(r"^(\s*)((?:- )?(?:[\w.\-]+:\s+)?)'([^']*)'(\s*(?:#.*)?)$", swap, line)
 
 
-FACT_NAMES = [l.strip() for l in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ansible-fact-names.txt"))
-              if l.strip() and not l.startswith("#")]
+FACT_NAMES = [name.strip() for name in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ansible-fact-names.txt"))
+              if name.strip() and not name.startswith("#")]
 _FACT = "|".join(sorted(map(re.escape, FACT_NAMES), key=len, reverse=True))
 # Facts that ansible_facts stores under their prefixed name (custom facts.d facts).
 PREFIXED_FACTS = ["local"]
@@ -334,13 +336,13 @@ def is_template(path):
 def normalize(text, path):
     if is_template(path):
         return fix_facts(text)
-    lines = [l.rstrip() for l in text.split("\n")]
+    lines = [line.rstrip() for line in text.split("\n")]
     while lines and not lines[-1]:
         lines.pop()
     lines.append("")
     while lines and not lines[0].strip():
         lines.pop(0)
-    head = next((l for l in lines if l.strip() and not l.lstrip().startswith("#")), "---")
+    head = next((line for line in lines if line.strip() and not line.lstrip().startswith("#")), "---")
     if head != "---" and not (lines and lines[0].startswith("#!")):
         lines.insert(0, "---")
     ansible = is_ansible(path, lines)

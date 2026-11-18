@@ -10,7 +10,7 @@
 ### TODO
 #### Print total summary of experiment (total number of jobs, jobs per node, success, etc)
 #### When a slow/bad job is found, write it out with the nodelist (compressed?)
-#### 
+####
 
 import sys
 import os
@@ -41,7 +41,7 @@ def format_hostlist(hostlist):
             s=hs
         else:
             s=s+","+hs
-  
+
     return s
 
 def validate_case(label,d):
@@ -68,7 +68,7 @@ print("")
 print("Verifying HPL Burnin Results")
 print("")
 
-if len(sys.argv) <= 1: 
+if len(sys.argv) <= 1:
         print("Error: no command line arguments found.")
         print_help()
 
@@ -108,46 +108,47 @@ for fn in glob.glob(expdir + "/*.out", recursive=False):
         file=open(fn,'r')
 
         tc[fn]=0
-         
-        for l in file.readlines():
+
+        for line in file.readlines():
                 # Sometimes there may be a 2nd entry, only pull the last
                 explist[fn]=1
 
 
-                if re.search('WR',l):
+                if re.search('WR',line):
                         # Check if this is regular HPL or HPL-AI
                         off=0
-                        if (l.split()[0] == "HPL_AI"): off=1
-                        cfg[fn]=l.split()[0+off]
-                        n[fn]=int(l.split()[1+off])
-                        nb[fn]=int(l.split()[2+off])
-                        p[fn]=int(l.split()[3+off])
-                        q[fn]=int(l.split()[4+off])
-                        time[fn]=float(l.split()[5+off])
+                        if (line.split()[0] == "HPL_AI"):
+                            off=1
+                        cfg[fn]=line.split()[0+off]
+                        n[fn]=int(line.split()[1+off])
+                        nb[fn]=int(line.split()[2+off])
+                        p[fn]=int(line.split()[3+off])
+                        q[fn]=int(line.split()[4+off])
+                        time[fn]=float(line.split()[5+off])
                         if time[fn] < besttime:
                                 besttime=time[fn]
-               
-                        if (l.split()[0] == "HPL_AI"): 
-                            gflops[fn]=float(l.split()[10])
+
+                        if (line.split()[0] == "HPL_AI"):
+                            gflops[fn]=float(line.split()[10])
                         else:
-                            gflops[fn]=float(l.split()[6])
+                            gflops[fn]=float(line.split()[6])
                         if gflops[fn] < minperf:
                                 minperf=gflops[fn]
                         if gflops[fn] > maxperf:
                                 maxperf=gflops[fn]
 
-                #if re.search('^\|\|Ax-b\|\|\/eps',l):
-                if re.search('\|\|Ax-b\|\|\_oo/\(eps',l):
-                        if l.split()[3]=='PASSED':
+                #if re.search('^\|\|Ax-b\|\|\/eps',line):
+                if re.search(r'\|\|Ax-b\|\|\_oo/\(eps',line):
+                        if line.split()[3]=='PASSED':
                                 status[fn]='passed'
-                        elif l.split()[3]=='FAILED':
+                        elif line.split()[3]=='FAILED':
                                 status[fn]='failed'
                         else:
-                                status[fn]='unknown'    
+                                status[fn]='unknown'
 
-                if re.search('^HOSTLIST:',l):
-                        hl[fn]=l.split()[1]
-                if re.search('End of Tests',l):
+                if re.search('^HOSTLIST:',line):
+                        hl[fn]=line.split()[1]
+                if re.search('End of Tests',line):
                         tc[fn]=1
 
         file.close()
@@ -159,7 +160,7 @@ if fncnt == 0:
     exit(1)
 
 e_cfg=validate_case("run config",cfg)
-if e_cfg == "": 
+if e_cfg == "":
     print("ERROR: Of the {} files read, the run config tag was not found.  All results failed to run, please check each run manually.".format(fncnt))
     print("")
     exit(1)
@@ -194,13 +195,18 @@ for key in explist:
         isunk=0
         isdnc=0
         for h in hl[key].split(','):
-                if h not in t_total: t_total[h]=0
+                if h not in t_total:
+                    t_total[h]=0
                 t_total[h]+=1
 
-                if h not in t_slow: t_slow[h]=0
-                if h not in t_failed: t_failed[h]=0
-                if h not in t_unk: t_unk[h]=0
-                if h not in t_dnc: t_dnc[h]=0
+                if h not in t_slow:
+                    t_slow[h]=0
+                if h not in t_failed:
+                    t_failed[h]=0
+                if h not in t_unk:
+                    t_unk[h]=0
+                if h not in t_dnc:
+                    t_dnc[h]=0
                 if tc[key] == 0:
                         t_dnc[h]+=1
                         dnccnt+=1
@@ -243,7 +249,7 @@ if failedcnt > 0:
 if unkcnt > 0:
         print("Nodes on which Jobs ended in Unknown State:")
         print_table(t_unk,t_total)
-        stat=1 
+        stat=1
 
 if dnccnt > 0:
         print("Nodes on which Jobs did not complete:")
@@ -277,4 +283,3 @@ if stat!=0:
     print("Issues were found.  Refer to the README.md file for instructions on how to interpret the results.")
 
 print("")
-

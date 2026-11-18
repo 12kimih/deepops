@@ -39,7 +39,7 @@ if argv[1] == 'update_order':
                         obj
                     ]
 
-        except KeyError as e:
+        except KeyError:
             pass
 
     # Iterate through FW Versioning, write Update Condition to updateItems
@@ -48,19 +48,19 @@ if argv[1] == 'update_order':
             if not component['IsUpToDate']:
                 try:
                     updateItems[component['ID']].append({'NeedsUpdate': True})
-                except:
+                except Exception:
                     try:
                         updateItems[component['Model']].append({'NeedsUpdate': True})
-                    except:
+                    except Exception:
                         continue
 
             if component['IsUpToDate']:
                 try:
                     updateItems[component['ID']].append({'NeedsUpdate': False})
-                except:
+                except Exception:
                     try:
                         updateItems[component['Model']].append({'NeedsUpdate': False})
-                    except:
+                    except Exception:
                         continue
 
     for i in updateItems:
@@ -151,7 +151,7 @@ if argv[1] == 'parse_update_json':
                 fw_update_json['State'] = 'Done'
                 fw_update_json['Message'] = lineJson['Message']
 
-        except Exception as e:
+        except Exception:
             continue
 
     print(return_json(fw_update_json))
