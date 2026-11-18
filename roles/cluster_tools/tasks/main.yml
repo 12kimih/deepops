@@ -171,13 +171,23 @@
         state: absent
       when: (cluster_tools_motd_title | trim | length) == 0
 
-- name: Check for Ubuntu motd-news
+# The units decide whether motd-news runs; /etc/default/motd-news only feeds the banner
+# fragment and is missing on some installs that still carry the units. So the units are
+# looked for themselves, and the file is set only where it exists.
+- name: Check for Ubuntu motd-news units
+  ansible.builtin.command: systemctl list-unit-files --no-legend motd-news.timer motd-news.service
+  register: cluster_tools_motd_news_units
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Check for the motd-news banner setting
   ansible.builtin.stat:
     path: /etc/default/motd-news
   register: cluster_tools_motd_news_stat
 
 - name: Configure Ubuntu motd-news
-  when: cluster_tools_motd_news_stat.stat.exists
+  when: cluster_tools_motd_news_units.stdout | trim | length > 0 or cluster_tools_motd_news_stat.stat.exists
   vars:
     _cluster_tools_motd_news_units: [motd-news.timer, motd-news.service]
   block:
@@ -186,6 +196,7 @@
         path: /etc/default/motd-news
         regexp: "^ENABLED="
         line: "ENABLED={{ 1 if cluster_tools_motd_news else 0 }}"
+      when: cluster_tools_motd_news_stat.stat.exists
 
     - name: Stop and mask the motd-news units
       ansible.builtin.systemd_service:
