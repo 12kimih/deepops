@@ -12,7 +12,17 @@ RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
 ExecStartPre=/usr/bin/docker pull {{ node_exporter_container }}
-ExecStart=/usr/bin/docker run --rm --network host --cpus={{ node_exporter_max_cpu }} --pid=host --name %n -v /:/host:ro,rslave -v {{ node_exporter_prom_dir }}:/run/prometheus {{ node_exporter_container }} --path.rootfs=/host --collector.textfile.directory="{{ node_exporter_prom_dir }}"
+ExecStart=/usr/bin/docker run --rm --network host --pid=host --cpus={{ node_exporter_max_cpu }} --name %n \
+  -v /:/host:ro,rslave \
+  -v {{ node_exporter_prom_dir }}:{{ node_exporter_prom_dir }}:ro \
+{% if 'systemd' in node_exporter_extra_collectors %}
+  -v /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro \
+{% endif %}
+  {{ node_exporter_container }} \
+  --path.rootfs=/host \
+  --web.listen-address=:{{ node_exporter_port }} \
+  --collector.textfile.directory={{ node_exporter_prom_dir }}{% for c in node_exporter_extra_collectors %} \
+  --collector.{{ c }}{% endfor %}
 
 [Install]
 WantedBy=multi-user.target

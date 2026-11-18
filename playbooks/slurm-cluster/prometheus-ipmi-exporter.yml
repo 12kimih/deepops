@@ -1,0 +1,10 @@
+---
+- name: Install docker
+  import_playbook: ../container/docker.yml
+
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tasks:
+    - name: Configure IPMI exporter
+      ansible.builtin.include_role:
+        name: prometheus-ipmi-exporter

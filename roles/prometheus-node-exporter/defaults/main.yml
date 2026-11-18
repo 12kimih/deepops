@@ -1,8 +1,11 @@
 ---
 node_exporter_container: "quay.io/prometheus/node-exporter:v1.12.1"
-# Port node-exporter listens on. The container keeps its own default (9100, host network);
-# this only sets the scrape target.
+# Port node-exporter listens on and is scraped at.
 node_exporter_port: 9100
+# Hosts listed as scrape targets; the playbook installs the exporter on all hosts.
+node_exporter_host_group: slurm-cluster
+# Collectors beyond the defaults. systemd feeds the failed-unit alert.
+node_exporter_extra_collectors: [systemd]
 node_exporter_prom_dir: "/run/prometheus"
 node_exporter_svc_name: "docker.node-exporter.service"
 node_exporter_state: started
