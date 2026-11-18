@@ -1,0 +1,29 @@
+---
+- name: Remove the packages declared absent
+  when: host_baseline_absent_packages | length > 0
+  block:
+    # apt-get -s resolves the wildcards and the reverse dependencies without changing
+    # anything. Only installed packages count, so a clean host reports nothing.
+    - name: Work out what removing them would take with them (Debian)
+      ansible.builtin.command:
+        argv: "{{ ['apt-get', '-s', '-q', 'purge'] + host_baseline_absent_packages }}"
+      register: host_baseline_plan
+      changed_when: false
+      failed_when: host_baseline_plan.rc != 0 and 'Unable to locate package' not in host_baseline_plan.stderr
+      check_mode: false  # read-only; --check needs the result
+      when: ansible_facts.os_family == 'Debian'
+
+    - name: Report the packages that will be removed
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} will lose:
+          {{ host_baseline_plan.stdout | regex_findall('(?m)^Purg (\S+)') | join(', ') }}
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - host_baseline_plan.stdout is search('(?m)^Purg ')
+
+    - name: Remove the packages declared absent
+      ansible.builtin.package:
+        name: "{{ host_baseline_absent_packages }}"
+        state: absent
+        purge: "{{ true if ansible_facts.os_family == 'Debian' else omit }}"

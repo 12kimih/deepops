@@ -79,6 +79,15 @@
     label: "{{ item.line }}"
   notify: "Restart nis"
 
+# Only the NIS master serves maps. A server left on a client (ypserv brings ypxfrd and
+# yppasswdd) answers map transfers and password changes for the domain from a copy
+# nobody keeps current; one was found on a compute node.
+- name: Remove the NIS server from hosts that are not the NIS master
+  ansible.builtin.package:
+    name: ypserv
+    state: absent
+  when: not (nis_make_server | default(false) | bool)
+
 - name: Remove name-service caches that would delay directory changes
   ansible.builtin.package:
     name: "{{ nis_client_remove_caches }}"

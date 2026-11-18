@@ -171,6 +171,9 @@ slurm_enable_nfs_server: true
 slurm_enable_nfs_client_nodes: true
 
 # NFS servers and clients are the [slurm-nfs] and [slurm-nfs-client] inventory groups.
+# Any other host the nfs role runs on has its NFS server stopped and removed, so a
+# server set up by hand once does not keep exporting.
+#nfs_servers: "{{ groups['slurm-nfs'] }}"
 
 # Flags for sharing slurm.conf among compute and control nodes
 slurm_conf_symlink: false

@@ -50,6 +50,26 @@
   tags:
     - people
 
+# create_home sets the mode only on a home it creates, so existing homes are set here.
+- name: Set each active person's home directory mode
+  ansible.builtin.file:
+    path: "{{ people_home_root }}/{{ item.key }}"
+    state: directory
+    mode: "{{ people_home_mode }}"
+  loop: "{{ people | people_active | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - people
+
+- name: Make useradd create homes with the same mode
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^#?\s*HOME_MODE\s'
+    line: "HOME_MODE\t{{ people_home_mode }}"
+  tags:
+    - people
+
 # Expiry blocks every login PAM checks, SSH keys included; a locked password alone
 # would not. Only accounts that exist are locked; a left person is never created.
 - name: Lock the accounts of people who have left

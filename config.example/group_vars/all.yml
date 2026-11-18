@@ -42,6 +42,10 @@
 ################################################################################
 # NETWORK                                                                      #
 ################################################################################
+# The cluster's internal network (CIDR): the one place it is written. NFS exports are
+# offered to it only (nfs_export_clients, STORAGE below).
+#cluster_subnet: "10.0.0.0/16"
+
 # DNS config
 # Playbook: dns-config
 #dns_config_servers: [8.8.8.8]
@@ -86,11 +90,14 @@ deepops_set_hostname: true
 
 
 ################################################################################
-# NETWORK                                                                      #
+# HOST BASELINE                                                                #
 ################################################################################
-# The cluster's internal network (CIDR): the one place it is written. NFS exports are
-# offered to it only (nfs_export_clients below).
-#cluster_subnet: "10.0.0.0/16"
+# Packages that must not be on a host (roles/host_baseline, playbooks/generic/
+# host-baseline.yml): services once installed by hand and no longer used, which nothing
+# else would ever remove. A --check run lists what apt would remove with them.
+# The controller keeps its database (slurmdbd) and web server (Open OnDemand).
+#host_baseline_absent_packages: "{{ ['avahi-daemon', 'iperf3', 'samba', 'mysql-server*']
+#  + ([] if inventory_hostname in groups['slurm-master'] | default([]) else ['apache2*']) }}"
 
 ################################################################################
 # STORAGE                                                                      #
