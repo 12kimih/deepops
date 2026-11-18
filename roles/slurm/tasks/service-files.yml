@@ -10,6 +10,9 @@
     - slurmdbd.service
   when: is_controller
   failed_when: false
+  notify:
+    - Restart slurmdbd
+    - Restart slurmctld
 
 - name: Copy compute service files
   ansible.builtin.copy:
@@ -21,13 +24,13 @@
     - slurmd.service
   when: is_compute
   failed_when: false
+  notify: Restart slurmd
 
 # slurmd inherits systemd's minimal PATH, which does not include a custom
 # slurm_install_prefix. Enroot's slurm-pmi hook (installed by the pyxis role)
 # and any other slurmd child that calls scontrol/squeue then fail with
 # "Command not found: scontrol" and every Pyxis container refuses to start.
-# The unconditional "start slurmd" task in compute.yml restarts the unit with
-# daemon-reload after this file, so the drop-in is active on every convergence.
+# A change restarts slurmd (daemon_reload in the handler) so the drop-in takes effect.
 - name: Create slurmd systemd override directory
   ansible.builtin.file:
     path: /etc/systemd/system/slurmd.service.d
@@ -47,3 +50,4 @@
       [Service]
       Environment="PATH={{ slurm_install_prefix }}/bin:{{ slurm_install_prefix }}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   when: is_compute
+  notify: Restart slurmd
