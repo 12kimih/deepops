@@ -5,6 +5,9 @@
    registered result is empty and every task that reads it fails or decides wrongly.
 2. A template task whose template renders a secret must set diff: false, or a
    --diff preview prints the secret.
+3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
+   ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
+   the vars/varnames lookups for a computed name.
 """
 
 import re
@@ -97,6 +100,16 @@ class TaskRules(unittest.TestCase):
                 if src and SECRET.search(src.read_text()):
                     offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}")
         self.assertEqual(offenders, [], "add diff: false to these template tasks")
+
+    def test_no_internal_vars_dictionary(self):
+        pattern = re.compile(r"(?<![\w.])(?:in\s+vars\b|vars\[)")
+        offenders = [
+            f"{path.relative_to(ROOT)}:{number}"
+            for path in list(task_files()) + sorted(ROOT.glob("roles/*/templates/**/*.j2"))
+            for number, line in enumerate(path.read_text().splitlines(), 1)
+            if not line.lstrip().startswith("#") and pattern.search(line)
+        ]
+        self.assertEqual(offenders, [], "the internal vars dictionary is deprecated")
 
 
 if __name__ == "__main__":

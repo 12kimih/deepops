@@ -1,11 +1,11 @@
 ---
-- name: Assert that variables are defined
-  ansible.builtin.fail:
-    msg: "Variable '{{ item }}' is not defined"
-  when: item not in vars
-  with_items:
-    - nis_domain
-    - nis_server
+- name: Assert that the required variables are defined
+  ansible.builtin.assert:
+    that:
+      - nis_domain is defined
+      - nis_server is defined
+    fail_msg: "Set nis_domain and nis_server in config/group_vars."
+    quiet: true
 
 - name: Prevent daemons from starting when installing packages, particularly ypbind
   ansible.builtin.copy:

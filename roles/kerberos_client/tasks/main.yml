@@ -1,10 +1,10 @@
 ---
-- name: Assert that variables are defined
-  ansible.builtin.fail:
-    msg: "Variable '{{ item }}' is not defined"
-  when: item not in vars
-  with_items:
-    - kerberos_client_realm_name
+- name: Assert that the required variables are defined
+  ansible.builtin.assert:
+    that:
+      - kerberos_client_realm_name is defined
+    fail_msg: "Set kerberos_client_realm_name in config/group_vars."
+    quiet: true
 
 - name: Install the kerberos packages (RedHat)
   ansible.builtin.dnf:
