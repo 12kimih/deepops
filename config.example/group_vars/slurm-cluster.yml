@@ -326,6 +326,11 @@ slurm_cluster_configure_gpu_power_limit: true
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
 #  - { name: dashboard,    text: "http://your-cluster.example.edu:3000" }
 
+# Ubuntu's motd-news fetches advertising from motd.ubuntu.com into the login banner. On
+# hosts without internet access each run fails and stays a failed systemd unit, so
+# switch it off there.
+#cluster_tools_motd_news: false
+
 # Directories copied onto a shared filesystem for users to read and copy from. Set
 # them on the one host that exports the share -- see config/host_vars/<head node>.
 #cluster_tools_shared_dirs:

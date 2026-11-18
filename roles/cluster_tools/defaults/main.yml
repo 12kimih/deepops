@@ -57,6 +57,14 @@ cluster_tools_shared_dirs: []
 cluster_tools_motd_dir: /etc/update-motd.d
 cluster_tools_motd_file: 20-cluster-tools
 
+# Ubuntu's motd-news: a timer that fetches advertising from motd.ubuntu.com for the
+# login banner. true is Ubuntu's own default and changes nothing on a stock host. false
+# stops, disables and masks the timer and its service, sets ENABLED=0 for the banner
+# fragment, and clears a failed run, which on a host without internet access is
+# otherwise a permanently failed unit that alerts on systemd failures keep reporting.
+# Hosts without motd-news are skipped.
+cluster_tools_motd_news: true
+
 # Per-user resource limits, written as a drop-in on systemd's user-.slice so they apply
 # to every login session. Set it on the LOGIN nodes only: a shell that a user opens on
 # a compute node is normally adopted into their job's cgroup, so a limit here would
