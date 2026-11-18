@@ -94,6 +94,8 @@ cluster_tools_motd_news: true
 #
 # Keys are [Slice] directives (CPUQuota, MemoryMax, TasksMax, ...); see systemd.resource-control(5).
 # Emptying it removes the drop-in, so a node dropped from the config is cleaned up.
+# Setting it also adds pam_systemd to cron's PAM stack (Debian), so cron jobs run in
+# their owner's slice under the same limits instead of in cron.service.
 cluster_tools_user_slice_limits: {}
 cluster_tools_user_slice_dir: /etc/systemd/system/user-.slice.d
 cluster_tools_user_slice_file: 50-limits.conf
