@@ -36,8 +36,7 @@ jobs:
       - name: install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install ansible==10.7.0 passlib
-          python3 -m pip install molecule molecule-plugins[docker] docker
+          python3 -m pip install -r "${{ github.repository }}/requirements-dev.txt"
       - name: cache galaxy roles and collections
         uses: actions/cache@v4
         with:

@@ -11,15 +11,9 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR="${SCRIPT_DIR}/.."
 
-# Configuration
-ANSIBLE_VERSION="${ANSIBLE_VERSION:-10.7.0}"     # Ansible version to install
-ANSIBLE_TOO_NEW="${ANSIBLE_TOO_NEW:-11.0.1}"    # Ansible version too new
-ANSIBLE_LINT_VERSION="${ANSIBLE_LINT_VERSION:-26.1.1}"
+# Configuration (Python package versions live in requirements.txt / requirements-dev.txt)
 CONFIG_DIR="${CONFIG_DIR:-${ROOT_DIR}/config}"            # Default configuration directory location
 DEEPOPS_TAG="${1:-master}"                      # DeepOps branch to set up
-JINJA2_VERSION="${JINJA2_VERSION:-3.1.5}"      # Jinja2 required version
-JMESPATH_VERSION="${JMESPATH_VERSION:-1.1.0}"    # jmespath version (matches kubespray requirements)
-MARKUPSAFE_VERSION="${MARKUPSAFE_VERSION:-3.0.2}"  # MarkupSafe version
 PIP="${PIP:-pip3}"                              # Pip binary to use
 PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"    # Python3 path
 VENV_DIR="${VENV_DIR:-/opt/deepops/env}"        # Path to python virtual environment to create
@@ -93,35 +87,6 @@ if command -v virtualenv &> /dev/null ; then
     virtualenv -q --python="${PYTHON_BIN}" "${VENV_DIR}"
     . "${VENV_DIR}/bin/activate"
     as_user "${PIP} install -q --upgrade pip"
-    as_user "${PIP} install -q packaging"
-
-    # Check for any installed ansible pip package
-    if pip show ansible 2>&1 >/dev/null; then
-        current_version=$(pip show ansible | grep Version | awk '{print $2}')
-	echo "Current version of Ansible is ${current_version}"
-	if "${VENV_DIR}/bin/python3" -c "from packaging.version import Version; print(Version('$current_version') >= Version('$ANSIBLE_TOO_NEW'))" | grep True 2>&1 >/dev/null; then
-            echo "Ansible version ${current_version} too new for DeepOps"
-	    echo "Please uninstall any ansible, ansible-base, and ansible-core packages and re-run this script"
-	    exit 1
-	fi
-	if "${VENV_DIR}/bin/python3" -c "from packaging.version import Version; print(Version('$current_version') < Version('$ANSIBLE_VERSION'))" | grep True 2>&1 >/dev/null; then
-	    echo "Ansible will be upgraded from ${current_version} to ${ANSIBLE_VERSION}"
-	fi
-    fi
-
-    as_user "${PIP} install -q --upgrade \
-        ansible==${ANSIBLE_VERSION} \
-	ansible-lint==${ANSIBLE_LINT_VERSION} \
-        Jinja2==${JINJA2_VERSION} \
-        netaddr \
-        packaging \
-        ruamel.yaml \
-        PyMySQL \
-        passlib \
-        paramiko \
-        jmespath==${JMESPATH_VERSION} \
-        MarkupSafe==${MARKUPSAFE_VERSION} \
-        selinux"
 else
     echo "ERROR: Unable to create Python virtual environment, 'virtualenv' command not found"
     exit 1
@@ -138,6 +103,15 @@ if ! (cd "${SCRIPT_DIR}/.." && grep -i deepops README.md >/dev/null 2>&1 ) ; the
         echo "ERROR: Unable to check out DeepOps git repo, 'git' command not found"
         exit
     fi
+fi
+
+# Install the pinned Python packages from the checkout (standalone runs have just cloned it)
+REPO_DIR="$( (cd "${SCRIPT_DIR}/.." && grep -qi deepops README.md 2>/dev/null) && cd "${SCRIPT_DIR}/.." && pwd || pwd)"
+if [ -f "${VENV_DIR}/bin/activate" ] ; then
+    . "${VENV_DIR}/bin/activate"
+    as_user "${PIP} install -q -r ${REPO_DIR}/requirements-dev.txt"
+    # Run the repository checks on every commit (see .pre-commit-config.yaml).
+    (cd "${REPO_DIR}" && git rev-parse --git-dir >/dev/null 2>&1 && pre-commit install >/dev/null) || true
 fi
 
 # Copy default configuration

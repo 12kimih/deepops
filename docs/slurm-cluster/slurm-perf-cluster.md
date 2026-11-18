@@ -217,11 +217,11 @@ For examples of how to run BERT multi-node training jobs using this configuratio
 
 ### Setup.sh fails due to unsupported ansible version
 
-DeepOps pins Ansible 10.7.0 (installed by `setup.sh`). If `setup.sh` fails to install it, install the pinned version directly via pip:
+DeepOps pins Ansible and its other Python tools in `requirements.txt` (installed by `setup.sh`). If `setup.sh` fails to install them, install the pinned set directly into the DeepOps virtualenv:
 
 ```bash
-# on the provisioning node
-sudo pip install ansible==10.7.0
+# on the provisioning node, from the DeepOps checkout
+pip install -r requirements.txt
 ```
 
 ### Connection to hosts via ansible refused/blocked
