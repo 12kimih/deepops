@@ -74,7 +74,12 @@ COMMAND = Command(
         Opt("-A", "--account", metavar="ACCOUNTS", section="Filters", help="only these accounts"),
         Opt("-q", "--qos", metavar="QOS", section="Filters", help="only these QoS"),
         Opt("-n", "--name", metavar="NAMES", section="Filters", help="only these job names"),
-        Opt("--queue", negate=True, default=True, section="Sections", help="the job list"),
+        Opt("--queue", metavar="WHICH", choices=("mine", "all", "none"), default="mine", section="Sections",
+            help="the job list: mine (default; a job filter shows what it selects), all, or none"),
+        Opt("-Q", dest="queue", action="store_const", const="all", brief=True, section="Sections",
+            help="everyone's jobs in the job list (--queue all)"),
+        Opt("--no-queue", dest="queue", action="store_const", const="none", section="Sections",
+            help="no job list (--queue none)"),
         Opt("-U", "--users", negate=True, default=True, section="Sections",
             help="who holds what, and each user's share of the GPUs"),
         Opt("-W", "--why", negate=True, default=False, brief=True, section="Sections",
@@ -167,6 +172,11 @@ class Filters:
         if any(pats and not _any(vals, pats) for pats, vals in checks):
             return False
         return not self.jobs or bool(self.jobs & {str(j["id"]), j["label"], str(j["array"])})
+
+    def narrows(self):
+        """Was any job filter given? Then the job list shows what it selects."""
+        return bool(self.users or self.parts or self.nodes or self.jobs or self.states or self.all_states
+                    or self.accounts or self.qos or self.names)  # fmt: skip
 
     def node(self, node):
         if self.nodes and not _any([node["name"]], self.nodes):
@@ -468,9 +478,14 @@ def _clock(seconds):
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
-def show_jobs(t, model, group=True, detail=False):
+def show_jobs(t, model, group=True, detail=False, scope="mine"):
+    """The job list. SCOPE mine shows your own jobs unless a job filter chose others;
+    the sections below it summarise everyone's."""
     jobs = model["jobs"]
     me, dot = model["mine"], t.g["dot"]
+    only_mine = scope == "mine" and not model["node_filter"].narrows()
+    if only_mine:
+        jobs = [j for j in jobs if j["user"] == me]
     if group:
         jobs = sorted(jobs, key=lambda j: (vocab.job_rank(j["state"]), -j["priority"], j["id"]))
     else:
@@ -574,12 +589,12 @@ def show_jobs(t, model, group=True, detail=False):
 
     tally = []
     if not rows:
-        tally = [("queue empty", "faint")]
+        tally = [("none of yours" if only_mine else "queue empty", "faint")]
     elif group:
         tally = [(f"{len(rows)} job{'s' * (len(rows) != 1)}", "sub")]
     else:
         tally = [(f"{counts[s]} {STATE_LABEL.get(s, s)}", JOB_STYLE.get(s, ("sub",))[0]) for s in order]
-    if mine_count:
+    if mine_count and not only_mine:
         tally.append((f"{mine_count} yours", "self"))
     if not rows:
         return t.section("JOBS", 40, tally) + "\n"
@@ -777,8 +792,8 @@ def privacy_note(t, model):
 
 def show(t, model, args):
     parts = []
-    if args.queue:
-        parts.append(show_jobs(t, model, args.group, args.detail))
+    if args.queue != "none":
+        parts.append(show_jobs(t, model, args.group, args.detail, args.queue))
     if args.users:
         parts.append(show_users(t, model))
     if args.why:

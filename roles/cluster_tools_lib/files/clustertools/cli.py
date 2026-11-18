@@ -199,7 +199,8 @@ class Command:
         cases = []
         for o in self.options:
             if o.takes_value:
-                src = COMPLETERS.get(o.complete)
+                # A named completer, else the option's own choices: a fixed set needs no command.
+                src = COMPLETERS.get(o.complete) or (o.choices and "printf '%s\\n' " + " ".join(o.choices))
                 pattern = "|".join(o.flags)
                 body = f'COMPREPLY=($(compgen -W "$({src})" -- "$cur"))' if src else "COMPREPLY=()"
                 cases.append(f"        {pattern}) {body}; return ;;")
