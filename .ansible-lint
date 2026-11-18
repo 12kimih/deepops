@@ -8,16 +8,15 @@
 # octal modes) -- stay enforced in CI and cannot regress.
 profile: production
 
-# Don't auto-install requirements.yml at lint time. The galaxy roles are already
-# vendored under roles/galaxy/ (on roles_path via ansible.cfg) and the collections
-# come from the pip-installed ansible, so the network install only added a flaky
-# GitHub-download step that timed out in CI ("failed to download ... read timed out").
+# Don't install requirements.yml at lint time: scripts/deepops/galaxy.py has already
+# put the pinned collections and roles where ansible.cfg looks, and scripts/check.sh
+# checks that they match.
 offline: true
 
 # Exclude external/vendored roles and hardware-specific roles
 exclude_paths:
   - roles/galaxy/
-  # Galaxy collections installed by setup.sh / CI, not part of the repository.
+  # Galaxy collections installed by scripts/deepops/galaxy.py, not part of the repository.
   - collections/
   - roles/nvidia-dgx/
   - roles/nvidia-dgx-firmware/
@@ -25,8 +24,7 @@ exclude_paths:
   - submodules/
   # Molecule scenarios are test scaffolding (hosts: all playbooks). The standalone
   # `ansible-lint roles/` job syntax-checks them, which fails in CI without the full
-  # molecule/galaxy/collections environment (collection version skew between the
-  # pip-bundled and project-required community.* versions). They are exercised by
+  # molecule/galaxy/collections environment. They are exercised by
   # `molecule test` (the molecule workflow) instead.
   - roles/*/molecule/
 

@@ -1,4 +1,7 @@
 ---
+# Every collection and Galaxy role the playbooks use, at its exact version: ansible-core
+# ships none, so a module whose collection is missing here fails to resolve.
+# scripts/deepops/galaxy.py installs this file and scripts/check.sh checks it.
 collections:
   - name: ansible.posix
     version: 2.2.2
@@ -11,6 +14,9 @@ collections:
 
   - name: ansible.mysql
     version: 5.2.1
+
+  - name: kubernetes.core
+    version: 6.6.0
 
   - name: devsec.hardening
     version: 11.0.0
