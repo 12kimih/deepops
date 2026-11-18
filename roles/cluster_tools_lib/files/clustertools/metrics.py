@@ -1,10 +1,12 @@
 """metrics: GPU allocation from Slurm as Prometheus metrics, for node_exporter.
 
 Slurm's own exporters report jobs and nodes, not which GPU each job holds. This writes:
-  slurm_gpu_allocated{host,gpu,gpu_type,user,account,partition,job} 1 per allocated GPU
-  slurm_node_gpus{host,gpu_type}                                    GPUs configured
+  slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job} 1 per allocated GPU
+  slurm_node_gpus{node,gpu_type}                                    GPUs configured
 so a dashboard can show who holds which GPU, and an alert can compare DCGM utilisation
-with allocation (a busy GPU no job holds).
+with allocation (a busy GPU no job holds). The label is `node`, as in Slurm's own metrics:
+the scrape target already carries `host`, and a scraped `host` would be renamed
+exported_host.
 
 `metrics PATH` writes the text file atomically (a temporary file in the same directory,
 fsync, rename), which node_exporter's textfile collector needs so it never reads half a
@@ -47,7 +49,7 @@ def textfile(jobs_data, nodes_data):
         gpu_type = ",".join(sorted(types))
         for host, index in gpus:
             labels = {
-                "host": host, "gpu": index, "gpu_type": gpu_type, "user": job["user_name"],
+                "node": host, "gpu": index, "gpu_type": gpu_type, "user": job["user_name"],
                 "account": job.get("account") or "", "partition": job.get("partition") or "",
                 "job": slurm.job_label(job),
             }  # fmt: skip
@@ -58,7 +60,7 @@ def textfile(jobs_data, nodes_data):
         for gtype, count in _GRES.findall(node.get("gres") or ""):
             counts[gtype] = counts.get(gtype, 0) + int(count)
         for gtype, count in sorted(counts.items()):
-            lines.append(_series("slurm_node_gpus", {"host": node["name"], "gpu_type": gtype}, count))
+            lines.append(_series("slurm_node_gpus", {"node": node["name"], "gpu_type": gtype}, count))
     return "\n".join(lines) + "\n"
 
 
