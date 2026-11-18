@@ -1,6 +1,26 @@
 ---
 # Kubernetes Cluster Playbook
 
+# Kubespray pins its own Ansible range (submodules/kubespray/playbooks/ansible_version.yml)
+# and runs from the environment scripts/setup.sh builds for it.
+- name: Check that this runs from the Kubespray environment
+  hosts: localhost
+  gather_facts: false
+  tags: always
+  vars:
+    kubespray_ansible: "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../submodules/kubespray/playbooks/ansible_version.yml') | from_yaml)[0].vars }}"
+  tasks:
+    - name: Require the Ansible version Kubespray supports
+      ansible.builtin.assert:
+        that:
+          - ansible_version.string is version(kubespray_ansible.minimal_ansible_version, '>=')
+          - ansible_version.string is version(kubespray_ansible.maximal_ansible_version, '<')
+        fail_msg: >-
+          Kubespray needs ansible-core >= {{ kubespray_ansible.minimal_ansible_version }} and
+          < {{ kubespray_ansible.maximal_ansible_version }}, this is {{ ansible_version.string }}.
+          Run the Kubernetes playbooks from the Kubespray environment:
+          source /opt/deepops/kubespray-env/bin/activate
+
 # Set facts depending on container runtime
 # Use GPU operator when container runtime is not docker
 # etcd_deployment_type must be `host` when container_manager is not `docker`
