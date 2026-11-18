@@ -226,8 +226,11 @@
     - config
 
 # state: started (not restarted) keeps re-runs idempotent; the "Restart slurmd"
-# notify handlers (slurm.conf/cgroup.conf/gres.conf/pmix changes) do the actual
-# restart only when something changed, instead of bouncing slurmd every run.
+# handlers (configuration, binaries, unit files) restart it only when something
+# changed, flushed here so a new slurmd runs before the checks below.
+- name: Apply a pending slurmd restart
+  ansible.builtin.meta: flush_handlers
+
 - name: Start slurmd
   ansible.builtin.systemd:
     name: slurmd

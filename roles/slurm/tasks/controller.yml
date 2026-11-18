@@ -183,12 +183,17 @@
   tags:
     - config
 
-- name: Restart slurmdbd
+# Restart only when its configuration or binaries changed (the handlers), then make
+# sure it runs. An unconditional restart dropped every client connection on each run.
+- name: Apply pending slurmdbd and slurmctld restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Start slurmdbd
   ansible.builtin.systemd:
     name: slurmdbd
-    state: restarted
+    state: started
     enabled: true
-    daemon-reload: true
+    daemon_reload: true
 
 - name: Wait for slurmdbd to be available
   ansible.builtin.wait_for:
@@ -256,12 +261,14 @@
   failed_when: false
   when: slurm_downgrade
 
-- name: Restart slurmctld
+# After a downgrade the state was rebuilt with slurmctld -i and the daemon killed,
+# so it must start again; otherwise the handler restarted it if anything changed.
+- name: Start slurmctld
   ansible.builtin.systemd:
     name: slurmctld
-    state: restarted
+    state: "{{ 'restarted' if slurm_downgrade else 'started' }}"
     enabled: true
-    daemon-reload: true
+    daemon_reload: true
 
 # QoS, accounts and members from the site's declaration (slurm_accounting_file). The
 # slurm.conf priority settings go along so the module can refuse a QoS layout in which
