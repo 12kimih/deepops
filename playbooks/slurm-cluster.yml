@@ -134,6 +134,10 @@
   import_playbook: slurm-cluster/prometheus-node-exporter.yml
   when: slurm_enable_monitoring
 
+- name: Install monitoring exporters | Install prometheus IPMI exporter
+  import_playbook: slurm-cluster/prometheus-ipmi-exporter.yml
+  when: slurm_enable_monitoring
+
 - name: Install monitoring exporters | Install nvidia dcgm exporter
   import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
   when: slurm_enable_monitoring
