@@ -448,7 +448,8 @@ def normalize(text, path):
 def targets(paths):
     """The given files, and the repository's YAML files under the given directories.
 
-    The repository's files are the ones git sees: tracked, or new and not ignored.
+    The repository's files are the ones git tracks, staged ones included (git add a new
+    file to have it checked), so another session's half-written file is never judged.
     .gitignore is the one list of what is not ours (environments, installed
     collections, site config); submodules are their own repositories.
     """
@@ -462,8 +463,6 @@ def targets(paths):
                 "ls-files",
                 "-z",
                 "--cached",
-                "--others",
-                "--exclude-standard",
                 "--",
                 f"{p}/*.yml",
                 f"{p}/*.yaml",
