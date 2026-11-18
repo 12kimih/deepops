@@ -17,3 +17,16 @@ cluster_tools_lib_dir: /usr/local/lib/cluster-tools
 # The interpreter commands run under. The system Python, never a python3 found in a
 # user's PATH (conda, a venv), which may be older or carry a different package.
 cluster_tools_lib_python: /usr/bin/python3
+
+# Site facts Slurm cannot know, for the cluster's commands, login banner and alerts.
+# Rendered once to cluster_tools_lib_info_file and read through clustertools.site; a key
+# left empty is left out, and every reader skips what is missing. Set the real values in
+# config (they are private); derive a value from its own setting, never restate it.
+cluster_info:
+  name: ""  # system ID, e.g. <org>-<kind>
+  docs_url: ""  # public user docs
+  dashboard_url: "{{ grafana_root_url | default('') }}"
+  login_host: ""  # what users ssh to
+  ssh_port: 22
+# clustertools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.
+cluster_tools_lib_info_file: /etc/cluster-tools/cluster.json
