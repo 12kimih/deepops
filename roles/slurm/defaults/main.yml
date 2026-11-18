@@ -69,6 +69,9 @@ slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
 # sacctmgr accounting account new users are added to, and its Organization label.
 slurm_acct_account: compute-account
 slurm_acct_organization: deepops
+# Users added to slurm_acct_account when no accounting file is used. It used to be
+# whoever ran the play, which made Slurm membership depend on who deployed last.
+slurm_acct_users: []
 
 slurm_enable_ha: false
 # HA StateSaveLocation. Must be on storage shared by all controllers when HA is on;

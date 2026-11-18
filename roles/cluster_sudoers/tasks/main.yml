@@ -1,4 +1,16 @@
 ---
+# Off: take our rule away (and nothing else), then stop.
+- name: Remove the administrator sudoers rule while cluster_sudoers_netgroup is empty
+  when: cluster_sudoers_netgroup | length == 0
+  block:
+    - name: Remove the administrator sudoers rule
+      ansible.builtin.file:
+        path: "/etc/sudoers.d/{{ cluster_sudoers_file }}"
+        state: absent
+
+    - name: Stop here while the role is off
+      ansible.builtin.meta: end_role
+
 # sudo skips any file in sudoers.d containing a dot or ending in '~'.
 - name: Assert the sudoers filename is one sudo will actually read
   ansible.builtin.assert:

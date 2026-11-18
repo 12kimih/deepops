@@ -7,7 +7,7 @@ root_url = {{ grafana_root_url }}
 
 [security]
 admin_user = {{ grafana_cfg_user }}
-admin_password = {{ grafana_cfg_pass }}
+admin_password = {{ grafana_cfg_pass | required_secret('grafana_cfg_pass') }}
 disable_gravatar = true
 
 [users]

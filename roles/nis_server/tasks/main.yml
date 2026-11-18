@@ -237,6 +237,18 @@
 # filter and the numeric-gid path Slurm uses. See nis_export_netgroups in
 # defaults/main.yml. Membership here is DECLARATIVE -- the file is rendered whole, so
 # removing a user from the list removes their access on the next run.
+#
+# An empty list leaves a hand-written /etc/netgroup alone, but a file this role wrote
+# is rendered empty: emptying the list must revoke what it granted.
+- name: Check whether /etc/netgroup was written by this role
+  ansible.builtin.command:
+    cmd: grep -q -F "Written by roles/nis_server" /etc/netgroup
+  register: nis_netgroup_ours
+  changed_when: false
+  failed_when: nis_netgroup_ours.rc > 1
+  check_mode: false  # read-only; --check needs the result
+  when: nis_export_netgroups | length == 0
+
 - name: Publish the NIS netgroups
   ansible.builtin.template:
     src: netgroup.j2
@@ -244,7 +256,7 @@
     owner: root
     group: root
     mode: "0644"
-  when: nis_export_netgroups | length > 0
+  when: nis_export_netgroups | length > 0 or nis_netgroup_ours.rc | default(1) == 0
 
 # The maps are generated from the source files (/etc/passwd, /etc/group, /etc/netgroup,
 # ...); a source edit reaches NIS clients only once they are rebuilt. Run on every

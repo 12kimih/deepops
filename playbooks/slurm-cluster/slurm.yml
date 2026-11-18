@@ -4,16 +4,6 @@
   roles:
     - role: facts
 
-# Set root SSH key to allow SSH/ansible when no slurm job running for ansible user
-- hosts: slurm-node
-  become: true
-  tasks:
-    - name: Add SSH public key to root user authorized keys
-      ansible.posix.authorized_key:
-        user: root
-        state: present
-        key: "{{ lookup('file', ansible_ssh_private_key_file | default(lookup('env', 'HOME') + '/.ssh/id_rsa') + '.pub') }}"
-
 # Build slurm first on all nodes
 - hosts: slurm-cluster
   become: true
@@ -30,7 +20,6 @@
   roles:
     - role: slurm
       vars:
-        user: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
         slurm_workflow_build: false
 
 # Set up slurm-login-on-compute if enabled
@@ -41,6 +30,4 @@
       ansible.builtin.include_role:
         name: slurm
         tasks_from: login-compute-setup
-      vars:
-        user: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
       when: slurm_login_on_compute | default(false)
