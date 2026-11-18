@@ -14,6 +14,7 @@ Generators:
   versions              every pinned version, image and chart in role defaults
   role-variables:ROLE   the variables of roles/ROLE/defaults/main.yml, with the
                         comment above each one as its description
+  role-tree             the in-tree roles, as a directory tree
 
 Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
@@ -116,7 +117,14 @@ def gen_role_variables(role):
     return "\n".join(rows) + "\n"
 
 
-GENERATORS = {"versions": gen_versions, "role-variables": gen_role_variables}
+def gen_role_tree(_arg):
+    names = sorted(p.name for p in (ROOT / "roles").iterdir() if p.is_dir() and p.name != "galaxy")
+    branches = ["├──"] * (len(names) - 1) + ["└──"]
+    tree = "\n".join(f"│   {b} {n}" for b, n in zip(branches, names))
+    return f"```text\n├── roles\n{tree}\n```\n"
+
+
+GENERATORS = {"versions": gen_versions, "role-variables": gen_role_variables, "role-tree": gen_role_tree}
 
 
 def render(match):
