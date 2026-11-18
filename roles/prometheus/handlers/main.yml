@@ -3,3 +3,13 @@
   ansible.builtin.service:
     name: "{{ prometheus_svc_name }}"
     state: restarted
+
+# Needs --web.enable-lifecycle; retries cover a restart that is still starting up.
+- name: Reload prometheus
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port }}/-/reload"
+    method: POST
+  register: prometheus_reload
+  until: prometheus_reload is succeeded
+  retries: 10
+  delay: 3

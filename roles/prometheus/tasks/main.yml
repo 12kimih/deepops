@@ -1,29 +1,53 @@
 ---
-- name: Create config dir
+- name: Create config dirs
   ansible.builtin.file:
-    path: "{{ prometheus_config_dir }}"
+    path: "{{ item }}"
     state: directory
     mode: "0755"
+  loop:
+    - "{{ prometheus_config_dir }}"
+    - "{{ prometheus_config_dir }}/rules"
+    - "{{ prometheus_cfg_endpoint_dir }}"
 
-- name: Create endpoints config dir
-  ansible.builtin.file:
-    path: "{{ prometheus_cfg_endpoint_dir }}"
-    state: directory
-    mode: "0755"
+- name: Collect alert rule sources
+  ansible.builtin.set_fact:
+    prometheus_rule_sources: "{{ lookup('ansible.builtin.fileglob', role_path ~ '/files/rules/*.yml', wantlist=True) + prometheus_extra_rule_files }}"
 
-- name: Create alarm rules dir
-  ansible.builtin.file:
-    path: "{{ prometheus_config_dir }}/rules"
-    state: directory
-    mode: "0755"
+- name: Install python3 docker module
+  ansible.builtin.package:
+    name: python3-docker
+    state: present
 
-- name: Install alarm rules file
-  ansible.builtin.template:
-    src: "{{ prometheus_alert_rules_src }}"
-    dest: "{{ prometheus_config_dir }}/rules/alert_rules.yml"
+# promtool ships in the same image; pulling first lets it validate files below.
+- name: Pull prometheus image
+  community.docker.docker_image:
+    name: "{{ prometheus_container }}"
+    source: pull
+
+- name: Install alert rules
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ prometheus_config_dir }}/rules/{{ item | basename }}"
     owner: root
     group: root
     mode: "0644"
+    validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check rules /check.yml"
+  loop: "{{ prometheus_rule_sources }}"
+  notify: Reload prometheus
+
+- name: Find installed rule files
+  ansible.builtin.find:
+    paths: "{{ prometheus_config_dir }}/rules"
+  register: prometheus_rule_files
+
+- name: Remove rule files no longer managed
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ prometheus_rule_files.files | map(attribute='path') | reject('in', prometheus_rule_paths) }}"
+  vars:
+    prometheus_rule_paths: "{{ prometheus_rule_sources | map('basename') | map('regex_replace', '^', prometheus_config_dir ~ '/rules/') }}"
+  notify: Reload prometheus
 
 - name: Install config file
   ansible.builtin.template:
@@ -32,17 +56,13 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Restart prometheus
-
-- name: Install python3 docker module
-  ansible.builtin.package:
-    name: python3-docker
-    state: present
+    validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check config --syntax-only /check.yml"
+  notify: Reload prometheus
 
 - name: Create a persistent docker volume for metrics
   community.docker.docker_volume:
     name: "{{ prometheus_docker_volume_name }}"
-    state: "present"
+    state: present
 
 - name: Install systemd unit file
   ansible.builtin.template:
@@ -59,4 +79,3 @@
     state: "{{ prometheus_state }}"
     enabled: "{{ prometheus_enabled }}"
     daemon_reload: true
-  notify: Restart prometheus

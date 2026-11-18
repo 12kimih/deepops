@@ -1,0 +1,26 @@
+---
+groups:
+  - name: monitoring
+    rules:
+      - alert: PrometheusRuleEvaluationFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Prometheus rule group {{ $labels.rule_group }} fails to evaluate"
+      - alert: PrometheusNotificationsFailing
+        expr: rate(prometheus_notifications_errors_total[5m]) > 0
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Prometheus cannot deliver alerts to Alertmanager"
+      - alert: AlertmanagerNotificationsFailing
+        expr: rate(alertmanager_notifications_failed_total[5m]) > 0
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Alertmanager fails to send to {{ $labels.integration }}"
+      - alert: PrometheusTsdbCompactionsFailing
+        expr: increase(prometheus_tsdb_compactions_failed_total[3h]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Prometheus TSDB compactions are failing"
