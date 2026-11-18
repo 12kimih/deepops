@@ -1,0 +1,38 @@
+---
+# Slurm controller backups (roles/slurm_backup textfile metrics).
+groups:
+  - name: backup
+    rules:
+      - alert: SlurmBackupFailed
+        expr: slurm_backup_last_status == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "The last Slurm backup to {{ $labels.destination }} failed"
+          description: >-
+            `journalctl -u slurm-backup@backup` on {{ $labels.host }} says why; the accounting
+            database and controller state have no fresh copy there.
+      - alert: SlurmBackupStale
+        expr: |
+          time() - slurm_backup_last_success_timestamp_seconds > 36 * 3600
+          unless on (instance, destination) slurm_backup_last_status == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "No Slurm backup to {{ $labels.destination }} has succeeded for 36 hours"
+          description: >-
+            The daily backup did not run or stopped before writing its result:
+            `systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on
+            {{ $labels.host }}.
+      - alert: SlurmBackupRestoreTestFailed
+        expr: slurm_backup_restore_test_status == 0
+        labels: {severity: warning}
+        annotations:
+          summary: "The monthly Slurm backup restore test failed on {{ $labels.host }}"
+          description: "A backup that does not restore is no backup: `journalctl -u slurm-backup@restore-test`."
+      - alert: SlurmBackupRestoreTestStale
+        expr: |
+          time() - slurm_backup_restore_test_last_success_timestamp_seconds > 40 * 86400
+          unless on (instance) slurm_backup_restore_test_status == 0
+        labels: {severity: warning}
+        annotations:
+          summary: "No Slurm backup restore test has passed on {{ $labels.host }} for 40 days"
+          description: "The monthly restore test did not run: `systemctl list-timers slurm-backup*`."
