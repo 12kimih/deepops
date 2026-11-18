@@ -13,15 +13,15 @@ import getopt
 import re
 
 def print_help():
-  
+
     print("")
     print("\tformat_results.py -d (experiment directory)\n")
     print("")
     sys.exit(1)
 
-print("") 
+print("")
 
-try: 
+try:
     opts,args = getopt.getopt(sys.argv[1:],"d:",["d="])
 except getopt.GetoptError:
     print_help()
@@ -37,7 +37,7 @@ if expdir == "":
     print("ERROR: Directory must be specified.")
     print_help()
 
-if not os.path.isdir(expdir): 
+if not os.path.isdir(expdir):
     print("ERROR: Specified path is not a directory.  DIR="+dir)
     print("ERROR: exiting")
     print("")
@@ -56,18 +56,18 @@ for fn in os.listdir(expdir):
         hosts=""
         perf=""
         for line in fp:
-            l=line.strip()
+            text=line.strip()
             # Matching: HOSTLIST node-001,node-002
-            if(re.match('HOSTLIST',l)):
+            if(re.match('HOSTLIST',text)):
                 if hosts != "":
                     print("ERROR: Found HOSTLIST twice in "+fn)
-                hosts=l.split()[-1]
+                hosts=text.split()[-1]
 
            ## Matching:  WR01C2C8      180224   144     4     4              50.27              7.763e+04
-            m=re.match('^W\w\d{2}\w\d\w\d (.*)$',l)
+            m=re.match(r'^W\w\d{2}\w\d\w\d (.*)$',text)
             if m:
                 # Silently grab the last one
-                perf=l.split()[-1]
+                perf=text.split()[-1]
 
         # Compress nodelist
 
@@ -88,9 +88,9 @@ print("")
 ## Print headers
 maxexp=0
 for k,v in sorted(res.items()):
-    l=len(res[k])
-    if l > maxexp:
-        maxexp=l
+    count=len(res[k])
+    if count > maxexp:
+        maxexp=count
 
 print("Nodelist;",end="")
 for n in range(1,maxexp+1):
@@ -99,8 +99,3 @@ print("")
 
 for k,v in sorted(res.items()):
     print("%s;%s" % (k,";".join(res[k])))
-
-        
-
-
-   

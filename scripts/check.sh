@@ -32,6 +32,7 @@ step "generated docs are current" "${python}" scripts/docs/generate.py --check
 # is the one list of what is not ours.
 mapfile -d '' yaml_files < <(git ls-files -z --cached --others --exclude-standard -- '*.yml' '*.yaml')
 step "yamllint" yamllint --no-warnings "${yaml_files[@]}"
+step "ruff" ruff check
 step "no secrets or site data in tracked files" "${python}" scripts/deepops/sensitive_guard.py tree
 
 if ! "${fast}"; then

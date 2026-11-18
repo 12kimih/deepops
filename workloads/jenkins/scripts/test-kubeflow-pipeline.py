@@ -1,6 +1,5 @@
 import kfp
 import kfp_server_api
-import json
 import time
 
 # Define and build a Kubeflow Pipeline
@@ -8,16 +7,16 @@ import time
     name="kubeflow-quick-test",
     description="Verify Kubeflow can launch a container via a pipeline")
 def test_kubeflow_op():
-    op = kfp.dsl.ContainerOp(
+    kfp.dsl.ContainerOp(   # registered with the pipeline as it is built
       name='kubeflow-test-op',
       image='busybox',
       command=["/bin/sh", "-cx"],
       arguments=["echo 'Container started!'"],
       file_outputs={}
-      )                 
+      )
 kfp.compiler.Compiler().compile(test_kubeflow_op, 'kubeflow-test.yml')
 
-# Connect to Kubeflow and create job, this simply runs a busybox container that prints a message                 
+# Connect to Kubeflow and create job, this simply runs a busybox container that prints a message
 while True:
     time.sleep(30) # Occasionally Kubeflow fails to respond even when all deployments are up. I don't know why, sometimes it is a 403, sometimes a 500, and sometimes it works. So we will just wait and re-try until the test/script times out.
     try:

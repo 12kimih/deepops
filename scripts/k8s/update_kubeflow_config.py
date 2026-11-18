@@ -42,11 +42,11 @@ def get_images(url='https://api.ngc.nvidia.com/v2/repos', number_tags=5):
     # Parse Registry response
     try:
         repos = json.loads(repos.read())
-    except Exception as e:
+    except Exception:
         logging.error("Failed to parse NGC response")
         return 1
     if 'repositories' not in repos:
-        loggging.warn("no repositories listed")
+        logging.warning("no repositories listed")
         return 1
 
     # Iterate through registry response
