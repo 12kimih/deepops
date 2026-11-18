@@ -2,9 +2,8 @@
 slurm_pam_lib_dir: /lib64/security
 
 # Build dependencies per the Slurm 25.11.x admin quickstart. dbus-devel and
-# libbpf-devel are needed for the cgroup/v2 plugin; numactl-devel, lua-devel and
-# readline-devel enable NUMA affinity, Lua plugins (job_submit) and interactive
-# scontrol. mariadb-devel provides mysql.h for the accounting store.
+# libbpf-devel are needed for the cgroup/v2 plugin; numactl-devel and readline-devel
+# enable NUMA affinity and interactive scontrol (Lua comes from slurm_lua_deps). mariadb-devel provides mysql.h for the accounting store.
 # https://slurm.schedmd.com/archive/slurm-25.11.6/quickstart_admin.html
 slurm_build_deps:
   - "@Development Tools"
@@ -17,7 +16,6 @@ slurm_build_deps:
   - pam-devel
   - dbus-devel
   - libbpf-devel
-  - lua-devel
   - perl-ExtUtils-MakeMaker
   - libatomic
 
@@ -40,3 +38,7 @@ slurm_pmix_deps:
 
 slurm_hwloc_deps:
   - "@Development Tools"
+
+# Installed only when slurm_build_lua is enabled.
+slurm_lua_deps:
+  - lua-devel

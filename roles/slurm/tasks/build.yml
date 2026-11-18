@@ -81,6 +81,22 @@
   with_items: "{{ slurm_build_deps + (slurm_slurmrestd_deps if slurm_build_slurmrestd | default(false) else []) }}"
   when: ansible_os_family == 'RedHat'
 
+- name: Install lua build dependencies
+  ansible.builtin.apt:
+    name: "{{ slurm_lua_deps }}"
+    state: present
+  when:
+    - slurm_build_lua | bool
+    - ansible_distribution == 'Ubuntu'
+
+- name: Install lua build dependencies
+  ansible.builtin.dnf:
+    name: "{{ slurm_lua_deps }}"
+    state: present
+  when:
+    - slurm_build_lua | bool
+    - ansible_os_family == 'RedHat'
+
 - name: Remove slurm packages
   ansible.builtin.apt:
     name: "{{ item }}"
@@ -168,14 +184,16 @@
   failed_when: false
   when: slurm_build
 
+# --with-lua is appended here rather than baked into slurm_configure so that
+# sites overriding the configure line keep working and the flag stays opt-in.
 - name: Configure
-  ansible.builtin.command: "{{ slurm_configure }}"
+  ansible.builtin.command: "{{ slurm_configure }}{{ ' --with-lua' if slurm_build_lua | bool else '' }}"
   args:
     chdir: "{{ slurm_build_dir }}"
   when: slurm_build and (not slurm_autodetect_nvml)
 
 - name: Configure
-  ansible.builtin.command: "{{ slurm_configure_nvml }}"
+  ansible.builtin.command: "{{ slurm_configure_nvml }}{{ ' --with-lua' if slurm_build_lua | bool else '' }}"
   args:
     chdir: "{{ slurm_build_dir }}"
   when: slurm_build and slurm_autodetect_nvml

@@ -27,6 +27,13 @@ slurm_configure_nvml: "./configure --prefix={{ slurm_install_prefix }} --disable
   --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix
   }} --with-hwloc={{ hwloc_install_prefix }} --with-nvml={{ slurm_cuda_prefix }}"
 slurm_force_rebuild: false
+# Build Slurm with Lua support, which Lua plugins such as job_submit/lua and
+# cli_filter/lua need. When enabled, the role installs the distro Lua
+# development package (slurm_lua_deps in vars/) and passes --with-lua to
+# configure, so the build fails loudly if Lua cannot be found. Turning this on
+# for an already-installed Slurm also needs slurm_force_rebuild: true.
+# Defaults to on when the lua job_submit plugin is configured.
+slurm_build_lua: "{{ 'lua' in (slurm_job_submit_plugins | default('')) }}"
 slurm_contain_ssh: true
 
 slurm_cluster_name: deepops
