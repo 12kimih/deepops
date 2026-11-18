@@ -1,0 +1,62 @@
+---
+# Slurm QoS, accounts and their members, declared in one place. Point
+# slurm_accounting_file at this file (group_vars/slurm-cluster.yml); slurm.yml with
+# --tags accounting makes the accounting database match it, and --check --diff shows
+# the sacctmgr commands first. Entities missing here are reported, not deleted.
+#
+# This example: two teams under one parent, a preemptible default tier, a high tier
+# per team with its own GPU quota, and an urgent tier for administrators. Pair it with
+# PriorityFlags=NO_NORMAL_QOS,NO_NORMAL_ASSOC and PriorityWeightQOS=1 in slurm.conf, so
+# a QoS priority is used as is; require_qos_tiers then fails a run whose association
+# priority, fairshare and age weights could lift a job into the next tier.
+require_qos_tiers: true
+
+qos:
+  normal:
+    description: Slurm's default QoS
+  low:
+    max_wall: 1-00:00:00
+    description: Default tier; preempted by the high tiers
+  high_a:
+    priority: 10000
+    preempt: [low]
+    grp_tres: {gres/gpu: 8}
+    description: Team a's guaranteed GPUs
+  high_b:
+    priority: 10000
+    preempt: [low]
+    grp_tres: {gres/gpu: 8}
+    description: Team b's guaranteed GPUs
+  urgent:
+    priority: 20000
+    preempt: [high_a, high_b, low]
+    description: Emergency tier for administrators
+
+accounts:
+  lab:
+    fairshare: parent              # users compete with each other, not team by team
+    max_submit_jobs: 500           # per user, queued plus running; inherited downwards
+    qos: [low]
+    default_qos: low
+    description: All research teams
+  team-a:
+    parent: lab
+    fairshare: parent
+    qos: [high_a, low]
+    members: [alice, bob]
+  team-b:
+    parent: lab
+    fairshare: parent
+    qos: [high_b, low]
+    members: [carol]
+  admin:
+    fairshare: parent
+    priority: 5000                 # first within any tier; team quotas still apply
+    max_submit_jobs: 500
+    qos: [low]
+    default_qos: low
+    members:
+      - {user: alice, qos: [high_a, low, urgent]}
+
+users:
+  alice: {default_account: team-a}   # needed for a user in several accounts

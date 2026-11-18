@@ -257,3 +257,24 @@
     state: restarted
     enabled: true
     daemon-reload: true
+
+# QoS, accounts and members from the site's declaration (slurm_accounting_file). The
+# slurm.conf priority settings go along so the module can refuse a QoS layout in which
+# association priority, fairshare and age could lift a job into the next tier.
+- name: Converge Slurm accounting
+  when: slurm_accounting_file | length > 0
+  # Bounds the sacctmgr calls: a stuck slurmdbd would otherwise hang the play.
+  timeout: 600
+  tags:
+    - accounting
+  vars:
+    _slurm_priority: "{{ lookup('ansible.builtin.template', slurm_conf_template) | regex_findall('(?m)^(Priority\\w+)=(\\S+)') | community.general.dict }}"
+  slurm_accounting:
+    spec: "{{ lookup('ansible.builtin.file', slurm_accounting_file) | from_yaml }}"
+    sacctmgr: "{{ slurm_install_prefix }}/bin/sacctmgr"
+    priority_flags: "{{ (_slurm_priority.PriorityFlags | default('')).split(',') | select | list }}"
+    priority_weights:
+      qos: "{{ _slurm_priority.PriorityWeightQOS | default(0) }}"
+      assoc: "{{ _slurm_priority.PriorityWeightAssoc | default(0) }}"
+      fairshare: "{{ _slurm_priority.PriorityWeightFairshare | default(0) }}"
+      age: "{{ _slurm_priority.PriorityWeightAge | default(0) }}"
