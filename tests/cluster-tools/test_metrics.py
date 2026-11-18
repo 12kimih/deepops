@@ -1,5 +1,6 @@
 """Tests for clustertools.metrics: GPU allocation as node_exporter textfile metrics."""
 
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,12 +32,19 @@ class TextfileTests(unittest.TestCase):
         allocated = [line for line in text.splitlines() if line.startswith("slurm_gpu_allocated{")]
         self.assertEqual(len(allocated), 4)
         self.assertIn('slurm_gpu_allocated{node="gpu1",gpu="1",gpu_type="a10",user="alice",account="acct1",'
-                      'partition="a10-1",job="1"} 1', text)  # fmt: skip
+                      'partition="a10-1",job_id="1"} 1', text)  # fmt: skip
         self.assertIn('node="gpu3",gpu="0",gpu_type="a30",user="bob"', text)
-        self.assertIn('job="9_3"', text)
+        self.assertIn('job_id="9_3"', text)
         self.assertNotIn("carol", text)
         self.assertIn('slurm_node_gpus{node="gpu4",gpu_type="a30"} 7', text)
         self.assertIn("# TYPE slurm_gpu_allocated gauge", text)
+
+    def test_no_label_the_scrape_attaches_itself(self):
+        # A scraped label named like a target label is renamed exported_*.
+        text = metrics.textfile({"jobs": [running(1, "u", "gpu1", ["gpu:a10:1(IDX:0)"])]}, load("nodes"))
+        names = set(re.findall(r'[{,]([a-z_]+)="', text))
+        self.assertTrue(names)
+        self.assertEqual(names & {"job", "instance", "host"}, set())
 
     def test_label_values_are_escaped(self):
         text = metrics.textfile({"jobs": [running(1, 'a"b\\c', "gpu1", ["gpu:a10:1(IDX:0)"])]}, {"nodes": []})

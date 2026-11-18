@@ -25,10 +25,12 @@ class ProgramTests(unittest.TestCase):
             with self.subTest(module=name):
                 importlib.import_module(f"clustertools.{name}")
 
-    def test_every_program_has_a_main(self):
-        for name in sorted(PROGRAMS):
+    def test_every_program_has_a_main_and_runs_as_a_module(self):
+        for name in sorted(PROGRAMS | {"banner"}):
             with self.subTest(program=name):
-                self.assertTrue(callable(importlib.import_module(f"clustertools.{name}").main))
+                module = importlib.import_module(f"clustertools.{name}")
+                self.assertTrue(callable(module.main))
+                self.assertIn('if __name__ == "__main__":', Path(module.__file__).read_text())
 
 
 if __name__ == "__main__":

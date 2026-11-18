@@ -59,3 +59,7 @@ def script(title, commands=(), links=(), flavour=render.DEFAULT_FLAVOUR, color=T
 def main():
     sys.stdout.write(script(**json.load(sys.stdin)))
     return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
