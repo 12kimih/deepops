@@ -114,6 +114,13 @@
 - hosts: all
   gather_facts: true
   tasks:
+    # Only packages a host has: dpkg cannot select one it does not know.
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+      when:
+        - container_manager is defined and container_manager != "docker"
+        - ansible_facts.distribution == "Ubuntu"
+
     - name: Un-hold container runtime packages on Ubuntu
       ansible.builtin.dpkg_selections:
         name: "{{ item }}"
@@ -126,7 +133,7 @@
       when:
         - container_manager is defined and container_manager != "docker"
         - ansible_facts.distribution == "Ubuntu"
-      ignore_errors: true
+        - item in ansible_facts.packages
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 # Install Kubernetes
