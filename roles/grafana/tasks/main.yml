@@ -45,12 +45,6 @@
   loop_control:
     label: "{{ item.path }}"
 
-- name: Install the deepops dashboards
-  ansible.builtin.include_tasks: dashboards.yml
-  vars:
-    grafana_dashboard_set: deepops
-    grafana_dashboard_files: "{{ grafana_dashboards | map('regex_replace', '^', role_path ~ '/../../src/dashboards/') | list }}"
-
 - name: Install datasource config
   ansible.builtin.template:
     src: prometheus-datasource.yml.j2
@@ -128,3 +122,35 @@
   no_log: true
   changed_when: true
   when: grafana_state != "stopped" and grafana_login.status == 401
+
+# After the restart above: a dashboard provisioned while the old provider config was
+# still loaded would land in the old folder.
+- name: Install the deepops dashboards
+  ansible.builtin.include_tasks: dashboards.yml
+  vars:
+    grafana_dashboard_set: deepops
+    grafana_dashboard_files: "{{ grafana_dashboards | map('regex_replace', '^', role_path ~ '/../../src/dashboards/') | list }}"
+
+# Provisioning never moves a dashboard to a changed folder, renames the folder or removes
+# a dashboard it stopped managing; this converges those (see the script).
+- name: Reconcile dashboards and folders
+  ansible.builtin.script:
+    cmd: >-
+      grafana_reconcile.py
+      --url http://localhost:{{ grafana_port }}
+      --ini {{ (grafana_config_dir ~ '/grafana.ini') | quote }}
+      --folder-uid {{ grafana_dashboard_folder_uid | quote }}
+      --folder-title {{ grafana_dashboard_folder | quote }}
+      --dashboards-path {{ grafana_cfg_dashboard_path | quote }}
+      --retire {{ grafana_retired_dashboards | map('quote') | join(' ') }}
+      {{ '--check' if ansible_check_mode else '' }}
+    executable: python3
+  check_mode: false  # the script reports instead of acting under --check
+  register: grafana_reconcile
+  changed_when: (grafana_reconcile.stdout | from_json).changed and not ansible_check_mode
+  when: grafana_state != "stopped"
+
+- name: Show reconcile actions
+  ansible.builtin.debug:
+    var: (grafana_reconcile.stdout | from_json).actions
+  when: grafana_reconcile is changed or (ansible_check_mode and grafana_reconcile.stdout is defined)

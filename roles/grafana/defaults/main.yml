@@ -20,6 +20,12 @@ grafana_anonymous_role: Viewer
 
 grafana_cfg_dashboard_path: "{{ grafana_data_dir }}/dashboards"
 grafana_dashboard_folder: Cluster
+# The folder's identity: renaming grafana_dashboard_folder renames this folder in place.
+grafana_dashboard_folder_uid: deepops
+# Dashboards earlier deepops versions shipped under other UIDs (GPU Nodes, Node Exporter
+# Full, SLURM Dashboard). Grafana keeps them as ordinary dashboards once their files are
+# gone, so the role deletes them.
+grafana_retired_dashboards: [syl6zhqkz, rYdddlPWk, slurm]
 # Files under src/dashboards/ to provision (exporter roles may add their own).
 grafana_dashboards:
   - gpu-nodes.json
