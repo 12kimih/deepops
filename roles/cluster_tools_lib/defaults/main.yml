@@ -1,0 +1,17 @@
+---
+# cluster_tools_lib -- the Python package the cluster's own commands share
+# (clustertools: reading Slurm, its vocabulary, terminal rendering). Roles that ship a
+# command list this role under meta dependencies and install the command with
+# tasks_from: command, so every command finds the package the same way.
+#
+# The package lives outside the interpreter's site-packages on purpose: a path there
+# names the Python version, so an OS upgrade would silently drop the package from
+# sys.path. Commands put this directory on sys.path themselves instead. Standard library
+# only, so nothing is installed with pip (PEP 668).
+#
+# The same directory cluster_tools publishes its shell libraries to: one library
+# directory for the cluster's tools, whichever language a library is written in.
+cluster_tools_lib_dir: /usr/local/lib/cluster-tools
+# The interpreter commands run under. The system Python, never a python3 found in a
+# user's PATH (conda, a venv), which may be older or carry a different package.
+cluster_tools_lib_python: /usr/bin/python3

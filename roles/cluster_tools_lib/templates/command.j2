@@ -1,0 +1,10 @@
+#!{{ cluster_tools_lib_python }} -I
+{{ ansible_managed | comment }}
+# -I keeps PYTHONPATH and the user's site-packages out, so a module of theirs can never
+# stand in for one of ours.
+import sys
+
+sys.path.insert(0, "{{ cluster_tools_lib_dir }}")
+from {{ cluster_tools_lib_command.module }} import main  # noqa: E402
+
+sys.exit(main())

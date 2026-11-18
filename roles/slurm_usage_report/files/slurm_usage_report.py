@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Post a Slurm GPU usage report to Slack and notify owners of idle GPU jobs.
 
 Reads jobs and node state from Slurm's JSON output, per-GPU utilisation from
@@ -17,6 +16,9 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
+from clustertools.slurm import (GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_label, node_state,
+                                num, scontrol)
+
 SLACK_API = "https://slack.com/api/"
 MAX_BLOCKS = 45      # Slack allows 50 blocks per message
 MAX_SECTION = 2900   # and 3000 characters per section text
@@ -24,71 +26,13 @@ BAR_WIDTH = 10
 
 
 # --- Slurm ----------------------------------------------------------------------
-
-def run(*cmd):
-    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
-
-
-def expand_ranges(spec):
-    """'0-2,5' -> [0, 1, 2, 5]"""
-    out = []
-    for part in spec.split(","):
-        lo, _, hi = part.partition("-")
-        out.extend(range(int(lo), int(hi or lo) + 1))
-    return out
-
-
-_hostnames = {}
-
-
-def hostnames(nodelist):
-    """Expand a Slurm node list with Slurm's own parser (cached)."""
-    if "[" not in nodelist:
-        return nodelist.split(",")
-    if nodelist not in _hostnames:
-        _hostnames[nodelist] = run("scontrol", "show", "hostnames", nodelist).split()
-    return _hostnames[nodelist]
-
+# Reading Slurm is clustertools.slurm's job (the cluster_tools_lib role): one reader for
+# every tool. What is left here is what this report makes of it.
 
 def duration(secs):
     days, rest = divmod(int(secs), 86400)
     clock = f"{rest // 3600}:{rest % 3600 // 60:02d}:{rest % 60:02d}"
     return f"{days}-{clock}" if days else clock
-
-
-# Slurm is read through its JSON output only: free-text fields such as job names are
-# plain values there, so they can never pose as other fields.
-GPU_DETAIL = re.compile(r"gpu(?::([^:,(]+))?(?::\d+)?\(IDX:([^)]+)\)")
-GPU_REQUESTED = re.compile(r"(?:^|,)gres/gpu=(\d+)")
-GPU_CONFIGURED = re.compile(r"gpu(?::[^:,(]+)?:(\d+)")
-
-
-def num(value):
-    """Slurm JSON numbers: {"set", "infinite", "number"} objects or plain ints."""
-    if isinstance(value, dict):
-        return value["number"] if value.get("set") and not value.get("infinite") else None
-    return value
-
-
-def job_label(job):
-    array, task = num(job.get("array_job_id")), num(job.get("array_task_id"))
-    return f"{array}_{task}" if array and task is not None else str(job["job_id"])
-
-
-def job_gpus(job):
-    """[(host, index)] and GPU types from gres_detail, one entry per allocated node."""
-    hosts, details = hostnames(job.get("nodes") or ""), job.get("gres_detail") or []
-    if details and len(details) != len(hosts):
-        print(f"job {job['job_id']}: {len(details)} GRES entries for {len(hosts)} nodes; "
-              "GPUs not attributed", file=sys.stderr)
-        return [], set()
-    gpus, types = [], set()
-    for host, detail in zip(hosts, details):
-        for gtype, spec in GPU_DETAIL.findall(detail):
-            if gtype:
-                types.add(gtype)
-            gpus.extend((host, i) for i in expand_ranges(spec))
-    return gpus, types
 
 
 def parse_jobs(data, now):
@@ -121,18 +65,6 @@ def parse_jobs(data, now):
     return running, dict(pending)
 
 
-def node_state(flags):
-    """Short state of an unavailable node from its Slurm state flags, else None."""
-    if "DOWN" in flags:
-        return "down"
-    if "FAIL" in flags:
-        return "fail"
-    if "DRAIN" in flags:
-        busy = {"ALLOCATED", "MIXED", "COMPLETING"} & set(flags)
-        return "draining" if busy else "drained"
-    return None
-
-
 def parse_nodes(data):
     """({node: gpu count}, [(node, state, since, user, reason)]) from `scontrol --json show nodes`."""
     gpus, unavailable = {}, []
@@ -147,13 +79,9 @@ def parse_nodes(data):
     return gpus, sorted(unavailable)
 
 
-def slurm_json(*args):
-    return json.loads(run("scontrol", *args))
-
-
 def collect_slurm(now):
-    jobs, pending = parse_jobs(slurm_json("-d", "--json", "show", "job"), now)
-    nodes, reasons = parse_nodes(slurm_json("--json", "show", "nodes"))
+    jobs, pending = parse_jobs(scontrol("-d", "show", "job"), now)
+    nodes, reasons = parse_nodes(scontrol("show", "nodes"))
     return {"jobs": jobs, "nodes": nodes, "reasons": reasons, "pending": pending}
 
 
@@ -381,7 +309,7 @@ def slack_id(user, cfg, slack, cache):
 
 # --- Main -----------------------------------------------------------------------
 
-def main():
+def report_once():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--config", default="/etc/slurm-usage-report/config.json")
     ap.add_argument("--dry-run", action="store_true", help="print instead of posting")
@@ -444,9 +372,14 @@ def main():
         json.dump(state, f)
 
 
-if __name__ == "__main__":
+def main():
     try:
-        main()
-    except (subprocess.CalledProcessError, RuntimeError, OSError) as e:
+        report_once()
+    except (subprocess.CalledProcessError, RuntimeError, OSError, ValueError) as e:
         print(f"slurm-usage-report: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -5,7 +5,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 {{ slurm_usage_report_script }} --config {{ slurm_usage_report_config_dir }}/config.json
+ExecStart={{ slurm_usage_report_script }} --config {{ slurm_usage_report_config_dir }}/config.json
 StateDirectory={{ slurm_usage_report_svc_name }}
 ProtectSystem=full
 PrivateTmp=true
