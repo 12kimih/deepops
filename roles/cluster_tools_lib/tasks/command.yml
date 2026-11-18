@@ -6,6 +6,14 @@
 #   vars:
 #     cluster_tools_lib_command: {dest: /usr/local/bin/NAME, module: MODULE}
 # MODULE is a module on cluster_tools_lib_dir that defines main() -> exit status.
+# The destination directory may not exist on a fresh host (/usr/local/libexec, for one).
+# No owner or mode: an existing shared directory (/usr/local/bin) keeps its own; a new
+# one is root's with the default 0755.
+- name: Create the directory of a cluster command ({{ cluster_tools_lib_command.dest | basename }})
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_command.dest | dirname }}"
+    state: directory
+
 - name: Install a cluster command ({{ cluster_tools_lib_command.dest | basename }})
   ansible.builtin.template:
     src: command.j2
