@@ -37,17 +37,14 @@
 - name: Install CA certificate from live proxy
   when: nginx_docker_cache_ca is not defined
   block:
-    - name: Download CA certificate from live proxy
-      ansible.builtin.get_url:
-        url: "{{ nginx_docker_cache_proxy_url }}/ca.crt"
+    - name: Install the proxy's CA certificate read from the cache host
+      ansible.builtin.copy:
+        content: "{{ nginx_docker_cache_live_ca.content | b64decode }}"
         dest: "{{ nginx_docker_cache_ca_client_crt_el }}"
         owner: "root"
         group: "root"
         mode: "0644"
       register: download_ca_cert
-      until: download_ca_cert is succeeded
-      retries: 5
-      delay: 10
     - name: Update CA cert bundle
       ansible.builtin.command: update-ca-trust
       when: download_ca_cert.changed
