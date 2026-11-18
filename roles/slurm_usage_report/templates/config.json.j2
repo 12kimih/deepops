@@ -1,0 +1,14 @@
+{{ {
+  "slack_token": slurm_usage_report_token,
+  "channel": slurm_usage_report_channel,
+  "prometheus_url": slurm_usage_report_prometheus_url,
+  "idle_hours": slurm_usage_report_idle_hours | float,
+  "idle_util_threshold": slurm_usage_report_idle_util_threshold | float,
+  "notify": slurm_usage_report_notify,
+  "dm_repeat_hours": slurm_usage_report_dm_repeat_hours | float,
+  "dm_text": slurm_usage_report_dm_text,
+  "cancel_after_hours": slurm_usage_report_cancel_after_hours | float,
+  "user_map": slurm_usage_report_user_map,
+  "email_domain": slurm_usage_report_email_domain,
+  "state_file": "/var/lib/" ~ slurm_usage_report_svc_name ~ "/state.json"
+} | to_nice_json }}

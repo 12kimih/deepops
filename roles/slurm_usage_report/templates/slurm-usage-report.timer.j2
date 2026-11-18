@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Slurm GPU usage report {{ slurm_usage_report_schedule }}
+
+[Timer]
+OnCalendar={{ slurm_usage_report_schedule }}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

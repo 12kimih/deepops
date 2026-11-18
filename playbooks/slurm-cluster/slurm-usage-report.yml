@@ -1,0 +1,7 @@
+---
+- hosts: "{{ hostlist | default(slurm_monitoring_group | default('slurm-master')) }}"
+  become: true
+  tasks:
+    - name: Configure the Slurm usage report
+      ansible.builtin.include_role:
+        name: slurm_usage_report

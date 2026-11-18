@@ -1,0 +1,31 @@
+---
+# Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle.
+# Runs on a host with the Slurm client commands and access to Prometheus.
+# No-op until a Slack bot token (chat:write, im:write, users:read.email) is set.
+slurm_usage_report_token: "{{ slack_bot_token | default('') }}"
+slurm_usage_report_channel: "#gpu-usage"
+slurm_usage_report_schedule: hourly
+slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port | default(9090) }}"
+
+# A job is idle when it has run for idle_hours and every GPU it holds stayed at or
+# under idle_util_threshold percent for that whole time.
+slurm_usage_report_idle_hours: 2
+slurm_usage_report_idle_util_threshold: 0
+# none | dm | dm+mention (dm, then a mention in the report thread from the second
+# consecutive idle report on).
+slurm_usage_report_notify: dm
+slurm_usage_report_dm_repeat_hours: 6
+slurm_usage_report_dm_text: >-
+  Your job {job} ({gpus} GPU, running {runtime}) has had idle GPUs for {hours}h.
+  If you no longer need it, please free the GPUs with `scancel {job}`.
+# Cancel jobs idle this long (0 = never). Announce the policy before enabling.
+slurm_usage_report_cancel_after_hours: 0
+
+# Slurm user -> Slack member ID or email. Users not listed are looked up as
+# <user>@<email_domain> when email_domain is set; otherwise shown without a mention.
+slurm_usage_report_user_map: {}
+slurm_usage_report_email_domain: ""
+
+slurm_usage_report_script: /usr/local/libexec/slurm-usage-report
+slurm_usage_report_config_dir: /etc/slurm-usage-report
+slurm_usage_report_svc_name: slurm-usage-report
