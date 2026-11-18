@@ -81,7 +81,7 @@ class TableTests(unittest.TestCase):
         self.assertEqual(users["user1"]["cpu"], 72)
 
     def test_reason_code_and_own_jobs_marked(self):
-        text = out("--ascii", "--no-resources", "--no-users")
+        text = out("-Q", "--ascii", "--no-resources", "--no-users")
         self.assertRegex(text, r"\(QOSMaxGRESPerJob\)")
         self.assertRegex(text, r"(?m)^> +90010 ")
 
@@ -114,6 +114,40 @@ class TableTests(unittest.TestCase):
     def test_a_hostile_job_name_is_only_a_name(self):
         job = next(j for j in model()["jobs"] if j["id"] == 90002)
         self.assertEqual((job["user"], job["state"], job["partition"][:3]), ("user3", "PD", "a30"))
+
+
+class QueueTests(unittest.TestCase):
+    """The job list shows your own jobs by default; the sections below summarise all."""
+
+    def ids(self, text):
+        return set(re.findall(r"(?m)^[ >▌] +(\d+) ", ANSI.sub("", text)))
+
+    def test_default_is_your_own_jobs(self):
+        self.assertEqual(self.ids(out("--ascii", "--no-users", "--no-resources")), {"90010", "90012"})
+
+    def test_all_jobs_on_request(self):
+        everyone = self.ids(out("-Q", "--ascii", "--no-users", "--no-resources"))
+        self.assertTrue({"90010", "90011", "90013", "90001"} <= everyone)
+        self.assertEqual(everyone, self.ids(out("--queue", "all", "--ascii", "--no-users", "--no-resources")))
+
+    def test_a_job_filter_shows_what_it_selects(self):
+        self.assertEqual(self.ids(out("-u", "user4", "--ascii", "--no-users", "--no-resources")), {"90013"})
+
+    def test_the_rest_still_covers_everyone(self):
+        self.assertIn("user2", out("--no-resources"))  # USERS lists everyone by default
+
+    def test_none_of_yours_and_none_at_all(self):
+        text = out("--no-users", "--no-resources", env={"USER": "nobody"})
+        self.assertIn("none of yours", text)
+        self.assertNotIn("JOBID", text)
+        self.assertNotIn("JOBS", out("--queue", "none", "--no-users", "--no-resources"))
+        self.assertNotIn("JOBS", out("--no-queue", "--no-users", "--no-resources"))
+
+    def test_json_is_not_narrowed_by_the_view(self):
+        self.assertIn(90011, {j["id"] for j in model()["jobs"]})
+
+    def test_queue_values_complete(self):
+        self.assertIn('--queue) COMPREPLY=($(compgen -W "$(printf', out("--completion", "bash"))
 
 
 class FilterTests(unittest.TestCase):
