@@ -22,5 +22,5 @@ grafana_cfg_dashboard_path: "{{ grafana_data_dir }}/dashboards"
 grafana_dashboard_folder: Cluster
 # Files under src/dashboards/ to provision (exporter roles may add their own).
 grafana_dashboards:
-  - gpu-dashboard.json
-  - node-exporter-full.json
+  - gpu-nodes.json
+  - node-exporter-hosts.json

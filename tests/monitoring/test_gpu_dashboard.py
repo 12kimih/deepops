@@ -21,7 +21,7 @@ def panels(items):
 class GpuDashboardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.dashboard = json.loads((ROOT / "src/dashboards/gpu-dashboard.json").read_text())
+        cls.dashboard = json.loads((ROOT / "src/dashboards/gpu-nodes.json").read_text())
         cls.variables = {v["name"]: v for v in cls.dashboard["templating"]["list"]}
 
     def test_exporter_selectors_use_independent_instances(self):
@@ -131,18 +131,31 @@ class GpuDashboardTests(unittest.TestCase):
                             )
                             rules.append({"record": f"panel_{panel['id']}_{index}", "expr": expr})
                 # Assert representative host/GPU panels select the chosen node.
-                for expr, value in (
-                    (f'node_load1{{instance="{node}"}}', 2),
-                    (f'DCGM_FI_DEV_POWER_USAGE{{instance="{gpu}"}}', 100),
+                # Queries deduplicate on the dimension they draw (max, max by (gpu)), so a
+                # label change on the scrape target never splits one line into two.
+                gpu_index = re.search(r'gpu="([^"]+)"', gpu_labels).group(1)
+                for expr, value, labels in (
+                    (f'max(node_load1{{instance="{node}"}})', 2, ""),
+                    (
+                        f'max by (gpu) (DCGM_FI_DEV_POWER_USAGE{{instance="{gpu}"}})',
+                        100,
+                        f'gpu="{gpu_index}"',
+                    ),
                 ):
                     record = next(r["record"] for r in rules if r["expr"] == expr)
-                    labels = f'instance="{node}"' if value == 2 else f'instance="{gpu}"{gpu_labels}'
                     expected.append(
                         {
                             "expr": record,
                             "eval_time": "1m",
                             "exp_samples": [
-                                {"labels": '{__name__="' + record + '",' + labels + "}", "value": value}
+                                {
+                                    "labels": '{__name__="'
+                                    + record
+                                    + '"'
+                                    + ("," + labels if labels else "")
+                                    + "}",
+                                    "value": value,
+                                }
                             ],
                         }
                     )

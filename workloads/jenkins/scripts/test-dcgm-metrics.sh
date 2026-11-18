@@ -37,7 +37,7 @@ if [ ${DEEPOPS_FULL_INSTALL} ]; then
 fi
 
 # Get an up-to-date list of all DCGM metrics included in the default dashboard, with some awk magic
-dcgm_metrics=$(grep DCGM ${ROOT_DIR}/src/dashboards/gpu-dashboard.json   | awk -F\{ '{print $1}' | awk -F"DCGM" '{print "DCGM"$2}' | sort | uniq)
+dcgm_metrics=$(grep DCGM ${ROOT_DIR}/src/dashboards/gpu-nodes.json   | awk -F\{ '{print $1}' | awk -F"DCGM" '{print "DCGM"$2}' | sort | uniq)
 
 # Verify all DCGM metrics from the default dashboard are being returned by the DCGM-exporter
 for metric in ${dcgm_metrics}; do

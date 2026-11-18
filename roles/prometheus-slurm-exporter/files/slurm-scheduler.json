@@ -767,7 +767,7 @@
           },
           "yaxes": [
             {
-              "format": "\u00b5s",
+              "format": "µs",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -850,7 +850,7 @@
           },
           "yaxes": [
             {
-              "format": "\u00b5s",
+              "format": "µs",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -878,7 +878,9 @@
   ],
   "schemaVersion": 14,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "slurm"
+  ],
   "templating": {
     "list": []
   },
@@ -912,7 +914,8 @@
     ]
   },
   "timezone": "",
-  "title": "SLURM Dashboard",
+  "title": "Slurm / Scheduler",
   "version": 18,
-  "uid": "slurm"
+  "uid": "slurm-scheduler",
+  "description": "Slurm nodes, jobs and scheduler cycles."
 }

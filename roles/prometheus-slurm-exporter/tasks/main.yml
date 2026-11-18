@@ -19,29 +19,18 @@
     group: root
     mode: "0644"
 
-- name: Create data dir
-  ansible.builtin.file:
-    path: "{{ grafana_data_dir }}"
-    state: directory
-    owner: "{{ grafana_user_id }}"
-    mode: "0755"
+# Resolved here: inside the included grafana role, role_path names that role.
+- name: Locate the Slurm dashboard
+  ansible.builtin.set_fact:
+    slurm_exporter_dashboards: ["{{ role_path }}/files/slurm-scheduler.json"]
 
-- name: Create dashboard dir
-  ansible.builtin.file:
-    path: "{{ grafana_cfg_dashboard_path }}"
-    state: directory
-    owner: "{{ grafana_user_id }}"
-    mode: "0755"
-
-- name: Copy dashboards
-  ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ grafana_cfg_dashboard_path }}"
-    owner: "{{ grafana_user_id }}"
-    mode: "0644"
-  with_items:
-    - slurm-dashboard.json
-  notify: Restart grafana
+- name: Install the Slurm dashboard
+  ansible.builtin.include_role:
+    name: grafana
+    tasks_from: dashboards
+  vars:
+    grafana_dashboard_set: slurm
+    grafana_dashboard_files: "{{ slurm_exporter_dashboards }}"
 
 - name: Create image build dir
   ansible.builtin.file:
