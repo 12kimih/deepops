@@ -1,5 +1,5 @@
 ---
-- hosts: "{{ hostlist | default(slurm_monitoring_group | default('slurm-master')) }}"
+- hosts: "{{ hostlist | default('slurm-metric') }}"
   become: true
   tasks:
     - name: Configure the Slurm usage report
