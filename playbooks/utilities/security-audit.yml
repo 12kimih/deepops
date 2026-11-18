@@ -1,0 +1,22 @@
+---
+# Read-only security inventory of every host (scripts/validation/security_audit.sh).
+# Compare the hosts: a listener, export, package or setting on one node and not the
+# others is drift to explain, and anything a role does not declare is a finding.
+#
+#   ansible-playbook -K playbooks/utilities/security-audit.yml
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  gather_facts: false
+  tags:
+    - security-audit
+  tasks:
+    - name: Run the security inventory
+      ansible.builtin.script:
+        cmd: "{{ playbook_dir }}/../../scripts/validation/security_audit.sh"
+      register: security_audit
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Show the security inventory
+      ansible.builtin.debug:
+        msg: "{{ security_audit.stdout_lines }}"
