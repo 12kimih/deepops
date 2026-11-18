@@ -72,6 +72,53 @@ def node_unavailable(state):
     return None
 
 
+# --- Job states -------------------------------------------------------------------
+# squeue's short codes for the JSON state names. A job's JSON state is a list: the base
+# state, then flags such as COMPLETING or CONFIGURING, which squeue reports instead.
+
+JOB_CODES = {
+    "PENDING": "PD", "RUNNING": "R", "SUSPENDED": "S", "COMPLETING": "CG", "COMPLETED": "CD",
+    "CONFIGURING": "CF", "CANCELLED": "CA", "FAILED": "F", "TIMEOUT": "TO", "PREEMPTED": "PR",
+    "NODE_FAIL": "NF", "BOOT_FAIL": "BF", "DEADLINE": "DL", "OUT_OF_MEMORY": "OOM",
+    "STOPPED": "ST", "RESIZING": "RS", "REQUEUED": "RQ", "REQUEUE_HOLD": "RH",
+    "REQUEUE_FED": "RF", "RESV_DEL_HOLD": "RD", "SPECIAL_EXIT": "SE", "SIGNALING": "SI",
+    "STAGE_OUT": "SO", "REVOKED": "RV",
+}
+# States that still own their allocation. A finished job keeps a stale allocation
+# until the controller forgets it, so counting every allocation over-counts.
+_HOLDS = frozenset(("RUNNING", "COMPLETING", "CONFIGURING", "RESIZING", "SIGNALING",
+                    "SUSPENDED", "STOPPED", "STAGE_OUT"))
+_FINISHED = frozenset(("COMPLETED", "CANCELLED", "FAILED", "TIMEOUT", "PREEMPTED", "NODE_FAIL",
+                       "BOOT_FAIL", "DEADLINE", "OUT_OF_MEMORY", "REVOKED"))
+
+
+def job_code(state):
+    """The squeue code for a job's JSON state list: CG and CF win over the base state."""
+    flags = [f.upper() for f in state or []] or ["UNKNOWN"]
+    for flag in ("COMPLETING", "CONFIGURING"):
+        if flag in flags:
+            return JOB_CODES[flag]
+    return JOB_CODES.get(flags[0], flags[0])
+
+
+def job_holds(state):
+    """Does a job in this state still own its allocation?"""
+    return bool(_HOLDS & {f.upper() for f in state or []})
+
+
+def job_active(state):
+    """Would squeue list it by default: not finished, or still completing."""
+    flags = {f.upper() for f in state or []}
+    return "COMPLETING" in flags or not (flags & _FINISHED)
+
+
+def job_rank(code):
+    """Queue order of a state code: pending 0, holding resources 1, the rest 2."""
+    if code == "PD":
+        return 0
+    return 1 if code in ("R", "CG", "S", "ST", "CF", "RS", "SI", "SO") else 2
+
+
 # --- Pending reasons ----------------------------------------------------------------
 # Families after the grouping in Slurm's job_reason_codes page. The code itself is
 # what a tool shows: it is what squeue, sacct and the documentation use. The rules are

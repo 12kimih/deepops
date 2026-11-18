@@ -80,7 +80,8 @@ def main(src, dst):
     kept += [j for j in jobs if j not in kept][:max(0, JOBS_KEPT - len(kept))]
 
     out = {
-        "nodes": {"meta": raw["nodes"]["meta"], "nodes": [pick(n, NODE_FIELDS) for n in raw["nodes"]["nodes"]]},
+        "nodes": {"meta": raw["nodes"]["meta"],
+                  "nodes": [pick(n, NODE_FIELDS) for n in raw["nodes"]["nodes"]]},
         "partitions": {"meta": raw["partitions"]["meta"],
                        "partitions": [{"name": p["name"], "partition": {"state": p["partition"]["state"]},
                                        "nodes": {"configured": p["nodes"]["configured"]}}

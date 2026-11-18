@@ -39,6 +39,26 @@ class NodeStateTests(unittest.TestCase):
                 self.assertEqual(vocab.node_unavailable(flags), label)
 
 
+class JobStateTests(unittest.TestCase):
+    def test_codes_and_holding(self):
+        self.assertEqual(vocab.job_code(["RUNNING"]), "R")
+        self.assertEqual(vocab.job_code(["COMPLETED", "COMPLETING"]), "CG")
+        self.assertEqual(vocab.job_code(["PENDING", "CONFIGURING"]), "CF")
+        self.assertEqual(vocab.job_code(["OUT_OF_MEMORY"]), "OOM")
+        self.assertTrue(vocab.job_holds(["SUSPENDED"]))
+        self.assertFalse(vocab.job_holds(["COMPLETED"]))
+        self.assertFalse(vocab.job_holds(["PENDING"]))
+
+    def test_active_is_what_squeue_lists(self):
+        self.assertTrue(vocab.job_active(["PENDING"]))
+        self.assertTrue(vocab.job_active(["COMPLETED", "COMPLETING"]))
+        self.assertFalse(vocab.job_active(["COMPLETED"]))
+        self.assertFalse(vocab.job_active(["CANCELLED"]))
+
+    def test_rank(self):
+        self.assertEqual([vocab.job_rank(c) for c in ("PD", "R", "CG", "F")], [0, 1, 1, 2])
+
+
 class ReasonTests(unittest.TestCase):
     def test_families(self):
         cases = {

@@ -1,6 +1,5 @@
 """Shared test setup for the cluster tools: import paths, fixtures and a fake Slurm."""
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +27,6 @@ def run_tool(module, *args, env=None, path=True):
     e = {"PATH": f"{HERE / 'bin'}:/usr/bin:/bin" if path else "/usr/bin:/bin",
          "FIXTURES": str(FIXTURES), "LANG": "C.UTF-8", "COLUMNS": "120", "USER": "user1",
          **(env or {})}
-    code = (f"import sys; sys.path[:0] = {[str(ROLES / 'cluster_tools_lib/files'), str(ROLES / 'cluster_tools/files')]!r}; "
-            f"import {module}; sys.exit({module}.main())")
+    paths = [str(ROLES / "cluster_tools_lib/files"), str(ROLES / "cluster_tools/files")]
+    code = f"import sys; sys.path[:0] = {paths!r}; import {module}; sys.exit({module}.main())"
     return subprocess.run([sys.executable, "-I", "-c", code, *args], env=e, capture_output=True, text=True)
