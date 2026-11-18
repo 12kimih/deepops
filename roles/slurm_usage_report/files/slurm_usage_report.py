@@ -16,8 +16,8 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from clustertools.slurm import (GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_label, node_state,
-                                num, scontrol)
+from clustertools.slurm import GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_label, num, scontrol
+from clustertools.vocab import node_unavailable
 
 SLACK_API = "https://slack.com/api/"
 MAX_BLOCKS = 45      # Slack allows 50 blocks per message
@@ -70,7 +70,7 @@ def parse_nodes(data):
     gpus, unavailable = {}, []
     for node in data["nodes"]:
         gpus[node["name"]] = sum(int(n) for n in GPU_CONFIGURED.findall(node.get("gres") or ""))
-        state = node_state(node.get("state") or [])
+        state = node_unavailable(node.get("state") or [])
         if state:
             changed = num(node.get("reason_changed_at"))
             since = datetime.fromtimestamp(changed).isoformat(timespec="seconds") if changed else ""
