@@ -1,4 +1,27 @@
 ---
+- name: Remove the registry from this host
+  when: standalone_container_registry_state == 'absent'
+  block:
+    # Only where Docker runs; a host without it has no registry to remove.
+    - name: Check for the Docker daemon socket
+      ansible.builtin.stat:
+        path: /var/run/docker.sock
+      register: standalone_container_registry_docker
+
+    - name: Remove the registry container
+      community.docker.docker_container:
+        name: "{{ standalone_container_registry_name }}"
+        state: absent
+      when: standalone_container_registry_docker.stat.exists
+
+    - name: Remove the registry configuration
+      ansible.builtin.file:
+        path: "{{ standalone_container_registry_config_dir }}"
+        state: absent
+
+    - name: Stop here; the registry belongs elsewhere
+      ansible.builtin.meta: end_role
+
 - name: Create local directory for configuration
   ansible.builtin.file:
     path: "{{ standalone_container_registry_config_dir }}"

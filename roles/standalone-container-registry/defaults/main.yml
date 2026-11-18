@@ -5,6 +5,9 @@ epel_key_url: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible
 standalone_container_registry_image: "registry:3.1.2@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c"
 standalone_container_registry_port: "5000"
 standalone_container_registry_name: "deepops-registry"
+# absent removes the container and its config: the registry playbook applies it to
+# every host outside its target group, so a registry started elsewhere earlier goes.
+standalone_container_registry_state: present
 
 standalone_container_registry_config_template: "config.yml"
 

@@ -5,6 +5,9 @@ storage:
     rootdirectory: /var/lib/registry
 http:
   addr: "0.0.0.0:{{ standalone_container_registry_port }}"
+  # The debug server (pprof, metrics) is for this host only.
+  debug:
+    addr: "127.0.0.1:5001"
 log:
   accesslog:
     disabled: false
