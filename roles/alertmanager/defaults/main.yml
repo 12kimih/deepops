@@ -2,13 +2,14 @@
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_config_src: templates/alertmanager.yml.j2
 alertmanager_container: "prom/alertmanager:v0.34.1"
-# Port Alertmanager listens on. The container keeps its own default (9093, host
-# network); this only sets the Prometheus alertmanagers target, so change both together.
 alertmanager_port: 9093
-# Slack alerting. Empty leaves the receiver without a Slack config, so alerts go nowhere.
-# Set these in config/.
+# Slack incoming webhook. Empty leaves the receiver without Slack, so alerts go nowhere.
 alertmanager_slack_api_url: ""
 alertmanager_slack_channel: "#alerts"
+# Prepended to critical alerts, e.g. "<!subteam^S0123ABCD>" for a user group or "<!channel>".
+alertmanager_slack_critical_mention: ""
+alertmanager_repeat_interval: 4h
+alertmanager_critical_repeat_interval: 1h
 alertmanager_svc_name: "docker.alertmanager.service"
 alertmanager_docker_volume_name: "deepops_alertmanager_metrics"
 alertmanager_state: started
