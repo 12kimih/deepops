@@ -317,19 +317,6 @@ enroot_environ_config_files_dgx:
     content: |
       OMPI_MCA_btl_tcp_if_exclude=lo,docker0,ib0,ib1,ib2,ib3
 
-# Singularity configuration
-# Playbook: singularity, slurm-cluster
-# Singularity target version
-# set an alternate singularity version here;
-# see roles/singularity_wrapper/defaults/main.yml for default
-# singularity_version:
-singularity_conf_path: "/etc/singularity/singularity.conf"
-bind_paths: []
-  # example:
-  #- /mnt/shared
-golang_install_dir: '/opt/go/{{ golang_version }}'
-golang_gopath: /opt/go/packages
-
 ################################################################################
 # AUTH                                                                         #
 ################################################################################
@@ -365,20 +352,7 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 # controller itself still runs Ubuntu 22.04.
 maas_repo: "{{ 'ppa:maas/3.7' if ansible_distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
 
-# Defines if maas user should generate ssh keys
-# Usable for remote KVM/libvirt power actions
-maas_setup_user: false
-
 maas_single_node_install: true
-
-maas_kvm_management: false
-
-# Avoid installing python-libmaas via pip: it shadows the packaged MAAS CLI
-# with /usr/local/bin/maas, which breaks DeepOps' MAAS operational workflow.
-maas_python_reqs:
-  - jinja2
-  - oauth
-  - pyyaml
 
 ################################################################################
 # NVIDIA Datacenter GPU Manager                                                #
@@ -406,7 +380,10 @@ deepops_disable_cloud_init: true
 # Default profile when using NVIDIA MIG Manager: https://github.com/NVIDIA/mig-parted
 mig_manager_profile: all-disabled
 mig_manager_config: /etc/nvidia-mig-manager/config.yml
-mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
+# Optional, site-managed hooks file passed to `nvidia-mig-parted apply -k`.
+# DeepOps does not create this file. Leave empty to apply without custom hooks;
+# set a path only after provisioning and reviewing the hooks on every target.
+mig_manager_hooks: ""
 
 ################################################################################
 # Node networking                                                              #

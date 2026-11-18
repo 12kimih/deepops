@@ -48,7 +48,7 @@
       - make
       - -j
   environment:
-    CPPFLAGS: "-I {{ slurm_install_prefix }}/include/slurm"
+    CPPFLAGS: "-I {{ slurm_install_prefix }}/include"
   register: result
   changed_when: "result.stdout != \"make: Nothing to be done for 'all'.\""
   when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))

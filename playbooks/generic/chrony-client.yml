@@ -5,4 +5,4 @@
   tasks:
     - name: Configure Chrony client
       ansible.builtin.include_role:
-        name: DeepOps.chrony
+        name: deepops_chrony

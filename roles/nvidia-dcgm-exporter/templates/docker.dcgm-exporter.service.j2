@@ -3,6 +3,7 @@ Description=NVIDIA DCGM Exporter
 After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
+PartOf=docker.service
 
 [Service]
 TimeoutStartSec=0

@@ -15,13 +15,14 @@ Instructions for deploying a GPU cluster with Slurm
   - [Configuring shared filesystems](#configuring-shared-filesystems)
   - [Installing tools and applications](#installing-tools-and-applications)
   - [Installing Open on Demand](#installing-open-on-demand)
-  - [Pyxis, Enroot, and Singularity](#pyxis-enroot-and-singularity)
+  - [Pyxis and Enroot](#pyxis-and-enroot)
   - [Large deployments](#large-deployments)
   - [Identity across the cluster](#identity-across-the-cluster)
   - [Rebooting the cluster](#rebooting-the-cluster)
   - [When a node will not finish booting](#when-a-node-will-not-finish-booting)
   - [Out-of-band management](#out-of-band-management)
   - [Utility playbooks](#utility-playbooks)
+  - [Uninstalling Slurm](#uninstalling-slurm)
 
 ## Requirements
 
@@ -93,7 +94,7 @@ default parameters that can be overriden:
 ```bash
     # String; Container for nccl performance/validation tests. Either docker
     #   tag or can be path to sqsh file.
-    base_container: "nvcr.io/nvidia/tensorflow:21.09-tf2-py3"
+    base_container: "nvcr.io/nvidia/pytorch:26.04-py3"
 
     # String; Container to be created or one that might exist with nccl tests.
     #   If `compile_nccl_tests` is True, it must be a sqsh file.
@@ -172,17 +173,17 @@ NOTE: This will use Pyxis to download a container.
 
    ```bash
    ansible-playbook -l slurm-cluster playbooks/slurm-cluster/slurm-validation.yml \
-     -e '{base_container: nvcr.io/nvidia/pytorch:21.09-py3}' \
+     -e '{base_container: nvcr.io/nvidia/pytorch:26.04-py3}' \
      -e '{nccl_tests_container: "${HOME}/enroot_images/nccl_tests_torch_val.sqsh"}' \
      -e '{num_nodes: 2}' \
      -e '{srun_exports: "NCCL_DEBUG=INFO,OMPI_MCA_pml=^ucx,OMPI_MCA_coll=^hcoll"}' \
      -e '{cleanup: True}'
    ```
 
-3. Example to run on 1 node using existing NCCL container from a docker repo.
+3. Example to run on 1 node using an existing NCCL test container from a site registry.
    ```bash
    ansible-playbook -l slurm-cluster playbooks/slurm-cluster/slurm-validation.yml \
-     -e '{nccl_tests_container: deepops/nccl-tests-tf20.06-ubuntu18.04:latest}' \
+     -e '{nccl_tests_container: registry.example.com/hpc/nccl-tests:latest}' \
      -e '{compile_nccl_tests: False}' \
      -e '{num_nodes: 1}'
    ```
@@ -193,7 +194,7 @@ Pay attention to the playbook output in the terminal. The NCCL compilation and s
 
 Now that Slurm is installed, try a ["Hello World" example using MPI](../../workloads/examples/slurm/mpi-hello/README.md).
 
-Read through the [slurm usage guide](slurm-usage.md) and [Open OnDemand guide](ood.md) for more information.
+Read through the [slurm usage guide](slurm-usage.md) for more information.
 
 ## Customizing the Slurm configuration
 
@@ -243,6 +244,21 @@ for ready-to-copy examples.
 The default Slurm deployment includes a collection of prolog and epilog scripts that should be modified to suit a particular system.
 For more information, see the [prolog/epilog documentation](slurm-prolog-epilog/README.md).
 
+From release 26.11 the cleanup that runs when a user's job ends is job-scoped by default and no longer touches the user's other running jobs on the node; `slurm_epilog_cleanup_scope: user` restores the previous behaviour for one release. See [Job-scoped epilog cleanup](epilog-job-scoped-cleanup.md).
+
+### Lua plugins
+
+Slurm's Lua plugins (for example `JobSubmitPlugins=lua` or `CliFilterPlugins=lua`) only load when Slurm was built with Lua support. DeepOps does not request Lua support or install its development package by default; Slurm may still detect a preinstalled Lua library. To enable it, set the following in `config/group_vars/slurm-cluster.yml` and run the Slurm playbook:
+
+```yaml
+slurm_build_lua: true
+# Needed when Slurm is already installed at the configured version, otherwise
+# the build step is skipped and the existing binaries stay in place.
+slurm_force_rebuild: true
+```
+
+This installs the distribution's Lua development package (`liblua5.3-dev` on Ubuntu, `lua-devel` on RHEL-family systems; override the role variable `slurm_lua_deps` through Ansible extra vars to pick another version) and passes `--with-lua` to Slurm's `configure`. Place your `job_submit.lua` or `cli_filter.lua` in the Slurm configuration directory (`/etc/slurm` by default) and enable the plugin in `slurm.conf` as described in the [Slurm documentation](https://slurm.schedmd.com/job_submit_plugins.html).
+
 ## Node Health Check
 
 The default Slurm deployment includes setting up [Node Health Check](https://github.com/mej/nhc). This tool will run periodically on idle nodes to validate that the hardware and software is set up as expected. Nodes which fail this check will be automatically drained in Slurm to prevent jobs running on potentially broken nodes.
@@ -285,13 +301,15 @@ For information about configuring a shared NFS filesystem on your Slurm cluster,
 You may optionally choose to install a tool for managing additional packages on your Slurm cluster.
 See the documentation on [software modules](./software-modules.md) for information on how to set this up.
 
-## Installing Open on Demand
+## Open OnDemand
 
-[Open OnDemand](https://openondemand.org/) can be installed by setting the `install_open_ondemand` variable to yes before running the `slurm-cluster.yml` playbook.
+DeepOps no longer bundles an Open OnDemand installer. Sites that want the [Open OnDemand](https://openondemand.org/) HPC portal on their Slurm cluster should deploy it directly from the upstream project, following its own [installation documentation](https://osc.github.io/ood-documentation/latest/installation.html).
 
-## Pyxis, Enroot, and Singularity
+## Pyxis and Enroot
 
-[Pyxis](https://github.com/NVIDIA/pyxis) and [Enroot](https://github.com/NVIDIA/enroot) are installed by default and can be disabled by setting `slurm_install_enroot` and `slurm_install_pyxis` to no. Singularity can be installed by setting the `slurm_cluster_install_singularity` variable to yes before running the `slurm-cluster.yml` playbook.
+[Pyxis](https://github.com/NVIDIA/pyxis) and [Enroot](https://github.com/NVIDIA/enroot) are installed by default and can be disabled by setting `slurm_install_enroot` and `slurm_install_pyxis` to no. They are the supported, release-validated container runtime for Slurm in DeepOps.
+
+The DeepOps Singularity wrapper role has been retired. Singularity lives on upstream as [Apptainer](https://apptainer.org/); sites that still want it can install Apptainer/Singularity separately.
 
 ## Large deployments
 
@@ -351,3 +369,6 @@ See [out-of-band management](../deepops/bmc.md).
 
 [Utility playbooks](../deepops/utilities.md) lists every playbook for running the cluster
 after it is deployed -- power, reboots, NFS, GPU caps and the rest.
+## Uninstalling Slurm
+
+DeepOps has no automated Slurm uninstall playbook (the Kubernetes side has the Kubespray reset playbook, see [Reset the Cluster](../k8s-cluster/README.md#reset-the-cluster)). For the list of services, files, and system changes the Slurm playbook makes, and a manual procedure to undo them, see the [Slurm uninstall guide](./slurm-uninstall.md).

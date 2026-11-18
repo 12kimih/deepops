@@ -1,0 +1,4 @@
+# roles/deepops_hosts/vars/main.yml
+---
+
+hosts_file: /etc/hosts

@@ -1,5 +1,5 @@
 ---
-node_exporter_container: "quay.io/prometheus/node-exporter:v1.11.1"
+node_exporter_container: "quay.io/prometheus/node-exporter:v1.12.1"
 # Port node-exporter listens on. The container keeps its own default (9100, host network);
 # this only sets the scrape target.
 node_exporter_port: 9100

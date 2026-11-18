@@ -11,7 +11,7 @@ Instructions for deploying a GPU cluster with Kubernetes
     - [Persistent Storage](#persistent-storage)
       - [NFS Client Provisioner](#nfs-client-provisioner)
       - [Ceph Cluster (deprecated)](#ceph-cluster-deprecated)
-      - [NetApp Astra Trident](#netapp-astra-trident)
+      - [NetApp Trident](#netapp-trident)
     - [Monitoring](#monitoring)
     - [Logging](#logging)
       - [Centralized syslog](#centralized-syslog)
@@ -20,6 +20,7 @@ Instructions for deploying a GPU cluster with Kubernetes
     - [Load Balancer and Ingress](#load-balancer-and-ingress)
     - [Kubeflow](#kubeflow)
     - [NVIDIA Network Operator](#nvidia-network-operator)
+    - [Run:ai and KAI Scheduler](#runai-and-kai-scheduler)
   - [Cluster Maintenance](#cluster-maintenance)
     - [Adding Nodes](#adding-nodes)
     - [Removing Nodes](#removing-nodes)
@@ -114,12 +115,23 @@ The following components are completely optional and can be installed on an exis
 
 ### Kubernetes Dashboard
 
-Kubespray no longer ships the dashboard addon, so install the [Kubernetes Dashboard](https://github.com/kubernetes/dashboard) yourself first.
-Then run the following script to create an administrative user and print out the dashboard URL and access token:
+DeepOps does not install Kubernetes Dashboard. The pinned Kubespray release
+(v2.31.0) no longer ships the dashboard add-on; the former `dashboard_enabled`
+and dashboard image settings have no effect.
 
-```bash
-./scripts/k8s/deploy_dashboard_user.sh
-```
+If you need a dashboard, install and configure it separately using the
+[upstream Kubernetes Dashboard documentation](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/),
+including its authentication and access instructions. For air-gapped deployments,
+mirror the images and charts required by that installation separately; the
+Kubespray download step does not cache a dashboard add-on.
+
+The legacy `scripts/k8s/deploy_dashboard_user.sh` helper is not an installer. It
+assumes a `kubernetes-dashboard` Service already exists in `kube-system`, changes
+it to a NodePort, and creates a cluster-admin service account if it is missing.
+It also expects a legacy service-account token Secret. Do not use it as a setup
+step for a new DeepOps cluster or assume it works with a separately installed
+Dashboard version. The helper is unchanged; this guidance does not establish
+that its HTTPS access works.
 
 The script expects the dashboard service as `kubernetes-dashboard` in the `kube-system` namespace.
 On Kubernetes 1.24 and later it prints no token, because service-account token secrets are no longer created automatically; create one with `kubectl -n kube-system create token admin-user`.
@@ -128,7 +140,7 @@ On Kubernetes 1.24 and later it prints no token, because service-account token s
 
 #### NFS Client Provisioner
 
-The default behavior of DeepOps is to setup an NFS server on the first `kube_control_plane` node. This temporary NFS server is used by the `nfs-client-provisioner` which is installed as the default StorageClass of a standard DeepOps deployment.
+The default DeepOps Kubernetes storage path is the `nfs-subdir-external-provisioner` chart, backed by an NFS export on the first `kube_control_plane` node. This is a convenience default for examples, smoke tests, and small internal clusters. It is not a highly available production storage design.
 
 To use an existing NFS server, set the `k8s_nfs_server` and `k8s_nfs_export_path` variables in `config/group_vars/k8s_cluster.yml` and set the `k8s_deploy_nfs_server` to false in `config/group_vars/k8s_cluster.yml`. Additionally, the `k8s_nfs_mkdir` variable can be set to `false` if the export directory is already configured on the server.
 
@@ -138,13 +150,16 @@ To manually install or re-install the `nfs-client-provisioner` run:
 ansible-playbook playbooks/k8s-cluster/nfs-client-provisioner.yml
 ```
 
-To skip this installation set `k8s_nfs_client_provisioner` to `false`.
+To skip this installation, set `k8s_nfs_client_provisioner` to `false`.
 
 #### Ceph Cluster (deprecated)
 
-For a non-nfs based alternative, deploy a Ceph cluster running on Kubernetes for services that require persistent storage (such as Kubeflow):
+The Rook/Ceph helper is deprecated and community-supported. It predates the current Rook Helm chart layout and should not be used as a new production storage path without a site-owned Rook/Ceph design and validation plan.
+
+For legacy environments that still use this helper, deploy a Ceph cluster running on Kubernetes with:
 
 ```bash
+export DEEPOPS_ENABLE_DEPRECATED_ROOK=true
 ./scripts/k8s/deploy_rook.sh
 ```
 
@@ -154,9 +169,9 @@ Poll the Ceph status by running (this script will return when Ceph initializatio
 ./scripts/k8s/deploy_rook.sh -w
 ```
 
-#### NetApp Astra Trident
+#### NetApp Trident
 
-Deploy NetApp Astra Trident for services that require persistent storage (such as Kubeflow). Note that you must have a supported NetApp storage system/instance/service in order to use Astra Trident to provision persistent storage.
+The Trident role is optional and community-supported in DeepOps. Use it only when the site already has a supported NetApp storage system or service and a storage owner who can validate the backend, StorageClass, and snapshot policy against current NetApp documentation.
 
 1. Set configuration parameters.
 
@@ -164,7 +179,9 @@ Deploy NetApp Astra Trident for services that require persistent storage (such a
    vi config/group_vars/netapp-trident.yml
    ```
 
-2. Deploy Astra Trident using Ansible.
+   By default, the example configuration installs Trident but does not create a backend, StorageClass, or snapshot controller. Set `create_backends`, `create_StorageClasses`, or `enable_volume_snapshots` to `true` only after replacing the example backend values with site-specific storage details and auth values.
+
+2. Deploy Trident using Ansible.
 
    ```bash
    # NOTE: If SSH requires a password, add: `-k`
@@ -173,7 +190,7 @@ Deploy NetApp Astra Trident for services that require persistent storage (such a
    ansible-playbook -l k8s_cluster playbooks/k8s-cluster/netapp-trident.yml
    ```
 
-3. Verify that Astra Trident is running.
+3. Verify that Trident is running.
 
    ```bash
    ./tridentctl -n deepops-trident version
@@ -185,11 +202,11 @@ Deploy NetApp Astra Trident for services that require persistent storage (such a
    +----------------+----------------+
    | SERVER VERSION | CLIENT VERSION |
    +----------------+----------------+
-   | 22.01.0        | 22.01.0        |
+   | 26.02.1        | 26.02.1        |
    +----------------+----------------+
    ```
 
-For more information on Astra Trident, please refer to the [official documentation](https://docs.netapp.com/us-en/trident/index.html).
+For more information on Trident, refer to the [official documentation](https://docs.netapp.com/us-en/trident/index.html).
 
 ### Monitoring
 
@@ -260,6 +277,10 @@ For more information on Kubeflow, please refer to the [official documentation](h
 ### NVIDIA Network Operator
 
 NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage networking related components in a Kubernetes cluster. High performance networking in Kubernetes requires many components, such as Multus CNI, device drivers and plugins to be installed correctly, NVIDIA network operator aims to manage all those necessary components automatically under one operator framework to simplify the deployment, operation and management of NVIDIA networking for Kubernetes. To deploy NVIDIA network operator, please refer to the [NVIDIA Network Operator Deployment Guide in DeepOps](nvidia-network-operator.md), for more information on NVIDIA network operator, please refer to its [github](https://github.com/Mellanox/network-operator) page and this [solution guide](https://docs.nvidia.com/networking/display/COKAN10/Network+Operator).
+
+### Run:ai and KAI Scheduler
+
+Optional GPU-aware scheduling (queues, gang scheduling, fractional GPUs) on top of the GPU Operator, off by default. See the [Run:ai and KAI Scheduler guide](runai.md).
 
 ## Cluster Maintenance
 

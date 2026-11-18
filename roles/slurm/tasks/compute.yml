@@ -81,6 +81,17 @@
   notify: Restart slurmd
   tags: config
 
+- name: Validate slurm_epilog_cleanup_scope
+  ansible.builtin.assert:
+    that:
+      - slurm_epilog_cleanup_scope in ['job', 'user']
+    fail_msg: >-
+      slurm_epilog_cleanup_scope must be 'job' or 'user'
+      (got '{{ slurm_epilog_cleanup_scope }}').
+  tags:
+    - prolog
+    - epilog
+
 - name: Copy shared scripts
   ansible.builtin.template:
     src: "{{ item }}"
@@ -88,6 +99,46 @@
     mode: "0755"
   with_fileglob:
     - templates/etc/slurm/shared/bin/*
+  tags:
+    - prolog
+    - epilog
+
+- name: Warn that slurm_epilog_cleanup_scope user is deprecated
+  ansible.builtin.debug:
+    msg: >-
+      slurm_epilog_cleanup_scope: user restores the older user-scoped epilog
+      cleanup and is deprecated; see docs/slurm-cluster/epilog-job-scoped-cleanup.md.
+  when: slurm_epilog_cleanup_scope == 'user'
+  tags:
+    - prolog
+    - epilog
+
+- name: Create shared library directory for job-scoped epilog cleanup
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/shared/lib"
+    state: directory
+    owner: slurm
+    mode: "0755"
+  when: slurm_epilog_cleanup_scope == 'job'
+  tags:
+    - prolog
+    - epilog
+
+- name: Copy job-scoped epilog helpers
+  ansible.builtin.template:
+    src: etc/slurm/shared/lib/epilog-job-scope.sh
+    dest: "{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh"
+    mode: "0644"
+  when: slurm_epilog_cleanup_scope == 'job'
+  tags:
+    - prolog
+    - epilog
+
+- name: Remove job-scoped epilog helpers when the scope is user
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh"
+    state: absent
+  when: slurm_epilog_cleanup_scope == 'user'
   tags:
     - prolog
     - epilog
@@ -180,6 +231,31 @@
     - /etc/localusers
   tags:
     - localusers
+
+# A wrong -account line in /etc/pam.d/sshd locks operators out, and build.yml skips
+# the rebuild when the version already matches, so confirm the module is where
+# slurm_pam_lib_dir says before writing either block.
+- name: Locate the pam_slurm_adopt module
+  ansible.builtin.stat:
+    path: "{{ slurm_pam_lib_dir }}/pam_slurm_adopt.so"
+    follow: true
+  register: slurm_pam_adopt_module
+  tags:
+    - config
+  when: slurm_enable_pam_slurm_adopt
+
+- name: Fail when pam_slurm_adopt is missing from the selected directory
+  ansible.builtin.fail:
+    msg: >-
+      {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so is not a regular file, so
+      /etc/pam.d/sshd will not be pointed at it. Rebuild with
+      slurm_force_rebuild=true, or set slurm_pam_lib_dir to the directory the
+      installed module lives in.
+  tags:
+    - config
+  when:
+    - slurm_enable_pam_slurm_adopt
+    - not slurm_pam_adopt_module.stat.exists or not (slurm_pam_adopt_module.stat.isreg | default(false))
 
 - name: Configure /etc/pam.d/sshd to restrict node access without jobs
   ansible.builtin.blockinfile:

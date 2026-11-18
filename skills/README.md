@@ -1,0 +1,31 @@
+# DeepOps skills
+
+Reusable, self-contained procedures for operating DeepOps, written for AI
+agents and equally usable by humans. Each skill is a directory containing a
+`SKILL.md` with YAML frontmatter (`name`, `description`) followed by
+preconditions, exact commands, expected outputs, and failure branches.
+
+The format follows the emerging cross-tool agent-skills convention: agent
+frameworks that support skill discovery can load these directly, and any
+agent (or person) can simply read the relevant `SKILL.md` before acting.
+
+| Skill | Use when |
+|-------|----------|
+| [deploy-slurm-cluster](deploy-slurm-cluster/SKILL.md) | Deploying or rebuilding a Slurm GPU cluster. |
+| [deploy-k8s-gpu-cluster](deploy-k8s-gpu-cluster/SKILL.md) | Deploying or rebuilding a Kubernetes GPU cluster. |
+| [provision-with-maas](provision-with-maas/SKILL.md) | Provisioning, tagging, validating, or releasing machines through MAAS. |
+| [deploy-airgapped](deploy-airgapped/SKILL.md) | Preparing mirrors and deploying Slurm or Kubernetes without Internet access. |
+| [model-workflows](model-workflows/SKILL.md) | Choosing cache, single-node serving or fine-tuning readiness; identifying unsupported training or multi-node requests. |
+| [manage-model-cache](manage-model-cache/SKILL.md) | Preparing shared model files, pinning revisions, or diagnosing offline cache access. |
+| [serve-model](serve-model/SKILL.md) | Serving a cached snapshot on one GPU and validating a local completion endpoint. |
+| [finetune-model](finetune-model/SKILL.md) | Checking single-node training prerequisites without claiming training success. |
+| [deploy-runai-kai](deploy-runai-kai/SKILL.md) | Adding or removing optional KAI Scheduler / Run:ai, fractional-GPU scheduling. |
+| [validate-gpu-cluster](validate-gpu-cluster/SKILL.md) | Health checks and post-deploy verification. |
+| [diagnose-driver-install](diagnose-driver-install/SKILL.md) | NVIDIA driver failures, `nvidia-smi` errors, GPU pods crash-looping. |
+
+Start with [AGENTS.md](../AGENTS.md) at the repository root for orientation,
+golden paths, and operating rules.
+
+Contributions should keep skills honest: every command must work as written
+from a clean checkout, and failure branches should come from real observed
+failures, not speculation.

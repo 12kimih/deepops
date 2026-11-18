@@ -1,7 +1,7 @@
 ---
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_config_src: templates/alertmanager.yml.j2
-alertmanager_container: "prom/alertmanager:v0.32.2"
+alertmanager_container: "prom/alertmanager:v0.34.1"
 # Port Alertmanager listens on. The container keeps its own default (9093, host
 # network); this only sets the Prometheus alertmanagers target, so change both together.
 alertmanager_port: 9093

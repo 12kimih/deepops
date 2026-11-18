@@ -3,6 +3,7 @@ Description=Prometheus Slurm Exporter
 After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
+PartOf=docker.service
 
 [Service]
 TimeoutStartSec=0
@@ -10,8 +11,10 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
+{% if not slurm_exporter_build_image %}
 ExecStartPre=/usr/bin/docker pull {{ slurm_exporter_container }}
-ExecStart=/usr/bin/docker run --rm --network host --name %n -v {{ slurm_install_prefix }}/bin/sdiag:{{ slurm_install_prefix }}/bin/sdiag:ro -v {{ slurm_install_prefix }}/bin/sinfo:{{ slurm_install_prefix }}/bin/sinfo:ro -v {{ slurm_install_prefix }}/bin/squeue:{{ slurm_install_prefix }}/bin/squeue:ro -v {{ slurm_install_prefix }}/bin/sshare:{{ slurm_install_prefix }}/bin/sshare:ro -v /etc/slurm:/etc/slurm:ro -v {{ slurm_install_prefix }}/lib/slurm:{{ slurm_install_prefix }}/lib/slurm:ro -v /etc/hosts:/etc/hosts:ro -v /var/run/munge:/var/run/munge:ro {{ slurm_exporter_container }}
+{% endif %}
+ExecStart=/usr/bin/docker run --rm --network host --name %n{% for tool in ['sdiag', 'sinfo', 'squeue', 'sshare'] %} -v {{ slurm_install_prefix }}/bin/{{ tool }}:/usr/local/bin/{{ tool }}:ro{% endfor %} -v /etc/slurm:/etc/slurm:ro -v {{ slurm_install_prefix }}/lib:{{ slurm_install_prefix }}/lib:ro -v /etc/hosts:/etc/hosts:ro -v /var/run/munge:/var/run/munge:ro {{ slurm_exporter_container }}
 
 [Install]
 WantedBy=multi-user.target

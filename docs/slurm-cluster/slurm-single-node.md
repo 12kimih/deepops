@@ -11,7 +11,8 @@ Single Node Slurm Deployment Guide
     - [Allocating GPUs](#allocating-gpus)
     - [Running Containers](#running-containers)
       - [Rootless Docker](#rootless-docker)
-    - [Enroot and Singularity](#enroot-and-singularity)
+    - [Enroot and Pyxis](#enroot-and-pyxis)
+  - [Uninstalling](#uninstalling)
 
 ## Introduction
 
@@ -92,7 +93,7 @@ The general requirements and procedure for Slurm setup via deepops is documented
 
    b. Configuring `"config/group_vars/slurm-cluster.yml"`
 
-   Typically users cannot ssh as local users directly to compute nodes in a Slurm cluster without a Slurm reservation. However, since in this deployment a compute node also functions as a login node we need to add users to slurm configuration for the ability to ssh as local users. Again, this is needed when a compute node also functions as a login node. Additionally, set the singularity install option (which is no by default). Singularity can be used to run containers and it will be used to set up rootless options as well. Do not set a default NFS with single node deployment.
+   Typically users cannot ssh as local users directly to compute nodes in a Slurm cluster without a Slurm reservation. However, since in this deployment a compute node also functions as a login node we need to add users to slurm configuration for the ability to ssh as local users. Again, this is needed when a compute node also functions as a login node. Do not set a default NFS with single node deployment.
 
    ```bash
    vi config/group_vars/slurm-cluster.yml
@@ -101,7 +102,6 @@ The general requirements and procedure for Slurm setup via deepops is documented
    ```yaml
    slurm_enable_nfs_server: false
    slurm_enable_nfs_client_nodes: false
-   slurm_cluster_install_singularity: yes
 
    slurm_login_on_compute: true
 
@@ -331,8 +331,8 @@ attach to the tmux session in the adopted ssh session.
 
 ### Running Containers
 
-DeepOps enables running containers with several containerization platforms:
-docker, singularity, and enroot with pyxis.
+DeepOps enables running containers on Slurm with rootless Docker and with
+Enroot/Pyxis, which is installed by default.
 
 #### Rootless Docker
 
@@ -368,11 +368,11 @@ compute-session:start_rootless_docker.sh
 ```
 
 An option "--quiet" can be passed to the "start_rootless_docker.sh" script to
-hide rootless docker messages. Pull/run a docker image:
+hide rootless docker messages. Pull/run a site-maintained NCCL tests image:
 
 ```bash
 compute-session:docker run --gpus=all --rm -it \
-  deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
+  registry.example.com/hpc/nccl-tests:latest \
   mpirun --allow-run-as-root -np 2  all_reduce_perf -b 1M -e 4G -f 2 -g 1
 ```
 
@@ -386,7 +386,7 @@ module load rootless-docker
 
 start_rootless_docker.sh --quiet
 
-docker run --gpus=all --rm -t deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
+docker run --gpus=all --rm -t registry.example.com/hpc/nccl-tests:latest \
   mpirun --allow-run-as-root -np 2  all_reduce_perf -b 1M -e 4G -f 2 -g 1
 
 stop_rootless_docker.sh
@@ -403,7 +403,7 @@ starting the container and checking the number of GPUs and CPUs available.
 
 ```bash
 compute-session:docker run --gpus=all --rm -it \
-  deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
+  registry.example.com/hpc/nccl-tests:latest \
   bash -c 'echo NGPUS: $(nvidia-smi -L | wc -l) NCPUS: $(nproc)'
 NGPUS: 2 NCPUS: 2
 ```
@@ -416,7 +416,7 @@ already does not have permission to outside of the container.
 
 ```bash
 compute-session:docker run --gpus=all --rm -it -v ${PWD}:${PWD} --workdir=${PWD} \
-  deepops/nccl-tests-tf20.06-ubuntu18.04:latest bash -c 'touch somefile-in-container'
+  registry.example.com/hpc/nccl-tests:latest bash -c 'touch somefile-in-container'
 ```
 
 Then outside of the container.
@@ -434,14 +434,14 @@ outside of the container.
 
 ```bash
 compute-session:docker run --gpus=all --rm -it -v /etc/slurm:/slurm --workdir=${PWD} \
-  deepops/nccl-tests-tf20.06-ubuntu18.04:latest bash -c 'cat /slurm/slurmdbd.conf'
+  registry.example.com/hpc/nccl-tests:latest bash -c 'cat /slurm/slurmdbd.conf'
 cat: /slurm/slurmdbd.conf: Permission denied
 ```
 
 Rootless docker supports building containers and many standard docker features
 with a few limitations. These limitations can make it challenging to run
 multi node Slurm jobs, therefore for multi node jobs on Slurm the recommended
-approach is via enroot or singularity.
+approach is via Enroot/Pyxis.
 
 A user can explicitly stop the rootless docker daemon with "stop_rootless_docker.sh"
 script, or just exit the Slurm session. Upon exit from a slurm session the
@@ -458,19 +458,21 @@ login-session:$
 These scripts "start_rootless_docker.sh" and "stop_rootless_docker.sh" appear
 on a user's path upon loading the rootless docker module.
 
-### Enroot and Singularity
+### Enroot and Pyxis
 
-Singularity and enroot could also be deployed via DeepOps. These would be
-useful for multi-node jobs if running on more than one DGX system.
-Enroot with pyxis can be tested by running:
+Enroot with Pyxis is installed by DeepOps by default and is the supported
+container runtime for multi-node jobs across more than one DGX system.
+It can be tested by running:
+
+The examples below use `registry.example.com/hpc/nccl-tests:latest` as a placeholder for a site-maintained NCCL tests image.
 
 ```bash
 login-session:srun --mpi=pmi2 --ntasks=2 --gpus-per-task=1 \
-  --container-image=deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
+  --container-image=registry.example.com/hpc/nccl-tests:latest \
   all_reduce_perf -b 1M -e 4G -f 2 -g 1
 ```
 
-The pyxis+enroot is invoked via option `--container-image=deepops/nccl-tests-tf20.06-ubuntu18.04:latest`
+The pyxis+enroot is invoked via option "--container-image=registry.example.com/hpc/nccl-tests:latest"
 to run the "all_reduce_perf" nccl test. Refer to enroot and pyxis documentation
 for further details.
 
@@ -490,7 +492,7 @@ Then invoke as:
 
 ```bash
 login-session:srun --ntasks=2 --gpus-per-task=1 --no-container-remap-root \
-  --container-image=deepops/nccl-tests-tf20.06-ubuntu18.04:latest --container-workdir=${PWD} \
+  --container-image=registry.example.com/hpc/nccl-tests:latest --container-workdir=${PWD} \
   test-allreduce.sh
 ```
 
@@ -502,25 +504,19 @@ will typically be inferred from the environment. Calling mpirun approach could
 be useful, because certain binding options are not available to srun directly,
 but can be set via mpirun.
 
-Singularity could be used in a similar fashion to enroot. Don't forget the
-"--nv" option for GPUs.
+The DeepOps Singularity wrapper role has been retired, so DeepOps no longer
+installs Singularity. Singularity lives on upstream as
+[Apptainer](https://apptainer.org/); if your site installs Apptainer/Singularity
+separately, it can run the same containers with `singularity exec --nv` (remember
+the "--nv" option for GPUs). Enroot/Pyxis is the supported path and excels at
+running containerized multi node jobs, which is somewhat difficult and less
+convenient to do using docker on Slurm.
 
-```bash
-login-session:srun --mpi=pmi2 --ntasks=2 --gpus-per-task=1 \
-  singularity exec --nv docker://deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
-    all_reduce_perf -b 1M -e 4G -f 2 -g 1
-```
+## Uninstalling
 
-Similarly to invoke mpirun with singularity run script (same script as was used
-with enroot):
-
-```bash
-login-session:srun --ntasks=2 --gpus-per-task=1 \
-  singularity exec --nv docker://deepops/nccl-tests-tf20.06-ubuntu18.04:latest \
-    ${PWD}/test-allreduce.sh
-```
-
-Refer to singularity documentation for further details. Building containers with
-singularity is permitted to non-privileged users via the "--fakeroot" option.
-Enroot and singularity excel at running containerized multi node jobs, which is
-somewhat difficult and less convenient to do using docker on Slurm.
+There is no automated uninstall for a single-node Slurm deployment. The
+[Slurm uninstall guide](./slurm-uninstall.md) lists the main services, paths, and
+system changes to review, including the `slurm_login_on_compute`
+specifics (the `DeviceAllow` property on the SSH unit and the `/etc/localusers`
+PAM rule), and gives a step-by-step manual procedure. On a single node, run
+both the controller and compute steps on the same machine.
