@@ -25,6 +25,7 @@ Usage: normalize-ansible-style.py [--check] PATH...
 """
 import os
 import re
+import subprocess
 import sys
 
 BUILTIN = set("""
@@ -229,8 +230,8 @@ def indent_sequences(lines):
     return lines
 
 
-# Same exclusions as .yamllint, plus Jinja templates which are not YAML yet.
-SKIP_DIRS = re.compile(r"(^|/)(submodules|roles/galaxy|\.ansible|\.venv|collections|config|templates|\.git)(/|$)")
+# Jinja templates are not YAML until rendered.
+TEMPLATES = re.compile(r"(^|/)templates/")
 
 
 def is_ansible(path, lines):
@@ -349,15 +350,22 @@ def normalize(text, path):
 
 
 def targets(paths):
+    """The given files, and the repository's YAML files under the given directories.
+
+    The repository's files are the ones git sees: tracked, or new and not ignored.
+    .gitignore is the one list of what is not ours (environments, installed
+    collections, site config); submodules are their own repositories.
+    """
     for p in paths:
         if os.path.isfile(p):
             yield p
             continue
-        for root, dirs, files in os.walk(p):
-            dirs[:] = [d for d in dirs if not SKIP_DIRS.search(os.path.relpath(os.path.join(root, d)))]
-            for f in files:
-                if f.endswith((".yml", ".yaml")):
-                    yield os.path.relpath(os.path.join(root, f))
+        listed = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard",
+                                 "--", f"{p}/*.yml", f"{p}/*.yaml"],
+                                capture_output=True, text=True, check=True).stdout
+        for f in sorted(set(listed.split("\0")) - {""}):
+            if os.path.isfile(f) and not TEMPLATES.search(f):
+                yield os.path.relpath(f)
 
 
 def main(argv):
