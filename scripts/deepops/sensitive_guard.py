@@ -72,8 +72,8 @@ def git(*args: str, input_text: str | None = None) -> str:
 
 
 def mapping_keys(path: Path, variable: str) -> list[str]:
-    """Keys of a top-level block mapping `variable:` with scalar entries."""
-    keys, inside = [], False
+    """Direct keys of a top-level block mapping `variable:`; nested mappings are skipped."""
+    keys, inside, indent = [], False, None
     for line in path.read_text().splitlines():
         if not inside:
             inside = re.fullmatch(rf"{re.escape(variable)}:\s*", line) is not None
@@ -82,6 +82,10 @@ def mapping_keys(path: Path, variable: str) -> list[str]:
             continue
         if not line[:1].isspace():
             break
+        depth = len(line) - len(line.lstrip())
+        indent = depth if indent is None else indent
+        if depth != indent:
+            continue
         match = re.match(r"\s+([^\s:#'\"][^:]*?|'[^']+'|\"[^\"]+\"):(?:\s|$)", line)
         if match:
             keys.append(match.group(1).strip("'\""))
