@@ -23,7 +23,7 @@
       ansible.builtin.include_role:
         name: nvidia_container_toolkit
       when:
-        - ansible_facts.local['gpus']['count'] | int > 0
+        - ansible_facts.ansible_local['gpus']['count'] | int > 0
         - >
           (ansible_facts.distribution == "Ubuntu" and ansible_facts.distribution_version is version('22.04', '>='))
           or

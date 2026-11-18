@@ -2,6 +2,8 @@
 # plus common facts of other platforms; interface-named facts (ansible_eth0) are left
 # out. normalize-ansible-style.py rewrites ansible_<name> to ansible_facts.<name>:
 # ansible-core 2.22 deprecates injecting facts as top-level variables (removed in 2.24).
+# Local facts are the one exception: ansible_facts keeps their prefix, so ansible_local
+# becomes ansible_facts.ansible_local. test_fact_names.py checks this list against Ansible.
 all_ipv4_addresses
 all_ipv6_addresses
 apparmor
@@ -51,7 +53,6 @@ iscsi_iqn
 kernel
 kernel_version
 loadavg
-local
 locally_reachable_ips
 lsb
 lvm
