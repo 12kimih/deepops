@@ -40,6 +40,18 @@
 
 
 ################################################################################
+# NODE USER POLICY                                                             #
+################################################################################
+# What users may leave running outside a Slurm job (roles/node_user_policy). Lingering
+# (loginctl enable-linger) starts a user's services outside any job, so on a compute
+# node they escape its cgroup: only the admins keep it, and only root may enable it.
+# Crontabs stay open on the login node (jobs there run under the per-user limits) and
+# are closed on compute nodes, where they would run outside every job.
+#node_user_policy_manage_linger: true
+#node_user_policy_linger_users: "{{ cluster_admins }}"
+#node_user_policy_cron_users: "{{ none if inventory_hostname in groups['slurm-login'] | default([]) else cluster_admins }}"
+
+################################################################################
 # NETWORK                                                                      #
 ################################################################################
 # The cluster's internal network (CIDR): the one place it is written. NFS exports are

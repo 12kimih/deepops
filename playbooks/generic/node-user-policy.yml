@@ -1,0 +1,9 @@
+---
+# What users may leave running outside a Slurm job (roles/node_user_policy): lingering
+# and crontabs. Preview with --check --diff.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - node-user-policy
+  roles:
+    - role: node_user_policy

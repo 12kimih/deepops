@@ -103,6 +103,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nhc
 │   ├── nis_client
 │   ├── nis_server
+│   ├── node_user_policy
 │   ├── nvidia-dcgm-exporter
 │   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware

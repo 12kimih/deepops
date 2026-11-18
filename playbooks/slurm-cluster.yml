@@ -222,6 +222,12 @@
   tags:
     - root-access
 
+- name: Limit what users leave running outside Slurm jobs
+  import_playbook: generic/node-user-policy.yml
+  tags:
+    - node-user-policy
+    - people
+
 - name: Publish the site's commands, shell defaults and login banner
   import_playbook: slurm-cluster/cluster-tools.yml
   tags:
