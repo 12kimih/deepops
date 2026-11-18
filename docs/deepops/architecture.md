@@ -103,6 +103,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware
 │   ├── nvidia-gpu-operator
+│   ├── nvidia-gpu-operator-node-prep
 │   ├── nvidia-gpu-tests
 │   ├── nvidia-k8s-gpu-device-plugin
 │   ├── nvidia-k8s-gpu-feature-discovery
@@ -118,6 +119,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia_power_limit
 │   ├── openmpi
 │   ├── prometheus
+│   ├── prometheus-ipmi-exporter
 │   ├── prometheus-node-exporter
 │   ├── prometheus-slurm-exporter
 │   ├── pyxis
@@ -127,6 +129,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── runai
 │   ├── serial_console
 │   ├── slurm
+│   ├── slurm_usage_report
 │   ├── spack
 │   └── standalone-container-registry
 ```
