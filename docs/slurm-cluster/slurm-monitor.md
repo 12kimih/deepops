@@ -121,7 +121,7 @@ Prometheus evaluates the alert rules in `roles/prometheus/files/rules/`, grouped
 targets (a host is down only when none of its exporters answer; one silent exporter is
 an exporter alert), host (disk, inodes, memory, clock, failed or unresponsive systemd,
 ECC, RAID, NIC errors), GPU (XID, missing GPUs, row remapping, temperature, PCIe replays),
-power (PSU and BMC sensors) and the monitoring stack itself. Add site rules with
+power (PSU, BMC sensors, and chassis intrusion as a warning, since it is a latched event cleared in the BMC) and the monitoring stack itself. Add site rules with
 `prometheus_extra_rule_files`. Check rule state at http://\<slurm-metric ip\>:9090/alerts.
 `tests/monitoring/alert-rules.test.yml` unit-tests the rules with `promtool test rules`.
 

@@ -99,12 +99,14 @@ tests:
             exp_annotations:
               summary: "Cooling or drive fault reported by the BMC of n1"
 
-  - name: BMC sensors of every type, PSU separately
+  - name: BMC sensors of every type, PSU and chassis intrusion separately
     interval: 1m
     input_series:
       - series: 'ipmi_temperature_state{host="n1", name="CPU1 Temp"}'
         values: '2x10'
       - series: 'ipmi_sensor_state{host="n1", name="PS1 Status", type="Power Supply"}'
+        values: '2x10'
+      - series: 'ipmi_sensor_state{host="n1", name="Chassis Intru", type="Physical Security"}'
         values: '2x10'
     alert_rule_test:
       - eval_time: 6m
@@ -120,6 +122,13 @@ tests:
             exp_annotations:
               summary: "Power supply PS1 Status on n1 reports a fault"
               description: "A failed or unplugged PSU leaves the server without redundancy."
+      - eval_time: 6m
+        alertname: ChassisIntrusion
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, name: "Chassis Intru", type: "Physical Security"}
+            exp_annotations:
+              summary: "Chassis intrusion reported by the BMC of n1"
+              description: "The cover was opened, or an old intrusion event was never cleared. Check the node, then clear the event in the BMC."
 
   - name: a GPU disappearing keeps alerting
     interval: 1m
