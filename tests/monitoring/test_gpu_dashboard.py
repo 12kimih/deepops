@@ -133,13 +133,14 @@ class GpuDashboardTests(unittest.TestCase):
                 # Assert representative host/GPU panels select the chosen node.
                 # Queries deduplicate on the dimension they draw (max, max by (gpu)), so a
                 # label change on the scrape target never splits one line into two.
-                gpu_index = re.search(r'gpu="([^"]+)"', gpu_labels).group(1)
+                gpu_match = re.search(r'gpu="([^"]+)"', gpu_labels)
+                gpu_by = f'gpu="{gpu_match.group(1)}"' if gpu_match else ""
                 for expr, value, labels in (
                     (f'max(node_load1{{instance="{node}"}})', 2, ""),
                     (
                         f'max by (gpu) (DCGM_FI_DEV_POWER_USAGE{{instance="{gpu}"}})',
                         100,
-                        f'gpu="{gpu_index}"',
+                        gpu_by,
                     ),
                 ):
                     record = next(r["record"] for r in rules if r["expr"] == expr)
