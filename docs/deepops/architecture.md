@@ -27,7 +27,7 @@ Template folder for `config` folder generated after running `scripts/setup.sh`.
 ```
 
 ## docs
-Documentation for all DeepOps functionality. 
+Documentation for all DeepOps functionality.
 ```bash
 ├── docs
 │   ├── airgap
@@ -59,20 +59,23 @@ Playbooks run via Ansible as part of complete Slurm or Kubernetes installation o
 │   └── utilities
 ```
 
- 
+
 ## roles
 Roles run as part of the various playbooks. Includes default values and tasks as well.
-```bash
+<!-- BEGIN GENERATED: role-tree -->
+```text
 ├── roles
+│   ├── ai_agent_rules
 │   ├── alertmanager
 │   ├── autofs
 │   ├── bmc
 │   ├── cachefilesd
 │   ├── cluster_sudoers
 │   ├── cluster_tools
+│   ├── cluster_tools_lib
+│   ├── container_image
 │   ├── deepops_chrony
 │   ├── deepops_hosts
-│   ├── deepops_users
 │   ├── default_target
 │   ├── dns-config
 │   ├── docker
@@ -118,6 +121,8 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia_power_limit
 │   ├── openmpi
+│   ├── os_updates
+│   ├── people
 │   ├── prometheus
 │   ├── prometheus-ipmi-exporter
 │   ├── prometheus-node-exporter
@@ -133,9 +138,10 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── spack
 │   └── standalone-container-registry
 ```
+<!-- END GENERATED: role-tree -->
 
 ## scripts
-Various scripts used to setup environments and collect information. 
+Various scripts used to setup environments and collect information.
 ```bash
 ├── scripts
 │   ├── airgap
@@ -147,7 +153,7 @@ Various scripts used to setup environments and collect information.
 ```
 
 ## src
-Contains some source material such as GPU Dashboard for Grafana. 
+Contains some source material such as GPU Dashboard for Grafana.
 ```bash
 ├── src
 │   ├── containers
@@ -172,7 +178,7 @@ Various resources for setting up virtual envs used with DeepOps
 ```
 
 ## workloads
-Sample workloads which one can use after setting up their cluster. 
+Sample workloads which one can use after setting up their cluster.
 ```bash
 └── workloads
     ├── bit
