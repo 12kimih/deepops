@@ -37,11 +37,6 @@ def all_panels(dash):
         yield from panels(row.get("panels", []))
 
 
-# Slurm / Scheduler predates native panels; it is rewritten on Slurm's own metrics with
-# the Slurm 26.05 upgrade, which retires its exporter.
-LEGACY_PANELS = {"slurm-scheduler"}
-
-
 class DashboardConventionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -74,8 +69,6 @@ class DashboardConventionTests(unittest.TestCase):
 
     def test_gaps_stay_gaps(self):
         for path, dash in self.dashboards:
-            if dash["uid"] in LEGACY_PANELS:
-                continue
             for panel in all_panels(dash):
                 with self.subTest(path=str(path), panel=panel.get("title")):
                     self.assertNotEqual(panel.get("type"), "graph")

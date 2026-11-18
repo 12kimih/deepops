@@ -56,6 +56,11 @@ fixed UID, so links survive renames:
 | Slurm / Scheduler | `slurm-scheduler` | nodes, jobs and scheduler statistics | `prometheus-slurm-exporter` |
 | Node Exporter / Hosts | `node-exporter-hosts` | per-host detail (grafana.com 1860 "Node Exporter Full", revision 46) | `grafana` |
 
+The dashboards deepops builds are Python (`scripts/dashboards/`, shared building blocks in
+`grafana.py`); `scripts/dashboards/build.py` writes the JSON the roles ship, and the
+checks fail when that JSON is stale. Edit the Python, never the JSON. Node Exporter / Hosts
+is the upstream file, kept as is.
+
 Each role installs its dashboards into its own subdirectory and removes the ones it no
 longer ships; Grafana then deletes those, so the files are the only source of truth.
 The folder has a fixed UID (`grafana_dashboard_folder_uid`). File provisioning does not
@@ -129,7 +134,7 @@ an exporter alert), host (disk, inodes, memory, clock, failed or unresponsive sy
 ECC, RAID, NIC errors), GPU (XID, missing GPUs, row remapping, temperature, PCIe replays),
 power (PSU, BMC sensors, and chassis intrusion as a warning, since it is a latched event cleared in the BMC) and the monitoring stack itself. Add site rules with
 `prometheus_extra_rule_files`. Check rule state at http://\<slurm-metric ip\>:9090/alerts.
-`tests/monitoring/alert-rules.test.yml` unit-tests the rules with `promtool test rules`.
+The alert-rules test files in `tests/monitoring/` (one per evaluation interval) unit-test the rules with `promtool test rules`.
 
 The always-firing `Watchdog` alert proves the whole path works. Point
 `alertmanager_heartbeat_url` at an external check (for example a healthchecks.io ping
