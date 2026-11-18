@@ -5,15 +5,17 @@ series against the shipped alert rules in `roles/prometheus/files/rules/`. Add a
 every new rule, and check each metric's meaning against the exporter's `# HELP` text (the
 IPMI chassis fault states, for one, use 1 for "no fault").
 
-## GPU Nodes dashboard checks
-
-Run without a cluster using Python 3 and Prometheus's `promtool`:
+Run without a cluster:
 
 ```sh
-python3 -m unittest discover -s tests/monitoring -v
-# If promtool is not on PATH:
-PROMTOOL=/path/to/promtool python3 -m unittest discover -s tests/monitoring -v
+cd tests/monitoring && python3 -m unittest discover -s . -v
 ```
+
+promtool comes from `$PROMTOOL`, else `promtool` on PATH, else the Prometheus image the
+role deploys (`prometheus_container`) through docker (`promtool_runner.py`), so the
+checks use the deployed version. Without promtool or docker the tests are skipped.
+
+## GPU Nodes dashboard checks
 
 The checks load `src/dashboards/gpu-dashboard.json`, check every exporter
 selector, and execute the variable queries and all panel expressions using
