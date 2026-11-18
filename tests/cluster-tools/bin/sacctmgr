@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 # Fake sacctmgr: serves the fixture for `sacctmgr --json show qos|assoc`.
+[[ -n "${FAKE_DBD_SLEEP:-}" ]] && sleep "$FAKE_DBD_SLEEP"   # a slurmdbd that does not answer
 for a in "$@"; do case "$a" in qos) exec cat "$FIXTURES/qos.json" ;; assoc) exec cat "$FIXTURES/assoc.json" ;; esac; done
 echo "sacctmgr: unsupported fake call: $*" >&2; exit 1

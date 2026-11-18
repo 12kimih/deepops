@@ -8,7 +8,6 @@ itself, so a script reads the same figures a person sees.
 import json
 import os
 import pwd
-import subprocess
 import sys
 
 from clustertools import slurm
@@ -270,7 +269,7 @@ def main(argv=None):
         if args.usage:
             try:
                 jobs = slurm.scontrol("show", "jobs")
-            except subprocess.CalledProcessError as e:
+            except slurm.FAILURES as e:
                 usage_error = slurm.failure(e)
         usage = args.usage and not usage_error
         model = build(qos_data, assoc_data, jobs, args.user or _me(), usage, args.mine, args.all)

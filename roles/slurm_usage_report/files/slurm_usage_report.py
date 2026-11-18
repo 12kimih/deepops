@@ -17,7 +17,7 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from clustertools.slurm import GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_label, num, scontrol
+from clustertools.slurm import FAILURES, GPU_CONFIGURED, GPU_REQUESTED, job_gpus, job_label, num, scontrol
 from clustertools.vocab import node_unavailable
 
 SLACK_API = "https://slack.com/api/"
@@ -457,7 +457,7 @@ def report_once():
 def main():
     try:
         report_once()
-    except (subprocess.CalledProcessError, RuntimeError, OSError, ValueError) as e:
+    except (*FAILURES, RuntimeError, OSError, ValueError) as e:
         print(f"slurm-usage-report: {e}", file=sys.stderr)
         return 1
     return 0
