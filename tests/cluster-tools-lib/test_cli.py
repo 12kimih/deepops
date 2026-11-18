@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools.cli import Command, Opt  # noqa: E402
+from clustertools.cli import COMPLETERS, Command, Opt  # noqa: E402
 
 CMD = Command(
     "demo",
@@ -78,7 +78,8 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("complete -F _demo demo", script)
         self.assertIn("--no-users", script)
-        self.assertIn('-p|--partition) COMPREPLY=($(compgen -W "$(sinfo -h -o %R', script)
+        # Wired to the completer as defined, so the test follows the definition.
+        self.assertIn(f'-p|--partition) COMPREPLY=($(compgen -W "$({COMPLETERS["partitions"]})"', script)
         self.assertIn("--theme)", script)
 
     def test_themes_lists_flavours(self):
