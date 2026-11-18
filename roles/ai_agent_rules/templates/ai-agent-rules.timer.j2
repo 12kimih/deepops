@@ -1,0 +1,12 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Refresh the AI agent rules {{ ai_agent_rules_schedule }}
+
+[Timer]
+OnCalendar={{ ai_agent_rules_schedule }}
+OnBootSec=5min
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

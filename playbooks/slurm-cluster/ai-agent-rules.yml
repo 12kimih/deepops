@@ -1,0 +1,10 @@
+---
+# Give AI coding agents on every node the site's agent rules (roles/ai_agent_rules).
+# No-op until ai_agent_rules_url is set in config/group_vars.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tags:
+    - ai-agent-rules
+  roles:
+    - ai_agent_rules
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
