@@ -28,7 +28,10 @@ step "ansible.cfg has only known settings" ansible-config validate
 step "Galaxy collections and roles match roles/requirements.yml" "${python}" scripts/deepops/galaxy.py --check
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
-step "yamllint" yamllint --no-warnings .
+# The repository's YAML is what git sees (tracked, or new and not ignored): .gitignore
+# is the one list of what is not ours.
+mapfile -d '' yaml_files < <(git ls-files -z --cached --others --exclude-standard -- '*.yml' '*.yaml')
+step "yamllint" yamllint --no-warnings "${yaml_files[@]}"
 
 if ! "${fast}"; then
     step "unit tests (scripts/validation/tests)" "${python}" -m unittest discover -s scripts/validation/tests -q

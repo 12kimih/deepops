@@ -10,15 +10,16 @@
 
 extends: default
 
-# Jinja2 / Helm chart templates under any templates/ dir are not valid
-# standalone YAML, so they are excluded from linting.
+# scripts/check.sh lints the files git sees, so .gitignore decides what is not ours
+# (environments, installed collections, site config). Listed here: Jinja2 / Helm
+# templates, which are not YAML until rendered, and the trees a bare `yamllint .`
+# would otherwise walk into.
 ignore: |
   /submodules/
   /roles/galaxy/
-  /.ansible/
-  /.venv/
   /collections/
   /config/
+  /.venv*/
   **/templates/**
 
 rules:
