@@ -16,8 +16,12 @@ pyxis_container_scope: job
 pyxis_sbatch_support: 1
 pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 
-is_controller: false
-is_compute: false
+# A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
+# the controller group, slurmd on the compute group, client-only elsewhere.
+slurm_controller_group: slurm-master
+slurm_compute_group: slurm-node
+is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"
+is_compute: "{{ inventory_hostname in (groups[slurm_compute_group] | default([])) }}"
 
 # pyxis builds a SPANK plugin against the deployed Slurm headers, so it needs a
 # compiler toolchain (build-essential / @Development Tools) in addition to the

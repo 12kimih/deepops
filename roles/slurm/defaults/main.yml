@@ -71,8 +71,12 @@ slurm_enable_ha: false
 # set it to your shared path (e.g. /sw/slurm) in config/group_vars.
 slurm_ha_state_save_location: "{{ deepops_dir }}/slurm/state"
 
-is_controller: false
-is_compute: false
+# A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
+# the controller group, slurmd on the compute group, client-only elsewhere.
+slurm_controller_group: slurm-master
+slurm_compute_group: slurm-node
+is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"
+is_compute: "{{ inventory_hostname in (groups[slurm_compute_group] | default([])) }}"
 
 # Controls when a DOWN node will be returned to service. 2 lets nodes auto-recover
 # after a clean RebootProgram cycle (driver/firmware updates); 1 leaves them DOWN

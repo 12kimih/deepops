@@ -7,7 +7,7 @@
   register: undrain_nodes_result
   ignore_errors: true
   with_items:
-    - "{{ groups['slurm-node'] }}"
+    - "{{ groups[slurm_compute_group] }}"
   environment:
     PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_env.PATH }}"
   run_once: true

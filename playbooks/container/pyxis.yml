@@ -1,18 +1,4 @@
 ---
-- hosts: slurm-master
-  tasks:
-    - name: Set controller fact
-      ansible.builtin.set_fact:
-        is_controller: true
-      tags: always
-
-- hosts: slurm-node
-  tasks:
-    - name: Set compute fact
-      ansible.builtin.set_fact:
-        is_compute: true
-      tags: always
-
 - hosts: slurm-cluster
   become: true
   tasks:
