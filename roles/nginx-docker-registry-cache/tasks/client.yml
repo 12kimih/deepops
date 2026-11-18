@@ -1,4 +1,18 @@
 ---
+# The proxy generates its CA on first start. Read it from the cache host over the
+# Ansible connection (authenticated), not from the proxy over plain HTTP: whoever can
+# answer that HTTP request would otherwise choose a CA every client trusts system-wide.
+- name: Read the proxy's CA certificate from the cache host
+  ansible.builtin.slurp:
+    src: "{{ nginx_docker_cache_ca_path }}/ca.crt"
+  delegate_to: "{{ groups[nginx_docker_cache_hostgroup][0] }}"
+  run_once: true
+  register: nginx_docker_cache_live_ca
+  until: nginx_docker_cache_live_ca is succeeded
+  retries: 5
+  delay: 10
+  when: nginx_docker_cache_ca is not defined
+
 - name: Set up Ubuntu client
   ansible.builtin.include_tasks: client-ubuntu.yml
   when: ansible_facts.distribution == 'Ubuntu'
