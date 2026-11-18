@@ -53,13 +53,26 @@ class TextfileTests(unittest.TestCase):
     def test_each_gpu_carries_its_own_type_and_joins_its_node(self):
         jobs = {"jobs": [running(1, "u", "gpu[1-2]", ["gpu:a10:1(IDX:0)", "gpu:a30:1(IDX:3)"]),
                          running(2, "u", "gpu3", ["gpu:2(IDX:0-1)"])]}  # fmt: skip
-        nodes = {"nodes": [{"name": "gpu3", "gres": "gpu:2"}]}
+        nodes = {"nodes": [{"name": "gpu3", "gres": "gpu:2", "state": ["IDLE"]}]}
         text = metrics.textfile(jobs, nodes)
         self.assertIn('node="gpu1",gpu="0",gpu_type="a10"', text)
         self.assertIn('node="gpu2",gpu="3",gpu_type="a30"', text)
         # Untyped: the same empty type on the allocation and the node, so the two join.
         self.assertIn('node="gpu3",gpu="1",gpu_type=""', text)
         self.assertIn('slurm_node_gpus{node="gpu3",gpu_type=""} 2', text)
+
+    def test_node_state_drain_and_schedulable(self):
+        nodes = {"nodes": [{"name": "gpu1", "gres": "gpu:a10:4", "state": ["MIXED", "DRAIN"]},
+                           {"name": "gpu2", "gres": "gpu:a10:4", "state": ["IDLE"]},
+                           {"name": "gpu3", "gres": "", "state": ["DOWN", "NOT_RESPONDING"]}]}  # fmt: skip
+        text = metrics.textfile({"jobs": []}, nodes)
+        for line in ('slurm_node_state{node="gpu1",state="mixed"} 1', 'slurm_node_drain{node="gpu1"} 1',
+                     'slurm_node_schedulable{node="gpu1"} 0', 'slurm_node_state{node="gpu2",state="idle"} 1',
+                     'slurm_node_drain{node="gpu2"} 0', 'slurm_node_schedulable{node="gpu2"} 1',
+                     'slurm_node_state{node="gpu3",state="down"} 1', 'slurm_node_schedulable{node="gpu3"} 0'):  # fmt: skip
+            self.assertIn(line, text)
+        # One series per node and metric: no reason text, so no unbounded labels.
+        self.assertEqual(len(re.findall(r"^slurm_node_state\{", text, re.M)), 3)
 
 
 class WriteTests(unittest.TestCase):

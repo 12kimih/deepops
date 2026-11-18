@@ -3,6 +3,10 @@
 Slurm's own exporters report jobs and nodes, not which GPU each job holds. This writes:
   slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job_id} 1 per allocated GPU
   slurm_node_gpus{node,gpu_type}                                    GPUs configured
+  slurm_node_state{node,state}         1 per node, Slurm's base state (idle, mixed, down...)
+  slurm_node_drain{node}               1 when the drain flag is set beside that state
+  slurm_node_schedulable{node}         1 when a new job can start there (vocab.node_schedulable,
+                                       the definition sq's free capacity uses)
 so a dashboard can show who holds which GPU, and an alert can compare DCGM utilisation
 with allocation (a busy GPU no job holds). Label names avoid those the scrape attaches
 itself, which would be renamed exported_*: `job` and `instance` (Prometheus's own) and
@@ -53,6 +57,20 @@ def textfile(jobs_data, nodes_data):
     for node in nodes_data["nodes"]:
         for gtype, count in sorted(slurm.node_gpus(node.get("gres")).items()):
             lines.append(_series("slurm_node_gpus", {"node": node["name"], "gpu_type": gtype}, count))
+    # No reason text as a label: it is free text, so every new reason would be a new series.
+    for name, help_text, value in (
+        ("slurm_node_state", "Slurm's base state of a node, 1 for the current one.", None),
+        ("slurm_node_drain", "1 when the node's drain flag is set.", vocab.node_drain),
+        ("slurm_node_schedulable", "1 when a new job can start on the node.", vocab.node_schedulable),
+    ):
+        lines += [f"# HELP {name} {help_text}", f"# TYPE {name} gauge"]
+        for node in nodes_data["nodes"]:
+            if value is None:
+                lines.append(
+                    _series(name, {"node": node["name"], "state": vocab.node_base(node["state"])}, 1)
+                )
+            else:
+                lines.append(_series(name, {"node": node["name"]}, int(value(node["state"]))))
     return "\n".join(lines) + "\n"
 
 
