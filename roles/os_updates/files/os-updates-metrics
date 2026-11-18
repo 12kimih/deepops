@@ -1,33 +1,64 @@
 #!/bin/sh
 # Pending package updates and whether a reboot is needed, as node_exporter textfile
 # metrics (roles/os_updates). Simulates the full upgrade the maintenance window runs,
-# so held-back packages count too. Usage: os-updates-metrics <textfile-dir>
+# so held-back packages count too.
+#
+#   os-updates-metrics <textfile-dir>            measure, keep, publish
+#   os-updates-metrics --publish <textfile-dir>  publish the kept file only (at boot)
+#
+# The metrics are kept in /var/lib/os-updates (the textfile directory is usually
+# tmpfs and empty after a reboot, and an absent series never alerts), together with
+# when security updates were first seen pending, so "pending for N days" survives.
 set -eu
+state=/var/lib/os-updates
+publish_only=false
+[ "${1:-}" = "--publish" ] && { publish_only=true; shift; }
 dir=${1:?textfile directory}
-mkdir -p "$dir"
+mkdir -p "$dir" "$state"
+
+publish() {
+    [ -f "$state/os-updates.prom" ] || return 0
+    tmp=$(mktemp "$dir/.os-updates.XXXXXX")
+    cp "$state/os-updates.prom" "$tmp"
+    chmod 0644 "$tmp"
+    mv "$tmp" "$dir/os-updates.prom"
+}
+if $publish_only; then publish; exit 0; fi
+
+now=$(date +%s)
 plan=$(apt-get -s -q -o Debug::NoLocking=1 dist-upgrade 2>/dev/null | grep '^Inst ' || true)
 all=$(printf '%s\n' "$plan" | grep -c '^Inst ' || true)
 security=$(printf '%s\n' "$plan" | grep -c -- '-security' || true)
-if [ -f /var/run/reboot-required ]; then
-    reboot=1; since=$(stat -c %Y /var/run/reboot-required)
+if [ "$security" -gt 0 ]; then
+    [ -s "$state/security-pending-since" ] || echo "$now" > "$state/security-pending-since"
+    security_since=$(cat "$state/security-pending-since")
 else
-    reboot=0; since=0
+    rm -f "$state/security-pending-since"
+    security_since=0
 fi
-tmp=$(mktemp "$dir/.os-updates.XXXXXX")
+if [ -f /var/run/reboot-required ]; then
+    reboot=1; reboot_since=$(stat -c %Y /var/run/reboot-required)
+else
+    reboot=0; reboot_since=0
+fi
+tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS
 # HELP os_updates_pending_packages Packages a full upgrade would install or change.
 # TYPE os_updates_pending_packages gauge
 os_updates_pending_packages{kind="all"} $all
 os_updates_pending_packages{kind="security"} $security
+# HELP os_updates_security_pending_since_seconds When security updates were first seen pending (0 = none).
+# TYPE os_updates_security_pending_since_seconds gauge
+os_updates_security_pending_since_seconds $security_since
 # HELP os_updates_reboot_required Whether an installed update asks for a reboot.
 # TYPE os_updates_reboot_required gauge
 os_updates_reboot_required $reboot
 # HELP os_updates_reboot_required_since_seconds When the reboot was first asked for (0 = not asked).
 # TYPE os_updates_reboot_required_since_seconds gauge
-os_updates_reboot_required_since_seconds $since
-# HELP os_updates_metrics_timestamp_seconds When these metrics were written.
+os_updates_reboot_required_since_seconds $reboot_since
+# HELP os_updates_metrics_timestamp_seconds When these metrics were measured.
 # TYPE os_updates_metrics_timestamp_seconds gauge
-os_updates_metrics_timestamp_seconds $(date +%s)
+os_updates_metrics_timestamp_seconds $now
 METRICS
-chmod 0644 "$tmp"
-mv "$tmp" "$dir/os-updates.prom"
+mv "$tmp" "$state/os-updates.prom"
+publish

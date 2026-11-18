@@ -41,3 +41,5 @@ slurm_backup_config: /etc/slurm-backup.json
 # node_exporter's textfile collector directory (roles/prometheus-node-exporter).
 slurm_backup_textfile_dir: "{{ node_exporter_prom_dir | default('/run/prometheus') }}"
 slurm_backup_textfile: slurm-backup.prom
+# Where the metrics are kept between runs and reboots (copied into the textfile dir).
+slurm_backup_metrics_file: /var/lib/slurm-backup/slurm-backup.prom

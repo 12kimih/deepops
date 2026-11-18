@@ -41,6 +41,7 @@
         content: "{{ {'database': slurm_backup_database, 'state_dir': slurm_backup_state,
                       'munge_key': slurm_backup_munge_key, 'weekly_day': slurm_backup_weekly_day,
                       'textfile_dir': slurm_backup_textfile_dir, 'textfile': slurm_backup_textfile,
+                      'metrics_file': slurm_backup_metrics_file,
                       'destinations': slurm_backup_destinations} | to_nice_json }}\n"
 
     - name: Install the backup service
@@ -57,6 +58,15 @@
       loop: "{{ slurm_backup_timers }}"
       loop_control:
         label: "{{ item.command }}"
+
+    # The textfile directory is usually tmpfs: the publish instance copies the kept
+    # metrics back at boot so the series never go absent until the next backup.
+    - name: Republish the kept metrics at boot
+      ansible.builtin.systemd:
+        name: slurm-backup@publish.service
+        enabled: true
+        daemon_reload: true
+      when: not ansible_check_mode
 
     # Under --check the unit files above are not written, so there is nothing to enable.
     - name: Enable the timers

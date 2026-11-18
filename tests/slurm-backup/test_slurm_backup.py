@@ -56,6 +56,7 @@ class Backup(unittest.TestCase):
             "weekly_day": 7,
             "textfile_dir": str(base / "prom"),
             "textfile": "slurm-backup.prom",
+            "metrics_file": str(base / "state" / "slurm-backup.prom"),
             "destinations": [
                 {"path": str(base / "primary"), "munge_key": True, "daily": 2},
                 {"path": str(base / "secondary")},
@@ -101,6 +102,13 @@ class Backup(unittest.TestCase):
         (self.base / "bin" / "mariadb-dump").write_text("#!/bin/sh\nexit 3\n")
         with self.assertRaises(RuntimeError):
             self.run_on("2026-11-21", 6)
+
+    def test_metrics_survive_a_lost_textfile_dir(self):
+        self.run_on("2026-11-21", 6)
+        published = self.base / "prom" / "slurm-backup.prom"
+        published.unlink()  # a reboot empties the tmpfs textfile directory
+        self.assertEqual(sb.publish(self.cfg), 0)
+        self.assertIn("slurm_backup_last_success_timestamp_seconds", published.read_text())
 
 
 class Main(unittest.TestCase):

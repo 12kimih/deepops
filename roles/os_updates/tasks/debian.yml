@@ -116,6 +116,20 @@
             Type=oneshot
             ExecStart=/usr/local/sbin/os-updates-metrics {{ os_updates_metrics_textfile_dir }}
             Nice=10
+          # The textfile directory is usually tmpfs: republish the kept metrics at
+          # boot so the series never go absent until the next measurement.
+          publish.service: |
+            # Managed by roles/os_updates.
+            [Unit]
+            Description=Republish the kept pending-update metrics after boot
+            After=local-fs.target
+
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/sbin/os-updates-metrics --publish {{ os_updates_metrics_textfile_dir }}
+
+            [Install]
+            WantedBy=multi-user.target
           timer: |
             # Managed by roles/os_updates.
             [Unit]
@@ -131,12 +145,18 @@
             WantedBy=timers.target
 
     # Under --check the unit files above are not written, so there is nothing to enable.
-    - name: Enable the pending-updates metrics timer
+    - name: Enable the pending-updates metrics timer and boot republish
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        daemon_reload: true
+      loop: [os-updates-metrics.timer, os-updates-metrics.publish.service]
+      when: not ansible_check_mode
+
+    - name: Start the pending-updates metrics timer
       ansible.builtin.systemd:
         name: os-updates-metrics.timer
-        enabled: true
         state: started
-        daemon_reload: true
       when: not ansible_check_mode
 
 - name: Remove the pending-updates metrics when they are off
@@ -147,19 +167,22 @@
         path: /etc/systemd/system/os-updates-metrics.timer
       register: os_updates_metrics_timer
 
-    - name: Stop and disable the metrics timer
+    - name: Stop and disable the metrics timer and boot republish
       ansible.builtin.systemd:
-        name: os-updates-metrics.timer
+        name: "{{ item }}"
         enabled: false
         state: stopped
+      loop: [os-updates-metrics.timer, os-updates-metrics.publish.service]
       when: os_updates_metrics_timer.stat.exists
 
-    - name: Remove the metrics command and units
+    - name: Remove the metrics command, units and kept metrics
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
         - /usr/local/sbin/os-updates-metrics
         - /etc/systemd/system/os-updates-metrics.service
+        - /etc/systemd/system/os-updates-metrics.publish.service
         - /etc/systemd/system/os-updates-metrics.timer
+        - /var/lib/os-updates
         - "{{ os_updates_metrics_textfile_dir }}/os-updates.prom"
