@@ -17,6 +17,8 @@ offline: true
 # Exclude external/vendored roles and hardware-specific roles
 exclude_paths:
   - roles/galaxy/
+  # Galaxy collections installed by setup.sh / CI, not part of the repository.
+  - collections/
   - roles/nvidia-dgx/
   - roles/nvidia-dgx-firmware/
   - roles/nvidia-gpu-tests/
