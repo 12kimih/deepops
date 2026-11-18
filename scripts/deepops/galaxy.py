@@ -14,6 +14,7 @@ Usage:
   galaxy.py --check    exit 1 unless every pinned collection and role is installed
                        at its pinned version
 """
+
 import json
 import os
 import shutil
@@ -29,7 +30,10 @@ COLLECTIONS = ROOT / "collections"
 ROLES = ROOT / "roles" / "galaxy"
 # The ansible-galaxy of this interpreter's environment, whatever PATH holds.
 GALAXY = shutil.which("ansible-galaxy", path=str(Path(sys.executable).parent)) or "ansible-galaxy"
-REQUIREMENTS = [ROOT / "roles" / "requirements.yml", Path(os.environ.get("CONFIG_DIR", ROOT / "config")) / "requirements.yml"]
+REQUIREMENTS = [
+    ROOT / "roles" / "requirements.yml",
+    Path(os.environ.get("CONFIG_DIR", ROOT / "config")) / "requirements.yml",
+]
 
 
 def galaxy(kind, req, dest):
@@ -62,7 +66,9 @@ def install():
     # Swap in only a complete install; a partial one would replace a working set.
     incomplete = problems(staged[COLLECTIONS], staged[ROLES])
     if incomplete:
-        raise SystemExit("staged install is incomplete, left the installed set alone:\n  " + "\n  ".join(incomplete))
+        raise SystemExit(
+            "staged install is incomplete, left the installed set alone:\n  " + "\n  ".join(incomplete)
+        )
     for live, new in staged.items():
         old = live.with_name(f".{live.name}.old")
         shutil.rmtree(old, ignore_errors=True)
@@ -74,8 +80,12 @@ def install():
 
 
 def installed_collections(where=COLLECTIONS):
-    out = subprocess.run([GALAXY, "collection", "list", "--format", "json", "-p", str(where)],
-                         cwd=ROOT, capture_output=True, text=True).stdout
+    out = subprocess.run(
+        [GALAXY, "collection", "list", "--format", "json", "-p", str(where)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    ).stdout
     found = {}
     for path, colls in (json.loads(out or "{}")).items():
         if Path(path).resolve() == (where / "ansible_collections").resolve():

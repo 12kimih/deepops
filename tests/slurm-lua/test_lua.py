@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Inert Ansible command/dependency regressions; run with Ansible's Python."""
+
 import os
 from pathlib import Path
 import shlex
@@ -8,6 +9,7 @@ import unittest
 import yaml
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from ansible_yaml import canonical, condition, render, same_name  # noqa: E402
 
@@ -25,10 +27,14 @@ class LuaBuild(unittest.TestCase):
         for enabled, expected in ((False, False), (True, True), ("false", False), ("true", True)):
             for nvml in (False, True):
                 with self.subTest(enabled=enabled, nvml=nvml):
-                    variables = {**DEFAULTS, "slurm_build_lua": enabled,
-                                 "slurm_build": True, "slurm_autodetect_nvml": nvml,
-                                 "slurm_configure": "./configure --site-option",
-                                 "slurm_configure_nvml": "./configure --site-option --with-nvml=/cuda"}
+                    variables = {
+                        **DEFAULTS,
+                        "slurm_build_lua": enabled,
+                        "slurm_build": True,
+                        "slurm_autodetect_nvml": nvml,
+                        "slurm_configure": "./configure --site-option",
+                        "slurm_configure_nvml": "./configure --site-option --with-nvml=/cuda",
+                    }
                     commands = []
                     for task in TASKS:
                         if not same_name(task.get("name"), "configure"):
@@ -47,9 +53,12 @@ class LuaBuild(unittest.TestCase):
         ):
             for enabled in (False, True):
                 with self.subTest(distro=distro, enabled=enabled):
-                    variables = {**DEFAULTS, **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
-                                 "slurm_build_lua": enabled,
-                                 "ansible_facts": {"distribution": distro, "os_family": family}}
+                    variables = {
+                        **DEFAULTS,
+                        **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
+                        "slurm_build_lua": enabled,
+                        "ansible_facts": {"distribution": distro, "os_family": family},
+                    }
                     selected = []
                     for task in TASKS:
                         if not same_name(task.get("name"), "install lua build dependencies"):

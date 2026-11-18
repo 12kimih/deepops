@@ -1,4 +1,5 @@
 """Tests for qos (roles/cluster_tools/files/qos.py) against Slurm 25.11 fixtures."""
+
 import json
 import re
 import unittest
@@ -37,9 +38,11 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(rows["hotfix"]["preempted_by"], [])
 
     def test_usage_counts_running_jobs_of_that_qos_only(self):
-        jobs = [running(1, "high_t2", "cpu=8,gres/gpu=4,gres/gpu:a10=4"),
-                running(2, "high_t2", "gres/gpu=1,gres/gpu:a30=1"),
-                dict(running(3, "high_t2", "gres/gpu:a10=9"), job_state=["COMPLETED"])]
+        jobs = [
+            running(1, "high_t2", "cpu=8,gres/gpu=4,gres/gpu:a10=4"),
+            running(2, "high_t2", "gres/gpu=1,gres/gpu:a30=1"),
+            dict(running(3, "high_t2", "gres/gpu:a10=9"), job_state=["COMPLETED"]),
+        ]
         gpu = {r["name"]: r for r in model(jobs=jobs)["qos"]}["high_t2"]["gpu"]
         self.assertEqual((gpu["a10"]["used"], gpu["a30"]["used"]), (4, 1))
         self.assertEqual(gpu["a10"]["limit"], 14)
@@ -63,7 +66,7 @@ class ShowTests(unittest.TestCase):
     def test_fits_the_window(self):
         for cols in (70, 90, 120, 200):
             lines = self.lines(cols)
-            table = lines[:lines.index("")]          # heading, header, rule and rows
+            table = lines[: lines.index("")]  # heading, header, rule and rows
             self.assertGreater(len(table), 5)
             for line in table:
                 self.assertLessEqual(render.width(line), cols, (cols, line))

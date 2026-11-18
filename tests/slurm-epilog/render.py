@@ -6,6 +6,7 @@ These files are Jinja templates, so they cannot be run -- or even parsed by
 test something the cluster never runs, so the harness renders first and runs
 the result.
 """
+
 import sys
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -60,9 +61,7 @@ def main():
         trim_blocks=True,
         autoescape=False,
     )
-    rendered = env.get_template(template_path.lstrip("/")).render(
-        slurm_epilog_cleanup_scope=scope, **VARS
-    )
+    rendered = env.get_template(template_path.lstrip("/")).render(slurm_epilog_cleanup_scope=scope, **VARS)
 
     with open(output_path, "w") as handle:
         handle.write(rendered)

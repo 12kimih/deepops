@@ -1,10 +1,10 @@
 """Check the dcgm-exporter counters file: a malformed row stops the exporter."""
+
 import csv
 import unittest
 from pathlib import Path
 
-COUNTERS = (Path(__file__).resolve().parents[2]
-            / "roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv")
+COUNTERS = Path(__file__).resolve().parents[2] / "roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv"
 TYPES = {"gauge", "counter", "label"}
 
 

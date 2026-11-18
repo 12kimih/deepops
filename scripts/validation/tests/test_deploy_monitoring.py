@@ -67,11 +67,22 @@ class TestDeployMonitoringExit(unittest.TestCase):
         os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR)
 
     def run_script(self, args=(), **env):
-        e = dict(os.environ, PATH=self.bin + ":" + os.environ["PATH"],
-                 STUB_LOG=self.log, STUB_STATE=self.state,
-                 STUB_ARGS=os.path.join(self.tmp, "helm-args"), **env)
-        r = subprocess.run(["bash", os.path.join(self.tmp, "scripts", "k8s", "deploy_monitoring.sh"), *args],
-                           cwd=self.tmp, env=e, capture_output=True, text=True, timeout=60)
+        e = dict(
+            os.environ,
+            PATH=self.bin + ":" + os.environ["PATH"],
+            STUB_LOG=self.log,
+            STUB_STATE=self.state,
+            STUB_ARGS=os.path.join(self.tmp, "helm-args"),
+            **env,
+        )
+        r = subprocess.run(
+            ["bash", os.path.join(self.tmp, "scripts", "k8s", "deploy_monitoring.sh"), *args],
+            cwd=self.tmp,
+            env=e,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
         calls = ""
         if os.path.exists(self.log):
             with open(self.log) as log:
@@ -81,12 +92,29 @@ class TestDeployMonitoringExit(unittest.TestCase):
     def test_reset_deletes_all_monitoring_crds(self):
         r, calls = self.run_script(args=("-d",))
         self.assertEqual(r.returncode, 0, r.stderr)
-        deleted = {line.removeprefix("kubectl delete crd ")
-                   for line in calls.splitlines() if line.startswith("kubectl delete crd ")}
-        self.assertEqual(deleted, {name + ".monitoring.coreos.com" for name in (
-            "alertmanagerconfigs", "alertmanagers", "podmonitors", "probes",
-            "prometheusagents", "prometheuses", "prometheusrules", "scrapeconfigs",
-            "servicemonitors", "thanosrulers")})
+        deleted = {
+            line.removeprefix("kubectl delete crd ")
+            for line in calls.splitlines()
+            if line.startswith("kubectl delete crd ")
+        }
+        self.assertEqual(
+            deleted,
+            {
+                name + ".monitoring.coreos.com"
+                for name in (
+                    "alertmanagerconfigs",
+                    "alertmanagers",
+                    "podmonitors",
+                    "probes",
+                    "prometheusagents",
+                    "prometheuses",
+                    "prometheusrules",
+                    "scrapeconfigs",
+                    "servicemonitors",
+                    "thanosrulers",
+                )
+            },
+        )
 
     def test_fresh_install_succeeds(self):
         r, calls = self.run_script(STATUS_AFTER="deployed")
@@ -143,7 +171,11 @@ class TestDeployMonitoringExit(unittest.TestCase):
         self.assertIn("--version 88.6.5", calls)
 
     def test_invalid_mirror_fails_before_workload_install(self):
-        for reference in ("https://mirror.example/image", "mirror.example/", "mirror.example/image,other=value"):
+        for reference in (
+            "https://mirror.example/image",
+            "mirror.example/",
+            "mirror.example/image,other=value",
+        ):
             with self.subTest(reference=reference):
                 r, calls = self.run_script(STATUS_AFTER="deployed", PROMETHEUS_REPO=reference)
                 self.assertNotEqual(r.returncode, 0)

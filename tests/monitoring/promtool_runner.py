@@ -4,6 +4,7 @@ Uses $PROMTOOL or promtool on PATH; otherwise the promtool inside the Prometheus
 the role deploys (prometheus_container), so tests check against the deployed version
 and nobody pins promtool separately. Skips when neither promtool nor docker exists.
 """
+
 import os
 import re
 import shutil
@@ -29,6 +30,21 @@ def run(args, cwd, mounts=()):
     dirs = sorted({str(Path(d).resolve()) for d in (cwd, *mounts)})
     volumes = [arg for d in dirs for arg in ("-v", f"{d}:{d}:ro")]
     return subprocess.run(
-        ["docker", "run", "--rm", "-u", f"{os.getuid()}:{os.getgid()}", *volumes,
-         "-w", str(Path(cwd).resolve()), "--entrypoint", "promtool", prometheus_image(), *args],
-        capture_output=True, text=True, check=False)
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-u",
+            f"{os.getuid()}:{os.getgid()}",
+            *volumes,
+            "-w",
+            str(Path(cwd).resolve()),
+            "--entrypoint",
+            "promtool",
+            prometheus_image(),
+            *args,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )

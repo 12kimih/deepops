@@ -1,4 +1,5 @@
 """Execute the installer offline, then render its actual argv with chart 92.14.0."""
+
 import os
 from pathlib import Path
 import shutil
@@ -44,8 +45,12 @@ class TestInstallerImages(unittest.TestCase):
         version_index = args.index("--version")
         self.assertEqual(args[version_index + 1], "92.14.0")
         args[1] = CHART
-        rendered = subprocess.run([REAL_HELM, "template", *args, "--kube-version", "1.34.0"],
-                                  capture_output=True, text=True, check=True)
+        rendered = subprocess.run(
+            [REAL_HELM, "template", *args, "--kube-version", "1.34.0"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
         docs = [d for d in yaml.safe_load_all(rendered.stdout) if d]
         images = {}
         for doc in docs:
@@ -64,17 +69,19 @@ class TestInstallerImages(unittest.TestCase):
         return images
 
     def test_default_images_are_unchanged(self):
-        self.assertEqual(self.render(), {
-            "operator": ["quay.io/prometheus-operator/prometheus-operator:v0.94.2"],
-            "prometheus": ["quay.io/prometheus/prometheus:v3.15.1-distroless"],
-            "alertmanager": ["quay.io/prometheus/alertmanager:v0.34.1"],
-            "grafana": ["docker.io/grafana/grafana:13.2.4-distroless"],
-            "sidecar": ["quay.io/kiwigrid/k8s-sidecar:2.14.1"] * 2,
-        })
+        self.assertEqual(
+            self.render(),
+            {
+                "operator": ["quay.io/prometheus-operator/prometheus-operator:v0.94.2"],
+                "prometheus": ["quay.io/prometheus/prometheus:v3.15.1-distroless"],
+                "alertmanager": ["quay.io/prometheus/alertmanager:v0.34.1"],
+                "grafana": ["docker.io/grafana/grafana:13.2.4-distroless"],
+                "sidecar": ["quay.io/kiwigrid/k8s-sidecar:2.14.1"] * 2,
+            },
+        )
 
     def test_explicit_tag_replaces_default_without_changing_repository(self):
-        images = self.render(**{var: mirror + ":custom-tag"
-                                for var, (_, mirror) in MIRRORS.items()})
+        images = self.render(**{var: mirror + ":custom-tag" for var, (_, mirror) in MIRRORS.items()})
         for _, (component, mirror) in MIRRORS.items():
             self.assertTrue(all(image == mirror + ":custom-tag" for image in images[component]))
 
@@ -85,15 +92,16 @@ class TestInstallerImages(unittest.TestCase):
                 images = self.render(**{variable: mirror})
                 # Preserve the chart-selected tag while replacing all registry/path
                 # segments; an unused key or double-registry render fails here.
-                self.assertEqual(images[component], [mirror + ":" + image.rsplit(":", 1)[1]
-                                                      for image in defaults[component]])
+                self.assertEqual(
+                    images[component],
+                    [mirror + ":" + image.rsplit(":", 1)[1] for image in defaults[component]],
+                )
                 for other in images.keys() - {component}:
                     self.assertEqual(images[other], defaults[other])
 
     def test_explicit_tags_and_digests_render_without_duplicate_suffixes(self):
         digest = "a" * 64
-        overrides = {var: mirror + ":custom@sha256:" + digest
-                     for var, (_, mirror) in MIRRORS.items()}
+        overrides = {var: mirror + ":custom@sha256:" + digest for var, (_, mirror) in MIRRORS.items()}
         images = self.render(**overrides)
         for variable, (component, _) in MIRRORS.items():
             self.assertTrue(all(image == overrides[variable] for image in images[component]))
@@ -109,11 +117,15 @@ class TestInstallerImages(unittest.TestCase):
     def test_digest_only_reference_retains_default_tag(self):
         defaults = self.render()
         digest = "c" * 64
-        images = self.render(**{var: mirror + "@sha256:" + digest
-                                for var, (_, mirror) in MIRRORS.items()})
+        images = self.render(**{var: mirror + "@sha256:" + digest for var, (_, mirror) in MIRRORS.items()})
         for _, (component, mirror) in MIRRORS.items():
-            self.assertEqual(images[component], [mirror + ":" + image.rsplit(":", 1)[1] + "@sha256:" + digest
-                                                 for image in defaults[component]])
+            self.assertEqual(
+                images[component],
+                [
+                    mirror + ":" + image.rsplit(":", 1)[1] + "@sha256:" + digest
+                    for image in defaults[component]
+                ],
+            )
 
 
 if __name__ == "__main__":

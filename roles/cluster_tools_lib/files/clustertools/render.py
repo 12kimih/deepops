@@ -7,6 +7,7 @@ punctuation (dashes, middle dots, ellipses): separators are spacing and colour, 
 placeholders are ASCII. Widths are measured in terminal columns, so a wide character
 never breaks alignment. Python 3.9 or newer, standard library only.
 """
+
 import os
 import shutil
 import sys
@@ -15,30 +16,106 @@ import unicodedata
 # --- Palettes (https://catppuccin.com/palette) ---------------------------------------
 
 PALETTES = {
-    "latte": dict(rosewater="dc8a78", flamingo="dd7878", pink="ea76cb", mauve="8839ef",
-                  red="d20f39", maroon="e64553", peach="fe640b", yellow="df8e1d", green="40a02b",
-                  teal="179299", sky="04a5e5", sapphire="209fb5", blue="1e66f5", lavender="7287fd",
-                  text="4c4f69", subtext1="5c5f77", subtext0="6c6f85", overlay2="7c7f93",
-                  overlay1="8c8fa1", overlay0="9ca0b0", surface2="acb0be", surface1="bcc0cc",
-                  surface0="ccd0da"),
-    "frappe": dict(rosewater="f2d5cf", flamingo="eebebe", pink="f4b8e4", mauve="ca9ee6",
-                   red="e78284", maroon="ea999c", peach="ef9f76", yellow="e5c890", green="a6d189",
-                   teal="81c8be", sky="99d1db", sapphire="85c1dc", blue="8caaee", lavender="babbf1",
-                   text="c6d0f5", subtext1="b5bfe2", subtext0="a5adce", overlay2="949cbb",
-                   overlay1="838ba7", overlay0="737994", surface2="626880", surface1="51576d",
-                   surface0="414559"),
-    "macchiato": dict(rosewater="f4dbd6", flamingo="f0c6c6", pink="f5bde6", mauve="c6a0f6",
-                      red="ed8796", maroon="ee99a0", peach="f5a97f", yellow="eed49f",
-                      green="a6da95", teal="8bd5ca", sky="91d7e3", sapphire="7dc4e4",
-                      blue="8aadf4", lavender="b7bdf8", text="cad3f5", subtext1="b8c0e0",
-                      subtext0="a5adcb", overlay2="939ab7", overlay1="8087a2", overlay0="6e738d",
-                      surface2="5b6078", surface1="494d64", surface0="363a4f"),
-    "mocha": dict(rosewater="f5e0dc", flamingo="f2cdcd", pink="f5c2e7", mauve="cba6f7",
-                  red="f38ba8", maroon="eba0ac", peach="fab387", yellow="f9e2af", green="a6e3a1",
-                  teal="94e2d5", sky="89dceb", sapphire="74c7ec", blue="89b4fa", lavender="b4befe",
-                  text="cdd6f4", subtext1="bac2de", subtext0="a6adc8", overlay2="9399b2",
-                  overlay1="7f849c", overlay0="6c7086", surface2="585b70", surface1="45475a",
-                  surface0="313244"),
+    "latte": dict(
+        rosewater="dc8a78",
+        flamingo="dd7878",
+        pink="ea76cb",
+        mauve="8839ef",
+        red="d20f39",
+        maroon="e64553",
+        peach="fe640b",
+        yellow="df8e1d",
+        green="40a02b",
+        teal="179299",
+        sky="04a5e5",
+        sapphire="209fb5",
+        blue="1e66f5",
+        lavender="7287fd",
+        text="4c4f69",
+        subtext1="5c5f77",
+        subtext0="6c6f85",
+        overlay2="7c7f93",
+        overlay1="8c8fa1",
+        overlay0="9ca0b0",
+        surface2="acb0be",
+        surface1="bcc0cc",
+        surface0="ccd0da",
+    ),
+    "frappe": dict(
+        rosewater="f2d5cf",
+        flamingo="eebebe",
+        pink="f4b8e4",
+        mauve="ca9ee6",
+        red="e78284",
+        maroon="ea999c",
+        peach="ef9f76",
+        yellow="e5c890",
+        green="a6d189",
+        teal="81c8be",
+        sky="99d1db",
+        sapphire="85c1dc",
+        blue="8caaee",
+        lavender="babbf1",
+        text="c6d0f5",
+        subtext1="b5bfe2",
+        subtext0="a5adce",
+        overlay2="949cbb",
+        overlay1="838ba7",
+        overlay0="737994",
+        surface2="626880",
+        surface1="51576d",
+        surface0="414559",
+    ),
+    "macchiato": dict(
+        rosewater="f4dbd6",
+        flamingo="f0c6c6",
+        pink="f5bde6",
+        mauve="c6a0f6",
+        red="ed8796",
+        maroon="ee99a0",
+        peach="f5a97f",
+        yellow="eed49f",
+        green="a6da95",
+        teal="8bd5ca",
+        sky="91d7e3",
+        sapphire="7dc4e4",
+        blue="8aadf4",
+        lavender="b7bdf8",
+        text="cad3f5",
+        subtext1="b8c0e0",
+        subtext0="a5adcb",
+        overlay2="939ab7",
+        overlay1="8087a2",
+        overlay0="6e738d",
+        surface2="5b6078",
+        surface1="494d64",
+        surface0="363a4f",
+    ),
+    "mocha": dict(
+        rosewater="f5e0dc",
+        flamingo="f2cdcd",
+        pink="f5c2e7",
+        mauve="cba6f7",
+        red="f38ba8",
+        maroon="eba0ac",
+        peach="fab387",
+        yellow="f9e2af",
+        green="a6e3a1",
+        teal="94e2d5",
+        sky="89dceb",
+        sapphire="74c7ec",
+        blue="89b4fa",
+        lavender="b4befe",
+        text="cdd6f4",
+        subtext1="bac2de",
+        subtext0="a6adc8",
+        overlay2="9399b2",
+        overlay1="7f849c",
+        overlay0="6c7086",
+        surface2="585b70",
+        surface1="45475a",
+        surface0="313244",
+    ),
 }
 FLAVOURS = ("mocha", "macchiato", "frappe", "latte")
 DEFAULT_FLAVOUR = "mocha"
@@ -46,24 +123,24 @@ DEFAULT_FLAVOUR = "mocha"
 # Semantic roles -> palette entries. Callers name the ROLE, never the colour: "this is
 # a heading" survives a flavour change, "this is mauve" does not.
 ROLES = {
-    "text": "text",        # primary values
-    "sub": "subtext0",     # secondary values
-    "head": "subtext1",    # column headers (bold)
-    "muted": "overlay1",   # de-emphasised (totals, pending rows)
-    "faint": "overlay0",   # idle, not applicable
-    "rule": "surface1",    # rules, bar troughs
-    "acc": "mauve",        # section headings
-    "part": "blue",        # pool headings, command names
-    "node": "subtext1",    # node names
-    "self": "lavender",    # yours: your jobs, the QoS you may use
-    "ok": "green",         # running, lightly loaded
-    "warn": "yellow",      # pending, half loaded
-    "hot": "peach",        # suspended, heavily loaded
-    "crit": "red",         # failed, saturated, down
-    "info": "sky",         # completing, paths and URLs
-    "done": "teal",        # completed
+    "text": "text",  # primary values
+    "sub": "subtext0",  # secondary values
+    "head": "subtext1",  # column headers (bold)
+    "muted": "overlay1",  # de-emphasised (totals, pending rows)
+    "faint": "overlay0",  # idle, not applicable
+    "rule": "surface1",  # rules, bar troughs
+    "acc": "mauve",  # section headings
+    "part": "blue",  # pool headings, command names
+    "node": "subtext1",  # node names
+    "self": "lavender",  # yours: your jobs, the QoS you may use
+    "ok": "green",  # running, lightly loaded
+    "warn": "yellow",  # pending, half loaded
+    "hot": "peach",  # suspended, heavily loaded
+    "crit": "red",  # failed, saturated, down
+    "info": "sky",  # completing, paths and URLs
+    "done": "teal",  # completed
 }
-TONES = ("text", "sub", "muted", "faint")   # the brightness ladder for plain text
+TONES = ("text", "sub", "muted", "faint")  # the brightness ladder for plain text
 
 
 def flavour_name(name):
@@ -73,7 +150,7 @@ def flavour_name(name):
 
 
 def rgb(hexcode):
-    return tuple(int(hexcode[i:i + 2], 16) for i in (0, 2, 4))
+    return tuple(int(hexcode[i : i + 2], 16) for i in (0, 2, 4))
 
 
 def x256(r, g, b):
@@ -92,7 +169,7 @@ def x16(r, g, b):
     """SGR code of the ANSI colour nearest in HUE. Distance in RGB would send every
     pastel to white; mapping by hue keeps green green on a 16-colour terminal."""
     mx, mn = max(r, g, b), min(r, g, b)
-    if 100 * (mx - mn) < 28 * mx:                       # unsaturated: a grey
+    if 100 * (mx - mn) < 28 * mx:  # unsaturated: a grey
         return 37 if mx + mn >= 340 else 90
     if mx == r:
         h = (60 * (g - b) // (mx - mn) + 360) % 360
@@ -101,17 +178,17 @@ def x16(r, g, b):
     else:
         h = 60 * (r - g) // (mx - mn) + 240
     if h < 30 or h >= 330:
-        n = 1      # red
+        n = 1  # red
     elif h < 90:
-        n = 3      # yellow
+        n = 3  # yellow
     elif h < 150:
-        n = 2      # green
+        n = 2  # green
     elif h < 210:
-        n = 6      # cyan
+        n = 6  # cyan
     elif h < 255:
-        n = 4      # blue (mauve, ~267, reads as violet)
+        n = 4  # blue (mauve, ~267, reads as violet)
     else:
-        n = 5      # magenta
+        n = 5  # magenta
     return (90 if mx + mn >= 256 else 30) + n
 
 
@@ -125,6 +202,7 @@ def sgr(hexcode, depth):
 
 
 # --- Width ----------------------------------------------------------------------------
+
 
 def width(text):
     """Terminal columns TEXT takes: wide East Asian characters count two, combining
@@ -157,6 +235,7 @@ def pad(text, cols, align="l"):
 
 # --- Theme ----------------------------------------------------------------------------
 
+
 class Theme:
     """Colours and glyphs for one output stream. Role colours are SGR prefixes, empty
     without colour; paint() wraps a text in one."""
@@ -168,12 +247,38 @@ class Theme:
         self.bold, self.reset = ("\033[1m", "\033[0m") if color else ("", "")
         self.c["head"] += self.bold
         if ascii:
-            self.g = dict(sec="|", bar_f="#", bar_e="-", rule="-", self=">", tee="|- ", end="`- ",
-                          pipe="|  ", gap="   ", inf="inf", arrow="->", check="+", cross="x")
+            self.g = dict(
+                sec="|",
+                bar_f="#",
+                bar_e="-",
+                rule="-",
+                self=">",
+                tee="|- ",
+                end="`- ",
+                pipe="|  ",
+                gap="   ",
+                inf="inf",
+                arrow="->",
+                check="+",
+                cross="x",
+            )
         else:
-            self.g = dict(sec="▎", bar_f="█", bar_e="░", rule="─", self="▌", tee="├─ ", end="└─ ",
-                          pipe="│  ", gap="   ", inf="∞", arrow="→", check="✓", cross="✕")
-        self.g.update(ell="~", dot="-")      # truncation mark, "no value" placeholder
+            self.g = dict(
+                sec="▎",
+                bar_f="█",
+                bar_e="░",
+                rule="─",
+                self="▌",
+                tee="├─ ",
+                end="└─ ",
+                pipe="│  ",
+                gap="   ",
+                inf="∞",
+                arrow="→",
+                check="✓",
+                cross="✕",
+            )
+        self.g.update(ell="~", dot="-")  # truncation mark, "no value" placeholder
 
     def paint(self, style, text):
         """TEXT in STYLE: a role name, a raw SGR prefix, or "" for none."""
@@ -208,9 +313,11 @@ class Theme:
             return [(" " * cols, "")]
         filled = min(cols, (used * cols + total // 2) // total)
         if filled == 0 and used > 0:
-            filled = 1                                # any use at all must be visible
-        return [(self.g["bar_f"] * filled, style or self.load(used, total)),
-                (self.g["bar_e"] * (cols - filled), "rule")]
+            filled = 1  # any use at all must be visible
+        return [
+            (self.g["bar_f"] * filled, style or self.load(used, total)),
+            (self.g["bar_e"] * (cols - filled), "rule"),
+        ]
 
     def bar(self, used, total, cols, style=None):
         """The same bar, painted."""
@@ -249,12 +356,13 @@ def detect(flavour=None, color_when="auto", ascii=False, wide=False, stream=None
     if color and depth != 24:
         try:
             import curses
+
             curses.setupterm(env.get("TERM"), stream.fileno() if tty else -1)
             if curses.tigetflag("RGB") > 0 or curses.tigetflag("Tc") > 0:
                 depth = 24
             elif 0 < curses.tigetnum("colors") < 256:
                 depth = 16
-        except Exception:                             # no terminfo entry: keep 256
+        except Exception:  # no terminfo entry: keep 256
             pass
 
     ctype = env.get("LC_ALL") or env.get("LC_CTYPE") or env.get("LANG") or ""
@@ -272,6 +380,7 @@ def detect(flavour=None, color_when="auto", ascii=False, wide=False, stream=None
 
 
 # --- Grid: a table of styled cells ----------------------------------------------------
+
 
 class Grid:
     """A table whose widths follow the plain text, so colour never disturbs alignment.

@@ -1,4 +1,5 @@
 """Unit tests for clustertools.vocab (roles/cluster_tools_lib), no cluster needed."""
+
 import sys
 import unittest
 from pathlib import Path
@@ -10,12 +11,24 @@ from clustertools import vocab  # noqa: E402
 class NodeStateTests(unittest.TestCase):
     def test_classes(self):
         cases = {
-            "IDLE": "idle", "IDLE+POWERED_DOWN": "idle", "MIXED": "mix", "ALLOCATED": "alloc",
-            "COMPLETING": "alloc", "MIXED+DRAIN": "drain", "IDLE+DRAIN": "drain",
-            "IDLE+MAINT+RESERVED": "drain", "IDLE+REBOOT_REQUESTED": "idle",
-            "DOWN+NOT_RESPONDING": "down", "MIXED+NOT_RESPONDING": "down", "INVAL": "down",
-            "UNKNOWN": "down", "SOMETHINGNEW": "down", "DRAIN": "drain", "INACTIVE": "down",
-            "UP": "", "": "down",
+            "IDLE": "idle",
+            "IDLE+POWERED_DOWN": "idle",
+            "MIXED": "mix",
+            "ALLOCATED": "alloc",
+            "COMPLETING": "alloc",
+            "MIXED+DRAIN": "drain",
+            "IDLE+DRAIN": "drain",
+            "IDLE+MAINT+RESERVED": "drain",
+            "IDLE+REBOOT_REQUESTED": "idle",
+            "DOWN+NOT_RESPONDING": "down",
+            "MIXED+NOT_RESPONDING": "down",
+            "INVAL": "down",
+            "UNKNOWN": "down",
+            "SOMETHINGNEW": "down",
+            "DRAIN": "drain",
+            "INACTIVE": "down",
+            "UP": "",
+            "": "down",
         }
         for state, cls in cases.items():
             with self.subTest(state=state):
@@ -30,10 +43,16 @@ class NodeStateTests(unittest.TestCase):
         self.assertEqual(vocab.node_state(["MIXED", "DRAIN"]), "mixed+drain")
 
     def test_unavailable_order(self):
-        cases = [(["IDLE"], None), (["IDLE", "NOT_RESPONDING"], None), (["IDLE", "MAINT"], None),
-                 (["IDLE", "DRAIN"], "drained"), (["MIXED", "DRAIN"], "draining"),
-                 (["COMPLETING", "DRAIN"], "draining"), (["IDLE", "FAIL", "DRAIN"], "fail"),
-                 (["DOWN", "FAIL", "DRAIN"], "down")]
+        cases = [
+            (["IDLE"], None),
+            (["IDLE", "NOT_RESPONDING"], None),
+            (["IDLE", "MAINT"], None),
+            (["IDLE", "DRAIN"], "drained"),
+            (["MIXED", "DRAIN"], "draining"),
+            (["COMPLETING", "DRAIN"], "draining"),
+            (["IDLE", "FAIL", "DRAIN"], "fail"),
+            (["DOWN", "FAIL", "DRAIN"], "down"),
+        ]
         for flags, label in cases:
             with self.subTest(flags=flags):
                 self.assertEqual(vocab.node_unavailable(flags), label)
@@ -62,12 +81,22 @@ class JobStateTests(unittest.TestCase):
 class ReasonTests(unittest.TestCase):
     def test_families(self):
         cases = {
-            "Priority": "wait", "Resources": "wait", "QOSGrpGRES": "limit",
-            "AssocGrpCpuLimit": "limit", "QOSMaxGRESPerUser": "limit", "QOSMaxGRESPerJob": "over",
-            "AssocMaxWallDurationPerJobLimit": "over", "PartitionTimeLimit": "over",
-            "ReqNodeNotAvail": "nodes", "Dependency": "start", "BeginTime": "start",
-            "JobHeldUser": "held", "DependencyNeverSatisfied": "error", "InvalidQOS": "error",
-            "QOSNotAllowed": "error", "SomethingNew": "other",
+            "Priority": "wait",
+            "Resources": "wait",
+            "QOSGrpGRES": "limit",
+            "AssocGrpCpuLimit": "limit",
+            "QOSMaxGRESPerUser": "limit",
+            "QOSMaxGRESPerJob": "over",
+            "AssocMaxWallDurationPerJobLimit": "over",
+            "PartitionTimeLimit": "over",
+            "ReqNodeNotAvail": "nodes",
+            "Dependency": "start",
+            "BeginTime": "start",
+            "JobHeldUser": "held",
+            "DependencyNeverSatisfied": "error",
+            "InvalidQOS": "error",
+            "QOSNotAllowed": "error",
+            "SomethingNew": "other",
         }
         for code, family in cases.items():
             with self.subTest(code=code):

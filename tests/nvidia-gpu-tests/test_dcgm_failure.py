@@ -4,6 +4,7 @@
 Run with: python3 tests/nvidia-gpu-tests/test_dcgm_failure.py
 Requires PyYAML and ansible-playbook on PATH.
 """
+
 import os
 from pathlib import Path
 import subprocess
@@ -35,31 +36,62 @@ class DcgmFailureTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="dcgm-test-") as directory:
             temp = Path(directory)
             stub = temp / "dcgmi"
-            stub.write_text('#!/bin/sh\n[ "$*" = "diag -r 3" ] || exit 99\nprintf "diagnostic fixture\\n"\nexit "$DIAG_RC"\n')
+            stub.write_text(
+                '#!/bin/sh\n[ "$*" = "diag -r 3" ] || exit 99\nprintf "diagnostic fixture\\n"\nexit "$DIAG_RC"\n'
+            )
             stub.chmod(0o755)
             config = temp / "ansible.cfg"
             config.write_text("[defaults]\nretry_files_enabled = False\nhost_key_checking = False\n")
-            play = [{
-                "hosts": "localhost", "connection": "local", "gather_facts": False,
-                "vars": defaults,
-                "environment": {"PATH": str(temp) + os.pathsep + os.environ["PATH"]},
-                "tasks": [task, {"name": "Verify diagnostic result", "assert": {"that": [
-                    "dcgm.rc == expected_rc | int", "'diagnostic fixture' in dcgm.stdout"
-                ]}}],
-            }]
+            play = [
+                {
+                    "hosts": "localhost",
+                    "connection": "local",
+                    "gather_facts": False,
+                    "vars": defaults,
+                    "environment": {"PATH": str(temp) + os.pathsep + os.environ["PATH"]},
+                    "tasks": [
+                        task,
+                        {
+                            "name": "Verify diagnostic result",
+                            "assert": {
+                                "that": [
+                                    "dcgm.rc == expected_rc | int",
+                                    "'diagnostic fixture' in dcgm.stdout",
+                                ]
+                            },
+                        },
+                    ],
+                }
+            ]
             playbook = temp / "test.yml"
             playbook.write_text(yaml.safe_dump(play))
-            env = dict(os.environ, ANSIBLE_CONFIG=str(config), ANSIBLE_HOME=str(temp / "home"),
-                       ANSIBLE_LOCAL_TEMP=str(temp / "local"), ANSIBLE_REMOTE_TEMP=str(temp / "remote"),
-                       ANSIBLE_NOCOLOR="1")
+            env = dict(
+                os.environ,
+                ANSIBLE_CONFIG=str(config),
+                ANSIBLE_HOME=str(temp / "home"),
+                ANSIBLE_LOCAL_TEMP=str(temp / "local"),
+                ANSIBLE_REMOTE_TEMP=str(temp / "remote"),
+                ANSIBLE_NOCOLOR="1",
+            )
             for name, extra, fail_on_error in cases:
                 for rc in (0, 1):
                     with self.subTest(setting=name, diagnostic_rc=rc):
                         result = subprocess.run(
-                            ["ansible-playbook", "-i", "localhost,", str(playbook),
-                             "-e", f"expected_rc={rc}", *extra],
-                            cwd=temp, env=dict(env, DIAG_RC=str(rc)),
-                            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60,
+                            [
+                                "ansible-playbook",
+                                "-i",
+                                "localhost,",
+                                str(playbook),
+                                "-e",
+                                f"expected_rc={rc}",
+                                *extra,
+                            ],
+                            cwd=temp,
+                            env=dict(env, DIAG_RC=str(rc)),
+                            text=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            timeout=60,
                         )
                         if rc:
                             self.assertIn("diagnostic fixture", result.stdout, result.stdout)

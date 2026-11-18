@@ -6,6 +6,7 @@ their own tags. An untagged include of tagged tasks hides them, so
 `--tags config` on the slurm role used to do nothing. An include of tagged
 tasks carries tags itself (normally `always`).
 """
+
 from pathlib import Path
 import unittest
 

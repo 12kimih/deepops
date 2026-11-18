@@ -1,4 +1,5 @@
 """Unit tests for clustertools.cli (roles/cluster_tools_lib)."""
+
 import contextlib
 import io
 import sys
@@ -8,12 +9,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
 from clustertools.cli import Command, Opt  # noqa: E402
 
-CMD = Command("demo", "a demo command", [
-    Opt("-m", "--me", brief=True, help="only your jobs"),
-    Opt("-p", "--partition", metavar="P", complete="partitions", brief=True, help="these partitions"),
-    Opt("-U", "--users", negate=True, default=True, help="the user table"),
-    Opt("--json", section="Output", help="machine-readable"),
-], env="DEMO_OPTIONS", machine="--json", notes=["Trailing note."], theme_env="DEMO_THEME")
+CMD = Command(
+    "demo",
+    "a demo command",
+    [
+        Opt("-m", "--me", brief=True, help="only your jobs"),
+        Opt("-p", "--partition", metavar="P", complete="partitions", brief=True, help="these partitions"),
+        Opt("-U", "--users", negate=True, default=True, help="the user table"),
+        Opt("--json", section="Output", help="machine-readable"),
+    ],
+    env="DEMO_OPTIONS",
+    machine="--json",
+    notes=["Trailing note."],
+    theme_env="DEMO_THEME",
+)
 
 ENV = {"LANG": "C.UTF-8"}
 
@@ -69,7 +78,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("complete -F _demo demo", script)
         self.assertIn("--no-users", script)
-        self.assertIn("-p|--partition) COMPREPLY=($(compgen -W \"$(sinfo -h -o %R", script)
+        self.assertIn('-p|--partition) COMPREPLY=($(compgen -W "$(sinfo -h -o %R', script)
         self.assertIn("--theme)", script)
 
     def test_themes_lists_flavours(self):

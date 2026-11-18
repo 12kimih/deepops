@@ -13,9 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 class AirgapPinTests(unittest.TestCase):
     def setUp(self):
         self.skill = (ROOT / "skills/deploy-airgapped/SKILL.md").read_text()
-        self.gpu = yaml.safe_load(
-            (ROOT / "roles/nvidia-gpu-operator/defaults/main.yml").read_text()
-        )
+        self.gpu = yaml.safe_load((ROOT / "roles/nvidia-gpu-operator/defaults/main.yml").read_text())
 
     def assert_references_match(self, text, pattern, expected):
         versions = re.findall(pattern, text)
@@ -30,9 +28,7 @@ class AirgapPinTests(unittest.TestCase):
             r"nvidia/gpu-operator --version (\S+)",
             r"gpu-operator-(v[\d.]+)\.tgz",
         ):
-            self.assert_references_match(
-                self.skill, pattern, self.gpu["gpu_operator_chart_version"]
-            )
+            self.assert_references_match(self.skill, pattern, self.gpu["gpu_operator_chart_version"])
 
     def test_registry_images_and_archives_match_role(self):
         registry = yaml.safe_load(

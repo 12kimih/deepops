@@ -9,6 +9,7 @@ Slurm release. Binaries come from PATH, never a fixed prefix.
 
 Python 3.9 or newer, standard library only.
 """
+
 import json
 import re
 import subprocess
@@ -44,6 +45,7 @@ def num(value):
 
 
 # --- Host lists -----------------------------------------------------------------
+
 
 def expand_ranges(spec):
     """'0-2,5' -> [0, 1, 2, 5]"""
@@ -98,6 +100,7 @@ def hostnames(nodelist):
 
 # --- Jobs ---------------------------------------------------------------------------
 
+
 def array_tasks(spec):
     """How many tasks a pending array record stands for (ArrayTaskId 1-100:2%10). Slurm
     keeps an array's unstarted tasks as one record; each is a job to the scheduler and
@@ -132,8 +135,10 @@ def job_gpus(job):
     guessing which node holds what."""
     hosts, details = hostnames(job.get("nodes") or ""), job.get("gres_detail") or []
     if details and len(details) != len(hosts):
-        print(f"job {job['job_id']}: {len(details)} GRES entries for {len(hosts)} nodes; "
-              "GPUs not attributed", file=sys.stderr)
+        print(
+            f"job {job['job_id']}: {len(details)} GRES entries for {len(hosts)} nodes; GPUs not attributed",
+            file=sys.stderr,
+        )
         return [], set()
     gpus, types = [], set()
     for host, detail in zip(hosts, details):
@@ -145,6 +150,7 @@ def job_gpus(job):
 
 
 # --- Trackable resources (TRES) -----------------------------------------------------
+
 
 def tres_list(items):
     """{"gres/gpu:a10": 6, "cpu": 8} from a JSON TRES list ([{"type", "name", "count"}])."""
@@ -167,7 +173,7 @@ def tres_str(text):
     return out
 
 
-_MEM_UNIT = {"K": 1 / 1024, "M": 1, "G": 1024, "T": 1024 ** 2, "P": 1024 ** 3}
+_MEM_UNIT = {"K": 1 / 1024, "M": 1, "G": 1024, "T": 1024**2, "P": 1024**3}
 
 
 def mem_mib(value):

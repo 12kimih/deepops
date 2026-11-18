@@ -29,9 +29,7 @@ import sys
 def run(cmd, timeout=60):
     """Run a command, returning (rc, stdout, stderr) without raising."""
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout after %ss" % timeout
@@ -107,9 +105,7 @@ def build_node_details(states_output, gres_output):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate a DeepOps Slurm deployment."
-    )
+    parser = argparse.ArgumentParser(description="Validate a DeepOps Slurm deployment.")
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
     parser.add_argument(
         "--skip-gpu-job",
@@ -175,7 +171,12 @@ def main():
         if unavail and not args.allow_unavailable_nodes:
             result["failures"].append(
                 "%d node(s) unavailable: %s"
-                % (unavail, ", ".join(sorted(k for k in states if k not in ("idle", "mixed", "allocated", "completing"))))
+                % (
+                    unavail,
+                    ", ".join(
+                        sorted(k for k in states if k not in ("idle", "mixed", "allocated", "completing"))
+                    ),
+                )
             )
 
     gres_output = ""
@@ -198,9 +199,7 @@ def main():
             result["gpu_job_ok"] = True
             result["gpus_visible_in_job"] = len(out.splitlines())
         else:
-            result["failures"].append(
-                "srun GPU job failed: %s" % (err or out or "rc=%s" % rc)
-            )
+            result["failures"].append("srun GPU job failed: %s" % (err or out or "rc=%s" % rc))
 
     result["ok"] = not result["failures"]
 

@@ -17,6 +17,7 @@ Generators:
 
 Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
+
 import re
 import sys
 from pathlib import Path
@@ -24,7 +25,9 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-BLOCK = re.compile(r"(<!-- BEGIN GENERATED: (?P<name>[\w:.-]+) -->\n)(?P<body>.*?)(<!-- END GENERATED: (?P=name) -->)", re.S)
+BLOCK = re.compile(
+    r"(<!-- BEGIN GENERATED: (?P<name>[\w:.-]+) -->\n)(?P<body>.*?)(<!-- END GENERATED: (?P=name) -->)", re.S
+)
 PIN = re.compile(r"(version|_container|_image|_tag|_branch)$|_version_|_chart_version$")
 
 
@@ -47,7 +50,11 @@ def example_values():
 
 
 def roles():
-    return sorted(p.name for p in (ROOT / "roles").iterdir() if (p / "defaults" / "main.yml").exists() and p.name != "galaxy")
+    return sorted(
+        p.name
+        for p in (ROOT / "roles").iterdir()
+        if (p / "defaults" / "main.yml").exists() and p.name != "galaxy"
+    )
 
 
 def cell(text):
@@ -60,8 +67,14 @@ def gen_versions(_arg):
     for role in roles():
         for name, value in defaults(role).items():
             # A pin looks like a version (1.2.3, v1.2, a commit) or an image reference.
-            if PIN.search(name) and literal(value) and re.match(r"^(v?\d|[0-9a-f]{12,}$|[\w./-]+:[\w.-]+$|[\w.-]+\.tar)", str(value)):
-                rows.append(f"| {role} | `{name}` | `{cell(value)}` | {('`' + cell(example[name]) + '`') if name in example and example[name] != str(value) else ''} |")
+            if (
+                PIN.search(name)
+                and literal(value)
+                and re.match(r"^(v?\d|[0-9a-f]{12,}$|[\w./-]+:[\w.-]+$|[\w.-]+\.tar)", str(value))
+            ):
+                rows.append(
+                    f"| {role} | `{name}` | `{cell(value)}` | {('`' + cell(example[name]) + '`') if name in example and example[name] != str(value) else ''} |"
+                )
     return "\n".join(rows) + "\n"
 
 
@@ -87,7 +100,13 @@ def gen_role_variables(role):
     notes = comments_above(path)
     rows = ["| Variable | Default | Description |", "|---|---|---|"]
     for name, value in defaults(role).items():
-        shown = "`" + cell(yaml.safe_dump(value, default_flow_style=True, width=1000).strip().removesuffix("...").strip()) + "`"
+        shown = (
+            "`"
+            + cell(
+                yaml.safe_dump(value, default_flow_style=True, width=1000).strip().removesuffix("...").strip()
+            )
+            + "`"
+        )
         rows.append(f"| `{name}` | {shown} | {cell(notes.get(name, ''))} |")
     return "\n".join(rows) + "\n"
 

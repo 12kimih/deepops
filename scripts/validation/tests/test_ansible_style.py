@@ -18,9 +18,13 @@ class AnsibleStyleTests(unittest.TestCase):
     def test_tree_is_normalized(self):
         result = subprocess.run(
             [sys.executable, "scripts/deepops/normalize-ansible-style.py", "--check", "."],
-            cwd=ROOT, capture_output=True, text=True,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
         )
-        self.assertEqual(result.returncode, 0, "run scripts/deepops/normalize-ansible-style.py on:\n" + result.stdout)
+        self.assertEqual(
+            result.returncode, 0, "run scripts/deepops/normalize-ansible-style.py on:\n" + result.stdout
+        )
 
 
 if __name__ == "__main__":

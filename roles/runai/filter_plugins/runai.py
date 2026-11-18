@@ -1,4 +1,5 @@
 """Small helpers for the runai role (pure functions, unit tested)."""
+
 import re
 
 
@@ -16,15 +17,19 @@ def runai_deep_merge(base, extra):
 def runai_password_ok(value):
     """Run:ai admin login policy: 8+ chars, digit, lower, upper, special from -!@#$%^&*()_+="""
     return bool(
-        isinstance(value, str) and len(value) >= 8
-        and re.search(r"[0-9]", value) and re.search(r"[a-z]", value)
-        and re.search(r"[A-Z]", value) and re.search(r"[-!@#$%^&*()_+=]", value)
+        isinstance(value, str)
+        and len(value) >= 8
+        and re.search(r"[0-9]", value)
+        and re.search(r"[a-z]", value)
+        and re.search(r"[A-Z]", value)
+        and re.search(r"[-!@#$%^&*()_+=]", value)
     )
 
 
 def _items(doc):
     if isinstance(doc, str):
         import json
+
         doc = json.loads(doc)
     return (doc or {}).get("items", [])
 

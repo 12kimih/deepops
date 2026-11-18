@@ -58,13 +58,17 @@ BUILTIN = [
     Rule("Slack webhook", re.compile(r"hooks\.slack\.com/services/T[0-9A-Z]+/B[0-9A-Z]+/[0-9A-Za-z]{20,}")),
     Rule("GitHub token", re.compile(r"\b(?:gh[pousr]_[0-9A-Za-z]{36,}|github_pat_[0-9A-Za-z_]{40,})")),
     Rule("AWS access key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    Rule("Healthchecks ping URL", re.compile(r"hc-ping\.com/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")),
+    Rule(
+        "Healthchecks ping URL",
+        re.compile(r"hc-ping\.com/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+    ),
 ]
 
 
 def git(*args: str, input_text: str | None = None) -> str:
-    return subprocess.run(["git", *args], input=input_text, capture_output=True, text=True,
-                          errors="replace", check=True).stdout
+    return subprocess.run(
+        ["git", *args], input=input_text, capture_output=True, text=True, errors="replace", check=True
+    ).stdout
 
 
 def mapping_keys(path: Path, variable: str) -> list[str]:
@@ -89,7 +93,7 @@ def mapping_keys(path: Path, variable: str) -> list[str]:
 def load_site_rules(path: Path) -> list[Rule]:
     lines = [(number, raw.strip()) for number, raw in enumerate(path.read_text().splitlines(), 1)]
     lines = [(number, line) for number, line in lines if line and not line.startswith("#")]
-    allowed = {line[len("allow:"):] for _, line in lines if line.startswith("allow:")}
+    allowed = {line[len("allow:") :] for _, line in lines if line.startswith("allow:")}
     rules = []
     for number, line in lines:
         if line.startswith("allow:"):
@@ -105,7 +109,9 @@ def load_site_rules(path: Path) -> list[Rule]:
             rules.append(Rule(name, re.compile(body), replacement))
         elif kind == "keys":
             vars_file, _, variable = body.rpartition(":")
-            words = sorted(set(mapping_keys(path.parent / vars_file, variable)) - allowed, key=len, reverse=True)
+            words = sorted(
+                set(mapping_keys(path.parent / vars_file, variable)) - allowed, key=len, reverse=True
+            )
             alternation = "|".join(re.escape(word) for word in words)
             rules.append(Rule(name, re.compile(rf"(?<![\w.-])(?:{alternation})(?![\w-])"), replacement))
         else:
@@ -116,8 +122,9 @@ def load_site_rules(path: Path) -> list[Rule]:
 def site_file(root: Path, explicit: str | None) -> Path:
     configured = explicit or os.environ.get("DEEPOPS_SENSITIVE_PATTERNS")
     if not configured:
-        configured = subprocess.run(["git", "config", "--get", "deepops.sensitivePatterns"],
-                                    capture_output=True, text=True).stdout.strip()
+        configured = subprocess.run(
+            ["git", "config", "--get", "deepops.sensitivePatterns"], capture_output=True, text=True
+        ).stdout.strip()
     return Path(configured) if configured else root / DEFAULT_SITE_FILE
 
 
@@ -155,8 +162,18 @@ class Scanner:
                 number += 1
 
     def commits(self, revs: list[str]) -> None:
-        log = git("log", "--format=%x01%H%n%B%x02", "-p", "-U0", "--no-color", "--no-ext-diff",
-                  "--no-textconv", "--diff-merges=first-parent", *revs, "--")
+        log = git(
+            "log",
+            "--format=%x01%H%n%B%x02",
+            "-p",
+            "-U0",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--diff-merges=first-parent",
+            *revs,
+            "--",
+        )
         for chunk in log.split("\x01")[1:]:
             sha, _, rest = chunk.partition("\n")
             message, _, diff = rest.partition("\x02")
@@ -169,15 +186,21 @@ def push_revs() -> list[list[str]]:
     to_ref = os.environ.get("PRE_COMMIT_TO_REF")
     if to_ref:
         from_ref = os.environ.get("PRE_COMMIT_FROM_REF", "")
-        return [[to_ref, "--not", from_ref] if from_ref and not ZERO_SHA.match(from_ref)
-                else [to_ref, "--not", "--remotes"]]
+        return [
+            [to_ref, "--not", from_ref]
+            if from_ref and not ZERO_SHA.match(from_ref)
+            else [to_ref, "--not", "--remotes"]
+        ]
     sets = []
     for line in sys.stdin.read().splitlines():
         _, local_sha, _, remote_sha = line.split()
         if ZERO_SHA.match(local_sha):
             continue
-        sets.append([local_sha, "--not", remote_sha] if not ZERO_SHA.match(remote_sha)
-                    else [local_sha, "--not", "--remotes"])
+        sets.append(
+            [local_sha, "--not", remote_sha]
+            if not ZERO_SHA.match(remote_sha)
+            else [local_sha, "--not", "--remotes"]
+        )
     return sets
 
 
@@ -193,8 +216,11 @@ def replace_text(rules: list[Rule]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--patterns", help=f"site file (default: $DEEPOPS_SENSITIVE_PATTERNS, "
-                        f"git config deepops.sensitivePatterns, then {DEFAULT_SITE_FILE})")
+    parser.add_argument(
+        "--patterns",
+        help=f"site file (default: $DEEPOPS_SENSITIVE_PATTERNS, "
+        f"git config deepops.sensitivePatterns, then {DEFAULT_SITE_FILE})",
+    )
     parser.add_argument("--no-site", action="store_true", help="built-in rules only (for site repositories)")
     parser.add_argument("mode", choices=["staged", "message", "push", "history", "tree", "replace-text"])
     parser.add_argument("args", nargs="*")
@@ -220,8 +246,9 @@ def main() -> int:
 
     scan = Scanner(rules)
     if opts.mode == "staged":
-        scan.diff(git("diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv",
-                      "--diff-filter=d"))
+        scan.diff(
+            git("diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--diff-filter=d")
+        )
     elif opts.mode == "message":
         if len(opts.args) != 1:
             parser.error("message takes the message file")
@@ -245,8 +272,11 @@ def main() -> int:
                 scan.text(name, data.decode(errors="replace"))
 
     if scan.findings:
-        print(f"sensitive-guard: {scan.findings} finding(s). Replace them with generic values, "
-              f"or mark a deliberate line with '{ALLOW}'.", file=sys.stderr)
+        print(
+            f"sensitive-guard: {scan.findings} finding(s). Replace them with generic values, "
+            f"or mark a deliberate line with '{ALLOW}'.",
+            file=sys.stderr,
+        )
         return 1
     return 0
 

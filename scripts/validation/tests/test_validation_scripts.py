@@ -11,9 +11,7 @@ SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(
-        name, os.path.join(SCRIPTS_DIR, name + ".py")
-    )
+    spec = importlib.util.spec_from_file_location(name, os.path.join(SCRIPTS_DIR, name + ".py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -78,14 +76,14 @@ class TestK8sParsers(unittest.TestCase):
                     "status": {
                         "conditions": [{"type": "Ready", "status": "True"}],
                         "allocatable": {"nvidia.com/gpu": "8"},
-                    }
+                    },
                 },
                 {
                     "metadata": {"name": "node-b"},
                     "status": {
                         "conditions": [{"type": "Ready", "status": "False"}],
                         "allocatable": {},
-                    }
+                    },
                 },
             ]
         }

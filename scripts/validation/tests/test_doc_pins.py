@@ -14,7 +14,9 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[3]
-PIN = re.compile(r"\b([a-z][a-z0-9_]*(?:version|_container|_image|_tag)[a-z0-9_]*)\s*[:=]\s*[\"']?([vV]?\d[\w.\-:/]*)")
+PIN = re.compile(
+    r"\b([a-z][a-z0-9_]*(?:version|_container|_image|_tag)[a-z0-9_]*)\s*[:=]\s*[\"']?([vV]?\d[\w.\-:/]*)"
+)
 
 
 def role_defaults():

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check a local vLLM server with one small inference request; never launch it."""
+
 import argparse
 import http.client
 import ipaddress
@@ -27,21 +28,30 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def local_origin(value):
     try:
         parsed = urllib.parse.urlsplit(value)
-        if (parsed.scheme != "http" or not parsed.hostname
-                or not ipaddress.ip_address(parsed.hostname).is_loopback
-                or "@" in parsed.netloc
-                or parsed.path not in ("", "/") or parsed.query or parsed.fragment
-                or parsed.port is None or not 1 <= parsed.port <= 65535):
+        if (
+            parsed.scheme != "http"
+            or not parsed.hostname
+            or not ipaddress.ip_address(parsed.hostname).is_loopback
+            or "@" in parsed.netloc
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+            or parsed.port is None
+            or not 1 <= parsed.port <= 65535
+        ):
             raise ValueError
         return "http://" + parsed.netloc
     except ValueError:
-        raise ValidationError("base URL must be an HTTP loopback IP with an explicit port and no credentials, path, query, or fragment") from None
+        raise ValidationError(
+            "base URL must be an HTTP loopback IP with an explicit port and no credentials, path, query, or fragment"
+        ) from None
 
 
 def request(opener, origin, path, timeout, payload=None, expect_json=True):
     data = None if payload is None else json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(origin + path, data=data,
-                                 headers={"Content-Type": "application/json", "Accept": "application/json"})
+    req = urllib.request.Request(
+        origin + path, data=data, headers={"Content-Type": "application/json", "Accept": "application/json"}
+    )
     try:
         deadline = time.monotonic() + timeout
         with opener.open(req, timeout=timeout) as response:
@@ -97,24 +107,42 @@ def validate(args):
         result["checks"][stage] = True
         stage = "model"
         models = request(opener, origin, "/v1/models", args.timeout)
-        if (not isinstance(models, dict) or not isinstance(models.get("data"), list)
-                or not all(isinstance(item, dict) for item in models["data"])
-                or not any(item.get("id") == args.model for item in models["data"])):
+        if (
+            not isinstance(models, dict)
+            or not isinstance(models.get("data"), list)
+            or not all(isinstance(item, dict) for item in models["data"])
+            or not any(item.get("id") == args.model for item in models["data"])
+        ):
             raise ValidationError("expected served model is absent or model-list response is malformed")
         result["checks"][stage] = True
         stage = "completion"
-        completion = request(opener, origin, "/v1/completions", args.timeout, {
-            "model": args.model, "prompt": "The capital of France is",
-            "max_tokens": 8, "temperature": 0, "stream": False,
-        })
+        completion = request(
+            opener,
+            origin,
+            "/v1/completions",
+            args.timeout,
+            {
+                "model": args.model,
+                "prompt": "The capital of France is",
+                "max_tokens": 8,
+                "temperature": 0,
+                "stream": False,
+            },
+        )
         if not isinstance(completion, dict) or completion.get("model") != args.model:
             raise ValidationError("completion response does not identify the expected model")
         choices = completion.get("choices")
         usage = completion.get("usage")
-        if (not isinstance(choices, list) or not choices or not isinstance(choices[0], dict)
-                or not isinstance(choices[0].get("text"), str) or not choices[0]["text"].strip()
-                or not isinstance(usage, dict) or type(usage.get("completion_tokens")) is not int
-                or not 0 < usage["completion_tokens"] <= 8):
+        if (
+            not isinstance(choices, list)
+            or not choices
+            or not isinstance(choices[0], dict)
+            or not isinstance(choices[0].get("text"), str)
+            or not choices[0]["text"].strip()
+            or not isinstance(usage, dict)
+            or type(usage.get("completion_tokens")) is not int
+            or not 0 < usage["completion_tokens"] <= 8
+        ):
             raise ValidationError("completion must contain nonempty text and 1 to 8 generated tokens")
         result["checks"][stage] = True
         result["ok"] = True
@@ -125,16 +153,30 @@ def validate(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000",
-                        help="Loopback HTTP origin, without /v1; proxies and redirects disabled")
+    parser.add_argument(
+        "--base-url",
+        default="http://127.0.0.1:8000",
+        help="Loopback HTTP origin, without /v1; proxies and redirects disabled",
+    )
     parser.add_argument("--model", required=True, help="Expected --served-model-name")
     parser.add_argument("--cache-dir", required=True, help="Explicit shared HF_HUB_CACHE")
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--revision", required=True, help="Full immutable model commit hash")
-    parser.add_argument("--require-file", required=True, action="append",
-                        help="Required snapshot file; repeat for all configuration, tokenizer and weight files")
-    parser.add_argument("--timeout", type=float, default=30, help="Socket timeout and response-body time budget, 0 < seconds <= 120")
-    parser.add_argument("--json", action="store_true", help="Emit schema-versioned JSON without generated text")
+    parser.add_argument(
+        "--require-file",
+        required=True,
+        action="append",
+        help="Required snapshot file; repeat for all configuration, tokenizer and weight files",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=30,
+        help="Socket timeout and response-body time budget, 0 < seconds <= 120",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Emit schema-versioned JSON without generated text"
+    )
     args = parser.parse_args()
     result = validate(args)
     if args.json:

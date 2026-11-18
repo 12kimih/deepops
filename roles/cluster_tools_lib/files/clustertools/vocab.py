@@ -3,6 +3,7 @@
 Every tool classifies through these functions, so a state or a reason reads the same
 in sq, qos and the usage report. Python 3.9 or newer, standard library only.
 """
+
 from fnmatch import fnmatchcase
 
 
@@ -21,13 +22,25 @@ def _flags(state):
 # never read as DOWN.
 
 NODE_CLASSES = ("idle", "mix", "alloc", "drain", "down")
-OPEN_CLASSES = frozenset(("idle", "mix", "alloc"))   # still take new work
+OPEN_CLASSES = frozenset(("idle", "mix", "alloc"))  # still take new work
 
-_DOWN = frozenset(("DOWN", "FAIL", "FAILING", "NOT_RESPONDING", "INVALID_REG", "INVALID",
-                   "FUTURE", "INVAL", "UNKNOWN", "ERROR", "INACTIVE"))
+_DOWN = frozenset(
+    (
+        "DOWN",
+        "FAIL",
+        "FAILING",
+        "NOT_RESPONDING",
+        "INVALID_REG",
+        "INVALID",
+        "FUTURE",
+        "INVAL",
+        "UNKNOWN",
+        "ERROR",
+        "INACTIVE",
+    )
+)
 _DRAIN = frozenset(("DRAIN", "DRAINING", "DRAINED", "MAINT", "REBOOT_ISSUED"))
-_BASE = {"IDLE": "idle", "MIXED": "mix", "ALLOCATED": "alloc", "COMPLETING": "alloc",
-         "BLOCKED": "alloc"}
+_BASE = {"IDLE": "idle", "MIXED": "mix", "ALLOCATED": "alloc", "COMPLETING": "alloc", "BLOCKED": "alloc"}
 
 NODE_HELP = {
     "idle": "no jobs; takes work (a powered-down cloud node counts)",
@@ -77,19 +90,50 @@ def node_unavailable(state):
 # state, then flags such as COMPLETING or CONFIGURING, which squeue reports instead.
 
 JOB_CODES = {
-    "PENDING": "PD", "RUNNING": "R", "SUSPENDED": "S", "COMPLETING": "CG", "COMPLETED": "CD",
-    "CONFIGURING": "CF", "CANCELLED": "CA", "FAILED": "F", "TIMEOUT": "TO", "PREEMPTED": "PR",
-    "NODE_FAIL": "NF", "BOOT_FAIL": "BF", "DEADLINE": "DL", "OUT_OF_MEMORY": "OOM",
-    "STOPPED": "ST", "RESIZING": "RS", "REQUEUED": "RQ", "REQUEUE_HOLD": "RH",
-    "REQUEUE_FED": "RF", "RESV_DEL_HOLD": "RD", "SPECIAL_EXIT": "SE", "SIGNALING": "SI",
-    "STAGE_OUT": "SO", "REVOKED": "RV",
+    "PENDING": "PD",
+    "RUNNING": "R",
+    "SUSPENDED": "S",
+    "COMPLETING": "CG",
+    "COMPLETED": "CD",
+    "CONFIGURING": "CF",
+    "CANCELLED": "CA",
+    "FAILED": "F",
+    "TIMEOUT": "TO",
+    "PREEMPTED": "PR",
+    "NODE_FAIL": "NF",
+    "BOOT_FAIL": "BF",
+    "DEADLINE": "DL",
+    "OUT_OF_MEMORY": "OOM",
+    "STOPPED": "ST",
+    "RESIZING": "RS",
+    "REQUEUED": "RQ",
+    "REQUEUE_HOLD": "RH",
+    "REQUEUE_FED": "RF",
+    "RESV_DEL_HOLD": "RD",
+    "SPECIAL_EXIT": "SE",
+    "SIGNALING": "SI",
+    "STAGE_OUT": "SO",
+    "REVOKED": "RV",
 }
 # States that still own their allocation. A finished job keeps a stale allocation
 # until the controller forgets it, so counting every allocation over-counts.
-_HOLDS = frozenset(("RUNNING", "COMPLETING", "CONFIGURING", "RESIZING", "SIGNALING",
-                    "SUSPENDED", "STOPPED", "STAGE_OUT"))
-_FINISHED = frozenset(("COMPLETED", "CANCELLED", "FAILED", "TIMEOUT", "PREEMPTED", "NODE_FAIL",
-                       "BOOT_FAIL", "DEADLINE", "OUT_OF_MEMORY", "REVOKED"))
+_HOLDS = frozenset(
+    ("RUNNING", "COMPLETING", "CONFIGURING", "RESIZING", "SIGNALING", "SUSPENDED", "STOPPED", "STAGE_OUT")
+)
+_FINISHED = frozenset(
+    (
+        "COMPLETED",
+        "CANCELLED",
+        "FAILED",
+        "TIMEOUT",
+        "PREEMPTED",
+        "NODE_FAIL",
+        "BOOT_FAIL",
+        "DEADLINE",
+        "OUT_OF_MEMORY",
+        "REVOKED",
+    )
+)
 
 
 def job_code(state):
@@ -128,22 +172,60 @@ REASON_CLASSES = ("wait", "limit", "over", "nodes", "start", "held", "error")
 
 _REASON_RULES = (
     ("wait", ("Priority", "Resources", "None", "Prolog", "Licenses", "")),
-    ("error", ("*NeverSatisfied*", "*Invalid*", "*NotAllowed*", "BadConstraints",
-               "JobLaunchFailure", "launch*")),
-    ("over", ("*PerJob*", "*PerNode*", "QOSMin*", "AssocMin*", "PartitionTimeLimit",
-              "PartitionNodeLimit", "PartitionConfig")),
-    ("limit", ("QOSGrp*", "AssocGrp*", "QOSMax*", "AssocMax*", "Max*PerAccount",
-               "Max*PerUser", "*JobsLimit", "AccountingPolicy")),
-    ("nodes", ("ReqNodeNotAvail", "Reservation*", "PartitionDown", "PartitionInactive",
-               "NodeDown", "Nodes_required_for_job_are_DOWN*", "PowerUpNodes")),
+    (
+        "error",
+        ("*NeverSatisfied*", "*Invalid*", "*NotAllowed*", "BadConstraints", "JobLaunchFailure", "launch*"),
+    ),
+    (
+        "over",
+        (
+            "*PerJob*",
+            "*PerNode*",
+            "QOSMin*",
+            "AssocMin*",
+            "PartitionTimeLimit",
+            "PartitionNodeLimit",
+            "PartitionConfig",
+        ),
+    ),
+    (
+        "limit",
+        (
+            "QOSGrp*",
+            "AssocGrp*",
+            "QOSMax*",
+            "AssocMax*",
+            "Max*PerAccount",
+            "Max*PerUser",
+            "*JobsLimit",
+            "AccountingPolicy",
+        ),
+    ),
+    (
+        "nodes",
+        (
+            "ReqNodeNotAvail",
+            "Reservation*",
+            "PartitionDown",
+            "PartitionInactive",
+            "NodeDown",
+            "Nodes_required_for_job_are_DOWN*",
+            "PowerUpNodes",
+        ),
+    ),
     ("start", ("Dependency", "BeginTime")),
     ("held", ("JobHeld*",)),
 )
 
 REASON_TITLE = {
-    "wait": "waiting its turn", "limit": "limit reached", "over": "request over a limit",
-    "nodes": "nodes unavailable", "start": "start condition", "held": "held",
-    "error": "cannot run", "other": "other",
+    "wait": "waiting its turn",
+    "limit": "limit reached",
+    "over": "request over a limit",
+    "nodes": "nodes unavailable",
+    "start": "start condition",
+    "held": "held",
+    "error": "cannot run",
+    "other": "other",
 }
 REASON_CODES = {
     "wait": "Priority, Resources",

@@ -107,9 +107,7 @@ class TransientExecutionContract(unittest.TestCase):
                 with self.subTest(path=path, task=task.get("name")):
                     self.assertIn(TRANSIENT_SERVICE, command)
                     driven = "nvidia-smi" if "nvidia-smi" in command else "nvidia-mig-parted"
-                    self.assertLess(
-                        command.index(TRANSIENT_SERVICE), command.index(driven)
-                    )
+                    self.assertLess(command.index(TRANSIENT_SERVICE), command.index(driven))
 
     def test_mig_administration_is_covered_too(self):
         # The probe is useless on its own: once it succeeds, apply and assert

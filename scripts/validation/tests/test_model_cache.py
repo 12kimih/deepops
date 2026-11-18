@@ -1,4 +1,5 @@
 """Offline contract tests: missing/unsafe files must never report a ready cache."""
+
 import json
 import os
 from pathlib import Path
@@ -27,10 +28,23 @@ class ModelCacheTests(unittest.TestCase):
 
     def run_validator(self, *extra, success=True):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "--json", "--cache-dir", str(self.cache),
-             "--repo-id", "example/model", "--revision", REVISION,
-             "--require-file", "config.json", *extra],
-            capture_output=True, text=True, timeout=5,
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--json",
+                "--cache-dir",
+                str(self.cache),
+                "--repo-id",
+                "example/model",
+                "--revision",
+                REVISION,
+                "--require-file",
+                "config.json",
+                *extra,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         self.assertEqual(result.returncode, 0 if success else 1, result.stderr + result.stdout)
         payload = json.loads(result.stdout)
@@ -131,9 +145,19 @@ class ModelCacheTests(unittest.TestCase):
 
     def test_required_files_cannot_be_omitted(self):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "--cache-dir", str(self.cache),
-             "--repo-id", "example/model", "--revision", REVISION],
-            capture_output=True, text=True, timeout=5,
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--cache-dir",
+                str(self.cache),
+                "--repo-id",
+                "example/model",
+                "--revision",
+                REVISION,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         self.assertEqual(result.returncode, 2)
 
