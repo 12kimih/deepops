@@ -290,12 +290,17 @@ slurm_cluster_configure_gpu_power_limit: true
 #cluster_tools_libs:
 #  - src: "{{ inventory_dir }}/files/slurm/lib/cluster-theme.sh"
 #    dest: cluster-theme.sh
+#  - src: "{{ inventory_dir }}/files/slurm/lib/cluster-slurm.sh"
+#    dest: cluster-slurm.sh
 
 # Change a Slurm command's default output through its own environment variable rather
 # than by wrapping the command (see `man sinfo`, `man squeue`). The environment is
 # inherited, so batch scripts and remote commands get the same output.
 #cluster_tools_environment:
 #  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
+#  # The name the commands print (sq, slurm-help); without it they fall back to
+#  # Slurm's ClusterName.
+#  CLUSTER_TITLE: "{{ cluster_tools_motd_title }}"
 #  # COLORTERM is how a terminal advertises 24-bit colour, and sshd forwards nothing
 #  # but LANG and LC_* -- so it is lost on every hop and colour-aware tools fall back
 #  # to their 256-colour approximation on the compute nodes. Asserting it here is a
