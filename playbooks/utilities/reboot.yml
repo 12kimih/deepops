@@ -10,15 +10,9 @@
   serial: "{{ reboot_serial | default('100%') }}"
   tags:
     - reboot
-  vars:
-    # ansible.cfg sets ConnectionAttempts=100 (carried over from kubespray), which lets one SSH
-    # probe block for the whole reboot_timeout. The reboot module only re-checks its
-    # deadline between probes, so it never sees the node come back. ServerAliveInterval
-    # drops a control master the reboot left stale.
-    ansible_ssh_args: >-
-      -o ControlMaster=auto -o ControlPersist=5m
-      -o ServerAliveInterval=10 -o ServerAliveCountMax=3
-      -o UserKnownHostsFile=/dev/null
+  # ansible.cfg's single connection attempt and keepalives are what the reboot module
+  # needs: each probe returns quickly, so it re-checks its deadline and sees the node
+  # come back.
   pre_tasks:
     # Lets the whole cluster reboot in one batch: a node holding a hard mount from a
     # peer that goes down with it blocks in D state and never reaches the reboot. The
