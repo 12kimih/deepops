@@ -10,9 +10,9 @@ The steps outlined below were tested using a virtual DeepOps cluster with one lo
 where each compute node has been allocated 8 CPU cores and a single NVIDIA Tesla P4 GPU.
 Any cluster hardware should work to duplicate this example, provided that each compute node you use for the benchmark includes at least one CUDA-capable GPU.
 
-> **Note:** this example is unmaintained. `ansible-prereqs.yml` targets a `slurm-workers` group (DeepOps
-> names its compute nodes `slurm-node`), uses an `nvidia-ml` role that no longer exists, and pins CUDA 10.0.
-> Its `andrewrothstein.miniconda` role is a Galaxy role listed in `roles/requirements.yml`.
+> **Note:** this example is unmaintained. `ansible-prereqs.yml` installs the CUDA toolkit on the
+> `slurm-node` group with the `nvidia_cuda` role; its `andrewrothstein.miniconda` role is a Galaxy role
+> listed in `roles/requirements.yml`.
 
 ## Assumptions
 

@@ -10,29 +10,12 @@
         name: "git"
         state: present
 
-  # CUDA components just on workers
-- hosts: slurm-workers
+  # CUDA toolkit on the compute nodes, from the NVIDIA repository
+- hosts: slurm-node
   become: true
   roles:
     - facts
-    - nvidia-ml
-
-  tasks:
-    - name: Ensure CUDA is installed (Ubuntu)
-      ansible.builtin.package:
-        name: "{{ item }}"
-        state: present
-      with_items:
-        - "cuda=10.0*"      # CUDA 10.0 currently needed
-      when: (ansible_os_family == "Debian") and (ansible_local['gpus']['count'])
-
-    - name: Ensure CUDA is installed (RHEL)
-      ansible.builtin.package:
-        name: "{{ item }}"
-        state: present
-      with_items:
-        - "cuda-10-0"
-      when: (ansible_os_family == "RedHat") and (ansible_local['gpus']['count'])
+    - nvidia_cuda
 
   # Pre-copy scripts to all nodes
 - hosts: all

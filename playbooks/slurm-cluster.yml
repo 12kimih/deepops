@@ -25,7 +25,9 @@
   when: chrony_install | default(true)
 
 - name: Set up a local cluster container registry
-  import_playbook: container/standalone-container-registry.yml hostlist=slurm-master
+  import_playbook: container/standalone-container-registry.yml
+  vars:
+    hostlist: slurm-master
   when: slurm_enable_container_registry | default(true)
 
 - name: Set up NGINX-based container caching | Install docker registry cache server
@@ -82,11 +84,15 @@
   when: slurm_install_authentication | default(true)
 
 - name: Install DCGM
-  import_playbook: nvidia-software/nvidia-dcgm.yml hostlist=slurm-node
+  import_playbook: nvidia-software/nvidia-dcgm.yml
+  vars:
+    hostlist: slurm-node
   when: install_dcgm | default(false)
 
 - name: Install Node Health Check
-  import_playbook: slurm-cluster/nhc.yml hostlist=slurm-node
+  import_playbook: slurm-cluster/nhc.yml
+  vars:
+    hostlist: slurm-node
   when: slurm_install_nhc | default(false)
 
 - name: Install Slurm
@@ -167,7 +173,9 @@
 # Declarative: nodes with nvidia_power_limit_watts get the cap, nodes without have any
 # cap removed. Turn the whole step off with slurm_cluster_configure_gpu_power_limit.
 - name: Configure the GPU power limit
-  import_playbook: nvidia-software/nvidia-power-limit.yml hostlist=slurm-node
+  import_playbook: nvidia-software/nvidia-power-limit.yml
+  vars:
+    hostlist: slurm-node
   when: slurm_cluster_configure_gpu_power_limit | default(true)
 
 - name: Install Enroot and Pyxis
