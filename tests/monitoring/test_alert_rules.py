@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """Run the alert rule unit tests (alert-rules.test.yml) with promtool."""
-import os
-from pathlib import Path
-import shutil
-import subprocess
 import unittest
+from pathlib import Path
+
+import promtool_runner
 
 HERE = Path(__file__).resolve().parent
 
 
 class AlertRuleTests(unittest.TestCase):
     def test_alert_rules(self):
-        tool = shutil.which(os.environ.get("PROMTOOL", "promtool"))
-        self.assertIsNotNone(tool, "Install promtool or set PROMTOOL to its path")
-        result = subprocess.run([tool, "test", "rules", "alert-rules.test.yml"],
-                                cwd=HERE, capture_output=True, text=True)
+        result = promtool_runner.run(["test", "rules", "alert-rules.test.yml"], cwd=HERE,
+                                     mounts=[promtool_runner.ROOT / "roles/prometheus/files/rules"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 

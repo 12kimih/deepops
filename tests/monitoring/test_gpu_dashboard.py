@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Check the dashboard JSON and execute its selectors with promtool (no cluster)."""
 import json
-import os
-from pathlib import Path
 import re
-import shutil
-import subprocess
 import tempfile
 import unittest
+from pathlib import Path
+
+import promtool_runner
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -47,8 +46,6 @@ class GpuDashboardTests(unittest.TestCase):
             self.assertFalse(variable["includeAll"])
 
     def test_queries_against_kubernetes_and_slurm_series(self):
-        tool = shutil.which(os.environ.get("PROMTOOL", "promtool"))
-        self.assertIsNotNone(tool, "Install promtool or set PROMTOOL to its path")
         # GPU and node exporter IPs intentionally differ. An unrelated node
         # catches a selector that accidentally drops the chosen-host filter.
         cases = [
@@ -125,7 +122,7 @@ class GpuDashboardTests(unittest.TestCase):
                 tests_path.write_text(json.dumps({"rule_files": [str(rules_path)], "evaluation_interval": "1m",
                                                   "tests": [{"interval": "1m", "input_series": series,
                                                              "promql_expr_test": expected}]}))
-                result = subprocess.run([tool, "test", "rules", str(tests_path)], capture_output=True, text=True)
+                result = promtool_runner.run(["test", "rules", str(tests_path)], cwd=temp)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
