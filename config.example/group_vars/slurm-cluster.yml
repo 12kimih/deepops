@@ -301,6 +301,9 @@ slurm_cluster_configure_gpu_power_limit: true
 #  # The name the commands print (sq, slurm-help); without it they fall back to
 #  # Slurm's ClusterName.
 #  CLUSTER_TITLE: "{{ cluster_tools_motd_title }}"
+#  # sq's default options for everyone, as if typed first; a user's own SQ_OPTIONS or
+#  # command line overrides them (see `sq --help`).
+#  #SQ_OPTIONS: "--no-users"
 #  # COLORTERM is how a terminal advertises 24-bit colour, and sshd forwards nothing
 #  # but LANG and LC_* -- so it is lost on every hop and colour-aware tools fall back
 #  # to their 256-colour approximation on the compute nodes. Asserting it here is a
