@@ -1,0 +1,13 @@
+---
+# host_baseline -- what must NOT be on a host.
+#
+# Roles install what a host needs; nothing used to remove what someone installed by
+# hand and stopped using, so it ran for years unmanaged: a database and a file server
+# on a compute node, a web server on every node. This role removes the packages a site
+# declares absent. A --check run lists every package apt would remove with them
+# (reverse dependencies), so a preview shows the real change.
+#
+# Names may use apt wildcards ("mysql-server*"). Usually set per host role with an
+# expression on inventory groups, e.g. a database package absent everywhere but the
+# controller. Empty = nothing removed.
+host_baseline_absent_packages: []

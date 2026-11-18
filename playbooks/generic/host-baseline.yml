@@ -1,0 +1,10 @@
+---
+# Remove what must not be on a host (roles/host_baseline). Preview first:
+#
+#   ansible-playbook -K --check --diff playbooks/generic/host-baseline.yml
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - host-baseline
+  roles:
+    - role: host_baseline

@@ -30,6 +30,11 @@
     hostlist: slurm-master
   when: slurm_enable_container_registry | default(true)
 
+- name: Remove what must not be on a host
+  import_playbook: generic/host-baseline.yml
+  tags:
+    - host-baseline
+
 - name: Set up NGINX-based container caching | Install docker registry cache server
   import_playbook: container/nginx-docker-registry-cache-server.yml
   vars:

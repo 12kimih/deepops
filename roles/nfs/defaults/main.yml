@@ -10,6 +10,10 @@ nfs_is_client: false
 # is written as is.
 nfs_exports: []
 
+# The hosts that are NFS servers. Once set, every other host this role runs on has the
+# NFS server package removed (with its exports). Empty = no host is touched.
+nfs_servers: []
+
 # Hosts or networks every export is offered to unless an entry sets its own clients.
 # "*" is any host that can reach the server; set the cluster's subnet instead.
 nfs_export_clients: ["*"]

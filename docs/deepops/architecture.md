@@ -87,6 +87,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── enroot
 │   ├── facts
 │   ├── grafana
+│   ├── host_baseline
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
 │   ├── lmod

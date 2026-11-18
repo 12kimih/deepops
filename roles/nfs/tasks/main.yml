@@ -77,3 +77,32 @@
   ansible.builtin.include_tasks: client.yml
   when: nfs_is_client
   tags: always
+
+# A host that is not one of the declared NFS servers runs no NFS server: a server set
+# up by hand once keeps exporting long after its use ends (data exports were found on
+# compute nodes, offered to every host). Opt-in: only once nfs_servers names the
+# servers. The exported data on disk is left alone; the client side stays.
+- name: Retire the NFS server on hosts that are not NFS servers
+  when:
+    - nfs_servers | length > 0
+    - inventory_hostname not in nfs_servers
+  tags:
+    - nfs
+  block:
+    - name: Read the service list
+      ansible.builtin.service_facts:
+
+    - name: Stop and disable the NFS server
+      ansible.builtin.systemd:
+        name: "{{ nfs_server_daemon }}"
+        state: stopped
+        enabled: false
+      when: (nfs_server_daemon ~ '.service') in ansible_facts.services
+
+    # On RHEL the server lives in nfs-utils with the client, so only the service goes.
+    - name: Remove the NFS server package and its exports (Debian)
+      ansible.builtin.apt:
+        name: nfs-kernel-server
+        state: absent
+        purge: true
+      when: ansible_facts.os_family == 'Debian'
