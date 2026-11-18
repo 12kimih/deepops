@@ -41,14 +41,20 @@ package = false
 required-version = "==0.12.9"
 default-groups = ["dev"]
 
-# Python lint. The excludes live here, not in check.sh, so a bare `ruff check` checks
-# what check.sh checks. py39: several scripts run on nodes under the distro Python,
-# RHEL 9's included. E501 and W29x are left for one dedicated `ruff format` commit
-# rather than hand-wrapped.
+# Python lint and format. The excludes live here, not in check.sh, so a bare `ruff
+# check` or `ruff format` covers what check.sh does. py39: several scripts run on nodes
+# under the distro Python, RHEL 9's included. The formatter keeps ruff's defaults (the
+# Black style); its one repo-wide pass is listed in .git-blame-ignore-revs.
 [tool.ruff]
 line-length = 110
 target-version = "py39"
 extend-exclude = ["submodules", "roles/galaxy", "collections", ".venv*"]
 
 [tool.ruff.lint]
+# ruff's defaults plus invalid escapes. Line length is the formatter's job; E501 would
+# only flag the long strings, URLs and comments it rightly leaves whole.
 select = ["E4", "E7", "E9", "F", "W6"]
+
+[tool.ruff.lint.per-file-ignores]
+# Ansible modules put DOCUMENTATION, EXAMPLES and RETURN before their imports.
+"roles/*/library/*.py" = ["E402"]
