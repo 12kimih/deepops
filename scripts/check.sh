@@ -19,6 +19,7 @@ step() {
 python=python3
 command -v ansible-playbook >/dev/null || { echo "Activate the DeepOps virtualenv first (scripts/setup.sh)." >&2; exit 2; }
 
+step "ansible.cfg has only known settings" ansible-config validate
 step "style is normalized" "${python}" scripts/deepops/normalize-ansible-style.py --check .
 step "generated docs are current" "${python}" scripts/docs/generate.py --check
 step "yamllint" yamllint --no-warnings .
