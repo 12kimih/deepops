@@ -15,4 +15,5 @@
     name: "*"
     state: latest
     update_only: true
+    nobest: "{{ maintenance_dnf_nobest | bool }}"
   when: ansible_facts.os_family == 'RedHat'

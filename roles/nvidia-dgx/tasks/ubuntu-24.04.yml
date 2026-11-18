@@ -48,11 +48,6 @@
   ansible.builtin.apt:
     update_cache: true
 
-- name: Upgrade packages for DGX OS 7
-  ansible.builtin.apt:
-    upgrade: dist
-  when: dgx_os7_upgrade_packages
-
 - name: Install DGX OS 7 system packages
   ansible.builtin.apt:
     name: "{{ dgx_os7_system_packages + ([dgx_os7_station_package] if dgx_os7_platform.station else []) }}"

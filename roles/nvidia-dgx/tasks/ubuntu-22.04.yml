@@ -48,11 +48,6 @@
   ansible.builtin.apt:
     update_cache: true
 
-- name: Upgrade packages for DGX OS 6
-  ansible.builtin.apt:
-    upgrade: dist
-  when: dgx_os6_upgrade_packages
-
 - name: Install DGX OS 6 system configurations and tools
   ansible.builtin.apt:
     name: "{{ dgx_os6_platform.config_packages + dgx_os6_common_packages }}"

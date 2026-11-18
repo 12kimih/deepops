@@ -66,9 +66,13 @@
   when: ansible_facts.os_family == "RedHat"
 
 - name: Reboot to load the OFED kernel modules
-  ansible.builtin.reboot:
-    msg: "Rebooting to load DOCA-OFED kernel modules"
-    reboot_timeout: "{{ mofed_reboot_timeout }}"
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: reboot
+  vars:
+    maintenance_force_reboot: true
+    maintenance_reason: "load the DOCA-OFED kernel modules"
+    maintenance_reboot_timeout: "{{ mofed_reboot_timeout }}"
   when:
     - mofed_reboot | bool
     - (mofed_install_ubuntu.changed | default(false)) or (mofed_install_redhat.changed | default(false))

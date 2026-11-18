@@ -34,9 +34,13 @@
             not in (nvidia_driver_loaded_version.stdout | default(''))) }}
 
 - name: Reboot to load the new NVIDIA kernel module
-  ansible.builtin.reboot:
-    msg: "Rebooting to load the new NVIDIA driver"
-    reboot_timeout: "{{ nvidia_driver_reboot_timeout }}"
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: reboot
+  vars:
+    maintenance_force_reboot: true
+    maintenance_reason: "load the new NVIDIA driver"
+    maintenance_reboot_timeout: "{{ nvidia_driver_reboot_timeout }}"
   when:
     - nvidia_driver_reboot | bool
     - nvidia_driver_reboot_needed | bool

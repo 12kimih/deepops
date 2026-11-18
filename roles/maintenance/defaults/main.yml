@@ -24,6 +24,10 @@ maintenance_drain_poll: 60
 
 # Reboot even when the upgrade does not ask for it.
 maintenance_force_reboot: false
+
+# RHEL family: dnf --nobest, upgrading what can be upgraded when the newest version of
+# a package cannot be installed (the DGX software guides ask for it).
+maintenance_dnf_nobest: false
 # Unmount the network filesystems first: a hard mount from a peer that is going down
 # too can leave the node blocked in D state, never reaching the reboot.
 maintenance_detach_nfs: true

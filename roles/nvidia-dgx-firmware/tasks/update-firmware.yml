@@ -37,9 +37,13 @@
     - firmware_needs_upgrade | default(false)
 
 - name: Reboot if necessary
-  ansible.builtin.shell: sleep 2 && /sbin/shutdown -r now "Reboot required"
-  async: 1
-  poll: 0
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: reboot
+  vars:
+    maintenance_force_reboot: true
+    maintenance_reason: "load the new firmware"
+    maintenance_reboot_timeout: "{{ reboot_timeout }}"
   when:
     - reboot_required | default(false)
 

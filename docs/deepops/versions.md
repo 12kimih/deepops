@@ -22,6 +22,7 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | nginx-docker-registry-cache | `nginx_docker_cache_image` | `rpardini/docker-registry-proxy:0.7.0@sha256:413c340ea5f8` |  |
 | nhc | `nhc_version` | `1.4.3` |  |
 | nvidia-dcgm-exporter | `nvidia_dcgm_container_version` | `4.5.3-4.8.2-distroless` |  |
+| nvidia-dgx | `dgx_os6_driver_branch` | `550` |  |
 | nvidia-dgx-firmware | `firmware_update_tag` | `21.11.2` |  |
 | nvidia-dgx-firmware | `firmware_update_container` | `nvfw-dgxa100_21.11.2_211102.tar.gz` |  |
 | nvidia-gpu-operator | `gpu_operator_chart_version` | `v26.7.2` |  |
