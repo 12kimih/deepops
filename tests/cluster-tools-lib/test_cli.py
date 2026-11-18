@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools.cli import COMPLETERS, Command, Opt  # noqa: E402
+from clustertools import slurm  # noqa: E402
+from clustertools.cli import COMPLETERS, Command, Opt, run_main  # noqa: E402
 
 CMD = Command(
     "demo",
@@ -72,6 +73,30 @@ class CliTests(unittest.TestCase):
         for argv in (["--bogus"], ["-p"], ["--color", "sometimes"]):
             with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(run(argv)[0], 2)
+
+    def test_a_broken_default_is_a_usage_error_naming_it(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = run([], env={**ENV, "DEMO_OPTIONS": '-p "a10'})[0]
+        self.assertEqual(code, 2)
+        self.assertIn("$DEMO_OPTIONS: No closing quotation", err.getvalue())
+
+    def test_failures_are_reported_as_what_they_are(self):
+        def fails(error):
+            def body():
+                raise error
+
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                return run_main("demo", body), err.getvalue().strip()
+
+        self.assertEqual(fails(slurm.Missing("scontrol not found")), (127, "demo: scontrol not found"))
+        self.assertEqual(fails(slurm.Failed("scontrol: down")), (1, "demo: scontrol: down"))
+        self.assertEqual(fails(PermissionError(13, "Permission denied", "/etc/x.prom")),
+                         (1, "demo: /etc/x.prom: Permission denied"))  # fmt: skip
+        # A bug of the command's own is not dressed up as Slurm's.
+        with self.assertRaises(ValueError):
+            run_main("demo", lambda: int("x"))
 
     def test_refused_options_say_why(self):
         cmd = Command("demo", "x", [], refuse={"-o": "use squeue -o", "--format": "use squeue --format"})

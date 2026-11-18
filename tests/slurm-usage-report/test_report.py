@@ -1,8 +1,11 @@
 """Unit tests for the Slurm usage report, clustertools.usage_report (no cluster needed)."""
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
@@ -83,6 +86,7 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(jobs["1"]["gpus"], [("gpu1", 0), ("gpu1", 1)])
         self.assertEqual(jobs["1"]["gpu_type"], "a10")
         self.assertEqual(jobs["2"]["gpus"], [("gpu3", 0), ("gpu3", 2), ("gpu3", 3)])
+        self.assertEqual(jobs["2"]["gpu_type"], "")  # untyped: its count is not a type
         self.assertEqual(jobs["2"]["label"], "10_7")
         self.assertEqual(jobs["5"]["label"], "20_0")
         self.assertEqual(jobs["1"]["label"], "1")
@@ -121,6 +125,13 @@ class ParseTests(unittest.TestCase):
         self.assertEqual((pending["alice"]["jobs"], pending["alice"]["gpus"]), (2, 8))
         self.assertEqual(pending["alice"]["wait"], 7200)
         self.assertEqual(pending["alice"]["reasons"], report.Counter({"Priority": 1, "Resources": 1}))
+
+    def test_a_pending_array_record_counts_every_task(self):
+        record = job(13, "bob", state="PENDING", state_reason="Priority", tres_req_str="cpu=1,node=1,gres/gpu=2",
+                     array_job_id=value(13), array_task_string="0-9:2%1")  # fmt: skip
+        _, pending = report.parse_jobs({"jobs": [record]}, NOW)
+        self.assertEqual((pending["bob"]["jobs"], pending["bob"]["gpus"]), (5, 10))
+        self.assertEqual(pending["bob"]["reasons"], report.Counter({"Priority": 5}))
 
     def test_nodes_and_unavailable_states(self):
         data = {
@@ -234,11 +245,16 @@ class RenderTests(unittest.TestCase):
             "total_gpus": 1000,
             "reasons": [],
             "now": 0,
+            # Every section over Slack's limit: pending users, drained nodes, idle jobs.
             "pending": {
                 f"user{u}": {"jobs": 1, "gpus": 1, "reasons": report.Counter({"Priority": 1}), "wait": 60}
-                for u in range(40)
+                for u in range(200)
             },
         }
+        data["reasons"] = [
+            (f"gpu{k}", "drain", "2026-01-01T00:00:00", "root", "maintenance window") for k in range(100)
+        ]
+        data["idle"] = [dict(j, notify=False) for j in jobs[:200]]
         cfg = {"idle_util_threshold": 0, "idle_hours": 2, "notify": ["mention"], "dashboard_url": ""}
         (text, summary), thread = report.render(data, cfg, lambda user, mention: user)
         self.assertTrue(text)
@@ -248,10 +264,66 @@ class RenderTests(unittest.TestCase):
                 self.assertLessEqual(len(b.get("text", {}).get("text", "")), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
+    def test_a_long_section_is_cut_at_a_line_and_closes_its_code_block(self):
+        text = "head\n```\n" + "\n".join(f"row {i:04d} " + "x" * 40 for i in range(200)) + "\n```"
+        cut = report.section(text)["text"]["text"]
+        self.assertLessEqual(len(cut), 3000)
+        self.assertEqual(cut.count("```") % 2, 0)
+        kept = sum(1 for ln in cut.splitlines() if ln.startswith("row "))
+        self.assertIn(f"... {200 - kept} more lines", cut)
+        self.assertEqual(report.section("short")["text"]["text"], "short")
+
     def test_bar(self):
         self.assertEqual(report.bar(100), "█" * 10 + " 100%")
         self.assertEqual(report.bar(0), "░" * 10 + "   0%")
         self.assertTrue(report.bar(None).startswith("n/a"))
+
+
+class RunTests(unittest.TestCase):
+    """report_once: a failure part-way still records what this run did."""
+
+    def test_state_is_saved_when_a_notification_fails(self):
+        idle = [{"id": i, "label": i, "user": u, "gpus": [("gpu1", 0)], "gpu_type": "a10", "runtime": 9000,
+                 "qos": "normal", "partition": "p", "util": 0.0, "mem_gib": 1.0, "mem_known": 1, "idle": True,
+                 "idle_gpus": 1} for i, u in (("1", "alice"), ("2", "bob"))]  # fmt: skip
+        posted = []
+
+        class Slack:
+            token = "t"
+
+            def __init__(self, *_):
+                pass
+
+            def channel(self, target):
+                return target
+
+            def post(self, channel, text, blocks=None, thread_ts=None):
+                if channel == "UBOB":
+                    raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
+                posted.append(channel)
+                return "ts"
+
+        with tempfile.TemporaryDirectory() as d:
+            cfg = {"channel": "#gpu", "state_file": f"{d}/state.json", "idle_hours": 2, "idle_util_threshold": 1,
+                   "notify": ["dm"], "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
+                   "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
+                   "dm_text": "{job}", "dashboard_url": ""}  # fmt: skip
+            Path(f"{d}/config.json").write_text(json.dumps(cfg))
+            slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
+            with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
+                    mock.patch.object(report, "collect_slurm", lambda now: dict(slurm, jobs=[dict(j) for j in idle])), \
+                    mock.patch.object(report, "collect_gpus", lambda *_: {}), \
+                    mock.patch.object(report, "analyze", lambda jobs, *_: jobs), \
+                    mock.patch.object(report, "Slack", Slack):  # fmt: skip
+                self.assertEqual(report.main(), 1)
+                state = json.loads(Path(f"{d}/state.json").read_text())
+                # alice was told and is not told again next run; bob was not, so he is retried.
+                self.assertIsNotNone(state["idle"]["1"]["notified"])
+                self.assertIsNone(state["idle"]["2"]["notified"])
+                self.assertEqual(posted.count("UALICE"), 1)
+                report.main()
+                self.assertEqual(posted.count("UALICE"), 1)
+                self.assertEqual(Path(f"{d}/state.json").stat().st_mode & 0o777, 0o600)
 
 
 if __name__ == "__main__":

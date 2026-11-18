@@ -97,6 +97,15 @@ class TableTests(unittest.TestCase):
                 for line in body:
                     self.assertRegex(line, rf"^. ((\|  |   )?(\|- |`- )|{titles}|total|-+$)", line)
 
+    def test_filters_split_on_commas_only(self):
+        # squeue's rule: a job name may hold spaces.
+        name = "x UserId=root(0) JobState=RUNNING Partition=evil"
+        self.assertEqual([j["id"] for j in model("-n", name)["jobs"]], [90002])
+
+    def test_an_array_task_is_found_inside_its_pending_record(self):
+        self.assertEqual([j["label"] for j in model("-j", "84151_2")["jobs"]], ["84151_[0-3]"])
+        self.assertEqual(model("-j", "84151_7")["jobs"], [])
+
     def test_one_partition_set_is_one_group(self):
         # The fixture has the same pending sets written in both orders.
         why = model()["pending"]
@@ -270,7 +279,19 @@ class FailureTests(unittest.TestCase):
                                capture_output=True, text=True)  # fmt: skip
         except FileNotFoundError:
             self.skipTest("no timeout(1)")
-        self.assertIn("Slurm not answering, next try in 4s", r.stdout)
+        self.assertIn("Slurm read failed, next try in 4s", r.stdout)
+
+    def test_no_nodes_is_said_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            for f in SCENE.iterdir():
+                (Path(d) / f.name).write_text(f.read_text())
+            data = json.loads((Path(d) / "nodes.json").read_text())
+            (Path(d) / "nodes.json").write_text(json.dumps({**data, "nodes": []}))
+            for args in ((), ("--json",)):
+                r = sq(*args, env={"FIXTURES": d})
+                self.assertEqual(r.returncode, 1, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+            self.assertIn("No node data", sq(env={"FIXTURES": d}).stdout)
 
     def test_no_scontrol_is_127(self):
         self.assertEqual(sq(path=False).returncode, 127)

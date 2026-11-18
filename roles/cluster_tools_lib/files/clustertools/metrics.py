@@ -15,15 +15,11 @@ node_textfile_mtime_seconds then shows how stale it is. Python 3.9 or newer, sta
 library only.
 """
 
-import os
-import re
 import sys
-import tempfile
 
 from . import slurm, vocab
 from .cli import run_main
-
-_GRES = re.compile(r"gpu(?::([^:,(]+))?:(\d+)")
+from .files import write_atomic
 
 
 def _label(value):
@@ -46,38 +42,18 @@ def textfile(jobs_data, nodes_data):
         if not vocab.job_holds(job["job_state"]):
             continue
         gpus, types = slurm.job_gpus(job)
-        gpu_type = ",".join(sorted(types))
         for host, index in gpus:
             labels = {
-                "node": host, "gpu": index, "gpu_type": gpu_type, "user": job["user_name"],
+                "node": host, "gpu": index, "gpu_type": types[(host, index)], "user": job["user_name"],
                 "account": job.get("account") or "", "partition": job.get("partition") or "",
                 "job_id": slurm.job_label(job),
             }  # fmt: skip
             lines.append(_series("slurm_gpu_allocated", labels, 1))
     lines += ["# HELP slurm_node_gpus GPUs configured on a node, by type.", "# TYPE slurm_node_gpus gauge"]
     for node in nodes_data["nodes"]:
-        counts = {}
-        for gtype, count in _GRES.findall(node.get("gres") or ""):
-            counts[gtype] = counts.get(gtype, 0) + int(count)
-        for gtype, count in sorted(counts.items()):
+        for gtype, count in sorted(slurm.node_gpus(node.get("gres")).items()):
             lines.append(_series("slurm_node_gpus", {"node": node["name"], "gpu_type": gtype}, count))
     return "\n".join(lines) + "\n"
-
-
-def write(path, text):
-    """Replace PATH with TEXT so a reader sees the old file or the new one, never half."""
-    directory = os.path.dirname(os.path.abspath(path))
-    fd, tmp = tempfile.mkstemp(prefix=".metrics-", dir=directory)
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write(text)
-            f.flush()
-            os.fsync(f.fileno())
-        os.chmod(tmp, 0o644)
-        os.replace(tmp, path)
-    except BaseException:
-        os.unlink(tmp)
-        raise
 
 
 def main(argv=None):
@@ -86,7 +62,7 @@ def main(argv=None):
         print("usage: metrics PATH  (a node_exporter textfile, e.g. .../slurm_gpu.prom)", file=sys.stderr)
         return 2
     return run_main(
-        "metrics", lambda: write(argv[0], textfile(slurm.load("jobs_detail"), slurm.load("nodes")))
+        "metrics", lambda: write_atomic(argv[0], textfile(slurm.load("jobs_detail"), slurm.load("nodes")))
     )
 
 

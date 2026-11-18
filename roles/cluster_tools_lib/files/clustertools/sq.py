@@ -124,7 +124,8 @@ COMMAND = Command(
 
 
 def _globs(text):
-    return [g for g in re.split(r"[,\s]+", text or "") if g]
+    """A filter's comma-separated list, as squeue splits it: a job name may hold spaces."""
+    return [g for g in (text or "").split(",") if g]
 
 
 def _any(values, patterns):
@@ -171,7 +172,19 @@ class Filters:
         )  # fmt: skip
         if any(pats and not _any(vals, pats) for pats, vals in checks):
             return False
-        return not self.jobs or bool(self.jobs & {str(j["id"]), j["label"], str(j["array"])})
+        return not self.jobs or any(self._names_job(want, j) for want in self.jobs)
+
+    @staticmethod
+    def _names_job(want, j):
+        """Does a -j entry name J: its ID, its label, its array, or (ARRAY_TASK) a task
+        still inside its pending array record, as squeue -j finds it."""
+        if want in (str(j["id"]), j["label"], str(j["array"])):
+            return True
+        array, _, task = want.partition("_")
+        return (
+            bool(j["task_spec"]) and array == str(j["array"]) and task.isdigit()
+            and slurm.array_has(j["task_spec"], int(task))
+        )  # fmt: skip
 
     def narrows(self):
         """Was any job filter given? Then the job list shows what it selects."""
@@ -237,7 +250,7 @@ def _read_jobs(data, gres, now):
             "limit_unlimited": isinstance(j["time_limit"], dict) and bool(j["time_limit"].get("infinite")),
             "priority": slurm.num(j["priority"]) or 0,
             "reason": j["state_reason"] or "None", "reason_detail": j["state_description"] or "",
-            "tasks": slurm.array_tasks(j["array_task_string"]) if j["array_task_string"] else 1,
+            "tasks": slurm.job_tasks(j), "task_spec": j["array_task_string"] or "",
             "alloc": {"cpu": _int(alloc.get("cpu")), "mem": slurm.mem_mib(alloc.get("mem")),
                       "gres": _int(alloc.get(f"gres/{gres}"))},
             "req": {"nodes": _int(req.get("node")) or slurm.num(j["node_count"]) or 0,
@@ -315,13 +328,17 @@ def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title
         if j["reason_detail"]:
             details.setdefault(j["reason"], j["reason_detail"])
 
-    # Pools: the cluster, each partition, each family of partitions.
-    pools = {}
+    # Pools: the cluster, each partition, each family of partitions. The cluster's exists
+    # with no nodes at all, so an empty reply is shown as one, not a crash.
+    def empty():
+        return dict.fromkeys(
+            ("nodes", "cpu_total", "cpu_used", "mem_total", "mem_used", "gres_total", "gres_used",
+             "idle", "off", "free", "occupancy"), 0)  # fmt: skip
+
+    pools = {"c": empty()}
 
     def add(pool, n):
-        a = pools.setdefault(pool, dict.fromkeys(
-            ("nodes", "cpu_total", "cpu_used", "mem_total", "mem_used", "gres_total", "gres_used",
-             "idle", "off", "free", "occupancy"), 0))  # fmt: skip
+        a = pools.setdefault(pool, empty())
         a["nodes"] += 1
         for k in ("cpu_total", "cpu_used", "mem_total", "mem_used", "gres_total", "gres_used"):
             a[k] += n[k]
@@ -868,14 +885,12 @@ def watch(theme, args):
             try:
                 text, _ = frame(theme, args)
                 wait, pace = args.interval, f"every {args.interval}s"
-            except slurm.FAILURES as e:
-                text = "  " + theme.paint("crit", f"{e.cmd[0]}: {slurm.failure(e)}") + "\n"
-                wait = min(wait * 2, MAX_BACKOFF)
-                pace = theme.c["warn"] + f"Slurm not answering, next try in {wait}s"
-            except slurm.SchemaError as e:
+            except slurm.Missing:
+                raise  # it will not appear by waiting
+            except slurm.Error as e:  # a failing, silent or garbled reply may pass
                 text = "  " + theme.paint("crit", str(e)) + "\n"
                 wait = min(wait * 2, MAX_BACKOFF)
-                pace = theme.c["warn"] + f"next try in {wait}s"
+                pace = theme.c["warn"] + f"Slurm read failed, next try in {wait}s"
             if sys.stdout.isatty():
                 sys.stdout.write("\033[H\033[2J")
             footer = theme.paint("faint", f"{time.strftime('%H:%M:%S')}   {pace}, Ctrl-C to stop")

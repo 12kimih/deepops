@@ -42,6 +42,15 @@ class BannerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown flavour"):
             banner.script("t", COMMANDS, flavour="solarized")
 
+    def test_multi_line_text_is_refused(self):
+        # A newline would let a line read BANNER and run the rest as shell.
+        for kw in (
+            {"title": "Hi\nBANNER"},
+            {"title": "Hi", "commands": [{"name": "sq", "text": "q\nBANNER\necho RAN"}]},
+        ):
+            with self.assertRaisesRegex(ValueError, "control character"):
+                banner.script(color=False, **kw)
+
     def test_a_row_named_like_the_terminator_cannot_end_the_text(self):
         rows = [{"name": "BANNER", "text": "x"}, {"name": "y", "text": "BANNER"}]
         out = shown(banner.script("t", rows, LINKS, color=False))
