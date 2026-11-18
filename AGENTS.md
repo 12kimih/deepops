@@ -27,10 +27,16 @@ handling.
 
 ```bash
 git submodule update --init --recursive
-./scripts/setup.sh                      # installs Ansible + Galaxy dependencies
+./scripts/setup.sh                      # uv, the locked .venv, Galaxy collections, .venv-kubespray
 cp -r config.example config             # then edit config/inventory
 python3 scripts/validation/deepops_doctor.py --json   # verify before deploying
 ```
+
+Commands below are written as plain `ansible-playbook`; run them as
+`uv run ansible-playbook ...`, which keeps `.venv` equal to `uv.lock`. The
+Kubernetes playbooks run from `.venv-kubespray` instead (the playbook stops
+early otherwise). Versions live in `pyproject.toml`/`uv.lock` and
+`roles/requirements.yml`; see `docs/deepops/ansible.md`.
 
 The doctor must report `"ok": true` (or you must understand every failure)
 before you run any cluster playbook. With `--remote` it also proves SSH
@@ -155,8 +161,7 @@ and an r615+ driver the role will not install for you. See
 
 ## Contributing changes
 
-Run before pushing: `git diff --check`, YAML parse on changed files,
-`./scripts/deepops/ansible-lint-roles.sh`, and a focused
-`ansible-playbook --syntax-check` for changed playbooks. Public CI runs lint,
+Run before pushing: `scripts/check.sh` (every check CI runs; the pre-commit hook
+runs `scripts/check.sh --fast`). Public CI runs lint,
 setup, and molecule checks on every PR. Deployment-affecting changes need
 GPU-backed validation evidence in the PR body.

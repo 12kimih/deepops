@@ -144,8 +144,7 @@ rm -f /etc/ld.so.conf.d/slurm.conf && ldconfig
 ```
 
 Remove `/opt/deepops` entirely only if nothing else on the node uses it
-(the NHC build, the DeepOps Python virtualenv, and other roles also install
-under `/opt/deepops`).
+(the NHC build and other roles also install under `/opt/deepops`).
 
 ### 3. Remove configuration, state, and logs
 
