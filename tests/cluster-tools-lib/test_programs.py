@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
 import clustertools  # noqa: E402
 
-PROGRAMS = {"sq", "qos", "usage_report"}
+PROGRAMS = {"sq", "qos", "usage_report", "metrics"}
 
 
 class ProgramTests(unittest.TestCase):
