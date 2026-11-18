@@ -47,8 +47,9 @@ slurm_ha_state_save_location: "/sw/slurm"
 #alertmanager_slack_channel: "#alerts"
 # Prepended to critical alerts: "<!subteam^S0123ABCD>" for a user group, or "<!channel>".
 #alertmanager_slack_critical_mention: ""
-# Dead man's switch: ping URL of an external check (e.g. healthchecks.io, period 1m,
-# grace 5m) that alerts when the always-firing Watchdog alert stops arriving.
+# Dead man's switch: ping URL of an external check (e.g. healthchecks.io) that alerts
+# when the always-firing Watchdog alert stops arriving. Alertmanager pings about every
+# minute; give the check a 2 minute period (headroom for jitter) and 5 minutes of grace.
 #alertmanager_heartbeat_url: ""
 # Slack app bot token (xoxb-) for bot posts and DMs.
 #slack_bot_token: ""
@@ -294,10 +295,12 @@ slurm_cluster_configure_gpu_power_limit: true
 #cluster_tools_scripts:
 #  - src: "{{ inventory_dir }}/files/slurm/squeue.sh"
 #    dest: sq
-#  - src: "{{ inventory_dir }}/files/slurm/slurm-help.sh"
-#    dest: slurm-help
 #  - src: "{{ inventory_dir }}/files/slurm/qos.sh"
 #    dest: qos
+
+# Commands published before the role recorded what it publishes, to remove from every
+# host (for example a command a site has retired).
+#cluster_tools_retired: []
 
 # Shell libraries the commands above source, published to cluster_tools_lib_dir and not
 # executable: sourced, never run, so they claim no name in PATH. Use one for anything
@@ -313,7 +316,7 @@ slurm_cluster_configure_gpu_power_limit: true
 # inherited, so batch scripts and remote commands get the same output.
 #cluster_tools_environment:
 #  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
-#  # The name the commands print (sq, slurm-help); without it they fall back to
+#  # The name the commands print (sq, qos); without it they fall back to
 #  # Slurm's ClusterName.
 #  CLUSTER_TITLE: "{{ cluster_tools_motd_title }}"
 #  # sq's default options for everyone, as if typed first; a user's own SQ_OPTIONS or
@@ -328,14 +331,13 @@ slurm_cluster_configure_gpu_power_limit: true
 #  # after which the client's own value wins and this line stops mattering.
 #  COLORTERM: truecolor
 
-# Login banner -- what people see when they SSH in. One short line each; slurm-help
+# Login banner -- what people see when they SSH in. One short line each; the guide
 # carries the detail.
 #cluster_tools_motd_title: "my cluster"
 #cluster_tools_motd_commands:
 #  - { name: sq,         text: "queue and node usage, your own jobs marked" }
 #  - { name: qos,        text: "your QoS: what it preempts, how full its quota is" }
 #  - { name: sinfo,      text: "partition and node state" }
-#  - { name: slurm-help, text: "how to submit jobs, and the cluster rules" }
 #cluster_tools_motd_links:
 #  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
