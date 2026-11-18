@@ -1,0 +1,36 @@
+---
+# maintenance -- the steps of taking a node out of service, changing it and putting it
+# back, as separate task files a playbook calls in order (tasks_from):
+#
+#   drain    stop new Slurm jobs on the node and wait for the running ones to end
+#   upgrade  full package upgrade, including what unattended upgrades hold back
+#            (kernel, systemd, libc, GPU stack, scheduler): those wait for this window
+#   reboot   reboot if the upgrade asks for it (or always), detaching NFS first
+#   verify   the node is healthy again: slurmd, GPUs, NHC
+#   resume   return the node to Slurm, only if this run drained it
+#
+# playbooks/utilities/apt-upgrade.yml runs them one node at a time;
+# playbooks/utilities/reboot.yml runs the reboot step alone.
+
+# Slurm commands run on the controller.
+maintenance_slurm_controller: "{{ (groups['slurm-master'] | default([]) | first) | default('') }}"
+maintenance_slurm_bin: "{{ slurm_install_prefix | default('/usr/local') }}/bin"
+# The reason recorded on the nodes this run drains; resume only touches those.
+maintenance_reason: "maintenance: upgrade"
+# How long to wait for running jobs to finish, and how often to look (the cluster's
+# rule: no scheduler polling faster than every 30 s).
+maintenance_drain_timeout: 86400
+maintenance_drain_poll: 60
+
+# Reboot even when the upgrade does not ask for it.
+maintenance_force_reboot: false
+# Unmount the network filesystems first: a hard mount from a peer that is going down
+# too can leave the node blocked in D state, never reaching the reboot.
+maintenance_detach_nfs: true
+# A GPU server can spend several minutes in POST and memory training.
+maintenance_reboot_timeout: 1800
+
+# verify: the units that must be active, and whether to require GPUs and NHC.
+maintenance_verify_units: "{{ ['slurmd'] if inventory_hostname in groups['slurm-node'] | default([]) else [] }}"
+maintenance_verify_gpus: "{{ inventory_hostname in groups['slurm-node'] | default([]) }}"
+maintenance_verify_nhc: true

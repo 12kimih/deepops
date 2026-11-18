@@ -1,0 +1,15 @@
+---
+- name: Upgrade every package, the held-back stacks included (Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+    lock_timeout: 600
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  when: ansible_facts.os_family == 'Debian'
+
+- name: Upgrade every package (RHEL family)
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_only: true
+  when: ansible_facts.os_family == 'RedHat'

@@ -22,7 +22,7 @@ See [out-of-band management](bmc.md).
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `utilities/reboot.yml` | all | detaches NFS, reboots and waits for the host. It does not drain Slurm, and must not target the control node it runs from |
+| `utilities/reboot.yml` | all | detaches NFS, reboots and waits for the host (roles/maintenance). It does not drain Slurm, and must not target the control node it runs from |
 | `utilities/nfs-mount.yml` | all | mounts the NFS entries in each host's fstab that are not mounted, once their servers answer |
 
 For nodes running jobs, `scontrol reboot ASAP nextstate=RESUME <nodes>` drains them,
@@ -33,7 +33,7 @@ reboots each as it empties and returns it to service. See
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `utilities/apt-upgrade.yml` | all | `apt dist-upgrade`; pair it with `reboot.yml` |
+| `utilities/apt-upgrade.yml` | slurm-node | rolling maintenance (roles/maintenance): one node at a time, drain it, upgrade every package (the held-back kernel, systemd, libc, GPU and scheduler stacks included), reboot if needed, check slurmd, GPUs and NHC, resume. Run it monthly |
 | `utilities/netplan.yml` | all | node networking from `netplan_config`, one host at a time; see [netplan.md](netplan.md) |
 | `utilities/default-target.yml` | all | the systemd boot target, from the next boot |
 | `utilities/check-id-consistency.yml` | all | asserts that NIS groups resolve to their pinned GID on every node; read-only |
