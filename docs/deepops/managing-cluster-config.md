@@ -71,22 +71,22 @@ chmod 600 config/.vault-pass
 vault_password_file = ./config/.vault-pass
 ```
 
-Keep plaintext vars that *reference* vault values, and a separate encrypted file holding
-the actual secrets:
-
-```yaml
-# config/group_vars/all.yml (plaintext -- safe to read/grep)
-slurm_db_password: "{{ vault_slurm_db_password }}"
-```
+Each secret is vaulted inline with `ansible-vault encrypt_string`, in the same
+group_vars file as its plaintext neighbours. Names stay readable and grep-able, and a
+diff shows which secret changed. Run it from the DeepOps root so `ansible.cfg` supplies
+the password file; `--prompt` reads the value without echo or shell history:
 
 ```bash
-ansible-vault create config/group_vars/secrets.yml   # vault_slurm_db_password: ...
-ansible-vault edit   config/group_vars/secrets.yml   # edit later
-ansible-vault rekey  config/group_vars/secrets.yml   # rotate the password
+ansible-vault encrypt_string --prompt --name slurm_db_password
+# paste the printed `slurm_db_password: !vault |` block into config/group_vars/<group>.yml
 ```
 
-Commit `config/group_vars/secrets.yml` (ciphertext) to the **private** repo; never commit
-`config/.vault-pass`.
+Read a value back with
+`ansible localhost -m debug -a var=slurm_db_password -e @config/group_vars/slurm-cluster.yml`.
+To change the vault password, re-encrypt every value (`ansible-vault rekey` only
+handles whole encrypted files).
+
+Commit the ciphertext to the **private** repo; never commit `config/.vault-pass`.
 
 ### 5. Run exactly as before
 
