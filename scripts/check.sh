@@ -2,7 +2,8 @@
 # Every repository check, in one place: pre-commit, CI and people all run this.
 #   scripts/check.sh          everything
 #   scripts/check.sh --fast   the quick subset pre-commit runs on each commit (style,
-#                             generated docs, yamllint, sensitive data); CI runs everything
+#                             generated docs, linters, sensitive data, the unit suites
+#                             not marked .slow); CI runs everything
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -42,16 +43,23 @@ step "ruff" ruff check --force-exclude "${py_files[@]}"
 step "ruff format (run: uv run ruff format)" ruff format --check --force-exclude "${py_files[@]}"
 step "no secrets or site data in tracked files" "${python}" scripts/deepops/sensitive_guard.py tree
 
+# Unit suites: the quick ones also run in --fast (the commit hook); a suite marks
+# itself slow with a .slow file and then runs only in the full check. They run without
+# the GIT_* variables a git hook exports, so a test that drives git in a temporary
+# repository cannot reach this repository's index.
+isolated=(env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR)
+# Suites are the tracked tests/<suite>/test_*.py, like every other check.
+mapfile -t suites < <(git ls-files -- 'tests/*/test_*.py' | cut -d/ -f1-2 | sort -u | sed 's|$|/|')
+for suite in "${suites[@]}"; do
+    if "${fast}" && [ -e "${suite}.slow" ]; then continue; fi
+    step "unit tests (${suite%/})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} -m unittest discover -s . -q"
+done
+
 if ! "${fast}"; then
-    step "unit tests (scripts/validation/tests)" "${python}" -m unittest discover -s scripts/validation/tests -q
+    step "unit tests (scripts/validation/tests)" "${isolated[@]}" "${python}" -m unittest discover -s scripts/validation/tests -q
     step "ansible-lint" ansible-lint -q
     for playbook in playbooks/slurm-cluster.yml playbooks/k8s-cluster.yml; do
         step "syntax-check ${playbook}" ansible-playbook -i config.example/inventory --syntax-check "${playbook}"
-    done
-    for suite in tests/*/; do
-        if compgen -G "${suite}test_*.py" >/dev/null; then
-            step "unit tests (${suite%/})" bash -c "cd '${suite}' && ${python} -m unittest discover -s . -q"
-        fi
     done
     step "slurm epilog tests" bash tests/slurm-epilog/run-tests.sh
     for plugin in config.example/files/slurm/job_submit.lua; do
