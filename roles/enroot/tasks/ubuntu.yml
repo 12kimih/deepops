@@ -57,33 +57,47 @@
     path: /proc/sys/kernel/apparmor_restrict_unprivileged_userns
   register: enroot_userns_knob
 
-- name: Ubuntu | lift the user namespace restriction host-wide (escape hatch)
+# The wanted value is always written, so it no longer depends on what a hand-run
+# `sysctl -w` or another package left behind (gpu nodes were found at 0 with nothing
+# in the repo asking for it): 1 keeps the kernel restriction, 0 is the escape hatch.
+- name: Ubuntu | set the user namespace restriction
   ansible.posix.sysctl:
     name: kernel.apparmor_restrict_unprivileged_userns
-    value: "0"
+    value: "{{ '0' if enroot_apparmor_global_disable | bool else '1' }}"
     state: present
     sysctl_file: /etc/sysctl.d/90-enroot.conf
     reload: true
+  when: enroot_userns_knob.stat.exists
+
+# sysctl.d files load in name order, so one sorting after ours still wins at boot.
+- name: Ubuntu | read the user namespace restriction the kernel has now
+  ansible.builtin.slurp:
+    src: /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+  register: enroot_userns_now
+  when: enroot_userns_knob.stat.exists
+
+- name: Ubuntu | find what else sets the user namespace restriction
+  ansible.builtin.shell:
+    cmd: grep -rs apparmor_restrict_unprivileged_userns /etc/sysctl.d /run/sysctl.d /usr/lib/sysctl.d /etc/sysctl.conf || true
+  register: enroot_userns_sources
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
   when:
     - enroot_userns_knob.stat.exists
-    - enroot_apparmor_global_disable | bool
+    - (enroot_userns_now.content | b64decode | trim) != ('0' if enroot_apparmor_global_disable | bool else '1')
 
-# Turning the escape hatch off must also undo it, not just stop applying it.
-- name: Ubuntu | remove the host-wide user namespace override
-  ansible.builtin.file:
-    path: /etc/sysctl.d/90-enroot.conf
-    state: absent
-  register: enroot_userns_override
+- name: Ubuntu | fail when something else overrides the user namespace restriction
+  ansible.builtin.fail:
+    msg: >-
+      kernel.apparmor_restrict_unprivileged_userns is
+      {{ enroot_userns_now.content | b64decode | trim }} on {{ inventory_hostname }}, not
+      {{ '0' if enroot_apparmor_global_disable | bool else '1' }}. Set by:
+      {{ enroot_userns_sources.stdout_lines | join('; ') or 'no sysctl file (a manual sysctl -w)' }}.
+      Remove that setting; enroot_apparmor_global_disable is the one switch for it.
   when:
     - enroot_userns_knob.stat.exists
-    - not enroot_apparmor_global_disable | bool
-
-# Deleting the file leaves the running value at 0: restore the kernel default, then
-# let any other sysctl.d file the site keeps have the last word.
-- name: Ubuntu | restore the user namespace restriction
-  ansible.builtin.shell: sysctl -w kernel.apparmor_restrict_unprivileged_userns=1 && sysctl --system
-  changed_when: true
-  when: enroot_userns_override is changed
+    - not ansible_check_mode
+    - (enroot_userns_now.content | b64decode | trim) != ('0' if enroot_apparmor_global_disable | bool else '1')
 
 - name: Ubuntu | check for enroot's AppArmor profile
   ansible.builtin.stat:
