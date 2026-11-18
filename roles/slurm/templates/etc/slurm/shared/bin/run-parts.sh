@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # This could all be done with run-parts using regexes on ubuntu.
-# However, the RHEL-family run-parts is a plain shell script with no useful flags.
+# However, centos' version of run-parts is just a simple bash script with no useful flags.
 set -e
 
 if [ "$#" -ne 1 ]; then
@@ -123,7 +123,7 @@ fi
 export EPILOG_LAST_USER_JOB="$last_user_job"
 
 {% endif %}
-# Re-implement run-parts since on the RHEL family it is a plain shell script with no useful flags.
+# Re-implement run-parts since on centos it is just a bash script with no useful flags.
 failed=0
 for script in "$parts_dir"/*; do
     if [ ! -x "$script" ]; then
