@@ -1,0 +1,39 @@
+---
+- name: Install the metrics command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ slurm_metrics_command }}"
+      module: clustertools.metrics
+
+- name: Install systemd units
+  ansible.builtin.template:
+    src: "slurm-gpu-metrics.{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ slurm_metrics_svc_name }}.{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [service, timer]
+  notify: Restart slurm metrics timer
+
+- name: Enable the metrics timer
+  ansible.builtin.systemd:
+    name: "{{ slurm_metrics_svc_name }}.timer"
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# Resolved here: inside the included grafana role, role_path names that role.
+- name: Locate the dashboards
+  ansible.builtin.set_fact:
+    slurm_metrics_dashboards: ["{{ role_path }}/files/slurm-gpu-allocation.json"]
+
+- name: Install the dashboards
+  ansible.builtin.include_role:
+    name: grafana
+    tasks_from: dashboards
+  vars:
+    grafana_dashboard_set: slurm_metrics
+    grafana_dashboard_files: "{{ slurm_metrics_dashboards }}"

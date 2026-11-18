@@ -136,6 +136,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── runai
 │   ├── serial_console
 │   ├── slurm
+│   ├── slurm_metrics
 │   ├── slurm_usage_report
 │   ├── spack
 │   └── standalone-container-registry

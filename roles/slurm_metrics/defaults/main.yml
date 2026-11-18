@@ -1,0 +1,12 @@
+---
+# slurm_metrics: Slurm data for Prometheus that Slurm's own metrics lack.
+# Today: GPU allocation (which job holds which GPU), written every minute by
+# clustertools.metrics as a node_exporter text file on the controller, plus the
+# Slurm / GPU allocation dashboard. Install it on a host that runs node_exporter and
+# can run scontrol.
+slurm_metrics_command: /usr/local/libexec/slurm-gpu-metrics
+# node_exporter's textfile collector directory (roles/prometheus-node-exporter).
+slurm_metrics_textfile_dir: "{{ node_exporter_prom_dir | default('/run/prometheus') }}"
+slurm_metrics_textfile: slurm-gpu.prom
+slurm_metrics_interval: 60s
+slurm_metrics_svc_name: slurm-gpu-metrics

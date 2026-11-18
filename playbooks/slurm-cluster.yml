@@ -143,6 +143,12 @@
     hostlist: slurm-metric
   when: slurm_enable_monitoring
 
+- name: Install monitoring exporters | Install Slurm GPU allocation metrics
+  import_playbook: slurm-cluster/slurm-metrics.yml
+  vars:
+    hostlist: slurm-metric
+  when: slurm_enable_monitoring
+
 - name: Install monitoring exporters | Install prometheus slurm exporter
   import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
   vars:

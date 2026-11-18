@@ -405,9 +405,12 @@ slurm_enable_monitoring: true
 # Grafana web UI port (role default 3000). Override if 3000 is taken.
 #grafana_port: 3001
 # Grafana admin password, enforced on every run (role default "deepops"). Vault it.
-# Public URL Grafana uses in the links it generates.
 #grafana_cfg_pass: ""
+# Public URL Grafana uses in the links it generates.
 #grafana_root_url: "http://cluster.example:3000/"
+# Grafana folder of the provisioned dashboards; name it after the cluster's system ID,
+# one folder per cluster (role default "Cluster").
+#grafana_dashboard_folder: cluster-name
 
 # Prometheus TSDB retention; whichever limit is hit first wins (role defaults below).
 #prometheus_retention_time: 90d
