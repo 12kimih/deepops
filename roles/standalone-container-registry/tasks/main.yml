@@ -8,6 +8,7 @@
     mode: "0700"
 
 - name: Add config file
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: "{{ standalone_container_registry_config_template }}"
     dest: "{{ standalone_container_registry_config_dir }}/config.yml"

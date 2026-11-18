@@ -7,6 +7,7 @@
     - Restart munge
 
 - name: Create munge.key
+  diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: templates/etc/munge/munge.key.j2
     dest: /etc/munge/munge.key
