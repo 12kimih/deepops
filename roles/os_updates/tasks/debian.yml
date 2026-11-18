@@ -62,3 +62,104 @@
     owner: root
     group: root
     mode: "0644"
+
+# A hold keeps a package back from every upgrade, the maintenance window's included.
+- name: Read the apt holds
+  ansible.builtin.command:
+    argv: [apt-mark, showhold]
+  register: os_updates_holds
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Release the holds that are not allowed
+  ansible.builtin.command:
+    argv: [apt-mark, unhold, "{{ item }}"]
+  loop: >-
+    {{ os_updates_holds.stdout_lines
+       | reject('in', os_updates_holds.stdout_lines | select('search', os_updates_allowed_holds_regex) | list
+                if os_updates_allowed_holds | length > 0 else [])
+       | list }}
+  vars:
+    os_updates_allowed_holds_regex: >-
+      {{ '^(' ~ (os_updates_allowed_holds | map('regex_escape') | map('replace', '\*', '.*')
+                 | map('replace', '\?', '.') | join('|')) ~ ')$' }}
+  changed_when: true
+
+- name: Publish pending updates as metrics
+  when: os_updates_metrics | bool
+  block:
+    - name: Install the pending-updates metrics command
+      ansible.builtin.copy:
+        src: os-updates-metrics
+        dest: /usr/local/sbin/os-updates-metrics
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install the pending-updates metrics units
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/os-updates-metrics.{{ item.key }}"
+        mode: "0644"
+        content: "{{ item.value }}"
+      loop: "{{ units | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        units:
+          service: |
+            # Managed by roles/os_updates.
+            [Unit]
+            Description=Publish pending package updates as node_exporter metrics
+            After=apt-daily.service
+
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/sbin/os-updates-metrics {{ os_updates_metrics_textfile_dir }}
+            Nice=10
+          timer: |
+            # Managed by roles/os_updates.
+            [Unit]
+            Description=Publish pending package updates daily
+
+            [Timer]
+            OnCalendar=daily
+            OnBootSec=10min
+            RandomizedDelaySec=1h
+            Persistent=true
+
+            [Install]
+            WantedBy=timers.target
+
+    # Under --check the unit files above are not written, so there is nothing to enable.
+    - name: Enable the pending-updates metrics timer
+      ansible.builtin.systemd:
+        name: os-updates-metrics.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+      when: not ansible_check_mode
+
+- name: Remove the pending-updates metrics when they are off
+  when: not os_updates_metrics | bool
+  block:
+    - name: Check for the metrics timer
+      ansible.builtin.stat:
+        path: /etc/systemd/system/os-updates-metrics.timer
+      register: os_updates_metrics_timer
+
+    - name: Stop and disable the metrics timer
+      ansible.builtin.systemd:
+        name: os-updates-metrics.timer
+        enabled: false
+        state: stopped
+      when: os_updates_metrics_timer.stat.exists
+
+    - name: Remove the metrics command and units
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/sbin/os-updates-metrics
+        - /etc/systemd/system/os-updates-metrics.service
+        - /etc/systemd/system/os-updates-metrics.timer
+        - "{{ os_updates_metrics_textfile_dir }}/os-updates.prom"
