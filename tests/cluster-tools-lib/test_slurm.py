@@ -80,6 +80,18 @@ class ArrayTests(unittest.TestCase):
                 self.assertEqual(slurm.array_tasks(spec), n)
 
 
+class FailureTests(unittest.TestCase):
+    def test_one_line_for_each_kind_of_failure(self):
+        import subprocess
+
+        err = subprocess.CalledProcessError(1, ("scontrol",), stderr="slurm_load_jobs error: down\nmore")
+        self.assertEqual(slurm.failure(err), "slurm_load_jobs error: down")
+        self.assertEqual(
+            slurm.failure(subprocess.CalledProcessError(2, ("sinfo",))), "sinfo exited with status 2"
+        )
+        self.assertIn("no answer in", slurm.failure(subprocess.TimeoutExpired(("scontrol",), 20)))
+
+
 class TresTests(unittest.TestCase):
     def test_list_and_string(self):
         self.assertEqual(

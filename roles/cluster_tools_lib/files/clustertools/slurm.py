@@ -11,25 +11,34 @@ Python 3.9 or newer, standard library only.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
 
 
+# A throttled RPC does not fail: the client library sleeps and retries it for ever,
+# printing nothing below -v. Every call is therefore bounded, and running out of time
+# is reported as what it most likely is. $CLUSTER_TOOLS_TIMEOUT, shared with the shell
+# library, overrides the bound.
+TIMEOUT = int(os.environ.get("CLUSTER_TOOLS_TIMEOUT") or 20)
+
+
 def run(*cmd):
-    """stdout of a Slurm client command; CalledProcessError when it fails."""
-    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
+    """stdout of a Slurm client command. CalledProcessError when it fails,
+    TimeoutExpired when it has not answered within TIMEOUT seconds."""
+    return subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=TIMEOUT).stdout
+
+
+FAILURES = (subprocess.CalledProcessError, subprocess.TimeoutExpired)
 
 
 def failure(error):
-    """The first line Slurm wrote about a failed call (CalledProcessError)."""
+    """One line on why a Slurm call failed: Slurm's own first line, or the timeout."""
+    if isinstance(error, subprocess.TimeoutExpired):
+        return f"no answer in {TIMEOUT} s (slurmctld slow, or rate limiting your requests)"
     text = (error.stderr or "").strip()
     return text.splitlines()[0] if text else f"{error.cmd[0]} exited with status {error.returncode}"
-
-
-def rate_limited(error):
-    """Did slurmctld refuse the call because this user sent too many requests?"""
-    return bool(re.search(r"rate.?limit", error.stderr or "", re.IGNORECASE))
 
 
 def scontrol(*args):

@@ -10,7 +10,6 @@ command line always has the last word. Python 3.9 or newer, standard library onl
 import argparse
 import os
 import shlex
-import subprocess
 import sys
 
 from . import render, slurm
@@ -237,17 +236,15 @@ def swatch(theme):
 
 def run_main(name, body):
     """Run BODY() -> exit status, with the failures every command shares: a missing
-    Slurm client is 127 with one clear line, a failing one is 1 with its own message,
-    unreadable output is 1, and Ctrl-C or a closed pipe end quietly."""
+    Slurm client is 127 with one clear line, a failing or silent one is 1 with one line
+    on why, unreadable output is 1, and Ctrl-C or a closed pipe end quietly."""
     try:
         return body() or 0
     except FileNotFoundError as e:
         print(f"{name}: {e.filename} not found; run this on a Slurm client.", file=sys.stderr)
         return 127
-    except subprocess.CalledProcessError as e:
-        print(f"{name}: {slurm.failure(e)}", file=sys.stderr)
-        if slurm.rate_limited(e):
-            print(f"{name}: slurmctld is rate limiting your requests; run it again shortly.", file=sys.stderr)
+    except slurm.FAILURES as e:
+        print(f"{name}: {e.cmd[0]}: {slurm.failure(e)}", file=sys.stderr)
         return 1
     except ValueError as e:  # json.JSONDecodeError among them
         print(f"{name}: unreadable Slurm output: {e}", file=sys.stderr)
