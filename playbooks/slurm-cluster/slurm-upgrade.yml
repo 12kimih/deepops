@@ -40,6 +40,13 @@
       vars:
         slurm_upgrade: true
 
+# The packages build in a container there (roles/slurm/tasks/packages-build.yml).
+- name: Install Docker on the package build host
+  import_playbook: ../container/docker.yml
+  vars:
+    hostlist: slurm-master[0]
+    deepops_phase: require  # the build needs it whatever the cluster map says
+
 - hosts: slurm-master[0]
   become: true
   any_errors_fatal: true

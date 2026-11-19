@@ -2,8 +2,15 @@
 # Build the slurm-smd packages of slurm_version once, on this host (slurm-master[0]),
 # and publish them to the signed repository in slurm_repo_dir that every node installs
 # from. SchedMD's procedure (quickstart_admin.html#debuild): unpack the release, install
-# debian/control's build dependencies with mk-build-deps, build binary packages. Root
-# installs the dependencies and publishes; slurm_deb_build_user builds.
+# debian/control's build dependencies with mk-build-deps, build binary packages.
+#
+# The build runs in a throwaway container of this host's own release, never on the host:
+# whatever the host has installed (an older Slurm under /usr/local, libraries of other
+# software, its ld.so.conf) would otherwise be found before the build's own files. (Perl
+# links its modules with -L/usr/local/lib first: on 2026-11-20 the Perl bindings linked
+# the retired source build's libslurm.so.44, and dh_shlibdeps refused them.) The tree
+# lives on the host, owned by slurm_deb_build_user, who builds; root in the container
+# only installs the build dependencies, and root on the host publishes.
 - name: Setup role
   ansible.builtin.include_tasks: setup-role.yml
 
@@ -27,6 +34,42 @@
   changed_when: false
   check_mode: false  # read-only; --check needs the result
 
+# The build once ran on the host itself: its dependency package goes, and with it the
+# packages only it pulled in (those it orphans, not every orphan the host has).
+- name: Remove the build dependencies an earlier build installed on the host
+  when: ansible_facts.os_family == 'Debian'
+  block:
+    - name: List what apt would remove before
+      ansible.builtin.command:
+        argv: [apt-get, --simulate, autoremove]
+      register: slurm_deb_orphans_before
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Remove the host build's dependency package
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        host_baseline_absent_packages: [slurm-smd-build-deps]
+
+    - name: List what apt would remove after
+      ansible.builtin.command:
+        argv: [apt-get, --simulate, autoremove]
+      register: slurm_deb_orphans_after
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Remove the packages only the host build needed
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        # apt-get --simulate prints "Remv <package> [<version>]" per package.
+        host_baseline_absent_packages: >-
+          {{ slurm_deb_orphans_after.stdout | regex_findall('(?m)^Remv (\S+)')
+             | difference(slurm_deb_orphans_before.stdout | regex_findall('(?m)^Remv (\S+)')) }}
+
 - name: Look for this version in the repository
   ansible.builtin.stat:
     path: "{{ slurm_repo_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"
@@ -38,18 +81,13 @@
     _tree: "{{ slurm_deb_build_dir }}/slurm-{{ slurm_version }}"
     _nvml: "/usr/local/cuda-{{ slurm_nvml_cuda_version }}/targets/{{ ansible_facts.architecture | replace('aarch64', 'sbsa') }}-linux"
   block:
-    # cuda-nvml-dev-<version> (the NVML header and link stub) comes from NVIDIA's repository.
+    # cuda-nvml-dev-<version> (the NVML header and link stub) comes from NVIDIA's
+    # repository, which the build container reads through the host's source and keyring.
     - name: Add the CUDA repository
       ansible.builtin.include_role:
         name: package_repos
         tasks_from: cuda
-
-    - name: Install the packaging tools
-      ansible.builtin.apt:
-        name: [build-essential, fakeroot, devscripts, equivs, apt-utils, gnupg]
-        state: present
-        update_cache: true
-        cache_valid_time: 3600
+        public: true  # its source and keyring paths, for the build container
 
     - name: Create the build account
       ansible.builtin.user:
@@ -58,6 +96,7 @@
         home: "{{ slurm_deb_build_dir }}"
         create_home: false
         shell: /usr/sbin/nologin
+      register: slurm_deb_build_account
 
     # A fresh tree each build: the patches below apply to the release as shipped.
     - name: Remove an earlier build of this version
@@ -140,24 +179,70 @@
         quiet: true
       when: not ansible_check_mode
 
-    - name: Install the build dependencies
-      ansible.builtin.command:
-        argv: [mk-build-deps, --install, --remove, --tool, apt-get -y -q --no-install-recommends, "{{ _tree }}/debian/control"]
-        chdir: /var/cache/deepops
-      environment:
-        DEBIAN_FRONTEND: noninteractive
-      changed_when: true
+    - name: Build in a clean container
+      when: not ansible_check_mode
+      vars:
+        _in_container:
+          container: "{{ slurm_deb_build_container }}"
+          env: "{{ proxy_env | combine({'DEBIAN_FRONTEND': 'noninteractive'}) }}"
+      block:
+        # The tree at the same path; the CUDA repository (package_repos) read-only, for
+        # cuda-nvml-dev.
+        - name: Start the build container
+          community.docker.docker_container:
+            name: "{{ slurm_deb_build_container }}"
+            image: "{{ slurm_deb_build_image }}"
+            pull: always
+            command: [sleep, infinity]
+            network_mode: host
+            recreate: true
+            state: started
+            env: "{{ proxy_env }}"
+            mounts:
+              - {type: bind, source: "{{ slurm_deb_build_dir }}", target: "{{ slurm_deb_build_dir }}"}
+              - {type: bind, source: "{{ package_repos_cuda_keyring_file }}", target: "{{ package_repos_cuda_keyring_file }}", read_only: true}
+              - {type: bind, source: "{{ package_repos_cuda_source_file }}", target: "{{ package_repos_cuda_source_file }}", read_only: true}
 
-    - name: Build the packages
-      ansible.builtin.command:
-        argv: [dpkg-buildpackage, -b, -uc, -us]
-        chdir: "{{ _tree }}"
-      environment:
-        HOME: "{{ slurm_deb_build_dir }}"
-        DEB_BUILD_OPTIONS: "parallel={{ ansible_facts.processor_nproc }}"
-      become: true
-      become_user: "{{ slurm_deb_build_user }}"
-      changed_when: true
+        # A bare image has no CA certificates, so the HTTPS repositories (CUDA) are read
+        # only after the first install.
+        - name: Install the packaging tools in the container
+          community.docker.docker_container_exec:
+            container: "{{ _in_container.container }}"
+            env: "{{ _in_container.env }}"
+            argv:
+              - bash
+              - -ec
+              - |
+                apt-get update -q
+                apt-get install -y -q --no-install-recommends ca-certificates
+                apt-get update -q -o APT::Update::Error-Mode=any
+                apt-get install -y -q --no-install-recommends build-essential fakeroot devscripts equivs
+          changed_when: true
+
+        - name: Install the build dependencies in the container
+          community.docker.docker_container_exec:
+            container: "{{ _in_container.container }}"
+            env: "{{ _in_container.env }}"
+            argv: [mk-build-deps, --install, --remove, --tool, apt-get -y -q --no-install-recommends, "{{ _tree }}/debian/control"]
+            chdir: "{{ slurm_deb_build_dir }}"
+          changed_when: true
+
+        - name: Build the packages
+          community.docker.docker_container_exec:
+            container: "{{ _in_container.container }}"
+            user: "{{ slurm_deb_build_account.uid }}:{{ slurm_deb_build_account.group }}"
+            env:
+              HOME: "{{ slurm_deb_build_dir }}"
+              DEB_BUILD_OPTIONS: "parallel={{ ansible_facts.processor_nproc }}"
+            argv: [dpkg-buildpackage, -b, -uc, -us]
+            chdir: "{{ _tree }}"
+          changed_when: true
+
+      always:
+        - name: Remove the build container
+          community.docker.docker_container:
+            name: "{{ slurm_deb_build_container }}"
+            state: absent
 
     - name: List what the main package holds
       ansible.builtin.command:

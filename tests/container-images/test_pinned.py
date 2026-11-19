@@ -3,6 +3,8 @@ never change what a service runs (roles/container_image enforces it at deploy ti
 catches it at commit time)."""
 
 import re
+
+import yaml
 import unittest
 from pathlib import Path
 
@@ -21,9 +23,21 @@ class PinnedImagesTest(unittest.TestCase):
                 continue
             text = defaults.read_text()
             scalars = dict(re.findall(r'^([a-z0-9_]+): "([^"]*)"', text, re.M))
+            # An image per OS release: a map of pinned references, and the image a lookup in it.
+            maps = {
+                name: data for name, data in (yaml.safe_load(text) or {}).items() if name.endswith("_images")
+            }
+            for name, data in maps.items():
+                for release, ref in data.items():
+                    found += 1
+                    self.assertRegex(
+                        ref, PINNED, f"{defaults.relative_to(ROOT)}: {name}[{release}] is not pinned"
+                    )
             for name, value in IMAGE_VAR.findall(text):
                 if name in LOCAL:
                     continue
+                if any(re.fullmatch(r"\{\{\s*" + m + r"\[[^\]]+\]\s*\}\}", value) for m in maps):
+                    continue  # checked in its map above
                 found += 1
                 # Resolve references to other defaults of the same role (version, digest).
                 rendered = re.sub(

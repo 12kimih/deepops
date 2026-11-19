@@ -124,12 +124,6 @@ class PackageBuild(unittest.TestCase):
         for plugin in ("job_submit_lua.so", "gpu_nvml.so", "metrics_openmetrics.so", "mpi_pmix.so"):
             self.assertIn(plugin, DEFAULTS["slurm_deb_required_plugins"])
 
-    def test_the_build_runs_unprivileged(self):
-        build = find(BUILD, "Build the packages")
-        step = find(build["block"], "Build the packages")
-        self.assertEqual(step["become_user"], "{{ slurm_deb_build_user }}")
-        self.assertEqual(step["command"]["argv"][:2], ["dpkg-buildpackage", "-b"])
-
 
 class VersionCheck(unittest.TestCase):
     SUPPORTED = find(VERSION, "Refuse a Slurm version change Slurm does not support")
@@ -170,6 +164,66 @@ class VersionCheck(unittest.TestCase):
     def test_the_source_build_needs_the_upgrade_playbook_even_at_the_same_version(self):
         self.assertFalse(self.allowed("26.05.6", "26.05.6", upgrade=False, source=True))
         self.assertTrue(self.allowed("26.05.6", "26.05.6", upgrade=True, source=True))
+
+
+def walk(tasks):
+    """Every task, inside block, rescue and always too."""
+    for item in tasks:
+        yield item
+        for key in ("block", "rescue", "always"):
+            yield from walk(item.get(key, []))
+
+
+class TestCleanBuild(unittest.TestCase):
+    """The packages build in a container, so nothing the build host has installed (a
+    retired Slurm under /usr/local linked the Perl bindings on 2026-11-20) reaches them."""
+
+    BUILD_COMMANDS = ("mk-build-deps", "dpkg-buildpackage", "debuild", "apt-get")
+
+    def test_build_commands_run_in_the_container(self):
+        for task in walk(BUILD):
+            for module in ("command", "shell"):
+                args = task.get(module)
+                if args is None:
+                    continue
+                text = " ".join(args.get("argv", [])) if isinstance(args, dict) else str(args)
+                text += " " + (args.get("cmd", "") if isinstance(args, dict) else "")
+                for command in self.BUILD_COMMANDS:
+                    if command == "apt-get" and "--simulate" in text:
+                        continue  # the read-only look at the host's orphans
+                    self.assertNotIn(command, text, f"{task.get('name')}: {command} runs on the host")
+
+    def test_build_dependencies_are_not_installed_on_the_host(self):
+        for task in walk(BUILD):
+            apt = task.get("apt")
+            if apt and apt.get("state", "present") == "present" and apt.get("name"):
+                self.fail(f"{task.get('name')} installs {apt['name']} on the build host")
+
+    def test_the_container_sees_only_the_tree_and_the_cuda_source(self):
+        task = find(BUILD, "Start the build container")
+        targets = [m["target"] for m in task["docker_container"]["mounts"]]
+        self.assertEqual(
+            targets,
+            [
+                "{{ slurm_deb_build_dir }}",
+                "{{ package_repos_cuda_keyring_file }}",
+                "{{ package_repos_cuda_source_file }}",
+            ],
+        )
+        self.assertTrue(all(m.get("read_only") for m in task["docker_container"]["mounts"][1:]))
+
+    def test_the_container_is_removed_however_the_build_ends(self):
+        block = find(BUILD, "Build in a clean container")
+        removal = [
+            t for t in block.get("always", []) if t.get("docker_container", {}).get("state") == "absent"
+        ]
+        self.assertEqual(len(removal), 1)
+
+    def test_the_build_runs_as_the_build_account(self):
+        clean = find(BUILD, "Build in a clean container")
+        task = find(clean["block"], "Build the packages")["docker_container_exec"]
+        self.assertIn("slurm_deb_build_account.uid", task["user"])
+        self.assertEqual(task["argv"][0], "dpkg-buildpackage")
 
 
 if __name__ == "__main__":
