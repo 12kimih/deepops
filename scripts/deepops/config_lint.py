@@ -18,6 +18,10 @@ shadow     no group or host has its variables in two places (all.yml beside all/
            word, so a whole file of settings can vanish when a directory appears.
 
 CONFIG_DIR selects the site config (default config/); drift is skipped without it.
+Under the commit hook (pre-commit sets PRE_COMMIT) the site config is read as its git
+repository last committed it: pre-commit stashes this repository's unstaged edits but
+never the site's, so its working tree would be judged against the wrong example and
+one session's half-done edit would block every other session's commit.
 """
 
 import os
@@ -44,6 +48,40 @@ def tracked(*patterns):
     return [ROOT / p for p in out.stdout.split()]
 
 
+def committed_site():
+    """CONFIG as committed, when the commit hook runs and CONFIG is a git repository."""
+    return bool(os.environ.get("PRE_COMMIT")) and (CONFIG / ".git").exists()
+
+
+def site_entries(kind):
+    """{name: is a directory} for CONFIG/KIND: committed under the hook, else on disk."""
+    if committed_site():
+        out = subprocess.run(
+            ["git", "ls-tree", "-z", "HEAD", f"{kind}/"],
+            cwd=CONFIG, capture_output=True, text=True, check=True,
+            env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+        ).stdout  # fmt: skip
+        entries = {}
+        for record in filter(None, out.split("\0")):
+            meta, path = record.split("\t", 1)
+            entries[path.split("/", 1)[1]] = meta.split()[1] == "tree"
+        return entries
+    base = CONFIG / kind
+    return {p.name: p.is_dir() for p in base.iterdir()} if base.is_dir() else {}
+
+
+def site_text(rel):
+    """CONFIG/REL's text, or None when it does not exist: committed under the hook."""
+    if committed_site():
+        out = subprocess.run(
+            ["git", "show", f"HEAD:{rel}"], cwd=CONFIG, capture_output=True, text=True,
+            env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+        )  # fmt: skip
+        return out.stdout if out.returncode == 0 else None
+    path = CONFIG / rel
+    return path.read_text() if path.is_file() else None
+
+
 def var_files(base):
     return sorted(p for p in base.glob("group_vars/*.yml")) + sorted(
         p for p in base.glob("host_vars/*") if p.is_file()
@@ -68,18 +106,18 @@ def comment_text(line):
     return inner if inner.startswith("#") and comment_text(inner) else None
 
 
-def comments(path):
+def comments(text):
     out = []
-    for i, line in enumerate(path.read_text().splitlines(), 1):
+    for i, line in enumerate(text.splitlines(), 1):
         text = comment_text(line)
         if text is not None and not NAME.match(line) and not line.startswith("# site:"):
             out.append((i, text))
     return out
 
 
-def names(path):
+def names(text):
     found = {}
-    for i, line in enumerate(path.read_text().splitlines(), 1):
+    for i, line in enumerate(text.splitlines(), 1):
         m = NAME.match(line)
         if m and not line.startswith("# site:"):
             found.setdefault(m.group(1), i)
@@ -92,10 +130,10 @@ def check_drift():
     problems = []
     for example in var_files(EXAMPLE):
         rel = example.relative_to(EXAMPLE)
-        site = CONFIG / rel
-        if not site.exists():
+        site = site_text(str(rel))
+        if site is None:
             continue
-        ce, cs = comments(example), comments(site)
+        ce, cs = comments(example.read_text()), comments(site)
         es, ss = [t for _, t in ce], [t for _, t in cs]
         if es != ss:
             import difflib
@@ -107,7 +145,7 @@ def check_drift():
                     problems.append(
                         f"drift: {rel}: comments differ at config.example line {where_e}, config line {where_s}"
                     )
-        ne, ns = names(example), names(site)
+        ne, ns = names(example.read_text()), names(site)
         for n in sorted(set(ne) - set(ns)):
             problems.append(f"drift: {rel}:{ne[n]}: {n} is in config.example only")
         for n in sorted(set(ns) - set(ne)):
@@ -139,7 +177,7 @@ def check_dead():
     k8s_words = set(k8s_text.split())
     problems = []
     for example in var_files(EXAMPLE):
-        for name, line in names(example).items():
+        for name, line in names(example.read_text()).items():
             if name in READ_ELSEWHERE or name in k8s_words:
                 continue
             pattern = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
@@ -178,14 +216,18 @@ def check_shadow():
     problems = []
     for base in (EXAMPLE, CONFIG):
         for kind in ("group_vars", "host_vars"):
+            if base == CONFIG:
+                listing = site_entries(kind)
+            else:
+                listing = {p.name: p.is_dir() for p in (base / kind).glob("*")}
             entries = {}
-            for p in sorted((base / kind).glob("*")) if (base / kind).is_dir() else []:
+            for name, is_dir in sorted(listing.items()):
                 stem = (
-                    p.name
-                    if p.is_dir()
-                    else next((p.name[: -len(s)] for s in VAR_SUFFIXES[1:] if p.name.endswith(s)), p.name)
+                    name
+                    if is_dir
+                    else next((name[: -len(s)] for s in VAR_SUFFIXES[1:] if name.endswith(s)), name)
                 )
-                entries.setdefault(stem, []).append(p.name + ("/" if p.is_dir() else ""))
+                entries.setdefault(stem, []).append(name + ("/" if is_dir else ""))
             for stem, found in entries.items():
                 if len(found) > 1:
                     where = f"config/{kind}" if base == CONFIG else f"config.example/{kind}"

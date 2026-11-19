@@ -58,6 +58,26 @@ class Drift(unittest.TestCase):
         self.assertTrue(any("config line 3" in p for p in problems))
         self.assertFalse(any("Something else" in p for p in problems), "config text must not be printed")
 
+    def test_under_the_commit_hook_the_site_is_read_as_committed(self):
+        # pre-commit stashes this repository's unstaged edits, never the site's: a
+        # half-done site edit must not fail another commit, nor a committed shadow hide.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", str(self.site)]
+        self.write("# What x is.\n#x: 1\n", "# What x is.\nx: 2\n")
+        import subprocess
+
+        subprocess.run(git[:-2] + ["init", "-q", str(self.site)], check=True, env=env)
+        subprocess.run(git + ["add", "-A"], check=True, env=env)
+        subprocess.run(git + ["commit", "-qm", "c"], check=True, env=env)
+        (self.site / "group_vars/all.yml").write_text("# Half done.\nx: 2\ny: 1\n")
+        (self.site / "group_vars/all").mkdir()
+        by_hand = {k: v for k, v in os.environ.items() if k != "PRE_COMMIT"}
+        with mock.patch.dict(os.environ, by_hand, clear=True):
+            self.assertTrue(cl.check_drift())
+        with mock.patch.dict(os.environ, {"PRE_COMMIT": "1"}):
+            self.assertEqual(cl.check_drift(), [])
+            self.assertEqual(cl.check_shadow(), [])
+
 
 class Repository(unittest.TestCase):
     def test_this_repository_is_clean(self):
