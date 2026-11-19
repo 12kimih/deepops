@@ -34,6 +34,13 @@ __pycache__/
 /collections/
 /.collections.*/
 /k8s-config/
+# The same names as links (a scratch worktree links them to a full clone): a pattern
+# ending in / matches only a directory, so `git add -A` would stage the link itself.
+/.venv
+/.venv-kubespray
+/config
+/roles/galaxy
+/collections
 /kubectl
 /tridentctl
 
