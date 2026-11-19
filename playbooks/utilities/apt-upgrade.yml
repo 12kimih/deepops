@@ -2,7 +2,7 @@
 # Rolling maintenance upgrade (roles/maintenance): one node at a time, drain it in
 # Slurm and wait for its jobs, upgrade every package (the kernel, systemd, libc, GPU
 # and scheduler stacks that unattended upgrades hold back included), reboot if the
-# upgrade asks for it, check slurmd, the GPUs and NHC, and resume the node. A failed
+# upgrade asks for it, check slurmd, the GPUs, DCGM and NHC, and resume the node. A failed
 # node stops the run with that node still drained.
 #
 #   ansible-playbook -K playbooks/utilities/apt-upgrade.yml                  # compute nodes

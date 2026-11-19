@@ -111,7 +111,6 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia-dgx-firmware
 │   ├── nvidia-gpu-operator
 │   ├── nvidia-gpu-operator-node-prep
-│   ├── nvidia-gpu-tests
 │   ├── nvidia-k8s-gpu-device-plugin
 │   ├── nvidia-k8s-gpu-feature-discovery
 │   ├── nvidia-mig-manager

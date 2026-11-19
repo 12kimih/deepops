@@ -1,7 +1,0 @@
----
-- hosts: [kube_node, slurm-node]
-  gather_facts: false
-  tasks:
-    - name: Include NVIDIA GPU tests role
-      ansible.builtin.include_role:
-        name: nvidia-gpu-tests

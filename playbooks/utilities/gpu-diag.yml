@@ -1,0 +1,29 @@
+---
+# GPU burn-in and diagnostics (roles/maintenance): one node at a time, drain it in
+# Slurm and wait for its jobs, run the DCGM diagnostics with every other verify check,
+# and resume the node. A failing node stops the run and stays drained.
+#
+#   ansible-playbook -K playbooks/utilities/gpu-diag.yml
+#   -e hostlist=...                       a subset of the compute nodes
+#   -e maintenance_verify_dcgm_level=2    shorter run (default 3, about half an hour)
+#   -e maintenance_serial=2               nodes per batch (default 1)
+#
+# Needs DCGM on the nodes (install_dcgm). A node already drained is tested but left
+# drained.
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  serial: "{{ maintenance_serial | default(1) }}"
+  max_fail_percentage: 0
+  tags:
+    - gpu-diag
+  tasks:
+    - name: Take the node out, test its GPUs and put it back
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: "{{ step }}"
+      loop: [drain, verify, resume]
+      loop_control:
+        loop_var: step
+      vars:
+        maintenance_reason: "maintenance: GPU diagnostics"
+        maintenance_verify_dcgm_level: 3  # -e maintenance_verify_dcgm_level=N wins (extra vars)

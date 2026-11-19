@@ -1,1 +1,0 @@
-# Slow suite: scripts/check.sh runs it in the full check only, not in --fast (the commit hook).

@@ -6,7 +6,7 @@
 #   upgrade  full package upgrade, including what unattended upgrades hold back
 #            (kernel, systemd, libc, GPU stack, scheduler): those wait for this window
 #   reboot   reboot if the upgrade asks for it (or always), detaching NFS first
-#   verify   the node is healthy again: slurmd, GPUs, NHC
+#   verify   the node is healthy again: slurmd, GPUs, DCGM diagnostics, NHC
 #   resume   return the node to Slurm, only if this run drained it
 #
 # playbooks/utilities/apt-upgrade.yml runs them one node at a time;
@@ -37,6 +37,11 @@ maintenance_reboot_timeout: 1800
 # verify: the units that must be active, and whether to require GPUs and NHC.
 maintenance_verify_units: "{{ ['slurmd'] if inventory_hostname in groups['slurm-node'] | default([]) else [] }}"
 maintenance_verify_gpus: "{{ inventory_hostname in groups['slurm-node'] | default([]) }}"
+# The DCGM diagnostic run level (dcgmi diag -r): 0 off, 1 quick (seconds), 2 medium
+# (about two minutes), 3 long stress (about half an hour), 4 extended. It loads every
+# GPU, so it runs only here, on a node this run drained. Level 1 by default wherever
+# DCGM is installed (install_dcgm); playbooks/utilities/gpu-diag.yml runs a long one.
+maintenance_verify_dcgm_level: "{{ 1 if maintenance_verify_gpus | bool and install_dcgm | default(false) | bool else 0 }}"
 maintenance_verify_nhc: true
 
 # Kernel policy settings every host must share; consistency.yml fails when they differ.

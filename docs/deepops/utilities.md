@@ -33,7 +33,7 @@ reboots each as it empties and returns it to service. See
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `utilities/apt-upgrade.yml` | slurm-node | rolling maintenance (roles/maintenance): one node at a time, drain it, upgrade every package (the held-back kernel, systemd, libc, GPU and scheduler stacks included), reboot if needed, check slurmd, GPUs and NHC, resume. Run it monthly |
+| `utilities/apt-upgrade.yml` | slurm-node | rolling maintenance (roles/maintenance): one node at a time, drain it, upgrade every package (the held-back kernel, systemd, libc, GPU and scheduler stacks included), reboot if needed, check slurmd, GPUs, DCGM (level 1) and NHC, resume. Run it monthly |
 | `utilities/netplan.yml` | all | node networking from `netplan_config`, one host at a time; see [netplan.md](netplan.md) |
 | `utilities/default-target.yml` | all | the systemd boot target, from the next boot |
 | `utilities/check-id-consistency.yml` | all | asserts that NIS groups resolve to their pinned GID on every node; read-only |
@@ -43,6 +43,7 @@ reboots each as it empties and returns it to service. See
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
 | `nvidia-software/nvidia-power-limit.yml` | slurm-node | persistent GPU power cap from `nvidia_power_limit_watts`; a host without one has its cap removed |
+| `utilities/gpu-diag.yml` | slurm-node | GPU burn-in: one node at a time, drain it, run the DCGM diagnostics (`dcgmi diag -r 3`, `-e maintenance_verify_dcgm_level=N`) with the other verify checks, resume; a failing node stays drained |
 | `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS and IOMMU state; read-only |
 | `utilities/disable-acs.yml` | slurm-node | disables PCIe ACS for GPU peer-to-peer, persistently |
 | `slurm-cluster/nvidia-cuda-toolkit.yml` | all | CUDA toolkits as Lmod modules, installed once into the shared tree |
