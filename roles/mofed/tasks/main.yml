@@ -1,66 +1,138 @@
 ---
-# Install DOCA-OFED (the MLNX_OFED successor) from NVIDIA's DOCA network repo.
-# https://docs.nvidia.com/doca/sdk/doca-host-installation-and-upgrade/index.html
-- name: Include OS-specific prerequisite vars
-  ansible.builtin.include_vars: "{{ lookup('first_found', _mofed_vars) }}"
-  vars:
-    _mofed_vars:
-      files:
-        - "{{ ansible_facts.distribution | lower }}.yml"
-        - "rhel{{ ansible_facts.distribution_major_version }}.yml"
-        - "rhel8.yml"
-      paths:
-        - vars
+# DOCA-OFED from NVIDIA's DOCA network repository, as the DOCA-Host installation guide
+# of mofed_doca_version describes (see defaults/main.yml).
 
-# --- Ubuntu: DOCA-OFED apt repository ---
-- name: Ubuntu | add the DOCA repository GPG key
+# --- Prerequisites: headers of the running kernel and DKMS, which builds the modules ---
+- name: Add EPEL for DKMS (RHEL family)
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: epel
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Install the kernel headers, DKMS and compiler (Debian)
+  ansible.builtin.apt:
+    name: ["linux-headers-{{ ansible_facts.kernel }}", dkms, gcc, make]
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install the kernel headers, DKMS and compiler (RHEL family)
+  ansible.builtin.dnf:
+    name: ["kernel-devel-{{ ansible_facts.kernel }}", "kernel-headers", dkms, gcc, make]
+    state: present
+  when: ansible_facts.os_family == "RedHat"
+
+# --- Previous stacks: "Full uninstallation is required before installing DOCA-Host" ---
+- name: Read the OFED stack on the host
+  ansible.builtin.command:
+    argv: [ofed_info, -s]
+  register: mofed_ofed_info
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the installed DOCA profile's version
+  ansible.builtin.command:
+    argv: "{{ ['dpkg-query', '-W', '-f', '${Version}', mofed_package] if ansible_facts.os_family == 'Debian'
+              else ['rpm', '-q', '--qf', '%{VERSION}', mofed_package] }}"
+  register: mofed_installed_version
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+# A standalone MLNX_OFED (ofed_info names itself MLNX_OFED_LINUX) goes with its own
+# uninstaller, as the guide says.
+- name: Remove MLNX_OFED
+  ansible.builtin.command:
+    argv: [/usr/sbin/ofed_uninstall.sh, --force]
+  changed_when: true
+  when: mofed_ofed_info.stdout is search('^MLNX_OFED_LINUX')
+
+# DOCA before 2.6 cannot be upgraded in place: every DOCA package goes first.
+- name: Remove a DOCA older than 2.6
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: ["doca*", "flexio*", "dpa-gdbserver*", "dpa-stats*", "dpa-resource-mgmt*", "dpaeumgmt*"]
+  when:
+    - mofed_installed_version.rc == 0
+    - mofed_installed_version.stdout | length > 0
+    - mofed_installed_version.stdout is version('2.6', '<')
+
+# --- The repository, signed by the "NVIDIA DOCA Host" key ---
+- name: Fetch the repository signing key
   ansible.builtin.include_role:
     name: download
   vars:
-    download_url: "{{ mofed_repo_gpg_key }}"
-    download_checksum: "{{ mofed_repo_gpg_key_checksum }}"
-    download_dest: /usr/share/keyrings/mellanox-doca.asc
-  when: ansible_facts.distribution == "Ubuntu"
+    download_url: "{{ mofed_repo_keys[ansible_facts.os_family].url }}"
+    download_checksum: "{{ mofed_repo_keys[ansible_facts.os_family].checksum }}"
+    download_dest: "{{ mofed_repo_keys[ansible_facts.os_family].dest }}"
 
-- name: Ubuntu | add the DOCA-OFED apt repository
-  ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/mellanox-doca.asc] {{ mofed_repo_base_url }} ./"
-    filename: mellanox-doca
-    state: present
-  when: ansible_facts.distribution == "Ubuntu"
+- name: Read the key's fingerprint
+  ansible.builtin.command:
+    argv: [gpg, --batch, --no-default-keyring, --show-keys, --with-colons, "{{ mofed_repo_keys[ansible_facts.os_family].dest }}"]
+  register: mofed_key_info
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
 
-# --- RHEL/Rocky: DOCA-OFED dnf repository ---
-- name: RHEL | add the DOCA-OFED dnf repository
+- name: Check the key is NVIDIA's
+  ansible.builtin.assert:
+    that: mofed_repo_key_fingerprint in (mofed_key_info.stdout | regex_findall('(?m)^fpr:+([0-9A-F]+):'))
+    fail_msg: "{{ mofed_repo_keys[ansible_facts.os_family].dest }} does not have fingerprint {{ mofed_repo_key_fingerprint }}; not trusting it."
+    quiet: true
+  when: not ansible_check_mode or mofed_key_info.rc == 0
+
+# The key that signed DOCA before 3.2.2, and the repository entry that used it.
+- name: Remove the old key and repository entry (Debian)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/share/keyrings/mellanox-doca.asc
+    - /etc/apt/sources.list.d/mellanox-doca.list
+  when: ansible_facts.os_family == "Debian"
+
+- name: Add the DOCA repository (Debian)
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/nvidia-doca.sources
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ mofed_repo_base_url }}
+      Suites: ./
+      Signed-By: {{ mofed_repo_keys.Debian.dest }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Add the DOCA repository (RHEL family)
   ansible.builtin.yum_repository:
     name: mellanox-doca
-    description: NVIDIA DOCA-OFED
+    description: NVIDIA DOCA-Host
     baseurl: "{{ mofed_repo_base_url }}"
     gpgcheck: true
-    gpgkey: "{{ mofed_repo_gpg_key }}"
+    gpgkey: "file://{{ mofed_repo_keys.RedHat.dest }}"
   when: ansible_facts.os_family == "RedHat"
 
-- name: RHEL | install prerequisites
-  ansible.builtin.dnf:
-    name: "{{ mofed_pkg_prereqs }}"
-    state: present
-  when: ansible_facts.os_family == "RedHat"
-
-# --- Install the OFED bundle (apt/dnf state=present is idempotent) ---
-- name: Install DOCA-OFED (Ubuntu)
+# --- The profile, then the firmware updater if asked for ---
+- name: Install DOCA-OFED (Debian)
   ansible.builtin.apt:
-    name: "{{ mofed_package }}"
+    name: "{{ [mofed_package] + (['mlnx-fw-updater'] if mofed_install_fw_updater else []) }}"
     state: present
     update_cache: true
-  register: mofed_install_ubuntu
-  when: ansible_facts.distribution == "Ubuntu"
+  register: mofed_install_debian
+  when: ansible_facts.os_family == "Debian"
   environment: "{{ proxy_env }}"
 
-- name: Install DOCA-OFED (RHEL/Rocky)
+- name: Install DOCA-OFED (RHEL family)
   ansible.builtin.dnf:
-    name: "{{ mofed_package }}"
+    name: "{{ [mofed_package] + (['mlnx-fw-updater'] if mofed_install_fw_updater else []) }}"
     state: present
   register: mofed_install_redhat
   when: ansible_facts.os_family == "RedHat"
+  environment: "{{ proxy_env }}"
 
 - name: Ask for a reboot to load the OFED kernel modules
   ansible.builtin.include_role:
@@ -68,4 +140,25 @@
     tasks_from: reboot_request
   vars:
     maintenance_reason: "load the DOCA-OFED kernel modules"
-  when: (mofed_install_ubuntu.changed | default(false)) or (mofed_install_redhat.changed | default(false))
+  when: (mofed_install_debian is changed) or (mofed_install_redhat is changed)
+
+# Installed, and from the pinned release (DOCA-Host versions read <release>-<build>).
+- name: Read the installed DOCA profile's version again
+  ansible.builtin.command:
+    argv: "{{ ['dpkg-query', '-W', '-f', '${Version}', mofed_package] if ansible_facts.os_family == 'Debian'
+              else ['rpm', '-q', '--qf', '%{VERSION}', mofed_package] }}"
+  register: mofed_final_version
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: not ansible_check_mode
+
+- name: Check the pinned DOCA release is installed
+  ansible.builtin.assert:
+    that: mofed_final_version.stdout is match(mofed_doca_version | regex_escape ~ '([-.]|$)')
+    fail_msg: >-
+      {{ mofed_package }} is {{ mofed_final_version.stdout | default('not installed', true) }}, not
+      {{ mofed_doca_version }}. A newer DOCA is not downgraded in place: remove it as the
+      DOCA-Host guide describes, then rerun.
+    quiet: true
+  when: not ansible_check_mode

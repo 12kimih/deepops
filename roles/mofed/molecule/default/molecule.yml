@@ -4,8 +4,8 @@ dependency:
 driver:
   name: docker
 platforms:
-  - name: mofed-ubuntu-2204
-    image: geerlingguy/docker-ubuntu2204-ansible
+  - name: mofed-ubuntu-2404
+    image: geerlingguy/docker-ubuntu2404-ansible
     cgroupns_mode: host
     pre_build_image: true
     privileged: true
