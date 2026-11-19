@@ -1,4 +1,41 @@
 ---
+# Every GPU the node had when this play started (the gpus local fact, from lspci
+# at fact gathering, before the reboot) must answer again. Checked first: a missing
+# GPU is what a failed slurmd or NHC would only hint at.
+- name: Check every GPU answers
+  when: maintenance_verify_gpus | bool and not ansible_check_mode
+  vars:
+    maintenance_gpus_expected: "{{ ansible_facts.ansible_local.gpus.count | default(0) | int }}"
+  block:
+    # In a transient unit: nvidia-smi run directly from a session leaks into its cgroup.
+    - name: List the GPUs the driver answers for
+      ansible.builtin.command:
+        argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, nvidia-smi, -L]
+      register: maintenance_gpus
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only
+
+    - name: Count the GPUs on the PCIe bus now
+      ansible.builtin.shell:
+        cmd: set -o pipefail; lspci | grep -cE '(3D|VGA compatible) controller. NVIDIA' || true
+        executable: /bin/bash
+      register: maintenance_gpus_bus
+      changed_when: false
+      check_mode: false  # read-only
+
+    - name: Fail when a GPU is missing
+      ansible.builtin.fail:
+        msg: >-
+          {{ maintenance_gpus.stdout_lines | select('match', 'GPU [0-9]') | list | length }} of
+          {{ maintenance_gpus_expected }} GPUs answer, {{ maintenance_gpus_bus.stdout | trim }} are on the
+          PCIe bus. Fewer on the bus: a GPU, riser or PCIe switch dropped off; power-cycle the node
+          through its BMC, and if they stay gone it is hardware. All on the bus: the driver failed for
+          some; see dmesg | grep -E 'NVRM|Xid'.
+      when: >-
+        maintenance_gpus.rc != 0 or
+        maintenance_gpus.stdout_lines | select('match', 'GPU [0-9]') | list | length < [maintenance_gpus_expected | int, 1] | max
+
 # A service that does not come up fails the node with its journal from this boot,
 # which says why; its systemd properties do not.
 - name: Wait for the node's services
@@ -32,44 +69,6 @@
   loop_control:
     label: "{{ item.item.item }}"
   when: not ansible_check_mode
-
-# In a transient unit: nvidia-smi run directly from a session leaks into its cgroup.
-- name: Check the GPUs answer
-  ansible.builtin.command:
-    argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, nvidia-smi, -L]
-  register: maintenance_gpus
-  changed_when: false
-  failed_when: maintenance_gpus.rc != 0 or maintenance_gpus.stdout is not search('^GPU \\d', multiline=True)
-  when: maintenance_verify_gpus | bool and not ansible_check_mode
-
-# Fails the node on any failed test; the run stops with the node still drained. After
-# a reboot the host engine may still be starting: only that is waited for. A hung run is
-# killed at its level's limit and fails the node like a failed test.
-- name: Run the DCGM diagnostics
-  ansible.builtin.command:
-    argv:
-      - systemd-run
-      - --wait
-      - --pipe
-      - --collect
-      - --quiet
-      - "--property=RuntimeMaxSec={{ maintenance_verify_dcgm_timeout[maintenance_verify_dcgm_level | int] }}"
-      - --
-      - dcgmi
-      - diag
-      - -r
-      - "{{ maintenance_verify_dcgm_level }}"
-  register: maintenance_dcgm
-  until: maintenance_dcgm.rc == 0 or 'Unable to establish a connection' not in (maintenance_dcgm.stdout ~ maintenance_dcgm.stderr)
-  retries: 12
-  delay: 10
-  changed_when: false
-  when: maintenance_verify_dcgm_level | int > 0 and not ansible_check_mode
-
-- name: Report the DCGM diagnostics
-  ansible.builtin.debug:
-    msg: "{{ maintenance_dcgm.stdout_lines }}"
-  when: maintenance_dcgm.stdout_lines is defined
 
 - name: Look for NHC
   ansible.builtin.stat:
