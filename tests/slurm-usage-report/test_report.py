@@ -279,7 +279,9 @@ class RenderTests(unittest.TestCase):
         lines = [ln for p in parts for ln in p.splitlines() if ln.startswith("row ")]
         self.assertEqual(lines, rows)
         self.assertEqual([b["text"]["text"] for b in report.sections("short")], ["short"])
-        self.assertLessEqual(len(report.sections("y" * 5000)[0]["text"]["text"]), 3000)
+        long = report.sections("y" * 7000)
+        self.assertTrue(all(len(b["text"]["text"]) <= 3000 for b in long))
+        self.assertEqual(sum(len(b["text"]["text"]) for b in long), 7000, "a long line is split, not cut")
 
     def test_bar(self):
         self.assertEqual(report.bar(100), "█" * 10 + " 100%")
@@ -336,13 +338,16 @@ class RunTests(unittest.TestCase):
 
 class GpuIndexTests(unittest.TestCase):
     def test_keyed_on_the_device_slurm_counts_not_the_nvml_index(self):
-        # NVML index 0 is /dev/nvidia1 here: Slurm's IDX 1 must read its figure.
+        # NVML index 0 is /dev/nvidia1 here: Slurm's IDX 1 must read its figure. The
+        # query goes through the minor-number mapping; its device label is Slurm's.
         prom = report.Prometheus("http://x")
+        asked = []
         rows = [{"metric": {"host": "n", "gpu": "0", "device": "nvidia1"}, "value": [0, "70"]},
                 {"metric": {"host": "n", "gpu": "1", "device": "nvidia0"}, "value": [0, "0"]},
                 {"metric": {"host": "n", "gpu": "2"}, "value": [0, "5"]}]  # fmt: skip
-        with mock.patch.object(prom, "query", lambda expr: rows):
+        with mock.patch.object(prom, "query", lambda expr: asked.append(expr) or rows):
             self.assertEqual(prom.per_gpu("q"), {("n", 1): 70.0, ("n", 0): 0.0})
+        self.assertIn("group_left (device) host_gpu:dcgm_slurm_device:info", asked[0])
 
 
 class ConfigTests(unittest.TestCase):
@@ -372,7 +377,8 @@ class ConfigTests(unittest.TestCase):
     def test_a_damaged_state_file_is_a_fresh_start(self):
         with tempfile.TemporaryDirectory() as d:
             for text in ("[1]", "{bad", '{"idle": [], "users": 3}',
-                         '{"idle": {"1": {"since": "x"}, "2": {"since": 5, "notified": null}}}'):  # fmt: skip
+                         '{"idle": {"1": {"since": "x"}, "2": {"since": 5, "notified": null},'
+                         ' "3": {"since": 5}, "4": {"since": true, "notified": null}}}'):  # fmt: skip
                 Path(f"{d}/s").write_text(text)
                 state = report.load_state(f"{d}/s")
                 self.assertEqual(set(state), {"idle", "users"})
@@ -390,6 +396,21 @@ class CancelTests(unittest.TestCase):
                 mock.patch.object(report, "run") as run:  # fmt: skip
             report.act({"idle": [j]}, cfg, lambda u, m: u, slack, {}, NOW)
         return run.call_count
+
+    def test_an_owner_without_a_slack_member_is_not_counted_as_told(self):
+        j = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": True, "runtime": 9,
+             "state": {"since": NOW - 30 * 3600, "notified": None}}  # fmt: skip
+        cfg = {
+            "notify": ["dm"],
+            "cancel_after_hours": 24,
+            "channel": "#c",
+            "dm_text": "{job}",
+            "idle_hours": 2,
+        }
+        with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
+                mock.patch.object(report, "slack_id", lambda *a: ""), mock.patch("sys.stderr"):  # fmt: skip
+            report.act({"idle": [j]}, cfg, lambda u, m: u, mock.Mock(), {}, NOW)
+        self.assertIsNone(j["state"]["notified"])
 
     def test_cancelled_only_after_the_owner_was_told_in_an_earlier_run(self):
         self.assertEqual(self.run_act(None), 0)  # never told (lost state, failed DM)

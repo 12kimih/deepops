@@ -995,7 +995,7 @@
       },
       "targets": [
         {
-          "expr": "host_device:slurm_gpu_allocated:max * on (host, device) group_left () max by (host, device) (DCGM_FI_DEV_GPU_UTIL)",
+          "expr": "host_device:slurm_gpu_allocated:max * on (host, device) group_left () host_device:dcgm_gpu_util:max",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",

@@ -553,6 +553,8 @@ tests:
             exp_annotations:
               summary: "Heartbeat of the alerting pipeline; not a problem"
 
+  # NVML order and device minor numbers swapped: NVML GPU 0 is /dev/nvidia1, the one
+  # Slurm's IDX 1 holds. The busy GPU no job holds is NVML 1, Slurm's nvidia0.
   - name: a busy GPU no Slurm job holds fires; a held one does not
     interval: 1m
     input_series:
@@ -560,6 +562,10 @@ tests:
         values: '100x30'
       - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
         values: '100x30'
+      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0x30'
       - series: 'slurm_gpu_allocated{host="m", instance="m:9100", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
         values: '1x30'
       # Any file name: the rules read the timestamp the writer puts in the file.
@@ -572,9 +578,9 @@ tests:
       - eval_time: 20m
         alertname: GpuBusyWithoutJob
         exp_alerts:
-          - exp_labels: {severity: warning, host: n1, gpu: "0", device: nvidia0}
+          - exp_labels: {severity: warning, host: n1, gpu: "1", device: nvidia0}
             exp_annotations:
-              summary: "GPU 0 on n1 is 100% busy with no Slurm job holding it"
+              summary: "GPU nvidia0 on n1 is 100% busy with no Slurm job holding it"
               description: >-
                 A process outside Slurm, or one left behind by a finished job. As root on
                 the host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a
@@ -588,6 +594,8 @@ tests:
     input_series:
       - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
         values: '100x30'
+      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0x30'
       - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
         values: '0x30'
       - series: 'node_textfile_scrape_error{host="m", instance="m:9100"}'
