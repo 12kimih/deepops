@@ -41,7 +41,7 @@ TEST_PASSWORD = "smoke-test-only"
 # What a site sets for the optional parts, so those parts render (and are checked) too.
 SITE = {
     "grafana_cfg_pass": TEST_PASSWORD,
-    "grafana_root_url": "https://portal.example.com:59001/grafana/",
+    "grafana_root_url": "https://portal.example.com/grafana/",
     "grafana_auth_proxy_header": "X-WEBAUTH-USER",
     "alertmanager_slack_api_url": "https://hooks.slack.example/services/T/B/X",
     "alertmanager_heartbeat_url": "https://hc.example/ping/x",
