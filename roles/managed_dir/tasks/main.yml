@@ -19,12 +19,15 @@
   ansible.builtin.assert:
     that:
       - managed_dir_path is match('/')
+      - managed_dir_sources | length > 0 or managed_dir_allow_empty | bool
       - managed_dir_sources | reject('match', '/') | list == []
       - managed_dir_sources | map('basename') | unique | length == managed_dir_sources | length
     fail_msg: >-
       managed_dir needs an absolute managed_dir_path and absolute, distinctly named
-      sources: resolve globs with a set_fact in the calling role, since a relative path
-      would be looked up in managed_dir itself.
+      sources, and some sources unless managed_dir_allow_empty: resolve globs with a
+      set_fact in the calling role, since include vars are evaluated in managed_dir
+      (a relative path or role_path would name managed_dir; an empty glob would empty
+      the directory).
     quiet: true
 
 - name: Create {{ managed_dir_path }}
