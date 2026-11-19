@@ -6,8 +6,9 @@
 # the runtime stage provides a current glibc plus the system libraries those
 # binaries link that are not part of the Slurm install prefix.
 # Both stages are pinned by digest, so a rebuild uses exactly these images.
-# Ubuntu's LTS releases only: an even year's .04.
-# upstream: registry \d[02468]\.04
+# The hosts' Ubuntu release: the container runs the hosts' Slurm binaries, so it
+# provides the libraries they were linked against on those hosts.
+# upstream: registry 24\.04
 ARG SLURM_EXPORTER_BASE_IMAGE=ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
 ARG SLURM_EXPORTER_BUILD_IMAGE=golang:1.27@sha256:205c7636d74e0ffbe3d007162df7d74f859f5a8c8322dfb9f907977686c126cf
 
