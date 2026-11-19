@@ -46,6 +46,26 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_nginx_docker_cache }}", group: slurm-node}
     needs: [docker]
+  # The Kubernetes GPU stack: the GPU Operator, or the device plugin and GPU Feature
+  # Discovery without it (never both). Cluster releases, decided on the first control
+  # plane host.
+  gpu_operator:
+    role: nvidia-gpu-operator
+    rules:
+      - {switch: "{{ deepops_gpu_operator_enabled }}", group: kube_control_plane, first: true}
+  k8s_gpu_plugin:
+    role: nvidia-k8s-gpu-device-plugin
+    rules:
+      - {switch: "{{ not deepops_gpu_operator_enabled | bool }}", group: kube_control_plane, first: true}
+  k8s_gpu_feature_discovery:
+    role: nvidia-k8s-gpu-feature-discovery
+    rules:
+      - {switch: "{{ not deepops_gpu_operator_enabled | bool }}", group: kube_control_plane, first: true}
+  # The NFS client provisioner, a cluster release.
+  k8s_nfs_client:
+    role: nfs-client-provisioner
+    rules:
+      - {switch: "{{ k8s_nfs_client_provisioner }}", group: kube_control_plane, first: true}
   # Monitoring. An entry's key is its variable prefix (<key>_state); role names the
   # role where that differs. Prometheus scrapes each exporter where it is present.
   prometheus:

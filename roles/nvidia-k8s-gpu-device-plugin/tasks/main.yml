@@ -1,24 +1,10 @@
 ---
-# One Helm release in its desired state, through the shared helm_release role (a
-# converged rerun changes nothing).
-- name: Install the NVIDIA device plugin
-  ansible.builtin.include_role:
-    name: helm_release
-  vars:
-    helm_release:
-      release: "{{ k8s_gpu_plugin_release_name }}"
-      namespace: default
-      chart: "{{ k8s_gpu_plugin_chart_name }}"
-      repo: "{{ k8s_gpu_plugin_helm_repo }}"
-      version: "{{ k8s_gpu_plugin_chart_version }}"
-      helm_values:
-        migStrategy: "{{ k8s_gpu_mig_strategy }}"
-        failOnInitError: "{{ k8s_gpu_plugin_init_error | bool }}"
-        allowDefaultNamespace: true
-        affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: nvidia.com/gpu.count
-                      operator: Exists
+- name: Check the component state
+  ansible.builtin.assert:
+    that: k8s_gpu_plugin_state in ['present', 'absent', 'kept']
+    fail_msg: "k8s_gpu_plugin_state must be present, absent or kept, not {{ k8s_gpu_plugin_state }}."
+    quiet: true
+
+- name: "Make the NVIDIA device plugin {{ k8s_gpu_plugin_state }}"
+  ansible.builtin.include_tasks: "{{ k8s_gpu_plugin_state }}.yml"
+  when: k8s_gpu_plugin_state != 'kept'

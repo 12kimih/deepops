@@ -1,4 +1,8 @@
 ---
+# present, absent or kept (do nothing) (docs/deepops/component-state.md); the Kubernetes
+# deploy sets it from deepops_components on the first control-plane host, which decides
+# for the cluster.
+gpu_operator_state: present
 # See GitHub for more information https://github.com/NVIDIA/gpu-operator
 
 # See https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html#considerations-to-install-gpu-operator-with-nvidia-vgpu-driver

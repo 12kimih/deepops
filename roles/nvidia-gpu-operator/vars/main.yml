@@ -1,0 +1,4 @@
+---
+# A cluster's Helm release: nothing of it lives on the host, so the record holds only
+# the component's state (roles/component_record).
+gpu_operator_items: []

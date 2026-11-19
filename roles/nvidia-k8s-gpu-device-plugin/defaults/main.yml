@@ -1,4 +1,8 @@
 ---
+# present, absent or kept (do nothing) (docs/deepops/component-state.md); the Kubernetes
+# deploy sets it from deepops_components on the first control-plane host, which decides
+# for the cluster.
+k8s_gpu_plugin_state: present
 # Vars needed to install device plugin
 k8s_gpu_plugin_helm_repo: "https://nvidia.github.io/k8s-device-plugin"
 k8s_gpu_plugin_chart_name: "nvidia-device-plugin"

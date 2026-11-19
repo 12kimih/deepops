@@ -32,8 +32,14 @@ EXPLICIT = {
 }
 
 
+JINJA = {"not", "and", "or", "bool", "true", "false"}
+
+
 def switches(name):
-    return {re.sub(r"[{} ]", "", rule["switch"]) for rule in REGISTRY[name]["rules"]}
+    """The deploy switches a component's rules read."""
+    return {
+        w for rule in REGISTRY[name]["rules"] for w in re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))
+    } - JINJA
 
 
 class Registry(unittest.TestCase):
@@ -42,11 +48,13 @@ class Registry(unittest.TestCase):
         self.assertEqual(sorted(components.components_order(REGISTRY)), sorted(REGISTRY))
 
     def test_rules_name_deploy_switches(self):
+        # A rule's switch is a deploy switch, or an expression of deploy switches.
         defaults = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text())
         for name in REGISTRY:
-            for switch in switches(name):
-                with self.subTest(component=name):
-                    self.assertIn(switch, defaults, "a rule's switch is a deploy switch")
+            for rule in REGISTRY[name]["rules"]:
+                words = set(re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))) - JINJA
+                with self.subTest(component=name, switch=rule["switch"]):
+                    self.assertTrue(words and words <= set(defaults), "a rule's switch names deploy switches")
 
 
 class Explicit(unittest.TestCase):
@@ -76,9 +84,9 @@ GATES = {
     "slurm_install_pyxis": "pending: deepops (batch 3)",
     "slurm_cluster_configure_gpu_power_limit": "pending: deepops (batch 3)",
     "slurm_enable_dns_resolver": "pending: deepops (with egress_policy's resolver)",
-    "deepops_gpu_operator_enabled": "pending: deepops-4 (batch 5, the Kubernetes GPU stack)",
-    "gpu_operator_preinstalled_nvidia_software": "pending: deepops-4 (batch 5)",
-    "k8s_nfs_client_provisioner": "pending: deepops-4 (batch 5)",
+    # The GPU Operator's switch also gates the driver and the toolkit on Kubernetes nodes.
+    "deepops_gpu_operator_enabled": "pending: deepops (the driver and toolkit gates, with batch 3)",
+    "gpu_operator_preinstalled_nvidia_software": "pending: deepops (the driver and toolkit gates, with batch 3)",
 }
 
 
@@ -126,21 +134,30 @@ class Playbooks(unittest.TestCase):
                 when = play.get("when") or []
                 text = " ".join(when if isinstance(when, list) else [str(when)])
                 for name in REGISTRY:
-                    for switch in switches(name):
+                    # A switch still gating a component yet to move is classified in GATES.
+                    for switch in switches(name) - set(GATES):
                         with self.subTest(deploy=deploy, play=play.get("name"), switch=switch):
                             self.assertNotRegex(
                                 text, rf"\b{switch}\b", "the switch decides the state, not whether it runs"
                             )
 
     def test_component_plays_take_their_state_from_the_map(self):
-        # Every play that applies a component role passes its state from the map, or kept
-        # where it applies the role for something else (the NFS client part).
+        # Every play that applies a component role, as a role entry (a mapping or a bare
+        # name) or an include_role task, passes its state from the map, or kept where it
+        # applies the role for something else (the NFS client part).
         uses = {}
         for path in sorted((ROOT / "playbooks").rglob("*.yml")):
             for play in yaml.safe_load(path.read_text()) or []:
                 for entry in (play or {}).get("roles") or []:
-                    if isinstance(entry, dict):
-                        uses.setdefault(entry.get("role"), []).append((path, entry))
+                    entry = entry if isinstance(entry, dict) else {"role": entry}
+                    uses.setdefault(entry.get("role"), []).append((path, entry))
+                for task in (play or {}).get("tasks") or []:
+                    include = (task or {}).get("ansible.builtin.include_role") or (task or {}).get(
+                        "include_role"
+                    )
+                    # tasks_from runs a part of the role, not the component.
+                    if isinstance(include, dict) and "tasks_from" not in include:
+                        uses.setdefault(include.get("name"), []).append((path, task.get("vars") or {}))
         for name in REGISTRY:
             role = components.component_role(REGISTRY, name)
             self.assertIn(role, uses, name)
