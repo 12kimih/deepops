@@ -1,0 +1,32 @@
+---
+# Put module trees on every node's initial MODULEPATH, for every shell: the one way a
+# role registers modulefiles with Lmod.
+#
+#   - ansible.builtin.include_role:
+#       name: lmod
+#       tasks_from: register
+#     vars:
+#       lmod_register_name: nvidia_hpc_sdk        # one block per name
+#       lmod_register_paths: ["/opt/nvidia/hpc_sdk/modulefiles"]   # [] removes the block
+#
+# Lmod reads /etc/lmod/.modulespath (one directory per line) when a shell starts, before
+# any later profile.d script could change MODULEPATH, and `module reset` returns to it.
+# https://lmod.readthedocs.io/en/latest/030_installing.html
+- name: Create Lmod's configuration directory
+  ansible.builtin.file:
+    path: /etc/lmod
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Register the module trees of {{ lmod_register_name }}
+  ansible.builtin.blockinfile:
+    path: /etc/lmod/.modulespath
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+    marker: "# {mark} {{ lmod_register_name }}"
+    block: "{{ lmod_register_paths | join('\n') }}"
+    state: "{{ 'present' if lmod_register_paths | length > 0 else 'absent' }}"

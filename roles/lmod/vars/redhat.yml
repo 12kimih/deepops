@@ -1,0 +1,5 @@
+---
+# The docs' RHEL package list (Lua with luaposix and luafilesystem from EPEL, Tcl), plus
+# the build tools.
+lmod_build_deps: [lua, lua-devel, lua-posix, lua-filesystem, lua-term, tcl, tcl-devel, make, bc]
+lmod_distro_packages: [Lmod]
