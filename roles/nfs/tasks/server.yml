@@ -19,6 +19,23 @@
   tags:
     - nfs
 
+# A shared directory lives in a tree this host exports; anywhere else it would be made
+# through another server's mount (root_squash) or on a disk nobody shares.
+- name: Refuse a shared directory outside this server's exports
+  ansible.builtin.assert:
+    that:
+      - _roots | length > 0
+      - (item.path | regex_replace('/+$', '') ~ '/') is match('(' ~ (_roots | map('regex_escape') | join('|')) ~ ')')
+    fail_msg: "{{ item.path }} is not inside an export of {{ inventory_hostname }} ({{ nfs_exports | map(attribute='path') | join(', ') }})."
+    quiet: true
+  vars:
+    _roots: "{{ nfs_exports | map(attribute='path') | map('regex_replace', '/+$', '') | map('regex_replace', '$', '/') | list }}"
+  loop: "{{ nfs_shared_dirs }}"
+  loop_control:
+    label: "{{ item.path }}"
+  tags:
+    - nfs
+
 - name: Keep the shared directories at their owner and mode
   ansible.builtin.file:
     path: "{{ item.path }}"
