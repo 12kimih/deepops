@@ -55,10 +55,11 @@ groups:
           description: >-
             A process outside Slurm, or one left behind by a finished job. As root on the
             host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a hung one.
+      # The textfile error counts only on the host that writes the allocation data.
       - alert: SlurmGpuMetricsStale
         expr: |
           time() - slurm_metrics_updated_timestamp_seconds > 300
-          or node_textfile_scrape_error > 0
+          or (node_textfile_scrape_error > 0 and on (instance) slurm_metrics_updated_timestamp_seconds)
         for: 5m
         labels: {severity: warning}
         annotations:
@@ -66,3 +67,17 @@ groups:
           description: >-
             `systemctl status slurm-gpu-metrics` and `journalctl -u slurm-gpu-metrics` on
             the host say why; GpuBusyWithoutJob is off meanwhile.
+      # The join above needs the DCGM fields of roles/nvidia-dcgm-exporter's metrics file.
+      # A GPU node still running an older file reports utilisation without them, which
+      # silently turns GpuBusyWithoutJob and the allocation dashboard's utilisation off.
+      - alert: DcgmFieldsMissing
+        expr: |
+          count by (host) (DCGM_FI_DEV_GPU_UTIL)
+          unless on (host) count by (host) (host_gpu:dcgm_slurm_device:info)
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "DCGM on {{ $labels.host }} does not export the fields the Slurm GPU join needs"
+          description: >-
+            Its metrics file predates DCGM_FI_DEV_MINOR_NUMBER. `ansible-playbook -K -l {{ $labels.host }}
+            playbooks/slurm-cluster/nvidia-dcgm-exporter.yml` installs the current one.

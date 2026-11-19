@@ -267,7 +267,9 @@ def table(
     if value:
         name, unit, scheme = value
         rename["Value"] = name
-        props = [{"id": "unit", "value": unit}]
+        # NaN is a value the query could not know (a join with nothing to join).
+        unknown = {"type": "special", "options": {"match": "nan", "result": {"text": "no data", "index": 0}}}
+        props = [{"id": "unit", "value": unit}, {"id": "mappings", "value": [unknown]}]
         if scheme:
             props += [
                 {"id": "custom.cellOptions", "value": {"type": "color-text"}},

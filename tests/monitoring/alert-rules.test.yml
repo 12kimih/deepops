@@ -172,21 +172,36 @@ tests:
               summary: "/ on n1 is over 97% full"
               description: "1% free. Writes will start failing."
 
-  - name: XIDs from user programs are ignored, hardware XIDs alert
+  - name: XIDs from user programs are ignored, hardware XIDs alert, from either series shape
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="0"}'
-        values: '0x5 43x10'
-      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="1"}'
-        values: '0x5 48x10'
+      # The last-XID gauge: a series appears with its code and never changes.
+      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="0", err_code="43"}'
+        values: '_x15 43x20'
+      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="1", err_code="48"}'
+        values: '_x15 48x20'
+      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="3", err_code="79"}'
+        values: '79x35'
+      # The per-window count, which also sees a repeat of the same XID.
+      - series: 'DCGM_EXP_XID_ERRORS_COUNT{host="n2", instance="n2:9400", gpu="2", xid="79"}'
+        values: '0x15 2x4 0x15'
+      - series: 'DCGM_EXP_XID_ERRORS_COUNT{host="n2", instance="n2:9400", gpu="2", xid="31"}'
+        values: '0x15 5x4 0x15'
     alert_rule_test:
-      - eval_time: 8m
+      - eval_time: 18m
         alertname: GpuXidError
         exp_alerts:
-          - exp_labels: {severity: warning, host: n1, instance: "n1:9400", gpu: "1"}
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9400", gpu: "1", xid: "48"}
             exp_annotations:
               summary: "XID 48 on n1 GPU 1"
               description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
+          - exp_labels: {severity: warning, host: n2, instance: "n2:9400", gpu: "2", xid: "79"}
+            exp_annotations:
+              summary: "XID 79 on n2 GPU 2"
+              description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
+      - eval_time: 30m
+        alertname: GpuXidError
+        exp_alerts: []
 
   - name: GPU temperature uses the device slowdown limit, else a fixed one
     interval: 1m
@@ -613,3 +628,35 @@ tests:
               description: >-
                 `systemctl status slurm-gpu-metrics` and `journalctl -u slurm-gpu-metrics`
                 on the host say why; GpuBusyWithoutJob is off meanwhile.
+
+  - name: a GPU node whose DCGM lacks the minor number warns; one with it does not
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="0"}'
+        values: '0x40'
+      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n2", instance="n2:9400", gpu="0"}'
+        values: '0x40'
+      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n2", instance="n2:9400", gpu="0"}'
+        values: '0x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: DcgmFieldsMissing
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1}
+            exp_annotations:
+              summary: "DCGM on n1 does not export the fields the Slurm GPU join needs"
+              description: "Its metrics file predates DCGM_FI_DEV_MINOR_NUMBER. `ansible-playbook -K -l n1 playbooks/slurm-cluster/nvidia-dcgm-exporter.yml` installs the current one."
+
+  - name: a textfile error elsewhere does not call the Slurm allocation data stale
+    interval: 1m
+    input_series:
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="ctl", instance="ctl:9100"}'
+        values: '0+60x15'
+      - series: 'node_textfile_scrape_error{host="ctl", instance="ctl:9100"}'
+        values: '0x15'
+      - series: 'node_textfile_scrape_error{host="n1", instance="n1:9100"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: SlurmGpuMetricsStale
+        exp_alerts: []
