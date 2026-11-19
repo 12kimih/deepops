@@ -19,13 +19,15 @@ detection and cleanup share one source.
 
 Modes:
   staged            lines added in the index (pre-commit)
-  message FILE      a commit message (commit-msg)
-  push              commits a push would publish (pre-push)
+  message FILE      a commit message (commit-msg), every line above git's scissors
+  push              commits a push would publish (pre-push): under pre-commit, which
+                    passes on one ref only, everything not yet on that remote
   history REV...    lines added and messages of commits, e.g. main ^upstream/master
   tree              every tracked file in the work tree
   replace-text      print git-filter-repo --replace-text rules for the site file
 
-Findings name the place and the rule, never the matched text. A line containing
+Every mode checks file names too, renamed ones included, and a binary file's printable
+runs. Findings name the place and the rule, never the matched text. A line containing
 "sensitive-guard: allow" is skipped. Exit status: 0 clean, 1 findings, 2 usage error.
 """
 
@@ -42,6 +44,13 @@ from pathlib import Path
 ALLOW = "sensitive-guard: allow"
 DEFAULT_SITE_FILE = "config/sensitive-patterns"
 ZERO_SHA = re.compile(r"^0+$")
+SCISSORS = re.compile(r"^\S -{24} >8 -{24}$")  # git commit -v: the diff below is not the message
+PRINTABLE_RUN = re.compile(rb"[\x20-\x7e]{6,}")  # what `strings` would show of a binary
+# Names as they are, not quoted; renames as a deletion and an addition, so the new
+# name and the whole content are seen; and the raw records, which name every file,
+# a binary one too.
+DIFF = ("-c", "core.quotePath=false")
+DIFF_OPTS = ("--raw", "-p", "-U0", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv")
 
 
 @dataclass(frozen=True)
@@ -69,6 +78,10 @@ def git(*args: str, input_text: str | None = None) -> str:
     return subprocess.run(
         ["git", *args], input=input_text, capture_output=True, text=True, errors="replace", check=True
     ).stdout
+
+
+def blob(sha: str) -> bytes:
+    return subprocess.run(["git", "cat-file", "blob", sha], capture_output=True, check=True).stdout
 
 
 def mapping_keys(path: Path, variable: str) -> list[str]:
@@ -150,33 +163,39 @@ class Scanner:
         for number, line in enumerate(text.splitlines(), 1):
             self.line(f"{where}:{number}", line)
 
+    def binary(self, where: str, data: bytes) -> None:
+        for run in PRINTABLE_RUN.findall(data):
+            self.line(f"{where} (binary)", run.decode("ascii"))
+
     def diff(self, diff: str, prefix: str = "") -> None:
-        """Added lines of a unified diff produced with -U0."""
-        path, number = "?", 0
+        """Output of `git diff`/`git log` with DIFF_OPTS: every file's name (raw records),
+        the added lines, and a binary file's content."""
+        blobs, path, number, header = {}, "?", 0, False
         for line in diff.splitlines():
-            if line.startswith("+++ "):
-                path = line[6:] if line.startswith("+++ b/") else line[4:]
-                if path != "/dev/null":
-                    self.line(f"{prefix}{path} (file name)", path)
+            if line.startswith(":") and "\t" in line and not header:
+                meta, _, name = line.partition("\t")  # ":mode mode sha sha STATUS\tname"
+                fields = meta.split()
+                if len(fields) == 5 and fields[4] != "D":
+                    blobs[name] = fields[3]
+                    self.line(f"{prefix}{name} (file name)", name)
+            elif line.startswith("diff --git a/"):
+                rest = line[len("diff --git a/") :]  # "NAME b/NAME": no renames, so one name
+                path, number, header = rest[: (len(rest) - 3) // 2], 0, True
+            elif header and line.startswith("Binary files "):
+                if blobs.get(path) and not ZERO_SHA.match(blobs[path]):
+                    self.binary(f"{prefix}{path}", blob(blobs[path]))
             elif line.startswith("@@"):
                 match = re.search(r"\+(\d+)", line)
-                number = int(match.group(1)) if match else 0
+                number, header = (int(match.group(1)) if match else 0), False
+            elif header:
+                continue  # index, mode, ---/+++ lines: names are in the raw records
             elif line.startswith("+"):
                 self.line(f"{prefix}{path}:{number}", line[1:])
                 number += 1
 
     def commits(self, revs: list[str]) -> None:
         log = git(
-            "log",
-            "--format=%x01%H%n%B%x02",
-            "-p",
-            "-U0",
-            "--no-color",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--diff-merges=first-parent",
-            *revs,
-            "--",
+            *DIFF, "log", "--format=%x01%H%n%B%x02", *DIFF_OPTS, "--diff-merges=first-parent", *revs, "--"
         )
         for chunk in log.split("\x01")[1:]:
             sha, _, rest = chunk.partition("\n")
@@ -185,18 +204,22 @@ class Scanner:
             self.diff(diff, prefix=f"commit {sha[:12]} ")
 
 
-def push_revs() -> list[list[str]]:
-    """Revision sets for a pre-push hook, from pre-commit's env or git's stdin."""
-    to_ref = os.environ.get("PRE_COMMIT_TO_REF")
-    if to_ref:
-        from_ref = os.environ.get("PRE_COMMIT_FROM_REF", "")
-        return [
-            [to_ref, "--not", from_ref]
-            if from_ref and not ZERO_SHA.match(from_ref)
-            else [to_ref, "--not", "--remotes"]
-        ]
+def push_revs() -> list[list[str]] | None:
+    """Revision sets for a pre-push hook; None when git said nothing at all.
+
+    pre-commit passes on only the first ref of a push (PRE_COMMIT_FROM_REF/TO_REF), none
+    for a push that reaches a root commit, and keeps the hook's stdin. So under
+    pre-commit every local branch and tag is checked against what the remote already
+    has: a superset of the push, never less. Run as git's own hook, the refs come on
+    stdin."""
+    remote = os.environ.get("PRE_COMMIT_REMOTE_NAME")
+    if remote:
+        return [["--branches", "--tags", "--not", f"--remotes={remote}"]]
+    lines = sys.stdin.read().splitlines()
+    if not lines:
+        return None
     sets = []
-    for line in sys.stdin.read().splitlines():
+    for line in lines:
         _, local_sha, _, remote_sha = line.split()
         if ZERO_SHA.match(local_sha):
             continue
@@ -244,22 +267,33 @@ def main() -> int:
         elif opts.mode == "replace-text" or opts.patterns:
             print(f"site patterns not found: {path}", file=sys.stderr)
             return 2
+        else:
+            print(f"sensitive-guard: no site patterns at {path}; built-in rules only", file=sys.stderr)
     if opts.mode == "replace-text":
         sys.stdout.write(replace_text(rules))
         return 0
 
     scan = Scanner(rules)
     if opts.mode == "staged":
-        scan.diff(
-            git("diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--diff-filter=d")
-        )
+        scan.diff(git(*DIFF, "diff", "--cached", *DIFF_OPTS, "--diff-filter=d"))
     elif opts.mode == "message":
         if len(opts.args) != 1:
             parser.error("message takes the message file")
-        text = Path(opts.args[0]).read_text(errors="replace")
-        scan.text("commit message", "\n".join(line for line in text.splitlines() if not line.startswith("#")))
+        # Every line above the scissors: a "#" line stays in the commit when the message
+        # came from -m or -F, and which lines git strips depends on settings, so none is
+        # assumed comment. Below the scissors is the diff `commit -v` shows, not message.
+        kept = []
+        for line in Path(opts.args[0]).read_text(errors="replace").splitlines():
+            if SCISSORS.match(line):
+                break
+            kept.append(line)
+        scan.text("commit message", "\n".join(kept))
     elif opts.mode == "push":
-        for revs in push_revs():
+        sets = push_revs()
+        if sets is None:
+            print("sensitive-guard: push: no refs to check were given", file=sys.stderr)
+            return 2
+        for revs in sets:
             scan.commits(revs)
     elif opts.mode == "history":
         if not opts.args:
@@ -272,7 +306,9 @@ def main() -> int:
                 continue
             data = path.read_bytes()
             scan.line(f"{name} (file name)", name)
-            if b"\0" not in data[:8192]:
+            if b"\0" in data[:8192]:
+                scan.binary(name, data)
+            else:
                 scan.text(name, data.decode(errors="replace"))
 
     if scan.findings:
