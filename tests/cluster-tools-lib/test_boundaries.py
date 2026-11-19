@@ -7,8 +7,11 @@ without a timeout; clustertools.slurm.run is the one way to call Slurm.
 """
 
 import ast
+import os
 import re
+import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -39,6 +42,16 @@ class BoundaryTests(unittest.TestCase):
             )
         ]
         self.assertEqual(offenders, [], "start processes with clustertools.proc.run, which is bounded")
+
+    def test_a_timeout_kills_what_the_process_started(self):
+        # subprocess.run kills only its own child: a pipeline's members (a dump and its
+        # gzip) outlived it and kept writing.
+        marker = f"{os.getpid()}.25"
+        with self.assertRaises(proc.TimeoutExpired):
+            proc.run(["bash", "-o", "pipefail", "-c", '"$@" | cat', "bash", "sleep", marker], timeout=0.5)
+        time.sleep(0.2)
+        alive = subprocess.run(["pgrep", "-x", "-f", f"sleep {marker}"], capture_output=True, text=True)
+        self.assertEqual(alive.stdout, "")
 
     def test_proc_refuses_an_unbounded_call(self):
         for timeout in (None, 0, -1):

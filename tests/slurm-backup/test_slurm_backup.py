@@ -195,6 +195,15 @@ class Backup(unittest.TestCase):
         self.assertIn("unexpected entry", " ".join(problems))
         self.assertFalse((self.base / "outside").exists())
 
+    def test_a_malformed_checksum_line_is_a_problem_not_a_crash(self):
+        self.run_on("2026-11-21", 6)
+        sums = self.base / "primary" / "daily" / "2026-11-21" / sb.SUMS_FILE
+        sums.write_text(sums.read_text() + "garbage\n")
+        _, problems = sb.fetch_newest(self.cfg["destinations"][0], self.base, 60)
+        self.assertIn("malformed line", " ".join(problems))
+        self.assertEqual(sb.restore_test(self.cfg), 1)
+        self.assertIn("slurm_backup_restore_test_status{} 0", self.prom())
+
     def test_a_hung_destination_fails_alone_and_is_reported(self):
         real = sb.run_as
 

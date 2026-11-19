@@ -133,6 +133,8 @@ def load_site_rules(path: Path) -> list[Rule]:
             words = sorted(
                 set(mapping_keys(path.parent / vars_file, variable)) - allowed, key=len, reverse=True
             )
+            if not words:  # every key allowed: an empty alternation would match everywhere
+                continue
             alternation = "|".join(re.escape(word) for word in words)
             rules.append(Rule(name, re.compile(rf"(?<![\w.-])(?:{alternation})(?![\w-])"), replacement))
         else:

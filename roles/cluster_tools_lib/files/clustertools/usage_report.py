@@ -526,7 +526,12 @@ def report_once():
     cache = state.setdefault("users", {})
 
     def who(user, mention):
-        member = slack_id(user, cfg, slack, cache) if mention else ""
+        # A failed lookup leaves the name unmentioned rather than the report unposted;
+        # act() looks the member up again and reports the failure with the others.
+        try:
+            member = slack_id(user, cfg, slack, cache) if mention else ""
+        except (RuntimeError, OSError):
+            member = ""
         return f"<@{member}> ({user})" if member else user
 
     if preview:  # a preview notifies, cancels and records nothing
