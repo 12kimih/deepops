@@ -1,4 +1,4 @@
 ---
 dependencies:
-  - role: deepops_paths  # deepops_dir, sm_* module paths
-  - { role: easy-build }
+  - role: deepops_paths  # sm_* and easybuild_* paths
+  - role: easy-build  # easybuild_user, easybuild_version

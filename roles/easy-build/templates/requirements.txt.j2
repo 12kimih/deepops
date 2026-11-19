@@ -1,0 +1,4 @@
+# EasyBuild {{ easybuild_version }}, installed with pip --require-hashes (roles/easy-build).
+{% for name, sha in easybuild_sha256[easybuild_version] | dictsort %}
+{{ name }}=={{ easybuild_version }} --hash=sha256:{{ sha }}
+{% endfor %}

@@ -1,15 +1,19 @@
+# Install EasyBuild and build software modules with it.
 #
-# install software modules using EasyBuild.
+#   ansible-playbook playbooks/slurm-cluster/easybuild-modules.yml
 #
+# Lmod goes on every node, so EasyBuild's module tree is found everywhere. EasyBuild and
+# its builds go once on the host that owns the shared tree: slurm-master[0] unless you
+# pass -e hostlist=<host> (group_vars cannot pick a play's hosts).
 ---
-- hosts: all
+- name: Ensure Lmod is present on all nodes
+  hosts: "{{ hostlist | default('all') }}"
+  become: true
   roles:
-    - role: lmod
+    - lmod
 
-- hosts: slurm-master[0]
+- name: Install EasyBuild and build easybuild_packages on the software-tree host
+  hosts: "{{ hostlist | default('slurm-master[0]') }}"
+  become: true
   roles:
-    - role: easy-build
-
-- hosts: slurm-master
-  roles:
-    - role: easy-build-packages
+    - easy-build-packages

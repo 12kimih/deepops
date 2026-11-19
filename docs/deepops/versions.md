@@ -13,7 +13,8 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | deploy_defaults | `ngc_ready_cuda_container` | `nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04` |  |
 | deploy_defaults | `ngc_ready_pytorch_container` | `nvcr.io/nvidia/pytorch:26.05-py3` |  |
 | deploy_defaults | `ngc_ready_tensorflow_container` | `nvcr.io/nvidia/tensorflow:25.02-tf2-py3` |  |
-| easy-build-packages | `sm_files_repo_version` | `4ef7ae6cc2284f69412a8db5e10dddd92024eeab` |  |
+| easy-build | `easybuild_version` | `5.4.2` |  |
+| easy-build | `easybuild_setuptools_version` | `82.0.1` |  |
 | enroot | `enroot_version` | `4.2.0` |  |
 | grafana | `grafana_container` | `grafana/grafana:13.2.4@sha256:dbbc38ea2110` |  |
 | k8s-internal-container-registry | `container_registry_version` | `2.1.0` |  |

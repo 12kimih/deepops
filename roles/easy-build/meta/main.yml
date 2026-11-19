@@ -1,4 +1,5 @@
 ---
 dependencies:
-  - role: deepops_paths  # deepops_dir, sm_* module paths
-  - { role: lmod }
+  - role: deepops_paths  # sm_* and easybuild_* paths
+  - role: retired_settings  # a site still setting an old sm_* EasyBuild name stops here
+  - role: lmod

@@ -112,44 +112,83 @@ This will produce less-optimized but more generic builds.
 
 ## Installing EasyBuild
 
-[EasyBuild](https://easybuild.readthedocs.io/en/latest/) is a software build and installation framework that allows you to manage (scientific) software on HPC systems in an efficient way.
+[EasyBuild](https://docs.easybuild.io/) is a software build and installation framework that allows you to manage (scientific) software on HPC systems in an efficient way.
 
 To install EasyBuild using DeepOps, you can run:
 
 ```bash
-ansible-playbook -l slurm-cluster playbooks/slurm-cluster/easybuild-modules.yml
+ansible-playbook playbooks/slurm-cluster/easybuild-modules.yml
 ```
+
+Lmod goes on every node. EasyBuild and its builds go once on the host that owns the shared
+tree, `slurm-master[0]` unless you pass `-e hostlist=<host>`. The `easy-build` role follows
+the [official pip installation](https://docs.easybuild.io/installation/):
+
+- **EasyBuild itself:** `pip install --require-hashes` into a root-owned venv per version,
+  `/sw/software/EasyBuild/<version>`, from a requirements list pinned by sha256 (the
+  `easybuild`, framework, easyblocks and easyconfigs sdists, and the setuptools that builds
+  them, so pip fetches nothing unverified). The modulefile `EasyBuild/<version>` lands in
+  the shared module tree, `/sw/modules/all`.
+- **The build account:** EasyBuild refuses to run as root, so builds run as an
+  unprivileged system account (`easybuild_user`, default `easybuild`). It owns only
+  EasyBuild's own tree, `/sw/easybuild` (software, modules, sources), and its home
+  `/var/lib/easybuild`, where builds unpack on local disk. The rest of `/sw` and the shared
+  module tree stay root's.
+- **Configuration:** `/etc/xdg/easybuild.d/deepops.cfg` (root, `0644`) sets the prefix, the
+  module path, Lmod and Lua modulefiles. EasyBuild 5 reads `$XDG_CONFIG_DIRS/easybuild.d`,
+  default `/etc/xdg`; `/etc/easybuild.d` (as the installation page still says) is only
+  warned about and not read. The robot path is EasyBuild's default, the easyconfigs it
+  ships.
+- **Module trees:** the `lmod` role registers `lmod_module_paths` on every node, the shared
+  tree first and then `/sw/easybuild/modules/all`, so what EasyBuild builds is found
+  everywhere.
+
+EasyBuild 5 needs Lmod 8.0 or newer and Python 3.9 or newer for the venv
+(`easybuild_python`). The venv uses the build host's interpreter, so `module load
+EasyBuild` works on nodes with the same Python at the same path.
 
 ### Configuration
 
-- `sm_prefix`: Root path for installing modules. Defaults to `/sw`.
-- `sm_install_default`: Controls whether to install a default set of packages when installing EasyBuild. Defaults to `true`.
-- `sm_files_url`: Git repository to find default easyconfigs to install. Default is `https://github.com/DeepOps/easybuild_files.git`
+- `easybuild_version`: The EasyBuild release (default `5.4.2`). A new version needs its
+  sdist checksums in `easybuild_sha256` (see `roles/easy-build/defaults/main.yml`).
+- `easybuild_user`: The build account (default `easybuild`).
+- `easybuild_prefix`: EasyBuild's own tree, the only part of `/sw` the build account owns
+  (default `/sw/easybuild`).
+- `easybuild_packages`: Easyconfigs to build with `eb --robot` as the build account, each a
+  file name from the easyconfigs EasyBuild ships (find them with `eb --search <name>`) or
+  the path to a site recipe. Dependencies are built too; something already installed is
+  not rebuilt, and the task reports changed only when something was built. Default `[]`.
+
+To run EasyBuild by hand, become the build account with a login shell:
+
+```bash
+sudo -u easybuild bash -l
+module load EasyBuild
+eb --search zlib
+eb --robot zlib-1.3.1-GCCcore-14.2.0.eb
+```
 
 ### Usage
 
-Once you have installed EasyBuild, you can view the list of installed Environment Modules using the `module avail` command:
+Once you have built software with EasyBuild, `module avail` lists it on every node:
 
 ```bash
 login01:~$ module avail
 
-------------------------------------------------------------------------------------------------- /sw/modules/all --------------------------------------------------------------------------------------------------
-   Bison/3.3.2    EasyBuild/4.2.2 (L)    M4/1.4.18    binutils/2.32    flex/2.6.4    help2man/1.47.4    zlib/1.2.11
+------------------------------- /sw/modules/all --------------------------------
+   EasyBuild/5.4.2    cuda/12.9
 
-  Where:
-   L:  Module is loaded
-
-Use "module spider" to find all possible modules.
-Use "module keyword key1 key2 ..." to search for all possible modules matching any of the "keys".
+---------------------------- /sw/easybuild/modules/all ----------------------------
+   GCCcore/14.2.0    binutils/2.42    zlib/1.3.1-GCCcore-14.2.0
 ```
 
 You can then load a chosen module using `module load`.
 Loading a module will change your active environment variables (such as `PATH`) to add the software package in question to your environment.
 
 ```bash
-login01:~$ module load flex/2.6.4
-login01:~$ which flex
-/sw/software/flex/2.6.4/bin/flex
+login01:~$ module load zlib/1.3.1-GCCcore-14.2.0
+login01:~$ echo $EBROOTZLIB
+/sw/easybuild/software/zlib/1.3.1-GCCcore-14.2.0
 ```
 
-For more information on using EasyBuild, see the [EasyBuild documentation](https://easybuild.readthedocs.io/en/latest/).
+For more information on using EasyBuild, see the [EasyBuild documentation](https://docs.easybuild.io/).

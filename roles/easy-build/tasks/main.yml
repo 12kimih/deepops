@@ -1,134 +1,131 @@
-#
-# an ansible role to install easy_build:
-#
 ---
-- name: "Install needed packages"
+# EasyBuild with pip, per https://docs.easybuild.io/installation/: a root-owned venv per
+# version on the shared tree, a modulefile next to the other shared modules, a system
+# config in /etc/xdg/easybuild.d, and an unprivileged account that builds (eb refuses root).
+- name: Refuse an EasyBuild version without its checksums
+  ansible.builtin.assert:
+    that: easybuild_version in easybuild_sha256
+    fail_msg: "easybuild_sha256 has no row for EasyBuild {{ easybuild_version }}: add the sdist sha256s from pypi.org."
+    quiet: true
+
+- name: Install what EasyBuild needs (Debian family)
   become: true
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
-    name: python3-setuptools
+    name: [python3-venv, tar, gzip, bzip2, unzip, xz-utils, patch]
     state: present
   when: ansible_facts.os_family == "Debian"
 
-- name: "Install needed packages"
+- name: Install what EasyBuild needs (RedHat family)
   become: true
   ansible.builtin.dnf:
-    name: python3-setuptools
+    name: [python3, tar, gzip, bzip2, unzip, xz, patch]
     state: present
   when: ansible_facts.os_family == "RedHat"
 
-- name: "Rm previous tmp folders"
-  ansible.builtin.file:
-    path: "{{ eb_tmp_dir }}"
-    state: absent
-    force: true
-
-- name: "Check if easybuild is installed"
-  ansible.builtin.find:
-    paths: "{{ sm_software_path }}/EasyBuild/"
-    file_type: file
-    patterns: "^eb$"
-    use_regex: true
-    recurse: true
-  register: ebsw_exe
-  ignore_errors: true
-
-- name: "Mkdir tmp folders"
-  ansible.builtin.file:
-    path: "{{ eb_tmp_dir }}"
-    state: directory
-    force: true
-    recurse: true
-    mode: "u=rwx,g=rwx,o=rx"
-  when: not ebsw_exe.matched
-
-- name: "Download bootstrap script"
-  ansible.builtin.include_role:
-    name: download
-  vars:
-    download_url: "{{ eb_bootstrap_url }}"
-    download_checksum: "{{ eb_bootstrap_checksum }}"
-    download_dest: /var/cache/deepops/easybuild/bootstrap_eb.py
-  when: not ebsw_exe.matched
-
-#
-# Ansible doesn't run task in a login shell, so we have to source the
-# EasyBuild config manually. We might want to create some abstraction for this.
-#
-- name: "Install latest EasyBuild version"
-  ansible.builtin.shell: . /etc/profile && python3 /var/cache/deepops/easybuild/bootstrap_eb.py {{ eb_tmp_dir }}
-  args:
-    executable: /bin/bash
-  when: not ebsw_exe.matched
-
-- name: "Get EasyBuild version"
+# The old bootstrap wrote world-writable profile scripts root's login shells ran.
+- name: Remove the old EasyBuild profile scripts
   become: true
-  ansible.builtin.command: ls {{ eb_tmp_dir }}/software/EasyBuild/
-  args:
-    executable: /bin/bash
-  register: ebsw_version
-  when: not ebsw_exe.matched
+  ansible.builtin.file:
+    path: "/etc/profile.d/{{ item }}"
+    state: absent
+  loop: [z01_eb.sh, z01_eb.csh]
 
-- name: "Patch EasyBuild module"
-  ansible.builtin.lineinfile:
-    dest: "{{ eb_tmp_dir }}/modules/all/EasyBuild/{{ ebsw_version.stdout }}.lua"
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-  with_items:
-    - regexp: "^local root .*$"
-      line: 'local root = "{{ sm_software_path }}/EasyBuild/{{ ebsw_version.stdout }}"'
-  when: not ebsw_exe.matched
+- name: Create the build account
+  become: true
+  ansible.builtin.user:
+    name: "{{ easybuild_user }}"
+    system: true
+    home: "{{ easybuild_home }}"
+    create_home: true
+    shell: /usr/sbin/nologin
 
-- name: Ensure directory ownership is correct for software paths
+# Only the account's home and EasyBuild's own prefix are the account's, never more of
+# the shared tree; EasyBuild creates what it needs below them.
+- name: Give the build account its home and prefix
   become: true
   ansible.builtin.file:
     path: "{{ item }}"
-    owner: "{{ ansible_user }}"
-    state: "directory"
-    recurse: true
-  with_items:
-    - "{{ sm_software_path }}"
-    - "{{ sm_module_root }}"
-    - "{{ sm_files_path }}"
-    - "{{ sm_sources_path }}"
-    - "{{ sm_build_path }}"
+    state: directory
+    owner: "{{ easybuild_user }}"
+    group: "{{ easybuild_user }}"
+    mode: "0755"
+  loop:
+    - "{{ easybuild_home }}"
+    - "{{ easybuild_prefix }}"
 
-- name: "Cp EasyBuild software"
-  ansible.builtin.command: cp -R "{{ eb_tmp_dir }}/software/EasyBuild" "{{ sm_software_path }}"
-  when: not ebsw_exe.matched
-
-- name: "Cp EasyBuild module"
-  ansible.builtin.command: cp -R "{{ eb_tmp_dir }}/modules/all/EasyBuild" "{{ sm_module_path }}"
-  when: not ebsw_exe.matched
-
-- name: "Rm EasyBuild tmp directories"
+- name: Create the root-owned EasyBuild directories
+  become: true
   ansible.builtin.file:
-    path: "{{ eb_tmp_dir }}"
-    state: absent
-    force: true
-  when: not ebsw_exe.matched
-
-- name: "Configure sh profile"
-  become: true
-  ansible.builtin.template:
-    src: templates/z01_eb.sh
-    dest: /etc/profile.d
+    path: "{{ item }}"
+    state: directory
     owner: root
     group: root
-    mode: "0777"
-  when: not ebsw_exe.matched
-  tags:
-    - configuration
+    mode: "0755"
+  loop:
+    - "{{ easybuild_venv }}"
+    - "{{ sm_module_path }}/EasyBuild"
+    - /etc/xdg/easybuild.d
 
-- name: "Configure csh profile"
+- name: Write the pinned requirements
   become: true
   ansible.builtin.template:
-    src: templates/z01_eb.csh
-    dest: /etc/profile.d
+    src: "{{ item }}.j2"
+    dest: "{{ easybuild_venv }}/{{ item }}"
     owner: root
     group: root
-    mode: "0777"
-  when: not ebsw_exe.matched
-  tags:
-    - configuration
+    mode: "0644"
+  loop: [setuptools.txt, requirements.txt]
+
+# setuptools first: the sdists have only setup.py, and building them without isolation
+# keeps pip from fetching an unpinned setuptools.
+- name: Install EasyBuild into its venv
+  become: true
+  ansible.builtin.shell: |
+    set -eu
+    umask 022
+    venv={{ easybuild_venv | quote }}
+    {{ easybuild_python | quote }} -m venv "$venv"
+    pip=("$venv/bin/pip" install --no-cache-dir --disable-pip-version-check --require-hashes)
+    "${pip[@]}" --only-binary :all: -r "$venv/setuptools.txt"
+    "${pip[@]}" --no-build-isolation -r "$venv/requirements.txt"
+  args:
+    executable: /bin/bash
+    creates: "{{ easybuild_venv }}/bin/eb"
+
+- name: Write the EasyBuild modulefile
+  become: true
+  ansible.builtin.template:
+    src: EasyBuild.lua.j2
+    dest: "{{ sm_module_path }}/EasyBuild/{{ easybuild_version }}.lua"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write the EasyBuild system configuration
+  become: true
+  ansible.builtin.template:
+    src: easybuild.cfg.j2
+    dest: /etc/xdg/easybuild.d/deepops.cfg
+    owner: root
+    group: root
+    mode: "0644"
+
+# Proves the module loads and EasyBuild takes its prefix from the system configuration
+# (F) as the build account, not its per-user default.
+- name: Check EasyBuild runs as the build account
+  become: true
+  become_user: "{{ easybuild_user }}"
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -l
+      - -c
+      - module load "EasyBuild/$1" && eb --version && eb --show-config | grep -Eq "^prefix +\(F\) = $2\$"
+      - check
+      - "{{ easybuild_version }}"
+      - "{{ easybuild_prefix }}"
+    chdir: "{{ easybuild_home }}"
+  changed_when: false
+  when: not ansible_check_mode  # a first --check has no account to become yet

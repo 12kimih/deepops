@@ -1,5 +1,21 @@
 ---
-eb_tmp_dir: /var/cache/deepops/build/easybuild  # root runs from here: never under /tmp
-# The script at that commit, checked on download (roles/download).
-eb_bootstrap_checksum: "sha256:616bf3ce812c0844bf9ea3e690f9d88b394ed48f834ddb8424a73cf45fc64ea5"
-eb_bootstrap_url: "https://raw.githubusercontent.com/easybuilders/easybuild-framework/49533e6ef8f3ca27f984eeb212e157874cae9183/easybuild/scripts/bootstrap_eb.py"
+# EasyBuild installed with pip into a root-owned venv, one per version:
+# {{ sm_software_path }}/EasyBuild/<version>, loaded as `module load EasyBuild/<version>`.
+easybuild_version: "5.4.2"
+# sha256 of each sdist pip installs, per version (pypi.org); a version without its row stops.
+easybuild_sha256:
+  "5.4.2":
+    easybuild: 28a1e9ae18734da81d0171249480bf3f7337ec3d85dfaf763111fce0f21c064b
+    easybuild-framework: 284fe46e92defef7dd8827082064285a806a767f6fd3322bfe26c859afbb730f
+    easybuild-easyblocks: 6af03a367baa46dfcf9378cf6dc40c545c79985484177313cfe81627d33aa6de
+    easybuild-easyconfigs: 5d47d26c73dcb1d1cb468c741ab9520ad2700a6ffb7755cf08f8ad6a82ffd2b3
+# The sdists build with setuptools (setup.py only); pinned here so pip fetches nothing
+# unverified. 82.x is the newest that still runs on Python 3.9.
+easybuild_setuptools_version: "82.0.1"
+easybuild_setuptools_sha256: a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb
+# Interpreter for the venv: Python 3.9 or newer.
+easybuild_python: python3
+# EasyBuild refuses to run as root, so builds run as this system account. It owns only
+# easybuild_prefix (roles/deepops_paths) and its home, where builds unpack (local disk).
+easybuild_user: easybuild
+easybuild_home: /var/lib/easybuild

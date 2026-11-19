@@ -11,6 +11,7 @@ sm_prefix: /sw
 sm_module_root: "{{ sm_prefix }}/modules"
 sm_module_path: "{{ sm_module_root }}/all"
 sm_software_path: "{{ sm_prefix }}/software"
-sm_files_path: "{{ sm_prefix }}/easybuild_files"
-sm_sources_path: "{{ sm_prefix }}/sources"
-sm_build_path: "{{ sm_prefix }}/build"
+# EasyBuild's own tree (software, modules, sources), the only part of sm_prefix its
+# build account (roles/easy-build) owns.
+easybuild_prefix: "{{ sm_prefix }}/easybuild"
+easybuild_module_path: "{{ easybuild_prefix }}/modules/all"

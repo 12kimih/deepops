@@ -1,61 +1,36 @@
 ---
-#
-# install software modules using EasyBuild:
-#
-- name: "Ubuntu pre-install tasks"
-  ansible.builtin.include_tasks: ubuntu-pre-install.yml
-  when: ansible_facts.distribution == 'Ubuntu'
+# Builds easybuild_packages with `eb --robot` as the build account (roles/easy-build).
+- name: Install the build host's compilers and system libraries (Debian family)
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    name: [build-essential, libssl-dev, libibverbs-dev]
+    state: present
+  when:
+    - easybuild_packages | length > 0
+    - ansible_facts.os_family == "Debian"
 
-- name: "RedHat family pre-install tasks"
-  ansible.builtin.include_tasks: redhat-pre-install.yml
-  when: ansible_facts.os_family == 'RedHat'
+- name: Install the build host's compilers and system libraries (RedHat family)
+  become: true
+  ansible.builtin.dnf:
+    name: [gcc, gcc-c++, make, openssl-devel, rdma-core-devel]
+    # rdma-core-devel is in CodeReady Builder: "powertools" on EL8, "crb" on EL9+.
+    enablerepo: "{{ 'powertools' if ansible_facts.distribution_major_version == '8' else 'crb' }}"
+    state: present
+  when:
+    - easybuild_packages | length > 0
+    - ansible_facts.os_family == "RedHat"
 
-- name: "Download default easy-configs if needed"
-  ansible.builtin.git:
-    repo: "{{ sm_files_url }}"
-    dest: "{{ sm_files_path }}"
-    update: true
-    version: "{{ sm_files_repo_version }}"
-  register: eb_easyconfigs_download
-  until: eb_easyconfigs_download is succeeded
-  retries: 5
-  delay: 10
-  when: sm_install_default
-
-- name: "Check the sm_files_path is reachable"
-  ansible.builtin.stat:
-    path: "{{ sm_files_path }}"
-  register: eb_path
-
-- name: "Find the list of the easybuild files"
-  ansible.builtin.find:
-    paths: "{{ sm_files_path }}"
-    file_type: file
-    patterns: "*.eb"
-    recurse: false
-  register: eb_meta
-  when: eb_path.stat.isdir is defined and eb_path.stat.isdir
-
-- name: "Extract the list of easybuild file paths"
-  vars:
-    eb_files: []
-  ansible.builtin.set_fact:
-    eb_files: "{{ eb_files + [item.path] }}"
-  with_items: "{{ eb_meta.files }}"
-
-- name: "Install the selected easybuild modules"
-  ansible.builtin.shell: |
-    . /etc/profile.d/00-modulepath.sh &&
-    . /etc/profile.d/lmod.sh          &&
-    . /etc/profile.d/z01_eb.sh        &&
-    module purge                      &&
-    module load EasyBuild             &&
-    eb --parallel=16 "{{ item }}" --robot
-  with_items:
-    - "{{ eb_files | sort() }}"
-  args:
-    executable: /bin/bash
-  register: eb_install
-  # eb --robot is a no-op for specs already built; only report changed when it
-  # actually completed an install (matches the spack build task's pattern).
-  changed_when: "'COMPLETED' in eb_install.stdout"
+# A login shell sets up Lmod (/etc/profile.d) for the module load.
+- name: Build the easyconfigs and their dependencies
+  become: true
+  become_user: "{{ easybuild_user }}"
+  ansible.builtin.command:
+    argv: [bash, -l, -c, 'module load "EasyBuild/$1" && eb --robot "$2"', build, "{{ easybuild_version }}", "{{ item }}"]
+    chdir: "{{ easybuild_home }}"
+  loop: "{{ easybuild_packages }}"
+  when: not ansible_check_mode  # a first --check has no account to become yet
+  register: easybuild_build
+  # eb prints this once per installation it completes, and nothing when all is built.
+  changed_when: "'COMPLETED: Installation ended successfully' in easybuild_build.stdout"

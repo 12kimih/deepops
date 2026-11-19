@@ -203,15 +203,26 @@ nfs_mounts:
 # Note: the sm_prefix must be in an NFS-shared location
 #sm_prefix: "/sw"
 
-# Easybuild-specific
+# The shared module tree (CUDA modules, the EasyBuild module) and its software:
 #sm_module_root: "{{ sm_prefix }}/modules"
-#sm_software_path: "{{ sm_prefix }}/software"
-#sm_files_path: "{{ sm_prefix }}/easybuild_files"
-#sm_sources_path: "{{ sm_prefix }}/sources"
-#sm_build_path: "{{ sm_prefix }}/build"
-#sm_files_url: "https://github.com/DeepOps/easybuild_files.git"
-#sm_install_default: true
 #sm_module_path: "{{ sm_module_root }}/all"
+#sm_software_path: "{{ sm_prefix }}/software"
+# Module trees Lmod searches on every node, in order:
+#lmod_module_paths:
+#  - "{{ sm_module_path }}"
+#  - "{{ easybuild_module_path }}"
+
+# EasyBuild (playbooks/slurm-cluster/easybuild-modules.yml): installed with pip into a
+# root-owned venv, `module load EasyBuild/<version>`. Builds run as an unprivileged
+# account that owns only EasyBuild's own tree:
+#easybuild_version: "5.4.2"
+#easybuild_user: easybuild
+#easybuild_prefix: "{{ sm_prefix }}/easybuild"
+#easybuild_module_path: "{{ easybuild_prefix }}/modules/all"
+# Easyconfigs to build with `eb --robot` (a shipped easyconfig's file name or a path):
+#easybuild_packages: []
+#easybuild_packages:  # example
+#  - zlib-1.3.1-GCCcore-14.2.0.eb
 
 # Spack-specific
 spack_install_dir: "{{ sm_prefix }}/spack"
