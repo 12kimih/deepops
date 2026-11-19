@@ -3,10 +3,14 @@
 Run with: python3 -m unittest discover scripts/validation/tests
 """
 
+import contextlib
 import importlib.util
+import io
+import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -206,6 +210,67 @@ class TestRunDecodes(unittest.TestCase):
             with self.subTest(module=module.__name__):
                 rc, out, _ = module.run(cmd)
                 self.assertEqual((rc, out), (0, "ok \ufffd"))
+
+
+class TestSlurmGpuJob(unittest.TestCase):
+    SINFO_GRES = "n1 gpu:a100:4(S:0-1)\nn2 gpu:h100:8\nn3 gpu:h100:8\nn3 gpu:h100:8\nn4 (null)\n"
+
+    def test_gpu_types_count_each_node_once(self):
+        self.assertEqual(validate_slurm.parse_gres_gpu_types(self.SINFO_GRES), {"a100": 4, "h100": 16})
+
+    def test_the_type_with_the_most_gpus_is_picked(self):
+        self.assertEqual(validate_slurm.pick_gpu_type(self.SINFO_GRES), "h100")
+        self.assertEqual(validate_slurm.pick_gpu_type("n1 gpu:b:2\nn2 gpu:a:2\n"), "a")
+        self.assertEqual(validate_slurm.pick_gpu_type("n1 gpu:4\n"), "")
+
+    def test_the_job_is_named_and_typed(self):
+        cmd = validate_slurm.gpu_job_command("deepops-validate-1", "h100", "batch")
+        self.assertIn("--job-name=deepops-validate-1", cmd)
+        self.assertIn("--gpus=h100:1", cmd)
+        self.assertEqual(cmd[cmd.index("--partition") + 1], "batch")
+        self.assertIn("--gpus=1", validate_slurm.gpu_job_command("x", "", ""))
+
+    def main(self, argv, srun_rc):
+        calls = []
+
+        def fake_run(cmd, timeout=60):
+            calls.append(cmd)
+            if cmd[0] == "srun":
+                return (srun_rc, "NVIDIA H100, 580.95", "") if srun_rc == 0 else (124, "", "timeout after 1s")
+            if cmd[:2] == ["sinfo", "--version"]:
+                return 0, "slurm 26.05.1", ""
+            if cmd[-1] == "%n %T":
+                return 0, "n1 idle\nn2 idle\n", ""
+            if cmd[-1] == "%n %G":
+                return 0, self.SINFO_GRES, ""
+            return 0, "", ""
+
+        out = io.StringIO()
+        with (
+            mock.patch.object(validate_slurm, "run", fake_run),
+            mock.patch.object(validate_slurm.shutil, "which", return_value="/usr/bin/sinfo"),
+            mock.patch.object(sys, "argv", ["validate_slurm.py", "--json"] + argv),
+            contextlib.redirect_stdout(out),
+        ):
+            rc = validate_slurm.main()
+        return rc, json.loads(out.getvalue()), calls
+
+    def test_a_timed_out_job_is_cancelled_by_its_name(self):
+        rc, result, calls = self.main(["--gpu-type", "a100"], srun_rc=124)
+        self.assertEqual(rc, 1)
+        self.assertFalse(result["gpu_job_ok"])
+        srun = next(c for c in calls if c[0] == "srun")
+        self.assertIn("--gpus=a100:1", srun)
+        name = next(a for a in srun if a.startswith("--job-name="))[len("--job-name=") :]
+        scancel = next(c for c in calls if c[0] == "scancel")
+        self.assertEqual(scancel[:3], ["scancel", "--name", name])
+
+    def test_a_job_that_ran_is_not_cancelled(self):
+        rc, result, calls = self.main([], srun_rc=0)
+        self.assertEqual(rc, 0)
+        self.assertTrue(result["gpu_job_ok"])
+        self.assertIn("--gpus=h100:1", next(c for c in calls if c[0] == "srun"))
+        self.assertFalse([c for c in calls if c[0] == "scancel"])
 
 
 if __name__ == "__main__":
