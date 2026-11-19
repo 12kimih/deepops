@@ -25,41 +25,46 @@ cuda_modroot: "{{ sm_module_path }}"  # module  -> <modroot>/cuda/<version>.lua
 cuda_cache_dir: /var/cache/deepops/cuda  # root runs the runfiles from here: never /var/tmp
 cuda_base_url: "https://developer.download.nvidia.com/compute/cuda"
 
-# CUDA toolkits to install: the latest patch of each minor from 11.8 to 13.3.
-# Each entry needs the exact runfile name (the embedded driver version is not
-# derivable from the toolkit version). Trim or extend this in
-# config/group_vars/ to match the toolkits you actually want; current runfiles
-# are listed at https://developer.nvidia.com/cuda-toolkit-archive
-cuda_versions:
-  - {version: "11.8.0", runfile: "cuda_11.8.0_520.61.05_linux.run"}
-  - {version: "12.0.1", runfile: "cuda_12.0.1_525.85.12_linux.run"}
-  - {version: "12.1.1", runfile: "cuda_12.1.1_530.30.02_linux.run"}
-  - {version: "12.2.2", runfile: "cuda_12.2.2_535.104.05_linux.run"}
-  - {version: "12.3.2", runfile: "cuda_12.3.2_545.23.08_linux.run"}
-  - {version: "12.4.1", runfile: "cuda_12.4.1_550.54.15_linux.run"}
-  - {version: "12.5.1", runfile: "cuda_12.5.1_555.42.06_linux.run"}
-  - {version: "12.6.3", runfile: "cuda_12.6.3_560.35.05_linux.run"}
-  - {version: "12.8.2", runfile: "cuda_12.8.2_570.211.01_linux.run"}
-  - {version: "12.9.2", runfile: "cuda_12.9.2_575.57.08_linux.run"}
-  - {version: "13.0.3", runfile: "cuda_13.0.3_580.126.20_linux.run"}
-  - {version: "13.1.2", runfile: "cuda_13.1.2_590.48.01_linux.run"}
-  - {version: "13.2.1", runfile: "cuda_13.2.1_595.58.03_linux.run"}
-  - {version: "13.3.0", runfile: "cuda_13.3.0_610.43.02_linux.run"}
+# Which toolkits: the newest patch of every CUDA minor release from cuda_toolkit_oldest
+# up to the newest the nodes' driver runs (nvidia_driver_cuda_major, roles/
+# nvidia_versions). Users pick a minor (`module load cuda/12.4`); a patch release
+# replaces the previous patch of its minor in place, and a minor that leaves the range
+# leaves the software tree. A new NVIDIA release is one regeneration of the catalog
+# below; raising the driver branch brings in the next CUDA major by itself.
+cuda_toolkit_oldest: "11.8"
+cuda_versions: >-
+  {{ cuda_releases
+     | selectattr('version', 'version', cuda_toolkit_oldest, '>=')
+     | rejectattr('version', 'version', (nvidia_driver_cuda_major | int + 1) ~ '.0', '>=')
+     | list }}
 
-# Per runfile, as NVIDIA publishes them (<cuda_base_url>/<version>/docs/sidebar/
-# md5sum.txt, its only checksum for these files); add one for each runfile added.
-cuda_runfile_checksums:
-  cuda_11.8.0_520.61.05_linux.run: "md5:d6cf26349e5a4104b8683e26b717fa22"
-  cuda_12.0.1_525.85.12_linux.run: "md5:2a5b80f322151e25ed792029e4571318"
-  cuda_12.1.1_530.30.02_linux.run: "md5:2f0a4127bf797bf4eab0be2a547cb8d0"
-  cuda_12.2.2_535.104.05_linux.run: "md5:a32d82924645e0369c14acaebd54bff1"
-  cuda_12.3.2_545.23.08_linux.run: "md5:9d3585b651f4909f72c4db379beb3e01"
-  cuda_12.4.1_550.54.15_linux.run: "md5:afc99bab1d8c6579395d851d948ca3c1"
-  cuda_12.5.1_555.42.06_linux.run: "md5:6521c4c2f3872e40e2c18ddf685b62bf"
-  cuda_12.6.3_560.35.05_linux.run: "md5:29d297908c72b810c9ceaa5177142abd"
-  cuda_12.8.2_570.211.01_linux.run: "md5:82a348acc1271169ce3d2126f941f65f"
-  cuda_12.9.2_575.57.08_linux.run: "md5:9b91ed7b1fb15f2ba42b94135dbc95b8"
-  cuda_13.0.3_580.126.20_linux.run: "md5:13acdcabcb9e939f716c29eff8c12181"
-  cuda_13.1.2_590.48.01_linux.run: "md5:30335614adb11ca310c61ba1105de4fc"
-  cuda_13.2.1_595.58.03_linux.run: "md5:e5b4bdf19cc27d63a8254cb486764626"
-  cuda_13.3.0_610.43.02_linux.run: "md5:16d68669cf659157777d2e7adaff179d"
+# Every CUDA minor release NVIDIA publishes (newest patch), its x86_64 runfile and
+# NVIDIA's checksum for it (docs/sidebar/md5sum.txt, the only one published for
+# runfiles). Regenerate with scripts/deepops/cuda_releases.py; never edit by hand.
+# BEGIN GENERATED: cuda_releases (scripts/deepops/cuda_releases.py)
+cuda_releases:
+  - {version: "11.0.3", runfile: "cuda_11.0.3_450.51.06_linux.run", checksum: "md5:70af4cebe30549b9995fb9c57d538214"}
+  - {version: "11.1.1", runfile: "cuda_11.1.1_455.32.00_linux.run", checksum: "md5:c24e2755e3868692051a38797ce01044"}
+  - {version: "11.2.2", runfile: "cuda_11.2.2_460.32.03_linux.run", checksum: "md5:955ae5d59531923d32a3bfe3f68a7dfe"}
+  - {version: "11.3.1", runfile: "cuda_11.3.1_465.19.01_linux.run", checksum: "md5:065d2a85decd34afab7e135c009830ee"}
+  - {version: "11.4.4", runfile: "cuda_11.4.4_470.82.01_linux.run", checksum: "md5:21e66ea7ea4f0e39f752a7f6269614ab"}
+  - {version: "11.5.2", runfile: "cuda_11.5.2_495.29.05_linux.run", checksum: "md5:2c33591bb5b33a3d4bffafdc7da76fe4"}
+  - {version: "11.6.2", runfile: "cuda_11.6.2_510.47.03_linux.run", checksum: "md5:2989d2d2a943fa5e2a1f29f660221788"}
+  - {version: "11.7.1", runfile: "cuda_11.7.1_515.65.01_linux.run", checksum: "md5:cd470869c316fb7f389b3fdf34edec5f"}
+  - {version: "11.8.0", runfile: "cuda_11.8.0_520.61.05_linux.run", checksum: "md5:d6cf26349e5a4104b8683e26b717fa22"}
+  - {version: "12.0.1", runfile: "cuda_12.0.1_525.85.12_linux.run", checksum: "md5:2a5b80f322151e25ed792029e4571318"}
+  - {version: "12.1.1", runfile: "cuda_12.1.1_530.30.02_linux.run", checksum: "md5:2f0a4127bf797bf4eab0be2a547cb8d0"}
+  - {version: "12.2.2", runfile: "cuda_12.2.2_535.104.05_linux.run", checksum: "md5:a32d82924645e0369c14acaebd54bff1"}
+  - {version: "12.3.2", runfile: "cuda_12.3.2_545.23.08_linux.run", checksum: "md5:9d3585b651f4909f72c4db379beb3e01"}
+  - {version: "12.4.1", runfile: "cuda_12.4.1_550.54.15_linux.run", checksum: "md5:afc99bab1d8c6579395d851d948ca3c1"}
+  - {version: "12.5.1", runfile: "cuda_12.5.1_555.42.06_linux.run", checksum: "md5:6521c4c2f3872e40e2c18ddf685b62bf"}
+  - {version: "12.6.3", runfile: "cuda_12.6.3_560.35.05_linux.run", checksum: "md5:29d297908c72b810c9ceaa5177142abd"}
+  - {version: "12.8.2", runfile: "cuda_12.8.2_570.211.01_linux.run", checksum: "md5:82a348acc1271169ce3d2126f941f65f"}
+  - {version: "12.9.2", runfile: "cuda_12.9.2_575.57.08_linux.run", checksum: "md5:9b91ed7b1fb15f2ba42b94135dbc95b8"}
+  - {version: "13.0.3", runfile: "cuda_13.0.3_580.126.20_linux.run", checksum: "md5:13acdcabcb9e939f716c29eff8c12181"}
+  - {version: "13.1.2", runfile: "cuda_13.1.2_590.48.01_linux.run", checksum: "md5:30335614adb11ca310c61ba1105de4fc"}
+  - {version: "13.2.2", runfile: "cuda_13.2.2_595.71.05_linux.run", checksum: "md5:5d7a0bc1f719655f2083fc711cacf7cf"}
+  - {version: "13.3.1", runfile: "cuda_13.3.1_610.43.02_linux.run", checksum: "md5:7c8d3eca60ee10d2c290bdc045f88f09"}
+  - {version: "13.4.3", runfile: "cuda_13.4.3_linux.run", checksum: "md5:d79b49d3ab39f5d45d48d91b31275de4"}
+  - {version: "13.5.0", runfile: "cuda_13.5.0_linux.run", checksum: "md5:6c1f56882ef5804043b15ff09e75d630"}
+# END GENERATED: cuda_releases

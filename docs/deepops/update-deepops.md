@@ -468,11 +468,14 @@ On RHEL and related distros, DeepOps installs the driver module stream for `nvid
 
 #### Updating the CUDA toolkit
 
-CUDA is served as per-version Lmod modules by default. To add a version, list it in `cuda_versions` in your DeepOps configuration and re-run:
+CUDA is served as Lmod modules, one per CUDA minor, by default. When NVIDIA releases a new patch or minor, regenerate the role's catalog (it pins each runfile with NVIDIA's checksum) and re-run the playbook, in a maintenance window since the previous patch of a minor is removed:
 
 ```bash
+python3 scripts/deepops/cuda_releases.py      # rewrites cuda_releases in roles/nvidia_cuda_toolkit/defaults
 ansible-playbook playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
 ```
+
+The newest toolkits arrive by themselves up to the CUDA major the driver branch serves (`nvidia_driver_branch`); a new CUDA major needs the driver raised first. `cuda_toolkit_oldest` sets how far back the modules go.
 
 For the single system-wide toolkit instead (`nvidia_cuda_install: true`), set the package in `cuda_version`, for example `cuda-toolkit-13-2`, and re-run `playbooks/nvidia-software/nvidia-cuda.yml`.
 
