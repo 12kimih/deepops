@@ -53,23 +53,32 @@
     path: "{{ rootlessdocker_install_dir }}/config/install_success"
   register: rootless_docker_installed
 
+- name: Create the root-owned staging directory
+  ansible.builtin.file:
+    path: /var/cache/deepops
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not rootless_docker_installed.stat.exists
+
 - name: Template setup rootless docker script
   ansible.builtin.template:
     src: "{{ role_path }}/templates/rootless_docker_setup.sh.j2"
-    dest: /tmp/rootless_docker_setup.sh
+    dest: /var/cache/deepops/rootless_docker_setup.sh
     mode: "0755"
   when: not rootless_docker_installed.stat.exists
 
 - name: Execute setup rootless docker script
   become: true
-  ansible.builtin.command: /tmp/rootless_docker_setup.sh
+  ansible.builtin.command: /var/cache/deepops/rootless_docker_setup.sh
   args:
     executable: /bin/bash
     creates: "{{ rootlessdocker_install_dir }}/config/install_success"
 
 - name: Clean up rootless docker set script
   ansible.builtin.file:
-    path: /tmp/rootless_docker_setup.sh
+    path: /var/cache/deepops/rootless_docker_setup.sh
     state: absent
 
 - name: Add the br_netfilter module

@@ -22,7 +22,7 @@ cuda_install_root: "{{ cuda_prefix }}/cuda"                        # toolkit -> 
 cuda_modroot: "{{ sm_module_path | default('/sw/modules/all') }}"  # module  -> <modroot>/cuda/<version>.lua
 
 # Runfile download cache (reused across runs; kept off /tmp in case it is small).
-cuda_cache_dir: "/var/tmp/cuda_runfiles"
+cuda_cache_dir: /var/cache/deepops/cuda  # root runs the runfiles from here: never /var/tmp
 cuda_base_url: "https://developer.download.nvidia.com/compute/cuda"
 
 # CUDA toolkits to install: the latest patch of each minor from 11.8 to 13.3.

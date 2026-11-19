@@ -10,6 +10,14 @@
   ansible.builtin.command: "{{ helm_cmd }} repo update"
   changed_when: false
 
+- name: Create the directory for values.yaml
+  ansible.builtin.file:
+    path: "{{ container_registry_values_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Copy values.yaml into place
   ansible.builtin.template:
     src: "{{ container_registry_values_template }}"

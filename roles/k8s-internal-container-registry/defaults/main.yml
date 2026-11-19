@@ -9,7 +9,7 @@ container_registry_chart_name: "{{ container_registry_repo_name }}/docker-regist
 container_registry_installed_name: "docker-registry"
 
 container_registry_values_template: "values.yaml"
-container_registry_values_path: "/tmp/container-registry.yaml"
+container_registry_values_path: /var/cache/deepops/container-registry.yaml  # root helm reads it: never /tmp
 
 container_registry_namespace: "deepops-docker"
 # Pinned to chart 2.x (registry/distribution 2.x). Chart 3.0.0 ships distribution 3.x

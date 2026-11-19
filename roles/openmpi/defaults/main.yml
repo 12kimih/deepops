@@ -9,7 +9,8 @@ openmpi_src_url: "https://download.open-mpi.org/release/open-mpi/{{ openmpi_tag 
 # Per version, as published on open-mpi.org (roles/download).
 openmpi_checksums:
   "5.0.10": "sha256:0acecc4fc218e5debdbcb8a41d182c6b0f1d29393015ed763b2a91d5d7374cc6"
-openmpi_build_dir: /tmp/openmpi-build
+# Root builds here, so never under a world-writable directory such as /tmp.
+openmpi_build_dir: /var/cache/deepops/build/openmpi
 openmpi_install_prefix: /usr/local
 # Default builds OpenMPI's bundled (internal) PMIx. On 5.0.x that bundled PMIx is
 # 5.x -- the SAME major Slurm links (pmix_version 5.0.10) -- so they are
