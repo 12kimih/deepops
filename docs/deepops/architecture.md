@@ -134,6 +134,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── prometheus-slurm-exporter
 │   ├── prometheus_paths
 │   ├── pyxis
+│   ├── quiet_install
 │   ├── recorded_files
 │   ├── roce_backend
 │   ├── root_access

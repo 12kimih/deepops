@@ -11,49 +11,11 @@
 # Debian 11+ `nis` pulls in ypserv (the NIS *server*) too, which a client must not run.
 # ypbind-mt provides the ypbind.service client daemon; yp-tools gives ypwhich/ypcat.
 # https://wiki.debian.org/BullseyeNis
-- name: Install RHEL-family NIS client packages
-  ansible.builtin.dnf:
-    name: ypbind
-    state: present
-  when: ansible_facts.os_family == "RedHat"
-
-- name: Find the Debian NIS client packages not yet installed
-  ansible.builtin.package_facts:
-  when: ansible_facts.os_family == "Debian"
-
-# policy-rc.d (exit 101) keeps ypbind from starting half-configured during the install.
-# It blocks every service start on the host while present, so it is written only for
-# an install that will happen, never over a site's own policy-rc.d, and removed in
-# `always`, so a failed install cannot leave later upgrades unable to restart anything.
-- name: Install the Debian NIS client packages without starting their daemons yet
-  when:
-    - ansible_facts.os_family == "Debian"
-    - nis_client_missing | length > 0
+- name: Install the NIS client packages without starting their daemons yet
+  ansible.builtin.include_role:
+    name: quiet_install
   vars:
-    nis_client_missing: "{{ ['ypbind-mt', 'yp-tools', 'rpcbind'] | reject('in', ansible_facts.packages) | list }}"
-  block:
-    - name: Block daemon auto-start during the install
-      ansible.builtin.copy:
-        src: policy-rc.d
-        dest: /usr/sbin/policy-rc.d
-        owner: root
-        group: root
-        mode: "0700"
-        force: false  # a site's own policy-rc.d stays, and stays in charge
-      register: nis_client_policy
-
-    - name: Install Debian/Ubuntu NIS client packages
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600
-        name: "{{ nis_client_missing }}"
-        state: present
-  always:
-    - name: Remove the daemon-start block
-      ansible.builtin.file:
-        path: /usr/sbin/policy-rc.d
-        state: absent
-      when: nis_client_policy is defined and nis_client_policy is changed
+    quiet_install_packages: "{{ ['ypbind'] if ansible_facts.os_family == 'RedHat' else ['ypbind-mt', 'yp-tools', 'rpcbind'] }}"
 
 - name: Ensure rpcbind is running
   ansible.builtin.service: name=rpcbind state=started enabled=true
