@@ -1,0 +1,12 @@
+---
+# The container and its configuration (it holds the upstream credentials) go; the image
+# store stays, so turning the registry back on, here or on another host given the
+# directory, finds what it held. python3-docker serves every Docker-driving role, so
+# only the record frees it (it is not exclusive).
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: standalone_container_registry
+    component_record_action: absent
+    component_record_items: "{{ standalone_container_registry_items }}"

@@ -25,9 +25,16 @@
 - name: Apply the OS update policy
   import_playbook: generic/os-updates.yml
 
+# The container engine, where a component below needs it (deepops_components).
+- name: Install Docker where a component needs it
+  import_playbook: container/docker.yml
+  vars:
+    deepops_phase: install
+
 - name: Set up a local cluster container registry
   import_playbook: container/standalone-container-registry.yml
-  when: slurm_enable_container_registry
+  vars:
+    deepops_phase: install
 
 - name: Remove what must not be on a host
   import_playbook: generic/host-baseline.yml
@@ -107,12 +114,6 @@
 
 - name: Install the Open OnDemand portal
   import_playbook: slurm-cluster/open-ondemand.yml
-  vars:
-    deepops_phase: install
-
-# The container engine, where a component below needs it (deepops_components).
-- name: Install Docker where a component needs it
-  import_playbook: container/docker.yml
   vars:
     deepops_phase: install
 
@@ -325,6 +326,11 @@
 
 - name: Remove the Prometheus where it is no longer wanted
   import_playbook: slurm-cluster/prometheus.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the cluster container registry where it is no longer wanted
+  import_playbook: container/standalone-container-registry.yml
   vars:
     deepops_phase: remove
 

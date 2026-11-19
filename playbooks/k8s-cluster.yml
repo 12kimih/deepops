@@ -80,11 +80,18 @@
 - name: Configure hostnames, /etc/hosts
   import_playbook: generic/hosts.yml
 
+# The container engine, where a component below needs it (deepops_components).
+- name: Install Docker where a component needs it
+  import_playbook: container/docker.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: install
+
 - name: Set up a local cluster container registry
   import_playbook: container/standalone-container-registry.yml
   vars:
-    hostlist: kube_control_plane
-  when: kube_enable_container_registry
+    hostlist: k8s_cluster
+    deepops_phase: install
 
 # Install 'sshpass' program for: https://github.com/ansible/ansible/issues/56629
 - hosts: all
@@ -391,6 +398,19 @@
 # Only where the site lists nfs in deepops_component_removals (removal: explicit).
 - name: Remove the NFS server where it is listed for removal
   import_playbook: generic/nfs-server.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+
+- name: Remove the cluster container registry where it is no longer wanted
+  import_playbook: container/standalone-container-registry.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+
+# Only where the site named docker in deepops_component_removals.
+- name: Remove Docker where it is no longer wanted
+  import_playbook: container/docker.yml
   vars:
     hostlist: k8s_cluster
     deepops_phase: remove

@@ -19,6 +19,13 @@ deepops_component_registry:
     removal: explicit
     managed: "{{ docker_install }}"
     rules: []
+  # One registry for the cluster (its image store stays when it goes).
+  standalone_container_registry:
+    role: standalone-container-registry
+    rules:
+      - {switch: "{{ slurm_enable_container_registry }}", group: slurm-master}
+      - {switch: "{{ kube_enable_container_registry }}", group: kube_control_plane}
+    needs: [docker]
   # Monitoring. An entry's key is its variable prefix (<key>_state); role names the
   # role where that differs. Prometheus scrapes each exporter where it is present.
   prometheus:

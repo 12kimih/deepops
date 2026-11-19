@@ -1,22 +1,17 @@
 ---
+# Run alone it brings the Docker it needs; a deploy imports Docker itself, before it.
 - name: Install docker
   import_playbook: docker.yml
+  when: deepops_phase == 'converge'
 
-# One registry, on the hosts named by hostlist (slurm-cluster.yml passes slurm-master,
-# k8s-cluster.yml kube_control_plane). It used to default to every host, so one run
-# without hostlist left a registry on each node; every other host now has it removed.
-- hosts: "{{ hostlist | default('slurm-master') }}"
-  become: true
-  become_method: ansible.builtin.sudo
-  roles:
-    - role: deploy_defaults
-    - standalone-container-registry
-
-- hosts: "all:!{{ hostlist | default('slurm-master') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere,
+# so a registry started on another host earlier goes.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   become_method: ansible.builtin.sudo
   roles:
     - role: deploy_defaults
     - role: standalone-container-registry
-      vars:
-        standalone_container_registry_state: absent
+      standalone_container_registry_state: >-
+        {{ deepops_components.standalone_container_registry | component_phase(deepops_phase) }}
