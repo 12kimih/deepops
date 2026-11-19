@@ -746,6 +746,26 @@ pruned.
 - **Tests:** the site-block pattern in `job_submit_test.lua` had stopped matching, so
   the suite aborted at its first case; fixed, and stale expectations corrected.
 
+## 42. EasyBuild 5 with pip, built by an unprivileged account
+
+- **Why:** the old `easy-build` role bootstrapped an unpinned "latest" EasyBuild with an
+  old `bootstrap_eb.py`, wrote `/etc/profile.d/z01_eb.{sh,csh}` with mode `0777` (run by
+  root's login shells), and recursively chowned the whole `/sw` tree, the shared module
+  directory with root's CUDA modulefiles included, to `ansible_user`.
+- **Now:** EasyBuild 5.4.2 is `pip install --require-hashes` into a root-owned venv per
+  version, with setuptools pinned too and the sdists built without isolation, so nothing
+  is fetched unverified ([docs](https://docs.easybuild.io/installation/)). Its modulefile
+  goes in the shared tree. EasyBuild refuses root, so builds run as a system account
+  (`easybuild_user`) that owns only `easybuild_prefix` and its local home.
+  `/etc/xdg/easybuild.d/deepops.cfg` (`0644`) replaces the profile scripts, which are
+  removed; EasyBuild 5 does not read `/etc/easybuild.d`.
+- **Lmod:** `lmod_module_paths` (shared tree first, then EasyBuild's) is the one list the
+  `lmod` role registers; `LMOD_SITE_MODULEPATH` holds it last to first because Lmod's init
+  prepends each entry.
+- **Packages:** `easybuild_packages` (default empty) replaces the 2020 DeepOps recipe
+  repository (GCC 8.3.0, CUDA 10.2); `sm_files_*`, `sm_install_default`,
+  `sm_sources_path` and `sm_build_path` are retired. Only `slurm-master[0]` builds.
+
 ## Status
 
 Every item from the modernization brief is implemented, linted (yamllint 0;

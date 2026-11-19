@@ -1,7 +1,0 @@
-#
-# Build dependencies for the EasyBuild modules (RHEL family):
-#
----
-- name: "RHEL install"
-  ansible.builtin.debug:
-    msg: "No installs for RHEL"

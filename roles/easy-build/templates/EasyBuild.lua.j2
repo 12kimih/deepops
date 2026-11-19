@@ -1,0 +1,9 @@
+-- EasyBuild {{ easybuild_version }}, a root-owned venv (roles/easy-build).
+help([[EasyBuild {{ easybuild_version }}: build and install software as modules. https://docs.easybuild.io]])
+whatis("Description: EasyBuild {{ easybuild_version }}, a software build and installation framework")
+conflict("EasyBuild")
+local root = "{{ easybuild_venv }}"
+prepend_path("PATH", pathJoin(root, "bin"))
+setenv("EB_PYTHON", pathJoin(root, "bin", "python"))
+setenv("EBROOTEASYBUILD", root)
+setenv("EBVERSIONEASYBUILD", "{{ easybuild_version }}")

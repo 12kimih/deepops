@@ -1,0 +1,3 @@
+---
+# Derived, not a setting: one venv per EasyBuild version.
+easybuild_venv: "{{ sm_software_path }}/EasyBuild/{{ easybuild_version }}"

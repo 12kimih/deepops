@@ -1,2 +1,7 @@
 ---
-# Module paths (sm_prefix, sm_module_path, ...): roles/deepops_paths.
+# Module trees Lmod searches on every node, in order (LMOD_SITE_MODULEPATH): the shared
+# tree first, then EasyBuild's. Paths come from roles/deepops_paths; Lmod skips a tree
+# that does not exist yet.
+lmod_module_paths:
+  - "{{ sm_module_path }}"
+  - "{{ easybuild_module_path }}"
