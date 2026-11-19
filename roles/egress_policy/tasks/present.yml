@@ -1,4 +1,12 @@
 ---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: egress_policy
+    component_record_action: begin
+    component_record_items: "{{ egress_policy_items }}"
+
 # Without the internal networks every job's traffic between nodes would be limited.
 - name: Check the egress policy settings
   ansible.builtin.assert:
@@ -184,6 +192,11 @@
         daemon_reload: true
       when: not ansible_check_mode
 
-- name: Remove the metrics when they are off
-  ansible.builtin.include_tasks: metrics_absent.yml
-  when: not egress_policy_metrics
+# With the metrics off they are not in egress_policy_items, so the record removes them.
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: egress_policy
+    component_record_action: present
+    component_record_items: "{{ egress_policy_items }}"

@@ -17,6 +17,7 @@ import unittest
 from pathlib import Path
 
 import jinja2
+import jinja2.nativetypes
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,13 +43,18 @@ def render(role, name, host="n1", groups=None, **overrides):
     env.filters.update(networks.FilterModule().filters())
     env.filters["to_json"] = json.dumps
     env.filters["comment"] = lambda text: "# " + text
+    env.filters["regex_replace"] = lambda text, pattern, repl="": re.sub(pattern, repl, text)
     values = {**load(role), "ansible_managed": "managed", "node_exporter_prom_dir": "/run/prometheus"}
     values.update(inventory_hostname=host, groups=groups or {"slurm-login": ["login1"]})
     values.update(egress_policy_internal_networks=["192.0.2.0/24", "198.51.100.7", "2001:db8::/32"])
     values.update(overrides)
-    for key, value in values.items():  # role defaults that refer to other values
+    # Role defaults that refer to other values, typed as Ansible types them (a list stays
+    # a list).
+    native = jinja2.nativetypes.NativeEnvironment()
+    native.filters = env.filters
+    for key, value in values.items():
         if isinstance(value, str) and "{{" in value:
-            values[key] = env.from_string(value).render(**values)
+            values[key] = native.from_string(value).render(**values)
     return env.get_template(name).render(**values)
 
 

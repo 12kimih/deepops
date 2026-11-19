@@ -6,3 +6,19 @@ _egress_policy_metrics_command: /usr/local/libexec/egress-policy-metrics
 _egress_policy_metrics_config: /etc/cluster-tools/egress-policy-metrics.json
 _egress_policy_metrics_units: [egress-policy-metrics.service, egress-policy-metrics.timer]
 _egress_policy_textfile: egress-policy.prom
+
+# What the component installs, for its record (roles/component_record): the metrics
+# only while egress_policy_metrics is on, so turning them off removes them. nftables
+# ships with the OS and stays.
+_egress_policy_base_items:
+  - "unit:{{ _egress_policy_unit }}"
+  - "file:/etc/systemd/system/{{ _egress_policy_unit }}"
+  - "file:{{ _egress_policy_ruleset }}"
+  - "file:{{ egress_policy_ssh_client_file }}"
+_egress_policy_metrics_items: >-
+  {{ _egress_policy_metrics_units | map('regex_replace', '^', 'unit:') | list
+     + _egress_policy_metrics_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ _egress_policy_metrics_command, 'file:' ~ _egress_policy_metrics_config,
+        'file:' ~ egress_policy_metrics_textfile_dir ~ '/' ~ _egress_policy_textfile] }}
+egress_policy_items: >-
+  {{ _egress_policy_base_items + (_egress_policy_metrics_items if egress_policy_metrics else []) }}

@@ -1,13 +1,10 @@
 ---
-- name: Check the egress policy state
+- name: Check the component state
   ansible.builtin.assert:
-    that: egress_policy_state in ["present", "absent"]
-    fail_msg: "egress_policy_state must be present or absent, not {{ egress_policy_state }}"
+    that: egress_policy_state in ['present', 'absent', 'kept']
+    fail_msg: "egress_policy_state must be present, absent or kept, not {{ egress_policy_state }}."
+    quiet: true
 
-- name: Apply the egress policy
-  ansible.builtin.include_tasks: present.yml
-  when: egress_policy_state == "present"
-
-- name: Remove the egress policy
-  ansible.builtin.include_tasks: absent.yml
-  when: egress_policy_state == "absent"
+- name: "Make egress_policy {{ egress_policy_state }}"
+  ansible.builtin.include_tasks: "{{ egress_policy_state }}.yml"
+  when: egress_policy_state != 'kept'

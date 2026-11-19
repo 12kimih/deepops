@@ -62,6 +62,9 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_nfs_server }}", group: slurm-nfs}
       - {switch: "{{ k8s_deploy_nfs_server }}", group: kube_control_plane, first: true}
+  egress_policy:
+    rules:
+      - {switch: "{{ slurm_enable_egress_policy }}", group: slurm-cluster}
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-
