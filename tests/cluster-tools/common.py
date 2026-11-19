@@ -34,9 +34,11 @@ def running(job_id, qos, tres, user="user1", partition="a10-1", nodes="gpu1"):
 
 
 def run_tool(module, *args, env=None, path=True):
-    """Run a tool's main() in a fresh interpreter against the fake Slurm."""
+    """Run a tool's main() in a fresh interpreter against the fake Slurm. path=False
+    gives it no PATH at all: the host may well have Slurm in /usr/bin (any host with
+    the slurm-smd packages), so leaving the system directories in would find it."""
     e = {
-        "PATH": f"{HERE / 'bin'}:/usr/bin:/bin" if path else "/usr/bin:/bin",
+        "PATH": f"{HERE / 'bin'}:/usr/bin:/bin" if path else str(HERE / "no-commands"),
         "FIXTURES": str(FIXTURES),
         "LANG": "C.UTF-8",
         "COLUMNS": "120",
