@@ -1,0 +1,28 @@
+---
+# A Slurm compute node must be drained (or down) before a change that breaks its jobs:
+# a reboot, a driver switch. One Slurm does not know yet (a first deploy) has no jobs.
+#   maintenance_change        what is about to happen (named in the refusal)
+#   maintenance_undrained_ok  go ahead anyway (its jobs are lost or broken)
+- name: Read the node's Slurm state before {{ maintenance_change }}
+  ansible.builtin.command:
+    argv: ["{{ maintenance_slurm_bin }}/scontrol", show, node, -o, "{{ inventory_hostname }}"]
+  delegate_to: "{{ maintenance_slurm_controller }}"
+  register: maintenance_slurm_node
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when:
+    - inventory_hostname in groups[slurm_compute_group] | default([])
+    - maintenance_slurm_controller | length > 0
+    - not maintenance_undrained_ok | bool
+
+- name: Refuse on a node that takes jobs, before {{ maintenance_change }}
+  ansible.builtin.fail:
+    msg: >-
+      {{ inventory_hostname }} is not drained in Slurm
+      ({{ (maintenance_slurm_node.stdout ~ maintenance_slurm_node.stderr) | regex_search('State=\S+') or 'state unknown' }}),
+      and {{ maintenance_change }} would break its jobs. {{ maintenance_drain_hint }}
+  when:
+    - maintenance_slurm_node is not skipped
+    - maintenance_slurm_node.stdout is not search('State=\S*(DRAIN|DOWN)')
+    - (maintenance_slurm_node.stdout ~ maintenance_slurm_node.stderr) is not search('not found')

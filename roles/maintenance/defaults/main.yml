@@ -8,6 +8,9 @@
 #   reboot   reboot if the upgrade asks for it (or always), detaching NFS first;
 #            a Slurm compute node only once drained
 #   reboot_request  what a role calls instead of rebooting: marks the reboot pending
+#   require_drained what a role calls before a change that breaks running jobs
+#   role     run the role maintenance_role on the node (a driver switch, between drain
+#            and reboot)
 #   verify   the node is healthy again: slurmd, GPUs, DCGM diagnostics, NHC
 #   resume   return the node to Slurm, only if this run drained it
 #
@@ -33,6 +36,13 @@ maintenance_force_reboot: false
 maintenance_reboot_now: false
 # Reboot a Slurm compute node that still takes jobs (its running jobs are lost).
 maintenance_reboot_undrained: false
+# require_drained (set by its caller): the change, whether to go ahead undrained, and how
+# to do it properly.
+maintenance_change: this change
+maintenance_undrained_ok: false
+maintenance_drain_hint: ""
+# role: the role the step applies.
+maintenance_role: ""
 
 # RHEL family: dnf --nobest, upgrading what can be upgraded when the newest version of
 # a package cannot be installed (the DGX software guides ask for it).

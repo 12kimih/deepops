@@ -1,0 +1,8 @@
+---
+# A role's change made inside the maintenance window (between drain and reboot), for a
+# change that breaks running jobs: playbooks/nvidia-software/nvidia-driver.yml switches
+# driver branches this way.
+- name: Apply to the drained node the role {{ maintenance_role }}
+  ansible.builtin.include_role:
+    name: "{{ maintenance_role }}"
+    public: true
