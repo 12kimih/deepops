@@ -100,6 +100,10 @@
     - prolog
     - epilog
 
+- name: Check the node's GPUs against gres.conf
+  ansible.builtin.include_tasks: gres-check.yml
+  when: slurm_gres_conf_template | length > 0
+
 # The packaged unit reads SLURMD_OPTIONS from here. --conf-server: slurmd takes its
 # configuration from slurmctld (configless, https://slurm.schedmd.com/configless_slurm.html),
 # every controller in order.

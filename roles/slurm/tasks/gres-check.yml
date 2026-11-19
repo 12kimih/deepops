@@ -1,0 +1,57 @@
+---
+# The facts in a hand-maintained gres.conf must match the node: as many GPUs as it
+# lists, and every /dev/nvidiaN it names present. Site policy in it (Cores, the Type
+# names users request) is never compared. A GPU that died or moved shows up here,
+# before slurmd would mark the node INVALID; with AutoDetect Slurm checks it itself.
+- name: Read the GPU devices gres.conf gives this node
+  ansible.builtin.set_fact:
+    slurm_gres_expected: "{{ lookup('ansible.builtin.template', slurm_gres_conf_template) | slurm_gres_devices(inventory_hostname) }}"
+
+- name: Compare the node's GPUs with gres.conf
+  when: slurm_gres_expected is not none and slurm_gres_expected | length > 0
+  block:
+    # In a transient unit: an ssh session may not see the GPUs (DeviceAllow).
+    - name: Count the GPUs the driver answers for
+      ansible.builtin.command:
+        argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, nvidia-smi, --query-gpu=index, "--format=csv,noheader"]
+      register: slurm_gres_gpus
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only
+
+    - name: List the GPU device files
+      ansible.builtin.shell:
+        cmd: ls -1 /dev/nvidia[0-9]* 2>/dev/null || true
+      register: slurm_gres_files
+      changed_when: false
+      check_mode: false  # read-only
+
+    - name: Look for a pending reboot
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: slurm_gres_reboot
+
+    - name: Refuse a gres.conf the node's GPUs do not match
+      ansible.builtin.assert:
+        that:
+          - _present | sort == slurm_gres_expected
+          - slurm_gres_gpus.stdout_lines | select | list | length == slurm_gres_expected | length
+        fail_msg: >-
+          gres.conf gives {{ inventory_hostname }} {{ slurm_gres_expected | length }} GPUs
+          ({{ slurm_gres_expected | join(' ') }}); the node has
+          {{ slurm_gres_gpus.stdout_lines | select | list | length }} answering and the device files
+          {{ _present | join(' ') or 'none' }}. Fix gres.conf (and Gres= in slurm.conf) or the hardware.
+        quiet: true
+      vars:
+        _present: "{{ slurm_gres_files.stdout_lines | map('trim') | select | list }}"
+      when: slurm_gres_gpus.rc == 0
+
+    - name: Refuse when the driver does not answer
+      ansible.builtin.fail:
+        msg: "nvidia-smi fails on {{ inventory_hostname }}: {{ slurm_gres_gpus.stderr | default('') | trim }}"
+      when: slurm_gres_gpus.rc != 0 and not slurm_gres_reboot.stat.exists
+
+    - name: Say the comparison waits for the pending reboot
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: the driver does not answer and a reboot is pending; gres.conf is compared after it."
+      when: slurm_gres_gpus.rc != 0 and slurm_gres_reboot.stat.exists
