@@ -74,11 +74,12 @@
       check_mode: false  # read-only; --check needs the result
 
     # systemctl directly: the systemd module refuses a unit whose file went with the
-    # package, which is exactly this case.
+    # package, which is exactly this case. The script module runs under a terminal, so
+    # its output carries carriage returns and blank lines: only real lines count.
     - name: Stop the services still running a removed program
       ansible.builtin.command:
         argv: [systemctl, stop, "{{ item.split()[0] }}"]
       changed_when: true
-      loop: "{{ host_baseline_orphans.stdout_lines }}"
+      loop: "{{ host_baseline_orphans.stdout_lines | map('trim') | select | list }}"
       loop_control:
         label: "{{ item }}"
