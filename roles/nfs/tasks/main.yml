@@ -101,8 +101,9 @@
 
     # On RHEL the server lives in nfs-utils with the client, so only the service goes.
     - name: Remove the NFS server package and its exports (Debian)
-      ansible.builtin.apt:
-        name: nfs-kernel-server
-        state: absent
-        purge: true
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        host_baseline_absent_packages: [nfs-kernel-server]
       when: ansible_facts.os_family == 'Debian'

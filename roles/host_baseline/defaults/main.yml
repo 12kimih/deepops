@@ -5,7 +5,9 @@
 # hand and stopped using, so it ran for years unmanaged: a database and a file server
 # on a compute node, a web server on every node. This role removes the packages a site
 # declares absent. A --check run lists every package apt would remove with them
-# (reverse dependencies), so a preview shows the real change.
+# (reverse dependencies), so a preview shows the real change. Packages are purged and
+# any system service still running a removed program is stopped. Other roles remove
+# packages only through here (include_role: host_baseline, tasks_from: absent).
 #
 # Names may use apt wildcards ("mysql-server*"). Usually set per host role with an
 # expression on inventory groups, e.g. a database package absent everywhere but the

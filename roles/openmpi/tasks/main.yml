@@ -52,26 +52,13 @@
   with_items: "{{ openmpi_deps }}"
   when: ansible_facts.os_family == 'RedHat'
 
-- name: Remove openmpi packages
-  ansible.builtin.apt:
-    name: "{{ item }}"
-    state: absent
-  with_items:
-    - openmpi-bin
-    - openmpi-common
-    - libopenmpi-dev
-  when: ansible_facts.distribution == 'Ubuntu'
-  failed_when: false
-
-- name: Remove openmpi packages
-  ansible.builtin.dnf:
-    name: "{{ item }}"
-    state: absent
-  with_items:
-    - openmpi
-    - openmpi-devel
-  when: ansible_facts.os_family == 'RedHat'
-  failed_when: false
+# The distribution's Open MPI would shadow the build on PATH and the linker path.
+- name: Remove the distribution's Open MPI
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ openmpi_distro_packages[ansible_facts.os_family] }}"
 
 - name: Make openmpi build directory
   ansible.builtin.file:

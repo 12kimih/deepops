@@ -70,10 +70,11 @@
     - (nvidia_driver_rhel_package_resolved | trim) not in ansible_facts.packages
 
 - name: Purge pre-existing NVIDIA driver packages (RHEL/Rocky)
-  ansible.builtin.dnf:
-    name: "{{ nvidia_driver_existing_packages.stdout_lines }}"
-    state: absent
-    autoremove: true
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ nvidia_driver_existing_packages.stdout_lines }}"
   when:
     - nvidia_driver_purge_existing | bool
     - nvidia_driver_existing_packages.stdout_lines is defined

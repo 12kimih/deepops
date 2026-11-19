@@ -84,7 +84,7 @@ deepops_set_hostname: true
 ################################################################################
 # SOFTWARE                                                                     #
 ################################################################################
-# Extra software to install or remove
+# Extra software to install (removal: HOST BASELINE below)
 # Playbook: software
 #software_extra_packages:
 #  - curl
@@ -97,8 +97,6 @@ deepops_set_hostname: true
 #  - build-essential
 #  - linux-tools-generic
 #  - "{{ 'linux-headers-' + ansible_facts.kernel }}"
-#software_remove_packages:
-#  - popularity-contest
 
 
 ################################################################################

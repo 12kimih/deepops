@@ -36,9 +36,11 @@
 # Direct .deb installs conflict on a version change, so remove first when the
 # installed version differs from the target.
 - name: Ubuntu | remove existing enroot before a version change
-  ansible.builtin.apt:
-    name: "{{ enroot_packages }}"
-    state: absent
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ enroot_packages }}"
   when:
     - "'enroot' in ansible_facts.packages"
     - ansible_facts.packages['enroot'][0]['version'] != enroot_version_string

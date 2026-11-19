@@ -67,9 +67,11 @@
     dgx_redhat_driver_module_specs: "{{ dgx_redhat_driver_profiles | map('regex_replace', '^(.*)$', 'nvidia-driver:' ~ dgx_redhat_driver_stream ~ '/\\1') | list }}"
 
 - name: Remove precompiled NVIDIA kmod headers before DKMS driver install
-  ansible.builtin.dnf:
-    name: nvidia-kmod-headers
-    state: absent
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: [nvidia-kmod-headers]
   when:
     - dgx_redhat_install_driver
     - "'dkms' in dgx_redhat_driver_stream"
