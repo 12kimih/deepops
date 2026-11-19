@@ -1,6 +1,6 @@
 ---
 # Shared Slurm and DeepOps paths (commands, plugin dir, config dir, host groups, state
-# location, ClusterName): roles/slurm_paths and roles/deepops_paths.
+# location, ClusterName, the secret files): roles/slurm_paths and roles/deepops_paths.
 
 # Slurm comes as SchedMD's Debian packages (slurm-smd*), built once per version from
 # the checksummed release tarball with the debian/ directory it ships
@@ -26,14 +26,9 @@ slurm_upgrade_max_majors: 2
 # The apt repository: a flat, signed repository on storage every node mounts, written
 # only by the build host (slurm-master[0]) as root, so that host must be able to
 # (the NFS server, or a local disk exported to the nodes). apt checks its signature
-# against slurm_repo_signing_pubkey, so whoever can write the share cannot hand the
-# nodes a package.
+# against slurm_repo_signing_pubkey_file (roles/slurm_paths), so whoever can write the
+# share cannot hand the nodes a package.
 slurm_repo_dir: "{{ sm_prefix }}/.slurm-repo"
-# ASCII-armored OpenPGP secret key that signs the repository, needed on the build host
-# only (vault it); its public half is slurm_repo_signing_pubkey. Make the pair once
-# (docs/slurm-cluster/slurm-upgrade.md); replacing it is a deliberate step.
-slurm_repo_signing_key: ""
-slurm_repo_signing_pubkey: ""
 
 # The build: an unprivileged account unpacks and builds; root only installs the build
 # dependencies and publishes the result. Never under a world-writable directory.
@@ -99,13 +94,6 @@ slurm_sysconf_dir: /etc/sysconfig
 slurm_contain_ssh: true
 
 slurm_username: slurm
-# The MUNGE key every Slurm host shares, a file in the site config kept vault-encrypted
-# and copied verbatim. Create it with munge's own tool, or capture a running cluster's
-# (docs/slurm-cluster/munge-key.md), then `ansible-vault encrypt` it. Never derived from
-# a password: such a key is only as strong as the password, and the derivation followed
-# Ansible's hashing internals, so another Ansible could produce a different key.
-# https://github.com/dun/munge/wiki/Installation-Guide#creating-a-secret-key
-slurm_munge_key_file: "{{ inventory_dir }}/files/munge/munge.key"
 slurm_user_uid: 22078
 slurm_user_home: /local/slurm
 

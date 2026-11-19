@@ -32,7 +32,7 @@ Slurm daemon (the build passes `--no-start`): the role restarts them in Slurm's 
 
 The packages go into a flat apt repository in `slurm_repo_dir` (default
 `/sw/.slurm-repo`, on the shared software filesystem), signed with
-`slurm_repo_signing_key`. Every node trusts that key for that repository only
+the key in `slurm_repo_signing_key_file`. Every node trusts that key for that repository only
 (`signed-by`), installs exactly `slurm_deb_version`, and an apt pin keeps any upgrade
 (unattended, or `playbooks/utilities/apt-upgrade.yml`) from moving it. A signed
 repository rather than a trusted unsigned one: apt runs as root on every node, so
@@ -46,33 +46,33 @@ The nodes keep no copy of the configuration (configless): see the
 
 ## One-time settings
 
-In the site configuration; vault the secrets.
+In the site configuration.
 
 ### The MUNGE key
 
 The key every Slurm host shares is a vault-encrypted file in the site configuration,
-`slurm_munge_key_file`, copied verbatim; nothing derives or generates it. Capture a
-running cluster's key, or make a new one, as [munge-key.md](munge-key.md) says. Older
+`slurm_munge_key_file`, copied verbatim; nothing derives it from a password. The first
+play creates it when missing; capture a running cluster's key first, as
+[munge-key.md](munge-key.md) says. Older
 DeepOps derived the key from a password and `slurm_cluster_name`, so a rename changed
 the key on every host at once: deploy the key file before anything else below, and
 before any rename.
 
 ### The repository signing key
 
-Make the pair once, on a trusted machine:
+Two files in the site configuration: `slurm_repo_signing_key_file` (default
+`config/files/slurm/repo-signing.key`, the ASCII-armored secret key, vault-encrypted)
+and `slurm_repo_signing_pubkey_file` (`repo-signing.asc` beside it, the public key,
+plain). The first play (`playbooks/slurm-cluster/site-secrets.yml`, `roles/site_secrets`)
+creates the pair when both are missing: an ed25519 signing key without a passphrase and
+without expiry, made in a throwaway GnuPG home on the controller. It never replaces
+either file, and stops if only one of them exists. Commit both.
 
-```bash
-export GNUPGHOME=$(mktemp -d)
-gpg --batch --passphrase '' --quick-gen-key 'Slurm packages <root@localhost>' ed25519 sign never
-gpg --armor --export-secret-keys | ansible-vault encrypt_string --stdin-name slurm_repo_signing_key
-gpg --armor --export        # paste as slurm_repo_signing_pubkey (not secret)
-rm -rf "$GNUPGHOME"
-```
-
-The build checks its signature against `slurm_repo_signing_pubkey` before publishing,
-so a mismatched pair fails there and not on every node. Replacing the key is a
-deliberate step: set both, run `playbooks/slurm-cluster/slurm.yml` (the repository
-is signed again and every node gets the new public key).
+The build checks its signature against `slurm_repo_signing_pubkey_file` before
+publishing, so a mismatched pair fails there and not on every node. Replacing the key
+is a deliberate step: move both files away (or put your own pair there), run
+`playbooks/slurm-cluster/slurm.yml` (the repository is signed again and every node gets
+the new public key).
 
 ### Your own slurm.conf template
 

@@ -19,10 +19,11 @@
 
 # Slurm is installed from SchedMD's Debian packages, built on slurm-master[0] and
 # published to a signed apt repository on shared storage that host writes as root.
-# Make the key pair once (docs/slurm-cluster/slurm-upgrade.md); vault the secret key.
+# The MUNGE key and the repository key pair are files here, created vaulted by the
+# first play when missing (roles/site_secrets); commit them.
 #slurm_repo_dir: "{{ sm_prefix }}/.slurm-repo"
-#slurm_repo_signing_key: ""
-#slurm_repo_signing_pubkey: ""
+#slurm_repo_signing_key_file: "{{ inventory_dir }}/files/slurm/repo-signing.key"
+#slurm_repo_signing_pubkey_file: "{{ inventory_dir }}/files/slurm/repo-signing.asc"
 # The CUDA release whose NVML header the build uses (AutoDetect=nvml): the one the
 # driver branch serves.
 #slurm_nvml_cuda_version: '{{ nvidia_driver_cuda_release }}'

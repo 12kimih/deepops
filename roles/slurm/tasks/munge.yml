@@ -10,8 +10,8 @@
   ansible.builtin.assert:
     that: slurm_munge_key_file is file
     fail_msg: >-
-      {{ slurm_munge_key_file }} does not exist. Capture the running cluster's key, or
-      create one, and vault it: docs/slurm-cluster/munge-key.md.
+      {{ slurm_munge_key_file }} does not exist; the site_secrets play creates it, or
+      capture the running cluster's key: docs/slurm-cluster/munge-key.md.
     quiet: true
   run_once: true
   delegate_to: localhost

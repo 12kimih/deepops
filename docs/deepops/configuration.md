@@ -239,7 +239,8 @@ for this.
 
 Typical values that should be encrypted include:
 
-- `slurm_db_password` (the SlurmDBD database credential), and the MUNGE key file (`slurm_munge_key_file`, a vault-encrypted file: [the MUNGE key](../slurm-cluster/munge-key.md))
+- `slurm_db_password` (the SlurmDBD database credential)
+- The MUNGE key file (`slurm_munge_key_file`: [the MUNGE key](../slurm-cluster/munge-key.md)) and the Slurm repository signing key (`slurm_repo_signing_key_file`): vault-encrypted files the first play creates when missing (`roles/site_secrets`)
 - `grafana_cfg_pass` (Grafana admin password)
 - Container registry credentials (`docker_login_registries`, `standalone_container_registry_cache_username`/`password`)
 - Any BMC/IPMI credentials used for provisioning (`bmc_password`)

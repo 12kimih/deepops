@@ -7,9 +7,13 @@
 
 - name: Require the repository public key
   ansible.builtin.assert:
-    that: slurm_repo_signing_pubkey | length > 0
-    fail_msg: slurm_repo_signing_pubkey is empty; see docs/slurm-cluster/slurm-upgrade.md.
+    that: slurm_repo_signing_pubkey_file is file
+    fail_msg: >-
+      {{ slurm_repo_signing_pubkey_file }} does not exist; the site_secrets play creates
+      it (docs/slurm-cluster/slurm-upgrade.md).
     quiet: true
+  run_once: true
+  delegate_to: localhost
 
 - name: Create the apt keyring directory
   ansible.builtin.file:
@@ -21,8 +25,8 @@
 
 - name: Trust the repository key for this repository only
   ansible.builtin.copy:
+    src: "{{ slurm_repo_signing_pubkey_file }}"
     dest: /etc/apt/keyrings/deepops-slurm.asc
-    content: "{{ slurm_repo_signing_pubkey }}"
     owner: root
     group: root
     mode: "0644"

@@ -22,6 +22,29 @@ slurm_slurmctld_port: 6817
 nhc_install_dir: /usr
 nhc_program: "{{ nhc_install_dir }}/sbin/nhc"
 
+# The site's Slurm secrets, files in the site config. roles/site_secrets creates each
+# one that is missing (the first play of every playbook that deploys Slurm) and never
+# replaces one, so a running cluster keeps its keys; capturing a running cluster's MUNGE
+# key instead: docs/slurm-cluster/munge-key.md.
+# The MUNGE key every Slurm host shares, copied verbatim, vaulted: random bytes, never
+# derived from a password (only as strong as the password).
+# https://github.com/dun/munge/wiki/Installation-Guide#creating-a-secret-key
+slurm_munge_key_file: "{{ inventory_dir }}/files/munge/munge.key"
+# The OpenPGP key pair that signs the Slurm package repository, ASCII-armored: the secret
+# key (vaulted) is used on the build host only, the public key is what every node's apt
+# trusts. Replacing the pair is a deliberate step (docs/slurm-cluster/slurm-upgrade.md).
+slurm_repo_signing_key_file: "{{ inventory_dir }}/files/slurm/repo-signing.key"
+slurm_repo_signing_pubkey_file: "{{ inventory_dir }}/files/slurm/repo-signing.asc"
+# The declarations roles/site_secrets reads (its defaults say the format).
+slurm_site_secrets:
+  - path: "{{ slurm_munge_key_file }}"
+    kind: random
+    length: 1024
+  - path: "{{ slurm_repo_signing_key_file }}"
+    public_path: "{{ slurm_repo_signing_pubkey_file }}"
+    kind: gpg_signing
+    uid: "Slurm packages ({{ slurm_cluster_name }}) <root@localhost>"
+
 # The cluster's name (slurm.conf ClusterName, the accounting cluster), read by every role
 # that names the cluster (the Slurm config, accounting, the web portal's cluster file).
 # Renaming a running cluster is its own step: playbooks/slurm-cluster/slurm-cluster-rename.yml.

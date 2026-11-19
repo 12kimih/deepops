@@ -170,6 +170,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── rsyslog_server
 │   ├── runai
 │   ├── serial_console
+│   ├── site_secrets
 │   ├── slurm
 │   ├── slurm_backup
 │   ├── slurm_metrics

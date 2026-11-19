@@ -15,8 +15,8 @@ platforms:
 
 provisioner:
   name: ansible
-  # The package build needs slurm_repo_signing_key/pubkey and slurm_munge_key;
-  # supply test values here to run this scenario (it is not in CI).
+  # The package build needs the secret files of slurm_site_secrets (roles/slurm_paths);
+  # point their settings at test files here to run this scenario (it is not in CI).
   inventory:
     group_vars:
       all:
