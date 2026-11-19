@@ -15,6 +15,10 @@
 6. Nothing from the network is used unverified: every get_url carries a checksum, and
    an archive or a package is never taken straight from a URL (unarchive src, apt deb,
    dnf name). roles/download fetches with a required checksum, then unpacks.
+7. Facts are read through ansible_facts (`ansible_facts.services`,
+   `ansible_facts.distribution`), never as the variables Ansible also injects
+   (`services`, `ansible_distribution`): injection is deprecated and goes away, and a
+   condition on a name that is gone is simply never true.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -90,7 +94,43 @@ def template_path(path, src):
     return candidate if candidate.is_file() else None
 
 
+# Facts as injected variables: the fact modules' bare names, and gathered facts by
+# their ansible_ prefix. Magic variables (ansible_check_mode, ansible_host...) are not
+# facts and are not listed.
+INJECTED = re.compile(
+    r"(?<![\w.'\"\[-])(?<!filter=)(?:(?:in\s+|not\s+in\s+)(?:services|packages)\b|(?:services|packages)\["
+    r"|ansible_(?:distribution|os_family|kernel|architecture|processor|memtotal_mb|lsb|pkg_mgr"
+    r"|service_mgr|devices|mounts|interfaces|default_ipv[46]|all_ipv[46]_addresses|fqdn|hostname"
+    r"|nodename|machine_id|virtualization|system|python|date_time|env|local|product|bios|cmdline"
+    r"|selinux|apparmor|user_id|domain|dns|proc_cmdline|uptime_seconds|board)\w*)"
+)
+
+
+def fact_files():
+    for part in ("tasks", "handlers", "defaults", "vars"):
+        yield from (p for p in sorted(ROOT.glob(f"roles/*/{part}/**/*.yml")) if "galaxy" not in p.parts)
+    yield from (p for p in sorted(ROOT.glob("roles/*/templates/**/*.j2")) if "galaxy" not in p.parts)
+    yield from sorted(ROOT.glob("playbooks/**/*.yml"))
+
+
 class TaskRules(unittest.TestCase):
+    def test_facts_through_ansible_facts(self):
+        offenders = [
+            f"{path.relative_to(ROOT)}:{number}"
+            for path in fact_files()
+            for number, line in enumerate(path.read_text().splitlines(), 1)
+            if not line.lstrip().startswith("#") and INJECTED.search(line)
+        ]
+        self.assertEqual(offenders, [], "read these through ansible_facts")
+
+    def test_the_fact_rule_sees_injected_names(self):
+        for bad in ('when: ""x.service" in services"', "{{ ansible_distribution }}", "x: packages['a']"):
+            self.assertTrue(INJECTED.search(bad), bad)
+        for good in ("when: '\"x\" in ansible_facts.services'", "{{ ansible_facts.distribution }}",
+                     "ansible_check_mode", "ansible_facts['packages']", "Gather service facts",
+                     "ansible.builtin.setup: filter=ansible_local"):  # fmt: skip
+            self.assertFalse(INJECTED.search(good), good)
+
     def test_read_only_commands_run_under_check(self):
         offenders = [
             f"{path.relative_to(ROOT)}: {task.get('name')}"
