@@ -27,7 +27,7 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | grafana | `grafana_container` | `grafana/grafana:13.3.1@sha256:0615ec4fbd40` |  |
 | k8s-internal-container-registry | `container_registry_version` | `2.1.0` |  |
 | lmod | `lmod_version` | `9.4.5` |  |
-| mofed | `mofed_doca_version` | `3.3.0` |  |
+| mofed | `mofed_doca_version` | `3.2.3` |  |
 | netapp-trident | `trident_version` | `26.10.1` |  |
 | netapp-trident | `trident_helm_chart_version` | `100.2610.1` |  |
 | nfs-client-provisioner | `k8s_nfs_client_chart_version` | `4.0.18` |  |

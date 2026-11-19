@@ -1,10 +1,17 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Read the installed doca-ofed and the repository it came from
+      ansible.builtin.command:
+        argv: [apt-cache, policy, doca-ofed]
+      register: mofed_policy
+      changed_when: false
+
+    - name: Check the pinned LTS release from the signed DOCA repository
       ansible.builtin.assert:
-        that: true
+        that:
+          - mofed_policy.stdout is search('Installed. 3\.2\.3-')
+          - mofed_policy.stdout is search('linux\.mellanox\.com/public/repo/doca/3\.2\.3/ubuntu24\.04')
+        fail_msg: "{{ mofed_policy.stdout }}"

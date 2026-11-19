@@ -1,9 +1,0 @@
----
-mofed_pkg_prereqs:
-  - tcsh
-  - gcc-gfortran
-  - numactl-libs
-  - kernel-modules-extra
-  - tcl
-  - tk
-  - fuse-libs

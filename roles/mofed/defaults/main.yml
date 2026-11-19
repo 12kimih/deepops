@@ -1,31 +1,42 @@
 ---
-# DOCA-OFED is the successor to MLNX_OFED (the last standalone MLNX_OFED was the
-# 24.10 LTS, October 2024). It is installed from NVIDIA's DOCA network repository
-# and then `apt/dnf install doca-ofed` (the MLNX_OFED-equivalent driver/lib/tool
-# bundle: the same kernel drivers, user-space libraries and management tools).
-# Transition: https://docs.nvidia.com/doca/sdk/mlnx_ofed-to-doca-ofed-transition-guide/index.html
-# Host install: https://docs.nvidia.com/doca/sdk/doca-host-installation-and-upgrade/index.html
-#
-# VALIDATION REQUIRED: confirm the version and that mofed_repo_base_url resolves for
-# YOUR exact OS + adapter on https://developer.nvidia.com/doca-downloads before
-# running on RDMA/InfiniBand hardware. DOCA pins driver/firmware combinations per
-# release, and not every OS/arch is published for every DOCA version.
-# upstream: manual https://developer.nvidia.com/doca-downloads
-mofed_doca_version: "3.3.0"
+# DOCA-OFED (doca-ofed, the successor to MLNX_OFED) from NVIDIA's DOCA network
+# repository, as the DOCA-Host installation guide of the pinned release describes:
+# https://networking-docs.nvidia.com/doca/archive/3-2-3/doca-host-installation-and-upgrade
+# The pin follows the LTS branch (October 2025 LTS, supported through 2028), not the
+# newest feature release; its kernel modules are built by DKMS for the running kernel.
+# upstream: manual https://networking-docs.nvidia.com/software/lts-releases (the DOCA 3.2 LTS branch)
+mofed_doca_version: "3.2.3"
 
-# Repo distro id (ubuntu<ver> / rhel<major.minor>) and arch (x86_64 / arm64-sbsa).
+# The repository tree per OS: ubuntu<version>, or rhel<major> (DOCA no longer publishes
+# a tree per RHEL minor release; DKMS builds for the minor in use).
 mofed_repo_distro: >-
-  {{ ('ubuntu' ~ ansible_facts.distribution_version) if ansible_facts.distribution == 'Ubuntu'
-     else ('rhel' ~ ansible_facts.distribution_version) }}
+  {{ ('ubuntu' ~ ansible_facts.distribution_version) if ansible_facts.os_family == 'Debian'
+     else ('rhel' ~ ansible_facts.distribution_major_version) }}
 mofed_repo_arch: "{{ 'arm64-sbsa' if ansible_facts.architecture == 'aarch64' else 'x86_64' }}"
 mofed_repo_base_url: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_repo_distro | trim }}/{{ mofed_repo_arch }}"
-mofed_repo_gpg_key: "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
-# Checked on download (roles/download).
-mofed_repo_gpg_key_checksum: "sha256:e7dbe32100fadbf08da347c2448d5d05d810ba0144a349721372f13b6df86dd6"
 
-# Package to install. doca-ofed = OFED drivers/libs/tools (MLNX_OFED equivalent);
-# doca-all and doca-networking are larger supersets.
+# The repository signing key ("NVIDIA DOCA Host", replacing the Mellanox keys from DOCA
+# 3.2.2 on), per package format. Each is fetched with a fixed checksum and its
+# fingerprint checked before the package manager trusts it.
+mofed_repo_keys:
+  Debian:
+    url: https://linux.mellanox.com/public/repo/doca/public_keys/nvidia-doca-debian-gpg-public-key.gpg
+    checksum: "sha256:2367ec42f81ddf785040cc410b03d861d9eb2c75c35ff859d98ce4494944f4e0"
+    dest: /usr/share/keyrings/nvidia-doca.gpg
+  RedHat:
+    url: https://linux.mellanox.com/public/repo/doca/public_keys/nvidia-doca-rpm-gpg-public-key.asc
+    checksum: "sha256:833f5dd328f6170206ee6ea6df669d0aafecc9f947cbbb2af8c97571396dd976"
+    dest: /etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-doca
+mofed_repo_key_fingerprint: "70454E6BF5D9C2D3B78709E8DC726C5E41B9CC50"
+
+# The DOCA-Host profile to install. doca-ofed = OFED drivers/libs/tools (MLNX_OFED
+# equivalent); doca-all and doca-networking are larger supersets.
 mofed_package: "doca-ofed"
+
+# mlnx-fw-updater, the guide's last install step, flashes the adapters' firmware to the
+# version this DOCA release ships when it installs. Off: firmware is changed in a
+# maintenance window, deliberately.
+mofed_install_fw_updater: false
 
 # An install asks for a reboot to load the OFED kernel modules (roles/maintenance,
 # reboot_request); it does not reboot the node itself.
