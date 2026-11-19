@@ -105,7 +105,7 @@ class Playbooks(unittest.TestCase):
                 if not target:
                     continue
                 text = (ROOT / deploy).parent.joinpath(target).read_text()
-                for name in re.findall(r"deepops_components\.(\w+)", text):
+                for name in dict.fromkeys(re.findall(r"deepops_components\.(\w+)", text)):
                     imports.append((name, (play.get("vars") or {}).get("deepops_phase")))
             with self.subTest(deploy=deploy):
                 found = {name for name, _ in imports}
@@ -166,6 +166,20 @@ class Desired(unittest.TestCase):
         for wrong in (["typo"], ["plain"]):
             with self.subTest(removals=wrong), self.assertRaises(Exception):
                 want({**reg, "plain": {"rules": []}}, self.GROUPS, "n1", wrong)
+
+    def test_a_site_managed_component_is_left_alone_in_every_phase(self):
+        reg = {
+            "eng": {"rules": [], "removal": "explicit", "managed": "False"},
+            "app": {"rules": [{"switch": True, "group": "slurm-node"}], "needs": ["eng"]},
+        }
+        state = components.components_desired(reg, self.GROUPS, "n1")["eng"]
+        self.assertEqual(state, "unmanaged", "even where a present component needs it")
+        for phase in components.PHASES:
+            self.assertEqual(components.component_phase(state, phase), "kept", phase)
+
+    def test_require_installs_unless_the_site_manages_it(self):
+        self.assertEqual([components.component_phase(s, "require") for s in ("absent", "kept", "present")],
+                         ["present"] * 3)  # fmt: skip
 
     def test_phases(self):
         phase = components.component_phase

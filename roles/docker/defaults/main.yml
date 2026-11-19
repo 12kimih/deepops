@@ -1,4 +1,9 @@
 ---
+# present, absent or kept (do nothing) (docs/deepops/component-state.md). A deploy sets
+# it from deepops_components: present where a component that needs Docker is, kept
+# elsewhere (never removed unless named in deepops_component_removals), kept everywhere
+# with docker_install false (the site manages Docker).
+docker_state: present
 # Install Docker CE from Docker's official repository, following the official docs:
 #   Ubuntu: https://docs.docker.com/engine/install/ubuntu/
 #   Debian: https://docs.docker.com/engine/install/debian/

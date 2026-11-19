@@ -1,10 +1,10 @@
 ---
 # The exporter runs in a container on the GPU nodes; the driver is nvidia-driver.yml's
 # (run it first; slurm-cluster.yml does).
-# The removal phase installs nothing.
+# Run alone it brings the Docker it needs; a deploy imports Docker itself, before it.
 - name: Install docker
   import_playbook: ../container/docker.yml
-  when: deepops_phase != 'remove'
+  when: deepops_phase == 'converge'
 
 - name: Install the NVIDIA Container Toolkit
   import_playbook: ../container/nvidia-docker.yml
