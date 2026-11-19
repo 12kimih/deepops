@@ -258,7 +258,7 @@ Kibana is deployed as a ClusterIP service; the guide shows how to expose it thro
 
 ### Container Registry
 
-The default container registry hostname is `registry.local`. To set another hostname (for example, one that is resolvable outside the cluster), add `-e container_registry_hostname=registry.example.com`.
+The default container registry hostname is `registry.local`. To set another hostname (for example, one that is resolvable outside the cluster), set `container_registry_hostname: registry.example.com` in `config/group_vars/k8s_cluster.yml`.
 
 ```bash
 ansible-playbook --tags container-registry playbooks/k8s-cluster/container-registry.yml

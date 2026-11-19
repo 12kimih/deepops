@@ -33,11 +33,16 @@
   check_mode: false
 
 - name: Remove unused controller releases owned by this role
-  ansible.builtin.command: "{{ runai_helm }} uninstall {{ item.item }} --namespace {{ runai_gateway_controller_namespace }} --wait"
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ item.item }}"
+      namespace: "{{ runai_gateway_controller_namespace }}"
+      state: absent
   loop: "{{ runai_gw_owners.results }}"
-  register: runai_rm_kgw
-  changed_when: runai_rm_kgw.rc == 0
-  failed_when: runai_rm_kgw.rc != 0 and 'not found' not in runai_rm_kgw.stderr
+  loop_control:
+    label: "{{ item.item }}"
   when:
     - runai_gw_unused | bool
     - item.stdout | length > 0

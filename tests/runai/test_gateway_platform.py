@@ -71,7 +71,7 @@ class PlatformPath(unittest.TestCase):
                             "ansible_become": False,
                             "ansible_python_interpreter": sys.executable,
                             "runai_kubectl": str(HERE / "bin/kubectl"),
-                            "runai_helm": str(HERE / "bin/helm"),
+                            "helm_bin": str(HERE / "bin/helm"),
                             "runai_work_dir": str(self.state / "work"),
                             "runai_mode": "platform",
                             "runai_platform_exposure": "gateway",

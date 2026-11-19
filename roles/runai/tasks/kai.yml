@@ -3,7 +3,6 @@
   ansible.builtin.include_role:
     name: helm_release
   vars:
-    helm_bin: "{{ runai_helm }}"
     helm_release:
       release: "{{ runai_kai_release_name }}"
       namespace: "{{ runai_kai_namespace }}"

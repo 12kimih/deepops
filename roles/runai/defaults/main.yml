@@ -14,9 +14,7 @@ runai_mode: "off"
 # present installs/updates; absent removes everything this role installed.
 runai_state: "present"
 
-runai_helm: /usr/local/bin/helm
 runai_kubectl: kubectl
-runai_helm_timeout: "20m"
 # Require at least one node advertising nvidia.com/gpu before installing.
 runai_require_gpu: true
 runai_work_dir: "{{ deepops_dir }}/runai"

@@ -1,6 +1,9 @@
 ---
 # Where DeepOps puts things on a host, written once for every role that uses it.
 deepops_dir: /opt/deepops
+# The Helm client every role drives (roles/helm_release, roles/runai); Kubespray puts
+# it in its bin_dir, /usr/local/bin.
+helm_bin: /usr/local/bin/helm
 # Node-side home of a GPU power cap (roles/nvidia_power_limit). Its unit reads it as an
 # EnvironmentFile, so the number lives in one place on the node, and anything else that
 # changes a GPU's power limit reads the cap back instead of guessing: the Slurm

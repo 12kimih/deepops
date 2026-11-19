@@ -1,29 +1,21 @@
 ---
 # Removes only what this role installs. Leaves the GPU stack alone.
-- name: Remove the Run:ai cluster
-  ansible.builtin.command: "{{ runai_helm }} uninstall {{ runai_cluster_release_name }} --namespace {{ runai_cluster_namespace }} --wait --timeout {{ runai_helm_timeout }}"
-  register: runai_rm_cluster
-  changed_when: runai_rm_cluster.rc == 0
-  failed_when: runai_rm_cluster.rc != 0 and 'not found' not in runai_rm_cluster.stderr
-
-- name: Remove the Run:ai control plane
-  ansible.builtin.command: "{{ runai_helm }} uninstall {{ runai_cp_release_name }} --namespace {{ runai_cp_namespace }} --wait --timeout {{ runai_helm_timeout }}"
-  register: runai_rm_cp
-  changed_when: runai_rm_cp.rc == 0
-  failed_when: runai_rm_cp.rc != 0 and 'not found' not in runai_rm_cp.stderr
-
-- name: Remove KAI Scheduler
-  ansible.builtin.command: "{{ runai_helm }} uninstall {{ runai_kai_release_name }} --namespace {{ runai_kai_namespace }} --wait --timeout {{ runai_helm_timeout }}"
-  register: runai_rm_kai
-  changed_when: runai_rm_kai.rc == 0
-  failed_when: runai_rm_kai.rc != 0 and 'not found' not in runai_rm_kai.stderr
-
-- name: Remove the HAProxy ingress controller this role installed
-  ansible.builtin.command: "{{ runai_helm }} uninstall {{ runai_platform_ingress_release_name }} --namespace {{ runai_platform_ingress_namespace }} --wait"
-  register: runai_rm_ingress
-  changed_when: runai_rm_ingress.rc == 0
-  failed_when: runai_rm_ingress.rc != 0 and 'not found' not in runai_rm_ingress.stderr
-  when: runai_haproxy_managed | bool
+- name: Remove the Run:ai releases this role installed
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ item.release }}"
+      namespace: "{{ item.namespace }}"
+      state: absent
+  loop: >-
+    {{ [{'release': runai_cluster_release_name, 'namespace': runai_cluster_namespace},
+        {'release': runai_cp_release_name, 'namespace': runai_cp_namespace},
+        {'release': runai_kai_release_name, 'namespace': runai_kai_namespace}]
+       + ([{'release': runai_platform_ingress_release_name, 'namespace': runai_platform_ingress_namespace}]
+          if runai_haproxy_managed | bool else []) }}
+  loop_control:
+    label: "{{ item.release }}"
 
 - name: Remove the Gateway and what was installed for it
   ansible.builtin.include_tasks: gateway_remove.yml

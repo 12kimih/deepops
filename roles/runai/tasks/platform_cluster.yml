@@ -1,6 +1,6 @@
 ---
 - name: Check whether the Run:ai cluster is already installed
-  ansible.builtin.command: "{{ runai_helm }} list --namespace {{ runai_cluster_namespace }} --output json"
+  ansible.builtin.command: "{{ helm_bin }} list --namespace {{ runai_cluster_namespace }} --output json"
   register: runai_cluster_list
   changed_when: false
   check_mode: false
@@ -45,7 +45,6 @@
   ansible.builtin.include_role:
     name: helm_release
   vars:
-    helm_bin: "{{ runai_helm }}"
     helm_release:
       release: "{{ runai_cluster_release_name }}"
       namespace: "{{ runai_cluster_namespace }}"

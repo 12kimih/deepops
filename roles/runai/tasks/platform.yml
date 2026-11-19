@@ -27,7 +27,6 @@
   ansible.builtin.include_role:
     name: helm_release
   vars:
-    helm_bin: "{{ runai_helm }}"
     helm_release:
       release: "{{ runai_platform_ingress_release_name }}"
       namespace: "{{ runai_platform_ingress_namespace }}"
@@ -58,7 +57,6 @@
   ansible.builtin.include_role:
     name: helm_release
   vars:
-    helm_bin: "{{ runai_helm }}"
     helm_release:
       release: "{{ runai_cp_release_name }}"
       namespace: "{{ runai_cp_namespace }}"
