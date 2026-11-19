@@ -407,6 +407,20 @@ def check_doc_limits():
     return problems
 
 
+def check_retired():
+    """A config that still sets a retired setting stops every deploy at the
+    retired_settings role: the change that retires a setting fixes the configs too."""
+    gone, problems = retired(), []
+    for label, tree, _ in configs():
+        for src in settings.Config(tree).sources:
+            for e in src.entries:
+                if e.active and e.name in gone:
+                    problems.append(
+                        f"retired: {label}/{src.rel}:{e.line}: {e.name} is retired: set {gone[e.name]} instead"
+                    )
+    return problems
+
+
 def check_shadow():
     problems = []
     for label, tree, _ in configs():
@@ -440,6 +454,7 @@ CHECKS = {
     "doc-vars": check_doc_vars,
     "doc-limits": check_doc_limits,
     "shadow": check_shadow,
+    "retired": check_retired,
 }
 
 
