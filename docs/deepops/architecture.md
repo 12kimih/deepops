@@ -107,6 +107,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nginx-docker-registry-cache
 │   ├── nhc
 │   ├── nis_client
+│   ├── nis_defaults
 │   ├── nis_server
 │   ├── node_user_policy
 │   ├── nvidia-dcgm-exporter

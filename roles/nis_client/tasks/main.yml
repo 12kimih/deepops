@@ -63,7 +63,7 @@
     tasks_from: absent
   vars:
     host_baseline_absent_packages: >-
-      {{ ([] if nis_make_server | default(false) | bool else ['ypserv'])
+      {{ ([] if nis_make_server | bool else ['ypserv'])
       + nis_client_remove_caches }}
 
 - name: Make sure rpcbind is running

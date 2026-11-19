@@ -1,22 +1,24 @@
 """A set of files installed into a directory goes through roles/managed_dir.
 
-A copy or template looped over a glob, or a copy of a whole directory (src ending in
-"/"), only adds: a file dropped from the sources stays
-on the host, and in a prolog.d, a rule directory or a Python package it keeps running.
-The glob also reads the controller's working tree, so whatever lies there ships too
-(the clustertools package carried a __pycache__ this way). managed_dir installs the set
-and removes everything else. A directory the role does not own alone is the exception,
-listed here with the reason.
+A copy or template looped over a glob (with_fileglob, a fileglob or filetree lookup),
+or a copy of a whole directory (src ending in "/"), only adds: a file dropped from the
+sources stays on the host, and in a prolog.d, a rule directory or a Python package it
+keeps running. managed_dir installs the set and removes everything else. A directory
+others also write to records what it installed with roles/recorded_files instead: a
+file that includes that role (as a task, not a word in a comment) is fine. A directory
+the role does not own alone, and deliberately leaves alone, is listed with the reason.
 """
 
-from pathlib import Path
+import sys
 import unittest
-
-import yaml
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-INSTALLERS = ("ansible.builtin.copy", "ansible.builtin.template", "copy", "template")
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import Scan, ansible_files, module, tasks  # noqa: E402
 
+INSTALLERS = {"copy", "template", "synchronize"}
+GLOBS = ("fileglob", "filetree")
 # file -> why a glob install there must not remove what it did not install
 SHARED = {
     "roles/cluster_tools/tasks/main.yml": "cluster_tools_shared_dirs publish onto a shared filesystem "
@@ -24,48 +26,50 @@ SHARED = {
 }
 
 
-def tasks(data):
-    if not isinstance(data, list):
-        return
-    for task in data:
-        if not isinstance(task, dict):
-            continue
-        yield task
-        for key in ("block", "rescue", "always", "tasks", "pre_tasks", "post_tasks", "handlers"):
-            yield from tasks(task.get(key))
-
-
 def uses_recorded_files(path):
-    """A file whose installs into a shared directory end in recorded_files removes what
-    it dropped: the other right answer."""
-    return "recorded_files" in path.read_text()
+    return any(
+        module(t)[0] in ("include_role", "import_role") and module(t)[1].get("name") == "recorded_files"
+        for t in tasks(path)
+    )
 
 
 def globbed_installs(path):
-    for task in tasks(yaml.safe_load(path.read_text()) or []):
-        if not any(k in task for k in INSTALLERS):
+    for task in tasks(path):
+        name, args = module(task)
+        if name not in INSTALLERS:
             continue
-        loop = (
-            str(task.get("loop", "")) + str(task.get("with_items", "")) + str(task.get("with_fileglob", ""))
-        )
-        args = next((task[k] for k in INSTALLERS if isinstance(task.get(k), dict)), {})
-        if "with_fileglob" in task or "fileglob" in loop or str(args.get("src", "")).endswith("/"):
+        loop = " ".join(str(task.get(k, "")) for k in task if k == "loop" or k.startswith("with_"))
+        if any(k.startswith("with_file") for k in task) or any(g in loop for g in GLOBS):
+            yield task.get("name", "?")
+        elif str(args.get("src", "")).endswith("/"):
             yield task.get("name", "?")
 
 
 class ManagedDirTests(unittest.TestCase):
     def test_globbed_installs_go_through_managed_dir(self):
-        found = {}
-        for path in sorted(ROOT.glob("roles/*/tasks/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml")):
-            rel = str(path.relative_to(ROOT))
+        scan, found = Scan(SHARED, minimum=200), {}
+        for path in map(scan.seen, ansible_files()):
+            rel = path.relative_to(ROOT).as_posix()
             names = list(globbed_installs(path))
-            if names and rel not in SHARED and not uses_recorded_files(path):
+            if names and not scan.excuse(rel) and not uses_recorded_files(path):
                 found[rel] = names
         self.assertEqual(found, {}, "install these through roles/managed_dir (see its tasks/main.yml)")
+        scan.check(self)
 
-    def test_exceptions_still_exist(self):
-        for rel in SHARED:
-            self.assertTrue(list(globbed_installs(ROOT / rel)), f"{rel} no longer globs; drop it from SHARED")
+    def test_the_check_sees_each_form(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            sample = Path(d) / "t.yml"
+            sample.write_text(
+                "- name: a\n  copy: src={{ item }} dest=/x/\n  with_fileglob: ['*']\n"
+                "- name: b\n  ansible.legacy.template: {src: '{{ item.src }}', dest: /y}\n"
+                "  loop: \"{{ query('filetree', 't') }}\"\n"
+                "- name: c\n  copy: {src: files/, dest: /z/}\n"
+                "# recorded_files is only a word here\n"
+            )
+            self.assertEqual(list(globbed_installs(sample)), ["a", "b", "c"])
+            self.assertFalse(uses_recorded_files(sample))
 
 
 if __name__ == "__main__":
