@@ -34,64 +34,58 @@ func runCommand(name string, args ...string) (string, error) {
 	return string(out), nil
 }
 
-// ParseNodeStates aggregates `sinfo -h -o %T,%D` output into the dashboard's
-// node state gauges. State names may carry suffix flags (*, ~, #, $, @, +)
-// and long forms (allocated, drained); matching is by prefix category.
-func ParseNodeStates(input string) map[string]float64 {
-	states := map[string]float64{
-		"alloc": 0, "comp": 0, "down": 0, "drain": 0, "err": 0,
-		"fail": 0, "idle": 0, "maint": 0, "mix": 0,
-	}
-	for _, line := range strings.Split(input, "\n") {
-		parts := strings.Split(strings.TrimSpace(line), ",")
-		if len(parts) != 2 {
-			continue
-		}
-		state := strings.ToLower(strings.TrimRight(parts[0], "*~#$@+^-"))
-		count, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(state, "alloc"):
-			states["alloc"] += count
-		case strings.HasPrefix(state, "comp"):
-			states["comp"] += count
-		case strings.HasPrefix(state, "down"):
-			states["down"] += count
-		case strings.HasPrefix(state, "drain"):
-			states["drain"] += count
-		case strings.HasPrefix(state, "err"):
-			states["err"] += count
-		case strings.HasPrefix(state, "fail"):
-			states["fail"] += count
-		case strings.HasPrefix(state, "idle"):
-			states["idle"] += count
-		case strings.HasPrefix(state, "maint"):
-			states["maint"] += count
-		case strings.HasPrefix(state, "mix"):
-			states["mix"] += count
+// nodeState maps a Slurm node state (long or short, with its flag suffixes) to the
+// dashboard's node gauge category; one Slurm does not name here counts as "other",
+// so the categories always add up to the nodes there are.
+func nodeState(raw string) string {
+	state := strings.ToLower(strings.TrimRight(raw, "*~#$@+^-!%"))
+	for _, c := range []string{"alloc", "comp", "down", "drain", "err", "fail", "idle", "maint", "mix"} {
+		if strings.HasPrefix(state, c) {
+			return c
 		}
 	}
-	return states
+	return "other"
 }
 
-// ParseCPUs parses `sinfo -h -o %C` (allocated/idle/other/total).
-func ParseCPUs(input string) (map[string]float64, error) {
-	fields := strings.Split(strings.TrimSpace(input), "/")
-	if len(fields) != 4 {
-		return nil, fmt.Errorf("unexpected %%C output: %q", strings.TrimSpace(input))
+// ParseNodes reads `sinfo -h -N -o %N|%T|%C`: a line per node and partition. A node in
+// several partitions is listed once for each, so it is counted once, by name; the
+// partition-grouped forms (-o %T,%D or %C without -N) count it once per partition or
+// print one line per partition.
+func ParseNodes(input string) (map[string]float64, map[string]float64, error) {
+	states := map[string]float64{
+		"alloc": 0, "comp": 0, "down": 0, "drain": 0, "err": 0,
+		"fail": 0, "idle": 0, "maint": 0, "mix": 0, "other": 0,
 	}
 	keys := []string{"alloc", "idle", "other", "total"}
-	cpus := map[string]float64{}
-	for i, k := range keys {
-		v, err := strconv.ParseFloat(fields[i], 64)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected %%C field %q: %w", fields[i], err)
+	cpus := map[string]float64{"alloc": 0, "idle": 0, "other": 0, "total": 0}
+	seen := map[string]bool{}
+	for _, line := range strings.Split(input, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
 		}
-		cpus[k] = v
+		parts := strings.Split(line, "|")
+		if len(parts) != 3 {
+			return nil, nil, fmt.Errorf("unexpected sinfo line: %q", line)
+		}
+		if seen[parts[0]] {
+			continue
+		}
+		seen[parts[0]] = true
+		states[nodeState(parts[1])]++
+		fields := strings.Split(parts[2], "/")
+		if len(fields) != 4 {
+			return nil, nil, fmt.Errorf("unexpected %%C for %s: %q", parts[0], parts[2])
+		}
+		for i, k := range keys {
+			v, err := strconv.ParseFloat(fields[i], 64)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unexpected %%C field %q: %w", fields[i], err)
+			}
+			cpus[k] += v
+		}
 	}
-	return cpus, nil
+	return states, cpus, nil
 }
 
 // ParseQueueStates counts `squeue -a -r -h -o %T --states=all` job states
@@ -207,22 +201,16 @@ func collect() string {
 	m := &metricsBuilder{}
 	errors := 0
 
-	if out, err := runCommand("sinfo", "-h", "-o", "%T,%D"); err == nil {
-		m.gaugeSet("slurm_nodes_", "Count of nodes by state", ParseNodeStates(out))
-	} else {
-		log.Printf("node collector: %v", err)
-		errors++
-	}
-
-	if out, err := runCommand("sinfo", "-h", "-o", "%C"); err == nil {
-		if cpus, perr := ParseCPUs(out); perr == nil {
+	if out, err := runCommand("sinfo", "-h", "-N", "-o", "%N|%T|%C"); err == nil {
+		if states, cpus, perr := ParseNodes(out); perr == nil {
+			m.gaugeSet("slurm_nodes_", "Count of nodes by state", states)
 			m.gaugeSet("slurm_cpus_", "Aggregate CPUs by allocation state", cpus)
 		} else {
-			log.Printf("cpu collector: %v", perr)
+			log.Printf("node collector: %v", perr)
 			errors++
 		}
 	} else {
-		log.Printf("cpu collector: %v", err)
+		log.Printf("node collector: %v", err)
 		errors++
 	}
 

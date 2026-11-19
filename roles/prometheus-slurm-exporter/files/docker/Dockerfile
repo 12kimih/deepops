@@ -11,7 +11,9 @@ ARG SLURM_EXPORTER_BUILD_IMAGE=golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7
 
 FROM ${SLURM_EXPORTER_BUILD_IMAGE} AS build
 COPY exporter/ /src/
-RUN cd /src && CGO_ENABLED=0 go build -buildvcs=false -o /deepops-slurm-exporter .
+# Tested before it is built: an image never carries a parser its own tests reject.
+RUN cd /src && go vet ./... && go test ./... \
+    && CGO_ENABLED=0 go build -buildvcs=false -o /deepops-slurm-exporter .
 
 FROM ${SLURM_EXPORTER_BASE_IMAGE}
 # The slurm system user must resolve inside the container or the mounted

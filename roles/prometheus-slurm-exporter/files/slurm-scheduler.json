@@ -88,7 +88,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_nodes_alloc) + max(slurm_nodes_mix) + max(slurm_nodes_idle) + max(slurm_nodes_comp) + max(slurm_nodes_drain) + max(slurm_nodes_maint) + max(slurm_nodes_down) + max(slurm_nodes_fail) + max(slurm_nodes_err)",
+          "expr": "max(slurm_nodes_alloc) + max(slurm_nodes_mix) + max(slurm_nodes_idle) + max(slurm_nodes_comp) + max(slurm_nodes_drain) + max(slurm_nodes_maint) + max(slurm_nodes_down) + max(slurm_nodes_fail) + max(slurm_nodes_err) + max(slurm_nodes_other)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -587,6 +587,21 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
           }
         ]
       },
@@ -688,6 +703,15 @@
             "uid": "${datasource}"
           },
           "refId": "I"
+        },
+        {
+          "expr": "max(slurm_nodes_other)",
+          "legendFormat": "other",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "J"
         }
       ],
       "gridPos": {
