@@ -13,10 +13,7 @@
 # Required (shared with nis_client): the NIS domain this server is master for.
 # nis_domain: example.nis
 
-# Designate THIS host as the NIS master. Set true for the server node only, e.g. in
-# group_vars/nis-master.yml (the [nis-master] inventory group) or that host's
-# host_vars. Default false so the role is a no-op everywhere else.
-nis_make_server: false
+# nis_make_server (is this host the NIS master?) comes from roles/nis_defaults.
 
 # /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client
 # networks may query this server, as "NETMASK NETWORK" lines. The default allows

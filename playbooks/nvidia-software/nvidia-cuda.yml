@@ -9,5 +9,5 @@
     - name: Install the NVIDIA CUDA toolkit
       ansible.builtin.include_role:
         name: nvidia_cuda
-      when: nvidia_cuda_install | default(true) | bool
+      when: nvidia_cuda_install | default(false) | bool
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
