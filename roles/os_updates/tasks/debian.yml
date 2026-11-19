@@ -119,6 +119,7 @@
 
             [Service]
             Type=oneshot
+            TimeoutStartSec=15min
             ExecStart=/usr/local/sbin/os-updates-metrics {{ os_updates_metrics_textfile_dir }}
             Nice=10
           # The textfile directory is usually tmpfs: republish the kept metrics at
@@ -131,6 +132,7 @@
 
             [Service]
             Type=oneshot
+            TimeoutStartSec=1min
             ExecStart=/usr/local/sbin/os-updates-metrics --publish {{ os_updates_metrics_textfile_dir }}
 
             [Install]

@@ -4,6 +4,8 @@ Description=Write Slurm GPU allocation for node_exporter
 
 [Service]
 Type=oneshot
+# A oneshot has no start timeout by default; one hang would stop its timer for good.
+TimeoutStartSec=50
 # The directory may sit on /run, which is empty after a boot.
 ExecStartPre=/usr/bin/install -d -m 0755 {{ slurm_metrics_textfile_dir }}
 ExecStart={{ slurm_metrics_command }} {{ slurm_metrics_textfile_dir }}/{{ slurm_metrics_textfile }}

@@ -21,6 +21,7 @@
 
           [Service]
           Type=oneshot
+          TimeoutStartSec=2min
           ExecStart=/bin/bash -c "for dev in $$(lspci -d '*:*:*' | awk '{print $$1}'); do setpci -v -s $$dev ECAP_ACS+0x6.w=0000 >/dev/null 2>&1 || true; done"
           RemainAfterExit=yes
 
