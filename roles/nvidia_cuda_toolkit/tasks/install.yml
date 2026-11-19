@@ -57,36 +57,43 @@
   ansible.builtin.set_fact:
     cuda_to_install: "{{ cuda_nvcc_pre.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
 
-- name: Download the CUDA runfiles
-  ansible.builtin.include_role:
-    name: download
-  vars:
-    download_url: "{{ cuda_base_url }}/{{ item.version }}/local_installers/{{ item.runfile }}"
-    download_checksum: "{{ item.checksum }}"
-    download_dest: "{{ cuda_cache_dir }}/{{ item.runfile }}"
-  loop: "{{ cuda_to_install }}"
-  loop_control:
-    label: "{{ item.version }}"
+# Run as root, the runfile also writes host-wide files named per component, not per
+# version (/usr/local/cuda, /etc/ld.so.conf.d/cuda-X-Y.conf, /usr/lib/pkgconfig/*.pc,
+# nsight .desktop files) and records them as owned in /var/log/nvidia/.uninstallManifests.
+# Toolkits side by side overwrite each other's, the host linker resolves CUDA libraries
+# outside any module, and the 13.5+ installer aborts when a file another toolkit's
+# manifest owns has changed ("installed shared generated output changed"). Every
+# --installpath/--toolkitpath combination writes them, so they are removed before and
+# after the installs: a toolkit here is reached only through its module.
+- name: Remove the host-wide files earlier installs left
+  ansible.builtin.include_tasks: system_files.yml
+  when: cuda_to_install | length > 0
 
-# Official runfile options (CUDA Installation Guide, Advanced Options):
-#   --silent       non-interactive
-#   --toolkit      install the CUDA Toolkit only (no driver -- host driver safe)
-#   --toolkitpath  per-version install location
-#   --override     ignore compiler/toolkit detection checks (newer host gcc)
-#   --no-man-page  skip man pages
-#   --tmpdir       scratch dir (in case /tmp is small)
-- name: Install the CUDA toolkits (toolkit only -- driver untouched)
-  ansible.builtin.command:
-    cmd: >-
-      sh {{ cuda_cache_dir }}/{{ item.runfile }}
-      --silent --toolkit
-      --toolkitpath={{ cuda_install_root }}/{{ item.version }}
-      --override --no-man-page
-      --tmpdir={{ cuda_cache_dir }}/tmp
-    creates: "{{ cuda_install_root }}/{{ item.version }}/bin/nvcc"
+# One toolkit at a time (space check, download, install, drop the runfile): the peak is
+# one runfile and its unpacked copy, not the whole catalog, on a disk the host shares.
+- name: Install each missing toolkit
+  ansible.builtin.include_tasks: install_one.yml
   loop: "{{ cuda_to_install }}"
   loop_control:
-    label: "{{ item.version }}"
+    loop_var: cuda_toolkit
+    label: "{{ cuda_toolkit.version }}"
+
+- name: Remove the host-wide files the installs wrote
+  ansible.builtin.include_tasks: system_files.yml
+
+# A runfile is needed only until its toolkit is installed (a failed install keeps its
+# own for the rerun, which stops before this task).
+- name: Find the cached runfiles
+  ansible.builtin.find:
+    paths: "{{ cuda_cache_dir }}"
+    patterns: "*.run"
+  register: cuda_cached_runfiles
+
+- name: Remove the cached runfiles
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cuda_cached_runfiles.files | map(attribute='path') | list }}"
 
 # Named by minor: a patch release changes what cuda/12.4 points at, never the name a
 # job script loads.
