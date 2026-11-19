@@ -345,7 +345,7 @@ guard_case() {
         no "$label" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
     elif [ ! -e "$dir/roots/tmp/scratch" ]; then
         no "$label" "the guard did not stop the deletion: the fixture file is gone"
-    elif [ -n "$expect" ] && ! printf '%s' "$out" | grep -q "$expect"; then
+    elif [ -n "$expect" ] && ! grep -q "$expect" <<<"$out"; then
         no "$label" "expected the log to mention '$expect'; out=$(printf '%s' "$out" | tail -1)"
     else
         ok "$label"
@@ -373,7 +373,7 @@ else
     own_file "$identity" "$dir/roots/tmp/scratch"
     out=$(PATH="$dir/bin:$PATH" SLURM_JOB_USER=nosuchuser-$$ "$dir/42-cleanup" 2>&1); rc=$?
     if [ "$rc" = 0 ] && [ -e "$dir/roots/tmp/scratch" ] \
-       && printf '%s' "$out" | grep -q 'cannot resolve'; then
+       && grep -q 'cannot resolve' <<<"$out"; then
         ok "an unresolvable owner stops the cleanup"
     else
         no "an unresolvable owner stops the cleanup" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
@@ -389,7 +389,7 @@ else
     own_file "$identity" "$dir/roots/tmp/scratch"
     out=$(PATH="$dir/bin:$PATH" SLURM_JOB_USER=root "$dir/42-cleanup" 2>&1); rc=$?
     if [ "$rc" = 0 ] && [ -e "$dir/roots/tmp/scratch" ] \
-       && ! printf '%s' "$out" | grep -q 'Removed residual'; then
+       && ! grep -q 'Removed residual' <<<"$out"; then
         ok "root is left alone"
     else
         no "root is left alone" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
@@ -703,7 +703,7 @@ else
     out=$(PATH="$dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 \
           HOSTNAME=node1 SLURM_JOBID=1000 SQUEUE_JOBS="" SQUEUE_RC=0 \
           "$dir/run-parts.sh" "$dir/parts" 2>&1); rc=$?
-    if [ "$rc" = 0 ] && [ ! -e "$dir/RAN" ] && printf '%s' "$out" | grep -q 'cannot load'; then
+    if [ "$rc" = 0 ] && [ ! -e "$dir/RAN" ] && grep -q 'cannot load' <<<"$out"; then
         ok "a missing helper library fails closed"
     else
         no "a missing helper library fails closed" "rc=$rc ran=$([ -e "$dir/RAN" ] && echo yes || echo no) out=$(printf '%s' "$out" | tail -1)"
@@ -720,7 +720,7 @@ else
     out=$(PATH="$dir/bin:$PATH" SLURM_JOB_USER="nosuchuser-$$" SLURM_JOB_UID="" SLURM_JOB_ID=1000 \
           HOSTNAME=node1 SLURM_JOBID=1000 SQUEUE_JOBS="" SQUEUE_RC=0 \
           "$dir/run-parts.sh" "$dir/parts" 2>&1); rc=$?
-    if [ "$rc" = 0 ] && [ ! -e "$dir/RAN" ] && printf '%s' "$out" | grep -q 'no numeric uid'; then
+    if [ "$rc" = 0 ] && [ ! -e "$dir/RAN" ] && grep -q 'no numeric uid' <<<"$out"; then
         ok "no resolvable uid fails closed"
     else
         no "no resolvable uid fails closed" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
@@ -815,7 +815,7 @@ else
     rm -f "$vanished_quiet_dir/proc/3012/cgroup"
     out=$(PATH="$vanished_quiet_dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 \
           EPILOG_LAST_USER_JOB=1 "$vanished_quiet_dir/40-processes" 2>&1)
-    if ! printf '%s' "$out" | grep -qi 'no such file\|line [0-9]*:'; then
+    if ! grep -qi 'no such file\|line [0-9]*:' <<<"$out"; then
         ok "a vanished process produces no shell error output"
     else
         no "a vanished process produces no shell error output" "$(printf '%s' "$out" | head -2 | tr '\n' ' ')"
@@ -871,7 +871,7 @@ else
     rm -f "$lookup_dir/etc/localusers.backup"
     out=$(PATH="$lookup_dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 \
           EPILOG_LAST_USER_JOB=1 "$lookup_dir/40-processes" 2>&1); rc=$?
-    if [ "$rc" = 0 ] && [ ! -s "$lookup_dir/kill.log" ] && printf '%s' "$out" | grep -q 'localusers lookup failed'; then
+    if [ "$rc" = 0 ] && [ ! -s "$lookup_dir/kill.log" ] && grep -q 'localusers lookup failed' <<<"$out"; then
         ok "an unreadable localusers.backup stops the process cleanup"
     else
         no "an unreadable localusers.backup stops the process cleanup" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
@@ -928,7 +928,7 @@ else
             no "$label" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
         elif [ "$state" != "$expect" ]; then
             no "$label" "file is $state, wanted $expect"
-        elif [ "$expect" = kept ] && ! printf '%s' "$out" | grep -q 'job_container/tmpfs is configured'; then
+        elif [ "$expect" = kept ] && ! grep -q 'job_container/tmpfs is configured' <<<"$out"; then
             no "$label" "skipped without logging why: $(printf '%s' "$out" | tail -1)"
         else
             ok "$label"

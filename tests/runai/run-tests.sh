@@ -22,7 +22,7 @@ changed() { echo "$out" | awk '/PLAY RECAP/{f=1} f && /localhost/' | grep -o 'ch
 
 # 1. off by default: nothing is installed
 STATE=""; run off
-[ $rc -eq 0 ] && [ ! -s "$STATE/calls.log" ] && echo "$out" | grep -q "runai_mode is off" && pass "off is a no-op" || bad "off is a no-op"
+[ $rc -eq 0 ] && [ ! -s "$STATE/calls.log" ] && grep -q "runai_mode is off" <<<"$out" && pass "off is a no-op" || bad "off is a no-op"
 unset STATE
 
 # 2. bad mode is refused
@@ -50,27 +50,27 @@ unset STATE
 # 4. kai refuses to run beside the Run:ai cluster chart (two KAIs)
 export FAKE_STATE="$(mktemp -d)"; echo '{"runai/runai-cluster":{"ns":"runai","chart":"runai-cluster-3.0.20","values":{}}}' > "$FAKE_STATE/releases.json"
 STATE="$FAKE_STATE"; run two -e runai_mode=kai
-[ $rc -ne 0 ] && echo "$out" | grep -q "ships its own KAI" && pass "kai refused beside runai-cluster" || bad "two-KAI guard (kai)"
+[ $rc -ne 0 ] && grep -q "ships its own KAI" <<<"$out" && pass "kai refused beside runai-cluster" || bad "two-KAI guard (kai)"
 unset STATE
 
 # 5. platform refuses when standalone KAI is present
 export FAKE_STATE="$(mktemp -d)"; echo '{"kai-scheduler/kai-scheduler":{"ns":"kai-scheduler","chart":"kai-scheduler-v0.18.5","values":{}}}' > "$FAKE_STATE/releases.json"
 STATE="$FAKE_STATE"; run two2 -e runai_mode=platform -e runai_platform_domain=runai.lab.test -e 'runai_platform_admin_password=Passw0rd!x'
-[ $rc -ne 0 ] && echo "$out" | grep -q "standalone KAI" && pass "platform refused beside standalone KAI" || bad "two-KAI guard (platform)"
+[ $rc -ne 0 ] && grep -q "standalone KAI" <<<"$out" && pass "platform refused beside standalone KAI" || bad "two-KAI guard (platform)"
 unset STATE
 
 # 6. no GPUs: refused with a pointer
 STATE=""; FAKE_GPUS=0 run nogpu -e runai_mode=kai
-[ $rc -ne 0 ] && echo "$out" | grep -q "No node advertises nvidia.com/gpu" && pass "no GPUs refused" || bad "no GPUs refused"
+[ $rc -ne 0 ] && grep -q "No node advertises nvidia.com/gpu" <<<"$out" && pass "no GPUs refused" || bad "no GPUs refused"
 unset STATE
 
 # 7. fractioning refused on the default driver, and on an old operator
 STATE=""; FAKE_DRIVER_MAJOR=580 run frac -e runai_mode=kai -e runai_kai_gpu_fractioning=true
-[ $rc -ne 0 ] && echo "$out" | grep -q "GPU Operator" && pass "fractioning refused without GPU Operator v26.7.1" || bad "fractioning operator guard"
+[ $rc -ne 0 ] && grep -q "GPU Operator" <<<"$out" && pass "fractioning refused without GPU Operator v26.7.1" || bad "fractioning operator guard"
 unset STATE
 export FAKE_STATE="$(mktemp -d)"; echo '{"gpu-operator/nvidia-gpu-operator":{"ns":"gpu-operator","chart":"gpu-operator-v26.7.1","values":{}}}' > "$FAKE_STATE/releases.json"
 STATE="$FAKE_STATE"; FAKE_DRIVER_MAJOR=580 run frac2 -e runai_mode=kai -e runai_kai_gpu_fractioning=true
-[ $rc -ne 0 ] && echo "$out" | grep -q "r615" && pass "fractioning refused on driver r580" || bad "fractioning driver guard"
+[ $rc -ne 0 ] && grep -q "r615" <<<"$out" && pass "fractioning refused on driver r580" || bad "fractioning driver guard"
 FAKE_DRIVER_MAJOR=615 run frac3 -e runai_mode=kai -e runai_kai_gpu_fractioning=true
 [ $rc -eq 0 ] && pass "fractioning accepted with v26.7.1 + r615" || bad "fractioning accepted ($rc)"
 python3 - "$STATE" <<'P' && pass "fractioning sets NvFractions" || bad "fractioning values"
@@ -91,10 +91,10 @@ unset STATE
 
 # 9. platform input checks (no secrets needed to see them fail)
 STATE=""; run p1 -e runai_mode=platform
-[ $rc -ne 0 ] && echo "$out" | grep -q "runai_platform_domain" && pass "platform needs a domain" || bad "platform domain check"
+[ $rc -ne 0 ] && grep -q "runai_platform_domain" <<<"$out" && pass "platform needs a domain" || bad "platform domain check"
 run p2 -e runai_mode=platform -e runai_platform_domain=runai.lab.test -e runai_platform_admin_password=weak
 [ $rc -ne 0 ] && pass "platform refuses a weak admin login" || bad "weak login"
-echo "$out" | grep -q "weak" && bad "login value leaked into output" || pass "login value not printed"
+grep -q "weak" <<<"$out" && bad "login value leaked into output" || pass "login value not printed"
 unset STATE
 
 # 10. exposure: address selection and Gateway API (fake helm/kubectl)
@@ -109,7 +109,7 @@ STATE=""; gw lb -e runai_platform_exposure=ingress
 [ "$(jq_ "d['cp']['global'].get('gatewayAPI')")" = "None" ] && pass "ingress exposure leaves Gateway API values out" || bad "ingress values"
 unset STATE
 STATE=""; FAKE_LB_IP=none gw lb2 -e runai_platform_exposure=ingress
-[ $rc -ne 0 ] && echo "$out" | grep -q "No external address" && pass "no LoadBalancer address stops with an explanation" || bad "LB timeout"
+[ $rc -ne 0 ] && grep -q "No external address" <<<"$out" && pass "no LoadBalancer address stops with an explanation" || bad "LB timeout"
 unset STATE
 STATE=""; gw np -e runai_platform_exposure=ingress -e runai_platform_ingress_service_type=NodePort
 [ $rc -eq 0 ] && [ "$(jq_ "d['address']")" = "192.0.2.10" ] && pass "NodePort keeps the node address" || bad "NodePort address"
