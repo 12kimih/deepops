@@ -72,3 +72,37 @@
         post_reboot_delay: 15
         reboot_timeout: "{{ maintenance_reboot_timeout }}"
         connect_timeout: 5
+      when: maintenance_reboot_method == 'os'
+
+    # A host whose hardware comes back whole only from a cold start (devices that drop
+    # off the bus on a warm reboot) is power-cycled through its BMC instead.
+    - name: Power-cycle the host through its BMC
+      when: maintenance_reboot_method == 'bmc_cycle'
+      block:
+        - name: Read the boot before the power cycle
+          ansible.builtin.slurp:
+            src: /proc/sys/kernel/random/boot_id
+          register: maintenance_boot_before
+
+        - name: Cycle the chassis power
+          ansible.builtin.include_role:
+            name: bmc
+            tasks_from: chassis
+          vars:
+            bmc_power_action: cycle
+
+        - name: Wait for the host to come back
+          ansible.builtin.wait_for_connection:
+            delay: 60
+            timeout: "{{ maintenance_reboot_timeout }}"
+
+        - name: Read the boot after the power cycle
+          ansible.builtin.slurp:
+            src: /proc/sys/kernel/random/boot_id
+          register: maintenance_boot_after
+
+        - name: Require that the host really booted again
+          ansible.builtin.assert:
+            that: maintenance_boot_after.content != maintenance_boot_before.content
+            fail_msg: "{{ inventory_hostname }} answers with the same boot as before the power cycle."
+            quiet: true
