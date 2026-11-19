@@ -7,8 +7,16 @@
 - name: Check the package database (Debian)
   when: ansible_facts.os_family == 'Debian'
   block:
+    # fuser (psmisc) tells whether something holds dpkg's lock. Ubuntu servers ship it,
+    # minimal images do not: install it first (apt itself waits for the lock).
+    - name: Install fuser
+      ansible.builtin.apt:
+        name: psmisc
+        state: present
+        lock_timeout: 600
+
     # fuser exits 1 when nothing holds the lock, 0 while something does; anything else
-    # (127: psmisc missing) is an error, not a free lock.
+    # is an error, not a free lock.
     - name: Wait for any running apt or dpkg to finish
       ansible.builtin.command:
         argv: [fuser, /var/lib/dpkg/lock-frontend]
