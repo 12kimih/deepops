@@ -53,7 +53,9 @@ maintenance_verify_gpus: "{{ inventory_hostname in groups['slurm-node'] | defaul
 maintenance_verify_dcgm_level: "{{ 1 if maintenance_verify_gpus | bool and install_dcgm | bool else 0 }}"
 # The longest each level may run (seconds), about four times its usual length.
 maintenance_verify_dcgm_timeout: {1: 600, 2: 1200, 3: 7200, 4: 28800}
-maintenance_verify_nhc: true
+# NHC where the deploy puts it (playbooks/slurm-cluster/nhc.yml: the compute nodes), not
+# wherever an nhc binary happens to be: a stale hand install elsewhere is not a health check.
+maintenance_verify_nhc: "{{ inventory_hostname in groups['slurm-node'] | default([]) and slurm_install_nhc | bool }}"
 
 # Kernel policy settings every host must share; consistency.yml fails when they differ.
 # The user-namespace restriction is the one a site most often changes by hand on one
