@@ -1,8 +1,6 @@
 # roles/deepops_hosts/defaults/main.yml
 ---
 
-hosts_playbook_version: "1.0.1"
-
 # If set to true, basic IPv6 entries (localhost6, ip6-localnet, etc) are added.
 hosts_add_basic_ipv6: false
 
