@@ -219,11 +219,21 @@ slurm_clear_old_prolog_epilog: false
 # See docs/slurm-cluster/epilog-job-scoped-cleanup.md
 slurm_epilog_cleanup_scope: job
 
-# Fileglob patterns used to copy prolog and epilog files
+# Fileglob patterns used to copy prolog, epilog and task prolog files. The task prolog
+# runs as the job user before every task of every step; what its parts print as
+# `export NAME=value` reaches the task's environment.
 prolog_fileglob:
   - "templates/etc/slurm/prolog.d/*"
 epilog_fileglob:
   - "templates/etc/slurm/epilog.d/*"
+task_prolog_fileglob:
+  - "templates/etc/slurm/task-prolog.d/*"
+
+# Each job user's runtime directory on a node (<root>/<uid>, tmpfs), the job's
+# XDG_RUNTIME_DIR: a job inherits the login node's, which does not exist on the
+# compute node (rootless podman fails on it). The prolog creates it, the task prolog
+# exports it, the epilog of the user's last job on the node removes it.
+slurm_user_runtime_root: /run/slurm-users
 
 # Disable clearing of shared memory when user login shell exits
 slurm_fix_shm: true

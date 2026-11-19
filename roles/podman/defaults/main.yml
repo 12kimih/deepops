@@ -9,9 +9,11 @@
 # without a range cannot run podman.
 
 # The distribution packages (podman 4.9 on Ubuntu 24.04). uidmap/shadow-utils provide
-# newuidmap and newgidmap; slirp4netns is the rootless network of podman 4.
+# newuidmap and newgidmap; slirp4netns is the rootless network of podman 4; apparmor
+# ships the profiles that let podman, crun and slirp4netns create user namespaces
+# under Ubuntu's restriction (podman does not depend on it).
 podman_packages:
-  Debian: [podman, uidmap, slirp4netns]
+  Debian: [podman, uidmap, slirp4netns, apparmor]
   RedHat: [podman, shadow-utils, slirp4netns]
 
 # Roster-shaped mapping (login -> {uid, status}) of the people who get a range, and
@@ -25,8 +27,3 @@ podman_subid_count: 65536
 # never NFS, where overlay does not work and small-file I/O is slow. Each user's
 # directory is created here, owned by them; the root itself is root-owned.
 podman_storage_root: /var/lib/podman-storage
-
-# Per-user runtime directories (<root>/<UID>, tmpfs, recreated at boot). A Slurm job
-# inherits the login node's XDG_RUNTIME_DIR, which does not exist on the compute
-# node, and podman fails on it; /usr/local/bin/podman points it here instead.
-podman_runtime_root: /run/podman-users

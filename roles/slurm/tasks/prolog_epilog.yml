@@ -105,3 +105,33 @@
     managed_dir_mode: "0755"
   tags:
     - epilog
+
+- name: Copy the task prolog
+  ansible.builtin.template:
+    src: etc/slurm/task-prolog.sh
+    dest: "{{ slurm_config_dir }}/"
+    mode: "0755"
+  tags:
+    - prolog
+
+- name: Collect the task prolog parts
+  ansible.builtin.set_fact:
+    slurm_task_prolog_parts: >-
+      {{ query('ansible.builtin.fileglob', *(task_prolog_fileglob | map('regex_replace', '^(?!/)', role_path ~ '/')))
+         | sort }}
+  tags:
+    - prolog
+
+- name: Install the task prolog parts
+  ansible.builtin.include_role:
+    name: managed_dir
+    apply:
+      tags: [prolog]
+  vars:
+    managed_dir_path: "{{ slurm_config_dir }}/task-prolog.d"
+    managed_dir_sources: "{{ slurm_task_prolog_parts }}"
+    managed_dir_allow_empty: true  # task_prolog_fileglob may name none
+    managed_dir_template: true
+    managed_dir_mode: "0755"
+  tags:
+    - prolog

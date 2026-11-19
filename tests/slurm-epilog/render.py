@@ -17,6 +17,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 VARS = {
     "slurm_config_dir": "/etc/slurm",
     "slurm_install_prefix": "/usr",
+    "slurm_user_runtime_root": "/run/slurm-users",
 }
 
 SCOPES = ("job", "user")

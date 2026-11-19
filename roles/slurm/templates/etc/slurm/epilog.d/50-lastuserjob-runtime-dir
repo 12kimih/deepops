@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# The runtime directory goes with the user's last job on the node (40-all-runtime-dir
+# in the prolog makes it). Never across a mount; a failure is logged, not returned: a
+# failing epilog drains the node.
+set -u
+
+dir='{{ slurm_user_runtime_root }}'/"$SLURM_JOB_UID"
+
+case "$SLURM_JOB_UID" in
+    ''|0|*[!0-9]*) exit 0 ;;
+esac
+[ -d "$dir" ] && [ ! -L "$dir" ] || exit 0
+rm -rf --one-file-system -- "$dir" \
+    || logger -t slurm-runtime-dir "cannot remove all of $dir" 2>/dev/null || :
+exit 0
