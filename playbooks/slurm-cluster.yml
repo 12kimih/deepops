@@ -172,6 +172,11 @@
   tags:
     - podman
 
+- name: Clean up users' container image stores daily
+  import_playbook: container/container-storage-gc.yml
+  tags:
+    - container-storage-gc
+
 # Both run after authentication.yml has published the group and the netgroup through
 # NIS, so the compute nodes can resolve them. No-ops unless configured.
 - name: Point the Docker socket at a cluster-wide group

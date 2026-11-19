@@ -215,3 +215,22 @@ tests:
             exp_annotations:
               summary: "No Slurm backup to /backup/a has run for 36 hours"
               description: "`systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on m; the accounting database and controller state have no copy there."
+
+  - name: container storage cleanup that stopped warns after 3 days
+    interval: 1h
+    input_series:
+      - series: 'container_storage_gc_last_success_timestamp_seconds{host="n1", instance="n1:9100"}'
+        values: '0x80'
+      - series: 'container_storage_gc_last_success_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '0+3600x80'
+    alert_rule_test:
+      - eval_time: 70h
+        alertname: ContainerStorageCleanupStale
+        exp_alerts: []
+      - eval_time: 74h
+        alertname: ContainerStorageCleanupStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "Container image stores on n1 have not been cleaned up for 3 days"
+              description: "The daily cleanup failed or did not run, so podman storage and the enroot cache can fill the local disk: `journalctl -u container-storage-gc` and `systemctl list-timers container-storage-gc.timer` on the host."

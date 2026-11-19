@@ -412,6 +412,19 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 # Per-user image storage, on node-local disk (never NFS).
 #podman_storage_root: /var/lib/podman-storage
 
+# The daily cleanup of users' podman storage and enroot cache: a user's whole store
+# goes when they left the roster, after it went unused, or least recently used first
+# while the disk is above the limit; never while they use that tool.
+#slurm_container_storage_gc: true
+#container_storage_gc_people: "{{ people }}"  # example
+#container_storage_gc_unused_days: 14
+#container_storage_gc_max_used_percent: 80
+#container_storage_gc_on_calendar: "*-*-* 04:00:00"
+
+# Each job user's runtime directory on a node, the job's XDG_RUNTIME_DIR (made by the
+# prolog, exported by the task prolog, removed with the user's last job there).
+#slurm_user_runtime_root: /run/slurm-users
+
 ################################################################################
 # Node Health Check                                                            #
 ################################################################################

@@ -1,0 +1,43 @@
+---
+- name: Install the container storage cleanup command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ _container_storage_gc_command }}"
+      module: clustertools.container_gc
+
+- name: Create the cluster tools configuration directory
+  ansible.builtin.file:
+    path: "{{ _container_storage_gc_config | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the container storage cleanup configuration
+  ansible.builtin.copy:
+    dest: "{{ _container_storage_gc_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _container_storage_gc_cfg | to_nice_json }}\n"
+
+- name: Install the container storage cleanup units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _container_storage_gc_units }}"
+  register: container_storage_gc_units
+
+- name: Enable the container storage cleanup timer
+  ansible.builtin.systemd:
+    name: container-storage-gc.timer
+    enabled: true
+    state: "{{ 'restarted' if container_storage_gc_units is changed else 'started' }}"
+    daemon_reload: true
+  when: not ansible_check_mode

@@ -1,0 +1,13 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Remove unused, orphaned or space-starved users' container image stores
+
+[Service]
+Type=oneshot
+# A oneshot has no start timeout by default; one hang would stop its timer for good.
+TimeoutStartSec=3h
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ container_storage_gc_textfile_dir }}
+ExecStart={{ _container_storage_gc_command }} {{ _container_storage_gc_config }}
+Nice=10
+IOSchedulingClass=idle
