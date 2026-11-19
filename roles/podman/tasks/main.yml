@@ -41,44 +41,37 @@
     group: root
     mode: "0644"
 
-- name: Create the storage and runtime roots
+- name: Create the storage root
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ podman_storage_root }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
-  loop:
-    - "{{ podman_storage_root }}"
-    - "{{ podman_runtime_root }}"
 
 # Created by root, so no user can take another's name first in a shared parent.
-- name: Create each user's storage and runtime directory
+- name: Create each user's storage directory
   ansible.builtin.file:
-    path: "{{ item.0 }}/{{ item.1.uid }}"
+    path: "{{ podman_storage_root }}/{{ item.uid }}"
     state: directory
-    owner: "{{ item.1.uid }}"
-    group: "{{ item.1.uid }}"
+    owner: "{{ item.uid }}"
+    group: "{{ item.uid }}"
     mode: "0700"
-  loop: "{{ [podman_storage_root, podman_runtime_root] | product(podman_subids) | list }}"
+  loop: "{{ podman_subids }}"
   loop_control:
-    label: "{{ item.0 }}/{{ item.1.uid }} ({{ item.1.name }})"
+    label: "{{ podman_storage_root }}/{{ item.uid }} ({{ item.name }})"
 
-- name: Recreate the runtime directories at boot
-  ansible.builtin.template:
-    src: tmpfiles.conf.j2
-    dest: /etc/tmpfiles.d/podman-users.conf
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Point podman at the user's runtime directory
-  ansible.builtin.template:
-    src: podman-wrapper.sh.j2
-    dest: /usr/local/bin/podman
-    owner: root
-    group: root
-    mode: "0755"
+# A job's XDG_RUNTIME_DIR now comes from Slurm's task prolog (roles/slurm,
+# slurm_user_runtime_root). Earlier releases of this role used a podman wrapper and a
+# runtime directory of their own.
+- name: Remove the earlier podman wrapper and runtime directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/bin/podman
+    - /etc/tmpfiles.d/podman-users.conf
+    - /run/podman-users
 
 - name: Let podman create user namespaces under AppArmor
   ansible.builtin.include_tasks: apparmor.yml

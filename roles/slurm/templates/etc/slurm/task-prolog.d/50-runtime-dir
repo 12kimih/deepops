@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# XDG_RUNTIME_DIR for the task: the directory the prolog made for this user on this
+# node (prolog.d/40-all-runtime-dir), never the login node's, which is not here.
+dir='{{ slurm_user_runtime_root }}'/"$(id -u)"
+if [ -d "$dir" ] && [ -O "$dir" ]; then
+    echo "export XDG_RUNTIME_DIR=$dir"
+fi

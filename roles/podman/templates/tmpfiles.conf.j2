@@ -1,6 +1,0 @@
-# {{ ansible_managed }}
-# Rootless podman runtime directories, one per user, recreated at boot (roles/podman).
-d {{ podman_runtime_root }} 0755 root root -
-{% for range in podman_subids %}
-d {{ podman_runtime_root }}/{{ range.uid }} 0700 {{ range.uid }} {{ range.uid }} -
-{% endfor %}

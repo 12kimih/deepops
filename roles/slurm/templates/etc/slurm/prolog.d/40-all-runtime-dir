@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# The job user's runtime directory, which the task prolog exports as XDG_RUNTIME_DIR.
+# Its parent is root's alone, so no other user can have put anything in its place.
+# Nothing here fails the prolog, which would drain the node: a problem is logged and
+# the job runs with the XDG_RUNTIME_DIR it brought.
+set -u
+
+root='{{ slurm_user_runtime_root }}'
+dir="$root/$SLURM_JOB_UID"
+log() { logger -t slurm-runtime-dir "$*" 2>/dev/null || :; }
+
+case "$SLURM_JOB_UID" in
+    ''|0|*[!0-9]*) exit 0 ;;  # root, or no usable uid
+esac
+if ! install -d -o root -g root -m 0755 -- "$root"; then
+    log "cannot create $root"
+    exit 0
+fi
+if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
+    rm -f -- "$dir"
+fi
+install -d -o "$SLURM_JOB_UID" -g "${SLURM_JOB_GID:-$SLURM_JOB_UID}" -m 0700 -- "$dir" \
+    || log "cannot create $dir for uid $SLURM_JOB_UID"
+exit 0

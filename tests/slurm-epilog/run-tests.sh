@@ -941,6 +941,8 @@ else
     jc_case "a commented-out JobContainerType does not skip the cleanup" \
         "#JobContainerType=job_container/tmpfs" gone
     jc_case "no JobContainerType: cleanup runs" "ProctrackType=proctrack/cgroup" gone
+    jc_case "Slurm 26.05's NamespaceType=namespace/tmpfs is detected too" \
+        "NamespaceType=namespace/tmpfs" kept
     jc_case "no slurm.conf readable: cleanup runs as before" "" gone
 fi
 
@@ -1214,6 +1216,63 @@ ssh_case "a name that is only a prefix of a listed operator is not exempt" \
 je
 je.kim" "root
 je.kim"
+
+# --- task prolog and the job runtime directory ----------------------------------------
+# The task prolog's output becomes the task's environment, and a failing task prolog
+# cancels the task: only export/unset lines may pass, and nothing may fail it.
+echo
+echo "task-prolog.sh and the runtime directory parts"
+tp="$work/tp"; rm -rf "$tp"; mkdir -p "$tp/task-prolog.d" "$tp/runtime"
+if render "task-prolog.sh" "$tp/task-prolog.sh" \
+   && render "task-prolog.d/50-runtime-dir" "$tp/task-prolog.d/50-runtime-dir" \
+   && render "epilog.d/50-lastuserjob-runtime-dir" "$tp/50-epilog"; then
+    sed -i "s#'/etc/slurm'/task-prolog.d#'$tp'/task-prolog.d#" "$tp/task-prolog.sh"
+    sed -i "s#'/run/slurm-users'#'$tp/runtime'#" "$tp/task-prolog.d/50-runtime-dir" "$tp/50-epilog"
+    printf '#!/bin/sh\necho "export GOOD=1"\necho "print noise"\necho "export BAD-NAME=1"\necho "rm -rf /"\n' \
+        > "$tp/task-prolog.d/10-mixed"
+    printf '#!/bin/sh\necho "export ALSO=1"\nexit 3\n' > "$tp/task-prolog.d/20-fails"
+    printf '#!/bin/sh\necho "export SKIPPED=1"\n' > "$tp/task-prolog.d/30-not-executable"
+    chmod +x "$tp/task-prolog.d/10-mixed" "$tp/task-prolog.d/20-fails"
+    me=$(id -u)
+    out=$("$tp/task-prolog.sh"); rc=$?
+    if [ "$rc" = 0 ] && [ "$out" = "export GOOD=1
+export ALSO=1" ]; then
+        ok "only export lines pass, a failing part is ignored, a non-executable part is skipped"
+    else
+        no "only export lines pass, a failing part is ignored, a non-executable part is skipped" "rc=$rc out=$out"
+    fi
+    rm -f "$tp/task-prolog.d/"[123]0-*
+    out=$("$tp/task-prolog.sh")
+    if [ -z "$out" ]; then
+        ok "no runtime directory: XDG_RUNTIME_DIR is left alone"
+    else
+        no "no runtime directory: XDG_RUNTIME_DIR is left alone" "$out"
+    fi
+    mkdir -m 0700 "$tp/runtime/$me"
+    out=$("$tp/task-prolog.sh")
+    if [ "$out" = "export XDG_RUNTIME_DIR=$tp/runtime/$me" ]; then
+        ok "the user's own runtime directory becomes XDG_RUNTIME_DIR"
+    else
+        no "the user's own runtime directory becomes XDG_RUNTIME_DIR" "$out"
+    fi
+    mkdir -p "$tp/elsewhere"; touch "$tp/elsewhere/keep"
+    rmdir "$tp/runtime/$me"; ln -s "$tp/elsewhere" "$tp/runtime/$me"
+    SLURM_JOB_UID=$me "$tp/50-epilog"
+    if [ -e "$tp/elsewhere/keep" ]; then
+        ok "the epilog never follows a symlink in place of the runtime directory"
+    else
+        no "the epilog never follows a symlink in place of the runtime directory" "target emptied"
+    fi
+    rm -f "$tp/runtime/$me"; mkdir -p "$tp/runtime/$me/containers"; touch "$tp/runtime/$me/containers/x"
+    SLURM_JOB_UID=$me "$tp/50-epilog"
+    if [ ! -e "$tp/runtime/$me" ]; then
+        ok "the epilog of the user's last job removes the runtime directory"
+    else
+        no "the epilog of the user's last job removes the runtime directory" "still there"
+    fi
+else
+    no "task prolog templates render" "render failed"
+fi
 
 echo
 printf '%d passed, %d failed\n' "$pass" "$fail"

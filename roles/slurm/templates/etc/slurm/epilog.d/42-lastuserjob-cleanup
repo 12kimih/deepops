@@ -39,11 +39,15 @@ esac
 # Files carry a uid, never a job id, so deleting "this job's files" from
 # ownership alone is not possible: this script stays per user, and the
 # dispatcher only runs it when neither squeue nor the node's cgroups show
-# another job of the user. When Slurm's job_container/tmpfs plugin is active,
+# another job of the user. When Slurm's tmpfs namespace plugin is active,
 # /tmp and /dev/shm are private to each job and vanish with it, so this
 # cleanup has nothing to add and would only reach into the host's copies.
-slurm_conf='{{ slurm_config_dir }}/slurm.conf'
-if grep -qE '^[[:space:]]*JobContainerType[[:space:]]*=[[:space:]]*job_container/tmpfs' "$slurm_conf" 2>/dev/null; then
+# A configless node has no slurm.conf of its own: slurmd keeps the one it
+# fetched in /run/slurm/conf. Slurm 26.05 names the plugin NamespaceType=
+# namespace/tmpfs; earlier releases JobContainerType=job_container/tmpfs.
+slurm_conf="${SLURM_CONF:-/run/slurm/conf/slurm.conf}"
+[ -r "$slurm_conf" ] || slurm_conf='{{ slurm_config_dir }}/slurm.conf'
+if grep -qiE '^[[:space:]]*(NamespaceType[[:space:]]*=[[:space:]]*namespace/tmpfs|JobContainerType[[:space:]]*=[[:space:]]*job_container/tmpfs)' "$slurm_conf" 2>/dev/null; then
     logger -s -t slurm-epilog \
         "job_container/tmpfs is configured; per-job /tmp and /dev/shm are removed with the job, skipping file cleanup"
     exit 0
