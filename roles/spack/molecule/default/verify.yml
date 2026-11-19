@@ -1,10 +1,31 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Ask Spack for its version and package repository
+      ansible.builtin.command:
+        argv: "{{ item }}"
+      register: spack_answers
+      changed_when: false
+      loop:
+        - [/sw/spack/bin/spack, --version]
+        - [/sw/spack/bin/spack, location, --repo, builtin]
+        - [/sw/spack/bin/spack, config, get, modules]
+
+    - name: Check the pinned release, the shared repository and Lmod modules
       ansible.builtin.assert:
-        that: true
+        that:
+          - spack_answers.results[0].stdout is match('1\.2\.2')
+          - spack_answers.results[1].stdout is match('/sw/spack-packages')
+          - "'lmod' in spack_answers.results[2].stdout"
+        fail_msg: "{{ spack_answers.results | map(attribute='stdout') | list }}"
+
+    - name: Read Lmod's module path file
+      ansible.builtin.slurp:
+        src: /etc/lmod/.modulespath
+      register: spack_modulespath
+
+    - name: Check the Spack tree is registered
+      ansible.builtin.assert:
+        that: "'/sw/spack/share/spack/lmod/Core' in (spack_modulespath.content | b64decode)"

@@ -29,3 +29,4 @@ retired_settings:
   sm_build_path: easybuild_home in roles/easy-build (builds unpack under it)
   slurm_password: slurm_munge_key_file, a vaulted key file (docs/slurm-cluster/munge-key.md)
   nvidia_driver_persistenced_dropin: the role owns the nvidia-persistenced unit with persistence mode on (roles/nvidia_driver)
+  spack_build_packages: spack_default_packages (the specs to install; empty installs none) in roles/spack

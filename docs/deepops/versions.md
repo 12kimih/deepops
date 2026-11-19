@@ -66,5 +66,6 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | slurm | `hwloc_version` | `2.13.0` |  |
 | slurm | `pmix_version` | `5.0.10` |  |
 | spack | `spack_version` | `v1.2.2` |  |
+| spack | `spack_packages_version` | `v2026.06.0` |  |
 | standalone-container-registry | `standalone_container_registry_image` | `registry:3.1.2@sha256:82f6ff4a7f98` |  |
 <!-- END GENERATED: versions -->
