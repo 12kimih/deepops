@@ -9,3 +9,4 @@
     component_record_name: docker
     component_record_action: absent
     component_record_items: "{{ _docker_all_items }}"
+    component_record_exclusive_packages: "{{ docker_packages }}"

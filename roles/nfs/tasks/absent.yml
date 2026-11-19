@@ -18,3 +18,5 @@
     component_record_name: nfs
     component_record_action: absent
     component_record_items: "{{ nfs_items }}"
+    # The server package is the server's alone (a hand-made server once kept exporting).
+    component_record_exclusive_packages: [nfs-kernel-server]

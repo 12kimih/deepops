@@ -15,8 +15,8 @@
 # begin, before a component installs anything: it is recorded as installing with the
 # items it will add. present, after: the items are the whole set it needs now; what only
 # an earlier version needed is removed. absent: the component leaves every item's owner
-# set; items is what it installed before the record existed (adopted), and must list
-# only items no other component installs. Whatever no component needs any longer is
+# set; items is what it installed before the record existed (adopted; packages only
+# those in component_record_exclusive_packages). Whatever no component needs any longer is
 # removed: containers, then units (stopped and disabled), files, empty directories, and
 # packages last (roles/host_baseline). Data is never an item, so it is never removed.
 # absent also withdraws the calling role's pending reboot request (roles/maintenance).
@@ -24,4 +24,8 @@ component_record_name: ""
 component_record_action: ""
 component_record_version: ""
 component_record_items: []
+# absent adopts a package only when this names it: what only this component installs.
+# A package other roles also install (python3-docker, nodejs) is freed by the record
+# alone, when its last recorded owner goes.
+component_record_exclusive_packages: []
 component_record_path: /etc/ansible/facts.d/deepops_components.fact

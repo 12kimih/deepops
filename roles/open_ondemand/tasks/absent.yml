@@ -49,6 +49,10 @@
     component_record_name: open_ondemand
     component_record_action: absent
     component_record_items: "{{ open_ondemand_items + open_ondemand_legacy_items }}"
+    # nodejs and the Apache OpenID module may serve others: only the record frees them.
+    component_record_exclusive_packages: >-
+      {{ ['ondemand', 'ondemand-dex', 'ondemand-nginx', 'ondemand-passenger']
+         + open_ondemand_legacy_items | map('regex_replace', '^package:', '') | list }}
 
 # apache2 stays (a dependency other sites may use); undo what present changed in it:
 # Debian's stock ports.conf and default site.
