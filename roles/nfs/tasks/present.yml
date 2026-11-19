@@ -5,7 +5,13 @@
   vars:
     component_record_name: nfs
     component_record_action: begin
-    component_record_items: "{{ nfs_items }}"
+    component_record_items: "{{ nfs_items + nfs_common_items }}"
+
+- name: Set up what servers and clients share
+  ansible.builtin.include_role:
+    name: nfs_common
+    tasks_from: install
+  tags: always
 
 - name: Set up the server
   ansible.builtin.include_tasks: server.yml
@@ -21,4 +27,4 @@
   vars:
     component_record_name: nfs
     component_record_action: present
-    component_record_items: "{{ nfs_items }}"
+    component_record_items: "{{ nfs_items + nfs_common_items }}"

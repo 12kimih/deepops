@@ -1,0 +1,26 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nfs_client
+    component_record_action: begin
+    component_record_items: "{{ nfs_client_items + nfs_common_items }}"
+
+- name: Set up what servers and clients share
+  ansible.builtin.include_role:
+    name: nfs_common
+    tasks_from: install
+  tags: always
+
+- name: Set up the mounts
+  ansible.builtin.include_tasks: client.yml
+  tags: always
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nfs_client
+    component_record_action: present
+    component_record_items: "{{ nfs_client_items + nfs_common_items }}"

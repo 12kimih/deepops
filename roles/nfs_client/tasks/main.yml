@@ -1,0 +1,15 @@
+---
+# The mounts are a component (docs/deepops/component-state.md), removed only explicitly:
+# present where the deploy wants them, kept elsewhere, absent where the site lists
+# nfs_client in deepops_component_removals. The server's exports are roles/nfs.
+- name: Check the component state
+  ansible.builtin.assert:
+    that: nfs_client_state in ['present', 'absent', 'kept']
+    fail_msg: "nfs_client_state must be present, absent or kept, not {{ nfs_client_state }}."
+    quiet: true
+  tags: always
+
+- name: "Make the NFS mounts {{ nfs_client_state }}"
+  ansible.builtin.include_tasks: "{{ nfs_client_state }}.yml"
+  when: nfs_client_state != 'kept'
+  tags: always

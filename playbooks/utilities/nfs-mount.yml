@@ -13,7 +13,7 @@
   tasks:
     - name: Mount the shared filesystems
       ansible.builtin.include_role:
-        name: nfs
+        name: nfs_client
         tasks_from: mount.yml
         apply:
           tags: [nfs_mount]

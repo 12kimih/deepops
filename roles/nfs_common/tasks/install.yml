@@ -1,0 +1,35 @@
+---
+# Not main.yml: the server and client roles depend on this one for its settings and
+# items, and install it only on their present path.
+- name: Install the NFS utilities (Debian family)
+  ansible.builtin.apt:
+    name: "{{ nfs_common_package }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install the NFS utilities (RHEL family)
+  ansible.builtin.dnf:
+    name: "{{ nfs_common_package }}"
+    state: present
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Configure the NFSv4 ID mapping domain
+  ansible.builtin.lineinfile:
+    dest: /etc/idmapd.conf
+    regexp: "^Domain"
+    insertafter: "^# Domain"
+    line: "Domain = {{ nfs_idmapd_domain }}"
+    backup: true
+
+# Raise TCP/socket buffers for the NFS data path on fast cluster networks.
+# https://nfs.sourceforge.net/nfs-howto/ar01s05.html
+- name: Tune the network buffers for NFS
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: sysctl
+  vars:
+    host_baseline_sysctls: "{{ nfs_network_sysctls }}"
+    host_baseline_sysctl_file: "{{ nfs_common_sysctl_file }}"
+  when: nfs_tune_network | bool

@@ -56,7 +56,7 @@
 - name: Install the shutdown-time NFS detach unit
   ansible.builtin.template:
     src: nfs-detach-on-shutdown.service.j2
-    dest: /etc/systemd/system/nfs-detach-on-shutdown.service
+    dest: "/etc/systemd/system/{{ nfs_client_detach_unit }}"
     mode: "0644"
   when: nfs_detach_on_shutdown | bool
   tags:
@@ -64,7 +64,7 @@
 
 - name: Enable the shutdown-time NFS detach unit
   ansible.builtin.systemd:
-    name: nfs-detach-on-shutdown.service
+    name: "{{ nfs_client_detach_unit }}"
     enabled: true
     state: started
     daemon_reload: true

@@ -1,0 +1,11 @@
+---
+# What the client component installs, for its record (roles/component_record), beside
+# the shared part (nfs_common_items). Each mount's fstab entry is an item, so a mount
+# dropped from nfs_mounts leaves fstab (the live mount stays until the next boot); the
+# mountpoint directory is not (it is where data appears). The detach unit is an item only
+# while wanted, so switching it off removes it.
+nfs_client_detach_unit: nfs-detach-on-shutdown.service
+nfs_client_items: >-
+  {{ (['unit:' ~ nfs_client_detach_unit, 'file:/etc/systemd/system/' ~ nfs_client_detach_unit]
+      if nfs_detach_on_shutdown | bool else [])
+     + nfs_mounts | map(attribute='mountpoint') | map('regex_replace', '^', 'mount:') | list }}

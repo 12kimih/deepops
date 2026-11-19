@@ -1,9 +1,12 @@
 ---
-- hosts: "{{ hostlist | default('slurm-nfs-client') }}"
+# A host's NFS mounts: present on the deploy's NFS clients (deepops_components), kept
+# elsewhere, removed from a host only when the site lists nfs_client in
+# deepops_component_removals.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-    # The client part only; the server's exports are not this play's business.
-    - { role: nfs, nfs_is_client: true, nfs_state: kept }
+    - role: nfs_client
+      nfs_client_state: "{{ deepops_components.nfs_client | component_phase(deepops_phase) }}"
   tags:
     - nfs_client

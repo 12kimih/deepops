@@ -22,6 +22,7 @@ EXPLICIT = {
     "nvidia_driver",
     "slurm",
     "nfs",
+    "nfs_client",
     "nis_server",
     "nis_client",
     "kerberos_client",
@@ -65,7 +66,6 @@ GATES = {
     "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
     # Components still to move (docs/deepops/component-state.md, batches), by owner.
     "slurm_install_authentication": "pending: deepops-4 (the directory work; removal explicit)",
-    "slurm_enable_nfs_client_nodes": "pending: deepops-2 (the NFS client mounts)",
     "slurm_cluster_install_nvidia_driver": "pending: deepops (batch 3; removal explicit)",
     "install_dcgm": "pending: deepops (batch 3)",
     "slurm_install_nhc": "pending: deepops (batch 3)",

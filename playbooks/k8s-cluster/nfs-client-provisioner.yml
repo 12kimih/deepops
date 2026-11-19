@@ -25,11 +25,16 @@
       tags:
         - nfs_mkdir
 
+# What a kubelet needs to mount the provisioner's volumes.
 - hosts: "k8s_cluster"
   become: true
   roles:
     - role: deploy_defaults
-    - nfs
+  tasks:
+    - name: Install the NFS utilities
+      ansible.builtin.include_role:
+        name: nfs_common
+        tasks_from: install
   tags:
     - nfs_software
 
