@@ -335,6 +335,8 @@ DeepOps no longer bundles an Open OnDemand installer. Sites that want the [Open 
 
 [Pyxis](https://github.com/NVIDIA/pyxis) and [Enroot](https://github.com/NVIDIA/enroot) are installed by default and can be disabled by setting `slurm_install_enroot` and `slurm_install_pyxis` to no. They are the supported, release-validated container runtime for Slurm in DeepOps.
 
+The per-user directories containers keep around jobs, and what creates and removes each, are listed in [the job environment](./job-environment.md).
+
 To build images from a Dockerfile, users run rootless Podman in a CPU job and import the result with `enroot import podman://IMAGE`; see [Building container images with rootless Podman](../container/podman.md). It is installed on the compute nodes by default (`slurm_install_podman`) and replaces the retired docker-rootless role.
 
 The DeepOps Singularity wrapper role has been retired. Singularity lives on upstream as [Apptainer](https://apptainer.org/); sites that still want it can install Apptainer/Singularity separately.
