@@ -1,3 +1,0 @@
----
-# Intentionally empty: playbooks/k8s-cluster/roce.yaml runs this role with
-# tasks_from: allhosts (all hosts) and tasks_from: k8smaster (control plane).
