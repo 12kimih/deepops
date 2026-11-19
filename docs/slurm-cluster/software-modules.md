@@ -52,27 +52,29 @@ ansible-playbook -l slurm-cluster playbooks/slurm-cluster/spack-modules.yml
 
 ### Configuration
 
-- `spack_install_dir`: Controls the directory where Spack is installed. This should be a shared filesystem visible on all nodes in the cluster (for example, using NFS). The default is `/sw/spack`.
-- `spack_build_packages`: Controls whether to build a default set of packages when installing Spack. Defaults to `false`.
-- `spack_default_packages`: List of default packages to build, if `spack_build_packages` is `true`. The default value for this can be found in `config.example/group_vars/slurm-cluster.yml`.
+Spack is cloned at the release tag `spack_version`, and its builtin package repository
+(spack/spack-packages, separate since Spack 1.0) once into `spack_packages_dir` at
+`spack_packages_version`, so no user's Spack clones it into their home. Both live under
+the shared prefix; the settings sit in the instance's site scope
+(`$SPACK_ROOT/etc/spack/site`).
+
+- `spack_install_dir`: where Spack is installed, on a filesystem every node shares.
+  The default is `/sw/spack`.
+- `spack_default_packages`: specs the role installs into the shared instance. None by default.
+- `spack_lmod_core_compilers`: compilers whose packages go in the Core layer of the Lmod
+  hierarchy. The default is `[gcc]`.
 
 ### Usage
 
-Once you have installed Spack, you can view the list of installed Environment Modules using the `module avail` command:
+Spack generates an Lmod module for each package it installs, in a Core/compiler/MPI
+hierarchy under `$SPACK_ROOT/share/spack/lmod`. The playbook registers the Core layer
+with Lmod on every node, so `module avail` lists them and `module load` works anywhere:
 
 ```bash
 login01:~$ module avail
-
-------------------------------------------- /sw/spack/share/spack/modules/linux-ubuntu18.04-ivybridge --------------------------------------------
-   autoconf-2.69-gcc-7.5.0-hfxfrih          libsigsegv-2.12-gcc-7.5.0-2yve3ej    perl-5.30.3-gcc-7.5.0-khsv2dq
-   automake-1.16.2-gcc-7.5.0-j5wdstd        libtool-2.4.6-gcc-7.5.0-lec45xk      pkgconf-1.7.3-gcc-7.5.0-zmzhxvk
-   cuda-10.2.89-gcc-7.5.0-sozilk3           libxml2-2.9.10-gcc-7.5.0-nxbegjt     readline-8.0-gcc-7.5.0-mnwvfzz
-   gdbm-1.18.1-gcc-7.5.0-4nm26e5            m4-1.4.18-gcc-7.5.0-6uxhjm6          util-macros-1.19.1-gcc-7.5.0-7katknz
-   hwloc-1.11.11-gcc-7.5.0-ahecdai          ncurses-6.2-gcc-7.5.0-ucxzuau        xz-5.2.5-gcc-7.5.0-g6ssadh
-   libiconv-1.16-gcc-7.5.0-pndwbk6          numactl-2.0.12-gcc-7.5.0-qmslmbp     zlib-1.2.11-gcc-7.5.0-dsnnbcq
-   libpciaccess-0.13.5-gcc-7.5.0-ynb22rn    openmpi-3.1.6-gcc-7.5.0-dpwfhsq
-
-Use "module spider" to find all possible modules.
+---------------------------- /sw/spack/share/spack/lmod/Core ----------------------------
+   cuda/13.0.2    gcc/14.3.0    openmpi/5.0.8 ...
+```
 Use "module keyword key1 key2 ..." to search for all possible modules matching any of the "keys".
 ```
 
@@ -89,14 +91,11 @@ In addition to using Environment Modules directly, Spack also provides a mechani
 
 ```bash
 login01:~$ spack find
-==> 20 installed packages
--- linux-ubuntu18.04-ivybridge / gcc@7.5.0 ----------------------
-autoconf@2.69    gdbm@1.18.1    libpciaccess@0.13.5  libxml2@2.9.10  numactl@2.0.12  pkgconf@1.7.3       xz@5.2.5
-automake@1.16.2  hwloc@1.11.11  libsigsegv@2.12      m4@1.4.18       openmpi@3.1.6   readline@8.0        zlib@1.2.11
-cuda@10.2.89     libiconv@1.16  libtool@2.4.6        ncurses@6.2     perl@5.30.3     util-macros@1.19.1
-vagrant@virtual-login01:~$ spack load cuda@10.2.89
-vagrant@virtual-login01:~$ which nvcc
-/sw/spack/opt/spack/linux-ubuntu18.04-ivybridge/gcc-7.5.0/cuda-10.2.89-sozilk3ahqmsg3nndyifhv7hhw2j6cgt/bin/nvcc
+-- linux-ubuntu24.04-x86_64_v3 / %c,cxx=gcc@13.3.0 --------------------
+cuda@13.0.2  openmpi@5.0.8 ...
+login01:~$ spack load cuda
+login01:~$ which nvcc
+/sw/spack/opt/spack/linux-x86_64_v3/cuda-13.0.2-.../bin/nvcc
 ```
 
 For more information on using Spack, see the [Spack documentation](https://spack.readthedocs.io/en/latest/).

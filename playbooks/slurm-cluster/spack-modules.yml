@@ -1,10 +1,17 @@
 # Deploy the Spack package manager
 ---
+# Lmod and Spack's module tree on every node.
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   roles:
     - lmod
+  tasks:
+    - name: Register the Spack module tree
+      ansible.builtin.include_role:
+        name: spack
+        tasks_from: register
 
+# The shared instance, installed once.
 - hosts: "{{ hostlist | default('slurm-master[0]') }}"
   become: true
   roles:

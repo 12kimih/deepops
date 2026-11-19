@@ -227,13 +227,11 @@ nfs_mounts:
 #  - zlib-1.3.1-GCCcore-14.2.0.eb
 
 # Spack-specific
-spack_install_dir: "{{ sm_prefix }}/spack"
-#spack_build_packages: false
-# Illustrative only (spack_build_packages is false by default). Latest CUDA as the
-# single example spec -- `cuda` with no version lets Spack pick its newest. (CUDA
-# is also available as Lmod modules via the nvidia_cuda_toolkit role.)
-spack_default_packages:
-  - "cuda"
+#spack_install_dir: "{{ sm_prefix }}/spack"
+# Specs the role installs into the shared instance; none by default.
+#spack_default_packages: []
+#spack_default_packages:  # example
+#  - cuda
 
 # Software for the NFS share is installed on slurm-login[0].
 

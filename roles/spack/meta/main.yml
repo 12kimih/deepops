@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: spack
+  author: DeepOps
+  description: Spack in a shared prefix, with its package repository pinned and Lmod modules
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
+dependencies:
+  - role: deepops_paths  # sm_prefix
+  - role: retired_settings  # spack_build_packages
