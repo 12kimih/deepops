@@ -1,5 +1,5 @@
 ---
-eb_tmp_dir: /tmp/easybuild
+eb_tmp_dir: /var/cache/deepops/build/easybuild  # root runs from here: never under /tmp
 # The script at that commit, checked on download (roles/download).
 eb_bootstrap_checksum: "sha256:616bf3ce812c0844bf9ea3e690f9d88b394ed48f834ddb8424a73cf45fc64ea5"
 eb_bootstrap_url: "https://raw.githubusercontent.com/easybuilders/easybuild-framework/49533e6ef8f3ca27f984eeb212e157874cae9183/easybuild/scripts/bootstrap_eb.py"

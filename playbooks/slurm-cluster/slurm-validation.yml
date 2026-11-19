@@ -175,7 +175,9 @@
           ansible.builtin.copy:
             content: "STDOUT:\n{{ result.stdout }}\n\nSTDERR:\n{{ result.stderr }}"
             dest: /tmp/nccl_tests.err
+            mode: "0644"
           delegate_to: localhost
+          become: false  # the operator's own file, never root writing into /tmp
 
         - name: Fail Slurm validation playbook
           ansible.builtin.fail:
@@ -185,7 +187,9 @@
       ansible.builtin.copy:
         content: "STDERR:\n{{ result.stderr }}\n\nSTDOUT:\n{{ result.stdout }}"
         dest: /tmp/nccl_tests.out
+        mode: "0644"
       delegate_to: localhost
+      become: false
 
     - name: Extract "Out of bounds values" and "Avg bus bandwidth".
       ansible.builtin.shell:

@@ -49,7 +49,7 @@
   vars:
     download_url: "{{ eb_bootstrap_url }}"
     download_checksum: "{{ eb_bootstrap_checksum }}"
-    download_dest: /tmp/bootstrap_eb.py
+    download_dest: /var/cache/deepops/easybuild/bootstrap_eb.py
   when: not ebsw_exe.matched
 
 #
@@ -57,7 +57,7 @@
 # EasyBuild config manually. We might want to create some abstraction for this.
 #
 - name: "Install latest EasyBuild version"
-  ansible.builtin.shell: . /etc/profile && python3 /tmp/bootstrap_eb.py {{ eb_tmp_dir }}
+  ansible.builtin.shell: . /etc/profile && python3 /var/cache/deepops/easybuild/bootstrap_eb.py {{ eb_tmp_dir }}
   args:
     executable: /bin/bash
   when: not ebsw_exe.matched

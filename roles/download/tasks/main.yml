@@ -11,6 +11,17 @@
       downloads it.
     quiet: true
 
+# Root writes, unpacks and later builds there: under a directory every user can write,
+# a user could plant the file or the tree first, or swap it afterwards.
+- name: Refuse a world-writable location
+  ansible.builtin.assert:
+    that:
+      - (download_dest ~ '/' ~ download_unpack) is not search('(^|/)(tmp|var/tmp|dev/shm)/')
+    fail_msg: >-
+      {{ download_dest }} {{ download_unpack }}: root fetches and unpacks here, so it must
+      not be under /tmp, /var/tmp or /dev/shm; use /var/cache/deepops.
+    quiet: true
+
 - name: Create the download directory
   ansible.builtin.file:
     path: "{{ download_dest | dirname }}"

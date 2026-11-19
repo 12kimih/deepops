@@ -19,6 +19,9 @@
    `ansible_facts.distribution`), never as the variables Ansible also injects
    (`services`, `ansible_distribution`): injection is deprecated and goes away, and a
    condition on a name that is gone is simply never true.
+8. Nothing root writes, unpacks, builds or runs lives under a world-writable directory
+   (/tmp, /var/tmp, /dev/shm): a user can plant the file or tree first, or swap it
+   after. Root's scratch is /var/cache/deepops.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -113,7 +116,26 @@ def fact_files():
     yield from sorted(ROOT.glob("playbooks/**/*.yml"))
 
 
+WORLD_WRITABLE = re.compile(r':\s*"?/(?:tmp|var/tmp|dev/shm)/')
+# file -> why its world-writable path is not root's to trust
+WORLD_WRITABLE_OK = {
+    "roles/enroot/defaults/main.yml": "a per-user directory the job user owns; the prolog makes it as that user",
+    "playbooks/slurm-cluster/slurm-validation.yml": "the operator's own output file, written with become: false",
+    "roles/nvidia-dgx-firmware/tasks/transfer-logs.yml": "upstream DGX: fetches the dump nvsm itself wrote there",
+}
+
+
 class TaskRules(unittest.TestCase):
+    def test_root_never_works_under_a_world_writable_directory(self):
+        offenders = [
+            f"{path.relative_to(ROOT)}:{number}"
+            for path in list(fact_files())
+            if str(path.relative_to(ROOT)) not in WORLD_WRITABLE_OK and path.suffix == ".yml"
+            for number, line in enumerate(path.read_text().splitlines(), 1)
+            if not line.lstrip().startswith("#") and WORLD_WRITABLE.search(line)
+        ]
+        self.assertEqual(offenders, [], "use /var/cache/deepops, never /tmp, /var/tmp or /dev/shm")
+
     def test_facts_through_ansible_facts(self):
         offenders = [
             f"{path.relative_to(ROOT)}:{number}"
