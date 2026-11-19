@@ -1,11 +1,13 @@
 #!/usr/bin/python
-"""Create one secret file of the site config if it is missing; never replace one."""
+"""Create or adopt one secret file of the site config if it is missing; never replace one."""
 
 DOCUMENTATION = r"""
 module: site_secret
 short_description: Create a missing secret file (random bytes or a GPG signing key pair)
 description:
   - Runs on the controller. Does nothing when the file exists, so a site keeps its keys.
+  - With I(adopt_from), writes I(content) (a host's installed copy) instead of a new
+    secret, after checking it against I(sha256).
   - Secret material never reaches disk unencrypted when I(vault) is true (ansible-vault
     reads it on stdin), and is never returned.
   - Supports check mode (reports what it would create).
@@ -44,8 +46,19 @@ options:
     description: Mode of the files written.
     type: raw
     default: "0600"
+  adopt_from:
+    description: The host whose installed copy is adopted (for the result only).
+    type: str
+  content:
+    description: That copy, base64 (as slurp returns it); not needed in check mode.
+    type: str
+  sha256:
+    description: The checksum the hosts agreed on; I(content) must match it.
+    type: str
 """
 
+import base64
+import hashlib
 import os
 import secrets
 import shutil
@@ -122,11 +135,15 @@ def main():
             "uid": {"type": "str"},
             "public_path": {"type": "path"},
             "vault": {"type": "bool", "default": True},
-            "vault_password_file": {"type": "path"},
+            "vault_password_file": {"type": "path", "no_log": False},  # a path, not the password
             "ansible_vault": {"type": "path", "default": "ansible-vault"},
             "mode": {"type": "raw", "default": "0600"},
+            "adopt_from": {"type": "str"},
+            "content": {"type": "str", "no_log": True},
+            "sha256": {"type": "str"},
         },
         required_if=[("kind", "gpg_signing", ["uid", "public_path"])],
+        required_by={"adopt_from": ["sha256"]},
         supports_check_mode=True,
     )
     p = module.params
@@ -134,7 +151,9 @@ def main():
     paths = [p["path"]] + ([p["public_path"]] if p["kind"] == "gpg_signing" else [])
     present = [path for path in paths if os.path.lexists(path)]
     if present == paths:
-        module.exit_json(changed=False, created=[])
+        module.exit_json(changed=False, created=[], adopted=[])
+    if p["adopt_from"] and p["kind"] != "random":
+        module.fail_json(msg="only a random secret (one file) can be adopted")
     if present:
         module.fail_json(
             msg=f"{present[0]} exists but not the rest of its pair ({paths}); restore it or move it away"
@@ -143,9 +162,16 @@ def main():
         module.fail_json(
             msg=f"{p['path']} must be vaulted, and no vault password file is set (ansible.cfg vault_password_file)"
         )
+    adopted = [f"{p['path']} from {p['adopt_from']}"] if p["adopt_from"] else []
     if module.check_mode:
-        module.exit_json(changed=True, created=paths)
+        module.exit_json(changed=True, created=[] if adopted else paths, adopted=adopted)
 
+    if adopted:
+        data = base64.b64decode(p["content"] or "")
+        if hashlib.sha256(data).hexdigest() != p["sha256"]:
+            module.fail_json(msg=f"the copy read from {p['adopt_from']} does not match the agreed checksum")
+        write_new(module, p["path"], data, mode, p["vault"])
+        module.exit_json(changed=True, created=[], adopted=adopted)
     if p["kind"] == "random":
         if p["length"] < 32:
             module.fail_json(msg="length must be at least 32 bytes")
@@ -154,7 +180,7 @@ def main():
         secret, public = gpg_pair(module, p["uid"])
         write_new(module, p["path"], secret.encode(), mode, p["vault"])
         write_new(module, p["public_path"], public.encode(), mode, False)
-    module.exit_json(changed=True, created=paths)
+    module.exit_json(changed=True, created=paths, adopted=[])
 
 
 if __name__ == "__main__":

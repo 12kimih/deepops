@@ -51,9 +51,9 @@ In the site configuration.
 ### The MUNGE key
 
 The key every Slurm host shares is a vault-encrypted file in the site configuration,
-`slurm_munge_key_file`, copied verbatim; nothing derives it from a password. The first
-play creates it when missing; capture a running cluster's key first, as
-[munge-key.md](munge-key.md) says. Older
+`slurm_munge_key_file`, copied verbatim; nothing derives it from a password. When it
+is missing, the first play adopts the key the hosts already share, or creates one on a
+new cluster ([munge-key.md](munge-key.md)). Older
 DeepOps derived the key from a password and `slurm_cluster_name`, so a rename changed
 the key on every host at once: deploy the key file before anything else below, and
 before any rename.

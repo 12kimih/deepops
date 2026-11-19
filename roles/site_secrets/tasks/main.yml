@@ -1,21 +1,90 @@
 ---
 # Create each declared secret file the site config lacks, on the controller, once per
 # run (library/site_secret.py). An existing file is never read or rewritten, so a
-# running cluster keeps its keys; under --check nothing is written.
-- name: Create the missing secret files
-  site_secret:
+# running cluster keeps its keys; under --check nothing is written. A declaration with
+# adopt takes the copy the play's hosts already hold instead, when they agree, and is
+# generated only when no host holds one.
+- name: Look for the secret files in the site config
+  ansible.builtin.stat:
     path: "{{ item.path }}"
-    kind: "{{ item.kind }}"
-    length: "{{ item.length | default(omit) }}"
-    uid: "{{ item.uid | default(omit) }}"
-    public_path: "{{ item.public_path | default(omit) }}"
-    vault: "{{ item.vault | default(true) }}"
-    vault_password_file: "{{ site_secrets_vault_password_file or omit }}"
-    ansible_vault: "{{ ansible_playbook_python | dirname }}/ansible-vault"
-    mode: "{{ item.mode | default('0600') }}"
+    get_checksum: false
   loop: "{{ site_secrets }}"
   loop_control:
     label: "{{ item.path }}"
+  register: site_secrets_site
+  delegate_to: localhost
+  connection: local
+  become: false
+  run_once: true
+
+# Every host answers, or the run stops: a host left out could hold a different key.
+- name: Look for installed copies to adopt
+  ansible.builtin.stat:
+    path: "{{ item.adopt }}"
+    checksum_algorithm: sha256
+    get_mime: false
+    get_attributes: false
+  loop: "{{ site_secrets }}"
+  loop_control:
+    label: "{{ item.adopt | default(item.path) }}"
+    index_var: _index
+  when: item.adopt is defined and not site_secrets_site.results[_index].stat.exists
+  register: site_secrets_installed
+  become: true
+  any_errors_fatal: true
+
+- name: Plan each secret
+  ansible.builtin.set_fact:
+    site_secrets_plan: "{{ site_secrets_site.results | site_secrets_plan(_installed, site_secrets_adopt_from) }}"
+  vars:
+    _installed: "{{ dict(ansible_play_hosts | zip(ansible_play_hosts | map('extract', hostvars, 'site_secrets_installed'))) }}"
+  run_once: true
+
+- name: Refuse installed copies that disagree
+  ansible.builtin.assert:
+    that: item.checksums.values() | unique | length <= 1
+    fail_msg: >-
+      {{ item.decl.path }} is missing and the hosts' installed copies differ, so none is
+      adopted and none generated (sha256 per host: {{ item.checksums.items() | map('join', ' ')
+      | join(', ') }}). Make them agree first: docs/slurm-cluster/munge-key.md.
+    quiet: true
+  loop: "{{ site_secrets_plan }}"
+  loop_control:
+    label: "{{ item.decl.path }}"
+  when: not item.exists
+  run_once: true
+
+- name: Read the installed copies to adopt
+  ansible.builtin.slurp:
+    src: "{{ item.paths[item.source] }}"
+  loop: "{{ site_secrets_plan }}"
+  loop_control:
+    label: "{{ item.decl.path }}"
+  when: not item.exists and item.source | length > 0 and not ansible_check_mode
+  register: site_secrets_read
+  no_log: true  # the result holds the secret
+  delegate_to: "{{ item.source | default(inventory_hostname, true) }}"
+  become: true
+  run_once: true
+
+- name: Create or adopt the missing secret files
+  site_secret:
+    path: "{{ item.decl.path }}"
+    kind: "{{ item.decl.kind }}"
+    length: "{{ item.decl.length | default(omit) }}"
+    uid: "{{ item.decl.uid | default(omit) }}"
+    public_path: "{{ item.decl.public_path | default(omit) }}"
+    vault: "{{ item.decl.vault | default(true) }}"
+    vault_password_file: "{{ site_secrets_vault_password_file or omit }}"
+    ansible_vault: "{{ ansible_playbook_python | dirname }}/ansible-vault"
+    mode: "{{ item.decl.mode | default('0600') }}"
+    adopt_from: "{{ item.source or omit }}"
+    sha256: "{{ item.checksums[item.source] | default(omit) }}"
+    content: "{{ site_secrets_read.results[_index].content | default(omit) }}"
+  loop: "{{ site_secrets_plan }}"
+  loop_control:
+    label: "{{ item.decl.path }}"
+    index_var: _index
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
   register: site_secrets_result
@@ -27,11 +96,13 @@
 - name: Report the new secret files
   ansible.builtin.debug:
     msg: >-
-      {{ 'Would create' if ansible_check_mode else 'Created' }} {{ _created | join(', ') }}.
+      {{ 'Would write' if ansible_check_mode else 'Wrote' }}
+      {{ ((_adopted | map('regex_replace', '^', 'adopted ') | list) + (_created | map('regex_replace', '^', 'new ') | list)) | join(', ') }}.
       Commit them to the site config repository: they are the cluster's keys, and one
       lost must be replaced on every host.
   vars:
     _created: "{{ site_secrets_result.results | map(attribute='created') | flatten }}"
-  when: _created | length > 0
+    _adopted: "{{ site_secrets_result.results | map(attribute='adopted') | flatten }}"
+  when: (_created + _adopted) | length > 0
   delegate_to: localhost
   run_once: true
