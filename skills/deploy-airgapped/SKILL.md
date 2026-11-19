@@ -582,16 +582,12 @@ sha256sum -c SHA256SUMS
 
    Activate the provisioning environment prepared before isolation (or install
    it from approved internal indexes), then copy and edit `config.example/` if
-   site configuration was not transferred separately. Install the mirrored
-   Helm version expected by `scripts/k8s/install_helm.sh` on an amd64 Linux
-   provisioning host so that script does not fetch its public installer:
+   site configuration was not transferred separately. Point
+   `scripts/k8s/install_helm.sh` at the mirrored Helm release tarballs; it installs
+   the version the bundled Kubespray pins and checks Kubespray's checksum:
 
    ```bash
-   mkdir -p /tmp/deepops-helm
-   tar -xzf /var/repos/downloads/helm-v3.22.0-linux-amd64.tar.gz \
-     -C /tmp/deepops-helm
-   sudo install -m 0755 /tmp/deepops-helm/linux-amd64/helm /usr/local/bin/helm
-   helm version --short | grep '^v3.22.0'
+   HELM_DOWNLOAD_BASE=http://repo-server/downloads scripts/k8s/install_helm.sh
    ```
 
    Mirror the matching archive for another provisioning platform; do not use

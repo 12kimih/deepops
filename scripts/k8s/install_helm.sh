@@ -1,58 +1,59 @@
 #!/usr/bin/env bash
+# Install the Helm client on this (admin) machine at the version the bundled Kubespray
+# installs on the cluster, from the official release tarball, verified against the
+# checksum Kubespray pins for it: one pin, nothing run from the network.
+#   HELM_DOWNLOAD_BASE  where the tarballs are (default https://get.helm.sh; a mirror in
+#                       an airgap)
+#   HELM_INSTALL_DIR    where helm goes (default /usr/local/bin)
+set -euo pipefail
 
-set -x
-
-# Source common libraries and env variables
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ROOT_DIR="${SCRIPT_DIR}/../.."
-source ${ROOT_DIR}/scripts/common.sh
+CHECKSUMS="${ROOT_DIR}/submodules/kubespray/roles/kubespray_defaults/vars/main/checksums.yml"
+HELM_DOWNLOAD_BASE="${HELM_DOWNLOAD_BASE:-https://get.helm.sh}"
+HELM_INSTALL_DIR="${HELM_INSTALL_DIR:-/usr/local/bin}"
 
-HELM_INSTALL_DIR=/usr/local/bin
-HELM_INSTALL_SCRIPT_URL="${HELM_INSTALL_SCRIPT_URL:-https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3}"
-HELM_MINIMUM_VERSION=v3.4.1+gc4e7485
+case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *) echo "Unsupported architecture $(uname -m)" >&2; exit 1 ;;
+esac
 
-if ! kubectl version ; then
-    echo "Unable to talk to Kubernetes API"
+if [ ! -r "${CHECKSUMS}" ]; then
+    echo "${CHECKSUMS} is missing: run git submodule update --init --recursive" >&2
     exit 1
 fi
 
-# Install dependencies
-. /etc/os-release
-case "$ID" in
-    rhel*|centos*)
-        if ! type curl >/dev/null 2>&1 ; then
-            sudo yum -y install curl
-        fi
-        ;;
-    ubuntu*)
-        if ! type curl >/dev/null 2>&1 ; then
-            sudo apt-get -y install curl
-        fi
-        ;;
-    *)
-        echo "Unsupported Operating System $ID_LIKE"
-        exit 1
-        ;;
-esac
-
-helm_version=$(helm version --short 2>/dev/null || true)
-helm_min_installed=$(echo -e "${HELM_MINIMUM_VERSION}\n${helm_version}"| sort -V | head -n 1)
-if [ "${HELM_MINIMUM_VERSION}" != "${helm_min_installed}" ]; then
-    if [ "${helm_version}" != "" ]; then
-        sudo mv $(which helm) "$(which helm).bak"
-        echo "Helm ${helm_version} currently installed, upgrading to ${HELM_MINIMUM_VERSION}"
-    fi
-    # A private directory: the installer runs sudo, so a fixed path in /var/tmp that
-    # another user created first would hand them root.
-    helm_tmp=$(mktemp -d)
-    trap 'rm -rf "${helm_tmp}"' EXIT
-    curl -fsSL -o "${helm_tmp}/get_helm.sh" "${HELM_INSTALL_SCRIPT_URL}"
-    chmod +x "${helm_tmp}/get_helm.sh"
-    mkdir -p "${HELM_INSTALL_DIR}"
-    HELM_INSTALL_DIR=${HELM_INSTALL_DIR} DESIRED_VERSION=v3.22.0 "${helm_tmp}/get_helm.sh" # Keep near helm_version in the bundled Kubespray (roles/kubespray_defaults)
+# Kubespray's helm_version is the first entry under helm_archive_checksums.<arch>.
+read -r version checksum < <(awk -v arch="${arch}" '
+    /^helm_archive_checksums:/ { block = 1; next }
+    block && /^[^ ]/ { exit }
+    block && $0 ~ "^  " arch ":$" { in_arch = 1; next }
+    in_arch && /^    [0-9]/ { sub(":", "", $1); sub("^sha256:", "", $2); print $1, $2; exit }
+' "${CHECKSUMS}")
+if [ -z "${version:-}" ] || [ -z "${checksum:-}" ]; then
+    echo "No Helm version for ${arch} in ${CHECKSUMS}" >&2
+    exit 1
 fi
 
-sudo chmod 0755 "${HELM_INSTALL_DIR}/helm"
+if command -v helm >/dev/null 2>&1 && [ "$(helm version --template '{{.Version}}' 2>/dev/null)" = "v${version}" ]; then
+    echo "Helm v${version} is installed."
+    exit 0
+fi
 
-# Display the helm version for better debug
-helm version
+for tool in curl sha256sum tar; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        echo "${tool} is required" >&2
+        exit 1
+    fi
+done
+
+# A private directory: what is unpacked here is installed with sudo.
+tmp="$(mktemp -d)"
+trap 'rm -rf "${tmp}"' EXIT
+tarball="helm-v${version}-linux-${arch}.tar.gz"
+curl -fsSL --retry 3 -o "${tmp}/${tarball}" "${HELM_DOWNLOAD_BASE}/${tarball}"
+echo "${checksum}  ${tmp}/${tarball}" | sha256sum -c --quiet -
+tar -xzf "${tmp}/${tarball}" -C "${tmp}"
+sudo install -D -m 0755 "${tmp}/linux-${arch}/helm" "${HELM_INSTALL_DIR}/helm"
+"${HELM_INSTALL_DIR}/helm" version --short
