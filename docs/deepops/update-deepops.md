@@ -380,10 +380,12 @@ Performing these component-based upgrades does not require updating the DeepOps 
 
 **Important:** Slurm generally supports upgrading within two major releases without loss of state information or accounting data. E.g., you can upgrade to 25.11 from 25.05 or 24.11, but not from earlier releases. We recommend consulting the release notes for your desired version of Slurm before running an upgrade.
 
-To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version:
+To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version, with the checksum of its source tarball (the download stops without one; take it from a source independent of the download site, such as a distribution's package sources):
 
 ```yaml
-slurm_version: 25.11.6
+slurm_version: 26.05.6
+slurm_checksums:
+  "26.05.6": "sha512:<checksum of slurm-26.05.6.tar.bz2>"
 ```
 
 Then re-run the Slurm playbook:
@@ -464,28 +466,19 @@ ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 
 #### Updating Enroot and Pyxis
 
-To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wise to use:
+To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wish to use, with the checksum of every file they download (the download stops without one). GitHub publishes them with each release's assets:
 
 ```yaml
 slurm_pyxis_version: "0.24.0"
+slurm_pyxis_checksums:
+  "0.24.0": "sha256:<checksum of the v0.24.0 source archive>"
 enroot_version: "4.2.0"
+enroot_checksums:
+  "enroot_4.2.0-1_amd64.deb": "sha256:<checksum>"
+  "enroot+caps_4.2.0-1_amd64.deb": "sha256:<checksum>"
 ```
 
-On RHEL-family hosts, override the RPM URLs alongside the version. The
-`nvidia.enroot` role builds them with a hardcoded `el7` tag, but Enroot moved
-to `el8` artifacts in 3.4.1 and stopped publishing `el7` ones, so raising
-`enroot_version` to 3.4.1 or later on its own makes the download 404:
-
-```yaml
-enroot_rpm_packages:
-  - 'https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}/enroot-{{ enroot_version_string }}.el8.x86_64.rpm'
-  - 'https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}/enroot+caps-{{ enroot_version_string }}.el8.x86_64.rpm'
-```
-
-One version needs more than that: 3.4.0 ships `enroot_3.4.0-1_amd64.deb`
-alongside `enroot-3.4.0-2.el7.x86_64.rpm`, and the role derives both filenames
-from a single `enroot_release`, so no value of it satisfies both package
-families. It is the only release where the two disagree; pick a different one.
+`enroot_checksums` names each release file of the packages and architectures your hosts install (`roles/enroot/defaults/main.yml` lists the current ones); a setting in your config replaces the role's whole list.
 
 Then re-run the Pyxis playbook:
 

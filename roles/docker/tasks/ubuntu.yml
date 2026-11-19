@@ -3,7 +3,8 @@
 # official GPG key in /etc/apt/keyrings/docker.asc + a deb822 docker.sources repo.
 - name: Set the Docker repo URL for this distro
   ansible.builtin.set_fact:
-    _docker_repo_url: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}"
+    _docker_repo_url: "{{ lookup('ansible.builtin.vars', 'docker_' ~ ansible_facts.distribution | lower ~ '_repo_base_url') }}"
+    _docker_repo_gpgkey: "{{ lookup('ansible.builtin.vars', 'docker_' ~ ansible_facts.distribution | lower ~ '_repo_gpgkey') }}"
 
 # "sudo apt-get install ca-certificates curl"
 - name: Install repository prerequisites
@@ -27,7 +28,7 @@
   ansible.builtin.include_role:
     name: download
   vars:
-    download_url: "{{ _docker_repo_url }}/gpg"
+    download_url: "{{ _docker_repo_gpgkey }}"
     download_checksum: "{{ docker_apt_key_checksum }}"
     download_dest: "{{ docker_apt_keyring }}"
 

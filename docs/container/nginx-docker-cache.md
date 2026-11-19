@@ -70,11 +70,11 @@ This set of files will then be used for both the server and the clients.
 
 ### Server deployment
 
-To deploy the proxy server with the default configuration, add the host(s) where you wish to run the proxy to the `cache` hostgroup in inventory.
+To deploy the proxy server with the default configuration, add the host(s) where you wish to run the proxy to the `slurm-cache` hostgroup in inventory (the playbook's target, and the group clients find the proxy in, `nginx_docker_cache_hostgroup`).
 Then run:
 
 ```bash
-ansible-playbook -l cache playbooks/container/nginx-docker-registry-cache-server.yml
+ansible-playbook playbooks/container/nginx-docker-registry-cache-server.yml
 ```
 
 ### Configuring Docker clients
