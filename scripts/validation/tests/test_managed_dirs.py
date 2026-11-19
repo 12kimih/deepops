@@ -20,10 +20,7 @@ from repo_scan import Scan, ansible_files, module, tasks  # noqa: E402
 INSTALLERS = {"copy", "template", "synchronize"}
 GLOBS = ("fileglob", "filetree")
 # file -> why a glob install there must not remove what it did not install
-SHARED = {
-    "roles/cluster_tools/tasks/main.yml": "cluster_tools_shared_dirs publish onto a shared filesystem "
-    "that also holds files users and admins put there",
-}
+SHARED = {}
 
 
 def uses_recorded_files(path):
