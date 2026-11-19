@@ -1,0 +1,43 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: chrony
+    component_record_action: begin
+    component_record_items: "{{ chrony_items }}"
+
+- name: Installation
+  ansible.builtin.include_tasks: "{{ ansible_facts.os_family | lower }}.yml"
+
+- name: Copy the chrony.conf template file
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ chrony_config_location }}"
+    mode: "0644"
+    owner: root
+    group: root
+  notify:
+    - Restart chrony
+
+- name: Start and enable chrony service
+  ansible.builtin.service:
+    name: "{{ chrony_service_name }}"
+    state: "{{ chrony_service_state }}"
+    enabled: "{{ chrony_service_enabled }}"
+
+- name: Ensure tzdata package is installed
+  ansible.builtin.package:
+    name: "{{ chrony_tzdata_package }}"
+    state: present
+
+- name: Set timezone
+  community.general.timezone: name="{{ chrony_timezone }}"
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: chrony
+    component_record_action: present
+    component_record_items: "{{ chrony_items }}"

@@ -1,0 +1,33 @@
+---
+# A host is never left without time sync: the OS's own service comes back first (on
+# Ubuntu and Debian, systemd-timesyncd conflicts with chrony, so apt takes chrony out
+# as it installs it), then the record drops chrony.
+- name: Refuse to remove the OS's own time service
+  ansible.builtin.assert:
+    that: ansible_facts.os_family == 'Debian'
+    fail_msg: >-
+      On the RHEL family chrony is the OS's time service: leave chrony out of
+      deepops_component_removals there (chrony_install: false leaves it to the site).
+    quiet: true
+
+- name: Hand time sync back to systemd-timesyncd
+  ansible.builtin.apt:
+    name: systemd-timesyncd
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Start systemd-timesyncd
+  ansible.builtin.systemd_service:
+    name: systemd-timesyncd
+    state: started
+    enabled: true
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: chrony
+    component_record_action: absent
+    component_record_items: "{{ chrony_items }}"
+    component_record_exclusive_packages: [chrony]

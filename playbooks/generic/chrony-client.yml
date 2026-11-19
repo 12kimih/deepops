@@ -1,10 +1,9 @@
 ---
-# Chrony will ensure that the clocks of all your servers are in sync and can be used to sync with an internal server
-- hosts: all
+# Chrony will ensure that the clocks of all your servers are in sync and can be used to
+# sync with an internal server. Every host it runs on converges to deepops_components.
+- hosts: "{{ hostlist | default('all') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Configure Chrony client
-      ansible.builtin.include_role:
-        name: deepops_chrony
+    - role: deepops_chrony
+      chrony_state: "{{ deepops_components.chrony | component_phase(deepops_phase) }}"
