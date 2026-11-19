@@ -5,16 +5,41 @@
 A process that never answers (a Slurm RPC the client retries for ever, a read from a
 hung NFS mount) hangs whatever waits for it, so a call without a positive timeout is
 refused. check defaults to True. Failures raise proc.CalledProcessError or
-proc.TimeoutExpired (subprocess's own). Python 3.9 or newer, standard library only.
+proc.TimeoutExpired (subprocess's own).
+
+The process runs in a session of its own, and on a timeout (or an interrupt) the whole
+session is killed: subprocess.run kills only the process it started, so the commands a
+shell pipeline or runuser starts (a database dump and its gzip) would outlive it.
+Python 3.9 or newer, standard library only.
 """
 
+import os
+import signal
 import subprocess
 
 CalledProcessError = subprocess.CalledProcessError
 TimeoutExpired = subprocess.TimeoutExpired
 
 
-def run(argv, *, timeout, check=True, **kwargs):
+def run(argv, *, timeout, check=True, input=None, capture_output=False, **kwargs):
     if not timeout or timeout <= 0:
         raise ValueError(f"{argv[0]}: a process needs a positive timeout")
-    return subprocess.run(list(argv), check=check, timeout=timeout, **kwargs)
+    argv = list(argv)
+    if input is not None:
+        kwargs.setdefault("stdin", subprocess.PIPE)
+    if capture_output:
+        kwargs.setdefault("stdout", subprocess.PIPE)
+        kwargs.setdefault("stderr", subprocess.PIPE)
+    with subprocess.Popen(argv, start_new_session=True, **kwargs) as child:
+        try:
+            out, err = child.communicate(input, timeout=timeout)
+        except BaseException:  # the timeout, or an interrupt: nothing it started survives
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.communicate()
+            raise
+    if check and child.returncode:
+        raise CalledProcessError(child.returncode, argv, out, err)
+    return subprocess.CompletedProcess(argv, child.returncode, out, err)

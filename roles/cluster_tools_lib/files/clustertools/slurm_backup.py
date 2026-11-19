@@ -55,7 +55,9 @@ PREFIX = "slurm_backup_"
 STEP_TIMEOUT = 3600
 KEEP = {"daily": 14, "weekly": 8}
 # Failures one step can raise; each is reported, none ends the run without metrics.
-FAILURES = (proc.CalledProcessError, proc.TimeoutExpired, OSError, tarfile.TarError, RuntimeError)
+# ValueError: a malformed answer (a count that is no number, a row of the wrong shape)
+# fails the step and is recorded, never a traceback that skips the metrics.
+FAILURES = (proc.CalledProcessError, proc.TimeoutExpired, OSError, tarfile.TarError, RuntimeError, ValueError)
 
 
 # --- pure helpers (unit tested) ----------------------------------------------------
@@ -287,8 +289,14 @@ def fetch_newest(dest, into, timeout):
         raise RuntimeError(f"{daily}: no backup to test")
     newest = daily / dated[-1]
     sums = run_as(owner, ["cat", str(newest / SUMS_FILE)], timeout, capture_output=True, text=True).stdout
-    listed = dict(reversed(line.split(None, 1)) for line in sums.splitlines() if line.strip())
-    problems = [f"{name}: not in {SUMS_FILE}" for name in (DB_FILE, STATE_FILE) if name not in listed]
+    listed, problems = {}, []
+    for line in sums.splitlines():
+        fields = line.split(None, 1)
+        if len(fields) == 2:
+            listed[fields[1]] = fields[0]
+        elif fields:  # written where another account can write: report, never trust
+            problems.append(f"{SUMS_FILE}: malformed line {line[:80]!r}")
+    problems += [f"{name}: not in {SUMS_FILE}" for name in (DB_FILE, STATE_FILE) if name not in listed]
     # Only the names this program writes: the file is read from a destination another
     # account can write, and a name is a path root writes to here.
     problems += [f"{SUMS_FILE}: unexpected entry {name!r}" for name in listed if name not in FILES]
