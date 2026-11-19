@@ -1,7 +1,8 @@
 #!/bin/sh
 # Pending package updates and whether a reboot is needed, as node_exporter textfile
 # metrics (roles/os_updates). Simulates the full upgrade the maintenance window runs,
-# so held-back packages count too.
+# so held-back packages count too. Also every installed package and its version, so
+# Prometheus sees hosts drift apart the day it happens, not at the next maintenance.
 #
 #   os-updates-metrics <textfile-dir>            measure, keep, publish
 #   os-updates-metrics --publish <textfile-dir>  publish the kept file only (at boot)
@@ -57,6 +58,10 @@ else
     reboot=0; reboot_since=0
     rm -f "$reboot_stamp"
 fi
+# One series per installed package ("ii"); label values escaped as the format requires.
+packages=$(dpkg-query -W -f '${db:Status-Abbrev}|${binary:Package}|${Version}\n' 2>/dev/null \
+    | awk -F'|' '$1 ~ /^ii/ { gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
+        printf "os_updates_package_info{package=\"%s\",version=\"%s\"} 1\n", $2, $3 }')
 tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS
 # HELP os_updates_pending_packages Packages a full upgrade would install or change.
@@ -78,6 +83,9 @@ os_updates_dpkg_problems $dpkg_problems
 # HELP os_updates_apt_ok Whether apt could simulate the upgrade (0: the counts above are not valid).
 # TYPE os_updates_apt_ok gauge
 os_updates_apt_ok $apt_ok
+# HELP os_updates_package_info An installed package and its version (value always 1).
+# TYPE os_updates_package_info gauge
+$packages
 # HELP os_updates_metrics_timestamp_seconds When these metrics were measured.
 # TYPE os_updates_metrics_timestamp_seconds gauge
 os_updates_metrics_timestamp_seconds $now

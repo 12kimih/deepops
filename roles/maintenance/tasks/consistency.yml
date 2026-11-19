@@ -35,11 +35,12 @@
   vars:
     _hosts: "{{ ansible_play_hosts | select('in', hostvars) | list }}"
     _drift: "{{ dict(_hosts | zip(_hosts | map('extract', hostvars, 'maintenance_fleet_state'))) | fleet_drift }}"
+    _nl: "\n"  # YAML makes this a newline; inside a template '\n' stays two characters
   ansible.builtin.assert:
     that: _drift | length == 0
     quiet: true
     fail_msg: |-
       {{ _drift | length }} differences between {{ _hosts | join(', ') }}:
-      {{ _drift[:60] | join('\n') }}{{ '\n...' if _drift | length > 60 else '' }}
+      {{ _drift[:60] | join(_nl) }}{{ _nl ~ '...' if _drift | length > 60 else '' }}
       Bring them level with playbooks/utilities/apt-upgrade.yml (and the role that owns
       a differing sysctl).
