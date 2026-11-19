@@ -47,10 +47,14 @@
   when: slurm_source_build | bool
 
 # dpkg starts and restarts no Slurm daemon (the packages are built that way); the
-# handlers restart them in Slurm's order: slurmdbd, slurmctld, slurmd.
+# handlers restart them in Slurm's order: slurmdbd, slurmctld, slurmd. pyxis is in the
+# same transaction: it depends on exactly this slurm-smd, so the plugin and the Slurm
+# that loads it always change together.
 - name: Install the Slurm packages
   ansible.builtin.apt:
-    name: "{{ _packages | map('regex_replace', '$', '=' ~ slurm_deb_version) | list + [slurm_pmix_runtime_package] }}"
+    name: >-
+      {{ _packages | map('regex_replace', '$', '=' ~ slurm_deb_version) | list + [slurm_pmix_runtime_package]
+         + ([slurm_pyxis_package ~ '=' ~ slurm_pyxis_deb_version] if slurm_pyxis_wanted | bool else []) }}
     state: present
     update_cache: true
     allow_downgrade: false

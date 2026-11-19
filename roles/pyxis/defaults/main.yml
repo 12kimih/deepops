@@ -1,17 +1,6 @@
 ---
-# pyxis is a SPANK plugin and MUST be (re)built against the deployed Slurm
-# headers, which the slurm-smd-dev package installs (roles/slurm) on every host; it
-# installs into the packaged plugin directory (slurm_plugin_dir).
-# upstream: git https://github.com/NVIDIA/pyxis v(\d+)\.(\d+)\.(\d+)
-slurm_pyxis_version: 0.24.0
-slurm_pyxis_tarball_url: "https://github.com/NVIDIA/pyxis/archive/v{{ slurm_pyxis_version }}.tar.gz"
-# The tag's source archive per version (roles/download).
-slurm_pyxis_checksums:
-  "0.24.0": "sha256:9c4cdb79a67301d8ea05951aa4d2c205f40cf6145e338214b0191add8b36d6c4"
-# Each version builds in its own source tree; the record names the pyxis and Slurm
-# versions the installed plugin was built from (a change of either rebuilds it).
-pyxis_src_dir: "/usr/local/src/pyxis-{{ slurm_pyxis_version }}"
-pyxis_build_record: "{{ slurm_plugin_dir }}/spank_pyxis.so.built-from"
+# pyxis is packaged with the Slurm packages (roles/slurm, packages-build.yml) and
+# installed with them; this role configures it and enroot's hooks.
 
 # pyxis SPANK plugin options written into plugstack.conf.d/pyxis.conf.
 # https://github.com/NVIDIA/pyxis/wiki/Setup
@@ -21,16 +10,11 @@ pyxis_container_scope: job
 pyxis_sbatch_support: 1
 pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 
-
-# pyxis builds a SPANK plugin against the deployed Slurm headers, so it needs a
-# compiler toolchain (build-essential / @Development Tools) in addition to the
-# column/hex helpers. https://github.com/NVIDIA/pyxis
+# Helpers pyxis runs at job time (column, hexdump).
 pyxis_ubuntu_deps:
-  - "build-essential"
   - "bsdmainutils"
 
 pyxis_el_deps:
-  - "@Development Tools"
   - "util-linux"
 
 # /run is default partition of pyxis runtime_path
@@ -38,5 +22,3 @@ resize_run_partition: false
 
 # /run tmpfs size. ubuntu default is 10% of physical memory
 pyxis_run_tmpfs_size: 50%
-# Rebuild pyxis even when the installed build matches.
-slurm_pyxis_force_rebuild: false

@@ -56,7 +56,6 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | prometheus-ipmi-exporter | `ipmi_exporter_container` | `quay.io/prometheuscommunity/ipmi-exporter:v1.10.1@sha256:0662cadaf268` |  |
 | prometheus-node-exporter | `node_exporter_container` | `quay.io/prometheus/node-exporter:v1.12.1@sha256:1b4e4438faca` |  |
 | prometheus-slurm-exporter | `slurm_exporter_container` | `deepops/prometheus-slurm-exporter:2.0.0` |  |
-| pyxis | `slurm_pyxis_version` | `0.24.0` |  |
 | runai | `runai_kai_chart_version` | `v0.18.8` |  |
 | runai | `runai_gpu_operator_min_version` | `v26.7.1` |  |
 | runai | `runai_chart_version` | `3.0.26` |  |
@@ -65,6 +64,7 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | runai | `runai_gateway_controller_version` | `v2.2.9` |  |
 | runai | `runai_platform_prometheus_min_version` | `88.6.5` |  |
 | slurm | `slurm_version` | `26.05.6` |  |
+| slurm | `slurm_pyxis_version` | `0.24.0` |  |
 | spack | `spack_version` | `v1.2.2` |  |
 | spack | `spack_packages_version` | `v2026.06.0` |  |
 | standalone-container-registry | `standalone_container_registry_image` | `registry:3.1.2@sha256:82f6ff4a7f98` |  |

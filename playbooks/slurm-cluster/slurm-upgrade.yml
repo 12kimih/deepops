@@ -10,8 +10,8 @@
 #      install, start slurmdbd (it converts the database first) then slurmctld; check
 #      scontrol, sacct and job_submit
 #   4. compute nodes, maintenance_serial at a time: drain and wait for their jobs,
-#      install and restart slurmd, rebuild pyxis, check the node, resume it
-#   5. the other hosts (login): install, sackd, pyxis
+#      install (pyxis comes with Slurm) and restart slurmd, check the node, resume it
+#   5. the other hosts (login): install, sackd
 #   6. every slurmd reports the new version
 #
 # A failed node stops the run with that node still drained. Nothing can go back once a
@@ -111,14 +111,6 @@
         maintenance_steps: "{{ ['role'] if inventory_hostname in groups['slurm-master'] else ['drain', 'role'] }}"
         slurm_upgrade: true
 
-    # The SPANK plugin built for the old release is dropped by the slurm role; build it
-    # for the new one before the node takes jobs again.
-    - name: Rebuild pyxis for the new Slurm
-      ansible.builtin.include_role:
-        name: pyxis
-        public: true
-      when: slurm_install_enroot and slurm_install_pyxis
-
     - name: Check the node and return it to Slurm
       ansible.builtin.include_role:
         name: maintenance
@@ -141,25 +133,13 @@
       vars:
         slurm_upgrade: true
 
-    - name: Rebuild pyxis for the new Slurm
-      ansible.builtin.include_role:
-        name: pyxis
-        public: true
-      when: slurm_install_enroot and slurm_install_pyxis
 
-# The controller's pyxis (its commands load the plugin too), and the check that every
-# slurmd now runs slurm_version.
+# The check that every slurmd now runs slurm_version.
 - hosts: slurm-master
   become: true
   roles:
     - role: deploy_defaults
   tasks:
-    - name: Rebuild pyxis for the new Slurm
-      ansible.builtin.include_role:
-        name: pyxis
-        public: true
-      when: slurm_install_enroot and slurm_install_pyxis
-
     - name: Check every slurmd runs slurm_version
       ansible.builtin.include_role:
         name: slurm

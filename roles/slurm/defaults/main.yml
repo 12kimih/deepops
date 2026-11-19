@@ -53,6 +53,21 @@ slurm_deb_lua_dev: liblua5.4-dev
 # ships with (roles/nvidia_versions): a newer header could call functions the driver
 # lacks. The library itself comes from the driver on each GPU node.
 slurm_nvml_cuda_version: "{{ nvidia_driver_cuda_release }}"
+# pyxis, NVIDIA's SPANK plugin for containers, is built from its own debian/ directory
+# with the Slurm packages (against the slurm-smd-dev just built) and published with
+# them. A SPANK plugin must match the Slurm it loads in, so its package version names
+# that Slurm and it depends on exactly that slurm-smd.
+# upstream: git https://github.com/NVIDIA/pyxis v(\d+)\.(\d+)\.(\d+)
+slurm_pyxis_version: 0.24.0
+slurm_pyxis_tarball_url: "https://github.com/NVIDIA/pyxis/archive/v{{ slurm_pyxis_version }}.tar.gz"
+# The tag's source archive per version (roles/download).
+slurm_pyxis_checksums:
+  "0.24.0": "sha256:9c4cdb79a67301d8ea05951aa4d2c205f40cf6145e338214b0191add8b36d6c4"
+slurm_pyxis_package: nvslurm-plugin-pyxis
+slurm_pyxis_deb_version: "{{ slurm_pyxis_version }}-1+slurm{{ slurm_deb_version | replace('-', '.') }}"
+# Where pyxis goes: where its play runs (playbooks/container/pyxis.yml).
+slurm_pyxis_wanted: "{{ slurm_install_enroot | bool and slurm_install_pyxis | bool }}"
+
 # Plugins the packages must contain: a missing build dependency drops its plugin
 # without failing the build, so the build checks for these.
 slurm_deb_required_plugins:
@@ -66,7 +81,7 @@ slurm_deb_required_plugins:
   - task_cgroup.so
 
 # Packages per kind of host, installed at slurm_deb_version. slurm-smd-dev is on
-# every host: SPANK plugins (roles/pyxis) build against it where they load.
+# every host: the headers anything built against Slurm needs.
 slurm_packages_common: [slurm-smd, slurm-smd-client, slurm-smd-dev]
 slurm_packages_controller: [slurm-smd-slurmctld, slurm-smd-slurmdbd]
 slurm_packages_compute: [slurm-smd-slurmd, slurm-smd-libpam-slurm-adopt, slurm-smd-libpmi2-0]
