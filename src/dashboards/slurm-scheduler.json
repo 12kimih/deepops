@@ -2,7 +2,7 @@
   "uid": "slurm-scheduler",
   "title": "Slurm / Scheduler",
   "id": null,
-  "description": "Nodes, CPUs, jobs and scheduler health of the Slurm cluster.",
+  "description": "Nodes, CPUs, GPUs, jobs and scheduler health of the Slurm cluster (slurmctld's own metrics).",
   "tags": [
     "slurm"
   ],
@@ -88,7 +88,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_nodes_alloc) + max(slurm_nodes_mix) + max(slurm_nodes_idle) + max(slurm_nodes_comp) + max(slurm_nodes_drain) + max(slurm_nodes_maint) + max(slurm_nodes_down) + max(slurm_nodes_fail) + max(slurm_nodes_err) + max(slurm_nodes_other)",
+          "expr": "max(slurm_nodes)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -147,7 +147,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_nodes_alloc) + max(slurm_nodes_mix)",
+          "expr": "max(slurm_nodes_alloc) + max(slurm_nodes_mixed)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -269,7 +269,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_nodes_drain)",
+          "expr": "max(slurm_nodes_drained) + max(slurm_nodes_draining)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -332,7 +332,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_nodes_down) + max(slurm_nodes_fail) + max(slurm_nodes_err)",
+          "expr": "max(slurm_nodes_down) + max(slurm_nodes_fail)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -351,7 +351,7 @@
     },
     {
       "type": "stat",
-      "title": "CPUs allocated",
+      "title": "GPUs allocated",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -392,7 +392,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_cpus_alloc) / max(slurm_cpus_total)",
+          "expr": "sum(slurm_node_gpus_alloc) / sum(slurm_node_gpus)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -412,7 +412,7 @@
     {
       "type": "timeseries",
       "title": "Nodes by state",
-      "description": "Stacked, so the top is every node.",
+      "description": "Base states, stacked, so the top is every node (other: future, unknown, blocked).",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -633,7 +633,7 @@
           "refId": "A"
         },
         {
-          "expr": "max(slurm_nodes_mix)",
+          "expr": "max(slurm_nodes_mixed)",
           "legendFormat": "mixed",
           "datasource": {
             "type": "prometheus",
@@ -651,8 +651,8 @@
           "refId": "C"
         },
         {
-          "expr": "max(slurm_nodes_comp)",
-          "legendFormat": "completing",
+          "expr": "max(slurm_nodes_down)",
+          "legendFormat": "down",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -660,58 +660,13 @@
           "refId": "D"
         },
         {
-          "expr": "max(slurm_nodes_drain)",
-          "legendFormat": "drained",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "refId": "E"
-        },
-        {
-          "expr": "max(slurm_nodes_maint)",
-          "legendFormat": "maintenance",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "refId": "F"
-        },
-        {
-          "expr": "max(slurm_nodes_down)",
-          "legendFormat": "down",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "refId": "G"
-        },
-        {
-          "expr": "max(slurm_nodes_fail)",
-          "legendFormat": "failed",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "refId": "H"
-        },
-        {
-          "expr": "max(slurm_nodes_err)",
-          "legendFormat": "error",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "refId": "I"
-        },
-        {
-          "expr": "max(slurm_nodes_other)",
+          "expr": "max(slurm_nodes) - (max(slurm_nodes_alloc) + max(slurm_nodes_mixed) + max(slurm_nodes_idle) + max(slurm_nodes_down))",
           "legendFormat": "other",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "refId": "J"
+          "refId": "E"
         }
       ],
       "gridPos": {
@@ -724,8 +679,315 @@
     },
     {
       "type": "timeseries",
+      "title": "Nodes closed or out",
+      "description": "Flags beside the base state; a node can carry several.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "allocated"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mixed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "idle"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "completing"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "draining"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "drained"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "maintenance"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "down"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "not responding"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "powered down"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(slurm_nodes_drained)",
+          "legendFormat": "drained",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "max(slurm_nodes_draining)",
+          "legendFormat": "draining",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "max(slurm_nodes_maint)",
+          "legendFormat": "maintenance",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "C"
+        },
+        {
+          "expr": "max(slurm_nodes_noresp)",
+          "legendFormat": "not responding",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "D"
+        },
+        {
+          "expr": "max(slurm_nodes_fail)",
+          "legendFormat": "failed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "E"
+        },
+        {
+          "expr": "max(slurm_nodes_powered_down)",
+          "legendFormat": "powered down",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "F"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "id": 9
+    },
+    {
+      "type": "timeseries",
       "title": "CPUs",
-      "description": "Stacked, so the top is every CPU.",
+      "description": "CPUs jobs can use (CoreSpec excluded), stacked. Slurm counts the CPUs of drained and down nodes as idle; the node panels show those.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -780,18 +1042,109 @@
                 }
               }
             ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(slurm_node_cpus_alloc)",
+          "legendFormat": "Allocated",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
+          "refId": "A"
+        },
+        {
+          "expr": "sum(slurm_node_cpus_idle)",
+          "legendFormat": "Idle",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "B"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 9
+      },
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "GPUs",
+      "description": "Configured GPUs (gres/gpu), stacked. Not allocated includes those on drained and down nodes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Other (drained, down)"
+              "options": "Allocated"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
                   "mode": "fixed",
-                  "fixedColor": "orange"
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Not allocated"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
                 }
               }
             ]
@@ -817,7 +1170,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_cpus_alloc)",
+          "expr": "sum(slurm_node_gpus_alloc)",
           "legendFormat": "Allocated",
           "datasource": {
             "type": "prometheus",
@@ -826,31 +1179,22 @@
           "refId": "A"
         },
         {
-          "expr": "max(slurm_cpus_idle)",
-          "legendFormat": "Idle",
+          "expr": "sum(slurm_node_gpus) - sum(slurm_node_gpus_alloc)",
+          "legendFormat": "Not allocated",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "refId": "B"
-        },
-        {
-          "expr": "max(slurm_cpus_other)",
-          "legendFormat": "Other (drained, down)",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "refId": "C"
         }
       ],
       "gridPos": {
         "x": 12,
-        "y": 5,
+        "y": 14,
         "w": 12,
         "h": 9
       },
-      "id": 9
+      "id": 11
     },
     {
       "type": "row",
@@ -859,11 +1203,11 @@
       "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 23,
         "w": 24,
         "h": 1
       },
-      "id": 10
+      "id": 12
     },
     {
       "type": "stat",
@@ -907,7 +1251,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_running)",
+          "expr": "max(slurm_jobs_running)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -918,11 +1262,11 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 24,
         "w": 4,
         "h": 4
       },
-      "id": 11
+      "id": 13
     },
     {
       "type": "stat",
@@ -966,7 +1310,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_pending)",
+          "expr": "max(slurm_jobs_pending)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -977,11 +1321,11 @@
       ],
       "gridPos": {
         "x": 4,
-        "y": 15,
+        "y": 24,
         "w": 4,
         "h": 4
       },
-      "id": 12
+      "id": 14
     },
     {
       "type": "stat",
@@ -1025,7 +1369,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_completing)",
+          "expr": "max(slurm_jobs_completing)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1036,11 +1380,11 @@
       ],
       "gridPos": {
         "x": 8,
-        "y": 15,
+        "y": 24,
         "w": 4,
         "h": 4
       },
-      "id": 13
+      "id": 15
     },
     {
       "type": "stat",
@@ -1084,7 +1428,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_suspended)",
+          "expr": "max(slurm_jobs_suspended)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1095,16 +1439,16 @@
       ],
       "gridPos": {
         "x": 12,
-        "y": 15,
+        "y": 24,
         "w": 4,
         "h": 4
       },
-      "id": 14
+      "id": 16
     },
     {
       "type": "stat",
       "title": "Failed (recent)",
-      "description": "Ended jobs squeue still lists (MinJobAge, 300 s by default), so a short-lived count.",
+      "description": "Ended jobs slurmctld still holds (MinJobAge, 300 s by default), so a short-lived count.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1147,7 +1491,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_failed)",
+          "expr": "max(slurm_jobs_failed)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1158,16 +1502,16 @@
       ],
       "gridPos": {
         "x": 16,
-        "y": 15,
+        "y": 24,
         "w": 4,
         "h": 4
       },
-      "id": 15
+      "id": 17
     },
     {
       "type": "stat",
       "title": "Node failures (recent)",
-      "description": "Ended jobs squeue still lists (MinJobAge, 300 s by default), so a short-lived count.",
+      "description": "Ended jobs slurmctld still holds (MinJobAge, 300 s by default), so a short-lived count.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1210,7 +1554,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_node_fail)",
+          "expr": "max(slurm_jobs_node_failed)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1221,11 +1565,11 @@
       ],
       "gridPos": {
         "x": 20,
-        "y": 15,
+        "y": 24,
         "w": 4,
         "h": 4
       },
-      "id": 16
+      "id": 18
     },
     {
       "type": "timeseries",
@@ -1323,7 +1667,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_running)",
+          "expr": "max(slurm_jobs_running)",
           "legendFormat": "Running",
           "datasource": {
             "type": "prometheus",
@@ -1332,7 +1676,7 @@
           "refId": "A"
         },
         {
-          "expr": "max(slurm_queue_pending)",
+          "expr": "max(slurm_jobs_pending)",
           "legendFormat": "Pending",
           "datasource": {
             "type": "prometheus",
@@ -1341,7 +1685,7 @@
           "refId": "B"
         },
         {
-          "expr": "max(slurm_queue_completing)",
+          "expr": "max(slurm_jobs_completing)",
           "legendFormat": "Completing",
           "datasource": {
             "type": "prometheus",
@@ -1352,16 +1696,16 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 28,
         "w": 12,
         "h": 9
       },
-      "id": 17
+      "id": 19
     },
     {
       "type": "timeseries",
       "title": "Recently ended jobs by outcome",
-      "description": "Ended jobs squeue still lists (MinJobAge, 300 s by default), so a short-lived count.",
+      "description": "Ended jobs slurmctld still holds (MinJobAge, 300 s by default), so a short-lived count.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1498,7 +1842,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_queue_completed)",
+          "expr": "max(slurm_jobs_completed)",
           "legendFormat": "Completed",
           "datasource": {
             "type": "prometheus",
@@ -1507,7 +1851,7 @@
           "refId": "A"
         },
         {
-          "expr": "max(slurm_queue_failed)",
+          "expr": "max(slurm_jobs_failed)",
           "legendFormat": "Failed",
           "datasource": {
             "type": "prometheus",
@@ -1516,7 +1860,7 @@
           "refId": "B"
         },
         {
-          "expr": "max(slurm_queue_timeout)",
+          "expr": "max(slurm_jobs_timeout)",
           "legendFormat": "Timed out",
           "datasource": {
             "type": "prometheus",
@@ -1525,7 +1869,7 @@
           "refId": "C"
         },
         {
-          "expr": "max(slurm_queue_cancelled)",
+          "expr": "max(slurm_jobs_cancelled)",
           "legendFormat": "Cancelled",
           "datasource": {
             "type": "prometheus",
@@ -1534,7 +1878,7 @@
           "refId": "D"
         },
         {
-          "expr": "max(slurm_queue_preempted)",
+          "expr": "max(slurm_jobs_preempted)",
           "legendFormat": "Preempted",
           "datasource": {
             "type": "prometheus",
@@ -1543,7 +1887,7 @@
           "refId": "E"
         },
         {
-          "expr": "max(slurm_queue_node_fail)",
+          "expr": "max(slurm_jobs_node_failed)",
           "legendFormat": "Node failure",
           "datasource": {
             "type": "prometheus",
@@ -1554,11 +1898,11 @@
       ],
       "gridPos": {
         "x": 12,
-        "y": 19,
+        "y": 28,
         "w": 12,
         "h": 9
       },
-      "id": 18
+      "id": 20
     },
     {
       "type": "row",
@@ -1567,16 +1911,16 @@
       "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 37,
         "w": 24,
         "h": 1
       },
-      "id": 19
+      "id": 21
     },
     {
       "type": "timeseries",
       "title": "Main scheduler cycle",
-      "description": "How long one pass of the main scheduler took (sdiag).",
+      "description": "How long one pass of the main scheduler took (as sdiag reports it).",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1619,7 +1963,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_scheduler_last_cycle)",
+          "expr": "max(slurm_schedule_cycle_last)",
           "legendFormat": "Last",
           "datasource": {
             "type": "prometheus",
@@ -1628,7 +1972,7 @@
           "refId": "A"
         },
         {
-          "expr": "max(slurm_scheduler_mean_cycle)",
+          "expr": "max(slurm_sched_mean_cycle)",
           "legendFormat": "Mean",
           "datasource": {
             "type": "prometheus",
@@ -1639,16 +1983,16 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 29,
+        "y": 38,
         "w": 8,
         "h": 8
       },
-      "id": 20
+      "id": 22
     },
     {
       "type": "timeseries",
       "title": "Backfill cycle",
-      "description": "How long one backfill pass took (sdiag).",
+      "description": "How long one backfill pass took (as sdiag reports it).",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1691,7 +2035,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_scheduler_backfill_last_cycle)",
+          "expr": "max(slurm_bf_cycle_last)",
           "legendFormat": "Last",
           "datasource": {
             "type": "prometheus",
@@ -1700,7 +2044,7 @@
           "refId": "A"
         },
         {
-          "expr": "max(slurm_scheduler_backfill_mean_cycle)",
+          "expr": "max(slurm_bf_mean_cycle)",
           "legendFormat": "Mean",
           "datasource": {
             "type": "prometheus",
@@ -1711,11 +2055,11 @@
       ],
       "gridPos": {
         "x": 8,
-        "y": 29,
+        "y": 38,
         "w": 8,
         "h": 8
       },
-      "id": 21
+      "id": 23
     },
     {
       "type": "timeseries",
@@ -1764,7 +2108,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_scheduler_backfill_depth_mean)",
+          "expr": "max(slurm_bf_depth_mean)",
           "legendFormat": "Jobs considered per cycle (mean)",
           "datasource": {
             "type": "prometheus",
@@ -1775,15 +2119,15 @@
       ],
       "gridPos": {
         "x": 16,
-        "y": 29,
+        "y": 38,
         "w": 8,
         "h": 8
       },
-      "id": 22
+      "id": 24
     },
     {
       "type": "stat",
-      "title": "Scheduler threads",
+      "title": "Controller threads",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -1823,7 +2167,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_scheduler_threads)",
+          "expr": "max(slurm_server_thread_cnt)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1834,16 +2178,16 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 46,
         "w": 8,
         "h": 4
       },
-      "id": 23
+      "id": 25
     },
     {
       "type": "stat",
       "title": "Agent queue",
-      "description": "RPCs waiting for slurmctld's agent; a growing queue means the controller lags.",
+      "description": "RPCs waiting for slurmctld's agent to retry; a growing queue means the controller lags.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1890,7 +2234,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_scheduler_queue_size)",
+          "expr": "max(slurm_agent_queue_size)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1901,16 +2245,16 @@
       ],
       "gridPos": {
         "x": 8,
-        "y": 37,
+        "y": 46,
         "w": 8,
         "h": 4
       },
-      "id": 24
+      "id": 26
     },
     {
       "type": "stat",
-      "title": "Exporter errors",
-      "description": "Collectors that failed on the last scrape; their series are missing meanwhile.",
+      "title": "Pending queue",
+      "description": "Jobs the main scheduler had to consider on its last cycle.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1925,12 +2269,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
               }
             ]
           }
@@ -1953,7 +2293,7 @@
       },
       "targets": [
         {
-          "expr": "max(slurm_exporter_collector_errors)",
+          "expr": "max(slurm_schedule_queue_len)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -1964,11 +2304,11 @@
       ],
       "gridPos": {
         "x": 16,
-        "y": 37,
+        "y": 46,
         "w": 8,
         "h": 4
       },
-      "id": 25
+      "id": 27
     }
   ]
 }

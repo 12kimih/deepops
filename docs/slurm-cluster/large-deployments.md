@@ -49,9 +49,6 @@ These include:
 | `/etc/hosts`                                   | `slurm_configure_etc_hosts`          | List of hosts and IP addresses in the cluster | Set it `false` and manage the file yourself ([hosts file manual](https://man7.org/linux/man-pages/man5/hosts.5.html))                    |
 | `/etc/slurm/slurm.conf`                        | `slurm_conf_template`                | Slurm scheduler configuration                 | [Slurm configurator](https://slurm.schedmd.com/configurator.easy.html)                                                                    |
 | `/etc/nhc/nhc.conf`                            | `nhc_config_template`                | Node Health Check configuration               | [NHC documentation](https://github.com/mej/nhc/blob/master/README.md)                                                                     |
-| `/etc/prometheus/endpoints/node-exporter.yml`  | `node_exporter_conf_template`        | Prometheus endpoints for node-exporter        | [Sample targets config](https://prometheus.io/docs/prometheus/latest/getting_started/#configure-prometheus-to-monitor-the-sample-targets) |
-| `/etc/prometheus/endpoints/dcgm-exporter.yml`  | `nvidia_dcgm_exporter_conf_template` | Prometheus endpoints for dcgm-exporter        | [Sample targets config](https://prometheus.io/docs/prometheus/latest/getting_started/#configure-prometheus-to-monitor-the-sample-targets) |
-| `/etc/prometheus/endpoints/slurm-exporter.yml` | `slurm_exporter_conf_template`       | Prometheus endpoints for slurm-exporter       | [Sample targets config](https://prometheus.io/docs/prometheus/latest/getting_started/#configure-prometheus-to-monitor-the-sample-targets) |
 
 In many cases, a good way to get started with one of these files is to run DeepOps once, find the generated file, and then use it as a starting point for your static file.
 

@@ -1,4 +1,7 @@
 ---
+- name: Collect the exporter source
+  ansible.builtin.include_tasks: sources.yml
+
 - name: Remove what this component installed
   ansible.builtin.include_role:
     name: component_record

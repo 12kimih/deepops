@@ -97,3 +97,37 @@ class DashboardConventionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SlurmNativeMetricsTests(unittest.TestCase):
+    """The Slurm dashboard reads slurmctld's own metrics: every name must be one the
+    pinned Slurm serves (tests/cluster-tools/slurm-names.json, from its source by
+    scripts/deepops/slurm_names.py), on an endpoint Prometheus scrapes."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sys
+
+        sys.path.insert(0, str(ROOT / "scripts/validation"))
+        from validate_monitoring import metric_names
+
+        cls.metric_names = staticmethod(metric_names)
+        served = json.loads((ROOT / "tests/cluster-tools/slurm-names.json").read_text())["metrics"]
+        scraped = yaml.safe_load((ROOT / "roles/prometheus/defaults/main.yml").read_text())[
+            "prometheus_slurmctld_metrics"
+        ]
+        cls.served, cls.scraped = served, scraped
+
+    def test_every_scraped_set_is_an_endpoint(self):
+        self.assertEqual(sorted(set(self.scraped) - set(self.served)), [])
+
+    def test_the_slurm_dashboard_reads_only_scraped_native_metrics(self):
+        available = {name for s in self.scraped for name in self.served[s]}
+        names = set()
+        for name in ("slurm-scheduler.json",):
+            dash = json.loads((ROOT / "src/dashboards" / name).read_text())
+            for panel in panels(dash.get("panels", [])):
+                for target in panel.get("targets", []):
+                    names |= self.metric_names(target.get("expr", ""))
+        self.assertTrue(names)
+        self.assertEqual(sorted(names - available), [])

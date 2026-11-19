@@ -92,9 +92,7 @@ deepops_component_registry:
     needs: [docker]
   slurm_exporter:
     role: prometheus-slurm-exporter
-    rules:
-      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
-    needs: [docker]
+    retired: "slurmctld serves its own metrics (MetricsType=metrics/openmetrics), 2026-11"
   dcgm_exporter:
     role: nvidia-dcgm-exporter
     rules:

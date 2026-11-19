@@ -9,14 +9,12 @@ alertmanager_port: 9093
 # The exporters' ports (host network), which they listen on and Prometheus scrapes.
 node_exporter_port: 9100
 ipmi_exporter_port: 9290
-slurm_exporter_port: 8080
 dcgm_exporter_port: 9400
 # Every exporter Prometheus scrapes: its component (roles/deploy_defaults/vars/main.yml
 # says on which hosts it is present), the port and the module label alerts name it by.
 prometheus_exporters:
   - {component: node_exporter, port: "{{ node_exporter_port }}", module: node-exporter}
   - {component: ipmi_exporter, port: "{{ ipmi_exporter_port }}", module: ipmi-exporter}
-  - {component: slurm_exporter, port: "{{ slurm_exporter_port }}", module: slurm-exporter}
   - {component: dcgm_exporter, port: "{{ dcgm_exporter_port }}", module: dcgm-exporter}
 # How often Prometheus scrapes, which Grafana also needs to size its queries.
 prometheus_cfg_scrape_interval: 15s
@@ -32,8 +30,8 @@ grafana_dashboards_dir: "{{ grafana_config_dir }}/dashboards"
 # by one component) -> files in src/dashboards/. The roles install from here; the tests
 # and scripts/validation/validate_monitoring.py read it too.
 grafana_dashboard_sets:
-  deepops: [gpu-nodes.json, node-exporter-hosts.json]  # roles/grafana
-  slurm: [slurm-scheduler.json]  # roles/prometheus-slurm-exporter
+  # roles/grafana; slurm-scheduler reads slurmctld's own metrics (prometheus_slurmctld_metrics)
+  deepops: [gpu-nodes.json, node-exporter-hosts.json, slurm-scheduler.json]
   slurm_metrics: [slurm-gpu-allocation.json]  # roles/slurm_metrics
 # Grafana's public URL (e.g. "http://cluster.example:3000/"): Grafana's own links, and
 # the dashboard links alerts and the login banner carry.

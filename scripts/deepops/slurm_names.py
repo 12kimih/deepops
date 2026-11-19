@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Slurm's own names for node, partition and job states and pending reasons, taken from
-the source of the Slurm release deepops pins.
+"""Slurm's own names for node, partition and job states, pending reasons and the
+metrics slurmctld serves, taken from the source of the Slurm release deepops pins.
 
     slurm_names.py          rewrite tests/cluster-tools/slurm-names.json
     slurm_names.py --check  exit 1 when the file is not what the pinned release gives
@@ -8,11 +8,13 @@ the source of the Slurm release deepops pins.
 The cluster tools classify what Slurm's JSON says (roles/cluster_tools_lib, vocab.py).
 A word Slurm never sends matches nothing, silently: "MAINT" (sinfo's short form) once
 left nodes in a maintenance reservation counted as schedulable, since the JSON says
-"MAINTENANCE". The tests compare vocab with this file, and the file's release with
-slurm_version, so a Slurm bump is not done until this is rerun and vocab follows.
+"MAINTENANCE". The tests compare vocab, and the dashboards' and alert rules' Slurm
+metrics, with this file, and the file's release with slurm_version, so a Slurm bump is
+not done until this is rerun and they follow.
 
 Sources at the release's tag: the newest data_parser plugin's parsers.c (the JSON's
-flag names) and src/common/job_state_reason.c (the reason codes). Standard library and
+flag names), src/common/job_state_reason.c (the reason codes) and the metrics/openmetrics
+plugin (the metric names, by endpoint). Standard library and
 PyYAML only.
 """
 
@@ -68,17 +70,75 @@ def flag_names(parsers, array):
     return re.findall(r'\badd_flag(?!_hidden)\w*\([^"]*"([A-Z_]+)"', m.group(1))
 
 
+# slurmctld's metrics endpoints (src/slurmctld/http.c) by the plugin function that
+# fills each one (src/plugins/metrics/openmetrics/openmetrics.c).
+METRIC_SETS = {
+    "nodes": "nodes",
+    "jobs": "jobs",
+    "parts": "partitions",
+    "sched": "scheduler",
+    "ua": "jobs-users-accts",
+}
+
+
+def metric_names(source):
+    """{endpoint: sorted metric names} of metrics/openmetrics. ADD_METRIC*(set, type,
+    data, name, ...) emits slurm_<name>; the _PFX form, run per user and per account
+    for /metrics/jobs-users-accts, slurm_<user|account>_<name>. A metric belongs to the
+    endpoint whose metrics_p_parse_* function holds it, or calls the helper that does."""
+    functions = [
+        (m.start(), m.group(1))
+        for m in re.finditer(r"^(?:static|extern) [^\n(]*?\**(\w+)\([^;]*?\n\{", source, re.M)
+    ]
+    bodies = {name: source[start : (functions[i + 1][0] if i + 1 < len(functions) else len(source))]
+              for i, (start, name) in enumerate(functions)}  # fmt: skip
+
+    def endpoint(function, seen=()):
+        m = re.fullmatch(r"metrics_p_parse_(\w+)_metrics", function)
+        if m:
+            return METRIC_SETS[m.group(1)]
+        callers = [
+            n
+            for n, body in bodies.items()
+            if n != function and n not in seen and re.search(rf"\b{function}\b", body)
+        ]
+        found = {endpoint(c, (*seen, function)) for c in callers} - {None}
+        if len(found) > 1:
+            raise RuntimeError(f"{function} serves several endpoints: {sorted(found)}")
+        return found.pop() if found else None
+
+    sets = {e: set() for e in METRIC_SETS.values()}
+    prefixes = re.findall(r'args\.pfx = "(\w+)"', source)
+    for m in re.finditer(
+        r"^\s*ADD_METRIC(_KEYVAL_PFX|_KEYVAL|)\(set, \w+, [^,]+, (?:pfx, )?(\w+)", source, re.M
+    ):
+        holder = [name for start, name in functions if start < m.start()][-1]
+        target = endpoint(holder)
+        if target is None:
+            raise RuntimeError(f"metric {m.group(2)} in {holder}, which no endpoint reaches")
+        if m.group(1) == "_KEYVAL_PFX":
+            sets[target].update(f"slurm_{p}_{m.group(2)}" for p in prefixes)
+        else:
+            sets[target].add("slurm_" + m.group(2))
+    if not all(sets.values()):
+        raise RuntimeError(f"no metrics found for {[e for e, n in sets.items() if not n]}")
+    return {e: sorted(n) for e, n in sets.items()}
+
+
 def names(version):
     tag = "slurm-" + version.replace(".", "-") + "-1"
     parser, parsers = newest_parser(tag)
     reasons = re.findall(r'\.str = "([^"]+)"', fetch(f"{RAW}/{tag}/src/common/job_state_reason.c"))
+    metrics = metric_names(fetch(f"{RAW}/{tag}/src/plugins/metrics/openmetrics/openmetrics.c"))
     return {
         "slurm_version": version,
-        "source": f"SchedMD/slurm {tag}: src/plugins/data_parser/{parser}/parsers.c, src/common/job_state_reason.c",
+        "source": f"SchedMD/slurm {tag}: src/plugins/data_parser/{parser}/parsers.c, src/common/job_state_reason.c,"
+        " src/plugins/metrics/openmetrics/openmetrics.c",
         "node_states": flag_names(parsers, "NODE_STATES"),
         "partition_states": flag_names(parsers, "PARTITION_STATES"),
         "job_states": flag_names(parsers, "JOB_STATE"),
         "job_reasons": reasons,
+        "metrics": metrics,
     }
 
 
