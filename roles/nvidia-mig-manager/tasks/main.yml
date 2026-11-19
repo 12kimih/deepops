@@ -38,9 +38,16 @@
     - has_mig.rc == 2
     - ansible_facts.ansible_local['gpus']['count'] | default(0) | int > 0
 
-- name: Check for NVIDIA MIG parted
-  ansible.builtin.shell: which nvidia-mig-parted  # noqa command-instead-of-shell
-  register: has_mig_parted
+# The installed package's version, not whether nvidia-mig-parted is on PATH: a
+# mig_manager_version bump must upgrade it. Both print "installed VERSION-RELEASE"; a
+# missing package (or dpkg's "config-files" left by a removal) never matches.
+- name: Read the installed MIG Manager version
+  ansible.builtin.command:
+    argv: >-
+      {{ ['dpkg-query', '-W', '-f=${db:Status-Status} ${Version}', 'nvidia-mig-manager']
+         if ansible_facts.os_family == 'Debian'
+         else ['rpm', '-q', '--qf', 'installed %{VERSION}-%{RELEASE}', 'nvidia-mig-manager'] }}
+  register: mig_manager_installed
   failed_when: false
   changed_when: false
   check_mode: false  # read-only; --check needs the result
@@ -49,7 +56,7 @@
 - name: Install MIG Manager
   when:
     - has_mig.rc == 0
-    - has_mig_parted.rc != 0
+    - (mig_manager_installed.stdout | trim) != 'installed ' ~ mig_manager_version ~ '-' ~ mig_manager_release
   vars:
     mig_manager_url: "{{ mig_manager_url_deb if ansible_facts.os_family == 'Debian' else mig_manager_url_rpm }}"
     mig_manager_file: "/var/cache/deepops/{{ mig_manager_url | basename }}"
@@ -62,10 +69,12 @@
         download_checksum: "{{ mig_manager_checksums[mig_manager_url | basename] | default('') }}"
         download_dest: "{{ mig_manager_file }}"
 
-    # Under --check a file not fetched yet is not there to install.
+    # Under --check a file not fetched yet is not there to install. Another installed
+    # version is replaced (allow_downgrade: a newer one too).
     - name: Install MIG Manager (apt)
       ansible.builtin.apt:
         deb: "{{ mig_manager_file }}"
+        allow_downgrade: true
       when:
         - ansible_facts.os_family == "Debian"
         - not (ansible_check_mode and download_fetch is changed)
@@ -74,6 +83,7 @@
       ansible.builtin.dnf:
         name: "{{ mig_manager_file }}"
         state: present
+        allow_downgrade: true
       when:
         - ansible_facts.os_family == "RedHat"
         - not (ansible_check_mode and download_fetch is changed)

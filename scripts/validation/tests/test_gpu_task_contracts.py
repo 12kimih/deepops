@@ -182,7 +182,7 @@ class MigApplyFailureContract(unittest.TestCase):
                 self.assertLessEqual(
                     {
                         "has_mig.rc == 0",
-                        "has_mig_parted.rc != 0",
+                        "(mig_manager_installed.stdout | trim) != 'installed ' ~ mig_manager_version ~ '-' ~ mig_manager_release",
                         f'ansible_facts.os_family == "{family}"',
                     },
                     conditions(MIG_ROLE, name),
