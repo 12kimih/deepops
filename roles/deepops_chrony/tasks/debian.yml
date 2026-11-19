@@ -1,3 +1,7 @@
 ---
 - name: Install the require packages in Debian derivatives
-  ansible.builtin.apt: name=chrony state={{ chrony_pkg_state }}
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: true
+    cache_valid_time: 3600

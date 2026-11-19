@@ -4,6 +4,15 @@
 # not settings: sites turn the switches in roles/deploy_defaults/defaults/main.yml.
 # Components move here batch by batch; one not listed is still installed by its switch.
 deepops_component_registry:
+  # Time sync: present wherever a deploy runs while chrony_install is on; the site's own
+  # with chrony_install false; removed only when named (a host must keep time).
+  chrony:
+    role: deepops_chrony
+    removal: explicit
+    managed: "{{ chrony_install }}"
+    rules:
+      - {switch: "{{ chrony_install }}", group: slurm-cluster}
+      - {switch: "{{ chrony_install }}", group: k8s_cluster}
   rsyslog_server:
     rules:
       - {switch: "{{ slurm_enable_rsyslog_server }}", group: slurm-master, first: true}

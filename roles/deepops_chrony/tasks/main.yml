@@ -1,30 +1,14 @@
 ---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: chrony_state in ['present', 'absent', 'kept']
+    fail_msg: "chrony_state must be present, absent or kept, not {{ chrony_state }}."
+    quiet: true
+
 - name: Add the OS specific variables
   ansible.builtin.include_vars: "{{ ansible_facts.os_family | lower }}.yml"
+  when: chrony_state != 'kept'
 
-- name: Installation
-  ansible.builtin.include_tasks: "{{ ansible_facts.os_family | lower }}.yml"
-
-- name: Copy the chrony.conf template file
-  ansible.builtin.template:
-    src: chrony.conf.j2
-    dest: "{{ chrony_config_location }}"
-    mode: "0644"
-    owner: root
-    group: root
-  notify:
-    - Restart chrony
-
-- name: Start and enable chrony service
-  ansible.builtin.service:
-    name: "{{ chrony_service_name }}"
-    state: "{{ chrony_service_state }}"
-    enabled: "{{ chrony_service_enabled }}"
-
-- name: Ensure tzdata package is installed
-  ansible.builtin.package:
-    name: "{{ chrony_tzdata_package }}"
-    state: present
-
-- name: Set timezone
-  community.general.timezone: name="{{ chrony_timezone }}"
+- name: "Make chrony {{ chrony_state }}"
+  ansible.builtin.include_tasks: "{{ chrony_state }}.yml"
+  when: chrony_state != 'kept'

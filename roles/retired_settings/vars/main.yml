@@ -49,6 +49,7 @@ retired_settings:
   nvidia_container_toolkit_keyring_ascii_path: nothing (roles/package_repos keeps the key as /etc/apt/keyrings/nvidia-container-toolkit.asc)
   nvidia_container_toolkit_keyring_path: nothing (roles/package_repos keeps the key as /etc/apt/keyrings/nvidia-container-toolkit.asc)
   nvidia_container_toolkit_apt_source_path: nothing (roles/package_repos writes /etc/apt/sources.list.d/nvidia-container-toolkit.sources)
+  chrony_pkg_state: chrony_state (present, absent or kept) in roles/deepops_chrony, set by the deploy from chrony_install
   runai_helm: helm_bin in roles/deepops_paths (the one Helm client path)
   runai_helm_timeout: helm_timeout in roles/helm_release (every release waits as long)
   helm_cmd: helm_bin in roles/deepops_paths (the one Helm client path)

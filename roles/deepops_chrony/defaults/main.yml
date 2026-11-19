@@ -1,5 +1,11 @@
 ---
-chrony_pkg_state: present
+# Time sync with chrony. present, absent or kept (do nothing); a deploy sets it from
+# deepops_components: present on every host of the deploy while chrony_install is on,
+# left alone with chrony_install false (the site manages time sync). absent, only when
+# the site names chrony in deepops_component_removals, hands time sync back to the OS:
+# systemd-timesyncd on Ubuntu and Debian. On the RHEL family chrony is the OS's own
+# time service and stays.
+chrony_state: present
 chrony_service_state: started
 chrony_service_enabled: true
 chrony_config_server:

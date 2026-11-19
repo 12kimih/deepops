@@ -20,7 +20,8 @@
 
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
-  when: chrony_install
+  vars:
+    deepops_phase: install
 
 - name: Apply the OS update policy
   import_playbook: generic/os-updates.yml
@@ -360,6 +361,12 @@
 # Only where the site lists nfs in deepops_component_removals (removal: explicit).
 - name: Remove the NFS server where it is listed for removal
   import_playbook: generic/nfs-server.yml
+  vars:
+    deepops_phase: remove
+
+# Only where the site named chrony in deepops_component_removals (the OS time sync takes over).
+- name: Hand time sync back to the OS where chrony is no longer wanted
+  import_playbook: generic/chrony-client.yml
   vars:
     deepops_phase: remove
 

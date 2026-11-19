@@ -15,11 +15,11 @@ None
 
 | Variable | Required | Default | Comments |
 |----------|----------|---------|----------|
-| `chrony_pkg_state` | No | `present` | Set pkg `enabled`, `disabled`, `latest`  |
-| `chrony_service_state` | No | `started` | Set service state, started, enabled or disabled  |
-| `chrony_service_enabled` | No | `yes` | A list of NTP servers to use.  |
+| `chrony_state` | No | `present` | present, absent or kept; a deploy sets it from `chrony_install` (docs/deepops/component-state.md). absent hands time sync back to systemd-timesyncd (Debian family only) |
+| `chrony_service_state` | No | `started` | The chrony service's state |
+| `chrony_service_enabled` | No | `true` | Whether the chrony service starts at boot |
 | `chrony_config_server` | No | `["0.pool.ntp.org","1.pool.ntp.org","2.pool.ntp.org", "3.pool.ntp.org"]` | A list of NTP servers to use.  |
-| `chrony_config_logdir` | No | `/var/log/chrony` | A list of NTP servers to use.  |
+| `chrony_config_logdir` | No | `/var/log/chrony` | Where chrony writes its logs |
 | `chrony_timezone` | No | `Etc/UTC` | Set the timezone for your server. |
 
 ## Examples
