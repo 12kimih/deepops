@@ -16,7 +16,7 @@ copy it from the controller, and vault it at once:
 
 ```bash
 cd ~/deepops
-uv run ansible slurm-cluster -b -K -m ansible.builtin.stat -a "path=/etc/munge/munge.key checksum_algorithm=sha256" | grep -o '"checksum": "[^"]*"' | sort | uniq -c
+uv run ansible slurm-cluster -b -K -m ansible.builtin.command -a "sha256sum /etc/munge/munge.key" | awk '/munge.key/ {print $1}' | sort | uniq -c
 uv run ansible 'slurm-master[0]' -b -K -m ansible.builtin.fetch -a "src=/etc/munge/munge.key dest=config/files/munge/munge.key flat=yes"
 uv run ansible-vault encrypt config/files/munge/munge.key
 ```
