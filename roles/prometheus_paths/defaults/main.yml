@@ -6,10 +6,28 @@ prometheus_config_dir: /etc/prometheus
 prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
 prometheus_port: 9090
 alertmanager_port: 9093
+# The exporters' ports (host network), which they listen on and Prometheus scrapes.
+node_exporter_port: 9100
+ipmi_exporter_port: 9290
+slurm_exporter_port: 8080
+dcgm_exporter_port: 9400
+# Every exporter Prometheus scrapes: its component (roles/deploy_defaults/vars/main.yml
+# says on which hosts it is present), the port and the module label alerts name it by.
+prometheus_exporters:
+  - {component: node_exporter, port: "{{ node_exporter_port }}", module: node-exporter}
+  - {component: ipmi_exporter, port: "{{ ipmi_exporter_port }}", module: ipmi-exporter}
+  - {component: slurm_exporter, port: "{{ slurm_exporter_port }}", module: slurm-exporter}
+  - {component: dcgm_exporter, port: "{{ dcgm_exporter_port }}", module: dcgm-exporter}
 # How often Prometheus scrapes, which Grafana also needs to size its queries.
 prometheus_cfg_scrape_interval: 15s
 # node_exporter's textfile collector directory, which every textfile writer fills.
 node_exporter_prom_dir: /run/prometheus
+# Grafana's configuration, mounted into its container at /etc/grafana, and in it the
+# provisioned dashboards: configuration, so never in its data directory. Grafana and
+# every role that ships a dashboard (one subdirectory each, roles/grafana tasks_from
+# dashboards) write there.
+grafana_config_dir: /etc/grafana
+grafana_dashboards_dir: "{{ grafana_config_dir }}/dashboards"
 # Grafana's public URL (e.g. "http://cluster.example:3000/"): Grafana's own links, and
 # the dashboard links alerts and the login banner carry.
 grafana_root_url: ""

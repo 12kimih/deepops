@@ -225,10 +225,14 @@ class MonitoringImages(unittest.TestCase):
         etc, data = self.tmp / "grafana-etc", self.tmp / "grafana-data"
         shutil.copytree(self.rendered / "grafana", etc)
         expected = set()
+        # Each role's dashboards in its own directory under grafana_dashboards_dir, which
+        # lies in the configuration the container mounts at /etc/grafana.
+        dashboards = etc / default("prometheus_paths", "grafana_dashboards_dir").split("}}/", 1)[-1]
+        data.mkdir()
         for folder, files in DASHBOARDS.items():
-            (data / "dashboards" / folder).mkdir(parents=True)
+            (dashboards / folder).mkdir(parents=True)
             for path in files:
-                shutil.copy(path, data / "dashboards" / folder)
+                shutil.copy(path, dashboards / folder)
                 expected.add(json.loads(path.read_text())["uid"])
         port = default("grafana", "grafana_port")
         with Container(
@@ -246,11 +250,11 @@ class MonitoringImages(unittest.TestCase):
             self.assertEqual({d["folderUid"] for d in found if d["uid"] in expected}, {folder})
 
     def test_dcgm_exporter_accepts_its_counters(self):
-        image = default("nvidia-dcgm-exporter", "nvidia_dcgm_container")
+        image = default("nvidia-dcgm-exporter", "dcgm_exporter_container")
         counters = (
             ROOT
             / "roles/nvidia-dcgm-exporter/files"
-            / default("nvidia-dcgm-exporter", "nvidia_dcgm_container_custom_metrics_file")
+            / default("nvidia-dcgm-exporter", "dcgm_exporter_counters_file")
         )
         copy = self.tmp / "dcgm-counters.csv"
         shutil.copy(counters, copy)
@@ -258,7 +262,7 @@ class MonitoringImages(unittest.TestCase):
         # The unit's own arguments (templates/docker.dcgm-exporter.service.j2), then the check.
         check = docker("run", "--rm", "-v", f"{copy}:/etc/dcgm-exporter/custom-counters.csv:ro", image,
                        "--collectors", "/etc/dcgm-exporter/custom-counters.csv",
-                       "--address", f":{default('nvidia-dcgm-exporter', 'nvidia_dcgm_exporter_port')}",
+                       "--address", f":{default('prometheus_paths', 'dcgm_exporter_port')}",
                        "config", "validate", check=False)  # fmt: skip
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertIn("0 errors, 0 warnings", check.stdout + check.stderr)

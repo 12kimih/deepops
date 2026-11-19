@@ -1,5 +1,7 @@
 ---
-grafana_config_dir: /etc/grafana
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+grafana_state: present
 grafana_config_template: templates/grafana.ini.j2
 grafana_data_dir: /var/lib/grafana
 grafana_user_id: 472
@@ -24,7 +26,6 @@ grafana_cfg_pass: deepops
 grafana_anonymous_enabled: true
 grafana_anonymous_role: Viewer
 
-grafana_cfg_dashboard_path: "{{ grafana_data_dir }}/dashboards"
 grafana_dashboard_folder: Cluster
 # The folder's identity: renaming grafana_dashboard_folder renames this folder in place.
 grafana_dashboard_folder_uid: deepops

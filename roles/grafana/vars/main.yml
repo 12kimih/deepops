@@ -1,0 +1,14 @@
+---
+# What this component installs, for its record (roles/component_record). The database
+# (grafana_data_dir) is data and stays; other roles' dashboards are theirs.
+grafana_items: >-
+  {{ ['unit:' ~ grafana_svc_name, 'container:' ~ grafana_svc_name,
+      'file:/etc/systemd/system/' ~ grafana_svc_name,
+      'file:' ~ grafana_config_dir ~ '/grafana.ini',
+      'file:' ~ grafana_config_dir ~ '/provisioning/datasources/prometheus-datasource.yml',
+      'file:' ~ grafana_config_dir ~ '/provisioning/dashboards/prometheus-dashboard.yml']
+     + grafana_dashboards | map('regex_replace', '^', 'file:' ~ grafana_dashboards_dir ~ '/deepops/') | list
+     + ['dir:' ~ grafana_dashboards_dir ~ '/deepops', 'dir:' ~ grafana_dashboards_dir,
+        'dir:' ~ grafana_config_dir ~ '/provisioning/datasources',
+        'dir:' ~ grafana_config_dir ~ '/provisioning/dashboards',
+        'dir:' ~ grafana_config_dir ~ '/provisioning', 'dir:' ~ grafana_config_dir] }}

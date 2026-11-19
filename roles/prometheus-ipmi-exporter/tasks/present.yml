@@ -1,0 +1,82 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ipmi_exporter
+    component_record_action: begin
+    component_record_items: "{{ ipmi_exporter_items }}"
+
+# Prometheus generates every exporter's scrape targets (roles/prometheus); the file this
+# role wrote on each host before goes.
+- name: Remove the scrape target file this role wrote before
+  ansible.builtin.file:
+    path: "{{ prometheus_cfg_endpoint_dir }}/ipmi-exporter.yml"
+    state: absent
+
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ ipmi_exporter_container }}"
+
+- name: Load IPMI kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+    persistent: present
+  loop: "{{ ipmi_exporter_kernel_modules }}"
+  failed_when: false
+
+- name: Check for the IPMI device
+  ansible.builtin.stat:
+    path: /dev/ipmi0
+  register: ipmi_exporter_device
+
+- name: Skip hosts without a BMC
+  ansible.builtin.debug:
+    msg: "No /dev/ipmi0 on {{ inventory_hostname }}; ipmi-exporter not installed."
+  when: not ipmi_exporter_device.stat.exists
+
+- name: Install ipmi-exporter
+  when: ipmi_exporter_device.stat.exists
+  block:
+    - name: Create config dir
+      ansible.builtin.file:
+        path: "{{ ipmi_exporter_config_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install config file
+      ansible.builtin.template:
+        src: config.yml.j2
+        dest: "{{ ipmi_exporter_config_dir }}/config.yml"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart ipmi-exporter
+
+    - name: Install systemd unit file
+      ansible.builtin.template:
+        src: docker.ipmi-exporter.service.j2
+        dest: "/etc/systemd/system/{{ ipmi_exporter_svc_name }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart ipmi-exporter
+
+    - name: Configure service
+      ansible.builtin.systemd:
+        name: "{{ ipmi_exporter_svc_name }}"
+        state: "{{ ipmi_exporter_service_state }}"
+        enabled: "{{ ipmi_exporter_service_enabled }}"
+        daemon_reload: true
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ipmi_exporter
+    component_record_action: present
+    component_record_items: "{{ ipmi_exporter_items }}"
+    component_record_version: "{{ ipmi_exporter_container | regex_replace('@.*', '') }}"

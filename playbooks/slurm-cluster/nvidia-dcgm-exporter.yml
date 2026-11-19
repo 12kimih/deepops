@@ -1,17 +1,20 @@
 ---
 # The exporter runs in a container on the GPU nodes; the driver is nvidia-driver.yml's
 # (run it first; slurm-cluster.yml does).
+# The removal phase installs nothing.
 - name: Install docker
   import_playbook: ../container/docker.yml
+  when: deepops_phase != 'remove'
 
 - name: Install the NVIDIA Container Toolkit
   import_playbook: ../container/nvidia-docker.yml
+  when: deepops_phase != 'remove'
 
-- hosts: "{{ hostlist | default('all') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
-  roles:
-    - role: deploy_defaults
-  tasks:
+  pre_tasks:
     - name: Install custom facts module
       ansible.builtin.include_role:
         name: facts
@@ -19,8 +22,8 @@
       ansible.builtin.set_fact:
         has_gpus: true
       when: ansible_facts.ansible_local['gpus']['count'] | int > 0
-    - name: Configure dcgm exporter
-      ansible.builtin.include_role:
-        name: nvidia-dcgm-exporter
-        public: true
-      when: ansible_facts.distribution == "Ubuntu" or ansible_facts.os_family == "RedHat"
+  roles:
+    - role: deploy_defaults
+    - role: nvidia-dcgm-exporter
+      dcgm_exporter_state: "{{ deepops_components.dcgm_exporter | component_phase(deepops_phase) }}"
+  tags: [dcgm-exporter, monitoring]

@@ -1,0 +1,19 @@
+---
+# What this component installs, for its record (roles/component_record). The TSDB volume
+# is data and stays; the alert rule files are added from what is installed.
+prometheus_items:
+  - "unit:{{ prometheus_svc_name }}"
+  - "container:{{ prometheus_svc_name }}"
+  - "file:/etc/systemd/system/{{ prometheus_svc_name }}"
+  - "file:{{ prometheus_config_dir }}/prometheus.yml"
+  - "file:{{ prometheus_cfg_endpoint_dir }}/{{ prometheus_targets_file }}"
+  - "dir:{{ prometheus_cfg_endpoint_dir }}"
+  - "dir:{{ prometheus_config_dir }}/rules"
+  - "dir:{{ prometheus_config_dir }}"
+  - package:python3-docker
+# The alert rule files this run installs.
+prometheus_rule_items: >-
+  {{ prometheus_rule_sources | map('basename') | map('regex_replace', '^', 'file:' ~ prometheus_config_dir ~ '/rules/') | list }}
+# The scrape targets of every exporter, from where the component map makes it present
+# (templates/<this name>).
+prometheus_targets_file: deepops-exporters.yml

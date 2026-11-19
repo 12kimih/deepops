@@ -1,0 +1,17 @@
+---
+# The alert rule files installed are found, so one dropped from the role since is
+# removed too; the TSDB volume is data and stays.
+- name: Find the installed alert rules
+  ansible.builtin.find:
+    paths: "{{ prometheus_config_dir }}/rules"
+    patterns: "*.yml"
+  register: prometheus_installed_rules
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: prometheus
+    component_record_action: absent
+    component_record_items: >-
+      {{ prometheus_items + prometheus_installed_rules.files | map(attribute='path') | map('regex_replace', '^', 'file:') | list }}

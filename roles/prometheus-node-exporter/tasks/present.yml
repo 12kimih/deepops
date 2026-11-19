@@ -1,0 +1,49 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: node_exporter
+    component_record_action: begin
+    component_record_items: "{{ node_exporter_items }}"
+
+# Prometheus generates every exporter's scrape targets (roles/prometheus); the file this
+# role wrote on each host before goes.
+- name: Remove the scrape target file this role wrote before
+  ansible.builtin.file:
+    path: "{{ prometheus_cfg_endpoint_dir }}/node-exporter.yml"
+    state: absent
+
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ node_exporter_container }}"
+
+- name: Install systemd unit file
+  ansible.builtin.template:
+    src: templates/docker.node-exporter.service.j2
+    dest: "/etc/systemd/system/{{ node_exporter_svc_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  # The unit carries the image, the collectors and the limits; the scrape target file
+  # above is Prometheus's, so node-exporter restarts for the unit, never for it.
+  notify: Restart node-exporter
+
+- name: Configure service
+  ansible.builtin.systemd:
+    name: "{{ node_exporter_svc_name }}"
+    state: "{{ node_exporter_service_state }}"
+    enabled: "{{ node_exporter_service_enabled }}"
+    daemon_reload: true
+  notify: Restart node-exporter
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: node_exporter
+    component_record_action: present
+    component_record_items: "{{ node_exporter_items }}"
+    component_record_version: "{{ node_exporter_container | regex_replace('@.*', '') }}"

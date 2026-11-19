@@ -1,12 +1,10 @@
 ---
-# Slurm data Slurm's own metrics lack (GPU allocation), for node_exporter on the
-# controller, and its dashboard.
-- hosts: "{{ hostlist | default('slurm-metric') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Configure Slurm metrics
-      ansible.builtin.include_role:
-        name: slurm_metrics
-        public: true
+    - role: slurm_metrics
+      slurm_metrics_state: "{{ deepops_components.slurm_metrics | component_phase(deepops_phase) }}"
+  tags: ['slurm-metrics', 'monitoring']

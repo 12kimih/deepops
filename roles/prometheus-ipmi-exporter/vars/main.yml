@@ -1,0 +1,8 @@
+---
+# What this component installs, for its record (roles/component_record). The kernel
+# modules stay loaded until the next boot; their load-at-boot files go.
+ipmi_exporter_items: >-
+  {{ ['unit:' ~ ipmi_exporter_svc_name, 'container:' ~ ipmi_exporter_svc_name,
+      'file:/etc/systemd/system/' ~ ipmi_exporter_svc_name,
+      'file:' ~ ipmi_exporter_config_dir ~ '/config.yml', 'dir:' ~ ipmi_exporter_config_dir]
+     + ipmi_exporter_kernel_modules | map('regex_replace', '^(.*)$', 'file:/etc/modules-load.d/\\1.conf') | list }}

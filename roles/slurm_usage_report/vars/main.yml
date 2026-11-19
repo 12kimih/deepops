@@ -1,0 +1,11 @@
+---
+# What this component installs, for its record (roles/component_record). Its state file
+# (when each job turned idle, whom it notified) is data and stays.
+slurm_usage_report_items:
+  - "unit:{{ slurm_usage_report_svc_name }}.timer"
+  - "unit:{{ slurm_usage_report_svc_name }}.service"
+  - "file:/etc/systemd/system/{{ slurm_usage_report_svc_name }}.timer"
+  - "file:/etc/systemd/system/{{ slurm_usage_report_svc_name }}.service"
+  - "file:{{ slurm_usage_report_script }}"
+  - "file:{{ slurm_usage_report_config_dir }}/config.json"
+  - "dir:{{ slurm_usage_report_config_dir }}"

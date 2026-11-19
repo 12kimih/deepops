@@ -1,68 +1,10 @@
 ---
-- name: Create config dirs
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    mode: "0755"
-  loop:
-    - "{{ prometheus_config_dir }}"
-    - "{{ prometheus_config_dir }}/rules"
-    - "{{ prometheus_cfg_endpoint_dir }}"
+- name: Check the component state
+  ansible.builtin.assert:
+    that: prometheus_state in ['present', 'absent', 'kept']
+    fail_msg: "prometheus_state must be present, absent or kept, not {{ prometheus_state }}."
+    quiet: true
 
-- name: Collect alert rule sources
-  ansible.builtin.set_fact:
-    prometheus_rule_sources: "{{ lookup('ansible.builtin.fileglob', role_path ~ '/files/rules/*.yml', wantlist=True) + prometheus_extra_rule_files }}"
-
-- name: Install python3 docker module
-  ansible.builtin.package:
-    name: python3-docker
-    state: present
-
-# promtool ships in the same image; pulling first lets it validate files below.
-- name: Pull the image
-  ansible.builtin.include_role:
-    name: container_image
-  vars:
-    container_image: "{{ prometheus_container }}"
-
-# promtool checks each rule file before it is installed; a rule file dropped from the
-# sources is removed.
-- name: Install alert rules
-  ansible.builtin.include_role:
-    name: managed_dir
-  vars:
-    managed_dir_path: "{{ prometheus_config_dir }}/rules"
-    managed_dir_sources: "{{ prometheus_rule_sources }}"
-    managed_dir_validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check rules /check.yml"
-    managed_dir_notify: [Reload prometheus]
-
-- name: Install config file
-  ansible.builtin.template:
-    src: "{{ prometheus_config_src }}"
-    dest: "{{ prometheus_config_dir }}/prometheus.yml"
-    owner: root
-    group: root
-    mode: "0644"
-    validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check config --syntax-only /check.yml"
-  notify: Reload prometheus
-
-- name: Create a persistent docker volume for metrics
-  community.docker.docker_volume:
-    name: "{{ prometheus_docker_volume_name }}"
-    state: present
-
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.prometheus.service.j2
-    dest: "/etc/systemd/system/{{ prometheus_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart prometheus
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ prometheus_svc_name }}"
-    state: "{{ prometheus_service_state }}"
-    enabled: "{{ prometheus_service_enabled }}"
-    daemon_reload: true
+- name: "Make prometheus {{ prometheus_state }}"
+  ansible.builtin.include_tasks: "{{ prometheus_state }}.yml"
+  when: prometheus_state != 'kept'
