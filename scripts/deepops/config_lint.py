@@ -42,10 +42,11 @@ READ_ELSEWHERE = {"ansible_user", "ansible_host", "ansible_python_interpreter", 
 
 
 def tracked(*patterns):
+    """Tracked files: what a commit holds, never untracked work in the tree."""
     out = subprocess.run(
-        ["git", "ls-files", "--", *patterns], cwd=ROOT, capture_output=True, text=True, check=True
+        ["git", "ls-files", "-z", "--", *patterns], cwd=ROOT, capture_output=True, text=True, check=True
     )
-    return [ROOT / p for p in out.stdout.split()]
+    return [ROOT / p for p in out.stdout.split("\0") if p]
 
 
 def committed_site():
@@ -199,6 +200,13 @@ def check_dead():
 
 
 def check_doc_paths():
+    # A path counts when git tracks it (a file, or a directory holding tracked files):
+    # a doc naming a file only this checkout has would pass here and fail in CI.
+    known = set()
+    for path in tracked():
+        rel = path.relative_to(ROOT)
+        known.add(str(rel))
+        known.update(str(parent) for parent in rel.parents)
     problems = []
     for doc in tracked("*.md", "skills"):
         # MODERNIZATION.md is the change log: it names files that were removed on purpose.
@@ -208,7 +216,7 @@ def check_doc_paths():
             for path in PATH.findall(line):
                 if any(c in path for c in "*<>{}") or path.endswith("/..."):
                     continue
-                if not (ROOT / path).exists():
+                if path.rstrip("/") not in known:
                     problems.append(f"doc-paths: {doc.relative_to(ROOT)}:{number}: {path} does not exist")
     return problems
 
