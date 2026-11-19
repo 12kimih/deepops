@@ -55,7 +55,7 @@
 - name: Configure service
   ansible.builtin.systemd:
     name: "{{ nvidia_dcgm_svc_name }}"
-    state: "{{ nvidia_dcgm_state }}"
-    enabled: "{{ nvidia_dcgm_enabled }}"
+    state: "{{ dcgm_exporter_service_state }}"
+    enabled: "{{ dcgm_exporter_service_enabled }}"
     daemon_reload: true
   when: has_gpus

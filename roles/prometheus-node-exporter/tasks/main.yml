@@ -39,7 +39,7 @@
 - name: Configure service
   ansible.builtin.systemd:
     name: "{{ node_exporter_svc_name }}"
-    state: "{{ node_exporter_state }}"
-    enabled: "{{ node_exporter_enabled }}"
+    state: "{{ node_exporter_service_state }}"
+    enabled: "{{ node_exporter_service_enabled }}"
     daemon_reload: true
   notify: Restart node-exporter

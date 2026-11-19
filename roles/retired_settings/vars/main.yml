@@ -35,6 +35,20 @@ retired_settings:
   trident_helm_repo_name: trident_helm_repo_url (installed with helm --repo, no named repository) in roles/netapp-trident
   trident_helm_chart_name: trident_helm_chart (the chart name; the repository is trident_helm_repo_url) in roles/netapp-trident
   k8s_nfs_client_repo_name: k8s_nfs_client_helm_repo (installed with helm --repo, no named repository) in roles/nfs-client-provisioner
+  prometheus_state: prometheus_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  prometheus_enabled: prometheus_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  grafana_state: grafana_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  grafana_enabled: grafana_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  alertmanager_state: alertmanager_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  alertmanager_enabled: alertmanager_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  slurm_exporter_state: slurm_exporter_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  slurm_exporter_enabled: slurm_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  node_exporter_state: node_exporter_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  node_exporter_enabled: node_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  ipmi_exporter_state: ipmi_exporter_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  ipmi_exporter_enabled: ipmi_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  nvidia_dcgm_state: dcgm_exporter_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  nvidia_dcgm_enabled: dcgm_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
   runai_helm: helm_bin in roles/deepops_paths (the one Helm client path)
   runai_helm_timeout: helm_timeout in roles/helm_release (every release waits as long)
   helm_cmd: helm_bin in roles/deepops_paths (the one Helm client path)

@@ -8,8 +8,8 @@ ipmi_exporter_config_dir: /etc/ipmi-exporter
 ipmi_exporter_collectors: [bmc, ipmi, chassis, dcmi, sel]
 ipmi_exporter_kernel_modules: [ipmi_devintf, ipmi_si]
 ipmi_exporter_svc_name: "docker.ipmi-exporter.service"
-ipmi_exporter_state: started
-ipmi_exporter_enabled: true
+ipmi_exporter_service_state: started
+ipmi_exporter_service_enabled: true
 ipmi_exporter_max_cpu: "0.2"
 
 ipmi_exporter_conf_template: "ipmi-exporter.yml.j2"

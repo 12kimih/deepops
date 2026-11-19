@@ -86,8 +86,8 @@
 - name: Configure service
   ansible.builtin.systemd:
     name: "{{ grafana_svc_name }}"
-    state: "{{ grafana_state }}"
-    enabled: "{{ grafana_enabled }}"
+    state: "{{ grafana_service_state }}"
+    enabled: "{{ grafana_service_enabled }}"
     daemon_reload: true
 
 - name: Apply pending restarts
@@ -101,7 +101,7 @@
   retries: 30
   delay: 2
   # Under --check nothing was started or changed, so there is nothing to wait for.
-  when: grafana_state != "stopped" and not ansible_check_mode
+  when: grafana_service_state != "stopped" and not ansible_check_mode
 
 # grafana.ini sets the password only when the database is first created.
 - name: Check the admin password
@@ -113,7 +113,7 @@
     status_code: [200, 401]
   register: grafana_login
   no_log: true
-  when: grafana_state != "stopped" and not ansible_check_mode
+  when: grafana_service_state != "stopped" and not ansible_check_mode
 
 # On stdin, not argv: every user on the host can read a process's arguments.
 - name: Reset the admin password
@@ -122,7 +122,7 @@
     stdin: "{{ grafana_cfg_pass }}"
   no_log: true
   changed_when: true
-  when: grafana_state != "stopped" and (grafana_login.status | default(200)) == 401
+  when: grafana_service_state != "stopped" and (grafana_login.status | default(200)) == 401
 
 # After the restart above: a dashboard provisioned while the old provider config was
 # still loaded would land in the old folder.
@@ -149,7 +149,7 @@
   check_mode: false  # the script reports instead of acting under --check
   register: grafana_reconcile
   changed_when: (grafana_reconcile.stdout | from_json).changed and not ansible_check_mode
-  when: grafana_state != "stopped"
+  when: grafana_service_state != "stopped"
 
 - name: Show reconcile actions
   ansible.builtin.debug:
