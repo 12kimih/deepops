@@ -112,3 +112,6 @@ retired_settings:
   grafana_cfg_dashboard_path: grafana_dashboards_dir in roles/prometheus_paths (configuration, under /etc)
   nfs_servers: "deepops_component_removals: [nfs] (the NFS server goes from every host outside the deploy's NFS servers) in roles/deploy_defaults"
   maas_repo: maas_series (the MAAS release series; its PPA comes through roles/package_repos with a checked key) in roles/maas-controller
+  pyxis_src_dir: none; pyxis is packaged with Slurm (roles/slurm, slurm_pyxis_package)
+  pyxis_build_record: none; pyxis is packaged with Slurm (roles/slurm, slurm_pyxis_package)
+  slurm_pyxis_force_rebuild: slurm_force_rebuild in roles/slurm (pyxis is built with the Slurm packages)

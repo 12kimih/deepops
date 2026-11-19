@@ -1,116 +1,37 @@
 ---
-# A SPANK plugin is tied to the Slurm it was built against: slurmd refuses one built
-# for another release. So pyxis is rebuilt whenever the pyxis version or the installed
-# Slurm version differs from the ones recorded at its last build (or the plugin is
-# missing); otherwise re-runs are a no-op and do not bounce slurmd.
-# slurm_pyxis_force_rebuild=true forces a rebuild.
-- name: Read the installed Slurm version
-  ansible.builtin.command:
-    argv: ["{{ slurm_install_prefix }}/bin/scontrol", --version]
-  register: pyxis_slurm_version
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-  tags: pyxis
-
-- name: Check for an installed pyxis plugin
+# The plugin itself comes with the Slurm packages (roles/slurm installs
+# slurm_pyxis_package with the Slurm it was built for); this configures it.
+- name: Check for the pyxis SPANK plugin
   ansible.builtin.stat:
     path: "{{ slurm_plugin_dir }}/spank_pyxis.so"
-  register: pyxis_installed
+  register: pyxis_plugin
   tags: pyxis
 
-- name: Read what the installed plugin was built from
-  ansible.builtin.command:
-    argv: [cat, "{{ pyxis_build_record }}"]
-  register: pyxis_built_from
-  changed_when: false
-  failed_when: false
-  check_mode: false  # read-only; --check needs the result
+- name: Require the pyxis package
+  ansible.builtin.assert:
+    that: pyxis_plugin.stat.exists
+    fail_msg: >-
+      {{ slurm_plugin_dir }}/spank_pyxis.so is missing: the slurm play installs pyxis with
+      the Slurm packages (slurm_pyxis_package); run it first.
+    quiet: true
+  when: not ansible_check_mode
   tags: pyxis
 
-- name: Name what the plugin would be built from now
-  ansible.builtin.set_fact:
-    pyxis_build_key: "pyxis {{ slurm_pyxis_version }} for {{ pyxis_slurm_version.stdout | trim }}"
+# Earlier versions of this role built the plugin on every host from a source tree
+# under /usr/local/src, with a record of what it was built from.
+- name: Find the source trees earlier versions built pyxis in
+  ansible.builtin.find:
+    paths: /usr/local/src
+    patterns: "pyxis-*"
+    file_type: directory
+  register: pyxis_old_trees
   tags: pyxis
 
-- name: Decide whether pyxis needs building
-  ansible.builtin.set_fact:
-    pyxis_rebuild: >-
-      {{ slurm_pyxis_force_rebuild | bool
-         or not pyxis_installed.stat.exists
-         or (pyxis_built_from.stdout | trim) != pyxis_build_key }}
-  tags: pyxis
-
-- name: Create pyxis source dir
+- name: Remove what the on-host builds left
   ansible.builtin.file:
-    path: "{{ pyxis_src_dir }}"
-    state: directory
-    mode: "0755"
-  when: pyxis_rebuild | bool
-  tags: pyxis
-
-- name: Fetch and unpack the Pyxis source
-  ansible.builtin.include_role:
-    name: download
-    apply:
-      tags: pyxis
-  vars:
-    download_url: "{{ slurm_pyxis_tarball_url }}"
-    download_checksum: "{{ slurm_pyxis_checksums[slurm_pyxis_version] | default('') }}"
-    download_dest: "/var/cache/deepops/pyxis-{{ slurm_pyxis_version }}.tar.gz"
-    download_unpack: "{{ pyxis_src_dir }}"
-    download_strip: 1
-  when: pyxis_rebuild | bool
-  tags: pyxis
-
-- name: Clean pyxis source directory
-  ansible.builtin.command:
-    chdir: "{{ pyxis_src_dir }}"
-    argv:
-      - make
-      - clean
-  register: pyxis_make_clean
-  failed_when: false
-  changed_when: pyxis_make_clean.rc == 0
-  when: pyxis_rebuild | bool
-  tags: pyxis
-
-- name: Build pyxis
-  ansible.builtin.command:
-    chdir: "{{ pyxis_src_dir }}"
-    argv:
-      - make
-      - -j
-  register: result
-  changed_when: "result.stdout != \"make: Nothing to be done for 'all'.\""
-  when: pyxis_rebuild | bool
-  notify:
-    - Restart slurmd
-  tags: pyxis
-
-# `make install` places the plugin at {{ slurm_plugin_dir }}/spank_pyxis.so
-# (a consistent, owned location) instead of running it from the source tree.
-- name: Install pyxis
-  ansible.builtin.command:
-    chdir: "{{ pyxis_src_dir }}"
-    argv:
-      - make
-      - install
-      - "prefix={{ slurm_install_prefix }}"
-      - "libdir={{ slurm_plugin_dir | dirname }}"
-  changed_when: true
-  when: pyxis_rebuild | bool
-  notify:
-    - Restart slurmd
-  tags: pyxis
-
-- name: Record what the plugin was built from
-  ansible.builtin.copy:
-    dest: "{{ pyxis_build_record }}"
-    content: "{{ pyxis_build_key }}\n"
-    owner: root
-    group: root
-    mode: "0644"
-  when: pyxis_rebuild | bool
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ pyxis_old_trees.files | map(attribute='path') | list + [slurm_plugin_dir ~ '/spank_pyxis.so.built-from'] }}"
   tags: pyxis
 
 # Slurm reads only plugstack.conf; this include pulls in plugstack.conf.d/*.conf, which

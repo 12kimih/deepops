@@ -75,11 +75,30 @@
     path: "{{ slurm_repo_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"
   register: slurm_repo_has_version
 
+- name: Look for this pyxis in the repository
+  ansible.builtin.stat:
+    path: "{{ slurm_repo_dir }}/{{ slurm_pyxis_package }}_{{ slurm_pyxis_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"
+  register: slurm_repo_has_pyxis
+
+- name: Decide what to build
+  ansible.builtin.set_fact:
+    slurm_deb_build_slurm: "{{ slurm_force_rebuild | bool or not slurm_repo_has_version.stat.exists }}"
+    slurm_deb_build_pyxis: >-
+      {{ slurm_pyxis_wanted | bool
+         and (slurm_force_rebuild | bool or not slurm_repo_has_version.stat.exists or not slurm_repo_has_pyxis.stat.exists) }}
+
 - name: Build the packages
-  when: slurm_force_rebuild | bool or not slurm_repo_has_version.stat.exists
+  when: slurm_deb_build_slurm or slurm_deb_build_pyxis
   vars:
     _tree: "{{ slurm_deb_build_dir }}/slurm-{{ slurm_version }}"
+    _pyxis_tree: "{{ slurm_deb_build_dir }}/pyxis-{{ slurm_pyxis_version }}"
     _nvml: "/usr/local/cuda-{{ slurm_nvml_cuda_version }}/targets/{{ ansible_facts.architecture | replace('aarch64', 'sbsa') }}-linux"
+    # pyxis builds against the slurm-smd-dev of this version: just built, or published.
+    _pyxis_deb: "{{ slurm_deb_build_dir }}/{{ slurm_pyxis_package }}_{{ slurm_pyxis_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"
+    _slurm_debs: >-
+      {{ [slurm_deb_build_dir if slurm_deb_build_slurm else slurm_repo_dir]
+         | product(['slurm-smd', 'slurm-smd-dev'])
+         | map('join', '/') | map('regex_replace', '$', '_' ~ slurm_deb_version ~ '_' ~ slurm_deb_arch.stdout ~ '.deb') | list }}
   block:
     # cuda-nvml-dev-<version> (the NVML header and link stub) comes from NVIDIA's
     # repository, which the build container reads through the host's source and keyring.
@@ -98,86 +117,151 @@
         shell: /usr/sbin/nologin
       register: slurm_deb_build_account
 
-    # A fresh tree each build: the patches below apply to the release as shipped.
-    - name: Remove an earlier build of this version
-      ansible.builtin.file:
-        path: "{{ _tree }}"
-        state: absent
-
     - name: Create the build directory
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: "{{ slurm_deb_build_dir }}"
         state: directory
         owner: "{{ slurm_deb_build_user }}"
         mode: "0755"
-      loop: ["{{ slurm_deb_build_dir }}", "{{ _tree }}"]
 
-    - name: Fetch and unpack the Slurm release
-      ansible.builtin.include_role:
-        name: download
-      vars:
-        download_url: "{{ slurm_src_url }}"
-        download_checksum: "{{ slurm_checksums[slurm_version] | default('') }}"
-        download_dest: "/var/cache/deepops/{{ slurm_src_url | basename }}"
-        download_unpack: "{{ _tree }}"
-        download_strip: 1
-        download_owner: "{{ slurm_deb_build_user }}"
+    - name: Prepare the Slurm tree
+      when: slurm_deb_build_slurm
+      block:
+        # A fresh tree each build: the patches below apply to the release as shipped.
+        - name: Remove an earlier build of this version
+          ansible.builtin.file:
+            path: "{{ _tree }}"
+            state: absent
 
-    # The shipped debian/ directory, adjusted where this cluster needs more than it
-    # declares: Lua 5.4 for 5.3, NVML and the other extra build dependencies, NVML from
-    # its package path (never /usr/local/cuda), no dpkg dependency on the driver's
-    # libnvidia-ml (gpu_nvml.so loads it from the driver on GPU nodes only), and no
-    # daemon started or restarted by dpkg: the role restarts them in Slurm's order.
-    - name: Build against Lua {{ slurm_deb_lua_dev }}
-      ansible.builtin.replace:
-        path: "{{ _tree }}/debian/control"
-        regexp: '^ liblua5\.\d-dev,$'
-        replace: " {{ slurm_deb_lua_dev }},"
-      register: slurm_deb_patch_lua
+        - name: Create the build directory
+          ansible.builtin.file:
+            path: "{{ _tree }}"
+            state: directory
+            owner: "{{ slurm_deb_build_user }}"
+            mode: "0755"
 
-    - name: Add the build dependencies debian/control lacks
-      ansible.builtin.replace:
-        path: "{{ _tree }}/debian/control"
-        regexp: "^Build-Depends:$"
-        # Put first in the field's value, leaving no line blank: an empty line ends the
-        # paragraph, and dpkg reads the rest as one without a field.
-        replace: "Build-Depends:{% for dep in _deps %}\n {{ dep }},{% endfor %}"
-      vars:
-        _deps: "{{ ['cuda-nvml-dev-' ~ slurm_nvml_cuda_version | replace('.', '-')] + slurm_deb_build_extra_deps }}"
-      register: slurm_deb_patch_deps
+        - name: Fetch and unpack the Slurm release
+          ansible.builtin.include_role:
+            name: download
+          vars:
+            download_url: "{{ slurm_src_url }}"
+            download_checksum: "{{ slurm_checksums[slurm_version] | default('') }}"
+            download_dest: "/var/cache/deepops/{{ slurm_src_url | basename }}"
+            download_unpack: "{{ _tree }}"
+            download_strip: 1
+            download_owner: "{{ slurm_deb_build_user }}"
 
-    - name: Configure with NVML from its package
-      ansible.builtin.replace:
-        path: "{{ _tree }}/debian/rules"
-        regexp: "dh_auto_configure -- "
-        replace: "dh_auto_configure -- --with-nvml={{ _nvml }} "
-      register: slurm_deb_patch_nvml
+        # The shipped debian/ directory, adjusted where this cluster needs more than it
+        # declares: Lua 5.4 for 5.3, NVML and the other extra build dependencies, NVML from
+        # its package path (never /usr/local/cuda), no dpkg dependency on the driver's
+        # libnvidia-ml (gpu_nvml.so loads it from the driver on GPU nodes only), and no
+        # daemon started or restarted by dpkg: the role restarts them in Slurm's order.
+        - name: Build against Lua {{ slurm_deb_lua_dev }}
+          ansible.builtin.replace:
+            path: "{{ _tree }}/debian/control"
+            regexp: '^ liblua5\.\d-dev,$'
+            replace: " {{ slurm_deb_lua_dev }},"
+          register: slurm_deb_patch_lua
 
-    - name: Leave the daemons to the role
-      ansible.builtin.replace:
-        path: "{{ _tree }}/debian/rules"
-        regexp: "dh_installsystemd -p"
-        replace: "dh_installsystemd --no-start --no-stop-on-upgrade -p"
-      register: slurm_deb_patch_start
+        - name: Add the build dependencies debian/control lacks
+          ansible.builtin.replace:
+            path: "{{ _tree }}/debian/control"
+            regexp: "^Build-Depends:$"
+            # Put first in the field's value, leaving no line blank: an empty line ends the
+            # paragraph, and dpkg reads the rest as one without a field.
+            replace: "Build-Depends:{% for dep in _deps %}\n {{ dep }},{% endfor %}"
+          vars:
+            _deps: "{{ ['cuda-nvml-dev-' ~ slurm_nvml_cuda_version | replace('.', '-')] + slurm_deb_build_extra_deps }}"
+          register: slurm_deb_patch_deps
 
-    - name: Keep the driver's libnvidia-ml out of the package dependencies
-      ansible.builtin.blockinfile:
-        path: "{{ _tree }}/debian/rules"
-        # A make recipe line must start with a tab.
-        block: "override_dh_shlibdeps:\n\tdh_shlibdeps -Xgpu_nvml.so"  # noqa: no-tabs
-      register: slurm_deb_patch_shlibs
+        - name: Configure with NVML from its package
+          ansible.builtin.replace:
+            path: "{{ _tree }}/debian/rules"
+            regexp: "dh_auto_configure -- "
+            replace: "dh_auto_configure -- --with-nvml={{ _nvml }} "
+          register: slurm_deb_patch_nvml
 
-    - name: Check every packaging change applied
-      ansible.builtin.assert:
-        that: >-
-          [slurm_deb_patch_lua, slurm_deb_patch_deps, slurm_deb_patch_nvml, slurm_deb_patch_start,
-           slurm_deb_patch_shlibs] | select('changed') | list | length == 5
-        fail_msg: >-
-          The debian/ directory of Slurm {{ slurm_version }} no longer has what the build
-          adjusts (liblua5.x-dev, Build-Depends:, dh_auto_configure, dh_installsystemd);
-          update roles/slurm/tasks/packages-build.yml for it.
-        quiet: true
-      when: not ansible_check_mode
+        - name: Leave the daemons to the role
+          ansible.builtin.replace:
+            path: "{{ _tree }}/debian/rules"
+            regexp: "dh_installsystemd -p"
+            replace: "dh_installsystemd --no-start --no-stop-on-upgrade -p"
+          register: slurm_deb_patch_start
+
+        - name: Keep the driver's libnvidia-ml out of the package dependencies
+          ansible.builtin.blockinfile:
+            path: "{{ _tree }}/debian/rules"
+            # A make recipe line must start with a tab.
+            block: "override_dh_shlibdeps:\n\tdh_shlibdeps -Xgpu_nvml.so"  # noqa: no-tabs
+          register: slurm_deb_patch_shlibs
+
+        - name: Check every packaging change applied
+          ansible.builtin.assert:
+            that: >-
+              [slurm_deb_patch_lua, slurm_deb_patch_deps, slurm_deb_patch_nvml, slurm_deb_patch_start,
+               slurm_deb_patch_shlibs] | select('changed') | list | length == 5
+            fail_msg: >-
+              The debian/ directory of Slurm {{ slurm_version }} no longer has what the build
+              adjusts (liblua5.x-dev, Build-Depends:, dh_auto_configure, dh_installsystemd);
+              update roles/slurm/tasks/packages-build.yml for it.
+            quiet: true
+          when: not ansible_check_mode
+
+
+    - name: Prepare the pyxis tree
+      when: slurm_deb_build_pyxis
+      block:
+        - name: Remove an earlier pyxis tree
+          ansible.builtin.file:
+            path: "{{ _pyxis_tree }}"
+            state: absent
+
+        - name: Create the pyxis tree
+          ansible.builtin.file:
+            path: "{{ _pyxis_tree }}"
+            state: directory
+            owner: "{{ slurm_deb_build_user }}"
+            mode: "0755"
+
+        - name: Fetch and unpack the pyxis release
+          ansible.builtin.include_role:
+            name: download
+          vars:
+            download_url: "{{ slurm_pyxis_tarball_url }}"
+            download_checksum: "{{ slurm_pyxis_checksums[slurm_pyxis_version] | default('') }}"
+            download_dest: "/var/cache/deepops/pyxis-{{ slurm_pyxis_version }}.tar.gz"
+            download_unpack: "{{ _pyxis_tree }}"
+            download_strip: 1
+            download_owner: "{{ slurm_deb_build_user }}"
+
+        # NVIDIA's debian/ directory (https://github.com/NVIDIA/pyxis, "make deb"), with
+        # a version naming the Slurm it is built for, and a dependency on exactly that
+        # slurm-smd in place of enroot's: deepops installs enroot from NVIDIA's releases
+        # (roles/enroot), which no apt repository has, and a SPANK plugin loads only in
+        # the Slurm it was built against.
+        - name: Version pyxis for this Slurm
+          ansible.builtin.replace:
+            path: "{{ _pyxis_tree }}/debian/changelog"
+            regexp: '\A{{ slurm_pyxis_package }} \([^)]*\)'
+            replace: "{{ slurm_pyxis_package }} ({{ slurm_pyxis_deb_version }})"
+          register: slurm_pyxis_patch_version
+
+        - name: Make pyxis depend on this Slurm
+          ansible.builtin.replace:
+            path: "{{ _pyxis_tree }}/debian/control"
+            regexp: '^Depends: (\$\{shlibs:Depends\}, \$\{misc:Depends\}),.*$'
+            replace: 'Depends: \1, slurm-smd (= {{ slurm_deb_version }})'
+          register: slurm_pyxis_patch_depends
+
+        - name: Check every pyxis packaging change applied
+          ansible.builtin.assert:
+            that: "[slurm_pyxis_patch_version, slurm_pyxis_patch_depends] | select('changed') | list | length == 2"
+            fail_msg: >-
+              The debian/ directory of pyxis {{ slurm_pyxis_version }} no longer has what the
+              build adjusts (its changelog's first entry, Depends:); update
+              roles/slurm/tasks/packages-build.yml for it.
+            quiet: true
+          when: not ansible_check_mode
 
     - name: Build in a clean container
       when: not ansible_check_mode
@@ -186,8 +270,8 @@
           container: "{{ slurm_deb_build_container }}"
           env: "{{ proxy_env | combine({'DEBIAN_FRONTEND': 'noninteractive'}) }}"
       block:
-        # The tree at the same path; the CUDA repository (package_repos) read-only, for
-        # cuda-nvml-dev.
+        # The trees at the same path; the repository (for pyxis, the published Slurm) and
+        # the CUDA repository (package_repos, for cuda-nvml-dev) read-only.
         - name: Start the build container
           community.docker.docker_container:
             name: "{{ slurm_deb_build_container }}"
@@ -200,6 +284,7 @@
             env: "{{ proxy_env }}"
             mounts:
               - {type: bind, source: "{{ slurm_deb_build_dir }}", target: "{{ slurm_deb_build_dir }}"}
+              - {type: bind, source: "{{ slurm_repo_dir }}", target: "{{ slurm_repo_dir }}", read_only: true}
               - {type: bind, source: "{{ package_repos_cuda_keyring_file }}", target: "{{ package_repos_cuda_keyring_file }}", read_only: true}
               - {type: bind, source: "{{ package_repos_cuda_source_file }}", target: "{{ package_repos_cuda_source_file }}", read_only: true}
 
@@ -226,6 +311,7 @@
             argv: [mk-build-deps, --install, --remove, --tool, apt-get -y -q --no-install-recommends, "{{ _tree }}/debian/control"]
             chdir: "{{ slurm_deb_build_dir }}"
           changed_when: true
+          when: slurm_deb_build_slurm
 
         - name: Build the packages
           community.docker.docker_container_exec:
@@ -237,6 +323,32 @@
             argv: [dpkg-buildpackage, -b, -uc, -us]
             chdir: "{{ _tree }}"
           changed_when: true
+          when: slurm_deb_build_slurm
+
+        - name: Install this Slurm and pyxis's build dependencies in the container
+          community.docker.docker_container_exec:
+            container: "{{ _in_container.container }}"
+            env: "{{ _in_container.env }}"
+            argv:
+              - bash
+              - -ec
+              - |
+                apt-get install -y -q --no-install-recommends {{ _slurm_debs | map('quote') | join(' ') }}
+                mk-build-deps --install --remove --tool 'apt-get -y -q --no-install-recommends' {{ (_pyxis_tree ~ '/debian/control') | quote }}
+            chdir: "{{ slurm_deb_build_dir }}"
+          changed_when: true
+          when: slurm_deb_build_pyxis
+
+        - name: Build the pyxis package
+          community.docker.docker_container_exec:
+            container: "{{ _in_container.container }}"
+            user: "{{ slurm_deb_build_account.uid }}:{{ slurm_deb_build_account.group }}"
+            env:
+              HOME: "{{ slurm_deb_build_dir }}"
+            argv: [dpkg-buildpackage, -b, -uc, -us]
+            chdir: "{{ _pyxis_tree }}"
+          changed_when: true
+          when: slurm_deb_build_pyxis
 
       always:
         - name: Remove the build container
@@ -249,14 +361,14 @@
         argv: [dpkg-deb, --contents, "{{ slurm_deb_build_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"]
       register: slurm_deb_contents
       changed_when: false
-      when: not ansible_check_mode
+      when: not ansible_check_mode and slurm_deb_build_slurm
 
     - name: Read the main package's dependencies
       ansible.builtin.command:
         argv: [dpkg-deb, --field, "{{ slurm_deb_build_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb", Depends]
       register: slurm_deb_depends
       changed_when: false
-      when: not ansible_check_mode
+      when: not ansible_check_mode and slurm_deb_build_slurm
 
     - name: Check the packages hold every required plugin
       ansible.builtin.assert:
@@ -272,12 +384,37 @@
         quiet: true
       vars:
         _missing: "{{ slurm_deb_required_plugins | reject('in', slurm_deb_contents.stdout) | list }}"
-      when: not ansible_check_mode
+      when: not ansible_check_mode and slurm_deb_build_slurm
+
+    - name: Read what the pyxis package holds and needs
+      ansible.builtin.command:
+        argv: [dpkg-deb, --info, "{{ _pyxis_deb }}"]
+      register: slurm_pyxis_deb_info
+      changed_when: false
+      when: not ansible_check_mode and slurm_deb_build_pyxis
+
+    - name: List what the pyxis package holds
+      ansible.builtin.command:
+        argv: [dpkg-deb, --contents, "{{ _pyxis_deb }}"]
+      register: slurm_pyxis_deb_contents
+      changed_when: false
+      when: not ansible_check_mode and slurm_deb_build_pyxis
+
+    - name: Check the pyxis package puts the plugin where Slurm loads it, for this Slurm
+      ansible.builtin.assert:
+        that:
+          - ('.' ~ slurm_plugin_dir ~ '/spank_pyxis.so') in slurm_pyxis_deb_contents.stdout
+          - ('slurm-smd (= ' ~ slurm_deb_version ~ ')') in slurm_pyxis_deb_info.stdout
+        fail_msg: >-
+          The pyxis package {{ _pyxis_deb | basename }} does not install
+          {{ slurm_plugin_dir }}/spank_pyxis.so or does not depend on slurm-smd (= {{ slurm_deb_version }}).
+        quiet: true
+      when: not ansible_check_mode and slurm_deb_build_pyxis
 
 - name: Find the built packages
   ansible.builtin.find:
     paths: "{{ slurm_deb_build_dir }}"
-    patterns: "*_{{ slurm_deb_version }}_*.deb"
+    patterns: ["*_{{ slurm_deb_version }}_*.deb", "{{ slurm_pyxis_package }}_{{ slurm_pyxis_deb_version }}_*.deb"]
   register: slurm_deb_built
 
 - name: Create the repository directory

@@ -199,13 +199,14 @@ class TestCleanBuild(unittest.TestCase):
             if apt and apt.get("state", "present") == "present" and apt.get("name"):
                 self.fail(f"{task.get('name')} installs {apt['name']} on the build host")
 
-    def test_the_container_sees_only_the_tree_and_the_cuda_source(self):
+    def test_the_container_sees_only_the_trees_the_repository_and_the_cuda_source(self):
         task = find(BUILD, "Start the build container")
         targets = [m["target"] for m in task["docker_container"]["mounts"]]
         self.assertEqual(
             targets,
             [
                 "{{ slurm_deb_build_dir }}",
+                "{{ slurm_repo_dir }}",
                 "{{ package_repos_cuda_keyring_file }}",
                 "{{ package_repos_cuda_source_file }}",
             ],
@@ -224,6 +225,62 @@ class TestCleanBuild(unittest.TestCase):
         task = find(clean["block"], "Build the packages")["docker_container_exec"]
         self.assertIn("slurm_deb_build_account.uid", task["user"])
         self.assertEqual(task["argv"][0], "dpkg-buildpackage")
+
+
+# From pyxis-0.24.0/debian (NVIDIA's packaging: the first changelog entry and the
+# binary package's Depends, with an older entry the version edit must leave alone).
+PYXIS_CHANGELOG = """nvslurm-plugin-pyxis (0.24.0-1) UNRELEASED; urgency=medium
+
+  * Release v0.24.0
+
+ -- NVIDIA CORPORATION <cudatools@nvidia.com>  Tue, 12 May 2026 04:06:41 +0000
+
+nvslurm-plugin-pyxis (0.23.0-1) UNRELEASED; urgency=medium
+"""
+PYXIS_CONTROL = """Source: nvslurm-plugin-pyxis
+Build-Depends: debhelper (>= 10), slurm-smd-dev | libslurm-dev
+
+Package: nvslurm-plugin-pyxis
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, enroot (>= 3.1.0) | enroot-hardened (>= 3.1.0)
+"""
+
+
+class PyxisPackage(unittest.TestCase):
+    """pyxis is packaged with Slurm: versioned for it and depending on exactly it, so the
+    plugin and the Slurm that loads it change in one apt transaction."""
+
+    def deb_version(self):
+        return render(render(DEFAULTS["slurm_pyxis_deb_version"], variables()), variables())
+
+    def test_the_version_names_this_slurm(self):
+        self.assertEqual(self.deb_version(), "0.24.0-1+slurm26.05.6.1")
+
+    def test_only_the_first_changelog_entry_is_renamed(self):
+        values = variables()
+        values["slurm_pyxis_deb_version"] = self.deb_version()
+        task = find(BUILD, "Version pyxis for this Slurm")["replace"]
+        out = re.sub(
+            render(task["regexp"], values), render(task["replace"], values), PYXIS_CHANGELOG, flags=re.M
+        )
+        self.assertTrue(out.startswith("nvslurm-plugin-pyxis (0.24.0-1+slurm26.05.6.1) UNRELEASED;"))
+        self.assertIn("nvslurm-plugin-pyxis (0.23.0-1) UNRELEASED;", out)
+
+    def test_it_depends_on_exactly_this_slurm_not_on_enroot(self):
+        out = replace(PYXIS_CONTROL, "Make pyxis depend on this Slurm")
+        self.assertIn("Depends: ${shlibs:Depends}, ${misc:Depends}, slurm-smd (= 26.05.6-1)\n", out)
+        self.assertNotIn("enroot", out)
+        self.assertIn("Build-Depends: debhelper (>= 10), slurm-smd-dev | libslurm-dev", out)
+
+    def test_it_is_installed_with_slurm(self):
+        install = find(load("roles/slurm/tasks/packages.yml"), "Install the Slurm packages")
+        self.assertIn("slurm_pyxis_package", install["apt"]["name"])
+
+    def test_no_host_builds_pyxis(self):
+        for path in sorted((ROOT / "roles" / "pyxis" / "tasks").glob("*.yml")):
+            text = path.read_text()
+            for word in ("make", "gcc", "build-essential"):
+                self.assertIsNone(re.search(rf"\b{word}\b", text), f"{path.name} mentions {word}")
 
 
 if __name__ == "__main__":

@@ -33,6 +33,15 @@ never `/usr/local/cuda`), and stops if a plugin in `slurm_deb_required_plugins` 
 missing or `job_submit_lua.so` does not link Lua 5.4. dpkg never starts or restarts a
 Slurm daemon (the build passes `--no-start`): the role restarts them in Slurm's order.
 
+pyxis (`slurm_pyxis_version`) is built in the same container from NVIDIA's own
+`debian/` directory, against the `slurm-smd-dev` of this version, as
+`nvslurm-plugin-pyxis` version `<pyxis>-1+slurm<slurm_deb_version>`: it depends on
+exactly that `slurm-smd` (instead of enroot, which `roles/enroot` installs from
+NVIDIA's releases) and is installed in the same apt transaction as Slurm wherever
+`slurm_install_enroot` and `slurm_install_pyxis` are on. A SPANK plugin loads only in
+the Slurm it was built for, so the two always change together; nothing is compiled
+on the nodes.
+
 The packages go into a flat apt repository in `slurm_repo_dir` (default
 `/sw/.slurm-repo`, on the shared software filesystem), signed with
 the key in `slurm_repo_signing_key_file`. Every node trusts that key for that repository only
@@ -126,11 +135,10 @@ Following [Slurm's upgrade guide](https://slurm.schedmd.com/upgrades.html):
    `ping`, `sinfo`, `sacct`, the accounting cluster and, with the Lua plugin, a
    test-only submission through `job_submit.lua`. Running jobs keep running.
 4. Compute nodes, `maintenance_serial` at a time (roles/maintenance): drain and wait
-   for the node's jobs, install and restart `slurmd`, rebuild pyxis for the new
-   release (its old build is dropped from `plugstack.conf.d` until then), check
+   for the node's jobs, install (pyxis with it) and restart `slurmd`, check
    `slurmd`, the GPUs, DCGM and NHC, resume the node. A failing node stops the run
    and stays drained.
-5. Login and other hosts: install, restart `sackd`, rebuild pyxis.
+5. Login and other hosts: install (pyxis with it), restart `sackd`.
 6. Every `slurmd` must report the new version.
 
 ### Going back
