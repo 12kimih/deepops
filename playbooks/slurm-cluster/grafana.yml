@@ -8,3 +8,4 @@
     - name: Configure grafana
       ansible.builtin.include_role:
         name: grafana
+        public: true

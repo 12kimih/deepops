@@ -20,6 +20,7 @@
     - name: Take the node out, test its GPUs and put it back
       ansible.builtin.include_role:
         name: maintenance
+        public: true
         tasks_from: run
       vars:
         maintenance_steps: [drain, verify, resume]

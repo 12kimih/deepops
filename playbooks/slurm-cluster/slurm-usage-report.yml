@@ -5,3 +5,4 @@
     - name: Configure the Slurm usage report
       ansible.builtin.include_role:
         name: slurm_usage_report
+        public: true

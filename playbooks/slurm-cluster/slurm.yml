@@ -11,6 +11,7 @@
     - name: Build slurm on all nodes
       ansible.builtin.include_role:
         name: slurm
+        public: true
         tasks_from: build
 
 # One pass over every Slurm host: each one's duties (controller, compute or client
@@ -29,5 +30,6 @@
     - name: Setup slurm login on compute if enabled.
       ansible.builtin.include_role:
         name: slurm
+        public: true
         tasks_from: login-compute-setup
       when: slurm_login_on_compute | default(false)

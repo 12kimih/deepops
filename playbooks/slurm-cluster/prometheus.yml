@@ -8,3 +8,4 @@
     - name: Configure prometheus
       ansible.builtin.include_role:
         name: prometheus
+        public: true

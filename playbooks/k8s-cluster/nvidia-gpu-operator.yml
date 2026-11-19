@@ -7,6 +7,7 @@
     - name: Install helm chart for GPU operator
       ansible.builtin.include_role:
         name: nvidia-gpu-operator
+        public: true
       run_once: true
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   tags:

@@ -21,6 +21,7 @@
     - name: Reboot
       ansible.builtin.include_role:
         name: maintenance
+        public: true
         tasks_from: reboot
       vars:
         maintenance_force_reboot: true
