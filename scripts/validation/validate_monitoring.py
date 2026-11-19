@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Validate a DeepOps monitoring deployment through Prometheus and report a verdict.
+
+Run it after deploying the monitoring playbooks, from a checkout of this repository on
+any host that reaches Prometheus (read-only HTTP API; nothing is changed):
+
+    validate_monitoring.py [--url http://localhost:9090] [--json]
+
+Checks:
+  ready        Prometheus answers /-/ready.
+  targets      every scrape target is up.
+  rules        every rule group evaluates without error.
+  alerting     an Alertmanager is attached and the Watchdog alert reaches it (the
+               always-firing alert that proves the alert path end to end).
+  metrics      every metric the repository's alert rules and dashboards read exists,
+               except those only some hardware has (OPTIONAL). A metric missing while
+               others from its exporter exist is a rollout gap: a newer rule or
+               dashboard reached Prometheus before the exporter config it needs.
+  gpu_join     every GPU DCGM reports joins Slurm's device numbering (the join the
+               allocation alerts and dashboard stand on).
+  freshness    the textfile metrics with an update timestamp were written recently.
+
+Exit codes: 0 = all checks passed, 1 = a check failed, 2 = Prometheus unreachable.
+"""
+
+import argparse
+import json
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+RULES = ROOT / "roles" / "prometheus" / "files" / "rules"
+DASHBOARDS = [
+    ROOT / "src" / "dashboards" / "gpu-nodes.json",
+    ROOT / "roles" / "prometheus-slurm-exporter" / "files" / "slurm-scheduler.json",
+    ROOT / "roles" / "slurm_metrics" / "files" / "slurm-gpu-allocation.json",
+]
+# Metrics only some hardware or some exporter versions produce; their absence is no
+# failure (the panels reading them say so, the alerts reading them stay quiet).
+OPTIONAL = re.compile(
+    r"^(DCGM_FI_DEV_NVLINK_.*|DCGM_FI_PROF_.*|DCGM_EXP_XID_ERRORS_COUNT|DCGM_FI_DEV_XID_ERRORS"
+    r"|node_infiniband_.*|node_hwmon_power_.*|ipmi_.*|.+_tls_cert_not_after_seconds"
+    r"|ALERTS|ALERTS_FOR_STATE)$"
+)
+# Metrics that exist only while what they count does (a GPU some job holds).
+WHILE_IN_USE = re.compile(r"^(slurm_gpu_allocated)$")
+# Exporters by metric prefix: a missing metric is a rollout gap only when its exporter
+# reports others.
+EXPORTERS = ("DCGM_", "node_", "slurm_", "os_updates_", "ipmi_")
+# Textfile writers that stamp each write, and how old a stamp may be.
+FRESH = {"slurm_metrics_updated_timestamp_seconds": 300}
+PROMQL_WORDS = {
+    "by", "on", "and", "or", "unless", "without", "ignoring", "group_left", "group_right",
+    "offset", "bool", "time", "vector", "scalar", "inf", "nan", "le", "count", "sum", "max",
+    "min", "avg", "topk", "bottomk", "quantile", "stddev", "rate", "irate", "increase",
+    "changes", "delta", "deriv", "resets", "label_replace", "label_join", "abs", "absent",
+    "absent_over_time", "clamp_min", "clamp_max", "round", "ceil", "floor", "histogram_quantile",
+    "max_over_time", "min_over_time", "avg_over_time", "sum_over_time", "count_over_time",
+    "last_over_time", "present_over_time", "timestamp", "sort", "sort_desc", "query_result",
+    "label_values", "humanizeDuration", "humanize",
+}  # fmt: skip
+
+
+def metric_names(expr):
+    """The metric names an expression reads (selectors, label lists, windows, strings
+    and dashboard variables aside)."""
+    text = re.sub(r'\{[^}]*\}|\[[^]]*\]|"[^"]*"|\$\w+|\$\{[^}]*\}', " ", expr)
+    # label lists: by (host), on (instance), group_left (state)
+    text = re.sub(r"\b(by|on|without|ignoring|group_left|group_right)\s*\([^)]*\)", " ", text)
+    names = set()
+    for m in re.finditer(r"[A-Za-z_:][A-Za-z0-9_:]*", text):
+        name, rest = m.group(0), text[m.end() :].lstrip()
+        if name in PROMQL_WORDS or rest.startswith("(") or re.fullmatch(r"\d.*", name):
+            continue
+        names.add(name)
+    return names
+
+
+def repo_metrics():
+    """{metric: [where it is read]} over the alert rules and dashboards, recording rules
+    expanded to what they read."""
+    reads, recorded = {}, {}
+    for path in sorted(RULES.glob("*.yml")):
+        for group in yaml.safe_load(path.read_text())["groups"]:
+            for rule in group["rules"]:
+                if "record" in rule:
+                    recorded[rule["record"]] = metric_names(rule["expr"])
+                for name in metric_names(rule["expr"]):
+                    reads.setdefault(name, []).append(
+                        f"{path.name}:{rule.get('alert') or rule.get('record')}"
+                    )
+    for path in DASHBOARDS:
+        if not path.is_file():
+            continue
+        dash = json.loads(path.read_text())
+        panels = [p for top in dash.get("panels", []) for p in [top, *top.get("panels", [])]]
+        for panel in panels:
+            for target in panel.get("targets", []):
+                for name in metric_names(target.get("expr", "")):
+                    reads.setdefault(name, []).append(f"{path.name}:{panel.get('title')}")
+    return reads, recorded
+
+
+class Prometheus:
+    def __init__(self, url):
+        self.url = url.rstrip("/")
+
+    def get(self, path, **params):
+        query = f"?{urllib.parse.urlencode(params)}" if params else ""
+        with urllib.request.urlopen(self.url + path + query, timeout=30) as resp:
+            body = resp.read()
+        return json.loads(body) if body.strip().startswith(b"{") else body.decode()
+
+    def query(self, expr):
+        return self.get("/api/v1/query", query=expr)["data"]["result"]
+
+
+def check(prom):
+    results = {}
+
+    def record(name, ok, detail):
+        results[name] = {"ok": ok, "detail": detail}
+
+    targets = prom.get("/api/v1/targets", state="active")["data"]["activeTargets"]
+    down = sorted(
+        f"{t['labels'].get('job')}/{t['labels'].get('instance')}" for t in targets if t["health"] != "up"
+    )
+    record("targets", not down and bool(targets), {"total": len(targets), "down": down})
+
+    groups = prom.get("/api/v1/rules")["data"]["groups"]
+    broken = [
+        f"{g['name']}/{r.get('name')}: {r.get('lastError')}"
+        for g in groups
+        for r in g["rules"]
+        if r.get("health") not in ("ok", None)
+    ]
+    record("rules", not broken and bool(groups), {"groups": len(groups), "errors": broken})
+
+    managers = prom.get("/api/v1/alertmanagers")["data"]["activeAlertmanagers"]
+    watchdog = prom.query('ALERTS{alertname="Watchdog", alertstate="firing"}')
+    record(
+        "alerting",
+        bool(managers) and bool(watchdog),
+        {"alertmanagers": len(managers), "watchdog_firing": bool(watchdog)},
+    )
+
+    present = set(prom.get("/api/v1/label/__name__/values")["data"])
+    reads, recorded = repo_metrics()
+    gaps = {}
+    for name, where in sorted(reads.items()):
+        inputs = recorded.get(name, {name})
+        for metric in inputs:
+            if (
+                metric in present
+                or metric in recorded
+                or OPTIONAL.match(metric)
+                or WHILE_IN_USE.match(metric)
+            ):
+                continue
+            prefix = next((p for p in EXPORTERS if metric.startswith(p)), None)
+            if prefix and any(m.startswith(prefix) for m in present):
+                gaps.setdefault(metric, sorted(set(where)))
+    record("metrics", not gaps, {"read": len(reads), "missing": gaps})
+
+    reporting = {r["metric"].get("host") for r in prom.query("count by (host) (DCGM_FI_DEV_GPU_UTIL)")}
+    joined = {
+        r["metric"].get("host") for r in prom.query("count by (host) (host_gpu:dcgm_slurm_device:info)")
+    }
+    record(
+        "gpu_join", reporting <= joined, {"gpu_hosts": len(reporting), "unjoined": sorted(reporting - joined)}
+    )
+
+    stale = {}
+    now = time.time()
+    for metric, limit in FRESH.items():
+        for series in prom.query(metric):
+            age = now - float(series["value"][1])
+            if age > limit:
+                stale[f"{metric}{{host={series['metric'].get('host')}}}"] = round(age)
+    record("freshness", not stale, {"stale_seconds": stale})
+    return results
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    p.add_argument("--url", default="http://localhost:9090", help="Prometheus base URL")
+    p.add_argument("--json", action="store_true", help="print one JSON object")
+    args = p.parse_args(argv)
+    prom = Prometheus(args.url)
+    try:
+        ready = "Ready" in str(prom.get("/-/ready"))
+        results = {"ready": {"ok": ready, "detail": {}}, **check(prom)}
+    except (urllib.error.URLError, OSError, ValueError, KeyError) as e:
+        out = {"ok": False, "error": f"{args.url}: {e}"}
+        print(json.dumps(out) if args.json else out["error"], file=sys.stdout if args.json else sys.stderr)
+        return 2
+    ok = all(r["ok"] for r in results.values())
+    if args.json:
+        print(json.dumps({"ok": ok, "checks": results}, indent=2))
+    else:
+        for name, r in results.items():
+            print(f"{'ok  ' if r['ok'] else 'FAIL'} {name}: {json.dumps(r['detail'])}")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
