@@ -198,7 +198,7 @@ Ported from the operator's private playbooks, rewritten in DeepOps style
   rebooting into firmware.
 - `playbooks/nvidia-software/nvidia-vulkan.yml` -- Vulkan runtime/tools/Mesa.
 - `playbooks/utilities/apt-upgrade.yml` -- hostlist-parameterized dist-upgrade.
-- `playbooks/utilities/reboot.yml` -- rolling reboot (`reboot_serial`).
+- `playbooks/utilities/reboot.yml` -- rolling reboot (`maintenance_serial`).
 
 Boot-persistence / idempotency fixes:
 - `nvidia-peer-memory`: enable the `nv_peer_mem` service (`enabled: true`) and

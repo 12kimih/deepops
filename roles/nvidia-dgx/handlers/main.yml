@@ -9,9 +9,6 @@
     name: cachefilesd
     state: restarted
 
-- name: Reboot after driver install
-  ansible.builtin.include_tasks: reboot.yml  # a handler cannot include a role directly
-
 - name: Restart docker
   ansible.builtin.service:
     name: docker

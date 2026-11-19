@@ -465,6 +465,38 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "ask with roles/maintenance reboot_request instead")
         scan.check(self)
 
+    def test_suites_list_files_through_repo_scan(self):
+        # A suite running git ls-files itself sees files deleted but not yet staged and
+        # fails on them; repo_scan.tracked is the one listing (tracked and present).
+        own = ROOT / "tests" / "lib" / "repo_scan.py"
+        offenders = [
+            rel(path)
+            for path in tracked("tests/*.py", "scripts/validation/tests/*.py")
+            if path != own and path.name != Path(__file__).name and '"ls-files"' in path.read_text()
+        ]
+        self.assertEqual(offenders, [], "use tests/lib/repo_scan.py tracked()")
+
+    def test_no_handler_includes_a_role(self):
+        # ansible-core refuses include_role in a handler, also through an included task
+        # file, and only when the handler runs: a reboot request there failed on the
+        # rare run that needed it. Act on the registered result in a task instead.
+        offenders = []
+        for path in sorted(ROOT.glob("roles/*/handlers/*.yml")):
+            role_tasks = path.parents[1] / "tasks"
+            for task in tasks(path):
+                name, args = module(task)
+                where = f"{rel(path)}: {task.get('name')}"
+                if name in ("include_role", "import_role"):
+                    offenders.append(where)
+                elif name in ("include_tasks", "import_tasks"):
+                    target = args.get("file", args.get("_raw_params", ""))
+                    included = role_tasks / str(target)
+                    if included.is_file() and any(
+                        module(t)[0] in ("include_role", "import_role") for t in tasks(included)
+                    ):
+                        offenders.append(f"{where}: through {target}")
+        self.assertEqual(offenders, [], "a handler cannot include a role")
+
     def test_script_output_loops_drop_blank_lines(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):

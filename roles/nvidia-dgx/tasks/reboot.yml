@@ -1,6 +1,7 @@
 ---
-# Run by the "Reboot after driver install" handler: the reboot is asked for, and done
-# drained by playbooks/utilities/apt-upgrade.yml (roles/maintenance, reboot_request).
+# Run as a task, never from a handler (ansible-core refuses include_role there): the
+# reboot is asked for, and done drained by playbooks/utilities/apt-upgrade.yml
+# (roles/maintenance, reboot_request).
 - name: Ask for a reboot to load the DGX driver
   ansible.builtin.include_role:
     name: maintenance

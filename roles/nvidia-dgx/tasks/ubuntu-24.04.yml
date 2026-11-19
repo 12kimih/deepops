@@ -46,8 +46,11 @@
     state: present
     update_cache: true
   register: install_driver
-  notify: Reboot after driver install
   when: dgx_os7_install_driver
+
+- name: Ask for a reboot when that changed it
+  ansible.builtin.include_tasks: reboot.yml
+  when: install_driver is changed
 
 - name: Disable unattended upgrades for DGX OS 7
   ansible.builtin.include_role:

@@ -68,7 +68,7 @@ KUBESPRAY_READS = set(
 # another host's hostvars, which hold no role defaults, count as defined there.)
 UNOWNED = {
     # Play parameters given with -e: read in `serial:` or a play's vars, before any role.
-    "maintenance_serial", "reboot_serial",
+    "maintenance_serial",
     "model_cache_root", "model_cache_mount", "model_cache_owner", "model_cache_group",
 }  # fmt: skip
 DEFINED_TEST = re.compile(r"\b([a-z_][a-z0-9_]*)\s+is\s+(?:not\s+)?(?:defined|undefined)\b")

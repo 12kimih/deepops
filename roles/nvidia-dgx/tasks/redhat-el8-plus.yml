@@ -81,14 +81,11 @@
   loop: "{{ dgx_redhat_driver_module_specs }}"
   register: dgx_redhat_driver_module_install
   changed_when: "'Nothing to do' not in dgx_redhat_driver_module_install.stdout"
-  notify: Reboot after driver install
   when: dgx_redhat_install_driver
 
-- name: Mark Red Hat DGX driver install state for reboot handler
-  ansible.builtin.set_fact:
-    install_driver:
-      changed: "{{ dgx_redhat_driver_module_install.changed | default(false) }}"
-  when: dgx_redhat_install_driver
+- name: Ask for a reboot when that changed it
+  ansible.builtin.include_tasks: reboot.yml
+  when: dgx_redhat_driver_module_install is changed
 
 - name: Install Red Hat DGX driver support packages
   ansible.builtin.dnf:
