@@ -49,7 +49,7 @@ if [ "${HELM_MINIMUM_VERSION}" != "${helm_min_installed}" ]; then
     curl -fsSL -o "${helm_tmp}/get_helm.sh" "${HELM_INSTALL_SCRIPT_URL}"
     chmod +x "${helm_tmp}/get_helm.sh"
     mkdir -p "${HELM_INSTALL_DIR}"
-    HELM_INSTALL_DIR=${HELM_INSTALL_DIR} DESIRED_VERSION=v3.17.1 "${helm_tmp}/get_helm.sh" # Keep near helm_version in the bundled Kubespray (roles/kubespray_defaults)
+    HELM_INSTALL_DIR=${HELM_INSTALL_DIR} DESIRED_VERSION=v3.22.0 "${helm_tmp}/get_helm.sh" # Keep near helm_version in the bundled Kubespray (roles/kubespray_defaults)
 fi
 
 sudo chmod 0755 "${HELM_INSTALL_DIR}/helm"

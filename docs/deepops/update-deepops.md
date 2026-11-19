@@ -141,16 +141,18 @@ Find the Kubespray release the submodule pins with `git -C submodules/kubespray 
 When performing an update, it's important to make sure that your configured versions align with the supported versions in the version of Kubespray you are using.
 In particular,
 
-- Make sure the `helm_version` variable in your `config/group_vars/k8s_cluster.yml` file matches the version supported in the current Kubespray release.
-  You can determine this version by running:
+- If your `config/group_vars/k8s_cluster.yml` pins `helm_version`, make sure that version is listed in `helm_archive_checksums` in `submodules/kubespray/roles/kubespray_defaults/vars/main/checksums.yml`, or remove the pin.
+  Kubespray's default is the first version listed there:
 
   ```bash
-  grep -E "^helm_version:" submodules/kubespray/roles/kubespray_defaults/defaults/main/download.yml
-  helm_version: "v3.5.4"
+  grep -A3 "^helm_archive_checksums:" submodules/kubespray/roles/kubespray_defaults/vars/main/checksums.yml
   ```
 
-- Make sure the `kube_version` you are using appears in the list of supported versions in `kubectl_checksums`.
-  You can verify your supported version appears in the list by checking the `kubectl_checksums` variable in the `submodules/kubespray/roles/kubespray_defaults/defaults/main/download.yml` file.
+- Make sure the `kube_version` you are using appears in the list of supported versions in `kubectl_checksums`, in the same `checksums.yml` file.
+
+- Read the "Urgent Upgrade Notes" of every Kubespray release you move across and remove or rename the settings they list in your `config/`.
+
+- Rerun `./scripts/setup.sh` after the submodule moves: it rebuilds `.venv-kubespray` from the new release's `requirements.txt`, and `playbooks/k8s-cluster.yml` stops early on an Ansible version Kubespray does not support.
 
 Additionally, please note that Kubespray can only upgrade between one minor version of Kubernetes at a time.
 This means that you may need to upgrade multiple times between your current version and your desired version of Kubernetes.
