@@ -1,8 +1,13 @@
 {{ ansible_managed | comment(decoration='; ') }}
 [server]
+http_addr = {{ grafana_listen_address }}
 http_port = {{ grafana_port }}
 {% if grafana_root_url %}
 root_url = {{ grafana_root_url }}
+{% if grafana_root_url | urlsplit('path') not in ['', '/'] %}
+{# Served under a path of a reverse proxy (https://host/grafana/). #}
+serve_from_sub_path = true
+{% endif %}
 {% endif %}
 
 [security]
@@ -13,6 +18,18 @@ disable_gravatar = true
 [users]
 allow_sign_up = false
 
+{% if grafana_auth_proxy_header %}
+[auth]
+disable_login_form = true
+
+[auth.proxy]
+enabled = true
+header_name = {{ grafana_auth_proxy_header }}
+header_property = username
+auto_sign_up = true
+whitelist = {{ grafana_auth_proxy_whitelist }}
+
+{% endif %}
 [auth.anonymous]
 enabled = {{ grafana_anonymous_enabled | bool | lower }}
 org_role = {{ grafana_anonymous_role }}
