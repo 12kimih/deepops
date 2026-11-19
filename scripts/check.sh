@@ -4,18 +4,16 @@
 #   scripts/check.sh --fast   the quick subset pre-commit runs on each commit (style,
 #                             generated docs, linters, sensitive data, the unit suites
 #                             not marked .slow); CI runs everything
+#
+# The checks are independent, so they run in parallel (CHECK_JOBS at a time, default
+# the CPU count): the run takes about as long as its slowest check, not their sum.
+# Each prints one line when it ends, with its time; a failed one then prints its
+# output in full. CHECK_JOBS=1 runs them one by one.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 fast=false
 [ "${1:-}" = "--fast" ] && fast=true
-
-failed=()
-step() {
-    local name="$1"; shift
-    echo "==> ${name}"
-    if "$@"; then echo "    ok"; else echo "    FAILED"; failed+=("${name}"); fi
-}
 
 # Run under uv, which first makes .venv match uv.lock, so the tools are always the
 # pinned ones however this script was started.
@@ -24,6 +22,14 @@ if [ -z "${DEEPOPS_CHECK_UV:-}" ]; then
     DEEPOPS_CHECK_UV=1 exec uv run --locked -- scripts/check.sh "$@"
 fi
 python=python3
+
+names=()
+commands=()
+# step NAME COMMAND...: one check; it runs later, with the others.
+step() {
+    names+=("$1"); shift
+    commands+=("$(printf '%q ' "$@")")
+}
 
 step "ansible.cfg has only known settings" ansible-config validate
 step "Galaxy collections and roles match roles/requirements.yml" "${python}" scripts/deepops/galaxy.py --check
@@ -75,8 +81,35 @@ if ! "${fast}"; then
         'cd roles/prometheus-slurm-exporter/files/exporter && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
 fi
 
+# Run them: each in the background with its own log, at most CHECK_JOBS at once.
+jobs_max="${CHECK_JOBS:-$(nproc 2>/dev/null || echo 4)}"
+logs="$(mktemp -d)"
+trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "${logs}"' EXIT
+run_one() {
+    local i="$1" start=${SECONDS} status=ok
+    bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
+    echo "${status}" >"${logs}/${i}.status"
+    printf '%-6s %4ss  %s\n' "${status}" "$((SECONDS - start))" "${names[$i]}"
+}
+echo "Running ${#names[@]} checks, ${jobs_max} at a time"
+started=${SECONDS}
+for i in "${!names[@]}"; do
+    while [ "$(jobs -rp | wc -l)" -ge "${jobs_max}" ]; do wait -n || true; done
+    run_one "${i}" &
+done
+wait
+
+failed=()
+for i in "${!names[@]}"; do
+    if [ "$(cat "${logs}/${i}.status" 2>/dev/null)" != ok ]; then
+        failed+=("${names[$i]}")
+        printf '\n==> %s: FAILED\n' "${names[$i]}"
+        cat "${logs}/${i}"
+    fi
+done
+
 if [ "${#failed[@]}" -gt 0 ]; then
     printf 'Failed: %s\n' "${failed[@]}" >&2
     exit 1
 fi
-echo "All checks passed."
+echo "All checks passed ($((SECONDS - started))s)."
