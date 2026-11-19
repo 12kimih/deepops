@@ -56,10 +56,10 @@ maintenance_reboot_timeout: 1800
 # cycle through the BMC, roles/bmc: for hardware that comes back whole only from a cold
 # start). Per host in host_vars.
 maintenance_reboot_method: os
-# reboot_request: the role that asks (default: the one including it) and where the
-# requests wait; the reboot step runs each requesting role again after the reboot.
+# reboot_request: the role that asks (default: the one including it); its request
+# waits in maintenance_reboot_requests_dir (roles/deepops_paths), and the reboot step
+# runs each requesting role again after the reboot.
 maintenance_reboot_requester: "{{ (ansible_parent_role_names | default([]) | first) | default('') }}"
-maintenance_reboot_requests_dir: /var/lib/deepops/reboot-requested-by
 
 # Hosts the rest of the cluster depends on: the Slurm controller and the NFS servers.
 # Their package upgrades restart no service (policy-rc.d; the new code runs from their

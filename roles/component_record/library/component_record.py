@@ -81,7 +81,13 @@ def apply(data, name, action, items, version):
     owners = {item: set(names) for item, names in data["items"].items()}
     before = components.get(name, {})
     if action == "begin":
-        components[name] = {"state": "installing", "version": version}
+        # A converged rerun (present at this version, every item already its own) leaves
+        # the record as it is; new items or another version go through installing.
+        converged = before == {"state": "present", "version": version} and all(
+            name in owners.get(item, ()) for item in items
+        )
+        if not converged:
+            components[name] = {"state": "installing", "version": version}
         for item in items:
             owners.setdefault(item, set()).add(name)
     elif action == "present":

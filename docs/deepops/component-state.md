@@ -105,8 +105,9 @@ clients before the server.
   authentication (NIS, the directory, Kerberos), Slurm itself and MUNGE, and the NFS
   server (unexporting /home hangs every client, as on 2026-11-18). Their registry entry
   says `removal: explicit`; where no rule holds the map gives `kept` and the role does
-  nothing. The site removes one by naming it in `deepops_component_removals`; naming a
-  component a rule still wants on that host stops the deploy.
+  nothing. The site retires one by naming it in `deepops_component_removals`: it goes
+  from every host no rule wants it on and stays where one does. Naming a component
+  without `removal: explicit` stops the deploy.
 
 ## What absent must undo besides packages
 

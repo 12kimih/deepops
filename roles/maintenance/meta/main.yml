@@ -2,6 +2,7 @@
 dependencies:
   - role: slurm_paths  # slurm_install_prefix, slurm_config_dir, nhc_program, host groups
   - role: deploy_defaults  # install_dcgm, slurm_install_nhc
+  - role: deepops_paths  # maintenance_reboot_requests_dir
 
 galaxy_info:
   namespace: deepops
