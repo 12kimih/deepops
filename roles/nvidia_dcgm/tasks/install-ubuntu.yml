@@ -8,3 +8,6 @@
   ansible.builtin.apt:
     name: "{{ dcgm_pkg_name }}"
     state: "present"
+    update_cache: true
+    cache_valid_time: 3600
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
