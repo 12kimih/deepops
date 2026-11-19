@@ -1,0 +1,29 @@
+---
+- name: Check the resolver settings
+  ansible.builtin.assert:
+    that:
+      - dns_resolver_state in ["present", "absent"]
+      - dns_resolver_upstreams | networks_invalid | length == 0
+      - dns_resolver_upstreams | select('search', '/') | list | length == 0
+      - (dns_resolver_blocked_domains + dns_resolver_blocked_domains_site)
+        | reject('match', '^([A-Za-z0-9-]+\.)+[A-Za-z0-9-]+$') | list | length == 0
+    fail_msg: >-
+      dns_resolver_state is present or absent, dns_resolver_upstreams lists IP
+      addresses, and the blocked domains are plain names (no wildcard, no trailing dot).
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+# The host reaches unbound through systemd-resolved, as unbound's own guide sets it up.
+- name: Check for systemd-resolved
+  ansible.builtin.assert:
+    that: "'systemd-resolved.service' in ansible_facts.services"
+    fail_msg: "{{ inventory_hostname }} has no systemd-resolved, which this role points at the resolver."
+
+- name: Run the resolver
+  ansible.builtin.include_tasks: present.yml
+  when: dns_resolver_state == "present"
+
+- name: Remove the resolver
+  ansible.builtin.include_tasks: absent.yml
+  when: dns_resolver_state == "absent"

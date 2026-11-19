@@ -94,6 +94,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── deploy_defaults
 │   ├── deploy_record
 │   ├── dns-config
+│   ├── dns_resolver
 │   ├── docker
 │   ├── docker-login
 │   ├── docker_daemon_json

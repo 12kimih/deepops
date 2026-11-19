@@ -22,6 +22,29 @@
     name: nftables
     state: present
 
+# Users' DNS may only go to a resolver on loopback: with another one first in
+# resolv.conf they would have none.
+- name: Read the resolvers this host uses
+  ansible.builtin.slurp:
+    src: /etc/resolv.conf
+  register: egress_policy_resolv
+  when: egress_policy_dns_local_only
+
+- name: Refuse local-only DNS without a local resolver
+  vars:
+    egress_policy_nameservers: >-
+      {{ egress_policy_resolv.content | b64decode | regex_findall('(?m)^\s*nameserver\s+(\S+)') }}
+  ansible.builtin.assert:
+    that:
+      - egress_policy_nameservers | length > 0
+      - egress_policy_nameservers[0] is match('127\.|::1$')
+    fail_msg: >-
+      /etc/resolv.conf names {{ egress_policy_nameservers | join(', ') or 'no resolver' }}
+      first, so users, who may send DNS only to this host's own resolver, would have
+      none. Deploy roles/dns_resolver (slurm_enable_dns_resolver) first, or set
+      egress_policy_dns_local_only: false.
+  when: egress_policy_dns_local_only
+
 # The operator's session is the one at risk: with a local connection it is the login
 # Ansible runs in, so the variable is read without become (sudo drops it).
 - name: Find the SSH session this run came in on

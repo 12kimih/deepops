@@ -191,6 +191,12 @@
   tags:
     - root-access
 
+- name: Run a local resolver that blocks tunnel services by name
+  import_playbook: generic/dns-resolver.yml
+  when: slurm_enable_dns_resolver
+  tags:
+    - dns-resolver
+
 - name: Limit where users connect outside the cluster
   import_playbook: generic/egress-policy.yml
   when: slurm_enable_egress_policy

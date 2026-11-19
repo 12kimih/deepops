@@ -1,0 +1,32 @@
+---
+# Ubuntu's own setup comes back: resolved's stub, and resolv.conf naming it.
+- name: Remove the systemd-resolved drop-in
+  ansible.builtin.file:
+    path: "{{ _dns_resolver_resolved_dropin }}"
+    state: absent
+  register: dns_resolver_dropin
+
+- name: Restart systemd-resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: restarted
+  when: dns_resolver_dropin is changed and not ansible_check_mode
+
+- name: Name the systemd-resolved stub in /etc/resolv.conf
+  ansible.builtin.file:
+    path: /etc/resolv.conf
+    src: /run/systemd/resolve/stub-resolv.conf
+    state: link
+    force: true
+
+- name: Remove the unbound configuration
+  ansible.builtin.file:
+    path: "{{ _dns_resolver_conf }}"
+    state: absent
+
+- name: Stop unbound
+  ansible.builtin.systemd:
+    name: unbound
+    state: stopped
+    enabled: false
+  when: "'unbound.service' in ansible_facts.services"

@@ -65,13 +65,20 @@
 #egress_policy_exempt_uids: "{{ people | people_uids('admin') }}"  # example
 #egress_policy_ssh_rate: 20/minute
 #egress_policy_ssh_burst: 30
-#egress_policy_ssh_node_rate: 60/minute
-#egress_policy_ssh_node_burst: 120
+# The node-wide SSH bucket defaults to 600/minute, burst 1200 on [slurm-login] hosts
+# and 60/minute, burst 120 elsewhere.
+#egress_policy_ssh_node_rate: 600/minute  # example
+#egress_policy_ssh_node_burst: 1200  # example
 # Inbound filtering (replaces ufw): the internal networks, plus the SSH port on the
 # login node.
 #egress_policy_inbound: true  # example
 #egress_policy_inbound_tcp_ports: "{{ [cluster_info.ssh_port] if inventory_hostname in groups['slurm-login'] | default([]) else [] }}"  # example
 #egress_policy_trusted_interfaces: [tailscale0]  # example
+
+# Local resolver (roles/dns_resolver, slurm_enable_dns_resolver): unbound on loopback,
+# forwarding to the site's resolvers, answering NXDOMAIN for tunnel services.
+#dns_resolver_upstreams: [192.0.2.53, 198.51.100.53]  # example
+#dns_resolver_blocked_domains_site: [tunnel.example.net]  # example
 
 # DNS config
 # Playbook: dns-config
