@@ -34,6 +34,16 @@ What it sets up:
 - **Certificate expiry metric.** `open_ondemand_tls_cert_not_after_seconds` is
   published through node_exporter's textfile directory, daily and on each run.
 
+**Off means removed** (`open_ondemand_state`, set by a deploy from
+`slurm_install_open_ondemand`; [component state](../../docs/deepops/component-state.md)):
+present on the Slurm controller when the switch is on, absent on every other host the
+playbook runs on. Absent archives `/etc/ood` and the portal site to
+`open_ondemand_backup_dir` (data, never removed), removes the packages, repositories,
+keys, TLS files and metrics the role installed, through the component record (packages
+another component still needs stay), and gives Apache back its stock `ports.conf` and
+default site; apache2 itself stays. A host deployed before the record existed, or the
+release-package build of older OOD, is adopted and cleaned up the same way.
+
 The `www-data` sudo rule in `/etc/sudoers.d/ood` belongs to the `ondemand`
 package. It lets Apache start each user's server through `nginx_stage` and
 nothing else. OOD cannot work without it.
@@ -46,6 +56,7 @@ the portal host.
 <!-- BEGIN GENERATED: role-variables:open_ondemand -->
 | Variable | Default | Description |
 |---|---|---|
+| `open_ondemand_state` | `present` | present or absent (docs/deepops/component-state.md); a deploy sets it from deepops_components. |
 | `open_ondemand_series` | `'4.2'` | Pinned versions. A bump changes the series, the repo path and these together; read that series' release notes first (config keys and dependencies change per minor). |
 | `open_ondemand_version` | `4.2.5` |  |
 | `open_ondemand_dex_version` | `2.45.1.2` |  |
@@ -72,7 +83,8 @@ the portal host.
 | `open_ondemand_login_host` | `'{{ inventory_hostname }}'` |  |
 | `open_ondemand_proxied_services` | `[]` | A local web service published under a path of the portal, behind its login, e.g. Grafana: {path: /grafana/, upstream: "http://127.0.0.1:3000/", user_header: X-WEBAUTH-USER}. The portal sets user_header to the logged-in user and drops any value a client sends. Empty = none. |
 | `open_ondemand_backup_dir` | `/var/backups/open-ondemand` | Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken install) before changing them. |
+| `open_ondemand_data_paths` | `['{{ open_ondemand_backup_dir }}']` | Data the component never removes, present or absent. |
 | `open_ondemand_tls_metrics` | `true` | The certificate's expiry as a node_exporter textfile metric (open_ondemand_tls_cert_not_after_seconds), refreshed daily, so an alert can fire before it lapses. |
 | `open_ondemand_tls_metrics_textfile_dir` | `'{{ node_exporter_prom_dir }}'` |  |
-| `open_ondemand_managed_conffiles` | `[/etc/ood/config/ood_portal.yml, /etc/ood/config/nginx_stage.yml, /etc/ood/config/ood_portal.sha256sum, /etc/apache2/sites-available/ood-portal.conf]` | Files OOD's packages own that the role writes itself; dpkg -V may report these as changed. Any other difference in an OOD package fails the run. |
+| `open_ondemand_managed_conffiles` | `[/etc/ood/config/ood_portal.yml, /etc/ood/config/nginx_stage.yml, /etc/ood/config/ood_portal.sha256sum, /etc/apache2/sites-available/ood-portal.conf, /etc/ood/dex/config.yaml, /etc/ood/dex/dex.db]` | Files OOD's packages own that the role writes itself; dpkg -V may report these as changed. Any other difference in an OOD package fails the run. |
 <!-- END GENERATED: role-variables:open_ondemand -->

@@ -1,0 +1,23 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the installed version and the record
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, '${Version}', ondemand]
+      register: ood_version
+      changed_when: false
+
+    - name: Read the component record
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: ood_record
+
+    - name: Check the pinned release is back and recorded present
+      ansible.builtin.assert:
+        that:
+          - ood_version.stdout == '4.2.5'
+          - (ood_record.content | b64decode | from_json).components.open_ondemand.state == 'present'
+        fail_msg: "{{ ood_version.stdout }} / {{ ood_record.content | b64decode }}"

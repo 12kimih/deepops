@@ -1,0 +1,53 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: open_ondemand
+    component_record_action: begin
+    component_record_version: "{{ open_ondemand_version }}"
+    component_record_items: "{{ open_ondemand_items }}"
+
+- name: Check the portal settings
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == 'Debian'
+      - open_ondemand_servername | length > 0
+      - open_ondemand_tls_cert_src | length > 0
+      - open_ondemand_tls_key_src | length > 0
+      - open_ondemand_oidc_crypto_passphrase | length >= 32
+      - open_ondemand_dex_connectors | length > 0
+      - open_ondemand_host_regex not in ['', '[^/]+', '.*', '()']
+      - open_ondemand_allowlist_paths | length > 0
+      - open_ondemand_cluster_name | length > 0
+    fail_msg: >-
+      Open OnDemand needs a Debian-family host, open_ondemand_servername, TLS files
+      (open_ondemand_tls_cert_src, open_ondemand_tls_key_src), a vaulted
+      open_ondemand_oidc_crypto_passphrase of 32+ characters, at least one Dex connector
+      (without one Dex serves a static ood@localhost user), a host regex that is not
+      allow-any, an allowlist and a cluster name.
+    quiet: true
+
+- name: Add the package repositories
+  ansible.builtin.import_tasks: repos.yml
+
+- name: Install Open OnDemand
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure Open OnDemand
+  ansible.builtin.import_tasks: config.yml
+
+- name: Publish the certificate expiry
+  ansible.builtin.import_tasks: tls_metrics.yml
+
+- name: Verify the installed packages
+  ansible.builtin.import_tasks: verify.yml
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: open_ondemand
+    component_record_action: present
+    component_record_version: "{{ open_ondemand_version }}"
+    component_record_items: "{{ open_ondemand_items }}"

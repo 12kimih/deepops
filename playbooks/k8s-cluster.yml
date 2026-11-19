@@ -349,6 +349,14 @@
     - nvidia
   when: deepops_gpu_operator_enabled | bool == true
 
+# The NFS server the provisioner uses (deepops_components: k8s_deploy_nfs_server on
+# the first control-plane host).
+- name: Set up the NFS server
+  import_playbook: generic/nfs-server.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: install
+
 - name: Setup a volume for NFS, install nfs_utils, and install NFS Helm chart
   import_playbook: k8s-cluster/nfs-client-provisioner.yml
   when: k8s_nfs_client_provisioner
@@ -376,6 +384,13 @@
 
 - name: Remove the rsyslog server where it is no longer wanted
   import_playbook: generic/rsyslog-server.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+
+# Only where the site lists nfs in deepops_component_removals (removal: explicit).
+- name: Remove the NFS server where it is listed for removal
+  import_playbook: generic/nfs-server.yml
   vars:
     hostlist: k8s_cluster
     deepops_phase: remove

@@ -16,9 +16,10 @@ nfs_exports: []
 # (root), group (root)}.
 nfs_shared_dirs: []
 
-# The hosts that are NFS servers. Once set, every other host this role runs on has the
-# NFS server package removed (with its exports). Empty = no host is touched.
-nfs_servers: []
+# present, absent or kept (docs/deepops/component-state.md): the server's exports. A
+# deploy sets it from deepops_components; a host that should no longer serve is cleaned
+# up only when the site lists nfs in deepops_component_removals.
+nfs_state: present
 
 # Hosts or networks every export is offered to unless an entry sets its own clients.
 # "*" is any host that can reach the server; set the cluster's subnet instead.

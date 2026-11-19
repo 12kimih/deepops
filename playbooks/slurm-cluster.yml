@@ -60,7 +60,8 @@
 # all up in one run.
 - name: Set up NFS filesystem | Install nfs-server
   import_playbook: generic/nfs-server.yml
-  when: slurm_enable_nfs_server
+  vars:
+    deepops_phase: install
 
 - name: Set up NFS filesystem | Install nfs-client
   import_playbook: generic/nfs-client.yml
@@ -106,7 +107,8 @@
 
 - name: Install the Open OnDemand portal
   import_playbook: slurm-cluster/open-ondemand.yml
-  when: slurm_install_open_ondemand
+  vars:
+    deepops_phase: install
 
 # Monitoring: present where the switch and group say; removed in the removal phase.
 - name: Install monitoring services | Install prometheus
@@ -233,6 +235,8 @@
 
 - name: Publish the site's commands, shell defaults and login banner
   import_playbook: slurm-cluster/cluster-tools.yml
+  vars:
+    deepops_phase: install
   tags:
     - cluster-tools
 
@@ -248,6 +252,13 @@
 
 # Removal phase (docs/deepops/component-state.md): the components no longer wanted on a
 # host go, in the reverse of the install order, so nothing goes from under what needs it.
+- name: Withdraw the cluster commands, shell defaults and banner where no longer wanted
+  import_playbook: slurm-cluster/cluster-tools.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - cluster-tools
+
 - name: Remove the rsyslog client where it is no longer wanted
   import_playbook: generic/rsyslog-client.yml
   vars:
@@ -300,6 +311,17 @@
 
 - name: Remove the Prometheus where it is no longer wanted
   import_playbook: slurm-cluster/prometheus.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Open OnDemand portal where it is no longer wanted
+  import_playbook: slurm-cluster/open-ondemand.yml
+  vars:
+    deepops_phase: remove
+
+# Only where the site lists nfs in deepops_component_removals (removal: explicit).
+- name: Remove the NFS server where it is listed for removal
+  import_playbook: generic/nfs-server.yml
   vars:
     deepops_phase: remove
 

@@ -197,9 +197,8 @@ nfs_mounts:
 #slurm_enable_nfs_client_nodes: true
 
 # NFS servers and clients are the [slurm-nfs] and [slurm-nfs-client] inventory groups.
-# Any other host the nfs role runs on has its NFS server stopped and removed, so a
-# server set up by hand once does not keep exporting.
-#nfs_servers: "{{ groups['slurm-nfs'] }}"  # example
+# To stop and remove an NFS server on every other host (one set up by hand once keeps
+# exporting otherwise), list nfs in deepops_component_removals (group_vars/all.yml).
 
 ################################################################################
 # SOFTWARE MODULES (SM)                                                        #
@@ -313,6 +312,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 ################################################################################
 # Cluster Tools (site commands, shell defaults, login banner)                  #
 ################################################################################
+#slurm_install_cluster_tools: true
 # roles/cluster_tools publishes your own commands into PATH on every node, shell
 # defaults through /etc/profile.d, and a login banner through update-motd.d. Prefer
 # all three to aliases in /etc/bash.bashrc: an alias exists only inside an interactive

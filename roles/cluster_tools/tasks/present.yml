@@ -1,0 +1,19 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cluster_tools
+    component_record_action: begin
+    component_record_items: "{{ cluster_tools_items }}"
+
+- name: Publish what the configuration asks for
+  ansible.builtin.include_tasks: publish.yml
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cluster_tools
+    component_record_action: present
+    component_record_items: "{{ cluster_tools_items }}"

@@ -62,59 +62,25 @@
     - nfs
     - molecule-notest
 
-# nfs_is_server (what this play makes the host) and nfs_servers (which hosts may run a
-# server) must agree: otherwise one run would set the server up and then retire it.
-- name: Refuse a server that nfs_servers does not name
+# The server's exports are a component (docs/deepops/component-state.md), removed only
+# explicitly: present where the deploy wants a server, kept elsewhere, absent where the
+# site lists nfs in deepops_component_removals. The client side and the common setup
+# above serve every host.
+- name: Check the component state
   ansible.builtin.assert:
-    that: not nfs_is_server | bool or nfs_servers | length == 0 or inventory_hostname in nfs_servers
-    fail_msg: >-
-      {{ inventory_hostname }} is set up as an NFS server here but is not in nfs_servers
-      ({{ nfs_servers | join(', ') }}), which would retire it. Add it to nfs_servers.
+    that: nfs_state in ['present', 'absent', 'kept']
+    fail_msg: "nfs_state must be present, absent or kept, not {{ nfs_state }}."
     quiet: true
   tags: always
 
-- name: Setup server
-  ansible.builtin.include_tasks: server.yml
-  when: nfs_is_server
-  tags: always
-
-- name: Setup firewall
-  ansible.builtin.include_tasks: firewall.yml
-  when: nfs_is_server
+- name: "Make the NFS server {{ nfs_state }}"
+  ansible.builtin.include_tasks: "{{ nfs_state }}.yml"
+  when:
+    - nfs_state != 'kept'
+    - nfs_state == 'absent' or nfs_is_server | bool
   tags: always
 
 - name: Setup client
   ansible.builtin.include_tasks: client.yml
   when: nfs_is_client
   tags: always
-
-# A host that is not one of the declared NFS servers runs no NFS server: a server set
-# up by hand once keeps exporting long after its use ends (data exports were found on
-# compute nodes, offered to every host). Opt-in: only once nfs_servers names the
-# servers. The exported data on disk is left alone; the client side stays.
-- name: Retire the NFS server on hosts that are not NFS servers
-  when:
-    - not nfs_is_server | bool
-    - nfs_servers | length > 0
-    - inventory_hostname not in nfs_servers
-  tags:
-    - nfs
-  block:
-    - name: Read the service list
-      ansible.builtin.service_facts:
-
-    - name: Stop and disable the NFS server
-      ansible.builtin.systemd:
-        name: "{{ nfs_server_daemon }}"
-        state: stopped
-        enabled: false
-      when: (nfs_server_daemon ~ '.service') in ansible_facts.services
-
-    # On RHEL the server lives in nfs-utils with the client, so only the service goes.
-    - name: Remove the NFS server package and its exports (Debian)
-      ansible.builtin.include_role:
-        name: host_baseline
-        tasks_from: absent
-      vars:
-        host_baseline_absent_packages: [nfs-kernel-server]
-      when: ansible_facts.os_family == 'Debian'

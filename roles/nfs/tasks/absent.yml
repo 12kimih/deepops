@@ -1,0 +1,20 @@
+---
+# The server goes; the exported data on disk and the client side stay. On RHEL the server
+# lives in nfs-utils with the client, so only its unit goes (and its firewall services).
+- name: Close the firewall for the server (RHEL family)
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: disabled
+    immediate: true
+  loop: [mountd, rpc-bind, nfs]
+  failed_when: false
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nfs
+    component_record_action: absent
+    component_record_items: "{{ nfs_items }}"

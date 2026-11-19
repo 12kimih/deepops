@@ -107,19 +107,6 @@
   tags:
     - nfs
 
-- name: Ensure nfs-server.service drop-in directory exists
-  ansible.builtin.file:
-    path: /etc/systemd/system/nfs-server.service.d
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  when:
-    - nfs_exports | length > 0
-    - nfs_server_autorestart | bool
-  tags:
-    - nfs
-
 # The canonical unit is nfs-server.service on both Debian (nfs-kernel-server is an
 # alias symlink to it) and RHEL, so the drop-in and helper target that name directly.
 #

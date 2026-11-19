@@ -21,12 +21,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 PACKAGES = ["ondemand", "ondemand-dex", "ondemand-nginx", "ondemand-passenger", "nodejs"]
-MANAGED_CONFFILES = {
-    "/etc/ood/config/ood_portal.yml",
-    "/etc/ood/config/nginx_stage.yml",
-    "/etc/ood/config/ood_portal.sha256sum",
-    "/etc/apache2/sites-available/ood-portal.conf",
-}
+# The role installs this check with its package and conffile lists (one source).
+DPKG_VERIFY = "/usr/local/sbin/open-ondemand-dpkg-verify"
 CLUSTERS_D = Path("/etc/ood/config/clusters.d")
 
 
@@ -118,10 +114,14 @@ def check_packages(result, version):
             result["errors"].append(f"{pkg} is not installed")
     if version and installed.get("ondemand") != version:
         result["errors"].append(f"ondemand is {installed.get('ondemand')}, expected {version}")
-    rc, out, _ = run(["dpkg", "-V", *[p for p in PACKAGES if p in installed]])
-    diffs = [line for line in out.splitlines() if line.split()[-1] not in MANAGED_CONFFILES]
+    rc, out, err = run([DPKG_VERIFY])
+    diffs = [line for line in out.splitlines() if line.strip()]
     result["dpkg_verify_differences"] = diffs
-    if diffs:
+    if rc == 127:
+        result["errors"].append(
+            f"{DPKG_VERIFY} is missing: the portal was not deployed by roles/open_ondemand"
+        )
+    elif rc != 0:
         result["errors"].append(f"{len(diffs)} package files differ from the packages (dpkg -V)")
 
 
