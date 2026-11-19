@@ -1,7 +1,7 @@
 -- Regression tests for the job_submit.lua site policy.
 --
---   lua roles/slurm/tests/job_submit_test.lua config.example/files/slurm/job_submit.lua
---   lua roles/slurm/tests/job_submit_test.lua config/files/slurm/job_submit.lua
+--   lua5.4 roles/slurm/tests/job_submit_test.lua config.example/files/slurm/job_submit.lua
+--   lua5.4 roles/slurm/tests/job_submit_test.lua config/files/slurm/job_submit.lua
 --
 -- The plugin under test is loaded as a string with its [1] site block swapped for the
 -- one each scenario declares, so these tests exercise the plugin BODY and stay valid

@@ -1,0 +1,66 @@
+---
+# Which Slurm the host runs now: the slurm-smd package, or the retired source build
+# under slurm_source_build_prefix. Then refuse what Slurm does not support (going
+# back a version, crossing too many major releases) and any version change outside
+# the upgrade playbook, which orders it (slurmdbd, slurmctld, slurmd).
+- name: Read the installed Slurm package
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, "-f=${db:Status-Abbrev} ${Version}", slurm-smd]
+  register: slurm_installed_deb
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Look for the retired source build
+  ansible.builtin.stat:
+    path: "{{ slurm_source_build_prefix }}/{{ item }}"
+  register: slurm_source_bins
+  loop: [sbin/slurmd, sbin/slurmctld, sbin/slurmdbd, bin/sinfo]
+
+- name: Read the source build's version
+  ansible.builtin.command:
+    argv: ["{{ (slurm_source_bins.results | selectattr('stat.exists') | first).stat.path }}", --version]
+  register: slurm_source_version
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: slurm_source_bins.results | selectattr('stat.exists') | list | length > 0
+
+- name: Note the installed Slurm
+  vars:
+    _deb: "{{ slurm_installed_deb.stdout.split() if slurm_installed_deb.rc == 0 else [] }}"
+    _deb_version: "{{ (_deb[1] | regex_replace('-[^-]*$', '')) if (_deb | length == 2 and _deb[0] == 'ii') else '' }}"
+    _source_version: "{{ (slurm_source_version.stdout | default('')).split() | last | default('') }}"
+  ansible.builtin.set_fact:
+    slurm_source_build: "{{ slurm_source_version is not skipped }}"
+    slurm_installed_version: "{{ _deb_version if _deb_version | length > 0 else _source_version }}"
+
+# Two major releases a year since 24.05 (May and November); an older, irregular release
+# counts as further away than it is, which only refuses sooner.
+- name: Refuse a Slurm version change Slurm does not support
+  when: slurm_installed_version | length > 0
+  vars:
+    _majors_from: "{{ (slurm_installed_version.split('.')[0] | int) * 2 + ((slurm_installed_version.split('.')[1] | int) > 6) | int }}"
+    _majors_to: "{{ (slurm_version.split('.')[0] | int) * 2 + ((slurm_version.split('.')[1] | int) > 6) | int }}"
+  ansible.builtin.assert:
+    that:
+      - slurm_installed_version is version(slurm_version, '<=')
+      - (_majors_to | int) - (_majors_from | int) <= (slurm_upgrade_max_majors | int)
+    fail_msg: >-
+      {{ inventory_hostname }} runs Slurm {{ slurm_installed_version }} and slurm_version is
+      {{ slurm_version }}. Slurm cannot go back a version once a daemon has started (restore
+      the backups instead), and one upgrade crosses at most {{ slurm_upgrade_max_majors }}
+      major releases: upgrade through an intermediate release.
+    quiet: true
+
+- name: Refuse a version change outside the upgrade playbook
+  ansible.builtin.assert:
+    that: >-
+      slurm_upgrade | bool
+      or slurm_installed_version | length == 0
+      or (slurm_installed_version == slurm_version and not slurm_source_build | bool)
+    fail_msg: >-
+      {{ inventory_hostname }} runs Slurm {{ slurm_installed_version }}{{ ' (the retired source
+      build)' if slurm_source_build | bool else '' }}, not the slurm-smd {{ slurm_version }}
+      packages. Changing it needs the daemons upgraded in order with a backup first:
+      playbooks/slurm-cluster/slurm-upgrade.yml (docs/slurm-cluster/slurm-upgrade.md).
+    quiet: true

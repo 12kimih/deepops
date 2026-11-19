@@ -1,21 +1,32 @@
 ---
-# A SPANK plugin marked `required` in plugstack.conf must exist, or slurmd aborts
-# initialization and srun and sbatch fail ("cannot open spank_pyxis.so"), on every node
-# that reads it. A slurm rebuild wipes {{ slurm_install_prefix }}/lib/slurm, deleting the
-# plugin the later pyxis play installed on a prior run, and leaves a dangling entry. Drop
-# it; the pyxis play (it runs after slurm) rebuilds the plugin against the new slurm and
-# redeploys the conf. https://slurm.schedmd.com/spank.html
+# A SPANK plugin marked `required` in plugstack.conf must load, or slurmd aborts
+# initialization and srun and sbatch fail, on every node that reads it. After a Slurm
+# upgrade the pyxis plugin is either missing (the source build's plugin directory is
+# gone) or built for the old release, which Slurm refuses. Drop its entry then; the
+# pyxis play (it runs after slurm) rebuilds the plugin against the new Slurm and puts
+# the entry back. https://slurm.schedmd.com/spank.html
+- name: Read what the pyxis SPANK plugin was built for
+  ansible.builtin.slurp:
+    src: "{{ slurm_plugin_dir }}/spank_pyxis.so.built-from"
+  register: slurm_pyxis_built_from
+  failed_when: false
+  tags:
+    - config
+
 - name: Check for the pyxis SPANK plugin
   ansible.builtin.stat:
-    path: "{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so"
+    path: "{{ slurm_plugin_dir }}/spank_pyxis.so"
   register: slurm_pyxis_plugin
   tags:
     - config
 
-- name: Drop a dangling pyxis plugstack entry when its plugin is missing
+- name: Drop a pyxis plugstack entry the installed Slurm cannot load
   ansible.builtin.file:
     path: "{{ slurm_config_dir }}/plugstack.conf.d/pyxis.conf"
     state: absent
-  when: not slurm_pyxis_plugin.stat.exists
+  when: >-
+    not slurm_pyxis_plugin.stat.exists
+    or slurm_pyxis_built_from.content is not defined
+    or not (slurm_pyxis_built_from.content | b64decode | trim).endswith(' for slurm ' ~ slurm_version)
   tags:
     - config

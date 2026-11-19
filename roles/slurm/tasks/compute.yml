@@ -100,12 +100,16 @@
     - prolog
     - epilog
 
-- name: Configure slurmd for pmix
+# The packaged unit reads SLURMD_OPTIONS from here. --conf-server: slurmd takes its
+# configuration from slurmctld (configless, https://slurm.schedmd.com/configless_slurm.html),
+# every controller in order.
+- name: Configure slurmd for configless and pmix
   ansible.builtin.blockinfile:
     path: "{{ slurm_sysconf_dir }}/slurmd"
     create: true
     mode: "0644"
     block: |
+      SLURMD_OPTIONS="--conf-server {{ slurm_conf_servers }}"
       PMIX_MCA_ptl=^usock
       PMIX_MCA_psec=none
       PMIX_SYSTEM_TMPDIR=/var/empty
@@ -184,53 +188,15 @@
   when: slurm_enable_prolog_epilog
   tags: always
 
-- name: Configure slurm.conf
-  ansible.builtin.template:
-    src: "{{ slurm_conf_template }}"
-    dest: "{{ slurm_config_dir }}/slurm.conf"
-    mode: "0644"
-  when: not slurm_conf_symlink
-  notify:
-    - Restart slurmd
-  tags:
-    - config
-
-# Changed, so slurmd restarts, also when a controller rewrote the shared file this run
-# (controller.yml runs first); the link alone almost never changes.
-- name: Configure slurm.conf by symbolic link
+# slurmd fetches slurm.conf, gres.conf, cgroup.conf and plugstack.conf from slurmctld
+# (--conf-server, above) and caches them in /run/slurm/conf, where the commands on the
+# node find them too. A local copy would be read by the commands instead, and go stale.
+- name: Remove local copies of the configuration slurmctld serves
   ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/slurm.conf"
-    state: link
-    src: "{{ slurmctl_config_dir }}/slurm.conf"
-    force: true
-  register: slurm_conf_link
-  changed_when: >-
-    slurm_conf_link is changed
-    or (groups[slurm_controller_group] | map('extract', hostvars) | selectattr('slurm_conf_shared', 'defined')
-        | map(attribute='slurm_conf_shared') | select('changed') | list | length > 0)
-  when: slurm_conf_symlink
-  notify:
-    - Restart slurmd
-  tags:
-    - config
-
-- name: Configure cgroup.conf
-  ansible.builtin.template:
-    src: "{{ slurm_cgroup_conf_template }}"
-    dest: "{{ slurm_config_dir }}/cgroup.conf"
-    mode: "0644"
-  notify:
-    - Restart slurmd
-  tags:
-    - config
-
-- name: Configure gres.conf
-  ansible.builtin.template:
-    src: "{{ slurm_gres_conf_template }}"
-    dest: "{{ slurm_config_dir }}/gres.conf"
-    mode: "0644"
-  notify:
-    - Restart slurmd
+    path: "{{ slurm_config_dir }}/{{ item }}"
+    state: absent
+  loop: [slurm.conf, cgroup.conf, gres.conf]
+  when: not is_controller
   tags:
     - config
 
@@ -284,8 +250,8 @@
     - localusers
     - people
 
-# A wrong -account line in /etc/pam.d/sshd locks operators out, and build.yml skips
-# the rebuild when the version already matches, so confirm the module is where
+# A wrong -account line in /etc/pam.d/sshd locks operators out, so confirm the module
+# (slurm-smd-libpam-slurm-adopt) is where
 # slurm_pam_lib_dir says before writing either block.
 - name: Locate the pam_slurm_adopt module
   ansible.builtin.stat:
@@ -300,8 +266,8 @@
   ansible.builtin.fail:
     msg: >-
       {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so is not a regular file, so
-      /etc/pam.d/sshd will not be pointed at it. Rebuild with
-      slurm_force_rebuild=true, or set slurm_pam_lib_dir to the directory the
+      /etc/pam.d/sshd will not be pointed at it. The slurm-smd-libpam-slurm-adopt
+      package installs it there: reinstall it, or set slurm_pam_lib_dir to the directory the
       installed module lives in.
   tags:
     - config

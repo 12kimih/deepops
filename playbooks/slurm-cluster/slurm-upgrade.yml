@@ -1,0 +1,157 @@
+---
+# Upgrade Slurm to slurm_version in the order Slurm requires
+# (https://slurm.schedmd.com/upgrades.html), and replace the retired source build with
+# the packages on the way:
+#
+#   1. every host: refuse a downgrade or a jump of more than slurm_upgrade_max_majors
+#   2. build and publish the packages (slurm-master[0])
+#   3. controllers: a backup now (roles/slurm_backup), stop slurmctld and slurmdbd,
+#      install, start slurmdbd (it converts the database first) then slurmctld; check
+#      scontrol, sacct and job_submit
+#   4. compute nodes, maintenance_serial at a time: drain and wait for their jobs,
+#      install and restart slurmd, rebuild pyxis, check the node, resume it
+#   5. the other hosts (login): install, sackd, pyxis
+#   6. every slurmd reports the new version
+#
+# A failed node stops the run with that node still drained. Nothing can go back once a
+# daemon has started: the way back is the backup (docs/slurm-cluster/slurm-upgrade.md).
+#
+#   ansible-playbook -K playbooks/slurm-cluster/slurm-upgrade.yml
+#   -e maintenance_serial=2        compute nodes per batch (default 1)
+#   -e maintenance_drain_timeout=N seconds to wait for a node's jobs (default 86400)
+- hosts: all
+  become: true
+  roles:
+    - role: facts
+
+- hosts: slurm-cluster
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Check the version change is one Slurm supports
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: version
+      vars:
+        slurm_upgrade: true
+
+- hosts: slurm-master[0]
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Build and publish the Slurm packages
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: packages-build
+
+# slurmdbd, then slurmctld; slurmd keeps running jobs meanwhile (SlurmdTimeout bounds
+# how long slurmctld may be away).
+- hosts: slurm-master
+  become: true
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Back up the controller now
+      ansible.builtin.include_role:
+        name: slurm_backup
+        public: true
+        tasks_from: now
+      when: inventory_hostname == groups['slurm-master'][0]
+
+    - name: Stop slurmctld and slurmdbd for the upgrade
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop: [slurmctld, slurmdbd]
+      failed_when: false
+      when: not ansible_check_mode
+
+    - name: Upgrade the controller
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+      vars:
+        slurm_upgrade: true
+
+    - name: Check the controller
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: upgrade-verify
+      when: not ansible_check_mode
+
+- hosts: slurm-node
+  become: true
+  serial: "{{ maintenance_serial | default(1) }}"
+  max_fail_percentage: 0
+  roles:
+    - role: deploy_defaults
+  tasks:
+    - name: Drain the node and upgrade its slurmd
+      ansible.builtin.include_role:
+        name: maintenance
+        public: true
+        tasks_from: run
+      vars:
+        maintenance_reason: "maintenance: slurm upgrade"
+        maintenance_role: slurm
+        maintenance_steps: "{{ ['role'] if inventory_hostname in groups['slurm-master'] else ['drain', 'role'] }}"
+        slurm_upgrade: true
+
+    # The SPANK plugin built for the old release is dropped by the slurm role; build it
+    # for the new one before the node takes jobs again.
+    - name: Rebuild pyxis for the new Slurm
+      ansible.builtin.include_role:
+        name: pyxis
+        public: true
+      when: slurm_install_enroot and slurm_install_pyxis
+
+    - name: Check the node and return it to Slurm
+      ansible.builtin.include_role:
+        name: maintenance
+        public: true
+        tasks_from: run
+      vars:
+        maintenance_reason: "maintenance: slurm upgrade"
+        maintenance_steps: [verify, resume]
+
+# Login and other client hosts last, as Slurm's upgrade order has it.
+- hosts: slurm-cluster:!slurm-master:!slurm-node
+  become: true
+  roles:
+    - role: deploy_defaults
+  tasks:
+    - name: Upgrade the client host
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+      vars:
+        slurm_upgrade: true
+
+    - name: Rebuild pyxis for the new Slurm
+      ansible.builtin.include_role:
+        name: pyxis
+        public: true
+      when: slurm_install_enroot and slurm_install_pyxis
+
+# The controller's pyxis (its commands load the plugin too), and the check that every
+# slurmd now runs slurm_version.
+- hosts: slurm-master
+  become: true
+  roles:
+    - role: deploy_defaults
+  tasks:
+    - name: Rebuild pyxis for the new Slurm
+      ansible.builtin.include_role:
+        name: pyxis
+        public: true
+      when: slurm_install_enroot and slurm_install_pyxis
+
+    - name: Check every slurmd runs slurm_version
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: upgrade-nodes
+      when: not ansible_check_mode

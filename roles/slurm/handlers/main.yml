@@ -21,12 +21,31 @@
     daemon_reload: true
   when: is_controller
 
+# The nodes keep the configuration slurmctld served them until told to fetch it again
+# (configless); slurmctld must answer first, which it may not yet right after a restart.
+- name: Reconfigure slurmd
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/scontrol", reconfigure]
+  register: slurm_reconfigure
+  until: slurm_reconfigure.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: true
+  when: is_controller
+
 - name: Restart slurmd
   ansible.builtin.systemd:
     name: slurmd
     state: restarted
     daemon_reload: true
   when: is_compute
+
+- name: Restart sackd
+  ansible.builtin.systemd:
+    name: sackd
+    state: restarted
+    daemon_reload: true
+  when: not (is_compute or is_controller)
 
 - name: Restart logind
   ansible.builtin.service:

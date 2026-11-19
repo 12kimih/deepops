@@ -14,7 +14,7 @@
 
 - name: Check for an installed pyxis plugin
   ansible.builtin.stat:
-    path: "{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so"
+    path: "{{ slurm_plugin_dir }}/spank_pyxis.so"
   register: pyxis_installed
   tags: pyxis
 
@@ -80,8 +80,6 @@
     argv:
       - make
       - -j
-  environment:
-    CPPFLAGS: "-I {{ slurm_install_prefix }}/include"
   register: result
   changed_when: "result.stdout != \"make: Nothing to be done for 'all'.\""
   when: pyxis_rebuild | bool
@@ -89,7 +87,7 @@
     - Restart slurmd
   tags: pyxis
 
-# `make install` places the plugin at {{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so
+# `make install` places the plugin at {{ slurm_plugin_dir }}/spank_pyxis.so
 # (a consistent, owned location) instead of running it from the source tree.
 - name: Install pyxis
   ansible.builtin.command:
@@ -98,8 +96,7 @@
       - make
       - install
       - "prefix={{ slurm_install_prefix }}"
-  environment:
-    CPPFLAGS: "-I {{ slurm_install_prefix }}/include/slurm"
+      - "libdir={{ slurm_plugin_dir | dirname }}"
   changed_when: true
   when: pyxis_rebuild | bool
   notify:
@@ -116,16 +113,27 @@
   when: pyxis_rebuild | bool
   tags: pyxis
 
-# Slurm reads only plugstack.conf; this include pulls in plugstack.conf.d/*.conf.
+# Slurm reads only plugstack.conf; this include pulls in plugstack.conf.d/*.conf, which
+# each node reads from its own disk (pyxis.conf is there only where the plugin loads).
+# plugstack.conf itself lives on the controllers: slurmctld serves it to slurmd and
+# sackd (configless), so the nodes are told to fetch it again when it changes.
 # SPANK plugins are loaded by slurmd and slurmstepd and by the client commands, never
-# by slurmctld, so only slurmd restarts for them.
+# by slurmctld.
 - name: Copy top-level plugstack file
   ansible.builtin.template:
     src: etc/slurm/plugstack.conf
     dest: "{{ slurm_config_dir }}/"
     mode: "0644"
+  when: is_controller
   notify:
-    - Restart slurmd
+    - Reconfigure slurmd
+  tags: pyxis
+
+- name: Remove a local plugstack file slurmctld now serves
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/plugstack.conf"
+    state: absent
+  when: not is_controller
   tags: pyxis
 
 - name: Create plugstack.conf.d directory

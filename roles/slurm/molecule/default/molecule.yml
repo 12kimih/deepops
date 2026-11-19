@@ -13,14 +13,14 @@ platforms:
       - slurm-master
       - slurm-node
 
-# Note: Molecule tests do not use NVML because the Github runner can't handle
-# the CUDA install as well as the Slurm build, it times out.
 provisioner:
   name: ansible
+  # The package build needs slurm_repo_signing_key/pubkey and slurm_munge_key;
+  # supply test values here to run this scenario (it is not in CI).
   inventory:
     group_vars:
       all:
-        slurm_autodetect_nvml: false
+        slurm_upgrade: false
   ansible_args:
     - -vv
 verifier:

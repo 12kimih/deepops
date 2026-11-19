@@ -1,0 +1,4 @@
+---
+# Where the slurm-smd-libpam-slurm-adopt package puts the module (its build passes
+# --with-pam_dir=/usr/lib/<multiarch>/security).
+slurm_pam_lib_dir: "/usr/lib/{{ slurm_multiarch }}/security"

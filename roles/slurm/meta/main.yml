@@ -1,8 +1,9 @@
 ---
 dependencies:
-  - role: slurm_paths  # slurm_install_prefix, slurm_config_dir, host groups
-  - role: deepops_paths  # nvidia_power_limit_conf_file
+  - role: slurm_paths  # slurm_install_prefix, slurm_plugin_dir, slurm_config_dir, host groups
+  - role: deepops_paths  # nvidia_power_limit_conf_file, sm_prefix
   - role: facts
+  - role: retired_settings  # the source build's settings
 
 galaxy_info:
   namespace: deepops

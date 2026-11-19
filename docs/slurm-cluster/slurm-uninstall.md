@@ -8,7 +8,7 @@ How to remove a DeepOps Slurm deployment from a node, including the single-node
   - [What the Slurm playbook puts on a node](#what-the-slurm-playbook-puts-on-a-node)
   - [Uninstall procedure](#uninstall-procedure)
     - [1. Stop and disable the services](#1-stop-and-disable-the-services)
-    - [2. Remove the Slurm build](#2-remove-the-slurm-build)
+    - [2. Remove the Slurm packages](#2-remove-the-slurm-packages)
     - [3. Remove configuration, state, and logs](#3-remove-configuration-state-and-logs)
     - [4. Undo the login and PAM changes](#4-undo-the-login-and-pam-changes)
     - [5. Undo the system tweaks](#5-undo-the-system-tweaks)
@@ -49,8 +49,9 @@ only on `slurm-node` hosts):
 
 | Unit | Where it comes from |
 |---|---|
-| `slurmctld.service`, `slurmdbd.service` | Copied from the Slurm build tree to `/etc/systemd/system/` |
-| `slurmd.service` and the drop-in `/etc/systemd/system/slurmd.service.d/10-slurm-path.conf` | Same |
+| `slurmctld.service`, `slurmdbd.service` (and the drop-in `/etc/systemd/system/slurmdbd.service.d/`) | Packages `slurm-smd-slurmctld`, `slurm-smd-slurmdbd` (`/lib/systemd/system/`) |
+| `slurmd.service` | Package `slurm-smd-slurmd` |
+| `sackd.service` | Package `slurm-smd-sackd`, on hosts with neither `slurmd` nor `slurmctld` |
 | `munge.service` | Distribution package `munge` |
 | `mariadb.service` | Distribution package `mariadb-server` (controller only) |
 | `docker.slurm-exporter.service`, `docker.node-exporter.service`, `docker.dcgm-exporter.service`, `docker.prometheus.service`, `docker.grafana.service`, `docker.alertmanager.service` | Only when `slurm_enable_monitoring` is set |
@@ -59,22 +60,21 @@ Files and directories (variable name in parentheses):
 
 | Path | Purpose |
 |---|---|
-| `/usr/local/{bin,sbin,lib,include,share}` (`slurm_install_prefix`) | Slurm binaries, `libslurm*`, `lib/slurm/` plugins, man pages. Installed with `make install` into the shared `/usr/local` prefix |
-| `/opt/deepops/build/slurm` (`slurm_build_dir`) | Slurm source and build tree. Kept after install unless `slurm_build_dir_cleanup` is set |
-| `/opt/deepops/pmix`, `/opt/deepops/build/pmix` (`pmix_install_prefix`, `pmix_build_dir`) | PMIx built for Slurm |
-| `/opt/deepops/hwloc`, `/opt/deepops/build/hwloc` (`hwloc_install_prefix`, `hwloc_build_dir`) | hwloc built for Slurm |
-| `/etc/ld.so.conf.d/slurm.conf` | Adds the PMIx and hwloc library paths to the dynamic linker |
-| `/etc/slurm` (`slurm_config_dir`) | `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, `prolog.d/`, `epilog.d/`, `shared/bin/`, `localusers.backup`, Pyxis `plugstack.conf.d/` |
-| `/sw/.slurm` (`slurmctl_config_dir`) | Shared `slurm.conf` when `slurm_conf_symlink` is set |
+| The `slurm-smd*` packages | Commands in `/usr/bin` and `/usr/sbin`, plugins in `slurm_plugin_dir` (`/usr/lib/<multiarch>/slurm`), headers in `/usr/include/slurm` |
+| `/etc/apt/sources.list.d/deepops-slurm.list`, `/etc/apt/keyrings/deepops-slurm.asc`, `/etc/apt/preferences.d/deepops-slurm` | The Slurm repository, its key and the version hold |
+| `/sw/.slurm-repo` (`slurm_repo_dir`) | The signed package repository every node installs from (shared) |
+| `/var/cache/deepops/build/slurm-deb` (`slurm_deb_build_dir`), user `slurmbuild` | The package build, on `slurm-master[0]` only |
+| `/etc/slurm` (`slurm_config_dir`) | Controller: `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, `plugstack.conf`, `job_submit.lua`. Every node: `prolog.d/`, `epilog.d/`, `shared/bin/`, `localusers.backup`, Pyxis `plugstack.conf.d/` |
+| `/run/slurm/conf` | The configuration `slurmd` or `sackd` fetched from `slurmctld` (configless) |
 | `/sw/slurm` (`slurm_ha_state_save_location`) | State directory when `slurm_enable_ha` is set |
 | `/var/spool/slurm/ctld`, `/var/spool/slurm/d` | Controller and compute state |
 | `/var/log/slurm` | Daemon logs |
-| `/etc/sysconfig/slurmd` (`slurm_sysconf_dir`) | PMIx environment for `slurmd` |
+| `/etc/sysconfig/slurmd`, `/etc/sysconfig/sackd` (`slurm_sysconf_dir`) | `--conf-server` and the PMIx environment for `slurmd`; `--conf-server` for `sackd` |
 | `/etc/rsyslog.d/99-slurm.conf` | Routes Slurm logs through rsyslog |
 | `/etc/munge/munge.key` | Cluster-wide munge key |
 | `/etc/localusers` | Users allowed to SSH without a job |
 | `/local/slurm` (`slurm_user_home`) | Home of the `slurm` user (uid `slurm_user_uid`, default 22078) |
-| `/lib/<multiarch>/security/pam_slurm_adopt.so` (`slurm_pam_lib_dir`; `/lib64/security` on RHEL) | PAM module built from the Slurm contribs |
+| `/usr/lib/<multiarch>/security/pam_slurm_adopt.so` (`slurm_pam_lib_dir`) | Package `slurm-smd-libpam-slurm-adopt` |
 
 System changes outside those paths:
 
@@ -110,58 +110,46 @@ systemctl disable --now docker.slurm-exporter docker.node-exporter \
 # systemctl disable --now munge
 ```
 
-### 2. Remove the Slurm build
+### 2. Remove the Slurm packages
 
 **Complete [step 4](#4-undo-the-login-and-pam-changes) first**, while the PAM
 module and configuration backups still exist. Verify a fresh SSH login before
 removing any PAM module or Slurm configuration.
 
-The build tree is kept by default, and its Makefile knows every file that
-`make install` created. This is the most complete way to remove the binaries,
-libraries, headers, and man pages from `/usr/local`:
-
 ```bash
-cd /opt/deepops/build/slurm && make uninstall
-cd /opt/deepops/build/slurm/contribs/pam_slurm_adopt && make uninstall
+apt-get purge -y 'slurm-smd*'
+rm -f /etc/apt/sources.list.d/deepops-slurm.list /etc/apt/keyrings/deepops-slurm.asc \
+      /etc/apt/preferences.d/deepops-slurm
+apt-get update
 ```
 
-If the configured build tree is gone, recover the same Slurm version and
-configure options to establish its installation manifest, or inventory files
-manually. Typical entries include `srun`, `sinfo`, `sbatch`, `sacct`,
-`slurmctld`, `slurmd`, `slurmdbd`, `slurmstepd`, `lib/slurm/`,
-`include/slurm/`, Slurm man pages, and `pam_slurm_adopt.so` in
-`slurm_pam_lib_dir`. Remove only files confirmed to belong to that installation.
-Do not recursively delete `/usr/local` or glob `libpmi*` or man pages: those
-can belong to other MPI stacks or applications.
+A Pyxis plugin built on the node stays in `slurm_plugin_dir` (dpkg does not own it):
+remove `spank_pyxis.so` and `spank_pyxis.so.built-from` there. On `slurm-master[0]`,
+also remove the package build (`/var/cache/deepops/build/slurm-deb`, the user
+`slurmbuild`, the build dependencies package `slurm-smd-build-deps`).
 
-Then, only if no other application uses these PMIx/hwloc installations,
-remove the build trees and companion libraries (substitute custom paths):
-
-```bash
-rm -rf /opt/deepops/build/slurm /opt/deepops/build/pmix /opt/deepops/build/hwloc
-rm -rf /opt/deepops/pmix /opt/deepops/hwloc
-rm -f /etc/ld.so.conf.d/slurm.conf && ldconfig
-```
-
-Remove `/opt/deepops` entirely only if nothing else on the node uses it
-(the NHC build and other roles also install under `/opt/deepops`).
+A node that still has the older source build (`make install` under `/usr/local`, with
+`/opt/deepops/{pmix,hwloc}`): the upgrade playbook removes it
+([slurm-upgrade.md](slurm-upgrade.md)); by hand, `make uninstall` in
+`/opt/deepops/build/slurm` and its `contribs/pam_slurm_adopt`, then
+`/usr/local/lib/slurm`, `/usr/local/include/slurm`, `/opt/deepops/{pmix,hwloc}`, the
+build trees under `/opt/deepops/build`, `/etc/ld.so.conf.d/slurm.conf` (then
+`ldconfig`) and the unit copies in `/etc/systemd/system`.
 
 ### 3. Remove configuration, state, and logs
 
 ```bash
-rm -f /etc/systemd/system/slurmctld.service /etc/systemd/system/slurmdbd.service \
-      /etc/systemd/system/slurmd.service
-rm -rf /etc/systemd/system/slurmd.service.d
+rm -rf /etc/systemd/system/slurmdbd.service.d /etc/systemd/system/slurmd.service.d
 systemctl daemon-reload
 
 # Local paths only; inspect mounts/symlinks and save backups first.
 rm -rf /etc/slurm
 rm -rf /var/spool/slurm /var/log/slurm
-rm -f /etc/sysconfig/slurmd
+rm -f /etc/sysconfig/slurmd /etc/sysconfig/sackd
 rm -f /etc/rsyslog.d/99-slurm.conf && systemctl restart rsyslog
 ```
 
-`/sw/.slurm` (`slurmctl_config_dir`) and `/sw/slurm`
+`/sw/.slurm-repo` (`slurm_repo_dir`) and `/sw/slurm`
 (`slurm_ha_state_save_location`) may be shared by the entire cluster. Preserve
 them when removing one node. Remove them only once, after all controllers and
 compute nodes are retired and a restorable backup has been made.
@@ -256,7 +244,7 @@ Each is independent of Slurm and can stay in place if it is still useful.
 
 | Component | Flag | What to remove |
 |---|---|---|
-| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm` (`plugstack.conf`, `plugstack.conf.d/pyxis.conf`); the plugin is installed as `{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so` from the source tree in `/usr/local/src/pyxis-<version>` (`pyxis_src_dir`). Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
+| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm` (`plugstack.conf`, `plugstack.conf.d/pyxis.conf`); the plugin is installed as `{{ slurm_plugin_dir }}/spank_pyxis.so` from the source tree in `/usr/local/src/pyxis-<version>` (`pyxis_src_dir`). Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
 | Node Health Check | `slurm_install_nhc` | `/etc/nhc`, `/etc/sysconfig/nhc`, `/usr/sbin/nhc*`, `/usr/libexec/nhc`, `/opt/deepops/build/nhc` |
 | OpenMPI | `slurm_cluster_install_openmpi` (example inventory: off; unset: on) | Built into `/usr/local` from `/tmp/openmpi-build`; `cd` to that directory and `make uninstall` if it still exists |
 | Lmod / software modules | `slurm_install_lmod` | See `roles/lmod/defaults/main.yml` for `sm_software_path` and `sm_module_path`; profile scripts in `/etc/profile.d/` |
@@ -294,9 +282,7 @@ nvidia-smi -L                                    # GPUs visible from a normal SS
 
 ## Reinstalling instead of uninstalling
 
-If the goal is to rebuild Slurm binaries while keeping configuration, state,
-and accounting, you do not need the removal procedure above. This is not a
-clean-state reset. Set `slurm_force_rebuild: yes` in
-`config/group_vars/slurm-cluster.yml` and rerun the playbook; the build step
-runs `make uninstall` in the old build tree, removes the old plugin directory,
-and rebuilds from source before reapplying the configuration.
+If the goal is to reinstall Slurm while keeping configuration, state and accounting,
+you do not need the removal procedure above: `apt-get install --reinstall` the
+`slurm-smd*` packages on the node, or rebuild them with `-e slurm_force_rebuild=true`
+on `playbooks/slurm-cluster/slurm.yml` (same version, same package names).

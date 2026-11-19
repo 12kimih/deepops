@@ -1,0 +1,252 @@
+---
+# Build the slurm-smd packages of slurm_version once, on this host (slurm-master[0]),
+# and publish them to the signed repository in slurm_repo_dir that every node installs
+# from. SchedMD's procedure (quickstart_admin.html#debuild): unpack the release, install
+# debian/control's build dependencies with mk-build-deps, build binary packages. Root
+# installs the dependencies and publishes; slurm_deb_build_user builds.
+- name: Setup role
+  ansible.builtin.include_tasks: setup-role.yml
+
+- name: Require the repository signing key
+  ansible.builtin.assert:
+    that:
+      - slurm_repo_signing_key | length > 0
+      - slurm_repo_signing_pubkey | length > 0
+    fail_msg: >-
+      slurm_repo_signing_key (vaulted) and slurm_repo_signing_pubkey sign and verify the
+      Slurm package repository; make the pair as docs/slurm-cluster/slurm-upgrade.md says.
+    quiet: true
+
+- name: Read the package architecture
+  ansible.builtin.command:
+    argv: [dpkg, --print-architecture]
+  register: slurm_deb_arch
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Look for this version in the repository
+  ansible.builtin.stat:
+    path: "{{ slurm_repo_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"
+  register: slurm_repo_has_version
+
+- name: Build the packages
+  when: slurm_force_rebuild | bool or not slurm_repo_has_version.stat.exists
+  vars:
+    _tree: "{{ slurm_deb_build_dir }}/slurm-{{ slurm_version }}"
+    _nvml: "/usr/local/cuda-{{ slurm_nvml_cuda_version }}/targets/{{ ansible_facts.architecture | replace('aarch64', 'sbsa') }}-linux"
+  block:
+    # cuda-nvml-dev-<version> (the NVML header and link stub) comes from NVIDIA's repository.
+    - name: Add the CUDA repository
+      ansible.builtin.include_role:
+        name: package_repos
+        tasks_from: cuda
+
+    - name: Install the packaging tools
+      ansible.builtin.apt:
+        name: [build-essential, fakeroot, devscripts, equivs, apt-utils, gnupg]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create the build account
+      ansible.builtin.user:
+        name: "{{ slurm_deb_build_user }}"
+        system: true
+        home: "{{ slurm_deb_build_dir }}"
+        create_home: false
+        shell: /usr/sbin/nologin
+
+    # A fresh tree each build: the patches below apply to the release as shipped.
+    - name: Remove an earlier build of this version
+      ansible.builtin.file:
+        path: "{{ _tree }}"
+        state: absent
+
+    - name: Create the build directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ slurm_deb_build_user }}"
+        mode: "0755"
+      loop: ["{{ slurm_deb_build_dir }}", "{{ _tree }}"]
+
+    - name: Fetch and unpack the Slurm release
+      ansible.builtin.include_role:
+        name: download
+      vars:
+        download_url: "{{ slurm_src_url }}"
+        download_checksum: "{{ slurm_checksums[slurm_version] | default('') }}"
+        download_dest: "/var/cache/deepops/{{ slurm_src_url | basename }}"
+        download_unpack: "{{ _tree }}"
+        download_strip: 1
+        download_owner: "{{ slurm_deb_build_user }}"
+
+    # The shipped debian/ directory, adjusted where this cluster needs more than it
+    # declares: Lua 5.4 for 5.3, NVML and the other extra build dependencies, NVML from
+    # its package path (never /usr/local/cuda), no dpkg dependency on the driver's
+    # libnvidia-ml (gpu_nvml.so loads it from the driver on GPU nodes only), and no
+    # daemon started or restarted by dpkg: the role restarts them in Slurm's order.
+    - name: Build against Lua {{ slurm_deb_lua_dev }}
+      ansible.builtin.replace:
+        path: "{{ _tree }}/debian/control"
+        regexp: '^ liblua5\.\d-dev,$'
+        replace: " {{ slurm_deb_lua_dev }},"
+      register: slurm_deb_patch_lua
+
+    - name: Add the build dependencies debian/control lacks
+      ansible.builtin.replace:
+        path: "{{ _tree }}/debian/control"
+        regexp: "^Build-Depends:$"
+        replace: "Build-Depends:\n{% for dep in ['cuda-nvml-dev-' ~ slurm_nvml_cuda_version | replace('.', '-')] + slurm_deb_build_extra_deps %} {{ dep }},\n{% endfor %}"
+      register: slurm_deb_patch_deps
+
+    - name: Configure with NVML from its package
+      ansible.builtin.replace:
+        path: "{{ _tree }}/debian/rules"
+        regexp: "dh_auto_configure -- "
+        replace: "dh_auto_configure -- --with-nvml={{ _nvml }} "
+      register: slurm_deb_patch_nvml
+
+    - name: Leave the daemons to the role
+      ansible.builtin.replace:
+        path: "{{ _tree }}/debian/rules"
+        regexp: "dh_installsystemd -p"
+        replace: "dh_installsystemd --no-start --no-stop-on-upgrade -p"
+      register: slurm_deb_patch_start
+
+    - name: Keep the driver's libnvidia-ml out of the package dependencies
+      ansible.builtin.blockinfile:
+        path: "{{ _tree }}/debian/rules"
+        # A make recipe line must start with a tab.
+        block: "override_dh_shlibdeps:\n\tdh_shlibdeps -Xgpu_nvml.so"  # noqa: no-tabs
+      register: slurm_deb_patch_shlibs
+
+    - name: Check every packaging change applied
+      ansible.builtin.assert:
+        that: >-
+          [slurm_deb_patch_lua, slurm_deb_patch_deps, slurm_deb_patch_nvml, slurm_deb_patch_start,
+           slurm_deb_patch_shlibs] | select('changed') | list | length == 5
+        fail_msg: >-
+          The debian/ directory of Slurm {{ slurm_version }} no longer has what the build
+          adjusts (liblua5.x-dev, Build-Depends:, dh_auto_configure, dh_installsystemd);
+          update roles/slurm/tasks/packages-build.yml for it.
+        quiet: true
+      when: not ansible_check_mode
+
+    - name: Install the build dependencies
+      ansible.builtin.command:
+        argv: [mk-build-deps, --install, --remove, --tool, apt-get -y -q --no-install-recommends, "{{ _tree }}/debian/control"]
+        chdir: /var/cache/deepops
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      changed_when: true
+
+    - name: Build the packages
+      ansible.builtin.command:
+        argv: [dpkg-buildpackage, -b, -uc, -us]
+        chdir: "{{ _tree }}"
+      environment:
+        HOME: "{{ slurm_deb_build_dir }}"
+        DEB_BUILD_OPTIONS: "parallel={{ ansible_facts.processor_nproc }}"
+      become: true
+      become_user: "{{ slurm_deb_build_user }}"
+      changed_when: true
+
+    - name: List what the main package holds
+      ansible.builtin.command:
+        argv: [dpkg-deb, --contents, "{{ slurm_deb_build_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"]
+      register: slurm_deb_contents
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Read the main package's dependencies
+      ansible.builtin.command:
+        argv: [dpkg-deb, --field, "{{ slurm_deb_build_dir }}/slurm-smd_{{ slurm_deb_version }}_{{ slurm_deb_arch.stdout }}.deb", Depends]
+      register: slurm_deb_depends
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Check the packages hold every required plugin
+      ansible.builtin.assert:
+        that:
+          - _missing | length == 0
+          - slurm_deb_lua_dev | regex_replace('-dev$', '') in slurm_deb_depends.stdout
+          - "'libnvidia' not in slurm_deb_depends.stdout"
+        fail_msg: >-
+          The Slurm {{ slurm_version }} packages lack {{ _missing | join(', ') or 'nothing' }} or
+          do not link {{ slurm_deb_lua_dev | regex_replace('-dev$', '') }} (Depends:
+          {{ slurm_deb_depends.stdout }}): a build dependency was missing. See the configure
+          output in the build tree {{ _tree }}.
+        quiet: true
+      vars:
+        _missing: "{{ slurm_deb_required_plugins | reject('in', slurm_deb_contents.stdout) | list }}"
+      when: not ansible_check_mode
+
+- name: Find the built packages
+  ansible.builtin.find:
+    paths: "{{ slurm_deb_build_dir }}"
+    patterns: "*_{{ slurm_deb_version }}_*.deb"
+  register: slurm_deb_built
+
+- name: Create the repository directory
+  ansible.builtin.file:
+    path: "{{ slurm_repo_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Earlier versions stay: a node added mid-upgrade still installs the version it needs.
+- name: Publish the packages
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ slurm_repo_dir }}/"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ slurm_deb_built.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  register: slurm_repo_published
+
+- name: Look for the repository signature
+  ansible.builtin.stat:
+    path: "{{ slurm_repo_dir }}/InRelease"
+  register: slurm_repo_inrelease
+
+- name: Keep the public key to check the signature against
+  ansible.builtin.copy:
+    dest: /var/cache/deepops/slurm-repo.asc
+    content: "{{ slurm_repo_signing_pubkey }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: slurm_repo_pubkey_file
+
+# The index, then Release (its hashes) signed by the key from stdin, in a throwaway
+# keyring; then the signature is checked against slurm_repo_signing_pubkey, the key
+# the nodes trust, so a mismatched pair fails here and not on every node.
+- name: Index and sign the repository
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      work=$(mktemp -d /var/cache/deepops/slurm-repo-sign.XXXXXX)
+      trap 'rm -rf "$work"' EXIT
+      mkdir -m 0700 "$work/sign" "$work/check" "$work/index"
+      gpg --homedir "$work/sign" --batch --quiet --import
+      cd {{ slurm_repo_dir | quote }}
+      apt-ftparchive packages . > "$work/index/Packages"
+      gzip -9n -c "$work/index/Packages" > "$work/index/Packages.gz"
+      cd "$work/index"
+      apt-ftparchive -o APT::FTPArchive::Release::Origin=deepops -o APT::FTPArchive::Release::Label=slurm release . > "$work/Release"
+      gpg --homedir "$work/sign" --batch --yes --clearsign -o "$work/index/InRelease" "$work/Release"
+      gpg --homedir "$work/check" --batch --quiet --import /var/cache/deepops/slurm-repo.asc
+      gpg --homedir "$work/check" --batch --verify "$work/index/InRelease"
+      install -m 0644 "$work/index/Packages" "$work/index/Packages.gz" {{ slurm_repo_dir | quote }}/
+      install -m 0644 "$work/index/InRelease" {{ slurm_repo_dir | quote }}/
+    executable: /bin/bash
+    stdin: "{{ slurm_repo_signing_key }}"
+  no_log: true
+  changed_when: true
+  when: slurm_repo_published is changed or slurm_repo_pubkey_file is changed or not slurm_repo_inrelease.stat.exists

@@ -1,0 +1,22 @@
+---
+# Whether the host already holds exactly the site's MUNGE key (slurm_munge_key_file),
+# changing nothing: a step that must not change the key on the way (renaming the
+# cluster, whose name the key was once derived from) runs this first.
+- name: Compare the installed MUNGE key with slurm_munge_key_file
+  diff: false  # the file holds a secret; --diff would print it
+  ansible.builtin.copy:
+    src: "{{ slurm_munge_key_file }}"
+    dest: /etc/munge/munge.key
+    mode: "0400"
+    owner: munge
+    group: munge
+  check_mode: true
+  register: slurm_munge_check
+
+- name: Require the site's MUNGE key on the host
+  ansible.builtin.assert:
+    that: slurm_munge_check is not changed
+    fail_msg: >-
+      {{ inventory_hostname }} does not hold slurm_munge_key_file's key yet. Deploy it first
+      (playbooks/slurm-cluster/slurm.yml --tags munge, docs/slurm-cluster/munge-key.md).
+    quiet: true
