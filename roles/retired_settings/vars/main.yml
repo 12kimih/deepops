@@ -36,3 +36,5 @@ retired_settings:
   trident_helm_chart_name: trident_helm_chart (the chart name; the repository is trident_helm_repo_url) in roles/netapp-trident
   k8s_nfs_client_repo_name: k8s_nfs_client_helm_repo (installed with helm --repo, no named repository) in roles/nfs-client-provisioner
   k8s_nfs_client_chart_name: k8s_nfs_client_chart (the chart name; the repository is k8s_nfs_client_helm_repo) in roles/nfs-client-provisioner
+  sriov_resources: intf_resources in roles/nvidia-network-operator (roles/roce_backend is retired; NVIDIA Network Operator manages SR-IOV/RDMA)
+  roce_backend_num_vf: nvidia_network_operator_num_vf in roles/nvidia-network-operator (roles/roce_backend is retired)

@@ -51,9 +51,8 @@ Different layers; the monitoring stack uses the exporter.
 ## RDMA / InfiniBand drivers
 
 - `mofed` -- the modern **DOCA-OFED** driver (apt/dnf repo, multi-OS). **Use this.**
-- `roce_backend` -- legacy k8s SR-IOV/Multus wiring; its bundled MLNX_OFED-4.7 ISO
-  install is deprecated. For Kubernetes RDMA prefer `mofed` +
-  `nvidia-network-operator`.
+- `nvidia-network-operator` -- SR-IOV, RDMA and Multus for Kubernetes pods, from NVIDIA
+  Network Operator's Helm chart (the retired `roce_backend` wired them by hand).
 
 ## Time synchronization
 

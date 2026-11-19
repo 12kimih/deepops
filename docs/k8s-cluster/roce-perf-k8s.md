@@ -223,46 +223,12 @@ add switch PFC, ECN configuration
 
 9. Deploy SRIOV RoCE for Kubernetes Cluster
 
-   Use DeepOps RoCE_backend deployment scripts to deploy following components to the Kubernetes cluster, those steps are also described in detail in this [doc](https://github.com/NVIDIA/deepops/tree/master/roles/roce_backend):
-
-   - Upgrade Mellanox OFED driver package to the appropriate version to active SRIOV VFs
-   - Multus CNI to support multiple NICs in Kubernetes pod
-   - SR-IOV CNI and SRIOV device plugin
-   - DHCP CNI for pod IP addresses management for SR-IOV RoCE interfaces
-   - Latest MPI-Operator
-
-   Modify roles/roce_backend/vars/main.yml file, update the variables according to your hardware and network configuration. This is the parameters we used:
-
-   ```yaml
-   sriov_resources:
-     - pf_name: "enp5s0"
-       vlan_id: 111
-       res_name: "sriov_111"
-       network_name: "sriov111"
-     - pf_name: "enp132s0"
-       vlan_id: 112
-       res_name: "sriov_112"
-       network_name: "sriov112"
-
-   # NOTE: "15b3" is Mellanox vendor code and "1018" is for MT27800 Family [ConnectX-5 Virtual Function]
-
-   vendor: "15b3"
-   dev_id: "1018"
-   ```
-
-   The number of virtual functions per physical function is a setting in your config:
-
-   ```yaml
-   roce_backend_num_vf: 8
-   ```
-
-   Run following script to deploy SRIOV RoCE functions:
-
-   ```bash
-   nvidia@mgmt01:~/deepops_0322$ ansible-playbook -l k8s_cluster playbooks/k8s-cluster/roce.yaml
-   ```
-
-   If using a different username and SSH key-based authentication haven't set up, try to use `-u <user> -k -K` when you run the script.
+   Deploy NVIDIA Network Operator as the [NVIDIA Network Operator Deployment Guide in DeepOps](nvidia-network-operator.md)
+   describes. It installs and manages the components this test used: Multus CNI for several
+   NICs in a pod, the SR-IOV device plugin and CNI, IP address management for the SR-IOV
+   interfaces, and the MPI Operator. Set its interface list (`intf_resources`) and the number
+   of virtual functions per physical function (`nvidia_network_operator_num_vf`) for your
+   hardware. (This test originally used the `roce_backend` role, since retired.)
 
 10. Using SRIOV RoCE interfaces
 
