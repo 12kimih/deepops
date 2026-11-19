@@ -19,57 +19,32 @@
     update_cache: true
   when: nvidia_container_toolkit_repo_base_url | length > 0
 
-- name: Ubuntu | ensure keyring directory exists
-  ansible.builtin.file:
-    path: "{{ nvidia_container_toolkit_keyring_path | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Ubuntu | check NVIDIA Container Toolkit keyring
-  ansible.builtin.stat:
-    path: "{{ nvidia_container_toolkit_keyring_path }}"
-  register: nvidia_container_toolkit_keyring
-
-- name: Ubuntu | download NVIDIA Container Toolkit GPG key
+# NVIDIA's flat repository for this architecture, signed by its key alone
+# (roles/package_repos, the one way a repository is added).
+- name: Ubuntu | add the NVIDIA Container Toolkit repository
   ansible.builtin.include_role:
-    name: download
+    name: package_repos
+    tasks_from: repo
   vars:
-    download_url: "{{ nvidia_container_toolkit_repo_gpg_url }}"
-    download_checksum: "{{ nvidia_container_toolkit_repo_gpg_checksum }}"
-    download_dest: "{{ nvidia_container_toolkit_keyring_ascii_path }}"
-
-- name: Ubuntu | install NVIDIA Container Toolkit GPG keyring
-  ansible.builtin.command:
-    cmd: "gpg --dearmor --yes -o {{ nvidia_container_toolkit_keyring_path }} {{ nvidia_container_toolkit_keyring_ascii_path }}"
-  when: (download_fetch is changed or not nvidia_container_toolkit_keyring.stat.exists) and not ansible_check_mode
-  register: nvidia_container_toolkit_keyring_install
-  changed_when: true
-
-- name: Ubuntu | set NVIDIA Container Toolkit GPG keyring permissions
-  ansible.builtin.file:
-    path: "{{ nvidia_container_toolkit_keyring_path }}"
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Ubuntu | configure NVIDIA Container Toolkit APT repository
-  ansible.builtin.copy:
-    content: |
-      deb [signed-by={{ nvidia_container_toolkit_keyring_path }}] {{ nvidia_container_toolkit_repo_base_url }}/stable/deb/{{ nvidia_container_toolkit_deb_arch }} /
-    dest: "{{ nvidia_container_toolkit_apt_source_path }}"
-    owner: root
-    group: root
-    mode: "0644"
-  register: nvidia_container_toolkit_apt_source
+    package_repos_repo:
+      name: nvidia-container-toolkit
+      uris: "{{ nvidia_container_toolkit_repo_base_url }}/stable/deb/{{ nvidia_container_toolkit_deb_arch }}"
+      suites: [/]
+      architectures: []
+      key_url: "{{ nvidia_container_toolkit_repo_gpg_url }}"
+      key_checksum: "{{ nvidia_container_toolkit_repo_gpg_checksum }}"
+      # What this role and the install guide wrote before: the .list, the keyrings.
+      legacy_files:
+        - /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        - /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        - /usr/share/keyrings/nvidia-container-toolkit-keyring.asc
 
 - name: Ubuntu | install NVIDIA Container Toolkit
   ansible.builtin.apt:
     # apt pins as pkg=version; an empty version installs the latest.
     name: "{{ nvidia_container_toolkit_packages | map('regex_replace', '$', _version_suffix) | list }}"
     state: present
-    update_cache: "{{ nvidia_container_toolkit_apt_source.changed or nvidia_container_toolkit_keyring_install.changed | default(false) }}"
+    update_cache: "{{ package_repos_changed }}"
   vars:
     _version_suffix: "{{ ('=' ~ nvidia_container_toolkit_version) if (nvidia_container_toolkit_version | length > 0) else '' }}"
   environment: "{{ proxy_env }}"

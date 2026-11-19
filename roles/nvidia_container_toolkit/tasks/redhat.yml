@@ -5,25 +5,26 @@
     state: present
   when: nvidia_container_toolkit_repo_base_url | length > 0
 
-# Written here, as NVIDIA's .repo file defines it: the repository metadata is signed
-# (repo_gpgcheck), the packages are not.
-- name: Red Hat | configure NVIDIA Container Toolkit Yum repository
-  ansible.builtin.yum_repository:
-    name: nvidia-container-toolkit
-    file: nvidia-container-toolkit
-    description: nvidia-container-toolkit
-    baseurl: "{{ nvidia_container_toolkit_repo_base_url }}/stable/rpm/$basearch"
-    gpgkey: "{{ nvidia_container_toolkit_repo_gpg_url }}"
-    repo_gpgcheck: true
-    gpgcheck: false
-  register: nvidia_container_toolkit_yum_repo
+# As NVIDIA's .repo file defines it: the repository metadata is signed, the packages are
+# not (roles/package_repos, the one way a repository is added).
+- name: Red Hat | add the NVIDIA Container Toolkit repository
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: repo
+  vars:
+    package_repos_repo:
+      name: nvidia-container-toolkit
+      uris: "{{ nvidia_container_toolkit_repo_base_url }}/stable/rpm/$basearch"
+      key_url: "{{ nvidia_container_toolkit_repo_gpg_url }}"
+      key_checksum: "{{ nvidia_container_toolkit_repo_gpg_checksum }}"
+      signed: metadata
 
 - name: Red Hat | install NVIDIA Container Toolkit
   ansible.builtin.dnf:
     # dnf pins as pkg-version; an empty version installs the latest.
     name: "{{ nvidia_container_toolkit_packages | map('regex_replace', '$', _version_suffix) | list }}"
     state: present
-    update_cache: "{{ nvidia_container_toolkit_yum_repo.changed }}"
+    update_cache: "{{ package_repos_changed }}"
   vars:
     _version_suffix: "{{ ('-' ~ nvidia_container_toolkit_version) if (nvidia_container_toolkit_version | length > 0) else '' }}"
   environment: "{{ proxy_env }}"

@@ -27,10 +27,7 @@ REPO_DIRS = (
 REPO_NAMES = re.compile(r"(?<![a-z])sources(?![a-z])|keyring|\.repo\b|_repo_file|gpg_key")
 OWNER = "roles/package_repos/"
 # file -> who moves it to roles/package_repos (tasks_from: repo)
-NOT_MOVED_YET = {
-    "roles/nvidia_container_toolkit/tasks/ubuntu.yml": "deepops or deepops-4",
-    "roles/nvidia_container_toolkit/tasks/redhat.yml": "deepops or deepops-4",
-}
+NOT_MOVED_YET = {}
 
 
 def offences(path):

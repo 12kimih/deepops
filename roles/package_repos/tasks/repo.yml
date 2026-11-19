@@ -21,6 +21,8 @@
 #                                       # (an old .list, a trusted.gpg.d key, ...)
 #         module_hotfixes: false        # RHEL family, optional (e.g. CUDA on EL8)
 #         priority: 99                  # RHEL family, optional
+#         signed: packages              # RHEL family: what the key signs, packages (the
+#                                       # default) or metadata (NVIDIA's container toolkit)
 #         state: present                # or absent: source, key, pin and legacy files go
 #
 # The files it manages, for a component's record: /etc/apt/sources.list.d/<name>.sources,
@@ -38,6 +40,7 @@
     that:
       - package_repos_repo.name | default('') is match('^[a-z0-9][a-z0-9._-]*$')
       - package_repos_repo.state | default('present') in ['present', 'absent']
+      - package_repos_repo.signed | default('packages') in ['packages', 'metadata']
       - >-
         package_repos_repo.state | default('present') == 'absent'
         or (package_repos_repo.uris | default('') | length > 0
@@ -245,8 +248,8 @@
             name: "{{ package_repos_r.name }}"
             description: "{{ package_repos_r.name }}"
             baseurl: "{{ package_repos_r.uris }}"
-            gpgcheck: true
-            repo_gpgcheck: false
+            gpgcheck: "{{ package_repos_r.signed | default('packages') == 'packages' }}"
+            repo_gpgcheck: "{{ package_repos_r.signed | default('packages') == 'metadata' }}"
             gpgkey: "file://{{ package_repos_rpm_key }}"
             module_hotfixes: "{{ package_repos_r.module_hotfixes | default(omit) }}"
             priority: "{{ package_repos_r.priority | default(omit) }}"
