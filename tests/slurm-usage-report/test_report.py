@@ -156,8 +156,9 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(unavailable[0][2], report.datetime.fromtimestamp(NOW).isoformat(timespec="seconds"))
 
     def test_duration(self):
-        self.assertEqual(report.duration(93784), "1-2:03:04")
-        self.assertEqual(report.duration(306.9), "0:05:06")
+        # squeue's form, as sq shows the same jobs
+        self.assertEqual(report.duration(93784), "1-02:03:04")
+        self.assertEqual(report.duration(306.9), "5:06")
 
 
 class IdleTests(unittest.TestCase):
@@ -166,6 +167,7 @@ class IdleTests(unittest.TestCase):
             "id": jid,
             "label": jid,
             "user": "u",
+            "running": True,
             "runtime": runtime,
             "gpus": gpus,
             "gpu_type": "a10",
@@ -184,6 +186,7 @@ class IdleTests(unittest.TestCase):
             self.job("too-young", 60, [("n", 0)]),
             self.job("no-data", 7200, [("n", 0), ("n", 9)]),
             self.job("partly", 7200, [("n", 0), ("n", 2)]),
+            dict(self.job("suspended", 7200, [("n", 0)]), running=False),
         ]
         idle = report.analyze(jobs, gpu, window=7200, threshold=0)
         self.assertEqual([j["id"] for j in idle], ["all-idle"])
@@ -264,14 +267,19 @@ class RenderTests(unittest.TestCase):
                 self.assertLessEqual(len(b.get("text", {}).get("text", "")), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
-    def test_a_long_section_is_cut_at_a_line_and_closes_its_code_block(self):
-        text = "head\n```\n" + "\n".join(f"row {i:04d} " + "x" * 40 for i in range(200)) + "\n```"
-        cut = report.section(text)["text"]["text"]
-        self.assertLessEqual(len(cut), 3000)
-        self.assertEqual(cut.count("```") % 2, 0)
-        kept = sum(1 for ln in cut.splitlines() if ln.startswith("row "))
-        self.assertIn(f"... {200 - kept} more lines", cut)
-        self.assertEqual(report.section("short")["text"]["text"], "short")
+    def test_a_long_text_is_split_at_lines_and_nothing_is_lost(self):
+        # Every line reaches Slack: a dropped one could be the mention that tells an owner.
+        rows = [f"row {i:04d} " + "x" * 40 for i in range(200)]
+        text = "head\n```\n" + "\n".join(rows) + "\n```"
+        parts = [b["text"]["text"] for b in report.sections(text)]
+        self.assertGreater(len(parts), 1)
+        for p in parts:
+            self.assertLessEqual(len(p), 3000)
+            self.assertEqual(p.count("```") % 2, 0, "each part closes the code block it opens")
+        lines = [ln for p in parts for ln in p.splitlines() if ln.startswith("row ")]
+        self.assertEqual(lines, rows)
+        self.assertEqual([b["text"]["text"] for b in report.sections("short")], ["short"])
+        self.assertLessEqual(len(report.sections("y" * 5000)[0]["text"]["text"]), 3000)
 
     def test_bar(self):
         self.assertEqual(report.bar(100), "█" * 10 + " 100%")
@@ -324,6 +332,68 @@ class RunTests(unittest.TestCase):
                 report.main()
                 self.assertEqual(posted.count("UALICE"), 1)
                 self.assertEqual(Path(f"{d}/state.json").stat().st_mode & 0o777, 0o600)
+
+
+class GpuIndexTests(unittest.TestCase):
+    def test_keyed_on_the_device_slurm_counts_not_the_nvml_index(self):
+        # NVML index 0 is /dev/nvidia1 here: Slurm's IDX 1 must read its figure.
+        prom = report.Prometheus("http://x")
+        rows = [{"metric": {"host": "n", "gpu": "0", "device": "nvidia1"}, "value": [0, "70"]},
+                {"metric": {"host": "n", "gpu": "1", "device": "nvidia0"}, "value": [0, "0"]},
+                {"metric": {"host": "n", "gpu": "2"}, "value": [0, "5"]}]  # fmt: skip
+        with mock.patch.object(prom, "query", lambda expr: rows):
+            self.assertEqual(prom.per_gpu("q"), {("n", 1): 70.0, ("n", 0): 0.0})
+
+
+class ConfigTests(unittest.TestCase):
+    BASE = {"slack_token": "t", "channel": "#c", "prometheus_url": "", "idle_hours": 2,
+            "idle_util_threshold": 0, "notify": ["mention"], "notify_repeat_hours": 6,
+            "dm_text": "{job} {gpus} {hours} {runtime}", "cancel_after_hours": 0, "user_map": {},
+            "email_domain": "", "state_file": "/nonexistent"}  # fmt: skip
+
+    def load(self, **change):
+        with tempfile.TemporaryDirectory() as d:
+            Path(f"{d}/c.json").write_text(json.dumps(dict(self.BASE, **change)))
+            return report.load_config(f"{d}/c.json")
+
+    def test_a_good_config_loads(self):
+        self.assertEqual(self.load()["channel"], "#c")
+        self.assertEqual(self.load(cancel_after_hours=24)["cancel_after_hours"], 24)
+
+    def test_each_mistake_is_named_before_anything_runs(self):
+        for change, word in (({"dm_text": "{user}"}, "dm_text"), ({"dm_text": "{"}, "dm_text"),
+                             ({"notify": ["email"]}, "notify"), ({"idle_hours": "2"}, "idle_hours"),
+                             ({"cancel_after_hours": 1}, "exceed"),
+                             ({"cancel_after_hours": 24, "notify": []}, "notify"),
+                             ({"channel": None}, "channel")):  # fmt: skip
+            with self.subTest(change=change), self.assertRaisesRegex(report.ConfigError, word):
+                self.load(**change)
+
+    def test_a_damaged_state_file_is_a_fresh_start(self):
+        with tempfile.TemporaryDirectory() as d:
+            for text in ("[1]", "{bad", '{"idle": [], "users": 3}',
+                         '{"idle": {"1": {"since": "x"}, "2": {"since": 5, "notified": null}}}'):  # fmt: skip
+                Path(f"{d}/s").write_text(text)
+                state = report.load_state(f"{d}/s")
+                self.assertEqual(set(state), {"idle", "users"})
+                self.assertEqual(set(state["idle"]) - {"2"}, set())
+
+
+class CancelTests(unittest.TestCase):
+    def run_act(self, notified):
+        j = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": False,
+             "state": {"since": NOW - 30 * 3600, "notified": notified}}  # fmt: skip
+        cfg = {"notify": ["mention"], "cancel_after_hours": 24, "channel": "#c"}
+        slack = mock.Mock()
+        slack.post.return_value = "ts"
+        with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
+                mock.patch.object(report, "run") as run:  # fmt: skip
+            report.act({"idle": [j]}, cfg, lambda u, m: u, slack, {}, NOW)
+        return run.call_count
+
+    def test_cancelled_only_after_the_owner_was_told_in_an_earlier_run(self):
+        self.assertEqual(self.run_act(None), 0)  # never told (lost state, failed DM)
+        self.assertEqual(self.run_act(NOW - 3600), 1)
 
 
 if __name__ == "__main__":

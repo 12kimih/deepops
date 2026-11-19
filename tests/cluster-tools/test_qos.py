@@ -51,10 +51,15 @@ class BuildTests(unittest.TestCase):
         m = model(usage=False)
         self.assertTrue(all(q["used"] is None for r in m["qos"] for q in r["gpu"].values()))
 
+    def test_untyped_gpu_quota_is_its_own_column(self):
+        q = {"limits": {"max": {"tres": {"total": [{"type": "gres", "name": "gpu", "count": 8},
+                                                   {"type": "gres", "name": "gpu:a10", "count": 4}]}}}}  # fmt: skip
+        self.assertEqual(qos._gpu_limits(q), {"any": 8, "a10": 4})
+
     def test_wall_and_types(self):
         rows = {r["name"]: r for r in model()["qos"]}
         self.assertEqual(rows["low"]["max_wall_seconds"], 86400)
-        self.assertEqual(qos.clock(86400), "1-00:00:00")
+        self.assertEqual(qos.duration(86400, short=False), "1-00:00:00")
         self.assertEqual(model()["gpu_types"], ["a10", "a30"])
 
 

@@ -6,8 +6,8 @@ slurm_usage_report_token: "{{ slack_bot_token | default('') }}"
 slurm_usage_report_channel: "#gpu-usage"
 slurm_usage_report_schedule: hourly
 slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port | default(9090) }}"
-# Linked from the report; empty drops the link.
-slurm_usage_report_dashboard_url: "{{ grafana_root_url | default('') }}"
+# The report links cluster_info.dashboard_url (cluster_tools_lib), read on the host
+# through clustertools.site; empty drops the link.
 
 # A job is idle when it has run for idle_hours and every GPU it holds stayed at or
 # under idle_util_threshold percent for that whole time.
@@ -20,8 +20,9 @@ slurm_usage_report_notify_repeat_hours: 6
 slurm_usage_report_dm_text: >-
   Your job {job} ({gpus} GPU, running {runtime}) has had idle GPUs for {hours}h.
   If you no longer need it, please free the GPUs with `scancel {job}`.
-# Cancel jobs idle this long (0 = never), announced in the report thread. Announce
-# the policy before enabling.
+# Cancel jobs idle this long (0 = never), announced in the report thread, and only once
+# the owner was notified in an earlier run: needs notify and more than idle_hours.
+# Announce the policy before enabling.
 slurm_usage_report_cancel_after_hours: 0
 
 # Slurm user -> Slack member ID or email. Users not listed are looked up as

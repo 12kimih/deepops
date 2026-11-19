@@ -7,7 +7,8 @@ import tempfile
 
 
 def write_atomic(path, text, mode=0o644):
-    """Replace PATH with TEXT: a temporary file in the same directory, fsync, rename."""
+    """Replace PATH with TEXT: a temporary file in the same directory, fsync, rename,
+    then fsync the directory, so the rename itself survives a power cut."""
     directory = os.path.dirname(os.path.abspath(path))
     try:
         fd, tmp = tempfile.mkstemp(prefix=f".{os.path.basename(path)}-", dir=directory)
@@ -23,3 +24,8 @@ def write_atomic(path, text, mode=0o644):
     except BaseException:
         os.unlink(tmp)
         raise
+    dfd = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)

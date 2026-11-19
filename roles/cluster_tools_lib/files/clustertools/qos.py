@@ -6,13 +6,11 @@ itself, so a script reads the same figures a person sees.
 """
 
 import json
-import os
-import pwd
 import sys
 
-from . import slurm
-from .cli import Command, Opt, run_main
-from .render import Grid, width
+from . import slurm, vocab
+from .cli import Command, Opt, me, run_main
+from .render import Grid, duration, width
 
 BAR = 6  # quota bar width; shrinks to fit, then goes
 BAR_MIN = 3
@@ -25,8 +23,10 @@ NOTES = [
     "user). The last is why a job can wait on QOSGrpGRES while the cluster looks idle.",
     "GPU columns appear for every GPU type some QoS limits, and EXEMPT and GRACE only\nonce a QoS sets them.",
     "Reading the table:\n"
-    "  A GPU figure is the QoS's usage against its quota: every RUNNING job on that QoS,\n"
-    "  cluster-wide, the same sum the quota is checked against. -/N is unknown usage.\n"
+    "  A GPU figure is the QoS's usage against its quota: every job on that QoS that\n"
+    "  holds its allocation, the sum the quota is checked against. -/N is unknown usage.\n"
+    "  Under PrivateData=jobs only your own jobs are visible, so usage reads low.\n"
+    "  The any column is a quota on GPUs of every type together (gres/gpu=N).\n"
     "  A limit of 0 is not a full quota: that QoS may not use that GPU type at all.\n"
     "  No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -T).\n"
     "  A job pending on QOSGrpGRES is waiting for its own QoS's quota, not for the cluster.",
@@ -61,10 +61,21 @@ COMMAND = Command(
 )
 
 
+ANY = "any"  # the column of a quota on GPUs of every type together
+
+
+def _gpu_type(tres):
+    """The GPU column a TRES name counts in: its type, ANY for plain gres/gpu, None for
+    what is not a GPU."""
+    if tres == "gres/gpu":
+        return ANY
+    return tres[len("gres/gpu:") :] if tres.startswith("gres/gpu:") else None
+
+
 def _gpu_limits(qos):
-    """{gpu type: limit} from the QoS's GrpTRES."""
+    """{gpu column: limit} from the QoS's GrpTRES."""
     total = slurm.tres_list(((qos.get("limits") or {}).get("max") or {}).get("tres", {}).get("total"))
-    return {k[len("gres/gpu:") :]: v for k, v in total.items() if k.startswith("gres/gpu:")}
+    return {_gpu_type(k): v for k, v in total.items() if _gpu_type(k)}
 
 
 def _dig(d, *path):
@@ -88,13 +99,13 @@ def build(qos_data, assoc_data, jobs_data, who, usage=True, mine_only=False, sho
     if not granted:  # read nothing: filtering on it would hide all
         show_all = True
 
-    used = {}  # (qos, gpu type) -> GPUs held by running jobs
+    used = {}  # (qos, gpu column) -> GPUs held by its jobs
     for j in (jobs_data or {}).get("jobs", []) if usage else []:
-        if "RUNNING" not in (j.get("job_state") or []):
+        if not vocab.job_holds(j.get("job_state")):
             continue
         for key, n in slurm.tres_str(j.get("tres_alloc_str")).items():
-            if key.startswith("gres/gpu:"):
-                k = (j.get("qos", ""), key[len("gres/gpu:") :])
+            if _gpu_type(key):
+                k = (j.get("qos", ""), _gpu_type(key))
                 used[k] = used.get(k, 0) + int(n)
 
     qos_list = qos_data.get("qos", [])
@@ -146,13 +157,6 @@ def build(qos_data, assoc_data, jobs_data, who, usage=True, mine_only=False, sho
     }
 
 
-def clock(seconds):
-    """[D-]HH:MM:SS, as Slurm writes a duration."""
-    days, rest = divmod(int(seconds), 86400)
-    hms = f"{rest // 3600:02d}:{rest % 3600 // 60:02d}:{rest % 60:02d}"
-    return f"{days}-{hms}" if days else hms
-
-
 def _table(t, model, bar, caps):
     rows, types = model["qos"], model["gpu_types"]
     exempt = any(r["exempt_seconds"] for r in rows)
@@ -188,11 +192,11 @@ def _table(t, model, bar, caps):
             if bar:
                 piece += [(" ", "")] + t.bar_pieces(u, q["limit"], bar)
             cells.append(piece)
-        cells.append(plain(clock(r["max_wall_seconds"]) if r["max_wall_seconds"] else dot))
+        cells.append(plain(duration(r["max_wall_seconds"], short=False) if r["max_wall_seconds"] else dot))
         if exempt:
-            cells.append(plain(clock(r["exempt_seconds"]) if r["exempt_seconds"] else dot))
+            cells.append(plain(duration(r["exempt_seconds"], short=False) if r["exempt_seconds"] else dot))
         if grace:
-            cells.append(plain(clock(r["grace_seconds"]) if r["grace_seconds"] else dot))
+            cells.append(plain(duration(r["grace_seconds"], short=False) if r["grace_seconds"] else dot))
         g.row(cells, gutter=(t.g["self"], "self") if r["mine"] else "")
     return g
 
@@ -250,10 +254,6 @@ def show(t, model, only_mine=False):
     return "\n".join(out).rstrip() + "\n\n"
 
 
-def _me():
-    return os.environ.get("USER") or pwd.getpwuid(os.getuid()).pw_name
-
-
 def main(argv=None):
     def body():
         args, theme = COMMAND.parse(argv)
@@ -266,7 +266,7 @@ def main(argv=None):
             except (slurm.Failed, slurm.SchemaError) as e:
                 usage_error = str(e)
         usage = args.usage and not usage_error
-        model = build(qos_data, assoc_data, jobs, args.user or _me(), usage, args.mine, args.all)
+        model = build(qos_data, assoc_data, jobs, args.user or me(), usage, args.mine, args.all)
         model["usage_error"] = usage_error
         if args.json:
             json.dump(model, sys.stdout, indent=1)

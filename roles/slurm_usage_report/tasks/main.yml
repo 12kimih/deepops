@@ -36,6 +36,8 @@
         owner: root
         group: root
         mode: "0600"
+        # The report checks its own config, so a mistake fails the deploy, not the run.
+        validate: "{{ slurm_usage_report_script }} --check-config --config %s"
       # The user map comes from the people roster.
       tags:
         - people

@@ -21,8 +21,24 @@ from . import proc
 # A throttled RPC does not fail: the client library sleeps and retries it for ever,
 # printing nothing below -v. Every call is therefore bounded, and running out of time
 # is reported as what it most likely is. $CLUSTER_TOOLS_TIMEOUT, shared with the shell
-# library, overrides the bound.
-TIMEOUT = int(os.environ.get("CLUSTER_TOOLS_TIMEOUT") or 20)
+# library, overrides the bound; a value that is not a positive number of seconds is
+# named and ignored, so a typo never stops every command.
+DEFAULT_TIMEOUT = 20
+
+
+def _timeout(raw):
+    try:
+        seconds = int(raw) if raw else DEFAULT_TIMEOUT
+    except ValueError:
+        seconds = 0
+    if seconds > 0:
+        return seconds
+    print(f"$CLUSTER_TOOLS_TIMEOUT={raw!r} is not a positive number of seconds; using {DEFAULT_TIMEOUT}",
+          file=sys.stderr)  # fmt: skip
+    return DEFAULT_TIMEOUT
+
+
+TIMEOUT = _timeout(os.environ.get("CLUSTER_TOOLS_TIMEOUT"))
 
 
 class Error(Exception):
@@ -165,7 +181,24 @@ def load(kind):
         raise SchemaError(f"{cmd[0]}: unreadable JSON for {kind}: {e}") from None
     if not isinstance(data, dict):
         raise SchemaError(f"{cmd[0]}: the reply for {kind} is not a JSON object")
-    return check(kind, data)
+    return check(kind, printable(data))
+
+
+def printable(value):
+    """VALUE with every string made safe to print: a control character becomes "?" and
+    other whitespace a space. Job names, comments and reasons are anyone's free text, and
+    JSON carries an escape sequence in them intact, so a job named ESC]0;... would
+    otherwise retitle or clear the terminal of whoever lists it. Done once here, every
+    reader of Slurm is covered."""
+    if isinstance(value, str):
+        if value.isprintable():
+            return value
+        return "".join(c if c.isprintable() else " " if c.isspace() else "?" for c in value)
+    if isinstance(value, dict):
+        return {k: printable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [printable(v) for v in value]
+    return value
 
 
 def cluster_name(data):

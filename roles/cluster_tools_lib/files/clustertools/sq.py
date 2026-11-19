@@ -9,7 +9,6 @@ the model itself, so a script reads the figures a person sees.
 
 import json
 import os
-import pwd
 import re
 import shutil
 import sys
@@ -17,6 +16,7 @@ import time
 from fnmatch import fnmatchcase
 
 from . import render, slurm, vocab
+from . import cli
 from .cli import Command, Opt, run_main
 from .render import Grid, width
 
@@ -99,7 +99,7 @@ COMMAND = Command(
             help="the generic resource to count (default: the one most nodes have)"),
         Opt("-i", "--interval", "--iterate", metavar="SEC", type=_interval, brief=True, section="Layout",
             help=f"redraw every SEC seconds (at least {MIN_INTERVAL}); while Slurm fails or does not "
-            f"answer, the wait doubles, up to {MAX_BACKOFF}"),
+            f"answer, the wait doubles, up to {MAX_BACKOFF}s or SEC if longer"),
         Opt("--json", section="Output", help="the model as JSON, for scripts (ignores $SQ_OPTIONS)"),
     ],
     env="SQ_OPTIONS",
@@ -491,16 +491,6 @@ JOB_STYLE = {  # squeue code -> (role, ASCII mark, mark)
 STATE_LABEL = {"R": "running", "PD": "pending", "CG": "completing", "CD": "completed", "S": "suspended"}
 
 
-def _clock(seconds):
-    """squeue's duration: M:SS, H:MM:SS, then D-HH:MM:SS."""
-    days, rest = divmod(int(seconds), 86400)
-    h, rest = divmod(rest, 3600)
-    m, s = divmod(rest, 60)
-    if days:
-        return f"{days}-{h:02d}:{m:02d}:{s:02d}"
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-
-
 def show_jobs(t, model, group=True, detail=False, scope="mine"):
     """The job list. SCOPE mine shows your own jobs unless a job filter chose others;
     the sections below it summarise everyone's."""
@@ -540,12 +530,12 @@ def show_jobs(t, model, group=True, detail=False, scope="mine"):
         limit = (
             t.g["inf"]
             if j["limit_unlimited"]
-            else (_clock(j["limit_minutes"] * 60) if j["limit_minutes"] else dot)
+            else (render.duration(j["limit_minutes"] * 60) if j["limit_minutes"] else dot)
         )
         cells = [
             j["label"], f"{ascii_mark if t.ascii else mark} {j['state']}", j["name"], j["user"],
             j["partition"] or dot, j["qos"] or dot, str(j["node_count"]), where, str(j["cpus"]), j["gres"] or dot,
-            _clock(j["elapsed"]) if j["holds"] and j["elapsed"] else dot,
+            render.duration(j["elapsed"]) if j["holds"] and j["elapsed"] else dot,
             limit, str(j["priority"]),
         ]  # fmt: skip
         rows.append(
@@ -856,14 +846,10 @@ def to_json(model, args):
 # --- Running ------------------------------------------------------------------------
 
 
-def _me():
-    return os.environ.get("USER") or pwd.getpwuid(os.getuid()).pw_name
-
-
 def snapshot(args):
     """One consistent read: three controller calls."""
     nodes, parts, jobs = slurm.load("nodes"), slurm.load("partitions"), slurm.load("jobs")
-    me = _me()
+    me = cli.me()
     sel = Filters(me if args.me else "", args.user, args.partition, args.nodelist, args.states, args.jobs,
                   args.account, args.qos, args.name)  # fmt: skip
     return build(nodes, parts, jobs, sel, me, args.gres, title=os.environ.get("CLUSTER_TITLE"))
@@ -889,7 +875,7 @@ def watch(theme, args):
                 raise  # it will not appear by waiting
             except slurm.Error as e:  # a failing, silent or garbled reply may pass
                 text = "  " + theme.paint("crit", str(e)) + "\n"
-                wait = min(wait * 2, MAX_BACKOFF)
+                wait = max(args.interval, min(wait * 2, MAX_BACKOFF))  # never sooner than asked
                 pace = theme.c["warn"] + f"Slurm read failed, next try in {wait}s"
             if sys.stdout.isatty():
                 sys.stdout.write("\033[H\033[2J")
