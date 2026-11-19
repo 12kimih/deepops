@@ -1,11 +1,59 @@
 """Unit tests for clustertools.vocab (roles/cluster_tools_lib), no cluster needed."""
 
+import json
 import sys
 import unittest
+from fnmatch import fnmatchcase
 from pathlib import Path
+
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
 from clustertools import vocab  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[2]
+# Slurm's own names, from the source of the pinned release (scripts/deepops/slurm_names.py).
+NAMES = json.loads((ROOT / "tests/cluster-tools/slurm-names.json").read_text())
+
+
+class SlurmNamesTests(unittest.TestCase):
+    """vocab compares with words of Slurm's JSON. A word Slurm never sends matches
+    nothing, silently: "MAINT" once left nodes in a maintenance reservation counted as
+    schedulable, since the JSON says "MAINTENANCE"."""
+
+    # Words of scontrol's and sinfo's text output that the JSON never gives.
+    TEXT_ONLY = frozenset(("FAILING", "INVAL", "DRAINING", "DRAINED"))
+
+    def test_the_names_are_the_pinned_releases(self):
+        pinned = yaml.safe_load((ROOT / "roles/slurm/defaults/main.yml").read_text())["slurm_version"]
+        self.assertEqual(NAMES["slurm_version"], str(pinned), "run scripts/deepops/slurm_names.py")
+
+    def test_every_node_state_word_is_slurms(self):
+        words = vocab._DOWN | vocab._DRAIN | set(vocab._BASE)
+        slurm = set(NAMES["node_states"]) | set(NAMES["partition_states"])
+        self.assertEqual(sorted(words - slurm - self.TEXT_ONLY), [])
+
+    def test_every_job_state_word_is_slurms_and_every_state_has_a_code(self):
+        words = set(vocab.JOB_CODES) | vocab._HOLDS | vocab._FINISHED
+        self.assertEqual(sorted(words - set(NAMES["job_states"])), [])
+
+    def test_every_reason_rule_matches_a_slurm_reason(self):
+        dead = [
+            (family, p)
+            for family, patterns in vocab._REASON_RULES
+            for p in patterns
+            if p and not any(fnmatchcase(r, p) for r in NAMES["job_reasons"])
+        ]
+        self.assertEqual(dead, [])
+        self.assertEqual(sorted(vocab.ENDED_REASONS - set(NAMES["job_reasons"])), [])
+
+    def test_every_slurm_reason_has_a_family(self):
+        other = [
+            r
+            for r in NAMES["job_reasons"]
+            if vocab.reason_class(r) == "other" and r not in vocab.ENDED_REASONS
+        ]
+        self.assertEqual(other, [], "classify them in vocab._REASON_RULES (or ENDED_REASONS)")
 
 
 class NodeStateTests(unittest.TestCase):
@@ -34,24 +82,6 @@ class NodeStateTests(unittest.TestCase):
             with self.subTest(state=state):
                 self.assertEqual(vocab.node_class(state), cls)
                 self.assertEqual(vocab.node_class(state.split("+") if state else []), cls)
-
-    # Slurm's JSON names for node and partition states (data_parser v0.0.44,
-    # PARSER_FLAG_ARRAY(NODE_STATES) and (PARTITION_STATES) in
-    # src/plugins/data_parser/v0.0.44/parsers.c), the only form the tools read.
-    SLURM_STATES = frozenset(
-        "INVALID UNKNOWN DOWN IDLE ALLOCATED ERROR MIXED FUTURE EXTERNAL RESERVED UNDRAIN CLOUD "
-        "RESUME DRAIN COMPLETING NOT_RESPONDING POWERED_DOWN FAIL POWERING_UP MAINTENANCE "
-        "REBOOT_REQUESTED REBOOT_CANCELED POWERING_DOWN DYNAMIC_FUTURE REBOOT_ISSUED PLANNED "
-        "INVALID_REG POWER_DOWN POWER_UP POWER_DRAIN DYNAMIC_NORM BLOCKED INACTIVE UP".split()
-    )
-    # Words of scontrol's and sinfo's text output that the JSON never gives.
-    TEXT_ONLY = frozenset(("FAILING", "INVAL", "DRAINING", "DRAINED"))
-
-    def test_every_state_word_is_slurms(self):
-        # A word Slurm never sends matches nothing: "MAINT" once left a node in a
-        # maintenance reservation counted as schedulable.
-        words = vocab._DOWN | vocab._DRAIN | set(vocab._BASE)
-        self.assertEqual(sorted(words - self.SLURM_STATES - self.TEXT_ONLY), [])
 
     def test_every_class_is_known_and_explained(self):
         self.assertEqual(set(vocab.NODE_HELP), set(vocab.NODE_CLASSES))
