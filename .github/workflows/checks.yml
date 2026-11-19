@@ -25,7 +25,7 @@ jobs:
       - name: Install Lua for the job_submit.lua tests
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends lua5.3
+          sudo apt-get install -y --no-install-recommends lua5.4
 
       - name: Install the Galaxy collections and roles
         run: uv run --locked scripts/deepops/galaxy.py
