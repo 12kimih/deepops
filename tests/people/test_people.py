@@ -161,6 +161,17 @@ class Cli(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("1001 is also alice's", result.stderr)
 
+    def test_nothing_to_check_is_a_failure(self):
+        from unittest import mock
+
+        spec = importlib.util.spec_from_file_location(
+            "people_cli", ROOT / "scripts" / "deepops" / "people.py"
+        )
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        with mock.patch.object(cli, "default_files", return_value=[]):
+            self.assertEqual(cli.main(["check"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

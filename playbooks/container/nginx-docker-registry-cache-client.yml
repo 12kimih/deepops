@@ -2,7 +2,7 @@
 - name: Install docker
   import_playbook: docker.yml
 
-- hosts: "{{ hostlist | default('all') }}"
+- hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   tasks:
     - name: Configure nginx container caching proxy client

@@ -17,6 +17,14 @@
   max_fail_percentage: 0  # a node that fails to come back stops the rest
   tags:
     - reboot
+  pre_tasks:
+    # The default would take in the controller and the NFS servers the clients hang on.
+    - name: Require hostlist
+      ansible.builtin.assert:
+        that: hostlist is defined
+        fail_msg: Name the hosts to reboot with -e hostlist=...
+        quiet: true
+      run_once: true
   tasks:
     - name: Reboot
       ansible.builtin.include_role:

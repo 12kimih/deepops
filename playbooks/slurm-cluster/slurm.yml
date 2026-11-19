@@ -4,9 +4,11 @@
   roles:
     - role: facts
 
-# Build slurm first on all nodes
+# Build slurm first on all nodes. A failure on any host stops every host: a controller
+# whose build failed must not be followed by nodes templating a new slurm.conf.
 - hosts: slurm-cluster
   become: true
+  any_errors_fatal: true
   tasks:
     - name: Build slurm on all nodes
       ansible.builtin.include_role:

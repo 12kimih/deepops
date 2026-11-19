@@ -26,8 +26,6 @@
 
 - name: Set up a local cluster container registry
   import_playbook: container/standalone-container-registry.yml
-  vars:
-    hostlist: slurm-master
   when: slurm_enable_container_registry | default(true)
 
 - name: Remove what must not be on a host
@@ -37,14 +35,10 @@
 
 - name: Set up NGINX-based container caching | Install docker registry cache server
   import_playbook: container/nginx-docker-registry-cache-server.yml
-  vars:
-    hostlist: slurm-cache
   when: slurm_enable_nginx_docker_cache | default(false)
 
 - name: Set up NGINX-based container caching | Install docker registry cache client
   import_playbook: container/nginx-docker-registry-cache-client.yml
-  vars:
-    hostlist: slurm-node
   when: slurm_enable_nginx_docker_cache | default(false)
 
 - name: Install NVIDIA driver
@@ -65,14 +59,10 @@
 # all up in one run.
 - name: Set up NFS filesystem | Install nfs-server
   import_playbook: generic/nfs-server.yml
-  vars:
-    hostlist: slurm-nfs
   when: slurm_enable_nfs_server
 
 - name: Set up NFS filesystem | Install nfs-client
   import_playbook: generic/nfs-client.yml
-  vars:
-    hostlist: slurm-nfs-client
   when: slurm_enable_nfs_client_nodes
 
 # Authentication / directory services. Each role inside is gated on its own config
@@ -87,14 +77,10 @@
 
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
-  vars:
-    hostlist: slurm-node
   when: install_dcgm | default(false)
 
 - name: Install Node Health Check
   import_playbook: slurm-cluster/nhc.yml
-  vars:
-    hostlist: slurm-node
   when: slurm_install_nhc | default(false)
 
 - name: Install Slurm
@@ -115,44 +101,30 @@
 
 - name: Install the NVIDIA HPC SDK
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml
-  vars:
-    hostlist: slurm-login[0]
   when: slurm_install_hpcsdk
 
 - name: Install monitoring services | Install prometheus
   import_playbook: slurm-cluster/prometheus.yml
-  vars:
-    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring services | Install grafana
   import_playbook: slurm-cluster/grafana.yml
-  vars:
-    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring services | Install alert manager
   import_playbook: slurm-cluster/alertmanager.yml
-  vars:
-    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring services | Install the Slack usage report
   import_playbook: slurm-cluster/slurm-usage-report.yml
-  vars:
-    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring exporters | Install Slurm GPU allocation metrics
   import_playbook: slurm-cluster/slurm-metrics.yml
-  vars:
-    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring exporters | Install prometheus slurm exporter
   import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
-  vars:
-    hostlist: slurm-metric
   when: slurm_enable_monitoring
 
 - name: Install monitoring exporters | Install prometheus node exporter
@@ -169,14 +141,10 @@
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
-  vars:
-    hostlist: slurm-master[0]
   when: slurm_enable_rsyslog_server | default(true)
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog client
   import_playbook: generic/rsyslog-client.yml
-  vars:
-    hostlist: slurm-node
   when: slurm_enable_rsyslog_client | default(true)
 
 - name: Set Permissions to adjust GPU Clocks speeds
@@ -187,8 +155,6 @@
 # cap removed. Turn the whole step off with slurm_cluster_configure_gpu_power_limit.
 - name: Configure the GPU power limit
   import_playbook: nvidia-software/nvidia-power-limit.yml
-  vars:
-    hostlist: slurm-node
   when: slurm_cluster_configure_gpu_power_limit | default(true)
 
 - name: Install Enroot and Pyxis

@@ -1,5 +1,5 @@
 ---
-- hosts: "{{ hostlist | default('all') }}"
+- hosts: "{{ hostlist | default('slurm-nfs-client') }}"
   become: true
   roles:
     - { role: nfs, nfs_is_client: true }

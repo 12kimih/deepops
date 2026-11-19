@@ -340,6 +340,19 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "fetch through roles/download (a required checksum)")
         scan.check(self)
 
+    def test_the_slurm_deploy_takes_its_targets_from_the_components(self):
+        # A component playbook defaults to its own cluster target, so it acts the same
+        # run alone or from slurm-cluster.yml (nfs-server.yml alone once made every node
+        # an NFS server). The deploy passing a hostlist would write the target twice.
+        data = yaml.safe_load((ROOT / "playbooks/slurm-cluster.yml").read_text())
+        passed = [
+            item["import_playbook"]
+            for item in data
+            if isinstance(item, dict) and "import_playbook" in item and "hostlist" in (item.get("vars") or {})
+        ]
+        self.assertGreater(sum(1 for i in data if isinstance(i, dict) and "import_playbook" in i), 20)
+        self.assertEqual(passed, [], "give the component playbook this hostlist as its default instead")
+
     def test_a_loop_item_is_never_tested_for_being_defined(self):
         # In a loop item is always defined: `that: item is not defined` failed every
         # host (package_repos retired.yml). A variable NAMED by item is asked with

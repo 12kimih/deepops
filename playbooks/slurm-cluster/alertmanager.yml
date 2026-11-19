@@ -2,7 +2,7 @@
 - name: Install docker
   import_playbook: ../container/docker.yml
 
-- hosts: "{{ hostlist | default('all') }}"
+- hosts: "{{ hostlist | default('slurm-metric') }}"
   become: true
   tasks:
     - name: Configure alertmanager

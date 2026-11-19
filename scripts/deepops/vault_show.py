@@ -35,13 +35,38 @@ class Vaulted(str):
 Loader.add_constructor("!vault", lambda loader, node: Vaulted(loader.construct_scalar(node)))
 
 
-def candidates(host):
-    files = sorted((CONFIG / "group_vars").glob("*.y*ml"))
-    if host:
-        files = [
-            p for p in (CONFIG / "host_vars" / host, CONFIG / "host_vars" / f"{host}.yml") if p.is_file()
-        ] + files
+SUFFIXES = ("", ".yml", ".yaml", ".json")
+
+
+def var_files(kind, name=None):
+    """The files Ansible reads for KIND (group_vars, host_vars): NAME, NAME.yml,
+    NAME.yaml, NAME.json, or every file in the directory NAME/; every name when None."""
+    base = CONFIG / kind
+    if not base.is_dir():
+        return []
+    entries = [base / name] if name else sorted(base.iterdir())
+    files = []
+    for entry in entries:
+        if entry.is_dir():
+            files += sorted(p for p in entry.rglob("*") if p.is_file() and p.suffix in SUFFIXES)
+        for suffix in SUFFIXES if name else ("",):
+            path = entry.with_name(entry.name + suffix)
+            if path.is_file() and path.suffix in SUFFIXES:
+                files.append(path)
     return files
+
+
+def vaulted_in(files, name):
+    found = []
+    for path in files:
+        data = yaml.load(path.read_text(), Loader=Loader) or {}
+        if isinstance(data, dict) and isinstance(data.get(name), Vaulted):
+            found.append((path, data[name]))
+    return found
+
+
+def several(name, found, hint):
+    return f"{name} is vaulted in several files ({', '.join(str(p.relative_to(CONFIG)) for p, _ in found)}); {hint}"
 
 
 def main(argv):
@@ -49,20 +74,18 @@ def main(argv):
     parser.add_argument("name")
     parser.add_argument("--host", help="look in this host's host_vars first")
     args = parser.parse_args(argv)
-    found = []
-    for path in candidates(args.host):
-        data = yaml.load(path.read_text(), Loader=Loader) or {}
-        if isinstance(data, dict) and isinstance(data.get(args.name), Vaulted):
-            found.append((path, data[args.name]))
+    # A host's own value wins; among group values, which one a host sees depends on its
+    # groups, so more than one is never chosen silently.
+    host = vaulted_in(var_files("host_vars", args.host), args.name) if args.host else []
+    if len(host) > 1:
+        sys.exit(several(args.name, host, "keep one"))
+    found = host or vaulted_in(var_files("group_vars"), args.name)
     if not found:
         sys.exit(
             f"{args.name}: no !vault value in {CONFIG}/group_vars{' or host_vars/' + args.host if args.host else ''}"
         )
-    if len(found) > 1 and not args.host:
-        sys.exit(
-            f"{args.name} is vaulted in several files ({', '.join(str(p.relative_to(CONFIG)) for p, _ in found)}); "
-            "pass --host to choose"
-        )
+    if len(found) > 1:
+        sys.exit(several(args.name, found, "set it once, or for the host in host_vars and pass --host"))
     vault = shutil.which("ansible-vault", path=str(Path(sys.executable).parent)) or "ansible-vault"
     result = subprocess.run(
         [vault, "decrypt", "--output", "-"], input=found[0][1], cwd=ROOT, capture_output=True, text=True
