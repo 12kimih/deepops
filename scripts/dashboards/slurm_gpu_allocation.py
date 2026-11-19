@@ -2,8 +2,8 @@
 
 From roles/slurm_metrics (clustertools.metrics: slurm_gpu_allocated, slurm_node_gpus,
 slurm_node_state, slurm_node_drain, slurm_node_schedulable) and the recording rule
-host_device:slurm_gpu_allocated:max (rules/slurm.yml), which keys the allocation like
-DCGM series for the join with utilisation.
+host_device:slurm_gpu_allocated:max (rules/slurm.yml), joined with DCGM utilisation
+through host_device:dcgm_gpu_util:max, which carries Slurm's GPU numbering.
 """
 
 from grafana import STATE_COLORS, bars, dashboard, query, stat, table, timeseries
@@ -120,7 +120,7 @@ def build():
         share("Share allocated by node", "node", 16),
         table(
             "Allocations now",
-            f"{ALLOC} * on (host, device) group_left () max by (host, device) (DCGM_FI_DEV_GPU_UTIL)",
+            f"{ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util:max",
             ["user", "account", "partition", "job_id", "node", "gpu", "gpu_type", "Utilization"],
             h=10,
             sort="node",

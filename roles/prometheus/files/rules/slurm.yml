@@ -3,9 +3,38 @@
 groups:
   - name: slurm
     rules:
-      # Allocation keyed like DCGM series: host is the Slurm node name, device the GPU's
-      # minor number (/dev/nvidiaN), which Slurm's GPU index follows. One definition for
-      # the alerts and the Slurm / GPU allocation dashboard.
+      # Slurm numbers a node's GPUs by device file (/dev/nvidiaN, gres.conf File=), so its
+      # GPU index is the device minor number. DCGM's gpu label, and the device label
+      # dcgm-exporter derives from it, is the NVML index in PCI order, which need not be
+      # the same. The minor number DCGM reports joins the two: one series per GPU,
+      # value 1, labelled with the device Slurm means. PromQL cannot turn a value into a
+      # label, hence one term per possible minor number (16 GPUs a node at most).
+      - record: host_gpu:dcgm_slurm_device:info
+        expr: |
+          (label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 0, "device", "nvidia0", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 1, "device", "nvidia1", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 2, "device", "nvidia2", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 3, "device", "nvidia3", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 4, "device", "nvidia4", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 5, "device", "nvidia5", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 6, "device", "nvidia6", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 7, "device", "nvidia7", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 8, "device", "nvidia8", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 9, "device", "nvidia9", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 10, "device", "nvidia10", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 11, "device", "nvidia11", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 12, "device", "nvidia12", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 13, "device", "nvidia13", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 14, "device", "nvidia14", "", "")
+          or label_replace(max by (host, gpu) (DCGM_FI_DEV_MINOR_NUMBER) == 15, "device", "nvidia15", "", "")) * 0 + 1
+      # GPU utilisation keyed by the device Slurm means: what the alerts, the allocation
+      # dashboard and the usage report compare with allocation.
+      - record: host_device:dcgm_gpu_util:max
+        expr: |
+          max by (host, gpu) (DCGM_FI_DEV_GPU_UTIL)
+          * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
+      # Allocation keyed the same way: host is the Slurm node name, device nvidia<IDX>.
+      # One definition for the alerts and the Slurm / GPU allocation dashboard.
       - record: host_device:slurm_gpu_allocated:max
         expr: |
           label_replace(
@@ -16,13 +45,13 @@ groups:
       # Only while the allocation data is fresh, so a stale file never pages.
       - alert: GpuBusyWithoutJob
         expr: |
-          max by (host, gpu, device) (DCGM_FI_DEV_GPU_UTIL) > 0
+          host_device:dcgm_gpu_util:max > 0
           unless on (host, device) host_device:slurm_gpu_allocated:max
           and on () (time() - max(slurm_metrics_updated_timestamp_seconds) < 300)
         for: 15m
         labels: {severity: warning}
         annotations:
-          summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} is {{ $value }}% busy with no Slurm job holding it"
+          summary: "GPU {{ $labels.device }} on {{ $labels.host }} is {{ $value }}% busy with no Slurm job holding it"
           description: >-
             A process outside Slurm, or one left behind by a finished job. As root on the
             host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a hung one.

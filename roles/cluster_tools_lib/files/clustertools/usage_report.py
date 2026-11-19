@@ -121,12 +121,15 @@ class Prometheus:
         return body["data"]["result"]
 
     def per_gpu(self, expr):
-        """{(host, Slurm GPU index): value}. host is the scrape target without its port.
+        """{(host, Slurm GPU index): value} for a per-GPU DCGM expression.
 
-        Slurm's index follows the device minor number (/dev/nvidiaN), which dcgm-exporter
-        gives as device="nvidiaN"; its gpu label is the NVML index, which follows PCI order
-        and can differ. Keyed on gpu, a busy job could read another GPU's idleness and be
-        cancelled. The Prometheus rules join on device the same way."""
+        Slurm numbers GPUs by device minor number (/dev/nvidiaN); dcgm-exporter's gpu and
+        device labels are both the NVML index, in PCI order, which can differ. Keyed on
+        either, a busy job could read another GPU's idleness and be cancelled. So the
+        expression is relabelled through host_gpu:dcgm_slurm_device:info (rules/slurm.yml),
+        made from the minor number DCGM reports: one mapping for the alerts, the
+        dashboard and this report. A GPU the mapping lacks has no data, never idle."""
+        expr = f"max by (host, gpu) ({expr}) * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info"
         out = {}
         for r in self.query(expr):
             m = r["metric"]
@@ -221,8 +224,9 @@ def sections(text):
     closed at the end of one and reopened in the next. Nothing is cut: a line left out
     could be the mention that tells an owner about their idle job."""
     chunks, cur, fenced = [], [], False
-    for line in text.split("\n"):
-        line = line[: MAX_SECTION - 8]  # a single line is never longer than a section
+    width = MAX_SECTION - 8  # room for a code fence closed and reopened around a piece
+    pieces = [ln[i : i + width] for ln in text.split("\n") for i in range(0, max(len(ln), 1), width)]
+    for line in pieces:
         if cur and len("\n".join(cur + [line])) + 4 > MAX_SECTION:
             chunks.append("\n".join(cur + (["```"] if fenced else [])))
             cur = ["```"] if fenced else []
@@ -467,8 +471,13 @@ def load_state(path):
             k: v
             for k, v in (idle.items() if isinstance(idle, dict) else ())
             if isinstance(v, dict)
-            and isinstance(v.get("since"), number)
-            and (v.get("notified") is None or isinstance(v.get("notified"), number))
+            and {"since", "notified"} <= set(v)
+            and isinstance(v["since"], number)
+            and not isinstance(v["since"], bool)
+            and (
+                v["notified"] is None
+                or (isinstance(v["notified"], number) and not isinstance(v["notified"], bool))
+            )
         },
         "users": {
             k: v
@@ -550,23 +559,34 @@ def act(report, cfg, who, slack, cache, now):
     for j in report["idle"]:
         if not j["notify"]:
             continue
+        # Notified means a message reached the owner: the report's mention (posted above,
+        # which needs their Slack member) or a DM. Only then may cancelling follow.
+        try:
+            member = slack_id(j["user"], cfg, slack, cache)
+        except (RuntimeError, OSError) as e:
+            failures.append(f"looking up {j['user']} for {j['label']}: {e}")
+            continue
+        if not member:
+            print(f"slurm-usage-report: {j['user']} has no Slack member; {j['label']} not notified",
+                  file=sys.stderr)  # fmt: skip
+            continue  # so never cancelled either
+        delivered = "mention" in cfg["notify"]
         if "dm" in cfg["notify"]:
             try:
-                member = slack_id(j["user"], cfg, slack, cache)
-                if member:
-                    slack.post(
-                        slack.channel(member),
-                        cfg["dm_text"].format(
-                            job=j["label"],
-                            gpus=len(j["gpus"]),
-                            hours=f"{cfg['idle_hours']:g}",
-                            runtime=duration(j["runtime"]),
-                        ),
-                    )
+                slack.post(
+                    slack.channel(member),
+                    cfg["dm_text"].format(
+                        job=j["label"],
+                        gpus=len(j["gpus"]),
+                        hours=f"{cfg['idle_hours']:g}",
+                        runtime=duration(j["runtime"]),
+                    ),
+                )
+                delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {j['user']} of {j['label']}: {e}")
-                continue  # not marked notified: the next run tries again
-        j["state"]["notified"] = now
+        if delivered:
+            j["state"]["notified"] = now
 
     if cfg["cancel_after_hours"] > 0:
         cancelled = []
