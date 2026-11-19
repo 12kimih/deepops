@@ -13,3 +13,7 @@
 # expression on inventory groups, e.g. a database package absent everywhere but the
 # controller. Empty = nothing removed.
 host_baseline_absent_packages: []
+
+# Kernel settings (tasks_from: sysctl): the including role passes both.
+host_baseline_sysctls: {}
+host_baseline_sysctl_file: ""

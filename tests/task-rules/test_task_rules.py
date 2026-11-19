@@ -476,6 +476,18 @@ class TaskRules(unittest.TestCase):
         ]
         self.assertEqual(offenders, [], "use tests/lib/repo_scan.py tracked()")
 
+    def test_only_host_baseline_sets_kernel_settings(self):
+        # A sysctl written straight to a file was undone at boot by a later file (a hand
+        # line in /etc/sysctl.conf) while the running value looked right; the shared
+        # task removes the other assignments and checks the value boot applies.
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                if module(task)[0] == "sysctl" and rel(path) != "roles/host_baseline/tasks/sysctl.yml":
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "include_role host_baseline, tasks_from: sysctl")
+        scan.check(self)
+
     def test_no_handler_includes_a_role(self):
         # ansible-core refuses include_role in a handler, also through an included task
         # file, and only when the handler runs: a reboot request there failed on the

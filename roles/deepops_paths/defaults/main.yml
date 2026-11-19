@@ -1,5 +1,6 @@
 ---
-# Where DeepOps puts things on a host, written once for every role that uses it.
+# Where DeepOps puts things on a host, and what kind of host it is, written once for
+# every role that uses it.
 deepops_dir: /opt/deepops
 # The Helm client every role drives (roles/helm_release, roles/runai); Kubespray puts
 # it in its bin_dir, /usr/local/bin.
@@ -22,3 +23,7 @@ sm_software_path: "{{ sm_prefix }}/software"
 # build account (roles/easy-build) owns.
 easybuild_prefix: "{{ sm_prefix }}/easybuild"
 easybuild_module_path: "{{ easybuild_prefix }}/modules/all"
+# A container shares its host's kernel: /proc/sys is read-only there or would change
+# the host, so kernel settings and similar host-wide steps are skipped in one.
+deepops_container_types: [docker, container, containerd, podman, lxc, systemd-nspawn]
+deepops_containerized: "{{ ansible_facts.virtualization_type | default('') in deepops_container_types }}"

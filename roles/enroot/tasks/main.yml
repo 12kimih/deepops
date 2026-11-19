@@ -2,21 +2,15 @@
 # enroot requires user.max_user_namespaces and user.max_mnt_namespaces > 1 on
 # every supported OS (a hard prerequisite for the container start path).
 # https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
-- name: Set user.max_user_namespaces
-  ansible.posix.sysctl:
-    name: user.max_user_namespaces
-    value: "{{ enroot_max_user_namespaces }}"
-    state: present
-    sysctl_file: /etc/sysctl.d/90-enroot.conf
-    reload: true
-
-- name: Set user.max_mnt_namespaces
-  ansible.posix.sysctl:
-    name: user.max_mnt_namespaces
-    value: "{{ enroot_max_mnt_namespaces }}"
-    state: present
-    sysctl_file: /etc/sysctl.d/90-enroot.conf
-    reload: true
+- name: Set the user and mount namespace limits
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: sysctl
+  vars:
+    host_baseline_sysctls:
+      user.max_user_namespaces: "{{ enroot_max_user_namespaces }}"
+      user.max_mnt_namespaces: "{{ enroot_max_mnt_namespaces }}"
+    host_baseline_sysctl_file: /etc/sysctl.d/90-enroot.conf
 
 - name: Install enroot (Ubuntu)
   ansible.builtin.include_tasks: ubuntu.yml
@@ -67,7 +61,7 @@
   changed_when: false
   when:
     - enroot_tmpfiles is changed
-    - ansible_facts.virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
+    - not deepops_containerized | bool
   tags:
     - molecule-notest
 

@@ -42,25 +42,18 @@
 
 # Raise TCP/socket buffers for the NFS data path on fast cluster networks (applies on both
 # NFS servers and clients). https://nfs.sourceforge.net/nfs-howto/ar01s05.html
-# A container shares the host kernel, so setting these from inside one is either
-# impossible (read-only /proc/sys) or would mutate the host - skip there (this
-# also lets molecule's docker converge run cleanly). Bare metal and full VMs are
-# still tuned.
 - name: Tune the network buffers for NFS
-  ansible.posix.sysctl:
-    name: "{{ item.key }}"
-    value: "{{ item.value }}"
-    sysctl_file: /etc/sysctl.d/30-nfs-tuning.conf
-    sysctl_set: true
-    state: present
-    reload: true
-  loop: "{{ nfs_network_sysctls | dict2items }}"
-  when:
-    - nfs_tune_network | bool
-    - ansible_facts.virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: sysctl
+    apply:
+      tags: [nfs]
+  vars:
+    host_baseline_sysctls: "{{ nfs_network_sysctls }}"
+    host_baseline_sysctl_file: /etc/sysctl.d/30-nfs-tuning.conf
+  when: nfs_tune_network | bool
   tags:
     - nfs
-    - molecule-notest
 
 # The server's exports are a component (docs/deepops/component-state.md), removed only
 # explicitly: present where the deploy wants a server, kept elsewhere, absent where the
