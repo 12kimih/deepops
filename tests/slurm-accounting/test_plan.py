@@ -238,6 +238,24 @@ class Plan(unittest.TestCase):
         self.assertEqual(acct.minutes("02:30:00"), 150)
         self.assertEqual(acct.minutes("UNLIMITED"), None)
         self.assertEqual(acct.fmt_minutes(1440), "1-00:00:00")
+        # After a day count the first field is hours: 2-12 is two and a half days.
+        self.assertEqual(acct.minutes("2-12"), 3600)
+        self.assertEqual(acct.minutes("2-12:30"), 3630)
+        self.assertEqual(acct.minutes("90"), 90)
+        self.assertEqual(acct.minutes("90:30"), 91)  # MM:SS, seconds round up
+
+    def test_a_new_qos_gets_its_preempt_mode_on_creation(self):
+        s = copy(SPEC)
+        s["qos"]["urgent"] = {"priority": 20000, "preempt_mode": "requeue"}
+        cmds, _ = plan(s)
+        self.assertTrue(any("preemptmode=requeue" in cmd for cmd in cmds))
+
+    def test_prune_deletes_children_before_parents(self):
+        s = copy(SPEC)
+        del s["accounts"]["a"], s["accounts"]["lab"]
+        cmds, _ = plan(s, prune=True)
+        deleted = [c[3] for c in cmds if c[:2] == ["delete", "account"]]
+        self.assertEqual(deleted, ["name=a", "name=lab"])
 
 
 if __name__ == "__main__":

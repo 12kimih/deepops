@@ -85,16 +85,20 @@ def names(text):
 
 
 def minutes(value):
-    """Slurm time ([D-]HH:MM:SS, HH:MM:SS, MM:SS, MM, or 'UNLIMITED') -> minutes, or None."""
+    """Slurm time -> minutes, or None for no limit. Slurm's forms: MM, MM:SS, HH:MM:SS,
+    and with days D-HH, D-HH:MM, D-HH:MM:SS (after a day count the first field is hours).
+    Seconds round up, as a limit is never shortened."""
     if value in (None, "", "UNLIMITED", "INFINITE", -1):
         return None
     value = str(value)
     days, _, rest = value.rpartition("-") if "-" in value else ("0", "", value)
     parts = [int(p) for p in rest.split(":")]
-    if len(parts) == 1:
+    if days != "0" or "-" in value:
+        h, m, s = (parts + [0, 0])[:3]
+    elif len(parts) == 1:
         h, m, s = 0, parts[0], 0
     elif len(parts) == 2:
-        h, m, s = (0, *parts) if "-" not in value else (parts[0], parts[1], 0)
+        h, m, s = 0, parts[0], parts[1]
     else:
         h, m, s = parts
     return int(days or 0) * 1440 + h * 60 + m + (1 if s else 0)
@@ -278,7 +282,8 @@ def qos_changes(want, have):
         sets.append(f"priority={want['priority']}")
     if have is None or want["preempt"] != have["preempt"]:
         sets.append("preempt=" + ",".join(want["preempt"]))
-    if have is not None and want["preempt_mode"] != have["preempt_mode"]:
+    # A new QoS starts on the cluster's mode; set any other on creation, not a run later.
+    if want["preempt_mode"] != (have or {}).get("preempt_mode", "cluster"):
         sets.append(f"preemptmode={want['preempt_mode']}")
     if have is None or want["flags"] != have["flags"]:
         sets.append("flags=" + (",".join(want["flags"]) if want["flags"] else "-1"))
@@ -423,7 +428,9 @@ def plan(spec, cur_qos, cur_accounts, cur_users, cluster=None, prune=False):
         for item in unmanaged["associations"]:
             user, account = item.split("@")
             cmds.append(["delete", "user", "where", f"name={user}", f"account={account}", *where_cluster])
-        for name in reversed(unmanaged["accounts"]):
+        # Children before parents: Slurm refuses to delete an account that still has some.
+        doomed = set(unmanaged["accounts"])
+        for name in [a for a in reversed(ordered_accounts(cur_accounts)) if a in doomed]:
             cmds.append(["delete", "account", "where", f"name={name}", *where_cluster])
         for name in unmanaged["qos"]:
             cmds.append(["delete", "qos", "where", f"name={name}"])
