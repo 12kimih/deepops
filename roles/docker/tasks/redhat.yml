@@ -6,12 +6,6 @@
     name: dnf-plugins-core
     state: present
 
-- name: Refuse the retired repository file setting
-  ansible.builtin.assert:
-    that: docker_rh_repo_url is not defined
-    fail_msg: "docker_rh_repo_url is retired: set docker_rh_repo_base_url (and docker_rh_repo_gpgkey) instead."
-    quiet: true
-
 - name: Add the Docker CE dnf repository
   ansible.builtin.yum_repository:
     name: docker-ce-stable

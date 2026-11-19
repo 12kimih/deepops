@@ -31,7 +31,7 @@ Each section of sriov_resources must have:
 
 Please configure SRIOV interfaces depending on your deployment.
 Below provided sriov_resources example for four interfaces.
-```
+```yaml
 sriov_resources:
   - pf_name: "ens9f0"
     vlan_id: 111

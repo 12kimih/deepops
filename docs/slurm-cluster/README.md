@@ -91,7 +91,7 @@ The validation playbook will verify that Pyxis and Enroot can run GPU jobs
 across all nodes by running NCCL tests. The playbook has the following
 default parameters that can be overriden:
 
-```bash
+```yaml
     # String; Container for nccl performance/validation tests. Either docker
     #   tag or can be path to sqsh file.
     base_container: "nvcr.io/nvidia/pytorch:26.04-py3"

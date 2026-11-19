@@ -140,10 +140,13 @@ This playbook is developed and tested in following environments:
   ```
 
 5. Deploy NVIDIA Network Operator
-   Before running the playbook, please update "roles/nvidia-network-operator/vars/main.yaml" file according to your hardware and network configuration, this is what we used in that file:
+   Before running the playbook, set the number of virtual functions per physical function in your config (`config/group_vars/k8s-cluster.yml`), and update "roles/nvidia-network-operator/vars/main.yaml" according to your hardware and network configuration. This is what we used:
 
    ```yaml
-   num_vf: 8
+   # config/group_vars/k8s-cluster.yml
+   nvidia_network_operator_num_vf: 8
+
+   # roles/nvidia-network-operator/vars/main.yaml
    vendor_id: "15b3"
    link_type: "ib"
    mtu: 4096

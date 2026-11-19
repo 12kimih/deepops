@@ -368,7 +368,7 @@ you can configure Docker to treat your registry as insecure. Follow the
 or, if you installed Docker with DeepOps, configure the list in your DeepOps
 configuration:
 
-```bash
+```yaml
 docker_insecure_registries:
 - "registry-host:5000"
 ```

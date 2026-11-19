@@ -15,5 +15,7 @@
       ansible.builtin.include_role:
         name: nfs
         tasks_from: mount.yml
+        apply:
+          tags: [nfs_mount]
       tags:
         - nfs_mount

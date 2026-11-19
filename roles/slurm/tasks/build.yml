@@ -19,12 +19,18 @@
 - name: Setup munge
   ansible.builtin.include_tasks: munge.yml
 - name: Setup hwloc
-  ansible.builtin.include_tasks: hwloc.yml
+  ansible.builtin.include_tasks:
+    file: hwloc.yml
+    apply:
+      tags: [hwloc]
   tags: hwloc
   when: slurm_include_hwloc
 
 - name: Setup pmix
-  ansible.builtin.include_tasks: pmix.yml
+  ansible.builtin.include_tasks:
+    file: pmix.yml
+    apply:
+      tags: [pmix]
   tags: pmix
   when: slurm_include_pmix
 

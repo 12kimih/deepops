@@ -13,5 +13,7 @@
       ansible.builtin.include_role:
         name: bmc
         tasks_from: power.yml
+        apply:
+          tags: [power]
       tags:
         - power

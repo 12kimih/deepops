@@ -153,6 +153,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── pyxis
 │   ├── quiet_install
 │   ├── recorded_files
+│   ├── retired_settings
 │   ├── roce_backend
 │   ├── root_access
 │   ├── rsyslog_client

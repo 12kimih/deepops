@@ -243,7 +243,7 @@ The source for our built-in Grafana dashboards can be found in [src/dashboards](
 
 To enable syslog forwarding from the cluster nodes to the first Kubernetes controller node, you can set the following variables in your DeepOps configuration:
 
-```bash
+```yaml
 kube_enable_rsyslog_server: true
 kube_enable_rsyslog_client: true
 ```

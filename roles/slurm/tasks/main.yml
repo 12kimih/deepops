@@ -12,7 +12,10 @@
   ansible.builtin.include_tasks: setup-role.yml
   tags: always
 - name: Setup build
-  ansible.builtin.include_tasks: build.yml
+  ansible.builtin.include_tasks:
+    file: build.yml
+    apply:
+      tags: [build]
   tags: build
   when: slurm_workflow_build
 
@@ -40,7 +43,10 @@
   when: is_compute and slurm_fix_shm
 
 - name: Setup logging
-  ansible.builtin.include_tasks: logging.yml
+  ansible.builtin.include_tasks:
+    file: logging.yml
+    apply:
+      tags: [rsyslog, logging]
   tags:
     - rsyslog
     - logging

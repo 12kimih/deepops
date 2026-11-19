@@ -1,0 +1,18 @@
+---
+# Settings deepops no longer reads, each with what replaces it: the one list. A site still
+# setting one would be ignored without a word, so roles that read one before depend on
+# this role and a deploy stops on it; scripts/deepops/config_lint.py reports a document
+# or config that still names one. Add a name here when a setting is renamed or removed.
+retired_settings:
+  docker_rh_repo_url: docker_rh_repo_base_url (and docker_rh_repo_gpgkey) in roles/docker
+  nvidia_container_toolkit_rpm_repo_url: nvidia_container_toolkit_repo_base_url (a mirror) in roles/nvidia_container_toolkit
+  nvidia_driver_ubuntu_cuda_keyring_url: package_repos_cuda_base in roles/package_repos
+  nvidia_driver_ubuntu_cuda_repo_baseurl: package_repos_cuda_base in roles/package_repos
+  nvidia_driver_rhel_cuda_repo_baseurl: package_repos_cuda_base in roles/package_repos
+  nvidia_driver_rhel_cuda_repo_gpgkey: package_repos_cuda_base in roles/package_repos
+  nvidia_driver_ubuntu_repo_release: package_repos_cuda_release in roles/package_repos
+  nvidia_cuda_ubuntu_repo_release: package_repos_cuda_release in roles/package_repos
+  nvidia_dcgm_ubuntu_repo_release: package_repos_cuda_release in roles/package_repos
+  epel_package: package_repos_epel_* in roles/package_repos
+  epel_key_url: package_repos_epel_* in roles/package_repos
+  software_remove_packages: host_baseline_absent_packages (playbooks/generic/host-baseline.yml)

@@ -129,7 +129,7 @@ To configure alternate URLs for these repositories, set the following variables 
 
 **Ubuntu**
 
-```bash
+```yaml
 nvidia_container_toolkit_repo_base_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container>"
 nvidia_container_toolkit_repo_gpg_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container-gpgkey>"
 ```
@@ -139,11 +139,11 @@ Make that host name resolve to your mirror, or install Docker yourself and set `
 
 **Enterprise Linux**
 
-```bash
-# A .repo file whose baseurl points at your Docker CE mirror
-docker_rh_repo_url: "http://<your-package-mirror>/<your-path-to-docker-ce.repo>"
-
-nvidia_container_toolkit_rpm_repo_url: "http://<your-package-mirror>/<your-path-to-nvidia-container-toolkit.repo>"
+```yaml
+# Mirrors of https://download.docker.com/linux/centos and https://nvidia.github.io/libnvidia-container
+docker_rh_repo_base_url: "http://<your-package-mirror>/<your-path-to-docker-ce>"
+docker_rh_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-docker-ce>/gpg"
+nvidia_container_toolkit_repo_base_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container>"
 ```
 
 ### Configure DeepOps to use your mirrors for HTTP downloads
@@ -154,7 +154,7 @@ Use this section only for other direct HTTP downloads required by the roles you 
 The third-party package repositories come from one role, `roles/package_repos`.
 Point it at your mirrors; the layout below each base URL stays the upstream one.
 
-```bash
+```yaml
 # NVIDIA CUDA repository (drivers, CUDA, DCGM): the role installs the cuda-keyring
 # from here and points the APT source (or the dnf repository) at the same URL.
 package_repos_cuda_base: "http://<your-package-mirror>/<your-path>/compute/cuda/repos"
@@ -171,7 +171,7 @@ must serve NVIDIA's file unchanged.
 
 If running the container tests as part of the NGC-Ready playbook, set the following variables in your DeepOps configuration:
 
-```bash
+```yaml
 ngc_ready_cuda_container: "<your-container-registry>/nvidia/cuda:13.2.1-base-ubuntu24.04"
 ngc_ready_pytorch: "<your-container-registry>/nvidia/pytorch:26.05-py3"
 ngc_ready_tensorflow: "<your-container-registry>/nvidia/tensorflow:25.02-tf2-py3"

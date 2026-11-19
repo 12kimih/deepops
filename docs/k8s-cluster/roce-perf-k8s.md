@@ -248,7 +248,12 @@ add switch PFC, ECN configuration
 
    vendor: "15b3"
    dev_id: "1018"
-   num_vf: 8
+   ```
+
+   The number of virtual functions per physical function is a setting in your config:
+
+   ```yaml
+   roce_backend_num_vf: 8
    ```
 
    Run following script to deploy SRIOV RoCE functions:
