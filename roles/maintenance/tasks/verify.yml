@@ -99,13 +99,9 @@
     msg: "{{ maintenance_dcgm.stdout_lines }}"
   when: maintenance_dcgm.stdout_lines is defined
 
-- name: Look for NHC
-  ansible.builtin.stat:
-    path: /usr/sbin/nhc
-  register: maintenance_nhc
-
+# A node that should have NHC and lacks it fails here, rather than passing unchecked.
 - name: Run the node health check
   ansible.builtin.command:
     argv: [/usr/sbin/nhc]
   changed_when: false
-  when: maintenance_verify_nhc | bool and maintenance_nhc.stat.exists and not ansible_check_mode
+  when: maintenance_verify_nhc | bool and not ansible_check_mode
