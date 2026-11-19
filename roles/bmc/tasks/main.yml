@@ -17,7 +17,8 @@
   tags:
     - bmc
 
-# ipmi_si drives the KCS interface; ipmi_devintf exports it as /dev/ipmi0.
+# ipmi_si drives the KCS interface; ipmi_devintf exports it as /dev/ipmi0. A board
+# without a BMC refuses ipmi_si; the device check below decides what that means.
 - name: Load the in-band IPMI modules
   community.general.modprobe:
     name: "{{ item }}"
@@ -37,8 +38,34 @@
   tags:
     - bmc
 
-# A VM, a container, or a board without a BMC has no /dev/ipmi0. Skip rather
-# than fail, so the role stays safe to run across a mixed inventory.
+# A VM, a container, or a board without a BMC has no /dev/ipmi0. Such a host with no
+# bmc_ipaddr of its own is skipped, so the role stays safe across a mixed inventory
+# (bmc_password and the like are site-wide); one with a bmc_ipaddr fails, or its BMC
+# would silently stay unconfigured. Under --check the modules are not loaded, so
+# there it is only stated.
+- name: Require the in-band IPMI device on a host with a BMC address
+  ansible.builtin.fail:
+    msg: >-
+      bmc_ipaddr is {{ bmc_ipaddr }} for {{ inventory_hostname }}, but it has no /dev/ipmi0
+      (`lsmod | grep ipmi`, `dmesg | grep -i ipmi`). Check that the board has a BMC and
+      that its KCS interface is enabled, or remove bmc_ipaddr from this host's config.
+  when:
+    - bmc_ipaddr | length > 0
+    - not bmc_device.stat.exists
+    - not ansible_check_mode
+  tags:
+    - bmc
+
+- name: State that the BMC is not configured under --check
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }} has no /dev/ipmi0 yet; the run loads the IPMI modules first."
+  when:
+    - bmc_ipaddr | length > 0
+    - not bmc_device.stat.exists
+    - ansible_check_mode
+  tags:
+    - bmc
+
 - name: Configure the BMC
   when: bmc_device.stat.exists
   tags:

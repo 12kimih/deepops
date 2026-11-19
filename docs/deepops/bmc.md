@@ -42,7 +42,9 @@ when they are not.
 | `bmc_mgmt_interface`, `bmc_mgmt_address` | **host** | this host's leg on the management network |
 
 Every value is empty by default, and an empty value means the role leaves that setting
-alone. Running it against a host with no BMC, or a VM, is a no-op.
+alone. Running it against a host with no BMC, or a VM, is a no-op, unless that host has a
+`bmc_ipaddr`: then the missing `/dev/ipmi0` fails the host rather than leaving its BMC
+unconfigured.
 
 ### When the account is named something else, or is missing
 
