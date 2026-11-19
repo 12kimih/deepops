@@ -24,16 +24,7 @@ import sys
 from . import slurm, vocab
 from .cli import run_main
 from .files import write_atomic
-
-
-def _label(value):
-    """A Prometheus label value: backslash, quote and newline escaped."""
-    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
-
-def _series(name, labels, value):
-    inner = ",".join(f'{k}="{_label(v)}"' for k, v in labels.items())
-    return f"{name}{{{inner}}} {value}"
+from .prom import series
 
 
 def textfile(jobs_data, nodes_data):
@@ -52,11 +43,11 @@ def textfile(jobs_data, nodes_data):
                 "account": job.get("account") or "", "partition": job.get("partition") or "",
                 "job_id": slurm.job_label(job),
             }  # fmt: skip
-            lines.append(_series("slurm_gpu_allocated", labels, 1))
+            lines.append(series("slurm_gpu_allocated", labels, 1))
     lines += ["# HELP slurm_node_gpus GPUs configured on a node, by type.", "# TYPE slurm_node_gpus gauge"]
     for node in nodes_data["nodes"]:
         for gtype, count in sorted(slurm.node_gpus(node.get("gres")).items()):
-            lines.append(_series("slurm_node_gpus", {"node": node["name"], "gpu_type": gtype}, count))
+            lines.append(series("slurm_node_gpus", {"node": node["name"], "gpu_type": gtype}, count))
     # No reason text as a label: it is free text, so every new reason would be a new series.
     for name, help_text, value in (
         ("slurm_node_state", "Slurm's base state of a node, 1 for the current one.", None),
@@ -66,11 +57,9 @@ def textfile(jobs_data, nodes_data):
         lines += [f"# HELP {name} {help_text}", f"# TYPE {name} gauge"]
         for node in nodes_data["nodes"]:
             if value is None:
-                lines.append(
-                    _series(name, {"node": node["name"], "state": vocab.node_base(node["state"])}, 1)
-                )
+                lines.append(series(name, {"node": node["name"], "state": vocab.node_base(node["state"])}, 1))
             else:
-                lines.append(_series(name, {"node": node["name"]}, int(value(node["state"]))))
+                lines.append(series(name, {"node": node["name"]}, int(value(node["state"]))))
     return "\n".join(lines) + "\n"
 
 

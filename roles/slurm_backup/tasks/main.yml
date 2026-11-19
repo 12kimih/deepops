@@ -10,13 +10,15 @@
       - {command: backup, schedule: "{{ slurm_backup_schedule }}"}
       - {command: restore-test, schedule: "{{ slurm_backup_restore_test_schedule }}"}
   block:
+    # The program is clustertools.slurm_backup, shipped with the library it imports.
     - name: Install the backup command
-      ansible.builtin.copy:
-        src: slurm_backup.py
-        dest: "{{ slurm_backup_script }}"
-        owner: root
-        group: root
-        mode: "0755"
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: command
+      vars:
+        cluster_tools_lib_command:
+          dest: "{{ slurm_backup_script }}"
+          module: clustertools.slurm_backup
 
     # A destination on an NFS export with root_squash cannot be created by this host's
     # root, so its directory is made on the export's server, owned by the writer.
@@ -42,6 +44,7 @@
                       'munge_key': slurm_backup_munge_key, 'weekly_day': slurm_backup_weekly_day,
                       'textfile_dir': slurm_backup_textfile_dir, 'textfile': slurm_backup_textfile,
                       'metrics_file': slurm_backup_metrics_file,
+                      'step_timeout': slurm_backup_step_timeout,
                       'destinations': slurm_backup_destinations} | to_nice_json }}\n"
 
     - name: Install the backup service

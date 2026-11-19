@@ -1,20 +1,18 @@
-"""slurm_backup.py: retention, metrics, and a full backup run against stub tools."""
+"""clustertools.slurm_backup: retention, metrics, and full runs against stub tools."""
 
 import gzip
-import importlib.util
 import os
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location(
-    "slurm_backup", ROOT / "roles" / "slurm_backup" / "files" / "slurm_backup.py"
-)
-sb = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(sb)
+sys.path.insert(0, str(ROOT / "roles" / "cluster_tools_lib" / "files"))
+from clustertools import prom  # noqa: E402
+from clustertools import slurm_backup as sb  # noqa: E402
 
 
 class Pure(unittest.TestCase):
@@ -26,12 +24,12 @@ class Pure(unittest.TestCase):
 
     def test_metrics_lines(self):
         values = {sb.series("last_status", destination="/b"): 1, sb.series("last_run_timestamp_seconds"): 5}
-        text = sb.metrics("slurm_backup", values)
+        text = prom.render(values)
         self.assertEqual(
             text,
             'slurm_backup_last_run_timestamp_seconds{} 5\nslurm_backup_last_status{destination="/b"} 1\n',
         )
-        self.assertEqual(sb.parse_metrics("slurm_backup", text), {k: str(v) for k, v in values.items()})
+        self.assertEqual(prom.parse(text), {k: str(v) for k, v in values.items()})
 
 
 class Backup(unittest.TestCase):
@@ -102,6 +100,20 @@ class Backup(unittest.TestCase):
         (self.base / "bin" / "mariadb-dump").write_text("#!/bin/sh\nexit 3\n")
         with self.assertRaises(RuntimeError):
             self.run_on("2026-11-21", 6)
+
+    def test_a_hung_destination_fails_alone_and_is_reported(self):
+        real = sb.run_as
+
+        def run_as(owner, argv, timeout, **kwargs):
+            if str(self.base / "secondary") in " ".join(argv):
+                raise sb.proc.TimeoutExpired(argv, timeout)
+            return real(owner, argv, timeout, **kwargs)
+
+        with mock.patch.object(sb, "run_as", run_as):
+            self.assertEqual(self.run_on("2026-11-21", 6), 1)
+        prom_text = (self.base / "prom" / "slurm-backup.prom").read_text()
+        self.assertIn(f'slurm_backup_last_status{{destination="{self.base / "secondary"}"}} 0', prom_text)
+        self.assertIn(f'slurm_backup_last_status{{destination="{self.base / "primary"}"}} 1', prom_text)
 
     def test_metrics_survive_a_lost_textfile_dir(self):
         self.run_on("2026-11-21", 6)
