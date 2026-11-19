@@ -18,7 +18,7 @@ groups:
         expr: |
           max by (host, gpu, device) (DCGM_FI_DEV_GPU_UTIL) > 0
           unless on (host, device) host_device:slurm_gpu_allocated:max
-          and on () (time() - max(node_textfile_mtime_seconds{file=~".*slurm-gpu[.]prom"}) < 300)
+          and on () (time() - max(slurm_metrics_updated_timestamp_seconds) < 300)
         for: 15m
         labels: {severity: warning}
         annotations:
@@ -28,7 +28,7 @@ groups:
             host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a hung one.
       - alert: SlurmGpuMetricsStale
         expr: |
-          time() - node_textfile_mtime_seconds{file=~".*slurm-gpu[.]prom"} > 300
+          time() - slurm_metrics_updated_timestamp_seconds > 300
           or node_textfile_scrape_error > 0
         for: 5m
         labels: {severity: warning}

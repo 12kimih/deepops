@@ -39,6 +39,11 @@ class TextfileTests(unittest.TestCase):
         self.assertIn('slurm_node_gpus{node="gpu4",gpu_type="a30"} 7', text)
         self.assertIn("# TYPE slurm_gpu_allocated gauge", text)
 
+    def test_the_file_says_when_it_was_read(self):
+        # The stale alerts read this, so they hold whatever the file is called.
+        text = metrics.textfile({"jobs": []}, {"nodes": []}, now=1234.9)
+        self.assertIn("slurm_metrics_updated_timestamp_seconds{} 1234\n", text)
+
     def test_no_label_the_scrape_attaches_itself(self):
         # A scraped label named like a target label is renamed exported_*.
         text = metrics.textfile({"jobs": [running(1, "u", "gpu1", ["gpu:a10:1(IDX:0)"])]}, load("nodes"))
