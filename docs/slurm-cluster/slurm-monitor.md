@@ -126,6 +126,14 @@ Data is kept for `prometheus_retention_time` (default `90d`) or until it reaches
 `prometheus_retention_size` (default `50GB`), whichever comes first. Config and rule changes
 are checked with `promtool` before they are written, then applied with a live reload.
 
+After a monitoring deploy, `scripts/validation/validate_monitoring.py --json` (from a
+checkout on any host that reaches Prometheus; read-only) must report `"ok": true`. It
+checks that every target is up and every rule group evaluates, that the Watchdog alert
+reaches Alertmanager, that every metric the alert rules and dashboards read exists
+(except those only some hardware has), that every GPU joins Slurm's device numbering,
+and that the timestamped textfile metrics are fresh. A metric missing while its
+exporter reports others is a rollout gap: deploy that exporter's playbook to its hosts.
+
 ## Alertmanager
 
 Prometheus evaluates the alert rules in `roles/prometheus/files/rules/`, grouped by area:
