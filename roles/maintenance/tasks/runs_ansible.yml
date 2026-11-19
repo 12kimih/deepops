@@ -1,0 +1,17 @@
+---
+# Sets maintenance_runs_ansible: whether this host is the machine running Ansible (the
+# controller, when the playbook is started there), by its /etc/machine-id. Anything that
+# reboots or powers off a host asks here first: done to that machine, it kills the run
+# halfway. A host that cannot be read (down, unreachable) is not that machine.
+- name: Read whether this host is the machine running Ansible
+  ansible.builtin.slurp:
+    src: /etc/machine-id
+  register: maintenance_machine_id
+  failed_when: false
+  ignore_unreachable: true
+
+- name: Note whether this host is the machine running Ansible
+  ansible.builtin.set_fact:
+    maintenance_runs_ansible: >-
+      {{ maintenance_machine_id.content is defined
+         and (maintenance_machine_id.content | b64decode | trim) == (lookup('ansible.builtin.file', '/etc/machine-id') | trim) }}
