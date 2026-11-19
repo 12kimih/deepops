@@ -58,6 +58,10 @@ class BoundaryTests(unittest.TestCase):
             with self.subTest(timeout=timeout), self.assertRaises(ValueError):
                 proc.run(["true"], timeout=timeout)
 
+    def test_proc_text_survives_bytes_that_are_not_utf8(self):
+        out = proc.run(["printf", "job\\377name"], timeout=5, capture_output=True, text=True).stdout
+        self.assertEqual(out, "job\ufffdname")
+
     @staticmethod
     def slurm_argvs(tree):
         """Lines of every argv (a list or tuple literal) that starts with a Slurm command,
