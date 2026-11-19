@@ -82,6 +82,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── docker
 │   ├── docker-login
 │   ├── docker-rootless
+│   ├── docker_daemon_json
 │   ├── docker_socket_group
 │   ├── download
 │   ├── easy-build

@@ -32,21 +32,11 @@
 # rewrite -- other roles also write daemon.json.
 # https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 - name: Set the socket group in the Docker daemon configuration
-  ansible.builtin.command:
-    cmd: >-
-      python3 -c 'import json, pathlib, sys;
-      p = pathlib.Path("/etc/docker/daemon.json");
-      want = {{ {"group": docker_socket_group} | to_json }};
-      text = p.read_text().strip() if p.exists() else "";
-      data = json.loads(text) if text else {};
-      changed = any(data.get(k) != v for k, v in want.items());
-      data.update(want);
-      (p.write_text(json.dumps(data, indent=2) + chr(10)) if changed else None);
-      sys.exit(10 if changed else 0)'
-  register: docker_socket_group_daemon_json
-  changed_when: docker_socket_group_daemon_json.rc == 10
-  failed_when: docker_socket_group_daemon_json.rc not in [0, 10]
-  notify: Restart docker
+  ansible.builtin.include_role:
+    name: docker_daemon_json
+  vars:
+    docker_daemon_json_owner: socket-group
+    docker_daemon_json_keys: {group: "{{ docker_socket_group }}"}
 
 - name: Check whether the docker.socket unit exists
   ansible.builtin.command:
@@ -81,7 +71,7 @@
   notify:
     - Reload systemd
     - Restart the docker socket unit
-    - Restart docker
+    - Restart dockerd
 
 # Configuration alone cannot converge a node whose files are already right but whose live
 # socket is not -- handlers that never ran, or a socket changed by hand. Compare the live
@@ -105,4 +95,4 @@
   notify:
     - Reload systemd
     - Restart the docker socket unit
-    - Restart docker
+    - Restart dockerd

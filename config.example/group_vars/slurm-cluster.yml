@@ -412,7 +412,7 @@ docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*
 #docker_socket_group: "{{ cluster_docker_group_name }}"
 #docker_socket_group_gid: "{{ cluster_docker_group_gid }}"
 # Applying the change restarts dockerd, which stops running containers on the node.
-#docker_socket_group_restart: true
+#docker_daemon_restart: true
 
 ################################################################################
 # Monitoring stack                                                             #

@@ -89,7 +89,7 @@ group that is designed to be cluster-wide:
    `systemctl daemon-reload` re-reads the unit but does not re-create a socket that is
    already listening, and restarting `docker.service` does not restart `docker.socket`,
    so on a socket-activated node the override would otherwise sit unused until the next
-   reboot. Set `docker_socket_group_restart: false` to stage the configuration and
+   reboot. Set `docker_daemon_restart: false` to stage the configuration and
    bounce both during a maintenance window instead.
 
    On every run the role also compares the group that owns the live socket against the
@@ -156,7 +156,7 @@ stat -c '%G %a' /run/docker.sock    # must be the cluster group, mode 660
 ```
 
 A wrong group here means the daemon was never restarted after the configuration was
-written. Re-running the playbook with `docker_socket_group_restart: true` repairs it --
+written. Re-running the playbook with `docker_daemon_restart: true` repairs it --
 the role checks the live socket, not just the configuration files.
 
 ## Before reaching for this
