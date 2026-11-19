@@ -79,11 +79,11 @@ my-cluster-compute-02
 ```
 
 If you want to further sub-divide your cluster, or target particular hosts with playbooks, you can add other inventory groups to this file!
-For example, if you have a host that you will use as a separate NFS server, you may want to create an `nfs-server` group and only run the [NFS server playbook](../../playbooks/generic/nfs-server.yml) on that host.
-You can restrict the hosts that will run an Ansible playbook using the `--limit` or `-l` flag, e.g.:
+A component playbook targets its own group (the [NFS server playbook](../../playbooks/generic/nfs-server.yml) targets `slurm-nfs`, for example), and `--limit` or `-l` only narrows that group; it never adds hosts outside it.
+To run a playbook on another group, pass it as `hostlist`, e.g.:
 
 ```bash
-ansible-playbook -l nfs-server playbooks/generic/nfs-server.yml
+ansible-playbook -e hostlist=nfs-server playbooks/generic/nfs-server.yml
 ```
 
 For more information on using Ansible inventory files, we recommend reading the [Ansible documentation](https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html).

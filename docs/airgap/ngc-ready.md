@@ -134,8 +134,12 @@ nvidia_container_toolkit_repo_base_url: "http://<your-package-mirror>/<your-path
 nvidia_container_toolkit_repo_gpg_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container-gpgkey>"
 ```
 
-The Docker role has no variable for the Ubuntu repository: it always adds `https://download.docker.com/linux/ubuntu` (and its `/gpg` key) to `/etc/apt/sources.list.d/docker.sources`.
-Make that host name resolve to your mirror, or install Docker yourself and set `docker_install: false`.
+The Docker repository is a mirror of `https://download.docker.com/linux/ubuntu` (Kubespray reads the same settings):
+
+```yaml
+docker_ubuntu_repo_base_url: "http://<your-package-mirror>/<your-path-to-docker-ce-ubuntu>"
+docker_ubuntu_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-docker-ce-ubuntu>/gpg"
+```
 
 **Enterprise Linux**
 

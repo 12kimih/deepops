@@ -3,7 +3,7 @@
 
     config_lint.py [--fix]              run every check
     config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
-                                        doc-vars, shadow
+                                        doc-vars, doc-limits, shadow
 
 A role's defaults own each setting's default and a config states only what differs
 (scripts/deepops/settings.py models both):
@@ -24,6 +24,9 @@ doc-paths  every repository path a document names (roles/..., playbooks/..., ...
 doc-vars   every setting a document tells a reader to set (`name: value`) or lists in
            a table's first column is read somewhere, so a page never names a
            variable that was renamed or removed.
+doc-limits every `ansible-playbook -l X playbooks/...` a document shows limits to hosts the
+           play targets: -l only narrows a play's own hosts, so a group outside them
+           (or one config.example/inventory does not know) runs nothing there.
 shadow     no group or host has its variables in two places (all.yml beside all/, or
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
@@ -197,6 +200,7 @@ def read_words():
 # line of a YAML code block (```yaml: a page shows settings as YAML).
 SETTING = re.compile(r"`([a-z][a-z0-9]*_[a-z0-9_]+): [^`]+`")
 TABLE_NAME = re.compile(r"^\|\s*`([a-z][a-z0-9]*_[a-z0-9_]+)`")
+PROSE_SETTING = re.compile(r"^([a-z][a-z0-9]*_[a-z0-9_]+): \S.*$")
 BLOCK_SETTING = re.compile(r"^\s*#?\s?([a-z][a-z0-9]*_[a-z0-9_]+): ")
 
 
@@ -211,8 +215,10 @@ def doc_settings(text):
             if fence not in ("yaml", "yml"):
                 continue
             names = BLOCK_SETTING.findall(line)
-        else:
-            names = TABLE_NAME.findall(line) if line.startswith("|") else SETTING.findall(line)
+        elif line.startswith("|"):
+            names = TABLE_NAME.findall(line)
+        else:  # inline `name: value`, or a line that is nothing but one
+            names = SETTING.findall(line) or PROSE_SETTING.findall(line)
         for name in names:
             yield number, name
 
@@ -336,6 +342,71 @@ def check_doc_paths():
 VAR_SUFFIXES = ("", ".yml", ".yaml", ".json")
 
 
+def example_groups():
+    """(groups, {group: its child groups}, every name) of config.example/inventory."""
+    children, groups, current = {}, set(), None
+    text = (EXAMPLE / "inventory").read_text()
+    for line in text.splitlines():
+        header = re.match(r"^\[([^\]:]+)(:children)?\]", line)
+        if header:
+            current = header.group(1) if header.group(2) else None
+            groups.add(header.group(1))
+            children.setdefault(header.group(1), set())
+        elif current and line.strip() and not line.lstrip().startswith("#"):
+            children[current].add(line.strip())
+    return groups, children, set(re.findall(r"[A-Za-z0-9_.-]+", text))
+
+
+def play_targets(playbook):
+    """The group each play of PLAYBOOK targets (a hostlist default counts as the group)."""
+    data = settings.load(playbook.read_text()) or []
+    hosts = [play.get("hosts") for play in data if isinstance(play, dict) and "hosts" in play]
+    return [
+        re.search(r"default\('([^']+)'\)", str(h)).group(1) if "default(" in str(h) else str(h) for h in hosts
+    ]
+
+
+def check_doc_limits():
+    groups, children, names = example_groups()
+
+    def reach(group, seen=None):
+        seen = {group} if seen is None else seen
+        for child in children.get(group, ()):
+            if child not in seen:
+                seen.add(child)
+                reach(child, seen)
+        return seen
+
+    problems = []
+    command = re.compile(r"ansible-playbook\b[^\n`]*")
+    for doc in tracked("*.md"):
+        if not doc.is_file():
+            continue
+        for number, line in enumerate(doc.read_text(errors="ignore").splitlines(), 1):
+            for cmd in command.findall(line):
+                limit = re.search(r"(?:-l|--limit)[ =](\S+)", cmd)
+                playbook = re.search(r"(playbooks/[\w./-]+\.ya?ml)", cmd)
+                if not limit or not playbook or "hostlist" in cmd or not (ROOT / playbook.group(1)).is_file():
+                    continue
+                targets = play_targets(ROOT / playbook.group(1))
+                if not targets:  # a playbook of imports: each imported play checks its own
+                    continue
+                for name in re.split(r"[,:]", limit.group(1).strip("'\"")):
+                    name = name.lstrip("!&")
+                    if not name or re.search(r"[<>{}$*]", name) or name == "localhost":
+                        continue
+                    where = f"doc-limits: {doc.relative_to(ROOT)}:{number}: -l {name}"
+                    if name not in names:
+                        problems.append(f"{where}: config.example/inventory has no such group or host")
+                    elif name in groups and not any(
+                        t == "all" or t not in groups or reach(name) & reach(t) for t in targets
+                    ):
+                        problems.append(
+                            f"{where}: outside {playbook.group(1)}'s hosts ({', '.join(targets)})"
+                        )
+    return problems
+
+
 def check_shadow():
     problems = []
     for label, tree, _ in configs():
@@ -367,6 +438,7 @@ CHECKS = {
     "dead": check_dead,
     "doc-paths": check_doc_paths,
     "doc-vars": check_doc_vars,
+    "doc-limits": check_doc_limits,
     "shadow": check_shadow,
 }
 

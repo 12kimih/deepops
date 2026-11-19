@@ -24,6 +24,13 @@ docker_apt_sources: /etc/apt/sources.list.d/docker.sources
 # The signing key (the same file for Ubuntu and Debian), checked on download.
 docker_apt_key_checksum: "sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570"
 
+# The apt repository and its signing key per distribution; a mirror keeps the upstream
+# layout. Kubespray's docker role reads the same names, so one setting serves both deploys.
+docker_ubuntu_repo_base_url: "https://download.docker.com/linux/ubuntu"
+docker_ubuntu_repo_gpgkey: "{{ docker_ubuntu_repo_base_url }}/gpg"
+docker_debian_repo_base_url: "https://download.docker.com/linux/debian"
+docker_debian_repo_gpgkey: "{{ docker_debian_repo_base_url }}/gpg"
+
 # RHEL-family dnf repo, written here (not a downloaded .repo file, which could change
 # its settings): the centos tree works on RHEL/Rocky/Alma/CentOS; a mirror keeps its
 # layout ($releasever/$basearch/stable).

@@ -256,7 +256,7 @@ Each is independent of Slurm and can stay in place if it is still useful.
 
 | Component | Flag | What to remove |
 |---|---|---|
-| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm` (`plugstack.conf`, `plugstack.conf.d/pyxis.conf`); the plugin is installed as `{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so` from the source tree in `/usr/local/src/pyxis`. Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
+| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm` (`plugstack.conf`, `plugstack.conf.d/pyxis.conf`); the plugin is installed as `{{ slurm_install_prefix }}/lib/slurm/spank_pyxis.so` from the source tree in `/usr/local/src/pyxis-<version>` (`pyxis_src_dir`). Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
 | Node Health Check | `slurm_install_nhc` | `/etc/nhc`, `/etc/sysconfig/nhc`, `/usr/sbin/nhc*`, `/usr/libexec/nhc`, `/opt/deepops/build/nhc` |
 | OpenMPI | `slurm_cluster_install_openmpi` (example inventory: off; unset: on) | Built into `/usr/local` from `/tmp/openmpi-build`; `cd` to that directory and `make uninstall` if it still exists |
 | Lmod / software modules | `slurm_install_lmod` | See `roles/lmod/defaults/main.yml` for `sm_software_path` and `sm_module_path`; profile scripts in `/etc/profile.d/` |
