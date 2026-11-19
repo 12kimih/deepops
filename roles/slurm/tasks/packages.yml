@@ -15,45 +15,23 @@
   run_once: true
   delegate_to: localhost
 
-- name: Create the apt keyring directory
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Trust the repository key for this repository only
-  ansible.builtin.copy:
-    src: "{{ slurm_repo_signing_pubkey_file }}"
-    dest: /etc/apt/keyrings/deepops-slurm.asc
-    owner: root
-    group: root
-    mode: "0644"
-  register: slurm_repo_key
-
+# The flat repository on the shared filesystem, trusted through its own key only; apt
+# picks slurm_deb_version over any other version of these packages, and an upgrade
+# (unattended, or the maintenance role's) never moves them. Below 1000, so apt itself
+# never installs it over a newer one either.
 - name: Add the Slurm repository
-  ansible.builtin.copy:
-    dest: /etc/apt/sources.list.d/deepops-slurm.list
-    content: "deb [signed-by=/etc/apt/keyrings/deepops-slurm.asc] file:{{ slurm_repo_dir }} ./\n"
-    owner: root
-    group: root
-    mode: "0644"
-  register: slurm_repo_source
-
-# apt picks slurm_deb_version over any other version of these packages, and an
-# upgrade (unattended, or the maintenance role's) never moves them. Below 1000, so
-# apt itself never installs it over a newer one either.
-- name: Hold the Slurm packages at slurm_deb_version
-  ansible.builtin.copy:
-    dest: /etc/apt/preferences.d/deepops-slurm
-    content: |
-      Package: slurm-smd slurm-smd-*
-      Pin: version {{ slurm_deb_version }}
-      Pin-Priority: 990
-    owner: root
-    group: root
-    mode: "0644"
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: repo
+  vars:
+    package_repos_repo:
+      name: deepops-slurm
+      uris: "file:{{ slurm_repo_dir }}"
+      suites: [./]
+      key_src: "{{ slurm_repo_signing_pubkey_file }}"
+      pin: {packages: slurm-smd slurm-smd-*, pin: "version {{ slurm_deb_version }}", priority: 990}
+      # The one-line source and the extensionless hold this role wrote before.
+      legacy_files: [/etc/apt/sources.list.d/deepops-slurm.list, /etc/apt/preferences.d/deepops-slurm]
 
 - name: Remove the distribution's Slurm, which would conflict with the packages
   ansible.builtin.include_role:

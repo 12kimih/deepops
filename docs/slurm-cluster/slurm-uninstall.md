@@ -61,7 +61,7 @@ Files and directories (variable name in parentheses):
 | Path | Purpose |
 |---|---|
 | The `slurm-smd*` packages | Commands in `/usr/bin` and `/usr/sbin`, plugins in `slurm_plugin_dir` (`/usr/lib/<multiarch>/slurm`), headers in `/usr/include/slurm` |
-| `/etc/apt/sources.list.d/deepops-slurm.list`, `/etc/apt/keyrings/deepops-slurm.asc`, `/etc/apt/preferences.d/deepops-slurm` | The Slurm repository, its key and the version hold |
+| `/etc/apt/sources.list.d/deepops-slurm.sources`, `/etc/apt/keyrings/deepops-slurm.asc`, `/etc/apt/preferences.d/deepops-slurm.pref` | The Slurm repository, its key and the version hold |
 | `/sw/.slurm-repo` (`slurm_repo_dir`) | The signed package repository every node installs from (shared) |
 | `/var/cache/deepops/build/slurm-deb` (`slurm_deb_build_dir`), user `slurmbuild` | The package build, on `slurm-master[0]` only |
 | `/etc/slurm` (`slurm_config_dir`) | Controller: `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, `plugstack.conf`, `job_submit.lua`. Every node: `prolog.d/`, `epilog.d/`, `shared/bin/`, `localusers.backup`, Pyxis `plugstack.conf.d/` |
@@ -118,15 +118,15 @@ removing any PAM module or Slurm configuration.
 
 ```bash
 apt-get purge -y 'slurm-smd*'
-rm -f /etc/apt/sources.list.d/deepops-slurm.list /etc/apt/keyrings/deepops-slurm.asc \
-      /etc/apt/preferences.d/deepops-slurm
+rm -f /etc/apt/sources.list.d/deepops-slurm.sources /etc/apt/keyrings/deepops-slurm.asc \
+      /etc/apt/preferences.d/deepops-slurm.pref /var/cache/deepops/package-repos/deepops-slurm.key
 apt-get update
 ```
 
 A Pyxis plugin built on the node stays in `slurm_plugin_dir` (dpkg does not own it):
 remove `spank_pyxis.so` and `spank_pyxis.so.built-from` there. On `slurm-master[0]`,
 also remove the package build (`/var/cache/deepops/build/slurm-deb`, the user
-`slurmbuild`, the build dependencies package `slurm-smd-build-deps`).
+`slurmbuild`, the build image `slurm_deb_build_image`).
 
 A node that still has the older source build (`make install` under `/usr/local`, with
 `/opt/deepops/{pmix,hwloc}`): the upgrade playbook removes it
