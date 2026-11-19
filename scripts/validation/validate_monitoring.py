@@ -45,12 +45,15 @@ DASHBOARDS = [
 # Metrics only some hardware or some exporter versions produce; their absence is no
 # failure (the panels reading them say so, the alerts reading them stay quiet).
 OPTIONAL = re.compile(
-    r"^(DCGM_FI_DEV_NVLINK_.*|DCGM_FI_PROF_.*|DCGM_EXP_XID_ERRORS_COUNT|DCGM_FI_DEV_XID_ERRORS"
+    r"^(DCGM_FI_DEV_NVLINK_.*|DCGM_FI_PROF_.*"
     r"|node_infiniband_.*|node_hwmon_power_.*|ipmi_.*|.+_tls_cert_not_after_seconds"
     r"|ALERTS|ALERTS_FOR_STATE)$"
 )
-# Metrics that exist only while what they count does (a GPU some job holds).
-WHILE_IN_USE = re.compile(r"^(slurm_gpu_allocated)$")
+# Metrics that exist only while what they count does: a GPU some job holds, an XID or a
+# clock event in the exporter's window, the last XID since the exporter started.
+WHILE_IN_USE = re.compile(
+    r"^(slurm_gpu_allocated|DCGM_EXP_XID_ERRORS_COUNT|DCGM_EXP_CLOCK_EVENTS_COUNT|DCGM_FI_DEV_XID_ERROR)$"
+)
 # Exporters by metric prefix: a missing metric is a rollout gap only when its exporter
 # reports others.
 EXPORTERS = ("DCGM_", "node_", "slurm_", "os_updates_", "ipmi_")
@@ -169,7 +172,7 @@ def check(prom):
                 gaps.setdefault(metric, sorted(set(where)))
     record("metrics", not gaps, {"read": len(reads), "missing": gaps})
 
-    reporting = {r["metric"].get("host") for r in prom.query("count by (host) (DCGM_FI_DEV_GPU_UTIL)")}
+    reporting = {r["metric"].get("host") for r in prom.query("count by (host) (DCGM_FI_DEV_GPU_UTIL_RATIO)")}
     joined = {
         r["metric"].get("host") for r in prom.query("count by (host) (host_gpu:dcgm_slurm_device:info)")
     }

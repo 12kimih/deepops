@@ -3,7 +3,7 @@
 From roles/slurm_metrics (clustertools.metrics: slurm_gpu_allocated, slurm_node_gpus,
 slurm_node_state, slurm_node_drain, slurm_node_schedulable) and the recording rule
 host_device:slurm_gpu_allocated:max (rules/slurm.yml), joined with DCGM utilisation
-through host_device:dcgm_gpu_util:max, which carries Slurm's GPU numbering.
+through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering.
 """
 
 from grafana import STATE_COLORS, bars, dashboard, query, stat, table, timeseries
@@ -121,11 +121,11 @@ def build():
         table(
             "Allocations now",
             # Every allocation, with its utilisation where DCGM reports one (NaN otherwise).
-            f"{ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util:max or {ALLOC} * (0 / 0)",
+            f"{ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util_ratio:max or {ALLOC} * (0 / 0)",
             ["user", "account", "partition", "job_id", "node", "gpu", "gpu_type", "Utilization"],
             h=10,
             sort="node",
-            value=("Utilization", "percent", "continuous-RdYlGr"),
+            value=("Utilization", "percentunit", "continuous-RdYlGr"),
             no_value=NONE_ALLOCATED,
             description="Each GPU a running job holds, with its current utilisation (DCGM).",
         ),

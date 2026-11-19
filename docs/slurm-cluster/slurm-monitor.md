@@ -176,7 +176,7 @@ utilisation bar and GPU memory.
 
 A job counts as idle when it has run for `slurm_usage_report_idle_hours` and every GPU it
 holds stayed at or under `slurm_usage_report_idle_util_threshold` percent the whole time
-(DCGM `DCGM_FI_DEV_GPU_UTIL`). `slurm_usage_report_notify` lists how its owner hears about
+(DCGM `DCGM_FI_DEV_GPU_UTIL_RATIO`, shown in percent). `slurm_usage_report_notify` lists how its owner hears about
 it: `mention` in the report thread, `dm`, both, or `[]` for neither. Owners are notified
 when a job first turns idle and then every `slurm_usage_report_notify_repeat_hours`, not on
 every report; the thread lists idle jobs either way.
