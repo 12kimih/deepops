@@ -53,6 +53,10 @@ slurm_enable_dns_resolver: false
 # server). Turning their switch off, or a host leaving their group, leaves them as they
 # are; listing one here removes it from the hosts where nothing wants it any more.
 deepops_component_removals: []
+# What a component play does (plugins/filter/components.py component_phase): converge
+# when run alone; a deploy imports each one with install, then again with remove at
+# its end, in reverse dependency order, so nothing is removed from under what needs it.
+deepops_phase: converge
 
 # Kubernetes deploy (playbooks/k8s-cluster.yml)
 kube_enable_container_registry: false

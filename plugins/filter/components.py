@@ -83,6 +83,24 @@ def components_desired(registry, groups, host, removals=()):
     return {name: state(name) for name in registry}
 
 
+PHASES = ("converge", "install", "remove")
+
+
+def component_phase(state, phase="converge"):
+    """What a play does with a component in PHASE: converge applies the desired state,
+    install only installs (an absent component waits for remove), remove only removes
+    (a deploy runs it last, in reverse dependency order). kept means do nothing."""
+    if phase not in PHASES:
+        from ansible.errors import AnsibleFilterError
+
+        raise AnsibleFilterError(f"deepops_phase must be one of {', '.join(PHASES)}, not {phase}")
+    if phase == "install" and state == "absent":
+        return "kept"
+    if phase == "remove" and state != "absent":
+        return "kept"
+    return state
+
+
 def components_order(registry):
     """The registry's components with every one after what it needs (removal runs in
     the reverse); fails on a cycle."""
@@ -108,4 +126,8 @@ def components_order(registry):
 
 class FilterModule:
     def filters(self):
-        return {"components_desired": components_desired, "components_order": components_order}
+        return {
+            "components_desired": components_desired,
+            "components_order": components_order,
+            "component_phase": component_phase,
+        }

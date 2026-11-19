@@ -1,6 +1,6 @@
 ---
-# present or absent (docs/deepops/component-state.md); a deploy sets it from
-# deepops_components.
+# present, absent, or kept (do nothing) (docs/deepops/component-state.md); a deploy
+# sets it from deepops_components.
 rsyslog_client_state: present
 # The destination host for TCP forwarding of rsyslog messages; empty forwards nothing.
 # config.example sets it for Slurm and Kubernetes in group_vars/slurm-cluster.yml

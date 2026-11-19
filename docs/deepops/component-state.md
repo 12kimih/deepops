@@ -26,7 +26,8 @@ it, whatever was there before:
 <role>_state: present        # present or absent
 ```
 
-- `tasks/main.yml` asserts the value, then includes `present.yml` or `absent.yml`.
+- `tasks/main.yml` asserts the value (present, absent, or kept: do nothing), then
+  includes `present.yml` or `absent.yml`.
 - `absent.yml` undoes exactly what `present.yml` does, through the shared modules:
   packages through `host_baseline` (`tasks_from: absent`), files in shared directories
   through `recorded_files`, Helm charts through `helm_release` (`state: absent`),
@@ -95,9 +96,11 @@ the deploy and read their state from the map:
 
 ## Order
 
-Installs run in the playbooks' order, which the test checks against the registry's
-`needs` graph (a topological order). Removals run in a final phase of each deploy in
-the reverse of the same graph: pyxis before enroot before the container toolkit;
+Each component play passes its state through `component_phase(deepops_phase)`. Run alone
+it converges (`converge`). A deploy imports it twice: with `install` in the install
+order, where an absent component waits (`kept`), and with `remove` in a final phase,
+where only absent components act. Installs follow the registry's `needs` graph (a
+topological order) and removals its reverse, which the test checks: pyxis before enroot before the container toolkit;
 exporters, then their dashboards, then Alertmanager, then Prometheus and Grafana; usage
 report and metrics before cluster_tools_lib; HPC SDK registration before Lmod; NFS
 clients before the server.

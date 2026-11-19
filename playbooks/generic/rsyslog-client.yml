@@ -6,7 +6,7 @@
   roles:
     - role: deploy_defaults
     - role: rsyslog_client
-      rsyslog_client_state: "{{ deepops_components.rsyslog_client }}"
+      rsyslog_client_state: "{{ deepops_components.rsyslog_client | component_phase(deepops_phase) }}"
   tags:
     - rsyslog-client
     - rsyslog

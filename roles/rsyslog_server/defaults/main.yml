@@ -1,6 +1,6 @@
 ---
-# present or absent (docs/deepops/component-state.md); a deploy sets it from
-# deepops_components.
+# present, absent, or kept (do nothing) (docs/deepops/component-state.md); a deploy
+# sets it from deepops_components.
 rsyslog_server_state: present
 # 0 turns a listener off.
 rsyslog_server_tcp_port: 514

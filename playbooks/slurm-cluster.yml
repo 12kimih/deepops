@@ -147,9 +147,13 @@
 # Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
+  vars:
+    deepops_phase: install
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog client
   import_playbook: generic/rsyslog-client.yml
+  vars:
+    deepops_phase: install
 
 - name: Set Permissions to adjust GPU Clocks speeds
   import_playbook: utilities/gpu-clocks.yml
@@ -231,6 +235,18 @@
   import_playbook: nvidia-software/nvidia-peer-memory.yml
   tags:
     - nvidia-peer-memory
+
+# Removal phase (docs/deepops/component-state.md): the components no longer wanted on a
+# host go, in the reverse of the install order, so nothing goes from under what needs it.
+- name: Remove the rsyslog client where it is no longer wanted
+  import_playbook: generic/rsyslog-client.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the rsyslog server where it is no longer wanted
+  import_playbook: generic/rsyslog-server.yml
+  vars:
+    deepops_phase: remove
 
 # Last: each host records what was deployed to it (roles/deploy_record), where the next
 # preview starts (scripts/deepops/settings.py diff).
