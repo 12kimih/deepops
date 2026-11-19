@@ -87,6 +87,18 @@ image_command_tool: "crictl"
 # that take snapshots need them (roles/netapp-trident checks for them).
 #csi_snapshot_controller_enabled: false
 
+# NVIDIA Network Operator (playbooks/k8s-cluster/nvidia-network-operator.yaml): SR-IOV
+# virtual functions of these physical functions for pods. Defaults and the rest of its
+# settings: roles/nvidia-network-operator/defaults/main.yml.
+#nvidia_network_operator_interfaces: []
+#nvidia_network_operator_interfaces:  # example
+#  - if_name: ibp12s0
+#    pf_name: ibp12s0
+#    res_name: resibp12s0
+#    ip_addr: 192.168.101.0/24
+#nvidia_network_operator_num_vf: 8
+#nvidia_network_operator_link_type: ib
+
 ################################################################################
 # Logging with rsyslog                                                         #
 ################################################################################

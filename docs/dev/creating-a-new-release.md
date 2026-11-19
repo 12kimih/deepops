@@ -70,7 +70,7 @@ Update version numbers in the `roles/requirements.yml` file
   * Update `spack_version` in `roles/spack/defaults/main.yml`
   * Update `standalone_container_registry_image` in `roles/standalone-container-registry/defaults/main.yml`
   * Update `cuda_version` in `roles/nvidia_cuda/defaults/main.yml`
-  * Update `nvidia_network_operator_version` in `roles/nvidia-network-operator/vars/main.yaml`
+  * Update `nvidia_network_operator_version` and `nvidia_network_operator_mpi_operator_version` (with its checksum) in `roles/nvidia-network-operator/defaults/main.yml`
   * Update `mig_manager_url_deb` and `mig_manager_url_rpm` in `roles/nvidia-mig-manager/defaults/main.yml`
   * Update `nginx_docker_cache_image` in `roles/nginx-docker-registry-cache/defaults/main.yml`
 

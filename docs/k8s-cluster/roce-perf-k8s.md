@@ -226,7 +226,7 @@ add switch PFC, ECN configuration
    Deploy NVIDIA Network Operator as the [NVIDIA Network Operator Deployment Guide in DeepOps](nvidia-network-operator.md)
    describes. It installs and manages the components this test used: Multus CNI for several
    NICs in a pod, the SR-IOV device plugin and CNI, IP address management for the SR-IOV
-   interfaces, and the MPI Operator. Set its interface list (`intf_resources`) and the number
+   interfaces, and the MPI Operator. Set its interface list (`nvidia_network_operator_interfaces`) and the number
    of virtual functions per physical function (`nvidia_network_operator_num_vf`) for your
    hardware. (This test originally used the `roce_backend` role, since retired.)
 

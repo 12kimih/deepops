@@ -1,0 +1,12 @@
+---
+# Every component image of a release carries the release tag.
+nvidia_network_operator_image_tag: "network-operator-v{{ nvidia_network_operator_version }}"
+nvidia_network_operator_mpi_operator_url: >-
+  https://github.com/kubeflow/mpi-operator/releases/download/{{ nvidia_network_operator_mpi_operator_version }}/mpi-operator.yaml
+nvidia_network_operator_mpi_operator_manifest: "/var/cache/deepops/mpi-operator-{{ nvidia_network_operator_mpi_operator_version }}.yaml"
+# The kinds of resource the role creates per interface (present.yml), removed by absent.
+nvidia_network_operator_owned_kinds:
+  - {api: sriovnetwork.openshift.io/v1, kind: SriovIBNetwork}
+  - {api: sriovnetwork.openshift.io/v1, kind: SriovNetwork}
+  - {api: sriovnetwork.openshift.io/v1, kind: SriovNetworkNodePolicy}
+  - {api: nv-ipam.nvidia.com/v1alpha1, kind: IPPool}

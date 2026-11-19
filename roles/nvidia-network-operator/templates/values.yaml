@@ -1,9 +1,0 @@
----
-#
-# Default setting for DGX systems with IB networking
-#
-
-nfd:
-  enabled: true
-sriovNetworkOperator:
-  enabled: true

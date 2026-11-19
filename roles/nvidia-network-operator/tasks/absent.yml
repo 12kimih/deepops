@@ -1,0 +1,58 @@
+---
+# What present created, in reverse, then the release. A resource whose CRD is already gone
+# is gone too.
+- name: Remove the MPI Operator
+  when: nvidia_network_operator_mpi_operator | bool
+  run_once: true
+  block:
+    - name: Fetch the MPI Operator release manifest
+      ansible.builtin.include_role:
+        name: download
+      vars:
+        download_url: "{{ nvidia_network_operator_mpi_operator_url }}"
+        download_checksum: "{{ nvidia_network_operator_mpi_operator_checksums[nvidia_network_operator_mpi_operator_version] | default('') }}"
+        download_dest: "{{ nvidia_network_operator_mpi_operator_manifest }}"
+
+    - name: Delete what the MPI Operator manifest created
+      kubernetes.core.k8s:
+        state: absent
+        src: "{{ nvidia_network_operator_mpi_operator_manifest }}"
+      when: not ansible_check_mode
+
+- name: Delete the SR-IOV networks, node policies and IP pools
+  kubernetes.core.k8s:
+    state: absent
+    api_version: "{{ item.0.api }}"
+    kind: "{{ item.0.kind }}"
+    name: "{{ (item.1.ip_pool_name | default(item.1.res_name)) if item.0.kind == 'IPPool' else item.1.if_name }}"
+    namespace: "{{ nvidia_network_operator_namespace }}"
+  loop: "{{ nvidia_network_operator_owned_kinds | product(nvidia_network_operator_interfaces) | list }}"
+  loop_control:
+    label: "{{ item.0.kind }} {{ item.1.if_name }}"
+  register: nvidia_network_operator_removed
+  failed_when:
+    - nvidia_network_operator_removed is failed
+    - "'Failed to find exact match' not in (nvidia_network_operator_removed.msg | default(''))"
+  run_once: true
+
+- name: Delete the NicClusterPolicy
+  kubernetes.core.k8s:
+    state: absent
+    api_version: mellanox.com/v1alpha1
+    kind: NicClusterPolicy
+    name: nic-cluster-policy
+  register: nvidia_network_operator_ncp_removed
+  failed_when:
+    - nvidia_network_operator_ncp_removed is failed
+    - "'Failed to find exact match' not in (nvidia_network_operator_ncp_removed.msg | default(''))"
+  run_once: true
+
+- name: Remove the Network Operator release
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: network-operator
+      namespace: "{{ nvidia_network_operator_namespace }}"
+      state: absent
+  run_once: true
