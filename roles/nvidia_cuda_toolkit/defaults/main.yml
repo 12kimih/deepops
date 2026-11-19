@@ -13,10 +13,9 @@
 # or in config/ if your software tree lives on a different host.
 nvidia_cuda_toolkit_install: false
 
-# Install + module layout. Reuses the lmod role's sm_* vars so CUDA lands in the
-# same tree Lmod already searches (sm_module_path is placed on MODULEPATH by the
-# lmod role's 00-modulepath profile script), which is why no extra registration is
-# needed on a stock DeepOps slurm cluster.
+# Install + module layout: the shared tree (sm_* in roles/deepops_paths), whose module
+# directory the lmod role registers with Lmod (lmod_module_paths), so CUDA needs no
+# registration of its own.
 cuda_prefix: "{{ sm_prefix }}"
 cuda_install_root: "{{ cuda_prefix }}/cuda"                        # toolkit -> <root>/<version>
 cuda_modroot: "{{ sm_module_path }}"  # module  -> <modroot>/cuda/<version>.lua

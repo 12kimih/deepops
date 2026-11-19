@@ -1,10 +1,8 @@
 ---
-# The shared module tree (sm_module_path) is registered with Lmod ONCE, by the lmod role
-# (LMOD_SITE_MODULEPATH). CUDA modulefiles land in cuda_modroot, which defaults to
-# sm_module_path, so this role no longer ships its own profile.d snippet -- it just drops
-# modulefiles into the already-registered tree. If you override cuda_modroot to a path that
-# is NOT under a registered MODULEPATH, register that tree yourself. The download+install
-# path runs only where the playbook sets nvidia_cuda_toolkit_install.
+# CUDA modulefiles land in cuda_modroot (default sm_module_path), a tree the lmod role
+# registers with Lmod (lmod_module_paths). A cuda_modroot outside those trees needs to be
+# added there. The download+install path runs only where the playbook sets
+# nvidia_cuda_toolkit_install.
 
 - name: Install CUDA toolkits from the official runfiles
   ansible.builtin.import_tasks: install.yml
