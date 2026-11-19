@@ -4,6 +4,8 @@
     name: rsyslog
     state: present
 
+# Checked before it is installed (a broken file would stop all logging at the next
+# restart), and rsyslog restarts for it: that is what reads it.
 - name: Configure syslog listener
   ansible.builtin.template:
     src: "01-deepops-listen.conf"
@@ -11,6 +13,9 @@
     owner: "root"
     group: "root"
     mode: "0644"
+    validate: rsyslogd -N1 -f %s
+  notify:
+    - Reload rsyslog
 
 - name: Create directory for clients logs in ubuntu
   ansible.builtin.file:
@@ -20,8 +25,6 @@
     group: "syslog"
     mode: "0755"
   when: ansible_facts['distribution'] == "Ubuntu"
-  notify:
-    - Reload rsyslog
 
 - name: Create directory for clients logs in rhel
   ansible.builtin.file:
@@ -31,5 +34,13 @@
     group: "root"
     mode: "0755"
   when: ansible_facts.os_family == "RedHat"
-  notify:
-    - Reload rsyslog
+
+- name: Expire old client logs
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/deepops-rsyslog-server.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by roles/rsyslog_server: client logs older than rsyslog_log_retention_days go.
+      e {{ rsyslog_log_file_path }} - - - {{ rsyslog_log_retention_days | int }}d

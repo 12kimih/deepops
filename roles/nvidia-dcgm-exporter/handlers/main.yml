@@ -1,5 +1,7 @@
 ---
+# Only while it is meant to run: a restart would start an exporter set to stopped.
 - name: Restart dcgm
   ansible.builtin.service:
     name: "{{ nvidia_dcgm_svc_name }}"
     state: restarted
+  when: nvidia_dcgm_state == 'started'
