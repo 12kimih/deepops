@@ -26,7 +26,7 @@ import sys
 def run(cmd, timeout=120, env=None):
     """Run a command, returning (rc, stdout, stderr) without raising."""
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+        proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout, env=env)
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout after %ss" % timeout
