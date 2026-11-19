@@ -58,11 +58,13 @@
         label: "{{ item.command }}"
 
     # The textfile directory is usually tmpfs: the publish instance copies the kept
-    # metrics back at boot so the series never go absent until the next backup.
-    - name: Republish the kept metrics at boot
+    # metrics back at boot so the series never go absent until the next backup. Run
+    # now too, so each configured destination is known before its first backup.
+    - name: Republish the kept metrics at boot, and now
       ansible.builtin.systemd:
         name: slurm-backup@publish.service
         enabled: true
+        state: started
         daemon_reload: true
       when: not ansible_check_mode
 
