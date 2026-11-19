@@ -28,6 +28,8 @@ os_updates_held_back:
   - "slurm*"
   - "*munge*"
   - "nfs-*"
+  - "rpcbind"
+  - "mariadb-*"   # slurmdbd's database restarts on its own upgrade
   - "docker-ce*"
   - "containerd*"
   - "enroot*"

@@ -43,8 +43,22 @@ maintenance_detach_nfs: true
 # A GPU server can spend several minutes in POST and memory training.
 maintenance_reboot_timeout: 1800
 
-# verify: the units that must be active, and whether to require GPUs and NHC.
-maintenance_verify_units: "{{ ['slurmd'] if inventory_hostname in groups['slurm-node'] | default([]) else [] }}"
+# Hosts the rest of the cluster depends on: the Slurm controller and the NFS servers.
+# Their package upgrades restart no service (policy-rc.d; the new code runs from their
+# next reboot), and they are rebooted only while no job runs: a restart of nfs-server
+# under running jobs hung the cluster on 2026-11-18, and needrestart does not cover the
+# restarts packages make themselves.
+maintenance_shared_host: >-
+  {{ inventory_hostname in (groups[slurm_controller_group] | default([])) + (groups['slurm-nfs'] | default([])) }}
+# Reboot a shared host although jobs run (they lose the scheduler and /home).
+maintenance_reboot_busy_cluster: false
+
+# verify: the units that must be active (what the deploy runs on each kind of host),
+# and whether to require GPUs and NHC.
+maintenance_verify_units: >-
+  {{ (['slurmd'] if inventory_hostname in groups[slurm_compute_group] | default([]) else [])
+     + (['mariadb', 'munge', 'slurmdbd', 'slurmctld'] if inventory_hostname in groups[slurm_controller_group] | default([]) else [])
+     + (['nfs-server'] if inventory_hostname in groups['slurm-nfs'] | default([]) else []) }}
 maintenance_verify_gpus: "{{ inventory_hostname in groups['slurm-node'] | default([]) }}"
 # The DCGM diagnostic run level (dcgmi diag -r): 0 off, 1 quick (seconds), 2 medium
 # (about two minutes), 3 long stress (about half an hour), 4 extended. It loads every
