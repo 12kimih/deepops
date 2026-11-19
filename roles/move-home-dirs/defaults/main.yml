@@ -1,2 +1,4 @@
 ---
+# Move the home directories to move_home_dirs_new_root (playbooks/generic/authentication.yml).
+move_home_dirs_enable: false
 move_home_dirs_new_root: /local

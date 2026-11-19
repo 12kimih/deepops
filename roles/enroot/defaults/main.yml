@@ -100,6 +100,14 @@ enroot_config: |
   ENROOT_DATA_PATH {{ enroot_data_path }}
 # Lists of { filename: '', content: '' }. System-wide extension dirs run with
 # full capabilities pre-switch_root, so they are kept root-write-only.
-enroot_environ_config_files: []  # filenames end with .env
+# On a DGX, enroot_environ_config_files_dgx; filenames end with .env.
+enroot_environ_config_files: "{{ enroot_environ_config_files_dgx if ansible_facts.product_name | default('') is search('DGX') else [] }}"
+enroot_environ_config_files_dgx:
+  - filename: 50-mellanox.env
+    content: |
+      MELLANOX_VISIBLE_DEVICES=all
+  - filename: 50-mpi.env
+    content: |
+      OMPI_MCA_btl_tcp_if_exclude=lo,docker0,ib0,ib1,ib2,ib3
 enroot_hook_config_files: []     # filenames end with .sh
 enroot_mount_config_files: []    # filenames end with .fstab

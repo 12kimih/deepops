@@ -19,9 +19,10 @@
 # inside the exportable range, published cluster-wide (see nis_export_groups in the
 # nis_server role), and to chown the socket to THAT group on every node.
 #
-# Set both to enable; keep them identical to the values the group is published with.
-# docker_socket_group: dockerusers
-# docker_socket_group_gid: 4000
+# Set both to enable (e.g. dockerusers and 4000); keep them identical to the values the
+# group is published with. Empty: the role is a no-op.
+docker_socket_group: ""
+docker_socket_group_gid: ""
 
 # Also publish the group in the local files with the same pinned GID. dockerd resolves
 # the group name when it creates the socket, which on boot is routinely before the

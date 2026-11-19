@@ -2,8 +2,8 @@
 - name: Assert that the required variables are defined
   ansible.builtin.assert:
     that:
-      - nis_domain is defined
-      - nis_server is defined
+      - nis_domain | length > 0
+      - nis_server | length > 0
     fail_msg: "Set nis_domain and nis_server in config/group_vars."
     quiet: true
 

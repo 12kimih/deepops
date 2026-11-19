@@ -182,9 +182,6 @@ NOT_OURS = {
     # Kubespray's kubernetes/client role; playbooks/k8s-cluster.yml fetches kubectl and
     # admin.conf from where that role puts them.
     "artifacts_dir",
-    # kubespray_defaults derives it from http_proxy and friends; our plays read it as an
-    # optional setting ({} when unset), as every play's `environment`.
-    "proxy_env",
 }
 
 
@@ -289,7 +286,7 @@ def entries(text):
         if active:
             value = data.get(name, MISSING)
         else:
-            block = load("\n".join(raw[1:] for raw in lines[i : end + 1]))
+            block = load("".join(raw[1:] + "\n" for raw in lines[i : end + 1]))
             value = block.get(name, MISSING) if isinstance(block, dict) else MISSING
         pinned = i > 0 and lines[i - 1].startswith("# site:")
         example = not active and EXAMPLE_MARK.search(line) is not None

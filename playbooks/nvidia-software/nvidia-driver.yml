@@ -25,4 +25,4 @@
       when: >-
         (ansible_facts.ansible_local['gpus']['count'] | int > 0 and not is_dgx.stat.exists)
         or (nvidia_driver_force_install | bool)
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

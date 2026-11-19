@@ -31,4 +31,4 @@
           or
           (ansible_facts.os_family == "RedHat" and ansible_facts.distribution_major_version is version('8', '>='))
         - docker_install | bool
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

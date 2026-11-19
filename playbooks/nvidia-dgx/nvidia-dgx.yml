@@ -1,8 +1,10 @@
 ---
 - hosts: all
   become: true
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Include NVIDIA DGX role
       ansible.builtin.include_role:
         name: nvidia-dgx
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

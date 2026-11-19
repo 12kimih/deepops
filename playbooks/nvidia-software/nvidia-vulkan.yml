@@ -5,6 +5,8 @@
   tags:
     - nvidia
     - vulkan
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Install Vulkan packages (Ubuntu)
       ansible.builtin.apt:
@@ -17,4 +19,4 @@
         update_cache: true
         cache_valid_time: 3600
       when: ansible_facts.distribution == "Ubuntu"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

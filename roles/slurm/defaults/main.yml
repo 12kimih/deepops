@@ -138,13 +138,15 @@ slurm_oversubscribe: "{{ (slurm_manage_gpus == true) | ternary('NO', 'EXCLUSIVE'
 
 # Maximum run time limit for jobs. Format is minutes, minutes:seconds, hours:minutes:seconds, days-hours, days-hours:minutes, days-hours:minutes:seconds or "UNLIMITED". Time resolution is one minute and second values are rounded up to the next minute. This limit does not apply to jobs executed by SlurmUser or user root.
 # Sets: MaxTime={{ slurm_max_job_timelimit }}
-# Default: INFINITE
-# slurm_max_job_timelimit: INFINITE
+slurm_max_job_timelimit: INFINITE
 
 # Run time limit used for jobs that don't specify a value. If not set then MaxTime will be used. Format is the same as for MaxTime.
-# Sets: DefaultTime={{ slurm_default_job_timelimit }}
-# Default: <not included>
-# slurm_default_job_timelimit:
+# Sets: DefaultTime={{ slurm_default_job_timelimit }} (empty: left out)
+slurm_default_job_timelimit: ""
+
+# The node health check slurmd runs (e.g. /usr/sbin/nhc, playbooks/slurm-cluster/nhc.yml);
+# empty: none.
+slurm_health_check_program: ""
 
 # Set up prolog and epilog
 slurm_enable_prolog_epilog: true

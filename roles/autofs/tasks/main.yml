@@ -2,8 +2,8 @@
 - name: Assert that the required variables are defined
   ansible.builtin.assert:
     that:
-      - autofs_mount is defined
-      - autofs_map is defined
+      - autofs_mount | length > 0
+      - autofs_map | length > 0
     fail_msg: "Set autofs_mount and autofs_map in config/group_vars."
     quiet: true
 
@@ -29,7 +29,6 @@
     owner: "root"
     group: "root"
     mode: "0755"
-  when: autofs_mount is defined
 
 - name: Make sure autofs is running
   ansible.builtin.service:

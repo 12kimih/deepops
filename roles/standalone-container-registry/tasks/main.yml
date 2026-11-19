@@ -60,6 +60,6 @@
     # (a new image already recreates the container). restart_policy keeps it across boots.
     restart: "{{ standalone_container_registry_config is changed }}"
     restart_policy: unless-stopped
-    env: "{{ proxy_env if proxy_env is defined else {} }}"
+    env: "{{ proxy_env }}"
     volumes:
       - "{{ standalone_container_registry_config_dir }}/config.yml:/etc/docker/registry/config.yml"

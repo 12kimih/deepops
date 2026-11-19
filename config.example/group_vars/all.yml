@@ -175,7 +175,7 @@
 
 # Playbook: nvidia-set-gpu-clocks
 # Resets the Gpu clocks to the default values. (see the `--reset-gpu-clocks` flag in nvidia-smi for more)
-gpu_clock_reset: false
+#gpu_clock_reset: false
 # Specifies <minGpuClock,maxGpuClock> clocks as a pair (e.g. 1500,1500) that defines the range of desired locked GPU clock speed in MHz. Setting this will supersede application clocks and take effect regardless if an app is running. Input can also be a singular desired clock value. (see the `--lock-gpu-clocks` flag in nvidia-smi for more)
 gpu_clock_lock: "1507,1507"
 
@@ -335,14 +335,14 @@ docker_iptables_enabled: true
 # See docs/slurm-cluster/slurm-nfs.md.
 #enroot_data_path: '/mnt/nvme/enroot-data/user-$(id -u)'  # example
 #enroot_cache_path: '/mnt/nvme/enroot-cache/user-$(id -u)'  # example
-#enroot_environ_config_files: []
-enroot_environ_config_files_dgx:
-  - filename: 50-mellanox.env
-    content: |
-      MELLANOX_VISIBLE_DEVICES=all
-  - filename: 50-mpi.env
-    content: |
-      OMPI_MCA_btl_tcp_if_exclude=lo,docker0,ib0,ib1,ib2,ib3
+#enroot_environ_config_files: '{{ enroot_environ_config_files_dgx if ansible_facts.product_name | default('''') is search(''DGX'') else [] }}'
+#enroot_environ_config_files_dgx:
+#  - filename: 50-mellanox.env
+#    content: |
+#      MELLANOX_VISIBLE_DEVICES=all
+#  - filename: 50-mpi.env
+#    content: |
+#      OMPI_MCA_btl_tcp_if_exclude=lo,docker0,ib0,ib1,ib2,ib3
 
 ################################################################################
 # AUTH                                                                         #
@@ -402,12 +402,12 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 #deepops_disable_cloud_init: true
 
 # Default profile when using NVIDIA MIG Manager: https://github.com/NVIDIA/mig-parted
-mig_manager_profile: all-disabled
-mig_manager_config: /etc/nvidia-mig-manager/config.yml
+#mig_manager_profile: all-disabled
+#mig_manager_config: /etc/nvidia-mig-manager/config.yml
 # Optional, site-managed hooks file passed to `nvidia-mig-parted apply -k`.
 # DeepOps does not create this file. Leave empty to apply without custom hooks;
 # set a path only after provisioning and reviewing the hooks on every target.
-mig_manager_hooks: ""
+#mig_manager_hooks: ""
 
 ################################################################################
 # Node networking                                                              #
@@ -460,9 +460,9 @@ standalone_container_registry_cache_enable: true
 ################################################################################
 # Configuration for NGC-Ready playbook                                         #
 ################################################################################
-ngc_ready_cuda_container: "nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04"
-ngc_ready_pytorch: "nvcr.io/nvidia/pytorch:26.05-py3"
-ngc_ready_tensorflow: "nvcr.io/nvidia/tensorflow:25.02-tf2-py3"
+#ngc_ready_cuda_container: "nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04"
+#ngc_ready_pytorch: "nvcr.io/nvidia/pytorch:26.05-py3"
+#ngc_ready_tensorflow: "nvcr.io/nvidia/tensorflow:25.02-tf2-py3"
 
 ################################################################################
 # Kubespray runtime defaults                                                   #

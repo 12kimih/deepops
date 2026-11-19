@@ -51,5 +51,22 @@ k8s_deploy_nfs_server: true
 k8s_nfs_mkdir: true
 k8s_nfs_export_path: /export/deepops_nfs
 # Component playbooks run on their own
+# NVIDIA MIG Manager (playbooks/nvidia-software/nvidia-mig.yml,
+# https://github.com/NVIDIA/mig-parted): the profile, its config file, and an
+# optional, site-managed hooks file passed to `nvidia-mig-parted apply -k` (DeepOps
+# does not create it; set a path only after reviewing the hooks on every target)
+mig_manager_profile: all-disabled
+mig_manager_config: /etc/nvidia-mig-manager/config.yml
+mig_manager_hooks: ""
+# The containers playbooks/ngc-ready-server.yml tests
+ngc_ready_cuda_container: nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
+ngc_ready_pytorch: nvcr.io/nvidia/pytorch:26.05-py3
+ngc_ready_tensorflow: nvcr.io/nvidia/tensorflow:25.02-tf2-py3
+# GPU clocks playbooks/utilities/nvidia-set-gpu-clocks.yml locks ("MIN,MAX" MHz), or
+# resets with gpu_clock_reset: true
+gpu_clock_lock: ""
+gpu_clock_reset: false
+# Packages playbooks/generic/software.yml adds on every host
+software_extra_packages: []
 # /etc/rc.local's managed block (playbooks/generic/rc-local.yml); empty leaves none
 rc_local_contents: ""

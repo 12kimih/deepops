@@ -32,4 +32,4 @@
       ansible.builtin.include_role:
         name: nvidia_power_limit
       when: ansible_facts.ansible_local['gpus']['count'] | int > 0
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

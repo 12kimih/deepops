@@ -2,7 +2,7 @@
 # nis_server -- set up an NIS (YP) MASTER server (ypserv) so clients configured by
 # the nis_client role can bind to it. Opt-in: the authentication.yml playbook runs
 # this role only on the host where `nis_make_server` is true, and only when
-# `nis_domain` is defined.
+# `nis_domain` is set.
 #
 # NOTE: NIS-server setup is environment-sensitive (domain resolution, the ypinit
 # database build). Validate on your cluster after first run:
@@ -10,10 +10,8 @@
 #   ypcat passwd          # should print NIS passwd entries
 # Refs: https://wiki.debian.org/BullseyeNis , man ypinit(8), man ypserv(8)
 
-# Required (shared with nis_client): the NIS domain this server is master for.
-# nis_domain: example.nis
-
-# nis_make_server (is this host the NIS master?) comes from roles/nis_defaults.
+# nis_domain (the domain this server is master for) and nis_make_server (is this host
+# the NIS master?) come from roles/nis_defaults.
 
 # /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client
 # networks may query this server, as "NETMASK NETWORK" lines. The default allows

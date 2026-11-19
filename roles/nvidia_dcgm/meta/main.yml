@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: nvidia_versions  # nvidia_driver_cuda_major
+  - role: proxy_defaults  # proxy_env
 
 galaxy_info:
   namespace: deepops

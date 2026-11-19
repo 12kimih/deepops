@@ -6,5 +6,6 @@
   tags:
     - ai-agent-rules
   roles:
+    - role: proxy_defaults
     - ai_agent_rules
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

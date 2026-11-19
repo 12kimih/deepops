@@ -23,7 +23,7 @@
     group: "root"
     mode: "0400"
   register: nginx_docker_cache_ca_key
-  when: nginx_docker_cache_ca is defined
+  when: nginx_docker_cache_ca | length > 0
 
 - name: Add pre-defined CA certificate
   ansible.builtin.copy:
@@ -33,7 +33,7 @@
     group: "root"
     mode: "0444"
   register: nginx_docker_cache_ca_crt
-  when: nginx_docker_cache_ca is defined
+  when: nginx_docker_cache_ca | length > 0
 
 - name: Run caching proxy
   community.docker.docker_container:

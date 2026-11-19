@@ -1,2 +1,4 @@
 ---
+# The resolvers /etc/resolv.conf lists; the role refuses to run without one.
+dns_config_servers: []
 dns_config_search: []

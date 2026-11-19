@@ -11,7 +11,7 @@
         name: nvidia-gpu-operator
         public: true
       run_once: true
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
   tags:
     - nvidia
     - nvidia-gpu-operator

@@ -13,6 +13,8 @@
   tags:
     - nvidia
     - verify-acs
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Read the ACS Control register from every PCI device
       ansible.builtin.shell: |
@@ -104,4 +106,4 @@
           PCIe ACS is still enabled on one or more devices - NCCL GPU P2P will be
           degraded. See the per-device report above.
         success_msg: "PCIe ACS is disabled on every PCI device."
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

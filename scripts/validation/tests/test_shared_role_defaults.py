@@ -17,7 +17,9 @@ config.example shows but no role defines has no default at all, so a fallback th
 a second, unchecked one.
 """
 
+import os
 import re
+import subprocess
 import sys
 import unittest
 from collections import defaultdict
@@ -27,7 +29,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import Scan, defined_here, references, role_var_files, tracked  # noqa: E402
+from repo_scan import Scan, defined_here, load, references, role_var_files, tracked  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 import settings  # noqa: E402
@@ -47,6 +49,28 @@ STANDALONE = {"k8s_gpu_mig_strategy"}
 FALLBACK_OK = {("roles/runai/tasks/fractioning_preflight.yml", "gpu_operator_release_name")}
 FALLBACK = re.compile(r"([a-z_][a-z0-9_]*)\s*\|\s*(?:default|d)\(\s*([^)]*)\)")
 EMPTY = {"omit", "none", "None", "", "''", '""', "[]", "{}"}
+# A variable read with a fallback or a defined test (not an attribute: x.y is defined).
+GUARDED = re.compile(
+    r"(?<![\w.])([a-z_][a-z0-9_]*)\s*(?:\|\s*(?:default|d)\(|is\s+(?:not\s+)?(?:defined|undefined)\b)"
+)
+# Ansible's own names.
+IMPLICIT = {"item", "hostvars", "groups", "omit", "inventory_hostname", "group_names", "playbook_dir"}
+# Kubespray's variables our plays set for it (ansible_become, its own switches).
+KUBESPRAY_READS = set(
+    subprocess.run(
+        ["git", "grep", "-h", "-o", "-E", r"[a-z_][a-z0-9_]*", "--", "roles", "playbooks"],
+        cwd=ROOT / "submodules" / "kubespray", capture_output=True, text=True,
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    ).stdout.split()
+)  # fmt: skip
+# What no role can own, and why.
+# (hostlist, which imports also pass as vars, and the per-host values read through
+# another host's hostvars, which hold no role defaults, count as defined there.)
+UNOWNED = {
+    # Play parameters given with -e: read in `serial:` or a play's vars, before any role.
+    "maintenance_serial", "reboot_serial",
+    "model_cache_root", "model_cache_mount", "model_cache_owner", "model_cache_group",
+}  # fmt: skip
 DEFINED_TEST = re.compile(r"\b([a-z_][a-z0-9_]*)\s+is\s+(?:not\s+)?(?:defined|undefined)\b")
 # Roles that read another role's default without loading it, and why.
 ROLE_READS_OK = {
@@ -125,6 +149,59 @@ class SharedRoleDefaultTests(unittest.TestCase):
                     if var in owners and not scan.excuse((name, var)):
                         offenders.append(f"{name}:{number}: {var} is defined")
         self.assertEqual(offenders, [], "the variable has a default: read it, loading its role")
+        scan.check(self)
+
+    def test_a_guarded_setting_has_an_owner(self):
+        """A setting read through `| default(...)` or `is defined` is one a site may leave
+        out, so it needs a default (empty for unset) in the role that reads it: then
+        "unset" is spelled once, config.example can show it, and settings.py and
+        config_lint see it. Only what no role can own is exempt (UNOWNED)."""
+        owners, local = settings.owners(), set()
+        for path in ansible_sources():
+            if path.suffix in (".yml", ".yaml") and "/templates/" not in path.as_posix():
+                data = load(path)
+                local |= defined_here(data) | (
+                    set(data) if "/vars/" in str(path) and isinstance(data, dict) else set()
+                )
+        scan, offenders = Scan(UNOWNED, minimum=200), []
+        for path in map(scan.seen, ansible_sources()):
+            name = path.relative_to(ROOT).as_posix()
+            for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
+                if line.lstrip().startswith("#"):
+                    continue
+                for m in GUARDED.finditer(line):
+                    var = m.group(1)
+                    if line[: m.start()].rstrip().endswith("|"):
+                        continue  # a filter's name (x | first | default(...))
+                    if var in owners or var in local or var.startswith("ansible_") or var in IMPLICIT:
+                        continue
+                    if not scan.excuse(var):
+                        offenders.append(f"{name}:{number}: {var}")
+        self.assertEqual(offenders, [], "give it a default in the role that reads it (or deploy_defaults)")
+        scan.check(self)
+
+    def test_a_value_passed_is_read(self):
+        """A `vars:` entry of a play, an import, a task or a role that nothing reads is a
+        switch that does nothing (nvidia_docker_skip_docker_reload outlived its reader)."""
+        sources = [
+            p.read_text(errors="ignore") for p in tracked("roles", "playbooks", "plugins") if p.is_file()
+        ]
+        scan, unread = Scan(minimum=150), []
+        for path in map(scan.seen, [p for p in ansible_sources() if p.suffix in (".yml", ".yaml")]):
+            if (
+                "/templates/" in path.as_posix()
+                or "/defaults/" in path.as_posix()
+                or "/vars/" in path.as_posix()
+            ):
+                continue
+            for name in sorted(passed_vars(load(path))):
+                use = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
+                # Its own `name:` key in the vars block is one occurrence; a reader adds more.
+                if name.startswith("ansible_") or name in KUBESPRAY_READS:
+                    continue  # Ansible's own connection settings, or Kubespray's
+                if sum(len(use.findall(text)) for text in sources) <= 1:
+                    unread.append(f"{path.relative_to(ROOT)}: {name}")
+        self.assertEqual(unread, [], "nothing reads it: drop it, or restore its reader")
         scan.check(self)
 
     def test_a_setting_without_an_owner_has_no_fallback(self):
@@ -246,6 +323,20 @@ def named_roles(node, keys):
     elif isinstance(node, list):
         for item in node:
             found += named_roles(item, keys)
+    return found
+
+
+def passed_vars(node):
+    """Names a `vars:` block anywhere in NODE passes."""
+    found = set()
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "vars" and isinstance(v, dict):
+                found |= {n for n in v if isinstance(n, str)}
+            found |= passed_vars(v)
+    elif isinstance(node, list):
+        for item in node:
+            found |= passed_vars(item)
     return found
 
 

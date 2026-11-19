@@ -52,7 +52,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 # minute; give the check a 2 minute period (headroom for jitter) and 5 minutes of grace.
 #alertmanager_heartbeat_url: ""
 # Slack app bot token (xoxb-) for bot posts and DMs.
-#slack_bot_token: ""  # example
+#slack_bot_token: ""
 
 # Hourly GPU usage report and idle-GPU nudges (roles/slurm_usage_report); needs
 # slack_bot_token. notify: any of mention, dm ([] = list only). cancel_after_hours 0 = never.
@@ -203,10 +203,10 @@ nfs_mounts:
 #sm_module_root: "{{ sm_prefix }}/modules"
 #sm_software_path: "{{ sm_prefix }}/software"
 #sm_files_path: "{{ sm_prefix }}/easybuild_files"
-sm_sources_path: "{{ sm_prefix }}/sources"
-sm_build_path: "{{ sm_prefix }}/build"
-sm_files_url: "https://github.com/DeepOps/easybuild_files.git"
-sm_install_default: true
+#sm_sources_path: "{{ sm_prefix }}/sources"
+#sm_build_path: "{{ sm_prefix }}/build"
+#sm_files_url: "https://github.com/DeepOps/easybuild_files.git"
+#sm_install_default: true
 #sm_module_path: "{{ sm_module_root }}/all"
 
 # Spack-specific

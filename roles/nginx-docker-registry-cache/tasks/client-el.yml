@@ -20,7 +20,7 @@
     - Restart docker
 
 - name: Install pre-defined CA certificate
-  when: nginx_docker_cache_ca is defined
+  when: nginx_docker_cache_ca | length > 0
   block:
     - name: Copy CA certificate in place
       ansible.builtin.copy:
@@ -35,7 +35,7 @@
       when: copy_ca_cert.changed
 
 - name: Install CA certificate from live proxy
-  when: nginx_docker_cache_ca is not defined
+  when: nginx_docker_cache_ca | length == 0
   block:
     - name: Install the proxy's CA certificate read from the cache host
       ansible.builtin.copy:

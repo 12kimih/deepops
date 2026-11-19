@@ -37,3 +37,5 @@ resize_run_partition: false
 
 # /run tmpfs size. ubuntu default is 10% of physical memory
 pyxis_run_tmpfs_size: 50%
+# Rebuild pyxis even when the installed build matches.
+slurm_pyxis_force_rebuild: false
