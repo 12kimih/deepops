@@ -1,14 +1,13 @@
 ---
-# What this component installs, for its record (roles/component_record): the service,
-# its dashboard, and the image build context (the built image goes with Docker's prune).
-slurm_exporter_dashboard_set: slurm
+# What this component installed, for its record (roles/component_record): the service,
+# its dashboard (now Grafana's own, reading slurmctld's metrics), and the image build
+# context (the built image goes with Docker's prune). Retired: absent removes them.
 slurm_exporter_items: >-
   {{ ['unit:' ~ slurm_exporter_svc_name, 'container:' ~ slurm_exporter_svc_name,
       'file:/etc/systemd/system/' ~ slurm_exporter_svc_name,
-      'dir:' ~ grafana_dashboards_dir ~ '/' ~ slurm_exporter_dashboard_set,
+      'file:' ~ grafana_dashboards_dir ~ '/slurm/slurm-scheduler.json',
+      'dir:' ~ grafana_dashboards_dir ~ '/slurm',
       'file:' ~ slurm_exporter_build_dir ~ '/Dockerfile']
-     + grafana_dashboard_sets[slurm_exporter_dashboard_set]
-       | map('regex_replace', '^', 'file:' ~ grafana_dashboards_dir ~ '/' ~ slurm_exporter_dashboard_set ~ '/') | list
      + (slurm_exporter_sources | default([]) | map('basename')
         | map('regex_replace', '^', 'file:' ~ slurm_exporter_build_dir ~ '/exporter/') | list)
      + ['dir:' ~ slurm_exporter_build_dir ~ '/exporter', 'dir:' ~ slurm_exporter_build_dir] }}

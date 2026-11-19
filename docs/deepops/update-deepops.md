@@ -452,7 +452,6 @@ From the provisioning node:
 ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/prometheus.yml
 ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/grafana.yml
 ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/alertmanager.yml
-ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/prometheus-slurm-exporter.yml
 ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
 ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 ```

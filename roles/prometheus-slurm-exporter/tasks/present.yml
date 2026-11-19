@@ -1,4 +1,7 @@
 ---
+- name: Collect the exporter source
+  ansible.builtin.include_tasks: sources.yml
+
 - name: Record what this component installs
   ansible.builtin.include_role:
     name: component_record
@@ -13,14 +16,6 @@
   ansible.builtin.file:
     path: "{{ prometheus_cfg_endpoint_dir }}/slurm-exporter.yml"
     state: absent
-
-- name: Install the Slurm dashboard
-  ansible.builtin.include_role:
-    name: grafana
-    tasks_from: dashboards
-    public: true
-  vars:
-    grafana_dashboard_set: "{{ slurm_exporter_dashboard_set }}"
 
 - name: Create image build dir
   ansible.builtin.file:
@@ -37,11 +32,6 @@
   when: slurm_exporter_build_image
 
 # Resolved here: inside the included managed_dir role, role_path names that role.
-
-- name: Collect the exporter source
-  ansible.builtin.set_fact:
-    slurm_exporter_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"
-  when: slurm_exporter_build_image
 
 # The source directory holds exactly the role's files: a Go file dropped from the role
 # would otherwise stay in the build context and still be compiled in.

@@ -488,11 +488,8 @@ docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*
 #prometheus_retention_time: 90d
 #prometheus_retention_size: 50GB
 
-# Slurm Prometheus exporter. By default the role builds the DeepOps-owned exporter
-# image locally (deepops/prometheus-slurm-exporter). To run an image from a registry
-# instead, turn the local build off and name the image.
-#slurm_exporter_build_image: false  # example
-#slurm_exporter_container: "<registry>/prometheus-slurm-exporter:latest"  # example
+# Slurm's metrics come from slurmctld itself (MetricsType=metrics/openmetrics, scraped by
+# Prometheus); the former Slurm exporter is retired and a deploy removes it.
 
 ################################################################################
 # Logging with rsyslog                                                         #

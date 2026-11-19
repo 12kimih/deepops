@@ -1,0 +1,7 @@
+---
+# The exporter's source files, which its items list: resolved here, in this role (inside
+# an included role, role_path names that role). Both paths need them, so absent also
+# removes the sources from a host deployed before component records.
+- name: Collect the exporter source
+  ansible.builtin.set_fact:
+    slurm_exporter_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"

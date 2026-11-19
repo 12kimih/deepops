@@ -16,16 +16,25 @@ DeepOps runs a `dcgm-exporter` container on every GPU node. This container expor
 
 ## Exporters
 
-Each exporter role writes its scrape targets to `/etc/prometheus/endpoints/` (file_sd), and
-Prometheus adds a `host` label (the target address without its port) so queries and alerts
-can join exporters:
+Prometheus renders its scrape targets from the component map
+(`roles/deploy_defaults/vars/main.yml`; `prometheus_exporters` in `roles/prometheus_paths`
+gives each exporter's port): an exporter is scraped exactly where it is present, so one
+turned off or moved stops being scraped. Prometheus adds a `host` label (the target
+address without its port) so queries and alerts can join exporters:
 
-| Exporter | Runs on | Scrape targets | Port |
-|---|---|---|---|
-| `node-exporter` | all hosts | `node_exporter_host_group` (default `slurm-cluster`) | 9100 |
-| `dcgm-exporter` | GPU nodes | `slurm-node` | 9400 |
-| `ipmi-exporter` | hosts with `/dev/ipmi0` | `ipmi_exporter_host_group` (default `slurm-cluster`) | 9290 |
-| `slurm-exporter` | `slurm-metric` | `slurm_exporter_host_group` (default `slurm-metric`) | 8080 |
+| Exporter | Runs on | Port |
+|---|---|---|
+| `node-exporter` | every Slurm host | 9100 |
+| `dcgm-exporter` | GPU nodes (`slurm-node`) | 9400 |
+| `ipmi-exporter` | every Slurm host; reads hosts with `/dev/ipmi0` | 9290 |
+| slurmctld (Slurm itself) | the controller | `slurm_slurmctld_port` (6817) |
+
+Slurm's metrics come from slurmctld itself (`MetricsType=metrics/openmetrics`): Prometheus
+scrapes its `/metrics/<set>` endpoints for each set in `prometheus_slurmctld_metrics`
+(jobs, nodes, partitions, scheduler). The metric names are Slurm's own; the tests check
+every name the Slurm dashboard reads against the pinned release's
+(`tests/cluster-tools/slurm-names.json`, from `scripts/deepops/slurm_names.py`). The Go
+exporter deepops used before is retired: a deploy removes it from every host.
 
 `ipmi-exporter` reads the BMC in-band and provides whole-system power draw
 (`ipmi_dcmi_power_consumption_watts`), PSU, fan and temperature sensors. The GPU dashboard
@@ -53,7 +62,7 @@ fixed UID, so links survive renames:
 |---|---|---|---|
 | GPU / Nodes | `gpu-nodes` | one GPU node: GPUs (DCGM), host resources, system power | `grafana` |
 | Slurm / GPU allocation | `slurm-gpu-allocation` | who holds which GPU, by user, account, type and node; GPUs busy with no job | `slurm_metrics` |
-| Slurm / Scheduler | `slurm-scheduler` | nodes, jobs and scheduler statistics | `prometheus-slurm-exporter` |
+| Slurm / Scheduler | `slurm-scheduler` | nodes, CPUs, GPUs, jobs and scheduler statistics (slurmctld's metrics) | `grafana` |
 | Node Exporter / Hosts | `node-exporter-hosts` | per-host detail (grafana.com 1860 "Node Exporter Full", revision 46) | `grafana` |
 
 The dashboards deepops builds are Python (`scripts/dashboards/`, shared building blocks in

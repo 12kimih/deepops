@@ -366,11 +366,7 @@ reference host; distribution repositories remain a separate prerequisite.
    variables with their internal registry paths. Every image must stay pinned by
    digest (`repo:tag@sha256:...`; the deploy refuses unpinned references), so mirror
    with a tool that keeps the manifest list intact (`skopeo copy --all`, or
-   `docker buildx imagetools create`) and keep the same `@sha256:` suffix. The Slurm exporter is a
-   special case: its default `slurm_exporter_build_image: true` builds from the
-   images its Dockerfile pins, and the runtime stage runs `apt-get`.
-   Build it while connected, archive it with the other images, and use the
-   prebuilt image offline:
+   `docker buildx imagetools create`) and keep the same `@sha256:` suffix:
 
    ```bash
    # Every image the roles pin (repo:tag@sha256), from the roles themselves.
@@ -380,16 +376,9 @@ reference host; distribution repositories remain a separate prerequisite.
      docker pull "${pin}" && docker tag "${pin}" "${pin%@*}"
    done < /tmp/images/pins.txt
    docker save -o /tmp/images/deepops-images.tar $(sed 's/@.*//' /tmp/images/pins.txt)
-   docker build -t deepops/prometheus-slurm-exporter:2.0.0 \
-     roles/prometheus-slurm-exporter/files/docker
-   docker save -o /tmp/images/prometheus-slurm-exporter-2.0.0.tar \
-     deepops/prometheus-slurm-exporter:2.0.0
    ```
 
-   This connected-side build obtains the two base images and runtime APT
-   packages. Do not leave the default local build enabled in the isolated
-   environment unless an approved internal build setup supplies both base
-   images and APT sources.
+   Slurm's metrics come from slurmctld itself, so no exporter image is built.
 
 5. Archive the initialized checkout separately from site secrets. **Keep
    `.git` in the archive**: `playbooks/k8s-cluster.yml` unconditionally runs
@@ -554,10 +543,6 @@ sha256sum -c SHA256SUMS
    docker tag nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04 \
      127.0.0.1:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
    docker push 127.0.0.1:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
-   docker load -i /tmp/images/prometheus-slurm-exporter-2.0.0.tar
-   docker tag deepops/prometheus-slurm-exporter:2.0.0 \
-     127.0.0.1:5000/deepops/prometheus-slurm-exporter:2.0.0
-   docker push 127.0.0.1:5000/deepops/prometheus-slurm-exporter:2.0.0
    docker load -i /tmp/images/deepops-images.tar
    # The local registry keeps each repository path, without the source registry's host.
    while read -r pin; do
@@ -664,8 +649,6 @@ profile is:
 ```yaml
 slurm_enable_container_registry: false
 standalone_container_registry_cache_enable: false
-slurm_exporter_build_image: false
-slurm_exporter_container: "registry-host:5000/deepops/prometheus-slurm-exporter:2.0.0@sha256:<digest>"
 # Each with the tag the role pins (docs/deepops/versions.md) and the mirror's digest.
 prometheus_container: "registry-host:5000/prom/prometheus:<tag>@sha256:<digest>"
 grafana_container: "registry-host:5000/grafana/grafana:<tag>@sha256:<digest>"

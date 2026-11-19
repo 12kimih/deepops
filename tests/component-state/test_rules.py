@@ -38,7 +38,9 @@ JINJA = {"not", "and", "or", "bool", "true", "false"}
 def switches(name):
     """The deploy switches a component's rules read."""
     return {
-        w for rule in REGISTRY[name]["rules"] for w in re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))
+        w
+        for rule in REGISTRY[name].get("rules") or []
+        for w in re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))
     } - JINJA
 
 
@@ -51,7 +53,7 @@ class Registry(unittest.TestCase):
         # A rule's switch is a deploy switch, or an expression of deploy switches.
         defaults = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text())
         for name in REGISTRY:
-            for rule in REGISTRY[name]["rules"]:
+            for rule in REGISTRY[name].get("rules") or []:
                 words = set(re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))) - JINJA
                 with self.subTest(component=name, switch=rule["switch"]):
                     self.assertTrue(words and words <= set(defaults), "a rule's switch names deploy switches")
@@ -125,6 +127,29 @@ class Roles(unittest.TestCase):
                     self.assertIn("name: component_record", text, f"{path}.yml records")
                     self.assertIn(f"component_record_name: {name}", text)
                 self.assertIn(f"{name}_items", yaml.safe_load((role / "vars/main.yml").read_text()))
+
+    def test_absent_knows_every_item_present_records(self):
+        # absent adopts by the same <name>_items as present. An item list reading a fact
+        # only present sets is shorter in absent: the Slurm exporter's sources stayed on
+        # every host deployed before component records.
+        def facts(role, path):
+            text = (role / f"tasks/{path}.yml").read_text()
+            for included in re.findall(r"include_tasks: (\S+\.yml)", text):
+                if (role / "tasks" / included).is_file():
+                    text += (role / "tasks" / included).read_text()
+            found = set()
+            for block in re.findall(r"set_fact:\n((?:\s{4,}.*\n)+)", text):
+                found |= set(re.findall(r"^\s{4}([a-z_][a-z0-9_]*):", block, re.M))
+            return found
+
+        for name in REGISTRY:
+            role = ROOT / "roles" / components.component_role(REGISTRY, name)
+            variables = yaml.safe_load((role / "vars/main.yml").read_text()) or {}
+            text = str(variables.get(f"{name}_items", ""))
+            text += "".join(str(v) for k, v in variables.items() if k in text)
+            read = set(re.findall(r"\b([a-z_][a-z0-9_]*)\b", text))
+            with self.subTest(component=name):
+                self.assertEqual(sorted((read & facts(role, "present")) - facts(role, "absent")), [])
 
 
 class Playbooks(unittest.TestCase):

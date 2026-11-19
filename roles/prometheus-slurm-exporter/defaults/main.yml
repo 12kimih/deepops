@@ -1,4 +1,7 @@
 ---
+# Retired (roles/deploy_defaults/vars/main.yml): slurmctld serves the Slurm metrics; a
+# deploy only removes this exporter. Deleted with its role once every site has converged.
+slurm_exporter_port: 8080
 # present or absent (docs/deepops/component-state.md); a deploy sets it from
 # deepops_components.
 slurm_exporter_state: present

@@ -147,11 +147,6 @@
   vars:
     deepops_phase: install
 
-- name: Install monitoring exporters | Install prometheus slurm exporter
-  import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
-  vars:
-    deepops_phase: install
-
 - name: Install monitoring exporters | Install nvidia dcgm exporter
   import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
   vars:
@@ -303,6 +298,7 @@
   vars:
     deepops_phase: remove
 
+# Retired: slurmctld serves the Slurm metrics; this removes the exporter everywhere.
 - name: Remove the Slurm exporter where it is no longer wanted
   import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
   vars:
