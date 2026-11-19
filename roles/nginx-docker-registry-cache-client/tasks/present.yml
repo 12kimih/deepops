@@ -1,0 +1,51 @@
+---
+- name: Require a cache to point at
+  ansible.builtin.assert:
+    that: nginx_docker_cache_host | length > 0
+    fail_msg: >-
+      No host runs the registry cache (nginx_docker_cache in deepops_components): put one
+      in [slurm-cache], or set nginx_docker_cache_host.
+    quiet: true
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nginx_docker_cache_client
+    component_record_action: begin
+    component_record_items: "{{ nginx_docker_cache_client_items }}"
+
+# The proxy generates its CA on first start. Read it from the cache host over the
+# Ansible connection (authenticated), not from the proxy over plain HTTP: whoever can
+# answer that HTTP request would otherwise choose a CA every client trusts system-wide.
+- name: Read the proxy's CA certificate from the cache host
+  ansible.builtin.slurp:
+    src: "{{ nginx_docker_cache_ca_path }}/ca.crt"
+  delegate_to: "{{ nginx_docker_cache_host }}"
+  run_once: true
+  register: nginx_docker_cache_live_ca
+  until: nginx_docker_cache_live_ca is succeeded
+  retries: 5
+  delay: 10
+  when: nginx_docker_cache_ca | length == 0
+
+- name: Set up Ubuntu client
+  ansible.builtin.include_tasks: client-ubuntu.yml
+  when: ansible_facts.distribution == 'Ubuntu'
+
+- name: Set up RHEL client
+  ansible.builtin.include_tasks: client-el.yml
+  when: ansible_facts.os_family == 'RedHat'
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nginx_docker_cache_client
+    component_record_action: present
+    component_record_items: "{{ nginx_docker_cache_client_items }}"
+
+# nginx_docker_cache_dockerd_clients turned off: the drop-in went with the record.
+- name: Restart Docker without the proxy
+  ansible.builtin.include_tasks: restart_docker.yml
+  when: nginx_docker_cache_docker_config_dest in component_record_removed.file
