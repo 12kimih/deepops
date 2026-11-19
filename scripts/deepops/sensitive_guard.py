@@ -45,6 +45,9 @@ ALLOW = "sensitive-guard: allow"
 DEFAULT_SITE_FILE = "config/sensitive-patterns"
 ZERO_SHA = re.compile(r"^0+$")
 SCISSORS = re.compile(r"^\S -{24} >8 -{24}$")  # git commit -v: the diff below is not the message
+# The line git's editor template opens with; when it is there git strips comment lines
+# (the template lists file names, untracked ones too), so they are not message.
+TEMPLATE = re.compile(r"^(\S) Please enter the commit message for your changes")
 PRINTABLE_RUN = re.compile(rb"[\x20-\x7e]{6,}")  # what `strings` would show of a binary
 # Names as they are, not quoted; renames as a deletion and an addition, so the new
 # name and the whole content are seen; and the raw records, which name every file,
@@ -209,12 +212,12 @@ def push_revs() -> list[list[str]] | None:
 
     pre-commit passes on only the first ref of a push (PRE_COMMIT_FROM_REF/TO_REF), none
     for a push that reaches a root commit, and keeps the hook's stdin. So under
-    pre-commit every local branch and tag is checked against what the remote already
-    has: a superset of the push, never less. Run as git's own hook, the refs come on
-    stdin."""
-    remote = os.environ.get("PRE_COMMIT_REMOTE_NAME")
-    if remote:
-        return [["--branches", "--tags", "--not", f"--remotes={remote}"]]
+    pre-commit every local branch and tag is checked against what any remote already
+    has (published history is out of this guard's reach either way, and a new remote
+    would otherwise rescan all of it): a superset of the push, never less. Run as
+    git's own hook, the refs come on stdin."""
+    if os.environ.get("PRE_COMMIT_REMOTE_NAME"):
+        return [["--branches", "--tags", "--not", "--remotes"]]
     lines = sys.stdin.read().splitlines()
     if not lines:
         return None
@@ -282,11 +285,14 @@ def main() -> int:
         # Every line above the scissors: a "#" line stays in the commit when the message
         # came from -m or -F, and which lines git strips depends on settings, so none is
         # assumed comment. Below the scissors is the diff `commit -v` shows, not message.
+        lines = Path(opts.args[0]).read_text(errors="replace").splitlines()
+        template = next((m.group(1) for m in map(TEMPLATE.match, lines) if m), None)
         kept = []
-        for line in Path(opts.args[0]).read_text(errors="replace").splitlines():
+        for line in lines:
             if SCISSORS.match(line):
                 break
-            kept.append(line)
+            if template is None or not line.startswith(template):
+                kept.append(line)
         scan.text("commit message", "\n".join(kept))
     elif opts.mode == "push":
         sets = push_revs()

@@ -136,6 +136,10 @@ class GuardTest(unittest.TestCase):
         # Below the scissors is the diff `commit -v` shows: a line it removes is no leak.
         msg.write_text("fix: generic\n# ------------------------ >8 ------------------------\n-port 48123\n")
         self.assertEqual(self.guard("message", str(msg))[0], 0)
+        # The editor template's comment lines (they list untracked names) are stripped by git.
+        msg.write_text("fix: generic\n# Please enter the commit message for your changes. Lines starting\n"
+                       "# Untracked files:\n#\tport-48123.txt\n")  # fmt: skip
+        self.assertEqual(self.guard("message", str(msg))[0], 0)
 
     def test_renamed_binary_and_plus_lines(self):
         self.commit("other", {"other.txt": "x\n"})
@@ -187,7 +191,10 @@ class GuardTest(unittest.TestCase):
         self.commit("leak", {"k.txt": "port 48123\n"})
         self.git("checkout", "-q", "main")
         self.assertEqual(self.guard("push", env=env)[0], 1)
+        # A new remote: what origin already has is not rescanned, the unpushed leak is.
         self.assertEqual(self.guard("push", env=dict(env, PRE_COMMIT_REMOTE_NAME="fresh"))[0], 1)
+        self.git("branch", "-D", "leak")
+        self.assertEqual(self.guard("push", env=dict(env, PRE_COMMIT_REMOTE_NAME="fresh"))[0], 0)
 
     def test_tree(self):
         self.assertEqual(self.guard("tree")[0], 0)
