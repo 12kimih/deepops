@@ -119,6 +119,13 @@ clients before the server.
   nothing. The site retires one by naming it in `deepops_component_removals`: it goes
   from every host no rule wants it on and stays where one does. Naming a component
   without `removal: explicit` stops the deploy.
+- Retiring a component is a code fact, not a site choice: its registry entry says
+  `retired: "<why, since when>"`, has no rules or needs, and nothing needs it. It is
+  absent on every host whatever `removal` says (a site-managed one stays unmanaged), so
+  its role's absent path runs everywhere, adopting what deployments before component
+  records left; a deploy imports its play in the removal phase only. Once every site
+  has converged, one commit deletes the entry, the role and the play, with
+  `retired_settings` entries for any of its settings a site may still set.
 
 ## What absent must undo besides packages
 

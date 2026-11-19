@@ -9,6 +9,7 @@
         removal: explicit                # optional: never removed by a switch or group
         role: prometheus-node-exporter   # optional: the role, where it is not the key
         managed: "{{ docker_install }}"  # optional: false leaves it to the site (kept)
+        retired: "why, since when"       # optional: absent everywhere (no rules, no needs)
 
 A component whose managed is false is the site's own (Docker on DGX OS, say): the map
 says unmanaged everywhere, whatever wants it, and every phase passes kept to its role.
@@ -26,6 +27,14 @@ server: removing them reboots nodes, locks users out or hangs every NFS client) 
 never removed because a rule stopped holding: it is kept (its role does nothing) unless
 the site names it in deepops_component_removals, which makes it absent on every host no
 rule wants it on (and present where one does).
+
+A retired component (retired: says why and since when) is a code fact, not a site
+choice: it is absent on every host, whatever removal says, so its role's absent path
+runs everywhere, adopting what deployments before component records left. Only a
+component the site manages (managed false) stays unmanaged. It has no rules or needs and
+nothing needs it; a deploy imports its play in the removal phase only. Once every site
+has converged, one commit deletes its entry, role and play (with retired_settings
+entries for any of its settings a site may still set).
 
 """
 
@@ -51,6 +60,14 @@ def check(registry, roles=None):
                 problems.append(f"{name}.needs: unknown component {need}")
         if (c or {}).get("removal", "implicit") not in ("implicit", "explicit"):
             problems.append(f"{name}.removal: implicit or explicit")
+        if "retired" in (c or {}):
+            if not isinstance(c["retired"], str) or not c["retired"].strip():
+                problems.append(f"{name}.retired: say why and since when")
+            if c.get("rules") or c.get("needs"):
+                problems.append(f"{name}.retired: a retired component has no rules or needs")
+        retired_needs = [n for n in (c or {}).get("needs") or [] if "retired" in (registry.get(n) or {})]
+        if retired_needs and "retired" not in (c or {}):
+            problems.append(f"{name}.needs: {', '.join(retired_needs)} is retired")
         if roles and not (Path(roles) / component_role(registry, name)).is_dir():
             problems.append(f"{name}.role: no role {component_role(registry, name)}")
     return problems
@@ -94,6 +111,8 @@ def components_desired(registry, groups, host, removals=()):
     def state(name):
         if not _on((registry[name] or {}).get("managed", True)):
             return "unmanaged"
+        if "retired" in (registry[name] or {}):
+            return "absent"
         if name in present:
             return "present"
         if (registry[name] or {}).get("removal") == "explicit" and name not in removals:
