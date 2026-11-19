@@ -110,6 +110,12 @@
   vars:
     deepops_phase: install
 
+# The container engine, where a component below needs it (deepops_components).
+- name: Install Docker where a component needs it
+  import_playbook: container/docker.yml
+  vars:
+    deepops_phase: install
+
 # Monitoring: present where the switch and group say; removed in the removal phase.
 - name: Install monitoring services | Install prometheus
   import_playbook: slurm-cluster/prometheus.yml
@@ -319,6 +325,12 @@
 
 - name: Remove the Prometheus where it is no longer wanted
   import_playbook: slurm-cluster/prometheus.yml
+  vars:
+    deepops_phase: remove
+
+# Only where the site named docker in deepops_component_removals.
+- name: Remove Docker where it is no longer wanted
+  import_playbook: container/docker.yml
   vars:
     deepops_phase: remove
 

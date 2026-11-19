@@ -4,6 +4,8 @@
 
 - name: Install docker
   import_playbook: container/docker.yml
+  vars:
+    deepops_phase: require  # this server runs containers whatever the cluster map says
 
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml

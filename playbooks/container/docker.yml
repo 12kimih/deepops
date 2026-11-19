@@ -18,9 +18,9 @@
       ansible.builtin.file:
         path: /etc/systemd/system/docker.service.d/docker-override.conf
         state: absent
-      when: docker_install
+      when: deepops_components.docker | component_phase(deepops_phase) == 'present'
   roles:
     - role: deploy_defaults
     - role: docker
-      when: docker_install
+      docker_state: "{{ deepops_components.docker | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

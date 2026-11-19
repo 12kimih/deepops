@@ -94,6 +94,11 @@ the deploy and read their state from the map:
       rsyslog_server_state: "{{ deepops_components.rsyslog_server }}"
 ```
 
+A component the site manages itself (`managed: false` in its entry, such as Docker with
+`docker_install: false` on DGX OS) is `unmanaged`: every phase passes `kept` to its role.
+A playbook that needs a component on its own hosts whatever the map says
+(`ngc-ready-server.yml` needs Docker) imports it with `deepops_phase: require`.
+
 ## Order
 
 Each component play passes its state through `component_phase(deepops_phase)`. Run alone

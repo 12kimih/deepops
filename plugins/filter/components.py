@@ -8,6 +8,10 @@
         needs: []                        # components a present one makes present
         removal: explicit                # optional: never removed by a switch or group
         role: prometheus-node-exporter   # optional: the role, where it is not the key
+        managed: "{{ docker_install }}"  # optional: false leaves it to the site (kept)
+
+A component whose managed is false is the site's own (Docker on DGX OS, say): the map
+says unmanaged everywhere, whatever wants it, and every phase passes kept to its role.
 
 The key is the component's variable prefix (<key>_state, <key>_items,
 deepops_components.<key>); role names its role directory where that differs.
@@ -88,6 +92,8 @@ def components_desired(registry, groups, host, removals=()):
                 todo.append(need)
 
     def state(name):
+        if not _on((registry[name] or {}).get("managed", True)):
+            return "unmanaged"
         if name in present:
             return "present"
         if (registry[name] or {}).get("removal") == "explicit" and name not in removals:
@@ -97,13 +103,16 @@ def components_desired(registry, groups, host, removals=()):
     return {name: state(name) for name in registry}
 
 
-PHASES = ("converge", "install", "remove")
+PHASES = ("converge", "install", "remove", "require")
 
 
 def component_phase(state, phase="converge"):
     """What a play does with a component in PHASE: converge applies the desired state,
     install only installs (an absent component waits for remove), remove only removes
-    (a deploy runs it last, in reverse dependency order). kept means do nothing."""
+    (a deploy runs it last, in reverse dependency order). require installs it whatever
+    the map says, for a playbook that needs it on its own hosts (ngc-ready-server.yml).
+    A component the site manages (unmanaged) is kept in every phase; kept means do
+    nothing."""
     if phase not in PHASES:
         from ansible.errors import AnsibleFilterError
 
@@ -112,6 +121,10 @@ def component_phase(state, phase="converge"):
         return "kept"
     if phase == "remove" and state != "absent":
         return "kept"
+    if state == "unmanaged":
+        return "kept"
+    if phase == "require":
+        return "present"
     return state
 
 

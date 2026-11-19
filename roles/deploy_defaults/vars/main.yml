@@ -12,34 +12,47 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_rsyslog_client }}", group: slurm-node}
       - {switch: "{{ kube_enable_rsyslog_client }}", group: k8s_cluster}
+  # The container engine: present where a component needs it, never removed by a switch
+  # (stopping it stops every container on the host, users' too), left alone where the
+  # site manages Docker itself (docker_install: false).
+  docker:
+    removal: explicit
+    managed: "{{ docker_install }}"
+    rules: []
   # Monitoring. An entry's key is its variable prefix (<key>_state); role names the
   # role where that differs. Prometheus scrapes each exporter where it is present.
   prometheus:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+    needs: [docker]
   alertmanager:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+    needs: [docker]
   grafana:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
-    needs: [prometheus]
+    needs: [docker, prometheus]
   node_exporter:
     role: prometheus-node-exporter
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-cluster}
+    needs: [docker]
   ipmi_exporter:
     role: prometheus-ipmi-exporter
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-cluster}
+    needs: [docker]
   slurm_exporter:
     role: prometheus-slurm-exporter
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+    needs: [docker]
   dcgm_exporter:
     role: nvidia-dcgm-exporter
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-node}
+    needs: [docker]
   # Text files node_exporter publishes; the report reads Prometheus.
   slurm_metrics:
     rules:

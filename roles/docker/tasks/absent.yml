@@ -1,0 +1,11 @@
+---
+# Only when the site names docker in deepops_component_removals: stopping the engine
+# stops every container on the host, users' included. The engine, its repository, its
+# settings and units go; images and volumes (/var/lib/docker) stay.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: docker
+    component_record_action: absent
+    component_record_items: "{{ _docker_all_items }}"
