@@ -72,7 +72,7 @@ groups:
         annotations:
           summary: "The hosts run {{ $value }} different kernels"
           description: >-
-            {{ range query "max by (host, release) (node_uname_info)" }}
+            {{ range query "max by (host, release) (node_uname_info)" | sortByLabel "host" }}
             {{- .Labels.host }}: {{ .Labels.release }}; {{ end }}
             A node left out of the last maintenance reboot runs the old one.
             `ansible-playbook -K playbooks/utilities/apt-upgrade.yml` reboots each into the installed kernel.
