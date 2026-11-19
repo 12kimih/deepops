@@ -224,7 +224,7 @@ reference host; distribution repositories remain a separate prerequisite.
 
 2. Mirror the Helm repositories/charts required by the selected Kubernetes
    profile. The default tree references the stable Helm repository, GPU
-   Operator `v26.7.2`, and, when enabled, NFS subdir external provisioner
+   Operator `v26.7.3`, and, when enabled, NFS subdir external provisioner
    `4.0.18`. Set `gpu_operator_helm_repo` and
    `k8s_nfs_client_helm_repo` to internal chart repositories.
 
@@ -234,7 +234,7 @@ reference host; distribution repositories remain a separate prerequisite.
    ```bash
    mkdir -p /tmp/charts
    helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
-   helm pull nvidia/gpu-operator --version v26.7.2 --destination /tmp/charts
+   helm pull nvidia/gpu-operator --version v26.7.3 --destination /tmp/charts
    helm repo add nfs-subdir-external-provisioner \
      https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
    helm pull nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
@@ -279,9 +279,9 @@ reference host; distribution repositories remain a separate prerequisite.
    NO_HTTP_SERVER=1 ./manage-offline-files.sh
 
    helm template nvidia-gpu-operator \
-     /tmp/charts/gpu-operator-v26.7.2.tgz \
+     /tmp/charts/gpu-operator-v26.7.3.tgz \
      --namespace gpu-operator \
-     --set driver.version=580.126.20 \
+     --set driver.version=580.196.07 \
      --set mig.strategy=mixed \
      --set driver.enabled=false \
      --set toolkit.enabled=true \

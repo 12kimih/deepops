@@ -31,7 +31,8 @@ def request(self, method, path, body=None, form=None):
     if (method, path) == ('POST', '/api/v1/clusters'):
         assert body['name'] == 'deepops'
         return {'uuid': 'offline-cluster'}
-    if (method, path) == ('GET', '/api/v1/clusters/offline-cluster/cluster-install-info?version=3.0.20'):
+    # Any chart version: the role asks for its own pin (runai_chart_version).
+    if method == 'GET' and path.startswith('/api/v1/clusters/offline-cluster/cluster-install-info?version='):
         return {'installationStr': '--set controlPlane.url=https://runai.lab.test --set cluster.uid=offline-cluster',
                 'bootstrapToken': 'offline-bootstrap'}
     raise AssertionError('unsupported HTTP request: %s %s' % (method, path))
