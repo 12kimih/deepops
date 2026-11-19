@@ -112,6 +112,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
 │   ├── lmod
+│   ├── local_accounts
 │   ├── locale
 │   ├── maas-controller
 │   ├── maintenance
@@ -173,7 +174,8 @@ reader writes `| default(...)` for a defined variable;
 │   ├── slurm_paths
 │   ├── slurm_usage_report
 │   ├── spack
-│   └── standalone-container-registry
+│   ├── standalone-container-registry
+│   └── system_accounts
 ```
 <!-- END GENERATED: role-tree -->
 

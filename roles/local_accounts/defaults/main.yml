@@ -1,0 +1,18 @@
+---
+# local_accounts -- local accounts with fixed IDs: the one way a role creates an
+# account (service accounts from roles/system_accounts, people from roles/people).
+#
+#   - ansible.builtin.include_role:
+#       name: local_accounts
+#     vars:
+#       local_accounts:
+#         slurm: "{{ system_accounts.slurm }}"
+#
+# name -> {uid (required), gid (default: uid), home, shell (default
+# local_accounts_shell), comment, system (default true), create_home (default true)}.
+# Each account gets its own group, named like it, with that GID. An existing account
+# or group with another number fails the run instead of being renumbered: usermod -u
+# and groupmod -g leave every file the account owns on shared storage with a stale
+# owner. Fix the declaration, or migrate the files and the ID by hand.
+local_accounts: {}
+local_accounts_shell: /usr/sbin/nologin

@@ -176,6 +176,22 @@
 #people: "{{ people_roster.people }}"  # example
 # Administrators: sudo on every node and SSH to compute nodes without a job.
 #cluster_admins: "{{ people | people_with_role('admin') }}"  # example
+# Service accounts (Slurm, its package builder, EasyBuild) with UIDs and GIDs fixed on
+# every host, none of them a person's (roles/system_accounts). Set the whole mapping
+# only when this site needs other numbers.
+#system_accounts:
+#  slurm:
+#    uid: 22078
+#    home: /local/slurm
+#    comment: Slurm
+#  slurmbuild:
+#    uid: 22079
+#    home: /var/lib/slurmbuild
+#    comment: Slurm package builder
+#  easybuild:
+#    uid: 22080
+#    home: /var/lib/easybuild
+#    comment: EasyBuild
 
 ################################################################################
 # NVIDIA                                                                       #
