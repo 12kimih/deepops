@@ -162,7 +162,7 @@ http://\<slurm-metric ip\>:9093 to view and silence alerts.
 monitoring host that posts a GPU usage report to Slack every hour
 (`slurm_usage_report_schedule`). The top-level message is a summary card (GPUs allocated,
 average utilisation, idle jobs, pending jobs, drained nodes, and a link to
-`slurm_usage_report_dashboard_url`); the thread lists idle jobs, drain/down nodes with
+`cluster_info.dashboard_url`); the thread lists idle jobs, drain/down nodes with
 reasons, pending jobs per user, and every running GPU job per user as a table with a
 utilisation bar and GPU memory.
 
@@ -173,7 +173,9 @@ it: `mention` in the report thread, `dm`, both, or `[]` for neither. Owners are 
 when a job first turns idle and then every `slurm_usage_report_notify_repeat_hours`, not on
 every report; the thread lists idle jobs either way.
 `slurm_usage_report_cancel_after_hours` cancels idle jobs after that long (0 = never) and
-says so in the report thread.
+says so in the report thread. A job is cancelled only after its owner was notified in an
+earlier report, so the setting must exceed `slurm_usage_report_idle_hours` and needs
+`slurm_usage_report_notify`; the deploy checks the config and stops on a mistake.
 
 The role needs a Slack app bot token (`slack_bot_token`, scopes `chat:write`, `im:write`,
 `users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack

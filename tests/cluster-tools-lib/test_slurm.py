@@ -3,6 +3,7 @@
 import json
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
@@ -251,6 +252,24 @@ class TresTests(unittest.TestCase):
     def test_cluster_name(self):
         self.assertEqual(slurm.cluster_name({"meta": {"slurm": {"cluster": "c1"}}}), "c1")
         self.assertEqual(slurm.cluster_name({}), "")
+
+
+class PrintableTests(unittest.TestCase):
+    def test_free_text_cannot_drive_the_terminal(self):
+        data = {"jobs": [{"name": "\x1b]0;owned\x07\x1b[2Jx", "comment": "a\tb\nc", "n": 3, "l": ["\x9b1m"]}]}
+        clean = slurm.printable(data)
+        self.assertEqual(clean["jobs"][0]["name"], "?]0;owned??[2Jx")
+        self.assertEqual(clean["jobs"][0]["comment"], "a b c")
+        self.assertEqual(clean["jobs"][0]["l"], ["?1m"])
+        self.assertEqual(clean["jobs"][0]["n"], 3)
+        self.assertEqual(slurm.printable("한글 ok"), "한글 ok")
+
+    def test_a_bad_timeout_is_named_and_ignored(self):
+        with mock.patch("sys.stderr"):
+            for raw in ("abc", "0", "-5"):
+                self.assertEqual(slurm._timeout(raw), slurm.DEFAULT_TIMEOUT)
+        self.assertEqual(slurm._timeout("45"), 45)
+        self.assertEqual(slurm._timeout(None), slurm.DEFAULT_TIMEOUT)
 
 
 if __name__ == "__main__":

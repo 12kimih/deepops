@@ -40,6 +40,13 @@ class ColourTests(unittest.TestCase):
         self.assertIsNone(render.flavour_name("solarized"))
 
 
+class DurationTests(unittest.TestCase):
+    def test_squeue_form_and_limit_form(self):
+        self.assertEqual([render.duration(x) for x in (59, 3599, 3600, 93784)],
+                         ["0:59", "59:59", "1:00:00", "1-02:03:04"])  # fmt: skip
+        self.assertEqual([render.duration(x, short=False) for x in (59, 86400)], ["00:00:59", "1-00:00:00"])
+
+
 class WidthTests(unittest.TestCase):
     def test_wide_and_combining(self):
         self.assertEqual(render.width("ab"), 2)

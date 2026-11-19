@@ -228,6 +228,19 @@ def trunc(text, cols, mark="~"):
     return out + mark
 
 
+def duration(seconds, short=True):
+    """A duration as Slurm writes one. SHORT is squeue's (M:SS, H:MM:SS, D-HH:MM:SS),
+    for elapsed times; otherwise always [D-]HH:MM:SS, as limits are written."""
+    days, rest = divmod(int(seconds), 86400)
+    h, rest = divmod(rest, 3600)
+    m, s = divmod(rest, 60)
+    if days:
+        return f"{days}-{h:02d}:{m:02d}:{s:02d}"
+    if not short:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
 def pad(text, cols, align="l"):
     gap = " " * max(0, cols - width(text))
     return gap + text if align == "r" else text + gap

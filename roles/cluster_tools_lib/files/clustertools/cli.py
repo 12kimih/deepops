@@ -9,6 +9,7 @@ command line always has the last word. Python 3.9 or newer, standard library onl
 
 import argparse
 import os
+import pwd
 import shlex
 import sys
 
@@ -272,6 +273,17 @@ def swatch(theme):
         + f" export CLUSTER_THEME={theme.flavour}",
     ]
     return "\n".join(out) + "\n"
+
+
+def me():
+    """Who runs the command: $USER, as the login set it, else the account of the uid;
+    the uid itself when even that cannot be looked up (the directory service is down)."""
+    if os.environ.get("USER"):
+        return os.environ["USER"]
+    try:
+        return pwd.getpwuid(os.getuid()).pw_name
+    except KeyError:
+        return str(os.getuid())
 
 
 def run_main(name, body):
