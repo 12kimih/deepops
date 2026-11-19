@@ -130,12 +130,14 @@ To keep a value even if its default changes, say why in a `# site:` comment righ
 Because defaults now reach your cluster with an upgrade, preview a deploy:
 
 ```bash
-uv run python scripts/deepops/settings.py diff --from <revision last deployed>   # what changes on each host
-uv run python scripts/deepops/settings.py show <host>                            # every setting, and where it comes from
+uv run python scripts/deepops/settings.py diff          # what the next deploy changes on each host
+uv run python scripts/deepops/settings.py show <host>   # every setting, and where it comes from
 ```
 
-Both read the inventory and variable files only; nothing connects to a host or decrypts a vaulted value.
-`--config-from <revision>` also compares your configuration repository at that revision.
+Each deploy ends by recording on every host what it deployed there (the deepops and config commits, as the custom fact `ansible_local.deepops_deploy`, by `roles/deploy_record`), so `diff` starts each host from its own last deploy, however that deploy was limited and whoever ran it.
+It reads those records from the controller's fact cache; when they are missing or expired it prints the command that refreshes them (`ansible ... -m ansible.builtin.setup -a filter=ansible_local`, which connects).
+`--from <revision>` (with `--config-from <revision>`) starts every host from one revision instead.
+Apart from that refresh, nothing connects to a host or decrypts a vaulted value.
 
 ### Which file should my variables go in?
 

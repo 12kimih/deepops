@@ -2,8 +2,8 @@
 """What each setting resolves to on each host: the role default that owns it and the
 config that overrides it. One model for config_lint and the deploy preview.
 
-    settings.py diff --from REV [--config-from REV]   what a deploy would change, per host
-    settings.py show HOST                             every setting HOST resolves, and where from
+    settings.py diff [--from REV] [--config-from REV]   what a deploy would change, per host
+    settings.py show HOST                               every setting HOST resolves, and where from
 
 A role's defaults own a setting's default (ours, a Galaxy role's or Kubespray's), and a
 config directory (config/ or config.example/) states only what differs. A host resolves
@@ -12,13 +12,17 @@ inventory file's vars of all and of each group, group_vars/all, group_vars of ea
 group (by depth, priority and name), the inventory file's host vars, host_vars. Play
 vars, role vars and set_fact are not settings and are not modelled.
 
-`diff` resolves every host twice, once with the role defaults and config of the given
-revisions and once with the working trees, and prints each value that changes. Nothing
-is decrypted (a vaulted value is compared as its ciphertext) and nothing connects to a
-host. Give it the revision the cluster was last deployed from.
+`diff` resolves every host twice, once with the role defaults and config it was last
+deployed from and once with the working trees, and prints each value that changes; a
+setting that only gained a default (it was unset) is listed apart. Each host's start is
+its own record (roles/deploy_record writes ansible_local.deepops_deploy at the end of a
+deploy), read from the controller's fact cache; --from and --config-from set one start
+for every host instead. Nothing is decrypted (a vaulted value is compared as its
+ciphertext) and nothing connects to a host.
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -341,10 +345,10 @@ class Config:
         self.hosts, self.group_hosts, self.inv_group_vars, self.inv_host_vars = {}, {}, {}, {}
         if text is None:
             return
-        # Group names such as slurm-node are kept as written (never rewritten to
-        # slurm_node, which would break [x:children]) and need no warning per read; an
-        # inventory that does not parse is an error, never an empty one.
-        os.environ["ANSIBLE_TRANSFORM_INVALID_GROUP_CHARS"] = "ignore"
+        # The repository's ansible.cfg, wherever this runs from: it keeps group names such
+        # as slurm-node as written (force_valid_group_names). An inventory that does not
+        # parse is an error here, never an empty one.
+        os.environ.setdefault("ANSIBLE_CONFIG", str(ROOT / "ansible.cfg"))
         os.environ["ANSIBLE_INVENTORY_UNPARSED_FAILED"] = "true"
         from ansible.inventory.helpers import sort_groups
         from ansible.inventory.manager import InventoryManager
@@ -448,11 +452,11 @@ def site_tree(config_dir, rev=None):
     return Tree(config_dir, rev=rev, tracked_only=False)
 
 
-def changes(old, old_owners, new, new_owners):
+def changes(old, old_owners, new, new_owners, hosts=None):
     """{host: [(name, before, after, where)]} for every value that differs between two
-    (Config, owners) states; a host only one state has counts too."""
+    (Config, owners) states, for HOSTS (default: every host either state has)."""
     out = {}
-    for host in sorted(set(old.hosts) | set(new.hosts)):
+    for host in sorted(hosts if hosts is not None else set(old.hosts) | set(new.hosts)):
         before, after = old.resolve(host, old_owners), new.resolve(host, new_owners)
         rows = []
         for name in sorted(set(before) | set(after)):
@@ -464,17 +468,81 @@ def changes(old, old_owners, new, new_owners):
     return out
 
 
+def deployed(config_dir, hosts):
+    """{host: record}: each host's latest deploy record (ansible_local.deepops_deploy),
+    read through Ansible from the controller's fact cache. An ad-hoc debug task runs on
+    the controller, so nothing connects to a host; a host without a fresh cached record
+    is left out."""
+    ansible = Path(sys.executable).with_name("ansible")
+    env = dict(CLEAN_ENV, ANSIBLE_LOAD_CALLBACK_PLUGINS="1", ANSIBLE_STDOUT_CALLBACK="ansible.builtin.json")
+    out = subprocess.run(
+        [str(ansible) if ansible.exists() else "ansible", "-i", str(Path(config_dir) / "inventory"),
+         ":".join(hosts), "-m", "ansible.builtin.debug", "-a", "var=ansible_local.deepops_deploy"],
+        cwd=ROOT, capture_output=True, text=True, env=env,
+    )  # fmt: skip
+    try:
+        results = json.loads(out.stdout)["plays"][0]["tasks"][0]["hosts"]
+    except (ValueError, KeyError, IndexError):
+        return {}
+    found = {}
+    for host, result in results.items():
+        records = result.get("ansible_local.deepops_deploy")
+        if isinstance(records, dict) and records:
+            found[host] = max(records.values(), key=lambda r: r.get("time", ""))
+    return found
+
+
 def cmd_diff(args):
     config_dir = Path(args.config)
-    found = changes(
-        Config(site_tree(config_dir, args.config_from)), owners(Tree(ROOT, rev=args.from_rev)),
-        Config(site_tree(config_dir)), owners(Tree(ROOT)),
-    )  # fmt: skip
-    for host, rows in found.items():
-        print(f"{host}:")
-        for name, before, after, where in rows:
+    new = Config(site_tree(config_dir))
+    new_owners = owners(Tree(ROOT))
+    starts = {}  # (deepops rev, config rev) -> hosts
+    if args.from_rev:
+        starts[(args.from_rev, args.config_from)] = sorted(new.hosts)
+    else:
+        records = deployed(config_dir, sorted(new.hosts))
+        for host in sorted(new.hosts):
+            if host in records:
+                r = records[host]
+                starts.setdefault((r["deepops"], r["config"]), []).append(host)
+                notes = [
+                    f"{tree} had uncommitted changes"
+                    for tree in ("deepops", "config")
+                    if r.get(f"{tree}_dirty")
+                ]
+                if r.get("limit") or r.get("tags") not in (["all"], None):
+                    notes.append(
+                        f"limited run (limit {r.get('limit') or 'none'}, tags {', '.join(r.get('tags') or [])})"
+                    )
+                if notes:
+                    print(
+                        f"{host}: last deployed {r['time']}: "
+                        + "; ".join(notes)
+                        + ", so the start is approximate"
+                    )
+        missing = sorted(set(new.hosts) - set(records))
+        if missing:
+            print(
+                f"no deploy record cached for {', '.join(missing)}: they were never deployed with one, or the "
+                "cache expired. Refresh it (this connects): uv run ansible "
+                f"{':'.join(missing)} -m ansible.builtin.setup -a filter=ansible_local; or pass --from REV."
+            )
+    found = {}
+    for (rev, config_rev), hosts in starts.items():
+        old = Config(site_tree(config_dir, config_rev or None))
+        found.update(changes(old, owners(Tree(ROOT, rev=rev)), new, new_owners, hosts))
+    # Hosts that change alike print once, together.
+    groups = {}
+    for host, rows in sorted(found.items()):
+        groups.setdefault(repr(rows), (rows, []))[1].append(host)
+    for rows, hosts in groups.values():
+        print(f"{', '.join(hosts)}:")
+        for name, before, after, where in (row for row in rows if row[1] is not MISSING):
             print(f"  {name}: {show(before)} -> {show(after)}  ({where})")
-    if not found:
+        added = [name for name, before, *_ in rows if before is MISSING]
+        if added:
+            print(f"  newly defined (they were unset): {', '.join(added)}")
+    if starts and not found:
         print("no setting changes on any host")
     return 0
 
@@ -498,10 +566,8 @@ def main(argv=None):
     parser.add_argument("--config", default=os.environ.get("DEEPOPS_CONFIG_DIR", str(ROOT / "config")))
     sub = parser.add_subparsers(dest="command", required=True)
     diff = sub.add_parser("diff", help="per-host setting changes since a revision")
-    diff.add_argument("--from", dest="from_rev", required=True, help="deepops revision last deployed")
-    diff.add_argument(
-        "--config-from", help="config revision last deployed (default: compare config as it is)"
-    )
+    diff.add_argument("--from", dest="from_rev", help="deepops revision to start every host from")
+    diff.add_argument("--config-from", help="with --from: the config revision (default: config as it is)")
     diff.set_defaults(func=cmd_diff)
     show_p = sub.add_parser("show", help="every setting a host resolves")
     show_p.add_argument("host")

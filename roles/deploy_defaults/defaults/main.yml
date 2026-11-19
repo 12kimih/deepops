@@ -60,8 +60,8 @@ mig_manager_config: /etc/nvidia-mig-manager/config.yml
 mig_manager_hooks: ""
 # The containers playbooks/ngc-ready-server.yml tests
 ngc_ready_cuda_container: nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
-ngc_ready_pytorch: nvcr.io/nvidia/pytorch:26.05-py3
-ngc_ready_tensorflow: nvcr.io/nvidia/tensorflow:25.02-tf2-py3
+ngc_ready_pytorch_container: nvcr.io/nvidia/pytorch:26.05-py3
+ngc_ready_tensorflow_container: nvcr.io/nvidia/tensorflow:25.02-tf2-py3
 # GPU clocks playbooks/utilities/nvidia-set-gpu-clocks.yml locks ("MIN,MAX" MHz), or
 # resets with gpu_clock_reset: true
 gpu_clock_lock: ""

@@ -91,6 +91,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── deepops_paths
 │   ├── default_target
 │   ├── deploy_defaults
+│   ├── deploy_record
 │   ├── dns-config
 │   ├── docker
 │   ├── docker-login

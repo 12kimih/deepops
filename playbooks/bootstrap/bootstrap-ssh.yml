@@ -1,36 +1,42 @@
 ---
+# First contact with new hosts, run once and on purpose, never by a deploy: install the
+# controller's key for the connection user so later runs need no password.
+#
+#   ansible-playbook -k playbooks/bootstrap/bootstrap-ssh.yml -l <new hosts>
+#
+# It creates an Ed25519 key on the controller if ansible_ssh_private_key_file (default
+# ~/.ssh/id_ed25519) does not exist. Every key it installs is access someone granted,
+# so keys beyond this first one belong in a managed list (roles/root_access, the people
+# roster), not in reruns of this playbook.
 - hosts: all
   become: false
   tasks:
     - name: Set SSH key location
       ansible.builtin.set_fact:
-        private_key: "{{ ansible_ssh_private_key_file | default(lookup('env', 'HOME') + '/.ssh/id_rsa') }}"
+        private_key: "{{ ansible_ssh_private_key_file | default(lookup('env', 'HOME') + '/.ssh/id_ed25519') }}"
 
     - name: Create SSH directory if it doesn't exist
       ansible.builtin.file:
-        path: "{{ lookup('env', 'HOME') + '/.ssh' }}"
+        path: "{{ private_key | dirname }}"
         state: directory
         mode: "0700"
-      delegate_to: 127.0.0.1
+      delegate_to: localhost
       run_once: true
 
-    - name: Generate default SSH keypair if it doesn't exist
-      ansible.builtin.command: ssh-keygen -q -t rsa -f "{{ private_key }}" -C "" -N ""
+    - name: Generate an SSH keypair if there is none
+      ansible.builtin.command: ssh-keygen -q -t ed25519 -f "{{ private_key }}" -C "" -N ""
       args:
         creates: "{{ private_key }}"
-      delegate_to: 127.0.0.1
+      delegate_to: localhost
       run_once: true
 
-    - name: Run setup to get ansible user
-      ansible.builtin.setup: gather_subset=min
-    - name: Add SSH public key to ansible user authorized keys
+    - name: Read the connection user
+      ansible.builtin.setup:
+        gather_subset: min
+
+    - name: Add the public key to the connection user's authorized keys
       ansible.posix.authorized_key:
-        user: "{{ ansible_facts.env.SUDO_USER | default(ansible_facts.env.USER) }}"
+        user: "{{ ansible_facts.user_id }}"
         state: present
-        key: "{{ lookup('file', private_key + '.pub') }}"
+        key: "{{ lookup('ansible.builtin.file', private_key + '.pub') }}"
       tags: ssh-public
-
-    - ansible.builtin.debug:
-        msg: Now, you shouldn't need to use -k/--ask-pass for these hosts anymore.
-      delegate_to: 127.0.0.1
-      run_once: true

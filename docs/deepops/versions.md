@@ -11,6 +11,8 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 |---|---|---|---|
 | alertmanager | `alertmanager_container` | `prom/alertmanager:v0.34.1@sha256:e9733bafb1bd` |  |
 | deploy_defaults | `ngc_ready_cuda_container` | `nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04` |  |
+| deploy_defaults | `ngc_ready_pytorch_container` | `nvcr.io/nvidia/pytorch:26.05-py3` |  |
+| deploy_defaults | `ngc_ready_tensorflow_container` | `nvcr.io/nvidia/tensorflow:25.02-tf2-py3` |  |
 | easy-build-packages | `sm_files_repo_version` | `4ef7ae6cc2284f69412a8db5e10dddd92024eeab` |  |
 | enroot | `enroot_version` | `4.2.0` |  |
 | grafana | `grafana_container` | `grafana/grafana:13.2.4@sha256:dbbc38ea2110` |  |

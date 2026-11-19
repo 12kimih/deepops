@@ -173,8 +173,8 @@ If running the container tests as part of the NGC-Ready playbook, set the follow
 
 ```yaml
 ngc_ready_cuda_container: "<your-container-registry>/nvidia/cuda:13.2.1-base-ubuntu24.04"
-ngc_ready_pytorch: "<your-container-registry>/nvidia/pytorch:26.05-py3"
-ngc_ready_tensorflow: "<your-container-registry>/nvidia/tensorflow:25.02-tf2-py3"
+ngc_ready_pytorch_container: "<your-container-registry>/nvidia/pytorch:26.05-py3"
+ngc_ready_tensorflow_container: "<your-container-registry>/nvidia/tensorflow:25.02-tf2-py3"
 ```
 
 ## Running the NGC-Ready playbook

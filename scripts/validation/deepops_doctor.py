@@ -185,7 +185,13 @@ def main():
             checks,
             "hosts_reachable",
             rc == 0,
-            "%d/%d host(s) reachable" % (reachable, hosts_total),
+            "%d/%d host(s) reachable" % (reachable, hosts_total)
+            + (
+                ""
+                if rc == 0
+                else "; for hosts that still ask for a password, run once:"
+                " ansible-playbook -k playbooks/bootstrap/bootstrap-ssh.yml -l <hosts>"
+            ),
         )
 
         rc, out, _ = run(

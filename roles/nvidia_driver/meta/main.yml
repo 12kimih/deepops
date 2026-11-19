@@ -21,3 +21,4 @@ galaxy_info:
     - driver
 dependencies:
   - role: nvidia_versions  # nvidia_driver_branch
+  - role: retired_settings  # nvidia_driver_ubuntu_use_open_kernel_modules

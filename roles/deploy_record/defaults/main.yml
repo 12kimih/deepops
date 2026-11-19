@@ -1,0 +1,7 @@
+---
+# Which deploy this is (slurm-cluster, k8s-cluster): its record on a host replaces that
+# deploy's last one.
+deploy_record_name: ""
+# The host's own record of what was deployed to it, a static custom fact: it reads back
+# as ansible_facts.ansible_local.deepops_deploy, from the host or from the controller's fact cache.
+deploy_record_fact: /etc/ansible/facts.d/deepops_deploy.fact

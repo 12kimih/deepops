@@ -1,11 +1,13 @@
 """settings.py: reading variable files, owners, Ansible's precedence, redundancy, diff."""
 
+import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
@@ -142,6 +144,40 @@ class Revisions(unittest.TestCase):
             config = S.Config(S.Tree(d, tracked_only=False))
             found = S.changes(config, owned(a=0, b=1, c=1), config, owned(a=0, b=2, c=1))
             self.assertEqual(found, {"h1": [("b", 1, 2, "roles/r/defaults/main.yml#b")]})
+
+
+class DeployRecords(unittest.TestCase):
+    """Each host carries what was deployed to it (roles/deploy_record); the preview reads
+    it back from the controller's fact cache through an ad-hoc debug task."""
+
+    def run_with(self, hosts_json):
+        out = json.dumps({"plays": [{"tasks": [{"hosts": hosts_json}]}]})
+        done = subprocess.CompletedProcess([], 0, stdout=out, stderr="")
+        with mock.patch.object(S.subprocess, "run", return_value=done) as run:
+            found = S.deployed("cfg", ["h1", "h2", "h3"])
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[-4:], ["-m", "ansible.builtin.debug", "-a", "var=ansible_local.deepops_deploy"])
+        return found
+
+    def test_the_latest_record_of_each_host(self):
+        old = {"deepops": "a", "config": "x", "time": "2026-01-01T00:00:00Z"}
+        new = {"deepops": "b", "config": "y", "time": "2026-02-01T00:00:00Z"}
+        found = self.run_with({
+            "h1": {"ansible_local.deepops_deploy": {"slurm-cluster": old, "k8s-cluster": new}},
+            "h2": {"ansible_local.deepops_deploy": "VARIABLE IS NOT DEFINED!"},
+        })  # fmt: skip
+        self.assertEqual(found, {"h1": new})
+
+    def test_unreadable_output_is_no_record(self):
+        done = subprocess.CompletedProcess([], 2, stdout="", stderr="boom")
+        with mock.patch.object(S.subprocess, "run", return_value=done):
+            self.assertEqual(S.deployed("cfg", ["h1"]), {})
+
+    def test_every_deploy_ends_by_recording(self):
+        for name in ("slurm-cluster", "k8s-cluster"):
+            last = S.load((ROOT / "playbooks" / f"{name}.yml").read_text())[-1]
+            self.assertEqual(last.get("roles"), [{"role": "deploy_record", "deploy_record_name": name}], name)
+            self.assertIn("always", last.get("tags", []), f"{name}: a run with --tags records too")
 
 
 class Owners(unittest.TestCase):

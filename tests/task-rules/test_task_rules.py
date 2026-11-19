@@ -154,7 +154,7 @@ def template_path(path, src):
 # their ansible_ prefix. Magic variables (ansible_check_mode, ansible_host...) are not
 # facts and are not listed.
 INJECTED = re.compile(
-    r"(?<![\w.'\"\[-])(?<!filter=)(?:(?:in\s+|not\s+in\s+)(?:services|packages)\b|(?:services|packages)\["
+    r"(?<![\w.'\"\[-])(?<!filter=)(?<!filter: )(?:(?:in\s+|not\s+in\s+)(?:services|packages)\b|(?:services|packages)\["
     r"|ansible_(?:distribution|os_family|kernel|architecture|processor|memtotal_mb|memory_mb|memfree_mb|lsb"
     r"|pkg_mgr|service_mgr|devices|mounts|interfaces|default_ipv[46]|all_ipv[46]_addresses|fqdn|hostname"
     r"|nodename|machine_id|virtualization|system|python(?!_interpreter)|date_time|env|local|product|bios"
@@ -248,7 +248,7 @@ class TaskRules(unittest.TestCase):
             self.assertFalse(INJECTED.search(good) or INJECTED_INDIRECT.search(good), good)
         for good in ("when: '\"x\" in ansible_facts.services'", "{{ ansible_facts.distribution }}",
                      "ansible_check_mode", "ansible_facts['packages']", "Gather service facts",
-                     "ansible.builtin.setup: filter=ansible_local"):  # fmt: skip
+                     "ansible.builtin.setup: filter=ansible_local", "filter: ansible_local"):  # fmt: skip
             self.assertFalse(INJECTED.search(good), good)
         for bad in (
             "chdir: /tmp",

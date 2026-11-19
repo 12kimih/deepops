@@ -33,7 +33,10 @@ description: Deploy a Slurm GPU cluster with DeepOps and prove it works. Use whe
    python3 scripts/validation/deepops_doctor.py --remote --json
    ```
 
-   Fix anything in `failures` (each check's `detail` says how) and rerun.
+   Fix anything in `failures` (each check's `detail` says how) and rerun. New
+   hosts that only accept a password get the controller's key once, on purpose:
+   `ansible-playbook -k playbooks/bootstrap/bootstrap-ssh.yml -l <new hosts>`
+   (no deploy does this for you).
 
 4. Deploy:
 
