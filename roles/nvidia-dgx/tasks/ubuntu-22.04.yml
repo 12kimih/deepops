@@ -38,8 +38,11 @@
     state: present
     update_cache: true
   register: install_driver
-  notify: Reboot after driver install
   when: dgx_os6_install_driver
+
+- name: Ask for a reboot when that changed it
+  ansible.builtin.include_tasks: reboot.yml
+  when: install_driver is changed
 
 - name: Install DGX OS 6 Docker and NVIDIA container toolkit
   ansible.builtin.apt:

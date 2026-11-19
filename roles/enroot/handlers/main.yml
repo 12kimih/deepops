@@ -1,3 +1,0 @@
----
-- name: Reboot node
-  ansible.builtin.include_tasks: reboot.yml  # a handler cannot include a role directly

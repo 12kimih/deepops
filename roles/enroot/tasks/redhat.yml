@@ -65,4 +65,8 @@
       'namespace.unpriv_enable=1' not in enroot_kernel_cmdline.stdout
       or 'user_namespace.enable=1' not in enroot_kernel_cmdline.stdout
   changed_when: true
-  notify: Reboot node
+  register: enroot_kernel_args_set
+
+- name: Ask for a reboot when that changed it
+  ansible.builtin.include_tasks: reboot.yml
+  when: enroot_kernel_args_set is changed

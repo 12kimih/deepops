@@ -12,7 +12,7 @@ Docker forwards them past the input filter.
 import importlib.util
 import json
 import re
-import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -20,6 +20,9 @@ import jinja2
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 ROLE = ROOT / "roles" / "egress_policy"
 RESOLVER = ROOT / "roles" / "dns_resolver"
 spec = importlib.util.spec_from_file_location("networks", ROOT / "plugins" / "filter" / "networks.py")
@@ -158,14 +161,12 @@ class ContainerPublishes(unittest.TestCase):
     BOUND = re.compile(r"^(\d{1,3}(\.\d{1,3}){3}|\[[0-9a-fA-F:]+\]|\{\{[^}]*\}\}):")
 
     def test_every_publish_binds_an_address(self):
-        files = subprocess.run(
-            ["git", "ls-files", "roles", "playbooks"], cwd=ROOT, capture_output=True, text=True, check=True
-        ).stdout.split()
         offenders = []
-        for name in files:
+        for path in tracked("roles", "playbooks"):
+            name = path.relative_to(ROOT).as_posix()
             if not name.endswith((".yml", ".yaml", ".j2", ".sh")):
                 continue
-            for n, line in enumerate((ROOT / name).read_text(errors="replace").splitlines(), 1):
+            for n, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
                 if "docker" not in line and "published_ports" not in line:
                     continue
                 for value in self.PUBLISH.findall(line):

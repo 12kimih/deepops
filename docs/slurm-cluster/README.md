@@ -344,7 +344,7 @@ alerts on tunnels and exposed listeners (roles/egress_policy).
 ## Rebooting the cluster
 
 `playbooks/utilities/reboot.yml` reboots the targeted hosts one at a time and waits for
-each to come back. `-e reboot_serial=N` reboots N at a time, and
+each to come back. `-e maintenance_serial=N` reboots N at a time, and
 `-e maintenance_reboot_timeout=N` sets how long a node has to return -- the default 1800s allows for
 BIOS POST and memory training on a GPU server. A compute node Slurm still schedules on
 is refused: drain it first, or use `playbooks/utilities/apt-upgrade.yml`, which drains,

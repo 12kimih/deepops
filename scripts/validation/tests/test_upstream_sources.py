@@ -6,11 +6,14 @@ and age. Container images (repo:tag@sha256) and pyproject.toml's pins need no li
 """
 
 import re
-import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 # A version pin: a *_version or *_branch setting whose value is a literal version
 # (minimums such as runai_gpu_operator_min_version are requirements, not pins).
 PIN = re.compile(r'^([a-z_][a-z0-9_]*(?:_version|_branch)):\s*"?(v?\d+(?:\.\d+)*(?:-[\w.~]+)?)"?\s*$')
@@ -19,15 +22,12 @@ SOURCE = re.compile(r"^\s*#\s*upstream:\s*(git|pypi|helm|deb|oci|cuda|manual|hol
 
 class UpstreamSources(unittest.TestCase):
     def test_every_pin_names_its_upstream(self):
-        files = subprocess.run(
-            ["git", "ls-files", "roles/*/defaults/main.yml", "roles/*/vars/*.yml", "roles/*/vars/*.yaml"],
-            cwd=ROOT, capture_output=True, text=True, check=True,
-        ).stdout.split()  # fmt: skip
         missing, pins = [], 0
-        for rel in files:
+        for path in tracked("roles/*/defaults/main.yml", "roles/*/vars/*.yml", "roles/*/vars/*.yaml"):
+            rel = path.relative_to(ROOT).as_posix()
             if rel.startswith("roles/galaxy/"):
                 continue
-            lines = (ROOT / rel).read_text().splitlines()
+            lines = path.read_text().splitlines()
             for number, line in enumerate(lines, 1):
                 m = PIN.match(line)
                 if not m or m.group(1).endswith("_min_version"):
