@@ -1,0 +1,70 @@
+---
+- name: Check the release request
+  ansible.builtin.assert:
+    that:
+      - helm_release.release | default('') | length > 0
+      - helm_release.namespace | default('') | length > 0
+      - helm_release.state | default('present') in ['present', 'absent']
+      - (helm_release.state | default('present')) == 'absent'
+        or (helm_release.chart | default('') | length > 0 and helm_release.version | default('') | string | length > 0)
+    fail_msg: "helm_release needs release, namespace, state present|absent, and chart and version to install."
+    quiet: true
+
+- name: "Look up the current release ({{ helm_release.release }})"
+  ansible.builtin.command:
+    argv: ["{{ helm_bin }}", list, --namespace, "{{ helm_release.namespace }}", --output, json]
+  register: helm_release_list
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  failed_when: helm_release_list.rc != 0 and 'not found' not in helm_release_list.stderr
+
+- name: "Note the current release ({{ helm_release.release }})"
+  ansible.builtin.set_fact:
+    helm_release_current: >-
+      {{ (helm_release_list.stdout | default('[]', true) | from_json
+          | selectattr('name', 'equalto', helm_release.release) | list | first) | default({}) }}
+
+- name: "Remove the release ({{ helm_release.release }})"
+  ansible.builtin.command:
+    argv: ["{{ helm_bin }}", uninstall, "{{ helm_release.release }}", --namespace, "{{ helm_release.namespace }}", --wait]
+  environment: "{{ proxy_env }}"
+  changed_when: true
+  when:
+    - helm_release.state | default('present') == 'absent'
+    - helm_release_current | length > 0
+
+- name: "Install or upgrade the release ({{ helm_release.release }})"
+  when: helm_release.state | default('present') == 'present'
+  block:
+    - name: "Read its current values ({{ helm_release.release }})"
+      ansible.builtin.command:
+        argv: ["{{ helm_bin }}", get, values, "{{ helm_release.release }}", --namespace, "{{ helm_release.namespace }}", --output, json]
+      register: helm_release_values
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      no_log: "{{ helm_release.sensitive | default(false) }}"
+      when: helm_release_current | length > 0
+
+    - name: "Decide whether to change it ({{ helm_release.release }})"
+      ansible.builtin.set_fact:
+        helm_release_needs_change: >-
+          {{ (helm_release_current | length == 0)
+             or (helm_release_current.status | default('') != 'deployed')
+             or (helm_release_current.chart | default('') != helm_release.chart.split('/')[-1] ~ '-' ~ helm_release.version)
+             or ((helm_release_values.stdout | default('null', true) | from_json or {}) | to_json(sort_keys=True)
+                 != (helm_release.helm_values | default({}) | to_json(sort_keys=True))) }}
+      no_log: "{{ helm_release.sensitive | default(false) }}"
+
+    - name: "Helm upgrade --install ({{ helm_release.release }})"
+      ansible.builtin.command:
+        argv: >-
+          {{ [helm_bin, 'upgrade', '--install', helm_release.release, helm_release.chart,
+              '--version', helm_release.version | string, '--namespace', helm_release.namespace, '--create-namespace']
+             + (['--repo', helm_release.repo] if helm_release.repo | default('') | length > 0 else [])
+             + (['--wait', '--timeout', helm_timeout] if helm_release.wait | default(true) else [])
+             + ['--values', '-'] }}
+        stdin: "{{ helm_release.helm_values | default({}) | to_json }}"
+      environment: "{{ proxy_env }}"
+      no_log: "{{ helm_release.sensitive | default(false) }}"
+      changed_when: true
+      when: helm_release_needs_change | bool

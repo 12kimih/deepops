@@ -51,4 +51,5 @@
     - name: Install nfs-client-provisioner
       ansible.builtin.include_role:
         name: nfs-client-provisioner
+        public: true
   environment: "{{ proxy_env }}"

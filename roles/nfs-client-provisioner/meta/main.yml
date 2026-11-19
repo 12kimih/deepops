@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: deploy_defaults  # k8s_nfs_export_path
+  - role: retired_settings  # the old chart setting names
 
 galaxy_info:
   namespace: deepops

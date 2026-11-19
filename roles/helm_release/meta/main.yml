@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: helm_release
+  author: DeepOps
+  description: One Helm release in its desired state (present or absent), idempotently
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+dependencies:
+  - role: proxy_defaults  # proxy_env

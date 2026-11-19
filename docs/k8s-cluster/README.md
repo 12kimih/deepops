@@ -179,7 +179,7 @@ The Trident role is optional and community-supported in DeepOps. Use it only whe
    vi config/group_vars/netapp-trident.yml
    ```
 
-   By default, the example configuration installs Trident but does not create a backend, StorageClass, or snapshot controller. Set `create_backends`, `create_StorageClasses`, or `enable_volume_snapshots` to `true` only after replacing the example backend values with site-specific storage details and auth values.
+   By default, the example configuration installs Trident but does not create a backend, StorageClass, or VolumeSnapshotClass. Set `create_backends`, `create_StorageClasses`, or `enable_volume_snapshots` to `true` only after replacing the example backend values with site-specific storage details and auth values. Volume snapshots also need Kubespray's snapshot CRDs and controller: set `csi_snapshot_controller_enabled: true` in `config/group_vars/k8s_cluster.yml` before deploying Kubernetes.
 
 2. Deploy Trident using Ansible.
 
@@ -193,7 +193,7 @@ The Trident role is optional and community-supported in DeepOps. Use it only whe
 3. Verify that Trident is running.
 
    ```bash
-   ./tridentctl -n deepops-trident version
+   ./tridentctl -n trident version
    ```
 
    Output of the above command should resemble the following:
