@@ -4,14 +4,16 @@ regression tests, then the behaviour the Python version adds."""
 
 import json
 import re
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import scenario
 from clustertools import vocab
-from common import HERE, LIB, run_tool
+from common import FAKE_PATH, LIB, run_tool
 
 TMP = tempfile.TemporaryDirectory()
 SCENE = Path(TMP.name)
@@ -272,13 +274,12 @@ class FailureTests(unittest.TestCase):
 
     def test_the_interval_backs_off_while_slurm_fails(self):
         code = f"import sys; sys.path.insert(0, {LIB!r}); from clustertools import sq; sys.exit(sq.main())"
-        env = {"PATH": f"{HERE / 'bin'}:/usr/bin:/bin", "FIXTURES": str(SCENE), "LANG": "C.UTF-8",
+        env = {"PATH": FAKE_PATH, "FIXTURES": str(SCENE), "LANG": "C.UTF-8",
                "USER": "user1", "FAKE_FAIL": "down"}  # fmt: skip
-        try:
-            r = subprocess.run(["timeout", "3", "python3", "-I", "-c", code, "-i", "2"], env=env,
-                               capture_output=True, text=True)  # fmt: skip
-        except FileNotFoundError:
+        if not shutil.which("timeout"):
             self.skipTest("no timeout(1)")
+        r = subprocess.run([shutil.which("timeout"), "3", sys.executable, "-I", "-c", code, "-i", "2"], env=env,
+                           capture_output=True, text=True)  # fmt: skip
         self.assertIn("Slurm read failed, next try in 4s", r.stdout)
 
     def test_no_nodes_is_said_not_a_crash(self):

@@ -7,19 +7,41 @@ restarted the count after every transient apt failure.
 
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from sandbox_path import sandbox_path  # noqa: E402
+
 SCRIPT = Path(__file__).resolve().parents[2] / "roles/os_updates/files/os-updates-metrics"
+# What the script runs besides the package tools each test fakes (dpkg, dpkg-query,
+# apt-get): never the host's, whose packages and pending reboot are not the test's.
+TOOLS = ("sh", "awk", "cat", "chmod", "date", "grep", "mkdir", "mktemp", "mv", "rm", "sed")
+STUBS = {"dpkg": "exit 0\n", "dpkg-query": "exit 0\n", "apt-get": "exit 0\n"}
+
+
+def environment(bin_, state, run=None, flag=None, **stubs):
+    """The script's environment: the fake package tools (STUBS, overridden by STUBS) in
+    BIN_ and TOOLS only on PATH, and every host path it reads or writes in the test's
+    directories (a reboot flag that does not exist unless FLAG is given)."""
+    bin_.mkdir(exist_ok=True)
+    for name, body in {**STUBS, **stubs}.items():
+        (bin_ / name).write_text("#!/bin/sh\n" + body)
+        (bin_ / name).chmod(0o755)
+    return {
+        **os.environ,
+        "PATH": sandbox_path(bin_, TOOLS),
+        "OS_UPDATES_STATE": str(state),
+        "OS_UPDATES_RUN": str(run or state),
+        "OS_UPDATES_REBOOT_FLAG": str(flag or Path(state, "no-reboot-required")),
+    }
 
 
 class PendingSinceTests(unittest.TestCase):
     def run_with(self, apt_script):
-        (self.bin / "apt-get").write_text("#!/bin/sh\n" + apt_script)
-        (self.bin / "apt-get").chmod(0o755)
-        env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}", OS_UPDATES_STATE=str(self.state),
-                   OS_UPDATES_RUN=str(self.state))  # fmt: skip
+        env = environment(self.bin, self.state, **{"apt-get": apt_script})
         subprocess.run(["sh", str(SCRIPT), str(self.textfile)], env=env, check=True, capture_output=True)
         since = self.state / "security-pending-since"
         return since.read_text().strip() if since.exists() else None
@@ -27,9 +49,6 @@ class PendingSinceTests(unittest.TestCase):
     def test_the_clock_survives_an_apt_failure_and_ends_when_nothing_is_pending(self):
         with tempfile.TemporaryDirectory() as d:
             self.bin, self.state, self.textfile = Path(d, "bin"), Path(d, "state"), Path(d, "textfile")
-            self.bin.mkdir()
-            (self.bin / "dpkg").write_text("#!/bin/sh\nexit 0\n")
-            (self.bin / "dpkg").chmod(0o755)
             first = self.run_with("echo 'Inst libfoo (1 Ubuntu:24.04/noble-security [amd64])'\n")
             self.assertIsNotNone(first)
             self.assertEqual(self.run_with("exit 100\n"), first, "an apt failure keeps the clock")
@@ -43,17 +62,8 @@ class PackageInfoTests(unittest.TestCase):
     def test_every_installed_package_is_one_series_and_removed_ones_are_not(self):
         with tempfile.TemporaryDirectory() as d:
             bin_, state, textfile = Path(d, "bin"), Path(d, "state"), Path(d, "textfile")
-            bin_.mkdir()
-            stubs = {
-                "dpkg": "exit 0\n",
-                "apt-get": "exit 0\n",
-                "dpkg-query": "printf 'ii |libc6:amd64|2.39-0ubuntu8.6\\nrc |oldpkg|1.0\\nii |linux-image-generic|6.8.0-149.149\\n'\n",
-            }
-            for name, body in stubs.items():
-                (bin_ / name).write_text("#!/bin/sh\n" + body)
-                (bin_ / name).chmod(0o755)
-            env = dict(os.environ, PATH=f"{bin_}:{os.environ['PATH']}", OS_UPDATES_STATE=str(state),
-                       OS_UPDATES_RUN=str(state))  # fmt: skip
+            query = "printf 'ii |libc6:amd64|2.39-0ubuntu8.6\\nrc |oldpkg|1.0\\nii |linux-image-generic|6.8.0-149.149\\n'\n"
+            env = environment(bin_, state, **{"dpkg-query": query})
             subprocess.run(["sh", str(SCRIPT), str(textfile)], env=env, check=True, capture_output=True)
             lines = [
                 line
@@ -69,24 +79,15 @@ class PackageInfoTests(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class BootRepublishTests(unittest.TestCase):
     def test_the_boot_republish_does_not_report_the_reboot_it_followed_as_pending(self):
         # Measured with a reboot pending, then republished after the reboot (the flag on
         # /run is gone): the kept copy said 1, which kept OsRebootPending firing.
         with tempfile.TemporaryDirectory() as d:
             bin_, state, run, textfile = (Path(d, n) for n in ("bin", "state", "run", "textfile"))
-            for path in (bin_, run):
-                path.mkdir()
-            for name in ("dpkg", "apt-get", "dpkg-query"):
-                (bin_ / name).write_text("#!/bin/sh\nexit 0\n")
-                (bin_ / name).chmod(0o755)
+            run.mkdir()
             flag = run / "reboot-required"
-            env = dict(os.environ, PATH=f"{bin_}:{os.environ['PATH']}", OS_UPDATES_STATE=str(state),
-                       OS_UPDATES_RUN=str(run), OS_UPDATES_REBOOT_FLAG=str(flag))  # fmt: skip
+            env = environment(bin_, state, run=run, flag=flag)
 
             def published(*args):
                 subprocess.run(
@@ -107,3 +108,7 @@ class BootRepublishTests(unittest.TestCase):
             self.assertEqual(
                 after, {"os_updates_reboot_required": "0", "os_updates_reboot_required_since_seconds": "0"}
             )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -10,6 +10,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from sandbox_path import sandbox_path  # noqa: E402
+
+# What slurm_backup runs besides the database clients the tests fake.
+TOOLS = ("sh", "bash", "gzip", "cat", "ls", "rm", "mkdir", "mv", "sha256sum", "timeout")
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles" / "cluster_tools_lib" / "files"))
 from clustertools import prom  # noqa: E402
@@ -94,7 +100,9 @@ class Backup(unittest.TestCase):
             ],
         }
         self.base = base
-        self.env = mock.patch.dict(os.environ, {"PATH": f"{bin_dir}:{os.environ['PATH']}"})
+        # The fake dump and the programs the tool runs, never the host's database client
+        # (the controller runs the accounting database): tests/lib/sandbox_path.py.
+        self.env = mock.patch.dict(os.environ, {"PATH": sandbox_path(bin_dir, TOOLS)})
         self.env.start()
         self.addCleanup(self.env.stop)
 
