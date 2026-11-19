@@ -12,7 +12,7 @@ lists the services that need a restart.
 
 | Distribution | Mechanism |
 |---|---|
-| Ubuntu, Debian | unattended-upgrades: `/etc/apt/apt.conf.d/20auto-upgrades` and `52deepops-unattended-upgrades` (security origins, held-back packages, no reboot); needrestart `/etc/needrestart/conf.d/50-deepops.conf` |
+| Ubuntu, Debian | unattended-upgrades: `/etc/apt/apt.conf.d/20auto-upgrades` and `52deepops-unattended-upgrades` (security origins, held-back packages, no reboot); Ubuntu phased updates taken on every node at once, `51deepops-phased-updates`, so nodes stay on the same versions; needrestart `/etc/needrestart/conf.d/50-deepops.conf` |
 | RHEL family | dnf-automatic: `upgrade_type = security`, `excludepkgs`, `reboot = never` |
 
 The held-back list is written once, as globs; the apt template derives the

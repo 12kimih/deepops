@@ -2,6 +2,14 @@
 - name: Make sure the package manager can work
   ansible.builtin.include_tasks: apt_health.yml
 
+# Before the upgrade, so it brings every node to the same versions (os_updates owns
+# the apt policy; a node it has not reached yet still upgrades level).
+- name: Take phased updates on every node at once
+  ansible.builtin.include_role:
+    name: os_updates
+    tasks_from: phased
+  when: ansible_facts.os_family == 'Debian'
+
 - name: Upgrade every package, the held-back stacks included (Ubuntu)
   ansible.builtin.apt:
     update_cache: true

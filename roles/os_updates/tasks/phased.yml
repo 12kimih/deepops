@@ -1,0 +1,17 @@
+---
+# Ubuntu phases some updates out to a random share of machines at a time: apt holds
+# them back on the others, so one upgrade leaves identical nodes on different package
+# versions (seen as mesa and snapd drift across GPU nodes). A fleet takes every update
+# on every node at once, in its maintenance window or by unattended upgrades alike.
+# https://discourse.ubuntu.com/t/phased-updates-in-apt-in-21-04/20345
+- name: Take phased updates on every node at once (Ubuntu)
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/51deepops-phased-updates
+    content: |
+      // Managed by DeepOps (roles/os_updates, tasks/phased.yml).
+      APT::Get::Always-Include-Phased-Updates "true";
+    owner: root
+    group: root
+    mode: "0644"
+    validate: apt-config -c %s dump
+  when: ansible_facts.distribution == 'Ubuntu'
