@@ -1,0 +1,5 @@
+---
+# Where Prometheus keeps its config and the scrape target files the exporter roles drop
+# there: written once here, for prometheus and every exporter role, which depend on it.
+prometheus_config_dir: /etc/prometheus
+prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"

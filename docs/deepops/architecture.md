@@ -132,6 +132,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── prometheus-ipmi-exporter
 │   ├── prometheus-node-exporter
 │   ├── prometheus-slurm-exporter
+│   ├── prometheus_paths
 │   ├── pyxis
 │   ├── recorded_files
 │   ├── roce_backend

@@ -13,8 +13,7 @@ cluster_tools_bin_dir: /usr/local/bin
 # cluster_tools_scripts, but dest lands under cluster_tools_lib_dir and is not executable:
 # a library is sourced, never run, so it claims no name in PATH. Use one for anything
 # several commands must agree on, instead of a copy each that drifts apart.
-cluster_tools_libs: []
-cluster_tools_lib_dir: /usr/local/lib/cluster-tools
+cluster_tools_libs: []  # cluster_tools_lib_dir comes from cluster_tools_lib (a dependency)
 
 # Built-in commands to publish, by name: any of sq (the queue, who holds what, why jobs
 # wait, and what each partition pool has left) and qos (the QoS a user may submit

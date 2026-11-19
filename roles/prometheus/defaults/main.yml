@@ -1,5 +1,4 @@
 ---
-prometheus_config_dir: /etc/prometheus
 prometheus_config_src: templates/prometheus.yml.j2
 prometheus_container: "prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e"
 prometheus_port: 9090
@@ -10,8 +9,6 @@ prometheus_enabled: true
 
 prometheus_cfg_scrape_interval: 15s
 prometheus_cfg_evaluation_interval: 15s
-# Each exporter role drops its scrape targets here (file_sd).
-prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
 
 # TSDB retention: whichever limit is hit first wins. Empty size disables the size cap.
 prometheus_retention_time: 90d
