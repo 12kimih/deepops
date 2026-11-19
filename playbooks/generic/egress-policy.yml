@@ -4,7 +4,8 @@
 #
 #   ansible-playbook -K --check --diff -l <host> playbooks/generic/egress-policy.yml
 #
-# Remove it again with -e egress_policy_state=absent.
+# Present where slurm_enable_egress_policy is on, removed where it is off
+# (deepops_components); -e egress_policy_state=absent removes it from the hosts run on.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   tags:
@@ -12,4 +13,5 @@
   roles:
     - role: deploy_defaults  # slurm_enable_egress_policy, proxy_env
     - role: egress_policy
+      egress_policy_state: "{{ deepops_components.egress_policy | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

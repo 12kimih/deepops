@@ -223,7 +223,8 @@
 
 - name: Limit where users connect outside the cluster
   import_playbook: generic/egress-policy.yml
-  when: slurm_enable_egress_policy
+  vars:
+    deepops_phase: install
   tags:
     - egress-policy
 
@@ -258,6 +259,13 @@
     deepops_phase: remove
   tags:
     - cluster-tools
+
+- name: Remove the egress policy where it is no longer wanted
+  import_playbook: generic/egress-policy.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - egress-policy
 
 - name: Remove the rsyslog client where it is no longer wanted
   import_playbook: generic/rsyslog-client.yml

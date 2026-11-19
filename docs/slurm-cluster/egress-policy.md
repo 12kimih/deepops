@@ -152,14 +152,15 @@ the mention that critical alerts carry, so they never page
    cluster deploy keeps them.
 
 `sudo systemctl stop egress-policy` removes the table at once (until the next start or
-deploy); `-e egress_policy_state=absent` removes everything the role installed.
+deploy). Turning `slurm_enable_egress_policy` off removes everything the role installed
+at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts run on.
 
 ## Variables
 
 <!-- BEGIN GENERATED: role-variables:egress_policy -->
 | Variable | Default | Description |
 |---|---|---|
-| `egress_policy_state` | `present` | present applies the policy; absent removes the table, its unit, the SSH drop-in and the metrics (the way back). |
+| `egress_policy_state` | `present` | present applies the policy; absent removes the table, its unit, the SSH drop-in and the metrics (the way back); kept does nothing. A deploy sets it from slurm_enable_egress_policy (docs/deepops/component-state.md). |
 | `egress_policy_internal_networks` | `[]` | The cluster's own networks (CIDRs, IPv4 or IPv6): users reach them on every port, and with egress_policy_inbound they reach this host on every port. List every network jobs talk over (an IPoIB or storage network too), or multi-node jobs break. Required. |
 | `egress_policy_restricted_uids` | `[1000-60000, 65536-4294967294]` | Who is a user: the uids whose outside traffic is limited ("A-B" or "N"). Below 1000 are root and system accounts; 60001-65535 are systemd's DynamicUser range and nobody, which containerized services run as. Above 65535 are subordinate uids, which a rootless container's processes run as. |
 | `egress_policy_exempt_uids` | `[]` | Users exempt from the limits: the administrators' uids, from the people roster. |

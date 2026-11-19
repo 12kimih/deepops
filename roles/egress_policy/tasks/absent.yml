@@ -1,18 +1,16 @@
 ---
-- name: Check for the egress policy unit
-  ansible.builtin.stat:
-    path: "/etc/systemd/system/{{ _egress_policy_unit }}"
-  register: egress_policy_unit_file
+# Stopping the unit deletes the table; the record stops it, then removes the ruleset,
+# the unit, the client SSH settings and the metrics. What it installed before the record
+# existed is adopted: every item, the metrics included.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: egress_policy
+    component_record_action: absent
+    component_record_items: "{{ _egress_policy_base_items + _egress_policy_metrics_items }}"
 
-# Stopping the unit deletes the table.
-- name: Stop and disable the egress policy unit
-  ansible.builtin.systemd:
-    name: "{{ _egress_policy_unit }}"
-    enabled: false
-    state: stopped
-  when: egress_policy_unit_file.stat.exists
-
-# A table loaded by hand, or left by a unit already removed.
+# A table loaded by hand, or left by a unit removed earlier.
 - name: Look for the egress policy table
   ansible.builtin.command:
     argv: [nft, list, table, inet, egress_policy]
@@ -26,21 +24,3 @@
     argv: [nft, delete, table, inet, egress_policy]
   changed_when: true
   when: egress_policy_table.rc == 0
-
-- name: Remove the ruleset, its unit and the client SSH settings
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "{{ _egress_policy_ruleset }}"
-    - "/etc/systemd/system/{{ _egress_policy_unit }}"
-    - "{{ egress_policy_ssh_client_file }}"
-  register: egress_policy_removed
-
-- name: Remove the metrics
-  ansible.builtin.include_tasks: metrics_absent.yml
-
-- name: Reload systemd
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: egress_policy_removed is changed

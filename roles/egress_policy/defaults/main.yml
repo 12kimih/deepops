@@ -5,7 +5,8 @@
 # See docs/slurm-cluster/egress-policy.md.
 
 # present applies the policy; absent removes the table, its unit, the SSH drop-in and
-# the metrics (the way back).
+# the metrics (the way back); kept does nothing. A deploy sets it from
+# slurm_enable_egress_policy (docs/deepops/component-state.md).
 egress_policy_state: present
 
 # The cluster's own networks (CIDRs, IPv4 or IPv6): users reach them on every port, and
