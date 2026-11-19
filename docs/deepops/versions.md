@@ -65,7 +65,6 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | runai | `runai_gateway_controller_version` | `v2.2.9` |  |
 | runai | `runai_platform_prometheus_min_version` | `88.6.5` |  |
 | slurm | `slurm_version` | `26.05.6` |  |
-| slurm | `slurm_nvml_cuda_version` | `13.0` |  |
 | spack | `spack_version` | `v1.2.2` |  |
 | spack | `spack_packages_version` | `v2026.06.0` |  |
 | standalone-container-registry | `standalone_container_registry_image` | `registry:3.1.2@sha256:82f6ff4a7f98` |  |

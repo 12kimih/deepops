@@ -47,9 +47,9 @@ slurm_deb_build_extra_deps: [libbpf-dev, libibmad-dev, libibumad-dev, libnuma-de
 slurm_deb_lua_dev: liblua5.4-dev
 # NVML (AutoDetect=nvml) builds against NVIDIA's cuda-nvml-dev package (header and
 # link stub, no driver) from the CUDA repository, of the CUDA release the driver branch
-# serves (nvidia_driver_branch 580: 13.0): a newer header could call functions the
-# driver lacks. The library itself comes from the driver on each GPU node.
-slurm_nvml_cuda_version: "13.0"
+# ships with (roles/nvidia_versions): a newer header could call functions the driver
+# lacks. The library itself comes from the driver on each GPU node.
+slurm_nvml_cuda_version: "{{ nvidia_driver_cuda_release }}"
 # Plugins the packages must contain: a missing build dependency drops its plugin
 # without failing the build, so the build checks for these.
 slurm_deb_required_plugins:
