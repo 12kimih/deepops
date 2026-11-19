@@ -25,7 +25,7 @@
 #slurm_repo_signing_pubkey: ""
 # The CUDA release whose NVML header the build uses (AutoDetect=nvml): the one the
 # driver branch serves.
-#slurm_nvml_cuda_version: "13.0"
+#slurm_nvml_cuda_version: '{{ nvidia_driver_cuda_release }}'
 
 # Ensure hosts file generation only runs across slurm cluster
 hosts_add_ansible_managed_hosts_groups: ["slurm-cluster"]

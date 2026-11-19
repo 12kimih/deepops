@@ -4,6 +4,7 @@ dependencies:
   - role: deepops_paths  # nvidia_power_limit_conf_file, sm_prefix
   - role: facts
   - role: retired_settings  # the source build's settings
+  - role: nvidia_versions  # nvidia_driver_cuda_release (the NVML headers the build uses)
 
 galaxy_info:
   namespace: deepops
