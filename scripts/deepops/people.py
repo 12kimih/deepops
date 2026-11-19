@@ -33,8 +33,12 @@ def main(argv):
     parser.add_argument("command", choices=["check"])
     parser.add_argument("files", nargs="*", type=Path)
     args = parser.parse_args(argv)
+    files = args.files or default_files()
+    if not files:
+        print("no roster to check: pass FILE, or create config.example/people.yml", file=sys.stderr)
+        return 1
     failed = False
-    for path in args.files or default_files():
+    for path in files:
         problems = people.check(yaml.safe_load(path.read_text()))
         for problem in problems:
             print(f"{path}: {problem}", file=sys.stderr)

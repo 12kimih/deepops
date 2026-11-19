@@ -65,6 +65,8 @@ if ! "${fast}"; then
         step "syntax-check ${playbook}" ansible-playbook -i config.example/inventory --syntax-check "${playbook}"
     done
     step "slurm epilog tests" bash tests/slurm-epilog/run-tests.sh
+    # Fake helm and kubectl; about eight minutes, so the full check only.
+    step "runai role tests" bash tests/runai/run-tests.sh
     for plugin in config.example/files/slurm/job_submit.lua; do
         step "job_submit.lua tests" lua roles/slurm/tests/job_submit_test.lua "${plugin}"
     done

@@ -2,7 +2,6 @@
 dependencies:
   - role: slurm_paths  # slurm_install_prefix, slurm_config_dir, host groups
   - role: facts
-  - role: rsyslog_client
 
 galaxy_info:
   namespace: deepops

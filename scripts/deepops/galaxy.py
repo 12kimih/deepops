@@ -80,14 +80,18 @@ def install():
 
 
 def installed_collections(where=COLLECTIONS):
-    out = subprocess.run(
+    result = subprocess.run(
         [GALAXY, "collection", "list", "--format", "json", "-p", str(where)],
         cwd=ROOT,
         capture_output=True,
         text=True,
-    ).stdout
+    )
+    # Nothing installed yet is an empty answer; a failure is not, and would read as
+    # "have none" for every collection.
+    if result.returncode != 0 and where.joinpath("ansible_collections").is_dir():
+        raise SystemExit(f"ansible-galaxy collection list failed: {result.stderr.strip()}")
     found = {}
-    for path, colls in (json.loads(out or "{}")).items():
+    for path, colls in (json.loads(result.stdout or "{}")).items():
         if Path(path).resolve() == (where / "ansible_collections").resolve():
             found.update({name: info["version"] for name, info in colls.items()})
     return found
@@ -100,6 +104,8 @@ def installed_role(name, where=ROLES):
 
 def problems(collections=COLLECTIONS, roles=ROLES):
     have, found = installed_collections(collections), []
+    if not REQUIREMENTS[0].exists():  # the site's list is optional, ours is not
+        found.append(f"{REQUIREMENTS[0].relative_to(ROOT)} is missing")
     for req in (r for r in REQUIREMENTS if r.exists()):
         data = yaml.safe_load(req.read_text()) or {}
         for c in data.get("collections") or []:

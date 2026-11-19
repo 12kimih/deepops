@@ -3,7 +3,7 @@
 # a GPU. Gate the role on GPU detection -- otherwise the dcgm service-start fails
 # on a CPU-only slurm-node (or the login/head node) and breaks the run. Mirrors
 # the GPU gate used by nvidia-driver.yml and nvidia-docker.yml.
-- hosts: "{{ hostlist | default('all') }}"
+- hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   tasks:
     - name: Install custom facts module (provides ansible_facts.ansible_local.gpus.count)

@@ -6,6 +6,10 @@ hwloc_build_dir: /opt/deepops/build/hwloc
 pmix_build_dir: /opt/deepops/build/pmix
 
 slurm_workflow_build: true
+# Set by the build (tasks/build.yml) when the installed Slurm is newer than the wanted
+# one; false when the role runs without a build, so the controller tasks never read it
+# undefined.
+slurm_downgrade: false
 slurm_version: "25.11.6"
 slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
 # The source tarball per version (roles/download); add one when changing slurm_version.

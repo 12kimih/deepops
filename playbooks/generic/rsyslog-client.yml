@@ -1,5 +1,5 @@
 ---
-- hosts: "{{ hostlist | default('all') }}"
+- hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   roles:
     - rsyslog_client

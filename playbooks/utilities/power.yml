@@ -8,6 +8,15 @@
   gather_facts: false
   tags:
     - power
+  pre_tasks:
+    # Anything but status acts on every BMC it reaches, the controller and the NFS
+    # servers too: name the hosts.
+    - name: Require hostlist for a power action
+      ansible.builtin.assert:
+        that: hostlist is defined or (bmc_power_action | default('status')) == 'status'
+        fail_msg: "-e bmc_power_action={{ bmc_power_action | default('status') }} needs -e hostlist=... naming the hosts."
+        quiet: true
+      run_once: true
   tasks:
     - name: Drive chassis power
       ansible.builtin.include_role:

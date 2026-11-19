@@ -60,6 +60,20 @@ class VaultShow(unittest.TestCase):
         self.assertIn("pass --host", self.run_script("secret").stderr)
         self.assertEqual(self.run_script("secret", "--host", "node1").stdout, "host\n")
 
+    def test_every_file_form_ansible_reads_is_searched(self):
+        (self.base / "config/group_vars/all").mkdir()
+        (self.base / "config/group_vars/all/secrets.yaml").write_text(self.vaulted("a", "dir"))
+        (self.base / "config/host_vars/node1.yaml").write_text(self.vaulted("b", "host"))
+        self.assertEqual(self.run_script("a").stdout, "dir\n")
+        self.assertEqual(self.run_script("b", "--host", "node1").stdout, "host\n")
+
+    def test_a_host_without_its_own_value_never_picks_a_group_silently(self):
+        (self.base / "config/group_vars/all.yml").write_text(self.vaulted("secret", "group"))
+        (self.base / "config/group_vars/other.yml").write_text(self.vaulted("secret", "other"))
+        result = self.run_script("secret", "--host", "node2")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("several files", result.stderr)
+
     def test_missing_name_fails(self):
         (self.base / "config/group_vars/all.yml").write_text("plain: 1\n")
         result = self.run_script("secret")
