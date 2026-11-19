@@ -6,11 +6,18 @@
           - {switch: "{{ slurm_enable_rsyslog_server }}", group: slurm-master, first: true}
           - {switch: "{{ kube_enable_rsyslog_server }}", group: kube_control_plane, first: true}
         needs: []                        # components a present one makes present
+        removal: explicit                # optional: never removed by a switch or group
 
 A rule holds when its switch is on and the host is in its group (only the group's first
 host with first: true). Rules of both deploys sit side by side, so a host in the Slurm
 and the Kubernetes deploy keeps what either wants. A component another present
 component needs is present too.
+
+A component with removal: explicit (the driver, authentication, Slurm, MUNGE, the NFS
+server: removing them reboots nodes, locks users out or hangs every NFS client) is
+never removed because a rule stopped holding: it is kept (its role does nothing) unless
+the site names it in deepops_component_removals, which makes it absent.
+
 """
 
 TRUE = {"true", "yes", "on", "1"}
@@ -30,12 +37,16 @@ def check(registry):
         for need in (c or {}).get("needs") or []:
             if need not in registry:
                 problems.append(f"{name}.needs: unknown component {need}")
+        if (c or {}).get("removal", "implicit") not in ("implicit", "explicit"):
+            problems.append(f"{name}.removal: implicit or explicit")
     return problems
 
 
-def components_desired(registry, groups, host):
-    """component -> present or absent for HOST."""
+def components_desired(registry, groups, host, removals=()):
+    """component -> present, absent or kept for HOST; REMOVALS names the explicit-removal
+    components the site wants absent."""
     problems = check(registry)
+    problems += [f"deepops_component_removals: unknown component {r}" for r in removals if r not in registry]
     if problems:
         from ansible.errors import AnsibleFilterError
 
@@ -54,7 +65,23 @@ def components_desired(registry, groups, host):
             if need not in present:
                 present.add(need)
                 todo.append(need)
-    return {name: "present" if name in present else "absent" for name in registry}
+    wanted = {r for r in removals if r in present}
+    if wanted:
+        from ansible.errors import AnsibleFilterError
+
+        raise AnsibleFilterError(
+            f"{host}: deepops_component_removals names {', '.join(sorted(wanted))}, which a switch "
+            "or group still wants here: turn that off first"
+        )
+
+    def state(name):
+        if name in present:
+            return "present"
+        if (registry[name] or {}).get("removal") == "explicit" and name not in removals:
+            return "kept"
+        return "absent"
+
+    return {name: state(name) for name in registry}
 
 
 def components_order(registry):

@@ -14,4 +14,5 @@ deepops_component_registry:
       - {switch: "{{ kube_enable_rsyslog_client }}", group: k8s_cluster}
 
 # This host's desired state of each component: present or absent.
-deepops_components: "{{ deepops_component_registry | components_desired(groups, inventory_hostname) }}"
+deepops_components: >-
+  {{ deepops_component_registry | components_desired(groups, inventory_hostname, deepops_component_removals) }}

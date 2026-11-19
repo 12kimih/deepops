@@ -102,9 +102,11 @@ exporters, then their dashboards, then Alertmanager, then Prometheus and Grafana
 report and metrics before cluster_tools_lib; HPC SDK registration before Lmod; NFS
 clients before the server.
 - Reboot-class and access-class components never go implicitly: the NVIDIA driver,
-  authentication (NIS, the directory, Kerberos), Slurm itself and MUNGE. Their absent
-  path exists but a deploy runs it only with an explicit `<role>_state: absent` set
-  in the configuration, never from a switch.
+  authentication (NIS, the directory, Kerberos), Slurm itself and MUNGE, and the NFS
+  server (unexporting /home hangs every client, as on 2026-11-18). Their registry entry
+  says `removal: explicit`; where no rule holds the map gives `kept` and the role does
+  nothing. The site removes one by naming it in `deepops_component_removals`; naming a
+  component a rule still wants on that host stops the deploy.
 
 ## What absent must undo besides packages
 
