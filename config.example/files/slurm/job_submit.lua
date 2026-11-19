@@ -298,39 +298,25 @@ local function reject_tasks(opt, value, cap, where, hint)
     return slurm.ERROR
 end
 
--- The fields that shape a GPU job (check_tasks, check_gpu_shape), which a
--- modification is merged over the job with.
-local SHAPE_FIELDS = {
-    "min_nodes", "gres", "tres_per_node", "tres_per_job", "tres_per_socket", "tres_per_task",
-    "sockets_per_node",
-    "ntasks_per_tres", "ntasks_per_socket", "ntasks_per_node", "num_tasks",
-}
-
--- The job as a modification would leave it: each shape field from the change where it
--- sets one, else from the job record. Submit and modify then judge the same thing.
-local function merged_shape(job_desc, job_rec)
-    local merged = {}
-    for _, key in ipairs(SHAPE_FIELDS) do
-        local v = job_desc[key]
-        if v == nil or v == "" or v == slurm.NO_VAL or v == slurm.NO_VAL16 then
-            v = job_rec ~= nil and job_rec[key] or nil
-        end
-        merged[key] = v
-    end
-    return merged
-end
-
 -- GPUs per node from GPUS_PER_NODE only (the [1] block). A per-node request is
 -- checked as it is; a per-socket one times --sockets-per-node (without it the count
 -- per node is open until placed, so it is refused with the way to say it); a job total
--- is spread over -N nodes when given, else taken as one node's (Slurm would otherwise
--- be free to split it unevenly).
+-- (--gpus, or --gpus-per-task times the tasks) over -N nodes, or as one node's request
+-- without -N. pin_gpu_shape then makes Slurm place a total that way. No GPUs (0) is
+-- always fine.
+local function gpu_nodes(job_desc)
+    if is_set(job_desc.min_nodes, slurm.NO_VAL) and job_desc.min_nodes >= 1 then
+        return job_desc.min_nodes, true
+    end
+    return 1, false
+end
+
 local function check_gpu_shape(job_desc)
     if #GPUS_PER_NODE == 0 then return slurm.SUCCESS end
-    local allowed = table.concat(GPUS_PER_NODE, ", ")
     local function refuse(fmt, ...)
-        slurm.log_user(fmt .. " A job takes %s GPUs per node, so a node's GPUs split " ..
-                       "without leaving fragments other jobs cannot use.", ..., allowed)
+        slurm.log_user("%s A job takes %s GPUs per node, so a node's GPUs split without " ..
+                       "leaving fragments other jobs cannot use.", string.format(fmt, ...),
+                       table.concat(GPUS_PER_NODE, ", "))
         return slurm.ERROR
     end
     local per_node = gpu_count_in(job_desc.gres) or gpu_count_in(job_desc.tres_per_node)
@@ -344,25 +330,25 @@ local function check_gpu_shape(job_desc)
         per_node = per_socket * job_desc.sockets_per_node
     end
     if per_node ~= nil then
-        if not GPUS_PER_NODE_OK[per_node] then
+        if per_node ~= 0 and not GPUS_PER_NODE_OK[per_node] then
             return refuse("%d GPUs per node is not allowed.", per_node)
         end
         return slurm.SUCCESS
     end
+    local nodes, nodes_given = gpu_nodes(job_desc)
     local total = gpu_count_in(job_desc.tres_per_job)
     local per_task = gpu_count_in(job_desc.tres_per_task)
-    local nodes_given = is_set(job_desc.min_nodes, slurm.NO_VAL) and job_desc.min_nodes >= 1
-    local nodes = nodes_given and job_desc.min_nodes or 1
     if total == nil and per_task ~= nil then
-        local tasks = 1
-        if is_set(job_desc.num_tasks, slurm.NO_VAL) then
-            tasks = job_desc.num_tasks
-        elseif is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) then
-            tasks = job_desc.ntasks_per_node * nodes
+        if is_set(job_desc.ntasks_per_node, slurm.NO_VAL16) then
+            total = job_desc.ntasks_per_node * per_task * nodes
+        elseif nodes > 1 then
+            return refuse("--gpus-per-task over %d nodes needs --ntasks-per-node, so every " ..
+                          "node gets the same GPUs.", nodes)
+        else
+            total = (is_set(job_desc.num_tasks, slurm.NO_VAL) and job_desc.num_tasks or 1) * per_task
         end
-        total = tasks * per_task
     end
-    if total == nil then return slurm.SUCCESS end
+    if total == nil or total == 0 then return slurm.SUCCESS end
     if total % nodes ~= 0 or not GPUS_PER_NODE_OK[total // nodes] then
         if nodes_given then
             return refuse("%d GPUs over %d node%s is not an allowed count per node.",
@@ -372,6 +358,33 @@ local function check_gpu_shape(job_desc)
                       "for more than one node give -N.", total)
     end
     return slurm.SUCCESS
+end
+
+-- A job total is only a number until Slurm places it, and Slurm may split it unevenly
+-- (8 GPUs as 7+1). So once check_gpu_shape accepted it, the job is held to the node
+-- count it was checked for (max_nodes), and a --gpus total becomes the per-node
+-- request it stands for.
+local function pin_gpu_shape(job_desc)
+    if #GPUS_PER_NODE == 0 then return end
+    if gpu_count_in(job_desc.gres) or gpu_count_in(job_desc.tres_per_node)
+       or gpu_count_in(job_desc.tres_per_socket) then
+        return
+    end
+    local total = gpu_count_in(job_desc.tres_per_job)
+    if total == nil and gpu_count_in(job_desc.tres_per_task) == nil then return end
+    local nodes = gpu_nodes(job_desc)
+    job_desc.max_nodes = nodes
+    if total == nil or total == 0 then return end
+    local per_node, job_rest = {}, {}
+    for token in string.gmatch(job_desc.tres_per_job, "[^,]+") do
+        if is_gpu_token(token) then
+            per_node[#per_node + 1] = string.gsub(token, "%d+$", string.format("%d", total // nodes))
+        else
+            job_rest[#job_rest + 1] = token
+        end
+    end
+    job_desc.tres_per_node = table.concat(per_node, ",")
+    job_desc.tres_per_job = table.concat(job_rest, ",")
 end
 
 -- A CPU-only job may not take a GPU node to itself (GPU_NODES_SHARED): --exclusive in
@@ -579,6 +592,7 @@ local function job_submit(job_desc, part_list, submit_uid)
         drop_cpu_sizing(job_desc, false)
     end
     route_gpu_job(job_desc, gpu_type)
+    pin_gpu_shape(job_desc)
     return slurm.SUCCESS
 end
 
@@ -633,15 +647,13 @@ local function job_modify(job_desc, job_rec, part_list, modify_uid)
         return check_cpu_on_gpu_nodes(job_desc, partition)
     end
 
-    -- The checks at submit saw the job as submitted; a later change of its GPUs or nodes
-    -- is judged on the job as it would be (merged_shape), by the same functions.
-    local merged = nil
-    if want_gpu or is_set(job_desc.min_nodes, slurm.NO_VAL) then
-        merged = merged_shape(job_desc, job_rec)
-        local rc = check_gpu_shape(merged)
-        if rc ~= slurm.SUCCESS then
-            return rc
-        end
+    -- The checks at submit saw the job whole. slurmctld hands this hook only part of a
+    -- job (its record carries no task counts), so a change of GPUs or nodes cannot be
+    -- judged again here; like the task layout, it is made by submitting again.
+    if want_gpu or is_set(job_desc.min_nodes, slurm.NO_VAL) or is_set(job_desc.max_nodes, slurm.NO_VAL) then
+        slurm.log_user("The GPUs or the node count of a GPU job cannot be changed; submit " ..
+                       "it again instead.")
+        return slurm.ERROR
     end
 
     if GPU_JOBS_USE_DEFAULTS then
@@ -650,13 +662,6 @@ local function job_modify(job_desc, job_rec, part_list, modify_uid)
             slurm.log_user("GPUs cannot be added to a CPU job; submit a new " ..
                            "GPU job instead.")
             return slurm.ERROR
-        end
-        -- Fewer GPUs or nodes than at submit could leave more tasks than GPUs.
-        if merged ~= nil then
-            local rc = check_tasks(merged)
-            if rc ~= slurm.SUCCESS then
-                return rc
-            end
         end
         if wants_memory(job_desc) then
             return reject_memory(true)
