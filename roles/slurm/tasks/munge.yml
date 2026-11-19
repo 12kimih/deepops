@@ -6,13 +6,24 @@
   notify:
     - Restart munge
 
-- name: Create munge.key
+- name: Require the site's MUNGE key
+  ansible.builtin.assert:
+    that: slurm_munge_key_file is file
+    fail_msg: >-
+      {{ slurm_munge_key_file }} does not exist. Capture the running cluster's key, or
+      create one, and vault it: docs/slurm-cluster/munge-key.md.
+    quiet: true
+  run_once: true
+  delegate_to: localhost
+
+- name: Install the MUNGE key
   diff: false  # the file holds a secret; --diff would print it
-  ansible.builtin.template:
-    src: templates/etc/munge/munge.key.j2
+  ansible.builtin.copy:
+    src: "{{ slurm_munge_key_file }}"
     dest: /etc/munge/munge.key
     mode: "0400"
     owner: munge
+    group: munge
   notify:
     - Restart munge
 

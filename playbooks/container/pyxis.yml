@@ -6,6 +6,20 @@
   roles:
     - role: deploy_defaults
     - role: enroot
+  tasks:
+    # enroot's NVIDIA hook runs nvidia-container-cli for every image that asks for GPUs
+    # (CUDA images all do); without the toolkit it fails "Command not found". Only the
+    # packages: Docker's runtime is container/nvidia-docker.yml's business.
+    - name: Read whether this host has GPUs
+      ansible.builtin.include_role:
+        name: facts
+
+    - name: Install the NVIDIA Container Toolkit for enroot's GPU hook
+      ansible.builtin.include_role:
+        name: nvidia_container_toolkit
+      vars:
+        nvidia_container_toolkit_configure_docker: false
+      when: ansible_facts.ansible_local['gpus']['count'] | int > 0
 
 - hosts: slurm-cluster
   become: true

@@ -239,7 +239,7 @@ for this.
 
 Typical values that should be encrypted include:
 
-- `slurm_password` and `slurm_db_password` (Slurm and SlurmDBD database credentials)
+- `slurm_db_password` (the SlurmDBD database credential), and the MUNGE key file (`slurm_munge_key_file`, a vault-encrypted file: [the MUNGE key](../slurm-cluster/munge-key.md))
 - `grafana_cfg_pass` (Grafana admin password)
 - Container registry credentials (`docker_login_registries`, `standalone_container_registry_cache_username`/`password`)
 - Any BMC/IPMI credentials used for provisioning (`bmc_password`)

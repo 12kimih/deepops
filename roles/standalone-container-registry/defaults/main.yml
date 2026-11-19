@@ -10,6 +10,9 @@ standalone_container_registry_state: present
 standalone_container_registry_config_template: "config.yml"
 
 standalone_container_registry_config_dir: "{{ deepops_dir }}/registry"
+# The registry's storage (/var/lib/registry), a host directory as the deploying docs use:
+# in the image's anonymous volume it was orphaned whenever the container was recreated.
+standalone_container_registry_data_dir: "{{ standalone_container_registry_config_dir }}/data"
 
 # To configure the container registry as a pull-through cache, set
 # standalone_container_registry_cache_enable to true.

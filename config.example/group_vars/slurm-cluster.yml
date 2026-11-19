@@ -12,7 +12,7 @@
 #slurm_manage_gpus: true
 #slurm_cluster_name: deepops
 #slurm_username: slurm
-#slurm_password: ReplaceWithASecurePasswordInTheVault
+#slurm_munge_key_file: "{{ inventory_dir }}/files/munge/munge.key"
 #slurm_db_username: slurm
 #slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
 #slurm_max_job_timelimit: UNLIMITED  # example
@@ -100,7 +100,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 # secrets live ONLY in your copy. Manage it as a separate PRIVATE repo:
 #   cp -r config.example config
 #   cd config && git init && git remote add origin git@github.com:yourorg/deepops-config.git
-#   ansible-vault encrypt_string --prompt --name slurm_password   # vault each secret inline
+#   ansible-vault encrypt_string --prompt --name slurm_db_password   # vault each secret inline
 
 ################################################################################
 # Login on compute

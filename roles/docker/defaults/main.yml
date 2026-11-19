@@ -2,7 +2,14 @@
 # Install Docker CE from Docker's official repository, following the official docs:
 #   Ubuntu: https://docs.docker.com/engine/install/ubuntu/
 #   Debian: https://docs.docker.com/engine/install/debian/
-#   RHEL:   https://docs.docker.com/engine/install/rhel/ (centos repo for EL clones)
+#   RHEL:   https://docs.docker.com/engine/install/rhel/ (RHEL 8-10 and its rebuilds)
+#
+# The Docker Engine release every node runs (docker-ce and docker-ce-cli, as the docs
+# pin them; the plugins and containerd.io follow the repository). Pinned so nodes
+# installed months apart run the same engine, and because live-restore keeps containers
+# only across patch releases (YY.MM.x). os_updates never upgrades docker-ce* on its own.
+# https://docs.docker.com/engine/release-notes/
+docker_engine_version: "29.10.0"
 #
 # The full Docker Engine package set per the docs (engine + CLI + containerd + the
 # buildx and compose plugins).
@@ -12,6 +19,13 @@ docker_packages:
   - containerd.io
   - docker-buildx-plugin
   - docker-compose-plugin
+
+# Packages that conflict with Docker Engine, removed before it is installed, as the
+# install docs say (the distribution's own docker, compose, containerd and runc).
+docker_conflicting_packages:
+  Debian: [docker.io, docker-compose, docker-compose-v2, docker-doc, podman-docker, containerd, runc]
+  RedHat: [docker, docker-client, docker-client-latest, docker-common, docker-latest,
+           docker-latest-logrotate, docker-logrotate, docker-engine, podman, runc]
 
 # Wait up to this many seconds for the apt/dpkg lock instead of failing immediately --
 # unattended-upgrades on a freshly booted node often holds it (the classic
@@ -32,9 +46,9 @@ docker_debian_repo_base_url: "https://download.docker.com/linux/debian"
 docker_debian_repo_gpgkey: "{{ docker_debian_repo_base_url }}/gpg"
 
 # RHEL-family dnf repo, written here (not a downloaded .repo file, which could change
-# its settings): the centos tree works on RHEL/Rocky/Alma/CentOS; a mirror keeps its
-# layout ($releasever/$basearch/stable).
-docker_rh_repo_base_url: "https://download.docker.com/linux/centos"
+# its settings): the rhel tree the RHEL install docs use; a mirror keeps its layout
+# ($releasever/$basearch/stable).
+docker_rh_repo_base_url: "https://download.docker.com/linux/rhel"
 docker_rh_repo_gpgkey: "{{ docker_rh_repo_base_url }}/gpg"
 
 # Manage + start the docker service after install.
@@ -74,6 +88,12 @@ docker_daemon_options: {}
 # run with it restarts dockerd once. Not compatible with swarm mode. Whether a run may
 # restart dockerd at all is docker_daemon_restart (roles/docker_daemon_json).
 docker_live_restore: true
+
+# The default logging driver of containers: Docker rotates no log by default, and the
+# docs recommend `local` (compressed, rotated; `docker logs` still works). Applies to
+# containers created after the change. "" leaves Docker's default (json-file, unbounded).
+# https://docs.docker.com/engine/logging/configure/
+docker_log_driver: local
 
 # Kernel limits a container host reaches long before it runs out of CPU or memory.
 # Both are ceilings: raising them permits more and costs nothing while unused. The

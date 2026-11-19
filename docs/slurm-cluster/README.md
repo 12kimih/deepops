@@ -232,7 +232,7 @@ and secrets there and manage that directory as a separate **private** repo:
 ```sh
 cp -r config.example config
 cd config && git init && git remote add origin git@github.com:yourorg/deepops-config.git
-ansible-vault encrypt_string --prompt --name slurm_password   # vault each secret inline
+ansible-vault encrypt_string --prompt --name slurm_db_password   # vault each secret inline
 ```
 
 See the comments in

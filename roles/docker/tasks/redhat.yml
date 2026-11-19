@@ -1,10 +1,13 @@
 ---
-# Follows https://docs.docker.com/engine/install/centos/ (works on RHEL/Rocky/Alma):
-# dnf-plugins-core + the docker-ce-stable repository, then install the Engine + plugins.
-- name: Install dnf-plugins-core
-  ansible.builtin.dnf:
-    name: dnf-plugins-core
-    state: present
+# Follows https://docs.docker.com/engine/install/rhel/ (RHEL 8-10 and its rebuilds):
+# remove the conflicting packages, add the docker-ce-stable repository (written here,
+# so no dnf config-manager plugin is needed), then install the Engine + plugins.
+- name: Remove the packages that conflict with Docker Engine
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ docker_conflicting_packages.RedHat }}"
 
 - name: Add the Docker CE dnf repository
   ansible.builtin.yum_repository:
@@ -17,5 +20,5 @@
 
 - name: Install Docker Engine + plugins
   ansible.builtin.dnf:
-    name: "{{ docker_packages }}"
+    name: "{{ docker_packages | map('regex_replace', '^(docker-ce|docker-ce-cli)$', '\\1-' ~ docker_engine_version) | list }}"
     state: present

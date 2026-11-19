@@ -40,6 +40,15 @@
     mode: "0600"
   register: standalone_container_registry_config
 
+- name: Create the registry storage directory
+  ansible.builtin.file:
+    path: "{{ standalone_container_registry_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  register: standalone_container_registry_data
+
 - name: Add EPEL (RHEL family)
   ansible.builtin.include_role:
     name: package_repos
@@ -49,6 +58,24 @@
   ansible.builtin.package:
     name: python3-docker
     state: present
+
+# A registry started before its storage was a host directory kept it in an anonymous
+# volume: copy that into the new directory once, before the container is recreated.
+- name: Look for an earlier registry container
+  community.docker.docker_container_info:
+    name: "{{ standalone_container_registry_name }}"
+  register: standalone_container_registry_earlier
+  when: standalone_container_registry_data is changed
+
+- name: Keep what the earlier registry stored
+  ansible.builtin.command:
+    argv: [docker, cp, "{{ standalone_container_registry_name }}:/var/lib/registry/.", "{{ standalone_container_registry_data_dir }}/"]
+  when:
+    - standalone_container_registry_data is changed
+    - standalone_container_registry_earlier.exists | default(false)
+    - standalone_container_registry_earlier.container.Mounts | selectattr('Destination', 'equalto', '/var/lib/registry')
+      | selectattr('Type', 'equalto', 'volume') | list | length > 0
+  changed_when: true
 
 - name: Run registry docker container
   community.docker.docker_container:
@@ -60,6 +87,8 @@
     # (a new image already recreates the container). restart_policy keeps it across boots.
     restart: "{{ standalone_container_registry_config is changed }}"
     restart_policy: unless-stopped
-    env: "{{ proxy_env }}"
+    # The registry exports traces to localhost:4318 unless told not to (its docs).
+    env: "{{ proxy_env | combine({'OTEL_TRACES_EXPORTER': 'none'}) }}"
     volumes:
       - "{{ standalone_container_registry_config_dir }}/config.yml:/etc/docker/registry/config.yml"
+      - "{{ standalone_container_registry_data_dir }}:/var/lib/registry"

@@ -66,7 +66,9 @@
     name: docker_daemon_json
   vars:
     docker_daemon_json_owner: docker
-    docker_daemon_json_keys: "{{ docker_daemon_options | combine({'live-restore': docker_live_restore | bool}) }}"
+    docker_daemon_json_keys: >-
+      {{ docker_daemon_options | combine({'live-restore': docker_live_restore | bool})
+         | combine({'log-driver': docker_log_driver} if docker_log_driver | length > 0 else {}) }}
 
 - name: Raise the kernel limits a container host runs into
   ansible.posix.sysctl:

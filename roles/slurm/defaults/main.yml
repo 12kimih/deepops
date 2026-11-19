@@ -47,7 +47,13 @@ slurm_contain_ssh: true
 
 slurm_cluster_name: deepops
 slurm_username: slurm
-slurm_password: ReplaceWithASecurePasswordInTheVault
+# The MUNGE key every Slurm host shares, a file in the site config kept vault-encrypted
+# and copied verbatim. Create it with munge's own tool, or capture a running cluster's
+# (docs/slurm-cluster/munge-key.md), then `ansible-vault encrypt` it. Never derived from
+# a password: such a key is only as strong as the password, and the derivation followed
+# Ansible's hashing internals, so another Ansible could produce a different key.
+# https://github.com/dun/munge/wiki/Installation-Guide#creating-a-secret-key
+slurm_munge_key_file: "{{ inventory_dir }}/files/munge/munge.key"
 slurm_user_uid: 22078
 slurm_user_home: /local/slurm
 
