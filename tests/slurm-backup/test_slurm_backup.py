@@ -225,6 +225,14 @@ class Backup(unittest.TestCase):
         self.assertEqual(sb.publish(self.cfg), 0)
         self.assertIn("slurm_backup_last_success_timestamp_seconds", published.read_text())
 
+    def test_publish_names_every_destination_before_its_first_backup(self):
+        # No backup has run: without this series SlurmBackupNeverRan has nothing to see.
+        self.assertEqual(sb.publish(self.cfg), 0)
+        text = (self.base / "prom" / "slurm-backup.prom").read_text()
+        for dest in self.cfg["destinations"]:
+            self.assertIn(f'slurm_backup_destination_configured{{destination="{dest["path"]}"}} 1', text)
+        self.assertNotIn("last_status", text)
+
 
 class Main(unittest.TestCase):
     def test_usage(self):

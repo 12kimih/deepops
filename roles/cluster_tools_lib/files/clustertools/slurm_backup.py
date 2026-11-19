@@ -140,11 +140,15 @@ def locked(cfg):
 
 
 def publish(cfg):
-    """Copy the kept metrics into the textfile directory."""
+    """Publish the kept metrics, with one series per configured destination: a
+    destination no backup has reached yet has no result series, and only this one says
+    it should (rules/backup.yml SlurmBackupNeverRan)."""
     kept = Path(cfg["metrics_file"])
-    if kept.exists():
-        Path(cfg["textfile_dir"]).mkdir(parents=True, exist_ok=True)
-        write_atomic(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), kept.read_text())
+    values = parse(kept.read_text()) if kept.exists() else {}
+    for dest in cfg["destinations"]:
+        values[series("destination_configured", destination=dest["path"])] = 1
+    Path(cfg["textfile_dir"]).mkdir(parents=True, exist_ok=True)
+    write_atomic(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), render(values))
     return 0
 
 

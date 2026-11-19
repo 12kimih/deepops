@@ -10,6 +10,8 @@
 # The metrics are kept in /var/lib/os-updates (the textfile directory is usually
 # tmpfs and empty after a reboot, and an absent series never alerts), together with
 # when security updates were first seen pending, so "pending for N days" survives.
+# Whether a reboot is pending is measured afresh on every publish, the boot one too: a
+# kept copy from before the reboot would report the reboot it just had as pending.
 set -eu
 state=${OS_UPDATES_STATE:-/var/lib/os-updates}  # overridable for the tests
 publish_only=false
@@ -17,16 +19,35 @@ publish_only=false
 dir=${1:?textfile directory}
 mkdir -p "$dir" "$state"
 
+now=$(date +%s)
+
+# reboot-required's mtime moves each time a package touches it; the first time it was
+# seen is kept instead, on /run like the flag itself, so a reboot clears both.
+reboot_flag=${OS_UPDATES_REBOOT_FLAG:-/var/run/reboot-required}  # overridable for the tests
+reboot_stamp=${OS_UPDATES_RUN:-/run}/os-updates-reboot-required-since
+reboot_state() {
+    if [ -f "$reboot_flag" ]; then
+        reboot=1
+        [ -s "$reboot_stamp" ] || echo "$now" > "$reboot_stamp"
+        reboot_since=$(cat "$reboot_stamp")
+    else
+        reboot=0; reboot_since=0
+        rm -f "$reboot_stamp"
+    fi
+}
+
 publish() {
     [ -f "$state/os-updates.prom" ] || return 0
+    reboot_state
     tmp=$(mktemp "$dir/.os-updates.XXXXXX")
-    cp "$state/os-updates.prom" "$tmp"
+    sed -e "s/^os_updates_reboot_required .*/os_updates_reboot_required $reboot/" \
+        -e "s/^os_updates_reboot_required_since_seconds .*/os_updates_reboot_required_since_seconds $reboot_since/" \
+        "$state/os-updates.prom" > "$tmp"
     chmod 0644 "$tmp"
     mv "$tmp" "$dir/os-updates.prom"
 }
 if $publish_only; then publish; exit 0; fi
 
-now=$(date +%s)
 # A package left half-installed or half-configured (an interrupted upgrade) makes
 # dpkg refuse every later change, security updates included, without telling anyone.
 dpkg_problems=$(dpkg --audit 2>/dev/null | grep -c '^ ' || true)
@@ -47,17 +68,7 @@ if [ "$apt_ok" = 1 ]; then
     fi
 fi
 security_since=$(cat "$state/security-pending-since" 2>/dev/null || echo 0)
-# reboot-required's mtime moves each time a package touches it; the first time it was
-# seen is kept instead, on /run like the flag itself, so a reboot clears both.
-reboot_stamp=${OS_UPDATES_RUN:-/run}/os-updates-reboot-required-since
-if [ -f /var/run/reboot-required ]; then
-    reboot=1
-    [ -s "$reboot_stamp" ] || echo "$now" > "$reboot_stamp"
-    reboot_since=$(cat "$reboot_stamp")
-else
-    reboot=0; reboot_since=0
-    rm -f "$reboot_stamp"
-fi
+reboot_state
 # One series per installed package ("ii"); label values escaped as the format requires.
 packages=$(dpkg-query -W -f '${db:Status-Abbrev}|${binary:Package}|${Version}\n' 2>/dev/null \
     | awk -F'|' '$1 ~ /^ii/ { gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);

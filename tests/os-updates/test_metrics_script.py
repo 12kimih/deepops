@@ -71,3 +71,39 @@ class PackageInfoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BootRepublishTests(unittest.TestCase):
+    def test_the_boot_republish_does_not_report_the_reboot_it_followed_as_pending(self):
+        # Measured with a reboot pending, then republished after the reboot (the flag on
+        # /run is gone): the kept copy said 1, which kept OsRebootPending firing.
+        with tempfile.TemporaryDirectory() as d:
+            bin_, state, run, textfile = (Path(d, n) for n in ("bin", "state", "run", "textfile"))
+            for path in (bin_, run):
+                path.mkdir()
+            for name in ("dpkg", "apt-get", "dpkg-query"):
+                (bin_ / name).write_text("#!/bin/sh\nexit 0\n")
+                (bin_ / name).chmod(0o755)
+            flag = run / "reboot-required"
+            env = dict(os.environ, PATH=f"{bin_}:{os.environ['PATH']}", OS_UPDATES_STATE=str(state),
+                       OS_UPDATES_RUN=str(run), OS_UPDATES_REBOOT_FLAG=str(flag))  # fmt: skip
+
+            def published(*args):
+                subprocess.run(
+                    ["sh", str(SCRIPT), *args, str(textfile)], env=env, check=True, capture_output=True
+                )
+                return dict(
+                    line.split(" ", 1)
+                    for line in (textfile / "os-updates.prom").read_text().splitlines()
+                    if line.startswith("os_updates_reboot_required")
+                )
+
+            flag.touch()
+            before = published()
+            self.assertEqual(before["os_updates_reboot_required"], "1")
+            flag.unlink()
+            (run / "os-updates-reboot-required-since").unlink()  # /run is empty after a reboot
+            after = published("--publish")
+            self.assertEqual(
+                after, {"os_updates_reboot_required": "0", "os_updates_reboot_required_since_seconds": "0"}
+            )

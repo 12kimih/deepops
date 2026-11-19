@@ -194,3 +194,24 @@ tests:
             exp_annotations:
               summary: "The open_ondemand TLS certificate on ctl has expired"
               description: "Clients refuse the service. Renew it in the site config's vault and deploy the role that installs it."
+
+  - name: a configured backup destination that never reports a result pages after 36 hours
+    interval: 1h
+    input_series:
+      - series: 'slurm_backup_destination_configured{host="m", instance="m:9100", destination="/backup/a"}'
+        values: '1x50'
+      - series: 'slurm_backup_destination_configured{host="m", instance="m:9100", destination="/backup/b"}'
+        values: '1x50'
+      - series: 'slurm_backup_last_status{host="m", instance="m:9100", destination="/backup/b"}'
+        values: '1x50'
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: SlurmBackupNeverRan
+        exp_alerts: []
+      - eval_time: 40h
+        alertname: SlurmBackupNeverRan
+        exp_alerts:
+          - exp_labels: {severity: critical, host: m, instance: "m:9100", destination: /backup/a}
+            exp_annotations:
+              summary: "No Slurm backup to /backup/a has run for 36 hours"
+              description: "`systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on m; the accounting database and controller state have no copy there."
