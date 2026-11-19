@@ -21,7 +21,7 @@ A roster file declares the roles a site uses and the people:
         status: active            # active (default) or left
 
 Every list a role consumes (sudo netgroup, group members, Slurm associations,
-chat IDs) is computed from `people` with the filters below, so access is granted
+chat IDs, subordinate IDs) is computed from `people` with the filters below, so access is granted
 and revoked in one place. Only `active` people get anything; someone who has left
 keeps an entry so the UID stays reserved and the account can be locked.
 
@@ -74,6 +74,34 @@ def people_accounting(people):
             if p.get("default_account"):
                 u["default_account"] = p["default_account"]
             out[n] = u
+    return out
+
+
+SUBID_MAX = 2**32 - 2  # the highest valid ID; 2**32 - 1 is (uid_t)-1
+
+
+def people_subids(people, base=100000, count=65536, uid_min=UID_MIN):
+    """[{name, uid, start, count}] subordinate ID ranges for active people, by UID.
+
+    A range is computed from the UID alone (start = base + (uid - uid_min) * count),
+    so every node agrees without coordination and a range never moves when someone is
+    added or leaves. A left person's range stays reserved by their UID. The ranges
+    must lie above every roster UID and within the 32-bit ID space."""
+    from ansible.errors import AnsibleFilterError
+
+    people = people or {}
+    uids = [int((p or {})["uid"]) for p in people.values()]
+    if uids and base <= max(uids):
+        raise AnsibleFilterError(f"subordinate ID base {base} must exceed the highest roster UID {max(uids)}")
+    out = []
+    for name, p in sorted(_active(people).items(), key=lambda item: int(item[1]["uid"])):
+        uid = int(p["uid"])
+        start = base + (uid - uid_min) * count
+        if uid < uid_min or start + count - 1 > SUBID_MAX:
+            raise AnsibleFilterError(
+                f"{name}: UID {uid} gives no subordinate range within {base}..{SUBID_MAX} of width {count}"
+            )
+        out.append({"name": name, "uid": uid, "start": start, "count": count})
     return out
 
 
@@ -164,5 +192,6 @@ class FilterModule:
             "people_with_role": people_with_role,
             "people_attr": people_attr,
             "people_accounting": people_accounting,
+            "people_subids": people_subids,
             "people_check": people_check,
         }

@@ -48,6 +48,21 @@ class Derive(unittest.TestCase):
             },
         )
 
+    def test_subids_follow_the_uid_alone(self):
+        ranges = people.people_subids(self.p)
+        self.assertEqual([r["name"] for r in ranges], ["alice", "bob", "dave"])
+        self.assertEqual(ranges[0], {"name": "alice", "uid": 1001, "start": 165536, "count": 65536})
+        # dave keeps his range when carol (1003, left) is gone from the active list
+        self.assertEqual(ranges[2]["start"], 100000 + 4 * 65536)
+
+    def test_subids_refuse_overlap_and_overflow(self):
+        from ansible.errors import AnsibleFilterError
+
+        with self.assertRaises(AnsibleFilterError):
+            people.people_subids(self.p, base=1004)
+        with self.assertRaises(AnsibleFilterError):
+            people.people_subids({"zed": {"uid": 70000}})
+
     def test_left_entry_with_access_would_still_grant_nothing(self):
         p = copy.deepcopy(self.p)
         p["carol"].update(roles=["admin"], accounts={"team-a": {}})

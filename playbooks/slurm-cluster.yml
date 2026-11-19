@@ -162,6 +162,12 @@
   tags:
     - pyxis
 
+- name: Install rootless Podman for image builds
+  import_playbook: container/podman.yml
+  when: slurm_install_podman
+  tags:
+    - podman
+
 # Both run after authentication.yml has published the group and the netgroup through
 # NIS, so the compute nodes can resolve them. No-ops unless configured.
 - name: Point the Docker socket at a cluster-wide group

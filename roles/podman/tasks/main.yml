@@ -1,0 +1,85 @@
+---
+- name: Install rootless Podman
+  ansible.builtin.package:
+    name: "{{ podman_packages[ansible_facts.os_family] }}"
+    state: present
+    install_recommends: "{{ false if ansible_facts.os_family == 'Debian' else omit }}"
+
+# Owned whole: a range outside the roster (useradd adds one for each new local user)
+# could overlap a roster range, and container root of two users would then share IDs.
+- name: Write the subordinate UID and GID ranges
+  ansible.builtin.template:
+    src: subid.j2
+    dest: "/etc/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [subuid, subgid]
+
+# Rootless podman reads /etc/containers/storage.conf unless the user has their own.
+- name: Keep rootless image storage on local disk
+  ansible.builtin.template:
+    src: storage.conf.j2
+    dest: /etc/containers/storage.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the containers.conf drop-in directory
+  ansible.builtin.file:
+    path: /etc/containers/containers.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Run podman without a systemd user instance
+  ansible.builtin.template:
+    src: containers.conf.j2
+    dest: /etc/containers/containers.conf.d/50-deepops-rootless.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the storage and runtime roots
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ podman_storage_root }}"
+    - "{{ podman_runtime_root }}"
+
+# Created by root, so no user can take another's name first in a shared parent.
+- name: Create each user's storage and runtime directory
+  ansible.builtin.file:
+    path: "{{ item.0 }}/{{ item.1.uid }}"
+    state: directory
+    owner: "{{ item.1.uid }}"
+    group: "{{ item.1.uid }}"
+    mode: "0700"
+  loop: "{{ [podman_storage_root, podman_runtime_root] | product(podman_subids) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1.uid }} ({{ item.1.name }})"
+
+- name: Recreate the runtime directories at boot
+  ansible.builtin.template:
+    src: tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/podman-users.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Point podman at the user's runtime directory
+  ansible.builtin.template:
+    src: podman-wrapper.sh.j2
+    dest: /usr/local/bin/podman
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Let podman create user namespaces under AppArmor
+  ansible.builtin.include_tasks: apparmor.yml
+  when: ansible_facts.distribution == 'Ubuntu'

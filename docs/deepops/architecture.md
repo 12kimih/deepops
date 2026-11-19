@@ -147,6 +147,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── os_updates
 │   ├── package_repos
 │   ├── people
+│   ├── podman
 │   ├── prometheus
 │   ├── prometheus-ipmi-exporter
 │   ├── prometheus-node-exporter

@@ -1,0 +1,11 @@
+---
+# Rootless Podman on the compute nodes (roles/podman): users build images from a
+# Dockerfile inside a CPU job and import them into enroot. Switched by
+# slurm_install_podman; docs/container/podman.md is the user guide.
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  tags:
+    - podman
+  roles:
+    - role: deploy_defaults
+    - role: podman

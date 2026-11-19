@@ -384,6 +384,20 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #pyxis_run_tmpfs_size: 50%
 
 ################################################################################
+# Rootless Podman (image builds)                                               #
+################################################################################
+# Rootless Podman on the compute nodes: users build an image from a Dockerfile in a
+# CPU job and import it with `enroot import podman://IMAGE` (docs/container/podman.md).
+#slurm_install_podman: true
+# Who gets a subordinate UID/GID range, computed from the roster UID so every node
+# agrees (start = base + (uid - 1000) * count). The base must exceed every roster UID.
+#podman_people: "{{ people }}"  # example
+#podman_subid_base: 100000
+#podman_subid_count: 65536
+# Per-user image storage, on node-local disk (never NFS).
+#podman_storage_root: /var/lib/podman-storage
+
+################################################################################
 # Node Health Check                                                            #
 ################################################################################
 #slurm_install_nhc: true
