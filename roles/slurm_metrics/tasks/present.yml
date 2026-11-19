@@ -33,11 +33,6 @@
     enabled: true
     daemon_reload: true
 
-# Resolved here: inside the included grafana role, role_path names that role.
-- name: Locate the dashboards
-  ansible.builtin.set_fact:
-    slurm_metrics_dashboards: ["{{ role_path }}/files/slurm-gpu-allocation.json"]
-
 - name: Install the dashboards
   ansible.builtin.include_role:
     name: grafana
@@ -45,7 +40,6 @@
     public: true
   vars:
     grafana_dashboard_set: "{{ slurm_metrics_dashboard_set }}"
-    grafana_dashboard_files: "{{ slurm_metrics_dashboards }}"
 
 - name: Record the component as present
   ansible.builtin.include_role:

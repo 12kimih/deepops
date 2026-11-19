@@ -8,7 +8,7 @@ through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering
 
 from grafana import STATE_COLORS, bars, dashboard, query, stat, table, timeseries
 
-PATH = "roles/slurm_metrics/files/slurm-gpu-allocation.json"
+PATH = "src/dashboards/slurm-gpu-allocation.json"
 
 ALLOC = "host_device:slurm_gpu_allocated:max"
 NODE_GPUS = "max by (node, gpu_type) (slurm_node_gpus)"

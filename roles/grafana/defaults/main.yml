@@ -33,7 +33,3 @@ grafana_dashboard_folder_uid: deepops
 # Full, SLURM Dashboard). Grafana keeps them as ordinary dashboards once their files are
 # gone, so the role deletes them.
 grafana_retired_dashboards: [syl6zhqkz, rYdddlPWk, slurm]
-# Files under src/dashboards/ to provision (exporter roles may add their own).
-grafana_dashboards:
-  - gpu-nodes.json
-  - node-exporter-hosts.json

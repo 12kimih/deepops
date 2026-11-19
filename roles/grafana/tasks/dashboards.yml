@@ -8,8 +8,7 @@
 #     name: grafana
 #     tasks_from: dashboards
 #   vars:
-#     grafana_dashboard_set: slurm
-#     grafana_dashboard_files: ["{{ role_path }}/files/slurm-scheduler.json"]
+#     grafana_dashboard_set: slurm   # its files: grafana_dashboard_sets (roles/prometheus_paths)
 - name: Create the dashboard directory ({{ grafana_dashboard_set }})
   ansible.builtin.file:
     path: "{{ grafana_dashboards_dir }}/{{ grafana_dashboard_set }}"
@@ -20,12 +19,12 @@
 
 - name: Install dashboards ({{ grafana_dashboard_set }})
   ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ grafana_dashboards_dir }}/{{ grafana_dashboard_set }}/{{ item | basename }}"
+    src: "{{ role_path }}/../../src/dashboards/{{ item }}"
+    dest: "{{ grafana_dashboards_dir }}/{{ grafana_dashboard_set }}/{{ item }}"
     owner: root
     group: root
     mode: "0644"
-  loop: "{{ grafana_dashboard_files }}"
+  loop: "{{ grafana_dashboard_sets[grafana_dashboard_set] }}"
 
 - name: Find installed dashboards ({{ grafana_dashboard_set }})
   ansible.builtin.find:
@@ -40,5 +39,5 @@
   loop: "{{ grafana_dashboard_installed.files | map(attribute='path') | reject('in', grafana_dashboard_wanted) }}"
   vars:
     grafana_dashboard_wanted: >-
-      {{ grafana_dashboard_files | map('basename')
+      {{ grafana_dashboard_sets[grafana_dashboard_set]
          | map('regex_replace', '^', grafana_dashboards_dir ~ '/' ~ grafana_dashboard_set ~ '/') | list }}

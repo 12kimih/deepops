@@ -7,7 +7,7 @@ the queries below change then.
 
 from grafana import STATE_COLORS, dashboard, query, row, stat, timeseries
 
-PATH = "roles/prometheus-slurm-exporter/files/slurm-scheduler.json"
+PATH = "src/dashboards/slurm-scheduler.json"
 
 # Exporter suffix -> state name shown (STATE_COLORS keys). The exporter's states are
 # exclusive, so they add up to every node.

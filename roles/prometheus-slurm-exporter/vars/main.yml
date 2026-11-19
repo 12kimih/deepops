@@ -5,9 +5,10 @@ slurm_exporter_dashboard_set: slurm
 slurm_exporter_items: >-
   {{ ['unit:' ~ slurm_exporter_svc_name, 'container:' ~ slurm_exporter_svc_name,
       'file:/etc/systemd/system/' ~ slurm_exporter_svc_name,
-      'file:' ~ grafana_dashboards_dir ~ '/' ~ slurm_exporter_dashboard_set ~ '/slurm-scheduler.json',
       'dir:' ~ grafana_dashboards_dir ~ '/' ~ slurm_exporter_dashboard_set,
       'file:' ~ slurm_exporter_build_dir ~ '/Dockerfile']
+     + grafana_dashboard_sets[slurm_exporter_dashboard_set]
+       | map('regex_replace', '^', 'file:' ~ grafana_dashboards_dir ~ '/' ~ slurm_exporter_dashboard_set ~ '/') | list
      + (slurm_exporter_sources | default([]) | map('basename')
         | map('regex_replace', '^', 'file:' ~ slurm_exporter_build_dir ~ '/exporter/') | list)
      + ['dir:' ~ slurm_exporter_build_dir ~ '/exporter', 'dir:' ~ slurm_exporter_build_dir] }}

@@ -14,10 +14,6 @@
     path: "{{ prometheus_cfg_endpoint_dir }}/slurm-exporter.yml"
     state: absent
 
-- name: Locate the Slurm dashboard
-  ansible.builtin.set_fact:
-    slurm_exporter_dashboards: ["{{ role_path }}/files/slurm-scheduler.json"]
-
 - name: Install the Slurm dashboard
   ansible.builtin.include_role:
     name: grafana
@@ -25,7 +21,6 @@
     public: true
   vars:
     grafana_dashboard_set: "{{ slurm_exporter_dashboard_set }}"
-    grafana_dashboard_files: "{{ slurm_exporter_dashboards }}"
 
 - name: Create image build dir
   ansible.builtin.file:

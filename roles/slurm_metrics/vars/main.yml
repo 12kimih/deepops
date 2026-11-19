@@ -3,12 +3,15 @@
 # its units, the text file it publishes (a stale one would keep feeding the alerts and
 # the dashboard) and its dashboard.
 slurm_metrics_dashboard_set: slurm_metrics
-slurm_metrics_items:
+slurm_metrics_items: >-
+  {{ slurm_metrics_service_items
+     + grafana_dashboard_sets[slurm_metrics_dashboard_set]
+       | map('regex_replace', '^', 'file:' ~ grafana_dashboards_dir ~ '/' ~ slurm_metrics_dashboard_set ~ '/') | list
+     + ['dir:' ~ grafana_dashboards_dir ~ '/' ~ slurm_metrics_dashboard_set] }}
+slurm_metrics_service_items:
   - "unit:{{ slurm_metrics_svc_name }}.timer"
   - "unit:{{ slurm_metrics_svc_name }}.service"
   - "file:/etc/systemd/system/{{ slurm_metrics_svc_name }}.timer"
   - "file:/etc/systemd/system/{{ slurm_metrics_svc_name }}.service"
   - "file:{{ slurm_metrics_command }}"
   - "file:{{ slurm_metrics_textfile_dir }}/{{ slurm_metrics_textfile }}"
-  - "file:{{ grafana_dashboards_dir }}/{{ slurm_metrics_dashboard_set }}/slurm-gpu-allocation.json"
-  - "dir:{{ grafana_dashboards_dir }}/{{ slurm_metrics_dashboard_set }}"
