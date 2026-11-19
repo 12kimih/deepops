@@ -1,0 +1,48 @@
+---
+- name: Refuse the retired repository settings
+  ansible.builtin.include_tasks: retired.yml
+
+- name: Add the CUDA repository (Ubuntu)
+  when: ansible_facts.os_family == 'Debian'
+  block:
+    - name: Fetch the CUDA keyring
+      ansible.builtin.include_role:
+        name: download
+      vars:
+        download_url: "{{ package_repos_cuda_url }}/{{ package_repos_cuda_keyring }}"
+        download_checksum: "{{ package_repos_cuda_keyring_checksums[package_repos_cuda_dir] | default('') }}"
+        download_dest: "/var/cache/deepops/{{ package_repos_cuda_dir | replace('/', '-') }}-{{ package_repos_cuda_keyring }}"
+
+    - name: Install the CUDA keyring
+      ansible.builtin.apt:
+        deb: "/var/cache/deepops/{{ package_repos_cuda_dir | replace('/', '-') }}-{{ package_repos_cuda_keyring }}"
+      register: package_repos_cuda_keyring_install
+      # Under --check a keyring not yet fetched is not there to install.
+      when: not (ansible_check_mode and download_fetch is changed)
+
+    # The keyring package writes this source with NVIDIA's URL; owned here, it follows
+    # package_repos_cuda_base, so a mirror needs no step on the hosts. (A conffile: apt
+    # keeps this version when the keyring is upgraded.)
+    - name: Point the CUDA repository source at package_repos_cuda_url
+      ansible.builtin.copy:
+        dest: "/etc/apt/sources.list.d/cuda-{{ package_repos_cuda_dir | replace('/', '-') }}.list"
+        content: "deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] {{ package_repos_cuda_url }}/ /\n"
+        owner: root
+        group: root
+        mode: "0644"
+      register: package_repos_cuda_source
+
+    - name: Read the CUDA repository index
+      ansible.builtin.apt:
+        update_cache: true
+      environment: "{{ proxy_env if proxy_env is defined else {} }}"
+      when: package_repos_cuda_keyring_install is changed or package_repos_cuda_source is changed
+
+- name: Add the CUDA repository (RHEL family)
+  ansible.builtin.yum_repository:
+    name: cuda
+    description: NVIDIA CUDA repository
+    baseurl: "{{ package_repos_cuda_url }}/"
+    gpgkey: "{{ package_repos_cuda_url }}/{{ package_repos_cuda_rhel_gpgkey }}"
+    gpgcheck: true
+  when: ansible_facts.os_family == 'RedHat'

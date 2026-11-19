@@ -4,8 +4,8 @@ nvidia_container_toolkit_repo_gpg_url: "{{ nvidia_container_toolkit_repo_base_ur
 nvidia_container_toolkit_keyring_ascii_path: "/usr/share/keyrings/nvidia-container-toolkit-keyring.asc"
 nvidia_container_toolkit_keyring_path: "/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
 nvidia_container_toolkit_apt_source_path: "/etc/apt/sources.list.d/nvidia-container-toolkit.list"
-nvidia_container_toolkit_rpm_repo_url: "{{ nvidia_container_toolkit_repo_base_url }}/stable/rpm/nvidia-container-toolkit.repo"
-nvidia_container_toolkit_yum_repo_path: "/etc/yum.repos.d/nvidia-container-toolkit.repo"
+# The signing key, checked on download.
+nvidia_container_toolkit_repo_gpg_checksum: "sha256:c880576d6cf75a48e5027a871bac70fd0421ab07d2b55f30877b21f1c87959c9"
 nvidia_container_toolkit_rpm_prerequisites:
   - ca-certificates
 

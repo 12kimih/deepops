@@ -19,6 +19,8 @@ mofed_repo_distro: >-
 mofed_repo_arch: "{{ 'arm64-sbsa' if ansible_facts.architecture == 'aarch64' else 'x86_64' }}"
 mofed_repo_base_url: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_repo_distro | trim }}/{{ mofed_repo_arch }}"
 mofed_repo_gpg_key: "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
+# Checked on download (roles/download).
+mofed_repo_gpg_key_checksum: "sha256:e7dbe32100fadbf08da347c2448d5d05d810ba0144a349721372f13b6df86dd6"
 
 # Package to install. doca-ofed = OFED drivers/libs/tools (MLNX_OFED equivalent);
 # doca-all and doca-networking are larger supersets.

@@ -37,6 +37,30 @@ enroot_package_state: present
 enroot_release_base_url: "https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}"
 _enroot_deb_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(ansible_facts.architecture, ansible_facts.architecture) }}"
 _enroot_rpm_el: "{{ '8' if (ansible_facts.distribution_major_version | int >= 8) else ansible_facts.distribution_major_version }}"
+# The release files of each package on this host's OS family and architecture.
+_enroot_files: >-
+  {{ enroot_packages | map('regex_replace', '$', '_' ~ enroot_version_string ~ '_' ~ _enroot_deb_arch ~ '.deb') | list
+  if ansible_facts.os_family == 'Debian' else
+  enroot_packages | map('regex_replace', '$', '-' ~ enroot_version_string ~ '.el' ~ _enroot_rpm_el ~ '.' ~ ansible_facts.architecture ~ '.rpm') | list }}
+# Per release file, as GitHub publishes for the release assets (roles/download); add
+# the new files when changing enroot_version.
+enroot_checksums:
+  "enroot+caps-4.2.0-1.el8.aarch64.rpm": "sha256:ac39f9f4e52b5789caff6123cbb1649e4a1ab87e31602310a18f84b52ddbc9e9"
+  "enroot+caps-4.2.0-1.el8.x86_64.rpm": "sha256:b83b7ee152deaf751ce611aaffa3f4a50a28d5e5f1a518d5f79fb3cdcd8e8ac1"
+  "enroot+caps_4.2.0-1_amd64.deb": "sha256:faf2eebf6efa7f4a58ba86ef3ba81f4e2b015bb892da865149133f20579f234c"
+  "enroot+caps_4.2.0-1_arm64.deb": "sha256:b6c7ca8e6c8dad69f5dab0b629e2d4582e8fcd330634f312f3ab3ec2f7bb97dd"
+  "enroot-4.2.0-1.el8.aarch64.rpm": "sha256:50a5084152631e6c011a88efdf3196c80cd94aa4d61f997b881fff159b8584a2"
+  "enroot-4.2.0-1.el8.x86_64.rpm": "sha256:1217f0262709d405ab03cc82a06c96c8efb709fc78557ec11d22bcd9697dfc00"
+  "enroot-hardened+caps-4.2.0-1.el8.aarch64.rpm": "sha256:c13dda5cb29c7107f9fac989ffa714d902d5091e44f778f432a5e60980dacb1b"
+  "enroot-hardened+caps-4.2.0-1.el8.x86_64.rpm": "sha256:b9d732f9eb52302863a4cf4d60717bda63ba075b88a2db68776aee7e0667c5f3"
+  "enroot-hardened+caps_4.2.0-1_amd64.deb": "sha256:abb269c368537c372f12fa0f63aa7317440d99bcc602771079231cc2c3b9cb95"
+  "enroot-hardened+caps_4.2.0-1_arm64.deb": "sha256:be5efa6ed07d3689b4b2cf17eae9cc28d22a3fc1c1015db1b34ebe7649a6d90a"
+  "enroot-hardened-4.2.0-1.el8.aarch64.rpm": "sha256:647714c3c5ce77d1210ca0ce1545d076cbce515a391fe7477812b834a5a2c41e"
+  "enroot-hardened-4.2.0-1.el8.x86_64.rpm": "sha256:58c79f5cdc2900fb6c52b74f331e57fc03e608241fe1b98f40bf9f6573c63d54"
+  "enroot-hardened_4.2.0-1_amd64.deb": "sha256:b6a8333a2251fc63a249bd2f91126d1942921ef1fc083a8ca511e595e1ace9f3"
+  "enroot-hardened_4.2.0-1_arm64.deb": "sha256:efc869f3272ab2e5b4b9171cbec706576d7f890f42a7b9462a042a7553217352"
+  "enroot_4.2.0-1_amd64.deb": "sha256:50bfcf8336bfe1a5d19481081d7800ae80300a27795595757f7d20957e079a62"
+  "enroot_4.2.0-1_arm64.deb": "sha256:ea7ccaba624c62eaed388c3aed29dbc261a9e42c7b6aaf4e95ff4037c8a2efe4"
 
 # --- Unprivileged user namespace enablement ----------------------------------
 # Namespace counts must be > 1 on every OS (a hard enroot prerequisite).

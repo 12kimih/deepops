@@ -22,3 +22,9 @@ mig_manager_rpm_arch: "{{ mig_manager_rpm_arch_map.get(ansible_facts.architectur
 
 mig_manager_url_deb: https://github.com/NVIDIA/mig-parted/releases/download/v{{ mig_manager_version }}/nvidia-mig-manager_{{ mig_manager_version }}-{{ mig_manager_release }}_{{ mig_manager_deb_arch }}.deb
 mig_manager_url_rpm: https://github.com/NVIDIA/mig-parted/releases/download/v{{ mig_manager_version }}/nvidia-mig-manager-{{ mig_manager_version }}-{{ mig_manager_release }}.{{ mig_manager_rpm_arch }}.rpm
+# Per release file, as GitHub publishes for the release assets (roles/download).
+mig_manager_checksums:
+  "nvidia-mig-manager-0.15.1-1.aarch64.rpm": "sha256:696788c8ad0c92a7f9de4b83a3726cfa459c72878c2dc56ebc8fb3d5cd285ba2"
+  "nvidia-mig-manager-0.15.1-1.x86_64.rpm": "sha256:13587efda4598d35866272633129288b9a9e9a451269c3e1a13ee90625547304"
+  "nvidia-mig-manager_0.15.1-1_amd64.deb": "sha256:0652e149602bab7cfb01b3c32d70c483e318030598a76808f1cf35508f168aa3"
+  "nvidia-mig-manager_0.15.1-1_arm64.deb": "sha256:7cb54f469a4a618ff966f246462f10d655095b04b467a20ef767ecdc28372386"

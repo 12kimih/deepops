@@ -27,12 +27,10 @@
         state: present
         update_cache: true
       when: ansible_facts.distribution == "Ubuntu"
-    - name: Enable EPEL repo
-      ansible.builtin.package:
-        name:
-          - "{{ epel_package }}"
-        state: present
-      when: ansible_facts.os_family == 'RedHat'
+    - name: Add EPEL (RHEL family)
+      ansible.builtin.include_role:
+        name: package_repos
+        tasks_from: epel
     - name: Install package dependencies
       ansible.builtin.package:
         name:

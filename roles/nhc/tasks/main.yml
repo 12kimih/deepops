@@ -42,27 +42,14 @@
     mode: "0755"
   when: nhc_build
 
-- name: Download nhc src
-  ansible.builtin.get_url:
-    url: "{{ nhc_src_url }}"
-    dest: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
-    mode: "0644"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
-  register: nhc_src_download
-  until: nhc_src_download is succeeded
-  retries: 5
-  delay: 10
-  when: nhc_build
-
-- name: Extract nhc src
-  ansible.builtin.unarchive:
-    src: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
-    dest: "{{ nhc_build_dir }}/"
-    remote_src: true
-  register: nhc_extract_download
-  until: nhc_extract_download is succeeded
-  retries: 5
-  delay: 10
+- name: Fetch and unpack the NHC source
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ nhc_src_url }}"
+    download_checksum: "{{ nhc_checksums[nhc_version] | default('') }}"
+    download_dest: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
+    download_unpack: "{{ nhc_build_dir }}"
   when: nhc_build
 
 - name: Configure nhc

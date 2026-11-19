@@ -151,29 +151,21 @@ nvidia_container_toolkit_rpm_repo_url: "http://<your-package-mirror>/<your-path-
 Current NVIDIA Container Toolkit installs do not need a standalone `nvidia-docker` wrapper file.
 Use this section only for other direct HTTP downloads required by the roles you enable.
 
-If installing on Enterprise Linux, you will need to provide a URL for the EPEL package.
-For example,
+The third-party package repositories come from one role, `roles/package_repos`.
+Point it at your mirrors; the layout below each base URL stays the upstream one.
 
 ```bash
-epel_package: "http://<your-http-mirror>/<your-path>/epel-release.rpm"
+# NVIDIA CUDA repository (drivers, CUDA, DCGM): the role installs the cuda-keyring
+# from here and points the APT source (or the dnf repository) at the same URL.
+package_repos_cuda_base: "http://<your-package-mirror>/<your-path>/compute/cuda/repos"
+
+# EPEL, Enterprise Linux only
+package_repos_epel_release: "http://<your-http-mirror>/<your-path>/epel-release.rpm"
+package_repos_epel_key: "http://<your-http-mirror>/<your-path>/RPM-GPG-KEY-EPEL-9"
 ```
 
-NVIDIA DCGM installs from the CUDA repository.
-
-**Ubuntu**
-
-```bash
-nvidia_driver_ubuntu_cuda_keyring_url: "http://<your-http-mirror>/<your-path>/cuda-keyring_1.1-1_all.deb"
-```
-
-The `cuda-keyring` package also adds an APT source pointing at `developer.download.nvidia.com`; replace it with your CUDA mirror on the offline hosts.
-
-**Enterprise Linux**
-
-```bash
-nvidia_driver_rhel_cuda_repo_baseurl: "http://<your-package-mirror>/<your-path-to-cuda-repo>/"
-nvidia_driver_rhel_cuda_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-cuda-repo>/D42D0685.pub"
-```
+The keyring is checked against `package_repos_cuda_keyring_checksums`, so a mirror
+must serve NVIDIA's file unchanged.
 
 ### Configure DeepOps to use your mirrors for container image pulls
 

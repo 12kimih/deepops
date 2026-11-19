@@ -65,11 +65,11 @@
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
 # --- Method: nvidia_repo (NVIDIA CUDA apt repo) ------------------------------
-- name: Install the cuda-keyring (Ubuntu, nvidia_repo)
-  ansible.builtin.apt:
-    deb: "{{ nvidia_driver_ubuntu_cuda_keyring_url }}"
+- name: Add the CUDA repository (Ubuntu, nvidia_repo)
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: cuda
   when: nvidia_driver_install_method == 'nvidia_repo'
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 # Branch is pinned via a separate package installed first; from the 590 series
 # Ubuntu drops the branch suffix from the driver package name.

@@ -45,3 +45,21 @@ cuda_versions:
   - {version: "13.1.2", runfile: "cuda_13.1.2_590.48.01_linux.run"}
   - {version: "13.2.1", runfile: "cuda_13.2.1_595.58.03_linux.run"}
   - {version: "13.3.0", runfile: "cuda_13.3.0_610.43.02_linux.run"}
+
+# Per runfile, as NVIDIA publishes them (<cuda_base_url>/<version>/docs/sidebar/
+# md5sum.txt, its only checksum for these files); add one for each runfile added.
+cuda_runfile_checksums:
+  cuda_11.8.0_520.61.05_linux.run: "md5:d6cf26349e5a4104b8683e26b717fa22"
+  cuda_12.0.1_525.85.12_linux.run: "md5:2a5b80f322151e25ed792029e4571318"
+  cuda_12.1.1_530.30.02_linux.run: "md5:2f0a4127bf797bf4eab0be2a547cb8d0"
+  cuda_12.2.2_535.104.05_linux.run: "md5:a32d82924645e0369c14acaebd54bff1"
+  cuda_12.3.2_545.23.08_linux.run: "md5:9d3585b651f4909f72c4db379beb3e01"
+  cuda_12.4.1_550.54.15_linux.run: "md5:afc99bab1d8c6579395d851d948ca3c1"
+  cuda_12.5.1_555.42.06_linux.run: "md5:6521c4c2f3872e40e2c18ddf685b62bf"
+  cuda_12.6.3_560.35.05_linux.run: "md5:29d297908c72b810c9ceaa5177142abd"
+  cuda_12.8.2_570.211.01_linux.run: "md5:82a348acc1271169ce3d2126f941f65f"
+  cuda_12.9.2_575.57.08_linux.run: "md5:9b91ed7b1fb15f2ba42b94135dbc95b8"
+  cuda_13.0.3_580.126.20_linux.run: "md5:13acdcabcb9e939f716c29eff8c12181"
+  cuda_13.1.2_590.48.01_linux.run: "md5:30335614adb11ca310c61ba1105de4fc"
+  cuda_13.2.1_595.58.03_linux.run: "md5:e5b4bdf19cc27d63a8254cb486764626"
+  cuda_13.3.0_610.43.02_linux.run: "md5:16d68669cf659157777d2e7adaff179d"

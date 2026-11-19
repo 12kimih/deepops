@@ -72,13 +72,7 @@ nvidia_driver_verify: true
 nvidia_driver_install_method: "ubuntu_repo"
 
 # --- NVIDIA CUDA repository (Ubuntu nvidia_repo method, and RHEL) --------------
-# The same variables and defaults as the nvidia_cuda and nvidia_dcgm roles, so one
-# mirror override (docs/airgap/ngc-ready.md) points all three at the same repo.
-nvidia_driver_ubuntu_cuda_repo_baseurl: "https://developer.download.nvidia.com/compute/cuda/repos/{{ _ubuntu_repo_dir }}"
-nvidia_driver_ubuntu_cuda_keyring_package: "cuda-keyring_1.1-1_all.deb"
-nvidia_driver_ubuntu_cuda_keyring_url: "{{ nvidia_driver_ubuntu_cuda_repo_baseurl }}/{{ nvidia_driver_ubuntu_cuda_keyring_package }}"
-nvidia_driver_rhel_cuda_repo_baseurl: "https://developer.download.nvidia.com/compute/cuda/repos/{{ _rhel_repo_dir }}/"
-nvidia_driver_rhel_cuda_repo_gpgkey: "https://developer.download.nvidia.com/compute/cuda/repos/{{ _rhel_repo_dir }}/D42D0685.pub"
+# roles/package_repos (tasks_from: cuda), shared with nvidia_cuda and nvidia_dcgm.
 
 # --- Post-installation actions -------------------------------------------------
 # Enable the NVIDIA persistence daemon (recommended over the deprecated

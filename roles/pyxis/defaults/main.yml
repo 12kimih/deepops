@@ -7,6 +7,9 @@ slurm_config_dir: /etc/slurm
 # build points CPPFLAGS at {{ slurm_install_prefix }}/include/slurm.
 slurm_pyxis_version: 0.24.0
 slurm_pyxis_tarball_url: "https://github.com/NVIDIA/pyxis/archive/v{{ slurm_pyxis_version }}.tar.gz"
+# The tag's source archive per version (roles/download).
+slurm_pyxis_checksums:
+  "0.24.0": "sha256:9c4cdb79a67301d8ea05951aa4d2c205f40cf6145e338214b0191add8b36d6c4"
 
 # pyxis SPANK plugin options written into plugstack.conf.d/pyxis.conf.
 # https://github.com/NVIDIA/pyxis/wiki/Setup

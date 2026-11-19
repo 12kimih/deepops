@@ -27,6 +27,13 @@ dgx_os6_install_logrotate: true
 dgx_os6_driver_branch: "550"
 
 # --- DGX OS 7 (Ubuntu 24.04) ---------------------------------------------------
+# The repository files (the trust anchors of the DGX repositories) per URL
+# (roles/download). NVIDIA keeps one unversioned file per release and updates it in
+# place: when it changes, the download stops until the new sum is recorded here.
+dgx_repo_files_checksums:
+  "https://repo.download.nvidia.com/baseos/ubuntu/jammy/dgx-repo-files.tgz": "sha256:81b6725c3b828215d2cfd58ddd007a29d31c6d40b44d05f87f0739cdb8088412"
+  "https://repo.download.nvidia.com/baseos/ubuntu/noble/x86_64/dgx-repo-files.tgz": "sha256:ddbcf6ef501c3b18a2773a0420eba64de250514d7ac915e575173674d6e348a4"
+  "https://repo.download.nvidia.com/baseos/ubuntu/noble/arm64/dgx-repo-files.tgz": "sha256:d91072b92f59ae8a4c2aaa189654316bdfc6740e71b339f2aaf4806894dc1105"
 dgx_os7_repo_files_url: "https://repo.download.nvidia.com/baseos/ubuntu/noble/{{ 'arm64' if ansible_facts.architecture in ['aarch64', 'arm64'] else 'x86_64' }}/dgx-repo-files.tgz"
 
 dgx_os7_install_driver: true

@@ -1,0 +1,51 @@
+---
+- name: Require a known checksum for the file
+  ansible.builtin.assert:
+    that:
+      - download_url | length > 0
+      - download_dest | length > 0
+      - download_checksum | length > 0
+    fail_msg: >-
+      No checksum for {{ download_url }}: add its "sha256:<hex>" (from the publisher,
+      or sha256sum of a copy you trust) to the checksum table of the role that
+      downloads it.
+    quiet: true
+
+- name: Create the download directory
+  ansible.builtin.file:
+    path: "{{ download_dest | dirname }}"
+    state: directory
+    owner: "{{ download_owner }}"
+    mode: "0755"
+
+- name: Fetch {{ download_url | basename }}
+  ansible.builtin.get_url:
+    url: "{{ download_url }}"
+    dest: "{{ download_dest }}"
+    checksum: "{{ download_checksum }}"
+    owner: "{{ download_owner }}"
+    mode: "0644"
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  register: download_fetch
+  until: download_fetch is succeeded
+  retries: "{{ download_retries }}"
+  delay: "{{ download_delay }}"
+
+- name: Unpack {{ download_url | basename }}
+  # Under --check a file not yet fetched is not there to unpack.
+  when: download_unpack | length > 0 and not (ansible_check_mode and download_fetch is changed)
+  block:
+    - name: Create the unpack directory
+      ansible.builtin.file:
+        path: "{{ download_unpack }}"
+        state: directory
+        owner: "{{ download_owner }}"
+        mode: "0755"
+
+    - name: Unpack the verified archive
+      ansible.builtin.unarchive:
+        src: "{{ download_dest }}"
+        dest: "{{ download_unpack }}"
+        remote_src: true
+        owner: "{{ download_owner }}"
+        extra_opts: "{{ ['--strip-components=' ~ download_strip] if download_strip | int > 0 else omit }}"

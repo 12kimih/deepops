@@ -13,36 +13,14 @@
     msg: "Unsupported DGX model for Ubuntu 24.04 DGX OS 7 role path: {{ ansible_facts.product_name }}"
   when: dgx_os7_platform is not defined
 
-- name: Create temporary DGX OS 7 repository archive path
-  ansible.builtin.tempfile:
-    state: file
-    suffix: -dgx-repo-files.tgz
-  register: dgx_os7_repo_archive
-
-- name: Download DGX OS 7 repository files
-  ansible.builtin.get_url:
-    url: "{{ dgx_os7_repo_files_url }}"
-    dest: "{{ dgx_os7_repo_archive.path }}"
-    mode: "0644"
-  register: dgx_os7_repo_files_download
-  until: dgx_os7_repo_files_download is succeeded
-  retries: 5
-  delay: 10
-
-- name: Install DGX OS 7 repository files
-  ansible.builtin.unarchive:
-    src: "{{ dgx_os7_repo_archive.path }}"
-    dest: /
-    remote_src: true
-  register: dgx_os7_repo_install_download
-  until: dgx_os7_repo_install_download is succeeded
-  retries: 5
-  delay: 10
-
-- name: Remove temporary DGX OS 7 repository archive
-  ansible.builtin.file:
-    path: "{{ dgx_os7_repo_archive.path }}"
-    state: absent
+- name: Fetch and install the DGX OS 7 repository files
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ dgx_os7_repo_files_url }}"
+    download_checksum: "{{ dgx_repo_files_checksums[dgx_os7_repo_files_url] | default('') }}"
+    download_dest: "/var/cache/deepops/dgx-os7-{{ ansible_facts.architecture }}-repo-files.tgz"
+    download_unpack: /
 
 - name: Update apt cache for DGX OS 7 repositories
   ansible.builtin.apt:

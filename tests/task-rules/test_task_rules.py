@@ -12,6 +12,9 @@
 5. A `when` condition is a boolean: ansible-core 2.19+ fails the task on one that
    yields a number or a string (`x | length`, `x | default('')`), so it must compare
    (`| length > 0`) or cast (`| bool`).
+6. Nothing from the network is used unverified: every get_url carries a checksum, and
+   an archive or a package is never taken straight from a URL (unarchive src, apt deb,
+   dnf name). roles/download fetches with a required checksum, then unpacks.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -33,6 +36,10 @@ COMMANDS = {
     "ansible.builtin.script",
 }
 TEMPLATES = {"template", "ansible.builtin.template"}
+# Fetched without a fixed checksum because the file changes in place upstream, and
+# checked against its publisher's signing key right after instead.
+SIGNATURE_CHECKED = {ROOT / "roles/package_repos/tasks/epel.yml"}
+URL = re.compile(r"^\s*(https?|ftp)://|^\s*\{\{[^}]*(url|_src)\b")
 SECRET = re.compile(
     r"\{\{[^}]*(password|passwd|_token|secret|webhook|api_key|_pass\b|heartbeat_url)[^}]*\}\}"
 )
@@ -146,6 +153,30 @@ class TaskRules(unittest.TestCase):
                     if isinstance(cond, str) and bare.search(cond.strip()):
                         offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}: {cond}")
         self.assertEqual(offenders, [], "compare or cast these conditions to a boolean")
+
+    def test_downloads_are_verified(self):
+        offenders = []
+        for path in task_files():
+            for task in tasks(path):
+                for key, args in task.items():
+                    if not isinstance(args, dict):
+                        continue
+                    module = key.removeprefix("ansible.builtin.")
+                    if module == "get_url" and not args.get("checksum") and path not in SIGNATURE_CHECKED:
+                        offenders.append(
+                            f"{path.relative_to(ROOT)}: {task.get('name')}: get_url without checksum"
+                        )
+                    source = {
+                        "unarchive": args.get("src"),
+                        "apt": args.get("deb"),
+                        "dnf": args.get("name"),
+                    }.get(module)
+                    for item in source if isinstance(source, list) else [source]:
+                        if isinstance(item, str) and URL.search(item):
+                            offenders.append(
+                                f"{path.relative_to(ROOT)}: {task.get('name')}: {module} from {item}"
+                            )
+        self.assertEqual(offenders, [], "fetch through roles/download (a required checksum)")
 
 
 if __name__ == "__main__":

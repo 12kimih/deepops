@@ -1,9 +1,8 @@
 ---
-- name: RHEL | install EPEL repository
-  ansible.builtin.dnf:
-    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
-    state: present
-    disable_gpg_check: true
+- name: RHEL | add EPEL
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: epel
 
 - name: RHEL | install enroot dependencies
   ansible.builtin.dnf:
@@ -36,13 +35,17 @@
     # "4.2.0-1"), so compare against enroot_version to stay idempotent.
     - ansible_facts.packages['enroot'][0]['version'] != enroot_version
 
+- name: RHEL | fetch the enroot release files
+  ansible.builtin.include_tasks: fetch.yml
+
+# Verified by checksum on download (fetch.yml); the GPG check stays off as before.
 - name: RHEL | install enroot from the release .rpm
   ansible.builtin.dnf:
-    name: "{{ enroot_release_base_url }}/{{ item }}-{{ enroot_version_string }}.el{{ _enroot_rpm_el }}.{{ ansible_facts.architecture }}.rpm"
+    name: "/var/cache/deepops/{{ item }}"
     state: "{{ enroot_package_state }}"
     disable_gpg_check: true
-  loop: "{{ enroot_packages }}"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  loop: "{{ _enroot_files }}"
+  when: not ansible_check_mode or enroot_fetched_all
 
 # On RHEL, unprivileged user namespaces are enabled via the kernel cmdline.
 # https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md

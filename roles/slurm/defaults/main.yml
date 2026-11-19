@@ -1,6 +1,4 @@
 ---
-epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
-epel_key_url: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}"
 
 deepops_dir: /opt/deepops
 slurm_build_dir: /opt/deepops/build/slurm
@@ -10,6 +8,11 @@ pmix_build_dir: /opt/deepops/build/pmix
 slurm_workflow_build: true
 slurm_version: "25.11.6"
 slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
+# The source tarball per version (roles/download); add one when changing slurm_version.
+# 26.05.6: Fedora's sources file (rawhide, epel10). 25.11.6 has no independent sum
+# yet: a rebuild of it stops until one is added.
+slurm_checksums:
+  "26.05.6": "sha512:864cbebccf65cbbcc4437265b0aa46703ac5ba3bf31810ae560bbaef8858857c1153f72cc3843f4afa161de5cb345197de41f533948706eb848357dd6aa17f4f"
 slurm_build_make_clean: false
 slurm_build_dir_cleanup: false
 # Distribution packages removed before the build, per OS family, so none shadows it.
@@ -198,6 +201,9 @@ slurm_include_hwloc: true
 hwloc_version: 2.13.0
 hwloc_tag: "v{{ hwloc_version.split('.')[0] }}.{{ hwloc_version.split('.')[1] }}"
 hwloc_src_url: "https://download.open-mpi.org/release/hwloc/{{ hwloc_tag }}/hwloc-{{ hwloc_version }}.tar.gz"
+# Per version, as published on open-mpi.org (roles/download).
+hwloc_checksums:
+  "2.13.0": "sha256:1514a5253f0a5c23bc006d3bdd30a6f6125c9a8dc9b5fa4984913d1fff45315d"
 hwloc_install_prefix: /opt/deepops/hwloc
 # Netloc was removed from hwloc in 2.10.0, so --enable-netloc is no longer passed.
 # Slurm only needs the topology lib.
@@ -217,6 +223,9 @@ slurm_include_pmix: true
 # https://slurm.schedmd.com/mpi_guide.html  https://openpmix.org/downloads.html
 pmix_version: 5.0.10
 pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{ pmix_version }}.tar.bz2"
+# Per version, as GitHub publishes for the release asset (roles/download).
+pmix_checksums:
+  "5.0.10": "sha256:78663f6b932589d68e24feaf7f8a948d60be68d91965f3effbacb4cd88cf9a95"
 pmix_install_prefix: /opt/deepops/pmix
 pmix_configure: "./configure --prefix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }}"
 pmix_force_rebuild: false

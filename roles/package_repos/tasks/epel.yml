@@ -1,0 +1,47 @@
+---
+- name: Refuse the retired repository settings
+  ansible.builtin.include_tasks: retired.yml
+
+# Rocky, Alma and CentOS ship epel-release in their own signed extras repository.
+# RHEL has none: the release package comes from the EPEL site, where the file changes
+# in place (no fixed checksum), so it is checked against the EPEL signing key instead.
+# dnf does not check the signature of a package named by path or URL.
+- name: Add EPEL (RHEL family)
+  when: ansible_facts.os_family == 'RedHat'
+  block:
+    - name: Trust the EPEL signing key
+      ansible.builtin.rpm_key:
+        key: "{{ package_repos_epel_key }}"
+        state: present
+      environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+    - name: Install epel-release from the distribution
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+      when: ansible_facts.distribution != 'RedHat'
+
+    - name: Install epel-release from the EPEL site (RHEL)
+      when: ansible_facts.distribution == 'RedHat'
+      block:
+        - name: Fetch the EPEL release package
+          ansible.builtin.get_url:  # no fixed checksum: verified by signature below
+            url: "{{ package_repos_epel_release }}"
+            dest: /var/cache/deepops/epel-release.rpm
+            mode: "0644"
+            force: true
+          environment: "{{ proxy_env if proxy_env is defined else {} }}"
+          check_mode: false  # a download into the cache; --check needs it to verify
+
+        - name: Check the package is signed by the EPEL key
+          ansible.builtin.command:
+            argv: [rpm, --checksig, /var/cache/deepops/epel-release.rpm]
+          register: package_repos_epel_sig
+          changed_when: false
+          check_mode: false  # read-only; --check needs the result
+          failed_when: package_repos_epel_sig.rc != 0 or package_repos_epel_sig.stdout is not search('digests signatures OK')
+
+        - name: Install the verified EPEL release package
+          ansible.builtin.dnf:
+            name: /var/cache/deepops/epel-release.rpm
+            state: present

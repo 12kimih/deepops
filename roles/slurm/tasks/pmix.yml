@@ -74,18 +74,15 @@
     mode: "0755"
   when: pmix_build
 
-- name: Download pmix source
-  ansible.builtin.unarchive:
-    src: "{{ pmix_src_url }}"
-    remote_src: true
-    dest: "{{ pmix_build_dir }}"
-    extra_opts:
-      - --strip-components=1
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
-  register: pmix_download
-  until: pmix_download is succeeded
-  retries: 5
-  delay: 10
+- name: Fetch and unpack the PMIx source
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ pmix_src_url }}"
+    download_checksum: "{{ pmix_checksums[pmix_version] | default('') }}"
+    download_dest: "/var/cache/deepops/{{ pmix_src_url | basename }}"
+    download_unpack: "{{ pmix_build_dir }}"
+    download_strip: 1
   when: pmix_build
 
 - name: Clean pmix src dir

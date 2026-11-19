@@ -7,11 +7,6 @@
     that: ansible_facts.architecture == "x86_64"
     fail_msg: "CUDA runfiles are x86_64 only (this host is {{ ansible_facts.architecture }})."
 
-- name: Ensure wget is installed (used to fetch the runfiles)
-  ansible.builtin.package:
-    name: wget
-    state: present
-
 - name: Ensure the CUDA install, module, and cache directories exist
   ansible.builtin.file:
     path: "{{ item }}"
@@ -35,14 +30,12 @@
     cuda_to_install: "{{ cuda_nvcc_pre.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
 
 - name: Download the CUDA runfiles
-  ansible.builtin.get_url:
-    url: "{{ cuda_base_url }}/{{ item.version }}/local_installers/{{ item.runfile }}"
-    dest: "{{ cuda_cache_dir }}/{{ item.runfile }}"
-    mode: "0644"
-  register: cuda_runfile_download
-  until: cuda_runfile_download is succeeded
-  retries: 5
-  delay: 10
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ cuda_base_url }}/{{ item.version }}/local_installers/{{ item.runfile }}"
+    download_checksum: "{{ cuda_runfile_checksums[item.runfile] | default('') }}"
+    download_dest: "{{ cuda_cache_dir }}/{{ item.runfile }}"
   loop: "{{ cuda_to_install }}"
   loop_control:
     label: "{{ item.version }}"

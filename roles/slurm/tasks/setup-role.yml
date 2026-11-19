@@ -11,15 +11,7 @@
   tags:
     - always
 
-- name: Trust GPG key for EPEL
-  ansible.builtin.rpm_key:
-    key: "{{ epel_key_url }}"
-    state: present
-  when: ansible_facts.os_family == "RedHat"
-
-- name: Add epel repo
-  ansible.builtin.dnf:
-    name:
-      - "{{ epel_package }}"
-    state: present
-  when: ansible_facts.os_family == "RedHat"
+- name: Add EPEL (RHEL family)
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: epel

@@ -1,6 +1,9 @@
 ---
 nhc_version: "1.4.3"
 nhc_src_url: "https://github.com/mej/nhc/releases/download/{{ nhc_version }}/lbnl-nhc-{{ nhc_version }}.tar.xz"
+# The release tarball per version (roles/download); add one when changing nhc_version.
+nhc_checksums:
+  "1.4.3": "sha256:dd752f1f2ea3a1e15412aed178562fc44a1251395c0bb4c69dfea1148750d158"
 nhc_install_dir: "/usr"
 nhc_config_dir: "/etc"
 

@@ -14,16 +14,13 @@
 
 # --- Ubuntu: DOCA-OFED apt repository ---
 - name: Ubuntu | add the DOCA repository GPG key
-  ansible.builtin.get_url:
-    url: "{{ mofed_repo_gpg_key }}"
-    dest: /usr/share/keyrings/mellanox-doca.asc
-    mode: "0644"
-  register: mofed_doca_gpg_download
-  until: mofed_doca_gpg_download is succeeded
-  retries: 5
-  delay: 10
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ mofed_repo_gpg_key }}"
+    download_checksum: "{{ mofed_repo_gpg_key_checksum }}"
+    download_dest: /usr/share/keyrings/mellanox-doca.asc
   when: ansible_facts.distribution == "Ubuntu"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Ubuntu | add the DOCA-OFED apt repository
   ansible.builtin.apt_repository:

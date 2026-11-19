@@ -1,22 +1,25 @@
 ---
 # Follows https://docs.docker.com/engine/install/centos/ (works on RHEL/Rocky/Alma):
-# dnf-plugins-core + the official docker-ce.repo, then install the Engine + plugins.
+# dnf-plugins-core + the docker-ce-stable repository, then install the Engine + plugins.
 - name: Install dnf-plugins-core
   ansible.builtin.dnf:
     name: dnf-plugins-core
     state: present
 
+- name: Refuse the retired repository file setting
+  ansible.builtin.assert:
+    that: docker_rh_repo_url is not defined
+    fail_msg: "docker_rh_repo_url is retired: set docker_rh_repo_base_url (and docker_rh_repo_gpgkey) instead."
+    quiet: true
+
 - name: Add the Docker CE dnf repository
-  ansible.builtin.get_url:
-    url: "{{ docker_rh_repo_url }}"
-    dest: /etc/yum.repos.d/docker-ce.repo
-    owner: root
-    group: root
-    mode: "0644"
-  register: docker_ce_repo_download
-  until: docker_ce_repo_download is succeeded
-  retries: 5
-  delay: 10
+  ansible.builtin.yum_repository:
+    name: docker-ce-stable
+    file: docker-ce
+    description: Docker CE Stable - $basearch
+    baseurl: "{{ docker_rh_repo_base_url }}/$releasever/$basearch/stable"
+    gpgkey: "{{ docker_rh_repo_gpgkey }}"
+    gpgcheck: true
 
 - name: Install Docker Engine + plugins
   ansible.builtin.dnf:

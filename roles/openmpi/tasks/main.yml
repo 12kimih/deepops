@@ -67,17 +67,15 @@
     mode: "0755"
   when: openmpi_build
 
-- name: Download openmpi source
-  ansible.builtin.unarchive:
-    src: "{{ openmpi_src_url }}"
-    remote_src: true
-    dest: "{{ openmpi_build_dir }}"
-    extra_opts:
-      - --strip-components=1
-  register: openmpi_src_download
-  until: openmpi_src_download is succeeded
-  retries: 5
-  delay: 10
+- name: Fetch and unpack the Open MPI source
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ openmpi_src_url }}"
+    download_checksum: "{{ openmpi_checksums[openmpi_version] | default('') }}"
+    download_dest: "/var/cache/deepops/{{ openmpi_src_url | basename }}"
+    download_unpack: "{{ openmpi_build_dir }}"
+    download_strip: 1
   when: openmpi_build
 
 - name: Uninstall old openmpi version

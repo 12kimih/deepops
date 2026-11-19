@@ -45,13 +45,16 @@
     - "'enroot' in ansible_facts.packages"
     - ansible_facts.packages['enroot'][0]['version'] != enroot_version_string
 
+- name: Ubuntu | fetch the enroot release files
+  ansible.builtin.include_tasks: fetch.yml
+
 - name: Ubuntu | install enroot from the release .deb
   ansible.builtin.apt:
-    deb: "{{ enroot_release_base_url }}/{{ item }}_{{ enroot_version_string }}_{{ _enroot_deb_arch }}.deb"
+    deb: "/var/cache/deepops/{{ item }}"
     state: "{{ enroot_package_state }}"
-  loop: "{{ enroot_packages }}"
+  loop: "{{ _enroot_files }}"
   register: enroot_install
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  when: not ansible_check_mode or enroot_fetched_all
 
 # The rest only matters where the kernel restricts unprivileged user namespaces.
 - name: Ubuntu | check for the AppArmor user namespace restriction
