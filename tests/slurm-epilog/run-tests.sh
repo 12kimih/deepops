@@ -984,10 +984,54 @@ else
     fi
 fi
 
+# --- enroot paths from enroot.conf ------------------------------------------------
+# The prolog and epilog take enroot's per-user paths from enroot.conf at job time,
+# the file the enroot role writes, so they cannot disagree with it. Templated from
+# the enroot role's variables they rendered empty wherever that role was not in the
+# same play, and the per-user directories in /run were never removed.
+echo
+echo "enroot-paths.sh -- the paths enroot.conf sets, as the job user expands them"
+ed="$work/enroot"; rm -rf "$ed"; mkdir -p "$ed/bin"
+if render "shared/lib/enroot-paths.sh" "$ed/lib.sh"; then
+    sed -i "s#^enroot_conf=.*#enroot_conf='$ed/enroot.conf'#" "$ed/lib.sh"
+    # sudo -u USER sh -c CMD: run CMD here, with the job user's uid standing in.
+    printf '#!/bin/sh\nshift 2\nexec "$@"\n' > "$ed/bin/sudo"
+    printf '#!/bin/sh\necho 1001\n' > "$ed/bin/id"
+    chmod +x "$ed/bin/sudo" "$ed/bin/id"
+    cat > "$ed/enroot.conf" <<'CONF'
+#ENROOT_RUNTIME_PATH        ${XDG_RUNTIME_DIR}/enroot
+ENROOT_RUNTIME_PATH /run/enroot/old-$(id -u)
+# BEGIN ANSIBLE MANAGED BLOCK (roles/enroot)
+ENROOT_RUNTIME_PATH /run/enroot/user-$(id -u)
+ENROOT_DATA_PATH /
+CONF
+    got=$(PATH="$ed/bin:$PATH" SLURM_JOB_USER=alice bash -c ". '$ed/lib.sh'
+        enroot_user_path ENROOT_RUNTIME_PATH; echo rc=\$?
+        enroot_user_path ENROOT_CACHE_PATH; echo rc=\$?
+        enroot_user_path ENROOT_DATA_PATH; echo rc=\$?" 2>&1 | tr '\n' ' ')
+    want="/run/enroot/user-1001 rc=0 rc=1 rc=1 "
+    if [ "$got" = "$want" ]; then
+        ok "the last setting wins, an unset key and a path at / are refused"
+    else
+        no "the last setting wins, an unset key and a path at / are refused" "got: $got"
+    fi
+else
+    no "enroot-paths.sh renders" "render failed"
+fi
+for t in prolog.d/50-all-enroot-dirs epilog.d/50-lastuserjob-all-enroot-dirs; do
+    if render "$t" "$ed/script" && grep -q 'shared/lib/enroot-paths.sh' "$ed/script" \
+       && ! grep -q '/run/enroot\|enroot-data\|enroot-cache' "$ed/script"; then
+        ok "$t takes its paths from enroot.conf, none of its own"
+    else
+        no "$t takes its paths from enroot.conf, none of its own" "see $t"
+    fi
+done
+
 # --- 26.09 snapshot -----------------------------------------------------------------
 # scope=user must render byte-for-byte what 26.09 deployed. The snapshots are the
 # 26.09 templates rendered with the same fixture values; script 41 is excluded
-# because its match fix applies in both scopes and is covered above.
+# because its match fix applies in both scopes and is covered above, and script 50
+# because it now reads enroot.conf in both scopes (covered below).
 echo
 echo "scope=user -- byte-identical to the 26.09 scripts"
 snap_ok() {
@@ -1001,7 +1045,6 @@ snap_ok() {
 }
 snap_ok "epilog.d/40-lastuserjob-processes"       40-lastuserjob-processes
 snap_ok "epilog.d/42-lastuserjob-cleanup"         42-lastuserjob-cleanup
-snap_ok "epilog.d/50-lastuserjob-all-enroot-dirs" 50-lastuserjob-all-enroot-dirs
 snap_ok "shared/bin/run-parts.sh"                 run-parts.sh
 snap_ok "epilog.sh"                               epilog.sh
 
@@ -1011,7 +1054,7 @@ for scope in job user; do
     bad=""
     for t in epilog.sh epilog.d/40-lastuserjob-processes epilog.d/41-lastuserjob-ssh \
              epilog.d/42-lastuserjob-cleanup epilog.d/50-lastuserjob-all-enroot-dirs \
-             shared/bin/run-parts.sh shared/lib/epilog-job-scope.sh; do
+             shared/bin/run-parts.sh shared/lib/epilog-job-scope.sh shared/lib/enroot-paths.sh; do
         RENDER_SCOPE=$scope render "$t" "$work/parse-$scope" 2>/dev/null || bad="$bad $t"
     done
     if [ -z "$bad" ]; then

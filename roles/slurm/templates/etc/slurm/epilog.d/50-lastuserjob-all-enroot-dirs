@@ -2,13 +2,10 @@
 set -ex
 
 command -v enroot >/dev/null || exit 0  # enroot not installed
+. '{{ slurm_config_dir }}/shared/lib/enroot-paths.sh'
 
-{% if enroot_runtime_path | default(none) %}
-runtime_path="$(sudo -u "$SLURM_JOB_USER" sh -c 'echo "{{ enroot_runtime_path }}"')"
-rm -rf "$runtime_path"
-{% endif %}
-
-{% if enroot_data_path | default(none) %}
-data_path="$(sudo -u "$SLURM_JOB_USER" sh -c 'echo "{{ enroot_data_path }}"')"
-rm -rf "$data_path"
-{% endif %}
+# The runtime and data directories go with the user's last job; the image cache stays.
+for key in ENROOT_RUNTIME_PATH ENROOT_DATA_PATH; do
+    path=$(enroot_user_path "$key") || continue
+    rm -rf "$path"
+done

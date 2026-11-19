@@ -50,6 +50,8 @@
 
 # Every job runs each part, so a part dropped from the sources must leave the node
 # too. A relative glob is the role's own; resolve it here, not inside managed_dir.
+# slurmd runs the parts as root, so they are root's (managed_dir's default owner): a
+# part the slurm account could change would be root for whoever holds that account.
 - name: Collect the prolog parts
   ansible.builtin.set_fact:
     slurm_prolog_parts: >-
@@ -67,8 +69,6 @@
     managed_dir_path: "{{ slurm_config_dir }}/prolog.d"
     managed_dir_sources: "{{ slurm_prolog_parts }}"
     managed_dir_template: true
-    managed_dir_owner: slurm
-    managed_dir_group: slurm
     managed_dir_mode: "0755"
   tags:
     - prolog
@@ -100,8 +100,6 @@
     managed_dir_path: "{{ slurm_config_dir }}/epilog.d"
     managed_dir_sources: "{{ slurm_epilog_parts }}"
     managed_dir_template: true
-    managed_dir_owner: slurm
-    managed_dir_group: slurm
     managed_dir_mode: "0755"
   tags:
     - epilog

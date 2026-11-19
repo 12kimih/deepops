@@ -4,13 +4,9 @@
     name: munge
     state: restarted
 
-- name: Restart slurmd
-  ansible.builtin.systemd:
-    name: slurmd
-    state: restarted
-    daemon_reload: true
-  when: is_compute
-
+# Handlers run in the order written here, not notified: slurmdbd, then slurmctld, then
+# slurmd, the order Slurm requires on an upgrade (a daemon may talk only to one of the
+# same or a newer release).
 - name: Restart slurmdbd
   ansible.builtin.systemd:
     name: slurmdbd
@@ -24,6 +20,13 @@
     state: restarted
     daemon_reload: true
   when: is_controller
+
+- name: Restart slurmd
+  ansible.builtin.systemd:
+    name: slurmd
+    state: restarted
+    daemon_reload: true
+  when: is_compute
 
 - name: Restart logind
   ansible.builtin.service:

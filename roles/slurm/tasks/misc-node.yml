@@ -2,14 +2,14 @@
 # Configure nodes that are neither running controller services, nor slurmd.
 # Examples include login nodes or CI nodes.
 
-- name: Create slurm directories
+# Root's, as on every node: Slurm only reads its config.
+- name: Create the slurm config directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ slurm_config_dir }}"
     state: directory
-    owner: slurm
+    owner: root
+    group: root
     mode: "0755"
-  with_items:
-    - "{{ slurm_config_dir }}"
 
 - name: Configure slurm.conf
   ansible.builtin.template:
