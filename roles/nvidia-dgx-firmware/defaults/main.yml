@@ -50,9 +50,6 @@ force_update: false
 # Set inactive_update to 'true' if you need to upgrade inactive components
 inactive_update: false
 
-# Reboot timeout (in seconds) 600s for a normal reboot, longer needed for an SBIOS update
-reboot_timeout: 1200
-
 nv_services:
   - nvsm
   - nvidia-persistenced

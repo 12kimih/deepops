@@ -43,14 +43,12 @@
       ansible.builtin.command: update-grub
       register: update_grub_cmd
       changed_when: update_grub_cmd.rc == 0
-    - name: Reboot after updating grub config
+    - name: Ask for a reboot to apply the cgroup kernel options
       ansible.builtin.include_role:
         name: maintenance
-        tasks_from: reboot
+        tasks_from: reboot_request
       vars:
-        maintenance_force_reboot: true
         maintenance_reason: "apply the cgroup kernel options"
-        maintenance_reboot_timeout: "{{ slurm_node_reboot_timeout }}"
 
 - name: Update grub
   when: update_grub.changed and ansible_facts.os_family == "RedHat"
@@ -59,14 +57,12 @@
       ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
       register: grub2_mkconfig_cmd
       changed_when: grub2_mkconfig_cmd.rc == 0
-    - name: Reboot after updating grub config
+    - name: Ask for a reboot to apply the cgroup kernel options
       ansible.builtin.include_role:
         name: maintenance
-        tasks_from: reboot
+        tasks_from: reboot_request
       vars:
-        maintenance_force_reboot: true
         maintenance_reason: "apply the cgroup kernel options"
-        maintenance_reboot_timeout: "{{ slurm_node_reboot_timeout }}"
 
 - name: Create sysconfig dir
   ansible.builtin.file:

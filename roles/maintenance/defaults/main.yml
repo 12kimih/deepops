@@ -5,7 +5,9 @@
 #   drain    stop new Slurm jobs on the node and wait for the running ones to end
 #   upgrade  full package upgrade, including what unattended upgrades hold back
 #            (kernel, systemd, libc, GPU stack, scheduler): those wait for this window
-#   reboot   reboot if the upgrade asks for it (or always), detaching NFS first
+#   reboot   reboot if the upgrade asks for it (or always), detaching NFS first;
+#            a Slurm compute node only once drained
+#   reboot_request  what a role calls instead of rebooting: marks the reboot pending
 #   verify   the node is healthy again: slurmd, GPUs, DCGM diagnostics, NHC
 #   resume   return the node to Slurm, only if this run drained it
 #
@@ -24,6 +26,11 @@ maintenance_drain_poll: 60
 
 # Reboot even when the upgrade does not ask for it.
 maintenance_force_reboot: false
+# reboot_request: reboot at once instead of leaving the reboot pending. Only for nodes
+# nobody uses yet (a first deploy); a Slurm compute node must still be drained.
+maintenance_reboot_now: false
+# Reboot a Slurm compute node that still takes jobs (its running jobs are lost).
+maintenance_reboot_undrained: false
 
 # RHEL family: dnf --nobest, upgrading what can be upgraded when the newest version of
 # a package cannot be installed (the DGX software guides ask for it).

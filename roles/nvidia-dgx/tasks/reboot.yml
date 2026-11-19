@@ -1,9 +1,9 @@
 ---
-# Run by the "Reboot after driver install" handler: every reboot goes through roles/maintenance.
-- name: Reboot through the maintenance role
+# Run by the "Reboot after driver install" handler: the reboot is asked for, and done
+# drained by playbooks/utilities/apt-upgrade.yml (roles/maintenance, reboot_request).
+- name: Ask for a reboot to load the DGX driver
   ansible.builtin.include_role:
     name: maintenance
-    tasks_from: reboot
+    tasks_from: reboot_request
   vars:
-    maintenance_force_reboot: true
     maintenance_reason: "load the DGX driver"

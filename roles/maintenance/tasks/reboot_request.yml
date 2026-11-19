@@ -1,0 +1,26 @@
+---
+# A role whose change takes effect only after a reboot (a new kernel module, kernel
+# command line or firmware) asks for one here instead of rebooting: the node may be
+# running jobs. The request is the file Debian's packages write, on every OS:
+# os_updates reports it (os_updates_reboot_required) and apt-upgrade.yml acts on it,
+# draining the node first and putting it back after the checks. On a node nobody uses
+# yet, -e maintenance_reboot_now=true reboots at once.
+- name: Ask for a reboot
+  ansible.builtin.copy:
+    dest: /var/run/reboot-required
+    content: "*** System restart required ***\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reboot now
+  ansible.builtin.include_tasks: reboot.yml
+  when: maintenance_reboot_now | bool
+
+- name: Say why the node waits for a reboot
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} needs a reboot to {{ maintenance_reason }}. Run
+      playbooks/utilities/apt-upgrade.yml -e hostlist={{ inventory_hostname }}: it
+      drains the node, reboots it, checks it and returns it to Slurm.
+  when: not maintenance_reboot_now | bool

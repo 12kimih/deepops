@@ -52,9 +52,8 @@ nvidia_driver_rhel_package: ""
 # are deliberately excluded from the purge.
 nvidia_driver_purge_existing: true
 
-# Reboot after a driver change (required to load the new kernel module).
-nvidia_driver_reboot: true
-nvidia_driver_reboot_timeout: 600
+# A driver change asks for a reboot (roles/maintenance, reboot_request) to load the new
+# kernel module; it does not reboot the node itself.
 
 # Run `nvidia-smi` and read /proc/driver/nvidia/version to verify the load.
 nvidia_driver_verify: true

@@ -11,7 +11,6 @@
 
 - name: Reboot after driver install
   ansible.builtin.include_tasks: reboot.yml  # a handler cannot include a role directly
-  when: install_driver.changed and not nvidia_driver_skip_reboot
 
 - name: Restart docker
   ansible.builtin.service:

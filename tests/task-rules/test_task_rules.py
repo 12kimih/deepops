@@ -24,6 +24,9 @@
    after. Root's scratch is /var/cache/deepops.
 9. No secret is on a command line: argv is readable by every user on the host (ps).
    A command takes it on stdin, from a root-only file, or from its environment.
+10. Only roles/maintenance reboots, and only a playbook asks it to: a role whose change
+   needs a reboot calls its reboot_request (the reboot is left pending, then done with
+   the node drained), never its reboot step, ansible.builtin.reboot or a reboot command.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -49,6 +52,8 @@ TEMPLATES = {"template", "ansible.builtin.template"}
 # checked against its publisher's signing key right after instead.
 SIGNATURE_CHECKED = {ROOT / "roles/package_repos/tasks/epel.yml"}
 URL = re.compile(r"^\s*(https?|ftp)://|^\s*\{\{[^}]*(url|_src)\b")
+REBOOT_STEP = ROOT / "roles/maintenance/tasks/reboot.yml"
+REBOOT_COMMAND = re.compile(r"^\s*(/\S*/)?(reboot|shutdown\s+-r|systemctl\s+(reboot|kexec))\b")
 SECRET = re.compile(
     r"\{\{[^}]*(password|passwd|_token|secret|webhook|api_key|_pass\b|heartbeat_url)[^}]*\}\}"
 )
@@ -285,6 +290,31 @@ class TaskRules(unittest.TestCase):
                                 f"{path.relative_to(ROOT)}: {task.get('name')}: {module} from {item}"
                             )
         self.assertEqual(offenders, [], "fetch through roles/download (a required checksum)")
+
+    def test_only_the_maintenance_role_reboots(self):
+        offenders = []
+        for path in task_files():
+            in_role = "roles" in path.relative_to(ROOT).parts[:1]
+            for task in tasks(path):
+                where = f"{path.relative_to(ROOT)}: {task.get('name')}"
+                for key, args in task.items():
+                    module = key.removeprefix("ansible.builtin.")
+                    if module == "reboot" and path != REBOOT_STEP:
+                        offenders.append(f"{where}: reboot module")
+                    if (
+                        module in ("include_role", "import_role")
+                        and isinstance(args, dict)
+                        and args.get("name") == "maintenance"
+                        and args.get("tasks_from") == "reboot"
+                        and in_role
+                    ):
+                        offenders.append(f"{where}: a role runs the reboot step")
+                    if module in {c.removeprefix("ansible.builtin.") for c in COMMANDS}:
+                        line = args.get("cmd") or args.get("argv") if isinstance(args, dict) else args
+                        line = " ".join(map(str, line)) if isinstance(line, list) else str(line or "")
+                        if REBOOT_COMMAND.search(line):
+                            offenders.append(f"{where}: reboot command")
+        self.assertEqual(offenders, [], "ask with roles/maintenance reboot_request instead")
 
 
 if __name__ == "__main__":
