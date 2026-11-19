@@ -24,7 +24,8 @@ spec:
       nodeSelector:
         hardware-type: NVIDIAGPU
       containers:
-      - image: "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless"
+      # Filled in by scripts/k8s/deploy_monitoring.sh from roles/nvidia-dcgm-exporter's pin.
+      - image: DCGM_EXPORTER_IMAGE
         name: nvidia-dcgm-exporter
         args: ["-f", "/etc/dcgm-config/dcgm-custom-metrics.csv"]
         env:

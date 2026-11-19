@@ -143,9 +143,10 @@ class Prometheus:
 
 def collect_gpus(prom, window):
     return {
-        "util_max": prom.per_gpu(f"max_over_time(DCGM_FI_DEV_GPU_UTIL[{window}s])"),
-        "util": prom.per_gpu("avg_over_time(DCGM_FI_DEV_GPU_UTIL[10m])"),
-        "mem_gib": prom.per_gpu("DCGM_FI_DEV_FB_USED / 1024"),
+        # Percent, the unit idle_util_threshold is set in; DCGM reports a 0 to 1 ratio.
+        "util_max": prom.per_gpu(f"100 * max_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[{window}s])"),
+        "util": prom.per_gpu("100 * avg_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[10m])"),
+        "mem_gib": prom.per_gpu("DCGM_FI_DEV_FB_USED_BYTES / 2^30"),
     }
 
 

@@ -457,7 +457,7 @@ ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
 ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 ```
 
-dcgm-exporter 4.9.0 renames 23 fields and changes their units (Hz, J, ratios, bytes): moving to it means moving `roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv`, the Prometheus rules and the dashboards in the same change.
+`roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv` is the pinned release's own `default-counters.csv` with deepops' rows enabled (its header lists them). A new dcgm-exporter release can rename fields or change their units, as 4.9.0 did (Hz, J, 0 to 1 ratios, bytes): start from that release's file, enable the same rows, and move the Prometheus rules and dashboards in the same change. `tests/monitoring/test_dcgm_counters.py` fails while anything reads a field the file does not export.
 
 #### Updating Enroot and Pyxis
 

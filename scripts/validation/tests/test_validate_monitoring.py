@@ -38,17 +38,19 @@ class MetricNames(unittest.TestCase):
 
     def test_the_repository_reads_metrics(self):
         reads, recorded = vm.repo_metrics()
-        self.assertIn("DCGM_FI_DEV_GPU_UTIL", reads)
+        self.assertIn("DCGM_FI_DEV_GPU_UTIL_RATIO", reads)
         self.assertIn("host_device:slurm_gpu_allocated:max", recorded)
 
 
 class Checks(unittest.TestCase):
     def test_a_field_missing_beside_its_exporters_others_is_a_rollout_gap(self):
-        names = {"DCGM_FI_DEV_GPU_UTIL", "node_uname_info", "up"}
+        names = {"DCGM_FI_DEV_GPU_UTIL_RATIO", "node_uname_info", "up"}
         result = vm.check(FakePrometheus(names, {WATCHDOG: [{}]}))
         self.assertFalse(result["metrics"]["ok"])
-        self.assertIn("DCGM_FI_DEV_MINOR_NUMBER", result["metrics"]["detail"]["missing"])
-        self.assertNotIn("DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL", result["metrics"]["detail"]["missing"])
+        self.assertIn("DCGM_FI_DEV_GPU_MINOR_NUMBER", result["metrics"]["detail"]["missing"])
+        self.assertNotIn(
+            "DCGM_FI_DEV_NVLINK_THROUGHPUT_BYTES_PER_SECOND", result["metrics"]["detail"]["missing"]
+        )
         self.assertNotIn("slurm_gpu_allocated", result["metrics"]["detail"]["missing"])
 
     def test_down_targets_rule_errors_and_a_silent_watchdog_fail(self):
@@ -65,7 +67,7 @@ class Checks(unittest.TestCase):
     def test_a_gpu_host_without_the_slurm_join_fails(self):
         queries = {
             WATCHDOG: [{}],
-            "count by (host) (DCGM_FI_DEV_GPU_UTIL)": [
+            "count by (host) (DCGM_FI_DEV_GPU_UTIL_RATIO)": [
                 {"metric": {"host": "n1"}},
                 {"metric": {"host": "n2"}},
             ],

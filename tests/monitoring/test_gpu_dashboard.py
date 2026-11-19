@@ -138,7 +138,7 @@ class GpuDashboardTests(unittest.TestCase):
                 for expr, value, labels in (
                     (f'max(node_load1{{instance="{node}"}})', 2, ""),
                     (
-                        f'max by (gpu) (DCGM_FI_DEV_POWER_USAGE{{instance="{gpu}"}})',
+                        f'max by (gpu) (DCGM_FI_DEV_BOARD_POWER_WATTS{{instance="{gpu}"}})',
                         100,
                         gpu_by,
                     ),
@@ -162,7 +162,7 @@ class GpuDashboardTests(unittest.TestCase):
                     )
                 series = [
                     {
-                        "series": f'DCGM_FI_DEV_POWER_USAGE{{instance="{gpu}"{gpu_labels}}}',
+                        "series": f'DCGM_FI_DEV_BOARD_POWER_WATTS{{instance="{gpu}"{gpu_labels}}}',
                         "values": "100 100",
                     },
                     {
@@ -171,7 +171,7 @@ class GpuDashboardTests(unittest.TestCase):
                     },
                     {"series": f'node_load1{{instance="{node}"}}', "values": "2 2"},
                     {
-                        "series": 'DCGM_FI_DEV_POWER_USAGE{instance="192.0.2.99:9400",kubernetes_node="other-worker"}',
+                        "series": 'DCGM_FI_DEV_BOARD_POWER_WATTS{instance="192.0.2.99:9400",kubernetes_node="other-worker"}',
                         "values": "900 900",
                     },
                     {

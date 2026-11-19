@@ -986,7 +986,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "percent"
+                "value": "percentunit"
               },
               {
                 "id": "mappings",
@@ -1025,7 +1025,7 @@
       },
       "targets": [
         {
-          "expr": "host_device:slurm_gpu_allocated:max * on (host, device) group_left () host_device:dcgm_gpu_util:max or host_device:slurm_gpu_allocated:max * (0 / 0)",
+          "expr": "host_device:slurm_gpu_allocated:max * on (host, device) group_left () host_device:dcgm_gpu_util_ratio:max or host_device:slurm_gpu_allocated:max * (0 / 0)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",

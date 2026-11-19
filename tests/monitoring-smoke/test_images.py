@@ -11,6 +11,9 @@ the new Grafana cannot load fails this suite, not a deploy.
                 Alertmanager boots on it.
   grafana       Grafana boots on the rendered grafana.ini and provisioning, and
                 provisions every dashboard deepops ships, in the managed folder.
+  dcgm-exporter `config validate` accepts the counters file with the flags the unit
+                passes (no GPU needed): a release that renames or refuses a field fails
+                here, as 4.9.0 refused the clock-event bitmap 4.8 exported.
 
 Containers publish on 127.0.0.1 only, run with --rm and are stopped when a test ends.
 Slow (a few image pulls and boots): it runs in the full check, not the commit hook.
@@ -224,6 +227,24 @@ class MonitoringImages(unittest.TestCase):
             self.assertEqual(expected - {d["uid"] for d in found}, set(), grafana.logs())
             folder = default("grafana", "grafana_dashboard_folder_uid")
             self.assertEqual({d["folderUid"] for d in found if d["uid"] in expected}, {folder})
+
+    def test_dcgm_exporter_accepts_its_counters(self):
+        image = default("nvidia-dcgm-exporter", "nvidia_dcgm_container")
+        counters = (
+            ROOT
+            / "roles/nvidia-dcgm-exporter/files"
+            / default("nvidia-dcgm-exporter", "nvidia_dcgm_container_custom_metrics_file")
+        )
+        copy = self.tmp / "dcgm-counters.csv"
+        shutil.copy(counters, copy)
+        copy.chmod(0o644)
+        # The unit's own arguments (templates/docker.dcgm-exporter.service.j2), then the check.
+        check = docker("run", "--rm", "-v", f"{copy}:/etc/dcgm-exporter/custom-counters.csv:ro", image,
+                       "--collectors", "/etc/dcgm-exporter/custom-counters.csv",
+                       "--address", f":{default('nvidia-dcgm-exporter', 'nvidia_dcgm_exporter_port')}",
+                       "config", "validate", check=False)  # fmt: skip
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertIn("0 errors, 0 warnings", check.stdout + check.stderr)
 
 
 if __name__ == "__main__":

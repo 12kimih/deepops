@@ -15,14 +15,15 @@ N = 'instance="$node_instance"'
 LOCAL_FS = 'fstype!~"tmpfs|ramfs|overlay|squashfs|nfs.*|cifs|fuse.*|autofs"'
 ETHERNET = 'device=~"en.*|eth.*|bond.*"'
 TRAFFIC_LIGHT = [(None, "green"), (80, "orange"), (90, "red")]
+TRAFFIC_LIGHT_RATIO = [(None, "green"), (0.8, "orange"), (0.9, "red")]
 
 
 def per_gpu(metric, expr=None):
     return query(expr or f"max by (gpu) ({metric}{{{G}}})", "GPU {{gpu}}")
 
 
-def gpu_total(metric, how="sum", scale=""):
-    return f"{how}(max by (gpu) ({metric}{{{G}}})){scale}"
+def gpu_total(metric, how="sum"):
+    return f"{how}(max by (gpu) ({metric}{{{G}}}))"
 
 
 def mem(*names, minus=()):
@@ -126,7 +127,7 @@ def build():
             23,
             stat(
                 "GPU SM Clock",
-                gpu_total("DCGM_FI_DEV_SM_CLOCK", "avg", " * 1e6"),
+                gpu_total("DCGM_FI_DEV_SM_CLOCK_HERTZ", "avg"),
                 unit="hertz",
                 value_size=24,
                 **small,
@@ -137,32 +138,38 @@ def build():
             23,
             stat(
                 "GPU Mem Clock",
-                gpu_total("DCGM_FI_DEV_MEM_CLOCK", "avg", " * 1e6"),
+                gpu_total("DCGM_FI_DEV_MEMORY_CLOCK_HERTZ", "avg"),
                 unit="hertz",
                 value_size=24,
                 **small,
             ),
         ),
         # columns 2 and 3: each GPU, and the node's total or average
-        at(6, 1, timeseries("GPU Power", [per_gpu("DCGM_FI_DEV_POWER_USAGE")], unit="watt", **gpu)),
+        at(6, 1, timeseries("GPU Power", [per_gpu("DCGM_FI_DEV_BOARD_POWER_WATTS")], unit="watt", **gpu)),
         at(
             14,
             1,
             stat(
-                "GPU Power", gpu_total("DCGM_FI_DEV_POWER_USAGE"), unit="watt", description="All GPUs.", **big
+                "GPU Power",
+                gpu_total("DCGM_FI_DEV_BOARD_POWER_WATTS"),
+                unit="watt",
+                description="All GPUs.",
+                **big,
             ),
         ),
         at(
             6,
             6,
-            timeseries("GPU Temperature", [per_gpu("DCGM_FI_DEV_GPU_TEMP")], unit="celsius", min=None, **gpu),
+            timeseries(
+                "GPU Temperature", [per_gpu("DCGM_FI_DEV_GPU_TEMP_CELSIUS")], unit="celsius", min=None, **gpu
+            ),
         ),
         at(
             14,
             6,
             stat(
                 "GPU Temp",
-                gpu_total("DCGM_FI_DEV_GPU_TEMP", "avg"),
+                gpu_total("DCGM_FI_DEV_GPU_TEMP_CELSIUS", "avg"),
                 unit="celsius",
                 description="Average over the GPUs.",
                 **big,
@@ -171,16 +178,18 @@ def build():
         at(
             6,
             11,
-            timeseries("GPU Utilization", [per_gpu("DCGM_FI_DEV_GPU_UTIL")], unit="percent", max=100, **gpu),
+            timeseries(
+                "GPU Utilization", [per_gpu("DCGM_FI_DEV_GPU_UTIL_RATIO")], unit="percentunit", max=1, **gpu
+            ),
         ),
         at(
             14,
             11,
             stat(
                 "GPU Util",
-                gpu_total("DCGM_FI_DEV_GPU_UTIL", "avg"),
-                unit="percent",
-                thresholds=TRAFFIC_LIGHT,
+                gpu_total("DCGM_FI_DEV_GPU_UTIL_RATIO", "avg"),
+                unit="percentunit",
+                thresholds=TRAFFIC_LIGHT_RATIO,
                 description="Average over the GPUs.",
                 **big,
             ),
@@ -190,9 +199,9 @@ def build():
             16,
             timeseries(
                 "GPU Memory Copy Utilization",
-                [per_gpu("DCGM_FI_DEV_MEM_COPY_UTIL")],
-                unit="percent",
-                max=100,
+                [per_gpu("DCGM_FI_DEV_MEMORY_UTIL_RATIO")],
+                unit="percentunit",
+                max=1,
                 **gpu,
             ),
         ),
@@ -201,9 +210,9 @@ def build():
             16,
             stat(
                 "GPU Mem Copy",
-                gpu_total("DCGM_FI_DEV_MEM_COPY_UTIL", "avg"),
-                unit="percent",
-                thresholds=[(None, "green"), (70, "orange"), (90, "red")],
+                gpu_total("DCGM_FI_DEV_MEMORY_UTIL_RATIO", "avg"),
+                unit="percentunit",
+                thresholds=[(None, "green"), (0.7, "orange"), (0.9, "red")],
                 **big,
             ),
         ),
@@ -215,8 +224,7 @@ def build():
                 [
                     per_gpu(
                         "",
-                        f"max by (gpu) (DCGM_FI_DEV_FB_USED{{{G}}}"
-                        f" / (DCGM_FI_DEV_FB_USED{{{G}}} + DCGM_FI_DEV_FB_FREE{{{G}}}))",
+                        f"max by (gpu) (DCGM_FI_DEV_FB_USED_BYTES{{{G}}} / DCGM_FI_DEV_FB_CAPACITY_BYTES{{{G}}})",
                     )
                 ],
                 unit="percentunit",
@@ -235,7 +243,7 @@ def build():
             1,
             timeseries(
                 "NVLink Bandwidth",
-                [query(gpu_total("DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL", "1e6 * sum"), "Total")],
+                [query(gpu_total("DCGM_FI_DEV_NVLINK_THROUGHPUT_BYTES_PER_SECOND"), "Total")],
                 unit="Bps",
                 no_value="No NVLink on this node",
                 **side,
@@ -295,15 +303,15 @@ def build():
     ]
     hostname = query_variable(
         "hostname",
-        'query_result(label_replace(DCGM_FI_DEV_POWER_USAGE{kubernetes_node!=""}, "hostname", "$1", "kubernetes_node", "(.+)")'
-        ' or label_replace(DCGM_FI_DEV_POWER_USAGE{kubernetes_node="",instance=~".*:9400"}, "hostname", "$1", "instance", "(.*):9400"))',
+        'query_result(label_replace(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node!=""}, "hostname", "$1", "kubernetes_node", "(.+)")'
+        ' or label_replace(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="",instance=~".*:9400"}, "hostname", "$1", "instance", "(.*):9400"))',
         '/hostname="([^"]+)"/',
         label="server",
     )
     gpu_instance = query_variable(
         "gpu_instance",
-        'query_result(DCGM_FI_DEV_POWER_USAGE{kubernetes_node="$hostname"}'
-        ' or DCGM_FI_DEV_POWER_USAGE{kubernetes_node="",instance="$hostname:9400"})',
+        'query_result(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="$hostname"}'
+        ' or DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="",instance="$hostname:9400"})',
         '/instance="([^"]+)"/',
         hide=True,
     )

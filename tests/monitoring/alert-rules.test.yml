@@ -130,13 +130,23 @@ tests:
               summary: "Chassis intrusion reported by the BMC of n1"
               description: "The cover was opened, or an old intrusion event was never cleared. Check the node, then clear the event in the BMC."
 
-  - name: a GPU disappearing keeps alerting
+  - name: a GPU disappearing keeps alerting, also when a host's GPUs all vanish, not when its exporter is down
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_GPU_TEMP{instance="n1:9400", host="n1", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{instance="n1:9400", host="n1", gpu="0"}'
         values: '40x300'
-      - series: 'DCGM_FI_DEV_GPU_TEMP{instance="n1:9400", host="n1", gpu="1"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{instance="n1:9400", host="n1", gpu="1"}'
         values: '40x30 _x270'
+      - series: 'up{instance="n1:9400", host="n1"}'
+        values: '1x300'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{instance="n2:9400", host="n2", gpu="0"}'
+        values: '40x30 _x270'
+      - series: 'up{instance="n2:9400", host="n2"}'
+        values: '1x300'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{instance="n3:9400", host="n3", gpu="0"}'
+        values: '40x30 _x270'
+      - series: 'up{instance="n3:9400", host="n3"}'
+        values: '1x30 0x270'
     alert_rule_test:
       - eval_time: 20m
         alertname: GpuMissing
@@ -146,7 +156,10 @@ tests:
         exp_alerts:
           - exp_labels: {severity: critical, instance: "n1:9400", host: n1}
             exp_annotations:
-              summary: "n1 reports fewer GPUs than it did in the last 7 days"
+              summary: "n1 reports 1 fewer GPUs than it did in the last 7 days"
+          - exp_labels: {severity: critical, instance: "n2:9400", host: n2}
+            exp_annotations:
+              summary: "n2 reports 1 fewer GPUs than it did in the last 7 days"
 
   - name: disk alerts skip network filesystems
     interval: 1m
@@ -172,17 +185,12 @@ tests:
               summary: "/ on n1 is over 97% full"
               description: "1% free. Writes will start failing."
 
-  - name: XIDs from user programs are ignored, hardware XIDs alert, from either series shape
+  - name: XIDs from user programs are ignored, hardware XIDs alert, a repeat too
     interval: 1m
     input_series:
-      # The last-XID gauge: a series appears with its code and never changes.
-      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="0", err_code="43"}'
-        values: '_x15 43x20'
-      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="1", err_code="48"}'
-        values: '_x15 48x20'
-      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1", instance="n1:9400", gpu="3", err_code="79"}'
-        values: '79x35'
-      # The per-window count, which also sees a repeat of the same XID.
+      # The windowed count (5 minutes): an XID appears as a series labelled with it.
+      - series: 'DCGM_EXP_XID_ERRORS_COUNT{host="n1", instance="n1:9400", gpu="1", xid="48"}'
+        values: '_x15 1x5 0x15'
       - series: 'DCGM_EXP_XID_ERRORS_COUNT{host="n2", instance="n2:9400", gpu="2", xid="79"}'
         values: '0x15 2x4 0x15'
       - series: 'DCGM_EXP_XID_ERRORS_COUNT{host="n2", instance="n2:9400", gpu="2", xid="31"}'
@@ -206,15 +214,15 @@ tests:
   - name: GPU temperature uses the device slowdown limit, else a fixed one
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_GPU_TEMP{host="n1", instance="n1:9400", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{host="n1", instance="n1:9400", gpu="0"}'
         values: '86x15'
-      - series: 'DCGM_FI_DEV_SLOWDOWN_TEMP{host="n1", instance="n1:9400", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_SLOWDOWN_CELSIUS{host="n1", instance="n1:9400", gpu="0"}'
         values: '95x15'
-      - series: 'DCGM_FI_DEV_GPU_TEMP{host="n1", instance="n1:9400", gpu="1"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{host="n1", instance="n1:9400", gpu="1"}'
         values: '91x15'
-      - series: 'DCGM_FI_DEV_SLOWDOWN_TEMP{host="n1", instance="n1:9400", gpu="1"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_SLOWDOWN_CELSIUS{host="n1", instance="n1:9400", gpu="1"}'
         values: '95x15'
-      - series: 'DCGM_FI_DEV_GPU_TEMP{host="n2", instance="n2:9400", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{host="n2", instance="n2:9400", gpu="0"}'
         values: '86x15'
     alert_rule_test:
       - eval_time: 12m
@@ -227,26 +235,28 @@ tests:
             exp_annotations:
               summary: "GPU 0 on n2 at 86C, near its slowdown temperature"
 
-  - name: hardware slowdown bits alert, power capping does not
+  - name: hardware slowdown clock events alert, power capping does not
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_CLOCKS_EVENT_REASONS{host="n1", instance="n1:9400", gpu="0"}'
+      - series: 'DCGM_EXP_CLOCK_EVENTS_COUNT{host="n1", instance="n1:9400", gpu="0", clock_event="power_cap"}'
         values: '4x20'
-      - series: 'DCGM_FI_DEV_CLOCKS_EVENT_REASONS{host="n1", instance="n1:9400", gpu="1"}'
-        values: '68x20'
+      - series: 'DCGM_EXP_CLOCK_EVENTS_COUNT{host="n1", instance="n1:9400", gpu="1", clock_event="hw_thermal"}'
+        values: '2x20'
+      - series: 'DCGM_EXP_CLOCK_EVENTS_COUNT{host="n1", instance="n1:9400", gpu="1", clock_event="gpu_idle"}'
+        values: '0x20'
     alert_rule_test:
       - eval_time: 16m
         alertname: GpuHardwareSlowdown
         exp_alerts:
-          - exp_labels: {severity: warning, host: n1, instance: "n1:9400", gpu: "1"}
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9400", gpu: "1", clock_event: hw_thermal}
             exp_annotations:
-              summary: "GPU 1 on n1 is held down by a hardware slowdown"
+              summary: "GPU 1 on n1 is held down by hw_thermal"
               description: "Thermal or power-brake slowdown; check cooling, fans and power supplies."
 
   - name: GpuFallenOffBus fires
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_XID_ERRORS{host="n1",instance="n1:9400",gpu="2"}'
+      - series: 'DCGM_FI_DEV_XID_ERROR{host="n1",instance="n1:9400",gpu="2"}'
         values: '79x5'
     alert_rule_test:
       - eval_time: 1m
@@ -259,7 +269,7 @@ tests:
   - name: GpuRowRemapFailure fires
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_ROW_REMAP_FAILURE{host="n1",instance="n1:9400",gpu="2"}'
+      - series: 'DCGM_FI_DEV_ROW_REMAP_FAILED{host="n1",instance="n1:9400",gpu="2"}'
         values: '1x5'
     alert_rule_test:
       - eval_time: 1m
@@ -273,7 +283,7 @@ tests:
   - name: GpuUncorrectableRemappedRows fires
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS{host="n1",instance="n1:9400",gpu="2"} 0x5'
+      - series: 'DCGM_FI_DEV_ROW_REMAP_UNCORRECTABLE_TOTAL{host="n1",instance="n1:9400",gpu="2"} 0x5'
         values: '1x10'
     alert_rule_test:
       - eval_time: 10m
@@ -287,9 +297,9 @@ tests:
   - name: GpuMemoryTemperatureHigh fires
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_MEMORY_TEMP{host="n1",instance="n1:9400",gpu="2"}'
+      - series: 'DCGM_FI_DEV_MEMORY_TEMP_CELSIUS{host="n1",instance="n1:9400",gpu="2"}'
         values: '92x15'
-      - series: 'DCGM_FI_DEV_MEM_MAX_OP_TEMP{host="n1",instance="n1:9400",gpu="2"}'
+      - series: 'DCGM_FI_DEV_MEMORY_MAX_OP_TEMP_CELSIUS{host="n1",instance="n1:9400",gpu="2"}'
         values: '95x15'
     alert_rule_test:
       - eval_time: 12m
@@ -302,7 +312,7 @@ tests:
   - name: GpuPcieReplaysHigh fires
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_PCIE_REPLAY_COUNTER{host="n1",instance="n1:9400",gpu="2"}'
+      - series: 'DCGM_FI_DEV_PCIE_REPLAY_TOTAL{host="n1",instance="n1:9400",gpu="2"}'
         values: '0+100x40'
     alert_rule_test:
       - eval_time: 30m
@@ -573,13 +583,13 @@ tests:
   - name: a busy GPU no Slurm job holds fires; a held one does not
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
-        values: '100x30'
-      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
-        values: '100x30'
-      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
         values: '1x30'
-      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
         values: '0x30'
       - series: 'slurm_gpu_allocated{host="m", instance="m:9100", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
         values: '1x30'
@@ -607,9 +617,9 @@ tests:
   - name: stale allocation data warns and silences the busy-GPU alert
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
-        values: '100x30'
-      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
         values: '0x30'
       - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
         values: '0x30'
@@ -632,11 +642,11 @@ tests:
   - name: a GPU node whose DCGM lacks the minor number warns; one with it does not
     interval: 1m
     input_series:
-      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0"}'
         values: '0x40'
-      - series: 'DCGM_FI_DEV_GPU_UTIL{host="n2", instance="n2:9400", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n2", instance="n2:9400", gpu="0"}'
         values: '0x40'
-      - series: 'DCGM_FI_DEV_MINOR_NUMBER{host="n2", instance="n2:9400", gpu="0"}'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n2", instance="n2:9400", gpu="0"}'
         values: '0x40'
     alert_rule_test:
       - eval_time: 35m
@@ -645,7 +655,7 @@ tests:
           - exp_labels: {severity: warning, host: n1}
             exp_annotations:
               summary: "DCGM on n1 does not export the fields the Slurm GPU join needs"
-              description: "Its metrics file predates DCGM_FI_DEV_MINOR_NUMBER. `ansible-playbook -K -l n1 playbooks/slurm-cluster/nvidia-dcgm-exporter.yml` installs the current one."
+              description: "Its metrics file lacks DCGM_FI_DEV_GPU_MINOR_NUMBER. `ansible-playbook -K -l n1 playbooks/slurm-cluster/nvidia-dcgm-exporter.yml` installs the current one."
 
   - name: a textfile error elsewhere does not call the Slurm allocation data stale
     interval: 1m
@@ -748,4 +758,20 @@ tests:
               description: "A client is connecting faster than the policy allows, often a loop retrying a failing login; left alone, the remote site blocks the cluster's address. `journalctl -k --grep egress-policy` on the host names the uid and destination."
       - eval_time: 19m
         alertname: EgressSshRejected
+        exp_alerts: []
+
+  - name: a busy GPU on a drained node is maintenance, not an alert
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0x30'
+      - series: 'slurm_node_drain{host="m", instance="m:9100", node="n1"}'
+        values: '1x30'
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: GpuBusyWithoutJob
         exp_alerts: []

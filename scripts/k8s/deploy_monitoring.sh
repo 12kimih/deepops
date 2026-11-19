@@ -29,7 +29,11 @@ ingress_name="ingress-nginx"
 
 PROMETHEUS_YAML_CONFIG="${PROMETHEUS_YAML_CONFIG:-${DEEPOPS_CONFIG_DIR}/helm/monitoring.yml}"
 PROMETHEUS_YAML_NO_PERSIST_CONFIG="${PROMETHEUS_YAML_NO_PERSIST_CONFIG:-${DEEPOPS_CONFIG_DIR}/helm/monitoring-no-persist.yml}"
-DCGM_CONFIG_CSV="${DCGM_CONFIG_CSV:-${DEEPOPS_CONFIG_DIR}/files/k8s-cluster/dcgm-custom-metrics.csv}"
+# The exporter, its image and its counters are the Slurm stack's (roles/nvidia-dcgm-exporter):
+# one pin and one counters file for both, so the GPU dashboard reads the same metrics.
+DCGM_EXPORTER_DEFAULTS="${ROOT_DIR}/roles/nvidia-dcgm-exporter/defaults/main.yml"
+DCGM_CONFIG_CSV="${DCGM_CONFIG_CSV:-${ROOT_DIR}/roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv}"
+DCGM_EXPORTER_IMAGE="${DCGM_EXPORTER_IMAGE:-$(sed -n 's/^nvidia_dcgm_container: *"\(.*\)"$/\1/p' "${DCGM_EXPORTER_DEFAULTS}")}"
 
 GPU_OPERATOR_NAMESPACE="${GPU_OPERATOR_NAMESPACE:-gpu-operator}"
 
@@ -232,14 +236,12 @@ function setup_gpu_monitoring() {
 
     # Deploy DCGM node exporter
     if kubectl -n monitoring get pod -l app=dcgm-exporter 2>&1 | grep "No resources found." >/dev/null 2>&1 ; then
+        image="${DCGM_EXPORTER_IMAGE}"
         if [ "${DCGM_DOCKER_REGISTRY}" ]; then
-            cat workloads/services/k8s/dcgm-exporter.yml \
-            | sed "s/image: quay.io/image: ${DCGM_DOCKER_REGISTRY}/g" \
-            | sed "s/image: nvcr.io/image: ${DCGM_DOCKER_REGISTRY}/g" \
-            | kubectl create -f -
-        else
-            kubectl create -f workloads/services/k8s/dcgm-exporter.yml
+            image="${DCGM_DOCKER_REGISTRY}/${image#*/}"
         fi
+        sed "s|image: DCGM_EXPORTER_IMAGE|image: \"${image}\"|" "${ROOT_DIR}/workloads/services/k8s/dcgm-exporter.yml" \
+            | kubectl create -f -
     fi
 }
 
