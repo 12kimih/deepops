@@ -1,12 +1,36 @@
 ---
+# A service that does not come up fails the node with its journal from this boot,
+# which says why; its systemd properties do not.
 - name: Wait for the node's services
-  ansible.builtin.systemd:
-    name: "{{ item }}"
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ item }}"]
   register: maintenance_unit
-  until: maintenance_unit.status.ActiveState == 'active'
+  until: maintenance_unit.stdout == 'active'
   retries: 30
   delay: 10
+  changed_when: false
+  failed_when: false
   loop: "{{ maintenance_verify_units }}"
+  when: not ansible_check_mode
+
+- name: Read the journal of each service that did not start
+  ansible.builtin.command:
+    argv: [journalctl, --boot, --unit, "{{ item.item }}", --lines, "40", --no-pager, --output, short-precise]
+  register: maintenance_unit_journal
+  changed_when: false
+  loop: "{{ maintenance_unit.results | default([]) | selectattr('stdout', 'defined') | rejectattr('stdout', 'eq', 'active') }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not ansible_check_mode
+
+- name: Fail on each service that did not start
+  ansible.builtin.fail:
+    msg: |-
+      {{ item.item.item }} is {{ item.item.stdout }} five minutes after the boot. Its journal:
+      {{ item.stdout }}
+  loop: "{{ maintenance_unit_journal.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.item }}"
   when: not ansible_check_mode
 
 # In a transient unit: nvidia-smi run directly from a session leaks into its cgroup.
