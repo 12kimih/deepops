@@ -145,7 +145,10 @@ clients before the server.
 - Every role in the registry has `<role>_state` in its defaults, an `absent.yml`, a
   detect step, and calls `component_record` in both paths.
 - Every deploy switch is in the registry; no import is skipped on `when: <switch>`,
-  and the playbooks' order agrees with the `needs` graph.
+  and the playbooks' order agrees with the `needs` graph. A switch a deploy still
+  gates an import on is listed in the test's `GATES` with why: a policy, a one-shot
+  setting, or a component still to move with its owner. The list only shrinks: a name
+  no gate uses fails the test.
 - No `absent.yml` removes a path listed as data in its role's defaults
   (`<role>_data_paths`), or any directory recursively unless the record names it.
 - A molecule scenario per batch runs present, rerun (`changed=0`), absent, rerun
