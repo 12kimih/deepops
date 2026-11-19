@@ -201,10 +201,10 @@ def report():
             except Exception as e:  # an unreadable upstream is a finding, not a crash
                 row.update(status="unknown", error=f"{type(e).__name__}: {e}"[:200])
         rows.append(row)
-    seen = set()
+    seen = {r["where"] for r in rows}  # an image pin with its own upstream line is reported once
     for ref, _sha, where in image_pins.pins():
         image, tag = ref.rsplit(":", 1)
-        if image in seen:
+        if image in seen or where in seen:
             continue
         seen.add(image)
         row = {"pin": image, "current": tag, "where": where, "source": "registry"}
