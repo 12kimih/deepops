@@ -9,6 +9,7 @@ Exit codes: 0 ready, 1 not ready, 2 bad input. Training is never validated.
 import argparse
 import json
 import math
+import os
 from pathlib import Path, PurePosixPath
 import re
 import socket
@@ -223,6 +224,7 @@ def validate(args):
         result["gpu_smoke_ran"] = True
         command = [
             "srun",
+            "--job-name=deepops-validate-%d" % os.getpid(),
             "--nodes=1",
             "--ntasks=1",
             "--gpus=1",

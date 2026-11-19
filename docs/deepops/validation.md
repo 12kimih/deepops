@@ -43,7 +43,10 @@ python3 scripts/validation/validate_slurm.py --skip-gpu-job   # read-only
 
 Checks controller reachability, node availability, configured `gres/gpu`
 resources, and (by default) submits a single-GPU `srun` job running
-`nvidia-smi`. Example JSON:
+`nvidia-smi`. The job is named `deepops-validate-<pid>` and asks for one GPU of
+the type with the most GPUs in `sinfo`'s GRES (`--gpu-type` picks another);
+when it does not finish within `--gpu-job-timeout` seconds it is cancelled, so
+it does not wait in the queue to take a GPU later. Example JSON:
 
 ```json
 {

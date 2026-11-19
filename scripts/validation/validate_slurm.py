@@ -19,7 +19,9 @@ check is the ``srun`` job this script runs.
 """
 
 import argparse
+import getpass
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -103,6 +105,33 @@ def parse_gres_gpus(output):
     return sum(parse_gres_gpu_counts(output).values())
 
 
+def parse_gres_gpu_types(output):
+    """Return {gpu_type: configured count} from ``sinfo -h -N -o '%n %G'`` output."""
+    types, seen = {}, set()
+    for line in output.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) != 2 or parts[0] in seen:
+            continue
+        seen.add(parts[0])
+        for match in re.finditer(r"gpu:([^:,(\s]+):(\d+)", parts[1]):
+            types[match.group(1)] = types.get(match.group(1), 0) + int(match.group(2))
+    return types
+
+
+def pick_gpu_type(output):
+    """The GPU type with the most configured GPUs, "" when no GRES names a type."""
+    types = parse_gres_gpu_types(output)
+    return min(types, key=lambda t: (-types[t], t)) if types else ""
+
+
+def gpu_job_command(job_name, gpu_type, partition):
+    """The single-GPU test job: named, so a timed-out one can be found and cancelled."""
+    cmd = ["srun", "--job-name=" + job_name, "--gpus=%s1" % (gpu_type + ":" if gpu_type else ""), "--time=5"]
+    if partition:
+        cmd += ["--partition", partition]
+    return cmd + ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
+
+
 def build_node_details(states_output, gres_output):
     """Return stable per-node state and configured GPU details."""
     states = parse_sinfo_node_states(states_output)
@@ -134,6 +163,11 @@ def main():
         "--partition",
         default="",
         help="partition for the GPU test job (default: cluster default)",
+    )
+    parser.add_argument(
+        "--gpu-type",
+        default="",
+        help="GPU type for the GPU test job (default: the most common type in sinfo's GRES)",
     )
     parser.add_argument(
         "--gpu-job-timeout",
@@ -203,11 +237,13 @@ def main():
 
     if not args.skip_gpu_job and result["controller_reachable"] and result["gpus_configured"] > 0:
         result["gpu_job_ran"] = True
-        cmd = ["srun", "--gpus=1", "--time=5"]
-        if args.partition:
-            cmd += ["--partition", args.partition]
-        cmd += ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
+        job_name = "deepops-validate-%d" % os.getpid()
+        cmd = gpu_job_command(job_name, args.gpu_type or pick_gpu_type(gres_output), args.partition)
         rc, out, err = run(cmd, timeout=args.gpu_job_timeout)
+        if rc == 124:
+            # Killing srun leaves its job queued, to take a GPU later with nobody
+            # waiting for it: cancel it by its name.
+            run(["scancel", "--name", job_name, "--user", getpass.getuser()])
         if rc == 0 and out:
             result["gpu_job_ok"] = True
             result["gpus_visible_in_job"] = len(out.splitlines())
