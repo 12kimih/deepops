@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# Rootless image storage on local disk, one directory per user (roles/podman).
+# The rootful values are podman's defaults.
+[storage]
+driver = "overlay"
+runroot = "/run/containers/storage"
+graphroot = "/var/lib/containers/storage"
+rootless_storage_path = "{{ podman_storage_root }}/$UID"

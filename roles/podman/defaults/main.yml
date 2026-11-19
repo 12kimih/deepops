@@ -1,0 +1,32 @@
+---
+# podman -- rootless Podman for users to build images from a Dockerfile inside a CPU
+# Slurm job, then import them into enroot (`enroot import podman://IMAGE`).
+#   https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md
+#
+# Each user needs a subordinate UID/GID range (/etc/subuid, /etc/subgid). The ranges
+# are computed from the people roster's UIDs (people_subids in plugins/filter/people.py),
+# so every node writes the same files; both files are owned by this role. A user
+# without a range cannot run podman.
+
+# The distribution packages (podman 4.9 on Ubuntu 24.04). uidmap/shadow-utils provide
+# newuidmap and newgidmap; slirp4netns is the rootless network of podman 4.
+podman_packages:
+  Debian: [podman, uidmap, slirp4netns]
+  RedHat: [podman, shadow-utils, slirp4netns]
+
+# Roster-shaped mapping (login -> {uid, status}) of the people who get a range, and
+# the ranges' layout: start = base + (uid - 1000) * count. The base must exceed every
+# roster UID; count 65536 covers the IDs any image uses.
+podman_people: {}
+podman_subid_base: 100000
+podman_subid_count: 65536
+
+# Per-user image storage (rootless_storage_path, as <root>/<UID>) on node-local disk:
+# never NFS, where overlay does not work and small-file I/O is slow. Each user's
+# directory is created here, owned by them; the root itself is root-owned.
+podman_storage_root: /var/lib/podman-storage
+
+# Per-user runtime directories (<root>/<UID>, tmpfs, recreated at boot). A Slurm job
+# inherits the login node's XDG_RUNTIME_DIR, which does not exist on the compute
+# node, and podman fails on it; /usr/local/bin/podman points it here instead.
+podman_runtime_root: /run/podman-users

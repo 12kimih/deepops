@@ -1,0 +1,5 @@
+---
+# The users' subordinate ranges, computed from the roster alone.
+podman_subids: "{{ podman_people | people_subids(podman_subid_base, podman_subid_count) }}"
+# The apparmor package's profiles that grant rootless podman user namespaces.
+podman_apparmor_profiles: [podman, crun, slirp4netns]

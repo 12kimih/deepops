@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Users have no systemd instance here, so podman manages cgroups itself and a
+# container stays in the Slurm job's cgroup, inside its limits. Events and logs go
+# to files, not the journal.
+[containers]
+log_driver = "k8s-file"
+
+[engine]
+cgroup_manager = "cgroupfs"
+events_logger = "file"

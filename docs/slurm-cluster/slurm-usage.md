@@ -134,7 +134,7 @@ srun -p PARTITION --gpus-per-task=1 \
     mpiexec --allow-run-as-root -np 2 python resnet.py --layers=50 --batch_size=32 --precision=fp16 --num_iter=50"
 ```
 
-The `--container-image` flag runs the job inside the image using Pyxis/Enroot, which DeepOps installs by default.
+The `--container-image` flag runs the job inside the image using Pyxis/Enroot, which DeepOps installs by default. To build your own image from a Dockerfile, see [Building container images with rootless Podman](../container/podman.md).
 
 ## Additional Resources
 

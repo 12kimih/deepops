@@ -1,0 +1,51 @@
+---
+# Ubuntu 24.04 restricts unprivileged user namespaces (roles/enroot keeps the
+# restriction on). The apparmor package's own profiles for podman, crun and
+# slirp4netns grant `userns` to those programs only; they must be loaded.
+- name: Check for the AppArmor user namespace restriction
+  ansible.builtin.stat:
+    path: /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+  register: podman_userns_knob
+
+# Absent where AppArmor is not visible (inside a container): nothing to load there.
+- name: Check for the kernel's AppArmor profile list
+  ansible.builtin.stat:
+    path: /sys/kernel/security/apparmor/profiles
+  register: podman_apparmor_fs
+
+- name: Check for the AppArmor profiles
+  ansible.builtin.stat:
+    path: "/etc/apparmor.d/{{ item }}"
+  loop: "{{ podman_apparmor_profiles }}"
+  register: podman_apparmor_files
+  when: podman_userns_knob.stat.exists
+
+- name: Fail without the AppArmor profiles
+  ansible.builtin.fail:
+    msg: >-
+      The kernel restricts unprivileged user namespaces, but
+      {{ podman_apparmor_files.results | rejectattr('stat.exists') | map(attribute='item') | join(', ') }}
+      is missing from /etc/apparmor.d (the apparmor package ships them), so rootless
+      podman cannot start a container. Reinstall the apparmor package.
+  when:
+    - podman_userns_knob.stat.exists
+    - podman_apparmor_files.results | rejectattr('stat.exists') | list | length > 0
+
+# The kernel's list decides, so a profile unloaded by hand is loaded again.
+- name: Read the loaded AppArmor profiles
+  ansible.builtin.slurp:
+    src: /sys/kernel/security/apparmor/profiles
+  register: podman_apparmor_loaded
+  when:
+    - podman_userns_knob.stat.exists
+    - podman_apparmor_fs.stat.exists
+
+- name: Load the AppArmor profiles
+  ansible.builtin.command:
+    argv: [apparmor_parser, -r, -W, "/etc/apparmor.d/{{ item }}"]
+  loop: "{{ podman_apparmor_profiles }}"
+  changed_when: true
+  when:
+    - podman_userns_knob.stat.exists
+    - podman_apparmor_fs.stat.exists
+    - (podman_apparmor_loaded.content | b64decode) is not search('(?m)^' ~ item ~ ' ')

@@ -35,6 +35,8 @@ allow_user_set_gpu_clocks: false
 slurm_cluster_configure_gpu_power_limit: true
 slurm_install_enroot: true
 slurm_install_pyxis: true
+# Rootless Podman on compute nodes, for Dockerfile builds in CPU jobs (roles/podman)
+slurm_install_podman: true
 
 # Kubernetes deploy (playbooks/k8s-cluster.yml)
 kube_enable_container_registry: false
