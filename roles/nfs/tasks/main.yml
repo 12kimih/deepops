@@ -62,6 +62,17 @@
     - nfs
     - molecule-notest
 
+# nfs_is_server (what this play makes the host) and nfs_servers (which hosts may run a
+# server) must agree: otherwise one run would set the server up and then retire it.
+- name: Refuse a server that nfs_servers does not name
+  ansible.builtin.assert:
+    that: not nfs_is_server | bool or nfs_servers | length == 0 or inventory_hostname in nfs_servers
+    fail_msg: >-
+      {{ inventory_hostname }} is set up as an NFS server here but is not in nfs_servers
+      ({{ nfs_servers | join(', ') }}), which would retire it. Add it to nfs_servers.
+    quiet: true
+  tags: always
+
 - name: Setup server
   ansible.builtin.include_tasks: server.yml
   when: nfs_is_server
@@ -83,6 +94,7 @@
 # servers. The exported data on disk is left alone; the client side stays.
 - name: Retire the NFS server on hosts that are not NFS servers
   when:
+    - not nfs_is_server | bool
     - nfs_servers | length > 0
     - inventory_hostname not in nfs_servers
   tags:
