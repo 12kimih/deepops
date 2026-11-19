@@ -1,14 +1,6 @@
 ---
 - name: Back up the Slurm controller
   when: slurm_backup_destinations | length > 0
-  vars:
-    slurm_backup_state: >-
-      {{ slurm_backup_state_dir
-         or (lookup('ansible.builtin.template', slurm_conf_template)
-             | regex_search('(?m)^StateSaveLocation=(\S+)', '\1') | default(['/var/spool/slurmctld'], true) | first) }}
-    slurm_backup_timers:
-      - {command: backup, schedule: "{{ slurm_backup_schedule }}"}
-      - {command: restore-test, schedule: "{{ slurm_backup_restore_test_schedule }}"}
   block:
     # The program is clustertools.slurm_backup, shipped with the library it imports.
     - name: Install the backup command
@@ -34,18 +26,21 @@
       loop_control:
         label: "{{ item.path }}"
 
+    # The program's own check refuses what it could not run (a keep count below 1
+    # would delete the set just written), so the deploy fails, not the 3 a.m. run.
     - name: Write the backup configuration
       ansible.builtin.copy:
         dest: "{{ slurm_backup_config }}"
         owner: root
         group: root
         mode: "0600"
-        content: "{{ {'database': slurm_backup_database, 'state_dir': slurm_backup_state,
+        content: "{{ {'database': slurm_backup_database, 'state_dir': slurm_state_save_location,
                       'munge_key': slurm_backup_munge_key, 'weekly_day': slurm_backup_weekly_day,
                       'textfile_dir': slurm_backup_textfile_dir, 'textfile': slurm_backup_textfile,
-                      'metrics_file': slurm_backup_metrics_file,
+                      'work_dir': slurm_backup_work_dir, 'metrics_file': slurm_backup_metrics_file,
                       'step_timeout': slurm_backup_step_timeout,
                       'destinations': slurm_backup_destinations} | to_nice_json }}\n"
+        validate: "{{ slurm_backup_script }} check %s"
 
     - name: Install the backup service
       ansible.builtin.template:
@@ -82,3 +77,37 @@
       loop_control:
         label: "{{ item.command }}"
       when: not ansible_check_mode
+
+# Backups switched off: nothing keeps running or alerting for them. The backup sets
+# themselves stay where they are.
+- name: Remove the backups that are switched off
+  when: slurm_backup_destinations | length == 0
+  block:
+    - name: Find the backup units
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ item }}"
+      register: slurm_backup_units
+      loop: "{{ slurm_backup_unit_files }}"
+
+    # Stopped before their files go; systemctl directly, as the units may be
+    # half-removed by an earlier interrupted run.
+    - name: Stop and disable the backup units
+      ansible.builtin.command:
+        argv: [systemctl, disable, --now, "{{ item.item | replace('@.service', '@publish.service') }}"]
+      changed_when: true
+      loop: "{{ slurm_backup_units.results | selectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Remove the units, configuration and metrics
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ slurm_backup_unit_files | map('regex_replace', '^', '/etc/systemd/system/') | list
+                + [slurm_backup_config, slurm_backup_metrics_file, slurm_backup_textfile_dir ~ '/' ~ slurm_backup_textfile] }}"
+      register: slurm_backup_removed
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: slurm_backup_removed is changed

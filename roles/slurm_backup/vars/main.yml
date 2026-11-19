@@ -1,0 +1,7 @@
+---
+# The two timed commands, and every unit file the role installs (removed together when
+# the backups are switched off).
+slurm_backup_timers:
+  - {command: backup, schedule: "{{ slurm_backup_schedule }}"}
+  - {command: restore-test, schedule: "{{ slurm_backup_restore_test_schedule }}"}
+slurm_backup_unit_files: "{{ ['slurm-backup@.service'] + slurm_backup_timers | map(attribute='command') | map('regex_replace', '^(.*)$', 'slurm-backup-\\1.timer') | list }}"
