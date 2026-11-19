@@ -42,6 +42,8 @@ maintenance_verify_gpus: "{{ inventory_hostname in groups['slurm-node'] | defaul
 # GPU, so it runs only here, on a node this run drained. Level 1 by default wherever
 # DCGM is installed (install_dcgm); playbooks/utilities/gpu-diag.yml runs a long one.
 maintenance_verify_dcgm_level: "{{ 1 if maintenance_verify_gpus | bool and install_dcgm | default(false) | bool else 0 }}"
+# The longest each level may run (seconds), about four times its usual length.
+maintenance_verify_dcgm_timeout: {1: 600, 2: 1200, 3: 7200, 4: 28800}
 maintenance_verify_nhc: true
 
 # Kernel policy settings every host must share; consistency.yml fails when they differ.

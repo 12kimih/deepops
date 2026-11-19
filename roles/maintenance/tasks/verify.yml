@@ -19,10 +19,22 @@
   when: maintenance_verify_gpus | bool and not ansible_check_mode
 
 # Fails the node on any failed test; the run stops with the node still drained. After
-# a reboot the host engine may still be starting: only that is waited for.
+# a reboot the host engine may still be starting: only that is waited for. A hung run is
+# killed at its level's limit and fails the node like a failed test.
 - name: Run the DCGM diagnostics
   ansible.builtin.command:
-    argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, dcgmi, diag, -r, "{{ maintenance_verify_dcgm_level }}"]
+    argv:
+      - systemd-run
+      - --wait
+      - --pipe
+      - --collect
+      - --quiet
+      - "--property=RuntimeMaxSec={{ maintenance_verify_dcgm_timeout[maintenance_verify_dcgm_level | int] }}"
+      - --
+      - dcgmi
+      - diag
+      - -r
+      - "{{ maintenance_verify_dcgm_level }}"
   register: maintenance_dcgm
   until: maintenance_dcgm.rc == 0 or 'Unable to establish a connection' not in (maintenance_dcgm.stdout ~ maintenance_dcgm.stderr)
   retries: 12
