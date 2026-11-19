@@ -28,3 +28,4 @@ retired_settings:
   sm_sources_path: easybuild_prefix in roles/deepops_paths (sources live under it)
   sm_build_path: easybuild_home in roles/easy-build (builds unpack under it)
   slurm_password: slurm_munge_key_file, a vaulted key file (docs/slurm-cluster/munge-key.md)
+  nvidia_driver_persistenced_dropin: the role owns the nvidia-persistenced unit with persistence mode on (roles/nvidia_driver)

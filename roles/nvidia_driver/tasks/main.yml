@@ -103,46 +103,68 @@
     - not (nvidia_driver_module_loaded | bool)
     - nvidia_driver_reboot_pending.stat.exists | default(false)
 
-# NVIDIA recommends the persistence daemon over the legacy `nvidia-smi -pm 1`
-# ("the daemon approach provides a more elegant and robust solution"; legacy
-# persistence mode is slated for deprecation). The driver packages pull in
-# nvidia-persistenced with an enable preset; enable it explicitly to be deterministic.
+# NVIDIA recommends the persistence daemon (not the legacy `nvidia-smi -pm 1`) with
+# persistence mode on. The distribution units do not give that: Ubuntu's runs
+# --no-persistence-mode, stops when unneeded and cannot be enabled (no [Install]). The
+# role owns the unit (/etc/systemd/system takes precedence), after NVIDIA's template.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
+# https://github.com/NVIDIA/nvidia-persistenced/blob/main/init/systemd/nvidia-persistenced.service.template
+- name: Own the persistence daemon's unit, persistence mode on
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nvidia-persistenced.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # roles/nvidia_driver: persistence mode on, started at boot
+      [Unit]
+      Description=NVIDIA Persistence Daemon
+      Wants=syslog.target
+
+      [Service]
+      Type=forking
+      ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
+      ExecStopPost=/bin/rm -rf /var/run/nvidia-persistenced
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Nvidia-persistenced unit changed
+  when: nvidia_driver_persistenced | bool
+
+# The drop-in earlier versions of this role could write; the unit above replaces it.
+- name: Remove the retired persistence drop-in
+  ansible.builtin.file:
+    path: /etc/systemd/system/nvidia-persistenced.service.d
+    state: absent
+  notify: Nvidia-persistenced unit changed
+
 - name: Enable the NVIDIA persistence daemon
   ansible.builtin.systemd:
     name: nvidia-persistenced
     enabled: true
     state: started
+    daemon_reload: true
   when:
     - nvidia_driver_persistenced | bool
     - nvidia_driver_module_loaded | bool
 
-# Optional drop-in (opt-in): force --persistence-mode and/or add --verbose. The
-# empty ExecStart= reset is required because ExecStart is a systemd list directive.
-- name: Create the nvidia-persistenced systemd drop-in directory
-  ansible.builtin.file:
-    path: /etc/systemd/system/nvidia-persistenced.service.d
-    state: directory
-    mode: "0755"
+- name: Read the persistence mode of every GPU
+  ansible.builtin.command:
+    argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, nvidia-smi, --query-gpu=persistence_mode, "--format=csv,noheader"]
+  register: nvidia_driver_persistence
+  changed_when: false
+  check_mode: false
   when:
     - nvidia_driver_persistenced | bool
-    - nvidia_driver_persistenced_dropin | bool
+    - nvidia_driver_verify | bool
     - nvidia_driver_module_loaded | bool
 
-- name: Deploy the nvidia-persistenced systemd drop-in
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      [Service]
-      ExecStart=
-      ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
-  notify: Reload systemd and restart nvidia-persistenced
-  when:
-    - nvidia_driver_persistenced | bool
-    - nvidia_driver_persistenced_dropin | bool
-    - nvidia_driver_module_loaded | bool
+- name: Fail when a GPU is not in persistence mode
+  ansible.builtin.assert:
+    that: nvidia_driver_persistence.stdout_lines | map('trim') | reject('eq', 'Enabled') | list | length == 0
+    fail_msg: "Persistence mode is not on for every GPU: {{ nvidia_driver_persistence.stdout_lines | join(', ') }}"
+    quiet: true
+  when: nvidia_driver_persistence is not skipped
 
 # NVSwitch HGX baseboards require Fabric Manager, branch-matched to the driver.
 # https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html

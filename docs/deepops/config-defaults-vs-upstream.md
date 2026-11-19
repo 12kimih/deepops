@@ -18,7 +18,9 @@ code). Values you set in your own gitignored `config/` always win over these.
 
 | Setting | Upstream | This fork | Why |
 |---|---|---|---|
-| `nvidia_driver_branch` | `"580"` | `"595"` | newer production branch |
+| `nvidia_driver_branch` | `"580"` | `"580"` | the long-term support branch (to mid-2028) |
+| Ubuntu driver packages | `nvidia-driver-<branch>-server-open` (pulls DKMS) | precompiled `linux-modules-nvidia-<branch>-server-open-<flavour>`, `nvidia-headless-no-dkms-...`, `nvidia-utils-...` | signed modules, no DKMS build on nodes (Ubuntu server docs) |
+| persistence daemon | distribution unit (`--no-persistence-mode` on Ubuntu) | the role's unit, persistence mode on, checked per GPU | NVIDIA post-installation actions |
 | open kernel modules | `nvidia_driver_ubuntu_use_open_kernel_modules: false` | `nvidia_driver_kernel_modules: "open"` | var renamed + open modules (required/recommended on recent GPUs) |
 | `nvidia_driver_server_branch` | (unset) | `true` | use the `-server` packages on Ubuntu |
 | `nvidia_driver_purge_existing` | (unset) | `true` | clean reinstall path |

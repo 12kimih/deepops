@@ -1,35 +1,44 @@
 ---
 # Two install methods, selected by nvidia_driver_install_method:
-#  - ubuntu_repo (default): the Canonical archive nvidia-driver-{branch}-server-open.
-#    The single meta resolves one consistent kernel-module closure (signed
-#    precompiled, Secure-Boot-friendly), unlike hand-listing dkms + no-dkms.
+#  - ubuntu_repo (default): the Canonical archive's server set, as Ubuntu's docs give it
+#    for compute nodes: the signed precompiled kernel modules for the running kernel
+#    flavour (linux-modules-nvidia-{branch}-server-open-{flavour}, which follow kernel
+#    upgrades), the userspace without DKMS (nvidia-headless-no-dkms-...) and the tools
+#    (nvidia-utils-...). The nvidia-driver-{branch}-server-open meta is NOT used: it
+#    depends on nvidia-dkms and builds the modules on every node.
 #    https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
 #  - nvidia_repo: NVIDIA's CUDA apt repo (cuda-keyring + nvidia-open / cuda-drivers),
 #    branch-pinned with nvidia-driver-pinning-{branch} (installed FIRST).
 #    https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/ubuntu.html
 
-# Resolve the target package up front so the purge can be skipped when the desired
-# driver is already installed (keeps re-runs idempotent -- otherwise the purge would
-# match the driver this role just installed and force a reboot on every run).
-- name: Determine the NVIDIA driver package (Ubuntu, Canonical archive)
-  ansible.builtin.set_fact:
-    nvidia_driver_package_resolved: >-
-      {{ nvidia_driver_package if (nvidia_driver_package | length > 0)
-         else 'nvidia-driver-' ~ nvidia_driver_branch
-              ~ ('-server' if (nvidia_driver_server_branch | bool) else '')
-              ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '') }}
-  when: nvidia_driver_install_method == 'ubuntu_repo'
-
-- name: Set the target NVIDIA driver package name (Ubuntu)
-  ansible.builtin.set_fact:
-    nvidia_driver_target_package: >-
-      {{ nvidia_driver_package_resolved if nvidia_driver_install_method == 'ubuntu_repo'
-         else ('nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers') }}
-
 - name: Gather installed package facts (Ubuntu)
   ansible.builtin.package_facts:
     manager: apt
-  when: nvidia_driver_purge_existing | bool
+
+# Resolved up front so the purge can be skipped when the driver is already installed
+# (re-runs stay idempotent). The modules are built for the running kernel flavour: the
+# HWE kernel's when its meta package is installed, the GA kernel's otherwise.
+- name: Determine the NVIDIA driver packages (Ubuntu, Canonical archive)
+  ansible.builtin.set_fact:
+    nvidia_driver_packages_resolved: >-
+      {{ [nvidia_driver_package] if nvidia_driver_package | length > 0 else
+         ['linux-modules-nvidia-' ~ _flavoured ~ '-' ~ _kernel_flavour,
+          'nvidia-headless-no-dkms-' ~ _flavoured,
+          'nvidia-utils-' ~ _branch] }}
+  vars:
+    _branch: "{{ nvidia_driver_branch ~ ('-server' if nvidia_driver_server_branch | bool else '') }}"
+    _flavoured: "{{ _branch ~ ('-open' if nvidia_driver_kernel_modules == 'open' else '') }}"
+    _hwe: "linux-generic-hwe-{{ ansible_facts.distribution_version }}"
+    _kernel_flavour: "{{ 'generic-hwe-' ~ ansible_facts.distribution_version if _hwe in ansible_facts.packages else 'generic' }}"
+  when: nvidia_driver_install_method == 'ubuntu_repo'
+
+# The package whose presence (at the branch) means this driver is installed.
+- name: Set the target NVIDIA driver package name (Ubuntu)
+  ansible.builtin.set_fact:
+    nvidia_driver_target_package: >-
+      {{ nvidia_driver_packages_resolved[0 if nvidia_driver_package | length > 0 else 1]
+         if nvidia_driver_install_method == 'ubuntu_repo'
+         else ('nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers') }}
 
 # A switch: the target is not installed, or (NVIDIA repo, whose package name carries no
 # branch) the installed one is of another branch. A new pin alone never replaces an
@@ -64,12 +73,35 @@
     nvidia_driver_purge_target: "{{ nvidia_driver_target_package }}"
 
 # --- Method: ubuntu_repo (Canonical archive) ---------------------------------
+# The CUDA repository (added for DCGM) also publishes driver packages, some newer than
+# the archive's (fabricmanager, nscq): with the archive's driver they must never come
+# from there, or an upgrade mixes two builds of one branch.
+- name: Take the NVIDIA driver packages from the Ubuntu archive only
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/deepops-nvidia-driver
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # roles/nvidia_driver (nvidia_driver_install_method: ubuntu_repo)
+      Package: *nvidia*
+      Pin: origin developer.download.nvidia.com
+      Pin-Priority: -1
+  when: nvidia_driver_install_method == 'ubuntu_repo'
+
+- name: Drop the archive-only pin (Ubuntu, nvidia_repo)
+  ansible.builtin.file:
+    path: /etc/apt/preferences.d/deepops-nvidia-driver
+    state: absent
+  when: nvidia_driver_install_method == 'nvidia_repo'
+
 - name: Install the NVIDIA driver from the Ubuntu archive
   ansible.builtin.apt:
-    name: "{{ nvidia_driver_package_resolved }}"
+    name: "{{ nvidia_driver_packages_resolved }}"
     state: present
+    install_recommends: false
     update_cache: true
-  register: nvidia_driver_install
+  register: nvidia_driver_install_archive
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
 # --- Method: nvidia_repo (NVIDIA CUDA apt repo) ------------------------------
@@ -94,8 +126,14 @@
     name: "{{ 'nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers' }}"
     state: present
     update_cache: true
-  register: nvidia_driver_install
+  register: nvidia_driver_install_repo
   when: nvidia_driver_install_method == 'nvidia_repo'
+
+# One result for main.yml, whichever method ran (a skipped task's register would
+# otherwise overwrite the one that installed).
+- name: Note whether the driver was installed now (Ubuntu)
+  ansible.builtin.set_fact:
+    nvidia_driver_install: "{{ nvidia_driver_install_archive if nvidia_driver_install_method == 'ubuntu_repo' else nvidia_driver_install_repo }}"
 
 # --- Fabric Manager (opt-in, NVSwitch HGX) -----------------------------------
 - name: Install NVIDIA Fabric Manager and NSCQ (Ubuntu)
@@ -105,6 +143,6 @@
     update_cache: true
   vars:
     # NVIDIA's repo drops the branch from these names from the 590 series on (the pin
-    # selects the branch); the Canonical archive keeps it.
+    # selects the branch); the Canonical archive keeps it (nvidia-fabricmanager-580).
     _suffix: "{{ '' if nvidia_driver_install_method == 'nvidia_repo' and nvidia_driver_branch | int >= 590 else '-' ~ nvidia_driver_branch }}"
   when: nvidia_driver_fabricmanager | bool

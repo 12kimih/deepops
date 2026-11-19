@@ -37,7 +37,7 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | nvidia_container_toolkit | `nvidia_container_toolkit_version` | `1.20.2-1` |  |
 | nvidia_hpc_sdk | `hpcsdk_major_version` | `26` |  |
 | nvidia_hpc_sdk | `hpcsdk_minor_version` | `9` |  |
-| nvidia_versions | `nvidia_driver_branch` | `580` | `595` |
+| nvidia_versions | `nvidia_driver_branch` | `580` |  |
 | open_ondemand | `open_ondemand_version` | `4.2.5` |  |
 | open_ondemand | `open_ondemand_dex_version` | `2.45.1.2` |  |
 | open_ondemand | `open_ondemand_nodejs_version` | `22.23.5-1nodesource1` |  |
