@@ -9,20 +9,28 @@ if [ "$#" -ne 1 ]; then
 fi
 parts_dir=$1
 
+# Logging never fails the run: a missing /dev/log (journald restarting) must not drain
+# the node.
 log () {
-    logger -s -t slurm "$@"
+    logger -s -t slurm "$@" || :
 }
+
+# The node as Slurm names it, which need not be the host name.
+node_name="${SLURMD_NODENAME:-$(hostname -s)}"
+# Every controller call is bounded: a slurmctld that does not answer must cost a
+# skipped cleanup, never a prolog that hangs every job start on this node.
+squeue_timeout=15
 
 # Use an absolute path: slurmd's PATH does not include a custom
 # slurm_install_prefix, and with an empty command result both sides of the
 # comparison below were "" and every job was treated as exclusive.
 squeue_bin="{{ slurm_install_prefix }}/bin/squeue"
 
-# Find out if we are running in exclusive mode.
-# Ask squeue for allocated CPUs and node count directly instead of parsing
-# "scontrol show job": on recent Slurm the pattern TRES=cpu= matched both the
-# ReqTRES= and AllocTRES= lines, yielding a multi-line value that never
-# compared equal, so exclusive jobs were never detected.
+# Find out if we are running in exclusive mode: Slurm's own answer, squeue's
+# OverSubscribe (%h), which is NO exactly when the job has its nodes to itself.
+# Comparing allocated CPUs with the node's count never matched once CoreSpecCount
+# reserves cores (an exclusive job gets only the rest), nor across nodes of
+# different sizes, so the *-exclusive-* scripts never ran.
 #
 # The lookup runs inside a conditional on purpose. This script has "set -e", so
 # a bare assignment from a failing squeue aborts the whole prolog/epilog run and
@@ -30,16 +38,12 @@ squeue_bin="{{ slurm_install_prefix }}/bin/squeue"
 # empty or non-numeric lookup must instead leave exclusive=0, which only skips
 # the *-exclusive-* scripts and lets every other script run.
 exclusive=0
-if job_alloc=$("$squeue_bin" -h -j "$SLURM_JOBID" -o "%C %D" 2>/dev/null); then
-    read -r numcpus_job numnodes_job <<<"$job_alloc" || true
-    if [[ "$numcpus_job" =~ ^[0-9]+$ ]] && [[ "$numnodes_job" =~ ^[0-9]+$ ]]; then
-        numcpus_sys=$(( $(grep -c ^processor /proc/cpuinfo) * numnodes_job ))
-        if [ "$numcpus_sys" -eq "$numcpus_job" ]; then
-            exclusive=1
-        fi
-    else
-        log "[WARN] squeue returned no usable allocation for job ${SLURM_JOBID} ('${job_alloc}'); treating the job as non-exclusive."
-    fi
+if oversubscribe=$(timeout "$squeue_timeout" "$squeue_bin" -h -j "$SLURM_JOBID" -o "%h" 2>/dev/null); then
+    case "$oversubscribe" in
+        NO) exclusive=1 ;;
+        OK|YES|USER|MCS|TOPO) ;;
+        *) log "[WARN] squeue returned no usable OverSubscribe for job ${SLURM_JOBID} ('${oversubscribe}'); treating the job as non-exclusive." ;;
+    esac
 else
     log "[WARN] squeue failed for job ${SLURM_JOBID}; treating the job as non-exclusive."
 fi
@@ -61,7 +65,7 @@ fi
 # last_user_job at 0, and disable the cleanup entirely.
 lastuserjob_states='running,suspended,stopped,configuring,resizing'
 last_user_job=0
-if user_jobs=$("$squeue_bin" -h -u "$SLURM_JOB_USER" -w "$HOSTNAME" -t "$lastuserjob_states" -o '%i' 2>/dev/null); then
+if user_jobs=$(timeout "$squeue_timeout" "$squeue_bin" -h -u "$SLURM_JOB_USER" -w "$node_name" -t "$lastuserjob_states" -o '%i' 2>/dev/null); then
     # Drop this job's own entry defensively. It should not be in the states
     # above, but an id match is cheap and keeps a future state addition from
     # silently switching the cleanup off.
@@ -70,7 +74,7 @@ if user_jobs=$("$squeue_bin" -h -u "$SLURM_JOB_USER" -w "$HOSTNAME" -t "$lastuse
         last_user_job=1
     fi
 else
-    log "[WARN] squeue failed while counting jobs for ${SLURM_JOB_USER} on ${HOSTNAME}; not running the last-user-job scripts."
+    log "[WARN] squeue failed while counting jobs for ${SLURM_JOB_USER} on ${node_name}; not running the last-user-job scripts."
 fi
 
 {% if slurm_epilog_cleanup_scope == 'job' %}

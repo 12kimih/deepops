@@ -21,3 +21,19 @@ enroot_user_path() {
     esac
     printf '%s\n' "$value"
 }
+
+# enroot_owned_dir PATH: PATH is a real directory (not a symlink) owned by the job user.
+enroot_owned_dir() {
+    [ -d "$1" ] && [ ! -L "$1" ] && [ "$(stat -c %u -- "$1")" = "$SLURM_JOB_UID" ]
+}
+
+# enroot_clear PATH: remove what is at PATH as root without following a symlink or
+# crossing a mount (a user's FUSE mount left inside). The parents are world-writable,
+# so whatever is there may be another user's plant; nothing in it is trusted or kept.
+enroot_clear() {
+    rm -rf --one-file-system -- "$1"
+}
+
+enroot_log() {
+    logger -t slurm-enroot "$*" 2>/dev/null || :
+}

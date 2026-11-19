@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-set -ex
+# The runtime and data directories go with the user's last job; the image cache stays.
+# Only the user's own real directory is removed, never across a mount, and a failure
+# is logged, not returned: a failing epilog drains the node.
+set -u
 
 command -v enroot >/dev/null || exit 0  # enroot not installed
-. '{{ slurm_config_dir }}/shared/lib/enroot-paths.sh'
+. '{{ slurm_config_dir }}/shared/lib/enroot-paths.sh' || exit 0
 
-# The runtime and data directories go with the user's last job; the image cache stays.
 for key in ENROOT_RUNTIME_PATH ENROOT_DATA_PATH; do
     path=$(enroot_user_path "$key") || continue
-    rm -rf "$path"
+    enroot_owned_dir "$path" || continue
+    enroot_clear "$path" || enroot_log "cannot remove all of $path"
 done
+exit 0

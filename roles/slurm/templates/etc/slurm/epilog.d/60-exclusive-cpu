@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-set -ex
+# The CPU governor for the job that has the node to itself. A node without a cpufreq
+# driver, or whose cpupower does not match the running kernel, cannot set it; that
+# is logged, never a failed part, which would drain the node.
+set -u
 
-command -v cpupower || exit 0
-
-cpupower frequency-info | grep -e "governors: Not Available" && exit 0
-cpupower frequency-set -g powersave
+command -v cpupower >/dev/null || exit 0
+if ! out=$(timeout 30 cpupower frequency-set -g powersave 2>&1); then
+    logger -t slurm-exclusive "CPU governor powersave not set: $out" || :
+fi
+exit 0

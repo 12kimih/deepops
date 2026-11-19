@@ -11,8 +11,9 @@ function check_nv_drv_version() {
 
 function check_nv_gpu_count() {
 	expected_count=$1
-	actual_count="$(nvidia-smi -L | wc -l)"
-	if [ $expected_count -ne $actual_count ]; then
+	# Physical GPUs only: -L also lists each MIG instance, on a line of its own.
+	actual_count="$(timeout 60 nvidia-smi -L | grep -c '^GPU ')"
+	if [ "$expected_count" -ne "$actual_count" ]; then
 		echo "GPU count incorrect"
 		return 1
 	fi
