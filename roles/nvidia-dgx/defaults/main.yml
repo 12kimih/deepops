@@ -4,7 +4,6 @@
 # Upgrading every package is not this role's job: use playbooks/utilities/apt-upgrade.yml.
 
 dgx_configure_raid_array: false
-nvidia_driver_skip_reboot: false
 dgx_raid_mount_path: /raid
 cachefilesd_cache_dir: /raid
 cachefilesd_cache_tag: dgx1cache

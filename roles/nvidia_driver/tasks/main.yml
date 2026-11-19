@@ -33,25 +33,21 @@
           (nvidia_driver_ondisk_version.stdout | trim)
             not in (nvidia_driver_loaded_version.stdout | default(''))) }}
 
-- name: Reboot to load the new NVIDIA kernel module
+- name: Ask for a reboot to load the new NVIDIA kernel module
   ansible.builtin.include_role:
     name: maintenance
-    tasks_from: reboot
+    tasks_from: reboot_request
   vars:
-    maintenance_force_reboot: true
     maintenance_reason: "load the new NVIDIA driver"
-    maintenance_reboot_timeout: "{{ nvidia_driver_reboot_timeout }}"
-  when:
-    - nvidia_driver_reboot | bool
-    - nvidia_driver_reboot_needed | bool
+  when: nvidia_driver_reboot_needed | bool
 
 # Post-installation actions, run after the reboot so the new module is loaded.
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
 
 # Re-read the loaded version AFTER the possible reboot and confirm it now matches the
 # on-disk module. Persistence/verify run only when the module is genuinely loaded and
-# current, so a still-pending reboot (nvidia_driver_reboot=false, or a module that fails
-# to load) skips them with a clear warning instead of a cryptic systemd failure.
+# current, so a pending reboot (or a module that fails to load) skips them with a clear
+# warning instead of a cryptic systemd failure.
 - name: Re-read the running NVIDIA kernel module version (after any reboot)
   ansible.builtin.command: cat /proc/driver/nvidia/version
   register: nvidia_driver_loaded_version_post
@@ -70,8 +66,8 @@
   ansible.builtin.debug:
     msg: >-
       The on-disk NVIDIA module ({{ nvidia_driver_ondisk_version.stdout | default('?') | trim }})
-      is not the one running on {{ inventory_hostname }}. Reboot it (or set
-      nvidia_driver_reboot=true) so the new driver loads; skipping persistence/verify.
+      is not the one running on {{ inventory_hostname }}; skipping persistence/verify
+      until the reboot asked for above loads it.
   when:
     - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0
     - not (nvidia_driver_module_loaded | bool)

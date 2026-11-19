@@ -1,10 +1,9 @@
 ---
-# Run by the "Reboot node" handler: every reboot goes through roles/maintenance.
-- name: Reboot through the maintenance role
+# Run by the "Reboot node" handler: the reboot is asked for, and done drained by
+# playbooks/utilities/apt-upgrade.yml (roles/maintenance, reboot_request).
+- name: Ask for a reboot to apply the enroot kernel settings
   ansible.builtin.include_role:
     name: maintenance
-    tasks_from: reboot
+    tasks_from: reboot_request
   vars:
-    maintenance_force_reboot: true
     maintenance_reason: "apply the enroot kernel settings"
-    maintenance_reboot_timeout: "{{ enroot_reboot_timeout }}"

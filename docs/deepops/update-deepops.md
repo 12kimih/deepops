@@ -269,7 +269,7 @@ DeepOps offers the option to configure each of the necessary NVIDIA components i
 
 ##### Updating the NVIDIA driver
 
-**Important**: Note that upgrading the NVIDIA driver will reboot the node, unless you set `nvidia_driver_reboot` to false.
+**Important**: A driver change does not reboot the node; it asks for a reboot (`/var/run/reboot-required`), which `playbooks/utilities/apt-upgrade.yml` performs with the node drained and checked afterwards. `-e maintenance_reboot_now=true` reboots at once instead, for nodes nobody uses yet.
 If you are using MIG-enabled GPUs ensure that your MIG configuration is persistent by using the [nvidia-mig-manager systemd](https://github.com/NVIDIA/mig-parted/tree/master/deployments/systemd) service
 or the [nvidia-mig-manager Kubernetes GPU Operator-included DaemonSet](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-operator-mig.html).
 
@@ -283,7 +283,6 @@ On Ubuntu, DeepOps installs the `-server-open` driver package for one release br
 
 ```bash
 ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
-ansible-playbook playbooks/utilities/reboot.yml -e hostlist=<list-of-nodes>
 ```
 
 To move to a new release branch, set it in your DeepOps configuration:
@@ -435,7 +434,7 @@ Note that this can take a long time, as we download and build Slurm from source 
 
 #### Updating the NVIDIA driver
 
-**Important**: Note that upgrading the NVIDIA driver will reboot the node, unless you set `nvidia_driver_reboot` to false.
+**Important**: A driver change does not reboot the node; it asks for a reboot (`/var/run/reboot-required`), which `playbooks/utilities/apt-upgrade.yml` performs with the node drained and checked afterwards. `-e maintenance_reboot_now=true` reboots at once instead, for nodes nobody uses yet.
 
 ##### On DGX
 
@@ -447,7 +446,6 @@ On Ubuntu, DeepOps installs the `-server-open` driver package for one release br
 
 ```bash
 ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
-ansible-playbook playbooks/utilities/reboot.yml -e hostlist=<list-of-nodes>
 ```
 
 To move to a new release branch, set it in your DeepOps configuration:

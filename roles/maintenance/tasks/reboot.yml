@@ -7,6 +7,35 @@
 - name: Reboot
   when: maintenance_force_reboot | bool or maintenance_reboot_required.stat.exists
   block:
+    # Every reboot comes through here, so this is where a node that runs jobs is
+    # protected: a compute node Slurm knows must be drained (or down) first. One it
+    # does not know yet (a first deploy) has no jobs to lose.
+    - name: Read the node's Slurm state
+      ansible.builtin.command:
+        argv: ["{{ maintenance_slurm_bin }}/scontrol", show, node, -o, "{{ inventory_hostname }}"]
+      delegate_to: "{{ maintenance_slurm_controller }}"
+      register: maintenance_reboot_node
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when:
+        - inventory_hostname in groups[slurm_compute_group] | default([])
+        - maintenance_slurm_controller | length > 0
+        - not maintenance_reboot_undrained | bool
+
+    - name: Refuse to reboot a node that takes jobs
+      ansible.builtin.fail:
+        msg: >-
+          {{ inventory_hostname }} is not drained in Slurm
+          ({{ (maintenance_reboot_node.stdout ~ maintenance_reboot_node.stderr) | regex_search('State=\S+') or 'state unknown' }}).
+          playbooks/utilities/apt-upgrade.yml -e hostlist={{ inventory_hostname }} -e maintenance_force_reboot=true
+          drains it, reboots it and returns it; -e maintenance_reboot_undrained=true
+          reboots it anyway, losing its jobs.
+      when:
+        - maintenance_reboot_node is not skipped
+        - maintenance_reboot_node.stdout is not search('State=\S*(DRAIN|DOWN)')
+        - (maintenance_reboot_node.stdout ~ maintenance_reboot_node.stderr) is not search('not found')
+
     # Triggers first, or the umount re-arms a mount against a dying server.
     - name: Detach the shared filesystems before the reboot
       ansible.builtin.shell:

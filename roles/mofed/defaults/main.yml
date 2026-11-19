@@ -26,7 +26,5 @@ mofed_repo_gpg_key_checksum: "sha256:e7dbe32100fadbf08da347c2448d5d05d810ba0144a
 # doca-all and doca-networking are larger supersets.
 mofed_package: "doca-ofed"
 
-# Reboot after install to load the OFED kernel modules (off by default; pair with
-# playbooks/utilities/reboot.yml for a controlled rolling reboot).
-mofed_reboot: false
-mofed_reboot_timeout: 600
+# An install asks for a reboot to load the OFED kernel modules (roles/maintenance,
+# reboot_request); it does not reboot the node itself.

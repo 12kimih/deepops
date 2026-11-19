@@ -9,7 +9,7 @@ pairs are duplicates.
 
 | You want | Use | What it does |
 |---|---|---|
-| A single CUDA in the default PATH on each GPU node | `nvidia_cuda` role / `playbooks/nvidia-software/nvidia-cuda.yml` | Installs **one** CUDA toolkit from the NVIDIA apt/dnf repo (and the driver). Gated by `slurm_cluster_install_cuda`. |
+| A single CUDA in the default PATH on each GPU node | `nvidia_cuda` role / `playbooks/nvidia-software/nvidia-cuda.yml` | Installs **one** CUDA toolkit from the NVIDIA apt/dnf repo (the driver is `nvidia-driver.yml`'s). Gated by `slurm_cluster_install_cuda`. |
 | Several CUDA versions users pick per job | `nvidia_cuda_toolkit` role / `playbooks/slurm-cluster/nvidia-cuda-toolkit.yml` | Installs **many** CUDA versions from the official `.run` files into `/sw` as Lmod modules (`module load cuda/<ver>`). Never touches the driver. Opt-in. |
 
 They are mutually exclusive: when serving CUDA as modules, set

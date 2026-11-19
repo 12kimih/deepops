@@ -36,14 +36,12 @@
   when:
     - firmware_needs_upgrade | default(false)
 
-- name: Reboot if necessary
+- name: Ask for a reboot to load the new firmware
   ansible.builtin.include_role:
     name: maintenance
-    tasks_from: reboot
+    tasks_from: reboot_request
   vars:
-    maintenance_force_reboot: true
     maintenance_reason: "load the new firmware"
-    maintenance_reboot_timeout: "{{ reboot_timeout }}"
   when:
     - reboot_required | default(false)
 
@@ -58,16 +56,10 @@
   ansible.builtin.debug:
     msg: "It is necessary to manually power cycle this DGX using the BMC or ipmitool. FW update message: {{ fw_update_json.Message }}"
 
-- name: Wait for server to reboot (if required)
-  ansible.builtin.wait_for_connection:
-    delay: 15
-    timeout: "{{ reboot_timeout }}"
-
-- name: Print Debug
-  ansible.builtin.debug:
-    msg: Host is online
-
+# Firmware that waits for a reboot still reports the old versions: verified on the
+# run after the reboot, when check-firmware finds nothing left to update.
 - name: Verify firmware
   ansible.builtin.include_tasks: verify-firmware.yml
   when:
     - firmware_needs_upgrade | default(false)
+    - not reboot_required | default(false)

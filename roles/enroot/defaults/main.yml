@@ -74,10 +74,9 @@ enroot_max_mnt_namespaces: 65536
 # setting it back to false restores the restriction.
 enroot_apparmor_global_disable: false
 
-# RHEL/Rocky: enable unprivileged userns via kernel cmdline if missing (+ reboot).
+# RHEL/Rocky: enable unprivileged userns via kernel cmdline if missing (asks for a reboot).
 enroot_configure_kernel_options: true
 enroot_configure_kernel_options_versions: "ALL"
-enroot_reboot_timeout: 900
 
 # --- enroot.conf / extension dirs --------------------------------------------
 # Per-user RUNTIME/CACHE/DATA paths. enroot expands $(id -u) at runtime; the role

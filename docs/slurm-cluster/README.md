@@ -335,10 +335,18 @@ through NIS resolves to its pinned GID on every node.
 
 ## Rebooting the cluster
 
-`playbooks/utilities/reboot.yml` reboots the targeted hosts and waits for each to come
-back. `-e reboot_serial=N` reboots in batches of N instead of all at once, and
+`playbooks/utilities/reboot.yml` reboots the targeted hosts one at a time and waits for
+each to come back. `-e reboot_serial=N` reboots N at a time, and
 `-e maintenance_reboot_timeout=N` sets how long a node has to return -- the default 1800s allows for
-BIOS POST and memory training on a GPU server.
+BIOS POST and memory training on a GPU server. A compute node Slurm still schedules on
+is refused: drain it first, or use `playbooks/utilities/apt-upgrade.yml`, which drains,
+reboots, checks and resumes (`-e maintenance_reboot_undrained=true` overrides, losing
+the node's jobs).
+
+Roles never reboot a node themselves. A change that needs one (a new driver or kernel
+module, kernel options, firmware) writes `/var/run/reboot-required`; the OS update
+metrics report it and apt-upgrade.yml performs it. On nodes nobody uses yet,
+`-e maintenance_reboot_now=true` reboots at once instead.
 
 Before rebooting, the play detaches every NFS mount. Without that, a node holding a
 `hard` mount from a server rebooting alongside it blocks in uninterruptible sleep during
