@@ -53,6 +53,15 @@
     manager: rpm
   when: nvidia_driver_purge_existing | bool
 
+# A switch: the target is not installed, or the installed one is of another branch
+# (nvidia-open / cuda-drivers carry no branch in their names).
+- name: Decide whether the driver switches (RHEL/Rocky)
+  ansible.builtin.set_fact:
+    nvidia_driver_switch: >-
+      {{ (nvidia_driver_rhel_package_resolved | trim) not in ansible_facts.packages
+         or ansible_facts.packages[nvidia_driver_rhel_package_resolved | trim][0].version is not match(nvidia_driver_branch ~ '\\.') }}
+  when: nvidia_driver_purge_existing | bool
+
 - name: Find pre-existing NVIDIA driver packages (RHEL/Rocky)
   ansible.builtin.shell:
     cmd: >-
@@ -63,7 +72,7 @@
   check_mode: false
   when:
     - nvidia_driver_purge_existing | bool
-    - (nvidia_driver_rhel_package_resolved | trim) not in ansible_facts.packages
+    - nvidia_driver_switch | bool
 
 - name: Remove the other NVIDIA driver packages (RHEL/Rocky)
   ansible.builtin.include_tasks: purge.yml
@@ -76,7 +85,7 @@
   changed_when: false
   when:
     - nvidia_driver_purge_existing | bool
-    - (nvidia_driver_rhel_package_resolved | trim) not in ansible_facts.packages
+    - nvidia_driver_switch | bool
 
 - name: Enable the NVIDIA driver dnf module stream (RHEL/Rocky)
   ansible.builtin.command:
