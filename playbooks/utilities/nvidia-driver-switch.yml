@@ -1,8 +1,8 @@
 ---
 # Switch the NVIDIA driver branch (nvidia_driver_branch) the way the maintenance role
 # changes a node: one node at a time, drain it in Slurm and wait for its jobs, switch
-# the driver (roles/nvidia_driver), reboot, converge the driver again on the new module
-# (persistence daemon), check slurmd, the GPUs, DCGM and NHC, and
+# the driver (roles/nvidia_driver), reboot (which runs the driver role again on the new
+# module), check slurmd, the GPUs, DCGM and NHC, and
 # resume it. A failed node stops the run with that node still drained. Removing the
 # running driver breaks every GPU job until the reboot, so the driver role refuses a
 # switch on a node that still takes jobs; this playbook is the way to make one.
@@ -39,10 +39,8 @@
       vars:
         maintenance_role: nvidia_driver
         maintenance_reason: "maintenance: driver switch"
-        # The role runs again after the reboot: only with the new module loaded can it
-        # enable the persistence daemon and check every GPU's persistence mode.
-        maintenance_steps: "{{ ['drain', 'role', 'reboot', 'role', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
-                              else ['role', 'reboot', 'role', 'verify'] }}"
+        maintenance_steps: "{{ ['drain', 'role', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
+                              else ['role', 'reboot', 'verify'] }}"
       when: ansible_facts.ansible_local['gpus']['count'] | int > 0 and not nvidia_driver_switch_dgx.stat.exists
   environment: "{{ proxy_env }}"
 

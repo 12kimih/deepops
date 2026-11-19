@@ -97,8 +97,8 @@
     msg: >-
       REBOOT PENDING: {{ inventory_hostname }} still runs the old NVIDIA module; the
       installed {{ nvidia_driver_ondisk_version.stdout | default('?') | trim }} is not in use.
-      Persistence daemon, Fabric Manager and GPU checks were NOT done; rerun this
-      playbook after the reboot.
+      The persistence daemon and Fabric Manager start at boot; the GPU checks run when
+      the maintenance reboot runs this role again (roles/maintenance, reboot_request).
   when:
     - not (nvidia_driver_module_loaded | bool)
     - nvidia_driver_reboot_pending.stat.exists | default(false)
@@ -138,12 +138,18 @@
     state: absent
   notify: Nvidia-persistenced unit changed
 
-- name: Enable the NVIDIA persistence daemon
+# Enabled now, whatever module runs: after a pending reboot it starts with the new one.
+- name: Enable the NVIDIA persistence daemon at boot
   ansible.builtin.systemd:
     name: nvidia-persistenced
     enabled: true
-    state: started
     daemon_reload: true
+  when: nvidia_driver_persistenced | bool
+
+- name: Start the NVIDIA persistence daemon
+  ansible.builtin.systemd:
+    name: nvidia-persistenced
+    state: started
   when:
     - nvidia_driver_persistenced | bool
     - nvidia_driver_module_loaded | bool
@@ -168,10 +174,15 @@
 
 # NVSwitch HGX baseboards require Fabric Manager, branch-matched to the driver.
 # https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
-- name: Enable NVIDIA Fabric Manager
+- name: Enable NVIDIA Fabric Manager at boot
   ansible.builtin.systemd:
     name: nvidia-fabricmanager
     enabled: true
+  when: nvidia_driver_fabricmanager | bool
+
+- name: Start NVIDIA Fabric Manager
+  ansible.builtin.systemd:
+    name: nvidia-fabricmanager
     state: started
   when:
     - nvidia_driver_fabricmanager | bool

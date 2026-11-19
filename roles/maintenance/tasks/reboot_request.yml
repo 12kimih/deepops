@@ -5,6 +5,14 @@
 # os_updates reports it (os_updates_reboot_required) and apt-upgrade.yml acts on it,
 # draining the node first and putting it back after the checks. On a node nobody uses
 # yet, -e maintenance_reboot_now=true reboots at once.
+- name: Create the directory of reboot requests
+  ansible.builtin.file:
+    path: "{{ maintenance_reboot_requests_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Ask for a reboot
   ansible.builtin.copy:
     dest: /var/run/reboot-required
@@ -13,6 +21,17 @@
     group: root
     mode: "0644"
 
+# The role asking (the one that included this) is recorded: some of its work can only
+# run on the new kernel or module, so the reboot step runs it again after the reboot.
+- name: Record which role waits for the reboot
+  ansible.builtin.copy:
+    dest: "{{ maintenance_reboot_requests_dir }}/{{ maintenance_reboot_requester }}"
+    content: "{{ maintenance_reason }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: maintenance_reboot_requester | length > 0
+
 - name: Reboot now
   ansible.builtin.include_tasks: reboot.yml
   when: maintenance_reboot_now | bool
@@ -20,7 +39,8 @@
 - name: Say why the node waits for a reboot
   ansible.builtin.debug:
     msg: >-
-      {{ inventory_hostname }} needs a reboot to {{ maintenance_reason }}. Run
-      playbooks/utilities/apt-upgrade.yml -e hostlist={{ inventory_hostname }}: it
-      drains the node, reboots it, checks it and returns it to Slurm.
+      {{ inventory_hostname }} needs a reboot to {{ maintenance_reason }}. A maintenance
+      run reboots it drained (playbooks/utilities/apt-upgrade.yml -e
+      hostlist={{ inventory_hostname }}) and then runs {{ maintenance_reboot_requester or 'the asking role' }} again on
+      the new kernel or module.
   when: not maintenance_reboot_now | bool

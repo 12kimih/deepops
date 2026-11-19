@@ -106,3 +106,28 @@
             that: maintenance_boot_after.content != maintenance_boot_before.content
             fail_msg: "{{ inventory_hostname }} answers with the same boot as before the power cycle."
             quiet: true
+
+    # The work the asking roles could only do on the new kernel or module (a driver's
+    # persistence check, a kernel setting's check): each runs again, then its request
+    # goes. A role still running (it asked with maintenance_reboot_now) carries on
+    # itself. A failed rerun keeps the request for the next maintenance run.
+    - name: Find the roles that waited for this reboot
+      ansible.builtin.find:
+        paths: "{{ maintenance_reboot_requests_dir }}"
+        file_type: file
+      register: maintenance_reboot_requests
+
+    - name: Run each waiting role again on the new boot
+      ansible.builtin.include_role:
+        name: "{{ maintenance_rerun_role }}"
+        public: true
+      loop: "{{ maintenance_reboot_requests.files | map(attribute='path') | map('basename')
+                | reject('in', ansible_parent_role_names | default([])) | list }}"
+      loop_control:
+        loop_var: maintenance_rerun_role
+
+    - name: Clear the reboot requests
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ maintenance_reboot_requests.files | map(attribute='path') | list }}"
