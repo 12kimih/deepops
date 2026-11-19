@@ -1,7 +1,8 @@
 ---
 # The one way any role removes packages (include_role: host_baseline, tasks_from:
 # absent, with host_baseline_absent_packages set): purged, so no conffile or init script
-# is left to start the service again, and followed by stopping what still runs.
+# is left to start the service again, and followed by stopping a daemon that still
+# runs from a removed program.
 - name: Remove the packages declared absent
   when: host_baseline_absent_packages | length > 0
   block:
@@ -58,33 +59,26 @@
         name: "{{ host_baseline_present }}"
         state: absent
         purge: "{{ true if ansible_facts.os_family == 'Debian' else omit }}"
+      register: host_baseline_removed
       when: host_baseline_present | length > 0
 
-- name: Look for services still running a removed program
-  ansible.builtin.script: orphan-services
-  register: host_baseline_orphans
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-
-- name: Report the services still running a removed program
-  ansible.builtin.debug:
-    msg: "{{ inventory_hostname }} will stop: {{ host_baseline_orphans.stdout_lines | join(', ') }}"
-  when: host_baseline_orphans.stdout_lines | length > 0
-
-# Stopped, and disabled when a unit file still enables it at boot (a removed package
-# often leaves none, and then there is nothing to disable).
+# Only after this run removed something, and only daemons whose own main process runs
+# a removed program (files/orphan-services): stopped, never disabled.
 - name: Stop the services still running a removed program
-  ansible.builtin.command:
-    argv:
-      - sh
-      - -c
-      - >-
-        systemctl stop "$1" &&
-        if [ "$(systemctl show -P UnitFileState "$1")" = enabled ];
-        then systemctl disable "$1"; fi
-      - sh
-      - "{{ item.split()[0] }}"
-  loop: "{{ host_baseline_orphans.stdout_lines }}"
-  loop_control:
-    label: "{{ item }}"
-  changed_when: true
+  when: host_baseline_removed is changed
+  block:
+    - name: Look for services still running a removed program
+      ansible.builtin.script: orphan-services
+      register: host_baseline_orphans
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    # systemctl directly: the systemd module refuses a unit whose file went with the
+    # package, which is exactly this case.
+    - name: Stop the services still running a removed program
+      ansible.builtin.command:
+        argv: [systemctl, stop, "{{ item.split()[0] }}"]
+      changed_when: true
+      loop: "{{ host_baseline_orphans.stdout_lines }}"
+      loop_control:
+        label: "{{ item }}"
