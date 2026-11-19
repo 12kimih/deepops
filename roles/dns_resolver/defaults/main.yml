@@ -1,0 +1,54 @@
+---
+# dns_resolver -- a caching resolver (unbound) on each host, on loopback only, that
+# every process on the host uses through systemd-resolved, and that answers NXDOMAIN
+# for services which publish a port from inside the cluster to the internet. With
+# roles/egress_policy users may send DNS to it alone, so the block holds. See
+# docs/slurm-cluster/egress-policy.md. Hosts with systemd-resolved (Ubuntu).
+
+# present runs the resolver; absent puts systemd-resolved's own stub back.
+dns_resolver_state: present
+
+# The site's resolvers unbound forwards every query to (IP addresses). Empty: unbound
+# resolves from the root servers itself, which needs outbound DNS to anywhere.
+dns_resolver_upstreams: []
+
+# Validate DNSSEC (unbound's default on Ubuntu). Turn off only when the upstreams strip
+# DNSSEC records, which makes every signed name fail.
+dns_resolver_dnssec: true
+
+# Names answered NXDOMAIN, with every name below them: tunnel and expose services
+# (an agent's control connection and the public URLs it hands out). The tailscale
+# control plane is not here: the administrators' tailscaled needs it, and users cannot
+# run a tunnel through it without a tailscaled of their own, which the metrics report.
+dns_resolver_blocked_domains:
+  - ngrok.io
+  - ngrok.com
+  - ngrok.app
+  - ngrok.dev
+  - ngrok-free.app
+  - ngrok-free.dev
+  - ngrok-agent.com
+  - trycloudflare.com
+  - cfargotunnel.com
+  - argotunnel.com
+  - devtunnels.ms
+  - tunnels.api.visualstudio.com
+  - loca.lt
+  - localtunnel.me
+  - localhost.run
+  - lhr.life
+  - serveo.net
+  - serveousercontent.com
+  - bore.pub
+  - pinggy.io
+  - pinggy.link
+  - pinggy.online
+  - zrok.io
+  - playit.gg
+  - localxpose.io
+  - loclx.io
+  - tunnelmole.com
+  - tunnelmole.net
+  - telebit.cloud
+# More names the site blocks, added to the list above.
+dns_resolver_blocked_domains_site: []

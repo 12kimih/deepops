@@ -42,6 +42,9 @@ slurm_install_podman: true
 # Where users may connect outside the cluster (roles/egress_policy); needs
 # egress_policy_internal_networks
 slurm_enable_egress_policy: false
+# A local resolver on every host that blocks tunnel services by name
+# (roles/dns_resolver); the egress policy lets users send DNS to it alone
+slurm_enable_dns_resolver: false
 
 # Kubernetes deploy (playbooks/k8s-cluster.yml)
 kube_enable_container_registry: false

@@ -197,6 +197,16 @@ class MonitoringImages(unittest.TestCase):
         check = docker("run", "--rm", "-u", f"{os.getuid()}", "-v", f"{config}:/etc/alertmanager:ro", "--entrypoint", "amtool", image,
                        "check-config", "/etc/alertmanager/alertmanager.yml", check=False)  # fmt: skip
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        # Warnings (a tunnel, an exposed listener) reach Slack without the mention that
+        # pages; only critical alerts carry it.
+        for labels, receiver in (
+            (["alertname=EgressTunnelRunning", "severity=warning", "host=n1"], "slack"),
+            (["alertname=HostDown", "severity=critical", "host=n1"], "slack-critical"),
+        ):
+            route = docker("run", "--rm", "-u", f"{os.getuid()}", "-v", f"{config}:/etc/alertmanager:ro", "--entrypoint", "amtool",
+                           image, "config", "routes", "test", "--config.file=/etc/alertmanager/alertmanager.yml", *labels,
+                           check=False)  # fmt: skip
+            self.assertEqual(route.stdout.strip(), receiver, route.stdout + route.stderr)
         with Container(
             image, 9093, "--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/tmp/data",
             volumes=[f"{config}:/etc/alertmanager:ro"],

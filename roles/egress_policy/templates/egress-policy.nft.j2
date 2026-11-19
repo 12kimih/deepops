@@ -14,6 +14,7 @@ table inet egress_policy {
 	counter rejected_port {}
 	counter rejected_ssh_user {}
 	counter rejected_ssh_node {}
+	counter rejected_dns {}
 
 	set internal4 { type ipv4_addr; flags interval; auto-merge;{{ elements(v4) }} }
 	set internal6 { type ipv6_addr; flags interval; auto-merge;{{ elements(v6) }} }
@@ -34,8 +35,16 @@ table inet egress_policy {
 
 	chain user {
 		ct state established,related accept
+{% if egress_policy_dns_local_only %}
+		# Only this host's resolver (on loopback, accepted above) answers users.
+		meta l4proto { tcp, udp } th dport { 53, 853 } jump dns_reject
+{% endif %}
 		ip daddr @internal4 accept
 		ip6 daddr @internal6 accept
+{% if egress_policy_allow_ping %}
+		icmp type echo-request accept
+		icmpv6 type echo-request accept
+{% endif %}
 {% if egress_policy_allowed_tcp_ports | length > 0 %}
 		tcp dport { {{ egress_policy_allowed_tcp_ports | join(', ') }} } accept
 {% endif %}
@@ -59,6 +68,11 @@ table inet egress_policy {
 	chain ssh_user_reject {
 		limit rate {{ egress_policy_log_rate }} log prefix "egress-policy ssh user: " flags skuid
 		counter name "rejected_ssh_user" reject with icmpx admin-prohibited
+	}
+
+	chain dns_reject {
+		limit rate {{ egress_policy_log_rate }} log prefix "egress-policy dns: " flags skuid
+		counter name "rejected_dns" reject with icmpx admin-prohibited
 	}
 
 	chain ssh_node_reject {

@@ -1,0 +1,16 @@
+---
+_dns_resolver_conf: /etc/unbound/unbound.conf.d/deepops.conf
+_dns_resolver_resolved_dropin: /etc/systemd/resolved.conf.d/60-dns-resolver.conf
+# One DNS query over UDP: SERVER NAME TYPE -> "RCODE ANSWERS". The check runs before
+# the host is pointed at the resolver, so it needs no client tool installed.
+_dns_resolver_query: |
+  import random, socket, struct, sys
+  server, name, qtype = sys.argv[1], sys.argv[2], int(sys.argv[3])
+  qid = random.randrange(65536)
+  labels = b"".join(bytes([len(p)]) + p.encode() for p in name.strip(".").split(".") if p)
+  query = struct.pack(">HHHHHH", qid, 0x0100, 1, 0, 0, 0) + labels + b"\0" + struct.pack(">HH", qtype, 1)
+  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  s.settimeout(5)
+  s.sendto(query, (server, 53))
+  reply = s.recv(4096)
+  print(reply[3] & 15, struct.unpack(">H", reply[6:8])[0])

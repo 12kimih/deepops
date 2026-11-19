@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: dns_resolver
+  author: DeepOps
+  description: A local unbound resolver on loopback that blocks tunnel services by name
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]

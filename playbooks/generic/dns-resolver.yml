@@ -1,0 +1,15 @@
+---
+# A local unbound resolver on every host that blocks tunnel services by name
+# (roles/dns_resolver). Preview on one host first:
+#
+#   ansible-playbook -K --check --diff -l <host> playbooks/generic/dns-resolver.yml
+#
+# Put systemd-resolved's stub back with -e dns_resolver_state=absent.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tags:
+    - dns-resolver
+  roles:
+    - role: deploy_defaults  # slurm_enable_dns_resolver, proxy_env
+    - role: dns_resolver
+  environment: "{{ proxy_env }}"
