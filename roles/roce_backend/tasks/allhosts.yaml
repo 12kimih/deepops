@@ -1,10 +1,10 @@
 ---
 # Tasks file for roce_backend role
-# Supported OS: Ubuntu 18.04 (the legacy MLNX_OFED ISO in vars/main.yml)
-# # Install Mellanox OFED and VF activation
+# Install Mellanox OFED through roles/mofed, the one place DeepOps installs it (a
+# verified repository, and a reboot left pending for the drained maintenance path).
 - name: MOFED installation
-  ansible.builtin.include_tasks: mofed-install.yaml
-  when: ansible_facts.distribution == 'Ubuntu'
+  ansible.builtin.include_role:
+    name: mofed
   tags:
     - roce_host
 

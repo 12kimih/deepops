@@ -29,15 +29,9 @@ sriov_resources:
 #    1014 - MT27700 Family [ConnectX-4 Virtual Function]
 vendor: "15b3"
 dev_id: "101c"
-num_vf: 8
 
-# NVIDIA OFED parameters. Prefer NVIDIA Network Operator with DOCA-OFED for
-# new Kubernetes RDMA/RoCE deployments; this role is a legacy direct-host path.
-mofed_version: "24.10-4.1.4.0"
-mofed_site_place: "MLNX_OFED-24.10-4.1.4.0"
-# The ISO is published per architecture. Follow the mofed role, which already
-# builds this name from ansible_facts.architecture (roles/mofed/defaults/main.yml).
-mofed_file_name: "MLNX_OFED_LINUX-{{ mofed_version }}-ubuntu{{ ansible_facts.distribution_version }}-{{ ansible_facts.architecture }}.iso"
+# MOFED comes from roles/mofed (its mofed_* settings). Prefer the NVIDIA Network
+# Operator with DOCA-OFED for new Kubernetes RDMA/RoCE deployments.
 
 multus_ds: "https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml"
 sriov_dp_ds: "https://raw.githubusercontent.com/k8snetworkplumbingwg/sriov-network-device-plugin/master/deployments/sriovdp-daemonset.yaml"

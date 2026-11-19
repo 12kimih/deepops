@@ -67,19 +67,13 @@ Supported values
 
 dev_id: "101c"
 ```
-4. Amount of Virtual function for activation - num_vf.
+4. Amount of Virtual function for activation - roce_backend_num_vf (defaults/main.yml).
 
-num_vf: 8
+roce_backend_num_vf: 8
 
-5. NVIDIA OFED version, site place and image name - mofed_version, mofed_site_place, mofed_file_name.
+5. NVIDIA OFED is installed by roles/mofed; set its mofed_* variables (roles/mofed/defaults/main.yml).
 
 For new Kubernetes RDMA/RoCE deployments, prefer NVIDIA Network Operator coverage with DOCA-OFED driver management. This DeepOps role remains a legacy direct-host install path for environments that still need it, so verify the OFED package against your exact operating system and kernel before using it in production.
-```
-# NVIDIA OFED parameters
-mofed_version: "24.10-4.1.4.0"
-mofed_site_place: "MLNX_OFED-24.10-4.1.4.0"
-mofed_file_name: "MLNX_OFED_LINUX-{{ mofed_version }}-ubuntu{{ ansible_distribution_version }}-{{ ansible_architecture }}.iso"
-```
 
 
 Dependencies

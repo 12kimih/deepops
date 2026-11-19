@@ -1,0 +1,3 @@
+---
+# SR-IOV virtual functions activated on each physical function.
+roce_backend_num_vf: 8

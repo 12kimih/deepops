@@ -13,7 +13,7 @@
         pfNames: ["{{ item.pf_name }}"]
       linkType: "{{ link_type }}"
       isRdma: true
-      numVfs: {{ num_vf | int }}
+      numVfs: {{ nvidia_network_operator_num_vf | int }}
       priority: 90
       resourceName: "{{ item.res_name }}"
   kubernetes.core.k8s:

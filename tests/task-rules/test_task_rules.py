@@ -33,56 +33,41 @@
 """
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-COMMANDS = {
-    "command",
-    "shell",
-    "script",
-    "ansible.builtin.command",
-    "ansible.builtin.shell",
-    "ansible.builtin.script",
-}
-TEMPLATES = {"template", "ansible.builtin.template"}
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import Scan, ansible_files, module, role_var_files, tasks, tracked  # noqa: E402
+
+COMMANDS = {"command", "shell", "script", "raw", "expect"}
+TEMPLATES = {"template"}
 # Fetched without a fixed checksum because the file changes in place upstream, and
 # checked against its publisher's signing key right after instead.
-SIGNATURE_CHECKED = {ROOT / "roles/package_repos/tasks/epel.yml"}
-URL = re.compile(r"^\s*(https?|ftp)://|^\s*\{\{[^}]*(url|_src)\b")
-REBOOT_STEP = ROOT / "roles/maintenance/tasks/reboot.yml"
-REBOOT_COMMAND = re.compile(r"^\s*(/\S*/)?(reboot|shutdown\s+-r|systemctl\s+(reboot|kexec))\b")
-SECRET = re.compile(
-    r"\{\{[^}]*(password|passwd|_token|secret|webhook|api_key|_pass\b|heartbeat_url)[^}]*\}\}"
+SIGNATURE_CHECKED = {"roles/package_repos/tasks/epel.yml"}
+URL = re.compile(r"^\s*(https?|ftp)://|^\s*git\+|^\s*\{\{[^}]*(url|_src)\b")
+REBOOT_STEP = "roles/maintenance/tasks/reboot.yml"
+REBOOT_COMMAND = re.compile(
+    r"(?:^|[;&|(]\s*|\s)(?:/\S*/)?(?:reboot|shutdown\s+(?:-r|--reboot)|systemctl\s+(?:--\S+\s+)*(?:reboot|kexec))(?=\s|$|[;&|)])",
+    re.M,
 )
+SECRET = re.compile(
+    r"\{\{[^}]*(password|passwd|_token|\btoken\b|secret|webhook|api_key|_pass\b|heartbeat_url|munge_key)[^}]*\}\}"
+)
+MINIMUM_FILES = 200  # a scan that sees fewer has lost its way
 
 
-def task_files():
-    for path in sorted(ROOT.glob("roles/*/tasks/**/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml")):
-        if "galaxy" not in path.parts:
-            yield path
+def rel(path):
+    return path.relative_to(ROOT).as_posix()
 
 
-def tasks(path):
-    data = yaml.safe_load(path.read_text())
-    if not isinstance(data, list):
-        return
-    plays = (
-        data
-        if data and isinstance(data[0], dict) and ("hosts" in data[0] or "import_playbook" in data[0])
-        else None
-    )
-    lists = [
-        p.get(k) for p in plays or [] if isinstance(p, dict) for k in ("pre_tasks", "tasks", "post_tasks")
-    ]
-    stack = lists if plays is not None else [data]
-    while stack:
-        for task in stack.pop() or []:
-            if isinstance(task, dict):
-                stack += [task.get(k) for k in ("block", "rescue", "always")]
-                yield task
+def command_line(args):
+    """What a command task runs: its free-form text, cmd or argv."""
+    line = args.get("cmd") or args.get("argv") or args.get("_raw_params") or args.get("command") or ""
+    return " ".join(map(str, line)) if isinstance(line, list) else str(line)
 
 
 def template_path(path, src):
@@ -109,36 +94,37 @@ def template_path(path, src):
 # facts and are not listed.
 INJECTED = re.compile(
     r"(?<![\w.'\"\[-])(?<!filter=)(?:(?:in\s+|not\s+in\s+)(?:services|packages)\b|(?:services|packages)\["
-    r"|ansible_(?:distribution|os_family|kernel|architecture|processor|memtotal_mb|lsb|pkg_mgr"
-    r"|service_mgr|devices|mounts|interfaces|default_ipv[46]|all_ipv[46]_addresses|fqdn|hostname"
-    r"|nodename|machine_id|virtualization|system|python(?!_interpreter)|date_time|env|local|product|bios|cmdline"
-    r"|selinux|apparmor|user_id|domain|dns|proc_cmdline|uptime_seconds|board)\w*)"
+    r"|ansible_(?:distribution|os_family|kernel|architecture|processor|memtotal_mb|memory_mb|memfree_mb|lsb"
+    r"|pkg_mgr|service_mgr|devices|mounts|interfaces|default_ipv[46]|all_ipv[46]_addresses|fqdn|hostname"
+    r"|nodename|machine_id|virtualization|system|python(?!_interpreter)|date_time|env|local|product|bios"
+    r"|cmdline|selinux|apparmor|user_id|domain|dns|proc_cmdline|uptime_seconds|board|swaptotal_mb)\w*)"
 )
 
 
 # The same facts read by name from hostvars, or by a name built at run time.
 INJECTED_INDIRECT = re.compile(
-    r"""\[\s*['"]ansible_(?!facts\b|host\b|user\b|port\b|connection\b|become|ssh_|python_interpreter)"""
+    r"""\[\s*['"]ansible_(?!facts\b|local\b|host\b|user\b|port\b|connection\b|become|ssh_|python_interpreter)"""
     r"""|['"]ansible_['"]?\s*[+~]"""
 )
 
 
 def fact_files():
-    for part in ("tasks", "handlers", "defaults", "vars"):
-        yield from (p for p in sorted(ROOT.glob(f"roles/*/{part}/**/*.yml")) if "galaxy" not in p.parts)
-    yield from (p for p in sorted(ROOT.glob("roles/*/templates/**/*.j2")) if "galaxy" not in p.parts)
-    yield from sorted(ROOT.glob("playbooks/**/*.yml"))
+    """Everything a fact could be read in: tasks, handlers, playbooks, role variables
+    and templates."""
+    return ansible_files() + role_var_files() + tracked("roles/*/templates/**")
 
 
-WORLD_WRITABLE = re.compile(r':\s*"?/(?:tmp|var/tmp|dev/shm)/')
+# A path under a world-writable directory, wherever it appears in a line.
+WORLD_WRITABLE = re.compile(r"(?<![\w.$}-])/(?:tmp|var/tmp|dev/shm)(?:/|\b)")
 # file -> why its world-writable path is not root's to trust
 WORLD_WRITABLE_OK = {
     "roles/enroot/defaults/main.yml": "a per-user directory the job user owns; the prolog makes it as that user",
     "playbooks/slurm-cluster/slurm-validation.yml": "the operator's own output file, written with become: false",
     "roles/nvidia-dgx-firmware/tasks/transfer-logs.yml": "upstream DGX: fetches the dump nvsm itself wrote there",
+    "roles/nvidia-dgx-firmware/tasks/clean.yml": "upstream DGX: removes that same nvsm dump",
+    "roles/ai_agent_rules/tasks/main.yml": "fetched on the controller, as the operator (become: false)",
+    "roles/download/tasks/main.yml": "the assert that refuses these paths names them",
 }
-
-
 # file -> why a secret on its command line is acceptable
 SECRET_ARGV_OK = {
     "roles/maas-controller/tasks/main.yml": "maas createadmin takes the password only as an argument; "
@@ -146,52 +132,52 @@ SECRET_ARGV_OK = {
 }
 
 
+def lines_of(path):
+    """(number, line) of a file without its comments: YAML # lines and trailing
+    "  # ..." comments, and Jinja {# #}."""
+    text = re.sub(
+        r"\{#.*?#\}", lambda m: "\n" * m.group().count("\n"), path.read_text(errors="ignore"), flags=re.S
+    )
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.lstrip().startswith("#"):
+            yield number, re.sub(r"\s+#\s.*$", "", line) if path.suffix in (".yml", ".yaml") else line
+
+
 class TaskRules(unittest.TestCase):
     def test_no_secret_on_a_command_line(self):
-        offenders = []
-        for path in task_files():
-            if str(path.relative_to(ROOT)) in SECRET_ARGV_OK:
-                continue
+        scan, offenders = Scan(SECRET_ARGV_OK, MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
-                for key in COMMANDS:
-                    args = task.get(key)
-                    if args is None:
-                        continue
-                    line = (
-                        args
-                        if isinstance(args, str)
-                        else str(args.get("cmd", "")) + str(args.get("argv", ""))
-                    )
-                    line += (
-                        str(task.get("args", {}).get("cmd", "")) if isinstance(task.get("args"), dict) else ""
-                    )
-                    if SECRET.search(line):
-                        offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}")
+                name, args = module(task)
+                if name in COMMANDS and SECRET.search(
+                    command_line(args) + " " + str(args.get("responses", ""))
+                ):
+                    if not scan.excuse(rel(path)):
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "pass the secret on stdin or from a root-only file, never in argv")
+        scan.check(self)
 
     def test_root_never_works_under_a_world_writable_directory(self):
-        offenders = [
-            f"{path.relative_to(ROOT)}:{number}"
-            for path in list(fact_files())
-            if str(path.relative_to(ROOT)) not in WORLD_WRITABLE_OK and path.suffix == ".yml"
-            for number, line in enumerate(path.read_text().splitlines(), 1)
-            if not line.lstrip().startswith("#") and WORLD_WRITABLE.search(line)
-        ]
+        scan, offenders = Scan(WORLD_WRITABLE_OK, MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files() + role_var_files()):
+            hits = [n for n, line in lines_of(path) if WORLD_WRITABLE.search(line)]
+            if hits and not scan.excuse(rel(path)):
+                offenders += [f"{rel(path)}:{n}" for n in hits]
         self.assertEqual(offenders, [], "use /var/cache/deepops, never /tmp, /var/tmp or /dev/shm")
+        scan.check(self)
 
     def test_facts_through_ansible_facts(self):
-        def code(path):  # Jinja comments blanked, line numbers kept
-            return re.sub(r"\{#.*?#\}", lambda m: "\n" * m.group().count("\n"), path.read_text(), flags=re.S)
-
-        offenders = [
-            f"{path.relative_to(ROOT)}:{number}"
-            for path in fact_files()
-            for number, line in enumerate(code(path).splitlines(), 1)
-            if not line.lstrip().startswith("#") and (INJECTED.search(line) or INJECTED_INDIRECT.search(line))
-        ]
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, fact_files()):
+            offenders += [
+                f"{rel(path)}:{n}"
+                for n, line in lines_of(path)
+                if INJECTED.search(line) or INJECTED_INDIRECT.search(line)
+            ]
         self.assertEqual(offenders, [], "read these through ansible_facts")
+        scan.check(self)
 
-    def test_the_fact_rule_sees_injected_names(self):
+    def test_the_rules_see_what_they_claim(self):
         for bad in ('when: ""x.service" in services"', "{{ ansible_distribution }}", "x: packages['a']"):
             self.assertTrue(INJECTED.search(bad), bad)
         for bad in ("hostvars[h]['ansible_hostname']", "hostvars[h]['ansible_default_' + p]"):
@@ -203,45 +189,62 @@ class TaskRules(unittest.TestCase):
                      "ansible_check_mode", "ansible_facts['packages']", "Gather service facts",
                      "ansible.builtin.setup: filter=ansible_local"):  # fmt: skip
             self.assertFalse(INJECTED.search(good), good)
+        for bad in (
+            "chdir: /tmp",
+            "cd /tmp && make",
+            "dest: '/var/tmp/x'",
+            "rm /tmp/{{ f }}",
+            "src: /dev/shm/a",
+        ):
+            self.assertTrue(WORLD_WRITABLE.search(bad), bad)
+        for good in ("PrivateTmp=true", "/var/cache/deepops/tmp", "tmpfs", "{{ x }}/tmp"):
+            self.assertFalse(WORLD_WRITABLE.search(good), good)
+        for bad in ("reboot", "sync\nreboot", "sleep 2 && reboot", "systemctl --no-block reboot",
+                    "shutdown --reboot now", "/sbin/reboot -f"):  # fmt: skip
+            self.assertTrue(REBOOT_COMMAND.search(bad), bad)
+        for good in ("reboot-required", "echo rebooting later", "dmesg | grep reboot_reason"):
+            self.assertFalse(REBOOT_COMMAND.search(good), good)
 
     def test_read_only_commands_run_under_check(self):
-        offenders = [
-            f"{path.relative_to(ROOT)}: {task.get('name')}"
-            for path in task_files()
-            for task in tasks(path)
-            if COMMANDS & set(task)
-            and str(task.get("changed_when", "")).lower() == "false"
-            and "register" in task
-            and "check_mode" not in task
-            and "ansible_check_mode" not in str(task.get("when", ""))
-        ]
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, _ = module(task)
+                if (
+                    name in COMMANDS
+                    and str(task.get("changed_when", "")).lower() == "false"
+                    and "register" in task
+                    and task.get("check_mode") is not False
+                    and "not ansible_check_mode" not in str(task.get("when", ""))
+                ):
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "add check_mode: false to these read-only tasks")
+        scan.check(self)
 
     def test_secret_templates_hide_their_diff(self):
-        offenders = []
-        for path in task_files():
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
-                module = next((task[k] for k in TEMPLATES if k in task), None)
-                if not isinstance(module, dict) or task.get("diff") is False:
+                name, args = module(task)
+                if name not in TEMPLATES or task.get("diff") is False:
                     continue
-                src = template_path(path, str(module.get("src", "")))
+                src = template_path(path, str(args.get("src", "")))
                 if src and SECRET.search(src.read_text()):
-                    offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}")
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "add diff: false to these template tasks")
+        scan.check(self)
 
     def test_no_internal_vars_dictionary(self):
         pattern = re.compile(r"(?<![\w.])(?:in\s+vars\b|vars\[)")
-        offenders = [
-            f"{path.relative_to(ROOT)}:{number}"
-            for path in list(task_files()) + sorted(ROOT.glob("roles/*/templates/**/*.j2"))
-            for number, line in enumerate(path.read_text().splitlines(), 1)
-            if not line.lstrip().startswith("#") and pattern.search(line)
-        ]
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, fact_files()):
+            offenders += [f"{rel(path)}:{n}" for n, line in lines_of(path) if pattern.search(line)]
         self.assertEqual(offenders, [], "the internal vars dictionary is deprecated")
+        scan.check(self)
 
     def test_play_hosts_use_only_hostlist(self):
-        offenders = []
-        for path in sorted(ROOT.glob("playbooks/**/*.yml")):
+        scan, offenders = Scan(minimum=20), []
+        for path in map(scan.seen, tracked("playbooks/*.y*ml", "playbooks/**/*.y*ml")):
             data = yaml.safe_load(path.read_text())
             for play in data if isinstance(data, list) else []:
                 if not isinstance(play, dict):
@@ -253,68 +256,83 @@ class TaskRules(unittest.TestCase):
                     words = {w for expr in code for w in re.findall(r"[A-Za-z_]\w*", expr)}
                     stray = words - {"hostlist", "default", "groups", "join"}
                     if stray:
-                        offenders.append(f"{path.relative_to(ROOT)}: {value}")
+                        offenders.append(f"{rel(path)}: {value}")
         self.assertEqual(offenders, [], "play hosts must be inventory groups or hostlist")
+        scan.check(self)
 
     def test_conditions_are_boolean(self):
-        bare = re.compile(r"\|\s*length\s*$|\|\s*default\((['\"])[^'\"]*\1\)\s*$")
-        offenders = []
-        for path in task_files():
+        bare = re.compile(r"\|\s*(length|int)\s*$|\|\s*(default|d)\((['\"])[^'\"]*\3\)\s*$")
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
-                conditions = task.get("when")
-                for cond in conditions if isinstance(conditions, list) else [conditions]:
-                    if isinstance(cond, str) and bare.search(cond.strip()):
-                        offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}: {cond}")
+                for key in ("when", "failed_when", "changed_when", "until"):
+                    conditions = task.get(key)
+                    for cond in conditions if isinstance(conditions, list) else [conditions]:
+                        if isinstance(cond, str) and bare.search(cond.strip()):
+                            offenders.append(f"{rel(path)}: {task.get('name')}: {key}: {cond}")
         self.assertEqual(offenders, [], "compare or cast these conditions to a boolean")
+        scan.check(self)
 
     def test_downloads_are_verified(self):
-        offenders = []
-        for path in task_files():
+        scan, offenders = Scan(SIGNATURE_CHECKED, MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
-                for key, args in task.items():
-                    if not isinstance(args, dict):
-                        continue
-                    module = key.removeprefix("ansible.builtin.")
-                    if module == "get_url" and not args.get("checksum") and path not in SIGNATURE_CHECKED:
-                        offenders.append(
-                            f"{path.relative_to(ROOT)}: {task.get('name')}: get_url without checksum"
-                        )
-                    source = {
-                        "unarchive": args.get("src"),
-                        "apt": args.get("deb"),
-                        "dnf": args.get("name"),
-                    }.get(module)
-                    for item in source if isinstance(source, list) else [source]:
-                        if isinstance(item, str) and URL.search(item):
-                            offenders.append(
-                                f"{path.relative_to(ROOT)}: {task.get('name')}: {module} from {item}"
-                            )
+                name, args = module(task)
+                where = f"{rel(path)}: {task.get('name')}"
+                if name == "get_url" and not args.get("checksum") and not scan.excuse(rel(path)):
+                    offenders.append(f"{where}: get_url without checksum")
+                source = {
+                    "unarchive": args.get("src"),
+                    "apt": args.get("deb"),
+                    "dnf": args.get("name"),
+                    "yum": args.get("name"),
+                    "package": args.get("name"),
+                    "pip": args.get("name"),
+                }.get(name)
+                for item in source if isinstance(source, list) else [source]:
+                    if isinstance(item, str) and URL.search(item):
+                        offenders.append(f"{where}: {name} from {item}")
+                if name in COMMANDS and re.search(r"(curl|wget)\b[^|]*\|\s*(ba)?sh\b", command_line(args)):
+                    offenders.append(f"{where}: a script piped from the network into a shell")
         self.assertEqual(offenders, [], "fetch through roles/download (a required checksum)")
+        scan.check(self)
+
+    def test_a_loop_item_is_never_tested_for_being_defined(self):
+        # In a loop item is always defined: `that: item is not defined` failed every
+        # host (package_repos retired.yml). A variable NAMED by item is asked with
+        # query('ansible.builtin.varnames', ...) or lookup('ansible.builtin.vars', ...).
+        pattern = re.compile(r"\bitem\s+is\s+(not\s+)?defined\b")
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                _, args = module(task)
+                for value in (task.get("when"), task.get("failed_when"), args.get("that")):
+                    for cond in value if isinstance(value, list) else [value]:
+                        if isinstance(cond, str) and pattern.search(cond):
+                            offenders.append(f"{rel(path)}: {task.get('name')}: {cond}")
+        self.assertEqual(offenders, [], "item is always defined in a loop; test the variable it names")
+        scan.check(self)
 
     def test_only_the_maintenance_role_reboots(self):
-        offenders = []
-        for path in task_files():
-            in_role = "roles" in path.relative_to(ROOT).parts[:1]
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            in_role = rel(path).startswith("roles/")
             for task in tasks(path):
-                where = f"{path.relative_to(ROOT)}: {task.get('name')}"
-                for key, args in task.items():
-                    module = key.removeprefix("ansible.builtin.")
-                    if module == "reboot" and path != REBOOT_STEP:
-                        offenders.append(f"{where}: reboot module")
-                    if (
-                        module in ("include_role", "import_role")
-                        and isinstance(args, dict)
-                        and args.get("name") == "maintenance"
-                        and args.get("tasks_from") == "reboot"
-                        and in_role
-                    ):
-                        offenders.append(f"{where}: a role runs the reboot step")
-                    if module in {c.removeprefix("ansible.builtin.") for c in COMMANDS}:
-                        line = args.get("cmd") or args.get("argv") if isinstance(args, dict) else args
-                        line = " ".join(map(str, line)) if isinstance(line, list) else str(line or "")
-                        if REBOOT_COMMAND.search(line):
-                            offenders.append(f"{where}: reboot command")
+                where = f"{rel(path)}: {task.get('name')}"
+                name, args = module(task)
+                if name == "reboot" and rel(path) != REBOOT_STEP:
+                    offenders.append(f"{where}: reboot module")
+                if (
+                    name in ("include_role", "import_role")
+                    and args.get("name") == "maintenance"
+                    and str(args.get("tasks_from", "")).removesuffix(".yml") == "reboot"
+                    and in_role
+                ):
+                    offenders.append(f"{where}: a role runs the reboot step")
+                if name in COMMANDS and REBOOT_COMMAND.search(command_line(args)):
+                    offenders.append(f"{where}: reboot command")
         self.assertEqual(offenders, [], "ask with roles/maintenance reboot_request instead")
+        scan.check(self)
 
 
 if __name__ == "__main__":
