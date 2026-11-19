@@ -3,7 +3,9 @@
 A NIS server removed with a bare package task left its rc package (init scripts kept)
 and its daemons running from the deleted binaries, still answering on the network.
 Every removal now goes through roles/host_baseline/tasks/absent.yml, which purges and
-then stops each system service whose program is gone (files/orphan-services).
+then stops each system service whose main process runs a removed program
+(files/orphan-services). Only the main process counts: a session inside ssh.service
+or a job inside slurmd running a deleted file must never stop those.
 """
 
 import os
@@ -31,7 +33,9 @@ def walk(tasks):
 
 
 class OrphanServices(unittest.TestCase):
-    def proc(self, entries):
+    def proc(self, entries, main=None):
+        """A fake /proc of (exe, cgroup) entries from pid 100 on, and a fake systemctl
+        that reports `main` ({unit: pid}) as each unit's MainPID (default: pid 100)."""
         root = Path(tempfile.mkdtemp())
         self.addCleanup(subprocess.run, ["rm", "-rf", str(root)])
         for pid, (exe, cgroup) in enumerate(entries, start=100):
@@ -39,10 +43,17 @@ class OrphanServices(unittest.TestCase):
             d.mkdir()
             os.symlink(exe, d / "exe")
             (d / "cgroup").write_text(cgroup + "\n")
+        cases = "".join(f"  {unit}) echo {pid} ;;\n" for unit, pid in (main or {}).items())
+        stub = root / "systemctl"
+        stub.write_text(f'#!/bin/sh\ncase "$4" in\n{cases}  *) echo 100 ;;\nesac\n')
+        stub.chmod(0o755)
         return root
 
     def run_script(self, root):
-        return subprocess.run([str(SCRIPT), str(root)], capture_output=True, text=True, check=True).stdout
+        env = {**os.environ, "SYSTEMCTL": str(root / "systemctl")}
+        return subprocess.run(
+            [str(SCRIPT), str(root)], capture_output=True, text=True, check=True, env=env
+        ).stdout
 
     def test_reports_a_service_whose_program_is_gone(self):
         root = self.proc([("/nonexistent/sbin/rpc.ypxfrd (deleted)", "0::/system.slice/ypxfrd.service")])
@@ -64,6 +75,18 @@ class OrphanServices(unittest.TestCase):
                 ("/nonexistent/train (deleted)", "0::/system.slice/slurmstepd.scope/job_1/step_0"),
                 ("/nonexistent/c (deleted)", "0::/system.slice/docker-abc.scope"),
             ]
+        )
+        self.assertEqual(self.run_script(root), "")
+
+    def test_a_session_process_never_stops_its_service(self):
+        # An admin's process in ssh.service (no pam_systemd) or a job in slurmd.service
+        # (cgroup v1) runs a deleted file; the daemon itself (pid 100) is fine.
+        root = self.proc(
+            [
+                ("/usr/sbin/sshd", "0::/system.slice/ssh.service"),
+                ("/nonexistent/tool (deleted)", "0::/system.slice/ssh.service"),
+            ],
+            main={"ssh.service": 100},
         )
         self.assertEqual(self.run_script(root), "")
 
