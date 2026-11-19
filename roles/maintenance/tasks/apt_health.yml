@@ -7,15 +7,17 @@
 - name: Check the package database (Debian)
   when: ansible_facts.os_family == 'Debian'
   block:
+    # fuser exits 1 when nothing holds the lock, 0 while something does; anything else
+    # (127: psmisc missing) is an error, not a free lock.
     - name: Wait for any running apt or dpkg to finish
       ansible.builtin.command:
         argv: [fuser, /var/lib/dpkg/lock-frontend]
       register: maintenance_dpkg_lock
-      until: maintenance_dpkg_lock.rc != 0
+      until: maintenance_dpkg_lock.rc == 1
       retries: 60
       delay: 10
       changed_when: false
-      failed_when: false
+      failed_when: maintenance_dpkg_lock.rc > 1
       check_mode: false  # read-only; --check needs the result
 
     - name: Look for half-installed or half-removed packages
