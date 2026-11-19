@@ -1,6 +1,7 @@
 """A set of files installed into a directory goes through roles/managed_dir.
 
-A copy or template looped over a glob only adds: a file dropped from the sources stays
+A copy or template looped over a glob, or a copy of a whole directory (src ending in
+"/"), only adds: a file dropped from the sources stays
 on the host, and in a prolog.d, a rule directory or a Python package it keeps running.
 The glob also reads the controller's working tree, so whatever lies there ships too
 (the clustertools package carried a __pycache__ this way). managed_dir installs the set
@@ -20,6 +21,8 @@ INSTALLERS = ("ansible.builtin.copy", "ansible.builtin.template", "copy", "templ
 SHARED = {
     "roles/facts/tasks/main.yml": "/etc/ansible/facts.d is Ansible's host-wide fact directory; "
     "other tools and admins put facts there too",
+    "roles/cluster_tools/tasks/main.yml": "cluster_tools_shared_dirs publish onto a shared filesystem "
+    "that also holds files users and admins put there",
 }
 
 
@@ -39,7 +42,8 @@ def globbed_installs(path):
         if not any(k in task for k in INSTALLERS):
             continue
         loop = str(task.get("loop", "")) + str(task.get("with_items", ""))
-        if "with_fileglob" in task or "fileglob" in loop:
+        args = next((task[k] for k in INSTALLERS if isinstance(task.get(k), dict)), {})
+        if "with_fileglob" in task or "fileglob" in loop or str(args.get("src", "")).endswith("/"):
             yield task.get("name", "?")
 
 
