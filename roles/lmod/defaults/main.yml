@@ -1,7 +1,22 @@
 ---
-# Module trees Lmod searches on every node, in order (LMOD_SITE_MODULEPATH): the shared
-# tree first, then EasyBuild's. Paths come from roles/deepops_paths; Lmod skips a tree
-# that does not exist yet.
+# Lmod built from TACC's release source, as https://lmod.readthedocs.io/en/latest/030_installing.html
+# describes. Distribution packages lag far behind (Ubuntu 24.04 ships 8.6.19 from 2022,
+# without the 9.4 security fix for CVE-2026-85013), so the role builds the release.
+# upstream: git https://github.com/TACC/Lmod (\d+)\.(\d+)\.(\d+)
+lmod_version: "9.4.5"
+lmod_src_url: "https://github.com/TACC/Lmod/archive/refs/tags/{{ lmod_version }}.tar.gz"
+# The tag's source archive per version (roles/download); add one when changing lmod_version.
+lmod_checksums:
+  "9.4.5": "sha256:05292b7a1d9285a869129726f1429f86393fe274bf12d311828e16df27cdaaf3"
+# The docs' prefix: Lmod installs into <prefix>/lmod/<version> and links <prefix>/lmod/lmod.
+lmod_install_prefix: /opt/apps
+lmod_build_dir: "{{ deepops_dir }}/build/lmod"
+# Rebuild Lmod even when the installed build matches its record.
+lmod_force_reinstall: false
+
+# Module trees on every node's initial MODULEPATH, in order: the shared tree first, then
+# EasyBuild's. Written to /etc/lmod/.modulespath, which Lmod reads for every shell; a tree
+# that does not exist yet is skipped. Other roles add theirs with tasks_from: register.
 lmod_module_paths:
   - "{{ sm_module_path }}"
   - "{{ easybuild_module_path }}"

@@ -1,0 +1,20 @@
+---
+# The docs' Ubuntu/Debian package list (Lua 5.3, luaposix, Tcl), with luafilesystem from
+# the source's INSTALL and the build tools.
+lmod_build_deps:
+  - lua5.3
+  - lua-bit32
+  - lua-posix
+  - lua-posix-dev
+  - liblua5.3-0
+  - liblua5.3-dev
+  - lua-filesystem
+  - lua-filesystem-dev
+  - tcl
+  - tcl-dev
+  - tcl8.6
+  - tcl8.6-dev
+  - libtcl8.6
+  - make
+  - bc
+lmod_distro_packages: [lmod]

@@ -1,12 +1,35 @@
 ---
-# This is an example playbook to execute Ansible tests.
-#
-# TODO: Add test to check for lmod bug in Ubuntu
-
 - name: Verify
   hosts: all
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Ask each shell for Lmod's version
+      ansible.builtin.command:
+        argv: "{{ item }}"
+      environment:
+        LMOD_REDIRECT: "no"
+      register: lmod_versions
+      changed_when: false
+      loop:
+        - [/bin/bash, -lc, module --version]
+        - [/bin/bash, -ic, module --version]
+        - [/bin/tcsh, -c, module --version]
+
+    - name: Check every shell runs the pinned Lmod
       ansible.builtin.assert:
-        that: true
+        that: "'Version 9.4.5' in (item.stdout ~ item.stderr)"
+        fail_msg: "{{ item.item | join(' ') }}: {{ item.stdout ~ item.stderr }}"
+      loop: "{{ lmod_versions.results }}"
+      loop_control:
+        label: "{{ item.item[0] }} {{ item.item[1] }}"
+
+    - name: Read the initial module path
+      ansible.builtin.command:
+        argv: [/bin/bash, -lc, 'echo $MODULEPATH']
+      register: lmod_modulepath
+      changed_when: false
+
+    - name: Check the shared tree is on it
+      ansible.builtin.assert:
+        that: "'/sw/modules/all' in lmod_modulepath.stdout"
+        fail_msg: "MODULEPATH is {{ lmod_modulepath.stdout }}"
