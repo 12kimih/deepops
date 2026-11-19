@@ -1,0 +1,14 @@
+-- Managed by the deepops nvidia_cuda_toolkit role.
+-- Every patch level of a minor answers to that minor's module (cuda/12.4.0 and
+-- cuda/12.4.1 load cuda/12.4, the installed patch): a job script that names a patch
+-- keeps working when a newer patch replaces it. A bare `module load cuda` loads the
+-- newest minor.
+{% for item in cuda_versions %}
+{%   set minor = item.version | regex_replace('\\.[0-9]+$', '') %}
+{%   for patch in range((item.version.split('.')[2] | int) + 1) %}
+module_version("cuda/{{ minor }}", "{{ minor }}.{{ patch }}")
+{%   endfor %}
+{% endfor %}
+{% if cuda_versions | length > 0 %}
+module_version("cuda/{{ (cuda_versions | last).version | regex_replace('\\.[0-9]+$', '') }}", "default")
+{% endif %}
