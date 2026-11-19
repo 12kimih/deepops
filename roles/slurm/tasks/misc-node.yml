@@ -1,6 +1,7 @@
 ---
 # Configure nodes that are neither running controller services, nor slurmd.
-# Examples include login nodes or CI nodes.
+# Examples include login nodes or CI nodes. sackd fetches the configuration from
+# slurmctld for their commands (configless), as slurmd does on a compute node.
 
 # Root's, as on every node: Slurm only reads its config.
 - name: Create the slurm config directory
@@ -11,11 +12,25 @@
     group: root
     mode: "0755"
 
-- name: Configure slurm.conf
-  ansible.builtin.template:
-    src: "{{ slurm_conf_template }}"
-    dest: "{{ slurm_config_dir }}/slurm.conf"
+# The commands read a local slurm.conf before sackd's copy in /run/slurm/conf; one
+# left from before configless would go stale.
+- name: Remove local copies of the configuration slurmctld serves
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/{{ item }}"
+    state: absent
+  loop: [slurm.conf, cgroup.conf, gres.conf]
+  tags:
+    - config
+
+- name: Point sackd at the controllers
+  ansible.builtin.copy:
+    dest: "{{ slurm_sysconf_dir }}/sackd"
+    content: |
+      SACKD_OPTIONS="--conf-server {{ slurm_conf_servers }}"
+    owner: root
+    group: root
     mode: "0644"
+  notify: Restart sackd
   tags:
     - config
 
@@ -30,8 +45,18 @@
     - slurmdbd
   failed_when: false
 
+- name: Apply a pending sackd restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Start sackd
+  ansible.builtin.systemd:
+    name: sackd
+    state: started
+    enabled: true
+    daemon_reload: true
+
 # Clients load SPANK plugins too: without this a login node keeps a dangling pyxis
-# entry after a Slurm rebuild and cannot run srun or sbatch until the pyxis play runs.
+# entry after a Slurm upgrade and cannot run srun or sbatch until the pyxis play runs.
 - name: Drop a dangling pyxis plugstack entry
   ansible.builtin.include_tasks: plugstack.yml
   tags:

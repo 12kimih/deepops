@@ -1,34 +1,34 @@
 GPU auto-detection with Slurm and NVML
 ======================================
 
-By default, DeepOps auto-detects GPUs on each node using a [custom Ansible facts script](https://github.com/NVIDIA/deepops/blob/72fe3a187ceb36c76febb64c0bab484cbae6a451/roles/facts/files/gpus.fact),
-and uses this to generate Slurm configuration files such as [`slurm.conf`](https://slurm.schedmd.com/slurm.conf.html) and [`gres.conf`](https://slurm.schedmd.com/gres.conf.html).
-This mechanism detects GPUs using only `lspci`, allowing us to generate configuration even if a GPU driver is not present.
+`gres.conf` holds one line, `AutoDetect=nvml` (whenever `slurm_manage_gpus` is on):
+slurmd asks the [NVIDIA Management Library](https://developer.nvidia.com/nvidia-management-library-nvml)
+(NVML, the driver's `libnvidia-ml`) for each node's GPUs, their device files and their
+CPU affinity, so no device list is written by hand and a changed GPU or
+[Multi-Instance GPU](https://www.nvidia.com/en-us/technologies/multi-instance-gpu/)
+layout needs no new file. See [Slurm's GRES guide](https://slurm.schedmd.com/gres.html#AutoDetect).
 
-The disadvantage to this method is that it generates static configuration files.
-This method cannot account for future changes in GPU hardware,
-or dynamic GPU configurations such as the use of [NVIDIA Multi-Instance GPU](https://www.nvidia.com/en-us/technologies/multi-instance-gpu/).
+The Slurm packages are built with NVML support (`gpu_nvml.so`) against NVIDIA's
+`cuda-nvml-dev-<version>` package (the header and a link stub, no driver), of the
+CUDA release the driver branch serves (`slurm_nvml_cuda_version`); the library itself
+comes from the driver on each GPU node. A node without the driver (the controller, a
+login node, a CPU node) only logs that NVML is not there.
 
-Instead of generating the configuration based on `lspci` output, Slurm provides the option of [GPU auto-detection](https://slurm.schedmd.com/gres.conf.html#OPT_AutoDetect)
-using the [NVIDIA Management Library](https://developer.nvidia.com/nvidia-management-library-nvml) (NVML).
-This method enables Slurm to automatically detect the presence of NVIDIA GPUs, and set up local CPU and network affinity correctly.
-However, using this feature requires that the NVIDIA driver and CUDA be installed before building Slurm.
+## GPU type names
 
+`slurm.conf` still declares how many GPUs of which type each node has
+(`Gres=gpu:<type>:<count>`). With AutoDetect a type there must be the name NVML reports
+for the GPU, lower case with spaces as underscores, or a substring of it: an
+`NVIDIA A100-SXM4-80GB` reports `nvidia_a100-sxm4-80gb`, so `gpu:a100:8` matches. `slurmd -C` on a node prints
+the detected names. A type that is no substring of the detected name (`a100sxm` for
+`nvidia_a100-sxm4-80gb`) does not match, and the node is drained
+for a GRES count mismatch. Either rename the type to a substring (users' `--gres` and
+accounting TRES change with it), or keep the name and describe those nodes by hand,
+which turns AutoDetect off for them only:
 
-## Turning on NVML auto-detection
-
-To enable NVML auto-detection in DeepOps, set the following variable in your DeepOps configuration:
-
-```yaml
-slurm_autodetect_nvml: true
 ```
-
-If building a new cluster, follow the [Slurm deployment guide](./README.md) to set up your new cluster.
-
-If enabling NVML on an existing cluster, run:
-
-```
-ansible-playbook -l slurm-cluster -e '{"slurm_force_rebuild": true}' playbooks/slurm-cluster/slurm.yml
+AutoDetect=nvml
+NodeName=node[01-02] AutoDetect=off Name=gpu Type=mytype File=/dev/nvidia[0-7]
 ```
 
 
@@ -131,7 +131,6 @@ slurm-login
 With a default configuration in `config/group_vars/slurm-cluster.yml` except for:
 
 ```yaml
-slurm_autodetect_nvml: true
 mig_manager_profile: all-balanced-a100-80
 ```
 

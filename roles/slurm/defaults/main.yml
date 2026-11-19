@@ -1,49 +1,101 @@
 ---
-# Shared Slurm and DeepOps paths (prefix, config dir, host groups, state location):
-# roles/slurm_paths and roles/deepops_paths.
-slurm_build_dir: /opt/deepops/build/slurm
-hwloc_build_dir: /opt/deepops/build/hwloc
-pmix_build_dir: /opt/deepops/build/pmix
+# Shared Slurm and DeepOps paths (commands, plugin dir, config dir, host groups, state
+# location, ClusterName): roles/slurm_paths and roles/deepops_paths.
 
-slurm_workflow_build: true
-# Set by the build (tasks/build.yml) when the installed Slurm is newer than the wanted
-# one; false when the role runs without a build, so the controller tasks never read it
-# undefined.
-slurm_downgrade: false
+# Slurm comes as SchedMD's Debian packages (slurm-smd*), built once per version from
+# the checksummed release tarball with the debian/ directory it ships
+# (https://slurm.schedmd.com/quickstart_admin.html#debuild), published to a signed
+# apt repository on shared storage, and installed on every node at exactly this
+# version. Changing the version of an installed cluster is the upgrade playbook's
+# job (playbooks/slurm-cluster/slurm-upgrade.yml); the role refuses it otherwise.
 # upstream: git https://github.com/SchedMD/slurm slurm-(\d+)-(\d+)-(\d+)-1
-slurm_version: "25.11.6"
+slurm_version: "26.05.6"
 slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
-# The source tarball per version (roles/download); add one when changing slurm_version.
-# 26.05.6: Fedora's sources file (rawhide, epel10). 25.11.6 has no independent sum
-# yet: a rebuild of it stops until one is added.
+# The release tarball per version (roles/download); add one when changing slurm_version.
+# 26.05.6: sha256sum of the download, whose sha512 matches Fedora's sources file.
 slurm_checksums:
-  "26.05.6": "sha512:864cbebccf65cbbcc4437265b0aa46703ac5ba3bf31810ae560bbaef8858857c1153f72cc3843f4afa161de5cb345197de41f533948706eb848357dd6aa17f4f"
-slurm_build_make_clean: false
-slurm_build_dir_cleanup: false
-# Distribution packages removed before the build, per OS family, so none shadows it.
+  "26.05.6": "sha256:386a0d624fa7c730cf4dfa9171bf6dc66b6816b5683242c5271879999a54a9a7"
+# The package version the shipped debian/changelog gives a release.
+slurm_deb_version: "{{ slurm_version }}-1"
+# Rebuild the packages even when the repository already holds this version.
+slurm_force_rebuild: false
+# The most major releases one upgrade may cross. SchedMD allows three from 24.11 on
+# (https://slurm.schedmd.com/upgrades.html); two keeps each step well inside that.
+slurm_upgrade_max_majors: 2
+
+# The apt repository: a flat, signed repository on storage every node mounts, written
+# only by the build host (slurm-master[0]) as root, so that host must be able to
+# (the NFS server, or a local disk exported to the nodes). apt checks its signature
+# against slurm_repo_signing_pubkey, so whoever can write the share cannot hand the
+# nodes a package.
+slurm_repo_dir: "{{ sm_prefix }}/.slurm-repo"
+# ASCII-armored OpenPGP secret key that signs the repository, needed on the build host
+# only (vault it); its public half is slurm_repo_signing_pubkey. Make the pair once
+# (docs/slurm-cluster/slurm-upgrade.md); replacing it is a deliberate step.
+slurm_repo_signing_key: ""
+slurm_repo_signing_pubkey: ""
+
+# The build: an unprivileged account unpacks and builds; root only installs the build
+# dependencies and publishes the result. Never under a world-writable directory.
+slurm_deb_build_dir: /var/cache/deepops/build/slurm-deb
+slurm_deb_build_user: slurmbuild
+# Build dependencies besides the Build-Depends of the shipped debian/control: NUMA,
+# readline, eBPF (cgroup/v2 device constraint), InfiniBand counters
+# (acct_gather_interconnect/ofed). Lua 5.4 replaces the control file's 5.3: the
+# release Ubuntu ships as current, which job_submit.lua is tested with.
+slurm_deb_build_extra_deps: [libbpf-dev, libibmad-dev, libibumad-dev, libnuma-dev, libreadline-dev]
+slurm_deb_lua_dev: liblua5.4-dev
+# NVML (AutoDetect=nvml) builds against NVIDIA's cuda-nvml-dev package (header and
+# link stub, no driver) from the CUDA repository, of the CUDA release the driver branch
+# serves (nvidia_driver_branch 580: 13.0): a newer header could call functions the
+# driver lacks. The library itself comes from the driver on each GPU node.
+slurm_nvml_cuda_version: "13.0"
+# Plugins the packages must contain: a missing build dependency drops its plugin
+# without failing the build, so the build checks for these.
+slurm_deb_required_plugins:
+  - acct_gather_interconnect_ofed.so
+  - auth_munge.so
+  - cgroup_v2.so
+  - gpu_nvml.so
+  - job_submit_lua.so
+  - metrics_openmetrics.so
+  - mpi_pmix.so
+  - task_cgroup.so
+
+# Packages per kind of host, installed at slurm_deb_version. slurm-smd-dev is on
+# every host: SPANK plugins (roles/pyxis) build against it where they load.
+slurm_packages_common: [slurm-smd, slurm-smd-client, slurm-smd-dev]
+slurm_packages_controller: [slurm-smd-slurmctld, slurm-smd-slurmdbd]
+slurm_packages_compute: [slurm-smd-slurmd, slurm-smd-libpam-slurm-adopt, slurm-smd-libpmi2-0]
+# Hosts with neither slurmd nor slurmctld (login nodes): sackd fetches the
+# configuration from slurmctld for their commands.
+slurm_packages_client: [slurm-smd-sackd]
+# The PMIx library mpi/pmix loads at run time (the packages build against the
+# distribution's libpmix-dev but do not depend on it), on every host srun runs on.
+slurm_pmix_runtime_package: "{{ 'libpmix2t64' if ansible_facts.distribution_version is version('24.04', '>=') else 'libpmix2' }}"
+# Set only by playbooks/slurm-cluster/slurm-upgrade.yml: lets the role change the
+# installed Slurm version (or replace the source build), in the order the playbook runs it.
+slurm_upgrade: false
+# Seconds to wait for slurmdbd to listen after a start: the first start of a new major
+# release converts the accounting database first, which can take tens of minutes.
+slurm_dbd_wait_timeout: 3600
+# Where slurmd and sackd fetch the configuration (configless): the controllers, in
+# order (SlurmctldHost order in slurm.conf).
+slurm_conf_servers: >-
+  {{ (groups[slurm_controller_group] if slurm_enable_ha else groups[slurm_controller_group][:1])
+     | map('regex_replace', '$', ':' ~ slurm_slurmctld_port) | join(',') }}
+# Distribution packages removed first, per OS family, so none shadows the packages.
 slurm_distro_packages:
   Debian: [slurm, slurm-wlm, slurmctld, slurmdbd, slurmd]
   RedHat: [slurm]
-# Only used when slurm_conf_symlink is true (slurm.conf shared via NFS). Defaults to
-# the local config dir; set this to a path NFS-shared to all nodes (e.g. /sw/.slurm)
-# in config/group_vars/slurm-cluster.yml when you enable the symlink.
-slurmctl_config_dir: "{{ slurm_config_dir }}"
+
+# The retired source build (make install under /usr/local, its own hwloc and PMIx),
+# which the upgrade playbook removes from a host before installing the packages.
+slurm_source_build_prefix: /usr/local
+slurm_source_build_dirs: [/opt/deepops/build/slurm, /opt/deepops/build/hwloc, /opt/deepops/build/pmix]
+slurm_source_build_trees: [/opt/deepops/hwloc, /opt/deepops/pmix]
+
 slurm_sysconf_dir: /etc/sysconfig
-slurm_cuda_prefix: /usr/local/cuda
-slurm_configure: "./configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd
-  --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix
-  }} --with-hwloc={{ hwloc_install_prefix }}"
-slurm_configure_nvml: "./configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd
-  --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix
-  }} --with-hwloc={{ hwloc_install_prefix }} --with-nvml={{ slurm_cuda_prefix }}"
-slurm_force_rebuild: false
-# Build Slurm with Lua support, which Lua plugins such as job_submit/lua and
-# cli_filter/lua need. When enabled, the role installs the distro Lua
-# development package (slurm_lua_deps in vars/) and passes --with-lua to
-# configure, so the build fails loudly if Lua cannot be found. Turning this on
-# for an already-installed Slurm also needs slurm_force_rebuild: true.
-# Defaults to on when the lua job_submit plugin is configured.
-slurm_build_lua: "{{ 'lua' in (slurm_job_submit_plugins) }}"
 slurm_contain_ssh: true
 
 slurm_username: slurm
@@ -92,15 +144,14 @@ slurm_acct_users: []
 # Controls when a DOWN node will be returned to service. 2 lets nodes auto-recover
 # after a clean RebootProgram cycle (driver/firmware updates); 1 leaves them DOWN
 # on an unexpected reboot until manual review.
-# https://slurm.schedmd.com/archive/slurm-25.11.6/slurm.conf.html#OPT_2_1
+# https://slurm.schedmd.com/slurm.conf.html#OPT_ReturnToService
 slurm_return_to_service: 2
 slurm_reboot_program: "/bin/systemctl reboot"
 slurm_resume_timeout: 900
 
 # Sets: GresTypes=gpu
-# Sets: Gres=gpu:{{ gpu_topology|count }}
+# Sets: Gres=gpu:{{ gpu_topology|count }}, and AutoDetect=nvml in gres.conf
 slurm_manage_gpus: true
-slurm_autodetect_nvml: true
 
 # Configuration file templates to use for configuring Slurm.
 # The default values are relative paths that will point to files within the
@@ -131,12 +182,6 @@ slurm_accounting_users: {}
 # template under config/files/slurm/ (slurm_conf_template), not in role variables.
 slurm_job_submit_plugins: ""
 
-# Build the slurmrestd REST API (pulls extra dev headers; off by default).
-slurm_build_slurmrestd: false
-
-# Flags for sharing slurm.conf among compute and control nodes
-slurm_conf_symlink: false
-
 # Partition OverSubscribe value used by the bundled slurm.conf template ("NO",
 # "EXCLUSIVE", "YES" or "FORCE"; see OverSubscribe in slurm.conf(5)). Default: "NO"
 # when slurm_manage_gpus is true, otherwise "EXCLUSIVE".
@@ -150,7 +195,8 @@ slurm_max_job_timelimit: INFINITE
 # Sets: DefaultTime={{ slurm_default_job_timelimit }} (empty: left out)
 slurm_default_job_timelimit: ""
 
-# The node health check slurmd runs (e.g. /usr/sbin/nhc, playbooks/slurm-cluster/nhc.yml);
+# The node health check slurmd runs on every node, allocated ones too (HealthCheckNodeState
+# ANY,CYCLE): {{ nhc_program }} where playbooks/slurm-cluster/nhc.yml installs NHC;
 # empty: none.
 slurm_health_check_program: ""
 
@@ -186,41 +232,3 @@ slurm_fix_shm: true
 slurm_enable_pam_slurm_adopt: true
 # Restrict user SSH access to only allow users with a running job
 slurm_restrict_node_access: true
-
-slurm_include_hwloc: true
-# upstream: git https://github.com/open-mpi/hwloc hwloc-(\d+)\.(\d+)\.(\d+)
-hwloc_version: 2.13.0
-hwloc_tag: "v{{ hwloc_version.split('.')[0] }}.{{ hwloc_version.split('.')[1] }}"
-hwloc_src_url: "https://download.open-mpi.org/release/hwloc/{{ hwloc_tag }}/hwloc-{{ hwloc_version }}.tar.gz"
-# Per version, as published on open-mpi.org (roles/download).
-hwloc_checksums:
-  "2.13.0": "sha256:1514a5253f0a5c23bc006d3bdd30a6f6125c9a8dc9b5fa4984913d1fff45315d"
-hwloc_install_prefix: /opt/deepops/hwloc
-# Netloc was removed from hwloc in 2.10.0, so --enable-netloc is no longer passed.
-# Slurm only needs the topology lib.
-hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-static --disable-cairo --disable-libxml2 --enable-plugins"
-hwloc_force_rebuild: false
-hwloc_distro_packages:
-  Debian: [hwloc, libhwloc-dev, libhwloc5]
-  RedHat: [hwloc-devel, hwloc-libs, hwloc]
-
-slurm_include_pmix: true
-# PMIx is built from source and linked into Slurm (--with-pmix) and, optionally,
-# OpenMPI. 5.0.x is the current stable OpenPMIx series (5.0.10, Jan 2026); Slurm
-# 22.05+ supports PMIx v2-v5, so 25.11 links 5.0.x cleanly. Keep this in step
-# with openmpi_version -- OpenMPI compiles against these PMIx headers when built
-# --with-pmix=<prefix>. libevent (a PMIx build dep) comes from slurm_pmix_deps;
-# hwloc is the role-built one (hwloc_install_prefix).
-# https://slurm.schedmd.com/mpi_guide.html  https://openpmix.org/downloads.html
-# upstream: git https://github.com/openpmix/openpmix v(\d+)\.(\d+)\.(\d+)
-pmix_version: 5.0.10
-pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{ pmix_version }}.tar.bz2"
-# Per version, as GitHub publishes for the release asset (roles/download).
-pmix_checksums:
-  "5.0.10": "sha256:78663f6b932589d68e24feaf7f8a948d60be68d91965f3effbacb4cd88cf9a95"
-pmix_install_prefix: /opt/deepops/pmix
-pmix_configure: "./configure --prefix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }}"
-pmix_force_rebuild: false
-pmix_distro_packages:
-  Debian: [pmix, libpmix-dev, libpmix5]
-  RedHat: [pmix-devel, pmix-libs, pmix]

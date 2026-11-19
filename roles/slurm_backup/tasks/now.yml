@@ -1,0 +1,20 @@
+---
+# A backup now, for a step that cannot be undone otherwise (a Slurm upgrade, a cluster
+# rename): refuses without destinations, installs the backup as main.yml does, and runs
+# it to the end (a oneshot: the start returns when it has finished or failed).
+- name: Require backup destinations
+  ansible.builtin.assert:
+    that: slurm_backup_destinations | length > 0
+    fail_msg: >-
+      This step cannot be undone except from a backup; set slurm_backup_destinations
+      (roles/slurm_backup) first.
+    quiet: true
+
+- name: Install the backups
+  ansible.builtin.include_tasks: main.yml
+
+- name: Back up the accounting database, the controller state and the MUNGE key now
+  ansible.builtin.systemd:
+    name: slurm-backup@backup.service
+    state: started
+  when: not ansible_check_mode

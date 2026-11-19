@@ -2,6 +2,11 @@
 - name: Converge
   hosts: all
   tasks:
+    - name: "Build the Slurm packages"
+      ansible.builtin.include_role:
+        name: "slurm"
+        tasks_from: packages-build
+
     - name: "Include slurm"
       ansible.builtin.include_role:
         name: "slurm"

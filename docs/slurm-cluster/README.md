@@ -215,6 +215,11 @@ Each file is rendered verbatim (Jinja still works, e.g. `{{ slurm_db_password }}
 the vault), so your whole cluster config -- node/partition/gres lines and every
 `slurm.conf` option -- lives in one place you control, instead of scattered across role
 variables. These files are server-specific, so keep them in `config/` (git-ignored).
+They live on the controller only: the nodes fetch them from `slurmctld` (configless).
+The controller refuses a `slurm.conf` template without `enable_configless` in
+`SlurmctldParameters`, with a `ClusterName` other than `{{ slurm_cluster_name }}`, or
+with a `PluginDir` other than the packages'; leave `PluginDir` out. Keep
+`MetricsType=metrics/openmetrics` for the Prometheus scrape.
 
 Optional submit-time routing (e.g. GPU jobs to per-GPU-type partitions) is available
 by setting `slurm_job_submit_plugins: "lua"` and pointing `slurm_job_submit_template`
@@ -224,7 +229,7 @@ routes by GPU type and sends CPU-only jobs to a CPU partition. Optionally it als
 pins GPU jobs to every partition of their type (`FORCE_GPU_PARTITION`) and sizes them
 by the partition defaults alone (`GPU_JOBS_USE_DEFAULTS`: CPU options dropped, memory
 options rejected, at most one task per GPU). Test a copy with
-`lua roles/slurm/tests/job_submit_test.lua <path>` before deploying it.
+`lua5.4 roles/slurm/tests/job_submit_test.lua <path>` before deploying it.
 
 Because `config/` is git-ignored by DeepOps, keep your server-specific settings
 and secrets there and manage that directory as a separate **private** repo:
@@ -248,16 +253,37 @@ From release 26.11 the cleanup that runs when a user's job ends is job-scoped by
 
 ### Lua plugins
 
-Slurm's Lua plugins (for example `JobSubmitPlugins=lua` or `CliFilterPlugins=lua`) only load when Slurm was built with Lua support. DeepOps does not request Lua support or install its development package by default; Slurm may still detect a preinstalled Lua library. To enable it, set the following in `config/group_vars/slurm-cluster.yml` and run the Slurm playbook:
+The Slurm packages are always built with Lua 5.4 (`liblua5.4`), so Lua plugins such as
+`JobSubmitPlugins=lua` or `CliFilterPlugins=lua` load without any setting. Point
+`slurm_job_submit_template` at your `job_submit.lua` (it goes to the controller only,
+the one daemon that runs it) and test it with the same Lua slurmctld runs:
+`lua5.4 roles/slurm/tests/job_submit_test.lua <path>`. See the
+[Slurm documentation](https://slurm.schedmd.com/job_submit_plugins.html).
 
-```yaml
-slurm_build_lua: true
-# Needed when Slurm is already installed at the configured version, otherwise
-# the build step is skipped and the existing binaries stay in place.
-slurm_force_rebuild: true
-```
+## How Slurm is installed
 
-This installs the distribution's Lua development package (`liblua5.3-dev` on Ubuntu, `lua-devel` on RHEL-family systems; override the role variable `slurm_lua_deps` through Ansible extra vars to pick another version) and passes `--with-lua` to Slurm's `configure`. Place your `job_submit.lua` or `cli_filter.lua` in the Slurm configuration directory (`/etc/slurm` by default) and enable the plugin in `slurm.conf` as described in the [Slurm documentation](https://slurm.schedmd.com/job_submit_plugins.html).
+The `slurm` role installs SchedMD's own Debian packages (`slurm-smd*`), built from the
+checksummed release tarball (`slurm_checksums`) with the `debian/` directory it ships,
+the way [Slurm's admin guide](https://slurm.schedmd.com/quickstart_admin.html#debuild)
+describes. `playbooks/slurm-cluster/slurm.yml` builds them once per version on
+`slurm-master[0]`, as an unprivileged account, against the distribution's PMIx, hwloc,
+Lua 5.4, curl, InfiniBand, MUNGE, MariaDB and PAM libraries and NVIDIA's NVML package,
+and publishes them to a signed apt repository on shared storage (`slurm_repo_dir`).
+Every node installs exactly `slurm_version` from it; apt holds it there.
+
+The nodes keep no copy of the configuration: `slurmctld` serves `slurm.conf`,
+`gres.conf`, `cgroup.conf` and `plugstack.conf`
+([configless](https://slurm.schedmd.com/configless_slurm.html)), `slurmd` fetches them
+with `--conf-server`, login nodes through `sackd`. A configuration change on the
+controller reaches them with `scontrol reconfigure`, which the role runs. Prolog and
+epilog scripts stay on each node (configless ships only single files).
+
+`slurmctld` serves its own metrics for Prometheus (`MetricsType=metrics/openmetrics`,
+`/metrics/jobs`, `/metrics/nodes`, `/metrics/partitions`, `/metrics/scheduler` on its
+port), which `roles/prometheus` scrapes.
+
+Changing `slurm_version` on a running cluster, the first move from an older source
+build included, is [the upgrade playbook](slurm-upgrade.md); a plain deploy refuses it.
 
 ## Node Health Check
 

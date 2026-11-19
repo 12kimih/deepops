@@ -1,0 +1,18 @@
+---
+# The end of an upgrade, on a controller: every slurmd reports slurm_version.
+- name: Read every slurmd's version
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/sinfo", -h, -N, -o, "%N %v"]
+  register: slurm_upgrade_versions
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  run_once: true
+
+- name: Check every slurmd runs slurm_version
+  ansible.builtin.assert:
+    that: _old | length == 0
+    fail_msg: "These nodes do not run Slurm {{ slurm_version }} yet: {{ _old | join(', ') }}"
+    quiet: true
+  vars:
+    _old: "{{ slurm_upgrade_versions.stdout_lines | reject('search', ' ' ~ slurm_version ~ '$') | unique | list }}"
+  run_once: true

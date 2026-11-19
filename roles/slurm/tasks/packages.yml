@@ -1,0 +1,86 @@
+---
+# Install the slurm-smd packages of slurm_version from the signed repository in
+# slurm_repo_dir (built by packages-build.yml). The version check (version.yml) runs
+# first: a change of version goes through the upgrade playbook, never a plain deploy.
+- name: Check the installed Slurm version
+  ansible.builtin.include_tasks: version.yml
+
+- name: Require the repository public key
+  ansible.builtin.assert:
+    that: slurm_repo_signing_pubkey | length > 0
+    fail_msg: slurm_repo_signing_pubkey is empty; see docs/slurm-cluster/slurm-upgrade.md.
+    quiet: true
+
+- name: Create the apt keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Trust the repository key for this repository only
+  ansible.builtin.copy:
+    dest: /etc/apt/keyrings/deepops-slurm.asc
+    content: "{{ slurm_repo_signing_pubkey }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: slurm_repo_key
+
+- name: Add the Slurm repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/deepops-slurm.list
+    content: "deb [signed-by=/etc/apt/keyrings/deepops-slurm.asc] file:{{ slurm_repo_dir }} ./\n"
+    owner: root
+    group: root
+    mode: "0644"
+  register: slurm_repo_source
+
+# apt picks slurm_deb_version over any other version of these packages, and an
+# upgrade (unattended, or the maintenance role's) never moves them. Below 1000, so
+# apt itself never installs it over a newer one either.
+- name: Hold the Slurm packages at slurm_deb_version
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/deepops-slurm
+    content: |
+      Package: slurm-smd slurm-smd-*
+      Pin: version {{ slurm_deb_version }}
+      Pin-Priority: 990
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Remove the distribution's Slurm, which would conflict with the packages
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ slurm_distro_packages[ansible_facts.os_family] }}"
+
+# Only the upgrade playbook gets here with a source build (version.yml refuses it
+# otherwise), its daemons stopped.
+- name: Remove the retired source build
+  ansible.builtin.include_tasks: migrate-source-build.yml
+  when: slurm_source_build | bool
+
+# dpkg starts and restarts no Slurm daemon (the packages are built that way); the
+# handlers restart them in Slurm's order: slurmdbd, slurmctld, slurmd.
+- name: Install the Slurm packages
+  ansible.builtin.apt:
+    name: "{{ _packages | map('regex_replace', '$', '=' ~ slurm_deb_version) | list + [slurm_pmix_runtime_package] }}"
+    state: present
+    update_cache: true
+    allow_downgrade: false
+    lock_timeout: 600
+  vars:
+    _packages: >-
+      {{ slurm_packages_common
+         + (slurm_packages_controller if is_controller else [])
+         + (slurm_packages_compute if is_compute else [])
+         + (slurm_packages_client if not (is_controller or is_compute) else []) }}
+  notify:
+    - Restart slurmdbd
+    - Restart slurmctld
+    - Restart slurmd
+    - Restart sackd

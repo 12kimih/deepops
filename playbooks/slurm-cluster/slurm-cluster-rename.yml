@@ -1,0 +1,123 @@
+---
+# Rename the Slurm cluster to slurm_cluster_name (ClusterName). Slurm has no rename:
+# slurmctld refuses to start on state saved under another name
+# (StateSaveLocation/clustername), and accounting keeps each cluster's associations
+# and history under its name. So the renamed cluster starts with an empty queue and a
+# new accounting cluster; the old one stays in the database, its history readable with
+# `sacct -M <old name>` / `sreport -M <old name>`.
+#
+#   1. refuse unless every host already holds the vaulted MUNGE key (slurm_munge_key_file):
+#      the key once derived from the cluster name, so the key comes first
+#   2. refuse unless no job is pending or running (drain the partitions, let the jobs
+#      end or cancel them first)
+#   3. a backup now; the new cluster in accounting
+#   4. stop slurmctld, set the old clustername file aside, deploy the controller under
+#      the new name (slurm.conf, accounting associations from slurm_accounting_file)
+#   5. restart slurmd and sackd, which fetch the new configuration
+#
+#   ansible-playbook -K playbooks/slurm-cluster/slurm-cluster-rename.yml
+# See docs/slurm-cluster/slurm-upgrade.md (Renaming the cluster).
+- hosts: all
+  become: true
+  roles:
+    - role: facts
+
+- hosts: slurm-cluster
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require the site's MUNGE key on every host first
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: munge-check
+
+- hosts: slurm-master[0]
+  become: true
+  any_errors_fatal: true
+  roles:
+    - role: slurm_paths
+  tasks:
+    - name: Read the name the controller's state belongs to
+      ansible.builtin.slurp:
+        src: "{{ slurm_state_save_location }}/clustername"
+      register: slurm_rename_state
+
+    - name: Note the old name
+      ansible.builtin.set_fact:
+        slurm_rename_from: "{{ (slurm_rename_state.content | b64decode).split('|') | first | trim }}"
+
+    - name: Require a new name
+      ansible.builtin.assert:
+        that: slurm_rename_from != slurm_cluster_name
+        fail_msg: The cluster is already named {{ slurm_cluster_name }}; nothing to rename.
+        quiet: true
+
+    - name: List the jobs in the queue
+      ansible.builtin.command:
+        argv: ["{{ slurm_install_prefix }}/bin/squeue", -h, -t, all, -o, "%i %T %u"]
+      register: slurm_rename_queue
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Require an empty queue
+      ansible.builtin.assert:
+        that: slurm_rename_queue.stdout_lines | length == 0
+        fail_msg: >-
+          {{ slurm_rename_queue.stdout_lines | length }} jobs are in the queue; under a new name
+          their accounting records and associations would not exist. Drain the partitions
+          (scontrol update partitionname=<p> state=drain), let them end or scancel them, and
+          run this again.
+        quiet: true
+
+    - name: Back up the controller now
+      ansible.builtin.include_role:
+        name: slurm_backup
+        public: true
+        tasks_from: now
+
+    - name: Add the new cluster to accounting
+      ansible.builtin.command:
+        argv: ["{{ slurm_install_prefix }}/bin/sacctmgr", -i, add, cluster, "{{ slurm_cluster_name }}"]
+      register: slurm_rename_add
+      failed_when: slurm_rename_add.rc != 0 and 'already exists' not in slurm_rename_add.stdout
+      changed_when: "'already exists' not in slurm_rename_add.stdout"
+
+    - name: Stop slurmctld
+      ansible.builtin.systemd:
+        name: slurmctld
+        state: stopped
+
+    # Kept, not deleted: it is the record of which name the saved state belonged to.
+    - name: Set the old clustername file aside
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ slurm_state_save_location }}/clustername"
+          - "{{ slurm_state_save_location }}/clustername.{{ slurm_rename_from }}.{{ ansible_facts.date_time.epoch }}"
+      changed_when: true
+
+- hosts: slurm-master
+  become: true
+  tasks:
+    - name: Deploy the controller under the new name
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+
+- hosts: slurm-cluster:!slurm-master
+  become: true
+  roles:
+    - role: slurm_paths
+  tasks:
+    - name: Restart slurmd, which fetches the new configuration
+      ansible.builtin.systemd:
+        name: slurmd
+        state: restarted
+      when: is_compute
+
+    - name: Restart sackd, which fetches the new configuration
+      ansible.builtin.systemd:
+        name: sackd
+        state: restarted
+      when: not is_compute

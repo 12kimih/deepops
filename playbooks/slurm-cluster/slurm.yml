@@ -4,17 +4,30 @@
   roles:
     - role: facts
 
-# Build slurm first on all nodes. A failure on any host stops every host: a controller
-# whose build failed must not be followed by nodes templating a new slurm.conf.
+# Every host first: a Slurm version change (or the retired source build) stops the
+# whole deploy before anything is installed. That is the upgrade playbook's job
+# (slurm-upgrade.yml), which orders it.
 - hosts: slurm-cluster
   become: true
   any_errors_fatal: true
   tasks:
-    - name: Build slurm on all nodes
+    - name: Check the installed Slurm version
       ansible.builtin.include_role:
         name: slurm
         public: true
-        tasks_from: build
+        tasks_from: version
+
+# The packages of slurm_version, built once into the repository every node installs
+# from (a no-op when the repository has them).
+- hosts: slurm-master[0]
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Build and publish the Slurm packages
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: packages-build
 
 # One pass over every Slurm host: each one's duties (controller, compute or client
 # only) follow from its inventory groups (slurm_controller_group, slurm_compute_group).
@@ -22,8 +35,6 @@
   become: true
   roles:
     - role: slurm
-      vars:
-        slurm_workflow_build: false
 
 # Set up slurm-login-on-compute if enabled
 - hosts: slurm-master

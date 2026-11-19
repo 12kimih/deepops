@@ -155,16 +155,14 @@ reference host; distribution repositories remain a separate prerequisite.
    while read -r url name; do
      sudo curl -fL "${url}" -o "/var/repos/downloads/${name}"
    done <<'EOF'
-   https://download.schedmd.com/slurm/slurm-26.05.5.tar.bz2 slurm-26.05.5.tar.bz2
-   https://download.open-mpi.org/release/hwloc/v2.5/hwloc-2.5.0.tar.gz hwloc-2.5.0.tar.gz
-   https://github.com/openpmix/openpmix/releases/download/v3.2.3/pmix-3.2.3.tar.bz2 pmix-3.2.3.tar.bz2
+   https://download.schedmd.com/slurm/slurm-26.05.6.tar.bz2 slurm-26.05.6.tar.bz2
    https://github.com/mej/nhc/releases/download/1.4.3/lbnl-nhc-1.4.3.tar.xz lbnl-nhc-1.4.3.tar.xz
    https://github.com/NVIDIA/pyxis/archive/v0.11.1.tar.gz pyxis-0.11.1.tar.gz
    https://developer.download.nvidia.com/hpc-sdk/23.7/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz
    https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz helm-v3.22.0-linux-amd64.tar.gz
    EOF
-   for name in slurm-26.05.5.tar.bz2 hwloc-2.5.0.tar.gz \
-     pmix-3.2.3.tar.bz2 lbnl-nhc-1.4.3.tar.xz pyxis-0.11.1.tar.gz \
+   for name in slurm-26.05.6.tar.bz2 \
+     lbnl-nhc-1.4.3.tar.xz pyxis-0.11.1.tar.gz \
      nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz \
      helm-v3.22.0-linux-amd64.tar.gz; do
      test -s "/var/repos/downloads/${name}"
@@ -193,9 +191,7 @@ reference host; distribution repositories remain a separate prerequisite.
    nonempty. Use these exact overrides with the published paths:
 
    ```yaml
-   slurm_src_url: "http://package-server/downloads/slurm-26.05.5.tar.bz2"
-   hwloc_src_url: "http://package-server/downloads/hwloc-2.5.0.tar.gz"
-   pmix_src_url: "http://package-server/downloads/pmix-3.2.3.tar.bz2"
+   slurm_src_url: "http://package-server/downloads/slurm-26.05.6.tar.bz2"
    nhc_src_url: "http://package-server/downloads/lbnl-nhc-1.4.3.tar.xz"
    slurm_pyxis_tarball_url: "http://package-server/downloads/pyxis-0.11.1.tar.gz"
    hpcsdk_download_url: "http://package-server/downloads/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz"

@@ -1,4 +1,15 @@
 ---
+# Slurm comes as SchedMD's Debian packages; there is no RPM path (yet).
+- name: Require a Debian-family host
+  ansible.builtin.assert:
+    that: ansible_facts.os_family == 'Debian'
+    fail_msg: >-
+      roles/slurm installs SchedMD's Debian packages (slurm-smd); {{ ansible_facts.distribution }}
+      is not Debian-family, and the RPM build is not implemented.
+    quiet: true
+  tags:
+    - always
+
 - name: Gather os specific variables
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
@@ -10,8 +21,3 @@
       skip: true
   tags:
     - always
-
-- name: Add EPEL (RHEL family)
-  ansible.builtin.include_role:
-    name: package_repos
-    tasks_from: epel

@@ -1,28 +1,32 @@
 ---
-- name: Install CUDA when we require NVML support for autodetection
-  ansible.builtin.include_role:
-    name: nvidia_cuda
-    public: true  # nvidia_versions (a dependency) supplies its values
-  when: slurm_autodetect_nvml
-
 # The includes below are tagged always: an untagged include is skipped under --tags,
 # and the tasks it holds (such as the `config` ones) would never be reached. Each
 # included task still answers to its own tags.
 - name: Setup role
   ansible.builtin.include_tasks: setup-role.yml
   tags: always
-- name: Setup build
+
+# The key first: every daemon and command authenticates with it.
+- name: Setup munge
   ansible.builtin.include_tasks:
-    file: build.yml
+    file: munge.yml
     apply:
-      tags: [build]
-  tags: build
-  when: slurm_workflow_build
+      tags: [munge]
+  tags: munge
+
+- name: Setup slurm user environment
+  ansible.builtin.include_tasks: setup-user.yml
+
+- name: Install the Slurm packages
+  ansible.builtin.include_tasks:
+    file: packages.yml
+    apply:
+      tags: [packages]
+  tags: packages
 
 - name: Setup slurm systemd services
   ansible.builtin.include_tasks: service-files.yml
-- name: Setup slurm user environment
-  ansible.builtin.include_tasks: setup-user.yml
+
 - name: Setup slurm controller
   ansible.builtin.include_tasks: controller.yml
   when: is_controller
@@ -55,6 +59,3 @@
   ansible.builtin.include_tasks: undrain.yml
   when: is_compute
   tags: always
-
-- name: Cleanup
-  ansible.builtin.include_tasks: build-cleanup.yml

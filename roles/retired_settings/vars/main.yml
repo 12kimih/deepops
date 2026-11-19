@@ -65,3 +65,27 @@ retired_settings:
   mpi_operator_version: nvidia_network_operator_mpi_operator_version (a kubeflow/mpi-operator release) in roles/nvidia-network-operator
   mpi_raw_url: nvidia_network_operator_mpi_operator_version (the release manifest, checksummed) in roles/nvidia-network-operator
   nvidia_network_operator_url: nvidia_network_operator_repo in roles/nvidia-network-operator
+  # Slurm from SchedMD's packages (roles/slurm) instead of a source build
+  slurm_build_dir: nothing, Slurm comes from packages built in slurm_deb_build_dir (roles/slurm)
+  slurm_configure: nothing, the packages build with the shipped debian/rules plus slurm_deb_build_extra_deps
+  slurm_configure_nvml: nothing, NVML is always built in from slurm_nvml_cuda_version
+  slurm_build_make_clean: nothing, the package build tree is replaced on each build
+  slurm_build_dir_cleanup: nothing, the package build tree is replaced on each build
+  slurm_cuda_prefix: slurm_nvml_cuda_version (NVML from cuda-nvml-dev, never /usr/local/cuda)
+  slurm_build_lua: nothing, the packages always carry Lua (slurm_deb_lua_dev)
+  slurm_build_slurmrestd: nothing, the packages always carry slurmrestd
+  slurm_autodetect_nvml: nothing, gres.conf has AutoDetect=nvml whenever slurm_manage_gpus is on
+  slurm_conf_symlink: nothing, the nodes fetch slurm.conf from slurmctld (configless)
+  slurmctl_config_dir: nothing, the nodes fetch slurm.conf from slurmctld (configless)
+  slurm_include_pmix: nothing, PMIx is the distribution's and MpiDefault lives in slurm.conf
+  slurm_include_hwloc: nothing, hwloc is the distribution's (libhwloc-dev)
+  hwloc_build_dir: nothing, hwloc is the distribution's (libhwloc-dev)
+  hwloc_version: nothing, hwloc is the distribution's (libhwloc-dev)
+  hwloc_install_prefix: nothing, hwloc is the distribution's (OpenMPI takes --with-hwloc=external)
+  hwloc_configure: nothing, hwloc is the distribution's (libhwloc-dev)
+  hwloc_force_rebuild: nothing, hwloc is the distribution's (libhwloc-dev)
+  pmix_build_dir: nothing, PMIx is the distribution's (libpmix-dev)
+  pmix_version: nothing, PMIx is the distribution's (libpmix-dev)
+  pmix_install_prefix: nothing, PMIx is the distribution's (OpenMPI takes --with-pmix=external)
+  pmix_configure: nothing, PMIx is the distribution's (libpmix-dev)
+  pmix_force_rebuild: nothing, PMIx is the distribution's (libpmix-dev)

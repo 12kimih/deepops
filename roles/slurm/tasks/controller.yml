@@ -63,17 +63,17 @@
     column_case_sensitive: true
   become: true
 
+
 # Config is root's and Slurm only reads it (slurmdbd.conf, a file, is the one Slurm
 # must own). The state directory holds every job's script and environment, which can
 # carry secrets, so only Slurm may read it.
-- name: Create the slurm config directories
+- name: Create the slurm config directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ slurm_config_dir }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
-  loop: "{{ [slurm_config_dir] + ([slurmctl_config_dir] if slurm_conf_symlink else []) }}"
 
 - name: Create slurm directories
   ansible.builtin.file:
@@ -89,21 +89,64 @@
     owner: slurm
     mode: "0700"
 
+# slurmctld refuses to start when ClusterName differs from the name its state was
+# saved under (StateSaveLocation/clustername), and the accounting database keeps a
+# cluster's history under its name. Renaming is its own playbook, never a side
+# effect of a deploy.
+- name: Read the name the controller's state belongs to
+  ansible.builtin.slurp:
+    src: "{{ slurm_state_save_location }}/clustername"
+  register: slurm_state_clustername
+  failed_when: false
+
+- name: Refuse a ClusterName change
+  vars:
+    _saved: "{{ (slurm_state_clustername.content | b64decode).split('|') | first | trim }}"
+  ansible.builtin.assert:
+    that: _saved == slurm_cluster_name
+    fail_msg: >-
+      slurm_cluster_name is {{ slurm_cluster_name }} but this controller's state belongs to
+      {{ _saved }}. Renaming a cluster empties its queue and starts a new accounting
+      history: playbooks/slurm-cluster/slurm-cluster-rename.yml
+      (docs/slurm-cluster/slurm-upgrade.md). To keep the name, set slurm_cluster_name: {{ _saved }}.
+    quiet: true
+  when: slurm_state_clustername.content is defined
+
+# The nodes run on what this slurm.conf says (configless): it must serve them their
+# configuration and carry the cluster's name, also when it is a site's own template.
+- name: Check the slurm.conf template
+  vars:
+    _conf: "{{ lookup('ansible.builtin.template', slurm_conf_template) }}"
+    _params: "{{ (_conf | regex_findall('(?m)^ *SlurmctldParameters *= *(.+)') | last | default('') | trim).split(',') }}"
+  ansible.builtin.assert:
+    that:
+      - _conf | regex_findall('(?m)^ *ClusterName *= *(.+)') | map('trim') | list == [slurm_cluster_name]
+      - "'enable_configless' in _params"
+      - _conf | regex_findall('(?m)^ *PluginDir *= *(.+)') | map('trim') | reject('eq', slurm_plugin_dir) | list | length == 0
+    fail_msg: >-
+      {{ slurm_conf_template }} must set ClusterName={{ '{{' }} slurm_cluster_name {{ '}}' }}
+      and include enable_configless in SlurmctldParameters (the nodes fetch their
+      configuration from slurmctld, slurmd --conf-server, and have no copy of their own),
+      and set no PluginDir other than the packages' {{ slurm_plugin_dir }} (best: none).
+    quiet: true
+  tags:
+    - config
+
 - name: Configure slurm.conf
   ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
     dest: "{{ slurm_config_dir }}/slurm.conf"
     mode: "0644"
-  when: not slurm_conf_symlink
   notify:
     - Restart slurmctld
+    - Reconfigure slurmd
   tags:
     - config
 
 # Deploy a user-provided job_submit.lua only when the lua plugin is enabled. DeepOps
 # does not generate it -- you supply your own (config.example/files/slurm/job_submit.lua
 # is a starting point). Copied VERBATIM, not templated: lua table literals contain
-# "{{" which would break Jinja. https://slurm.schedmd.com/archive/slurm-25.11.6/job_submit_plugins.html
+# "{{" which would break Jinja. Only slurmctld reads it. https://slurm.schedmd.com/job_submit_plugins.html
 - name: Assert a job_submit.lua is provided when the lua plugin is enabled
   ansible.builtin.assert:
     that: slurm_job_submit_template | length > 0
@@ -119,32 +162,6 @@
     dest: "{{ slurm_config_dir }}/job_submit.lua"
     mode: "0644"
   when: "'lua' in (slurm_job_submit_plugins)"
-  notify:
-    - Restart slurmctld
-  tags:
-    - config
-
-# The file every node links to. Its change is what restarts the daemons: the links
-# themselves almost never change. Compute nodes read slurm_conf_shared (compute.yml).
-- name: Configure slurm.conf to nfs
-  ansible.builtin.template:
-    src: "{{ slurm_conf_template }}"
-    dest: "{{ slurmctl_config_dir }}/slurm.conf"
-    mode: "0644"
-  register: slurm_conf_shared
-  when: slurm_conf_symlink
-  notify:
-    - Restart slurmctld
-  tags:
-    - config
-
-- name: Complete slurm.conf
-  ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/slurm.conf"
-    state: link
-    src: "{{ slurmctl_config_dir }}/slurm.conf"
-    force: true
-  when: slurm_conf_symlink
   notify:
     - Restart slurmctld
   tags:
@@ -168,9 +185,8 @@
   tags:
     - config
 
-# Also place cgroup.conf/gres.conf on the controller: compute.yml (which normally
-# templates them) only runs on is_compute nodes, so a controller that is also the
-# NFS config source, or a combined head+compute node, would otherwise lack them.
+# cgroup.conf and gres.conf live only here: slurmctld serves them to every slurmd with
+# slurm.conf (configless).
 - name: Configure cgroup.conf
   ansible.builtin.template:
     src: "{{ slurm_cgroup_conf_template }}"
@@ -178,6 +194,7 @@
     mode: "0644"
   notify:
     - Restart slurmctld
+    - Reconfigure slurmd
   tags:
     - config
 
@@ -188,6 +205,7 @@
     mode: "0644"
   notify:
     - Restart slurmctld
+    - Reconfigure slurmd
   tags:
     - config
 
@@ -203,18 +221,19 @@
     enabled: true
     daemon_reload: true
 
+# The packaged unit is Type=simple: the start returns at once, and after an upgrade
+# slurmdbd converts the database before it listens.
 - name: Wait for slurmdbd to be available
   ansible.builtin.wait_for:
     port: 6819
     delay: 5
+    timeout: "{{ slurm_dbd_wait_timeout }}"
 
 - name: Create cluster
   ansible.builtin.command: sacctmgr -i add cluster {{ slurm_cluster_name }}
   register: create_cluster_result
   failed_when: "create_cluster_result.rc != 0 and 'already exists' not in create_cluster_result.stdout"
   changed_when: "'already exists' not in create_cluster_result.stdout"
-  environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
   run_once: true
 
 # Without an accounting file (slurm_accounting_file), one flat account holds the users
@@ -233,8 +252,6 @@
     'Nothing new added' not in create_account_result.stdout and
     'Nothing added' not in create_account_result.stdout and
     'Already existing' not in create_account_result.stdout
-  environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 
 - name: Create users
   when: slurm_accounting_file | length == 0
@@ -250,37 +267,18 @@
     'Nothing added' not in create_user_result.stdout and
     'Already existing' not in create_user_result.stdout
   loop: "{{ slurm_acct_users }}"
-  environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
 
-- name: Clear slurm state when downgrading
-  ansible.builtin.command: slurmctld -i
-  when: slurm_downgrade
-  environment:
-    PATH: "{{ slurm_install_prefix }}/bin:{{ ansible_facts.env.PATH }}"
-
-- name: Wait for slurmctld to start
-  ansible.builtin.pause:
-    seconds: 20
-  when: slurm_downgrade
-
-- name: Kill slurmctld
-  ansible.builtin.command: killall slurmctld
-  failed_when: false
-  when: slurm_downgrade
-
-# After a downgrade the state was rebuilt with slurmctld -i and the daemon killed,
-# so it must start again; otherwise the handler restarted it if anything changed.
 - name: Start slurmctld
   ansible.builtin.systemd:
     name: slurmctld
-    state: "{{ 'restarted' if slurm_downgrade else 'started' }}"
+    state: started
     enabled: true
     daemon_reload: true
 
-# QoS, accounts and members from the site's declaration (slurm_accounting_file). The
-# slurm.conf priority settings go along so the module can refuse a QoS layout in which
-# association priority, fairshare and age could lift a job into the next tier.
+# QoS, accounts and members from the site's declaration (slurm_accounting_file), for
+# this cluster's associations (slurm_cluster_name), so a renamed cluster gets its own.
+# The slurm.conf priority settings go along so the module can refuse a QoS layout in
+# which association priority, fairshare and age could lift a job into the next tier.
 - name: Converge Slurm accounting
   when: slurm_accounting_file | length > 0
   # Bounds the sacctmgr calls: a stuck slurmdbd would otherwise hang the play.
@@ -294,6 +292,7 @@
   slurm_accounting:
     spec: "{{ _slurm_spec | combine({'users': (_slurm_spec.users | default({})) | combine(slurm_accounting_users, recursive=true)}) }}"
     sacctmgr: "{{ slurm_install_prefix }}/bin/sacctmgr"
+    cluster: "{{ slurm_cluster_name }}"
     prune: "{{ slurm_accounting_prune }}"
     priority_flags: "{{ (_slurm_priority.PriorityFlags | default('')).split(',') | select | list }}"
     priority_weights:

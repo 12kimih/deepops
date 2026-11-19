@@ -1,0 +1,69 @@
+---
+# After an upgrade, on a controller: the new slurmctld answers, accounting works, and
+# the job_submit plugin runs. A test-only submission goes through job_submit.lua
+# (slurmctld runs it for will-run requests as for real ones) and starts nothing.
+- name: Read the controller's Slurm version
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/scontrol", version]
+  register: slurm_verify_version
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Ask the controllers whether they are up
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/scontrol", ping]
+  register: slurm_verify_ping
+  until: slurm_verify_ping.rc == 0
+  retries: 12
+  delay: 10
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: List the nodes
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/sinfo", -h]
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: List the clusters accounting knows
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/sacctmgr", -nP, show, cluster, format=cluster]
+  register: slurm_verify_clusters
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the last day's jobs from accounting
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/sacct", -a, -X, -n, -S, now-1days, -o, jobid]
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the configured job_submit plugins
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/scontrol", show, config]
+  register: slurm_verify_config
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Submit a test-only job through job_submit
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/sbatch", --test-only, --time=1, --wrap=true]
+  register: slurm_verify_submit
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: "'lua' in slurm_job_submit_plugins"
+
+- name: Check the upgraded controller
+  ansible.builtin.assert:
+    that:
+      - slurm_verify_version.stdout | trim == 'slurm ' ~ slurm_version
+      - slurm_verify_ping.stdout is search('is UP')
+      - slurm_cluster_name in slurm_verify_clusters.stdout_lines
+      - "'lua' not in slurm_job_submit_plugins or slurm_verify_config.stdout is search('JobSubmitPlugins *=.*lua')"
+      - slurm_verify_submit is skipped or slurm_verify_submit.rc == 0
+    fail_msg: >-
+      After the upgrade: {{ slurm_verify_version.stdout | trim }}; ping:
+      {{ slurm_verify_ping.stdout | trim }}; clusters: {{ slurm_verify_clusters.stdout_lines | join(', ') }};
+      test-only submission: {{ (slurm_verify_submit.stdout | default('')) ~ (slurm_verify_submit.stderr | default('')) }}
+    quiet: true

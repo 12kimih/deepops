@@ -1,14 +1,30 @@
 ---
 # Where Slurm lives and which hosts play which part, written once for every role
 # that installs into, configures or talks to Slurm.
-slurm_install_prefix: /usr/local
+
+# The slurm-smd packages (roles/slurm) install the commands under /usr and the plugins
+# in the multiarch library directory; nothing here moves them.
+slurm_install_prefix: /usr
+# Debian multiarch tuple per architecture: not derivable from the architecture name
+# (armv7l is arm-linux-gnueabihf, ppc64le powerpc64le-linux-gnu).
+slurm_multiarch_map:
+  x86_64: x86_64-linux-gnu
+  aarch64: aarch64-linux-gnu
+  arm64: aarch64-linux-gnu
+  armv7l: arm-linux-gnueabihf
+  ppc64le: powerpc64le-linux-gnu
+slurm_multiarch: "{{ slurm_multiarch_map.get(ansible_facts.architecture, ansible_facts.architecture ~ '-linux-gnu') }}"
+slurm_plugin_dir: "/usr/lib/{{ slurm_multiarch }}/slurm"
 slurm_config_dir: /etc/slurm
+# slurmctld's port: slurm.conf, slurmd's --conf-server and the metrics scrape.
+slurm_slurmctld_port: 6817
 # Where roles/nhc installs the node health check, for the role and for whatever runs it.
 nhc_install_dir: /usr
 nhc_program: "{{ nhc_install_dir }}/sbin/nhc"
 
 # The cluster's name (slurm.conf ClusterName, the accounting cluster), read by every role
 # that names the cluster (the Slurm config, accounting, the web portal's cluster file).
+# Renaming a running cluster is its own step: playbooks/slurm-cluster/slurm-cluster-rename.yml.
 slurm_cluster_name: deepops
 
 # A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
