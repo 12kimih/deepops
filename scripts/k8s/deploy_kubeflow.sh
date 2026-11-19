@@ -176,12 +176,16 @@ function stand_up() {
 
 
 # Modify the ns finalizers so they don't wait for async processes to complete
+# The namespace JSON goes to curl on stdin: no temp file another user could plant or read.
 function fix_terminating_ns() {
   kubectl proxy &
-  for ns in ${@}; do
-    kubectl get namespace ${ns} -o json |jq '.spec = {"finalizers":[]}' > "/tmp/temp_${ns}.json"
-    curl -k -H "Content-Type: application/json" -X PUT --data-binary @"/tmp/temp_${ns}.json" 127.0.0.1:8001/api/v1/namespaces/${ns}/finalize
+  local proxy_pid=$!
+  sleep 2
+  for ns in "${@}"; do
+    kubectl get namespace "${ns}" -o json | jq '.spec = {"finalizers":[]}' | \
+      curl -k -H "Content-Type: application/json" -X PUT --data-binary @- "127.0.0.1:8001/api/v1/namespaces/${ns}/finalize"
   done
+  kill "${proxy_pid}"
 }
 
 
