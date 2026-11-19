@@ -51,3 +51,7 @@ hpcsdk_checksums: {}
 hpcsdk_temp_dir: /var/cache/deepops/build/hpc-sdk  # root installs from here: never under /tmp
 hpcsdk_dest_download_path: "{{ hpcsdk_temp_dir }}/{{ hpcsdk_download_name }}.tar.gz"
 hpcsdk_clean_up_temp_dir: true
+# The free space (GB) the install needs on the download and install disks before it
+# starts: the tarball, its unpacked copy and the installed tree (each about 15), and room
+# left over.
+hpcsdk_install_free_gb: 60

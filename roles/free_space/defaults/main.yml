@@ -1,0 +1,12 @@
+---
+# free_space -- refuse to start a large install without room for it. Roles that unpack
+# or install GBs include it first (include_role: free_space), because the disk is
+# often the one the host's own state lives on (a controller's scheduler state and
+# database) and must never fill up:
+#
+#   free_space_paths  existing directories the work writes to
+#   free_space_gb     the GB each of them must have free
+#   free_space_for    what the room is for (named in the failure)
+free_space_paths: []
+free_space_gb: 0
+free_space_for: ""

@@ -33,6 +33,15 @@
     - "{{ hpcsdk_temp_dir }}"
     - "{{ hpcsdk_install_dir }}"
 
+- name: Refuse to start without room for the HPC SDK
+  when: not nvhpc_localrc.stat.exists
+  ansible.builtin.include_role:
+    name: free_space
+  vars:
+    free_space_paths: ["{{ hpcsdk_temp_dir }}", "{{ hpcsdk_install_dir }}"]
+    free_space_gb: "{{ hpcsdk_install_free_gb }}"
+    free_space_for: "HPC SDK {{ hpcsdk_version_dir }}"
+
 - name: Fetch and unpack the HPC SDK
   when: not nvhpc_localrc.stat.exists
   ansible.builtin.include_role:

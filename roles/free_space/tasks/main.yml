@@ -1,0 +1,17 @@
+---
+- name: Read the free space for {{ free_space_for }}
+  ansible.builtin.command:
+    argv: "{{ ['df', '--output=avail', '--block-size=1G'] + free_space_paths }}"
+  register: free_space_df
+  changed_when: false
+  check_mode: false
+
+- name: Refuse to start without room for {{ free_space_for }}
+  ansible.builtin.assert:
+    that: free_space_df.stdout_lines[1:] | map('trim') | map('int') | min >= free_space_gb | int
+    fail_msg: >-
+      {{ free_space_for }} needs {{ free_space_gb }} GB free on each of
+      {{ free_space_paths | join(', ') }}; df reports
+      {{ free_space_df.stdout_lines[1:] | map('trim') | join(', ') }} GB.
+      Free space there, or lower the role's setting if it overestimates.
+    quiet: true
