@@ -1,0 +1,4 @@
+---
+# quiet_install -- install packages without starting the daemons they ship, for a
+# daemon that must not run before the caller has configured it. See tasks/main.yml.
+quiet_install_packages: []
