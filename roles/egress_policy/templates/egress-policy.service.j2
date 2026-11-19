@@ -1,0 +1,29 @@
+{{ ansible_managed | comment }}
+# Loads the egress policy table (roles/egress_policy) before the network comes up.
+# `systemctl stop` removes the table (the policy is off until the next start);
+# `systemctl reload` replaces it in one transaction. Ordered after nftables.service
+# and restarted with it, because its `flush ruleset` would remove the table too.
+[Unit]
+Description=Egress policy nftables table
+Documentation=man:nft(8)
+Wants=network-pre.target
+Before=network-pre.target shutdown.target
+After=nftables.service
+PartOf=nftables.service
+Conflicts=shutdown.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Loading a ruleset takes milliseconds; a hang must not hold up the boot.
+TimeoutStartSec=30s
+StandardInput=null
+ProtectSystem=full
+ProtectHome=true
+ExecStart=/usr/sbin/nft -f {{ _egress_policy_ruleset }}
+ExecReload=/usr/sbin/nft -f {{ _egress_policy_ruleset }}
+ExecStop=-/usr/sbin/nft delete table inet egress_policy
+
+[Install]
+WantedBy=sysinit.target

@@ -1,0 +1,11 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Write users' listening sockets and tunnel programs every {{ egress_policy_metrics_interval }}
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec={{ egress_policy_metrics_interval }}
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

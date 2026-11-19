@@ -1,0 +1,56 @@
+---
+# Egress policy (roles/egress_policy textfile metrics, clustertools.egress_metrics).
+# The nftables policy limits where users connect outside the cluster; these report what
+# it cannot block: a tunnel over an allowed port, a service open to the outside, and
+# the policy itself gone missing.
+groups:
+  - name: egress-policy
+    rules:
+      - alert: EgressPolicyNotLoaded
+        expr: egress_policy_loaded == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "The egress policy is not loaded on {{ $labels.host }}, so users' connections are not limited"
+          description: >-
+            Something removed the nftables table (a `flush ruleset`, a stopped unit).
+            `systemctl restart egress-policy` on the host loads it again;
+            `journalctl -u egress-policy` shows why it is missing.
+      - alert: EgressPolicyMetricsStale
+        expr: time() - egress_policy_metrics_timestamp_seconds > 15 * 60
+        labels: {severity: warning}
+        annotations:
+          summary: "Egress policy metrics from {{ $labels.host }} are over 15 minutes old"
+          description: "The metrics timer stopped: `systemctl status egress-policy-metrics.timer` on the host."
+      # A tunnel publishes a service inside the cluster to the internet over an allowed
+      # port (or relays a login into it), past both the egress and the inbound policy.
+      - alert: EgressTunnelRunning
+        expr: egress_policy_tunnel_processes > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.user }} runs the tunnel program {{ $labels.process }} on {{ $labels.host }}"
+          description: >-
+            Tunnels are not allowed on the cluster: ask {{ $labels.user }} to stop it
+            (`pgrep -u {{ $labels.user }} -a` on the host shows it).
+      - alert: EgressListenerExposed
+        expr: egress_policy_user_listener{exposed="true"} == 1
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: >-
+            {{ $labels.user }}'s {{ $labels.process }} on {{ $labels.host }} listens on
+            {{ $labels.address }} port {{ $labels.port }}/{{ $labels.proto }}, open from outside the cluster
+          description: >-
+            No inbound filter keeps this port from the internet. Ask the user to bind to
+            127.0.0.1 and reach it through an SSH tunnel, or turn on egress_policy_inbound
+            for the host.
+      - alert: EgressSshRejected
+        expr: sum by (host, reason) (increase(egress_policy_rejected_packets_total{reason=~"ssh_.*"}[10m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} rejected outbound SSH connections over the {{ $labels.reason }} limit"
+          description: >-
+            A client is connecting faster than the policy allows, often a loop retrying a
+            failing login; left alone, the remote site blocks the cluster's address.
+            `journalctl -k --grep egress-policy` on the host names the uid and destination.

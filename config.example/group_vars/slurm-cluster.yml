@@ -126,6 +126,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_install_authentication: true
 # A pull-through registry cache on [slurm-cache] for the compute nodes
 #slurm_enable_nginx_docker_cache: false
+# Where users may connect outside the cluster (egress_policy_* in group_vars/all.yml)
+#slurm_enable_egress_policy: false
 
 ################################################################################
 # NFS                                                                          #

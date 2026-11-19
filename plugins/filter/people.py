@@ -57,6 +57,11 @@ def people_with_role(people, role):
     return sorted(n for n, p in _active(people).items() if role in (p.get("roles") or []))
 
 
+def people_uids(people, role):
+    """Sorted UIDs of active people holding role (a kernel matches a uid, not a name)."""
+    return sorted(p["uid"] for n, p in _active(people).items() if role in (p.get("roles") or []))
+
+
 def people_attr(people, key):
     """{login: value} of key for active people who set it."""
     return {n: p[key] for n, p in sorted(_active(people).items()) if p.get(key) not in (None, "")}
@@ -190,6 +195,7 @@ class FilterModule:
             "people_active": people_active,
             "people_left": people_left,
             "people_with_role": people_with_role,
+            "people_uids": people_uids,
             "people_attr": people_attr,
             "people_accounting": people_accounting,
             "people_subids": people_subids,

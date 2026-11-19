@@ -1,0 +1,17 @@
+{{ ansible_managed | comment }}
+# Client SSH defaults for every user (roles/egress_policy). ssh keeps the first value
+# it reads, and reads ~/.ssh/config before this file, so a user's own setting wins.
+Host *
+{% for key, value in egress_policy_ssh_client_options.items() %}
+    {{ key }} {{ value }}
+{% endfor %}
+{% if egress_policy_ssh_multiplex_options | length > 0 %}
+
+# Reuse one connection per destination; end it with `ssh -O exit HOST`. Only when
+# ~/.ssh is writable: ssh exits when it cannot create the socket, and ssh itself makes
+# ~/.ssh on its first run.
+Match exec "test -w %d/.ssh"
+{% for key, value in egress_policy_ssh_multiplex_options.items() %}
+    {{ key }} {{ value }}
+{% endfor %}
+{% endif %}

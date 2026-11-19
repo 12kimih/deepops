@@ -660,3 +660,92 @@ tests:
       - eval_time: 12m
         alertname: SlurmGpuMetricsStale
         exp_alerts: []
+
+  - name: the egress policy gone missing, and its metrics stale
+    interval: 1m
+    input_series:
+      - series: 'egress_policy_loaded{host="n1", instance="n1:9100"}'
+        values: '1 1 0x10'
+      - series: 'egress_policy_metrics_timestamp_seconds{host="n1", instance="n1:9100"}'
+        values: '0x20'
+      - series: 'egress_policy_loaded{host="n2", instance="n2:9100"}'
+        values: '1x20'
+      - series: 'egress_policy_metrics_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '0+60x20'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: EgressPolicyNotLoaded
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: EgressPolicyNotLoaded
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "The egress policy is not loaded on n1, so users' connections are not limited"
+              description: "Something removed the nftables table (a `flush ruleset`, a stopped unit). `systemctl restart egress-policy` on the host loads it again; `journalctl -u egress-policy` shows why it is missing."
+      - eval_time: 15m
+        alertname: EgressPolicyMetricsStale
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: EgressPolicyMetricsStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "Egress policy metrics from n1 are over 15 minutes old"
+              description: "The metrics timer stopped: `systemctl status egress-policy-metrics.timer` on the host."
+
+  - name: a tunnel program that keeps running warns; a brief one does not
+    interval: 1m
+    input_series:
+      - series: 'egress_policy_tunnel_processes{host="n1", instance="n1:9100", user="bob", process="cloudflared"}'
+        values: '1x10'
+      - series: 'egress_policy_tunnel_processes{host="n2", instance="n2:9100", user="dave", process="ngrok"}'
+        values: '1 1 1 _x7'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: EgressTunnelRunning
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", user: bob, process: cloudflared}
+            exp_annotations:
+              summary: "bob runs the tunnel program cloudflared on n1"
+              description: "Tunnels are not allowed on the cluster: ask bob to stop it (`pgrep -u bob -a` on the host shows it)."
+
+  - name: a user's service open to the outside warns after 30 minutes; a filtered one never
+    interval: 1m
+    input_series:
+      - series: 'egress_policy_user_listener{host="n1", instance="n1:9100", user="bob", process="python3", proto="tcp", address="0.0.0.0", port="8888", exposed="true"}'
+        values: '1x40'
+      - series: 'egress_policy_user_listener{host="n2", instance="n2:9100", user="dave", process="torchrun", proto="tcp", address="::", port="29500", exposed="false"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: EgressListenerExposed
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: EgressListenerExposed
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", user: bob, process: python3, proto: tcp, address: "0.0.0.0", port: "8888", exposed: "true"}
+            exp_annotations:
+              summary: "bob's python3 on n1 listens on 0.0.0.0 port 8888/tcp, open from outside the cluster"
+              description: "No inbound filter keeps this port from the internet. Ask the user to bind to 127.0.0.1 and reach it through an SSH tunnel, or turn on egress_policy_inbound for the host."
+
+  - name: outbound SSH over a limit warns per host and limit; other rejections do not
+    interval: 1m
+    input_series:
+      - series: 'egress_policy_rejected_packets_total{host="n1", instance="n1:9100", reason="ssh_node"}'
+        values: '0 0 0 5 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9'
+      - series: 'egress_policy_rejected_packets_total{host="n1", instance="n1:9100", reason="port"}'
+        values: '0+10x19'
+      - series: 'egress_policy_rejected_packets_total{host="n2", instance="n2:9100", reason="ssh_user"}'
+        values: '0x19'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: EgressSshRejected
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, reason: ssh_node}
+            exp_annotations:
+              summary: "n1 rejected outbound SSH connections over the ssh_node limit"
+              description: "A client is connecting faster than the policy allows, often a loop retrying a failing login; left alone, the remote site blocks the cluster's address. `journalctl -k --grep egress-policy` on the host names the uid and destination."
+      - eval_time: 19m
+        alertname: EgressSshRejected
+        exp_alerts: []

@@ -1,0 +1,166 @@
+---
+# Without the internal networks every job's traffic between nodes would be limited.
+- name: Check the egress policy settings
+  ansible.builtin.assert:
+    that:
+      - egress_policy_internal_networks | length > 0
+      - egress_policy_internal_networks | networks_invalid | length == 0
+      - egress_policy_restricted_uids | reject('match', '^[0-9]+(-[0-9]+)?$') | list | length == 0
+      - egress_policy_exempt_uids | map('string') | reject('match', '^[0-9]+$') | list | length == 0
+      - (egress_policy_allowed_tcp_ports + egress_policy_allowed_udp_ports + egress_policy_ssh_ports
+         + egress_policy_inbound_tcp_ports + egress_policy_inbound_udp_ports)
+        | map('string') | reject('match', '^[0-9]+(-[0-9]+)?$') | list | length == 0
+      - ([egress_policy_ssh_rate, egress_policy_ssh_node_rate, egress_policy_log_rate]
+         | reject('match', '^[0-9]+/(second|minute|hour|day)$') | list | length == 0)
+    fail_msg: >-
+      egress_policy_internal_networks must list the cluster's networks as CIDRs
+      (invalid: {{ egress_policy_internal_networks | networks_invalid }}); uids are
+      numbers or "A-B", ports numbers or "A-B", rates N/second|minute|hour|day.
+
+- name: Install nftables
+  ansible.builtin.package:
+    name: nftables
+    state: present
+
+# The operator's session is the one at risk: with a local connection it is the login
+# Ansible runs in, so the variable is read without become (sudo drops it).
+- name: Find the SSH session this run came in on
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      set -- ${SSH_CONNECTION:-}
+      [ $# -eq 4 ] || exit 0
+      dev=$(ip -o route get "$1" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p')
+      echo "$1 $4 ${dev:-}"
+  become: false
+  register: egress_policy_session
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: egress_policy_inbound and egress_policy_inbound_lockout_check
+
+- name: Refuse inbound filtering that would cut this SSH session
+  vars:
+    egress_policy_session_fields: "{{ egress_policy_session.stdout.split() }}"
+  ansible.builtin.assert:
+    that: >-
+      egress_policy_session_fields | length < 2
+      or egress_policy_session_fields[0] | ip_in_networks(egress_policy_internal_networks)
+      or egress_policy_session_fields[1] | port_in_ports(egress_policy_inbound_tcp_ports)
+      or (egress_policy_session_fields[2:] | first | default('')) in egress_policy_trusted_interfaces + ['lo']
+    fail_msg: >-
+      This SSH session ({{ egress_policy_session.stdout }}: client, server port,
+      interface) is not from egress_policy_internal_networks or a trusted interface,
+      and its port is not in egress_policy_inbound_tcp_ports, so inbound filtering
+      would cut it. Add the port, or set egress_policy_inbound_lockout_check: false
+      if another path in is certain.
+  when: egress_policy_inbound and egress_policy_inbound_lockout_check
+
+- name: Write the ruleset
+  ansible.builtin.template:
+    src: egress-policy.nft.j2
+    dest: "{{ _egress_policy_ruleset }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: nft -c -f %s
+  register: egress_policy_ruleset
+
+- name: Install the unit that loads the ruleset at boot
+  ansible.builtin.template:
+    src: egress-policy.service.j2
+    dest: "/etc/systemd/system/{{ _egress_policy_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: egress_policy_unit
+
+# Under --check the files above are not written, so there is nothing to load.
+- name: Load the ruleset now and at boot
+  ansible.builtin.systemd:
+    name: "{{ _egress_policy_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  register: egress_policy_started
+  when: not ansible_check_mode
+
+# Reload replaces the table in one transaction; there is no moment without the policy.
+- name: Load a changed ruleset
+  ansible.builtin.systemd:
+    name: "{{ _egress_policy_unit }}"
+    state: reloaded
+  when:
+    - not ansible_check_mode
+    - egress_policy_ruleset is changed or egress_policy_unit is changed
+    - egress_policy_started is not changed
+
+# ufw's rules (the former ufw-enable.yml) would still drop what this table allows.
+- name: Hand inbound filtering over from ufw
+  when: egress_policy_inbound
+  block:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Disable ufw
+      community.general.ufw:
+        state: disabled
+      when: "'ufw.service' in ansible_facts.services"
+
+    - name: Stop the ufw service
+      ansible.builtin.systemd:
+        name: ufw
+        state: stopped
+        enabled: false
+      when: "'ufw.service' in ansible_facts.services"
+
+- name: Install the client SSH settings
+  ansible.builtin.template:
+    src: ssh_config.conf.j2
+    dest: "{{ egress_policy_ssh_client_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: ssh -G -F %s egress-policy.invalid
+
+- name: Publish listeners and tunnels as metrics
+  when: egress_policy_metrics
+  block:
+    - name: Install the metrics command
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: command
+      vars:
+        cluster_tools_lib_command:
+          dest: "{{ _egress_policy_metrics_command }}"
+          module: clustertools.egress_metrics
+
+    - name: Write the metrics configuration
+      ansible.builtin.copy:
+        dest: "{{ _egress_policy_metrics_config }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: "{{ {'table': 'egress_policy', 'user_uids': egress_policy_restricted_uids,
+                      'tunnel_programs': egress_policy_tunnel_programs} | to_nice_json }}\n"
+
+    - name: Install the metrics units
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ _egress_policy_metrics_units }}"
+      register: egress_policy_metrics_units
+
+    - name: Enable the metrics timer
+      ansible.builtin.systemd:
+        name: egress-policy-metrics.timer
+        enabled: true
+        state: "{{ 'restarted' if egress_policy_metrics_units is changed else 'started' }}"
+        daemon_reload: true
+      when: not ansible_check_mode
+
+- name: Remove the metrics when they are off
+  ansible.builtin.include_tasks: metrics_absent.yml
+  when: not egress_policy_metrics

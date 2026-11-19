@@ -1,0 +1,92 @@
+#!/usr/sbin/nft -f
+{{ ansible_managed | comment }}
+# Only this table is replaced, in one transaction: Docker's, Tailscale's and any other
+# table stay as they are. It is created first so the delete never fails.
+{% macro elements(items) -%}
+{%- if items | length > 0 %} elements = { {{ items | join(', ') }} };{% endif -%}
+{%- endmacro %}
+{% set v4 = egress_policy_internal_networks | networks_of_version(4) %}
+{% set v6 = egress_policy_internal_networks | networks_of_version(6) %}
+table inet egress_policy {}
+delete table inet egress_policy
+
+table inet egress_policy {
+	counter rejected_port {}
+	counter rejected_ssh_user {}
+	counter rejected_ssh_node {}
+
+	set internal4 { type ipv4_addr; flags interval; auto-merge;{{ elements(v4) }} }
+	set internal6 { type ipv6_addr; flags interval; auto-merge;{{ elements(v6) }} }
+	set exempt_uids { typeof meta skuid;{{ elements(egress_policy_exempt_uids | map('int') | unique | sort) }} }
+
+	# A token bucket per user and destination; an idle entry expires once full again.
+	set ssh_user4 { typeof meta skuid . ip daddr; size 65535; flags dynamic,timeout; timeout 10m; }
+	set ssh_user6 { typeof meta skuid . ip6 daddr; size 65535; flags dynamic,timeout; timeout 10m; }
+
+	# Traffic without a socket (forwarded, kernel replies, the NFS client) has no uid and
+	# never matches a uid rule, so it is never limited.
+	chain output {
+		type filter hook output priority filter; policy accept;
+		oif "lo" accept
+		meta skuid @exempt_uids accept
+		meta skuid { {{ egress_policy_restricted_uids | join(', ') }} } jump user
+	}
+
+	chain user {
+		ct state established,related accept
+		ip daddr @internal4 accept
+		ip6 daddr @internal6 accept
+{% if egress_policy_allowed_tcp_ports | length > 0 %}
+		tcp dport { {{ egress_policy_allowed_tcp_ports | join(', ') }} } accept
+{% endif %}
+{% if egress_policy_allowed_udp_ports | length > 0 %}
+		udp dport { {{ egress_policy_allowed_udp_ports | join(', ') }} } accept
+{% endif %}
+{% if egress_policy_ssh_ports | length > 0 %}
+		tcp dport { {{ egress_policy_ssh_ports | join(', ') }} } jump ssh
+{% endif %}
+		limit rate {{ egress_policy_log_rate }} log prefix "egress-policy port: " flags skuid
+		counter name "rejected_port" reject with icmpx admin-prohibited
+	}
+
+	chain ssh {
+		update @ssh_user4 { meta skuid . ip daddr limit rate over {{ egress_policy_ssh_rate }} burst {{ egress_policy_ssh_burst }} packets } jump ssh_user_reject
+		update @ssh_user6 { meta skuid . ip6 daddr limit rate over {{ egress_policy_ssh_rate }} burst {{ egress_policy_ssh_burst }} packets } jump ssh_user_reject
+		limit rate over {{ egress_policy_ssh_node_rate }} burst {{ egress_policy_ssh_node_burst }} packets jump ssh_node_reject
+		accept
+	}
+
+	chain ssh_user_reject {
+		limit rate {{ egress_policy_log_rate }} log prefix "egress-policy ssh user: " flags skuid
+		counter name "rejected_ssh_user" reject with icmpx admin-prohibited
+	}
+
+	chain ssh_node_reject {
+		limit rate {{ egress_policy_log_rate }} log prefix "egress-policy ssh node: " flags skuid
+		counter name "rejected_ssh_node" reject with icmpx admin-prohibited
+	}
+{% if egress_policy_inbound %}
+
+	counter dropped_inbound {}
+	set inbound_tcp { type inet_service; flags interval; auto-merge;{{ elements(egress_policy_inbound_tcp_ports) }} }
+	set inbound_udp { type inet_service; flags interval; auto-merge;{{ elements(egress_policy_inbound_udp_ports) }} }
+
+	chain input {
+		type filter hook input priority filter; policy drop;
+		iif "lo" accept
+		ct state established,related accept
+		ct state invalid drop
+		meta l4proto { icmp, ipv6-icmp } accept
+		udp sport 67 udp dport 68 accept
+		ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+		ip saddr @internal4 accept
+		ip6 saddr @internal6 accept
+{% if egress_policy_trusted_interfaces | length > 0 %}
+		iifname { {{ egress_policy_trusted_interfaces | map('to_json') | join(', ') }} } accept
+{% endif %}
+		tcp dport @inbound_tcp accept
+		udp dport @inbound_udp accept
+		counter name "dropped_inbound"
+	}
+{% endif %}
+}

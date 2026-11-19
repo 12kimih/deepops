@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: egress_policy
+  author: DeepOps
+  description: Limit where users' processes may connect outside the cluster, with nftables, and report listeners and tunnels
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
+dependencies:
+  - role: cluster_tools_lib  # the metrics program
+  - role: prometheus_paths  # node_exporter_prom_dir
