@@ -8,7 +8,9 @@
 # The checks are independent, so they run in parallel (CHECK_JOBS at a time, default
 # the CPU count): the run takes about as long as its slowest check, not their sum.
 # Each prints one line when it ends, with its time; a failed one then prints its
-# output in full. CHECK_JOBS=1 runs them one by one.
+# output in full. CHECK_JOBS=1 runs them one by one. They run niced, at idle I/O
+# priority: the host may be a login node or the controller, whose users and services
+# come first.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -19,7 +21,8 @@ fast=false
 # pinned ones however this script was started.
 if [ -z "${DEEPOPS_CHECK_UV:-}" ]; then
     command -v uv >/dev/null || { echo "uv is required; run scripts/setup.sh." >&2; exit 2; }
-    DEEPOPS_CHECK_UV=1 exec uv run --locked -- scripts/check.sh "$@"
+    idle=(); command -v ionice >/dev/null && idle=(ionice -c 3)   # Linux; elsewhere plain
+    DEEPOPS_CHECK_UV=1 exec "${idle[@]}" uv run --locked -- scripts/check.sh "$@"
 fi
 python=python3
 
@@ -57,11 +60,15 @@ step "no secrets or site data in tracked files" "${python}" scripts/deepops/sens
 # the GIT_* variables a git hook exports, so a test that drives git in a temporary
 # repository cannot reach this repository's index.
 isolated=(env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR)
-# Suites are the tracked tests/<suite>/test_*.py, like every other check.
-mapfile -t suites < <(git ls-files -- 'tests/*/test_*.py' | cut -d/ -f1-2 | sort -u | sed 's|$|/|')
-for suite in "${suites[@]}"; do
-    if "${fast}" && [ -e "${suite}.slow" ]; then continue; fi
-    step "unit tests (${suite%/})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} -m unittest discover -s . -q"
+# The tracked tests/<suite>/test_*.py, like every other check, one check per file so a
+# slow suite's files run side by side; each runs from its suite directory, as discover
+# would run it.
+mapfile -t test_files < <(git ls-files -- 'tests/*/test_*.py')
+for test_file in "${test_files[@]}"; do
+    suite="$(dirname "${test_file}")"
+    if "${fast}" && [ -e "${suite}/.slow" ]; then continue; fi
+    module="$(basename "${test_file}" .py)"
+    step "unit tests (${suite}/${module})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} -m unittest -q '${module}'"
 done
 
 if ! "${fast}"; then
@@ -87,7 +94,7 @@ logs="$(mktemp -d)"
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "${logs}"' EXIT
 run_one() {
     local i="$1" start=${SECONDS} status=ok
-    bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
+    nice -n 10 bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
     echo "${status}" >"${logs}/${i}.status"
     printf '%-6s %4ss  %s\n' "${status}" "$((SECONDS - start))" "${names[$i]}"
 }
