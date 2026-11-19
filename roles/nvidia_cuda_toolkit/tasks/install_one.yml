@@ -2,22 +2,13 @@
 # One toolkit (cuda_toolkit, an entry of cuda_releases): refuse to start without room,
 # download, install, drop the runfile.
 
-# The cache and the software tree may share a disk with the host's own state (on a
-# controller: the scheduler's state and its database), which must never fill up.
-- name: Read the free space before installing {{ cuda_toolkit.version }}
-  ansible.builtin.command:
-    argv: [df, --output=avail, --block-size=1G, "{{ cuda_cache_dir }}", "{{ cuda_install_root }}"]
-  register: cuda_free
-  changed_when: false
-  check_mode: false
-
 - name: Refuse to start without room for {{ cuda_toolkit.version }}
-  ansible.builtin.assert:
-    that: cuda_free.stdout_lines[1:] | map('trim') | map('int') | min >= cuda_install_free_gb | int
-    fail_msg: >-
-      {{ cuda_cache_dir }} or {{ cuda_install_root }} has less than cuda_install_free_gb
-      ({{ cuda_install_free_gb }} GB) free (df: {{ cuda_free.stdout_lines[1:] | map('trim') | join(', ') }} GB).
-    quiet: true
+  ansible.builtin.include_role:
+    name: free_space
+  vars:
+    free_space_paths: ["{{ cuda_cache_dir }}", "{{ cuda_install_root }}"]
+    free_space_gb: "{{ cuda_install_free_gb }}"
+    free_space_for: "CUDA {{ cuda_toolkit.version }}"
 
 - name: Download {{ cuda_toolkit.version }}
   ansible.builtin.include_role:

@@ -102,6 +102,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── easy-build-packages
 │   ├── enroot
 │   ├── facts
+│   ├── free_space
 │   ├── grafana
 │   ├── host_baseline
 │   ├── k8s-internal-container-registry
