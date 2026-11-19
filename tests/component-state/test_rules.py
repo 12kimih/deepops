@@ -164,7 +164,8 @@ class Playbooks(unittest.TestCase):
                 self.assertTrue(found <= set(REGISTRY))
                 install = [n for n, phase in imports if phase == "install"]
                 remove = [n for n, phase in imports if phase == "remove"]
-                self.assertEqual(sorted(install), sorted(found), "each component installs once")
+                retired = {n for n in found if "retired" in REGISTRY[n]}
+                self.assertEqual(sorted(install), sorted(found - retired), "each component installs once")
                 self.assertEqual(sorted(remove), sorted(found), "and is removed once")
                 self.assertTrue(
                     all(phase in ("install", "remove") for _, phase in imports), "a deploy sets the phase"
@@ -228,6 +229,27 @@ class Desired(unittest.TestCase):
         self.assertEqual(state, "unmanaged", "even where a present component needs it")
         for phase in components.PHASES:
             self.assertEqual(components.component_phase(state, phase), "kept", phase)
+
+    def test_a_retired_component_is_absent_everywhere_unless_the_site_manages_it(self):
+        reg = {
+            "old": {"retired": "replaced by new, 2026-11"},
+            "drv": {"retired": "gone, 2026-11", "removal": "explicit"},
+            "own": {"retired": "gone, 2026-11", "managed": False},
+        }
+        for host in ("m1", "n1", "k1"):
+            want = components.components_desired(reg, self.GROUPS, host)
+            self.assertEqual((want["old"], want["drv"], want["own"]), ("absent", "absent", "unmanaged"))
+        self.assertEqual(components.component_hosts(reg, self.GROUPS, "old"), [])
+        self.assertEqual(components.component_phase("absent", "install"), "kept", "installs nothing")
+        rule = [{"switch": True, "group": "slurm-node"}]
+        for bad in (
+            {"old": {"retired": ""}},
+            {"old": {"retired": "x", "rules": rule}},
+            {"old": {"retired": "x", "needs": ["dep"]}, "dep": {"rules": []}},
+            {"old": {"retired": "x"}, "app": {"rules": rule, "needs": ["old"]}},
+        ):
+            with self.subTest(registry=bad):
+                self.assertTrue(components.check(bad))
 
     def test_require_installs_unless_the_site_manages_it(self):
         self.assertEqual([components.component_phase(s, "require") for s in ("absent", "kept", "present")],
