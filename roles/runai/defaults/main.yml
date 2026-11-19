@@ -24,7 +24,7 @@ runai_work_dir: "{{ deepops_dir }}/runai"
 # ---------------------------------------------------------------- KAI Scheduler
 # Pinned chart (v0.18 is a long-term-support line). No "latest".
 runai_kai_chart: "oci://ghcr.io/kai-scheduler/kai-scheduler/kai-scheduler"
-runai_kai_chart_version: "v0.18.5"
+runai_kai_chart_version: "v0.18.8"
 runai_kai_release_name: "kai-scheduler"
 runai_kai_namespace: "kai-scheduler"
 
@@ -44,7 +44,7 @@ runai_kai_extra_values: {}
 runai_cp_chart: "control-plane"
 runai_cluster_chart: "runai-cluster"
 runai_chart_repo: "https://helm.ngc.nvidia.com/nvidia/runai-oss"
-runai_chart_version: "3.0.20"
+runai_chart_version: "3.0.26"
 runai_cp_release_name: "runai-backend"
 runai_cp_namespace: "runai-backend"
 runai_cluster_release_name: "runai-cluster"
@@ -103,7 +103,7 @@ runai_gateway_api_version: "v1.4.0"
 runai_gateway_api_crds_url: "https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ runai_gateway_api_version }}/standard-install.yaml"
 runai_gateway_install_controller: true
 runai_gateway_class: "kgateway"
-runai_gateway_controller_version: "v2.2.1"
+runai_gateway_controller_version: "v2.2.9"
 runai_gateway_controller_chart: "oci://cr.kgateway.dev/kgateway-dev/charts/kgateway"
 runai_gateway_controller_crds_chart: "oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds"
 runai_gateway_controller_namespace: "kgateway-system"

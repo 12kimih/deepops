@@ -13,7 +13,7 @@ jobs:
           - ubuntu-24.04
     steps:
       - name: check out repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: run setup.sh
         run: ./scripts/setup.sh </dev/null

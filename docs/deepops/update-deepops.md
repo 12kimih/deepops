@@ -488,9 +488,9 @@ The NVIDIA HPC SDK is installed in versioned directories, so that new versions a
 To install a newer HPC SDK, first configure the version variables in your DeepOps configuration:
 
 ```yaml
-hpcsdk_major_version: "26"
-hpcsdk_minor_version: "3"
-hpcsdk_file_cuda: "13.1"
+hpcsdk_major_version: "<YY>"
+hpcsdk_minor_version: "<M>"
+hpcsdk_file_cuda: "<the newest CUDA that release bundles>"
 hpcsdk_arch: "x86_64"
 ```
 

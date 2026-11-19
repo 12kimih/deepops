@@ -2,10 +2,10 @@
 # defaults file for netapp-trident role
 
 # Version of the Trident installer package to download when tridentctl is needed
-trident_version: "26.02.1"
+trident_version: "26.10.1"
 # Per version, as GitHub publishes for the release asset (roles/download).
 trident_checksums:
-  "26.02.1": "sha256:6dfc08a6d92496eb09fb132eafd14abef9b9f9980500fbf50f8338f5cd11ada3"
+  "26.10.1": "sha256:fafb41ec08b7cd0d57f76bb1204cf79424e6b2c1762403796b0f5358ad63ad52"
 trident_installer_url: "https://github.com/NetApp/trident/releases/download/v{{ trident_version }}/trident-installer-{{ trident_version }}.tar.gz"
 
 # Official Trident Helm chart settings
@@ -13,7 +13,7 @@ trident_helm_repo_name: netapp-trident
 trident_helm_repo_url: https://netapp.github.io/trident-helm-chart
 trident_helm_release_name: trident-operator
 trident_helm_chart_name: "{{ trident_helm_repo_name }}/trident-operator"
-trident_helm_chart_version: "100.2602.1"
+trident_helm_chart_version: "100.2610.1"
 
 # Namespace to install Trident in
 trident_namespace: trident

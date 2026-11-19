@@ -265,10 +265,10 @@ spack_default_packages:
 
 # Select the version of HPC SDK to download
 #hpcsdk_major_version: '26'
-#hpcsdk_minor_version: '3'
-#hpcsdk_file_cuda: '13.1'
+#hpcsdk_minor_version: '9'
+#hpcsdk_file_cuda: '13.3'
 #hpcsdk_arch: "x86_64"
-#hpcsdk_default_cuda: '13.1'
+#hpcsdk_default_cuda: '13.3'
 
 # In a Slurm cluster, default to setting up HPC SDK as modules rather than in
 # the default user environment
@@ -284,7 +284,7 @@ hpcsdk_install_in_path: false
 # this can help you get started.
 ################################################################################
 #slurm_cluster_install_openmpi: false
-#openmpi_version: 5.0.10
+#openmpi_version: 5.0.11
 #openmpi_install_prefix: "/usr/local"
 # OpenMPI 5.0.x built against the external PMIx + hwloc that Slurm uses (SchedMD
 # best practice). v5 removed --with-pmi/--with-slurm; `srun --mpi=pmix` needs only

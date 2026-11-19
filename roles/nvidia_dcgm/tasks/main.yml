@@ -1,4 +1,20 @@
 ---
+# Through a transient unit: on a Slurm node the ssh session does not see the GPUs.
+- name: Read the GPUs' compute capability
+  ansible.builtin.command: systemd-run --wait --pipe --collect --quiet -- nvidia-smi --query-gpu=compute_cap --format=csv,noheader
+  register: dcgm_compute_caps
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only
+
+- name: Use the CUDA 12 build for GPUs older than Turing on a CUDA 13 driver
+  ansible.builtin.set_fact:
+    _dcgm_cuda_major: "12"
+  when:
+    - nvidia_driver_cuda_major | int >= 13
+    - dcgm_compute_caps.rc == 0
+    - dcgm_compute_caps.stdout_lines | map('float') | select('lt', 7.5) | list | length > 0
+
 - name: Check for DGX
   ansible.builtin.set_fact:
     dcgm_is_dgx: true
@@ -16,27 +32,12 @@
   ansible.builtin.include_tasks: install-redhat.yml
   when: (ansible_facts.os_family == "RedHat") and not dcgm_is_dgx
 
-- name: Populate service facts
-  ansible.builtin.service_facts:
-  tags:
-    - molecule-notest
-
-- name: Start the nvidia-dcgm service when present (preferred)
+# DCGM 4 ships nvidia-dcgm.service (dcgm.service was the 2.x/3.x name).
+- name: Start the nvidia-dcgm service
   ansible.builtin.systemd:
     daemon_reload: true
-    name: "nvidia-dcgm.service"
-    state: "started"
+    name: nvidia-dcgm.service
+    state: started
     enabled: true
-  when: '"nvidia-dcgm.service" in ansible_facts.services'
-  tags:
-    - molecule-notest
-
-- name: Start the dcgm service otherwise
-  ansible.builtin.systemd:
-    daemon_reload: true
-    name: "dcgm.service"
-    state: "started"
-    enabled: true
-  when: '"nvidia-dcgm.service" not in ansible_facts.services'
   tags:
     - molecule-notest

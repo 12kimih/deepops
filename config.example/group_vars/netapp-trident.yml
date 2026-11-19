@@ -2,7 +2,7 @@
 # vars file for netapp-trident playbook
 
 # Version of the Trident installer package to download when tridentctl is needed
-#trident_version: "26.02.1"
+#trident_version: 26.10.1
 #trident_installer_url: "https://github.com/NetApp/trident/releases/download/v{{ trident_version }}/trident-installer-{{ trident_version }}.tar.gz"
 
 # Official Trident Helm chart settings
@@ -10,7 +10,7 @@
 #trident_helm_repo_url: https://netapp.github.io/trident-helm-chart
 #trident_helm_release_name: trident-operator
 #trident_helm_chart_name: "{{ trident_helm_repo_name }}/trident-operator"
-#trident_helm_chart_version: "100.2602.1"
+#trident_helm_chart_version: 100.2610.1
 
 # Namespace to install Trident in
 trident_namespace: deepops-trident

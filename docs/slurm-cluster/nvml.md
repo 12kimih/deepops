@@ -74,7 +74,7 @@ ansible-playbook -l slurm-node -e mig_manager_profile="all-1g.10gb" playbooks/nv
 
 Where `mig_manager_profile` is a configuration profile for the NVIDIA `mig-parted` tool.
 
-DeepOps does not create a MIG hooks file. The example configuration leaves `mig_manager_hooks: ""`, so the playbook omits the `-k` option. To use custom hooks, provision a reviewed hooks file on every target and set `mig_manager_hooks` to its path. An explicitly configured missing or invalid file remains an error; it is never silently ignored. Existing inventories that still set `/etc/nvidia-mig-manager/hooks.yaml` must either provide that file or clear the variable. Drain GPU workloads and stop GPU clients before changing MIG configuration, or provide site-specific hooks to manage those clients; omitting hooks does not quiesce them.
+The playbook applies the profile the way the package's own service does: the mig-parted configuration (copied from `mig_manager_config_src`, `config/nvidia-mig-config.yml` by default), the hooks file and the profile go into the environment of `nvidia-mig-parted apply`. The package's hooks (`/etc/nvidia-mig-manager/hooks.yaml`, which its install links to the hooks that fit the GPU) persist all three in `nvidia-mig-manager.service`'s `override.conf`, so the service reapplies the layout at every boot, and they stop and restart the GPU's services around a mode change. Set `mig_manager_hooks` to a reviewed file of your own to change that. Drain GPU workloads before changing the MIG configuration. On Kubernetes nodes the GPU Operator's MIG manager is in charge, and this playbook leaves them alone.
 
 For more information on configuring MIG, see the documentation for [NVIDIA mig-parted](https://github.com/NVIDIA/mig-parted).
 

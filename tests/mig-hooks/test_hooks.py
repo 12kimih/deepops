@@ -7,7 +7,6 @@ Run using the project's Ansible Python environment:
 
 import os
 from pathlib import Path
-import shlex
 import unittest
 
 import yaml
@@ -24,23 +23,25 @@ DEFAULTS = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").rea
 
 
 class Hooks(unittest.TestCase):
+    """The apply runs as the package's service.sh does: configuration, hooks and profile in
+    the environment, so the package's apply-start hook persists them for the boot-time
+    reapply (mig-parted deployments/systemd)."""
+
     def render(self, values):
-        variables = {**DEFAULTS, **values}
-        rendered = render(APPLY["command"], variables)
-        return shlex.split(rendered)
+        variables = {**DEFAULTS, "inventory_dir": "/cfg", **values}
+        return [render(arg, variables) for arg in APPLY["command"]["argv"]]
 
-    def test_the_default_does_not_require_an_unmanaged_file(self):
-        self.assertEqual(DEFAULTS["mig_manager_hooks"], "")
-        self.assertNotIn("-k", self.render({}))
+    def test_the_packaged_hooks_and_the_selected_profile_reach_the_environment(self):
+        args = self.render({"mig_manager_profile": "all-1g.10gb"})
+        self.assertEqual(args[:5], ["systemd-run", "--wait", "--pipe", "--collect", "--quiet"])
+        self.assertIn("--setenv=MIG_PARTED_HOOKS_FILE=/etc/nvidia-mig-manager/hooks.yaml", args)
+        self.assertIn("--setenv=MIG_PARTED_CONFIG_FILE=/etc/nvidia-mig-manager/config.yml", args)
+        self.assertIn("--setenv=MIG_PARTED_SELECTED_CONFIG=all-1g.10gb", args)
+        self.assertEqual(args[args.index("--") + 1 :], ["nvidia-mig-parted", "apply"])
 
-    def test_explicit_hooks_are_preserved_as_one_argument(self):
-        # Includes a missing path: do not silently bypass an operator's hooks.
-        for path in ("/etc/mig/custom-hooks.yaml", "/missing/hooks file.yaml"):
-            with self.subTest(path=path):
-                args = self.render({"mig_manager_hooks": path})
-                self.assertEqual(args[args.index("-k") + 1 :], [path])
-                self.assertEqual(args[:6], ["systemd-run", "--wait", "--pipe", "--collect", "--quiet", "--"])
-                self.assertIn("apply", args)
+    def test_a_site_hooks_file_with_spaces_stays_one_argument(self):
+        args = self.render({"mig_manager_hooks": "/etc/mig/custom hooks.yaml"})
+        self.assertIn("--setenv=MIG_PARTED_HOOKS_FILE=/etc/mig/custom hooks.yaml", args)
 
 
 if __name__ == "__main__":

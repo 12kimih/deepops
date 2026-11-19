@@ -202,7 +202,7 @@ The Trident role is optional and community-supported in DeepOps. Use it only whe
    +----------------+----------------+
    | SERVER VERSION | CLIENT VERSION |
    +----------------+----------------+
-   | 26.02.1        | 26.02.1        |
+   | <version>      | <version>      |
    +----------------+----------------+
    ```
 

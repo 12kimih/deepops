@@ -40,17 +40,9 @@ and any DeepOps-owned UI. The web UI in `platform` mode is the upstream one.
 
 ## Pinned versions
 
-| Component | Version |
-|---|---|
-| KAI Scheduler chart | v0.18.5 (v0.18 is a long-term-support line) |
-| gpu-fractioning (bundled in the KAI chart) | v0.1.7 |
-| Run:ai control-plane and cluster charts | 3.0.20 |
-| HAProxy ingress controller chart (platform) | 1.54.2 |
-| Gateway API CRDs (`runai_platform_exposure: gateway`) | v1.4.0 |
-| KGateway controller and CRD charts (gateway) | v2.2.1 |
-
-All are Apache-2.0. The Run:ai images come from `nvcr.io` without an NGC key.
-Versions are variables (`runai_*_version`); pins are refreshed with each release.
+The charts and images are pinned in `roles/runai/defaults/main.yml` and listed in
+[the generated version table](../deepops/versions.md). The KAI Scheduler chart stays
+on the v0.18 long-term-support line, and the gpu-fractioning component ships inside it.
 
 ## Install KAI Scheduler
 
@@ -138,7 +130,7 @@ python3 scripts/validation/validate_runai.py --json --memory-enforcement
 This also proves a pod inside its share completes and a pod that allocates past
 its share is refused. In this mode pods ask for memory with the
 `nvidia.com/container.<name>.gpu-memory.request` and `.limit` annotations; see the
-[KAI GPU sharing guide](https://github.com/kai-scheduler/KAI-Scheduler/tree/v0.18.5/docs/gpu-sharing).
+[KAI GPU sharing guide](https://github.com/kai-scheduler/KAI-Scheduler/tree/v0.18.8/docs/gpu-sharing).
 
 ## Install the platform (experimental)
 

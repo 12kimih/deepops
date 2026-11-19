@@ -33,7 +33,9 @@ unset STATE
 # 3. kai installs, is pinned, and a rerun changes nothing
 STATE=""; run kai1 -e runai_mode=kai
 r1=$rc
-grep -q -- "--version v0.18.5" "$STATE/calls.log" && grep -q "oci://ghcr.io/kai-scheduler/kai-scheduler/kai-scheduler" "$STATE/calls.log" && pass "kai chart pinned to v0.18.5" || bad "kai chart pinned"
+# The pin is the role's own default, read here so a bump needs no second edit.
+KAI_PIN="$(sed -n 's/^runai_kai_chart_version: "\(.*\)"$/\1/p' "$ROOT/roles/runai/defaults/main.yml")"
+grep -q -- "--version $KAI_PIN" "$STATE/calls.log" && grep -q "oci://ghcr.io/kai-scheduler/kai-scheduler/kai-scheduler" "$STATE/calls.log" && pass "kai chart pinned to $KAI_PIN" || bad "kai chart pinned"
 run kai2 -e runai_mode=kai
 [ $r1 -eq 0 ] && [ $rc -eq 0 ] && pass "kai converges" || bad "kai converges (rc=$r1/$rc)"
 n="$(grep -c '^upgrade' "$STATE/calls.log")"; [ "$n" = "1" ] && pass "kai rerun does not upgrade again (upgrades=$n)" || bad "kai rerun idempotent (upgrades=$n)"
@@ -118,11 +120,13 @@ unset STATE
 STATE=""; gw g1 -e runai_platform_exposure=gateway
 g1=$rc
 [ $g1 -eq 0 ] && [ "$(jq_ "d['address']")" = "192.0.2.50" ] && pass "gateway exposure uses the Gateway address" || bad "gateway address ($g1)"
-grep -q "standard-install.yaml" "$STATE/kubectl.log" && grep -q "v1.4.0/standard-install.yaml" "$STATE/kubectl.log" && pass "Gateway API CRDs pinned to v1.4.0" || bad "CRD pin"
-python3 - "$STATE" <<'P' && pass "KGateway chart and CRDs pinned to v2.2.1" || bad "kgateway pin"
+API_PIN="$(sed -n 's/^runai_gateway_api_version: "\(.*\)"$/\1/p' "$ROOT/roles/runai/defaults/main.yml")"
+grep -q "standard-install.yaml" "$STATE/kubectl.log" && grep -q "$API_PIN/standard-install.yaml" "$STATE/kubectl.log" && pass "Gateway API CRDs pinned to $API_PIN" || bad "CRD pin"
+GW_PIN="$(sed -n 's/^runai_gateway_controller_version: "\(.*\)"$/\1/p' "$ROOT/roles/runai/defaults/main.yml")"
+python3 - "$STATE" "$GW_PIN" <<'P' && pass "KGateway chart and CRDs pinned to $GW_PIN" || bad "kgateway pin"
 import json,sys
-r=json.load(open(sys.argv[1]+"/releases.json"))
-assert r["kgateway-system/kgateway"]["chart"]=="kgateway-v2.2.1" and r["kgateway-system/kgateway-crds"]["chart"]=="kgateway-crds-v2.2.1", r
+r=json.load(open(sys.argv[1]+"/releases.json")); v=sys.argv[2]
+assert r["kgateway-system/kgateway"]["chart"]=="kgateway-"+v and r["kgateway-system/kgateway-crds"]["chart"]=="kgateway-crds-"+v, r
 P
 python3 - "$STATE" <<'P' && pass "gateway values: ingress off, Gateway on, path routing" || bad "gateway values"
 import json,sys
