@@ -112,3 +112,20 @@
   loop: "{{ enroot_mount_config_files }}"
   loop_control:
     label: "{{ item.filename }}"
+
+# These directories also hold the package's own hooks and the pyxis links, so only the
+# files configured here are recorded and, once dropped from the config, removed: a hook
+# left behind would still run, as root, in every container.
+- name: Remove enroot files no longer configured
+  ansible.builtin.include_role:
+    name: recorded_files
+  vars:
+    recorded_files_record: "/var/lib/deepops/recorded/enroot-{{ item.dir }}"
+    recorded_files_names: "{{ item.files | map(attribute='filename') | list }}"
+    recorded_files_dirs: ["/etc/enroot/{{ item.dir }}"]
+  loop:
+    - { dir: environ.d, files: "{{ enroot_environ_config_files }}" }
+    - { dir: hooks.d, files: "{{ enroot_hook_config_files }}" }
+    - { dir: mounts.d, files: "{{ enroot_mount_config_files }}" }
+  loop_control:
+    label: "{{ item.dir }}"

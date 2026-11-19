@@ -13,6 +13,8 @@
 #       managed_dir_sources: "{{ slurm_prolog_sources }}"
 #       managed_dir_template: true
 # Afterwards managed_dir_changed says whether anything was installed or removed.
+# A directory other packages or admins also write to is roles/recorded_files' case: it
+# removes only the names it published.
 - name: Require a directory and absolute sources
   ansible.builtin.assert:
     that:

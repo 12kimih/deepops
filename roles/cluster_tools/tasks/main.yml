@@ -12,48 +12,15 @@
   loop_control:
     label: "{{ cluster_tools_lib_dir }}/{{ item.dest }}"
 
-# Recorded like the commands below, so a library dropped from the config leaves the hosts.
-- name: Look for the record of published libraries
-  ansible.builtin.stat:
-    path: "{{ cluster_tools_lib_manifest }}"
-  register: cluster_tools_lib_manifest_stat
-
-- name: Read the record of published libraries
-  ansible.builtin.slurp:
-    src: "{{ cluster_tools_lib_manifest }}"
-  register: cluster_tools_lib_manifest_read
-  when: cluster_tools_lib_manifest_stat.stat.exists
-
+# Recorded, so a library dropped from the config leaves the hosts.
 - name: Remove libraries no longer published
-  ansible.builtin.file:
-    path: "{{ cluster_tools_lib_dir }}/{{ item }}"
-    state: absent
+  ansible.builtin.include_role:
+    name: recorded_files
   vars:
-    _cluster_tools_recorded_libs: >-
-      {{ (cluster_tools_lib_manifest_read.content | b64decode).split()
-         if cluster_tools_lib_manifest_stat.stat.exists else [] }}
-  loop: >-
-    {{ (_cluster_tools_recorded_libs + cluster_tools_retired_libs) | unique
-       | difference(cluster_tools_libs | map(attribute='dest')) | list }}
-
-# Nothing published, no record: copy refuses empty content, and none is the truth.
-- name: Record the published libraries
-  ansible.builtin.copy:
-    content: |
-      {% for name in cluster_tools_libs | map(attribute='dest') | sort %}
-      {{ name }}
-      {% endfor %}
-    dest: "{{ cluster_tools_lib_manifest }}"
-    owner: root
-    group: root
-    mode: "0644"
-  when: cluster_tools_libs | length > 0
-
-- name: Remove the record of published libraries
-  ansible.builtin.file:
-    path: "{{ cluster_tools_lib_manifest }}"
-    state: absent
-  when: cluster_tools_libs | length == 0
+    recorded_files_record: "{{ cluster_tools_lib_manifest }}"
+    recorded_files_names: "{{ cluster_tools_libs | map(attribute='dest') | list }}"
+    recorded_files_dirs: ["{{ cluster_tools_lib_dir }}"]
+    recorded_files_retired: "{{ cluster_tools_retired_libs }}"
 
 - name: Assert the built-in commands are known and not also site scripts
   ansible.builtin.assert:
@@ -97,53 +64,16 @@
 
 # The role records what it published, so a command dropped from the config leaves the
 # hosts on the next run, as every other setting here does. Only names in that record, or
-# named in cluster_tools_retired (published before the record existed), are removed.
-- name: Look for the record of published commands
-  ansible.builtin.stat:
-    path: "{{ cluster_tools_manifest }}"
-  register: cluster_tools_manifest_stat
-
-- name: Read the record of published commands
-  ansible.builtin.slurp:
-    src: "{{ cluster_tools_manifest }}"
-  register: cluster_tools_manifest_read
-  when: cluster_tools_manifest_stat.stat.exists
-
+# named in cluster_tools_retired (published before the record existed), are removed:
+# the command and its completion.
 - name: Remove commands no longer published
-  ansible.builtin.file:
-    path: >-
-      {{ {'command': cluster_tools_bin_dir ~ '/' ~ item.0,
-          'completion': cluster_tools_completion_dir ~ '/' ~ item.0}[item.1] }}
-    state: absent
+  ansible.builtin.include_role:
+    name: recorded_files
   vars:
-    _cluster_tools_recorded: >-
-      {{ (cluster_tools_manifest_read.content | b64decode).split()
-         if cluster_tools_manifest_stat.stat.exists else [] }}
-  loop: >-
-    {{ (_cluster_tools_recorded + cluster_tools_retired) | unique
-       | difference(cluster_tools_scripts | map(attribute='dest'))
-       | difference(cluster_tools_commands)
-       | product(['command', 'completion']) | list }}
-  loop_control:
-    label: "{{ item.0 }} {{ item.1 }}"
-
-- name: Record the published commands
-  ansible.builtin.copy:
-    content: |
-      {% for name in (cluster_tools_scripts | map(attribute='dest') | list + cluster_tools_commands) | sort %}
-      {{ name }}
-      {% endfor %}
-    dest: "{{ cluster_tools_manifest }}"
-    owner: root
-    group: root
-    mode: "0644"
-  when: (cluster_tools_scripts + cluster_tools_commands) | length > 0
-
-- name: Remove the record of published commands
-  ansible.builtin.file:
-    path: "{{ cluster_tools_manifest }}"
-    state: absent
-  when: (cluster_tools_scripts + cluster_tools_commands) | length == 0
+    recorded_files_record: "{{ cluster_tools_manifest }}"
+    recorded_files_names: "{{ cluster_tools_scripts | map(attribute='dest') | list + cluster_tools_commands }}"
+    recorded_files_dirs: ["{{ cluster_tools_bin_dir }}", "{{ cluster_tools_completion_dir }}"]
+    recorded_files_retired: "{{ cluster_tools_retired }}"
 
 # A published name that also resolves elsewhere in PATH would shadow the real command
 # for every user, as an `alias squeue=/path/to/squeue.sh` does. Catch it
@@ -197,13 +127,15 @@
     state: absent
   when: cluster_tools_environment | length == 0
 
+# Each file keeps its mode from the source, so an example job script stays runnable;
+# a fixed 0644 took the execute bit off every one.
 - name: Publish the shared directories
   ansible.builtin.copy:
     src: "{{ item.src }}/"
     dest: "{{ item.dest }}/"
     owner: root
     group: root
-    mode: "0644"
+    mode: preserve
     directory_mode: "0755"
   loop: "{{ cluster_tools_shared_dirs }}"
   loop_control:

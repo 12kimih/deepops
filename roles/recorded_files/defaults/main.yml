@@ -1,0 +1,8 @@
+---
+# recorded_files -- what a role published into directories others write too, remembered
+# so that a name dropped from the set leaves the host. See tasks/main.yml.
+recorded_files_record: ""  # absolute path of the record, outside the directories
+recorded_files_names: []  # the names published now
+recorded_files_dirs: []  # each name lives in every one of these directories
+# Names published before the record existed; removed when present, skipped otherwise.
+recorded_files_retired: []
