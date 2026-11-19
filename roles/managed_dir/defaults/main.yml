@@ -2,6 +2,9 @@
 # managed_dir -- a directory that holds exactly a given set of files. See tasks/main.yml.
 managed_dir_path: ""
 managed_dir_sources: []  # controller paths; resolve globs in the caller (see tasks/main.yml)
+# An empty source list empties the directory; it is refused unless this says it is meant
+# (a site may configure no parts at all), as it usually is a glob that matched nothing.
+managed_dir_allow_empty: false
 managed_dir_template: false  # true renders each source as a Jinja template
 managed_dir_owner: root
 managed_dir_group: root

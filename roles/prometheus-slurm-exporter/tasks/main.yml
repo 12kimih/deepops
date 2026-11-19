@@ -46,6 +46,12 @@
     mode: "0644"
   when: slurm_exporter_build_image
 
+# Resolved here: inside the included managed_dir role, role_path names that role.
+- name: Collect the exporter source
+  ansible.builtin.set_fact:
+    slurm_exporter_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"
+  when: slurm_exporter_build_image
+
 # The source directory holds exactly the role's files: a Go file dropped from the role
 # would otherwise stay in the build context and still be compiled in.
 - name: Copy exporter source
@@ -53,7 +59,7 @@
     name: managed_dir
   vars:
     managed_dir_path: "{{ slurm_exporter_build_dir }}/exporter"
-    managed_dir_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"
+    managed_dir_sources: "{{ slurm_exporter_sources }}"
   when: slurm_exporter_build_image
 
 # The image carries a hash of the context it was built from, and is rebuilt whenever
@@ -62,8 +68,7 @@
 - name: Hash the image build context
   ansible.builtin.set_fact:
     slurm_exporter_context_hash: >-
-      {{ query('ansible.builtin.file', role_path ~ '/files/docker/Dockerfile',
-               *(query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort))
+      {{ query('ansible.builtin.file', role_path ~ '/files/docker/Dockerfile', *slurm_exporter_sources)
          | join('\0') | hash('sha256') }}
   when: slurm_exporter_build_image
 

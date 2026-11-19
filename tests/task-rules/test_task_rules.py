@@ -34,6 +34,9 @@
    but not those of the role that included it, and include_role is private by
    default: `managed_dir_path: "{{ prometheus_config_dir }}/rules"` was undefined
    inside managed_dir when the playbook included prometheus privately.
+   For the same reason an include's vars never use role_path or a relative file
+   lookup: inside the included role they name that role. They are resolved with a
+   set_fact in the caller first.
 12. A loop over the output lines of a script task drops the blank ones (`| map('trim')
    | select`): the script module runs under a terminal, so its output carries carriage
    returns and blank lines, and a blank item fails the task (`item.split()[0]`).
@@ -401,6 +404,22 @@ class TaskRules(unittest.TestCase):
                     if re.search(rf"\b{re.escape(var)}\.stdout_lines\b", loop) and "select" not in loop:
                         offenders.append(f"{rel(path)}: {task.get('name')}: loops over {var}.stdout_lines")
         self.assertEqual(offenders, [], "filter the lines: | map('trim') | select | list")
+        scan.check(self)
+
+    def test_include_vars_name_nothing_relative_to_a_role(self):
+        # An include's vars are evaluated inside the included role, where role_path and
+        # relative file lookups name that role: managed_dir_sources globbed
+        # roles/managed_dir/files/exporter, found nothing and emptied the build context.
+        relative = re.compile(
+            r"\brole_path\b|\b(?:lookup|query)\(\s*'(?:ansible\.builtin\.)?(?:file|fileglob|template|first_found)'"
+        )
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, _ = module(task)
+                if name in ("include_role", "import_role") and relative.search(str(task.get("vars", ""))):
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "resolve it with a set_fact before the include (see rule 11)")
         scan.check(self)
 
     def test_roles_that_need_their_dependencies_are_included_publicly(self):
