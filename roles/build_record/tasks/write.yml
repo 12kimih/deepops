@@ -3,7 +3,7 @@
 - name: Record what the install was built from ({{ build_record_path | basename }})
   ansible.builtin.copy:
     dest: "{{ build_record_path }}"
-    content: "{{ build_record_key }}\n"
+    content: "{{ build_record_key | trim }}\n"
     owner: root
     group: root
     mode: "0644"

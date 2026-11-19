@@ -17,14 +17,14 @@
 #       tasks_from: write
 #     vars: {build_record_path: ..., build_record_key: ...}
 #     when: nhc_build
-# A stale record is removed at once, so an install that stops part-way is redone on
-# the next run even when the key did not change (a forced rebuild).
+# A stale record is marked incomplete at once, so an install that stops part-way is
+# redone on the next run even when the key did not change (a forced rebuild).
 - name: Require an absolute record and a one-line key
   ansible.builtin.assert:
     that:
       - build_record_path is match('/')
-      - build_record_key | length > 0
-      - build_record_key is not search('\n')
+      - build_record_key | trim | length > 0
+      - build_record_key | trim is not search('\n')
       - build_record_installed | reject('match', '/') | list == []
     fail_msg: build_record needs an absolute build_record_path, a one-line key and absolute installed paths.
     quiet: true
@@ -50,14 +50,26 @@
     build_record_adopted: "{{ not build_record_force | bool and not _missing and _adopt }}"
   vars:
     _missing: "{{ build_record_files.results | rejectattr('stat.exists') | list | length > 0 }}"
-    _differs: "{{ (build_record_read.stdout | trim) != build_record_key }}"
+    _differs: "{{ (build_record_read.stdout | trim) != (build_record_key | trim) }}"
     _adopt: "{{ build_record_read.rc != 0 and build_record_adopt | bool }}"
 
-- name: Remove the stale record {{ build_record_path }}
-  ansible.builtin.file:
-    path: "{{ build_record_path }}"
-    state: absent
+# mkdir, not the file module: an existing directory keeps its mode.
+- name: Create the directory of {{ build_record_path }}
+  ansible.builtin.command:
+    argv: [mkdir, -p, -m, "0755", "{{ build_record_path | dirname }}"]
+    creates: "{{ build_record_path | dirname }}"
   when: build_record_stale | bool
+
+# Marked rather than removed: no record at all is what adoption takes for an install
+# from before records, which an interrupted install is not.
+- name: Mark the install incomplete until it is redone ({{ build_record_path | basename }})
+  ansible.builtin.copy:
+    dest: "{{ build_record_path }}"
+    content: "incomplete\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: build_record_stale | bool and not ansible_check_mode
 
 - name: Record an install from before records
   ansible.builtin.include_tasks: write.yml
