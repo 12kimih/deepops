@@ -6,9 +6,9 @@ func TestParseNodesCountsEachNodeOnce(t *testing.T) {
 	// n1 is in two partitions: listed twice, counted once, its CPUs once.
 	input := "n1|mixed|4/12/0/16\nn1|mixed|4/12/0/16\nn2|drained*|0/0/16/16\n" +
 		"n3|idle~|0/16/0/16\nn4|planned|0/16/0/16\nn5|allocated#|16/0/0/16\n\n"
-	states, cpus, err := ParseNodes(input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	states, cpus, bad := ParseNodes(input)
+	if bad != 0 {
+		t.Fatalf("unexpected bad lines: %d", bad)
 	}
 	expect := map[string]float64{"mix": 1, "drain": 1, "idle": 1, "other": 1, "alloc": 1, "down": 0}
 	for k, v := range expect {
@@ -19,8 +19,10 @@ func TestParseNodesCountsEachNodeOnce(t *testing.T) {
 	if cpus["alloc"] != 20 || cpus["idle"] != 44 || cpus["other"] != 16 || cpus["total"] != 80 {
 		t.Errorf("bad cpus: %+v", cpus)
 	}
-	if _, _, err := ParseNodes("garbage\n"); err == nil {
-		t.Error("expected error on malformed input")
+	// One unreadable line is skipped and counted; the other nodes still count.
+	states, cpus, bad = ParseNodes("garbage\nn9|idle|N/A\nn1|idle|0/8/0/8\n")
+	if bad != 2 || states["idle"] != 1 || cpus["total"] != 8 {
+		t.Errorf("bad=%d states=%+v cpus=%+v", bad, states, cpus)
 	}
 }
 

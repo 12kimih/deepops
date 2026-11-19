@@ -150,6 +150,12 @@
   tags:
     - config
 
+# Commands run here too; a dangling required pyxis entry would break them after a rebuild.
+- name: Drop a dangling pyxis plugstack entry
+  ansible.builtin.include_tasks: plugstack.yml
+  tags:
+    - always
+
 - name: Configure slurmdbd.conf
   diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:

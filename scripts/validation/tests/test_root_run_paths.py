@@ -9,6 +9,7 @@ own), and it is a file root never runs.
 """
 
 from pathlib import Path
+import tempfile
 import unittest
 
 import yaml
@@ -50,24 +51,22 @@ def slurm_owned_config_paths(path):
 class RootRunPathTests(unittest.TestCase):
     def test_nothing_under_the_slurm_config_dir_is_slurms(self):
         found = {}
-        for path in sorted(ROOT.glob("roles/*/tasks/*.yml")):
+        for path in sorted(ROOT.glob("roles/*/tasks/**/*.yml")):
             names = list(slurm_owned_config_paths(path))
             if names:
                 found[str(path.relative_to(ROOT))] = names
         self.assertEqual(found, {}, "make these root's: slurmd runs what lives there as root")
 
     def test_the_check_sees_a_slurm_owned_prolog_dir(self):
-        bad = ROOT / "scripts/validation/tests/.root-run-sample.yml"
-        bad.write_text(
-            "- name: parts\n  ansible.builtin.include_role: {name: managed_dir}\n"
-            "  vars: {managed_dir_path: '{{ slurm_config_dir }}/prolog.d', managed_dir_owner: slurm}\n"
-            "- name: dirs\n  ansible.builtin.file: {path: '{{ item }}', state: directory, owner: slurm}\n"
-            "  loop: ['{{ slurm_config_dir }}', /var/log/slurm]\n"
-        )
-        try:
+        with tempfile.TemporaryDirectory() as d:  # never in the shared working tree
+            bad = Path(d) / "sample.yml"
+            bad.write_text(
+                "- name: parts\n  ansible.builtin.include_role: {name: managed_dir}\n"
+                "  vars: {managed_dir_path: '{{ slurm_config_dir }}/prolog.d', managed_dir_owner: slurm}\n"
+                "- name: dirs\n  ansible.builtin.file: {path: '{{ item }}', state: directory, owner: slurm}\n"
+                "  loop: ['{{ slurm_config_dir }}', /var/log/slurm]\n"
+            )
             self.assertEqual(list(slurm_owned_config_paths(bad)), ["parts", "dirs"])
-        finally:
-            bad.unlink()
 
 
 if __name__ == "__main__":

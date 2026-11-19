@@ -20,7 +20,10 @@ from clustertools import cli, proc, slurm  # noqa: E402
 SOURCES = list(ROLES.glob("cluster_tools_lib/files/**/*.py"))
 READER = ROLES / "cluster_tools_lib/files/clustertools/slurm.py"
 PROC = ROLES / "cluster_tools_lib/files/clustertools/proc.py"
-SLURM = ("scontrol", "squeue", "sinfo", "sacctmgr", "sacct", "scancel", "sprio", "sshare")
+SLURM = (
+    "scontrol", "squeue", "sinfo", "sacctmgr", "sacct", "scancel", "sprio", "sshare", "srun", "sbatch",
+    "salloc", "sstat", "sdiag", "sreport", "scrontrol", "strigger", "sattach",
+)  # fmt: skip
 
 
 class BoundaryTests(unittest.TestCase):
@@ -31,7 +34,9 @@ class BoundaryTests(unittest.TestCase):
             for p in SOURCES
             if p != PROC
             for n, line in enumerate(p.read_text().splitlines(), 1)
-            if re.search(r"\b(subprocess|os\.system|os\.popen|os\.exec\w*|os\.spawn\w*)\b", line)
+            if re.search(
+                r"(subprocess|os\.system|os\.popen|os\.exec\w*|os\.spawn\w*|os\.posix_spawn\w*)\b", line
+            )
         ]
         self.assertEqual(offenders, [], "start processes with clustertools.proc.run, which is bounded")
 
@@ -46,7 +51,8 @@ class BoundaryTests(unittest.TestCase):
         wherever it is built: on the proc.run line or before it."""
         for node in ast.walk(tree):
             first = node.elts[0] if isinstance(node, (ast.List, ast.Tuple)) and node.elts else None
-            if isinstance(first, ast.Constant) and first.value in SLURM:
+            # A bare name or an absolute path to one (/usr/bin/scancel).
+            if isinstance(first, ast.Constant) and str(first.value).rsplit("/", 1)[-1] in SLURM:
                 yield node.lineno
 
     def test_only_the_reader_calls_slurm(self):
@@ -61,8 +67,10 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(offenders, [], "call Slurm through clustertools.slurm.run")
 
     def test_the_check_sees_an_argv_built_apart(self):
-        tree = ast.parse('argv = ["scancel", job]\nproc.run(argv, timeout=5)\nx = ("sinfo",)\n')
-        self.assertEqual(list(self.slurm_argvs(tree)), [1, 3])
+        tree = ast.parse(
+            'argv = ["scancel", job]\nproc.run(argv, timeout=5)\nx = ("sinfo",)\ny = ["/usr/bin/srun"]\n'
+        )
+        self.assertEqual(list(self.slurm_argvs(tree)), [1, 3, 4])
 
     def test_the_reader_bounds_every_call(self):
         calls = [
