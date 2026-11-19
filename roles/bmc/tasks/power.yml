@@ -22,6 +22,30 @@
   tags:
     - power
 
+# Powering off or resetting the machine running Ansible kills the run halfway and may
+# leave nobody able to power it back on.
+- name: Find out whether this host is the machine running Ansible
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: runs_ansible.yml
+    apply:
+      tags: [power]
+  when: bmc_power_action not in ["status", "on"]
+  tags:
+    - power
+
+- name: Refuse a power action on the machine running Ansible
+  ansible.builtin.assert:
+    that: not maintenance_runs_ansible | default(false) | bool
+    fail_msg: >-
+      {{ inventory_hostname }} runs this playbook; chassis power {{ bmc_power_action }}
+      would cut the run off. Leave it out of hostlist, or run the playbook from another
+      machine.
+    quiet: true
+  when: bmc_power_action not in ["status", "on"]
+  tags:
+    - power
+
 - name: "Chassis power {{ bmc_power_action }}"
   ansible.builtin.command:
     argv: ["ipmitool", "-I", "lanplus", "-C", "{{ bmc_cipher_suite }}", "-H", "{{ bmc_ipaddr }}", "-U", "{{ bmc_user_name }}", "-E", "chassis", "power", "{{ bmc_power_action }}"]

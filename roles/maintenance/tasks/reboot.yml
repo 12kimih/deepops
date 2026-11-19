@@ -8,17 +8,15 @@
 # cannot be rebooted by the play: the reboot kills the run halfway. Its reboot is left
 # pending (/var/run/reboot-required, reported by the os_updates metrics) for its
 # operator to do once the run has finished.
-- name: Read whether this host is the machine running Ansible
-  ansible.builtin.slurp:
-    src: /etc/machine-id
-  register: maintenance_machine_id
+- name: Find out whether this host is the machine running Ansible
+  ansible.builtin.include_tasks: runs_ansible.yml
   when: maintenance_force_reboot | bool or maintenance_reboot_required.stat.exists
 
 - name: Note whether this host is the machine running Ansible
   ansible.builtin.set_fact:
     maintenance_reboot_self: >-
-      {{ maintenance_machine_id is not skipped
-         and (maintenance_machine_id.content | b64decode | trim) == (lookup('ansible.builtin.file', '/etc/machine-id') | trim) }}
+      {{ (maintenance_force_reboot | bool or maintenance_reboot_required.stat.exists)
+         and maintenance_runs_ansible | default(false) | bool }}
 
 - name: Leave the reboot of the machine running Ansible to its operator
   when: maintenance_reboot_self | bool
