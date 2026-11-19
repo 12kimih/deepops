@@ -31,18 +31,32 @@
     manager: apt
   when: nvidia_driver_purge_existing | bool
 
+# A switch: the target is not installed, or (NVIDIA repo, whose package name carries no
+# branch) the installed one is of another branch. A new pin alone never replaces an
+# installed nvidia-open, so a switch removes the old driver and installs afresh.
+- name: Decide whether the driver switches (Ubuntu)
+  ansible.builtin.set_fact:
+    nvidia_driver_switch: >-
+      {{ (nvidia_driver_target_package | trim) not in ansible_facts.packages
+         or (nvidia_driver_install_method == 'nvidia_repo'
+             and ansible_facts.packages[nvidia_driver_target_package | trim][0].version is not match(nvidia_driver_branch ~ '\\.')) }}
+  when: nvidia_driver_purge_existing | bool
+
+# The Canonical archive's precompiled modules (linux-modules-, linux-objects-,
+# linux-signatures-nvidia-*) go too, or the old branch's module stays on disk.
 - name: Find pre-existing NVIDIA driver packages (Ubuntu)
   ansible.builtin.shell:
     cmd: >-
-      dpkg-query -W -f='${Package}\n' 2>/dev/null
-      | grep -E '^(nvidia-|libnvidia-)'
+      dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null
+      | awk '$1 ~ /^[ih]i/ {print $2}'
+      | grep -E '^(nvidia-|libnvidia-|linux-(modules|objects|signatures)-nvidia-)'
       | grep -vE 'container' || true
   register: nvidia_driver_existing_packages
   changed_when: false
   check_mode: false
   when:
     - nvidia_driver_purge_existing | bool
-    - (nvidia_driver_target_package | trim) not in ansible_facts.packages
+    - nvidia_driver_switch | bool
 
 - name: Remove the other NVIDIA driver packages (Ubuntu)
   ansible.builtin.include_tasks: purge.yml
@@ -86,9 +100,11 @@
 # --- Fabric Manager (opt-in, NVSwitch HGX) -----------------------------------
 - name: Install NVIDIA Fabric Manager and NSCQ (Ubuntu)
   ansible.builtin.apt:
-    name:
-      - "nvidia-fabricmanager-{{ nvidia_driver_branch }}"
-      - "libnvidia-nscq-{{ nvidia_driver_branch }}"
+    name: "{{ ['nvidia-fabricmanager', 'libnvidia-nscq'] | map('regex_replace', '$', _suffix) | list }}"
     state: present
     update_cache: true
+  vars:
+    # NVIDIA's repo drops the branch from these names from the 590 series on (the pin
+    # selects the branch); the Canonical archive keeps it.
+    _suffix: "{{ '' if nvidia_driver_install_method == 'nvidia_repo' and nvidia_driver_branch | int >= 590 else '-' ~ nvidia_driver_branch }}"
   when: nvidia_driver_fabricmanager | bool
