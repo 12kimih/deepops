@@ -18,8 +18,6 @@ open_ondemand_packages:
 # Apache modules the generated portal config and the proxied services need.
 open_ondemand_apache_modules: [ssl, rewrite, headers, proxy, proxy_http, proxy_wstunnel, lua, auth_openidc]
 open_ondemand_portal_generator: /opt/ood/ood-portal-generator/sbin/update_ood_portal
-open_ondemand_keyring: /etc/apt/keyrings/ondemand-web.asc
-open_ondemand_nodejs_keyring: /etc/apt/keyrings/nodesource.asc
 # What this component installs, for its record (roles/component_record). apache2 comes
 # with ondemand as a dependency and stays when the component goes (other sites may use
 # it); /etc/ood and the generated Apache config go with the ondemand package's purge.
@@ -27,9 +25,8 @@ open_ondemand_items: >-
   {{ ['package:ondemand', 'package:ondemand-dex', 'package:ondemand-nginx', 'package:ondemand-passenger',
       'package:nodejs', 'package:libapache2-mod-auth-openidc',
       'file:/etc/apt/sources.list.d/ondemand-web.sources', 'file:/etc/apt/sources.list.d/nodesource.sources',
-      'file:' ~ open_ondemand_keyring, 'file:' ~ open_ondemand_nodejs_keyring,
-      'file:/var/cache/deepops/open-ondemand/ondemand.asc', 'file:/var/cache/deepops/open-ondemand/nodesource.asc',
-      'dir:/var/cache/deepops/open-ondemand',
+      'file:/etc/apt/keyrings/ondemand-web.asc', 'file:/etc/apt/keyrings/nodesource.asc',
+      'file:/var/cache/deepops/package-repos/ondemand-web.key', 'file:/var/cache/deepops/package-repos/nodesource.key',
       'file:' ~ open_ondemand_tls_dir ~ '/fullchain.pem', 'file:' ~ open_ondemand_tls_dir ~ '/privkey.pem',
       'dir:' ~ open_ondemand_tls_dir, 'file:/usr/local/sbin/open-ondemand-dpkg-verify']
      + (['unit:open-ondemand-tls-metrics.timer', 'unit:open-ondemand-tls-metrics.service',

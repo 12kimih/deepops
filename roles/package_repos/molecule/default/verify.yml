@@ -1,0 +1,21 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Look for every file the repository had
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/apt/sources.list.d/nodesource.sources
+        - /etc/apt/sources.list.d/nodesource.list
+        - /etc/apt/keyrings/nodesource.asc
+        - /etc/apt/preferences.d/nodesource.pref
+        - /var/cache/deepops/package-repos/nodesource.key
+      register: repos_files
+
+    - name: Check nothing of it is left
+      ansible.builtin.assert:
+        that: repos_files.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: "{{ repos_files.results | selectattr('stat.exists') | map(attribute='item') | list | join(', ') }}"
