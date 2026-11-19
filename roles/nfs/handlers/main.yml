@@ -1,17 +1,13 @@
 ---
-- name: Restart rpcbind
-  ansible.builtin.service:
-    name: rpcbind
-    state: restarted
-
 - name: Reload systemd
   ansible.builtin.systemd:
     daemon_reload: true
 
-- name: Restart nfs
-  ansible.builtin.service:
-    name: "{{ nfs_server_daemon }}"
-    state: restarted
+# Live, without a restart: a running nfsd changes its thread count in place.
+- name: Apply nfsd thread count
+  ansible.builtin.command:
+    cmd: rpc.nfsd {{ nfs_server_threads | int }}
+  changed_when: true
 
 # exports(5) changes take effect with exportfs -ra, without restarting nfsd: a restart
 # drops every client's state and has hung nfsd before. Restart nfs is for nfsd's own

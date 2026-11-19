@@ -19,14 +19,13 @@
   tags:
     - nfs
 
+# Starting statd needs nothing else restarted, and a restart of nfs-server on a live
+# server can hang nfsd and every client with it.
 - name: Ensure statd is enabled
   ansible.builtin.service:
     name: rpc-statd
     enabled: true
     state: started
-  notify:
-    - Restart rpcbind
-    - Restart nfs
   tags:
     - nfs
 
@@ -43,8 +42,9 @@
     - nfs
 
 # threads= in the [nfsd] section of /etc/nfs.conf is the modern nfs-utils knob
-# (equivalent to the legacy RPCNFSDCOUNT). A restart applies it; verify with
-# `cat /proc/fs/nfsd/threads`. https://man7.org/linux/man-pages/man8/rpc.nfsd.8.html
+# (equivalent to the legacy RPCNFSDCOUNT); boots read it. A running nfsd takes the new
+# count from `rpc.nfsd N`, without a restart; verify with `cat /proc/fs/nfsd/threads`.
+# https://man7.org/linux/man-pages/man8/rpc.nfsd.8.html
 - name: Configure nfsd thread count
   community.general.ini_file:
     path: /etc/nfs.conf
@@ -53,7 +53,7 @@
     value: "{{ nfs_server_threads }}"
     mode: "0644"
   when: nfs_exports | length > 0
-  notify: Restart nfs
+  notify: Apply nfsd thread count
   tags:
     - nfs
 
