@@ -38,6 +38,7 @@
     owner: "root"
     group: "root"
     mode: "0600"
+  register: standalone_container_registry_config
 
 - name: Trust GPG key for EPEL
   ansible.builtin.rpm_key:
@@ -63,8 +64,9 @@
     image: "{{ standalone_container_registry_image }}"
     state: started
     network_mode: host
-    # restart_policy gives boot persistence; a forced restart on every run would
-    # bounce the container needlessly, so it is intentionally omitted.
+    # The registry reads its mounted config only at start: restart when it changed
+    # (a new image already recreates the container). restart_policy keeps it across boots.
+    restart: "{{ standalone_container_registry_config is changed }}"
     restart_policy: unless-stopped
     env: "{{ proxy_env if proxy_env is defined else {} }}"
     volumes:
