@@ -4,4 +4,4 @@
   ansible.builtin.service:
     name: "{{ nvidia_dcgm_svc_name }}"
     state: restarted
-  when: nvidia_dcgm_state == 'started'
+  when: dcgm_exporter_service_state == 'started'

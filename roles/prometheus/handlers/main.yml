@@ -5,7 +5,7 @@
   ansible.builtin.service:
     name: "{{ prometheus_svc_name }}"
     state: restarted
-  when: prometheus_state == 'started'
+  when: prometheus_service_state == 'started'
 
 # SIGHUP reloads the configuration, as the docs describe; the HTTP /-/reload would need
 # --web.enable-lifecycle, which also serves an unauthenticated /-/quit. Retries cover a
@@ -18,4 +18,4 @@
   retries: 10
   delay: 3
   changed_when: true
-  when: prometheus_state == 'started'
+  when: prometheus_service_state == 'started'

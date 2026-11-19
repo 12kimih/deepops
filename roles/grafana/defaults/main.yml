@@ -5,8 +5,8 @@ grafana_data_dir: /var/lib/grafana
 grafana_user_id: 472
 grafana_container: "grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf"
 grafana_svc_name: "docker.grafana.service"
-grafana_state: started
-grafana_enabled: true
+grafana_service_state: started
+grafana_service_enabled: true
 grafana_port: 3000
 # The address Grafana listens on ("" every address). Behind a reverse proxy on the same
 # host (Open OnDemand), 127.0.0.1, so the proxy is the only way in.

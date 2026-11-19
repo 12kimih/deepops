@@ -58,6 +58,6 @@
 - name: Configure service
   ansible.builtin.systemd:
     name: "{{ alertmanager_svc_name }}"
-    state: "{{ alertmanager_state }}"
-    enabled: "{{ alertmanager_enabled }}"
+    state: "{{ alertmanager_service_state }}"
+    enabled: "{{ alertmanager_service_enabled }}"
     daemon_reload: true

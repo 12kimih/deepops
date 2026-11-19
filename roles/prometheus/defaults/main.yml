@@ -3,8 +3,8 @@ prometheus_config_src: templates/prometheus.yml.j2
 prometheus_container: "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06"
 prometheus_svc_name: "docker.prometheus.service"
 prometheus_docker_volume_name: "deepops_prometheus_metrics"
-prometheus_state: started
-prometheus_enabled: true
+prometheus_service_state: started
+prometheus_service_enabled: true
 
 prometheus_cfg_evaluation_interval: 15s
 

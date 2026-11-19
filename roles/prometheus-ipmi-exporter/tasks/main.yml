@@ -67,6 +67,6 @@
     - name: Configure service
       ansible.builtin.systemd:
         name: "{{ ipmi_exporter_svc_name }}"
-        state: "{{ ipmi_exporter_state }}"
-        enabled: "{{ ipmi_exporter_enabled }}"
+        state: "{{ ipmi_exporter_service_state }}"
+        enabled: "{{ ipmi_exporter_service_enabled }}"
         daemon_reload: true

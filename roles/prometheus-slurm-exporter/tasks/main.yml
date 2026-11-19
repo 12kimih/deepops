@@ -106,7 +106,7 @@
 - name: Configure service
   ansible.builtin.systemd:
     name: "{{ slurm_exporter_svc_name }}"
-    state: "{{ slurm_exporter_state }}"
-    enabled: "{{ slurm_exporter_enabled }}"
+    state: "{{ slurm_exporter_service_state }}"
+    enabled: "{{ slurm_exporter_service_enabled }}"
     daemon_reload: true
   notify: Restart slurm-exporter

@@ -63,6 +63,6 @@
 - name: Configure service
   ansible.builtin.systemd:
     name: "{{ prometheus_svc_name }}"
-    state: "{{ prometheus_state }}"
-    enabled: "{{ prometheus_enabled }}"
+    state: "{{ prometheus_service_state }}"
+    enabled: "{{ prometheus_service_enabled }}"
     daemon_reload: true
