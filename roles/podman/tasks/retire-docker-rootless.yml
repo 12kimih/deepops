@@ -1,0 +1,38 @@
+---
+# What the retired docker-rootless role installed outside users' homes. Users' own
+# daemon state (/var/tmp/docker-container-storage-UID, /var/tmp/xdg_runtime_dir_UID)
+# is theirs to delete.
+- name: Remove the docker-rootless login scripts and boot settings
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/profile.d/00-rootlessdocker-modulepath.sh
+    - /etc/profile.d/00-rootlessdocker-modulepath.csh
+    - /etc/profile.d/z96_rootlessdocker_modules.sh
+    - /etc/sysctl.d/51-rootless.conf
+    - /etc/modules-load.d/br_netfilter.conf
+    - /var/cache/deepops/rootless_docker_setup.sh
+
+# The tree is on the shared software prefix. Over NFS (root squashed) a client cannot
+# remove it, so only a host where it is local does: the NFS server.
+- name: Find the docker-rootless install tree
+  ansible.builtin.stat:
+    path: "{{ podman_retired_docker_rootless_dir }}"
+  register: podman_docker_rootless_tree
+
+- name: Read the filesystem type under the docker-rootless tree
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, FSTYPE, --target, "{{ podman_retired_docker_rootless_dir }}"]
+  register: podman_docker_rootless_fstype
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: podman_docker_rootless_tree.stat.exists
+
+- name: Remove the docker-rootless install tree where it is local
+  ansible.builtin.file:
+    path: "{{ podman_retired_docker_rootless_dir }}"
+    state: absent
+  when:
+    - podman_docker_rootless_tree.stat.exists
+    - podman_docker_rootless_fstype.stdout | trim is not match('nfs|cifs|smb|fuse|lustre|gpfs|beegfs')

@@ -136,3 +136,17 @@ Ubuntu 24.04):
 
 Changing `podman_subid_base` or `podman_subid_count` moves every range; users then
 need `podman system migrate` (or `podman system reset -f`) on each node.
+
+### Replacing docker-rootless
+
+The docker-rootless role is retired: it piped an unpinned installer from the network
+into a root shell. `rootlessdocker_install_dir` is a retired setting, and a deploy
+that still sets it stops. The first play of `playbooks/container/podman.yml` runs on
+every `slurm-cluster` host, whatever `slurm_install_podman` says, and removes what
+the role installed: its `/etc/profile.d` scripts, `/etc/sysctl.d/51-rootless.conf`,
+`/etc/modules-load.d/br_netfilter.conf`, and the install tree
+(`<sm_software_path>/rootless-docker`). The tree sits on the shared software
+filesystem, which NFS clients cannot remove as root, so only the host where it is
+local (the NFS server) removes it. Users' old daemon state under
+`/var/tmp/docker-container-storage-<UID>` and `/var/tmp/xdg_runtime_dir_<UID>` is
+left to them.

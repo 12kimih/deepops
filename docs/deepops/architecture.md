@@ -95,7 +95,6 @@ reader writes `| default(...)` for a defined variable;
 │   ├── dns-config
 │   ├── docker
 │   ├── docker-login
-│   ├── docker-rootless
 │   ├── docker_daemon_json
 │   ├── docker_socket_group
 │   ├── download

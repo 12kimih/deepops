@@ -162,9 +162,10 @@
   tags:
     - pyxis
 
+# Not gated as a whole: its first play removes the retired docker-rootless; the role
+# itself is switched by slurm_install_podman.
 - name: Install rootless Podman for image builds
   import_playbook: container/podman.yml
-  when: slurm_install_podman
   tags:
     - podman
 
