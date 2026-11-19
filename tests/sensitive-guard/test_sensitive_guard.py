@@ -65,7 +65,7 @@ class GuardTest(unittest.TestCase):
         run = subprocess.run(
             [sys.executable, str(GUARD), *args],
             cwd=self.repo,
-            input=stdin,
+            input=stdin if stdin is not None else "",
             text=True,
             capture_output=True,
             env={**os.environ, **(env or {})},
@@ -128,10 +128,35 @@ class GuardTest(unittest.TestCase):
 
     def test_message(self):
         msg = self.repo / "MSG"
-        msg.write_text("feat: thing\n# 48123 in a comment is ignored\n")
-        self.assertEqual(self.guard("message", str(msg))[0], 0)
         msg.write_text("feat: open port 48123\n")
         self.assertEqual(self.guard("message", str(msg))[0], 1)
+        # -m "#..." keeps the line in the commit, so a "#" line is message too.
+        msg.write_text("fix\n\n#48123 was down\n")
+        self.assertEqual(self.guard("message", str(msg))[0], 1)
+        # Below the scissors is the diff `commit -v` shows: a line it removes is no leak.
+        msg.write_text("fix: generic\n# ------------------------ >8 ------------------------\n-port 48123\n")
+        self.assertEqual(self.guard("message", str(msg))[0], 0)
+
+    def test_renamed_binary_and_plus_lines(self):
+        self.commit("other", {"other.txt": "x\n"})
+        self.git("mv", "other.txt", f"{SITE_HOST}.txt")
+        code, out = self.guard("staged")
+        self.assertEqual((code, "(file name)" in out), (1, True), "a pure rename keeps its new name")
+        self.git("reset", "-q", "--hard")
+        (self.repo / "blob.dat").write_bytes(b"\x00\x01" + f"host {SITE_HOST} here".encode() + b"\x00")
+        self.git("add", "blob.dat")
+        code, out = self.guard("staged")
+        self.assertEqual((code, "blob.dat (binary)" in out), (1, True))
+        self.git("commit", "-qm", "bin")
+        self.assertEqual(self.guard("history", "HEAD", "^HEAD~1")[0], 1)
+        self.assertEqual(self.guard("tree")[0], 1)
+        self.git("rm", "-q", "blob.dat")
+        self.git("commit", "-qm", "rm")
+        # An added line that starts with "++ " is a line, not a file header.
+        (self.repo / "p.txt").write_text("++ port 48123\nfine\n")
+        self.git("add", "p.txt")
+        code, out = self.guard("staged")
+        self.assertEqual((code, "p.txt:1: site rule 3" in out), (1, True), out)
 
     def test_history_and_push(self):
         base = self.git("rev-parse", "HEAD").strip()
@@ -144,10 +169,25 @@ class GuardTest(unittest.TestCase):
         head = self.git("rev-parse", "HEAD").strip()
         stdin = f"refs/heads/main {head} refs/heads/main {base}\n"
         self.assertEqual(self.guard("push", stdin=stdin)[0], 1)
-        env = {"PRE_COMMIT_FROM_REF": base, "PRE_COMMIT_TO_REF": head}
-        self.assertEqual(self.guard("push", env=env)[0], 1)
         delete = f"(delete) {'0' * 40} refs/heads/old {base}\n"
         self.assertEqual(self.guard("push", stdin=delete)[0], 0)
+        self.assertEqual(self.guard("push")[0], 2, "no refs at all is not a clean push")
+
+    def test_push_under_pre_commit_checks_every_branch_the_remote_lacks(self):
+        # pre-commit passes on only the first ref; a leak on another branch, or on a
+        # remote that has nothing yet, must still be found.
+        remote = Path(self.tmp.name + "-remote")
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        self.git("remote", "add", "origin", str(remote))
+        self.git("push", "-q", "origin", "main")
+        self.git("fetch", "-q", "origin")
+        env = {"PRE_COMMIT_REMOTE_NAME": "origin", "PRE_COMMIT_FROM_REF": "x", "PRE_COMMIT_TO_REF": "main"}
+        self.assertEqual(self.guard("push", env=env)[0], 0)
+        self.git("checkout", "-q", "-b", "leak")
+        self.commit("leak", {"k.txt": "port 48123\n"})
+        self.git("checkout", "-q", "main")
+        self.assertEqual(self.guard("push", env=env)[0], 1)
+        self.assertEqual(self.guard("push", env=dict(env, PRE_COMMIT_REMOTE_NAME="fresh"))[0], 1)
 
     def test_tree(self):
         self.assertEqual(self.guard("tree")[0], 0)
