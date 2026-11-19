@@ -44,7 +44,6 @@
     src: docker/Dockerfile
     dest: "{{ slurm_exporter_build_dir }}/Dockerfile"
     mode: "0644"
-  register: slurm_exporter_dockerfile
   when: slurm_exporter_build_image
 
 # The source directory holds exactly the role's files: a Go file dropped from the role
@@ -57,8 +56,20 @@
     managed_dir_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"
   when: slurm_exporter_build_image
 
-- name: Check for existing exporter image
-  ansible.builtin.command: docker image inspect {{ slurm_exporter_container }}
+# The image carries a hash of the context it was built from, and is rebuilt whenever
+# that differs: decided by what the image is, not by what this run changed, so a
+# build that failed is retried on the next run instead of leaving the old image.
+- name: Hash the image build context
+  ansible.builtin.set_fact:
+    slurm_exporter_context_hash: >-
+      {{ query('ansible.builtin.file', role_path ~ '/files/docker/Dockerfile',
+               *(query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort))
+         | join('\0') | hash('sha256') }}
+  when: slurm_exporter_build_image
+
+- name: Read the context the current image was built from
+  ansible.builtin.command:
+    argv: [docker, image, inspect, --format, '{{ "{{" }} index .Config.Labels "deepops.context" {{ "}}" }}', "{{ slurm_exporter_container }}"]
   register: slurm_exporter_image_check
   failed_when: false
   changed_when: false
@@ -66,10 +77,9 @@
   when: slurm_exporter_build_image
 
 - name: Build exporter image
-  ansible.builtin.command: docker build -t {{ slurm_exporter_container }} {{ slurm_exporter_build_dir }}
-  when: >
-    slurm_exporter_build_image and
-    (slurm_exporter_image_check.rc != 0 or slurm_exporter_dockerfile.changed or managed_dir_changed | default(false))
+  ansible.builtin.command:
+    argv: [docker, build, --label, "deepops.context={{ slurm_exporter_context_hash }}", -t, "{{ slurm_exporter_container }}", "{{ slurm_exporter_build_dir }}"]
+  when: slurm_exporter_build_image and slurm_exporter_image_check.stdout | trim != slurm_exporter_context_hash
   notify: Restart slurm-exporter
 
 - name: Pull the prebuilt image
