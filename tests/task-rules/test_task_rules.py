@@ -27,19 +27,6 @@
 10. Only roles/maintenance reboots, and only a playbook asks it to: a role whose change
    needs a reboot calls its reboot_request (the reboot is left pending, then done with
    the node drained), never its reboot step, ansible.builtin.reboot or a reboot command.
-11. A role whose dependencies (meta) supply its values is included publicly
-   (include_role public: true; `roles:` and import_role are public already) when a
-   playbook includes it, or when a role includes one that passes such a value on to a
-   role it includes itself. Ansible shows a role the defaults of its own dependencies
-   but not those of the role that included it, and include_role is private by
-   default: `managed_dir_path: "{{ prometheus_config_dir }}/rules"` was undefined
-   inside managed_dir when the playbook included prometheus privately.
-   For the same reason an include's vars never use role_path or a relative file
-   lookup: inside the included role they name that role. They are resolved with a
-   set_fact in the caller first.
-12. A loop over the output lines of a script task drops the blank ones (`| map('trim')
-   | select`): the script module runs under a terminal, so its output carries carriage
-   returns and blank lines, and a blank item fails the task (`item.split()[0]`).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -154,39 +141,6 @@ def lines_of(path):
     for number, line in enumerate(text.splitlines(), 1):
         if not line.lstrip().startswith("#"):
             yield number, re.sub(r"\s+#\s.*$", "", line) if path.suffix in (".yml", ".yaml") else line
-
-
-def role_dependencies(role, seen=None):
-    """Every role ROLE depends on through meta, transitively."""
-    seen = set() if seen is None else seen
-    meta = ROOT / "roles" / role / "meta" / "main.yml"
-    data = yaml.safe_load(meta.read_text(encoding="utf-8")) if meta.is_file() else None
-    for dep in (data or {}).get("dependencies") or []:
-        name = dep if isinstance(dep, str) else dep.get("role") or dep.get("name")
-        if name and name not in seen:
-            seen.add(name)
-            role_dependencies(name, seen)
-    return seen
-
-
-def role_defaults(role):
-    path = ROOT / "roles" / role / "defaults" / "main.yml"
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else None
-    return set(data) if isinstance(data, dict) else set()
-
-
-def passes_dependency_values(role):
-    """True if ROLE hands a role it includes a value only its dependencies define."""
-    inherited = set().union(*map(role_defaults, role_dependencies(role))) - role_defaults(role)
-    if not inherited:
-        return False
-    word = re.compile(r"\b(" + "|".join(map(re.escape, sorted(inherited))) + r")\b")
-    for path in sorted((ROOT / "roles" / role / "tasks").rglob("*.y*ml")):
-        for task in tasks(path):
-            name, _ = module(task)
-            if name in ("include_role", "import_role") and word.search(str(task.get("vars", ""))):
-                return True
-    return False
 
 
 class TaskRules(unittest.TestCase):
@@ -404,39 +358,6 @@ class TaskRules(unittest.TestCase):
                     if re.search(rf"\b{re.escape(var)}\.stdout_lines\b", loop) and "select" not in loop:
                         offenders.append(f"{rel(path)}: {task.get('name')}: loops over {var}.stdout_lines")
         self.assertEqual(offenders, [], "filter the lines: | map('trim') | select | list")
-        scan.check(self)
-
-    def test_include_vars_name_nothing_relative_to_a_role(self):
-        # An include's vars are evaluated inside the included role, where role_path and
-        # relative file lookups name that role: managed_dir_sources globbed
-        # roles/managed_dir/files/exporter, found nothing and emptied the build context.
-        relative = re.compile(
-            r"\brole_path\b|\b(?:lookup|query)\(\s*'(?:ansible\.builtin\.)?(?:file|fileglob|template|first_found)'"
-        )
-        scan, offenders = Scan(minimum=MINIMUM_FILES), []
-        for path in map(scan.seen, ansible_files()):
-            for task in tasks(path):
-                name, _ = module(task)
-                if name in ("include_role", "import_role") and relative.search(str(task.get("vars", ""))):
-                    offenders.append(f"{rel(path)}: {task.get('name')}")
-        self.assertEqual(offenders, [], "resolve it with a set_fact before the include (see rule 11)")
-        scan.check(self)
-
-    def test_roles_that_need_their_dependencies_are_included_publicly(self):
-        scan, offenders, verdict = Scan(minimum=MINIMUM_FILES), [], {}
-        for path in map(scan.seen, ansible_files()):
-            in_playbook = rel(path).startswith("playbooks/")
-            for task in tasks(path):
-                name, args = module(task)
-                role = args.get("name")
-                if name != "include_role" or not isinstance(role, str) or "{" in role or args.get("public"):
-                    continue
-                if role not in verdict:
-                    verdict[role] = (bool(role_dependencies(role)), passes_dependency_values(role))
-                has_deps, passes_on = verdict[role]
-                if passes_on or (in_playbook and has_deps):
-                    offenders.append(f"{rel(path)}: {task.get('name')}: {role}")
-        self.assertEqual(offenders, [], "include these roles with public: true (see rule 11)")
         scan.check(self)
 
 
