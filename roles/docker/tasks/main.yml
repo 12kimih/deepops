@@ -71,19 +71,13 @@
          | combine({'log-driver': docker_log_driver} if docker_log_driver | length > 0 else {}) }}
 
 - name: Raise the kernel limits a container host runs into
-  ansible.posix.sysctl:
-    name: "{{ item.key }}"
-    value: "{{ item.value }}"
-    sysctl_file: /etc/sysctl.d/90-docker.conf
-    sysctl_set: true
-    state: present
-    reload: true
-  loop: "{{ docker_sysctls | dict2items }}"
-  when:
-    - docker_tune_kernel | bool
-    - ansible_facts.virtualization_type | default('') not in ['docker', 'container', 'containerd', 'podman', 'lxc', 'systemd-nspawn']
-  tags:
-    - molecule-notest
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: sysctl
+  vars:
+    host_baseline_sysctls: "{{ docker_sysctls }}"
+    host_baseline_sysctl_file: /etc/sysctl.d/90-docker.conf
+  when: docker_tune_kernel | bool
 
 - name: Prune unused images on a schedule
   when: docker_image_prune_until | length > 0
