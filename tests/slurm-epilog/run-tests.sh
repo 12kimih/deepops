@@ -1042,6 +1042,17 @@ CONF
     else
         no "the last setting wins, an unset key and a path at / are refused" "got: $got"
     fi
+    # Root clears only where no user can redirect the path; elsewhere the user does.
+    got=$(bash -c ". '$ed/lib.sh'
+        enroot_root_owned_above /usr/share/x; echo rc=\$?
+        enroot_root_owned_above '$ed/x'; echo rc=\$?
+        ln -s /usr '$ed/link'; enroot_root_owned_above '$ed/link/share/x'; echo rc=\$?" 2>&1 | tr '\n' ' ')
+    want="rc=0 rc=1 rc=1 "
+    if [ "$got" = "$want" ]; then
+        ok "root clears only a path whose every parent is a real root-owned directory"
+    else
+        no "root clears only a path whose every parent is a real root-owned directory" "got: $got"
+    fi
 else
     no "enroot-paths.sh renders" "render failed"
 fi

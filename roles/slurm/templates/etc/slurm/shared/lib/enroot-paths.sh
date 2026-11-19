@@ -27,11 +27,30 @@ enroot_owned_dir() {
     [ -d "$1" ] && [ ! -L "$1" ] && [ "$(stat -c %u -- "$1")" = "$SLURM_JOB_UID" ]
 }
 
-# enroot_clear PATH: remove what is at PATH as root without following a symlink or
-# crossing a mount (a user's FUSE mount left inside). The parents are world-writable,
-# so whatever is there may be another user's plant; nothing in it is trusted or kept.
+# enroot_root_owned_above PATH: every directory above PATH is a real directory root owns,
+# so no user can redirect PATH (a symlinked parent would turn `rm` into removing
+# whatever root-owned directory it points into).
+enroot_root_owned_above() {
+    local dir
+    dir=$(dirname -- "$1")
+    while :; do
+        [ -d "$dir" ] && [ ! -L "$dir" ] && [ "$(stat -c %u -- "$dir")" = 0 ] || return 1
+        [ "$dir" = / ] && return 0
+        dir=$(dirname -- "$dir")
+    done
+}
+
+# enroot_clear PATH: remove what is at PATH without following a symlink or crossing a
+# mount (a user's FUSE mount left inside). Under a world-writable root-owned parent
+# (the defaults) whatever is there may be another user's plant, so root removes it,
+# and only when every directory above is root's. Anywhere else (a ${HOME} path) the
+# job user removes it, which can reach nothing they could not remove themselves.
 enroot_clear() {
-    rm -rf --one-file-system -- "$1"
+    if enroot_root_owned_above "$1"; then
+        rm -rf --one-file-system -- "$1"
+    else
+        sudo -u "$SLURM_JOB_USER" rm -rf --one-file-system -- "$1"
+    fi
 }
 
 enroot_log() {

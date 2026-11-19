@@ -345,6 +345,23 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "pass the include's tags on with apply: {tags: [...]}")
         scan.check(self)
 
+    def test_scripts_slurmd_runs_call_slurm_by_absolute_path(self):
+        # slurmd's PATH lacks a custom slurm_install_prefix: a bare scontrol in an epilog
+        # failed there, and a node with residual GPU processes was never drained.
+        bare = re.compile(r"(?<![\w/${}.-])(scontrol|squeue|sinfo|sacct|scancel|srun|sbatch)\s")
+        scan, offenders = Scan(minimum=10), []
+        base = ROOT / "roles" / "slurm" / "templates" / "etc" / "slurm"
+        for path in sorted(p for sub in ("prolog.d", "epilog.d", "shared") for p in (base / sub).rglob("*")):
+            if not path.is_file():
+                continue
+            scan.seen(path)
+            for number, line in lines_of(path):
+                code = re.sub(r"(['\"]).*?\1", "", line)  # messages may name a command
+                if bare.search(code):
+                    offenders.append(f"{rel(path)}:{number}: {line.strip()}")
+        self.assertEqual(offenders, [], "call it as {{ slurm_install_prefix }}/bin/<command>")
+        scan.check(self)
+
     def test_only_the_maintenance_role_reboots(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):
