@@ -2,6 +2,10 @@
 # Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle.
 # Runs on a host with the Slurm client commands and access to Prometheus.
 # No-op until a Slack bot token (chat:write, im:write, users:read.email) is set.
+
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+slurm_usage_report_state: present
 slack_bot_token: ""
 slurm_usage_report_token: "{{ slack_bot_token }}"
 slurm_usage_report_channel: "#gpu-usage"

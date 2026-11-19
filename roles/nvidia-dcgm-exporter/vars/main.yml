@@ -1,0 +1,8 @@
+---
+# What this component installs, for its record (roles/component_record).
+dcgm_exporter_items:
+  - "unit:{{ dcgm_exporter_svc_name }}"
+  - "container:{{ dcgm_exporter_svc_name }}"
+  - "file:/etc/systemd/system/{{ dcgm_exporter_svc_name }}"
+  - "file:{{ dcgm_exporter_config_dir }}/{{ dcgm_exporter_counters_file }}"
+  - "dir:{{ dcgm_exporter_config_dir }}"

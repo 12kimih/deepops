@@ -12,6 +12,43 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_rsyslog_client }}", group: slurm-node}
       - {switch: "{{ kube_enable_rsyslog_client }}", group: k8s_cluster}
+  # Monitoring. An entry's key is its variable prefix (<key>_state); role names the
+  # role where that differs. Prometheus scrapes each exporter where it is present.
+  prometheus:
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+  alertmanager:
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+  grafana:
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+    needs: [prometheus]
+  node_exporter:
+    role: prometheus-node-exporter
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-cluster}
+  ipmi_exporter:
+    role: prometheus-ipmi-exporter
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-cluster}
+  slurm_exporter:
+    role: prometheus-slurm-exporter
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+  dcgm_exporter:
+    role: nvidia-dcgm-exporter
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-node}
+  # Text files node_exporter publishes; the report reads Prometheus.
+  slurm_metrics:
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+    needs: [node_exporter]
+  slurm_usage_report:
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
+    needs: [prometheus]
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-

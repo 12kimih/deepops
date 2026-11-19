@@ -1,0 +1,65 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: dcgm_exporter
+    component_record_action: begin
+    component_record_items: "{{ dcgm_exporter_items }}"
+
+# Prometheus generates every exporter's scrape targets (roles/prometheus); the file this
+# role wrote on each host before goes.
+- name: Remove the scrape target file this role wrote before
+  ansible.builtin.file:
+    path: "{{ prometheus_cfg_endpoint_dir }}/dcgm-exporter.yml"
+    state: absent
+
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ dcgm_exporter_container }}"
+
+- name: Create dcgm-exporter config dir
+  ansible.builtin.file:
+    path: "{{ dcgm_exporter_config_dir }}"
+    state: directory
+    mode: "0755"
+  when: has_gpus
+
+- name: Copy metrics file
+  ansible.builtin.copy:
+    src: "{{ dcgm_exporter_counters_file }}"
+    dest: "{{ dcgm_exporter_config_dir }}/{{ dcgm_exporter_counters_file }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: has_gpus
+  notify: Restart dcgm
+
+- name: Install systemd unit file
+  ansible.builtin.template:
+    src: templates/docker.dcgm-exporter.service.j2
+    dest: "/etc/systemd/system/{{ dcgm_exporter_svc_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: has_gpus
+  notify: Restart dcgm
+
+- name: Configure service
+  ansible.builtin.systemd:
+    name: "{{ dcgm_exporter_svc_name }}"
+    state: "{{ dcgm_exporter_service_state }}"
+    enabled: "{{ dcgm_exporter_service_enabled }}"
+    daemon_reload: true
+  when: has_gpus
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: dcgm_exporter
+    component_record_action: present
+    component_record_items: "{{ dcgm_exporter_items }}"
+    component_record_version: "{{ dcgm_exporter_container | regex_replace('@.*', '') }}"

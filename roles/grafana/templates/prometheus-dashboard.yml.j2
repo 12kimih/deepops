@@ -11,4 +11,5 @@ providers:
     disableDeletion: false
     allowUiUpdates: false
     options:
-      path: {{ grafana_cfg_dashboard_path }}
+      # grafana_dashboards_dir as the container sees it (grafana_config_dir is /etc/grafana there).
+      path: /etc/grafana/{{ grafana_dashboards_dir | relpath(grafana_config_dir) }}

@@ -1,4 +1,7 @@
 ---
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+prometheus_state: present
 prometheus_config_src: templates/prometheus.yml.j2
 prometheus_container: "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06"
 prometheus_svc_name: "docker.prometheus.service"

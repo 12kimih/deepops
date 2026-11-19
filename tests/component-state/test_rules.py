@@ -37,7 +37,7 @@ def switches(name):
 
 class Registry(unittest.TestCase):
     def test_it_is_valid_and_acyclic(self):
-        self.assertEqual(components.check(REGISTRY), [])
+        self.assertEqual(components.check(REGISTRY, ROOT / "roles"), [])
         self.assertEqual(sorted(components.components_order(REGISTRY)), sorted(REGISTRY))
 
     def test_rules_name_deploy_switches(self):
@@ -58,8 +58,8 @@ class Explicit(unittest.TestCase):
 class Roles(unittest.TestCase):
     def test_each_component_role_has_state_both_paths_and_the_record(self):
         for name in REGISTRY:
-            role = ROOT / "roles" / name
-            with self.subTest(role=name):
+            role = ROOT / "roles" / components.component_role(REGISTRY, name)
+            with self.subTest(component=name):
                 defaults = yaml.safe_load((role / "defaults/main.yml").read_text())
                 self.assertEqual(defaults.get(f"{name}_state"), "present")
                 main = (role / "tasks/main.yml").read_text()
@@ -87,7 +87,8 @@ class Playbooks(unittest.TestCase):
 
     def test_component_plays_take_their_state_from_the_map(self):
         for name in REGISTRY:
-            plays = [p for p in (ROOT / "playbooks").rglob("*.yml") if f"role: {name}\n" in p.read_text()]
+            role = components.component_role(REGISTRY, name)
+            plays = [p for p in (ROOT / "playbooks").rglob("*.yml") if f"role: {role}\n" in p.read_text()]
             self.assertTrue(plays, name)
             for path in plays:
                 with self.subTest(playbook=str(path.relative_to(ROOT))):
@@ -175,6 +176,12 @@ class Desired(unittest.TestCase):
         )
         with self.assertRaises(Exception):
             phase("present", "later")
+
+    def test_component_hosts_follow_the_map(self):
+        hosts = components.component_hosts
+        self.assertEqual(hosts(self.REG, self.GROUPS, "srv"), ["m1"])
+        self.assertEqual(hosts(self.REG, self.GROUPS, "dep"), hosts(self.REG, self.GROUPS, "top"))
+        self.assertEqual(hosts(self.REG, self.GROUPS, "cli"), ["n1", "k1"], "inventory order, either deploy")
 
     def test_order_puts_needs_first(self):
         order = components.components_order(self.REG)

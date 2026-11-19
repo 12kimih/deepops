@@ -1,3 +1,0 @@
-- targets: [{{ groups[node_exporter_host_group] | zip_longest([], fillvalue=':' ~ node_exporter_port) | map('join') | join(',') }}]
-  labels:
-    module: node-exporter

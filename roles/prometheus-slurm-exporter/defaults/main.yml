@@ -1,16 +1,14 @@
 ---
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+slurm_exporter_state: present
+
 # Built locally from the bundled Dockerfile by default; set
 # slurm_exporter_build_image: false and point slurm_exporter_container at a
 # site image (repo:tag@sha256:digest) to pull a registry image instead.
 slurm_exporter_container: "deepops/prometheus-slurm-exporter:2.0.0"
 slurm_exporter_build_image: true
 slurm_exporter_build_dir: /opt/deepops/build/slurm-exporter
-# Port the slurm exporter listens on (host network; -listen-address), and its scrape target.
-slurm_exporter_port: 8080
 slurm_exporter_svc_name: "docker.slurm-exporter.service"
 slurm_exporter_service_state: started
 slurm_exporter_service_enabled: true
-
-slurm_exporter_conf_template: "slurm-exporter.yml.j2"
-
-slurm_exporter_host_group: slurm-metric

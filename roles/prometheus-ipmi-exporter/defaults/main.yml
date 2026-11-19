@@ -1,8 +1,8 @@
 ---
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+ipmi_exporter_state: present
 ipmi_exporter_container: "quay.io/prometheuscommunity/ipmi-exporter:v1.10.1@sha256:0662cadaf268b6718f0f66429047cb23566ab3e4c175f25eaf588416a7b035e8"
-ipmi_exporter_port: 9290
-# Hosts listed as scrape targets.
-ipmi_exporter_host_group: slurm-cluster
 ipmi_exporter_config_dir: /etc/ipmi-exporter
 # In-band collectors read through /dev/ipmi0. dcmi gives whole-system power draw.
 ipmi_exporter_collectors: [bmc, ipmi, chassis, dcmi, sel]
@@ -11,5 +11,3 @@ ipmi_exporter_svc_name: "docker.ipmi-exporter.service"
 ipmi_exporter_service_state: started
 ipmi_exporter_service_enabled: true
 ipmi_exporter_max_cpu: "0.2"
-
-ipmi_exporter_conf_template: "ipmi-exporter.yml.j2"

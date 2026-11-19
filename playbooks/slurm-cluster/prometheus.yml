@@ -1,13 +1,15 @@
 ---
+# The removal phase installs nothing.
 - name: Install docker
   import_playbook: ../container/docker.yml
+  when: deepops_phase != 'remove'
 
-- hosts: "{{ hostlist | default('slurm-metric') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Configure prometheus
-      ansible.builtin.include_role:
-        name: prometheus
-        public: true
+    - role: prometheus
+      prometheus_state: "{{ deepops_components.prometheus | component_phase(deepops_phase) }}"
+  tags: ['prometheus', 'monitoring']

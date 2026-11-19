@@ -1,68 +1,11 @@
 ---
-- name: Install the usage report
-  when: slurm_usage_report_token | length > 0
-  block:
-    - name: Create config dir
-      ansible.builtin.file:
-        path: "{{ slurm_usage_report_config_dir }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0700"
+- name: Check the component state
+  ansible.builtin.assert:
+    that: slurm_usage_report_state in ['present', 'absent', 'kept']
+    fail_msg: "slurm_usage_report_state must be present, absent or kept, not {{ slurm_usage_report_state }}."
+    quiet: true
 
-    # The report is clustertools.usage_report, installed with the rest of the cluster's
-    # Python by cluster_tools_lib, so it always matches the library it imports. This role
-    # only wires it up.
-    - name: Remove the report module of earlier layouts
-      ansible.builtin.file:
-        path: "{{ cluster_tools_lib_dir }}/slurm_usage_report.py"
-        state: absent
-
-    - name: Install the report command
-      ansible.builtin.include_role:
-        name: cluster_tools_lib
-        tasks_from: command
-      vars:
-        cluster_tools_lib_command:
-          dest: "{{ slurm_usage_report_script }}"
-          module: clustertools.usage_report
-
-    # Holds the bot token.
-    - name: Install the report config
-      diff: false  # the file holds a secret; --diff would print it
-      ansible.builtin.template:
-        src: config.json.j2
-        dest: "{{ slurm_usage_report_config_dir }}/config.json"
-        owner: root
-        group: root
-        mode: "0600"
-        # The report checks its own config, so a mistake fails the deploy, not the run.
-        validate: "{{ slurm_usage_report_script }} --check-config --config %s"
-      # The user map comes from the people roster.
-      tags:
-        - people
-
-    - name: Install systemd units
-      ansible.builtin.template:
-        src: "slurm-usage-report.{{ item }}.j2"
-        dest: "/etc/systemd/system/{{ slurm_usage_report_svc_name }}.{{ item }}"
-        owner: root
-        group: root
-        mode: "0644"
-      loop: [service, timer]
-      notify: Restart usage report timer
-
-    - name: Enable the report timer
-      ansible.builtin.systemd:
-        name: "{{ slurm_usage_report_svc_name }}.timer"
-        state: started
-        enabled: true
-        daemon_reload: true
-
-- name: Disable the report timer without a token
-  ansible.builtin.systemd:
-    name: "{{ slurm_usage_report_svc_name }}.timer"
-    state: stopped
-    enabled: false
-  when: slurm_usage_report_token | length == 0
-  failed_when: false
+# Without a bot token the report has nothing to post with: nothing of it stays installed.
+- name: "Make slurm_usage_report {{ slurm_usage_report_state if slurm_usage_report_token | length > 0 else 'absent (no token)' }}"
+  ansible.builtin.include_tasks: "{{ slurm_usage_report_state if slurm_usage_report_token | length > 0 else 'absent' }}.yml"
+  when: slurm_usage_report_state != 'kept'

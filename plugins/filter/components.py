@@ -7,6 +7,10 @@
           - {switch: "{{ kube_enable_rsyslog_server }}", group: kube_control_plane, first: true}
         needs: []                        # components a present one makes present
         removal: explicit                # optional: never removed by a switch or group
+        role: prometheus-node-exporter   # optional: the role, where it is not the key
+
+The key is the component's variable prefix (<key>_state, <key>_items,
+deepops_components.<key>); role names its role directory where that differs.
 
 A rule holds when its switch is on and the host is in its group (only the group's first
 host with first: true). Rules of both deploys sit side by side, so a host in the Slurm
@@ -21,6 +25,8 @@ rule wants it on (and present where one does).
 
 """
 
+from pathlib import Path
+
 TRUE = {"true", "yes", "on", "1"}
 
 
@@ -28,8 +34,9 @@ def _on(value):
     return value is True or (isinstance(value, str) and value.strip().lower() in TRUE)
 
 
-def check(registry):
-    """Problems in a registry, as messages; empty means valid."""
+def check(registry, roles=None):
+    """Problems in a registry, as messages; empty means valid. With ROLES (the roles
+    directory), each component's role must be there too."""
     problems = []
     for name, c in (registry or {}).items():
         for i, rule in enumerate((c or {}).get("rules") or []):
@@ -40,7 +47,14 @@ def check(registry):
                 problems.append(f"{name}.needs: unknown component {need}")
         if (c or {}).get("removal", "implicit") not in ("implicit", "explicit"):
             problems.append(f"{name}.removal: implicit or explicit")
+        if roles and not (Path(roles) / component_role(registry, name)).is_dir():
+            problems.append(f"{name}.role: no role {component_role(registry, name)}")
     return problems
+
+
+def component_role(registry, name):
+    """The role directory of component NAME: its role, else its key."""
+    return (registry[name] or {}).get("role") or name
 
 
 def components_desired(registry, groups, host, removals=()):
@@ -124,10 +138,20 @@ def components_order(registry):
     return order
 
 
+def component_hosts(registry, groups, component, removals=()):
+    """The hosts where COMPONENT is installed (present, or kept: an explicit-removal
+    component a rule stopped wanting stays installed), in inventory order. What another
+    host serves or watches follows the same map: Prometheus scrapes each exporter there."""
+    hosts = list(dict.fromkeys(h for g in groups.values() for h in (g or [])))
+    installed = ("present", "kept")
+    return [h for h in hosts if components_desired(registry, groups, h, removals).get(component) in installed]
+
+
 class FilterModule:
     def filters(self):
         return {
             "components_desired": components_desired,
             "components_order": components_order,
             "component_phase": component_phase,
+            "component_hosts": component_hosts,
         }

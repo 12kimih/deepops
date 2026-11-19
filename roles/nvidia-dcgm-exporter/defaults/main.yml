@@ -1,18 +1,18 @@
 ---
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+dcgm_exporter_state: present
+
 # Pinned by tag and digest, like every image (scripts/deepops/image_pins.py pin <tag>).
 # The counters file (files/dcgm-custom-metrics.csv) is this release's default-counters.csv
 # with deepops' rows enabled: a new release brings its own file to start from.
-nvidia_dcgm_container: "nvcr.io/nvidia/k8s/dcgm-exporter:4.7.0-4.9.0-distroless@sha256:2490e1dfb5baaee6765ef2841813af7d978bb459a566c22c326a8fc27c64eea9"
-# The port the exporter listens on (host network), and its scrape target.
-nvidia_dcgm_exporter_port: 9400
-nvidia_dcgm_container_config_dir: "/opt/deepops/nvidia-dcgm-exporter"
-nvidia_dcgm_container_custom_metrics_file: "dcgm-custom-metrics.csv"
-nvidia_dcgm_svc_name: "docker.dcgm-exporter.service"
+dcgm_exporter_container: "nvcr.io/nvidia/k8s/dcgm-exporter:4.7.0-4.9.0-distroless@sha256:2490e1dfb5baaee6765ef2841813af7d978bb459a566c22c326a8fc27c64eea9"
+dcgm_exporter_config_dir: "/opt/deepops/nvidia-dcgm-exporter"
+dcgm_exporter_counters_file: "dcgm-custom-metrics.csv"
+dcgm_exporter_svc_name: "docker.dcgm-exporter.service"
 dcgm_exporter_service_state: started
 dcgm_exporter_service_enabled: true
 
-nvidia_dcgm_exporter_conf_template: "dcgm-exporter.yml.j2"
-
 has_gpus: false
 
-nvidia_dcgm_max_cpu: "0.5"
+dcgm_exporter_max_cpu: "0.5"

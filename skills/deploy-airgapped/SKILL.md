@@ -362,7 +362,7 @@ reference host; distribution repositories remain a separate prerequisite.
 
    When Slurm monitoring stays enabled, also mirror the images selected by
    `prometheus_container`, `grafana_container`, `alertmanager_container`,
-   `node_exporter_container`, and `nvidia_dcgm_container`, then override those
+   `node_exporter_container`, and `dcgm_exporter_container`, then override those
    variables with their internal registry paths. Every image must stay pinned by
    digest (`repo:tag@sha256:...`; the deploy refuses unpinned references), so mirror
    with a tool that keeps the manifest list intact (`skopeo copy --all`, or
@@ -671,7 +671,7 @@ prometheus_container: "registry-host:5000/prom/prometheus:<tag>@sha256:<digest>"
 grafana_container: "registry-host:5000/grafana/grafana:<tag>@sha256:<digest>"
 alertmanager_container: "registry-host:5000/prom/alertmanager:<tag>@sha256:<digest>"
 node_exporter_container: "registry-host:5000/prometheus/node-exporter:<tag>@sha256:<digest>"
-nvidia_dcgm_container: "registry-host:5000/nvidia/k8s/dcgm-exporter:<tag>@sha256:<digest>"
+dcgm_exporter_container: "registry-host:5000/nvidia/k8s/dcgm-exporter:<tag>@sha256:<digest>"
 ```
 
 Mirror and override the Slurm source/archive variables listed above. If their

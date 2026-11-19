@@ -1,0 +1,10 @@
+---
+# The database (grafana_data_dir) is data and stays: dashboards edited in the UI,
+# users and preferences are there when Grafana comes back.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: grafana
+    component_record_action: absent
+    component_record_items: "{{ grafana_items }}"

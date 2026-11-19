@@ -1,0 +1,12 @@
+---
+# What this component installs, for its record (roles/component_record). The state
+# volume (silences, the notification log) is data and stays.
+alertmanager_items:
+  - "unit:{{ alertmanager_svc_name }}"
+  - "container:{{ alertmanager_svc_name }}"
+  - "file:/etc/systemd/system/{{ alertmanager_svc_name }}"
+  - "file:{{ alertmanager_config_dir }}/alertmanager.yml"
+  - "file:{{ alertmanager_config_dir }}/templates/slack.tmpl"
+  - "dir:{{ alertmanager_config_dir }}/templates"
+  - "dir:{{ alertmanager_config_dir }}"
+  - package:python3-docker

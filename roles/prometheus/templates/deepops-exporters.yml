@@ -1,0 +1,10 @@
+{{ ansible_managed | comment }}
+# Every exporter Prometheus scrapes, on the hosts where the component map makes it
+# present (roles/deploy_defaults/vars/main.yml): an exporter turned off or moved stops
+# being scraped at this role's next run.
+{% for exporter in prometheus_exporters %}
+- targets: {{ deepops_component_registry | component_hosts(groups, exporter.component, deepops_component_removals)
+              | map('regex_replace', '$', ':' ~ exporter.port) | list | to_json }}
+  labels:
+    module: {{ exporter.module }}
+{% endfor %}

@@ -1,3 +1,0 @@
-- targets: [{{ groups[ipmi_exporter_host_group] | zip_longest([], fillvalue=':' ~ ipmi_exporter_port) | map('join') | join(',') }}]
-  labels:
-    module: ipmi-exporter

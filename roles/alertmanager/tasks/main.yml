@@ -1,63 +1,10 @@
 ---
-- name: Create config dirs
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    mode: "0755"
-  loop:
-    - "{{ alertmanager_config_dir }}"
-    - "{{ alertmanager_config_dir }}/templates"
+- name: Check the component state
+  ansible.builtin.assert:
+    that: alertmanager_state in ['present', 'absent', 'kept']
+    fail_msg: "alertmanager_state must be present, absent or kept, not {{ alertmanager_state }}."
+    quiet: true
 
-- name: Install python3 docker module
-  ansible.builtin.package:
-    name: python3-docker
-    state: present
-
-# amtool ships in the same image; pulling first lets it validate the config.
-- name: Pull the image
-  ansible.builtin.include_role:
-    name: container_image
-  vars:
-    container_image: "{{ alertmanager_container }}"
-
-- name: Install notification templates
-  ansible.builtin.copy:
-    src: slack.tmpl
-    dest: "{{ alertmanager_config_dir }}/templates/slack.tmpl"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart alertmanager
-
-# Holds the webhook secret: readable only by root and the container user (nobody).
-- name: Install config file
-  diff: false  # the file holds a secret; --diff would print it
-  ansible.builtin.template:
-    src: "{{ alertmanager_config_src }}"
-    dest: "{{ alertmanager_config_dir }}/alertmanager.yml"
-    owner: root
-    group: "65534"
-    mode: "0640"
-    validate: "docker run --rm -u 0 --entrypoint amtool -v %s:/check.yml:ro {{ alertmanager_container }} check-config /check.yml"
-  notify: Restart alertmanager
-
-- name: Create a persistent docker volume for state
-  community.docker.docker_volume:
-    name: "{{ alertmanager_docker_volume_name }}"
-    state: present
-
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.alertmanager.service.j2
-    dest: "/etc/systemd/system/{{ alertmanager_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart alertmanager
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ alertmanager_svc_name }}"
-    state: "{{ alertmanager_service_state }}"
-    enabled: "{{ alertmanager_service_enabled }}"
-    daemon_reload: true
+- name: "Make alertmanager {{ alertmanager_state }}"
+  ansible.builtin.include_tasks: "{{ alertmanager_state }}.yml"
+  when: alertmanager_state != 'kept'

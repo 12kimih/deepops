@@ -1,61 +1,10 @@
 ---
-- name: Pull the image
-  ansible.builtin.include_role:
-    name: container_image
-  vars:
-    container_image: "{{ nvidia_dcgm_container }}"
+- name: Check the component state
+  ansible.builtin.assert:
+    that: dcgm_exporter_state in ['present', 'absent', 'kept']
+    fail_msg: "dcgm_exporter_state must be present, absent or kept, not {{ dcgm_exporter_state }}."
+    quiet: true
 
-- name: Create config dir
-  ansible.builtin.file:
-    path: "{{ prometheus_config_dir }}"
-    state: directory
-    mode: "0755"
-
-- name: Create endpoints config dir
-  ansible.builtin.file:
-    path: "{{ prometheus_cfg_endpoint_dir }}"
-    state: directory
-    mode: "0755"
-
-- name: Install config file
-  ansible.builtin.template:
-    src: "{{ nvidia_dcgm_exporter_conf_template }}"
-    dest: "{{ prometheus_cfg_endpoint_dir }}/dcgm-exporter.yml"
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Create dcgm-exporter config dir
-  ansible.builtin.file:
-    path: "{{ nvidia_dcgm_container_config_dir }}"
-    state: directory
-    mode: "0755"
-  when: has_gpus
-
-- name: Copy metrics file
-  ansible.builtin.copy:
-    src: "{{ nvidia_dcgm_container_custom_metrics_file }}"
-    dest: "{{ nvidia_dcgm_container_config_dir }}/{{ nvidia_dcgm_container_custom_metrics_file }}"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  when: has_gpus
-  notify: Restart dcgm
-
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.dcgm-exporter.service.j2
-    dest: "/etc/systemd/system/{{ nvidia_dcgm_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  when: has_gpus
-  notify: Restart dcgm
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ nvidia_dcgm_svc_name }}"
-    state: "{{ dcgm_exporter_service_state }}"
-    enabled: "{{ dcgm_exporter_service_enabled }}"
-    daemon_reload: true
-  when: has_gpus
+- name: "Make dcgm_exporter {{ dcgm_exporter_state }}"
+  ansible.builtin.include_tasks: "{{ dcgm_exporter_state }}.yml"
+  when: dcgm_exporter_state != 'kept'

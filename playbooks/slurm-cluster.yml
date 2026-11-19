@@ -104,45 +104,55 @@
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml
   when: slurm_install_hpcsdk
 
-- name: Install monitoring services | Install prometheus
-  import_playbook: slurm-cluster/prometheus.yml
-  when: slurm_enable_monitoring
-
-- name: Install monitoring services | Install grafana
-  import_playbook: slurm-cluster/grafana.yml
-  when: slurm_enable_monitoring
-
-- name: Install monitoring services | Install alert manager
-  import_playbook: slurm-cluster/alertmanager.yml
-  when: slurm_enable_monitoring
-
 - name: Install the Open OnDemand portal
   import_playbook: slurm-cluster/open-ondemand.yml
   when: slurm_install_open_ondemand
 
-- name: Install monitoring services | Install the Slack usage report
-  import_playbook: slurm-cluster/slurm-usage-report.yml
-  when: slurm_enable_monitoring
+# Monitoring: present where the switch and group say; removed in the removal phase.
+- name: Install monitoring services | Install prometheus
+  import_playbook: slurm-cluster/prometheus.yml
+  vars:
+    deepops_phase: install
 
-- name: Install monitoring exporters | Install Slurm GPU allocation metrics
-  import_playbook: slurm-cluster/slurm-metrics.yml
-  when: slurm_enable_monitoring
+- name: Install monitoring services | Install alert manager
+  import_playbook: slurm-cluster/alertmanager.yml
+  vars:
+    deepops_phase: install
 
-- name: Install monitoring exporters | Install prometheus slurm exporter
-  import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
-  when: slurm_enable_monitoring
+- name: Install monitoring services | Install grafana
+  import_playbook: slurm-cluster/grafana.yml
+  vars:
+    deepops_phase: install
 
 - name: Install monitoring exporters | Install prometheus node exporter
   import_playbook: slurm-cluster/prometheus-node-exporter.yml
-  when: slurm_enable_monitoring
+  vars:
+    deepops_phase: install
 
 - name: Install monitoring exporters | Install prometheus IPMI exporter
   import_playbook: slurm-cluster/prometheus-ipmi-exporter.yml
-  when: slurm_enable_monitoring
+  vars:
+    deepops_phase: install
+
+- name: Install monitoring exporters | Install prometheus slurm exporter
+  import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
+  vars:
+    deepops_phase: install
 
 - name: Install monitoring exporters | Install nvidia dcgm exporter
   import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
-  when: slurm_enable_monitoring
+  vars:
+    deepops_phase: install
+
+- name: Install monitoring exporters | Install Slurm GPU allocation metrics
+  import_playbook: slurm-cluster/slurm-metrics.yml
+  vars:
+    deepops_phase: install
+
+- name: Install monitoring services | Install the Slack usage report
+  import_playbook: slurm-cluster/slurm-usage-report.yml
+  vars:
+    deepops_phase: install
 
 # Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
@@ -245,6 +255,51 @@
 
 - name: Remove the rsyslog server where it is no longer wanted
   import_playbook: generic/rsyslog-server.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Slack usage report where it is no longer wanted
+  import_playbook: slurm-cluster/slurm-usage-report.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Slurm GPU allocation metrics where it is no longer wanted
+  import_playbook: slurm-cluster/slurm-metrics.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the DCGM exporter where it is no longer wanted
+  import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Slurm exporter where it is no longer wanted
+  import_playbook: slurm-cluster/prometheus-slurm-exporter.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the IPMI exporter where it is no longer wanted
+  import_playbook: slurm-cluster/prometheus-ipmi-exporter.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the node exporter where it is no longer wanted
+  import_playbook: slurm-cluster/prometheus-node-exporter.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Grafana where it is no longer wanted
+  import_playbook: slurm-cluster/grafana.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Alertmanager where it is no longer wanted
+  import_playbook: slurm-cluster/alertmanager.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the Prometheus where it is no longer wanted
+  import_playbook: slurm-cluster/prometheus.yml
   vars:
     deepops_phase: remove
 

@@ -1,0 +1,119 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: slurm_exporter
+    component_record_action: begin
+    component_record_items: "{{ slurm_exporter_items }}"
+
+# Prometheus generates every exporter's scrape targets (roles/prometheus); the file this
+# role wrote on each host before goes.
+- name: Remove the scrape target file this role wrote before
+  ansible.builtin.file:
+    path: "{{ prometheus_cfg_endpoint_dir }}/slurm-exporter.yml"
+    state: absent
+
+- name: Locate the Slurm dashboard
+  ansible.builtin.set_fact:
+    slurm_exporter_dashboards: ["{{ role_path }}/files/slurm-scheduler.json"]
+
+- name: Install the Slurm dashboard
+  ansible.builtin.include_role:
+    name: grafana
+    tasks_from: dashboards
+    public: true
+  vars:
+    grafana_dashboard_set: "{{ slurm_exporter_dashboard_set }}"
+    grafana_dashboard_files: "{{ slurm_exporter_dashboards }}"
+
+- name: Create image build dir
+  ansible.builtin.file:
+    path: "{{ slurm_exporter_build_dir }}"
+    state: directory
+    mode: "0755"
+  when: slurm_exporter_build_image
+
+- name: Copy image build context
+  ansible.builtin.copy:
+    src: docker/Dockerfile
+    dest: "{{ slurm_exporter_build_dir }}/Dockerfile"
+    mode: "0644"
+  when: slurm_exporter_build_image
+
+# Resolved here: inside the included managed_dir role, role_path names that role.
+
+- name: Collect the exporter source
+  ansible.builtin.set_fact:
+    slurm_exporter_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"
+  when: slurm_exporter_build_image
+
+# The source directory holds exactly the role's files: a Go file dropped from the role
+# would otherwise stay in the build context and still be compiled in.
+
+- name: Copy exporter source
+  ansible.builtin.include_role:
+    name: managed_dir
+  vars:
+    managed_dir_path: "{{ slurm_exporter_build_dir }}/exporter"
+    managed_dir_sources: "{{ slurm_exporter_sources }}"
+  when: slurm_exporter_build_image
+
+# The image carries a hash of the context it was built from, and is rebuilt whenever
+# that differs: decided by what the image is, not by what this run changed, so a
+# build that failed is retried on the next run instead of leaving the old image.
+
+- name: Hash the image build context
+  ansible.builtin.set_fact:
+    slurm_exporter_context_hash: >-
+      {{ query('ansible.builtin.file', role_path ~ '/files/docker/Dockerfile', *slurm_exporter_sources)
+         | join('\0') | hash('sha256') }}
+  when: slurm_exporter_build_image
+
+- name: Read the context the current image was built from
+  ansible.builtin.command:
+    argv: [docker, image, inspect, --format, '{{ "{{" }} index .Config.Labels "deepops.context" {{ "}}" }}', "{{ slurm_exporter_container }}"]
+  register: slurm_exporter_image_check
+  failed_when: false
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: slurm_exporter_build_image
+
+- name: Build exporter image
+  ansible.builtin.command:
+    argv: [docker, build, --label, "deepops.context={{ slurm_exporter_context_hash }}", -t, "{{ slurm_exporter_container }}", "{{ slurm_exporter_build_dir }}"]
+  when: slurm_exporter_build_image and slurm_exporter_image_check.stdout | trim != slurm_exporter_context_hash
+  notify: Restart slurm-exporter
+
+- name: Pull the prebuilt image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ slurm_exporter_container }}"
+  when: not slurm_exporter_build_image
+
+- name: Install systemd unit file
+  ansible.builtin.template:
+    src: templates/docker.slurm-exporter.service.j2
+    dest: "/etc/systemd/system/{{ slurm_exporter_svc_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart slurm-exporter
+
+- name: Configure service
+  ansible.builtin.systemd:
+    name: "{{ slurm_exporter_svc_name }}"
+    state: "{{ slurm_exporter_service_state }}"
+    enabled: "{{ slurm_exporter_service_enabled }}"
+    daemon_reload: true
+  notify: Restart slurm-exporter
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: slurm_exporter
+    component_record_action: present
+    component_record_items: "{{ slurm_exporter_items }}"
+    component_record_version: "{{ slurm_exporter_container | regex_replace('@.*', '') }}"

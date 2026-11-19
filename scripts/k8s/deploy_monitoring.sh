@@ -33,7 +33,7 @@ PROMETHEUS_YAML_NO_PERSIST_CONFIG="${PROMETHEUS_YAML_NO_PERSIST_CONFIG:-${DEEPOP
 # one pin and one counters file for both, so the GPU dashboard reads the same metrics.
 DCGM_EXPORTER_DEFAULTS="${ROOT_DIR}/roles/nvidia-dcgm-exporter/defaults/main.yml"
 DCGM_CONFIG_CSV="${DCGM_CONFIG_CSV:-${ROOT_DIR}/roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv}"
-DCGM_EXPORTER_IMAGE="${DCGM_EXPORTER_IMAGE:-$(sed -n 's/^nvidia_dcgm_container: *"\(.*\)"$/\1/p' "${DCGM_EXPORTER_DEFAULTS}")}"
+DCGM_EXPORTER_IMAGE="${DCGM_EXPORTER_IMAGE:-$(sed -n 's/^dcgm_exporter_container: *"\(.*\)"$/\1/p' "${DCGM_EXPORTER_DEFAULTS}")}"
 
 GPU_OPERATOR_NAMESPACE="${GPU_OPERATOR_NAMESPACE:-gpu-operator}"
 
