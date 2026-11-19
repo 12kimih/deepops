@@ -48,4 +48,4 @@
 # nginx_docker_cache_dockerd_clients turned off: the drop-in went with the record.
 - name: Restart Docker without the proxy
   ansible.builtin.include_tasks: restart_docker.yml
-  when: nginx_docker_cache_docker_config_dest in component_record_result.orphans.file
+  when: nginx_docker_cache_docker_config_dest in component_record_removed.file
