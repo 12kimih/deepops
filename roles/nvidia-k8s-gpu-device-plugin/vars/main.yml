@@ -1,0 +1,4 @@
+---
+# A cluster's Helm release: nothing of it lives on the host, so the record holds only
+# the component's state (roles/component_record).
+k8s_gpu_plugin_items: []

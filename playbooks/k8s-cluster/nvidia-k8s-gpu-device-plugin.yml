@@ -1,4 +1,6 @@
 ---
+# A cluster's Helm release, decided on the first control-plane host: present where
+# deepops_components says so, removed where it says absent.
 - hosts: kube_control_plane[0]
   become: true
   roles:
@@ -7,6 +9,8 @@
     - name: Install k8s GPU plugin
       ansible.builtin.include_role:
         name: nvidia-k8s-gpu-device-plugin
+      vars:
+        k8s_gpu_plugin_state: "{{ deepops_components.k8s_gpu_plugin | component_phase(deepops_phase) }}"
       run_once: true
   environment: "{{ proxy_env }}"
   tags:

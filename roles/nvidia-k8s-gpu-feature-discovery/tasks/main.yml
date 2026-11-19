@@ -1,16 +1,10 @@
 ---
-# One Helm release in its desired state, through the shared helm_release role (a
-# converged rerun changes nothing).
-- name: Install NVIDIA GPU Feature Discovery
-  ansible.builtin.include_role:
-    name: helm_release
-  vars:
-    helm_release:
-      release: "{{ k8s_gpu_feature_discovery_release_name }}"
-      namespace: default
-      chart: "{{ k8s_gpu_feature_discovery_chart_name }}"
-      repo: "{{ k8s_gpu_feature_discovery_helm_repo }}"
-      version: "{{ k8s_gpu_feature_discovery_chart_version }}"
-      helm_values:
-        allowDefaultNamespace: true
-        migStrategy: "{{ k8s_gpu_mig_strategy }}"
+- name: Check the component state
+  ansible.builtin.assert:
+    that: k8s_gpu_feature_discovery_state in ['present', 'absent', 'kept']
+    fail_msg: "k8s_gpu_feature_discovery_state must be present, absent or kept, not {{ k8s_gpu_feature_discovery_state }}."
+    quiet: true
+
+- name: "Make GPU Feature Discovery {{ k8s_gpu_feature_discovery_state }}"
+  ansible.builtin.include_tasks: "{{ k8s_gpu_feature_discovery_state }}.yml"
+  when: k8s_gpu_feature_discovery_state != 'kept'

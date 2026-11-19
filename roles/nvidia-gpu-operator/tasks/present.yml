@@ -1,0 +1,30 @@
+---
+- name: Record the component
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: gpu_operator
+    component_record_action: begin
+    component_record_items: "{{ gpu_operator_items }}"
+
+- name: Set GPU Operator flags for systems with preinstalled NVIDIA software (DGX, etc).
+  ansible.builtin.set_fact:
+    gpu_operator_enable_driver: false
+    gpu_operator_enable_toolkit: true
+  when: gpu_operator_preinstalled_nvidia_software
+
+- name: Deploy nvidia gpu operator to kubernetes
+  ansible.builtin.include_tasks: k8s.yml
+  when: not gpu_operator_nvaie_enable
+
+- name: Deploy nvidia gpu operator to nvidia ai enterprise
+  ansible.builtin.include_tasks: nvaie.yml
+  when: gpu_operator_nvaie_enable
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: gpu_operator
+    component_record_action: present
+    component_record_items: "{{ gpu_operator_items }}"

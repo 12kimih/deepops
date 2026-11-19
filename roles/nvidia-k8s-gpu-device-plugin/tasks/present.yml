@@ -1,0 +1,40 @@
+---
+- name: Record the component
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: k8s_gpu_plugin
+    component_record_action: begin
+    component_record_items: "{{ k8s_gpu_plugin_items }}"
+
+# One Helm release in its desired state, through the shared helm_release role (a
+# converged rerun changes nothing).
+- name: Install the NVIDIA device plugin
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ k8s_gpu_plugin_release_name }}"
+      namespace: default
+      chart: "{{ k8s_gpu_plugin_chart_name }}"
+      repo: "{{ k8s_gpu_plugin_helm_repo }}"
+      version: "{{ k8s_gpu_plugin_chart_version }}"
+      helm_values:
+        migStrategy: "{{ k8s_gpu_mig_strategy }}"
+        failOnInitError: "{{ k8s_gpu_plugin_init_error | bool }}"
+        allowDefaultNamespace: true
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nvidia.com/gpu.count
+                      operator: Exists
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: k8s_gpu_plugin
+    component_record_action: present
+    component_record_items: "{{ k8s_gpu_plugin_items }}"

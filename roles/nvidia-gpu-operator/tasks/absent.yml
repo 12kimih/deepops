@@ -1,0 +1,19 @@
+---
+# The release goes; its CRDs and persistent volumes stay (Helm keeps them, as does
+# roles/helm_release).
+- name: Remove the GPU Operator
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ gpu_operator_release_name }}"
+      namespace: "{{ gpu_operator_namespace }}"
+      state: absent
+
+- name: Forget the component
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: gpu_operator
+    component_record_action: absent
+    component_record_items: "{{ gpu_operator_items }}"

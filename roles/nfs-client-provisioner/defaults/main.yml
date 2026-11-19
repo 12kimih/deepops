@@ -1,4 +1,8 @@
 ---
+# present, absent or kept (do nothing) (docs/deepops/component-state.md); the Kubernetes
+# deploy sets it from deepops_components on the first control-plane host, which decides
+# for the cluster.
+k8s_nfs_client_state: present
 # The NFS subdir external provisioner from its official Helm chart (roles/helm_release):
 # https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
 k8s_nfs_server: "127.0.0.1"

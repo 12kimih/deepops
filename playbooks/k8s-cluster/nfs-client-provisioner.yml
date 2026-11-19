@@ -47,4 +47,6 @@
       ansible.builtin.include_role:
         name: nfs-client-provisioner
         public: true
+      vars:
+        k8s_nfs_client_state: "{{ deepops_components.k8s_nfs_client | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

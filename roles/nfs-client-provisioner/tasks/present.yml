@@ -1,0 +1,34 @@
+---
+- name: Record the component
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: k8s_nfs_client
+    component_record_action: begin
+    component_record_items: "{{ k8s_nfs_client_items }}"
+
+# See the GitHub code repo: https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
+- name: Install nfs-client-provisioner
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ k8s_nfs_client_release_name }}"
+      namespace: "{{ k8s_nfs_client_namespace }}"
+      chart: "{{ k8s_nfs_client_chart }}"
+      repo: "{{ k8s_nfs_client_helm_repo }}"
+      version: "{{ k8s_nfs_client_chart_version }}"
+      helm_values:
+        nfs:
+          server: "{{ k8s_nfs_server }}"
+          path: "{{ k8s_nfs_export_path }}"
+        storageClass:
+          defaultClass: "{{ k8s_nfs_default_sc | bool }}"
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: k8s_nfs_client
+    component_record_action: present
+    component_record_items: "{{ k8s_nfs_client_items }}"

@@ -30,9 +30,9 @@
     - role: deploy_defaults
     - role: kubespray_defaults
   tasks:
+    # deepops_gpu_operator_enabled is the site's to set; a fact here overrode it.
     - name: Set facts when not using docker container runtime (default)
       ansible.builtin.set_fact:
-        deepops_gpu_operator_enabled: true
         etcd_deployment_type: host
       when: container_manager != "docker"
     - name: Set facts when using Docker container runtime
@@ -341,21 +341,24 @@
 
 - name: Install k8s GPU feature discovery
   import_playbook: k8s-cluster/nvidia-k8s-gpu-feature-discovery.yml
+  vars:
+    deepops_phase: install
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | bool == false
 
 - name: Install k8s GPU device plugin
   import_playbook: k8s-cluster/nvidia-k8s-gpu-device-plugin.yml
+  vars:
+    deepops_phase: install
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | bool == false
 
 - name: Install NVIDIA GPU Operator
   import_playbook: k8s-cluster/nvidia-gpu-operator.yml
+  vars:
+    deepops_phase: install
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | bool == true
 
 # The NFS server the provisioner uses (deepops_components: k8s_deploy_nfs_server on
 # the first control-plane host).
@@ -367,7 +370,8 @@
 
 - name: Setup a volume for NFS, install nfs_utils, and install NFS Helm chart
   import_playbook: k8s-cluster/nfs-client-provisioner.yml
-  when: k8s_nfs_client_provisioner
+  vars:
+    deepops_phase: install
 
 # Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Setup rsyslog server
@@ -397,10 +401,30 @@
     deepops_phase: remove
 
 # Only where the site lists nfs in deepops_component_removals (removal: explicit).
+- name: Remove the NFS client provisioner where it is no longer wanted
+  import_playbook: k8s-cluster/nfs-client-provisioner.yml
+  vars:
+    deepops_phase: remove
+
 - name: Remove the NFS server where it is listed for removal
   import_playbook: generic/nfs-server.yml
   vars:
     hostlist: k8s_cluster
+    deepops_phase: remove
+
+- name: Remove the GPU Operator where it is no longer wanted
+  import_playbook: k8s-cluster/nvidia-gpu-operator.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the device plugin where it is no longer wanted
+  import_playbook: k8s-cluster/nvidia-k8s-gpu-device-plugin.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove GPU Feature Discovery where it is no longer wanted
+  import_playbook: k8s-cluster/nvidia-k8s-gpu-feature-discovery.yml
+  vars:
     deepops_phase: remove
 
 - name: Remove the cluster container registry where it is no longer wanted

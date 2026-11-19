@@ -1,18 +1,10 @@
 ---
-# See the GitHub code repo: https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
-- name: Install nfs-client-provisioner
-  ansible.builtin.include_role:
-    name: helm_release
-  vars:
-    helm_release:
-      release: "{{ k8s_nfs_client_release_name }}"
-      namespace: "{{ k8s_nfs_client_namespace }}"
-      chart: "{{ k8s_nfs_client_chart }}"
-      repo: "{{ k8s_nfs_client_helm_repo }}"
-      version: "{{ k8s_nfs_client_chart_version }}"
-      helm_values:
-        nfs:
-          server: "{{ k8s_nfs_server }}"
-          path: "{{ k8s_nfs_export_path }}"
-        storageClass:
-          defaultClass: "{{ k8s_nfs_default_sc | bool }}"
+- name: Check the component state
+  ansible.builtin.assert:
+    that: k8s_nfs_client_state in ['present', 'absent', 'kept']
+    fail_msg: "k8s_nfs_client_state must be present, absent or kept, not {{ k8s_nfs_client_state }}."
+    quiet: true
+
+- name: "Make the NFS client provisioner {{ k8s_nfs_client_state }}"
+  ansible.builtin.include_tasks: "{{ k8s_nfs_client_state }}.yml"
+  when: k8s_nfs_client_state != 'kept'

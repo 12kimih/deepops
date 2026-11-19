@@ -1,0 +1,19 @@
+---
+# The release goes; its CRDs and persistent volumes stay (Helm keeps them, as does
+# roles/helm_release).
+- name: Remove the NFS client provisioner
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ k8s_nfs_client_release_name }}"
+      namespace: "{{ k8s_nfs_client_namespace }}"
+      state: absent
+
+- name: Forget the component
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: k8s_nfs_client
+    component_record_action: absent
+    component_record_items: "{{ k8s_nfs_client_items }}"
