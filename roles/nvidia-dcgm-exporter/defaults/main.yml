@@ -2,6 +2,7 @@
 # Pinned by tag and digest, like every image (scripts/deepops/image_pins.py pin <tag>).
 # 4.9.0 renames 23 fields and changes their units: moving there means moving the
 # custom metrics, the rules and the dashboards with it.
+# upstream: hold 4.9.0 renames fields and changes units; move with the metrics file, rules and dashboards
 nvidia_dcgm_container: "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003"
 # The port the exporter listens on (host network), and its scrape target.
 nvidia_dcgm_exporter_port: 9400

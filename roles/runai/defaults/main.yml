@@ -70,7 +70,7 @@ runai_platform_ingress_class: "haproxy"
 runai_platform_ingress_chart: "kubernetes-ingress"
 runai_platform_ingress_repo: "https://haproxytech.github.io/helm-charts"
 # upstream: helm https://haproxytech.github.io/helm-charts kubernetes-ingress
-runai_platform_ingress_chart_version: "1.54.2"
+runai_platform_ingress_chart_version: "1.57.1"
 runai_platform_ingress_release_name: "haproxy-kubernetes-ingress"
 runai_platform_ingress_namespace: "haproxy-controller"
 # 26.11 live-tested NodePort and LoadBalancer (MetalLB, single node, ingress and Gateway API).
@@ -102,12 +102,13 @@ runai_platform_exposure: "ingress"
 # KGateway is used because the guide uses it, it is Apache-2.0 and conformant, and one
 # controller keeps the live test small. Any conformant controller works: set
 # runai_gateway_install_controller: false and runai_gateway_class to its class.
-# upstream: git https://github.com/kubernetes-sigs/gateway-api v(\d+)\.(\d+)\.(\d+)
+# upstream: hold v1.4.0 is the release the Run:ai 3.0 Gateway API guide installs
 runai_gateway_api_version: "v1.4.0"
 runai_gateway_api_crds_url: "https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ runai_gateway_api_version }}/standard-install.yaml"
 runai_gateway_install_controller: true
 runai_gateway_class: "kgateway"
-# upstream: git https://github.com/kgateway-dev/kgateway v(\d+)\.(\d+)\.(\d+)
+# The Run:ai 3.0 Gateway API guide's kgateway 2.2 line, patch releases only.
+# upstream: git https://github.com/kgateway-dev/kgateway v(2)\.(2)\.(\d+)
 runai_gateway_controller_version: "v2.2.9"
 runai_gateway_controller_chart: "oci://cr.kgateway.dev/kgateway-dev/charts/kgateway"
 runai_gateway_controller_crds_chart: "oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds"

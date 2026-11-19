@@ -57,7 +57,7 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | runai | `runai_kai_chart_version` | `v0.18.8` |  |
 | runai | `runai_gpu_operator_min_version` | `v26.7.1` |  |
 | runai | `runai_chart_version` | `3.0.26` |  |
-| runai | `runai_platform_ingress_chart_version` | `1.54.2` |  |
+| runai | `runai_platform_ingress_chart_version` | `1.57.1` |  |
 | runai | `runai_gateway_api_version` | `v1.4.0` |  |
 | runai | `runai_gateway_controller_version` | `v2.2.9` |  |
 | runai | `runai_platform_prometheus_min_version` | `88.6.5` |  |
