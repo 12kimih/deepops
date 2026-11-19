@@ -3,6 +3,7 @@
 k8s_gpu_plugin_helm_repo: "https://nvidia.github.io/k8s-device-plugin"
 k8s_gpu_plugin_chart_name: "nvdp/nvidia-device-plugin"
 k8s_gpu_plugin_release_name: "nvidia-device-plugin"
+# upstream: helm https://nvidia.github.io/k8s-device-plugin nvidia-device-plugin
 k8s_gpu_plugin_chart_version: "0.20.2"
 k8s_gpu_plugin_init_error: "false"
 k8s_gpu_mig_strategy: "mixed"

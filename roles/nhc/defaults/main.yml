@@ -2,6 +2,7 @@
 # 1.5+ finds its settings in /etc/sysconfig and its helpers in /usr/libexec on every
 # distribution; 1.4 used /etc/default and /usr/lib on Debian and Ubuntu, so the
 # settings this role writes were never read and a failed check never drained the node.
+# upstream: git https://github.com/mej/nhc v?(\d+)\.(\d+)\.(\d+)
 nhc_version: "1.5.1"
 nhc_src_url: "https://github.com/mej/nhc/releases/download/{{ nhc_version }}/lbnl-nhc-{{ nhc_version }}.tar.gz"
 # The release tarball per version, as GitHub publishes for the release asset

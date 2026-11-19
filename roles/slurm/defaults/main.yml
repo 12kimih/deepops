@@ -10,6 +10,7 @@ slurm_workflow_build: true
 # one; false when the role runs without a build, so the controller tasks never read it
 # undefined.
 slurm_downgrade: false
+# upstream: git https://github.com/SchedMD/slurm slurm-(\d+)-(\d+)-(\d+)-1
 slurm_version: "25.11.6"
 slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
 # The source tarball per version (roles/download); add one when changing slurm_version.
@@ -187,6 +188,7 @@ slurm_enable_pam_slurm_adopt: true
 slurm_restrict_node_access: true
 
 slurm_include_hwloc: true
+# upstream: git https://github.com/open-mpi/hwloc hwloc-(\d+)\.(\d+)\.(\d+)
 hwloc_version: 2.13.0
 hwloc_tag: "v{{ hwloc_version.split('.')[0] }}.{{ hwloc_version.split('.')[1] }}"
 hwloc_src_url: "https://download.open-mpi.org/release/hwloc/{{ hwloc_tag }}/hwloc-{{ hwloc_version }}.tar.gz"
@@ -210,6 +212,7 @@ slurm_include_pmix: true
 # --with-pmix=<prefix>. libevent (a PMIx build dep) comes from slurm_pmix_deps;
 # hwloc is the role-built one (hwloc_install_prefix).
 # https://slurm.schedmd.com/mpi_guide.html  https://openpmix.org/downloads.html
+# upstream: git https://github.com/openpmix/openpmix v(\d+)\.(\d+)\.(\d+)
 pmix_version: 5.0.10
 pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{ pmix_version }}.tar.bz2"
 # Per version, as GitHub publishes for the release asset (roles/download).

@@ -14,6 +14,7 @@
 #   https://github.com/NVIDIA/enroot/blob/main/doc/configuration.md
 
 # --- Version / packages -------------------------------------------------------
+# upstream: git https://github.com/NVIDIA/enroot v(\d+)\.(\d+)\.(\d+)
 enroot_version: "4.2.1"
 enroot_release: "1"
 enroot_version_string: "{{ enroot_version }}-{{ enroot_release }}"

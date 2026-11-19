@@ -17,6 +17,7 @@
 # Version strings used to construct download URL
 # upstream: manual https://developer.nvidia.com/hpc-sdk-releases
 hpcsdk_major_version: "26"
+# upstream: manual https://developer.nvidia.com/hpc-sdk-releases (with hpcsdk_major_version)
 hpcsdk_minor_version: "9"
 hpcsdk_file_cuda: "13.3"
 hpcsdk_arch: "x86_64"

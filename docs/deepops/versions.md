@@ -6,6 +6,13 @@ last column shows where `config.example/` sets a different value. To change a
 version, override the variable in your `config/group_vars`; to change the
 default, edit the role's defaults and run `scripts/docs/generate.py`.
 
+`scripts/deepops/upstream.py` lists every pin whose upstream has a newer release
+(`--check` fails on one). The line above each version pin names where its releases are
+published (`# upstream: git|pypi|helm|deb|oci|cuda <source>`, or `manual`/`hold` with
+the reason), so a new pin is tracked from the start; container images are compared with
+their registry's tags (`scripts/deepops/image_pins.py pin IMAGE:TAG` prints the line to
+pin). Each component's update steps are in [update-deepops.md](update-deepops.md).
+
 <!-- BEGIN GENERATED: versions -->
 | Role | Variable | Default | config.example |
 |---|---|---|---|

@@ -3,6 +3,7 @@
 # (the driver itself, DCGM).
 
 # Driver branch to install (e.g. "580", "575"). Open modules require Turing+.
+# upstream: manual https://docs.nvidia.com/datacenter/tesla/drivers/supported-drivers-and-cuda-toolkit-versions.html (the newest long-term support branch)
 nvidia_driver_branch: "580"
 
 # The oldest driver branch each CUDA major runs on (CUDA toolkit release notes,

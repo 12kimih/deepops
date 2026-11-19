@@ -10,6 +10,7 @@
 # YOUR exact OS + adapter on https://developer.nvidia.com/doca-downloads before
 # running on RDMA/InfiniBand hardware. DOCA pins driver/firmware combinations per
 # release, and not every OS/arch is published for every DOCA version.
+# upstream: manual https://developer.nvidia.com/doca-downloads
 mofed_doca_version: "3.3.0"
 
 # Repo distro id (ubuntu<ver> / rhel<major.minor>) and arch (x86_64 / arm64-sbsa).

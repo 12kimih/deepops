@@ -22,6 +22,7 @@ dgx_os6_disable_unattended_upgrades: true
 dgx_os6_install_ipmisol: true
 dgx_os6_install_logrotate: true
 
+# upstream: hold DGX OS 6 ships its own branch; follow the DGX OS 6 release notes
 dgx_os6_driver_branch: "550"
 
 # --- DGX OS 7 (Ubuntu 24.04) ---------------------------------------------------

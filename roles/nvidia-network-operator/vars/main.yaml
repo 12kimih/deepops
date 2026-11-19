@@ -6,6 +6,7 @@
 # if_name must match k8s network annotation name
 #
 
+# upstream: helm https://helm.ngc.nvidia.com/nvidia network-operator
 nvidia_network_operator_version: "26.7.1"
 nvidia_network_operator_image_tag: "network-operator-v{{ nvidia_network_operator_version }}"
 nvidia_network_operator_namespace: "network-operator"

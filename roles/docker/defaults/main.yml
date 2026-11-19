@@ -9,6 +9,7 @@
 # installed months apart run the same engine, and because live-restore keeps containers
 # only across patch releases (YY.MM.x). os_updates never upgrades docker-ce* on its own.
 # https://docs.docker.com/engine/release-notes/
+# upstream: deb https://download.docker.com/linux/ubuntu/dists/noble/stable/binary-amd64/Packages docker-ce
 docker_engine_version: "29.10.0"
 #
 # The full Docker Engine package set per the docs (engine + CLI + containerd + the
