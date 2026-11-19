@@ -169,3 +169,28 @@ tests:
             exp_annotations:
               summary: "apt on n2 cannot plan an upgrade, so its pending-update counts mean nothing"
               description: "`apt-get -s dist-upgrade` on the host shows why (broken sources, held or conflicting packages)."
+
+  - name: a TLS certificate warns 30 days before it lapses, and pages once it has
+    interval: 1h
+    input_series:
+      # notAfter 40 days after the test starts
+      - series: 'open_ondemand_tls_cert_not_after_seconds{host="ctl", instance="ctl:9100"}'
+        values: '3456000x1100'
+    alert_rule_test:
+      - eval_time: 9d
+        alertname: TlsCertificateExpiring
+        exp_alerts: []
+      - eval_time: 11d
+        alertname: TlsCertificateExpiring
+        exp_alerts:
+          - exp_labels: {severity: warning, service: open_ondemand, host: ctl, instance: "ctl:9100"}
+            exp_annotations:
+              summary: "The open_ondemand TLS certificate on ctl expires in 29d 0h 0m 0s"
+              description: "Renew it in the site config's vault and deploy the role that installs it before it lapses."
+      - eval_time: 41d
+        alertname: TlsCertificateExpired
+        exp_alerts:
+          - exp_labels: {severity: critical, service: open_ondemand, host: ctl, instance: "ctl:9100"}
+            exp_annotations:
+              summary: "The open_ondemand TLS certificate on ctl has expired"
+              description: "Clients refuse the service. Renew it in the site config's vault and deploy the role that installs it."

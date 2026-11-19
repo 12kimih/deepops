@@ -1,0 +1,22 @@
+---
+# TLS certificates the roles install, each published by its role as a textfile metric
+# <service>_tls_cert_not_after_seconds (the certificate's notAfter, Unix time).
+groups:
+  - name: tls
+    rules:
+      - alert: TlsCertificateExpiring
+        expr: |
+          label_replace({__name__=~".+_tls_cert_not_after_seconds"}, "service", "$1", "__name__", "(.+)_tls_cert_not_after_seconds")
+          - time() < 30 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "The {{ $labels.service }} TLS certificate on {{ $labels.host }} expires in {{ $value | humanizeDuration }}"
+          description: "Renew it in the site config's vault and deploy the role that installs it before it lapses."
+      - alert: TlsCertificateExpired
+        expr: |
+          label_replace({__name__=~".+_tls_cert_not_after_seconds"}, "service", "$1", "__name__", "(.+)_tls_cert_not_after_seconds")
+          - time() < 0
+        labels: {severity: critical}
+        annotations:
+          summary: "The {{ $labels.service }} TLS certificate on {{ $labels.host }} has expired"
+          description: "Clients refuse the service. Renew it in the site config's vault and deploy the role that installs it."
