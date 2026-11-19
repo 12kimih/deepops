@@ -19,8 +19,6 @@ INSTALLERS = ("ansible.builtin.copy", "ansible.builtin.template", "copy", "templ
 
 # file -> why a glob install there must not remove what it did not install
 SHARED = {
-    "roles/facts/tasks/main.yml": "/etc/ansible/facts.d is Ansible's host-wide fact directory; "
-    "other tools and admins put facts there too",
     "roles/cluster_tools/tasks/main.yml": "cluster_tools_shared_dirs publish onto a shared filesystem "
     "that also holds files users and admins put there",
 }
@@ -37,11 +35,19 @@ def tasks(data):
             yield from tasks(task.get(key))
 
 
+def uses_recorded_files(path):
+    """A file whose installs into a shared directory end in recorded_files removes what
+    it dropped: the other right answer."""
+    return "recorded_files" in path.read_text()
+
+
 def globbed_installs(path):
     for task in tasks(yaml.safe_load(path.read_text()) or []):
         if not any(k in task for k in INSTALLERS):
             continue
-        loop = str(task.get("loop", "")) + str(task.get("with_items", ""))
+        loop = (
+            str(task.get("loop", "")) + str(task.get("with_items", "")) + str(task.get("with_fileglob", ""))
+        )
         args = next((task[k] for k in INSTALLERS if isinstance(task.get(k), dict)), {})
         if "with_fileglob" in task or "fileglob" in loop or str(args.get("src", "")).endswith("/"):
             yield task.get("name", "?")
@@ -53,7 +59,7 @@ class ManagedDirTests(unittest.TestCase):
         for path in sorted(ROOT.glob("roles/*/tasks/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml")):
             rel = str(path.relative_to(ROOT))
             names = list(globbed_installs(path))
-            if names and rel not in SHARED:
+            if names and rel not in SHARED and not uses_recorded_files(path):
                 found[rel] = names
         self.assertEqual(found, {}, "install these through roles/managed_dir (see its tasks/main.yml)")
 
