@@ -160,9 +160,9 @@ deepops_set_hostname: true
 ################################################################################
 # NVIDIA GPU configuration
 # Playbook: nvidia-cuda
-# cuda_version picks the package: cuda-toolkit is the latest, and a specific version
-# looks like cuda-toolkit=12.2.0-1
-# cuda_version: cuda-toolkit
+# cuda_version picks the package: by default the newest toolkit of the CUDA major the
+# driver branch serves; a specific version looks like cuda-toolkit-13-2
+# cuda_version: "cuda-toolkit-{{ nvidia_driver_cuda_major }}"
 # Set true to install the system-wide CUDA toolkit; leave false when CUDA is provided
 # per-version through Lmod/environment modules. In the slurm-cluster playbook the
 # toolkit is additionally gated by slurm_cluster_install_cuda.

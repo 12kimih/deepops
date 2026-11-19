@@ -5,8 +5,16 @@
 # Driver branch to install (e.g. "580", "575"). Open modules require Turing+.
 nvidia_driver_branch: "580"
 
-# The CUDA major version this branch serves: CUDA 13 needs a 580 or newer driver,
-# CUDA 12 a 525 or newer one (CUDA toolkit release notes, minimum driver versions).
-# Packages built per CUDA major (DCGM 4) follow it.
+# The oldest driver branch each CUDA major runs on (CUDA toolkit release notes,
+# "minimum required driver version"). A new CUDA major is one more line here.
 # https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
-nvidia_driver_cuda_major: "{{ 13 if nvidia_driver_branch | int >= 580 else (12 if nvidia_driver_branch | int >= 525 else 11) }}"
+nvidia_cuda_min_driver_branch:
+  11: 450
+  12: 525
+  13: 580
+# The newest CUDA major the driver branch serves; packages built per CUDA major
+# (DCGM 4) and the CUDA toolkits follow it.
+nvidia_driver_cuda_major: >-
+  {{ nvidia_cuda_min_driver_branch | dict2items
+     | selectattr('value', 'le', nvidia_driver_branch | int)
+     | map(attribute='key') | map('int') | max }}

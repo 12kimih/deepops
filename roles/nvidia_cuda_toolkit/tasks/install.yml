@@ -7,6 +7,24 @@
     that: ansible_facts.architecture == "x86_64"
     fail_msg: "CUDA runfiles are x86_64 only (this host is {{ ansible_facts.architecture }})."
 
+# A toolkit runs on a driver of its own CUDA major or newer (minor version
+# compatibility within a major): one the nodes' driver branch cannot run is refused
+# here, not discovered by a user's first job.
+- name: Refuse toolkits the nodes' driver cannot run
+  ansible.builtin.assert:
+    that:
+      - (item.version.split('.')[0] | int) in nvidia_cuda_min_driver_branch
+      - (item.version.split('.')[0] | int) <= (nvidia_driver_cuda_major | int)
+    fail_msg: >-
+      CUDA {{ item.version }} needs a driver branch of at least
+      {{ nvidia_cuda_min_driver_branch[item.version.split('.')[0] | int] | default('(unknown: add its major to nvidia_cuda_min_driver_branch)') }};
+      nvidia_driver_branch is {{ nvidia_driver_branch }} (CUDA {{ nvidia_driver_cuda_major }}).
+      Raise the driver branch first, or drop this toolkit from cuda_versions.
+    quiet: true
+  loop: "{{ cuda_versions }}"
+  loop_control:
+    label: "{{ item.version }}"
+
 - name: Ensure the CUDA install, module, and cache directories exist
   ansible.builtin.file:
     path: "{{ item }}"
