@@ -4,15 +4,15 @@
 # imports) installs ypserv, sets the NIS domain, writes securenets, and builds the maps
 # with `ypinit -m` (skipped if /var/yp/<domain> already exists, so an existing manual
 # database is preserved). Clients bind to it via nis_domain/nis_server in group_vars/all.yml.
-#nis_make_server: true
+#nis_make_server: true  # example
 
 # Create and lock the people roster's accounts here (roles/people, run by
 # authentication.yml just before nis_server publishes them). See PEOPLE in all.yml.
-#people_manage_accounts: true
+#people_manage_accounts: true  # example
 
 # Which client networks may query this NIS server ("NETMASK NETWORK" lines).
 # Role default = localhost + RFC1918; TIGHTEN to your actual cluster subnet.
-#nis_server_securenets:
+#nis_server_securenets:  # example
 #  - "255.0.0.0       127.0.0.0"   # localhost
 #  - "255.255.255.0   10.0.0.0"   # the cluster's internal subnet
 
@@ -26,7 +26,7 @@
 # the role away there revokes that person's access on the next run. Set
 # nis_export_groups_exclusive: false to make the list additive instead, for a group
 # other tooling also writes to.
-#nis_export_groups:
+#nis_export_groups:  # example
 #  - name: "{{ cluster_docker_group_name }}"
 #    gid: "{{ cluster_docker_group_gid }}"
 #    members: "{{ people | people_with_role('docker') }}"
@@ -40,6 +40,6 @@
 # Membership here is DECLARATIVE -- /etc/netgroup is rendered whole, so taking the
 # admin role away in the people roster revokes their access on the next run. That is
 # the difference from nis_export_groups above, which manages only the groups it lists.
-#nis_export_netgroups:
+#nis_export_netgroups:  # example
 #  - name: "{{ cluster_sudoers_netgroup }}"
 #    users: "{{ cluster_admins }}"

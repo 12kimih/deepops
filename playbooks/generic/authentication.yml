@@ -14,7 +14,7 @@
     # Accounts from the people roster, on the host that is the account source (the NIS
     # master). Before nis_server, whose last task publishes the changed files.
     - role: people
-      when: people_manage_accounts | default(false) | bool
+      when: people_manage_accounts | bool
     # Run the NIS master setup before the clients so they have a server to bind to.
     - role: nis_server
       when: (nis_make_server | bool) and (nis_domain is defined)

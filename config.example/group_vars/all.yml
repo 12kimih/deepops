@@ -14,7 +14,7 @@
 # of letting it auto-discover a per-user Python (e.g. a uv or pip --user install that
 # happens to be first on the SSH login's PATH). Keeps module deps in one predictable
 # place -- community.docker tasks (registry, monitoring) need requests + docker there.
-#ansible_python_interpreter: /usr/bin/python3
+#ansible_python_interpreter: /usr/bin/python3  # example
 
 ################################################################################
 # /etc/hosts                                                                   #
@@ -23,20 +23,20 @@
 # on this internal subnet prefix (e.g. "10.0.") -- useful when nodes have a secondary
 # IP on the cluster network and hostnames should resolve to it, not a management/public
 # NIC. Unset = use the interface's primary address.
-# hosts_internal_subnet_prefix: "10.0."
+#hosts_internal_subnet_prefix: "10.0."  # example
 
 ################################################################################
 # PROXY
 ################################################################################
 # Proxy Variables needed for scripts, ansible, etc.
-# http_proxy: http://10.0.2.5:3128
-# https_proxy: http://10.0.2.5:3128
-# no_proxy: localhost,cluster.local,127.0.0.1,::1,10.0.2.10,10.0.2.20,10.0.2.30
+#http_proxy: http://10.0.2.5:3128  # example
+#https_proxy: http://10.0.2.5:3128  # example
+#no_proxy: localhost,cluster.local,127.0.0.1,::1,10.0.2.10,10.0.2.20,10.0.2.30  # example
 
-# proxy_env:
-      # http_proxy: '{{ http_proxy }}'
-      # https_proxy: '{{ https_proxy }}'
-      # no_proxy: '{{ no_proxy }}'
+#proxy_env:  # example
+#  http_proxy: '{{ http_proxy }}'
+#  https_proxy: '{{ https_proxy }}'
+#  no_proxy: '{{ no_proxy }}'
 
 
 ################################################################################
@@ -47,36 +47,36 @@
 # node they escape its cgroup: only the admins keep it, and only root may enable it.
 # Crontabs stay open on the login node (jobs there run under the per-user limits) and
 # are closed on compute nodes, where they would run outside every job.
-#node_user_policy_manage_linger: true
-#node_user_policy_linger_users: "{{ cluster_admins }}"
-#node_user_policy_cron_users: "{{ none if inventory_hostname in groups['slurm-login'] | default([]) else cluster_admins }}"
+#node_user_policy_manage_linger: true  # example
+#node_user_policy_linger_users: "{{ cluster_admins }}"  # example
+#node_user_policy_cron_users: "{{ none if inventory_hostname in groups['slurm-login'] | default([]) else cluster_admins }}"  # example
 
 ################################################################################
 # NETWORK                                                                      #
 ################################################################################
 # The cluster's internal network (CIDR): the one place it is written. NFS exports are
 # offered to it only (nfs_export_clients, STORAGE below).
-#cluster_subnet: "10.0.0.0/16"
+#cluster_subnet: "10.0.0.0/16"  # example
 
 # DNS config
 # Playbook: dns-config
-#dns_config_servers: [8.8.8.8]
-#dns_config_search: [example.com]
+#dns_config_servers: [8.8.8.8]  # example
+#dns_config_search: [example.com]  # example
 
 # NTP configuration
 # Playbook: chrony-client
-chrony_install: true
-chrony_service_state: "started"
-chrony_service_enabled: true
-chrony_timezone: "Etc/UTC"
-chrony_config_server:
-  - 0.pool.ntp.org
-  - 1.pool.ntp.org
-  - 2.pool.ntp.org
-  - 3.pool.ntp.org
+#chrony_install: true
+#chrony_service_state: "started"
+#chrony_service_enabled: true
+#chrony_timezone: "Etc/UTC"
+#chrony_config_server:
+#  - 0.pool.ntp.org
+#  - 1.pool.ntp.org
+#  - 2.pool.ntp.org
+#  - 3.pool.ntp.org
 
 # Set hostname based on inventory file
-deepops_set_hostname: true
+#deepops_set_hostname: true
 
 # Default system locale applied to every node by the locale role (sets LANG=).
 #locale_lang: "en_US.UTF-8"
@@ -86,7 +86,7 @@ deepops_set_hostname: true
 ################################################################################
 # Extra software to install (removal: HOST BASELINE below)
 # Playbook: software
-#software_extra_packages:
+#software_extra_packages:  # example
 #  - curl
 #  - git
 #  - rsync
@@ -106,7 +106,7 @@ deepops_set_hostname: true
 # host-baseline.yml): services once installed by hand and no longer used, which nothing
 # else would ever remove. A --check run lists what apt would remove with them.
 # The controller keeps its database (slurmdbd) and web server (Open OnDemand).
-#host_baseline_absent_packages: "{{ ['avahi-daemon', 'iperf3', 'samba', 'mysql-server*']
+#host_baseline_absent_packages: "{{ ['avahi-daemon', 'iperf3', 'samba', 'mysql-server*']  # example
 #  + ([] if inventory_hostname in groups['slurm-master'] | default([]) else ['apache2*']) }}"
 
 ################################################################################
@@ -114,23 +114,23 @@ deepops_set_hostname: true
 ################################################################################
 # AutoFS configuration
 # Playbook: authentication
-#autofs_mount: "/home"
-#autofs_map: "auto.home_linux"
+#autofs_mount: "/home"  # example
+#autofs_map: "auto.home_linux"  # example
 
 # NFS Server
 # This config will create an NFS server and share the given exports. options are the
 # exports(5) flags alone; every export is offered to nfs_export_clients.
 # Playbook: nfs-server.yml
-#nfs_exports:
+#nfs_exports:  # example
 #  - path: /export/shared
 #    options: "rw,sync,root_squash,no_subtree_check"
-#nfs_export_clients: ["{{ cluster_subnet }}"]
+#nfs_export_clients: ["{{ cluster_subnet }}"]  # example
 
 # NFS Client
 # This config will mount an NFS share on hosts. An entry without `options` is mounted
 # with nfs_mount_options (see roles/nfs/defaults/main.yml).
 # Playbook: nfs-client.yml
-#nfs_mounts:
+#nfs_mounts:  # example
 #  - mountpoint: /mnt/shared
 #    server: '{{ groups["slurm-master"][0] }}'
 #    path: /export/shared
@@ -150,10 +150,10 @@ deepops_set_hostname: true
 #   uv run scripts/deepops/people.py check
 #   uv run ansible-playbook -K playbooks/slurm-cluster.yml --tags people
 # people_check validates the roster wherever it is used.
-#people_roster: "{{ lookup('ansible.builtin.file', inventory_dir ~ '/people.yml') | from_yaml | people_check }}"
-#people: "{{ people_roster.people }}"
+#people_roster: "{{ lookup('ansible.builtin.file', inventory_dir ~ '/people.yml') | from_yaml | people_check }}"  # example
+#people: "{{ people_roster.people }}"  # example
 # Administrators: sudo on every node and SSH to compute nodes without a job.
-#cluster_admins: "{{ people | people_with_role('admin') }}"
+#cluster_admins: "{{ people | people_with_role('admin') }}"  # example
 
 ################################################################################
 # NVIDIA                                                                       #
@@ -162,10 +162,10 @@ deepops_set_hostname: true
 # Playbook: nvidia-cuda
 # cuda_version picks the package: by default the newest toolkit of the CUDA major the
 # driver branch serves; a specific version looks like cuda-toolkit-13-2
-# cuda_version: "cuda-toolkit-{{ nvidia_driver_cuda_major }}"
+#cuda_version: "cuda-toolkit-{{ nvidia_driver_cuda_major }}"
 # Set true to install the system-wide CUDA toolkit; leave false when CUDA is provided
 # per-version through Lmod/environment modules.
-nvidia_cuda_install: false
+#nvidia_cuda_install: false
 
 # DGX-specific vars may be used to target specific models,
 # because available versions for DGX may differ from the generic repo
@@ -180,25 +180,25 @@ gpu_clock_reset: false
 gpu_clock_lock: "1507,1507"
 
 # Debugging var: force install NVIDIA driver even if GPU not detected
-nvidia_driver_force_install: false
+#nvidia_driver_force_install: false
 # Default NVIDIA driver branch for generic host driver installs.
 nvidia_driver_branch: "595"
 # Kernel module flavor: "open" (NVIDIA default since the 560 series, recommended
 # for Turing and newer GPUs) or "proprietary" (Maxwell/Pascal/Volta).
-nvidia_driver_kernel_modules: "open"
+#nvidia_driver_kernel_modules: "open"
 # Ubuntu only: use the data-center "Enterprise Ready" (-server) branch. Set false
 # for the desktop/latest branch (no -server suffix).
-nvidia_driver_server_branch: true
+#nvidia_driver_server_branch: true
 # Full override of the driver package name. Leave empty ("") to build it from the
 # toggles above (e.g. "nvidia-driver-580-server-open"). Set explicitly for any
 # other combination, e.g. "nvidia-driver-580" or "nvidia-driver-570-open".
-# nvidia_driver_package: ""
+#nvidia_driver_package: ""
 # RHEL/Rocky package/stream overrides (empty = build from toggles):
-# nvidia_driver_rhel_module_stream: ""
-# nvidia_driver_rhel_package: ""
+#nvidia_driver_rhel_module_stream: ""
+#nvidia_driver_rhel_package: ""
 # Purge any pre-existing NVIDIA driver packages before installing (clean
 # reinstall). Container Toolkit packages are excluded from the purge.
-nvidia_driver_purge_existing: true
+#nvidia_driver_purge_existing: true
 
 
 ################################################################################
@@ -210,11 +210,11 @@ nvidia_driver_purge_existing: true
 # docker_install gates the in-tree roles/docker. docker_dns_servers_strict,
 # docker_storage_options, docker_options and docker_iptables_enabled are kubespray's,
 # read only when kubespray itself installs Docker.
-docker_install: true
-# docker_version: 'latest'
-docker_dns_servers_strict: false
+#docker_install: true
+#docker_version: '28.3'
+#docker_dns_servers_strict: false
 docker_storage_options: -s overlay2
-#docker_options: "--bip=192.168.99.1/24"
+#docker_options: "--bip=192.168.99.1/24"  # example
 # Enable docker iptables
 # If this isn't set, containers won't have access to the outside net
 # See https://github.com/kubernetes-sigs/kubespray/issues/2002
@@ -235,7 +235,7 @@ docker_iptables_enabled: true
 # rather than write a colliding pool. Changing this restarts docker, which stops every
 # running container on the node -- set docker_daemon_restart to false to stage
 # the file for a maintenance window instead.
-#docker_daemon_options:
+#docker_daemon_options:  # example
 #  default-address-pools:
 #    - base: "10.99.0.0/16"
 #      size: 24
@@ -244,7 +244,7 @@ docker_iptables_enabled: true
 # inotify instances per UID, and the three ARP table thresholds (all three have to
 # move together). roles/docker raises these by default at values sized for a few
 # hundred concurrent containers; the values below carry about a thousand.
-#docker_sysctls:
+#docker_sysctls:  # example
 #  fs.inotify.max_user_instances: "8192"
 #  net.ipv4.neigh.default.gc_thresh1: "4096"
 #  net.ipv4.neigh.default.gc_thresh2: "8192"
@@ -266,8 +266,8 @@ docker_iptables_enabled: true
 # compute node. Pick a GID that is >= GID_MIN (so NIS exports it) and free on EVERY
 # node, then verify before enabling:
 #   for h in <all nodes>; do ssh $h "getent group <gid> || echo $h free"; done
-#cluster_docker_group_name: dockerusers
-#cluster_docker_group_gid: 4000
+#cluster_docker_group_name: dockerusers  # example
+#cluster_docker_group_gid: 4000  # example
 
 # NIS netgroup whose members get administrator sudo on every node.
 # Playbook: slurm-cluster (generic/cluster-sudoers.yml), authentication
@@ -285,14 +285,14 @@ docker_iptables_enabled: true
 # unreachable; the stock `%sudo` rule is deliberately left in place for it.
 # cluster_sudoers_local_group keeps that local group to exactly the administrators
 # who have a local account on each node.
-#cluster_sudoers_netgroup: cluster_admins
+#cluster_sudoers_netgroup: cluster_admins  # example
 # Require a password for sudo (the role default). Set true ONLY where a password
 # cannot be checked at all -- confirm by behaviour with `sudo -v` on a compute node as
 # the user, rather than by reasoning about which file holds the hash.
 #cluster_sudoers_nopasswd: false
 # Local sudo group and the administrators it is kept to.
-#cluster_sudoers_local_group: sudo
-#cluster_sudoers_local_members: "{{ cluster_admins }}"
+#cluster_sudoers_local_group: sudo  # example
+#cluster_sudoers_local_members: "{{ cluster_admins }}"  # example
 # Remove sudoers drop-ins this role did not write. They are always reported; set this
 # to actually delete them. bootstrap-sudo.yml (run by hand on a new node only) leaves
 # one behind for whoever ran it, granting passwordless root that no group audit shows.
@@ -309,11 +309,11 @@ docker_iptables_enabled: true
 # these hosts may SSH in as root everywhere else, and no other key may. Their keys are
 # read live from /root/.ssh/*.pub there and pinned to their address with from=: a
 # host's root_access_source (host_vars), else its ansible_host; it must be an IP.
-#root_access_from_hosts: "{{ groups['slurm-master'][:1] }}"
+#root_access_from_hosts: "{{ groups['slurm-master'][:1] }}"  # example
 # Docker daemon logins
 #   Note: example only! you should put these in an Ansible Vault file for security!
 #
-#docker_login_registries:
+#docker_login_registries:  # example
 #- registry: docker.io
 #  username: myuser
 #  password: mypassword
@@ -333,9 +333,9 @@ docker_iptables_enabled: true
 # can run enroot from the CLI and under Slurm without "permission denied". Uncomment
 # below ONLY to override -- e.g. to put cache/data on a mounted NVMe (still local!).
 # See docs/slurm-cluster/slurm-nfs.md.
-#enroot_data_path: '/mnt/nvme/enroot-data/user-$(id -u)'
-#enroot_cache_path: '/mnt/nvme/enroot-cache/user-$(id -u)'
-enroot_environ_config_files: []
+#enroot_data_path: '/mnt/nvme/enroot-data/user-$(id -u)'  # example
+#enroot_cache_path: '/mnt/nvme/enroot-cache/user-$(id -u)'  # example
+#enroot_environ_config_files: []
 enroot_environ_config_files_dgx:
   - filename: 50-mellanox.env
     content: |
@@ -350,17 +350,17 @@ enroot_environ_config_files_dgx:
 # NIS configuration
 # Playbook: authentication (also runs inside slurm-cluster.yml)
 # CLIENTS: set nis_domain + nis_server (the master's hostname/IP) to bind nodes to NIS.
-#nis_domain: example.com
-#nis_server: 10.0.0.1
+#nis_domain: example.com  # example
+#nis_server: 10.0.0.1  # example
 # MASTER SERVER (ypserv): configure it in group_vars/nis-master.yml (a one-host
 # [nis-master] inventory group). See that file.
 
 # Kerberos configuration
 # Playbook: authentication
-#kerberos_client_realm_name: "example.com"
+#kerberos_client_realm_name: "example.com"  # example
 #kerberos_client_kdc_hostname: "kerberos"
 #kerberos_client_admin_hostname: "kerberos"
-#nfs_idmapd_domain: example.com
+#nfs_idmapd_domain: example.com  # example
 
 
 ################################################################################
@@ -377,29 +377,29 @@ maas_region_controller: '192.168.1.1'
 maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 # MAAS 3.7 is the current Ubuntu 24.04 line. Keep the 3.5 PPA when the MAAS
 # controller itself still runs Ubuntu 22.04.
-maas_repo: "{{ 'ppa:maas/3.7' if ansible_facts.distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
+#maas_repo: "{{ 'ppa:maas/3.7' if ansible_facts.distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
 
-maas_single_node_install: true
+#maas_single_node_install: true
 
 ################################################################################
 # NVIDIA Datacenter GPU Manager                                                #
 ################################################################################
-install_dcgm: true
+#install_dcgm: true
 
 ################################################################################
 # Misc.                                                                        #
 ################################################################################
 # Set /etc/rc.local contents
 # Playbook: rc-local
-# rc_local_contents: |
-#   echo foo
-#   echo bar
+#rc_local_contents: |  # example
+#  echo foo
+#  echo bar
 #
 # DeepOps specific config
-deepops_dir: /opt/deepops
+#deepops_dir: /opt/deepops
 
 # Disable cloud-init
-deepops_disable_cloud_init: true
+#deepops_disable_cloud_init: true
 
 # Default profile when using NVIDIA MIG Manager: https://github.com/NVIDIA/mig-parted
 mig_manager_profile: all-disabled
@@ -416,7 +416,7 @@ mig_manager_hooks: ""
 # host's networking alone. netplan_conflicting_manager names the manager to mask
 # so it cannot compete with the renderer. See docs/deepops/netplan.md.
 #netplan_file: /etc/netplan/01-netcfg.yaml
-#netplan_conflicting_manager: NetworkManager
+#netplan_conflicting_manager: NetworkManager  # example
 
 ################################################################################
 # Serial console                                                               #
@@ -437,8 +437,8 @@ mig_manager_hooks: ""
 #bmc_channel: 1
 #bmc_user_name: ADMIN
 #bmc_ipsrc: static
-#bmc_netmask: 255.255.255.0
-#bmc_gateway: 10.0.0.1
+#bmc_netmask: 255.255.255.0  # example
+#bmc_gateway: 10.0.0.1  # example
 # Vault it: ansible-vault encrypt_string 'secret' --name bmc_password
 # Same, for the SNMP community: v1/v2c sends it in clear and the shipped default is
 # the first thing a scanner tries. Empty leaves it alone.
@@ -449,13 +449,13 @@ mig_manager_hooks: ""
 # Container registry                                                           #
 ################################################################################
 standalone_container_registry_cache_enable: true
-standalone_container_registry_port: "5000"
+#standalone_container_registry_port: "5000"
 
 # To configure some set of hosts as insecure registries, list them here.
 # Slurm and K8s cluster playbooks will automatically use the master nodes for
 # these if not specified.
-#docker_insecure_registries: ["<host>:<port>"]
-#docker_registry_mirrors: ["http://<host>:<port>"]
+#docker_insecure_registries: ["<host>:<port>"]  # example
+#docker_registry_mirrors: ["http://<host>:<port>"]  # example
 
 ################################################################################
 # Configuration for NGC-Ready playbook                                         #
@@ -471,5 +471,5 @@ ngc_ready_tensorflow: "nvcr.io/nvidia/tensorflow:25.02-tf2-py3"
 # errors on some kubespray releases. These are the standard defaults; override
 # in your config/ if your cluster differs.
 dns_domain: cluster.local
-is_fedora_coreos: false
+#is_fedora_coreos: false
 etcd_deployment_type: kubeadm

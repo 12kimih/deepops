@@ -1,0 +1,7 @@
+---
+dependencies:
+  - role: deploy_defaults  # k8s_nfs_export_path
+
+galaxy_info:
+  namespace: deepops
+  role_name: nfs_client_provisioner

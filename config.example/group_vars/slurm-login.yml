@@ -6,7 +6,7 @@
 # from taking the whole login node; real work belongs in a Slurm job. Nodes outside
 # this group have the drop-in removed. Keys are [Slice] directives -- see
 # systemd.resource-control(5).
-#cluster_tools_user_slice_limits:
+#cluster_tools_user_slice_limits:  # example
 #  CPUQuota: "1200%"   # 12 cores
 #  MemoryMax: 64G
 #  TasksMax: 4096

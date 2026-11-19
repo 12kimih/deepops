@@ -1,8 +1,14 @@
 ---
 # Where DeepOps puts things on a host, written once for every role that uses it.
 deepops_dir: /opt/deepops
+# Node-side home of a GPU power cap (roles/nvidia_power_limit). Its unit reads it as an
+# EnvironmentFile, so the number lives in one place on the node, and anything else that
+# changes a GPU's power limit reads the cap back instead of guessing: the Slurm
+# prolog/epilog does, so an exclusive job never gets the card maximum on a capped node.
+nvidia_power_limit_conf_file: /etc/nvidia-power-limit.conf
 # Software modules (Lmod): the prefix must be on storage every node shares.
 sm_prefix: /sw
 sm_module_root: "{{ sm_prefix }}/modules"
 sm_module_path: "{{ sm_module_root }}/all"
 sm_software_path: "{{ sm_prefix }}/software"
+sm_files_path: "{{ sm_prefix }}/easybuild_files"

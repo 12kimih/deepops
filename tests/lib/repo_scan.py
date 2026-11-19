@@ -10,10 +10,13 @@ and an empty tree passed every test. Here is the one walker they all use:
   role_var_files()     tracked role defaults and vars files
   tasks(path)          every task, in plays, blocks, rescues, always and handlers
   module(task)         (canonical module name, its arguments as a dict)
+  references(node)     the variable names a node's templates and conditions use
+  defined_here(node)   the names a node defines itself (vars, set_fact, register)
   Scan                 counts what a test scanned and which allowlist entries it used,
                        so a test fails on an empty scan and on a stale exception
 """
 
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -137,6 +140,54 @@ def text_of(task):
     """Everything a task would run or write, for checks that look at the words."""
     _, args = module(task)
     return " ".join(str(v) for v in args.values())
+
+
+CONDITIONS = {"when", "that", "failed_when", "changed_when", "until"}
+_JINJA = re.compile(r"\{\{(.*?)\}\}|\{%(.*?)%\}", re.S)
+_STRING = re.compile(r"'[^']*'|\"[^\"]*\"")
+_IDENT = re.compile(r"(?<![\w.])[A-Za-z_]\w*")
+
+
+def _names(expression):
+    return set(_IDENT.findall(_STRING.sub("", expression)))
+
+
+def references(node, key=None):
+    """The variable names NODE's templates and conditions use: identifiers inside
+    {{ }} and {% %}, and in the bare expressions of when/that/failed_when/changed_when/
+    until, string literals left out. Filter and test names come too; callers match
+    against variables they know."""
+    found = set()
+    if isinstance(node, dict):
+        for k, v in node.items():
+            found |= references(v, k)
+    elif isinstance(node, list):
+        for item in node:
+            found |= references(item, key)
+    elif isinstance(node, str):
+        if key in CONDITIONS:
+            found |= _names(_JINJA.sub(lambda m: m.group(1) or m.group(2) or "", node))
+        for m in _JINJA.finditer(node):
+            found |= _names(m.group(1) or m.group(2) or "")
+    return found
+
+
+def defined_here(node):
+    """Names NODE defines for itself: vars, set_fact, register and loop_var."""
+    found = set()
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in ("vars", "set_fact", "ansible.builtin.set_fact") and isinstance(v, dict):
+                found |= set(v)
+            elif k == "register" and isinstance(v, str):
+                found.add(v)
+            elif k == "loop_control" and isinstance(v, dict) and "loop_var" in v:
+                found.add(v["loop_var"])
+            found |= defined_here(v)
+    elif isinstance(node, list):
+        for item in node:
+            found |= defined_here(item)
+    return found
 
 
 class Scan:

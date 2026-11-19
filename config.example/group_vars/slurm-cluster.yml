@@ -4,23 +4,23 @@
 ################################################################################
 # Slurm job scheduler configuration
 # Playbook: slurm, slurm-cluster, slurm-validation
-# slurm_version: ""
-slurm_install_prefix: /usr/local
-pmix_install_prefix: /opt/deepops/pmix
-hwloc_install_prefix: /opt/deepops/hwloc
+#slurm_version: 25.11.6
+#slurm_install_prefix: /usr/local
+#pmix_install_prefix: /opt/deepops/pmix
+#hwloc_install_prefix: /opt/deepops/hwloc
 #slurm_user_home: /local/slurm
-slurm_manage_gpus: true
+#slurm_manage_gpus: true
 #slurm_cluster_name: deepops
 #slurm_username: slurm
-slurm_password: ReplaceWithASecurePasswordInTheVault
+#slurm_password: ReplaceWithASecurePasswordInTheVault
 #slurm_db_username: slurm
-slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
-#slurm_max_job_timelimit: UNLIMITED
-#slurm_default_job_timelimit:
+#slurm_db_password: AlsoReplaceWithASecurePasswordInTheVault
+#slurm_max_job_timelimit: UNLIMITED  # example
+#slurm_default_job_timelimit:  # example
 
 # Auto-detect GPUs using NVML
 # See docs/slurm-cluster/nvml.md for details.
-slurm_autodetect_nvml: true
+#slurm_autodetect_nvml: true
 
 # Ensure hosts file generation only runs across slurm cluster
 hosts_add_ansible_managed_hosts_groups: ["slurm-cluster"]
@@ -29,21 +29,21 @@ hosts_add_ansible_managed_hosts_groups: ["slurm-cluster"]
 # NOTE: The location for Slurm saved state needs to reside in a location shared by all Slurm controller nodes
 #       Ideally this is on external NFS server and not the primary control node, since its failure
 #       would also take down that NFS share
-slurm_enable_ha: false
+#slurm_enable_ha: false
 slurm_ha_state_save_location: "/sw/slurm"
 
 # Slurm config files. For full control, point these at your own complete templates
 # under config/files/slurm/ (the role renders them verbatim); otherwise the role
 # generates them from gathered facts and roles/slurm/defaults/main.yml.
-#slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf"
-#slurm_cgroup_conf_template: "{{ inventory_dir }}/files/slurm/cgroup.conf"
-#slurm_gres_conf_template: "{{ inventory_dir }}/files/slurm/gres.conf"
-#slurm_dbd_conf_template: "{{ inventory_dir }}/files/slurm/slurmdbd.conf"
+#slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf"  # example
+#slurm_cgroup_conf_template: "{{ inventory_dir }}/files/slurm/cgroup.conf"  # example
+#slurm_gres_conf_template: "{{ inventory_dir }}/files/slurm/gres.conf"  # example
+#slurm_dbd_conf_template: "{{ inventory_dir }}/files/slurm/slurmdbd.conf"  # example
 
 # --- Slack (empty = disabled) -------------------------------------------------
 # Vault secrets: ansible-vault encrypt_string --prompt --name <var>
 # Alertmanager incoming webhook; it posts to the channel chosen when it was created.
-#alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
+#alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"  # example
 #alertmanager_slack_channel: "#alerts"
 # Prepended to critical alerts: "<!subteam^S0123ABCD>" for a user group, or "<!channel>".
 #alertmanager_slack_critical_mention: ""
@@ -52,7 +52,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 # minute; give the check a 2 minute period (headroom for jitter) and 5 minutes of grace.
 #alertmanager_heartbeat_url: ""
 # Slack app bot token (xoxb-) for bot posts and DMs.
-#slack_bot_token: ""
+#slack_bot_token: ""  # example
 
 # Hourly GPU usage report and idle-GPU nudges (roles/slurm_usage_report); needs
 # slack_bot_token. notify: any of mention, dm ([] = list only). cancel_after_hours 0 = never.
@@ -61,22 +61,22 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_channel: "#gpu-usage"
 #slurm_usage_report_notify: [mention]
 #slurm_usage_report_cancel_after_hours: 0
-#slurm_usage_report_user_map: "{{ people | people_attr('slack') }}"
+#slurm_usage_report_user_map: "{{ people | people_attr('slack') }}"  # example
 
 # AI coding agents (roles/ai_agent_rules): the site's agent rules file (Markdown
 # starting with <!-- cluster-agent-rules -->), installed for Claude Code
 # (/etc/claude-code/CLAUDE.md) and Codex (/etc/codex/requirements.toml); users' own
 # agent files are not touched. Only the version whose SHA-256 is pinned here installs:
 # review a new version, put its hash here and redeploy. Empty = off.
-#ai_agent_rules_url: "https://docs.example.org/agents/AGENTS.md"
+#ai_agent_rules_url: "https://docs.example.org/agents/AGENTS.md"  # example
 #ai_agent_rules_sha256: ""
 
 # --- job_submit.lua (optional Lua submit filter) -----------------------------
 # DeepOps ships no routing template -- write your OWN job_submit.lua, drop it in
 # config/files/slurm/, and point Slurm at it (used verbatim). Docs:
 # https://slurm.schedmd.com/job_submit_plugins.html
-#slurm_job_submit_plugins: "lua"
-#slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
+#slurm_job_submit_plugins: "lua"  # example
+#slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"  # example
 
 # --- Backups of the controller (roles/slurm_backup) --------------------------
 # Daily: accounting database dump, StateSaveLocation and (where munge_key) the MUNGE
@@ -84,7 +84,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 # test loads the dump into a scratch database. Use two disks: a local one (root only,
 # holds the MUNGE key) and an NFS export, written as `owner` because root_squash maps
 # this host's root to nobody there (its directory is made on prepare_host, the server).
-#slurm_backup_destinations:
+#slurm_backup_destinations:  # example
 #  - {path: /backup/slurm, munge_key: true}
 #  - {path: /scratch/.slurm-backup, owner: slurm, prepare_host: nfs-server-host}
 
@@ -92,8 +92,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 # Declare QoS and the account tree in one file; slurm.yml (tag accounting) applies it
 # with sacctmgr, previewable with --check --diff. Who is in which account comes from
 # the people roster (slurm_accounting_users below, merged into the file's users).
-#slurm_accounting_file: "{{ inventory_dir }}/files/slurm/accounting.yml"
-#slurm_accounting_users: "{{ people | people_accounting }}"
+#slurm_accounting_file: "{{ inventory_dir }}/files/slurm/accounting.yml"  # example
+#slurm_accounting_users: "{{ people | people_accounting }}"  # example
 
 # --- Keeping server-specific settings out of git -----------------------------
 # The outer deepops repo ignores config/ (.gitignore: /config*/), so site data and
@@ -106,26 +106,26 @@ slurm_ha_state_save_location: "/sw/slurm"
 # Login on compute
 ################################################################################
 # Restrict user SSH access to only allow users with a running job
-slurm_restrict_node_access: true
+#slurm_restrict_node_access: true
 
 # List users who should always be able to SSH, even without a running job; here the
 # administrators from the people roster (cluster_admins in all.yml).
-slurm_allow_ssh_user: []
+#slurm_allow_ssh_user: []
 
 # Enable a Slurm compute node to also function as a login node.
 # This is needed for the "single node Slurm cluster" configuration.
 # See docs/slurm-cluster/slurm-single-node.md
-slurm_login_on_compute: false
+#slurm_login_on_compute: false
 
 ################################################################################
 # Optional installs                                                            #
 ################################################################################
-slurm_configure_etc_hosts: true
-slurm_cluster_install_nvidia_driver: true
+#slurm_configure_etc_hosts: true
+#slurm_cluster_install_nvidia_driver: true
 # The directory and accounts plays (generic/authentication.yml)
-slurm_install_authentication: true
+#slurm_install_authentication: true
 # A pull-through registry cache on [slurm-cache] for the compute nodes
-slurm_enable_nginx_docker_cache: false
+#slurm_enable_nginx_docker_cache: false
 
 ################################################################################
 # NFS                                                                          #
@@ -151,7 +151,7 @@ nfs_exports:
 # unit with ProtectHome= cannot namespace over an autofs /home and exits 226/NAMESPACE,
 # which takes networkd, logind, polkit and timedated down with it.
 # See docs/slurm-cluster/slurm-nfs.md and `man 5 nfs`.
-nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
+#nfs_mount_options: rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail
 nfs_mounts:
   - mountpoint: /home
     server: '{{ groups["slurm-master"][0] }}'
@@ -167,7 +167,7 @@ nfs_mounts:
 # NFS performance tuning (applies on server + clients). Defaults shown below;
 # adjust for your hardware. Very high nfsd thread counts can fail to start with
 # ENOMEM. See docs/slurm-cluster/slurm-nfs.md.
-nfs_server_threads: 128      # nfsd (kernel NFS server) thread count; lower on small servers, raise toward 256 on large busy ones
+#nfs_server_threads: 128      # nfsd (kernel NFS server) thread count; lower on small servers, raise toward 256 on large busy ones
 #nfs_tune_network: true      # raise TCP/socket buffers for high-bandwidth NFS (default true)
 
 # Auto-recover nfs-server if a START fails (e.g. rpc.nfsd ENOMEM when a package
@@ -177,42 +177,41 @@ nfs_server_threads: 128      # nfsd (kernel NFS server) thread count; lower on s
 #nfs_server_autorestart_delay: 30
 #nfs_server_autorestart_interval: 600   # must exceed retries*delay
 
-# Flags for enable/disable of NFS deployment
-#  - Set up an NFS server on nfs-server?
-slurm_enable_nfs_server: true
-#  - Mount NFS filesystems on nfs-clients?
-slurm_enable_nfs_client_nodes: true
+# Flags for enable/disable of NFS deployment: an NFS server on the NFS servers, and
+# the NFS mounts on the NFS clients
+#slurm_enable_nfs_server: true
+#slurm_enable_nfs_client_nodes: true
 
 # NFS servers and clients are the [slurm-nfs] and [slurm-nfs-client] inventory groups.
 # Any other host the nfs role runs on has its NFS server stopped and removed, so a
 # server set up by hand once does not keep exporting.
-#nfs_servers: "{{ groups['slurm-nfs'] }}"
+#nfs_servers: "{{ groups['slurm-nfs'] }}"  # example
 
 # Flags for sharing slurm.conf among compute and control nodes
-slurm_conf_symlink: false
+#slurm_conf_symlink: false
 
 ################################################################################
 # SOFTWARE MODULES (SM)                                                        #
 #   May be built with either EasyBuild or Spack                                #
 ################################################################################
-slurm_install_lmod: true
+#slurm_install_lmod: true
 
 # Note: the sm_prefix must be in an NFS-shared location
-sm_prefix: "/sw"
+#sm_prefix: "/sw"
 
 # Easybuild-specific
-sm_module_root: "{{ sm_prefix }}/modules"
-sm_software_path: "{{ sm_prefix }}/software"
-sm_files_path: "{{ sm_prefix }}/easybuild_files"
+#sm_module_root: "{{ sm_prefix }}/modules"
+#sm_software_path: "{{ sm_prefix }}/software"
+#sm_files_path: "{{ sm_prefix }}/easybuild_files"
 sm_sources_path: "{{ sm_prefix }}/sources"
 sm_build_path: "{{ sm_prefix }}/build"
 sm_files_url: "https://github.com/DeepOps/easybuild_files.git"
 sm_install_default: true
-sm_module_path: "{{ sm_module_root }}/all"
+#sm_module_path: "{{ sm_module_root }}/all"
 
 # Spack-specific
 spack_install_dir: "{{ sm_prefix }}/spack"
-spack_build_packages: false
+#spack_build_packages: false
 # Illustrative only (spack_build_packages is false by default). Latest CUDA as the
 # single example spec -- `cuda` with no version lets Spack pick its newest. (CUDA
 # is also available as Lmod modules via the nvidia_cuda_toolkit role.)
@@ -242,14 +241,14 @@ spack_default_packages:
 # NVIDIA HPC SDK                                                               #
 ################################################################################
 # Off by default (Spack is likewise opt-in via playbooks/slurm-cluster/spack-modules.yml).
-slurm_install_hpcsdk: false
+#slurm_install_hpcsdk: false
 
 # Select the version of HPC SDK to download
-#hpcsdk_major_version: ""
-#hpcsdk_minor_version: ""
-#hpcsdk_file_cuda: ""
+#hpcsdk_major_version: '26'
+#hpcsdk_minor_version: '3'
+#hpcsdk_file_cuda: '13.1'
 #hpcsdk_arch: "x86_64"
-#hpcsdk_default_cuda: ""
+#hpcsdk_default_cuda: '13.1'
 
 # In a Slurm cluster, default to setting up HPC SDK as modules rather than in
 # the default user environment
@@ -264,9 +263,9 @@ hpcsdk_install_in_path: false
 # using the OpenMPI provided in the HPC SDK, but if you need a custom build,   #
 # this can help you get started.
 ################################################################################
-slurm_cluster_install_openmpi: false
-#openmpi_version:
-openmpi_install_prefix: "/usr/local"
+#slurm_cluster_install_openmpi: false
+#openmpi_version: 5.0.10
+#openmpi_install_prefix: "/usr/local"
 # OpenMPI 5.0.x built against the external PMIx + hwloc that Slurm uses (SchedMD
 # best practice). v5 removed --with-pmi/--with-slurm; `srun --mpi=pmix` needs only
 # --with-pmix. (On OpenMPI 4.x add back --with-pmi/--with-slurm and use a
@@ -276,7 +275,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 ################################################################################
 # Allow the User Permission to Set GPU Clocks                                  #
 ################################################################################
-allow_user_set_gpu_clocks: false
+#allow_user_set_gpu_clocks: false
 ################################################################################
 # GPU Power Limit                                                              #
 ################################################################################
@@ -286,7 +285,7 @@ allow_user_set_gpu_clocks: false
 # limit. Cap specific nodes from config/host_vars/<node>. The cap also bounds the Slurm
 # prolog/epilog, so an exclusive job cannot raise a capped node to the card maximum. Set
 # this false to leave GPU power limits alone entirely.
-slurm_cluster_configure_gpu_power_limit: true
+#slurm_cluster_configure_gpu_power_limit: true
 
 ################################################################################
 # Cluster Tools (site commands, shell defaults, login banner)                  #
@@ -304,7 +303,7 @@ slurm_cluster_configure_gpu_power_limit: true
 
 # The cluster commands the role ships (Python, on the shared clustertools library):
 # sq (queue, users, why jobs wait, pools) and qos (the QoS you may use, quotas).
-#cluster_tools_commands: [sq, qos]
+#cluster_tools_commands: [sq, qos]  # example
 
 # Commands and libraries published before the role recorded what it publishes, to remove
 # from every host (for example a command a site has retired).
@@ -314,7 +313,7 @@ slurm_cluster_configure_gpu_power_limit: true
 # Change a Slurm command's default output through its own environment variable rather
 # than by wrapping the command (see `man sinfo`, `man squeue`). The environment is
 # inherited, so batch scripts and remote commands get the same output.
-#cluster_tools_environment:
+#cluster_tools_environment:  # example
 #  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
 #  # The name the commands print (sq, qos); without it they fall back to
 #  # Slurm's ClusterName.
@@ -334,7 +333,7 @@ slurm_cluster_configure_gpu_power_limit: true
 # Site facts Slurm cannot know (roles/cluster_tools_lib), set once here and read by the
 # cluster's commands, login banner and alerts; refer to them below rather than restating
 # a value. A key left empty is left out. dashboard_url derives from grafana_root_url.
-#cluster_info:
+#cluster_info:  # example
 #  name: "my-cluster"  # system ID, <org>-<kind>
 #  docs_url: "https://docs.example.edu/cluster/"  # public user docs
 #  dashboard_url: "{{ grafana_root_url | default('') }}"
@@ -343,12 +342,12 @@ slurm_cluster_configure_gpu_power_limit: true
 
 # Login banner -- what people see when they SSH in. One short line each; the guide
 # carries the detail.
-#cluster_tools_motd_title: "my cluster"
-#cluster_tools_motd_commands:
+#cluster_tools_motd_title: "my cluster"  # example
+#cluster_tools_motd_commands:  # example
 #  - { name: sq,         text: "your jobs, who holds what, why jobs wait, what is free" }
 #  - { name: qos,        text: "your QoS: what it preempts, how full its quota is" }
 #  - { name: sinfo,      text: "partition and node state" }
-#cluster_tools_motd_links:
+#cluster_tools_motd_links:  # example
 #  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
 #  - { name: dashboard,    text: "{{ cluster_info.dashboard_url }}" }
@@ -356,31 +355,31 @@ slurm_cluster_configure_gpu_power_limit: true
 # Ubuntu's motd-news fetches advertising from motd.ubuntu.com into the login banner. On
 # hosts without internet access each run fails and stays a failed systemd unit, so
 # switch it off there.
-#cluster_tools_motd_news: false
+#cluster_tools_motd_news: false  # example
 
 # Directories copied onto a shared filesystem for users to read and copy from. Set
 # them on the one host that exports the share -- see config/host_vars/<head node>.
-#cluster_tools_shared_dirs:
+#cluster_tools_shared_dirs:  # example
 #  - { src: "{{ inventory_dir }}/files/slurm/examples", dest: /sw/examples }
 #  - { src: "{{ inventory_dir }}/docs", dest: /sw/docs }
 
 ################################################################################
 # Enroot & Pyxis                                                               #
 ################################################################################
-slurm_install_enroot: true
-slurm_install_pyxis: true
-#slurm_pyxis_version:
+#slurm_install_enroot: true
+#slurm_install_pyxis: true
+#slurm_pyxis_version: 0.24.0
 
 # /run is default partition of pyxis runtime_path
-resize_run_partition: false
+#resize_run_partition: false
 
 # /run tmpfs size. ubuntu default is 10%
-pyxis_run_tmpfs_size: 50%
+#pyxis_run_tmpfs_size: 50%
 
 ################################################################################
 # Node Health Check                                                            #
 ################################################################################
-slurm_install_nhc: true
+#slurm_install_nhc: true
 slurm_health_check_program: "/usr/sbin/nhc"
 
 # The health check configuration generated by default in DeepOps is pretty
@@ -389,7 +388,7 @@ slurm_health_check_program: "/usr/sbin/nhc"
 # To set a custom file for Ansible to provision to /etc/nhc/nhc.conf, set the
 # following var:
 #
-#nhc_config_template: "/path/to/custom/nhc.conf"
+#nhc_config_template: "/path/to/custom/nhc.conf"  # example
 #
 # For documentation on the file format, see:
 # https://github.com/mej/nhc/blob/master/README.md
@@ -397,7 +396,7 @@ slurm_health_check_program: "/usr/sbin/nhc"
 ################################################################################
 # Container registry                                                           #
 ################################################################################
-slurm_enable_container_registry: true
+#slurm_enable_container_registry: true
 docker_insecure_registries: "{{ groups['slurm-master'] | map('regex_replace', '^(.*)$', '\\1:5000') | list + ['registry.local:31500'] }}"
 docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*)$', 'http://\\1:5000') | list }}"
 
@@ -411,28 +410,28 @@ docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*
 # through dockerd live outside the job's cgroup -- they survive scancel and their
 # GPU/CPU/memory are not charged to the allocation. Prefer enroot/pyxis
 # (srun --container-image=...) for anything that fits in a single container.
-#docker_socket_group: "{{ cluster_docker_group_name }}"
-#docker_socket_group_gid: "{{ cluster_docker_group_gid }}"
+#docker_socket_group: "{{ cluster_docker_group_name }}"  # example
+#docker_socket_group_gid: "{{ cluster_docker_group_gid }}"  # example
 # Applying the change restarts dockerd, which stops running containers on the node.
 #docker_daemon_restart: true
 
 ################################################################################
 # Monitoring stack                                                             #
 ################################################################################
-slurm_enable_monitoring: true
+#slurm_enable_monitoring: true
 
 # The monitoring services (Prometheus, Grafana, exporters) run on the [slurm-metric]
 # inventory group.
 
 # Grafana web UI port (role default 3000). Override if 3000 is taken.
-#grafana_port: 3001
+#grafana_port: 3000
 # Grafana admin password, enforced on every run (role default "deepops"). Vault it.
-#grafana_cfg_pass: ""
+#grafana_cfg_pass: deepops
 # Public URL Grafana uses in the links it generates.
-#grafana_root_url: "http://cluster.example:3000/"
+#grafana_root_url: "http://cluster.example:3000/"  # example
 # Grafana folder of the provisioned dashboards; name it after the cluster's system ID,
 # one folder per cluster (role default "Cluster").
-#grafana_dashboard_folder: cluster-name
+#grafana_dashboard_folder: cluster-name  # example
 
 # Prometheus TSDB retention; whichever limit is hit first wins (role defaults below).
 #prometheus_retention_time: 90d
@@ -441,13 +440,13 @@ slurm_enable_monitoring: true
 # Slurm Prometheus exporter. By default the role builds the DeepOps-owned exporter
 # image locally (deepops/prometheus-slurm-exporter). To run an image from a registry
 # instead, turn the local build off and name the image.
-#slurm_exporter_build_image: false
-#slurm_exporter_container: "<registry>/prometheus-slurm-exporter:latest"
+#slurm_exporter_build_image: false  # example
+#slurm_exporter_container: "<registry>/prometheus-slurm-exporter:latest"  # example
 
 ################################################################################
 # Logging with rsyslog                                                         #
 ################################################################################
-slurm_enable_rsyslog_server: true
-slurm_enable_rsyslog_client: true
+#slurm_enable_rsyslog_server: true
+#slurm_enable_rsyslog_client: true
 # The server is slurm-master[0]; the clients are [slurm-node].
 rsyslog_client_tcp_host: "{{ groups['slurm-master'][0] }}"

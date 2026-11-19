@@ -3,7 +3,7 @@
 # read, defined once. A play reading one lists this role first in its roles, so the
 # value is a role default (the lowest precedence) that config/ overrides; an import's
 # `when` is evaluated in the imported plays and sees it there. config.example shows
-# each switch with its meaning. Never write `| default(...)` for these.
+# each switch commented at its default. Never write `| default(...)` for these.
 
 # Both deploys
 deepops_disable_cloud_init: true
@@ -21,6 +21,8 @@ slurm_cluster_install_nvidia_driver: true
 slurm_enable_nfs_server: true
 slurm_enable_nfs_client_nodes: true
 slurm_install_authentication: true
+# The people role creates the roster's accounts on the account source (the NIS master)
+people_manage_accounts: false
 slurm_install_nhc: true
 slurm_cluster_install_openmpi: false
 slurm_install_lmod: true
@@ -42,3 +44,12 @@ deepops_gpu_operator_enabled: true
 # Set to true for DGX and other systems with pre-installed drivers
 gpu_operator_preinstalled_nvidia_software: true
 k8s_nfs_client_provisioner: true
+# The NFS server playbooks/k8s-cluster/nfs-client-provisioner.yml sets up on
+# kube_control_plane[0] (false: use an existing one at k8s_nfs_server), whether it
+# creates the export directory, and the directory the provisioner uses
+k8s_deploy_nfs_server: true
+k8s_nfs_mkdir: true
+k8s_nfs_export_path: /export/deepops_nfs
+# Component playbooks run on their own
+# /etc/rc.local's managed block (playbooks/generic/rc-local.yml); empty leaves none
+rc_local_contents: ""
