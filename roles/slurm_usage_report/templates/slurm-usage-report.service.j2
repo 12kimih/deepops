@@ -5,6 +5,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+# A oneshot has no start timeout by default; one hang would stop its timer for good.
+TimeoutStartSec=20min
 ExecStart={{ slurm_usage_report_script }} --config {{ slurm_usage_report_config_dir }}/config.json
 StateDirectory={{ slurm_usage_report_svc_name }}
 ProtectSystem=full

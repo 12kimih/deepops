@@ -16,6 +16,8 @@ ConditionPathExists={{ nvidia_power_limit_conf_file }}
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# A oneshot has no start timeout by default; a hung nvidia-smi would hold up boot.
+TimeoutStartSec=5min
 EnvironmentFile={{ nvidia_power_limit_conf_file }}
 {% if nvidia_power_limit_persistence_mode %}
 # Best-effort (leading '-'): keep the driver initialized so the cap sticks reliably.
