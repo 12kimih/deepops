@@ -4,8 +4,9 @@
 # files on the root filesystem, NFS exports, firewall, containers, secret file modes,
 # home modes, pending updates, auth failures, NOPASSWD rules, kernel hardening.
 #
-# Prints no secrets, key material or users' file contents, and never walks /home or
-# other network filesystems (find stays on / with -xdev). Run on every host and
+# Prints no secrets, key material or users' file contents, and never walks /home, the
+# exported trees or other network filesystems (find stays on / with -xdev and prunes
+# them; only their first level is checked). Run on every host and
 # compare (playbooks/utilities/security-audit.yml).
 t() { timeout 20 "$@" 2>/dev/null; }
 # count LABEL PATTERN CMD...: lines of CMD's output matching PATTERN, or "unknown" when
@@ -27,7 +28,14 @@ tfind() {
 h() { echo "### $*"; }
 # Container image layers hold whole OS trees with their own setuid and world-writable
 # files; they are not the host's, so the filesystem walks skip them.
+# Users' data is never walked, wherever it lives: /home and every exported tree may sit on
+# the root filesystem (an NFS server), so -xdev alone does not keep find out of them.
+SHARED=(/home)
+while read -r path _; do
+  case "$path" in /*) SHARED+=("$path");; esac
+done < <(grep -vE '^\s*(#|$)' /etc/exports 2>/dev/null)
 PRUNE=(-path /var/lib/docker -o -path /var/lib/containerd -o -path /var/lib/containers -o -path /var/snap)
+for path in "${SHARED[@]}"; do PRUNE+=(-o -path "$path"); done
 
 h "1 listeners on non-loopback addresses (proto addr:port user process)"
 t ss -Hltnup | awk '$5 !~ /^(127\.|\[::1\]|::1)/ {print $1, $5, $7}' | sed 's/users:((//; s/))//' | sort -u
@@ -73,6 +81,9 @@ tfind / -xdev \( "${PRUNE[@]}" \) -prune -o \( -perm -4000 -o -perm -2000 \) -ty
 h "10 world-writable files under /etc /usr /opt /var/lib (not symlinks), and world-writable dirs without sticky bit"
 tfind /etc /usr /opt /var/lib -xdev \( "${PRUNE[@]}" \) -prune -o -type f -perm -0002 -print | head -20
 tfind / -xdev \( "${PRUNE[@]}" \) -prune -o -type d -perm -0002 ! -perm -1000 -print | head -20
+# The shared trees themselves, one level down only: a world-writable directory there lets
+# anyone delete everyone's files.
+tfind "${SHARED[@]}" -maxdepth 1 -type d -perm -0002 ! -perm -1000 -print | head -20
 
 h "11 NFS exports (server side)"
 t exportfs -v | tr -s ' \t' ' ' | paste -sd ';' -; echo
