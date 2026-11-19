@@ -28,57 +28,59 @@ deepops_doctor = load("deepops_doctor")
 validate_runai = load("validate_runai")
 
 
-class TestSlurmParsers(unittest.TestCase):
-    def test_sinfo_states_healthy(self):
-        out = "node1 idle\nnode2 mixed\nnode3 allocated\n"
-        total, avail, unavail, states = validate_slurm.parse_sinfo_states(out)
-        self.assertEqual((total, avail, unavail), (3, 3, 0))
-        self.assertEqual(states["idle"], 1)
+def node(name, state, gres=""):
+    """A node record as scontrol --json gives it, the fields validate_slurm reads."""
+    return {"name": name, "state": state, "gres": gres}
 
-    def test_sinfo_states_down_and_flags(self):
-        out = "node1 idle\nnode2 down*\nnode3 drained\n"
-        total, avail, unavail, states = validate_slurm.parse_sinfo_states(out)
-        self.assertEqual((total, avail, unavail), (3, 1, 2))
-        self.assertIn("down", states)
-        self.assertIn("drained", states)
 
-    def test_a_node_that_cannot_run_jobs_now_is_unavailable(self):
-        # Not responding, powered off, rebooting, in maintenance: unavailable whatever
-        # the base state says; a planned (-) or combined (+) node is still available.
-        out = "n1 idle*\nn2 allocated*\nn3 mixed$\nn4 idle~\nn5 mixed-\nn6 idle+\nn7 idle@\n"
-        total, avail, unavail, states = validate_slurm.parse_sinfo_states(out)
-        self.assertEqual((total, avail, unavail), (7, 2, 5))
-        self.assertEqual(states["idle"], 4)
+class TestSlurmNodes(unittest.TestCase):
+    def test_a_healthy_cluster_is_all_available(self):
+        nodes = [node("n1", ["IDLE"]), node("n2", ["MIXED"]), node("n3", ["ALLOCATED"])]
+        _, states, unavailable = validate_slurm.summarize_nodes(nodes)
+        self.assertEqual(unavailable, [])
+        self.assertEqual(states, {"idle": 1, "mixed": 1, "allocated": 1})
 
-    def test_sinfo_states_dedupes_partition_overlap(self):
-        out = "node1 idle\nnode1 idle\n"
-        total, _, _, _ = validate_slurm.parse_sinfo_states(out)
-        self.assertEqual(total, 1)
+    def test_a_node_no_job_can_start_on_is_unavailable(self):
+        # The cluster tools' one definition (clustertools.vocab.node_schedulable):
+        # down, not responding, drained, draining or in maintenance is out; powered
+        # down (Slurm powers it up for a job) and reserved are in.
+        nodes = [
+            node("n1", ["IDLE", "NOT_RESPONDING"]),
+            node("n2", ["DOWN"]),
+            node("n3", ["MIXED", "DRAIN"]),
+            node("n4", ["IDLE", "POWERED_DOWN"]),
+            node("n5", ["IDLE", "RESERVED"]),
+            node("n6", ["IDLE", "MAINTENANCE", "RESERVED"]),
+        ]
+        _, states, unavailable = validate_slurm.summarize_nodes(nodes)
+        self.assertEqual(unavailable, ["n1", "n2", "n3", "n6"])
+        self.assertEqual(states["mixed+drain"], 1)
 
-    def test_gres_gpu_totals(self):
-        out = "node1 gpu:4\nnode2 gpu:h100:8(S:0-1)\nnode3 (null)\n"
-        self.assertEqual(validate_slurm.parse_gres_gpus(out), 12)
-
-    def test_gres_dedupes_nodes(self):
-        out = "node1 gpu:4\nnode1 gpu:4\n"
-        self.assertEqual(validate_slurm.parse_gres_gpus(out), 4)
-
-    def test_node_details_are_unique_normalized_and_sorted(self):
-        states = "node-b down*\nnode-a IDLE+\nnode-b idle\n"
-        gres = "node-b gpu:h100:8(S:0-1)\nnode-a gpu:2\nnode-b gpu:4\n"
+    def test_details_are_sorted_with_each_nodes_gpus(self):
+        nodes = [node("node-b", ["DOWN"], "gpu:h100:8(S:0-1)"), node("node-a", ["IDLE"], "gpu:2,gpu:t4:1")]
+        details, _, _ = validate_slurm.summarize_nodes(nodes)
         self.assertEqual(
-            validate_slurm.build_node_details(states, gres),
+            details,
             [
-                {"name": "node-a", "state": "idle", "gpus_configured": 2},
+                {"name": "node-a", "state": "idle", "gpus_configured": 3},
                 {"name": "node-b", "state": "down", "gpus_configured": 8},
             ],
         )
 
-    def test_node_details_default_missing_gres_to_zero(self):
-        self.assertEqual(
-            validate_slurm.build_node_details("node1 mixed\n", ""),
-            [{"name": "node1", "state": "mixed", "gpus_configured": 0}],
+    def test_the_fixture_of_every_slurm_release_reads(self):
+        # The same replies the cluster tools are tested on, one per Slurm release.
+        root = os.path.dirname(os.path.dirname(SCRIPTS_DIR))
+        fixtures = os.path.join(root, "tests", "cluster-tools", "fixtures")
+        releases = sorted(
+            d for d in os.listdir(fixtures) if os.path.isfile(os.path.join(fixtures, d, "nodes.json"))
         )
+        self.assertTrue(releases)
+        for release in releases:
+            with self.subTest(release=release), open(os.path.join(fixtures, release, "nodes.json")) as f:
+                nodes = validate_slurm.slurm.check("nodes", json.load(f))["nodes"]
+                details, states, _ = validate_slurm.summarize_nodes(nodes)
+                self.assertEqual(len(details), len(nodes))
+                self.assertEqual(sum(states.values()), len(nodes))
 
 
 class TestK8sParsers(unittest.TestCase):
@@ -213,15 +215,23 @@ class TestRunDecodes(unittest.TestCase):
 
 
 class TestSlurmGpuJob(unittest.TestCase):
-    SINFO_GRES = "n1 gpu:a100:4(S:0-1)\nn2 gpu:h100:8\nn3 gpu:h100:8\nn3 gpu:h100:8\nn4 (null)\n"
+    NODES = [
+        node("n1", ["IDLE"], "gpu:a100:4(S:0-1)"),
+        node("n2", ["IDLE"], "gpu:h100:8"),
+        node("n3", ["IDLE"], "gpu:h100:8"),
+        node("n4", ["IDLE"], "(null)"),
+    ]
 
-    def test_gpu_types_count_each_node_once(self):
-        self.assertEqual(validate_slurm.parse_gres_gpu_types(self.SINFO_GRES), {"a100": 4, "h100": 16})
+    def test_gpu_types_add_up_over_the_nodes(self):
+        self.assertEqual(validate_slurm.gpu_types(self.NODES), {"a100": 4, "h100": 16})
 
     def test_the_type_with_the_most_gpus_is_picked(self):
-        self.assertEqual(validate_slurm.pick_gpu_type(self.SINFO_GRES), "h100")
-        self.assertEqual(validate_slurm.pick_gpu_type("n1 gpu:b:2\nn2 gpu:a:2\n"), "a")
-        self.assertEqual(validate_slurm.pick_gpu_type("n1 gpu:4\n"), "")
+        self.assertEqual(validate_slurm.pick_gpu_type(self.NODES), "h100")
+        self.assertEqual(
+            validate_slurm.pick_gpu_type([node("n1", ["IDLE"], "gpu:b:2"), node("n2", ["IDLE"], "gpu:a:2")]),
+            "a",
+        )
+        self.assertEqual(validate_slurm.pick_gpu_type([node("n1", ["IDLE"], "gpu:4")]), "")
 
     def test_the_job_is_named_and_typed(self):
         cmd = validate_slurm.gpu_job_command("deepops-validate-1", "h100", "batch")
@@ -237,18 +247,13 @@ class TestSlurmGpuJob(unittest.TestCase):
             calls.append(cmd)
             if cmd[0] == "srun":
                 return (srun_rc, "NVIDIA H100, 580.95", "") if srun_rc == 0 else (124, "", "timeout after 1s")
-            if cmd[:2] == ["sinfo", "--version"]:
-                return 0, "slurm 26.05.1", ""
-            if cmd[-1] == "%n %T":
-                return 0, "n1 idle\nn2 idle\n", ""
-            if cmd[-1] == "%n %G":
-                return 0, self.SINFO_GRES, ""
             return 0, "", ""
 
         out = io.StringIO()
         with (
             mock.patch.object(validate_slurm, "run", fake_run),
-            mock.patch.object(validate_slurm.shutil, "which", return_value="/usr/bin/sinfo"),
+            mock.patch.object(validate_slurm.slurm, "load", return_value={"nodes": self.NODES}),
+            mock.patch.object(validate_slurm.shutil, "which", return_value="/usr/bin/scontrol"),
             mock.patch.object(sys, "argv", ["validate_slurm.py", "--json"] + argv),
             contextlib.redirect_stdout(out),
         ):

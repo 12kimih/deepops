@@ -18,7 +18,7 @@ class NodeStateTests(unittest.TestCase):
             "COMPLETING": "alloc",
             "MIXED+DRAIN": "drain",
             "IDLE+DRAIN": "drain",
-            "IDLE+MAINT+RESERVED": "drain",
+            "IDLE+MAINTENANCE+RESERVED": "drain",
             "IDLE+REBOOT_REQUESTED": "idle",
             "DOWN+NOT_RESPONDING": "down",
             "MIXED+NOT_RESPONDING": "down",
@@ -35,6 +35,24 @@ class NodeStateTests(unittest.TestCase):
                 self.assertEqual(vocab.node_class(state), cls)
                 self.assertEqual(vocab.node_class(state.split("+") if state else []), cls)
 
+    # Slurm's JSON names for node and partition states (data_parser v0.0.44,
+    # PARSER_FLAG_ARRAY(NODE_STATES) and (PARTITION_STATES) in
+    # src/plugins/data_parser/v0.0.44/parsers.c), the only form the tools read.
+    SLURM_STATES = frozenset(
+        "INVALID UNKNOWN DOWN IDLE ALLOCATED ERROR MIXED FUTURE EXTERNAL RESERVED UNDRAIN CLOUD "
+        "RESUME DRAIN COMPLETING NOT_RESPONDING POWERED_DOWN FAIL POWERING_UP MAINTENANCE "
+        "REBOOT_REQUESTED REBOOT_CANCELED POWERING_DOWN DYNAMIC_FUTURE REBOOT_ISSUED PLANNED "
+        "INVALID_REG POWER_DOWN POWER_UP POWER_DRAIN DYNAMIC_NORM BLOCKED INACTIVE UP".split()
+    )
+    # Words of scontrol's and sinfo's text output that the JSON never gives.
+    TEXT_ONLY = frozenset(("FAILING", "INVAL", "DRAINING", "DRAINED"))
+
+    def test_every_state_word_is_slurms(self):
+        # A word Slurm never sends matches nothing: "MAINT" once left a node in a
+        # maintenance reservation counted as schedulable.
+        words = vocab._DOWN | vocab._DRAIN | set(vocab._BASE)
+        self.assertEqual(sorted(words - self.SLURM_STATES - self.TEXT_ONLY), [])
+
     def test_every_class_is_known_and_explained(self):
         self.assertEqual(set(vocab.NODE_HELP), set(vocab.NODE_CLASSES))
         self.assertTrue(vocab.OPEN_CLASSES < set(vocab.NODE_CLASSES))
@@ -46,7 +64,7 @@ class NodeStateTests(unittest.TestCase):
         cases = [
             (["IDLE"], None),
             (["IDLE", "NOT_RESPONDING"], None),
-            (["IDLE", "MAINT"], None),
+            (["IDLE", "MAINTENANCE"], None),
             (["IDLE", "DRAIN"], "drained"),
             (["MIXED", "DRAIN"], "draining"),
             (["COMPLETING", "DRAIN"], "draining"),
@@ -116,7 +134,7 @@ class SchedulableTests(unittest.TestCase):
             ("IDLE",): (True, "idle", False), ("MIXED",): (True, "mixed", False),
             ("ALLOCATED",): (True, "allocated", False), ("IDLE", "POWERED_DOWN"): (True, "idle", False),
             ("IDLE", "RESERVED"): (True, "idle", False), ("IDLE", "DRAIN"): (False, "idle", True),
-            ("MIXED", "DRAIN"): (False, "mixed", True), ("IDLE", "MAINT"): (False, "idle", False),
+            ("MIXED", "DRAIN"): (False, "mixed", True), ("IDLE", "MAINTENANCE"): (False, "idle", False),
             ("IDLE", "NOT_RESPONDING"): (False, "idle", False), ("DOWN",): (False, "down", False),
             ("FUTURE",): (False, "future", False), (): (False, "unknown", False),
         }  # fmt: skip

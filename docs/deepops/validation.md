@@ -43,8 +43,13 @@ python3 scripts/validation/validate_slurm.py --skip-gpu-job   # read-only
 
 Checks controller reachability, node availability, configured `gres/gpu`
 resources, and (by default) submits a single-GPU `srun` job running
-`nvidia-smi`. The job is named `deepops-validate-<pid>` and asks for one GPU of
-the type with the most GPUs in `sinfo`'s GRES (`--gpu-type` picks another);
+`nvidia-smi`. Nodes are read from `scontrol --json` through the cluster tools'
+Slurm module, so a node counts as available exactly when `sq` and the metrics
+count it schedulable (not down, not responding, drained, draining or in
+maintenance; a powered-down node is available, Slurm powers it up).
+`node_states` counts each full state (`idle`, `mixed+drain`). The job is
+named `deepops-validate-<pid>` and asks for one GPU of the type with the most
+configured GPUs (`--gpu-type` picks another);
 when it does not finish within `--gpu-job-timeout` seconds it is cancelled, so
 it does not wait in the queue to take a GPU later. Example JSON:
 
