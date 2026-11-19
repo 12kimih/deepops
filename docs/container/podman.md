@@ -71,12 +71,28 @@ That makes builds fast and repeat builds reuse cached layers, with two consequen
   podman system reset -f            # remove everything of yours on this node
   ```
 
+- A daily cleanup removes your whole store on a node when you have not used it
+  there for 14 days, when you leave the cluster, or, least recently used first,
+  when the disk is nearly full. It never touches it while you run podman. The
+  enroot layer cache (`/var/lib/enroot-cache/user-<UID>`) is cleaned the same way.
+
+## GPUs
+
+Running GPU work from the imported image with Pyxis is the usual way. To test an
+image with podman in a GPU job, request the GPUs by their CDI name:
+
+```bash
+srun --gpus=1 --pty podman run --rm --device nvidia.com/gpu=all localhost/myimage:1 nvidia-smi
+```
+
+The container stays in the job's cgroup, so it reaches only the job's GPUs, as
+`nvidia-smi` in the job itself does.
+
 ## What does not work
 
 - Long-running containers or services. Every process, the containers included,
   belongs to the job and ends with it. There is no `podman system service`,
   `podman generate systemd` or Quadlet: users have no systemd instance on the nodes.
-- GPUs in `podman run`. Run GPU work with Pyxis or Enroot from the imported image.
 - Building or running outside a job: compute nodes are reached through Slurm.
 
 ## Troubleshooting
@@ -87,9 +103,9 @@ That makes builds fast and repeat builds reuse cached layers, with two consequen
   add you; ranges come from the user roster.
 
 Errors about `XDG_RUNTIME_DIR`, `/run/user/<UID>` or `pause.pid`
-: Run `podman` from `PATH` (`/usr/local/bin/podman`), not `/usr/bin/podman`. The
-  first points Podman at a runtime directory that exists on the node; a job
-  otherwise inherits the login node's, which does not.
+: Run podman inside a job. Slurm sets `XDG_RUNTIME_DIR` to a directory of yours on
+  the node for every job step; a shell that reached the node another way keeps the
+  login node's, which does not exist there.
 
 `overlay is not supported over nfs` or a very slow build
 : You have your own `~/.config/containers/storage.conf`, which replaces the node's
@@ -126,10 +142,25 @@ Ubuntu 24.04):
   limits, accounting and cleanup apply to them; no cgroup delegation is needed.
 - **Runtime directory.** A job inherits `XDG_RUNTIME_DIR=/run/user/<UID>` from the
   login node, which does not exist on the compute node, and podman fails on it.
-  `/usr/local/bin/podman` sets `XDG_RUNTIME_DIR` to `<podman_runtime_root>/<UID>`,
-  which the role creates for each person and `/etc/tmpfiles.d/podman-users.conf`
-  recreates at boot. `enroot import podman://` calls `podman` from `PATH` and so
-  goes through it.
+  Slurm's job environment sets it instead (roles/slurm, see
+  [the job environment](../slurm-cluster/job-environment.md)): the prolog creates
+  `<slurm_user_runtime_root>/<UID>`, the task prolog exports it to every task of
+  every step, and the epilog of the user's last job on the node removes it.
+- **GPUs.** `roles/nvidia_container_toolkit` keeps the toolkit's CDI specification
+  (`/var/run/cdi/nvidia.yaml`, refreshed by `nvidia-cdi-refresh` on driver changes
+  and at boot, and by `playbooks/nvidia-software/nvidia-mig.yml` after a MIG change),
+  which `--device nvidia.com/gpu=...` reads
+  ([CDI support](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html)).
+- **Cleanup.** `roles/container_storage_gc` (`slurm_container_storage_gc`) runs
+  `container-storage-gc` daily on every Slurm host. It reads the per-user store paths
+  from storage.conf and enroot.conf, and removes a user's whole store when they left
+  `container_storage_gc_people`, after `container_storage_gc_unused_days` without a
+  change, or least recently used first while the filesystem is above
+  `container_storage_gc_max_used_percent`, never while that user runs the tool. A
+  podman store is recreated empty for its user. Its metrics feed the
+  `ContainerStorageCleanupStale` alert; the disk itself is covered by the existing
+  filesystem alerts. `container-storage-gc /etc/cluster-tools/container-storage-gc.json
+  --dry-run` lists what it would remove for leaving or being unused.
 - **AppArmor.** Ubuntu 24.04 restricts unprivileged user namespaces. The apparmor
   package's `podman`, `crun` and `slirp4netns` profiles grant them to those programs
   only; the role fails if they are missing and loads any that is not loaded.
