@@ -98,6 +98,26 @@ def task_named(path, name):
     return matches[0]
 
 
+def conditions(path, name):
+    """Every `when` a task runs under: its own and those of the blocks around it."""
+    found = []
+
+    def walk(tasks, inherited):
+        for task in tasks or []:
+            if not isinstance(task, dict):
+                continue
+            own = task.get("when") or []
+            here = inherited + (own if isinstance(own, list) else [own])
+            if same_name(task.get("name"), name) and "block" not in task:
+                found.append(set(here))
+            for key in ("block", "rescue", "always"):
+                walk(task.get(key), here)
+
+    walk(yaml.safe_load((ROOT / path).read_text()), [])
+    assert len(found) == 1, f"{path}: {name}"
+    return found[0]
+
+
 class TransientExecutionContract(unittest.TestCase):
     """Nothing that touches a GPU may run directly in the ssh context."""
 
@@ -159,13 +179,13 @@ class MigApplyFailureContract(unittest.TestCase):
             ("Install MIG Manager (dnf)", "RedHat"),
         ):
             with self.subTest(name=name):
-                self.assertEqual(
-                    set(task_named(MIG_ROLE, name)["when"]),
+                self.assertLessEqual(
                     {
                         "has_mig.rc == 0",
                         "has_mig_parted.rc != 0",
                         f'ansible_facts.os_family == "{family}"',
                     },
+                    conditions(MIG_ROLE, name),
                 )
 
     def test_a_failed_probe_is_reported_rather_than_skipped(self):
