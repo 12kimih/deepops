@@ -1,0 +1,7 @@
+---
+dependencies:
+  - role: deepops_paths  # deepops_dir, sm_* module paths
+
+galaxy_info:
+  namespace: deepops
+  role_name: lmod

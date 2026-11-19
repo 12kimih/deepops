@@ -1,2 +1,3 @@
 ---
-dependencies: []
+dependencies:
+  - role: deepops_paths  # deepops_dir, sm_* module paths

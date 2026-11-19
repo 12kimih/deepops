@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from ansible_yaml import render  # noqa: E402
+from ansible_yaml import render, role_defaults  # noqa: E402
 
 ROLE = ROOT / "roles" / "nhc"
 FACTS = {
@@ -29,7 +29,7 @@ FACTS = {
 
 def conf(varfile, family):
     variables = {
-        **(yaml.safe_load((ROLE / "defaults" / "main.yml").read_text()) or {}),
+        **role_defaults("nhc"),
         **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
         "ansible_managed": "",
         "ansible_facts": {**FACTS, "os_family": family},

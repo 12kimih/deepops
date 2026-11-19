@@ -28,6 +28,20 @@ class PlatformPath(unittest.TestCase):
         self.state = Path(self.tmp.name)
         role = self.state / "roles/runai"
         shutil.copytree(ROOT / "roles/runai", role)
+        # The roles it depends on (shared defaults such as deepops_paths) come along, as
+        # a play would load them.
+        deps = list((yaml.safe_load((role / "meta/main.yml").read_text()) or {}).get("dependencies") or [])
+        while deps:
+            dep = deps.pop()
+            name = dep["role"] if isinstance(dep, dict) else dep
+            if not (self.state / "roles" / name).exists():
+                shutil.copytree(ROOT / "roles" / name, self.state / "roles" / name)
+                meta = ROOT / "roles" / name / "meta/main.yml"
+                deps += (
+                    (yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []
+                    if meta.is_file()
+                    else []
+                )
         for path in (role / "tasks").glob("*.yml"):
             text = path.read_text().replace("owner: root", 'owner: "%s"' % os.getuid())
             text = text.replace("group: root", 'group: "%s"' % os.getgid())

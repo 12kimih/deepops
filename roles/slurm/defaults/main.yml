@@ -1,6 +1,6 @@
 ---
-
-deepops_dir: /opt/deepops
+# Shared Slurm and DeepOps paths (prefix, config dir, host groups, state location):
+# roles/slurm_paths and roles/deepops_paths.
 slurm_build_dir: /opt/deepops/build/slurm
 hwloc_build_dir: /opt/deepops/build/hwloc
 pmix_build_dir: /opt/deepops/build/pmix
@@ -19,13 +19,11 @@ slurm_build_dir_cleanup: false
 slurm_distro_packages:
   Debian: [slurm, slurm-wlm, slurmctld, slurmdbd, slurmd]
   RedHat: [slurm]
-slurm_config_dir: /etc/slurm
 # Only used when slurm_conf_symlink is true (slurm.conf shared via NFS). Defaults to
 # the local config dir; set this to a path NFS-shared to all nodes (e.g. /sw/.slurm)
 # in config/group_vars/slurm-cluster.yml when you enable the symlink.
 slurmctl_config_dir: "{{ slurm_config_dir }}"
 slurm_sysconf_dir: /etc/sysconfig
-slurm_install_prefix: /usr/local
 slurm_cuda_prefix: /usr/local/cuda
 slurm_configure: "./configure --prefix={{ slurm_install_prefix }} --disable-dependency-tracking --disable-debug --disable-x11 --enable-really-no-cray --enable-salloc-kill-cmd
   --with-hdf5=no --sysconfdir={{ slurm_config_dir }} --enable-pam --with-pam_dir={{ slurm_pam_lib_dir }} --with-shared-libslurm --without-rpath --with-pmix={{ pmix_install_prefix
@@ -80,23 +78,6 @@ slurm_acct_organization: deepops
 # whoever ran the play, which made Slurm membership depend on who deployed last.
 slurm_acct_users: []
 
-slurm_enable_ha: false
-# HA StateSaveLocation. Must be on storage shared by all controllers when HA is on;
-# set it to your shared path (e.g. /sw/slurm) in config/group_vars.
-slurm_ha_state_save_location: "{{ deepops_dir }}/slurm/state"
-# Where slurmctld keeps its state, for slurm.conf and the directory task alike.
-slurm_state_save_location: "{{ slurm_ha_state_save_location if slurm_enable_ha else '/var/spool/slurmctld' }}"
-
-# A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
-# the controller group, slurmd on the compute group, client-only elsewhere.
-slurm_controller_group: slurm-master
-slurm_compute_group: slurm-node
-is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"
-is_compute: "{{ inventory_hostname in (groups[slurm_compute_group] | default([])) }}"
-
-# The systemd units that run sshd: the service, then the socket that starts it on
-# demand (Ubuntu 22.10+). Debian and Ubuntu name them ssh; upstream OpenSSH and RHEL sshd.
-ssh_units: "{{ ['sshd.service', 'sshd.socket'] if ansible_facts.os_family == 'RedHat' else ['ssh.service', 'ssh.socket'] }}"
 
 # Controls when a DOWN node will be returned to service. 2 lets nodes auto-recover
 # after a clean RebootProgram cycle (driver/firmware updates); 1 leaves them DOWN

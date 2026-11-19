@@ -14,7 +14,7 @@
 
 # Slurm commands run on the controller.
 maintenance_slurm_controller: "{{ (groups['slurm-master'] | default([]) | first) | default('') }}"
-maintenance_slurm_bin: "{{ slurm_install_prefix | default('/usr/local') }}/bin"
+maintenance_slurm_bin: "{{ slurm_install_prefix }}/bin"
 # The reason recorded on the nodes this run drains; resume only touches those.
 maintenance_reason: "maintenance: upgrade"
 # How long to wait for running jobs to finish, and how often to look (the cluster's
