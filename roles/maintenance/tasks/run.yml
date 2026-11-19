@@ -3,6 +3,32 @@
 # fails stops its own steps at once (it is never resumed), but the run stops only
 # after the other nodes of its batch finish theirs: failing it on the spot would end
 # the play for every node mid-step, leaving a node rebooted and never verified.
+# The steps that talk to Slurm call the commands this checkout installs. A controller
+# still on another install (the source build before slurm-upgrade.yml moved it to the
+# packages) has none there: say so once, before any node is touched.
+- name: Find the Slurm commands on the controller
+  ansible.builtin.stat:
+    path: "{{ maintenance_slurm_bin }}/scontrol"
+  delegate_to: "{{ maintenance_slurm_controller }}"
+  register: maintenance_scontrol
+  run_once: true
+  check_mode: false
+  when:
+    - maintenance_slurm_controller | length > 0
+    - ansible_play_hosts | intersect(groups[slurm_compute_group] | default([])) | length > 0
+    - maintenance_steps | intersect(['drain', 'reboot', 'verify', 'resume']) | length > 0
+
+- name: Require the Slurm commands this checkout installs
+  ansible.builtin.assert:
+    that: maintenance_scontrol.stat.exists
+    fail_msg: >-
+      {{ maintenance_slurm_bin }}/scontrol is missing on {{ maintenance_slurm_controller }}:
+      the controller runs a different Slurm install than this checkout deploys. Run
+      playbooks/slurm-cluster/slurm-upgrade.yml first (docs/slurm-cluster/slurm-upgrade.md).
+    quiet: true
+  run_once: true
+  when: maintenance_scontrol is not skipped
+
 - name: Run the maintenance steps
   block:
     - name: Run the step
