@@ -78,7 +78,8 @@ is signed again and every node gets the new public key).
 
 The controller refuses a `slurm_conf_template` that lacks `enable_configless` in
 `SlurmctldParameters`, names the cluster other than `{{ slurm_cluster_name }}`, or sets
-a `PluginDir` other than the packages' (leave it out). Add
+a `PluginDir` other than the packages' (leave it out; the same goes for a
+`slurm_dbd_conf_template`). Add
 `MetricsType=metrics/openmetrics` for the Prometheus scrape. With
 `AutoDetect=nvml`, GPU types in `Gres=` must be substrings of the names NVML reports:
 see [nvml.md](nvml.md#gpu-type-names).
