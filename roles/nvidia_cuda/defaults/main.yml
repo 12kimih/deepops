@@ -3,9 +3,10 @@
 # when CUDA is provided per-version through Lmod/environment modules instead.
 nvidia_cuda_install: false
 
-# 'cuda-toolkit' is the generic package and will pull the latest version
-# if you want a specific version, use e.g. cuda-toolkit=12.2.0-1
-cuda_version: cuda-toolkit
+# The newest toolkit of the CUDA major the driver branch serves (nvidia_versions):
+# the unversioned cuda-toolkit would follow NVIDIA's newest release past what the
+# driver runs. A specific version looks like cuda-toolkit-13-2.
+cuda_version: "cuda-toolkit-{{ nvidia_driver_cuda_major }}"
 
 # DGX-specific vars may be used to target specific models,
 # because available versions for DGX may differ from the generic repo

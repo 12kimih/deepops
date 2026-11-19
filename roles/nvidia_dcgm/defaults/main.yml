@@ -10,7 +10,7 @@ dcgm_pkg_name: "datacenter-gpu-manager-4-cuda{{ nvidia_driver_cuda_major }}"
 # (-cuda12, -cuda12-cublas, -multinode-cuda12, ...; globs, resolved by host_baseline).
 dcgm_other_pkgs: >-
   {{ ['datacenter-gpu-manager', 'datacenter-gpu-manager-config']
-     + ['11', '12', '13'] | reject('equalto', nvidia_driver_cuda_major | string)
+     + nvidia_cuda_min_driver_branch | list | map('string') | reject('equalto', nvidia_driver_cuda_major | string)
        | map('regex_replace', '^', 'datacenter-gpu-manager-4-*cuda') | map('regex_replace', '$', '*') | list }}
 
 # DGX OS ships its own DCGM and the package name differs per release.

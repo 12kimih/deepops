@@ -2,6 +2,7 @@
 - name: Install CUDA when we require NVML support for autodetection
   ansible.builtin.include_role:
     name: nvidia_cuda
+    public: true  # nvidia_versions (a dependency) supplies its values
   when: slurm_autodetect_nvml | default(false)
 
 # The includes below are tagged always: an untagged include is skipped under --tags,

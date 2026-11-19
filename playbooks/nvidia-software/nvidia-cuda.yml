@@ -9,5 +9,6 @@
     - name: Install the NVIDIA CUDA toolkit
       ansible.builtin.include_role:
         name: nvidia_cuda
+        public: true  # nvidia_versions (a dependency) supplies its values
       when: nvidia_cuda_install | default(false) | bool
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
