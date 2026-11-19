@@ -46,6 +46,21 @@ If something did reach a pushed commit, rewrite only your own commits with
 upstream commits and their signatures intact), force-push with lease, and ask GitHub
 Support to purge cached views of the old commits.
 
+### Silent reverts
+
+Several people pushing to one branch meet a quiet failure: a commit built on an
+out-of-date copy of a file, committed on top of newer history, puts the file back to an
+older version and undoes the commits in between without anyone saying so.
+[`scripts/deepops/no_silent_revert.py`](../../scripts/deepops/no_silent_revert.py), a
+pre-push hook, refuses such a commit and names the commits it would undo. A commit that
+means it says so in its message (revert, reapply, restore) and passes. Rebase onto the
+remote and redo the change otherwise. Both push hooks read the pushed commits from one
+place, [`scripts/deepops/push_range.py`](../../scripts/deepops/push_range.py).
+
+```bash
+scripts/deepops/no_silent_revert.py range origin/main..HEAD   # before pushing by hand
+```
+
 ## DeepOps end-to-end testing
 
 Public DeepOps pull requests are validated with GitHub Actions for setup, linting, CodeQL, and selected Molecule role tests. Those checks catch many packaging and role-regression issues, but they do not replace deployment validation on real GPU systems.

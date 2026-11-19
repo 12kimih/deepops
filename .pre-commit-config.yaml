@@ -62,3 +62,12 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+      # A commit built on an out-of-date copy and pushed on top undoes newer commits
+      # without saying so; see scripts/deepops/no_silent_revert.py.
+      - id: no-silent-revert
+        name: no silent revert (commits to push)
+        entry: scripts/deepops/no_silent_revert.py push
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
