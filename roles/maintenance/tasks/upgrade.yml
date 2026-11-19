@@ -54,7 +54,7 @@
         msg: >-
           {{ inventory_hostname }} serves the cluster, so the upgrade restarted no service.
           `needrestart -r l` lists those running old code; they take it at the next reboot
-          (playbooks/utilities/reboot.yml once no job runs).
+          (playbooks/utilities/reboot.yml, or `sudo systemctl reboot` on the host).
       when: _hold and maintenance_apt_upgrade is changed
   always:
     - name: Let services start again

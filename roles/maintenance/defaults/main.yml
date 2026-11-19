@@ -55,13 +55,12 @@ maintenance_reboot_timeout: 1800
 
 # Hosts the rest of the cluster depends on: the Slurm controller and the NFS servers.
 # Their package upgrades restart no service (policy-rc.d; the new code runs from their
-# next reboot), and they are rebooted only while no job runs: a restart of nfs-server
-# under running jobs hung the cluster on 2026-11-18, and needrestart does not cover the
-# restarts packages make themselves.
+# next reboot): a restart of nfs-server under running jobs hung the cluster on
+# 2026-11-18, and needrestart does not cover the restarts packages make themselves.
+# Rebooting one is allowed while jobs run: they run on the compute nodes and survive
+# it (I/O to a hard NFS mount waits for the server to come back).
 maintenance_shared_host: >-
   {{ inventory_hostname in (groups[slurm_controller_group] | default([])) + (groups['slurm-nfs'] | default([])) }}
-# Reboot a shared host although jobs run (they lose the scheduler and /home).
-maintenance_reboot_busy_cluster: false
 
 # verify: the units that must be active (what the deploy runs on each kind of host),
 # and whether to require GPUs and NHC.

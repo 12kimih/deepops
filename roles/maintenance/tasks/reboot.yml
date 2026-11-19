@@ -55,30 +55,6 @@
           drains it, reboots it and returns it; -e maintenance_reboot_undrained=true
           reboots it anyway, losing its jobs.
 
-    # A host the cluster depends on goes down only while nothing runs.
-    - name: Count the jobs running in the cluster
-      ansible.builtin.command:
-        argv: ["{{ maintenance_slurm_bin }}/squeue", --noheader, "--states=RUNNING,SUSPENDED,COMPLETING", "--format=%i"]
-      delegate_to: "{{ maintenance_slurm_controller }}"
-      register: maintenance_cluster_jobs
-      changed_when: false
-      check_mode: false  # read-only; --check needs the result
-      when:
-        - maintenance_shared_host | bool
-        - maintenance_slurm_controller | length > 0
-        - not maintenance_reboot_busy_cluster | bool
-
-    - name: Refuse to reboot a host the cluster depends on while jobs run
-      ansible.builtin.fail:
-        msg: >-
-          {{ inventory_hostname }} serves the cluster (scheduler or NFS) and
-          {{ maintenance_cluster_jobs.stdout_lines | length }} jobs run. Reboot it once
-          they end (drain the nodes first), or -e maintenance_reboot_busy_cluster=true
-          to reboot it under them.
-      when:
-        - maintenance_cluster_jobs is not skipped
-        - maintenance_cluster_jobs.stdout_lines | length > 0
-
     # Triggers first, or the umount re-arms a mount against a dying server.
     - name: Detach the shared filesystems before the reboot
       ansible.builtin.shell:
