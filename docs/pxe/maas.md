@@ -92,10 +92,10 @@ Please consult your hypervisor documentation for instructions on doing this.
    maas_dns_domain: 'deepops.local'
    maas_region_controller: '192.168.1.1'
    maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
-   maas_repo: "{{ 'ppa:maas/3.7' if ansible_distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
    ```
-   If you know every MAAS controller host is running Ubuntu 24.04, you can set this directly to `ppa:maas/3.7`.
-   If the controller is still Ubuntu 22.04, keep `ppa:maas/3.5`.
+   The MAAS release series follows the controller's Ubuntu release (`maas_series`: 3.8 on
+   26.04, 3.7 on 24.04, 3.5 on 22.04); set it only to pin another series. Its PPA is added
+   with the PPA's signing key checked against its fingerprint.
 1. Run the Ansible playbook to install:
    ```bash
    ansible-playbook -l <name-of-maas-node> playbooks/provisioning/maas.yml

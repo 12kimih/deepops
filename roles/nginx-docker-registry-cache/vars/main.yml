@@ -1,0 +1,8 @@
+---
+# What the component installs, for its record (roles/component_record): the container,
+# and the pre-defined CA's copies while one is set. The mirror cache and a CA the proxy
+# generated are data.
+nginx_docker_cache_items: >-
+  {{ ['container:' ~ nginx_docker_cache_name, 'package:python3-docker']
+     + (['file:' ~ nginx_docker_cache_ca_path ~ '/ca.key', 'file:' ~ nginx_docker_cache_ca_path ~ '/ca.crt']
+        if nginx_docker_cache_ca | length > 0 else []) }}

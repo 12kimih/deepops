@@ -64,7 +64,7 @@
 - name: Give Apache back its stock ports and default site
   when:
     - open_ondemand_apache.stat.exists
-    - component_record_result.orphans.values() | map('length') | sum > 0
+    - component_record_removed.values() | map('length') | sum > 0
   block:
     - name: Restore the stock ports.conf
       ansible.builtin.copy:

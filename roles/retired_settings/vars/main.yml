@@ -43,6 +43,7 @@ retired_settings:
   ipmi_exporter_enabled: ipmi_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
   nvidia_dcgm_state: dcgm_exporter_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
   nvidia_dcgm_enabled: dcgm_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
+  nginx_docker_cache_hostgroup: the registry entry nginx_docker_cache (its group, [slurm-cache]) in roles/deploy_defaults/vars/main.yml, or nginx_docker_cache_host to point clients elsewhere
   runai_helm: helm_bin in roles/deepops_paths (the one Helm client path)
   runai_helm_timeout: helm_timeout in roles/helm_release (every release waits as long)
   helm_cmd: helm_bin in roles/deepops_paths (the one Helm client path)
@@ -104,3 +105,4 @@ retired_settings:
   grafana_dashboards: grafana_dashboard_sets in roles/prometheus_paths (every set's files, under src/dashboards)
   grafana_cfg_dashboard_path: grafana_dashboards_dir in roles/prometheus_paths (configuration, under /etc)
   nfs_servers: "deepops_component_removals: [nfs] (the NFS server goes from every host outside the deploy's NFS servers) in roles/deploy_defaults"
+  maas_repo: maas_series (the MAAS release series; its PPA comes through roles/package_repos with a checked key) in roles/maas-controller

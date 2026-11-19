@@ -1,8 +1,10 @@
 """roles/component_record: owner sets, orphans, and a real run on scratch paths."""
 
+import base64
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -96,6 +98,8 @@ PLAY = """
         component_record_action: present
         component_record_items: "{{ items }}"
       when: action == 'present'
+    - ansible.builtin.debug:
+        msg: "REMOVED={{ component_record_removed | to_json | b64encode }}"
 """
 
 
@@ -108,6 +112,8 @@ class Run(unittest.TestCase):
         done = subprocess.run(argv + (["--check"] if check else []), cwd=ROOT, capture_output=True, text=True,
                               env={**os.environ, "ANSIBLE_CALLBACK_RESULT_FORMAT": "json"})  # fmt: skip
         self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
+        encoded = re.search(r"REMOVED=([A-Za-z0-9+/=]+)", done.stdout).group(1)
+        self.removed = json.loads(base64.b64decode(encoded))
         return int(done.stdout.rsplit("changed=", 1)[1].split()[0])
 
     def setUp(self):
@@ -133,10 +139,15 @@ class Run(unittest.TestCase):
         self.play("present", items[1:])
         self.assertFalse((conf / "a").exists(), "what the new set no longer needs goes")
         self.play("absent", [])
+        self.assertEqual(self.removed["file"], [f"{conf}/b"])
+        self.assertEqual(self.removed["dir"], [str(conf)], "only what was there")
         self.assertFalse(conf.exists(), "an emptied directory goes")
         self.assertTrue((self.base / "data" / "keep").exists(), "a directory with anything in it stays")
         self.assertEqual(json.loads(self.record.read_text()), EMPTY)
         self.assertEqual(self.play("absent", []), 0)
+        # Adopted on a host that never had them: orphans, but nothing removed.
+        self.assertEqual(self.play("absent", [f"file:{conf}/never"]), 0)
+        self.assertEqual(self.removed["file"], [], "an adopted orphan that was never there")
 
 
 if __name__ == "__main__":

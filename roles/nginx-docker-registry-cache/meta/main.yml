@@ -1,0 +1,3 @@
+---
+dependencies:
+  - role: nginx_docker_cache_defaults  # nginx_docker_cache_ca_path, nginx_docker_cache_ca
