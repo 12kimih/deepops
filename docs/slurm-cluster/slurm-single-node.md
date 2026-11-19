@@ -10,7 +10,7 @@ Single Node Slurm Deployment Guide
     - [Initial SSH to Login Node](#initial-ssh-to-login-node)
     - [Allocating GPUs](#allocating-gpus)
     - [Running Containers](#running-containers)
-      - [Rootless Docker](#rootless-docker)
+      - [Building images with rootless Podman](#building-images-with-rootless-podman)
     - [Enroot and Pyxis](#enroot-and-pyxis)
   - [Uninstalling](#uninstalling)
 
@@ -176,13 +176,6 @@ The general requirements and procedure for Slurm setup via deepops is documented
    reasoning for hiding GPUs in regular ssh sessions is that we want to
    avoid having users run a compute task on the GPUs without a Slurm job.
 
-   If you desire to use docker within slurm then also install rootless docker
-   after slurm deployment via playbook:
-
-   ```bash
-   ansible-playbook -K  --forks=1 --connection=local --limit slurm-cluster playbooks/container/docker-rootless.yml
-   ```
-
 6. Post install information.
 
    The admin users can access the GPUs that are restricted from regular ssh
@@ -331,132 +324,15 @@ attach to the tmux session in the adopted ssh session.
 
 ### Running Containers
 
-DeepOps enables running containers on Slurm with rootless Docker and with
-Enroot/Pyxis, which is installed by default.
+DeepOps runs containers on Slurm with Enroot/Pyxis, which is installed by
+default.
 
-#### Rootless Docker
+#### Building images with rootless Podman
 
-Docker is currently the de facto standard for containerization. Docker is very
-easy to work with when building and extending containers. NGC and many other
-data science software stacks are distributed as docker containers. Fortunately,
-it is straightforward to incorporate rootless docker with Slurm. The reason for
-using rootless docker is that we want to avoid granting elevated privileges to
-users unnecessarily.
-
-DeepOps sets up rootless docker as a module package. Environment modules are a
-popular way to setup cluster wide software for sharing. On a side note DeepOps
-can set up easybuild or spack to manage environment modules and packages. The
-workflow with rootless docker is as follows:
-
-1. A user starts a slurm job;
-2. module load the rootless docker package;
-3. Start rootless docker daemon;
-4. Work with docker containers per regular docker workflow.
-
-The following examples will illustrate the commands. Start by reserving desired
-resources:
-
-```bash
-login-session:srun --ntasks=1 --gpus-per-task=2 --pty bash
-```
-
-Load and start rootless docker:
-
-```bash
-compute-session:module load rootless-docker
-compute-session:start_rootless_docker.sh
-```
-
-An option "--quiet" can be passed to the "start_rootless_docker.sh" script to
-hide rootless docker messages. Pull/run a site-maintained NCCL tests image:
-
-```bash
-compute-session:docker run --gpus=all --rm -it \
-  registry.example.com/hpc/nccl-tests:latest \
-  mpirun --allow-run-as-root -np 2  all_reduce_perf -b 1M -e 4G -f 2 -g 1
-```
-
-This could be placed in a script and run with srun or sbatch. Example:
-
-```bash
-cat test-allreduce-docker.sh
-#!/bin/bash
-
-module load rootless-docker
-
-start_rootless_docker.sh --quiet
-
-docker run --gpus=all --rm -t registry.example.com/hpc/nccl-tests:latest \
-  mpirun --allow-run-as-root -np 2  all_reduce_perf -b 1M -e 4G -f 2 -g 1
-
-stop_rootless_docker.sh
-```
-
-Then run via:
-
-```bash
-login-session:srun --ntasks=1 --gpus-per-task=2 ${PWD}/test-allreduce-docker.sh
-```
-
-The Slurm constraints are enforced for rootless docker. This can be verified by
-starting the container and checking the number of GPUs and CPUs available.
-
-```bash
-compute-session:docker run --gpus=all --rm -it \
-  registry.example.com/hpc/nccl-tests:latest \
-  bash -c 'echo NGPUS: $(nvidia-smi -L | wc -l) NCPUS: $(nproc)'
-NGPUS: 2 NCPUS: 2
-```
-
-It is important to be aware that rootless docker runs via user namespace
-remapping. Therefore even though one might appear as root in a docker container,
-files created are owned by the user, and within the container a user would not
-have write/execute permissions to filesystem or executables that the user
-already does not have permission to outside of the container.
-
-```bash
-compute-session:docker run --gpus=all --rm -it -v ${PWD}:${PWD} --workdir=${PWD} \
-  registry.example.com/hpc/nccl-tests:latest bash -c 'touch somefile-in-container'
-```
-
-Then outside of the container.
-
-```bash
-ll -d somefile-in-container
--rw-r--r-- 1 testuser testuser 0 Dec 11 18:32 somefile-in-container
-
-cat /etc/slurm/slurmdbd.conf
-cat: /etc/slurm/slurmdbd.conf: Permission denied
-```
-
-Note there is no access to `slurmdbd.conf` within container since no access
-outside of the container.
-
-```bash
-compute-session:docker run --gpus=all --rm -it -v /etc/slurm:/slurm --workdir=${PWD} \
-  registry.example.com/hpc/nccl-tests:latest bash -c 'cat /slurm/slurmdbd.conf'
-cat: /slurm/slurmdbd.conf: Permission denied
-```
-
-Rootless docker supports building containers and many standard docker features
-with a few limitations. These limitations can make it challenging to run
-multi node Slurm jobs, therefore for multi node jobs on Slurm the recommended
-approach is via Enroot/Pyxis.
-
-A user can explicitly stop the rootless docker daemon with "stop_rootless_docker.sh"
-script, or just exit the Slurm session. Upon exit from a slurm session the
-processes in the session are killed therefore the user's rootless docker
-process will end.
-
-```bash
-compute-session:stop_rootless_docker.sh
-compute-session:exit
-exit
-login-session:$
-```
-
-These scripts "start_rootless_docker.sh" and "stop_rootless_docker.sh" appear
-on a user's path upon loading the rootless docker module.
+To build an image from a Dockerfile, use rootless Podman inside a CPU job and
+import the result into Enroot. The playbook installs it on the compute nodes
+(`slurm_install_podman`); the user guide is
+[docs/container/podman.md](../container/podman.md).
 
 ### Enroot and Pyxis
 

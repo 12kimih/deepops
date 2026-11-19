@@ -20,3 +20,4 @@ retired_settings:
   nvidia_driver_ubuntu_use_open_kernel_modules: nvidia_driver_kernel_modules (open or proprietary) in roles/nvidia_driver
   ngc_ready_pytorch: ngc_ready_pytorch_container in roles/deploy_defaults
   ngc_ready_tensorflow: ngc_ready_tensorflow_container in roles/deploy_defaults
+  rootlessdocker_install_dir: slurm_install_podman (rootless Podman, roles/podman, replaces the retired docker-rootless)

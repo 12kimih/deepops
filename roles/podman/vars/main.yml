@@ -3,3 +3,5 @@
 podman_subids: "{{ podman_people | people_subids(podman_subid_base, podman_subid_count) }}"
 # The apparmor package's profiles that grant rootless podman user namespaces.
 podman_apparmor_profiles: [podman, crun, slirp4netns]
+# Where the retired docker-rootless role installed (its rootlessdocker_install_dir default).
+podman_retired_docker_rootless_dir: "{{ sm_software_path }}/rootless-docker"

@@ -1,5 +1,7 @@
 ---
-dependencies: []
+dependencies:
+  - role: retired_settings  # rootlessdocker_install_dir (roles/docker-rootless, retired)
+  - role: deepops_paths  # sm_software_path, where docker-rootless installed
 
 galaxy_info:
   namespace: deepops

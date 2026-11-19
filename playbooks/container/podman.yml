@@ -2,6 +2,18 @@
 # Rootless Podman on the compute nodes (roles/podman): users build images from a
 # Dockerfile inside a CPU job and import them into enroot. Switched by
 # slurm_install_podman; docs/container/podman.md is the user guide.
+
+# docker-rootless is retired; remove what it installed wherever it may have run.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tags:
+    - podman
+  tasks:
+    - name: Remove the retired docker-rootless
+      ansible.builtin.include_role:
+        name: podman
+        tasks_from: retire-docker-rootless
+
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   tags:
@@ -9,3 +21,4 @@
   roles:
     - role: deploy_defaults
     - role: podman
+      when: slurm_install_podman
