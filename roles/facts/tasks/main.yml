@@ -1,4 +1,9 @@
 ---
+# Once per host and run (facts_ready): a later include in the same deploy ends here.
+- name: Nothing to do when this run gathered the facts already
+  ansible.builtin.meta: end_role
+  when: facts_ready | bool
+
 - name: Apt install pciutils
   ansible.builtin.apt:
     name: pciutils
@@ -48,3 +53,7 @@
 
 - name: Regather local facts
   ansible.builtin.setup: filter=ansible_local
+
+- name: Mark the facts gathered for this run
+  ansible.builtin.set_fact:
+    facts_ready: true

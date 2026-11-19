@@ -1,0 +1,70 @@
+---
+# Write on each host what was just deployed to it: the deepops and config commits (and
+# whether either tree had uncommitted changes), the time, the limit and the tags. The
+# host carries its own record, so it stays right after a deploy limited to some hosts or
+# run from another operator's machine; `scripts/deepops/settings.py diff` starts from it.
+- name: Require the deploy's name
+  ansible.builtin.assert:
+    that: deploy_record_name | length > 0
+    quiet: true
+  run_once: true
+  delegate_to: localhost
+
+- name: Read the commits this deploy ran from
+  ansible.builtin.command:
+    argv: [git, -C, "{{ item }}", rev-parse, HEAD]
+  loop: ["{{ playbook_dir | dirname }}", "{{ inventory_dir }}"]
+  register: deploy_record_head
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only, so --check previews the real record
+  run_once: true
+  delegate_to: localhost
+  become: false
+
+- name: Read whether either tree had uncommitted changes
+  ansible.builtin.command:
+    argv: [git, -C, "{{ item }}", status, --porcelain, --untracked-files=no]
+  loop: ["{{ playbook_dir | dirname }}", "{{ inventory_dir }}"]
+  register: deploy_record_status
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only, so --check previews the real record
+  run_once: true
+  delegate_to: localhost
+  become: false
+
+- name: Read this host's earlier records
+  ansible.builtin.slurp:
+    src: "{{ deploy_record_fact }}"
+  register: deploy_record_old
+  failed_when: false
+
+- name: Create the custom fact directory
+  ansible.builtin.file:
+    path: "{{ deploy_record_fact | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Record this deploy on the host
+  ansible.builtin.copy:
+    dest: "{{ deploy_record_fact }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ old | combine({deploy_record_name: record}) | to_nice_json }}\n"
+  vars:
+    old: "{{ (deploy_record_old.content | b64decode | from_json) if deploy_record_old.content is defined else {} }}"
+    record:
+      deepops: "{{ deploy_record_head.results[0].stdout }}"
+      deepops_dirty: "{{ deploy_record_status.results[0].stdout | length > 0 }}"
+      config: "{{ deploy_record_head.results[1].stdout }}"
+      config_dirty: "{{ deploy_record_status.results[1].stdout | length > 0 }}"
+      time: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+      limit: "{{ ansible_limit | default('') }}"
+      tags: "{{ ansible_run_tags }}"
+
+# Into the controller's fact cache too, so the next preview reads it without a connection.
+- name: Regather local facts
+  ansible.builtin.setup:
+    filter: ansible_local

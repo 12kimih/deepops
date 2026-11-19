@@ -1,0 +1,5 @@
+---
+# Set true (as a plain fact, for this run only) once the role has run on a host. Every
+# component playbook includes this role so it also works alone; in one deploy the later
+# includes then end at once instead of repeating the install and the regather.
+facts_ready: false

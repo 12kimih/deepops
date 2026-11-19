@@ -4,9 +4,6 @@
 - name: Install python required for Ansible
   import_playbook: bootstrap/bootstrap-python.yml
 
-- name: Set up SSH keys if needed
-  import_playbook: bootstrap/bootstrap-ssh.yml
-
 - name: Disable cloud-init
   import_playbook: generic/disable-cloud-init.yml
   when: deepops_disable_cloud_init
@@ -203,3 +200,15 @@
   import_playbook: nvidia-software/nvidia-peer-memory.yml
   tags:
     - nvidia-peer-memory
+
+# Last: each host records what was deployed to it (roles/deploy_record), where the next
+# preview starts (scripts/deepops/settings.py diff).
+- name: Record what was deployed
+  hosts: slurm-cluster
+  become: true
+  gather_facts: false
+  tags:
+    - always
+  roles:
+    - role: deploy_record
+      deploy_record_name: slurm-cluster

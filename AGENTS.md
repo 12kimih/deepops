@@ -29,6 +29,7 @@ handling.
 git submodule update --init --recursive
 ./scripts/setup.sh                      # uv, the locked .venv, Galaxy collections, .venv-kubespray
 cp -r config.example config             # then edit config/inventory
+ansible-playbook -k playbooks/bootstrap/bootstrap-ssh.yml   # only for hosts that still take a password
 python3 scripts/validation/deepops_doctor.py --json   # verify before deploying
 ```
 
@@ -130,8 +131,8 @@ limits, failure reasons and the distinction from training success.
    variables in `config/group_vars/`; do not edit roles for site-specific
    values. `config/` holds only what differs from the defaults
    (`config.example` shows each default commented); before a deploy,
-   `scripts/deepops/settings.py diff --from <last deployed revision>` lists
-   what changes on each host.
+   `scripts/deepops/settings.py diff` lists what changes on each host since
+   its last deploy (each host records it).
 
 ## Optional: KAI Scheduler / Run:ai (off by default)
 

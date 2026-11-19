@@ -66,11 +66,6 @@
   tags:
     - local
 
-- name: Set up SSH keys if needed
-  import_playbook: bootstrap/bootstrap-ssh.yml
-  tags:
-    - bootstrap
-
 - name: Disable cloud-init
   import_playbook: generic/disable-cloud-init.yml
   when: deepops_disable_cloud_init
@@ -365,3 +360,15 @@
   vars:
     hostlist: k8s_cluster
   when: kube_enable_rsyslog_client
+
+# Last: each host records what was deployed to it (roles/deploy_record), where the next
+# preview starts (scripts/deepops/settings.py diff).
+- name: Record what was deployed
+  hosts: k8s_cluster
+  become: true
+  gather_facts: false
+  tags:
+    - always
+  roles:
+    - role: deploy_record
+      deploy_record_name: k8s-cluster

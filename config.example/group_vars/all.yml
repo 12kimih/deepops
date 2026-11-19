@@ -461,8 +461,8 @@ standalone_container_registry_cache_enable: true
 # Configuration for NGC-Ready playbook                                         #
 ################################################################################
 #ngc_ready_cuda_container: "nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04"
-#ngc_ready_pytorch: "nvcr.io/nvidia/pytorch:26.05-py3"
-#ngc_ready_tensorflow: "nvcr.io/nvidia/tensorflow:25.02-tf2-py3"
+#ngc_ready_pytorch_container: "nvcr.io/nvidia/pytorch:26.05-py3"
+#ngc_ready_tensorflow_container: "nvcr.io/nvidia/tensorflow:25.02-tf2-py3"
 
 ################################################################################
 # Kubespray runtime defaults                                                   #

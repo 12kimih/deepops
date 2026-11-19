@@ -2,9 +2,6 @@
 - name: Install python
   import_playbook: bootstrap/bootstrap-python.yml
 
-- name: Set up SSH keys if needed
-  import_playbook: bootstrap/bootstrap-ssh.yml
-
 - name: Install docker
   import_playbook: container/docker.yml
 
@@ -22,6 +19,7 @@
   become: true
   roles:
     - role: deploy_defaults  # ngc_ready_*
+    - role: retired_settings  # the ngc_ready_* names before _container
   tasks:
     - name: Install docker python3 module
       ansible.builtin.apt:
@@ -80,7 +78,7 @@
     - name: Pull pytorch container
       community.docker.docker_container:
         name: pytorch-pull
-        image: "{{ ngc_ready_pytorch }}"
+        image: "{{ ngc_ready_pytorch_container }}"
         auto_remove: true
         pull: true
       tags:
@@ -89,7 +87,7 @@
     - name: Test pytorch
       community.docker.docker_container:
         name: pytorch
-        image: "{{ ngc_ready_pytorch }}"
+        image: "{{ ngc_ready_pytorch_container }}"
         working_dir: /opt/pytorch/examples/upstream/mnist
         detach: false
         network_mode: host
@@ -114,7 +112,7 @@
     - name: Pull tensorflow container
       community.docker.docker_container:
         name: tensorflow-pull
-        image: "{{ ngc_ready_tensorflow }}"
+        image: "{{ ngc_ready_tensorflow_container }}"
         auto_remove: true
         pull: true
       tags:
@@ -123,7 +121,7 @@
     - name: Test tensorflow
       community.docker.docker_container:
         name: tensorflow
-        image: "{{ ngc_ready_tensorflow }}"
+        image: "{{ ngc_ready_tensorflow_container }}"
         working_dir: /opt/tensorflow/tensorflow/examples/tutorials/mnist
         detach: false
         network_mode: host
