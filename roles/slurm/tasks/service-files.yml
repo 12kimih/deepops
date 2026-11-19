@@ -26,6 +26,38 @@
   failed_when: false
   notify: Restart slurmd
 
+# On a major upgrade slurmdbd converts the accounting database before it reports
+# ready, which can take far longer than systemd's start timeout; killed part-way, the
+# conversion is left half done. Its start is therefore not timed out (Slurm's upgrade
+# guide); a start that hangs stays visible as activating.
+- name: Let slurmdbd finish a database conversion
+  when: is_controller
+  block:
+    - name: Create slurmdbd systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/slurmdbd.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Do not time out the slurmdbd start
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/slurmdbd.service.d/10-start-timeout.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Service]
+          TimeoutStartSec=infinity
+      register: slurmdbd_timeout
+
+    # Only systemd reads it; slurmdbd needs no restart for this.
+    - name: Reload systemd for the slurmdbd override
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: slurmdbd_timeout is changed
+
 # slurmd inherits systemd's minimal PATH, which does not include a custom
 # slurm_install_prefix. Enroot's slurm-pmi hook (installed by the pyxis role)
 # and any other slurmd child that calls scontrol/squeue then fail with

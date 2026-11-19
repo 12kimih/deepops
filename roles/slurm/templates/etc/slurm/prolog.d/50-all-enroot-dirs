@@ -2,26 +2,14 @@
 set -ex
 
 command -v enroot >/dev/null || exit 0  # enroot not installed
+. '{{ slurm_config_dir }}/shared/lib/enroot-paths.sh'
 
-{% if enroot_runtime_path | default(none) %}
-runtime_path="$(sudo -u "$SLURM_JOB_USER" sh -c 'echo "{{ enroot_runtime_path }}"')"
-mkdir -p "$runtime_path"
-chown "$SLURM_JOB_UID:$(id -g "$SLURM_JOB_UID")" "$runtime_path"
-# Do not chmod the parent dir: mkdir -p already creates it 0755, and the parent may
-# be a shared or systemd-managed path (e.g. /run/user/$UID) we must not relax.
-chmod 0700 "$runtime_path"
-{% endif %}
-
-{% if enroot_cache_path | default(none) %}
-cache_path="$(sudo -u "$SLURM_JOB_USER" sh -c 'echo "{{ enroot_cache_path }}"')"
-mkdir -p "$cache_path"
-chown "$SLURM_JOB_UID:$(id -g "$SLURM_JOB_UID")" "$cache_path"
-chmod 0700 "$cache_path"
-{% endif %}
-
-{% if enroot_data_path | default(none) %}
-data_path="$(sudo -u "$SLURM_JOB_USER" sh -c 'echo "{{ enroot_data_path }}"')"
-mkdir -p "$data_path"
-chown "$SLURM_JOB_UID:$(id -g "$SLURM_JOB_UID")" "$data_path"
-chmod 0700 "$data_path"
-{% endif %}
+# Each per-user directory enroot.conf sets, created for the job user, private to them.
+# Do not chmod the parent dir: mkdir -p already creates it 0755, and the parent may be a
+# shared or systemd-managed path (e.g. /run/user/$UID) we must not relax.
+for key in ENROOT_RUNTIME_PATH ENROOT_CACHE_PATH ENROOT_DATA_PATH; do
+    path=$(enroot_user_path "$key") || continue
+    mkdir -p "$path"
+    chown "$SLURM_JOB_UID:$(id -g "$SLURM_JOB_UID")" "$path"
+    chmod 0700 "$path"
+done

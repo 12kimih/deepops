@@ -117,6 +117,7 @@
       ansible.builtin.service:
         name: "docker.slurm-exporter.service"
         state: stopped
+      register: slurm_exporter_stopped
       when: (ansible_facts.distribution == 'Ubuntu') and
         ("docker.slurm-exporter.service" in ansible_facts.services) and
         (ansible_facts.services["docker.slurm-exporter.service"].state == "running")
@@ -239,17 +240,17 @@
     state: directory
     mode: "0775"
 
+# The directory only: recursing would open everything under it to all, the HA state
+# directory with every job's script and environment among them, and report a change
+# on every run as new state files appear.
 - name: Fix deepops dir permissions
   ansible.builtin.file:
     path: "{{ deepops_dir }}"
     state: directory
     mode: "0755"
-    recurse: true
 
 - name: Start docker slurm exporter service again
   ansible.builtin.service:
     name: "docker.slurm-exporter.service"
-    state: restarted
-  when: (ansible_facts.distribution == 'Ubuntu') and
-    ("docker.slurm-exporter.service" in ansible_facts.services) and
-    (ansible_facts.services["docker.slurm-exporter.service"].state == "running")
+    state: started
+  when: slurm_exporter_stopped is changed

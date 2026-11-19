@@ -81,6 +81,8 @@ slurm_enable_ha: false
 # HA StateSaveLocation. Must be on storage shared by all controllers when HA is on;
 # set it to your shared path (e.g. /sw/slurm) in config/group_vars.
 slurm_ha_state_save_location: "{{ deepops_dir }}/slurm/state"
+# Where slurmctld keeps its state, for slurm.conf and the directory task alike.
+slurm_state_save_location: "{{ slurm_ha_state_save_location if slurm_enable_ha else '/var/spool/slurmctld' }}"
 
 # A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
 # the controller group, slurmd on the compute group, client-only elsewhere.

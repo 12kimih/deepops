@@ -75,6 +75,22 @@
     owner: root
     mode: "0755"
 
+# The config directory holds what root runs (prolog, epilog, their parts and
+# libraries), so it is root's; Slurm only reads it. Logs and the spool are Slurm's.
+- name: Create the slurm config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ slurm_config_dir }}"
+    - "{{ slurm_config_dir }}/shared"
+  tags:
+    - prolog
+    - epilog
+
 - name: Create slurm directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -82,8 +98,6 @@
     owner: slurm
     mode: "0755"
   with_items:
-    - "{{ slurm_config_dir }}"
-    - "{{ slurm_config_dir }}/shared"
     - /var/log/slurm
     - /var/spool/slurmd
   tags:
@@ -145,32 +159,26 @@
     - prolog
     - epilog
 
-- name: Create shared library directory for job-scoped epilog cleanup
-  ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/shared/lib"
-    state: directory
-    owner: slurm
-    mode: "0755"
-  when: slurm_epilog_cleanup_scope == 'job'
+- name: Collect the shared prolog and epilog libraries
+  ansible.builtin.set_fact:
+    slurm_shared_libs: "{{ query('ansible.builtin.fileglob', role_path ~ '/templates/etc/slurm/shared/lib/*') | sort }}"
   tags:
     - prolog
     - epilog
 
-- name: Copy job-scoped epilog helpers
-  ansible.builtin.template:
-    src: etc/slurm/shared/lib/epilog-job-scope.sh
-    dest: "{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh"
-    mode: "0644"
-  when: slurm_epilog_cleanup_scope == 'job'
-  tags:
-    - prolog
-    - epilog
-
-- name: Remove job-scoped epilog helpers when the scope is user
-  ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh"
-    state: absent
-  when: slurm_epilog_cleanup_scope == 'user'
+# Sourced by root's prolog and epilog, so root-owned like shared/bin: a directory the
+# slurm account could write would let it change what root runs. Every library is
+# installed whatever the scope; the job-scope one is read only when the scope is job.
+- name: Install the shared prolog and epilog libraries
+  ansible.builtin.include_role:
+    name: managed_dir
+    apply:
+      tags: [prolog, epilog]
+  vars:
+    managed_dir_path: "{{ slurm_config_dir }}/shared/lib"
+    managed_dir_sources: "{{ slurm_shared_libs }}"
+    managed_dir_template: true
+    managed_dir_mode: "0644"
   tags:
     - prolog
     - epilog
@@ -191,12 +199,19 @@
   tags:
     - config
 
+# Changed, so slurmd restarts, also when a controller rewrote the shared file this run
+# (controller.yml runs first); the link alone almost never changes.
 - name: Configure slurm.conf by symbolic link
   ansible.builtin.file:
     path: "{{ slurm_config_dir }}/slurm.conf"
     state: link
     src: "{{ slurmctl_config_dir }}/slurm.conf"
     force: true
+  register: slurm_conf_link
+  changed_when: >-
+    slurm_conf_link is changed
+    or (groups[slurm_controller_group] | map('extract', hostvars) | selectattr('slurm_conf_shared', 'defined')
+        | map(attribute='slurm_conf_shared') | select('changed') | list | length > 0)
   when: slurm_conf_symlink
   notify:
     - Restart slurmd

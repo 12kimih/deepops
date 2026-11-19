@@ -63,34 +63,31 @@
     column_case_sensitive: true
   become: true
 
+# Config is root's and Slurm only reads it (slurmdbd.conf, a file, is the one Slurm
+# must own). The state directory holds every job's script and environment, which can
+# carry secrets, so only Slurm may read it.
+- name: Create the slurm config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ [slurm_config_dir] + ([slurmctl_config_dir] if slurm_conf_symlink else []) }}"
+
 - name: Create slurm directories
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: /var/log/slurm
     state: directory
     owner: slurm
     mode: "0755"
-  with_items:
-    - "{{ slurm_config_dir }}"
-    - /var/spool/slurmctld
-    - /var/log/slurm
 
-- name: Create slurm directories for nfs sharing
+- name: Create the slurm state directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ slurm_state_save_location }}"
     state: directory
     owner: slurm
-    mode: "0755"
-  with_items:
-    - "{{ slurmctl_config_dir }}"
-  when: slurm_conf_symlink
-
-- name: Create slurm HA directory
-  ansible.builtin.file:
-    path: "{{ slurm_ha_state_save_location }}"
-    state: directory
-    owner: slurm
-    mode: "0755"
-  when: slurm_enable_ha
+    mode: "0700"
 
 - name: Configure slurm.conf
   ansible.builtin.template:
@@ -127,12 +124,17 @@
   tags:
     - config
 
+# The file every node links to. Its change is what restarts the daemons: the links
+# themselves almost never change. Compute nodes read slurm_conf_shared (compute.yml).
 - name: Configure slurm.conf to nfs
   ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
     dest: "{{ slurmctl_config_dir }}/slurm.conf"
     mode: "0644"
+  register: slurm_conf_shared
   when: slurm_conf_symlink
+  notify:
+    - Restart slurmctld
   tags:
     - config
 
