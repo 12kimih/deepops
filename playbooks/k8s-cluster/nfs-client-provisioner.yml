@@ -13,6 +13,8 @@
 # Install the required NFS software on all nodes and then helm install the nfs-client
 - hosts: kube_control_plane[0]
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Make sure NFS directory exists and is globally writable
       ansible.builtin.file:
@@ -34,12 +36,15 @@
 - hosts: "k8s_cluster"
   become: true
   roles:
+    - role: deploy_defaults
     - nfs
   tags:
     - nfs_software
 
 - hosts: kube_control_plane[0]
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Install nfs-client-provisioner
       ansible.builtin.include_role:

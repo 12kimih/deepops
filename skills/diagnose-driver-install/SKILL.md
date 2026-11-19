@@ -36,10 +36,9 @@ touching software.
 classic symptom of the wrong module flavor for the GPU generation:
 
 - Turing and newer (T4, A100, H100, RTX PRO Blackwell): open kernel modules
-  supported — DeepOps default `nvidia_driver_ubuntu_use_open_kernel_modules: true`
-  is correct.
+  supported; the DeepOps default `nvidia_driver_kernel_modules: open` is correct.
 - Pascal and older (P100, GTX 10xx): open modules are **not** supported —
-  set `nvidia_driver_ubuntu_use_open_kernel_modules: false` in
+  set `nvidia_driver_kernel_modules: proprietary` in
   `config/group_vars/all.yml` and rerun the driver play.
 
 Check what is loaded: `modinfo nvidia | grep -i license` (open modules say

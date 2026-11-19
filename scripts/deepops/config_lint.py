@@ -2,7 +2,7 @@
 """Keep the example config, the site config and the docs honest.
 
     config_lint.py              run every check
-    config_lint.py CHECK ...    run some: drift, dead, doc-paths, shadow
+    config_lint.py CHECK ...    run some: drift, dead, doc-paths, doc-vars, shadow
 
 drift      config/ mirrors config.example/: in each group_vars and host_vars file both
            have, the comment lines match in order and the same variable names appear
@@ -14,6 +14,9 @@ dead       every variable config.example sets or shows, and every role default, 
            left unread is usually a task that was lost.
 doc-paths  every repository path a document names (roles/..., playbooks/..., ...)
            exists, so a page never sends a reader to a file that is gone.
+doc-vars   every setting a document tells a reader to set (`name: value`) or lists in
+           a table's first column is read somewhere, so a page never names a
+           variable that was renamed or removed.
 shadow     no group or host has its variables in two places (all.yml beside all/, or
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
@@ -162,6 +165,46 @@ def check_drift():
     return problems
 
 
+def read_words():
+    """Every identifier our code, the example config and Kubespray contain, or None
+    when Kubespray is not checked out."""
+    words = set()
+    for path in tracked("roles", "playbooks", "plugins", "scripts", "config.example"):
+        if path.is_file() and "galaxy" not in path.parts:
+            words.update(re.findall(r"[a-z_][a-z0-9_]*", path.read_text(errors="ignore")))
+    kubespray = ROOT / "submodules" / "kubespray"
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    k8s = subprocess.run(
+        ["git", "grep", "-h", "-o", "-E", r"[a-z_][a-z0-9_]*", "--", "roles", "playbooks", "inventory"],
+        cwd=kubespray, capture_output=True, text=True, env=clean,
+    )  # fmt: skip
+    if not (kubespray / "cluster.yml").is_file() or k8s.returncode != 0:
+        return None
+    return words | set(k8s.stdout.split())
+
+
+# A setting a page tells the reader to set, and the first cell of a table row.
+SETTING = re.compile(r"`([a-z][a-z0-9]*_[a-z0-9_]+): [^`]+`")
+TABLE_NAME = re.compile(r"^\|\s*`([a-z][a-z0-9]*_[a-z0-9_]+)`")
+
+
+def check_doc_vars():
+    words = read_words()
+    if words is None:
+        return ["doc-vars: submodules/kubespray is not checked out (git submodule update --init)"]
+    problems = []
+    for doc in tracked("*.md"):
+        # MODERNIZATION.md is the change log: it names settings that were removed.
+        if not doc.is_file() or doc.name == "MODERNIZATION.md":
+            continue
+        for number, line in enumerate(doc.read_text().splitlines(), 1):
+            names = TABLE_NAME.findall(line) if line.startswith("|") else SETTING.findall(line)
+            for name in names:
+                if name not in words:
+                    problems.append(f"doc-vars: {doc.relative_to(ROOT)}:{number}: nothing reads {name}")
+    return problems
+
+
 def check_dead():
     sources = []
     for path in tracked("roles", "playbooks", "plugins", "scripts", "config.example"):
@@ -260,7 +303,13 @@ def check_shadow():
     return problems
 
 
-CHECKS = {"drift": check_drift, "dead": check_dead, "doc-paths": check_doc_paths, "shadow": check_shadow}
+CHECKS = {
+    "drift": check_drift,
+    "dead": check_dead,
+    "doc-paths": check_doc_paths,
+    "doc-vars": check_doc_vars,
+    "shadow": check_shadow,
+}
 
 
 def main(argv):

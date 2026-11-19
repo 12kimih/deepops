@@ -2,6 +2,7 @@
 - hosts: "{{ hostlist | default('slurm-nfs') }}"
   become: true
   roles:
+    - role: deploy_defaults
     - { role: nfs, nfs_is_server: true }
   tags:
     - nfs_server

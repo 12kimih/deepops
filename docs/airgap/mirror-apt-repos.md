@@ -126,7 +126,6 @@ The following DEB files are not installed from an APT repository, but installed 
 
 - _CUDA keyring_: `cuda-keyring_1.1-1_all.deb` from the CUDA repository, installed by the DCGM role (and by the driver role with `nvidia_driver_install_method: nvidia_repo`); DCGM itself comes from the CUDA repository
 - _NVIDIA Enroot_: Download from [Enroot releases](https://github.com/NVIDIA/enroot/releases/)
-- _TurboVNC_ (Open OnDemand desktops, `ood_url_turbovnc_pkg`): Download from [TurboVNC](https://downloads.sourceforge.net/project/turbovnc/2.2.4/turbovnc_2.2.4_amd64.deb)
 
 ## Downloading package repositories on a machine with Internet access
 

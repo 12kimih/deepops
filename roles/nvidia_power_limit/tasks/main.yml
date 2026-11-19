@@ -12,7 +12,7 @@
       nvidia_power_limit_watts must be a positive integer number of watts (e.g. 450), or
       left empty to remove any cap from this node. Got: "{{ nvidia_power_limit_watts }}".
       A typo would otherwise read as "no cap" and silently un-cap the node.
-  when: nvidia_power_limit_watts | default('') | string | trim | length > 0
+  when: nvidia_power_limit_watts | string | trim | length > 0
 
 # nvidia-smi runs in a transient unit throughout, so it sees the GPUs even where the
 # ssh service hides them (DeviceAllow, see slurm login-compute-setup).

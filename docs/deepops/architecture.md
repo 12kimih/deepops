@@ -62,6 +62,14 @@ Playbooks run via Ansible as part of complete Slurm or Kubernetes installation o
 
 ## roles
 Roles run as part of the various playbooks. Includes default values and tasks as well.
+
+Every variable has one default, in one role, at the lowest precedence, so `config/`
+sets only what differs and an upgrade that adds a variable never breaks it. A value
+several roles read lives in a defaults-only role they depend on (`slurm_paths`,
+`prometheus_paths`, `deepops_paths`, `nis_defaults`). What a deploy includes, the
+switches its imports and plays read, lives in `deploy_defaults`, which each such play
+lists in its roles. No reader writes `| default(...)` for a defined variable;
+`scripts/validation/tests/test_shared_role_defaults.py` enforces all of this.
 <!-- BEGIN GENERATED: role-tree -->
 ```text
 ├── roles
@@ -78,6 +86,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── deepops_hosts
 │   ├── deepops_paths
 │   ├── default_target
+│   ├── deploy_defaults
 │   ├── dns-config
 │   ├── docker
 │   ├── docker-login

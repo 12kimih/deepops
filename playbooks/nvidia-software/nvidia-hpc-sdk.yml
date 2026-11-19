@@ -2,4 +2,5 @@
 - hosts: "{{ hostlist | default('slurm-login[0]') }}"
   become: true
   roles:
+    - role: deploy_defaults
     - nvidia_hpc_sdk

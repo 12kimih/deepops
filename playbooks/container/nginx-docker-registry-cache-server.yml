@@ -4,6 +4,8 @@
 
 - hosts: "{{ hostlist | default('slurm-cache') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Deploy nginx container caching proxy
       ansible.builtin.include_role:

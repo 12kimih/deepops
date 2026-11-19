@@ -121,8 +121,11 @@ slurm_login_on_compute: false
 # Optional installs                                                            #
 ################################################################################
 slurm_configure_etc_hosts: true
-slurm_cluster_install_cuda: false
 slurm_cluster_install_nvidia_driver: true
+# The directory and accounts plays (generic/authentication.yml)
+slurm_install_authentication: true
+# A pull-through registry cache on [slurm-cache] for the compute nodes
+slurm_enable_nginx_docker_cache: false
 
 ################################################################################
 # NFS                                                                          #

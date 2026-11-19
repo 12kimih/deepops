@@ -2,6 +2,7 @@
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   roles:
+    - role: deploy_defaults
     - rsyslog_client
   tags:
     - rsyslog-client

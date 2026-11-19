@@ -31,5 +31,5 @@
     state: present
     update_cache: "{{ nvidia_container_toolkit_yum_repo.changed }}"
   vars:
-    _version_suffix: "{{ ('-' ~ nvidia_container_toolkit_version) if (nvidia_container_toolkit_version | default('') | length > 0) else '' }}"
+    _version_suffix: "{{ ('-' ~ nvidia_container_toolkit_version) if (nvidia_container_toolkit_version | length > 0) else '' }}"
   environment: "{{ proxy_env if proxy_env is defined else {} }}"

@@ -1,6 +1,8 @@
 ---
 - hosts: slurm-cluster
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Set enroot DGX config fact
       ansible.builtin.set_fact:
@@ -12,9 +14,11 @@
 - hosts: slurm-cluster
   become: true
   roles:
+    - role: deploy_defaults
     - role: enroot
 
 - hosts: slurm-cluster
   become: true
   roles:
+    - role: deploy_defaults
     - role: pyxis

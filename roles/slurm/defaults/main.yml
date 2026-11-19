@@ -42,7 +42,7 @@ slurm_force_rebuild: false
 # configure, so the build fails loudly if Lua cannot be found. Turning this on
 # for an already-installed Slurm also needs slurm_force_rebuild: true.
 # Defaults to on when the lua job_submit plugin is configured.
-slurm_build_lua: "{{ 'lua' in (slurm_job_submit_plugins | default('')) }}"
+slurm_build_lua: "{{ 'lua' in (slurm_job_submit_plugins) }}"
 slurm_contain_ssh: true
 
 slurm_cluster_name: deepops

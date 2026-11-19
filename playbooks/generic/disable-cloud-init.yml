@@ -11,11 +11,13 @@
 
 - hosts: "{{ hostlist | default('all') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Check if /etc/cloud is present
       ansible.builtin.stat:
         path: "/etc/cloud"
-      when: deepops_disable_cloud_init | default(true)
+      when: deepops_disable_cloud_init
       register: etc_cloud
 
     - name: Disable generator for setting cloud-init target
@@ -25,12 +27,12 @@
         group: "root"
         mode: "0644"
         state: "touch"
-      when: deepops_disable_cloud_init | default(true) and etc_cloud.stat.exists
+      when: deepops_disable_cloud_init and etc_cloud.stat.exists
 
     # Only the units a host has: one without cloud-config is fine, any other failure is not.
     - name: Gather service facts
       ansible.builtin.service_facts:
-      when: deepops_disable_cloud_init | default(true)
+      when: deepops_disable_cloud_init
 
     - name: Disable all systemd services
       ansible.builtin.service:
@@ -42,5 +44,5 @@
         - "cloud-config"
         - "cloud-final"
       when:
-        - deepops_disable_cloud_init | default(true)
+        - deepops_disable_cloud_init
         - (item ~ '.service') in ansible_facts.services

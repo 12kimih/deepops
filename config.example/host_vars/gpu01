@@ -3,7 +3,7 @@
 # These variables would only be used for a host named "gpu01"
 
 # Don't install the CUDA toolkit on this host
-#slurm_cluster_install_cuda: false
+#nvidia_cuda_install: false
 
 # Cap this host's GPUs at 450W (roles/nvidia_power_limit). Hosts without this have any
 # cap removed instead, so this is the only place a per-node cap should live.

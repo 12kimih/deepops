@@ -28,10 +28,12 @@
 # Set up slurm-login-on-compute if enabled
 - hosts: slurm-master
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Setup slurm login on compute if enabled.
       ansible.builtin.include_role:
         name: slurm
         public: true
         tasks_from: login-compute-setup
-      when: slurm_login_on_compute | default(false)
+      when: slurm_login_on_compute

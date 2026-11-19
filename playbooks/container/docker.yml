@@ -18,8 +18,9 @@
       ansible.builtin.file:
         path: /etc/systemd/system/docker.service.d/docker-override.conf
         state: absent
-      when: docker_install | default(true)
+      when: docker_install
   roles:
+    - role: deploy_defaults
     - role: docker
-      when: docker_install | default(true)
+      when: docker_install
   environment: "{{ proxy_env if proxy_env is defined else {} }}"

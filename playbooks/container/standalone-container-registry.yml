@@ -9,12 +9,14 @@
   become: true
   become_method: ansible.builtin.sudo
   roles:
+    - role: deploy_defaults
     - standalone-container-registry
 
 - hosts: "all:!{{ hostlist | default('slurm-master') }}"
   become: true
   become_method: ansible.builtin.sudo
   roles:
+    - role: deploy_defaults
     - role: standalone-container-registry
       vars:
         standalone_container_registry_state: absent

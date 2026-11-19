@@ -1,3 +1,4 @@
 ---
 dependencies:
   - role: deepops_paths  # deepops_dir, sm_* module paths
+  - role: deploy_defaults  # gpu_operator_preinstalled_nvidia_software

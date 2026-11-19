@@ -6,11 +6,11 @@
 - name: Determine the NVIDIA driver module stream and package (RHEL/Rocky)
   ansible.builtin.set_fact:
     nvidia_driver_rhel_stream_resolved: >-
-      {{ nvidia_driver_rhel_module_stream if (nvidia_driver_rhel_module_stream | default('') | length > 0)
+      {{ nvidia_driver_rhel_module_stream if (nvidia_driver_rhel_module_stream | length > 0)
          else 'nvidia-driver:' ~ nvidia_driver_branch
               ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '-dkms') }}
     nvidia_driver_rhel_package_resolved: >-
-      {{ nvidia_driver_rhel_package if (nvidia_driver_rhel_package | default('') | length > 0)
+      {{ nvidia_driver_rhel_package if (nvidia_driver_rhel_package | length > 0)
          else ('nvidia-open' if (nvidia_driver_kernel_modules == 'open') else 'cuda-drivers') }}
 
 - name: Add the CUDA repository (RHEL/Rocky)

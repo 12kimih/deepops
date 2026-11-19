@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: slurm_paths  # slurm_install_prefix, slurm_config_dir, host groups
+  - role: deploy_defaults  # slurm_install_pyxis
 
 galaxy_info:
   namespace: deepops
