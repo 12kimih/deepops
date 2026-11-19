@@ -17,7 +17,7 @@ shadow     no group or host has its variables in two places (all.yml beside all/
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
 
-CONFIG_DIR selects the site config (default config/); drift is skipped without it.
+DEEPOPS_CONFIG_DIR selects the site config (default config/); drift is skipped without it.
 Under the commit hook (pre-commit sets PRE_COMMIT) the site config is read as its git
 repository last committed it: pre-commit stashes this repository's unstaged edits but
 never the site's, so its working tree would be judged against the wrong example and
@@ -32,7 +32,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config.example"
-CONFIG = Path(os.environ.get("CONFIG_DIR", ROOT / "config"))
+CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
 NAME = re.compile(r"^#?\s?([a-z_][a-z0-9_]*):(\s|$)")
 PATH = re.compile(
     r"(?<![\w./-])((?:roles|playbooks|scripts|docs|config\.example|tests|skills|plugins)/[\w./-]*[\w/])"

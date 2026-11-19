@@ -6,7 +6,7 @@ ships no collections). They go where ansible.cfg looks: collections/ and
 roles/galaxy/. An install builds both afresh beside the old ones and then swaps
 them in, so nothing outside the requirements is left behind and a playbook
 running meanwhile never sees them missing. config/requirements.yml (or
-$CONFIG_DIR/requirements.yml), when a site has one, is installed on top.
+$DEEPOPS_CONFIG_DIR/requirements.yml), when a site has one, is installed on top.
 
 Usage:
   galaxy.py            install, unless everything already matches (retries, since
@@ -32,7 +32,7 @@ ROLES = ROOT / "roles" / "galaxy"
 GALAXY = shutil.which("ansible-galaxy", path=str(Path(sys.executable).parent)) or "ansible-galaxy"
 REQUIREMENTS = [
     ROOT / "roles" / "requirements.yml",
-    Path(os.environ.get("CONFIG_DIR", ROOT / "config")) / "requirements.yml",
+    Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config")) / "requirements.yml",
 ]
 
 
