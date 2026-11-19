@@ -234,6 +234,9 @@ spack_default_packages:
 # so `module avail` finds them with no extra MODULEPATH wiring):
 #cuda_prefix: "{{ sm_prefix }}"
 #cuda_modroot: "{{ sm_module_path }}"
+# Free space (GB) each toolkit install needs on the cache and install disks before it
+# starts; the toolkits install one at a time and each runfile is removed after:
+#cuda_install_free_gb: 30
 # The toolkits install on slurm-master[0], which owns the shared /sw tree; another host
 # only with -e hostlist=<host> on playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
 

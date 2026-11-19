@@ -1,0 +1,49 @@
+---
+# A toolkit lives only in its tree under cuda_install_root and is reached through its
+# module (install.yml says why). What a root runfile run writes outside the tree and
+# points into it is this role's and goes, with the runfile's ownership records: the
+# role removes trees itself and never runs cuda-uninstaller.
+
+- name: Find the host-wide files that point into the software tree
+  ansible.builtin.find:
+    paths: "{{ item.path }}"
+    patterns: "{{ item.pattern }}"
+    contains: "{{ item.contains }}"
+  loop:
+    - {path: /etc/ld.so.conf.d, pattern: "cuda-*.conf", contains: "{{ _root }}/.*"}
+    - {path: /usr/lib/pkgconfig, pattern: "*.pc", contains: "cudaroot={{ _root }}/.*"}
+    - {path: /usr/share/applications, pattern: "nsight*.desktop", contains: ".*{{ _root }}/.*"}
+  loop_control:
+    label: "{{ item.path }}"
+  vars:
+    _root: "{{ cuda_install_root | regex_escape }}"
+  register: cuda_system_files
+
+- name: Find the runfile's CUDA ownership records
+  ansible.builtin.find:
+    paths: /var/log/nvidia/.uninstallManifests
+    patterns: ["CUDA_*", "uninstallManifest-CUDA_*"]
+    file_type: any
+  register: cuda_system_manifests
+
+- name: Read the /usr/local/cuda link
+  ansible.builtin.stat:
+    path: /usr/local/cuda
+    get_checksum: false
+  register: cuda_system_link
+
+- name: Remove them
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ (cuda_system_files.results | map(attribute='files') | flatten
+        + cuda_system_manifests.files) | map(attribute='path') | list
+       + (['/usr/local/cuda'] if cuda_system_link.stat.islnk | default(false)
+          and cuda_system_link.stat.lnk_target.startswith(cuda_install_root ~ '/') else []) }}
+  register: cuda_system_removed
+
+- name: Drop the removed library paths from the linker cache
+  ansible.builtin.command: ldconfig
+  when: cuda_system_removed.results | selectattr('path', 'search', '^/etc/ld\.so\.conf\.d/') | list | length > 0
+  changed_when: true

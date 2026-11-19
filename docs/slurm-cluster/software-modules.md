@@ -32,7 +32,11 @@ runs, from the official NVIDIA runfiles into a shared `/sw/cuda/<version>` tree,
 Lmod modulefile per minor: users `module load cuda/12.4` on any node (`cuda/12.4.1` loads
 the same toolkit, and a bare `module load cuda` the newest; the host driver is never
 touched). A patch release replaces the previous patch of its minor without changing the
-module name a job script loads. This is the per-version, modules-based
+module name a job script loads. A toolkit exists only in its tree: the role installs one at a
+time after checking free space (`cuda_install_free_gb`), deletes each runfile once installed,
+and removes what the runfile writes host-wide (`/usr/local/cuda`, `/etc/ld.so.conf.d/cuda-*.conf`,
+pkg-config and nsight desktop files pointing into the tree), so nothing outside a loaded module
+resolves CUDA. This is the per-version, modules-based
 alternative to the system-wide `nvidia_cuda` install -- see
 [Choosing between similar roles and playbooks](../deepops/choosing-roles-and-playbooks.md).
 
