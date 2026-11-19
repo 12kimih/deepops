@@ -103,6 +103,11 @@
 # The packaged unit reads SLURMD_OPTIONS from here. --conf-server: slurmd takes its
 # configuration from slurmctld (configless, https://slurm.schedmd.com/configless_slurm.html),
 # every controller in order.
+# The PMIX_* settings are deliberate (owner, 2026-11-20): they are the pyxis wiki's set
+# for PMIx in containers (https://github.com/NVIDIA/pyxis/wiki/Setup, PMIx section), so
+# MPI jobs work inside enroot containers. psec=none and no usock trade hardening for
+# container compatibility and speed, accepted for a cluster of trusted lab users: do not
+# "harden" them away.
 - name: Configure slurmd for configless and pmix
   ansible.builtin.blockinfile:
     path: "{{ slurm_sysconf_dir }}/slurmd"
