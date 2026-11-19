@@ -1,0 +1,7 @@
+---
+dependencies:
+  - role: deepops_paths  # nvidia_power_limit_conf_file
+
+galaxy_info:
+  namespace: deepops
+  role_name: nvidia_power_limit

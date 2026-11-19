@@ -1,6 +1,8 @@
 ---
 - hosts: all
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Create /etc/rc.local on Ubuntu
       ansible.builtin.lineinfile:
@@ -19,7 +21,7 @@
       ansible.builtin.blockinfile:
         path: /etc/rc.local
         block: |
-          {{ rc_local_contents | default('# ansible: rc_local_contents undefined') }}
+          {{ rc_local_contents }}
         insertbefore: "^exit 0"
         mode: "0755"
         create: true

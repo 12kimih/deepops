@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """Keep the example config, the site config and the docs honest.
 
-    config_lint.py              run every check
-    config_lint.py CHECK ...    run some: drift, dead, doc-paths, doc-vars, shadow
+    config_lint.py [--fix]              run every check
+    config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
+                                        doc-vars, shadow
 
-drift      config/ mirrors config.example/: in each group_vars and host_vars file both
-           have, the comment lines match in order and the same variable names appear
-           (set or commented). A comment only the site needs starts with "# site:".
-           Only line numbers are printed for config/, which is private.
-dead       every variable config.example sets or shows, and every role default, is
-           read somewhere: a role, playbook, plugin or script, another value, or
-           Kubespray. A setting nothing reads misleads whoever sets it, and a default
-           left unread is usually a task that was lost.
+A role's defaults own each setting's default and a config states only what differs
+(scripts/deepops/settings.py models both):
+
+commented  config.example shows a setting commented at exactly its owner's default
+           ("#name: value"), or marks a value a site might set "# example" (always so
+           for a setting without a default). --fix writes the default.
+redundant  no active line, in config.example or config/, equals what every host it
+           decides would get without it, and none is overridden on every host. A site
+           pinning a value on purpose says why in a "# site:" comment right above it.
+           --fix comments the line out in config.example and deletes it in config/.
+dead       every variable config.example or config/ sets or shows, and every role
+           default, is read somewhere: a role, playbook, plugin or script, another
+           value, or Kubespray. A setting nothing reads misleads whoever sets it (a typo
+           in config/ is one), and a default left unread is usually a task that was lost.
 doc-paths  every repository path a document names (roles/..., playbooks/..., ...)
            exists, so a page never sends a reader to a file that is gone.
 doc-vars   every setting a document tells a reader to set (`name: value`) or lists in
@@ -21,11 +28,11 @@ shadow     no group or host has its variables in two places (all.yml beside all/
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
 
-DEEPOPS_CONFIG_DIR selects the site config (default config/); drift is skipped without it.
-Under the commit hook (pre-commit sets PRE_COMMIT) the site config is read as its git
-repository last committed it: pre-commit stashes this repository's unstaged edits but
-never the site's, so its working tree would be judged against the wrong example and
-one session's half-done edit would block every other session's commit.
+Only paths and line numbers are printed for config/, which is private.
+DEEPOPS_CONFIG_DIR selects the site config (default config/). Under the commit hook
+(pre-commit sets PRE_COMMIT) the site config is read as its git repository last
+committed it, and never fixed: pre-commit stashes this repository's unstaged edits but
+never the site's, so one session's half-done edit would block every other's commit.
 """
 
 import os
@@ -34,10 +41,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import settings  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config.example"
 CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
-NAME = re.compile(r"^#?\s?([a-z_][a-z0-9_]*):(\s|$)")
 PATH = re.compile(
     r"(?<![\w./-])((?:roles|playbooks|scripts|docs|config\.example|tests|skills|plugins)/[\w./-]*[\w/])"
 )
@@ -54,114 +63,107 @@ def tracked(*patterns):
 
 
 def committed_site():
-    """CONFIG as committed, when the commit hook runs and CONFIG is a git repository
-    with at least one commit (a fresh one has nothing committed to read yet)."""
+    """Whether to read CONFIG as committed: the commit hook runs and CONFIG is a git
+    repository with at least one commit (a fresh one has nothing committed to read yet)."""
     if not (os.environ.get("PRE_COMMIT") and (CONFIG / ".git").exists()):
         return False
     head = subprocess.run(
-        ["git", "rev-parse", "-q", "--verify", "HEAD"], cwd=CONFIG, capture_output=True,
-        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
-    )  # fmt: skip
+        ["git", "rev-parse", "-q", "--verify", "HEAD"],
+        cwd=CONFIG,
+        capture_output=True,
+        env=settings.CLEAN_ENV,
+    )
     return head.returncode == 0
 
 
-def site_entries(kind):
-    """{name: is a directory} for CONFIG/KIND: committed under the hook, else on disk."""
-    if committed_site():
-        out = subprocess.run(
-            ["git", "ls-tree", "-z", "HEAD", f"{kind}/"],
-            cwd=CONFIG, capture_output=True, text=True, check=True,
-            env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
-        ).stdout  # fmt: skip
-        entries = {}
-        for record in filter(None, out.split("\0")):
-            meta, path = record.split("\t", 1)
-            entries[path.split("/", 1)[1]] = meta.split()[1] == "tree"
-        return entries
-    base = CONFIG / kind
-    return {p.name: p.is_dir() for p in base.iterdir()} if base.is_dir() else {}
-
-
-def site_text(rel):
-    """CONFIG/REL's text, or None when it does not exist: committed under the hook."""
-    if committed_site():
-        out = subprocess.run(
-            ["git", "show", f"HEAD:{rel}"], cwd=CONFIG, capture_output=True, text=True,
-            env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
-        )  # fmt: skip
-        return out.stdout if out.returncode == 0 else None
-    path = CONFIG / rel
-    return path.read_text() if path.is_file() else None
-
-
-def var_files(base):
-    return sorted(p for p in base.glob("group_vars/*.yml")) + sorted(
-        p for p in base.glob("host_vars/*") if p.is_file()
-    )
-
-
-def comment_text(line):
-    """The comment a line carries, normalised to "# text", or None for a value line.
-
-    "# text" is a comment; "#  key: x", "#  - x" and "#key: x" are commented-out
-    values (config.example shows them commented, config sets them), except that a
-    commented value line holding a comment ("#  # text", the comment inside a
-    commented mapping) carries that comment, as "  # text" does in config.
-    """
-    s = line.strip()
-    if not s.startswith("#"):
-        return None
-    body = s[1:]
-    if body == "" or (body.startswith(" ") and not body.startswith("  ")):
-        return s
-    inner = body.strip()
-    return inner if inner.startswith("#") and comment_text(inner) else None
-
-
-def comments(text):
-    out = []
-    for i, line in enumerate(text.splitlines(), 1):
-        text = comment_text(line)
-        if text is not None and not NAME.match(line) and not line.startswith("# site:"):
-            out.append((i, text))
+def configs():
+    """(label, Tree, private) for config.example and, when present, the site config."""
+    out = [("config.example", settings.Tree(EXAMPLE, tracked_only=False), False)]
+    if CONFIG.is_dir():
+        rev = "HEAD" if committed_site() else None
+        out.append(("config", settings.Tree(CONFIG, rev=rev, tracked_only=False), True))
     return out
 
 
-def names(text):
-    found = {}
-    for i, line in enumerate(text.splitlines(), 1):
-        m = NAME.match(line)
-        if m and not line.startswith("# site:"):
-            found.setdefault(m.group(1), i)
-    return found
+class Fixes:
+    """Line edits to files, applied bottom-up so earlier line numbers stay valid."""
+
+    def __init__(self):
+        self.edits = {}
+
+    def add(self, path, first, last, lines):
+        self.edits.setdefault(Path(path), []).append((first, last, lines))
+
+    def apply(self):
+        for path, edits in self.edits.items():
+            text = path.read_text().splitlines()
+            for first, last, lines in sorted(edits, reverse=True):
+                text[first - 1 : last] = lines
+            path.write_text("\n".join(text) + "\n")
+        return sorted(self.edits)
 
 
-def check_drift():
-    if not CONFIG.is_dir():
-        return []
+def where(label, rel, entry, private):
+    return f"{label}/{rel}:{entry.line}" + ("" if private else f": {entry.name}")
+
+
+def check_commented(fix=None):
+    owners = settings.owners()
+    tree = settings.Tree(EXAMPLE, tracked_only=False)
     problems = []
-    for example in var_files(EXAMPLE):
-        rel = example.relative_to(EXAMPLE)
-        site = site_text(str(rel))
-        if site is None:
-            continue
-        ce, cs = comments(example.read_text()), comments(site)
-        es, ss = [t for _, t in ce], [t for _, t in cs]
-        if es != ss:
-            import difflib
+    for src in settings.Config(tree).sources:
+        for e in (e for e in src.entries if not e.active):
+            owner = owners.get(e.name)
+            at = where("config.example", src.rel, e, False)
+            if owner is not None and owner.value is settings.AMBIGUOUS:
+                continue
+            if e.value is settings.MISSING:
+                problems.append(f"commented: {at}: the commented value is not YAML")
+            elif e.example:
+                if owner is not None and e.value == owner.value:
+                    problems.append(f"commented: {at}: shows its default, so it is no example; drop the mark")
+            elif owner is None:
+                problems.append(
+                    f"commented: {at}: has no default, so the value is an example: mark it # example"
+                )
+            elif e.value != owner.value:
+                problems.append(
+                    f"commented: {at}: shows {settings.show(e.value)}, its default ({owner.paths[0]}) "
+                    f"is {settings.show(owner.value)}: show the default, or mark a site's value # example"
+                )
+                if fix is not None:
+                    fix.add(EXAMPLE / src.rel, e.line, e.end, commented(e.name, owner.value))
+    return problems
 
-            for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=es, b=ss, autojunk=False).get_opcodes():
-                if op != "equal":
-                    where_e = ce[i1][0] if i1 < len(ce) else "end"
-                    where_s = cs[j1][0] if j1 < len(cs) else "end"
-                    problems.append(
-                        f"drift: {rel}: comments differ at config.example line {where_e}, config line {where_s}"
+
+def commented(name, value):
+    """NAME: VALUE as commented lines, the way config.example shows a default."""
+    return ["#" + line for line in settings.dump({name: value}, block=True).splitlines()]
+
+
+def check_redundant(fix=None):
+    owners = settings.owners()
+    problems = []
+    for label, tree, private in configs():
+        config = settings.Config(tree)
+        same, unused = settings.redundant(config, owners)
+        base = EXAMPLE if label == "config.example" else CONFIG
+        for kind, found in (("redundant", same), ("unused", unused)):
+            for src, e in found:
+                if e.pinned:
+                    continue
+                why = (
+                    "equals what it would be without it" if kind == "redundant"
+                    else "is overridden on every host it applies to"
+                )  # fmt: skip
+                hint = "comment it out" if label == "config.example" else "delete it, or say why in # site:"
+                problems.append(f"{kind}: {where(label, src.rel, e, private)}: {why}; {hint}")
+                if fix is not None and tree.rev is None:
+                    lines = (tree.text(src.rel) or "").splitlines()[e.line - 1 : e.end]
+                    new = (
+                        ["#" + line if line else line for line in lines] if label == "config.example" else []
                     )
-        ne, ns = names(example.read_text()), names(site)
-        for n in sorted(set(ne) - set(ns)):
-            problems.append(f"drift: {rel}:{ne[n]}: {n} is in config.example only")
-        for n in sorted(set(ns) - set(ne)):
-            problems.append(f"drift: {rel}: config line {ns[n]} sets a name config.example lacks")
+                    fix.add(base / src.rel, e.line, e.end, new)
     return problems
 
 
@@ -233,23 +235,48 @@ def check_dead():
         return [f"dead: cannot read Kubespray's variables: {k8s.stderr.strip() or 'git grep found nothing'}"]
     k8s_words = set(k8s.stdout.split())
     problems = []
-    role_defaults = [p for p in tracked("roles/*/defaults/main.yml") if "galaxy" not in p.parts]
-    for example in var_files(EXAMPLE) + role_defaults:
-        for name, line in names(example.read_text()).items():
+    # (key, report as, private, {name: line}, text): the config files and role defaults
+    # whose names must be read, each also a source for the others.
+    named = []
+    for label, tree, private in configs():
+        for src in settings.Config(tree).sources:
+            found = {}
+            for e in src.entries:
+                found.setdefault(e.name, e.line)
+            key = f"{label}/{src.rel}"
+            named.append((key, key, private, found, tree.text(src.rel) or ""))
+    for path in [p for p in tracked("roles/*/defaults/main.yml") if "galaxy" not in p.parts]:
+        text = path.read_text()
+        found = {e.name: e.line for e in settings.entries(text) if e.active}
+        named.append((str(path), str(path.relative_to(ROOT)), False, found, text))
+    keys = {key for key, *_ in named}
+    texts = [(key, text) for key, _, _, _, text in named]
+    texts += [(str(path), text) for path, text in sources if source_key(path) not in keys]
+    # The site's own templates and files (files/slurm/*.conf, ...) read its settings too.
+    for label, tree, _ in configs():
+        if label == "config":
+            texts += [
+                (f"config/{rel}", tree.text(rel) or "") for rel in tree.files() if f"config/{rel}" not in keys
+            ]
+    for key, shown, private, found, own in named:
+        # Its own definition does not count, but another value in the same file that
+        # templates it does (the part after "name:").
+        rest = "\n".join(re.sub(r"^#?[A-Za-z_]\w*:", "", raw) for raw in own.splitlines())
+        for name, line in found.items():
             if name in READ_ELSEWHERE or name in k8s_words:
                 continue
             pattern = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
-            # Its own definition does not count, but another value in the same file
-            # that templates it does (the part after "name:").
-            used = any(
-                pattern.search(
-                    text if path != example else "\n".join(NAME.sub("", line) for line in text.splitlines())
-                )
-                for path, text in sources
+            if pattern.search(rest) or any(pattern.search(text) for k, text in texts if k != key):
+                continue
+            problems.append(
+                f"dead: {shown}:{line}" + (": nothing reads it" if private else f": nothing reads {name}")
             )
-            if not used:
-                problems.append(f"dead: {example.relative_to(ROOT)}:{line}: nothing reads {name}")
     return problems
+
+
+def source_key(path):
+    """PATH's key among the named files: config.example/<rel> for the example, else itself."""
+    return f"config.example/{path.relative_to(EXAMPLE)}" if EXAMPLE in path.parents else str(path)
 
 
 def check_doc_paths():
@@ -279,12 +306,9 @@ VAR_SUFFIXES = ("", ".yml", ".yaml", ".json")
 
 def check_shadow():
     problems = []
-    for base in (EXAMPLE, CONFIG):
+    for label, tree, _ in configs():
         for kind in ("group_vars", "host_vars"):
-            if base == CONFIG:
-                listing = site_entries(kind)
-            else:
-                listing = {p.name: p.is_dir() for p in (base / kind).glob("*")}
+            listing = tree.entries(kind)
             entries = {}
             for name, is_dir in sorted(listing.items()):
                 stem = (
@@ -295,7 +319,7 @@ def check_shadow():
                 entries.setdefault(stem, []).append(name + ("/" if is_dir else ""))
             for stem, found in entries.items():
                 if len(found) > 1:
-                    where = f"config/{kind}" if base == CONFIG else f"config.example/{kind}"
+                    where = f"{label}/{kind}"
                     problems.append(
                         f"shadow: {where}: {', '.join(found)} hold {stem}'s variables twice; "
                         "Ansible reads only one, so keep one"
@@ -303,8 +327,11 @@ def check_shadow():
     return problems
 
 
+# A check that can fix takes a Fixes to collect its edits in.
+FIXABLE = {"commented", "redundant"}
 CHECKS = {
-    "drift": check_drift,
+    "commented": check_commented,
+    "redundant": check_redundant,
     "dead": check_dead,
     "doc-paths": check_doc_paths,
     "doc-vars": check_doc_vars,
@@ -313,12 +340,17 @@ CHECKS = {
 
 
 def main(argv):
-    wanted = argv or list(CHECKS)
+    fix = Fixes() if "--fix" in argv else None
+    wanted = [a for a in argv if a != "--fix"] or list(CHECKS)
     unknown = [c for c in wanted if c not in CHECKS]
     if unknown:
         print(f"unknown check: {', '.join(unknown)}", file=sys.stderr)
         return 2
-    problems = [p for c in wanted for p in CHECKS[c]()]
+    problems = [p for c in wanted for p in (CHECKS[c](fix) if c in FIXABLE else CHECKS[c]())]
+    if fix is not None:
+        for path in fix.apply():
+            print(f"fixed {path}", file=sys.stderr)
+        return main([a for a in argv if a != "--fix"])
     for p in problems:
         print(p, file=sys.stderr)
     return 1 if problems else 0

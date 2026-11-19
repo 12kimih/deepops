@@ -21,7 +21,7 @@ esac
 # ceiling for every level: "max" clamps down to it, "default" restores it instead of
 # the higher card default, and "min" is already below it. Without it an exclusive job
 # would get the card maximum and leave the node un-capped after it ends.
-cap_file="{{ nvidia_power_limit_conf_file | default('/etc/nvidia-power-limit.conf') }}"
+cap_file="{{ nvidia_power_limit_conf_file }}"
 cap=""
 if [ -r "$cap_file" ]; then
     cap="$(sed -n 's/^NVIDIA_POWER_LIMIT_WATTS=//p' "$cap_file" | tail -n 1)"

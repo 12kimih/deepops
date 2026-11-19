@@ -8,11 +8,13 @@ shared value lives in one defaults-only role (prometheus_paths, slurm_paths,
 deepops_paths) that the roles reading it depend on, and this test fails on a second
 definition, in defaults or vars, or a literal fallback of a defined variable.
 
-What a deploy includes is read by plays, not roles: an import's `when`, a play's own
-tasks. Those switches live in deploy_defaults, which every such play lists in its
-roles (an import's `when` is evaluated in the imported plays, where it sees the
-role's defaults). A setting config.example shows but no role defines has no default
-at all, so a fallback there is a second, unchecked one.
+A role default exists only where its role is loaded. So a play reading one lists the
+owning role in its roles (deploy_defaults for what a deploy includes, kubespray_defaults
+for Kubespray's settings; an import's `when` is evaluated in the imported plays, which
+list it too), and a role reading another's names it in its meta dependencies. Without
+that, config/ restating the value was all that kept it defined. A setting
+config.example shows but no role defines has no default at all, so a fallback there is
+a second, unchecked one.
 """
 
 import re
@@ -25,7 +27,13 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import Scan, role_var_files, tracked  # noqa: E402
+from repo_scan import Scan, defined_here, references, role_var_files, tracked  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import settings  # noqa: E402
+
+KUBESPRAY = "kubespray"
+ROLES_PATH = [ROOT / "roles", ROOT / "roles" / "galaxy", ROOT / "submodules" / "kubespray" / "roles"]
 
 # Deliberate per-role overrides: the DGX role points cachefilesd at its RAID.
 INTENTIONAL = {
@@ -39,6 +47,19 @@ STANDALONE = {"k8s_gpu_mig_strategy"}
 FALLBACK_OK = {("roles/runai/tasks/fractioning_preflight.yml", "gpu_operator_release_name")}
 FALLBACK = re.compile(r"([a-z_][a-z0-9_]*)\s*\|\s*(?:default|d)\(\s*([^)]*)\)")
 EMPTY = {"omit", "none", "None", "", "''", '""', "[]", "{}"}
+DEFINED_TEST = re.compile(r"\b([a-z_][a-z0-9_]*)\s+is\s+(?:not\s+)?(?:defined|undefined)\b")
+# Roles that read another role's default without loading it, and why.
+ROLE_READS_OK = {
+    # runai finds a GPU Operator release some other play installed (FALLBACK_OK).
+    ("runai", "gpu_operator_release_name"),
+}
+# Plays that read a role default without its role, where the fallback they write is
+# that default.
+PLAY_READS_OK = {
+    # nis_export_groups is the NIS master's; the check reads it from that host's
+    # hostvars and treats a host without it as publishing nothing, the default.
+    ("playbooks/utilities/check-id-consistency.yml", "nis_export_groups"),
+}
 
 
 def role_defaults():
@@ -53,6 +74,8 @@ def role_defaults():
 
 
 class SharedRoleDefaultTests(unittest.TestCase):
+    maxDiff = None
+
     def test_a_shared_variable_is_defined_once(self):
         twice = {n: sorted(r) for n, r in role_defaults().items() if len(r) > 1 and n not in STANDALONE}
         self.assertEqual(twice, {}, "define it once, in a shared defaults role the readers depend on")
@@ -61,16 +84,8 @@ class SharedRoleDefaultTests(unittest.TestCase):
     def test_no_literal_fallback_restates_a_defined_variable(self):
         owners = role_defaults()
         scan, offenders = Scan(FALLBACK_OK, minimum=200), []
-        for path in map(
-            scan.seen, tracked("roles/*.y*ml", "roles/**/*.y*ml", "roles/**/*.j2", "playbooks/**")
-        ):
+        for path in map(scan.seen, ansible_sources()):
             name = path.relative_to(ROOT).as_posix()
-            if (
-                name.startswith("roles/galaxy/")
-                or "/molecule/" in name
-                or path.suffix not in (".yml", ".yaml", ".j2")
-            ):
-                continue
             role = name.split("/")[1] if name.startswith("roles/") else None
             for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
                 for var, arg in FALLBACK.findall(line):
@@ -97,6 +112,21 @@ class SharedRoleDefaultTests(unittest.TestCase):
         self.assertEqual(offenders, [], "the role defines it: read it bare")
         scan.check(self)
 
+    def test_no_defined_test_guards_a_role_default(self):
+        """`x is defined` on a variable a role defines is a fallback in another form:
+        always true where the role is loaded, and where it is not, the play silently
+        takes the other branch (container_manager once skipped a cleanup that way)."""
+        owners = settings.owners()
+        scan, offenders = Scan(PLAY_READS_OK, minimum=200), []
+        for path in map(scan.seen, ansible_sources()):
+            name = path.relative_to(ROOT).as_posix()
+            for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
+                for var in DEFINED_TEST.findall(line):
+                    if var in owners and not scan.excuse((name, var)):
+                        offenders.append(f"{name}:{number}: {var} is defined")
+        self.assertEqual(offenders, [], "the variable has a default: read it, loading its role")
+        scan.check(self)
+
     def test_a_setting_without_an_owner_has_no_fallback(self):
         owners, shown = role_defaults(), example_settings()
         scan, offenders = Scan(minimum=200), []
@@ -109,82 +139,168 @@ class SharedRoleDefaultTests(unittest.TestCase):
         self.assertEqual(offenders, [], "define it in the role that reads it, or in deploy_defaults")
         scan.check(self)
 
-    def test_a_play_reading_a_deploy_switch_loads_deploy_defaults(self):
-        switches = set(yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text()))
-        word = re.compile(r"\b(" + "|".join(sorted(switches)) + r")\b")
-        scan, missing = Scan(minimum=80), []
+    def test_a_play_reading_a_role_default_loads_its_owner(self):
+        """A role default exists only in a play that loads its role: elsewhere the
+        variable is undefined, or a fallback silently wins. So a play reading one lists
+        the owning role (deploy_defaults, a shared defaults role, kubespray_defaults),
+        and so do the plays an import's `when` reads it in."""
+        owners = settings.owners()
+        scan, missing = Scan(PLAY_READS_OK, minimum=80), []
 
-        def check(path, play, why):
-            if "deploy_defaults" not in role_closure(play.get("roles") or []):
-                missing.append(
-                    f"{path.relative_to(ROOT)}: play {play.get('name') or play.get('hosts')} ({why})"
-                )
+        def check(path, play, used):
+            loaded = role_closure(list(play.get("roles") or []) + imported_roles(play))
+            local = defined_here(play)
+            for name in sorted(used - local):
+                owner = owners.get(name)
+                if owner is None or owner.roles & loaded:
+                    continue
+                rel = path.relative_to(ROOT).as_posix()
+                if not scan.excuse((rel, name)):
+                    missing.append(f"{rel}: play {play.get('name') or play.get('hosts')} reads {name} "
+                                   f"({', '.join(sorted(owner.roles))})")  # fmt: skip
 
-        def imported(path, why):
-            for play in yaml.safe_load(path.read_text()) or []:
+        def plays(path):
+            data = yaml.safe_load(path.read_text())
+            return [p for p in data if isinstance(p, dict)] if isinstance(data, list) else []
+
+        def imported(path, used):
+            for play in plays(path):
                 if "import_playbook" in play:
-                    imported((path.parent / play["import_playbook"]).resolve(), why)
+                    imported((path.parent / play["import_playbook"]).resolve(), used)
                 else:
-                    check(path, play, why)
+                    check(path, play, used)
 
         for path in map(scan.seen, tracked("playbooks/*.yml", "playbooks/**/*.yml")):
-            data = yaml.safe_load(path.read_text())
-            for play in data if isinstance(data, list) else []:
-                if not isinstance(play, dict):
-                    continue
+            for play in plays(path):
                 if "import_playbook" in play:
-                    found = word.findall(str(play.get("when", "")))
-                    if found:
-                        imported(
-                            (path.parent / play["import_playbook"]).resolve(), f"imported when {found[0]}"
-                        )
+                    target = (path.parent / play["import_playbook"]).resolve()
+                    # Kubespray's own playbooks load kubespray_defaults themselves.
+                    if KUBESPRAY not in target.parts:
+                        imported(target, references({"when": play.get("when")}))
                 else:
-                    found = word.findall(yaml.safe_dump({k: v for k, v in play.items() if k != "hosts"}))
-                    if found:
-                        check(path, play, f"reads {found[0]}")
-        self.assertEqual(missing, [], "list deploy_defaults first in the play's roles")
+                    params = [
+                        {k: v for k, v in r.items() if k not in ("role", "name")}
+                        for r in play.get("roles") or [] if isinstance(r, dict)
+                    ]  # fmt: skip
+                    body = {k: v for k, v in play.items() if k not in ("hosts", "name", "roles")}
+                    check(path, play, references(body) | references(params))
+        self.assertEqual(missing, [], "list the owning role in the play's roles")
         scan.check(self)
 
-    def test_config_example_shows_each_switch_at_its_default(self):
-        defaults = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text())
-        shown = example_settings()
-        differ = {n: (shown[n], v) for n, v in defaults.items() if n in shown and shown[n] != v}
-        self.assertEqual(differ, {}, "config.example is the sample: show the default, or comment it out")
+    def test_a_role_reading_another_roles_default_depends_on_it(self):
+        """Inside a role, another role's default exists only when that role is loaded
+        too: a meta dependency, or an include. A fallback to exactly the owner's empty
+        default is the one alternative (the reader works without the owner)."""
+        owners = settings.owners()
+        scan, missing = Scan(ROLE_READS_OK, minimum=80), []
+        roles = sorted({p.relative_to(ROOT).parts[1] for p in tracked("roles/*/*/*")} - {"galaxy"})
+        for role in map(scan.seen, roles):
+            used, local, included = role_reads(role)
+            loaded = role_closure([role] + included)
+            for name in sorted(used - local):
+                owner = owners.get(name)
+                if owner is None or owner.roles & loaded or scan.excuse((role, name)):
+                    continue
+                if owner.value in ("", [], {}, None) and empty_fallbacks_only(role, name):
+                    continue
+                missing.append(f"roles/{role} reads {name} ({', '.join(sorted(owner.roles))})")
+        self.assertEqual(missing, [], "add the owning role (or a shared defaults role) to meta dependencies")
+        scan.check(self)
+
+
+def role_reads(role):
+    """(names ROLE's tasks, handlers, defaults, vars and templates use, names it defines
+    itself, roles it includes or imports)."""
+    used, local, included = set(), set(), []
+    for path in tracked(f"roles/{role}/**"):
+        rel = path.relative_to(ROOT).as_posix()
+        if "/molecule/" in rel or "/files/" in rel:
+            continue
+        text = path.read_text(errors="ignore")
+        if "/templates/" in rel:
+            used |= references(text)
+        elif path.suffix in (".yml", ".yaml") and rel.split("/")[2] in (
+            "tasks",
+            "handlers",
+            "defaults",
+            "vars",
+        ):
+            data = yaml.safe_load(text)
+            used |= references(data)
+            local |= defined_here(data) | (set(data) if isinstance(data, dict) else set())
+            included += [r for r in named_roles(data, INCLUDES)]
+    return used, local, included
+
+
+INCLUDES = ("include_role", "ansible.builtin.include_role", "import_role", "ansible.builtin.import_role")
+
+
+def named_roles(node, keys):
+    """The `name` of every KEYS task in NODE."""
+    found = []
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in keys and isinstance(v, dict) and v.get("name"):
+                found.append(v["name"])
+            found += named_roles(v, keys)
+    elif isinstance(node, list):
+        for item in node:
+            found += named_roles(item, keys)
+    return found
+
+
+def empty_fallbacks_only(role, name):
+    """Whether every use of NAME in ROLE falls back to an empty literal."""
+    use = re.compile(rf"(?<![\w.]){re.escape(name)}(?!\w)(\s*\|\s*(?:default|d)\(\s*([^),]*))?")
+    for path in tracked(f"roles/{role}/**"):
+        if "/molecule/" in path.as_posix():
+            continue
+        for m in use.finditer(path.read_text(errors="ignore")):
+            if m.group(2) is None or m.group(2).strip() not in EMPTY:
+                return False
+    return True
 
 
 def ansible_sources():
-    for path in tracked("roles/*.y*ml", "roles/**/*.y*ml", "roles/**/*.j2", "playbooks/**"):
+    """Our YAML and templates; a role's templates whatever their suffix (a .sh, a .conf)."""
+    for path in tracked("roles/*.y*ml", "roles/**/*.y*ml", "roles/**/templates/**", "playbooks/**"):
         name = path.relative_to(ROOT).as_posix()
-        if not (name.startswith("roles/galaxy/") or "/molecule/" in name) and path.suffix in (
-            ".yml",
-            ".yaml",
-            ".j2",
-        ):
+        if name.startswith("roles/galaxy/") or "/molecule/" in name:
+            continue
+        if path.suffix in (".yml", ".yaml", ".j2") or "/templates/" in name:
             yield path
 
 
 def example_settings():
-    """{name: value} that config.example sets (not only shows commented)."""
+    """{name: value} that config.example sets or shows commented."""
     found = {}
     for path in sorted((ROOT / "config.example" / "group_vars").glob("*.yml")):
-        for name, value in (yaml.safe_load(path.read_text()) or {}).items():
-            found.setdefault(name, value)
+        for entry in settings.entries(path.read_text()):
+            found.setdefault(entry.name, entry.value)
     return found
 
 
 def role_closure(roles):
-    """The roles a play's roles list loads, with their meta dependencies."""
+    """The roles a play's roles list loads, with their meta dependencies, found on
+    ansible.cfg's roles_path (ours, Galaxy's, Kubespray's)."""
     seen, todo = set(), [r if isinstance(r, str) else r.get("role") or r.get("name") for r in roles]
     while todo:
         name = todo.pop()
         if name in seen:
             continue
         seen.add(name)
-        meta = ROOT / "roles" / name / "meta" / "main.yml"
-        if meta.is_file():
-            deps = (yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []
-            todo += [d if isinstance(d, str) else d.get("role") or d.get("name") for d in deps]
+        for base in ROLES_PATH:
+            meta = base / name / "meta" / "main.yml"
+            if meta.is_file():
+                deps = (yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []
+                todo += [d if isinstance(d, str) else d.get("role") or d.get("name") for d in deps]
+                break
     return seen
+
+
+def imported_roles(play):
+    """Roles a play imports statically (import_role), whose defaults it sees."""
+    return named_roles(play, ("import_role", "ansible.builtin.import_role"))
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ cluster_tools_lib_python: /usr/bin/python3
 cluster_info:
   name: ""  # system ID, e.g. <org>-<kind>
   docs_url: ""  # public user docs
-  dashboard_url: "{{ grafana_root_url | default('') }}"
+  dashboard_url: "{{ grafana_root_url }}"
   login_host: ""  # what users ssh to
   ssh_port: 22
 # clustertools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.

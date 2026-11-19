@@ -37,7 +37,6 @@
     insertafter: "^# Domain"
     line: "Domain = {{ nfs_idmapd_domain }}"
     backup: true
-  when: nfs_idmapd_domain is defined
   tags:
     - nfs
 

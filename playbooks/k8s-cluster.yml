@@ -24,24 +24,26 @@
 # Set facts depending on container runtime
 # Use GPU operator when container runtime is not docker
 # etcd_deployment_type must be `host` when container_manager is not `docker`
+# A play reading Kubespray's settings lists kubespray_defaults, as Kubespray's do.
 - hosts: all
   roles:
     - role: deploy_defaults
+    - role: kubespray_defaults
   tasks:
     - name: Set facts when not using docker container runtime (default)
       ansible.builtin.set_fact:
         deepops_gpu_operator_enabled: true
         etcd_deployment_type: host
-      when:
-        - container_manager is defined
-        - container_manager != "docker"
+      when: container_manager != "docker"
     - name: Set facts when using Docker container runtime
       ansible.builtin.set_fact:
         etcd_deployment_type: docker
         gpu_operator_default_runtime: "docker"
-      when:
-        - container_manager is defined
-        - container_manager == "docker"
+      when: container_manager == "docker"
+    # For the plays below that do not load kubespray_defaults (container/nvidia-docker.yml).
+    - name: Note whether Docker is the container runtime
+      ansible.builtin.set_fact:
+        _k8s_runtime_is_docker: "{{ container_manager == 'docker' }}"
 
 - name: Install python required for Ansible
   import_playbook: bootstrap/bootstrap-python.yml
@@ -111,12 +113,14 @@
 # them from being removed and causing the install of the containerd runtime to fail
 - hosts: all
   gather_facts: true
+  roles:
+    - role: kubespray_defaults
   tasks:
     # Only packages a host has: dpkg cannot select one it does not know.
     - name: Gather package facts
       ansible.builtin.package_facts:
       when:
-        - container_manager is defined and container_manager != "docker"
+        - container_manager != "docker"
         - ansible_facts.distribution == "Ubuntu"
 
     - name: Un-hold container runtime packages on Ubuntu
@@ -129,7 +133,7 @@
         - docker-ce-rootless-extras
         - containerd.io
       when:
-        - container_manager is defined and container_manager != "docker"
+        - container_manager != "docker"
         - ansible_facts.distribution == "Ubuntu"
         - item in ansible_facts.packages
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
@@ -205,7 +209,7 @@
     - nvidia
   when:
     - deepops_gpu_operator_enabled | bool == false or gpu_operator_preinstalled_nvidia_software
-    - container_manager is defined and container_manager == "docker"
+    - _k8s_runtime_is_docker | bool
 
 # Manage kubectl binary -- handles cross-platform (e.g., Linux cluster -> macOS controller)
 - hosts: kube_control_plane

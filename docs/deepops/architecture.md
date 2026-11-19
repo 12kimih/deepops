@@ -67,9 +67,13 @@ Every variable has one default, in one role, at the lowest precedence, so `confi
 sets only what differs and an upgrade that adds a variable never breaks it. A value
 several roles read lives in a defaults-only role they depend on (`slurm_paths`,
 `prometheus_paths`, `deepops_paths`, `nis_defaults`). What a deploy includes, the
-switches its imports and plays read, lives in `deploy_defaults`, which each such play
-lists in its roles. No reader writes `| default(...)` for a defined variable;
+switches its imports and plays read, lives in `deploy_defaults`. A play or role reading
+another role's default loads that role (a play lists it in its roles, as Kubespray's
+plays list `kubespray_defaults`; a role names it in its meta dependencies), and no
+reader writes `| default(...)` for a defined variable;
 `scripts/validation/tests/test_shared_role_defaults.py` enforces all of this.
+`scripts/deepops/settings.py` models what each host resolves from these defaults and
+`config/` (see [configuration](configuration.md#finding-variables-to-change)).
 <!-- BEGIN GENERATED: role-tree -->
 ```text
 ├── roles

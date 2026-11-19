@@ -1,4 +1,14 @@
 ---
+# No-op until root_access_from_hosts names the break-glass hosts, which keep their own
+# root access: they leave the play here, so the run_once steps run on another host.
+- name: Nothing to do until root_access_from_hosts is set
+  ansible.builtin.meta: end_role
+  when: root_access_from_hosts | length == 0
+
+- name: Leave the break-glass hosts themselves alone
+  ansible.builtin.meta: end_host
+  when: inventory_hostname in root_access_from_hosts
+
 - name: Find root's public keys on the break-glass hosts
   ansible.builtin.find:
     paths: /root/.ssh

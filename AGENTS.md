@@ -128,7 +128,10 @@ limits, failure reasons and the distinction from training success.
    playbook. A converged rerun reports `changed=0`.
 6. **Configuration lives in `config/`, not in role defaults.** Override
    variables in `config/group_vars/`; do not edit roles for site-specific
-   values.
+   values. `config/` holds only what differs from the defaults
+   (`config.example` shows each default commented); before a deploy,
+   `scripts/deepops/settings.py diff --from <last deployed revision>` lists
+   what changes on each host.
 
 ## Optional: KAI Scheduler / Run:ai (off by default)
 

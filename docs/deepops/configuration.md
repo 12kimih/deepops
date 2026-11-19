@@ -113,13 +113,29 @@ You can do this with an Ansible variable by setting `openmpi_version: "<older ve
 ### Finding variables to change
 
 At this point, the natural question is, "where can I find what variables are available to change?"
-The [example configuration files](../../config.example/group_vars) list the most common parameters you may want to change,
-as well as specifying their default values.
-In particular, these files should contain all of the flags that enable or disable features in [k8s-cluster.yml](../../playbooks/k8s-cluster.yml) or [slurm-cluster.yml](../../playbooks/slurm-cluster.yml).
+The [example configuration files](../../config.example/group_vars) list the most common parameters you may want to change.
+In particular, these files contain all of the flags that enable or disable features in [k8s-cluster.yml](../../playbooks/k8s-cluster.yml) or [slurm-cluster.yml](../../playbooks/slurm-cluster.yml).
 
-If you're interested in customizing the behavior of a particular Ansible role further, you may also want to check the `defaults` directory for that role.
-This contains the default values of the variables included with the role itself, and may contain variables that aren't listed in the example configuration.
-However, you can override these values by adding them to your DeepOps configuration files.
+Every default lives in the `defaults` directory of one role, which may hold variables the example does not list; you override any of them from your configuration files.
+The example follows the convention of `sshd_config` and Kubespray's sample inventory:
+
+- `#name: value` shows the setting commented at exactly its default. Uncomment it only to change it.
+- `#name: value  # example` shows a value a site might set (always so for a setting without a default).
+- An uncommented line is a value the example site sets differently from the default.
+
+Your `config/` should likewise hold only what differs from the defaults, so a default that improves in a later DeepOps reaches your cluster.
+To keep a value even if its default changes, say why in a `# site:` comment right above it.
+`scripts/deepops/config_lint.py` enforces this for both directories (`--fix` comments out or deletes a line that restates a default, and updates a stale commented default).
+
+Because defaults now reach your cluster with an upgrade, preview a deploy:
+
+```bash
+uv run python scripts/deepops/settings.py diff --from <revision last deployed>   # what changes on each host
+uv run python scripts/deepops/settings.py show <host>                            # every setting, and where it comes from
+```
+
+Both read the inventory and variable files only; nothing connects to a host or decrypts a vaulted value.
+`--config-from <revision>` also compares your configuration repository at that revision.
 
 ### Which file should my variables go in?
 
