@@ -103,8 +103,15 @@ fi
 command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
 cd "${REPO_DIR}"
 uv sync --locked || { echo "ERROR: uv sync failed" >&2; exit 1; }
-# Run the repository checks on every commit (see .pre-commit-config.yaml).
-(git rev-parse --git-dir >/dev/null 2>&1 && uv run pre-commit install >/dev/null) || true
+# Run the repository checks on every commit (see .pre-commit-config.yaml). They include
+# the guard that keeps site data out of this public repository, so a failed install is
+# said, never swallowed: pre-commit refuses, for one, when core.hooksPath is set.
+if git rev-parse --git-dir >/dev/null 2>&1 ; then
+    if ! hook_out="$(uv run pre-commit install 2>&1)" ; then
+        echo "WARNING: the commit hooks were not installed, so nothing checks commits:" >&2
+        echo "${hook_out}" >&2
+    fi
+fi
 
 # Copy default configuration
 if grep -i deepops README.md >/dev/null 2>&1 ; then
