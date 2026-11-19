@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Back up the Slurm controller's irreplaceable state, and prove a backup restores.
+"""slurm_backup: back up the Slurm controller's irreplaceable state, and prove it restores.
 
     slurm-backup backup CONFIG.json        daily: dump, archive, copy, prune, report
     slurm-backup restore-test CONFIG.json  monthly: load the newest dump into a scratch
@@ -11,13 +10,17 @@ with --single-transaction), the StateSaveLocation tree (queued jobs, reservation
 and, where a destination asks for it, the MUNGE key. A SHA256SUMS file covers the
 set. Each destination keeps <daily> dated directories and <weekly> more taken on the
 weekly day; a destination owned by another user (an NFS export with root_squash) is
-written as that user. The last success per destination, and of the restore test, is
+written, listed and pruned as that user.
+
+Every external step is bounded by step_timeout (seconds): a hung NFS destination fails
+that destination, recorded as status 0, instead of blocking the run, which would leave
+no metric at all. The last success per destination, and of the restore test, is
 written as node_exporter textfile metrics so a stale backup raises an alert. They are
 kept in metrics_file (persistent; the textfile directory is usually tmpfs) and copied
 into the textfile directory, so they survive a reboot: an absent series never alerts.
 
-Standard library only; runs as root on the controller (mariadb root authenticates
-over the unix socket, so no password is ever on a command line).
+Runs as root on the controller (mariadb root authenticates over the unix socket, so no
+password is ever on a command line). Python 3.9 or newer, standard library only.
 """
 
 import datetime as dt
@@ -27,17 +30,22 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tarfile
 import tempfile
 from pathlib import Path
+
+from . import proc
+from .files import write_atomic
+from .prom import key, parse, render
 
 DB_FILE = "slurm_acct_db.sql.gz"
 STATE_FILE = "statesave.tar.gz"
 MUNGE_FILE = "munge.key"
 SUMS_FILE = "SHA256SUMS"
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+PREFIX = "slurm_backup_"
+STEP_TIMEOUT = 3600
 
 
 # --- pure helpers (unit tested) ----------------------------------------------------
@@ -50,27 +58,8 @@ def to_remove(names, keep):
 
 
 def series(name, **labels):
-    """A metric key: (name, sorted label pairs)."""
-    return (name, tuple(sorted(labels.items())))
-
-
-def metrics(prefix, values):
-    """Prometheus textfile lines for {series(...): value}, sorted."""
-    lines = []
-    for (name, labels), value in sorted(values.items()):
-        label = ",".join(f'{k}="{v}"' for k, v in labels)
-        lines.append(f"{prefix}_{name}{{{label}}} {value}")
-    return "\n".join(lines) + "\n"
-
-
-def parse_metrics(prefix, text):
-    """The inverse of metrics()."""
-    values = {}
-    for line in text.splitlines():
-        m = re.match(rf"^{prefix}_(\w+)\{{(.*)\}} (\S+)$", line)
-        if m:
-            values[series(m.group(1), **dict(re.findall(r'(\w+)="([^"]*)"', m.group(2))))] = m.group(3)
-    return values
+    """A metric key for this program's series (the prefix added)."""
+    return key(PREFIX + name, **labels)
 
 
 def sha256(path):
@@ -84,54 +73,44 @@ def sha256(path):
 # --- side effects --------------------------------------------------------------------
 
 
-def run_as(owner, argv, **kwargs):
-    """argv as `owner` (runuser) unless owner is root."""
+def run_as(owner, argv, timeout, **kwargs):
+    """argv as `owner` (runuser) unless owner is root, within `timeout` seconds."""
     if owner not in (None, "", "root"):
         argv = ["runuser", "-u", owner, "--", *argv]
-    return subprocess.run(argv, check=True, **kwargs)
-
-
-def atomic_write(path, text):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text(text)
-    tmp.chmod(0o644)
-    os.replace(tmp, path)
+    return proc.run(argv, timeout=timeout, **kwargs)
 
 
 def publish(cfg):
     """Copy the kept metrics into the textfile directory."""
     kept = Path(cfg["metrics_file"])
     if kept.exists():
-        atomic_write(Path(cfg["textfile_dir"]) / cfg["textfile"], kept.read_text())
+        Path(cfg["textfile_dir"]).mkdir(parents=True, exist_ok=True)
+        write_atomic(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), kept.read_text())
     return 0
 
 
 def write_metrics(cfg, values):
     """Merge values into the kept metrics (the other command's series stay), then publish."""
     kept = Path(cfg["metrics_file"])
-    merged = parse_metrics("slurm_backup", kept.read_text()) if kept.exists() else {}
+    merged = parse(kept.read_text()) if kept.exists() else {}
     merged.update(values)
-    atomic_write(kept, metrics("slurm_backup", merged))
+    kept.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(str(kept), render(merged))
     publish(cfg)
 
 
-def build(cfg, staging):
+def build(cfg, staging, timeout):
     """Dump, archive and checksum into staging; return the file names."""
-    dump = staging / DB_FILE
-    argv = [
-        "mariadb-dump",
-        "--single-transaction",
-        "--quick",
-        "--routines",
-        "--triggers",
-        "--events",
-        cfg["database"],
-    ]
-    with gzip.open(dump, "wb") as out, subprocess.Popen(argv, stdout=subprocess.PIPE) as proc:
-        shutil.copyfileobj(proc.stdout, out)
-    if proc.returncode != 0:
-        raise RuntimeError(f"mariadb-dump failed ({proc.returncode})")
+    raw = staging / "dump.sql"
+    argv = ["mariadb-dump", "--single-transaction", "--quick", "--routines", "--triggers", "--events"]
+    with open(raw, "wb") as out:
+        try:
+            proc.run([*argv, cfg["database"]], timeout=timeout, stdout=out)
+        except proc.CalledProcessError as e:
+            raise RuntimeError(f"mariadb-dump failed ({e.returncode})") from None
+    with open(raw, "rb") as src, gzip.open(staging / DB_FILE, "wb") as dst:
+        shutil.copyfileobj(src, dst)
+    raw.unlink()
     state = Path(cfg["state_dir"])
     with tarfile.open(staging / STATE_FILE, "w:gz") as tar:
         tar.add(state, arcname=state.name)
@@ -143,25 +122,26 @@ def build(cfg, staging):
     return files
 
 
-def deliver(dest, staging, files, day, weekly):
+def deliver(dest, staging, files, day, weekly, timeout):
     owner = dest.get("owner", "root")
     wanted = [f for f in files if f != MUNGE_FILE or dest.get("munge_key")]
     sums = "".join(
         line + "\n" for line in (staging / SUMS_FILE).read_text().splitlines() if line.split()[-1] in wanted
     )
+    write = ["sh", "-c", 'umask 077 && cat > "$1"', "sh"]
     for kind in ["daily"] + (["weekly"] if weekly else []):
-        target = Path(dest["path"]) / kind / day
-        run_as(owner, ["mkdir", "-p", "-m", "0700", str(target)])
+        base = Path(dest["path"]) / kind
+        target = base / day
+        run_as(owner, ["mkdir", "-p", "-m", "0700", str(target)], timeout)
         for f in wanted:
             with open(staging / f, "rb") as src:
-                run_as(owner, ["sh", "-c", 'umask 077 && cat > "$1"', "sh", str(target / f)], stdin=src)
-        run_as(
-            owner, ["sh", "-c", 'umask 077 && cat > "$1"', "sh", str(target / SUMS_FILE)], input=sums.encode()
-        )
-        base = Path(dest["path"]) / kind
+                run_as(owner, [*write, str(target / f)], timeout, stdin=src)
+        run_as(owner, [*write, str(target / SUMS_FILE)], timeout, input=sums.encode())
+        # Listed as the owner: on a root_squash export root cannot read the 0700 directory.
+        names = run_as(owner, ["ls", "-1", str(base)], timeout, capture_output=True, text=True).stdout.split()
         keep = dest.get(kind, 14 if kind == "daily" else 8)
-        for old in to_remove(os.listdir(base), keep):
-            run_as(owner, ["rm", "-rf", "--", str(base / old)])
+        for old in to_remove(names, keep):
+            run_as(owner, ["rm", "-rf", "--", str(base / old)], timeout)
     return sum((staging / f).stat().st_size for f in wanted)
 
 
@@ -169,19 +149,20 @@ def backup(cfg):
     now = dt.datetime.now()
     day = now.strftime("%Y-%m-%d")
     weekly = now.isoweekday() == int(cfg.get("weekly_day", 7))
+    timeout = int(cfg.get("step_timeout", STEP_TIMEOUT))
     values = {series("last_run_timestamp_seconds"): int(now.timestamp())}
     failed = False
     with tempfile.TemporaryDirectory(prefix="slurm-backup-") as tmp:  # 0700, root only
         staging = Path(tmp)
-        files = build(cfg, staging)
+        files = build(cfg, staging, timeout)
         for dest in cfg["destinations"]:
             where = {"destination": dest["path"]}
             try:
-                size = deliver(dest, staging, files, day, weekly)
+                size = deliver(dest, staging, files, day, weekly, timeout)
                 values[series("last_success_timestamp_seconds", **where)] = int(now.timestamp())
                 values[series("last_size_bytes", **where)] = size
                 values[series("last_status", **where)] = 1
-            except (subprocess.CalledProcessError, OSError) as exc:
+            except (proc.CalledProcessError, proc.TimeoutExpired, OSError) as exc:
                 print(f"{dest['path']}: {exc}", file=sys.stderr)
                 values[series("last_status", **where)] = 0
                 failed = True
@@ -189,25 +170,29 @@ def backup(cfg):
     return 1 if failed else 0
 
 
-def mysql(sql, database=None):
+def mysql(sql, timeout, database=None):
     argv = ["mariadb", "--batch", "--skip-column-names"] + ([database] if database else []) + ["-e", sql]
-    return subprocess.run(argv, check=True, capture_output=True, text=True).stdout
+    return proc.run(argv, timeout=timeout, capture_output=True, text=True).stdout
 
 
-def counts(database):
+def counts(database, timeout):
     rows = mysql(
         "SELECT table_name, table_rows FROM information_schema.tables "
-        f"WHERE table_schema = '{database}' AND table_type = 'BASE TABLE'"
+        f"WHERE table_schema = '{database}' AND table_type = 'BASE TABLE'",
+        timeout,
     )
     out = {}
     for line in rows.splitlines():
         name, n = line.split("\t")
-        out[name] = int(mysql(f"SELECT COUNT(*) FROM `{name}`", database).strip() or 0) if n != "NULL" else 0
+        out[name] = (
+            int(mysql(f"SELECT COUNT(*) FROM `{name}`", timeout, database).strip() or 0) if n != "NULL" else 0
+        )
     return out
 
 
 def restore_test(cfg):
     """Load the newest local backup into a scratch database and compare it with live."""
+    timeout = int(cfg.get("step_timeout", STEP_TIMEOUT))
     dest = next(d for d in cfg["destinations"] if d.get("owner", "root") == "root")
     daily = Path(dest["path"]) / "daily"
     newest = daily / max(n for n in os.listdir(daily) if DATE.match(n))
@@ -220,11 +205,11 @@ def restore_test(cfg):
         if not tar.getnames():
             problems.append(f"{STATE_FILE}: empty")
     scratch = cfg.get("restore_database", "slurm_backup_restore_test")
-    mysql(f"DROP DATABASE IF EXISTS `{scratch}`; CREATE DATABASE `{scratch}`")
+    mysql(f"DROP DATABASE IF EXISTS `{scratch}`; CREATE DATABASE `{scratch}`", timeout)
     try:
         with gzip.open(newest / DB_FILE, "rb") as dump:
-            subprocess.run(["mariadb", scratch], stdin=dump, check=True)
-        live, restored = counts(cfg["database"]), counts(scratch)
+            proc.run(["mariadb", scratch], timeout=timeout, stdin=dump)
+        live, restored = counts(cfg["database"], timeout), counts(scratch, timeout)
         for table, n in live.items():
             if table not in restored:
                 problems.append(f"table {table} missing from the backup")
@@ -233,7 +218,7 @@ def restore_test(cfg):
             elif n and not restored[table]:
                 problems.append(f"table {table}: empty in the backup, {n} rows live")
     finally:
-        mysql(f"DROP DATABASE IF EXISTS `{scratch}`")
+        mysql(f"DROP DATABASE IF EXISTS `{scratch}`", timeout)
     now = int(dt.datetime.now().timestamp())
     values = {
         series("restore_test_last_run_timestamp_seconds"): now,
@@ -248,7 +233,8 @@ def restore_test(cfg):
     return 1 if problems else 0
 
 
-def main(argv):
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
     commands = {"backup": backup, "restore-test": restore_test, "publish": publish}
     if len(argv) != 2 or argv[0] not in commands:
         print(__doc__.split("\n\n")[1], file=sys.stderr)
@@ -257,4 +243,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

@@ -43,3 +43,9 @@ slurm_backup_textfile_dir: "{{ node_exporter_prom_dir | default('/run/prometheus
 slurm_backup_textfile: slurm-backup.prom
 # Where the metrics are kept between runs and reboots (copied into the textfile dir).
 slurm_backup_metrics_file: /var/lib/slurm-backup/slurm-backup.prom
+
+# Seconds one step (the dump, one copy to a destination, a listing) may take before it
+# is abandoned, and the whole run before systemd stops it. A hung NFS destination then
+# fails that destination, recorded as last_status 0, instead of blocking every backup.
+slurm_backup_step_timeout: 3600
+slurm_backup_timeout: 21600

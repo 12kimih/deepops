@@ -1,8 +1,9 @@
-"""Architecture checks: Slurm is reached through clustertools.slurm alone.
+"""Architecture checks: every process is bounded, and Slurm is reached through slurm.run.
 
 A throttled Slurm RPC never fails, it stalls (the client library retries it for ever),
-so an unbounded call hangs whatever made it. clustertools.slurm.run is the one bounded
-way out; these tests keep it the only one.
+and a read from a hung NFS mount never returns, so an unbounded call hangs whatever
+made it. clustertools.proc.run is the one way to start a process and refuses one
+without a timeout; clustertools.slurm.run is the one way to call Slurm.
 """
 
 import re
@@ -12,25 +13,42 @@ from pathlib import Path
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
-from clustertools import cli, slurm  # noqa: E402
+from clustertools import cli, proc, slurm  # noqa: E402
 
 # All of the cluster's own Python: the clustertools package.
 SOURCES = list(ROLES.glob("cluster_tools_lib/files/**/*.py"))
 READER = ROLES / "cluster_tools_lib/files/clustertools/slurm.py"
+PROC = ROLES / "cluster_tools_lib/files/clustertools/proc.py"
 SLURM = ("scontrol", "squeue", "sinfo", "sacctmgr", "sacct", "scancel", "sprio", "sshare")
 
 
 class BoundaryTests(unittest.TestCase):
-    def test_only_the_reader_starts_processes(self):
+    def test_only_proc_starts_processes(self):
         self.assertTrue(SOURCES, "no sources found")
         offenders = [
             f"{p.relative_to(ROLES)}:{n}"
             for p in SOURCES
-            if p != READER
+            if p != PROC
             for n, line in enumerate(p.read_text().splitlines(), 1)
-            if re.search(r"\b(subprocess|os\.system|os\.popen)\b", line)
+            if re.search(r"\b(subprocess|os\.system|os\.popen|os\.exec\w*|os\.spawn\w*)\b", line)
         ]
-        self.assertEqual(offenders, [], "call Slurm through clustertools.slurm.run, which is bounded")
+        self.assertEqual(offenders, [], "start processes with clustertools.proc.run, which is bounded")
+
+    def test_proc_refuses_an_unbounded_call(self):
+        for timeout in (None, 0, -1):
+            with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                proc.run(["true"], timeout=timeout)
+
+    def test_only_the_reader_calls_slurm(self):
+        commands = re.compile(r"""["'](%s)["']""" % "|".join(SLURM))
+        offenders = [
+            f"{p.relative_to(ROLES)}:{n}"
+            for p in SOURCES
+            if p not in (READER, ROLES / "cluster_tools_lib/files/clustertools/cli.py")
+            for n, line in enumerate(p.read_text().splitlines(), 1)
+            if commands.search(line) and "proc.run" in line
+        ]
+        self.assertEqual(offenders, [], "call Slurm through clustertools.slurm.run")
 
     def test_the_reader_bounds_every_call(self):
         self.assertIn("timeout=TIMEOUT", READER.read_text())

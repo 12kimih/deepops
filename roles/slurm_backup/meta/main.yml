@@ -1,0 +1,7 @@
+---
+dependencies:
+  - role: cluster_tools_lib
+
+galaxy_info:
+  namespace: deepops
+  role_name: slurm_backup

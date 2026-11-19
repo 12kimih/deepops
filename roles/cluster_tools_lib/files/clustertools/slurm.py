@@ -13,8 +13,9 @@ Python 3.9 or newer, standard library only.
 import json
 import os
 import re
-import subprocess
 import sys
+
+from . import proc
 
 
 # A throttled RPC does not fail: the client library sleeps and retries it for ever,
@@ -52,16 +53,16 @@ def run(*cmd):
     """stdout of a Slurm client command; Missing, or Failed when it fails or has not
     answered within TIMEOUT seconds."""
     try:
-        return subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=TIMEOUT).stdout
+        return proc.run(cmd, timeout=TIMEOUT, capture_output=True, text=True).stdout
     except FileNotFoundError:
         raise Missing(f"{cmd[0]} not found; run this on a Slurm client.") from None
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+    except (proc.CalledProcessError, proc.TimeoutExpired) as e:
         raise Failed(f"{cmd[0]}: {failure(e)}") from None
 
 
 def failure(error):
     """One line on why a Slurm call failed: Slurm's own first line, or the timeout."""
-    if isinstance(error, subprocess.TimeoutExpired):
+    if isinstance(error, proc.TimeoutExpired):
         return f"no answer in {TIMEOUT} s (slurmctld slow, or rate limiting your requests)"
     text = (error.stderr or "").strip()
     return text.splitlines()[0] if text else f"{error.cmd[0]} exited with status {error.returncode}"
