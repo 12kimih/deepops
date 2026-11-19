@@ -92,7 +92,7 @@ check("A4 stamped", t.tres_per_job, "gres/gpu:a100=8")
 t = {partition = "gpu-h100", tres_per_task = "gres/gpu=1"}
 check("A5 --gpus-per-task", submit(t), slurm.SUCCESS)
 check("A5 stamped", t.tres_per_task, "gres/gpu:h100=1")
-t = {partition = "gpu-a100", tres_per_socket = "gres/gpu=2"}
+t = {partition = "gpu-a100", tres_per_socket = "gres/gpu=2", sockets_per_node = 2}
 check("A6 --gpus-per-socket", submit(t), slurm.SUCCESS)
 check("A6 stamped", t.tres_per_socket, "gres/gpu:a100=2")
 
@@ -347,10 +347,22 @@ t = {gres = "gres/gpu:a10:4", cpus_per_task = NO_VAL16, pn_min_cpus = NO_VAL16,
 check("M10 plain GPU job", submit(t), slurm.SUCCESS)
 check("M10 no notes beyond routing", #LOG, 0)
 check("M10 min_cpus left to Slurm", t.min_cpus, NO_VAL)
-t = {partition = "a10-1", cpus_per_task = 32, min_mem_per_node = 400000, shared = 0}
+t = {partition = "a10-1", cpus_per_task = 32, min_mem_per_node = 400000}
 check("M11 CPU job sizes itself", submit(t), slurm.SUCCESS)
 check("M11 -c kept", t.cpus_per_task, 32)
-check("M11 --exclusive kept", t.shared, 0)
+-- A CPU-only job may not take a GPU node to itself (GPU_NODES_SHARED).
+for _, s in ipairs({0, 2, 3}) do
+    t = {partition = "a10-1", cpus_per_task = 32, shared = s}
+    check("M11 --exclusive (shared=" .. s .. ") on a GPU partition refused", submit(t), slurm.ERROR)
+end
+t = {partition = "a10-1", min_mem_per_node = 0}
+check("M11 --mem=0 on a GPU partition refused", submit(t), slurm.ERROR)
+t = {partition = "a10-1", shared = 1}
+check("M11 --oversubscribe is fine", submit(t), slurm.SUCCESS)
+t = {partition = "cpu", shared = 0, min_mem_per_node = 0}
+check("M11 a CPU-only partition may be taken whole", submit(t), slurm.SUCCESS)
+t = {shared = 0}
+check("M11 modify cannot make a CPU job take a GPU node", modify(t, {partition = "a10-1"}), slurm.ERROR)
 
 print("== N. tasks may not outnumber GPUs ==")
 t = {gres = "gpu:a10:4", num_tasks = 4}
@@ -379,7 +391,7 @@ check("N9 message", LOG[1], "--ntasks-per-gpu=2 is not allowed; GPU jobs run at 
       "one task per GPU.")
 t = {tres_per_task = "gres/gpu:a10=1", num_tasks = 8}
 check("N10 --gpus-per-task: tasks never outnumber GPUs", submit(t), slurm.SUCCESS)
-t = {tres_per_socket = "gres/gpu:a10=2", ntasks_per_socket = 2}
+t = {tres_per_socket = "gres/gpu:a10=2", ntasks_per_socket = 2, sockets_per_node = 2}
 check("N11 --gpus-per-socket with matching tasks", submit(t), slurm.SUCCESS)
 t = {gres = "gpu:a10:4", ntasks_per_socket = 2}
 check("N12 --ntasks-per-socket without --gpus-per-socket", submit(t), slurm.ERROR)
@@ -445,6 +457,29 @@ check("O12 nodes cut below the job's tasks", modify(t, NODES_REC), slurm.ERROR)
 t = {gres = "gpu:4090:2"}
 check("O13 an all-digit GPU type is read as a type", modify(t, GPU_REC), slurm.ERROR)
 check("O13 not rewritten", t.gres, "gpu:4090:2")
+
+print("== Q. GPUs per node are 1, 2, 4 or 8 ==")
+local function shape(name, req, want)
+    check(name, submit(req), want)
+end
+shape("Q1 --gres 3 per node refused", {gres = "gpu:a10:3"}, slurm.ERROR)
+shape("Q1 --gres 8 per node", {gres = "gpu:a10:8"}, slurm.SUCCESS)
+shape("Q2 --gpus-per-node 6 refused", {tres_per_node = "gres/gpu:a10=6"}, slurm.ERROR)
+shape("Q3 --gpus=4 without -N", {tres_per_job = "gres/gpu:a10=4"}, slurm.SUCCESS)
+shape("Q3 --gpus=16 without -N refused", {tres_per_job = "gres/gpu:a10=16"}, slurm.ERROR)
+shape("Q4 --gpus=16 -N 2 is 8 per node", {tres_per_job = "gres/gpu:a10=16", min_nodes = 2}, slurm.SUCCESS)
+shape("Q4 --gpus=12 -N 2 is 6 per node, refused", {tres_per_job = "gres/gpu:a10=12", min_nodes = 2}, slurm.ERROR)
+shape("Q4 --gpus=9 -N 2 does not split, refused", {tres_per_job = "gres/gpu:a10=9", min_nodes = 2}, slurm.ERROR)
+shape("Q5 --gpus-per-task=1 -n 3 refused", {tres_per_task = "gres/gpu:a10=1", num_tasks = 3}, slurm.ERROR)
+shape("Q5 --gpus-per-task=2 -n 2", {tres_per_task = "gres/gpu:a10=2", num_tasks = 2}, slurm.SUCCESS)
+shape("Q6 --gpus-per-socket without sockets refused", {tres_per_socket = "gres/gpu:a10=2"}, slurm.ERROR)
+shape("Q6 --gpus-per-socket=3 x 2 sockets refused", {tres_per_socket = "gres/gpu:a10=3", sockets_per_node = 2}, slurm.ERROR)
+check("Q7 the user is told the allowed counts", logged("1, 2, 4, 8"), true)
+t = {gres = "gpu:3"}
+check("Q8 modify to 3 per node refused", modify(t, GPU_REC), slurm.ERROR)
+t = {min_nodes = 3}
+check("Q8 modify to a node count that does not split refused",
+      modify(t, {partition = A10, tres_per_job = "gres/gpu:a10=8"}), slurm.ERROR)
 
 print("== P. a Lua runtime error rejects instead of failing open ==")
 local broken = setmetatable({}, {__index = function() error("boom") end})
