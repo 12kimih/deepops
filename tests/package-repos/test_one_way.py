@@ -30,8 +30,6 @@ OWNER = "roles/package_repos/"
 NOT_MOVED_YET = {
     "roles/nvidia_container_toolkit/tasks/ubuntu.yml": "deepops or deepops-4",
     "roles/nvidia_container_toolkit/tasks/redhat.yml": "deepops or deepops-4",
-    "roles/nvidia_cuda/tasks/install-ubuntu.yml": "deepops",
-    "roles/nvidia_driver/tasks/redhat.yml": "deepops",
 }
 
 

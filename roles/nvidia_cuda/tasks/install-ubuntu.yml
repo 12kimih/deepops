@@ -1,8 +1,17 @@
 ---
-- name: Ubuntu | remove ppa
-  ansible.builtin.apt_repository:
-    repo: ppa:graphics-drivers/ppa
-    state: absent
+# Early DeepOps added the graphics-drivers PPA (apt_repository's file names, under
+# both PPA hosts it has used); its drivers would compete with the pinned driver.
+- name: Ubuntu | remove the graphics-drivers PPA
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: repo
+  vars:
+    package_repos_repo:
+      name: graphics-drivers-ppa
+      state: absent
+      legacy_files:
+        - /etc/apt/sources.list.d/ppa_launchpad_net_graphics_drivers_ppa_ubuntu.list
+        - /etc/apt/sources.list.d/ppa_launchpadcontent_net_graphics_drivers_ppa_ubuntu.list
 
 - name: Ubuntu | add the CUDA repository
   ansible.builtin.include_role:
