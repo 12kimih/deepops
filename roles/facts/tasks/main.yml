@@ -1,11 +1,15 @@
 ---
 - name: Apt install pciutils
-  ansible.builtin.apt: name=pciutils update_cache=true
+  ansible.builtin.apt:
+    name: pciutils
+    update_cache: true
+    cache_valid_time: 3600
   when: ansible_facts.os_family == 'Debian'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Dnf install pciutils
-  ansible.builtin.dnf: name=pciutils update_cache=true
+  ansible.builtin.dnf:
+    name: pciutils
   when: ansible_facts.os_family == 'RedHat'
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
@@ -15,13 +19,32 @@
     state: directory
     mode: "0755"
 
+- name: Collect the custom facts
+  ansible.builtin.set_fact:
+    facts_files: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/*') | sort }}"
+
+# facts.d is Ansible's host-wide directory, others put facts there too, so it is not
+# emptied; but root runs every executable fact in it on each setup, so one dropped
+# from this role must go: recorded_files removes what this role put there and no
+# longer ships.
 - name: Custom facts
   ansible.builtin.copy:
     src: "{{ item }}"
-    dest: /etc/ansible/facts.d/
+    dest: "/etc/ansible/facts.d/{{ item | basename }}"
+    owner: root
+    group: root
     mode: "0755"
-  with_fileglob:
-    - "*"
+  loop: "{{ facts_files }}"
+  loop_control:
+    label: "{{ item | basename }}"
+
+- name: Remove custom facts no longer shipped
+  ansible.builtin.include_role:
+    name: recorded_files
+  vars:
+    recorded_files_record: /var/lib/deepops/recorded/facts.d
+    recorded_files_names: "{{ facts_files | map('basename') | list }}"
+    recorded_files_dirs: [/etc/ansible/facts.d]
 
 - name: Regather local facts
   ansible.builtin.setup: filter=ansible_local

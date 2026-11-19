@@ -80,3 +80,13 @@
   loop: "{{ cuda_installed }}"
   loop_control:
     label: "{{ item.version }}"
+
+# The modules directory is shared with every other module tree; a version dropped from
+# cuda_versions leaves its modulefile behind unless recorded.
+- name: Remove modulefiles of toolkits no longer installed
+  ansible.builtin.include_role:
+    name: recorded_files
+  vars:
+    recorded_files_record: /var/lib/deepops/recorded/cuda-modulefiles
+    recorded_files_names: "{{ cuda_installed | map(attribute='version') | map('regex_replace', '$', '.lua') | list }}"
+    recorded_files_dirs: ["{{ cuda_modroot }}/cuda"]

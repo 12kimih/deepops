@@ -10,7 +10,7 @@
 # tmpfs and empty after a reboot, and an absent series never alerts), together with
 # when security updates were first seen pending, so "pending for N days" survives.
 set -eu
-state=/var/lib/os-updates
+state=${OS_UPDATES_STATE:-/var/lib/os-updates}  # overridable for the tests
 publish_only=false
 [ "${1:-}" = "--publish" ] && { publish_only=true; shift; }
 dir=${1:?textfile directory}
@@ -35,17 +35,26 @@ if sim=$(apt-get -s -q -o Debug::NoLocking=1 dist-upgrade 2>/dev/null); then apt
 plan=$(printf '%s\n' "$sim" | grep '^Inst ' || true)
 all=$(printf '%s\n' "$plan" | grep -c '^Inst ' || true)
 security=$(printf '%s\n' "$plan" | grep -c -- '-security' || true)
-if [ "$security" -gt 0 ]; then
-    [ -s "$state/security-pending-since" ] || echo "$now" > "$state/security-pending-since"
-    security_since=$(cat "$state/security-pending-since")
-else
-    rm -f "$state/security-pending-since"
-    security_since=0
+# The "pending since" clocks move only on what was actually measured: a run where apt
+# could not simulate knows nothing about security updates, so it keeps the clock
+# rather than resetting it (one transient apt failure would restart the alert's count).
+if [ "$apt_ok" = 1 ]; then
+    if [ "$security" -gt 0 ]; then
+        [ -s "$state/security-pending-since" ] || echo "$now" > "$state/security-pending-since"
+    else
+        rm -f "$state/security-pending-since"
+    fi
 fi
+security_since=$(cat "$state/security-pending-since" 2>/dev/null || echo 0)
+# reboot-required's mtime moves each time a package touches it; the first time it was
+# seen is kept instead.
 if [ -f /var/run/reboot-required ]; then
-    reboot=1; reboot_since=$(stat -c %Y /var/run/reboot-required)
+    reboot=1
+    [ -s "$state/reboot-required-since" ] || echo "$now" > "$state/reboot-required-since"
+    reboot_since=$(cat "$state/reboot-required-since")
 else
     reboot=0; reboot_since=0
+    rm -f "$state/reboot-required-since"
 fi
 tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS

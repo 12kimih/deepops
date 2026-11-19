@@ -82,8 +82,8 @@ h "15 /home top-level directories other users can enter or read (stat only)"
 stat -c '%A %U %n' /home/* 2>/dev/null | awk 'substr($1, 8, 3) != "---" {c++; print "  " $0} END {print (c+0) " homes open to other users"}' | tail -6
 
 h "16 pending updates: security / total, reboot required, kernel"
-t apt-get -s -o Debug::NoLocking=1 upgrade | grep -c '^Inst.*-security' | sed 's/^/security: /'
-t apt-get -s -o Debug::NoLocking=1 upgrade | grep -c '^Inst' | sed 's/^/total: /'
+t apt-get -s -o Debug::NoLocking=1 dist-upgrade | grep -c '^Inst.*-security' | sed 's/^/security: /'
+t apt-get -s -o Debug::NoLocking=1 dist-upgrade | grep -c '^Inst' | sed 's/^/total: /'
 [ -f /var/run/reboot-required ] && echo "reboot-required: $(cat /var/run/reboot-required.pkgs 2>/dev/null | tr '\n' ' ')"
 uname -r
 
