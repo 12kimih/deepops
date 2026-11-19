@@ -16,6 +16,19 @@ REGISTRY = yaml.safe_load((ROOT / "roles/deploy_defaults/vars/main.yml").read_te
     "deepops_component_registry"
 ]
 DEPLOYS = ("playbooks/slurm-cluster.yml", "playbooks/k8s-cluster.yml")
+# Removing these reboots nodes, locks users out or hangs every NFS client: a switch or a
+# group never removes them, only deepops_component_removals does.
+EXPLICIT = {
+    "nvidia_driver",
+    "slurm",
+    "nfs",
+    "nis_server",
+    "nis_client",
+    "kerberos_client",
+    "people",
+    "ldap_server",
+    "sssd_client",
+}
 
 
 def switches(name):
@@ -35,6 +48,13 @@ class Registry(unittest.TestCase):
                     self.assertIn(switch, defaults, "a rule's switch is a deploy switch")
 
 
+class Explicit(unittest.TestCase):
+    def test_access_and_reboot_class_components_are_removed_only_explicitly(self):
+        for name in sorted(EXPLICIT & set(REGISTRY)):
+            with self.subTest(component=name):
+                self.assertEqual(REGISTRY[name].get("removal"), "explicit")
+
+
 class Roles(unittest.TestCase):
     def test_each_component_role_has_state_both_paths_and_the_record(self):
         for name in REGISTRY:
@@ -43,7 +63,11 @@ class Roles(unittest.TestCase):
                 defaults = yaml.safe_load((role / "defaults/main.yml").read_text())
                 self.assertEqual(defaults.get(f"{name}_state"), "present")
                 main = (role / "tasks/main.yml").read_text()
-                self.assertIn(f"{name}_state in ['present', 'absent']", main)
+                explicit = REGISTRY[name].get("removal") == "explicit"
+                states = "['present', 'absent', 'kept']" if explicit else "['present', 'absent']"
+                self.assertIn(f"{name}_state in {states}", main)
+                if explicit:
+                    self.assertIn(f"{name}_state != 'kept'", main, "kept does nothing")
                 for path in ("present", "absent"):
                     text = (role / f"tasks/{path}.yml").read_text()
                     self.assertIn("name: component_record", text, f"{path}.yml records")
@@ -97,6 +121,17 @@ class Desired(unittest.TestCase):
         self.assertEqual(
             (want("n1")["dep"], want("k1")["dep"]), ("present", "absent"), "needed by a present one"
         )
+
+    def test_explicit_removal_keeps_until_named(self):
+        reg = {"drv": {"rules": [{"switch": True, "group": "slurm-node"}], "removal": "explicit"}}
+        want = components.components_desired
+        self.assertEqual(want(reg, self.GROUPS, "n1")["drv"], "present")
+        self.assertEqual(want(reg, self.GROUPS, "k1")["drv"], "kept", "a rule that stops holding keeps it")
+        self.assertEqual(want(reg, self.GROUPS, "k1", ["drv"])["drv"], "absent", "named: removed")
+        with self.assertRaises(Exception):
+            want(reg, self.GROUPS, "n1", ["drv"])  # named while a rule still wants it
+        with self.assertRaises(Exception):
+            want(reg, self.GROUPS, "n1", ["typo"])
 
     def test_order_puts_needs_first(self):
         order = components.components_order(self.REG)

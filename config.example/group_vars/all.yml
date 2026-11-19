@@ -130,6 +130,10 @@
 # The controller keeps its database (slurmdbd) and web server (Open OnDemand).
 #host_baseline_absent_packages: "{{ ['avahi-daemon', 'iperf3', 'samba', 'mysql-server*']  # example
 #  + ([] if inventory_hostname in groups['slurm-master'] | default([]) else ['apache2*']) }}"
+# A switch turned off, or a host that left a component's group, removes the component
+# (docs/deepops/component-state.md). The driver, authentication, Slurm, MUNGE and the
+# NFS server are kept then; name one here to remove it where nothing wants it.
+#deepops_component_removals: []
 
 ################################################################################
 # STORAGE                                                                      #

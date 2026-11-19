@@ -46,6 +46,12 @@ slurm_enable_egress_policy: false
 # (roles/dns_resolver); the egress policy lets users send DNS to it alone
 slurm_enable_dns_resolver: false
 
+# Components whose removal is explicit only (removal: explicit in the registry,
+# roles/deploy_defaults/vars/main.yml: the driver, authentication, Slurm, MUNGE, the NFS
+# server). Turning their switch off, or a host leaving their group, leaves them as they
+# are; listing one here removes it from the hosts where nothing wants it any more.
+deepops_component_removals: []
+
 # Kubernetes deploy (playbooks/k8s-cluster.yml)
 kube_enable_container_registry: false
 kube_enable_rsyslog_server: true
