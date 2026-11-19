@@ -30,9 +30,9 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | nvidia-k8s-gpu-feature-discovery | `k8s_gpu_feature_discovery_chart_version` | `0.20.1` |  |
 | nvidia-mig-manager | `mig_manager_version` | `0.15.1` |  |
 | nvidia_container_toolkit | `nvidia_container_toolkit_version` | `1.19.1-1` |  |
-| nvidia_driver | `nvidia_driver_branch` | `580` | `595` |
 | nvidia_hpc_sdk | `hpcsdk_major_version` | `26` |  |
 | nvidia_hpc_sdk | `hpcsdk_minor_version` | `3` |  |
+| nvidia_versions | `nvidia_driver_branch` | `580` | `595` |
 | openmpi | `openmpi_version` | `5.0.10` |  |
 | prometheus | `prometheus_container` | `prom/prometheus:v3.15.0@sha256:efd719c99d83` |  |
 | prometheus-ipmi-exporter | `ipmi_exporter_container` | `quay.io/prometheuscommunity/ipmi-exporter:v1.10.1@sha256:0662cadaf268` |  |

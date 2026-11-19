@@ -1,0 +1,12 @@
+---
+# The NVIDIA driver branch, written once for every role whose packages must match it
+# (the driver itself, DCGM).
+
+# Driver branch to install (e.g. "580", "575"). Open modules require Turing+.
+nvidia_driver_branch: "580"
+
+# The CUDA major version this branch serves: CUDA 13 needs a 580 or newer driver,
+# CUDA 12 a 525 or newer one (CUDA toolkit release notes, minimum driver versions).
+# Packages built per CUDA major (DCGM 4) follow it.
+# https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
+nvidia_driver_cuda_major: "{{ 13 if nvidia_driver_branch | int >= 580 else (12 if nvidia_driver_branch | int >= 525 else 11) }}"

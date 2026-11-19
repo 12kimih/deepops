@@ -9,7 +9,15 @@
     name: package_repos
     tasks_from: cuda
 
+- name: RedHat | remove the DCGM packages of another series
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ dcgm_other_pkgs }}"
+
 - name: RedHat | install package
-  ansible.builtin.package:
+  ansible.builtin.dnf:
     name: "{{ dcgm_pkg_name }}"
     state: "present"
+    install_weak_deps: true  # the diagnostics (NVIDIA's install guide)

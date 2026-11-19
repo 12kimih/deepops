@@ -21,8 +21,8 @@
 # completely with nvidia_driver_package (Ubuntu) / nvidia_driver_rhel_package
 # (RHEL/Rocky) for any combination not covered by the toggles.
 
-# Driver branch to install (e.g. "580", "575"). Open modules require Turing+.
-nvidia_driver_branch: "580"
+# The driver branch is nvidia_driver_branch (roles/nvidia_versions), shared with the
+# roles whose packages must match it.
 
 # Kernel module flavor: "open" (default, Turing and newer; adds the "-open"
 # suffix / "-open" dnf stream) or "proprietary" (omits it).

@@ -1,5 +1,17 @@
 ---
-dcgm_pkg_name: "datacenter-gpu-manager"
+# DCGM 4, built per CUDA major: the one matching the driver branch (NVIDIA's DCGM
+# install guide picks it from the driver's CUDA version; nvidia_driver_cuda_major is
+# that, known before the driver loads). The recommended packages it pulls in carry
+# the diagnostics. The 3.x package supports CUDA 12 at most: on a CUDA 13 driver
+# `dcgmi diag` stops with "Detected unsupported Cuda version".
+# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/getting-started.html
+dcgm_pkg_name: "datacenter-gpu-manager-4-cuda{{ nvidia_driver_cuda_major }}"
+# Removed first: the 3.x series and every DCGM 4 package built for another CUDA major
+# (-cuda12, -cuda12-cublas, -multinode-cuda12, ...; globs, resolved by host_baseline).
+dcgm_other_pkgs: >-
+  {{ ['datacenter-gpu-manager', 'datacenter-gpu-manager-config']
+     + ['11', '12', '13'] | reject('equalto', nvidia_driver_cuda_major | string)
+       | map('regex_replace', '^', 'datacenter-gpu-manager-4-*cuda') | map('regex_replace', '$', '*') | list }}
 
 # DGX OS ships its own DCGM and the package name differs per release.
 # install-dgx.yml converges on this package and removes the other series.

@@ -4,10 +4,18 @@
     name: package_repos
     tasks_from: cuda
 
+- name: Ubuntu | remove the DCGM packages of another series
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ dcgm_other_pkgs }}"
+
 - name: Ubuntu | install package
   ansible.builtin.apt:
     name: "{{ dcgm_pkg_name }}"
     state: "present"
+    install_recommends: true  # the diagnostics (NVIDIA's install guide)
     update_cache: true
     cache_valid_time: 3600
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
