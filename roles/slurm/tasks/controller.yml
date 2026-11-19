@@ -132,6 +132,20 @@
   tags:
     - config
 
+# The source build's PluginDir (/usr/local/lib/slurm) is gone after the move to the
+# packages; slurmdbd would start without its plugins.
+- name: Check the slurmdbd.conf template
+  vars:
+    _conf: "{{ lookup('ansible.builtin.template', slurm_dbd_conf_template) }}"
+  ansible.builtin.assert:
+    that: _conf | regex_findall('(?m)^ *PluginDir *= *(.+)') | map('trim') | reject('eq', slurm_plugin_dir) | list | length == 0
+    fail_msg: >-
+      {{ slurm_dbd_conf_template }} sets a PluginDir other than the packages'
+      {{ slurm_plugin_dir }}; leave PluginDir out.
+    quiet: true  # never prints the rendered file, which holds the database password
+  tags:
+    - config
+
 - name: Configure slurm.conf
   ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
