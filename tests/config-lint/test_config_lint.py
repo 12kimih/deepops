@@ -69,6 +69,14 @@ class Commented(Configs):
         self.assertIn("drop the mark", found[1])
 
 
+class Retired(Configs):
+    def test_a_config_setting_a_retired_name_is_reported(self):
+        self.write("#x: 1\n#old_example: 1\n", "x: 2\nold_site: 3\n")
+        with mock.patch.object(cl, "retired", return_value={"old_site": "x", "old_example": "x"}):
+            found = cl.check_retired()
+        self.assertEqual(found, ["retired: config/group_vars/all.yml:2: old_site is retired: set x instead"])
+
+
 class Redundant(Configs):
     def test_a_restated_default_is_reported_and_fixed(self):
         self.write("x: 1\nz: b\n", "# site: kept on purpose\nx: 1\ny: [1, 2]\nz: b\n")
