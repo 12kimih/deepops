@@ -2,9 +2,12 @@
 # What the component installs, for its record (roles/component_record). The image
 # prune units only while pruning is on, so turning it off removes them. Images and
 # volumes (/var/lib/docker) are data and stay.
+# The repository's files, named by roles/package_repos.
 _docker_repo_items:
-  Debian: ["file:{{ docker_apt_sources }}", "file:{{ docker_apt_keyring }}"]
-  RedHat: ["file:/etc/yum.repos.d/docker-ce-stable.repo"]
+  Debian: [file:/etc/apt/sources.list.d/docker.sources, file:/etc/apt/keyrings/docker.asc,
+           file:/var/cache/deepops/package-repos/docker.key]
+  RedHat: [file:/etc/yum.repos.d/docker.repo, file:/etc/pki/rpm-gpg/RPM-GPG-KEY-docker,
+           file:/var/cache/deepops/package-repos/docker.key]
 _docker_prune_items:
   - unit:docker-image-prune.timer
   - unit:docker-image-prune.service
