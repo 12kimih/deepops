@@ -2,15 +2,21 @@
 groups:
   - name: gpu
     rules:
-      # XID 13, 31, 43 and 45 are raised by faulty user programs, not hardware.
+      # XID 13, 31, 43 and 45 are raised by faulty user programs, not hardware. The
+      # exporter counts each XID over its last window (DCGM_EXP_XID_ERRORS_COUNT, label
+      # xid), so a repeat counts too. DCGM_FI_DEV_XID_ERRORS only ever holds the last code,
+      # in a series that appears with it (label err_code) and never changes: a series
+      # new in the last 10 minutes is an XID, for exporters without the count.
       - alert: GpuXidError
         expr: |
-          DCGM_FI_DEV_XID_ERRORS > 0 and changes(DCGM_FI_DEV_XID_ERRORS[10m]) > 0
-          unless (DCGM_FI_DEV_XID_ERRORS == 13 or DCGM_FI_DEV_XID_ERRORS == 31
-                  or DCGM_FI_DEV_XID_ERRORS == 43 or DCGM_FI_DEV_XID_ERRORS == 45)
+          max by (host, instance, gpu, xid) (DCGM_EXP_XID_ERRORS_COUNT{xid!~"13|31|43|45"}) > 0
+          or
+          max by (host, instance, gpu, xid) (label_replace(
+            DCGM_FI_DEV_XID_ERRORS{err_code!~"|13|31|43|45"} unless DCGM_FI_DEV_XID_ERRORS offset 10m,
+            "xid", "$1", "err_code", "(.+)"))
         labels: {severity: warning}
         annotations:
-          summary: "XID {{ $value }} on {{ $labels.host }} GPU {{ $labels.gpu }}"
+          summary: "XID {{ $labels.xid }} on {{ $labels.host }} GPU {{ $labels.gpu }}"
           description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
       - alert: GpuFallenOffBus
         expr: DCGM_FI_DEV_XID_ERRORS == 79

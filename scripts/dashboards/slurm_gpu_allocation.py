@@ -120,7 +120,8 @@ def build():
         share("Share allocated by node", "node", 16),
         table(
             "Allocations now",
-            f"{ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util:max",
+            # Every allocation, with its utilisation where DCGM reports one (NaN otherwise).
+            f"{ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util:max or {ALLOC} * (0 / 0)",
             ["user", "account", "partition", "job_id", "node", "gpu", "gpu_type", "Utilization"],
             h=10,
             sort="node",

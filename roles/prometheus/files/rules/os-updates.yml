@@ -66,12 +66,13 @@ groups:
             shows which host has which; `ansible-playbook -K playbooks/utilities/apt-upgrade.yml`
             brings them level.
       - alert: OsKernelsDiffer
-        expr: count(count by (release) (node_uname_info)) > 1
+        expr: count(count by (release) (max by (host, release) (node_uname_info))) > 1
         for: 26h
         labels: {severity: warning}
         annotations:
           summary: "The hosts run {{ $value }} different kernels"
           description: >-
-            `count by (release, host) (node_uname_info)` shows which; a node left out of the
-            last maintenance reboot runs the old one. `ansible-playbook -K
-            playbooks/utilities/apt-upgrade.yml` reboots each into the installed kernel.
+            {{ range query "max by (host, release) (node_uname_info)" }}
+            {{- .Labels.host }}: {{ .Labels.release }}; {{ end }}
+            A node left out of the last maintenance reboot runs the old one.
+            `ansible-playbook -K playbooks/utilities/apt-upgrade.yml` reboots each into the installed kernel.

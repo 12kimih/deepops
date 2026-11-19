@@ -603,6 +603,21 @@
               {
                 "id": "unit",
                 "value": "none"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "nan",
+                      "result": {
+                        "text": "no data",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }
@@ -974,6 +989,21 @@
                 "value": "percent"
               },
               {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "nan",
+                      "result": {
+                        "text": "no data",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
                 "id": "custom.cellOptions",
                 "value": {
                   "type": "color-text"
@@ -995,7 +1025,7 @@
       },
       "targets": [
         {
-          "expr": "host_device:slurm_gpu_allocated:max * on (host, device) group_left () host_device:dcgm_gpu_util:max",
+          "expr": "host_device:slurm_gpu_allocated:max * on (host, device) group_left () host_device:dcgm_gpu_util:max or host_device:slurm_gpu_allocated:max * (0 / 0)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
