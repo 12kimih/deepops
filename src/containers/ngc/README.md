@@ -52,7 +52,7 @@ ENTRYPOINT ["/bin/sh"]
 
 CMD ["-c", "jupyter lab  --notebook-dir=/workspace --ip=0.0.0.0 --no-browser --allow-root --port=8888 --NotebookApp.token='' --NotebookApp.password='' --NotebookApp.allow_origin='*' --NotebookApp.base_url=${NB_PREFIX}"]
 ```
- 
+
 As a quick-start, several pre-built Kubeflow containers with end-to-end AI workflow tutorial/demo containers can be found on NGC [here](https://ngc.nvidia.com/catalog/containers?query=%20label%3A%22NPN%22&quickFilter=containers).
 
 ## Misc. Notes

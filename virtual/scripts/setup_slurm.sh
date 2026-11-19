@@ -7,7 +7,7 @@ VIRT_DIR="${SCRIPT_DIR}/.."
 ROOT_DIR="${SCRIPT_DIR}/../.."
 
 #####################################
-# Configure slurm in virtual cluster 
+# Configure slurm in virtual cluster
 #####################################
 
 # Move working directory to root of DeepOps repo

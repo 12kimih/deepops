@@ -36,7 +36,7 @@ function help_me() {
   echo "-c    Only clone the Kubeflow manifests repo, but do not deploy Kubeflow."
   echo "-d    Delete Kubeflow from your system (skipping the CRDs and istio-system namespace that may have been installed with Kubeflow."
   echo "-D    Deprecated, same as -d. Previously 'Fully Delete Kubeflow from your system along with all Kubeflow CRDs the istio-system namespace. WARNING, do not use this option if other components depend on istio.'"
-  echo "-x    Deprecated, multi-user auth is now the default." 
+  echo "-x    Deprecated, multi-user auth is now the default."
   echo "-w    Wait for Kubeflow homepage to respond (also polls for various Kubeflow Deployments to have an available status)."
 }
 
@@ -109,7 +109,7 @@ function install_dependencies() {
       echo "The Rook/Ceph helper is deprecated; use a site-owned StorageClass or see docs/k8s-cluster/README.md before using it."
       exit 1
   fi
-  
+
   # Proxies
   if [ ${http_proxy} -o ${https_proxy} -o ${no_proxy} ]; then
       echo "Proxy detected. This could cause problems with a default Kubeflow installation."

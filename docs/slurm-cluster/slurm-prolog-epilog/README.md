@@ -1,7 +1,7 @@
 # Example scripts for Slurm prolog / epilog
 
 This is a collection of scripts that could be added to a Slurm prolog / epilog.
-These are not intended to be "drop in" solutions.  These scripts will need to be modified to fit various system configurations. 
+These are not intended to be "drop in" solutions.  These scripts will need to be modified to fit various system configurations.
 
 ## DCGM Stats
  - prolog-dcgmstats
@@ -32,7 +32,7 @@ The prolog-mps script will, if the user passes --comment=mps, start a single MPS
 daemon on the node.  
 The prolog-mps-per-gpu will, if the user passes --comment=mps-per-gpu, start one
 MPS daemon and MPS server per GPU.  The MPS server will be bound to the appropriate
-CPU cores. 
+CPU cores.
 
 ## DCGM Health Checks
  - prolog-dcgmhealth
@@ -86,9 +86,9 @@ Successfully ran diagnostic for group.
 ## GPU Reset
  - prolog-gpureset
 
-This script will reset the application clocks on the GPUs, activate accounting, and clear the current logs. 
-Inside this script there is a section that is commented out.  That commented out section would execute a 
-reset of the gpu.  That action is not always guaranteed to succeed and should be done with caution. 
+This script will reset the application clocks on the GPUs, activate accounting, and clear the current logs.
+Inside this script there is a section that is commented out.  That commented out section would execute a
+reset of the gpu.  That action is not always guaranteed to succeed and should be done with caution.
 
 ## GPU Check
  - prolog-lspci
@@ -96,7 +96,7 @@ reset of the gpu.  That action is not always guaranteed to succeed and should be
 This script will check that lspci sees all the GPUs that a node should have according to Slurm.
 **This script requires that slurm be configured with GPUs as a consumable resource (gres).  If this check fails the node will be put into a drain state. The job will fail and depending upon the slurm configuration it may or may not
  be requeued.  An interactive job will fail and not be requeued.**
- 
+
 ## Hyperthreading
  - hyperthreadingoff
  - hyperthreadingon

@@ -41,7 +41,7 @@ mkdir -p ~/.kube
 KUBECONFIG=./admin.conf
 if [ -f ~/.kube/config ] ; then
     mv ~/.kube/config{,.bak}
-    KUBECONFIG=${KUBECONFIG}:~/.kube/config.bak 
+    KUBECONFIG=${KUBECONFIG}:~/.kube/config.bak
 fi
 KUBECONFIG=${KUBECONFIG} kubectl config view --flatten | tee ~/.kube/config
 rm ./admin.conf

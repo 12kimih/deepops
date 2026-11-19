@@ -7,7 +7,7 @@ VIRT_DIR="${SCRIPT_DIR}/.."
 ROOT_DIR="${SCRIPT_DIR}/../.."
 
 #####################################
-# Configure k8s in virtual cluster 
+# Configure k8s in virtual cluster
 #####################################
 
 # Move working directory to root of DeepOps repo

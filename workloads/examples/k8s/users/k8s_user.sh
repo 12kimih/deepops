@@ -16,7 +16,7 @@ fi
 
 tmp_config=$(mktemp)
 
-# 
+#
 docker run --rm -ti -v /tmp:/tmp -v /shared:/shared micahhausler/k8s-oidc-helper -c /shared/etc/google_oauth2_client.json --file ${tmp_config} -w
 
 KUBECONFIG=/root/.kube/config /shared/bin/kubectl config --kubeconfig=${tmp_config}  set-cluster deepops --server=https://10..0.1.1:6443 --certificate-authority=/root/.kube/ca.pem --embed-certs=true

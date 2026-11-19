@@ -9,7 +9,7 @@ scp  \
 	workloads/jenkins/scripts/remote-script-for-slurm-gpu.sh \
 	"vagrant@10.0.0.5${GPU01}:remote-script-for-slurm-gpu.sh"
 
-# Compile and run CUDA sample 
+# Compile and run CUDA sample
 ssh \
 	-o "StrictHostKeyChecking no" \
 	-o "UserKnownHostsFile /dev/null" \

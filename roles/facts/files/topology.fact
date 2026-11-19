@@ -16,4 +16,3 @@ gpus=$(for i in `lspci | grep -E "(3D|VGA compatible) controller: NVIDIA" | awk 
 echo "    $gpus"
 echo "  ]"
 echo "}"
-

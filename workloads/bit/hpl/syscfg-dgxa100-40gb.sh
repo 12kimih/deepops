@@ -27,4 +27,3 @@ export GPU_PCIE_WIDTH_WARNING=16
 
 ## Depending on driver version, you may need to uncomment the following line
 # export LD_LIBRARY_PATH="/usr/local/cuda/compat:$LD_LIBRARY_PATH
-

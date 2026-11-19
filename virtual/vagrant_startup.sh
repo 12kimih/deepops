@@ -115,7 +115,7 @@ case "$ID" in
       wget https://releases.hashicorp.com/vagrant/2.2.14/vagrant_2.2.14_x86_64.deb -O vagrant.deb
       sudo dpkg -i vagrant.deb
       popd
-  
+
       # install vagrant plugins
       vagrant plugin install vagrant-libvirt
       vagrant plugin install vagrant-host-shell vagrant-scp vagrant-mutate

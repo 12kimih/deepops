@@ -32,7 +32,7 @@ function check_nv_pcie_link_width() {
 	for actual in $(nvidia-smi --query-gpu=pcie.link.width.current --format=csv | grep -v pcie.link.width.current); do
 		if [ $actual -ne $expected ]; then
 			echo "GPU link width incorrect - $actual"
-			return $actual 
+			return $actual
 		fi
 	done
 	return 0

@@ -19,4 +19,3 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=nccl_tests /root/nccl_tests/build/* /usr/local/bin/
 RUN ldconfig
-

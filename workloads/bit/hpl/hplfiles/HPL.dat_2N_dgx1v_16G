@@ -12,7 +12,7 @@ HPL.out      output file name (if any)
 4         Qs
 16.0         threshold
 1            # of panel fact
-1        PFACTs (0=left, 1=Crout, 2=Right) 
+1        PFACTs (0=left, 1=Crout, 2=Right)
 1            # of recursive stopping criterium
 8          NBMINs (>= 1)
 1            # of panels in recursion
@@ -29,4 +29,3 @@ HPL.out      output file name (if any)
 0            U  in (0=transposed,1=no-transposed) form
 1            Equilibration (0=no,1=yes)
 8            memory alignment in double (> 0)
-
