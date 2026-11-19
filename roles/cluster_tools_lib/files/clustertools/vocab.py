@@ -191,10 +191,26 @@ def job_rank(code):
 REASON_CLASSES = ("wait", "limit", "over", "nodes", "start", "held", "error")
 
 _REASON_RULES = (
-    ("wait", ("Priority", "Resources", "None", "Prolog", "Licenses", "")),
+    (
+        "wait",
+        (
+            "Priority",
+            "Resources",
+            "None",
+            "Prolog",
+            "Licenses",
+            "Cleaning",
+            "SchedDefer",
+            "FedJobLock",
+            "MpiPortsBusy",
+            "NvidiaImexChannels",
+            "BurstBuffer*",
+            "",
+        ),
+    ),
     (
         "error",
-        ("*NeverSatisfied*", "*Invalid*", "*NotAllowed*", "BadConstraints", "JobLaunchFailure", "launch*"),
+        ("*NeverSatisfied*", "*Invalid*", "*NotAllowed*", "BadConstraints", "JobLaunchFailure"),
     ),
     (
         "over",
@@ -202,10 +218,10 @@ _REASON_RULES = (
             "*PerJob*",
             "*PerNode*",
             "QOSMin*",
-            "AssocMin*",
             "PartitionTimeLimit",
             "PartitionNodeLimit",
             "PartitionConfig",
+            "MaxMemPerLimit",
         ),
     ),
     (
@@ -219,6 +235,10 @@ _REASON_RULES = (
             "Max*PerUser",
             "*JobsLimit",
             "AccountingPolicy",
+            "Association*Limit",
+            "QOS*Limit",
+            "QOSUsageThreshold",
+            "JobArrayTaskLimit",
         ),
     ),
     (
@@ -229,12 +249,24 @@ _REASON_RULES = (
             "PartitionDown",
             "PartitionInactive",
             "NodeDown",
-            "Nodes_required_for_job_are_DOWN*",
-            "PowerUpNodes",
+            "Constraints",
+            "MaxPoweredUpNodes",
         ),
     ),
     ("start", ("Dependency", "BeginTime")),
-    ("held", ("JobHeld*",)),
+    ("held", ("JobHeld*", "JobHoldMaxRequeue")),
+)
+# Codes Slurm gives a job that has ended, saying why; never a reason to wait.
+ENDED_REASONS = frozenset(
+    (
+        "SystemFailure",
+        "NonZeroExitCode",
+        "RaisedSignal",
+        "TimeLimit",
+        "InactiveLimit",
+        "DeadLine",
+        "OutOfMemory",
+    )
 )
 
 REASON_TITLE = {

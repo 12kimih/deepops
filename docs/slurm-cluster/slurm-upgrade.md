@@ -87,7 +87,17 @@ see [nvml.md](nvml.md#gpu-type-names).
 ## Upgrading Slurm
 
 Set `slurm_version` (and its `slurm_checksums` entry, the SHA256 of the release
-tarball), then:
+tarball), and regenerate Slurm's names for states and pending reasons, which the
+cluster tools classify (`tests/cluster-tools/slurm-names.json`; the tests refuse a
+file from another release, a vocabulary word the new release no longer sends and a
+reason it adds that nothing classifies):
+
+```bash
+python3 scripts/deepops/slurm_names.py
+python3 -m unittest discover -s tests/cluster-tools-lib
+```
+
+Then:
 
 ```bash
 ansible-playbook -K playbooks/slurm-cluster/slurm-upgrade.yml
