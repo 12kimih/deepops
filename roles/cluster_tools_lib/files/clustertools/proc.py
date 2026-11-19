@@ -5,7 +5,9 @@
 A process that never answers (a Slurm RPC the client retries for ever, a read from a
 hung NFS mount) hangs whatever waits for it, so a call without a positive timeout is
 refused. check defaults to True. Failures raise proc.CalledProcessError or
-proc.TimeoutExpired (subprocess's own).
+proc.TimeoutExpired (subprocess's own). Text output is decoded with errors="replace"
+unless the caller says otherwise: one byte that is not UTF-8 in a job name, a comment
+or a file must not stop a tool for everyone.
 
 The process runs in a session of its own, and on a timeout (or an interrupt) the whole
 session is killed: subprocess.run kills only the process it started, so the commands a
@@ -25,6 +27,8 @@ def run(argv, *, timeout, check=True, input=None, capture_output=False, **kwargs
     if not timeout or timeout <= 0:
         raise ValueError(f"{argv[0]}: a process needs a positive timeout")
     argv = list(argv)
+    if kwargs.get("text") or kwargs.get("universal_newlines"):
+        kwargs.setdefault("errors", "replace")
     if input is not None:
         kwargs.setdefault("stdin", subprocess.PIPE)
     if capture_output:
