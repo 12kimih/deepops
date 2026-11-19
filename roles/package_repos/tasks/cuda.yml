@@ -35,6 +35,14 @@
       environment: "{{ proxy_env }}"
       when: package_repos_cuda_keyring_install is changed or package_repos_cuda_source is changed
 
+# Earlier setups downloaded NVIDIA's own .repo file, which defines the repository a
+# second time.
+- name: Remove the downloaded CUDA .repo file (RHEL family)
+  ansible.builtin.file:
+    path: "/etc/yum.repos.d/cuda-rhel{{ ansible_facts.distribution_major_version }}.repo"
+    state: absent
+  when: ansible_facts.os_family == 'RedHat'
+
 - name: Add the CUDA repository (RHEL family)
   ansible.builtin.yum_repository:
     name: cuda
