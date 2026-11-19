@@ -234,7 +234,7 @@ docker_iptables_enabled: true
 # Pick the base from this site's own addressing plan. It must not overlap anything
 # the host routes, and the role checks it against the live routing table and fails
 # rather than write a colliding pool. Changing this restarts docker, which stops every
-# running container on the node -- set docker_daemon_options_restart to false to stage
+# running container on the node -- set docker_daemon_restart to false to stage
 # the file for a maintenance window instead.
 #docker_daemon_options:
 #  default-address-pools:

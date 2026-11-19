@@ -21,22 +21,14 @@
 # Idempotent: only writes + reports changed when a key actually differs.
 # https://docs.nvidia.com/deeplearning/frameworks/user-guide/
 - name: Docker | apply daemon defaults for NGC/NCCL workloads (shm-size + ulimits)
-  ansible.builtin.command:
-    cmd: >-
-      python3 -c 'import json, pathlib, sys;
-      p = pathlib.Path("/etc/docker/daemon.json");
-      tuning = {{ nvidia_container_toolkit_docker_tuning | to_json }};
-      text = p.read_text().strip() if p.exists() else "";
-      data = json.loads(text) if text else {};
-      changed = any(data.get(k) != v for k, v in tuning.items());
-      data.update(tuning);
-      (p.write_text(json.dumps(data, indent=2) + chr(10)) if changed else None);
-      sys.exit(10 if changed else 0)'
-  register: nvidia_container_toolkit_docker_tuning_result
-  changed_when: nvidia_container_toolkit_docker_tuning_result.rc == 10
-  failed_when: nvidia_container_toolkit_docker_tuning_result.rc not in [0, 10]
-  when: nvidia_container_toolkit_set_docker_tuning | bool
-  notify: Restart docker
+  ansible.builtin.include_role:
+    name: docker_daemon_json
+  vars:
+    docker_daemon_json_owner: nvidia-tuning
+    docker_daemon_json_keys: "{{ nvidia_container_toolkit_docker_tuning if nvidia_container_toolkit_set_docker_tuning | bool else {} }}"
+    # nvidia-ctk writes default-runtime and never takes it back; once the NVIDIA
+    # runtime is not to be the default, it goes.
+    docker_daemon_json_drop_if: "{{ {} if nvidia_container_toolkit_set_as_default_runtime | bool else {'default-runtime': 'nvidia'} }}"
 
 - name: Docker | check NVIDIA runtime configuration
   ansible.builtin.command:
@@ -61,4 +53,4 @@
     cmd: "nvidia-ctk runtime configure --runtime=docker{{ ' --set-as-default' if nvidia_container_toolkit_set_as_default_runtime | bool else '' }}"
   when: nvidia_container_toolkit_docker_runtime.rc != 0
   changed_when: true
-  notify: Restart docker
+  notify: Restart dockerd

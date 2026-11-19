@@ -59,27 +59,14 @@
       uses them today. Choose a base outside every prefix in `ip route`.
   when: docker_daemon_options.get("default-address-pools", []) | length > 0
 
-# Merge, never rewrite: nvidia_container_toolkit and docker_socket_group own their own
-# keys in this file. Idempotent -- only writes, and only reports changed, when a value
-# actually differs.
+# nvidia_container_toolkit and docker_socket_group own other keys in this file; each
+# goes through docker_daemon_json, which also removes a key its owner no longer sets.
 - name: Apply the daemon-wide Docker options
-  ansible.builtin.command:
-    cmd: >-
-      python3 -c 'import json, pathlib, sys;
-      p = pathlib.Path("/etc/docker/daemon.json");
-      want = {{ docker_daemon_options | to_json }};
-      text = p.read_text().strip() if p.exists() else "";
-      data = json.loads(text) if text else {};
-      changed = any(data.get(k) != v for k, v in want.items());
-      data.update(want);
-      p.parent.mkdir(parents=True, exist_ok=True);
-      (p.write_text(json.dumps(data, indent=2) + chr(10)) if changed else None);
-      sys.exit(10 if changed else 0)'
-  register: docker_daemon_options_result
-  changed_when: docker_daemon_options_result.rc == 10
-  failed_when: docker_daemon_options_result.rc not in [0, 10]
-  when: docker_daemon_options | length > 0
-  notify: Restart docker to apply daemon options
+  ansible.builtin.include_role:
+    name: docker_daemon_json
+  vars:
+    docker_daemon_json_owner: docker
+    docker_daemon_json_keys: "{{ docker_daemon_options | combine({'live-restore': docker_live_restore | bool}) }}"
 
 - name: Raise the kernel limits a container host runs into
   ansible.posix.sysctl:

@@ -18,15 +18,5 @@
     cmd: systemctl try-restart docker.socket
   changed_when: true
   when:
-    - docker_socket_group_restart | bool
+    - docker_daemon_restart | bool
     - ((docker_socket_group_unit | default({})).rc | default(1)) == 0
-
-# Restarting dockerd is what re-creates the socket with the new group ownership when
-# the daemon owns it, and what makes it pick up the file descriptor systemd re-bound
-# above when systemd owns it. It also stops running containers -- gated so the change
-# can be staged and applied during a maintenance window instead.
-- name: Restart docker
-  ansible.builtin.systemd:
-    name: docker
-    state: restarted
-  when: docker_socket_group_restart | bool

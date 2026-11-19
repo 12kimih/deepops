@@ -61,10 +61,11 @@ docker_service_state: started
 # https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 docker_daemon_options: {}
 
-# Restart docker when a daemon option changed. The restart stops every running
-# container on the node, so set this false to stage the file and restart during a
-# maintenance window instead.
-docker_daemon_options_restart: true
+# Containers keep running while dockerd restarts (an upgrade, a daemon.json change),
+# instead of all stopping: the exporters, the registry and users' containers alike.
+# Whether a run may restart dockerd at all is docker_daemon_restart
+# (roles/docker_daemon_json).
+docker_live_restore: true
 
 # Kernel limits a container host reaches long before it runs out of CPU or memory.
 # Both are ceilings: raising them permits more and costs nothing while unused. The

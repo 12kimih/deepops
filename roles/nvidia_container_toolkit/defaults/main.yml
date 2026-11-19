@@ -23,7 +23,6 @@ nvidia_container_toolkit_packages:
 
 nvidia_container_toolkit_configure_docker: true
 nvidia_container_toolkit_set_as_default_runtime: true
-nvidia_container_toolkit_restart_docker: true
 # Ensure the docker service is enabled at boot and running. On RHEL the docker-ce
 # package does not auto-enable docker, so every docker-based service (DCGM/Slurm
 # exporters, registry, ...) would be dead after reboot without this.

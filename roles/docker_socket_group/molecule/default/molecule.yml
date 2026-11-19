@@ -22,6 +22,6 @@ provisioner:
         # handlers; the scenario only checks that the group and the daemon
         # configuration are written correctly. The live-socket check finds no socket
         # for the same reason, so it does nothing.
-        docker_socket_group_restart: false
+        docker_daemon_restart: false
 verifier:
   name: ansible

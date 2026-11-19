@@ -1,0 +1,26 @@
+---
+# Every role that sets daemon.json keys comes through here, naming itself as owner:
+#   - ansible.builtin.include_role:
+#       name: docker_daemon_json
+#     vars:
+#       docker_daemon_json_owner: socket-group
+#       docker_daemon_json_keys: {group: "{{ docker_socket_group }}"}
+# The owner's keys are merged in, keys it set before and no longer wants are removed,
+# other owners' keys are kept, and one handler restarts dockerd once for all of them.
+- name: Require an owner
+  ansible.builtin.assert:
+    that: docker_daemon_json_owner is match('^[a-z0-9-]+$')
+    fail_msg: docker_daemon_json needs docker_daemon_json_owner, a short name such as docker.
+    quiet: true
+
+- name: Apply the daemon.json keys of {{ docker_daemon_json_owner }}
+  ansible.builtin.command:
+    argv: [python3, -I, -c, "{{ lookup('ansible.builtin.file', 'daemon-json.py') }}"]
+    stdin: >-
+      {{ {'path': '/etc/docker/daemon.json',
+          'record': docker_daemon_json_record_dir ~ '/' ~ docker_daemon_json_owner ~ '.json',
+          'want': docker_daemon_json_keys, 'drop_if': docker_daemon_json_drop_if} | to_json }}
+  register: docker_daemon_json_result
+  changed_when: docker_daemon_json_result.rc == 10
+  failed_when: docker_daemon_json_result.rc not in [0, 10]
+  notify: Restart dockerd

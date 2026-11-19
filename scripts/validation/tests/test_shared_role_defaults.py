@@ -65,6 +65,8 @@ class SharedRoleDefaultTests(unittest.TestCase):
         for name in filter(None, out.split("\0")):
             if name.startswith("roles/galaxy/") or not name.endswith((".yml", ".yaml", ".j2")):
                 continue
+            if not (ROOT / name).is_file():  # deleted in the working tree, not yet committed
+                continue
             role = name.split("/")[1] if name.startswith("roles/") else None
             for number, line in enumerate((ROOT / name).read_text(errors="ignore").splitlines(), 1):
                 for var, arg in FALLBACK.findall(line):

@@ -1,0 +1,12 @@
+---
+# docker_daemon_json -- the one way roles change /etc/docker/daemon.json. See tasks/main.yml.
+docker_daemon_json_owner: ""  # who owns these keys: docker, nvidia-tuning, socket-group
+docker_daemon_json_keys: {}  # the keys this owner wants, with their values
+# Keys another tool wrote that go when they hold this value, e.g. the default-runtime
+# nvidia-ctk set once the NVIDIA runtime is no longer the default.
+docker_daemon_json_drop_if: {}
+# May a run restart dockerd? A changed daemon.json (or socket group) takes effect only
+# then, and a restart stops every container live-restore does not keep. False stages
+# the change for a maintenance window; a later run with true applies it.
+docker_daemon_restart: true
+docker_daemon_json_record_dir: /var/lib/deepops/docker-daemon-json
