@@ -3,6 +3,9 @@
 Description=Slurm controller backup: %i
 After=mariadb.service
 Wants=mariadb.service
+# A destination on an NFS mount that is not there would be the bare mount point on the
+# local disk: the backup would land there and report success. Mounted first, or no run.
+RequiresMountsFor={{ slurm_backup_destinations | map(attribute='path') | join(' ') }}
 
 [Service]
 Type=oneshot

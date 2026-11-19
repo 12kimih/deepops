@@ -19,7 +19,7 @@ done
 sleep 5
 if [ -n "$(gpu_pids)" ]; then
     logger -t slurm-epilog "Residual GPU processes survived; draining $node_name" || :
-    timeout 30 scontrol update nodename="$node_name" state=drain reason='Residual GPU processes found' \
+    timeout 30 {{ slurm_install_prefix }}/bin/scontrol update nodename="$node_name" state=drain reason='Residual GPU processes found' \
         || logger -t slurm-epilog "could not drain $node_name" || :
 fi
 

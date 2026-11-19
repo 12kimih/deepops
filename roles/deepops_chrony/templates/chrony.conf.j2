@@ -28,13 +28,9 @@ bindcmdaddress ::1
 # Serve time even if not synchronized to any NTP server.
 #local stratum 10
 
+# NTP authentication keys (chronyc no longer uses a command key: chrony 2.2 removed
+# commandkey and generatecommandkey).
 keyfile {{ chrony_config_keyfile }}
-
-# Specify the key used as password for chronyc.
-commandkey 1
-
-# Generate command key if missing.
-generatecommandkey
 
 # Disable logging of client accesses.
 noclientlog

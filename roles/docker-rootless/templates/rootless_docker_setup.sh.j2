@@ -46,11 +46,11 @@ if ! grep "^$(id -un):\|^$(id -u):" /etc/subgid >/dev/null 2>&1; then
   cleansubgid=true
 fi
 
-curl -fsSL https://get.docker.com/rootless | \
-  SKIP_IPTABLES=1 FORCE_ROOTLESS_INSTALL=1 DOCKER_BIN="{{ rootlessdocker_install_dir }}/bin" sh
-
+# pipefail and the pipeline's own status: a failed download or install must not mark
+# the setup done (the task's creates: would never retry it).
 installsuccess=false
-if [ $? -eq 0 ] ; then
+if (set -o pipefail; curl -fsSL https://get.docker.com/rootless | \
+    SKIP_IPTABLES=1 FORCE_ROOTLESS_INSTALL=1 DOCKER_BIN="{{ rootlessdocker_install_dir }}/bin" sh); then
   installsuccess=true
 fi
 

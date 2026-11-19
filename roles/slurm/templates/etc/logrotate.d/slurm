@@ -1,0 +1,17 @@
+{{ ansible_managed | comment }}
+# Slurm is built from source, so no package rotates its logs. The daemons reopen their
+# log files on SIGUSR2; the prolog/epilog log is opened anew by every run.
+/var/log/slurm/*.log /var/log/slurm/prolog-epilog {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        for daemon in slurmctld slurmd slurmdbd; do
+            pkill -USR2 -x "$daemon" || true
+        done
+    endscript
+}

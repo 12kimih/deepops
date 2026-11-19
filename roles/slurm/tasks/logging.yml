@@ -8,3 +8,11 @@
     mode: "0644"
   notify:
     - Restart rsyslog
+
+- name: Rotate the slurm logs
+  ansible.builtin.template:
+    src: "etc/logrotate.d/slurm"
+    dest: "/etc/logrotate.d/slurm"
+    owner: "root"
+    group: "root"
+    mode: "0644"
