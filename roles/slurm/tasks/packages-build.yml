@@ -10,12 +10,15 @@
 - name: Require the repository signing key
   ansible.builtin.assert:
     that:
-      - slurm_repo_signing_key | length > 0
-      - slurm_repo_signing_pubkey | length > 0
+      - slurm_repo_signing_key_file is file
+      - slurm_repo_signing_pubkey_file is file
     fail_msg: >-
-      slurm_repo_signing_key (vaulted) and slurm_repo_signing_pubkey sign and verify the
-      Slurm package repository; make the pair as docs/slurm-cluster/slurm-upgrade.md says.
+      slurm_repo_signing_key_file (vaulted) and slurm_repo_signing_pubkey_file sign and
+      verify the Slurm package repository; the site_secrets play creates the pair
+      (docs/slurm-cluster/slurm-upgrade.md).
     quiet: true
+  run_once: true
+  delegate_to: localhost
 
 - name: Read the package architecture
   ansible.builtin.command:
@@ -217,15 +220,15 @@
 
 - name: Keep the public key to check the signature against
   ansible.builtin.copy:
+    src: "{{ slurm_repo_signing_pubkey_file }}"
     dest: /var/cache/deepops/slurm-repo.asc
-    content: "{{ slurm_repo_signing_pubkey }}"
     owner: root
     group: root
     mode: "0644"
   register: slurm_repo_pubkey_file
 
 # The index, then Release (its hashes) signed by the key from stdin, in a throwaway
-# keyring; then the signature is checked against slurm_repo_signing_pubkey, the key
+# keyring; then the signature is checked against slurm_repo_signing_pubkey_file, the key
 # the nodes trust, so a mismatched pair fails here and not on every node.
 - name: Index and sign the repository
   ansible.builtin.shell:
@@ -246,7 +249,7 @@
       install -m 0644 "$work/index/Packages" "$work/index/Packages.gz" {{ slurm_repo_dir | quote }}/
       install -m 0644 "$work/index/InRelease" {{ slurm_repo_dir | quote }}/
     executable: /bin/bash
-    stdin: "{{ slurm_repo_signing_key }}"
+    stdin: "{{ lookup('ansible.builtin.file', slurm_repo_signing_key_file) }}"  # decrypts the vaulted file
   no_log: true
   changed_when: true
   when: slurm_repo_published is changed or slurm_repo_pubkey_file is changed or not slurm_repo_inrelease.stat.exists

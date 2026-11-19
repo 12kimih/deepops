@@ -1,6 +1,10 @@
 ---
 # Slurm Cluster Playbook
 
+# First, before any host changes: a deploy needs no hand-made secret files.
+- name: Create the missing site secrets
+  import_playbook: slurm-cluster/site-secrets.yml
+
 - name: Install python required for Ansible
   import_playbook: bootstrap/bootstrap-python.yml
 

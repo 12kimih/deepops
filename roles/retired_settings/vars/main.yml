@@ -89,3 +89,6 @@ retired_settings:
   pmix_install_prefix: nothing, PMIx is the distribution's (OpenMPI takes --with-pmix=external)
   pmix_configure: nothing, PMIx is the distribution's (libpmix-dev)
   pmix_force_rebuild: nothing, PMIx is the distribution's (libpmix-dev)
+  # The repository signing key as files, like the MUNGE key
+  slurm_repo_signing_key: slurm_repo_signing_key_file, a vaulted file roles/site_secrets creates (roles/slurm_paths)
+  slurm_repo_signing_pubkey: slurm_repo_signing_pubkey_file, a file roles/site_secrets creates (roles/slurm_paths)

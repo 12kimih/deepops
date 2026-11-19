@@ -1,4 +1,7 @@
 ---
+- name: Create the missing site secrets
+  import_playbook: site-secrets.yml
+
 - hosts: all
   become: true
   roles:

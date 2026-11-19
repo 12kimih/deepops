@@ -3,6 +3,7 @@
 # (https://slurm.schedmd.com/upgrades.html), and replace the retired source build with
 # the packages on the way:
 #
+#   0. the controller: create the site's missing secret files (site-secrets.yml)
 #   1. every host: refuse a downgrade or a jump of more than slurm_upgrade_max_majors
 #   2. build and publish the packages (slurm-master[0])
 #   3. controllers: a backup now (roles/slurm_backup), stop slurmctld and slurmdbd,
@@ -19,6 +20,9 @@
 #   ansible-playbook -K playbooks/slurm-cluster/slurm-upgrade.yml
 #   -e maintenance_serial=2        compute nodes per batch (default 1)
 #   -e maintenance_drain_timeout=N seconds to wait for a node's jobs (default 86400)
+- name: Create the missing site secrets
+  import_playbook: site-secrets.yml
+
 - hosts: all
   become: true
   roles:

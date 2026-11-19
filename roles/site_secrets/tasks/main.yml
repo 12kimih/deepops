@@ -1,0 +1,37 @@
+---
+# Create each declared secret file the site config lacks, on the controller, once per
+# run (library/site_secret.py). An existing file is never read or rewritten, so a
+# running cluster keeps its keys; under --check nothing is written.
+- name: Create the missing secret files
+  site_secret:
+    path: "{{ item.path }}"
+    kind: "{{ item.kind }}"
+    length: "{{ item.length | default(omit) }}"
+    uid: "{{ item.uid | default(omit) }}"
+    public_path: "{{ item.public_path | default(omit) }}"
+    vault: "{{ item.vault | default(true) }}"
+    vault_password_file: "{{ site_secrets_vault_password_file or omit }}"
+    ansible_vault: "{{ ansible_playbook_python | dirname }}/ansible-vault"
+    mode: "{{ item.mode | default('0600') }}"
+  loop: "{{ site_secrets }}"
+  loop_control:
+    label: "{{ item.path }}"
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  register: site_secrets_result
+  delegate_to: localhost
+  connection: local
+  become: false
+  run_once: true
+
+- name: Report the new secret files
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Would create' if ansible_check_mode else 'Created' }} {{ _created | join(', ') }}.
+      Commit them to the site config repository: they are the cluster's keys, and one
+      lost must be replaced on every host.
+  vars:
+    _created: "{{ site_secrets_result.results | map(attribute='created') | flatten }}"
+  when: _created | length > 0
+  delegate_to: localhost
+  run_once: true

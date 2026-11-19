@@ -1,0 +1,9 @@
+---
+# The secret files a site needs, each created on the controller when missing and never
+# replaced: {path, kind, vault (default true), mode (default "0600")}, where kind is
+# random (length bytes, default 1024) or gpg_signing (uid; public_path gets the armored
+# public key, never vaulted). Each owning role declares its own list in its defaults
+# (roles/slurm_paths: slurm_site_secrets) and the play passes it here.
+site_secrets: []
+# Encrypts the vaulted files: the repository's (ansible.cfg vault_password_file).
+site_secrets_vault_password_file: "{{ lookup('ansible.builtin.config', 'DEFAULT_VAULT_PASSWORD_FILE') or '' }}"
