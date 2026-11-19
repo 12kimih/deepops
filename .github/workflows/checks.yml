@@ -10,8 +10,12 @@ jobs:
   checks:
     runs-on: ubuntu-24.04
     steps:
+      # Kubespray is a submodule: config_lint reads its variables and the full check
+      # syntax-checks the playbook that imports it.
       - name: Check out the repository
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
@@ -28,3 +32,11 @@ jobs:
 
       - name: Run every check
         run: scripts/check.sh
+
+      # The file hygiene hooks run only at commit otherwise, so a conflict marker or
+      # broken YAML committed past the hook (web UI, --no-verify) would pass CI.
+      # deepops-check is the step above.
+      - name: Run the commit hooks on every file
+        env:
+          SKIP: deepops-check
+        run: uv run --locked pre-commit run --all-files --show-diff-on-failure
