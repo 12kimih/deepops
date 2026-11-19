@@ -162,15 +162,20 @@
           loop:
             - "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
             - "{{ nvidia_power_limit_conf_file }}"
+          register: nvidia_power_limit_removed
           notify: Reload systemd
 
         # Removing the unit only stops the cap coming back at boot; the running driver
         # keeps its limit until reset here, per GPU against that card's own default.
+        # Only when this run removed a cap: otherwise the limits are a job's (the
+        # exclusive-job prolog raises them to the maximum), and a routine run would
+        # lower them mid-job.
         - name: Reset each GPU to its default power limit
           ansible.builtin.command:
             cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
           loop: "{{ nvidia_power_limit_state.stdout_lines | default([]) }}"
           when:
+            - nvidia_power_limit_removed is changed
             - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
             - item.split(',')[2] | trim | regex_search('^[0-9.]+$')
             - (item.split(',')[1] | trim | float) != (item.split(',')[2] | trim | float)
