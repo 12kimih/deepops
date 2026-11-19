@@ -1,0 +1,12 @@
+---
+# What the registry cache proxy (roles/nginx-docker-registry-cache) and its clients
+# (roles/nginx-docker-registry-cache-client) both read, written once.
+
+# The proxy's CA, generated on its first start unless pre-defined: clients read it from
+# here on the cache host over the Ansible connection.
+nginx_docker_cache_ca_path: "{{ deepops_dir }}/nginx-docker-cache/ca"
+# Optional: a pre-defined CA certificate and key, e.g. {crt: ca.crt, key: ca.key}
+# (empty: the proxy generates one; scripts/nginx-docker-cache/gen-ca.sh makes one).
+nginx_docker_cache_ca: {}
+# The proxy's port.
+nginx_docker_cache_port: 3128

@@ -1,0 +1,14 @@
+---
+- name: Look for Docker
+  ansible.builtin.systemd_service:
+    name: docker
+  register: nginx_docker_cache_client_docker
+  check_mode: true  # read-only: no state requested
+  failed_when: false
+
+- name: Restart Docker so its environment drops the proxy
+  ansible.builtin.systemd_service:
+    name: docker
+    state: restarted
+    daemon_reload: true
+  when: nginx_docker_cache_client_docker.status.ActiveState | default('') == 'active'

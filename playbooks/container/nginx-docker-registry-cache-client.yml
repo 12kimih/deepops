@@ -1,13 +1,14 @@
 ---
+# Run alone it brings the Docker it needs; a deploy imports Docker itself, before it.
 - name: Install docker
   import_playbook: docker.yml
+  when: deepops_phase == 'converge'
 
-- hosts: "{{ hostlist | default('slurm-node') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Configure nginx container caching proxy client
-      ansible.builtin.include_role:
-        name: "nginx-docker-registry-cache"
-        tasks_from: client
+    - role: nginx-docker-registry-cache-client
+      nginx_docker_cache_client_state: "{{ deepops_components.nginx_docker_cache_client | component_phase(deepops_phase) }}"

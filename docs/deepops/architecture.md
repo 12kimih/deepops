@@ -126,6 +126,8 @@ reader writes `| default(...)` for a defined variable;
 │   ├── nfs
 │   ├── nfs-client-provisioner
 │   ├── nginx-docker-registry-cache
+│   ├── nginx-docker-registry-cache-client
+│   ├── nginx_docker_cache_defaults
 │   ├── nhc
 │   ├── nis_client
 │   ├── nis_defaults
