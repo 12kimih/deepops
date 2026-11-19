@@ -47,12 +47,14 @@
   register: slurm_exporter_dockerfile
   when: slurm_exporter_build_image
 
+# The source directory holds exactly the role's files: a Go file dropped from the role
+# would otherwise stay in the build context and still be compiled in.
 - name: Copy exporter source
-  ansible.builtin.copy:
-    src: exporter/
-    dest: "{{ slurm_exporter_build_dir }}/exporter/"
-    mode: "0644"
-  register: slurm_exporter_source
+  ansible.builtin.include_role:
+    name: managed_dir
+  vars:
+    managed_dir_path: "{{ slurm_exporter_build_dir }}/exporter"
+    managed_dir_sources: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/exporter/*') | sort }}"
   when: slurm_exporter_build_image
 
 - name: Check for existing exporter image
@@ -67,7 +69,7 @@
   ansible.builtin.command: docker build -t {{ slurm_exporter_container }} {{ slurm_exporter_build_dir }}
   when: >
     slurm_exporter_build_image and
-    (slurm_exporter_image_check.rc != 0 or slurm_exporter_dockerfile.changed or slurm_exporter_source.changed)
+    (slurm_exporter_image_check.rc != 0 or slurm_exporter_dockerfile.changed or managed_dir_changed | default(false))
   notify: Restart slurm-exporter
 
 - name: Pull the prebuilt image
