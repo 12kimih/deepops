@@ -116,7 +116,7 @@ The following components are completely optional and can be installed on an exis
 ### Kubernetes Dashboard
 
 DeepOps does not install Kubernetes Dashboard. The pinned Kubespray release
-(v2.31.0) no longer ships the dashboard add-on; the former `dashboard_enabled`
+(v2.32.0) no longer ships the dashboard add-on; the former `dashboard_enabled`
 and dashboard image settings have no effect.
 
 If you need a dashboard, install and configure it separately using the

@@ -61,6 +61,19 @@ nfs_exports:
 docker_insecure_registries: "{{ groups['kube_control_plane'] | map('regex_replace', '^(.*)$', '\\1:5000') | list + ['registry.local:31500'] }}"
 crio_insecure_registries: "{{ groups['kube_control_plane'] | map('regex_replace', '^(.*)$', '\\1:5000') | list + ['registry.local:31500'] }}"
 docker_registry_mirrors: "{{ groups['kube_control_plane'] | map('regex_replace', '^(.*)$', 'http://\\1:5000') | list }}"
+# containerd (Kubespray's default runtime) reaches the in-cluster registry over plain
+# HTTP. This list replaces Kubespray's default, so its docker.io entry is kept.
+containerd_registries_mirrors:
+  - prefix: docker.io
+    mirrors:
+      - host: https://registry-1.docker.io
+        capabilities: ["pull", "resolve"]
+        skip_verify: false
+  - prefix: registry.local:31500
+    mirrors:
+      - host: http://registry.local:31500
+        capabilities: ["pull", "resolve"]
+        skip_verify: true
 
 # Use overlayfs snapshotter (kubespray default, works on ext4/xfs).
 # The previous "native" workaround for cri-tools #436/#710 is no longer needed.

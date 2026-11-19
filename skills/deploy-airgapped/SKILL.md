@@ -161,12 +161,12 @@ reference host; distribution repositories remain a separate prerequisite.
    https://github.com/mej/nhc/releases/download/1.4.3/lbnl-nhc-1.4.3.tar.xz lbnl-nhc-1.4.3.tar.xz
    https://github.com/NVIDIA/pyxis/archive/v0.11.1.tar.gz pyxis-0.11.1.tar.gz
    https://developer.download.nvidia.com/hpc-sdk/23.7/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz
-   https://get.helm.sh/helm-v3.17.1-linux-amd64.tar.gz helm-v3.17.1-linux-amd64.tar.gz
+   https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz helm-v3.22.0-linux-amd64.tar.gz
    EOF
    for name in slurm-26.05.5.tar.bz2 hwloc-2.5.0.tar.gz \
      pmix-3.2.3.tar.bz2 lbnl-nhc-1.4.3.tar.xz pyxis-0.11.1.tar.gz \
      nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz \
-     helm-v3.17.1-linux-amd64.tar.gz; do
+     helm-v3.22.0-linux-amd64.tar.gz; do
      test -s "/var/repos/downloads/${name}"
    done
    ```
@@ -593,10 +593,10 @@ sha256sum -c SHA256SUMS
 
    ```bash
    mkdir -p /tmp/deepops-helm
-   tar -xzf /var/repos/downloads/helm-v3.17.1-linux-amd64.tar.gz \
+   tar -xzf /var/repos/downloads/helm-v3.22.0-linux-amd64.tar.gz \
      -C /tmp/deepops-helm
    sudo install -m 0755 /tmp/deepops-helm/linux-amd64/helm /usr/local/bin/helm
-   helm version --short | grep '^v3.17.1'
+   helm version --short | grep '^v3.22.0'
    ```
 
    Mirror the matching archive for another provisioning platform; do not use
