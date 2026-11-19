@@ -48,7 +48,7 @@
   vars:
     download_url: "{{ nhc_src_url }}"
     download_checksum: "{{ nhc_checksums[nhc_version] | default('') }}"
-    download_dest: "{{ nhc_build_dir }}/nhc-{{ nhc_version }}.tar.xz"
+    download_dest: "{{ nhc_build_dir }}/{{ nhc_src_url | basename }}"
     download_unpack: "{{ nhc_build_dir }}"
   when: nhc_build
 
@@ -110,3 +110,38 @@
     owner: root
     group: root
     mode: "0644"
+
+# NHC picks its directories at run time (by version, distribution and its own path),
+# not from the build: a settings file it never reads loses NHC_RM, and a helper path
+# that does not exist means a failed check never drains the node. So the installed nhc
+# is asked where it looks, as root as slurmd runs it.
+- name: Read the version and directories the installed NHC uses
+  ansible.builtin.command:
+    argv: ["{{ nhc_program }}", -V, -V, -V]
+  register: nhc_info
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: not (ansible_check_mode and nhc_build)
+
+- name: Look for the helper that drains a node
+  ansible.builtin.stat:
+    path: "{{ nhc_libexec_dir }}/nhc/node-mark-offline"
+  register: nhc_offline_helper
+  when: nhc_info is not skipped
+
+- name: Refuse an NHC that is not this version or reads other directories
+  ansible.builtin.assert:
+    that:
+      - nhc_info.stdout is search('^LBNL NHC version ' ~ (nhc_version | regex_escape) ~ '$', multiline=True)
+      - "' SYSCONFIGDIR=\"' ~ nhc_sysconfig_dir ~ '\"' in nhc_info.stdout"
+      - "' LIBEXECDIR=\"' ~ nhc_libexec_dir ~ '\"' in nhc_info.stdout"
+      - "' CONFDIR=\"' ~ nhc_config_dir ~ '/nhc\"' in nhc_info.stdout"
+      - "' RM \"slurm\"' in nhc_info.stdout"
+      - "'OFFLINE_NODE=\"' ~ nhc_libexec_dir ~ '/nhc/node-mark-offline\"' in nhc_info.stdout"
+      - nhc_offline_helper.stat.executable | default(false)
+    fail_msg: >-
+      {{ nhc_program }} is not NHC {{ nhc_version }} reading {{ nhc_sysconfig_dir }}/nhc
+      (NHC_RM=slurm), {{ nhc_config_dir }}/nhc and helpers in {{ nhc_libexec_dir }}/nhc.
+      It reports: {{ nhc_info.stdout_lines | select('search', 'version|RM |DIR=|OFFLINE_NODE') | join(' ') }}
+    quiet: true
+  when: nhc_info is not skipped

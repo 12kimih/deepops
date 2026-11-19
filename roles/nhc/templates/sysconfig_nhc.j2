@@ -2,3 +2,5 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin:{{ slurm_install_prefix }}/bin
 NHC_RM=slurm
 SLURM_SINFO={{ slurm_install_prefix }}/bin/sinfo
 SLURM_SCONTROL={{ slurm_install_prefix }}/bin/scontrol
+ONLINE_NODE={{ nhc_libexec_dir }}/nhc/node-mark-online
+OFFLINE_NODE={{ nhc_libexec_dir }}/nhc/node-mark-offline

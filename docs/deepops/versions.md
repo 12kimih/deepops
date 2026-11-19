@@ -24,7 +24,7 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | netapp-trident | `trident_helm_chart_version` | `100.2602.1` |  |
 | nfs-client-provisioner | `k8s_nfs_client_chart_version` | `4.0.18` |  |
 | nginx-docker-registry-cache | `nginx_docker_cache_image` | `rpardini/docker-registry-proxy:0.8.0@sha256:fe958e7a4b7e` |  |
-| nhc | `nhc_version` | `1.4.3` |  |
+| nhc | `nhc_version` | `1.5.1` |  |
 | nvidia-dcgm-exporter | `nvidia_dcgm_container` | `nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f` |  |
 | nvidia-dgx | `dgx_os6_driver_branch` | `550` |  |
 | nvidia-dgx-firmware | `firmware_update_tag` | `21.11.2` |  |
