@@ -26,6 +26,12 @@
     - component_record_action == 'absent'
     - ansible_parent_role_names | default([]) | length > 0
 
+# What this call removed, by kind: only what was there (an orphan adopted on a host that
+# never had it removes nothing). Callers restart or rebuild on this, never on the orphans.
+- name: Start the list of what was removed
+  ansible.builtin.set_fact:
+    component_record_removed: {container: [], unit: [], file: [], dir: [], package: []}
+
 - name: Remove what no component needs any longer
   when: component_record_result.orphans.values() | map('length') | sum > 0
   vars:
@@ -42,6 +48,7 @@
         name: "{{ item }}"
         state: absent
       loop: "{{ component_record_orphans.container }}"
+      register: component_record_containers
       when: component_record_docker.stat.exists | default(false)
 
     - name: Look up units
@@ -60,6 +67,7 @@
       loop: "{{ component_record_units.results }}"
       loop_control:
         label: "{{ item.item }}"
+      register: component_record_stopped
       when: item.status.LoadState | default('not-found') not in ['not-found', 'masked']
 
     - name: Remove files
@@ -67,11 +75,14 @@
         path: "{{ item }}"
         state: absent
       loop: "{{ component_record_orphans.file }}"
+      register: component_record_files
 
     - name: Reload systemd after unit files went
       ansible.builtin.systemd_service:
         daemon_reload: true
-      when: component_record_orphans.unit | length > 0
+      when: >-
+        component_record_files.results | select('changed') | map(attribute='item')
+        | select('match', '/(etc|usr/lib|lib)/systemd/') | list | length > 0
 
     # A directory goes only when empty: anything left in it is not ours to remove.
     - name: Remove empty directories
@@ -100,3 +111,15 @@
       vars:
         host_baseline_absent_packages: "{{ component_record_orphans.package }}"
       when: component_record_orphans.package | length > 0
+
+    - name: Note what was removed
+      ansible.builtin.set_fact:
+        component_record_removed:
+          container: >-
+            {{ component_record_containers.results | default([]) | select('changed') | map(attribute='item') | list }}
+          unit: >-
+            {{ component_record_stopped.results | default([]) | select('changed') | map(attribute='item.item') | list }}
+          file: "{{ component_record_files.results | default([]) | select('changed') | map(attribute='item') | list }}"
+          dir: "{{ component_record_rmdir.results | default([]) | select('changed') | map(attribute='item') | list }}"
+          package: >-
+            {{ (host_baseline_present | default([])) if component_record_orphans.package | length > 0 else [] }}

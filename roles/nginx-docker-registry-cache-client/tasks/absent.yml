@@ -24,15 +24,15 @@
       changed_when: true
       when: >-
         nginx_docker_cache_client_ca_line is changed
-        or _nginx_docker_cache_client_crt in component_record_result.orphans.file
+        or _nginx_docker_cache_client_crt in component_record_removed.file
 
 - name: Rebuild the trust store (RHEL family)
   ansible.builtin.command: update-ca-trust
   changed_when: true
   when:
     - ansible_facts.os_family == 'RedHat'
-    - _nginx_docker_cache_client_crt in component_record_result.orphans.file
+    - _nginx_docker_cache_client_crt in component_record_removed.file
 
 - name: Restart Docker without the proxy
   ansible.builtin.include_tasks: restart_docker.yml
-  when: nginx_docker_cache_docker_config_dest in component_record_result.orphans.file
+  when: nginx_docker_cache_docker_config_dest in component_record_removed.file
