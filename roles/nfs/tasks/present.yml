@@ -9,9 +9,11 @@
 
 - name: Set up the server
   ansible.builtin.include_tasks: server.yml
+  tags: always
 
 - name: Open the firewall for it
   ansible.builtin.include_tasks: firewall.yml
+  tags: always
 
 - name: Record the component as present
   ansible.builtin.include_role:
