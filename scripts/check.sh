@@ -68,6 +68,9 @@ if ! "${fast}"; then
     for plugin in config.example/files/slurm/job_submit.lua; do
         step "job_submit.lua tests" lua roles/slurm/tests/job_submit_test.lua "${plugin}"
     done
+    # The Slurm exporter is Go; nothing else would run its tests.
+    step "Slurm exporter: gofmt, vet, tests" bash -c \
+        'cd roles/prometheus-slurm-exporter/files/exporter && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
 fi
 
 if [ "${#failed[@]}" -gt 0 ]; then

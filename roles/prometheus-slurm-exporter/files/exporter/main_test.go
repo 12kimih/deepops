@@ -2,38 +2,24 @@ package main
 
 import "testing"
 
-func TestParseNodeStates(t *testing.T) {
-	input := "allocated,3\nidle,10\nmixed,2\ndrained*,1\ndown~,4\nmaint,1\n\nnot-a-state-line\n"
-	states := ParseNodeStates(input)
-	expect := map[string]float64{
-		"alloc": 3, "idle": 10, "mix": 2, "drain": 1, "down": 4,
-		"maint": 1, "comp": 0, "err": 0, "fail": 0,
+func TestParseNodesCountsEachNodeOnce(t *testing.T) {
+	// n1 is in two partitions: listed twice, counted once, its CPUs once.
+	input := "n1|mixed|4/12/0/16\nn1|mixed|4/12/0/16\nn2|drained*|0/0/16/16\n" +
+		"n3|idle~|0/16/0/16\nn4|planned|0/16/0/16\nn5|allocated#|16/0/0/16\n\n"
+	states, cpus, err := ParseNodes(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	expect := map[string]float64{"mix": 1, "drain": 1, "idle": 1, "other": 1, "alloc": 1, "down": 0}
 	for k, v := range expect {
 		if states[k] != v {
 			t.Errorf("state %s: got %v want %v", k, states[k], v)
 		}
 	}
-}
-
-func TestParseNodeStatesLongNamesIrrelevant(t *testing.T) {
-	// State aggregation uses %T,%D so node name length can never matter,
-	// but flag suffixes on states must still strip.
-	states := ParseNodeStates("idle*,5\nallocated#,2\n")
-	if states["idle"] != 5 || states["alloc"] != 2 {
-		t.Errorf("suffix stripping failed: %+v", states)
+	if cpus["alloc"] != 20 || cpus["idle"] != 44 || cpus["other"] != 16 || cpus["total"] != 80 {
+		t.Errorf("bad cpus: %+v", cpus)
 	}
-}
-
-func TestParseCPUs(t *testing.T) {
-	cpus, err := ParseCPUs("3/13/0/16\n")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cpus["alloc"] != 3 || cpus["idle"] != 13 || cpus["other"] != 0 || cpus["total"] != 16 {
-		t.Errorf("bad parse: %+v", cpus)
-	}
-	if _, err := ParseCPUs("garbage"); err == nil {
+	if _, _, err := ParseNodes("garbage\n"); err == nil {
 		t.Error("expected error on malformed input")
 	}
 }

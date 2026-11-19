@@ -27,6 +27,7 @@ STATE_COLORS = {
     "down": "red",
     "failed": "dark-red",
     "error": "dark-red",
+    "other": "text",
 }
 
 

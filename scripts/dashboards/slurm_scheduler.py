@@ -21,6 +21,7 @@ NODE_STATES = {
     "down": "down",
     "fail": "failed",
     "err": "error",
+    "other": "other",  # a state the exporter does not name (planned, reserved, future...)
 }
 # Ended jobs squeue still lists (for MinJobAge, 300 s by default), by outcome.
 OUTCOMES = {
