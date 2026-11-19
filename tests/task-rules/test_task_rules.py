@@ -22,6 +22,8 @@
 8. Nothing root writes, unpacks, builds or runs lives under a world-writable directory
    (/tmp, /var/tmp, /dev/shm): a user can plant the file or tree first, or swap it
    after. Root's scratch is /var/cache/deepops.
+9. No secret is on a command line: argv is readable by every user on the host (ps).
+   A command takes it on stdin, from a root-only file, or from its environment.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -132,7 +134,36 @@ WORLD_WRITABLE_OK = {
 }
 
 
+# file -> why a secret on its command line is acceptable
+SECRET_ARGV_OK = {
+    "roles/maas-controller/tasks/main.yml": "maas createadmin takes the password only as an argument; "
+    "run once on the operator's own MAAS host",
+}
+
+
 class TaskRules(unittest.TestCase):
+    def test_no_secret_on_a_command_line(self):
+        offenders = []
+        for path in task_files():
+            if str(path.relative_to(ROOT)) in SECRET_ARGV_OK:
+                continue
+            for task in tasks(path):
+                for key in COMMANDS:
+                    args = task.get(key)
+                    if args is None:
+                        continue
+                    line = (
+                        args
+                        if isinstance(args, str)
+                        else str(args.get("cmd", "")) + str(args.get("argv", ""))
+                    )
+                    line += (
+                        str(task.get("args", {}).get("cmd", "")) if isinstance(task.get("args"), dict) else ""
+                    )
+                    if SECRET.search(line):
+                        offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "pass the secret on stdin or from a root-only file, never in argv")
+
     def test_root_never_works_under_a_world_writable_directory(self):
         offenders = [
             f"{path.relative_to(ROOT)}:{number}"

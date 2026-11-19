@@ -23,6 +23,30 @@
   tags:
     - people
 
+- name: Read the local groups
+  ansible.builtin.getent:
+    database: group
+    service: files
+  tags:
+    - people
+
+# The group module renumbers an existing group (groupmod -g), which orphans the group
+# ownership of every file on shared storage as surely as a UID change would.
+- name: Refuse to change an existing person's group GID
+  ansible.builtin.assert:
+    that: >-
+      (ansible_facts.getent_group[item.key][1] | int) == (item.value.uid | int)
+    fail_msg: >-
+      Group {{ item.key }} has GID {{ ansible_facts.getent_group[item.key][1] }} here but
+      {{ item.value.uid }} in the roster. Changing it would orphan the group's files on
+      shared storage; fix the roster, or migrate the files and the GID by hand.
+    quiet: true
+  loop: "{{ people | people_active | dict2items | selectattr('key', 'in', ansible_facts.getent_group) }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - people
+
 - name: Create each active person's group
   ansible.builtin.group:
     name: "{{ item.key }}"
