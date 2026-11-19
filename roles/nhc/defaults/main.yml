@@ -1,17 +1,24 @@
 ---
-nhc_version: "1.4.3"
-nhc_src_url: "https://github.com/mej/nhc/releases/download/{{ nhc_version }}/lbnl-nhc-{{ nhc_version }}.tar.xz"
-# The release tarball per version (roles/download); add one when changing nhc_version.
+# 1.5+ finds its settings in /etc/sysconfig and its helpers in /usr/libexec on every
+# distribution; 1.4 used /etc/default and /usr/lib on Debian and Ubuntu, so the
+# settings this role writes were never read and a failed check never drained the node.
+nhc_version: "1.5.1"
+nhc_src_url: "https://github.com/mej/nhc/releases/download/{{ nhc_version }}/lbnl-nhc-{{ nhc_version }}.tar.gz"
+# The release tarball per version, as GitHub publishes for the release asset
+# (roles/download); add one when changing nhc_version.
 nhc_checksums:
-  "1.4.3": "sha256:dd752f1f2ea3a1e15412aed178562fc44a1251395c0bb4c69dfea1148750d158"
+  "1.5.1": "sha256:ad5bd56938970a594937644d3b60a1629f41ab962a5a397d99be0b20b1c97354"
 nhc_config_dir: "/etc"
 
+# Where NHC looks for its helpers and its settings file: NHC's own defaults, which the
+# role checks the installed nhc reports (nhc -VVV), since nothing in the build sets them.
 nhc_libexec_dir: "/usr/libexec"
 nhc_build_dir: "/opt/deepops/build/nhc"
 nhc_sysconfig_dir: "/etc/sysconfig"
 
 nhc_extract_dir: "{{ nhc_build_dir }}/lbnl-nhc-{{ nhc_version }}"
-nhc_configure: "./configure --prefix={{ nhc_install_dir }} --sysconfdir={{ nhc_config_dir }} --libexecdir={{ nhc_libexec_dir }}"
+# --localstatedir: the default ($prefix/var) creates /usr/var.
+nhc_configure: "./configure --prefix={{ nhc_install_dir }} --sysconfdir={{ nhc_config_dir }} --libexecdir={{ nhc_libexec_dir }} --localstatedir=/var"
 nhc_test: "make test"
 nhc_run_test: false
 nhc_make: "make install"
