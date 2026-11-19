@@ -1,6 +1,14 @@
 ---
 # v1/v2c authenticates with this string alone and sends it in clear, and the shipped
 # default is the first thing any scanner tries. Passed on stdin, never in argv (ps).
+- name: Require an SNMP community exec passes through unchanged
+  ansible.builtin.assert:
+    that: bmc_snmp_community is match('^[^\\s"#~\'\t\r\n]+$')
+    fail_msg: bmc_snmp_community may not contain blanks, " # ~ or ', which ipmitool would change.
+  no_log: true
+  tags:
+    - bmc
+
 - name: Set the BMC SNMP community
   ansible.builtin.command:
     argv: ["ipmitool", "-I", "open", "exec", "/dev/stdin"]

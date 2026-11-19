@@ -45,8 +45,9 @@ ALLOW = "sensitive-guard: allow"
 DEFAULT_SITE_FILE = "config/sensitive-patterns"
 ZERO_SHA = re.compile(r"^0+$")
 SCISSORS = re.compile(r"^\S -{24} >8 -{24}$")  # git commit -v: the diff below is not the message
-# The line git's editor template opens with; when it is there git strips comment lines
-# (the template lists file names, untracked ones too), so they are not message.
+# git's editor template; when it says comment lines "will be ignored" git strips them
+# (the template lists file names, untracked ones too), so they are not message. With
+# commit.cleanup whitespace or verbatim it says they will be kept, and they are scanned.
 TEMPLATE = re.compile(r"^(\S) Please enter the commit message for your changes")
 PRINTABLE_RUN = re.compile(rb"[\x20-\x7e]{6,}")  # what `strings` would show of a binary
 # Names as they are, not quoted; renames as a deletion and an addition, so the new
@@ -286,7 +287,11 @@ def main() -> int:
         # came from -m or -F, and which lines git strips depends on settings, so none is
         # assumed comment. Below the scissors is the diff `commit -v` shows, not message.
         lines = Path(opts.args[0]).read_text(errors="replace").splitlines()
-        template = next((m.group(1) for m in map(TEMPLATE.match, lines) if m), None)
+        template = next(
+            (m.group(1) for i, m in enumerate(map(TEMPLATE.match, lines))
+             if m and "will be ignored" in " ".join(lines[i : i + 2])),
+            None,
+        )  # fmt: skip
         kept = []
         for line in lines:
             if SCISSORS.match(line):

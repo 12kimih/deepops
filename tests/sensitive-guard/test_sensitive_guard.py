@@ -137,9 +137,14 @@ class GuardTest(unittest.TestCase):
         msg.write_text("fix: generic\n# ------------------------ >8 ------------------------\n-port 48123\n")
         self.assertEqual(self.guard("message", str(msg))[0], 0)
         # The editor template's comment lines (they list untracked names) are stripped by git.
-        msg.write_text("fix: generic\n# Please enter the commit message for your changes. Lines starting\n"
-                       "# Untracked files:\n#\tport-48123.txt\n")  # fmt: skip
+        template = "# Please enter the commit message for your changes. Lines starting\n# with '#' will {}\n"
+        msg.write_text("fix: generic\n" + template.format("be ignored, and an empty message aborts the commit.")
+                       + "# Untracked files:\n#\tport-48123.txt\n")  # fmt: skip
         self.assertEqual(self.guard("message", str(msg))[0], 0)
+        # With commit.cleanup=whitespace git keeps those lines, so they are scanned.
+        msg.write_text("fix: generic\n" + template.format("be kept; you may remove them yourself if you want to.")
+                       + "#\tport-48123.txt\n")  # fmt: skip
+        self.assertEqual(self.guard("message", str(msg))[0], 1)
 
     def test_renamed_binary_and_plus_lines(self):
         self.commit("other", {"other.txt": "x\n"})

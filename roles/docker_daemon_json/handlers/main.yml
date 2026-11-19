@@ -1,6 +1,20 @@
 ---
-# One handler for every role's change to dockerd's configuration (daemon.json, the
-# socket group), so one run restarts dockerd at most once.
+# Every role's change to dockerd's configuration (daemon.json, the socket group) comes
+# here, so one run restarts each at most once, both gated by docker_daemon_restart.
+# Handlers run in the order written: the socket re-binds before dockerd restarts.
+#
+# Under socket activation systemd owns the socket and applies SocketGroup= only when
+# the unit re-binds; restarting docker.service does not restart docker.socket.
+# try-restart re-binds only a socket already running, so a node without socket
+# activation is never switched over to it. man systemctl(1), man systemd.socket(5)
+- name: Restart the docker socket unit
+  ansible.builtin.command:
+    cmd: systemctl try-restart docker.socket
+  changed_when: true
+  when:
+    - docker_daemon_restart | bool
+    - ((docker_socket_group_unit | default({})).rc | default(1)) == 0
+
 - name: Restart dockerd
   ansible.builtin.systemd:
     name: docker

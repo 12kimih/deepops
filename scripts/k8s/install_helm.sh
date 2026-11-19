@@ -42,11 +42,14 @@ if [ "${HELM_MINIMUM_VERSION}" != "${helm_min_installed}" ]; then
         sudo mv $(which helm) "$(which helm).bak"
         echo "Helm ${helm_version} currently installed, upgrading to ${HELM_MINIMUM_VERSION}"
     fi
-    curl -fsSL -o /var/tmp/get_helm.sh "${HELM_INSTALL_SCRIPT_URL}"
-    chmod +x /var/tmp/get_helm.sh
-    #sed -i 's/sudo//g' /var/tmp/get_helm.sh
-    mkdir -p ${HELM_INSTALL_DIR}
-    HELM_INSTALL_DIR=${HELM_INSTALL_DIR} DESIRED_VERSION=v3.17.1 /var/tmp/get_helm.sh # Keep near helm_version in the bundled Kubespray (roles/kubespray_defaults)
+    # A private directory: the installer runs sudo, so a fixed path in /var/tmp that
+    # another user created first would hand them root.
+    helm_tmp=$(mktemp -d)
+    trap 'rm -rf "${helm_tmp}"' EXIT
+    curl -fsSL -o "${helm_tmp}/get_helm.sh" "${HELM_INSTALL_SCRIPT_URL}"
+    chmod +x "${helm_tmp}/get_helm.sh"
+    mkdir -p "${HELM_INSTALL_DIR}"
+    HELM_INSTALL_DIR=${HELM_INSTALL_DIR} DESIRED_VERSION=v3.17.1 "${helm_tmp}/get_helm.sh" # Keep near helm_version in the bundled Kubespray (roles/kubespray_defaults)
 fi
 
 sudo chmod 0755 "${HELM_INSTALL_DIR}/helm"

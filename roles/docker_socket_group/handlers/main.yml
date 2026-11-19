@@ -3,20 +3,5 @@
   ansible.builtin.systemd:
     daemon_reload: true
 
-# Handlers run in the order they are defined here, not the order they were notified,
-# so the socket unit is always re-bound before the daemon is restarted.
-#
-# Under socket activation systemd owns the socket and applies SocketGroup= only when
-# the unit re-binds. `daemon-reload` re-reads the unit but does NOT re-create a socket
-# that is already listening, and restarting docker.service does not restart
-# docker.socket -- so without this handler the drop-in written by the role stays inert
-# until the node reboots. `try-restart` re-binds only a socket that is already running,
-# so a node that does not use socket activation is never switched over to it.
-# man systemctl(1), man systemd.socket(5)
-- name: Restart the docker socket unit
-  ansible.builtin.command:
-    cmd: systemctl try-restart docker.socket
-  changed_when: true
-  when:
-    - docker_daemon_restart | bool
-    - ((docker_socket_group_unit | default({})).rc | default(1)) == 0
+# The socket unit and dockerd restart through roles/docker_daemon_json's handlers,
+# gated by its docker_daemon_restart, in that order.
