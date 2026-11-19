@@ -11,6 +11,15 @@ LIB = str(ROLES / "cluster_tools_lib/files")
 sys.path.insert(0, LIB)
 FIXTURES = HERE / "fixtures/slurm-25.11"
 
+sys.path.insert(0, str(HERE.parent / "lib"))
+from sandbox_path import sandbox_path  # noqa: E402
+
+# The tools reach the fake Slurm (bin/) and what the fakes run, never the host's Slurm
+# (tests/lib/sandbox_path.py).
+FAKE_TOOLS = ("bash", "env", "cat", "sleep")
+FAKE_PATH = sandbox_path(HERE / "bin", FAKE_TOOLS)
+SYSTEM_PATH = sandbox_path(None, FAKE_TOOLS)
+
 
 def load(name):
     return json.loads((FIXTURES / f"{name}.json").read_text())
@@ -34,11 +43,11 @@ def running(job_id, qos, tres, user="user1", partition="a10-1", nodes="gpu1"):
 
 
 def run_tool(module, *args, env=None, path=True):
-    """Run a tool's main() in a fresh interpreter against the fake Slurm. path=False
-    gives it no PATH at all: the host may well have Slurm in /usr/bin (any host with
-    the slurm-smd packages), so leaving the system directories in would find it."""
+    """Run a tool's main() in a fresh interpreter against the fake Slurm; path=False
+    takes the fake away, as on a host without Slurm. Either way the host's own
+    directories stay out (the controller has Slurm in /usr/bin): tests/lib/sandbox_path.py."""
     e = {
-        "PATH": f"{HERE / 'bin'}:/usr/bin:/bin" if path else str(HERE / "no-commands"),
+        "PATH": FAKE_PATH if path else SYSTEM_PATH,
         "FIXTURES": str(FIXTURES),
         "LANG": "C.UTF-8",
         "COLUMNS": "120",
