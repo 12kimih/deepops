@@ -34,6 +34,9 @@
    but not those of the role that included it, and include_role is private by
    default: `managed_dir_path: "{{ prometheus_config_dir }}/rules"` was undefined
    inside managed_dir when the playbook included prometheus privately.
+12. A loop over the output lines of a script task drops the blank ones (`| map('trim')
+   | select`): the script module runs under a terminal, so its output carries carriage
+   returns and blank lines, and a blank item fails the task (`item.split()[0]`).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -372,6 +375,19 @@ class TaskRules(unittest.TestCase):
                 if name in COMMANDS and REBOOT_COMMAND.search(command_line(args)):
                     offenders.append(f"{where}: reboot command")
         self.assertEqual(offenders, [], "ask with roles/maintenance reboot_request instead")
+        scan.check(self)
+
+    def test_script_output_loops_drop_blank_lines(self):
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            found = list(tasks(path))
+            registered = {t.get("register") for t in found if module(t)[0] == "script" and t.get("register")}
+            for task in found:
+                loop = str(task.get("loop", ""))
+                for var in registered:
+                    if re.search(rf"\b{re.escape(var)}\.stdout_lines\b", loop) and "select" not in loop:
+                        offenders.append(f"{rel(path)}: {task.get('name')}: loops over {var}.stdout_lines")
+        self.assertEqual(offenders, [], "filter the lines: | map('trim') | select | list")
         scan.check(self)
 
     def test_roles_that_need_their_dependencies_are_included_publicly(self):
