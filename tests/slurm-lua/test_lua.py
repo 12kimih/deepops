@@ -60,7 +60,27 @@ def replace(text, task_name, **overrides):
     args = task["replace"]
     values = variables(**overrides)
     values.update(find(BUILD, "Build the packages")["vars"])
+    values.update({key: render(value, values) for key, value in task.get("vars", {}).items()})
     return re.sub(args["regexp"], render(args["replace"], values), text, flags=re.MULTILINE)
+
+
+def paragraphs(text):
+    """Deb822 paragraphs, split at empty lines as dpkg splits them."""
+    return [block.splitlines() for block in re.split(r"\n\s*\n", text.strip()) if block.strip()]
+
+
+def field(paragraph, name):
+    """A field's entries: its value with the continuation lines, split at commas."""
+    value, inside = [], False
+    for line in paragraph:
+        if line[:1] in (" ", "\t"):
+            if inside:
+                value.append(line)
+        else:
+            inside = line.startswith(f"{name}:")
+            if inside:
+                value.append(line.split(":", 1)[1])
+    return [entry.strip() for entry in ",".join(value).split(",") if entry.strip()]
 
 
 class PackageBuild(unittest.TestCase):
@@ -71,8 +91,10 @@ class PackageBuild(unittest.TestCase):
 
     def test_extra_build_dependencies_and_nvml_package(self):
         control = replace(CONTROL, "Add the build dependencies debian/control lacks")
-        deps = control.split("Build-Depends:\n", 1)[1].split("Homepage:", 1)[0]
-        names = [line.strip().rstrip(",") for line in deps.splitlines() if line.strip()]
+        # An empty line ends the paragraph: mk-build-deps then refuses the file
+        # ("continued value line not in field"), as the first live build did.
+        self.assertEqual(len(paragraphs(control)), 1, control)
+        names = field(paragraphs(control)[0], "Build-Depends")
         self.assertEqual(names[0], "cuda-nvml-dev-13-0")
         for dep in DEFAULTS["slurm_deb_build_extra_deps"]:
             self.assertIn(dep, names)

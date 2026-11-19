@@ -100,7 +100,11 @@
       ansible.builtin.replace:
         path: "{{ _tree }}/debian/control"
         regexp: "^Build-Depends:$"
-        replace: "Build-Depends:\n{% for dep in ['cuda-nvml-dev-' ~ slurm_nvml_cuda_version | replace('.', '-')] + slurm_deb_build_extra_deps %} {{ dep }},\n{% endfor %}"
+        # Put first in the field's value, leaving no line blank: an empty line ends the
+        # paragraph, and dpkg reads the rest as one without a field.
+        replace: "Build-Depends:{% for dep in _deps %}\n {{ dep }},{% endfor %}"
+      vars:
+        _deps: "{{ ['cuda-nvml-dev-' ~ slurm_nvml_cuda_version | replace('.', '-')] + slurm_deb_build_extra_deps }}"
       register: slurm_deb_patch_deps
 
     - name: Configure with NVML from its package
