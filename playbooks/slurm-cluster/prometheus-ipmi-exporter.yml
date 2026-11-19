@@ -4,6 +4,8 @@
 
 - hosts: "{{ hostlist | default('all') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Configure IPMI exporter
       ansible.builtin.include_role:

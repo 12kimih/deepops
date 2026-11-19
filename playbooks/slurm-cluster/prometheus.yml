@@ -4,6 +4,8 @@
 
 - hosts: "{{ hostlist | default('slurm-metric') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Configure prometheus
       ansible.builtin.include_role:

@@ -3,6 +3,8 @@
 # controller, and its dashboard.
 - hosts: "{{ hostlist | default('slurm-metric') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Configure Slurm metrics
       ansible.builtin.include_role:

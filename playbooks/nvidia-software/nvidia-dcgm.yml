@@ -5,6 +5,8 @@
 # the GPU gate used by nvidia-driver.yml and nvidia-docker.yml.
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Install custom facts module (provides ansible_facts.ansible_local.gpus.count)
       ansible.builtin.include_role:

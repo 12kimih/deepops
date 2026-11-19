@@ -22,10 +22,6 @@ gpu_operator_enable_toolkit: true
 gpu_operator_enable_dcgm: false
 gpu_operator_enable_migmanager: true
 
-# Set to true for DGX and other systems with pre-installed drivers
-# TODO: Remove this flag and take advantage of new per-node GPU Operator config to make this behavior dynamic
-gpu_operator_preinstalled_nvidia_software: true
-
 # Configuration customization
 gpu_operator_namespace: "gpu-operator"
 gpu_operator_grid_config_dir: "{{ deepops_dir }}/gpu_operator"

@@ -14,7 +14,7 @@
 - name: Determine the NVIDIA driver package (Ubuntu, Canonical archive)
   ansible.builtin.set_fact:
     nvidia_driver_package_resolved: >-
-      {{ nvidia_driver_package if (nvidia_driver_package | default('') | length > 0)
+      {{ nvidia_driver_package if (nvidia_driver_package | length > 0)
          else 'nvidia-driver-' ~ nvidia_driver_branch
               ~ ('-server' if (nvidia_driver_server_branch | bool) else '')
               ~ ('-open' if (nvidia_driver_kernel_modules == 'open') else '') }}

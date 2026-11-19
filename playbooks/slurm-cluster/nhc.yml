@@ -1,6 +1,8 @@
 ---
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Gather custom facts
       ansible.builtin.include_role:

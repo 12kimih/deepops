@@ -111,14 +111,14 @@
       slurm_job_submit_plugins includes 'lua' but slurm_job_submit_template is empty.
       Write a job_submit.lua, place it under config/files/slurm/, and point
       slurm_job_submit_template at it (see config.example/files/slurm/job_submit.lua).
-  when: "'lua' in (slurm_job_submit_plugins | default(''))"
+  when: "'lua' in (slurm_job_submit_plugins)"
 
 - name: Configure job_submit.lua
   ansible.builtin.copy:
     src: "{{ slurm_job_submit_template }}"
     dest: "{{ slurm_config_dir }}/job_submit.lua"
     mode: "0644"
-  when: "'lua' in (slurm_job_submit_plugins | default(''))"
+  when: "'lua' in (slurm_job_submit_plugins)"
   notify:
     - Restart slurmctld
   tags:

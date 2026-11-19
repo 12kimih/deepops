@@ -1,6 +1,8 @@
 ---
 - hosts: "{{ hostlist | default('slurm-metric') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Configure the Slurm usage report
       ansible.builtin.include_role:

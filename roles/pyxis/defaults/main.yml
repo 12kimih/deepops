@@ -1,5 +1,4 @@
 ---
-slurm_install_pyxis: true
 # pyxis is a SPANK plugin and MUST be (re)built against the deployed Slurm
 # headers; DeepOps builds Slurm from source under slurm_install_prefix, so the
 # build points CPPFLAGS at {{ slurm_install_prefix }}/include/slurm.

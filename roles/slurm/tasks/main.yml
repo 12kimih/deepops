@@ -3,7 +3,7 @@
   ansible.builtin.include_role:
     name: nvidia_cuda
     public: true  # nvidia_versions (a dependency) supplies its values
-  when: slurm_autodetect_nvml | default(false)
+  when: slurm_autodetect_nvml
 
 # The includes below are tagged always: an untagged include is skipped under --tags,
 # and the tasks it holds (such as the `config` ones) would never be reached. Each

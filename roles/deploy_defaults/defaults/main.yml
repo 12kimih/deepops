@@ -1,0 +1,44 @@
+---
+# What a deploy includes: the switches the deploy playbooks and their component plays
+# read, defined once. A play reading one lists this role first in its roles, so the
+# value is a role default (the lowest precedence) that config/ overrides; an import's
+# `when` is evaluated in the imported plays and sees it there. config.example shows
+# each switch with its meaning. Never write `| default(...)` for these.
+
+# Both deploys
+deepops_disable_cloud_init: true
+deepops_set_hostname: true
+chrony_install: true
+docker_install: true
+install_dcgm: true
+nvidia_driver_force_install: false
+
+# Slurm deploy (playbooks/slurm-cluster.yml)
+slurm_configure_etc_hosts: true
+slurm_enable_container_registry: true
+slurm_enable_nginx_docker_cache: false
+slurm_cluster_install_nvidia_driver: true
+slurm_enable_nfs_server: true
+slurm_enable_nfs_client_nodes: true
+slurm_install_authentication: true
+slurm_install_nhc: true
+slurm_cluster_install_openmpi: false
+slurm_install_lmod: true
+slurm_install_hpcsdk: false
+slurm_enable_monitoring: true
+slurm_enable_rsyslog_server: true
+slurm_enable_rsyslog_client: true
+slurm_login_on_compute: false
+allow_user_set_gpu_clocks: false
+slurm_cluster_configure_gpu_power_limit: true
+slurm_install_enroot: true
+slurm_install_pyxis: true
+
+# Kubernetes deploy (playbooks/k8s-cluster.yml)
+kube_enable_container_registry: false
+kube_enable_rsyslog_server: true
+kube_enable_rsyslog_client: true
+deepops_gpu_operator_enabled: true
+# Set to true for DGX and other systems with pre-installed drivers
+gpu_operator_preinstalled_nvidia_software: true
+k8s_nfs_client_provisioner: true

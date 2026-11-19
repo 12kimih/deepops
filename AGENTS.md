@@ -152,7 +152,7 @@ and an r615+ driver the role will not install for you. See
   `--flush-cache`.
 - **Open vs proprietary NVIDIA kernel modules matter per GPU generation.**
   Turing and newer support the open kernel modules; older GPUs (e.g. Pascal)
-  need `nvidia_driver_ubuntu_use_open_kernel_modules: false`. A wrong choice
+  need `nvidia_driver_kernel_modules: proprietary`. A wrong choice
   produces `nvidia-smi: No devices were found` after a clean-looking install.
   See `skills/diagnose-driver-install/`.
 - **Kubernetes playbooks fail on syntax/imports if `submodules/kubespray` is

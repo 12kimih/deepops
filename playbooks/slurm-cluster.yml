@@ -13,20 +13,20 @@
 
 - name: Configure hostnames, /etc/hosts
   import_playbook: generic/hosts.yml
-  when: slurm_configure_etc_hosts | default(true)
+  when: slurm_configure_etc_hosts
   tags:
     - set-hosts
 
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
-  when: chrony_install | default(true)
+  when: chrony_install
 
 - name: Apply the OS update policy
   import_playbook: generic/os-updates.yml
 
 - name: Set up a local cluster container registry
   import_playbook: container/standalone-container-registry.yml
-  when: slurm_enable_container_registry | default(true)
+  when: slurm_enable_container_registry
 
 - name: Remove what must not be on a host
   import_playbook: generic/host-baseline.yml
@@ -35,19 +35,19 @@
 
 - name: Set up NGINX-based container caching | Install docker registry cache server
   import_playbook: container/nginx-docker-registry-cache-server.yml
-  when: slurm_enable_nginx_docker_cache | default(false)
+  when: slurm_enable_nginx_docker_cache
 
 - name: Set up NGINX-based container caching | Install docker registry cache client
   import_playbook: container/nginx-docker-registry-cache-client.yml
-  when: slurm_enable_nginx_docker_cache | default(false)
+  when: slurm_enable_nginx_docker_cache
 
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml
-  when: slurm_cluster_install_nvidia_driver | default(true)
+  when: slurm_cluster_install_nvidia_driver
 
+# The role installs it only with nvidia_cuda_install: true, its one switch.
 - name: Install NVIDIA CUDA Toolkit
   import_playbook: nvidia-software/nvidia-cuda.yml
-  when: slurm_cluster_install_cuda | default(true)
 
 - name: Install software
   import_playbook: generic/software.yml
@@ -71,17 +71,17 @@
 # in config/group_vars. Runs after NFS (so /home is mounted) and before Slurm.
 - name: Configure authentication (NIS server + client, Kerberos, autofs, home dirs)
   import_playbook: generic/authentication.yml
-  when: slurm_install_authentication | default(true)
+  when: slurm_install_authentication
   tags:
     - people
 
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
-  when: install_dcgm | default(false)
+  when: install_dcgm
 
 - name: Install Node Health Check
   import_playbook: slurm-cluster/nhc.yml
-  when: slurm_install_nhc | default(false)
+  when: slurm_install_nhc
 
 - name: Install Slurm
   import_playbook: slurm-cluster/slurm.yml
@@ -93,7 +93,7 @@
 
 - name: Install OpenMPI
   import_playbook: slurm-cluster/openmpi.yml
-  when: slurm_cluster_install_openmpi | default(true)
+  when: slurm_cluster_install_openmpi
 
 - name: Install Lmod
   import_playbook: slurm-cluster/lmod.yml
@@ -141,11 +141,11 @@
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
-  when: slurm_enable_rsyslog_server | default(true)
+  when: slurm_enable_rsyslog_server
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog client
   import_playbook: generic/rsyslog-client.yml
-  when: slurm_enable_rsyslog_client | default(true)
+  when: slurm_enable_rsyslog_client
 
 - name: Set Permissions to adjust GPU Clocks speeds
   import_playbook: utilities/gpu-clocks.yml
@@ -155,7 +155,7 @@
 # cap removed. Turn the whole step off with slurm_cluster_configure_gpu_power_limit.
 - name: Configure the GPU power limit
   import_playbook: nvidia-software/nvidia-power-limit.yml
-  when: slurm_cluster_configure_gpu_power_limit | default(true)
+  when: slurm_cluster_configure_gpu_power_limit
 
 - name: Install Enroot and Pyxis
   import_playbook: container/pyxis.yml

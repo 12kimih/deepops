@@ -3,6 +3,8 @@
 # GPU operator
 - hosts: kube_control_plane[0]
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Install helm chart for GPU operator
       ansible.builtin.include_role:

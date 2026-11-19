@@ -82,7 +82,38 @@ class Drift(unittest.TestCase):
 class Repository(unittest.TestCase):
     def test_this_repository_is_clean(self):
         with mock.patch.dict(os.environ, {}):
-            self.assertEqual(cl.check_dead() + cl.check_doc_paths(), [])
+            self.assertEqual(cl.check_dead() + cl.check_doc_paths() + cl.check_doc_vars(), [])
+
+
+class DocVars(unittest.TestCase):
+    """A page naming a renamed variable sends the reader to a setting nothing reads
+    (AGENTS.md once said nvidia_driver_ubuntu_use_open_kernel_modules: false)."""
+
+    def problems(self, text):
+        with tempfile.TemporaryDirectory() as d:
+            doc = Path(d) / "page.md"
+            doc.write_text(text)
+            with (
+                mock.patch.object(cl, "ROOT", Path(d)),
+                mock.patch.object(cl, "tracked", return_value=[doc]),
+                mock.patch.object(cl, "read_words", return_value={"slurm_install_nhc"}),
+            ):
+                return cl.check_doc_vars()
+
+    def test_a_setting_and_a_table_name_are_checked(self):
+        found = self.problems(
+            "set `old_flag_name: false` here\n| `gone_setting` | yes |\n| `slurm_install_nhc` | `x_y: 1` |\n"
+        )
+        self.assertEqual(
+            found,
+            [
+                "doc-vars: page.md:1: nothing reads old_flag_name",
+                "doc-vars: page.md:2: nothing reads gone_setting",
+            ],
+        )
+
+    def test_read_settings_and_prose_words_pass(self):
+        self.assertEqual(self.problems("set `slurm_install_nhc: true`; the `no_wdelay` option\n"), [])
 
 
 class Shadow(unittest.TestCase):

@@ -21,6 +21,8 @@
 # a CPU-only head/login node in the target set is skipped instead of failing the run.
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Install custom facts module (provides ansible_facts.ansible_local.gpus.count)
       ansible.builtin.include_role:

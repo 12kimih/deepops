@@ -25,6 +25,8 @@
 # Use GPU operator when container runtime is not docker
 # etcd_deployment_type must be `host` when container_manager is not `docker`
 - hosts: all
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Set facts when not using docker container runtime (default)
       ansible.builtin.set_fact:
@@ -69,11 +71,11 @@
 
 - name: Disable cloud-init
   import_playbook: generic/disable-cloud-init.yml
-  when: deepops_disable_cloud_init | default(true)
+  when: deepops_disable_cloud_init
 
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
-  when: chrony_install | default(true)
+  when: chrony_install
 
 - name: Apply the OS update policy
   import_playbook: generic/os-updates.yml
@@ -85,7 +87,7 @@
   import_playbook: container/standalone-container-registry.yml
   vars:
     hostlist: kube_control_plane
-  when: kube_enable_container_registry | default(false)
+  when: kube_enable_container_registry
 
 # Install 'sshpass' program for: https://github.com/ansible/ansible/issues/56629
 - hosts: all
@@ -193,7 +195,7 @@
     hostlist: "k8s_cluster"
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | default(true) | bool == false or gpu_operator_preinstalled_nvidia_software | default(true)
+  when: deepops_gpu_operator_enabled | bool == false or gpu_operator_preinstalled_nvidia_software
 
 - name: Install the NVIDIA Container Toolkit on GPU servers
   import_playbook: container/nvidia-docker.yml
@@ -202,7 +204,7 @@
   tags:
     - nvidia
   when:
-    - deepops_gpu_operator_enabled | default(true) | bool == false or gpu_operator_preinstalled_nvidia_software | default(true)
+    - deepops_gpu_operator_enabled | bool == false or gpu_operator_preinstalled_nvidia_software
     - container_manager is defined and container_manager == "docker"
 
 # Manage kubectl binary -- handles cross-platform (e.g., Linux cluster -> macOS controller)
@@ -326,32 +328,32 @@
   import_playbook: k8s-cluster/nvidia-k8s-gpu-feature-discovery.yml
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | default(true) | bool == false
+  when: deepops_gpu_operator_enabled | bool == false
 
 - name: Install k8s GPU device plugin
   import_playbook: k8s-cluster/nvidia-k8s-gpu-device-plugin.yml
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | default(true) | bool == false
+  when: deepops_gpu_operator_enabled | bool == false
 
 - name: Install NVIDIA GPU Operator
   import_playbook: k8s-cluster/nvidia-gpu-operator.yml
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | default(true) | bool == true
+  when: deepops_gpu_operator_enabled | bool == true
 
 - name: Setup a volume for NFS, install nfs_utils, and install NFS Helm chart
   import_playbook: k8s-cluster/nfs-client-provisioner.yml
-  when: k8s_nfs_client_provisioner | default('false')
+  when: k8s_nfs_client_provisioner
 
 - name: Setup rsyslog server
   import_playbook: generic/rsyslog-server.yml
   vars:
     hostlist: kube_control_plane[0]
-  when: kube_enable_rsyslog_server | default(true)
+  when: kube_enable_rsyslog_server
 
 - name: Setup rsyslog client
   import_playbook: generic/rsyslog-client.yml
   vars:
     hostlist: k8s_cluster
-  when: kube_enable_rsyslog_client | default(true)
+  when: kube_enable_rsyslog_client

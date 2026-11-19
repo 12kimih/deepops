@@ -13,8 +13,8 @@
     # servers too: name the hosts.
     - name: Require hostlist for a power action
       ansible.builtin.assert:
-        that: hostlist is defined or (bmc_power_action | default('status')) == 'status'
-        fail_msg: "-e bmc_power_action={{ bmc_power_action | default('status') }} needs -e hostlist=... naming the hosts."
+        that: hostlist is defined or bmc_power_action is not defined or bmc_power_action == 'status'
+        fail_msg: "-e bmc_power_action={{ bmc_power_action }} needs -e hostlist=... naming the hosts."
         quiet: true
       run_once: true
   tasks:
