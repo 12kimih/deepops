@@ -18,6 +18,11 @@ import sys
 
 from validate_model_cache import validate as validate_cache
 
+# Slurm's replies are read by the cluster tools' one Slurm module (its JSON queries, its
+# per-release field check), from this checkout.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+from clustertools import slurm  # noqa: E402
+
 
 class BadInput(ValueError):
     """Invalid request, reported without raw arguments."""
@@ -99,24 +104,24 @@ def check_arguments(args):
         )
 
 
-def parse_record(output):
-    """Require one unambiguous scontrol --oneliner record."""
-    if len(output.splitlines()) != 1:
+def slurm_record(kind, name, timeout):
+    """The one record NAME of Slurm's KIND (nodes, partitions), or {} when the reply is
+    missing, unreadable, lacks a field the tools rely on, or is not exactly that record.
+    Runs through run(), so a failure exposes no output."""
+    rc, output, _ = run([*slurm.QUERIES[kind][0], name], timeout)
+    if rc != 0:
         return {}
-    record = {}
-    for item in output.split():
-        if "=" in item:
-            key, value = item.split("=", 1)
-            if key in record:
-                return {}
-            record[key] = value
-    return record
+    try:
+        records = slurm.parse(kind, output)[slurm.QUERIES[kind][1]]
+    except slurm.Error:
+        return {}
+    return records[0] if len(records) == 1 and records[0].get("name") == name else {}
 
 
 def gpu_count(tres):
     # Fails closed: if Slurm changes the TRES format, no match returns None and
     # the node is reported not ready instead of guessed.
-    matches = re.findall(r"(?:^|,)gres/gpu=(\d+)(?:,|$)", tres)
+    matches = re.findall(r"(?:^|,)gres/gpu=(\d+)(?:,|$)", tres or "")
     return int(matches[0]) if len(matches) == 1 else None
 
 
@@ -175,33 +180,31 @@ def validate(args):
         result["errors"].append({"stage": "arguments", "message": str(exc)})
         return result
     result["checks"]["container_pin"] = True
-    rc, output, _ = run(["scontrol", "show", "node", "--oneliner", args.node], args.timeout)
-    node = parse_record(output) if rc == 0 else {}
-    rc, output, _ = run(["scontrol", "show", "partition", "--oneliner", args.partition], args.timeout)
-    partition = parse_record(output) if rc == 0 else {}
+    node = slurm_record("nodes", args.node, args.timeout)
+    partition = slurm_record("partitions", args.partition, args.timeout)
     check(
         "scheduler",
-        node.get("NodeName") == args.node
-        and bool(node.get("State"))
-        and partition.get("PartitionName") == args.partition
-        and partition.get("State") == "UP"
-        and args.partition in node.get("Partitions", "").split(","),
+        bool(node)
+        and bool(node.get("state"))
+        and bool(partition)
+        and (partition.get("partition") or {}).get("state") == ["UP"]
+        and args.partition in (node.get("partitions") or []),
         "scheduler must return the selected node in the selected UP partition",
     )
     local_names = {socket.gethostname(), socket.gethostname().split(".")[0]}
     check(
         "local_node",
-        node.get("NodeHostName") in local_names,
+        node.get("hostname") in local_names,
         "run as the consumer on the selected compute host; remote runtime and cache are not verified",
     )
-    configured = gpu_count(node.get("CfgTRES", ""))
-    # Slurm emits an empty AllocTRES when nothing is allocated.
-    allocated = gpu_count(node.get("AllocTRES", ""))
-    if allocated is None and "AllocTRES" in node and not node["AllocTRES"]:
+    configured = gpu_count(node.get("tres"))
+    # Slurm gives an empty tres_used when nothing is allocated.
+    allocated = gpu_count(node.get("tres_used"))
+    if allocated is None and "tres_used" in node and not node["tres_used"]:
         allocated = 0
     check(
         "gpu_capacity",
-        node.get("State") == "IDLE" and configured is not None and configured >= 1 and allocated == 0,
+        node.get("state") == ["IDLE"] and configured is not None and configured >= 1 and allocated == 0,
         "selected node must be IDLE with at least one configured GPU and no allocated GPUs; mixed or flagged nodes are not accepted",
     )
     runtime_rc, runtime, _ = run(["enroot", "version"], args.timeout)

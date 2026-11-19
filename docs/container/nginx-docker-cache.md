@@ -36,7 +36,7 @@ However, those using this feature should ensure this mechanism fits their securi
 
 ### Configuration variables
 
-The full list of variables is in [roles/nginx-docker-registry-cache/defaults/main.yml](../../roles/nginx-docker-registry-cache/defaults/main.yml) (the proxy), [roles/nginx-docker-registry-cache-client/defaults/main.yml](../../roles/nginx-docker-registry-cache-client/defaults/main.yml) (the clients) and [roles/nginx_docker_cache_defaults/defaults/main.yml](../../roles/nginx_docker_cache_defaults/defaults/main.yml) (what both read).
+The full list of variables used by the caching proxy role can be found in [roles/nginx-docker-registry-cache/defaults/main.yml](../../roles/nginx-docker-registry-cache/defaults/main.yml).
 
 The following variables are the most common configuration you may want to adjust:
 
@@ -46,7 +46,7 @@ The following variables are the most common configuration you may want to adjust
 | `nginx_docker_cache_registry_string`       | `"registry.k8s.io quay.io gcr.io nvcr.io"` | Space-separated list of registries to proxy (`k8s.gcr.io` has been frozen since 2023; Kubernetes images come from `registry.k8s.io`) |
 | `nginx_docker_cache_manifests`             | `"false"`                                | Flag to determine whether to cache image manifests                            |
 | `nginx_docker_cache_manifest_default_time` | "1h"                                     | If manifests are cached, time to cache them                                   |
-| `nginx_docker_cache_host`                  | the first host running the proxy         | The proxy clients pull through; by default the first `slurm-cache` host where the cache component is installed |
+| `nginx_docker_cache_hostgroup`             | `"slurm-cache"`                          | Inventory group the proxy runs on (slurm-cluster.yml deploys it to `slurm-cache`) |
 | `nginx_docker_cache_dockerd_clients`       | `true`                                   | Flag to determine whether `dockerd` should be configured to use the proxy     |
 | `nginx_docker_cache_ca`                    | not configured by default                | Specifies file paths for CA certificate and key, if you supply these yourself |
 
@@ -62,15 +62,16 @@ To specify the CA certificate and key which you wish to use, set the following v
 
 ```yaml
 nginx_docker_cache_ca:
-  crt: "/path/to/ca.crt"
-  key: "/path/to/ca.key"
+- crt: "/path/to/ca.crt"
+- key: "/path/to/ca.key"
 ```
 
 This set of files will then be used for both the server and the clients.
 
 ### Server deployment
 
-Set `slurm_enable_nginx_docker_cache: true` and add the host that runs the proxy to the `slurm-cache` group in the inventory; the Slurm deploy then runs the proxy there and points every `slurm-node` host's Docker at it. Turning the switch off removes the proxy and the clients' settings at the next deploy (the mirror cache stays). To deploy only the proxy, run:
+To deploy the proxy server with the default configuration, add the host(s) where you wish to run the proxy to the `slurm-cache` hostgroup in inventory (the playbook's target, and the group clients find the proxy in, `nginx_docker_cache_hostgroup`).
+Then run:
 
 ```bash
 ansible-playbook playbooks/container/nginx-docker-registry-cache-server.yml

@@ -19,8 +19,6 @@
 # those in component_record_exclusive_packages). Whatever no component needs any longer is
 # removed: containers, then units (stopped and disabled), files, empty directories, and
 # packages last (roles/host_baseline). Data is never an item, so it is never removed.
-# component_record_removed lists, by kind, what this call actually removed: restart or
-# rebuild on it, never on the orphans (an adopted orphan that was never there is one).
 # absent also withdraws the calling role's pending reboot request (roles/maintenance).
 component_record_name: ""
 component_record_action: ""

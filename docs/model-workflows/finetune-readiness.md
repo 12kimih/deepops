@@ -7,8 +7,8 @@ uses Python's standard library and the existing local cache validator.
 
 ## Supported boundary
 
-- One explicitly named Slurm node and partition. `scontrol show node` must
-  report the local hostname as `NodeHostName`; aliases not matching the local
+- One explicitly named Slurm node and partition. `scontrol --json show nodes` must
+  report the local hostname as the node's `hostname`; aliases not matching the local
   hostname or its short form fail closed. The partition must be UP and include
   the node. Node names cannot be ranges, lists or command options.
 - The node must be exactly IDLE, with at least one configured GPU and zero

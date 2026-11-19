@@ -1,13 +1,7 @@
 ---
-# The MAAS release series, one Launchpad PPA (ppa:maas/<series>) each, published per
-# Ubuntu release: 3.8 for 26.04, 3.7 for 24.04 (the newest there), 3.5 for 22.04.
-maas_series: >-
-  {{ '3.8' if ansible_facts.distribution_version is version('26.04', '>=')
-     else '3.7' if ansible_facts.distribution_version is version('24.04', '>=') else '3.5' }}
-# Every MAAS PPA is signed by the same Launchpad key (its fingerprint from the Launchpad
-# API, ~maas/+archive/ubuntu/<series>: signing_key_fingerprint). The key ships with the
-# role (files/maas-ppa.asc), so no keyserver is asked; it is checked against this.
-maas_ppa_key_fingerprint: "3AB6DCF1F234E78DAA9C104204E7FDC5684D4A1C"
+# MAAS 3.7 is the current Ubuntu 24.04 line. Keep the 3.5 PPA when the MAAS
+# controller itself still runs Ubuntu 22.04.
+maas_repo: "{{ 'ppa:maas/3.7' if ansible_facts.distribution_version is version('24.04', '>=') else 'ppa:maas/3.5' }}"
 
 # This role installs a single-node MAAS controller only. Multi-node
 # region/rack topologies are site-owned; see docs/pxe/maas.md.

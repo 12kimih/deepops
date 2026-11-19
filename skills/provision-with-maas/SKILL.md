@@ -39,10 +39,9 @@ deployed machine tags into Ansible inventory.
    ```
 
 2. If DeepOps must install the MAAS controller, set `maas_adminusers`,
-   `maas_dns_domain`, `maas_region_controller` and
-   `maas_region_controller_url` in `config/group_vars/all.yml` (and
-   `maas_series` only to pin another MAAS release than the controller's
-   Ubuntu release gets). Review the inventory, then limit the
+   `maas_dns_domain`, `maas_region_controller`,
+   `maas_region_controller_url`, and `maas_repo` in
+   `config/group_vars/all.yml`. Review the inventory, then limit the
    controller playbook to exactly that host:
 
    ```bash

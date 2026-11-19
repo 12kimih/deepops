@@ -172,15 +172,21 @@ def check(kind, data):
     return data
 
 
-def load(kind):
-    """Read QUERIES[KIND] from Slurm, checked against FIELDS[KIND]."""
-    cmd = QUERIES[kind][0]
+def load(kind, *names):
+    """Read QUERIES[KIND] from Slurm (only the records NAMES, when given), checked
+    against FIELDS[KIND]."""
+    return parse(kind, run(*QUERIES[kind][0], *names))
+
+
+def parse(kind, text):
+    """TEXT, Slurm's reply to QUERIES[KIND], parsed, made printable and checked: what
+    load() does with the reply, for a caller that runs the command itself."""
     try:
-        data = json.loads(run(*cmd))
+        data = json.loads(text)
     except ValueError as e:
-        raise SchemaError(f"{cmd[0]}: unreadable JSON for {kind}: {e}") from None
+        raise SchemaError(f"{QUERIES[kind][0][0]}: unreadable JSON for {kind}: {e}") from None
     if not isinstance(data, dict):
-        raise SchemaError(f"{cmd[0]}: the reply for {kind} is not a JSON object")
+        raise SchemaError(f"{QUERIES[kind][0][0]}: the reply for {kind} is not a JSON object")
     return check(kind, printable(data))
 
 

@@ -1,12 +1,4 @@
 ---
-- name: Record what this component installs
-  ansible.builtin.include_role:
-    name: component_record
-  vars:
-    component_record_name: nginx_docker_cache
-    component_record_action: begin
-    component_record_items: "{{ nginx_docker_cache_items }}"
-
 - name: Install python3 docker module
   ansible.builtin.package:
     name: python3-docker
@@ -60,11 +52,3 @@
       REGISTRIES: "{{ nginx_docker_cache_registry_string }}"
       ENABLE_MANIFEST_CACHE: "{{ nginx_docker_cache_manifests }}"
       MANIFEST_CACHE_DEFAULT_TIME: "{{ nginx_docker_cache_manifest_default_time }}"
-
-- name: Record the component as present
-  ansible.builtin.include_role:
-    name: component_record
-  vars:
-    component_record_name: nginx_docker_cache
-    component_record_action: present
-    component_record_items: "{{ nginx_docker_cache_items }}"

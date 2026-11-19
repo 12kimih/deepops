@@ -7,36 +7,16 @@
       region/rack topologies should be deployed per the upstream MAAS
       documentation.
 
-# Resolved here, where role_path is this role's: package_repos reads the key later.
-- name: Locate the MAAS PPA key
-  ansible.builtin.set_fact:
-    maas_ppa_key: "{{ role_path }}/files/maas-ppa.asc"
-    maas_ppa_dir: "maas-ubuntu-{{ maas_series | replace('.', '_') }}"
-
-- name: Add the MAAS repository
-  ansible.builtin.include_role:
-    name: package_repos
-    tasks_from: repo
-  vars:
-    package_repos_repo:
-      name: maas
-      uris: "https://ppa.launchpadcontent.net/maas/{{ maas_series }}/ubuntu"
-      components: [main]
-      key_src: "{{ maas_ppa_key }}"
-      key_fingerprint: "{{ maas_ppa_key_fingerprint }}"
-      # What apt_repository / add-apt-repository wrote for the same PPA.
-      legacy_files:
-        - "/etc/apt/sources.list.d/{{ maas_ppa_dir }}-{{ ansible_facts.distribution_release }}.list"
-        - "/etc/apt/sources.list.d/{{ maas_ppa_dir }}-{{ ansible_facts.distribution_release }}.sources"
-        - "/etc/apt/sources.list.d/ppa_maas_{{ maas_series | replace('.', '_') }}_{{ ansible_facts.distribution_release }}.list"
-        - "/etc/apt/trusted.gpg.d/{{ maas_ppa_dir }}.gpg"
+- name: Add MAAS repository
+  ansible.builtin.apt_repository:
+    repo: "{{ maas_repo }}"
+    state: present
 
 - name: Install MAAS
   ansible.builtin.apt:
     name: maas
     state: present
     update_cache: true
-    cache_valid_time: 3600
 
 - name: Check whether admin accounts were created
   ansible.builtin.stat:
