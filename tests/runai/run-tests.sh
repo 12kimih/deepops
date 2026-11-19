@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Offline tests for roles/runai: fake helm/kubectl, no cluster needed.
+# Offline tests for roles/runai: fake helm/kubectl, no cluster needed. The Python suites
+# here run separately (scripts/check.sh, or python3 -m unittest in this directory).
 # Needs ansible-playbook and python3. Run from anywhere: bash tests/runai/run-tests.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -158,13 +159,7 @@ STATE=""; run bx -e runai_mode=platform -e runai_platform_domain=runai.lab.test 
 [ $rc -ne 0 ] && pass "unknown exposure refused" || bad "unknown exposure"
 unset STATE
 
-# Ownership, foreign users and default absent exercise the real task files.
-python3 -m unittest discover -q -s "$HERE" -p "test_gateway_lifecycle.py" && pass "Gateway lifecycle regressions" || bad "Gateway lifecycle regressions"
-
-# Full platform path, including TLS, DNS, registration, rerun and absent.
-python3 -m unittest discover -v -s "$HERE" -p "test_gateway_platform.py" && pass "Gateway full platform path" || bad "Gateway full platform path"
-
-# 11. filter unit tests
-python3 -m unittest discover -q -s "$HERE" -p "test_runai_helpers.py" && pass "helper unit tests" || bad "helper unit tests"
+# The Python suites beside this script (test_*.py: Gateway lifecycle, the full platform
+# path, the filters) are unit tests: scripts/check.sh runs each on its own, alongside this.
 
 exit $fail
