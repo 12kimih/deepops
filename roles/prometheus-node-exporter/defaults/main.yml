@@ -9,7 +9,6 @@ node_exporter_host_group: slurm-cluster
 node_exporter_extra_collectors: [systemd, processes]
 # Units the systemd collector reports; services and mounts are what alerts watch.
 node_exporter_systemd_unit_include: ".+[.](service|mount)"
-node_exporter_prom_dir: "/run/prometheus"
 node_exporter_svc_name: "docker.node-exporter.service"
 node_exporter_state: started
 node_exporter_enabled: true
