@@ -2,8 +2,13 @@
 # The secret files a site needs, each created on the controller when missing and never
 # replaced: {path, kind, vault (default true), mode (default "0600")}, where kind is
 # random (length bytes, default 1024) or gpg_signing (uid; public_path gets the armored
-# public key, never vaulted). Each owning role declares its own list in its defaults
-# (roles/slurm_paths: slurm_site_secrets) and the play passes it here.
+# public key, never vaulted). A random secret may name adopt, the path where the play's
+# hosts install it: if any host holds that file, it is adopted (all copies must agree,
+# sha256) instead of generated, so a running cluster never gets a new key. Each owning
+# role declares its own list in its defaults (roles/slurm_paths: slurm_site_secrets)
+# and the play passes it here.
 site_secrets: []
+# The host an adopted copy is read from when it holds one (else the first that does).
+site_secrets_adopt_from: ""
 # Encrypts the vaulted files: the repository's (ansible.cfg vault_password_file).
 site_secrets_vault_password_file: "{{ lookup('ansible.builtin.config', 'DEFAULT_VAULT_PASSWORD_FILE') or '' }}"

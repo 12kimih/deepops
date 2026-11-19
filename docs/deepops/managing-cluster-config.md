@@ -93,8 +93,8 @@ Commit the ciphertext to the **private** repo; never commit `config/.vault-pass`
 Secrets that are keys rather than chosen values (the MUNGE key, the Slurm repository
 signing key pair) are whole files under `config/files/`. Nobody makes them by hand: the
 first play of every playbook that deploys Slurm (`playbooks/slurm-cluster/site-secrets.yml`,
-`roles/site_secrets`) creates each one that is missing, vaulted with this password file,
-and never replaces one. So the password file must exist before the first deploy; commit
+`roles/site_secrets`) writes each one that is missing, vaulted with this password file,
+and never replaces one. A MUNGE key the hosts already share is adopted, not replaced. So the password file must exist before the first deploy; commit
 the files the play reports.
 
 ### 5. Run exactly as before
