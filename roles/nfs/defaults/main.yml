@@ -10,6 +10,12 @@ nfs_is_client: false
 # is written as is.
 nfs_exports: []
 
+# Directories inside the exported trees the server keeps at a fixed owner and mode, so a
+# hand chmod never lasts: e.g. a shared scratch {path: /home/data, mode: "1777"} (sticky:
+# everyone writes, each deletes only their own files). Each is {path, mode, owner
+# (root), group (root)}.
+nfs_shared_dirs: []
+
 # The hosts that are NFS servers. Once set, every other host this role runs on has the
 # NFS server package removed (with its exports). Empty = no host is touched.
 nfs_servers: []
