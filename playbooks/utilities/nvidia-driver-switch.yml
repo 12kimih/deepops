@@ -17,6 +17,8 @@
   max_fail_percentage: 0
   tags:
     - nvidia_driver
+  roles:
+    - role: deploy_defaults
   tasks:
     - name: Install custom facts
       ansible.builtin.include_role:
@@ -39,7 +41,7 @@
         maintenance_steps: "{{ ['drain', 'role', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
                               else ['role', 'reboot', 'verify'] }}"
       when: ansible_facts.ansible_local['gpus']['count'] | int > 0 and not nvidia_driver_switch_dgx.stat.exists
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
 
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
