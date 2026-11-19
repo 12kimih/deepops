@@ -67,6 +67,21 @@ def people_attr(people, key):
     return {n: p[key] for n, p in sorted(_active(people).items()) if p.get(key) not in (None, "")}
 
 
+def people_local_accounts(people, home_root="/home", shell="/bin/bash"):
+    """Active people as roles/local_accounts declarations: the roster UID, a per-user
+    group with GID = UID, the name as the comment, the shell, home under HOME_ROOT."""
+    return {
+        name: {
+            "uid": p["uid"],
+            "shell": p.get("shell") or shell,
+            "home": f"{home_root}/{name}",
+            "system": False,
+            **({"comment": p["name"]} if p.get("name") else {}),
+        }
+        for name, p in _active(people).items()
+    }
+
+
 def people_accounting(people):
     """{login: {accounts, default_account}} for active people with Slurm accounts.
 
@@ -198,6 +213,7 @@ class FilterModule:
             "people_uids": people_uids,
             "people_attr": people_attr,
             "people_accounting": people_accounting,
+            "people_local_accounts": people_local_accounts,
             "people_subids": people_subids,
             "people_check": people_check,
         }

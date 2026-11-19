@@ -1,76 +1,34 @@
 ---
+# A person's UID or per-user GID must not be a service account's (roles/system_accounts).
+- name: Refuse roster IDs the service accounts use
+  ansible.builtin.assert:
+    that: (people | people_local_accounts | accounts_disjoint(system_accounts)) is mapping
+    quiet: true
+  tags:
+    - people
+
+# The roster UID, a per-user group with GID = UID, the name as the comment and the
+# shell; an existing account with another number stops the run (roles/local_accounts).
+# Supplementary groups are not managed here: they come from the roles that own them
+# (nis_server for published groups, cluster_sudoers for the local sudo group).
+- name: Create or update each active person's account
+  ansible.builtin.include_role:
+    name: local_accounts
+    apply:
+      tags:
+        - people
+  vars:
+    local_accounts: "{{ people | people_local_accounts(people_home_root, people_default_shell) }}"
+    local_accounts_shell: "{{ people_default_shell }}"
+  tags:
+    - people
+
 # Accounts are read from the local files only: on a NIS master `getent` would also
 # answer from NIS, which is built from these same files and may be stale.
 - name: Read the local accounts
   ansible.builtin.getent:
     database: passwd
     service: files
-  tags:
-    - people
-
-- name: Refuse to change an existing account's UID
-  ansible.builtin.assert:
-    that: >-
-      (ansible_facts.getent_passwd[item.key][1] | int) == (item.value.uid | int)
-    fail_msg: >-
-      {{ item.key }} has UID {{ ansible_facts.getent_passwd[item.key][1] }} here but
-      {{ item.value.uid }} in the roster. Changing it would orphan the account's files
-      on shared storage; fix the roster, or migrate the files and the UID by hand.
-    quiet: true
-  loop: "{{ people | dict2items | selectattr('key', 'in', ansible_facts.getent_passwd) }}"
-  loop_control:
-    label: "{{ item.key }}"
-  tags:
-    - people
-
-- name: Read the local groups
-  ansible.builtin.getent:
-    database: group
-    service: files
-  tags:
-    - people
-
-# The group module renumbers an existing group (groupmod -g), which orphans the group
-# ownership of every file on shared storage as surely as a UID change would.
-- name: Refuse to change an existing person's group GID
-  ansible.builtin.assert:
-    that: >-
-      (ansible_facts.getent_group[item.key][1] | int) == (item.value.uid | int)
-    fail_msg: >-
-      Group {{ item.key }} has GID {{ ansible_facts.getent_group[item.key][1] }} here but
-      {{ item.value.uid }} in the roster. Changing it would orphan the group's files on
-      shared storage; fix the roster, or migrate the files and the GID by hand.
-    quiet: true
-  loop: "{{ people | people_active | dict2items | selectattr('key', 'in', ansible_facts.getent_group) }}"
-  loop_control:
-    label: "{{ item.key }}"
-  tags:
-    - people
-
-- name: Create each active person's group
-  ansible.builtin.group:
-    name: "{{ item.key }}"
-    gid: "{{ item.value.uid }}"
-  loop: "{{ people | people_active | dict2items }}"
-  loop_control:
-    label: "{{ item.key }} ({{ item.value.uid }})"
-  tags:
-    - people
-
-# `groups` is not managed here: supplementary groups come from the roles that own them
-# (nis_server for published groups, cluster_sudoers for the local sudo group).
-- name: Create or update each active person's account
-  ansible.builtin.user:
-    name: "{{ item.key }}"
-    uid: "{{ item.value.uid }}"
-    group: "{{ item.key }}"
-    comment: "{{ item.value.name | default(omit) }}"
-    shell: "{{ item.value.shell | default(people_default_shell) }}"
-    home: "{{ people_home_root }}/{{ item.key }}"
-    create_home: true
-  loop: "{{ people | people_active | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
   tags:
     - people
 

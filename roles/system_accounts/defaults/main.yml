@@ -1,0 +1,29 @@
+---
+# system_accounts -- the service accounts deepops creates, declared once, each with a
+# fixed UID and GID that are the same on every host. Numbers, not names, travel: Slurm
+# ships numeric IDs in every job (send_gids), NFS with AUTH_SYS sends them over the
+# wire, and `rsync -a` or `tar --numeric-owner` copy them. Left to the OS, each host
+# picks the next free number when the role first runs, so hosts installed at different
+# times disagree. The roles that run a service create its account from here through
+# roles/local_accounts; none sets its own IDs.
+#
+# Key = account and group name. uid (required); gid (default: uid); home; shell
+# (default /usr/sbin/nologin); comment. Accounts a package creates itself (munge,
+# nvidia-persistenced) are not listed: the package owns them.
+#
+# The accounts are local on every host, never in the directory, so services start when
+# the directory is down. Their IDs must not be a person's (roles/people refuses a roster
+# UID or GID taken here). A site that needs other numbers sets the whole mapping.
+system_accounts:
+  slurm:
+    uid: 22078
+    home: /local/slurm
+    comment: Slurm
+  slurmbuild:
+    uid: 22079
+    home: /var/lib/slurmbuild
+    comment: Slurm package builder
+  easybuild:
+    uid: 22080
+    home: /var/lib/easybuild
+    comment: EasyBuild
