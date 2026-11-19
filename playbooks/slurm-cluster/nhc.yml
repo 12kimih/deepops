@@ -8,3 +8,4 @@
     - name: Install Node Health Check
       ansible.builtin.include_role:
         name: nhc
+        public: true

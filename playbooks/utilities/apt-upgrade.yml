@@ -26,6 +26,7 @@
     - name: Take the node out, upgrade it and put it back
       ansible.builtin.include_role:
         name: maintenance
+        public: true
         tasks_from: run
       vars:
         maintenance_steps: "{{ ['drain', 'upgrade', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
@@ -40,4 +41,5 @@
     - name: Check the upgraded hosts are level
       ansible.builtin.include_role:
         name: maintenance
+        public: true
         tasks_from: consistency

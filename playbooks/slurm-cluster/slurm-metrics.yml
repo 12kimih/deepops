@@ -7,3 +7,4 @@
     - name: Configure Slurm metrics
       ansible.builtin.include_role:
         name: slurm_metrics
+        public: true

@@ -8,3 +8,4 @@
     - name: Configure IPMI exporter
       ansible.builtin.include_role:
         name: prometheus-ipmi-exporter
+        public: true

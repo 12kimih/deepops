@@ -8,3 +8,4 @@
     - name: Apply the OS update policy
       ansible.builtin.include_role:
         name: os_updates
+        public: true

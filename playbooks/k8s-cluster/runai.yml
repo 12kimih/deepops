@@ -12,6 +12,7 @@
     - name: Install or remove Run:ai
       ansible.builtin.include_role:
         name: runai
+        public: true
       run_once: true
   environment: "{{ proxy_env if proxy_env is defined else {} }}"
   tags:

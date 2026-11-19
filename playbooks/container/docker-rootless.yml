@@ -16,3 +16,4 @@
     - name: Install rootless docker
       ansible.builtin.include_role:
         name: docker-rootless
+        public: true

@@ -8,3 +8,4 @@
     - name: Configure node exporter
       ansible.builtin.include_role:
         name: prometheus-node-exporter
+        public: true

@@ -8,3 +8,4 @@
     - name: Configure alertmanager
       ansible.builtin.include_role:
         name: alertmanager
+        public: true

@@ -8,3 +8,4 @@
     - name: Configure prometheus slurm exporter
       ansible.builtin.include_role:
         name: prometheus-slurm-exporter
+        public: true
