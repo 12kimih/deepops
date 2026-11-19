@@ -11,6 +11,8 @@
 #         chart: netapp-trident/trident-operator   # repo/chart, or a chart name with repo:
 #         version: "100.2610.1"
 #         repo: https://netapp.github.io/trident-helm-chart   # optional (helm --repo)
+#         repo_username: "$oauthtoken"       # optional, a repository that needs credentials;
+#         repo_password: "{{ vault_... }}"   # never on a command line
 #         helm_values: {}                    # the release's user-supplied values
 #         sensitive: false                   # values hold secrets: hide them in output
 #         wait: true                         # helm --wait (present only)

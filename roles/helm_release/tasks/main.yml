@@ -67,4 +67,71 @@
       environment: "{{ proxy_env }}"
       no_log: "{{ helm_release.sensitive | default(false) }}"
       changed_when: true
-      when: helm_release_needs_change | bool
+      when:
+        - helm_release_needs_change | bool
+        - helm_release.repo_password | default('') | length == 0
+
+    # helm upgrade takes repository credentials only as --password on the command line,
+    # which every user can read (ps). With credentials, the repository goes into a
+    # private repository config (root-only, removed afterwards) through
+    # `helm repo add --password-stdin`, and the chart is installed from there.
+    - name: "Helm upgrade --install from an authenticated repository ({{ helm_release.release }})"
+      when:
+        - helm_release_needs_change | bool
+        - helm_release.repo_password | default('') | length > 0
+      block:
+        - name: Create root's scratch directory
+          ansible.builtin.file:
+            path: /var/cache/deepops
+            state: directory
+            owner: root
+            group: root
+            mode: "0755"
+
+        - name: Create a private Helm repository config
+          ansible.builtin.tempfile:
+            state: directory
+            path: /var/cache/deepops
+            prefix: helm-repo-
+          register: helm_release_repo_dir
+
+        - name: Add the repository with its credentials
+          ansible.builtin.command:
+            argv:
+              - "{{ helm_bin }}"
+              - repo
+              - add
+              - deepops-release
+              - "{{ helm_release.repo }}"
+              - --username
+              - "{{ helm_release.repo_username }}"
+              - --password-stdin
+              - --repository-config
+              - "{{ helm_release_repo_dir.path }}/repositories.yaml"
+              - --repository-cache
+              - "{{ helm_release_repo_dir.path }}/cache"
+            stdin: "{{ helm_release.repo_password }}"
+          environment: "{{ proxy_env }}"
+          no_log: true
+          changed_when: false
+
+        - name: "Install or upgrade ({{ helm_release.release }})"
+          ansible.builtin.command:
+            argv: >-
+              {{ [helm_bin, 'upgrade', '--install', helm_release.release,
+                  'deepops-release/' ~ helm_release.chart.split('/')[-1],
+                  '--version', helm_release.version | string, '--namespace', helm_release.namespace, '--create-namespace',
+                  '--repository-config', helm_release_repo_dir.path ~ '/repositories.yaml',
+                  '--repository-cache', helm_release_repo_dir.path ~ '/cache']
+                 + (['--wait', '--timeout', helm_timeout] if helm_release.wait | default(true) else [])
+                 + ['--values', '-'] }}
+            stdin: "{{ helm_release.helm_values | default({}) | to_json }}"
+          environment: "{{ proxy_env }}"
+          no_log: "{{ helm_release.sensitive | default(false) }}"
+          changed_when: true
+      always:
+        - name: Remove the private Helm repository config
+          ansible.builtin.file:
+            path: "{{ helm_release_repo_dir.path }}"
+            state: absent
+          when: helm_release_repo_dir.path is defined
