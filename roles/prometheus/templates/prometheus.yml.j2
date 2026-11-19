@@ -20,6 +20,17 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:{{ alertmanager_port }}']
         labels: {host: '{{ inventory_hostname }}', module: alertmanager}
+{% for set in prometheus_slurmctld_metrics if prometheus_slurmctld_targets | length > 0 %}
+  - job_name: slurmctld-{{ set }}
+    metrics_path: /metrics/{{ set }}
+    static_configs:
+      - targets: {{ prometheus_slurmctld_targets | to_json }}
+        labels: {module: slurmctld}
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.+):\d+'
+        target_label: host
+{% endfor %}
   - job_name: cluster
     file_sd_configs:
       - files:

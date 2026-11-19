@@ -117,7 +117,14 @@ class MonitoringImages(unittest.TestCase):
         out = cls.tmp / "rendered"
         defaults = [
             ROOT / "roles" / r / "defaults/main.yml"
-            for r in ("prometheus_paths", "prometheus", "alertmanager", "grafana")
+            for r in (
+                "deepops_paths",
+                "slurm_paths",
+                "prometheus_paths",
+                "prometheus",
+                "alertmanager",
+                "grafana",
+            )
         ]
         templates = {
             "prometheus/prometheus.yml": "roles/prometheus/templates/prometheus.yml.j2",
