@@ -19,8 +19,11 @@ enroot_version: "4.2.1"
 enroot_release: "1"
 enroot_version_string: "{{ enroot_version }}-{{ enroot_release }}"
 
-# Install the hardened build (keeps Spectre v2/v4 mitigations enabled) instead of
-# the standard build. Recommended for shared multi-tenant nodes.
+# The standard build turns off the Spectre v2/v4 mitigations inside containers and
+# lets them inherit open file descriptors, for speed; the hardened build keeps both
+# (installation.md: "slightly more secure but ... larger overhead"). Standard on
+# purpose: an AI/ML cluster of trusted users puts training performance first. Choose
+# hardened only for nodes shared with untrusted users.
 enroot_hardened: false
 # Also install the +caps package, which adds CAP_SYS_ADMIN file capabilities to
 # the two image-import helpers so unprivileged users can import images on the
