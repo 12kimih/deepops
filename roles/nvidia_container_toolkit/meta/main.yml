@@ -1,0 +1,9 @@
+---
+# A site still setting a name this role read before stops the deploy.
+dependencies:
+  - role: proxy_defaults  # proxy_env
+  - role: retired_settings
+
+galaxy_info:
+  namespace: deepops
+  role_name: nvidia_container_toolkit

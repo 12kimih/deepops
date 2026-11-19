@@ -27,6 +27,9 @@
 10. Only roles/maintenance reboots, and only a playbook asks it to: a role whose change
    needs a reboot calls its reboot_request (the reboot is left pending, then done with
    the node drained), never its reboot step, ansible.builtin.reboot or a reboot command.
+11. A tag on a dynamic include (include_tasks, include_role) other than `always` is
+   also passed on with apply: tags on the include select only the include itself, so
+   `--tags build` ran the include and none of the tasks it loads.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -324,6 +327,22 @@ class TaskRules(unittest.TestCase):
                         if isinstance(cond, str) and pattern.search(cond):
                             offenders.append(f"{rel(path)}: {task.get('name')}: {cond}")
         self.assertEqual(offenders, [], "item is always defined in a loop; test the variable it names")
+        scan.check(self)
+
+    def test_tags_on_a_dynamic_include_reach_its_tasks(self):
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if name not in ("include_tasks", "include_role"):
+                    continue
+                tags = task.get("tags") or []
+                tags = set(tags if isinstance(tags, list) else [tags]) - {"always"}
+                applied = (args.get("apply") or {}).get("tags") or []
+                applied = set(applied if isinstance(applied, list) else [applied])
+                if tags - applied:
+                    offenders.append(f"{rel(path)}: {task.get('name')}: {sorted(tags - applied)}")
+        self.assertEqual(offenders, [], "pass the include's tags on with apply: {tags: [...]}")
         scan.check(self)
 
     def test_only_the_maintenance_role_reboots(self):

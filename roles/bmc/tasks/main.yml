@@ -65,7 +65,10 @@
       when: bmc_password | length > 0
 
 - name: Configure this host's leg on the BMC network
-  ansible.builtin.include_tasks: mgmt_network.yml
+  ansible.builtin.include_tasks:
+    file: mgmt_network.yml
+    apply:
+      tags: [bmc]
   when: bmc_mgmt_address | length > 0
   tags:
     - bmc

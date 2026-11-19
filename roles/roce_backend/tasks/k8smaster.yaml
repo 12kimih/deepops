@@ -68,7 +68,10 @@
 # Create Network Attach Definitions
 
 - name: Add NetworkAttachmentDefinition
-  ansible.builtin.include_tasks: nad4roce.yaml
+  ansible.builtin.include_tasks:
+    file: nad4roce.yaml
+    apply:
+      tags: [roce_k8s]
   with_items: "{{ sriov_resources }}"
   tags:
     - roce_k8s

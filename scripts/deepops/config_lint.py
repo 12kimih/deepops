@@ -50,6 +50,9 @@ CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
 PATH = re.compile(
     r"(?<![\w./-])((?:roles|playbooks|scripts|docs|config\.example|tests|skills|plugins)/[\w./-]*[\w/])"
 )
+# The settings deepops no longer reads (roles/retired_settings): naming one there is not a
+# read, and a document or config that names one is told what replaced it.
+RETIRED_FILE = ROOT / "roles" / "retired_settings" / "vars" / "main.yml"
 # Read by Ansible itself or by tools outside the repository, not by our code.
 READ_ELSEWHERE = {"ansible_user", "ansible_host", "ansible_python_interpreter", "ansible_become"}
 
@@ -167,12 +170,17 @@ def check_redundant(fix=None):
     return problems
 
 
+def retired():
+    """{retired name: what replaces it}."""
+    return settings.load(RETIRED_FILE.read_text())["retired_settings"]
+
+
 def read_words():
     """Every identifier our code, the example config and Kubespray contain, or None
     when Kubespray is not checked out."""
     words = set()
     for path in tracked("roles", "playbooks", "plugins", "scripts", "config.example"):
-        if path.is_file() and "galaxy" not in path.parts:
+        if path.is_file() and "galaxy" not in path.parts and path != RETIRED_FILE:
             words.update(re.findall(r"[a-z_][a-z0-9_]*", path.read_text(errors="ignore")))
     kubespray = ROOT / "submodules" / "kubespray"
     clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -185,25 +193,45 @@ def read_words():
     return words | set(k8s.stdout.split())
 
 
-# A setting a page tells the reader to set, and the first cell of a table row.
+# A setting a page tells the reader to set, the first cell of a table row, and a setting
+# line of a YAML code block (```yaml: a page shows settings as YAML).
 SETTING = re.compile(r"`([a-z][a-z0-9]*_[a-z0-9_]+): [^`]+`")
 TABLE_NAME = re.compile(r"^\|\s*`([a-z][a-z0-9]*_[a-z0-9_]+)`")
+BLOCK_SETTING = re.compile(r"^\s*#?\s?([a-z][a-z0-9]*_[a-z0-9_]+): ")
+
+
+def doc_settings(text):
+    """(line number, setting name) for every setting a page names."""
+    fence = None  # the open code block's language
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fence = None if fence is not None else line.lstrip()[3:].strip().lower()
+            continue
+        if fence is not None:
+            if fence not in ("yaml", "yml"):
+                continue
+            names = BLOCK_SETTING.findall(line)
+        else:
+            names = TABLE_NAME.findall(line) if line.startswith("|") else SETTING.findall(line)
+        for name in names:
+            yield number, name
 
 
 def check_doc_vars():
     words = read_words()
     if words is None:
         return ["doc-vars: submodules/kubespray is not checked out (git submodule update --init)"]
-    problems = []
+    gone, problems = retired(), []
     for doc in tracked("*.md"):
         # MODERNIZATION.md is the change log: it names settings that were removed.
         if not doc.is_file() or doc.name == "MODERNIZATION.md":
             continue
-        for number, line in enumerate(doc.read_text().splitlines(), 1):
-            names = TABLE_NAME.findall(line) if line.startswith("|") else SETTING.findall(line)
-            for name in names:
-                if name not in words:
-                    problems.append(f"doc-vars: {doc.relative_to(ROOT)}:{number}: nothing reads {name}")
+        for number, name in doc_settings(doc.read_text()):
+            where = f"doc-vars: {doc.relative_to(ROOT)}:{number}"
+            if name in gone:
+                problems.append(f"{where}: {name} is retired: set {gone[name]} instead")
+            elif name not in words:
+                problems.append(f"{where}: nothing reads {name}")
     return problems
 
 
@@ -212,9 +240,13 @@ def check_dead():
     for path in tracked("roles", "playbooks", "plugins", "scripts", "config.example"):
         # A role's templates are read whatever their suffix (a .tok, a .service).
         if (
-            path.suffix in (".yml", ".yaml", ".j2", ".py", ".sh", ".lua", ".cfg", ".conf", "")
-            or "templates" in path.parts
-        ) and path.is_file():
+            (
+                path.suffix in (".yml", ".yaml", ".j2", ".py", ".sh", ".lua", ".cfg", ".conf", "")
+                or "templates" in path.parts
+            )
+            and path.is_file()
+            and path != RETIRED_FILE
+        ):
             sources.append((path, path.read_text(errors="ignore")))
     # Kubespray reads many config.example settings. Without its checkout every one of
     # them would read as dead, so a missing submodule is a failure of its own.

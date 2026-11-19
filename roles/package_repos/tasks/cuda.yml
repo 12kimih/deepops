@@ -1,7 +1,4 @@
 ---
-- name: Refuse the retired repository settings
-  ansible.builtin.include_tasks: retired.yml
-
 - name: Add the CUDA repository (Ubuntu)
   when: ansible_facts.os_family == 'Debian'
   block:
@@ -35,7 +32,7 @@
     - name: Read the CUDA repository index
       ansible.builtin.apt:
         update_cache: true
-      environment: "{{ proxy_env if proxy_env is defined else {} }}"
+      environment: "{{ proxy_env }}"
       when: package_repos_cuda_keyring_install is changed or package_repos_cuda_source is changed
 
 - name: Add the CUDA repository (RHEL family)

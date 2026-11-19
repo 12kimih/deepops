@@ -249,7 +249,7 @@ The [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) automates the 
 
 To update to a new version of the GPU operator, set the following parameter in your DeepOps configuration:
 
-```bash
+```yaml
 gpu_operator_chart_version: "<version>"
 ```
 
@@ -287,7 +287,7 @@ ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 
 To move to a new release branch, set it in your DeepOps configuration:
 
-```bash
+```yaml
 nvidia_driver_branch: "<branch>"
 ```
 
@@ -317,7 +317,7 @@ Updating GFD should typically be non-disruptive, and does not need to be run on 
 
 To update to a new version of GFD, set the following variable in your DeepOps configuration:
 
-```bash
+```yaml
 k8s_gpu_feature_discovery_chart_version: "<version>"
 ```
 
@@ -335,7 +335,7 @@ Updating the GPU Device Plugin should typically be non-disruptive, and does not 
 
 To update to a new version, set the following variable in your DeepOps configuration:
 
-```bash
+```yaml
 k8s_gpu_plugin_chart_version: "<version>"
 ```
 
@@ -420,7 +420,7 @@ Performing these component-based upgrades does not require updating the DeepOps 
 
 To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version:
 
-```bash
+```yaml
 slurm_version: 25.11.6
 ```
 
@@ -450,7 +450,7 @@ ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 
 To move to a new release branch, set it in your DeepOps configuration:
 
-```bash
+```yaml
 nvidia_driver_branch: "<branch>"
 ```
 
@@ -499,7 +499,7 @@ ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
 
 For the NVIDIA DCGM Exporter, the version and its digest are pinned together. To update, set both in your DeepOps configuration:
 
-```
+```yaml
 nvidia_dcgm_container_version: "4.5.3-4.8.2-distroless"
 nvidia_dcgm_container_digest: "sha256:<digest of that tag>"
 ```
@@ -514,7 +514,7 @@ ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 
 To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wise to use:
 
-```bash
+```yaml
 slurm_pyxis_version: "0.24.0"
 enroot_version: "4.2.0"
 ```
@@ -524,7 +524,7 @@ On RHEL-family hosts, override the RPM URLs alongside the version. The
 to `el8` artifacts in 3.4.1 and stopped publishing `el7` ones, so raising
 `enroot_version` to 3.4.1 or later on its own makes the download 404:
 
-```bash
+```yaml
 enroot_rpm_packages:
   - 'https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}/enroot-{{ enroot_version_string }}.el8.x86_64.rpm'
   - 'https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}/enroot+caps-{{ enroot_version_string }}.el8.x86_64.rpm'
@@ -547,7 +547,7 @@ The NVIDIA HPC SDK is installed in versioned directories, so that new versions a
 
 To install a newer HPC SDK, first configure the version variables in your DeepOps configuration:
 
-```bash
+```yaml
 hpcsdk_major_version: "26"
 hpcsdk_minor_version: "3"
 hpcsdk_file_cuda: "13.1"

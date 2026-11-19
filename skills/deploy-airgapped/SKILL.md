@@ -658,7 +658,6 @@ nvidia_container_toolkit_repo_gpg_url: "http://package-server/keys/libnvidia-con
 
 docker_rh_repo_base_url: "http://package-server/repos/docker-ce-stable"
 docker_rh_repo_gpgkey: "http://package-server/keys/docker-rpm.asc"
-nvidia_container_toolkit_rpm_repo_url: "http://package-server/repos/nvidia-container-toolkit.repo"
 
 docker_insecure_registries:
   - "registry-host:5000"
@@ -699,7 +698,6 @@ registration commands above:
 
 ```yaml
 registry_host: "registry-host:5000"
-registry_addr: "registry-host:5000"
 files_repo: "http://package-server/kubespray/offline-files"
 
 kube_image_repo: "{{ registry_host }}"

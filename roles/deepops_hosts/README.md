@@ -42,7 +42,7 @@ None of the variables below are required. When not set, the default setting is a
 
 | Variable                                 | Default                              | Comments                                                                                                          |
 | :---                                     | :---                                 | :---                                                                                                              |
-| `hosts_file_src`                         |                                      | When defined, this path will be copied to the hosts file and all other settings are ignored                       |
+| `hosts_file_src`                         | `""`                                 | When set, this path is copied to the hosts file and all other settings are ignored                                |
 | `hosts_add_basic_ipv6`                   | false                                | If true, basic IPv6 entries are added (e.g. localhost6, ip6-localnet, etc.)                                       |
 | `hosts_add_ansible_managed_hosts`        | false                                | If true, an entry for hosts managed by Ansible is added. (1)                                                      |
 | `hosts_add_ansible_managed_hosts_groups` | ['all']                              | Control which host entries are created when using `hosts_add_ansible_managed_hosts` |
@@ -61,7 +61,7 @@ None of the variables below are required. When not set, the default setting is a
 
 Individual hosts file entries can be added with `hosts_entries`, a list of dicts with keys `name`, `ip` and (optional) `aliases`. Example:
 
-```Yaml
+```yaml
 hosts_entries:
   - name: slashdot
     ip: 216.34.181.45

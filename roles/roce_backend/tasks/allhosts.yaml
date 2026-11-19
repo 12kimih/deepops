@@ -5,6 +5,8 @@
 - name: MOFED installation
   ansible.builtin.include_role:
     name: mofed
+    apply:
+      tags: [roce_host]
   tags:
     - roce_host
 
@@ -50,7 +52,10 @@
     - roce_host
 
 - name: Activate VFs for SR-IOV resources
-  ansible.builtin.include_tasks: vf-activate.yaml
+  ansible.builtin.include_tasks:
+    file: vf-activate.yaml
+    apply:
+      tags: [roce_host]
   with_items: "{{ sriov_resources }}"
   when: ofed_present.stat.exists
   tags:

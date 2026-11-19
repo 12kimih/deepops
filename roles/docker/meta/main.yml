@@ -1,0 +1,8 @@
+---
+# A site still setting a name this role read before stops the deploy.
+dependencies:
+  - role: retired_settings
+
+galaxy_info:
+  namespace: deepops
+  role_name: docker

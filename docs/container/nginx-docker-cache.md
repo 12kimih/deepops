@@ -60,7 +60,7 @@ A sample script for generating the key and certificate can be found in [scripts/
 
 To specify the CA certificate and key which you wish to use, set the following variable:
 
-```bash
+```yaml
 nginx_docker_cache_ca:
 - crt: "/path/to/ca.crt"
 - key: "/path/to/ca.key"

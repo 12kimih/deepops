@@ -19,7 +19,7 @@ However, using this feature requires that the NVIDIA driver and CUDA be installe
 
 To enable NVML auto-detection in DeepOps, set the following variable in your DeepOps configuration:
 
-```
+```yaml
 slurm_autodetect_nvml: true
 ```
 
@@ -130,7 +130,7 @@ slurm-login
 
 With a default configuration in `config/group_vars/slurm-cluster.yml` except for:
 
-```
+```yaml
 slurm_autodetect_nvml: true
 mig_manager_profile: all-balanced-a100-80
 ```
@@ -190,7 +190,7 @@ NHC does not yet support MIG, so we just disable the GPU check:
 
 We edit `config/group_vars/slurm-cluster.yml` to specify our custom files:
 
-```
+```yaml
 slurm_conf_template: "{{ inventory_dir }}/files/slurm/slurm.conf"
 nhc_config_template: "{{ inventory_dir }}/files/slurm/nhc.conf"
 ```

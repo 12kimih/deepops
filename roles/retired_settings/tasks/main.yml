@@ -1,0 +1,10 @@
+---
+- name: Refuse a retired setting
+  ansible.builtin.assert:
+    # item.key is the NAME, always defined in a loop; ask whether a variable of that name is set.
+    that: query('ansible.builtin.varnames', '^' ~ item.key ~ '$') | length == 0
+    fail_msg: "{{ item.key }} is retired: set {{ item.value }} instead."
+    quiet: true
+  loop: "{{ retired_settings | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

@@ -34,7 +34,10 @@
   when: is_compute
 
 - name: Pyxis tasks
-  ansible.builtin.include_tasks: pyxis.yml
+  ansible.builtin.include_tasks:
+    file: pyxis.yml
+    apply:
+      tags: [pyxis]
   when: slurm_install_pyxis
   tags: pyxis
 
