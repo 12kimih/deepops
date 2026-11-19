@@ -94,7 +94,7 @@
     owner: slurm
     mode: "0755"
   with_items:
-    - /var/log/slurm
+    - "{{ slurm_log_dir }}"
     - /var/spool/slurmd
   tags:
     - prolog

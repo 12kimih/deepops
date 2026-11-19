@@ -77,7 +77,7 @@
 
 - name: Create slurm directories
   ansible.builtin.file:
-    path: /var/log/slurm
+    path: "{{ slurm_log_dir }}"
     state: directory
     owner: slurm
     mode: "0755"

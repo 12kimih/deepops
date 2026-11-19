@@ -25,6 +25,8 @@ squeue_timeout=15
 # slurm_install_prefix, and with an empty command result both sides of the
 # comparison below were "" and every job was treated as exclusive.
 squeue_bin="{{ slurm_install_prefix }}/bin/squeue"
+# Where each part's output goes (slurm_log_files in roles/slurm_paths).
+parts_log="{{ slurm_log_files['slurm-prolog-epilog'] }}"
 
 # Find out if we are running in exclusive mode: Slurm's own answer, squeue's
 # OverSubscribe (%h), which is NO exactly when the job has its nodes to itself.
@@ -145,8 +147,8 @@ for script in "$parts_dir"/*; do
     # still reaps the ending job's.
     if [[ "$script" == *"-lastuserjob-processes" ]]; then
         log "Running $script ..."
-        if ! $script >>/var/log/slurm/prolog-epilog 2>&1; then
-            log "[ERROR] $script failed. Check the log at /var/log/slurm/prolog-epilog for more details."
+        if ! $script >>"$parts_log" 2>&1; then
+            log "[ERROR] $script failed. Check the log at $parts_log for more details."
             failed=1
         fi
         continue
@@ -157,8 +159,8 @@ for script in "$parts_dir"/*; do
         continue
     fi
     log "Running $script ..."
-    if ! $script >>/var/log/slurm/prolog-epilog 2>&1; then
-        log "[ERROR] $script failed. Check the log at /var/log/slurm/prolog-epilog for more details."
+    if ! $script >>"$parts_log" 2>&1; then
+        log "[ERROR] $script failed. Check the log at $parts_log for more details."
         failed=1
     fi
 done

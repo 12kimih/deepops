@@ -16,6 +16,15 @@ slurm_multiarch_map:
 slurm_multiarch: "{{ slurm_multiarch_map.get(ansible_facts.architecture, ansible_facts.architecture ~ '-linux-gnu') }}"
 slurm_plugin_dir: "/usr/lib/{{ slurm_multiarch }}/slurm"
 slurm_config_dir: /etc/slurm
+# Slurm's log files, keyed by the tag a forwarded line carries: slurm.conf and
+# slurmdbd.conf, the prolog and epilog parts, logrotate and the syslog forwarding
+# (roles/rsyslog_client) all take their paths from here.
+slurm_log_dir: /var/log/slurm
+slurm_log_files:
+  slurmctld: "{{ slurm_log_dir }}/slurmctld.log"
+  slurmd: "{{ slurm_log_dir }}/slurmd.log"
+  slurmdbd: "{{ slurm_log_dir }}/slurmdbd.log"
+  slurm-prolog-epilog: "{{ slurm_log_dir }}/prolog-epilog"
 # slurmctld's port: slurm.conf, slurmd's --conf-server and the metrics scrape.
 slurm_slurmctld_port: 6817
 # Where roles/nhc installs the node health check, for the role and for whatever runs it.
