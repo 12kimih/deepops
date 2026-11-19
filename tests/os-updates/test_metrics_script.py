@@ -18,7 +18,8 @@ class PendingSinceTests(unittest.TestCase):
     def run_with(self, apt_script):
         (self.bin / "apt-get").write_text("#!/bin/sh\n" + apt_script)
         (self.bin / "apt-get").chmod(0o755)
-        env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}", OS_UPDATES_STATE=str(self.state))
+        env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}", OS_UPDATES_STATE=str(self.state),
+                   OS_UPDATES_RUN=str(self.state))  # fmt: skip
         subprocess.run(["sh", str(SCRIPT), str(self.textfile)], env=env, check=True, capture_output=True)
         since = self.state / "security-pending-since"
         return since.read_text().strip() if since.exists() else None

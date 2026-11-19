@@ -16,7 +16,8 @@
 - name: Refuse a world-writable location
   ansible.builtin.assert:
     that:
-      - (download_dest ~ '/' ~ download_unpack) is not search('(^|/)(tmp|var/tmp|dev/shm)/')
+      - download_dest is not match('/(tmp|var/tmp|dev/shm)(/|$)')
+      - download_unpack is not match('/(tmp|var/tmp|dev/shm)(/|$)')
     fail_msg: >-
       {{ download_dest }} {{ download_unpack }}: root fetches and unpacks here, so it must
       not be under /tmp, /var/tmp or /dev/shm; use /var/cache/deepops.

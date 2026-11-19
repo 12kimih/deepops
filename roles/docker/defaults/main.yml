@@ -61,10 +61,11 @@ docker_service_state: started
 # https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 docker_daemon_options: {}
 
-# Containers keep running while dockerd restarts (an upgrade, a daemon.json change),
-# instead of all stopping: the exporters, the registry and users' containers alike.
-# Whether a run may restart dockerd at all is docker_daemon_restart
-# (roles/docker_daemon_json).
+# Containers started outside a systemd unit (docker run -d) keep running while dockerd
+# restarts. Those our roles run as units (docker.*.service, PartOf=docker.service)
+# restart with it either way. Turning it on is itself a daemon.json change: the first
+# run with it restarts dockerd once. Not compatible with swarm mode. Whether a run may
+# restart dockerd at all is docker_daemon_restart (roles/docker_daemon_json).
 docker_live_restore: true
 
 # Kernel limits a container host reaches long before it runs out of CPU or memory.

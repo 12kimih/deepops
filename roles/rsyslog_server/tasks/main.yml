@@ -5,7 +5,9 @@
     state: present
 
 # Checked before it is installed (a broken file would stop all logging at the next
-# restart), and rsyslog restarts for it: that is what reads it.
+# restart), and rsyslog restarts for it: that is what reads it. AppArmor lets rsyslogd
+# read only /etc/rsyslog.d, so the candidate is checked from there, under a name
+# without .conf that rsyslog never includes.
 - name: Configure syslog listener
   ansible.builtin.template:
     src: "01-deepops-listen.conf"
@@ -13,7 +15,8 @@
     owner: "root"
     group: "root"
     mode: "0644"
-    validate: rsyslogd -N1 -f %s
+    validate: >-
+      sh -c 'f=/etc/rsyslog.d/.deepops-validate; cp "$1" "$f" && rsyslogd -N1 -f "$f"; rc=$?; rm -f "$f"; exit $rc' sh %s
   notify:
     - Reload rsyslog
 
