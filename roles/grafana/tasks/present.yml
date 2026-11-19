@@ -127,8 +127,7 @@
 - name: Install the deepops dashboards
   ansible.builtin.include_tasks: dashboards.yml
   vars:
-    grafana_dashboard_set: deepops
-    grafana_dashboard_files: "{{ grafana_dashboards | map('regex_replace', '^', role_path ~ '/../../src/dashboards/') | list }}"
+    grafana_dashboard_set: "{{ grafana_dashboard_set_own }}"
 
 # Provisioning never moves a dashboard to a changed folder, renames the folder or removes
 # a dashboard it stopped managing; this converges those (see the script).

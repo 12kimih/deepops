@@ -17,11 +17,15 @@ ROOT = Path(__file__).resolve().parents[2]
 RULES = ROOT / "roles/prometheus/files/rules"
 
 
+# Every dashboard deepops provisions, set -> files in src/dashboards/.
+SETS = yaml.safe_load((ROOT / "roles/prometheus_paths/defaults/main.yml").read_text())[
+    "grafana_dashboard_sets"
+]
+
+
 def dashboards():
-    for path in sorted([*ROOT.glob("src/dashboards/*.json"), *ROOT.glob("roles/*/files/*.json")]):
-        data = json.loads(path.read_text())
-        if isinstance(data, dict) and ("panels" in data or "rows" in data):
-            yield path.relative_to(ROOT), data
+    for path in sorted(ROOT / "src/dashboards" / name for names in SETS.values() for name in names):
+        yield path.relative_to(ROOT), json.loads(path.read_text())
 
 
 def panels(items):
@@ -51,6 +55,14 @@ class DashboardConventionTests(unittest.TestCase):
 
     def test_found(self):
         self.assertGreaterEqual(len(self.dashboards), 4)
+
+    def test_every_dashboard_file_is_provisioned_and_no_set_shares_one(self):
+        listed = [name for names in SETS.values() for name in names]
+        self.assertEqual(len(listed), len(set(listed)))
+        self.assertEqual(sorted(listed), sorted(p.name for p in (ROOT / "src/dashboards").glob("*.json")))
+        stray = [str(p.relative_to(ROOT)) for p in ROOT.glob("roles/*/files/**/*.json")
+                 if "galaxy" not in p.parts and "panels" in json.loads(p.read_text())]  # fmt: skip
+        self.assertEqual(stray, [], "dashboards live in src/dashboards/, listed in grafana_dashboard_sets")
 
     def test_names_and_uids(self):
         seen = {}

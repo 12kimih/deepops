@@ -35,11 +35,6 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 ANSIBLE = ROOT / ".venv" / "bin" / "ansible-playbook"
-DASHBOARDS = {
-    "deepops": [ROOT / "src/dashboards" / name for name in ("gpu-nodes.json", "node-exporter-hosts.json")],
-    "slurm": [ROOT / "roles/prometheus-slurm-exporter/files/slurm-scheduler.json"],
-    "slurm_metrics": [ROOT / "roles/slurm_metrics/files/slurm-gpu-allocation.json"],
-}
 TEST_PASSWORD = "smoke-test-only"
 # What a site sets for the optional parts, so those parts render (and are checked) too.
 SITE = {
@@ -229,9 +224,9 @@ class MonitoringImages(unittest.TestCase):
         # lies in the configuration the container mounts at /etc/grafana.
         dashboards = etc / default("prometheus_paths", "grafana_dashboards_dir").split("}}/", 1)[-1]
         data.mkdir()
-        for folder, files in DASHBOARDS.items():
+        for folder, names in default("prometheus_paths", "grafana_dashboard_sets").items():
             (dashboards / folder).mkdir(parents=True)
-            for path in files:
+            for path in (ROOT / "src/dashboards" / name for name in names):
                 shutil.copy(path, dashboards / folder)
                 expected.add(json.loads(path.read_text())["uid"])
         port = default("grafana", "grafana_port")

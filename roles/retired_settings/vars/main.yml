@@ -101,5 +101,6 @@ retired_settings:
   nvidia_dcgm_container_custom_metrics_file: dcgm_exporter_counters_file in roles/nvidia-dcgm-exporter
   nvidia_dcgm_svc_name: dcgm_exporter_svc_name in roles/nvidia-dcgm-exporter
   nvidia_dcgm_max_cpu: dcgm_exporter_max_cpu in roles/nvidia-dcgm-exporter
+  grafana_dashboards: grafana_dashboard_sets in roles/prometheus_paths (every set's files, under src/dashboards)
   grafana_cfg_dashboard_path: grafana_dashboards_dir in roles/prometheus_paths (configuration, under /etc)
   nfs_servers: "deepops_component_removals: [nfs] (the NFS server goes from every host outside the deploy's NFS servers) in roles/deploy_defaults"

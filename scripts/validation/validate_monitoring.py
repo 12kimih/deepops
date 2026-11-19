@@ -37,10 +37,13 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 RULES = ROOT / "roles" / "prometheus" / "files" / "rules"
+# Every dashboard deepops provisions (grafana_dashboard_sets, roles/prometheus_paths).
 DASHBOARDS = [
-    ROOT / "src" / "dashboards" / "gpu-nodes.json",
-    ROOT / "roles" / "prometheus-slurm-exporter" / "files" / "slurm-scheduler.json",
-    ROOT / "roles" / "slurm_metrics" / "files" / "slurm-gpu-allocation.json",
+    ROOT / "src" / "dashboards" / name
+    for names in yaml.safe_load((ROOT / "roles/prometheus_paths/defaults/main.yml").read_text())[
+        "grafana_dashboard_sets"
+    ].values()
+    for name in names
 ]
 # Metrics only some hardware or some exporter versions produce; their absence is no
 # failure (the panels reading them say so, the alerts reading them stay quiet).
@@ -100,8 +103,6 @@ def repo_metrics():
                         f"{path.name}:{rule.get('alert') or rule.get('record')}"
                     )
     for path in DASHBOARDS:
-        if not path.is_file():
-            continue
         dash = json.loads(path.read_text())
         panels = [p for top in dash.get("panels", []) for p in [top, *top.get("panels", [])]]
         for panel in panels:
