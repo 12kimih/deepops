@@ -22,20 +22,28 @@
   ansible.builtin.command: ldconfig
   when: updated_openmpi_ld.changed # noqa no-handler
 
-- name: Default to building openmpi
-  ansible.builtin.set_fact:
-    openmpi_build: true
-
+# The installed version names the tree to uninstall from, and is adopted once for an
+# install from before the build record (roles/build_record).
 - name: Check installed openmpi version
   ansible.builtin.shell: "{{ openmpi_install_prefix }}/bin/ompi_info | grep 'Open MPI:' | awk '{print $3}'"
   register: openmpi_info_version
-  ignore_errors: true
-  changed_when: openmpi_info_version.rc != 0
+  failed_when: false
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
-- name: Don't build openmpi if it's already installed, unless forced
+- name: Check what the installed openmpi was built from
+  ansible.builtin.include_role:
+    name: build_record
+  vars:
+    build_record_path: "{{ openmpi_build_record }}"
+    build_record_key: "{{ openmpi_build_key }}"
+    build_record_installed: ["{{ openmpi_install_prefix }}/bin/ompi_info"]
+    build_record_force: "{{ openmpi_force_rebuild }}"
+    build_record_adopt: "{{ openmpi_info_version.stdout == openmpi_version }}"
+
+- name: Decide whether openmpi needs building
   ansible.builtin.set_fact:
-    openmpi_build: false
-  when: openmpi_info_version.stdout == openmpi_version and not openmpi_force_rebuild
+    openmpi_build: "{{ build_record_stale }}"
 
 - name: Install openmpi build dependencies
   ansible.builtin.apt:
@@ -60,6 +68,47 @@
   vars:
     host_baseline_absent_packages: "{{ openmpi_distro_packages[ansible_facts.os_family] }}"
 
+# The installed build is uninstalled from the tree that installed it: its version's,
+# or the single unversioned tree of releases before per-version trees. Unpacking a new
+# release over an old tree and uninstalling from that mix misses the old files.
+- name: Find the tree the installed openmpi was built in
+  ansible.builtin.stat:
+    path: "{{ item }}/Makefile"
+    get_checksum: false
+  loop: >-
+    {{ ([openmpi_build_root ~ '/openmpi-' ~ openmpi_info_version.stdout] if openmpi_info_version.stdout | length > 0 else [])
+       + [openmpi_build_root ~ '/openmpi'] }}
+  register: openmpi_old_trees
+  when: openmpi_build
+
+- name: Uninstall the installed openmpi from its own tree
+  ansible.builtin.command:
+    argv: [make, -j, uninstall]
+    chdir: "{{ (openmpi_old_trees.results | selectattr('stat.exists') | first).item }}"
+  failed_when: false  # a tree whose configure failed has nothing to uninstall
+  changed_when: true
+  when:
+    - openmpi_build
+    - openmpi_old_trees.results | selectattr('stat.exists') | list | length > 0
+  tags:
+    - uninstall
+
+- name: Find the openmpi build trees
+  ansible.builtin.find:
+    paths: "{{ openmpi_build_root }}"
+    patterns: ["openmpi", "openmpi-*"]
+    file_type: directory
+  register: openmpi_trees
+  when: openmpi_build
+
+# This version's tree too: it is unpacked fresh, never over a failed attempt.
+- name: Remove the old openmpi build trees
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ openmpi_trees.files | map(attribute='path') | list }}"
+  when: openmpi_build
+
 - name: Make openmpi build directory
   ansible.builtin.file:
     path: "{{ openmpi_build_dir }}"
@@ -76,22 +125,6 @@
     download_dest: "/var/cache/deepops/{{ openmpi_src_url | basename }}"
     download_unpack: "{{ openmpi_build_dir }}"
     download_strip: 1
-  when: openmpi_build
-
-- name: Uninstall old openmpi version
-  ansible.builtin.command: make -j uninstall
-  args:
-    chdir: "{{ openmpi_build_dir }}"
-  failed_when: false
-  when: openmpi_build
-  tags:
-    - uninstall
-
-- name: Clean openmpi src dir
-  ansible.builtin.command: make distclean
-  args:
-    chdir: "{{ openmpi_build_dir }}"
-  failed_when: false
   when: openmpi_build
 
 - name: Configure openmpi
@@ -114,4 +147,13 @@
 
 - name: Run ldconfig to ensure libs are found
   ansible.builtin.command: "ldconfig"
+  when: openmpi_build
+
+- name: Record what openmpi was built from
+  ansible.builtin.include_role:
+    name: build_record
+    tasks_from: write
+  vars:
+    build_record_path: "{{ openmpi_build_record }}"
+    build_record_key: "{{ openmpi_build_key }}"
   when: openmpi_build
