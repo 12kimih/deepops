@@ -55,19 +55,32 @@ def parse_sinfo_node_states(output):
     return nodes
 
 
+# Flags sinfo appends to a state that mean the node cannot run a job now, whatever
+# its base state says: not responding (*), powered off or powering up or down (~ # % !),
+# rebooting or about to (@ ^), in a maintenance reservation ($).
+UNAVAILABLE_FLAGS = set("*~#%!@^$")
+
+
 def parse_sinfo_states(output):
     """Parse ``sinfo -h -N -o '%n %T'`` output into node-state counts.
 
     Returns (nodes_total, nodes_available, nodes_unavailable, states) where
-    states maps state name (lowercase, trailing '*' stripped) to a count.
+    states maps state name (lowercase, flags stripped) to a count. A node is
+    available only in a state that runs jobs AND without a flag that says it cannot
+    now: an idle* node (slurmd not responding) is unavailable.
     """
-    states = {}
-    nodes = parse_sinfo_node_states(output)
-    for state in nodes.values():
-        states[state] = states.get(state, 0) + 1
-    available_states = ("idle", "mixed", "allocated", "completing")
-    available = sum(states.get(s, 0) for s in available_states)
-    total = len(nodes)
+    states, flags = {}, {}
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] not in flags:
+            raw = parts[1].strip().lower()
+            base = normalize_sinfo_state(raw)
+            flags[parts[0]] = set(raw[len(base) :])
+            states[base] = states.get(base, 0) + 1
+            flags[parts[0]].add(base)
+    available_states = {"idle", "mixed", "allocated", "completing"}
+    available = sum(1 for f in flags.values() if f & available_states and not f & UNAVAILABLE_FLAGS)
+    total = len(flags)
     return total, available, total - available, states
 
 

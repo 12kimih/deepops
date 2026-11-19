@@ -36,6 +36,14 @@ class TestSlurmParsers(unittest.TestCase):
         self.assertIn("down", states)
         self.assertIn("drained", states)
 
+    def test_a_node_that_cannot_run_jobs_now_is_unavailable(self):
+        # Not responding, powered off, rebooting, in maintenance: unavailable whatever
+        # the base state says; a planned (-) or combined (+) node is still available.
+        out = "n1 idle*\nn2 allocated*\nn3 mixed$\nn4 idle~\nn5 mixed-\nn6 idle+\nn7 idle@\n"
+        total, avail, unavail, states = validate_slurm.parse_sinfo_states(out)
+        self.assertEqual((total, avail, unavail), (7, 2, 5))
+        self.assertEqual(states["idle"], 4)
+
     def test_sinfo_states_dedupes_partition_overlap(self):
         out = "node1 idle\nnode1 idle\n"
         total, _, _, _ = validate_slurm.parse_sinfo_states(out)

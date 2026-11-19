@@ -8,6 +8,22 @@
 # other network filesystems (find stays on / with -xdev). Run on every host and
 # compare (playbooks/utilities/security-audit.yml).
 t() { timeout 20 "$@" 2>/dev/null; }
+# count LABEL PATTERN CMD...: lines of CMD's output matching PATTERN, or "unknown" when
+# CMD did not finish or failed; a check that did not run must not read as zero.
+count() {
+  label=$1 pattern=$2; shift 2
+  out=$(timeout 60 "$@" 2>/dev/null); rc=$?
+  if [ "$rc" -eq 124 ]; then echo "$label: unknown (timed out)"
+  elif [ "$rc" -ne 0 ]; then echo "$label: unknown (rc=$rc)"
+  else printf '%s\n' "$out" | grep -c -E "$pattern" | sed "s/^/$label: /"; fi
+}
+# tfind ARGS...: find with a longer bound that says when it was cut short, so a
+# partial list never looks complete. find's own rc 1 (unreadable paths) is not a cut.
+tfind() {
+  timeout 180 find "$@" 2>/dev/null; rc=$?
+  [ "$rc" -eq 124 ] && echo "TRUNCATED: find did not finish"
+  return 0
+}
 h() { echo "### $*"; }
 # Container image layers hold whole OS trees with their own setuid and world-writable
 # files; they are not the host's, so the filesystem walks skip them.
@@ -43,19 +59,20 @@ h "8 root authorized_keys (fingerprint options)"
 if [ -f /root/.ssh/authorized_keys ]; then
   while IFS= read -r line; do
     case "$line" in ''|\#*) continue;; esac
-    opts=$(printf '%s\n' "$line" | grep -oE '^[^ ]*(from|command|restrict)[^ ]*' || true)
+    # Option names only: a command="..." may carry a secret, and this output is shared.
+    opts=$(printf '%s\n' "$line" | grep -oE '^[^ ]*(from|command|restrict)[^ ]*' | grep -oE '(from|command|restrict)' | sort -u | paste -sd, - || true)
     fp=$(printf '%s\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')
     echo "$fp ${opts:-no-options}"
   done < /root/.ssh/authorized_keys
 fi
 
 h "9 setuid/setgid files on the root filesystem outside the usual places"
-t find / -xdev \( "${PRUNE[@]}" \) -prune -o \( -perm -4000 -o -perm -2000 \) -type f -print 2>/dev/null \
+tfind / -xdev \( "${PRUNE[@]}" \) -prune -o \( -perm -4000 -o -perm -2000 \) -type f -print \
   | grep -v -E '^/(usr/(bin|sbin|lib|libexec)|bin|sbin|snap)/' | head -30
 
 h "10 world-writable files under /etc /usr /opt /var/lib (not symlinks), and world-writable dirs without sticky bit"
-t find /etc /usr /opt /var/lib -xdev \( "${PRUNE[@]}" \) -prune -o -type f -perm -0002 -print 2>/dev/null | head -20
-t find / -xdev \( "${PRUNE[@]}" \) -prune -o -type d -perm -0002 ! -perm -1000 -print 2>/dev/null | head -20
+tfind /etc /usr /opt /var/lib -xdev \( "${PRUNE[@]}" \) -prune -o -type f -perm -0002 -print | head -20
+tfind / -xdev \( "${PRUNE[@]}" \) -prune -o -type d -perm -0002 ! -perm -1000 -print | head -20
 
 h "11 NFS exports (server side)"
 t exportfs -v | tr -s ' \t' ' ' | paste -sd ';' -; echo
@@ -82,17 +99,17 @@ h "15 /home top-level directories other users can enter or read (stat only)"
 stat -c '%A %U %n' /home/* 2>/dev/null | awk 'substr($1, 8, 3) != "---" {c++; print "  " $0} END {print (c+0) " homes open to other users"}' | tail -6
 
 h "16 pending updates: security / total, reboot required, kernel"
-t apt-get -s -o Debug::NoLocking=1 dist-upgrade | grep -c '^Inst.*-security' | sed 's/^/security: /'
-t apt-get -s -o Debug::NoLocking=1 dist-upgrade | grep -c '^Inst' | sed 's/^/total: /'
+count security '^Inst.*-security' apt-get -s -o Debug::NoLocking=1 dist-upgrade
+count total '^Inst' apt-get -s -o Debug::NoLocking=1 dist-upgrade
 [ -f /var/run/reboot-required ] && echo "reboot-required: $(cat /var/run/reboot-required.pkgs 2>/dev/null | tr '\n' ' ')"
 uname -r
 
 h "17 auth failures last 24h (sshd) and fail2ban"
-t journalctl -u ssh -u sshd --since -24h --no-pager | grep -c -E 'Failed password|Invalid user' | sed 's/^/failed-ssh-24h: /'
+count failed-ssh-24h 'Failed password|Invalid user' journalctl -u ssh -u sshd --since -24h --no-pager
 t fail2ban-client status 2>/dev/null | tr '\n' ';'; echo
 
 h "18 sudo rules granting NOPASSWD (file: rule)"
-grep -rhE 'NOPASSWD' /etc/sudoers /etc/sudoers.d 2>/dev/null | grep -vE '^\s*#' | sort -u
+grep -rHE 'NOPASSWD' /etc/sudoers /etc/sudoers.d 2>/dev/null | grep -vE ':\s*#' | sort -u
 
 h "19 kernel hardening sysctls"
 for k in kernel.unprivileged_bpf_disabled kernel.kptr_restrict kernel.dmesg_restrict kernel.yama.ptrace_scope kernel.apparmor_restrict_unprivileged_userns net.ipv4.ip_forward fs.protected_symlinks fs.protected_hardlinks; do
