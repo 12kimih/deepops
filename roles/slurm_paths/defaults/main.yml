@@ -3,6 +3,9 @@
 # that installs into, configures or talks to Slurm.
 slurm_install_prefix: /usr/local
 slurm_config_dir: /etc/slurm
+# Where roles/nhc installs the node health check, for the role and for whatever runs it.
+nhc_install_dir: /usr
+nhc_program: "{{ nhc_install_dir }}/sbin/nhc"
 
 # A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
 # the controller group, slurmd on the compute group, client-only elsewhere.

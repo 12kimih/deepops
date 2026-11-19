@@ -102,6 +102,6 @@
 # A node that should have NHC and lacks it fails here, rather than passing unchecked.
 - name: Run the node health check
   ansible.builtin.command:
-    argv: [/usr/sbin/nhc]
+    argv: ["{{ nhc_program }}"]
   changed_when: false
   when: maintenance_verify_nhc | bool and not ansible_check_mode

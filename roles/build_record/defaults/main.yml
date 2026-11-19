@@ -1,0 +1,10 @@
+---
+# build_record -- whether an install from source or an installer is current. See
+# tasks/main.yml.
+build_record_path: ""  # absolute path of the record, next to what it describes
+build_record_key: ""  # one line naming everything the install is built from now
+build_record_installed: []  # paths the install must have; a missing one redoes it
+build_record_force: false  # redo it even when the record matches
+# Without a record yet: true takes what is installed to be this build (an install from
+# before records) and writes the record instead of redoing it.
+build_record_adopt: false
