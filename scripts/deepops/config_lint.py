@@ -8,9 +8,10 @@ drift      config/ mirrors config.example/: in each group_vars and host_vars fil
            have, the comment lines match in order and the same variable names appear
            (set or commented). A comment only the site needs starts with "# site:".
            Only line numbers are printed for config/, which is private.
-dead       every variable config.example sets or shows is read somewhere: a role,
-           playbook, plugin or script, another config.example value, or Kubespray.
-           A setting nothing reads misleads whoever sets it.
+dead       every variable config.example sets or shows, and every role default, is
+           read somewhere: a role, playbook, plugin or script, another value, or
+           Kubespray. A setting nothing reads misleads whoever sets it, and a default
+           left unread is usually a task that was lost.
 doc-paths  every repository path a document names (roles/..., playbooks/..., ...)
            exists, so a page never sends a reader to a file that is gone.
 shadow     no group or host has its variables in two places (all.yml beside all/, or
@@ -157,10 +158,11 @@ def check_drift():
 def check_dead():
     sources = []
     for path in tracked("roles", "playbooks", "plugins", "scripts", "config.example"):
+        # A role's templates are read whatever their suffix (a .tok, a .service).
         if (
             path.suffix in (".yml", ".yaml", ".j2", ".py", ".sh", ".lua", ".cfg", ".conf", "")
-            and path.is_file()
-        ):
+            or "templates" in path.parts
+        ) and path.is_file():
             sources.append((path, path.read_text(errors="ignore")))
     # Kubespray reads many config.example settings. Without its checkout every one of
     # them would read as dead, so a missing submodule is a failure of its own.
@@ -181,7 +183,8 @@ def check_dead():
         return [f"dead: cannot read Kubespray's variables: {k8s.stderr.strip() or 'git grep found nothing'}"]
     k8s_words = set(k8s.stdout.split())
     problems = []
-    for example in var_files(EXAMPLE):
+    role_defaults = [p for p in tracked("roles/*/defaults/main.yml") if "galaxy" not in p.parts]
+    for example in var_files(EXAMPLE) + role_defaults:
         for name, line in names(example.read_text()).items():
             if name in READ_ELSEWHERE or name in k8s_words:
                 continue

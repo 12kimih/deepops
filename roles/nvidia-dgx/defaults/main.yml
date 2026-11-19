@@ -10,7 +10,6 @@ cachefilesd_cache_dir: /raid
 cachefilesd_cache_tag: dgx1cache
 cachefilesd_cache_brun: 25%
 cachefilesd_cache_bcull: 10%
-cachefilesd_cache_dir_mode: 1775
 
 # --- DGX OS 6 (Ubuntu 22.04) ---------------------------------------------------
 dgx_os6_repo_files_url: https://repo.download.nvidia.com/baseos/ubuntu/jammy/dgx-repo-files.tgz
@@ -40,12 +39,6 @@ dgx_os7_install_driver: true
 dgx_os7_disable_unattended_upgrades: true
 
 # --- Red Hat family (EL8, EL9) -------------------------------------------------
-dgx_repo_dir: "rhel{{ ansible_facts.distribution_major_version }}"
-
-dgx_extra_packages:
-  - dgx-conf-cachefilesd
-  - kernel-headers
-
 dgx_redhat_manage_subscription_repos: true
 dgx_redhat_install_driver: true
 dgx_redhat_install_container_runtime: true

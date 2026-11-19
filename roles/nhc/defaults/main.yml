@@ -24,7 +24,6 @@ nhc_config_template: "nhc.conf.j2"
 nhc_sysconfig_template: "sysconfig_nhc.j2"
 
 nhc_force_reinstall: false
-nhc_config: "nhc.conf.j2"
 
 # Shared filesystems NHC asserts are mounted read-write, so that a node which lost one
 # is drained instead of collecting failed jobs. Derived from the NFS client mounts to
