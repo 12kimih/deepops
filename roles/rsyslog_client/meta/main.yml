@@ -1,0 +1,8 @@
+---
+# slurm_log_files, the files it forwards by default: roles/slurm_paths.
+dependencies:
+  - role: slurm_paths
+
+galaxy_info:
+  namespace: deepops
+  role_name: rsyslog_client

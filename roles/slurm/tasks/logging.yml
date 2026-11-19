@@ -1,11 +1,10 @@
 ---
-- name: Import slurm logs into rsyslog
-  ansible.builtin.template:
-    src: "etc/rsyslog.d/99-slurm.conf"
-    dest: "/etc/rsyslog.d/99-slurm.conf"
-    owner: "root"
-    group: "root"
-    mode: "0644"
+# Forwarding the Slurm logs is roles/rsyslog_client's (rsyslog_client_forward_files): this
+# file fed them into the local syslog as well, a second copy of every line.
+- name: Remove the Slurm log import into the local syslog
+  ansible.builtin.file:
+    path: /etc/rsyslog.d/99-slurm.conf
+    state: absent
   notify:
     - Restart rsyslog
 

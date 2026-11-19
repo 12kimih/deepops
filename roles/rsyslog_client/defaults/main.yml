@@ -8,3 +8,7 @@ rsyslog_client_state: present
 rsyslog_client_tcp_host: ""
 
 rsyslog_client_tcp_port: "514"
+# Log files forwarded with the syslog stream, tag -> path: Slurm's (roles/slurm_paths).
+# They are read only to be forwarded (a ruleset of their own), never written a second
+# time to the local syslog; a file a host does not have is waited for, not an error.
+rsyslog_client_forward_files: "{{ slurm_log_files }}"

@@ -8,17 +8,37 @@ the result.
 """
 
 import sys
+from pathlib import Path
 
+import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-# Values a deployment supplies. Kept here rather than in the shell harness so
-# that a template referencing an unset variable fails loudly (StrictUndefined)
-# instead of rendering an empty string and changing what is under test.
-VARS = {
-    "slurm_config_dir": "/etc/slurm",
-    "slurm_install_prefix": "/usr",
-    "slurm_user_runtime_root": "/run/slurm-users",
-}
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def role_defaults(*names):
+    """The named settings as the roles define them (their defaults may template each
+    other), so the tests render with the deployed values, never a copy of them."""
+    found = {}
+    for path in sorted(ROOT.glob("roles/*/defaults/main.yml")):
+        if "galaxy" not in path.parts:
+            found.update(yaml.safe_load(path.read_text()) or {})
+    env = Environment(undefined=StrictUndefined, autoescape=False)  # noqa: S701 (not HTML)
+
+    def resolve(value):
+        if isinstance(value, str) and "{{" in value:
+            return resolve(env.from_string(value).render(**found))
+        if isinstance(value, dict):
+            return {k: resolve(v) for k, v in value.items()}
+        return value
+
+    return {name: resolve(found[name]) for name in names}
+
+
+# Values a deployment supplies, from the roles' defaults. A template referencing a
+# variable not listed here fails loudly (StrictUndefined) instead of rendering an empty
+# string and changing what is under test.
+VARS = role_defaults("slurm_config_dir", "slurm_install_prefix", "slurm_user_runtime_root", "slurm_log_files")
 
 SCOPES = ("job", "user")
 
