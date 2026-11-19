@@ -4,7 +4,6 @@ nhc_src_url: "https://github.com/mej/nhc/releases/download/{{ nhc_version }}/lbn
 # The release tarball per version (roles/download); add one when changing nhc_version.
 nhc_checksums:
   "1.4.3": "sha256:dd752f1f2ea3a1e15412aed178562fc44a1251395c0bb4c69dfea1148750d158"
-nhc_install_dir: "/usr"
 nhc_config_dir: "/etc"
 
 nhc_libexec_dir: "/usr/libexec"
@@ -20,7 +19,11 @@ nhc_make: "make install"
 nhc_config_template: "nhc.conf.j2"
 nhc_sysconfig_template: "sysconfig_nhc.j2"
 
+# Rebuild NHC even when the installed build matches its record.
 nhc_force_reinstall: false
+# What the installed NHC was built from (roles/build_record).
+nhc_build_record: "{{ nhc_program }}.built-from"
+nhc_build_key: "nhc {{ nhc_version }}: {{ nhc_configure }}"
 
 # Shared filesystems NHC asserts are mounted read-write, so that a node which lost one
 # is drained instead of collecting failed jobs. Derived from the NFS client mounts to

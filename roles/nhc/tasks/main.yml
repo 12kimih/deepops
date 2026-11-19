@@ -12,20 +12,20 @@
   tags:
     - always
 
-- name: Default to building NHC
-  ansible.builtin.set_fact:
-    nhc_build: true
+# An nhc on disk is not ours at this version (a distribution or hand install, or an
+# older nhc_version): only the record of our last build says so.
+- name: Check what the installed NHC was built from
+  ansible.builtin.include_role:
+    name: build_record
+  vars:
+    build_record_path: "{{ nhc_build_record }}"
+    build_record_key: "{{ nhc_build_key }}"
+    build_record_installed: ["{{ nhc_program }}"]
+    build_record_force: "{{ nhc_force_reinstall }}"
 
-- name: Check if nhc is installed
-  ansible.builtin.command: ls -l {{ nhc_install_dir }}/sbin/nhc
-  register: nhc_check
-  ignore_errors: true
-  changed_when: nhc_check.rc != 0
-
-- name: Don't build if installed unless we force
+- name: Decide whether NHC needs building
   ansible.builtin.set_fact:
-    nhc_build: false
-  when: nhc_check.rc == 0 and not nhc_force_reinstall
+    nhc_build: "{{ build_record_stale }}"
 
 - name: Install build dependencies
   ansible.builtin.package:
@@ -68,6 +68,15 @@
   ansible.builtin.command: "{{ nhc_make }}"
   args:
     chdir: "{{ nhc_extract_dir }}"
+  when: nhc_build
+
+- name: Record what NHC was built from
+  ansible.builtin.include_role:
+    name: build_record
+    tasks_from: write
+  vars:
+    build_record_path: "{{ nhc_build_record }}"
+    build_record_key: "{{ nhc_build_key }}"
   when: nhc_build
 
 - name: Add deepops checks to nhc

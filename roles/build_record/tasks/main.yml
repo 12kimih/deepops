@@ -1,0 +1,64 @@
+---
+# A file that merely exists (is nhc there, does --version match) says nothing about
+# how it was built: a dependency bump, a changed configure line or an install killed
+# part-way all pass it. The record names what the install was built from and is
+# written only after the install succeeded:
+#   - ansible.builtin.include_role:
+#       name: build_record
+#     vars:
+#       build_record_path: "{{ nhc_program }}.built-from"
+#       build_record_key: "nhc {{ nhc_version }}: {{ nhc_configure }}"
+#       build_record_installed: ["{{ nhc_program }}"]
+#   - ansible.builtin.set_fact:
+#       nhc_build: "{{ build_record_stale }}"
+#   (the install, when: nhc_build)
+#   - ansible.builtin.include_role:
+#       name: build_record
+#       tasks_from: write
+#     vars: {build_record_path: ..., build_record_key: ...}
+#     when: nhc_build
+# A stale record is removed at once, so an install that stops part-way is redone on
+# the next run even when the key did not change (a forced rebuild).
+- name: Require an absolute record and a one-line key
+  ansible.builtin.assert:
+    that:
+      - build_record_path is match('/')
+      - build_record_key | length > 0
+      - build_record_key is not search('\n')
+      - build_record_installed | reject('match', '/') | list == []
+    fail_msg: build_record needs an absolute build_record_path, a one-line key and absolute installed paths.
+    quiet: true
+
+- name: Read the record {{ build_record_path }}
+  ansible.builtin.command:
+    argv: [cat, "{{ build_record_path }}"]
+  register: build_record_read
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Look for what the install must have
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: false
+  loop: "{{ build_record_installed }}"
+  register: build_record_files
+
+- name: Decide whether the install is current ({{ build_record_path | basename }})
+  ansible.builtin.set_fact:
+    build_record_stale: "{{ build_record_force | bool or _missing or (_differs and not _adopt) }}"
+    build_record_adopted: "{{ not build_record_force | bool and not _missing and _adopt }}"
+  vars:
+    _missing: "{{ build_record_files.results | rejectattr('stat.exists') | list | length > 0 }}"
+    _differs: "{{ (build_record_read.stdout | trim) != build_record_key }}"
+    _adopt: "{{ build_record_read.rc != 0 and build_record_adopt | bool }}"
+
+- name: Remove the stale record {{ build_record_path }}
+  ansible.builtin.file:
+    path: "{{ build_record_path }}"
+    state: absent
+  when: build_record_stale | bool
+
+- name: Record an install from before records
+  ansible.builtin.include_tasks: write.yml
+  when: build_record_adopted | bool
