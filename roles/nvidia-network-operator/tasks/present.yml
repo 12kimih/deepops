@@ -1,0 +1,120 @@
+---
+- name: Install the Network Operator
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: network-operator
+      namespace: "{{ nvidia_network_operator_namespace }}"
+      chart: network-operator
+      repo: "{{ nvidia_network_operator_repo }}"
+      version: "{{ nvidia_network_operator_version }}"
+      helm_values:
+        nfd:
+          enabled: "{{ nvidia_network_operator_deploy_nfd | bool }}"
+        sriovNetworkOperator:
+          enabled: true
+  run_once: true
+
+# The chart installs no NicClusterPolicy: this one deploys Multus, the CNI plugins and
+# (with nv-ipam) NVIDIA's IPAM, at the release's image tag.
+- name: Create the NicClusterPolicy
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'nicclusterpolicy.yaml') | from_yaml }}"
+  run_once: true
+
+- name: Wait for the NVIDIA IPAM CRD
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: ippools.nv-ipam.nvidia.com
+  register: nvidia_network_operator_ipam_crd
+  until: nvidia_network_operator_ipam_crd.resources | length > 0
+  retries: 30
+  delay: 10
+  when: nvidia_network_operator_ipam_type == "nv-ipam"
+  run_once: true
+
+- name: Create the IP pools
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: nv-ipam.nvidia.com/v1alpha1
+      kind: IPPool
+      metadata:
+        name: "{{ item.ip_pool_name | default(item.res_name) }}"
+        namespace: "{{ nvidia_network_operator_namespace }}"
+      spec:
+        subnet: "{{ item.ip_addr }}"
+        perNodeBlockSize: "{{ nvidia_network_operator_ipam_per_node_block_size | int }}"
+  loop: "{{ nvidia_network_operator_interfaces }}"
+  loop_control:
+    label: "{{ item.if_name }}"
+  when: nvidia_network_operator_ipam_type == "nv-ipam"
+  run_once: true
+
+- name: Create the SR-IOV node policies
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: sriovnetwork.openshift.io/v1
+      kind: SriovNetworkNodePolicy
+      metadata:
+        name: "{{ item.if_name }}"
+        namespace: "{{ nvidia_network_operator_namespace }}"
+      spec:
+        deviceType: netdevice
+        mtu: "{{ nvidia_network_operator_mtu | int }}"
+        nodeSelector:
+          "feature.node.kubernetes.io/pci-{{ nvidia_network_operator_vendor_id }}.present": "true"
+        nicSelector:
+          vendor: "{{ nvidia_network_operator_vendor_id }}"
+          pfNames: ["{{ item.pf_name }}"]
+        linkType: "{{ nvidia_network_operator_link_type }}"
+        isRdma: true
+        numVfs: "{{ nvidia_network_operator_num_vf | int }}"
+        priority: 90
+        resourceName: "{{ item.res_name }}"
+  loop: "{{ nvidia_network_operator_interfaces }}"
+  loop_control:
+    label: "{{ item.if_name }}"
+  run_once: true
+
+# One network per interface: SriovIBNetwork on InfiniBand, SriovNetwork on Ethernet.
+- name: Create the SR-IOV networks
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: sriovnetwork.openshift.io/v1
+      kind: "{{ 'SriovIBNetwork' if nvidia_network_operator_link_type == 'ib' else 'SriovNetwork' }}"
+      metadata:
+        name: "{{ item.if_name }}"
+        namespace: "{{ nvidia_network_operator_namespace }}"
+      spec: >-
+        {{ {'resourceName': item.res_name, 'networkNamespace': 'default',
+            'ipam': {'type': nvidia_network_operator_ipam_type,
+                     'poolName': item.ip_pool_name | default(item.res_name)} | to_json}
+           | combine({'linkState': 'enable'} if nvidia_network_operator_link_type == 'ib' else {}) }}
+  loop: "{{ nvidia_network_operator_interfaces }}"
+  loop_control:
+    label: "{{ item.if_name }}"
+  run_once: true
+
+- name: Install the MPI Operator
+  when: nvidia_network_operator_mpi_operator | bool
+  run_once: true
+  block:
+    - name: Fetch the MPI Operator release manifest
+      ansible.builtin.include_role:
+        name: download
+      vars:
+        download_url: "{{ nvidia_network_operator_mpi_operator_url }}"
+        download_checksum: "{{ nvidia_network_operator_mpi_operator_checksums[nvidia_network_operator_mpi_operator_version] | default('') }}"
+        download_dest: "{{ nvidia_network_operator_mpi_operator_manifest }}"
+
+    - name: Apply the MPI Operator release manifest
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ nvidia_network_operator_mpi_operator_manifest }}"
+      when: not ansible_check_mode

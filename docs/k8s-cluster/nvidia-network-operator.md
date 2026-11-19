@@ -22,7 +22,7 @@ Here are the key components that NVIDIA network operator try to deploy together:
 - SR-IOV device plugin for kubernetes
 - Helm chart for NVIDIA network operator
 
-This playbook also installs the Kubeflow MPI Operator (`mpi_operator_version`, currently v2beta1) for multi-node MPI jobs.
+This playbook also installs the Kubeflow MPI Operator (`nvidia_network_operator_mpi_operator_version`, from its checksummed release manifest; it serves the `kubeflow.org/v2beta1` MPIJob API) for multi-node MPI jobs.
 
 Currently only InfiniBand networking is supported in this implementation, RoCE networking support will be added shortly.
 
@@ -140,18 +140,17 @@ This playbook is developed and tested in following environments:
   ```
 
 5. Deploy NVIDIA Network Operator
-   Before running the playbook, set the number of virtual functions per physical function in your config (`config/group_vars/k8s-cluster.yml`), and update "roles/nvidia-network-operator/vars/main.yaml" according to your hardware and network configuration. This is what we used:
+   Before running the playbook, describe your hardware in your config
+   (`config/group_vars/k8s_cluster.yml`); every setting and its default is in
+   `roles/nvidia-network-operator/defaults/main.yml`. This is what we used:
 
    ```yaml
-   # config/group_vars/k8s-cluster.yml
+   # config/group_vars/k8s_cluster.yml
    nvidia_network_operator_num_vf: 8
-
-   # roles/nvidia-network-operator/vars/main.yaml
-   vendor_id: "15b3"
-   link_type: "ib"
-   mtu: 4096
-
-   intf_resources:
+   nvidia_network_operator_vendor_id: "15b3"   # NVIDIA (Mellanox) ConnectX
+   nvidia_network_operator_link_type: "ib"     # or eth (RoCE)
+   nvidia_network_operator_mtu: 4096
+   nvidia_network_operator_interfaces:
      - if_name: "ibs1"
        pf_name: "ibs1"
        res_name: "resibs1"
@@ -161,8 +160,12 @@ This playbook is developed and tested in following environments:
        res_name: "resibp12s0"
        ip_addr: "192.168.102.0/24"
        ...
-    ## "15b3" is Mellanox vendor code for ConnectX cards.
    ```
+
+   Node Feature Discovery comes from the GPU Operator when it is deployed (the default)
+   and from the Network Operator's chart otherwise (`nvidia_network_operator_deploy_nfd`),
+   so the nodes are never labeled by two instances. `nvidia_network_operator_state: absent`
+   removes what the playbook created.
 
    Run the playbook:
 
@@ -218,7 +221,7 @@ spec:
                   EOF
 ```
 
-"nvidia.com/resibs1" is the network resource where SR-IOV is enabled, it's also defined in "roles/nvidia-network-operator/vars/main.yaml" in this repository.
+"nvidia.com/resibs1" is the network resource where SR-IOV is enabled, it is the res_name of an entry in nvidia_network_operator_interfaces.
 
 Alternatively, a local private docker registry can also be used in an air-gapped environment where docker.io is not accessible, In following example, A docker private registry at 192.168.1.11 is used to host and manage the testing images, please refer to this docker [document](https://docs.docker.com/registry/deploying/) for more details.
 

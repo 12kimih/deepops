@@ -42,6 +42,8 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | nvidia-k8s-gpu-device-plugin | `k8s_gpu_plugin_chart_version` | `0.20.2` |  |
 | nvidia-k8s-gpu-feature-discovery | `k8s_gpu_feature_discovery_chart_version` | `0.20.2` |  |
 | nvidia-mig-manager | `mig_manager_version` | `0.15.2` |  |
+| nvidia-network-operator | `nvidia_network_operator_version` | `26.7.1` |  |
+| nvidia-network-operator | `nvidia_network_operator_mpi_operator_version` | `v0.8.2` |  |
 | nvidia_container_toolkit | `nvidia_container_toolkit_version` | `1.20.2-1` |  |
 | nvidia_hpc_sdk | `hpcsdk_major_version` | `26` |  |
 | nvidia_hpc_sdk | `hpcsdk_minor_version` | `9` |  |

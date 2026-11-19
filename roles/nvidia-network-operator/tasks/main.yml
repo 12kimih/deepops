@@ -1,0 +1,19 @@
+---
+- name: Check the Network Operator settings
+  ansible.builtin.assert:
+    that:
+      - nvidia_network_operator_state in ['present', 'absent']
+      - nvidia_network_operator_state == 'absent' or nvidia_network_operator_interfaces | length > 0
+    fail_msg: >-
+      nvidia_network_operator_state must be present or absent, and present needs
+      nvidia_network_operator_interfaces (one entry per physical function).
+    quiet: true
+
+# kubernetes.core's modules need the Kubernetes Python client on the host they run on.
+- name: Install the Kubernetes Python client
+  ansible.builtin.package:
+    name: python3-kubernetes
+    state: present
+
+- name: Put the Network Operator in its desired state
+  ansible.builtin.include_tasks: "{{ nvidia_network_operator_state }}.yml"

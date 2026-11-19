@@ -1,3 +1,43 @@
 ---
-# SR-IOV virtual functions per physical function (SriovNetworkNodePolicy numVfs).
+# NVIDIA Network Operator from its Helm chart (roles/helm_release): SR-IOV virtual
+# functions, Multus, the SR-IOV/RDMA CNIs and device plugin, and IP address management
+# for pods' InfiniBand/RoCE interfaces. https://docs.nvidia.com/networking/display/kubernetes/
+# present installs or updates it; absent removes what the role created and the release
+# (CRDs stay, as Helm leaves them).
+nvidia_network_operator_state: present
+
+# upstream: helm https://helm.ngc.nvidia.com/nvidia network-operator
+nvidia_network_operator_version: "26.7.1"
+nvidia_network_operator_repo: "https://helm.ngc.nvidia.com/nvidia"
+nvidia_network_operator_namespace: "network-operator"
+
+# Node Feature Discovery labels the nodes the operator selects (pci-15b3.present). The GPU
+# Operator deploys its own NFD, which also labels network adapters, so the chart's is
+# used only without it: two NFD instances fight over the same labels.
+nvidia_network_operator_deploy_nfd: "{{ not (deepops_gpu_operator_enabled | bool) }}"
+
+# The interfaces to give pods virtual functions of, one entry per physical function:
+#   - if_name: ibp12s0          # the network's name in pod annotations
+#     pf_name: ibp12s0          # the physical function (port) on the nodes
+#     res_name: resibp12s0      # the device-plugin resource pods request
+#     ip_addr: 192.168.101.0/24 # its address pool (nv-ipam)
+# Required when present.
+nvidia_network_operator_interfaces: []
+# Virtual functions per physical function (SriovNetworkNodePolicy numVfs).
 nvidia_network_operator_num_vf: 8
+# The adapters' PCI vendor (NVIDIA/Mellanox), link type (ib or eth) and MTU.
+nvidia_network_operator_vendor_id: "15b3"
+nvidia_network_operator_link_type: "ib"
+nvidia_network_operator_mtu: 4096
+
+# IP address management for the interfaces: nv-ipam (NVIDIA's, an IPPool per interface).
+nvidia_network_operator_ipam_type: "nv-ipam"
+nvidia_network_operator_ipam_per_node_block_size: "{{ nvidia_network_operator_num_vf }}"
+
+# The Kubeflow MPI Operator for multi-node MPI jobs, from its release manifest.
+nvidia_network_operator_mpi_operator: true
+# upstream: git https://github.com/kubeflow/mpi-operator v(\d+)\.(\d+)\.(\d+)
+nvidia_network_operator_mpi_operator_version: "v0.8.2"
+# The release asset per version, as GitHub publishes it (roles/download).
+nvidia_network_operator_mpi_operator_checksums:
+  "v0.8.2": "sha256:a7eafe901bebde1410ae0448c2d1ada214a64b2686f6aa44e74eff978573033f"

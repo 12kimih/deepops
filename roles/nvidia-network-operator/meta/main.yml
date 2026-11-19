@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: nvidia_network_operator
+  author: DeepOps
+  description: NVIDIA Network Operator (SR-IOV, RDMA, Multus, IPAM for pods) and the MPI Operator
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+dependencies:
+  - role: deploy_defaults  # deepops_gpu_operator_enabled
+  - role: retired_settings  # the role's old unprefixed setting names
