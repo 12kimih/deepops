@@ -1,0 +1,121 @@
+---
+- name: Create the TLS directory
+  ansible.builtin.file:
+    path: "{{ open_ondemand_tls_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the certificate chain
+  ansible.builtin.copy:
+    src: "{{ open_ondemand_tls_cert_src }}"
+    dest: "{{ open_ondemand_tls_dir }}/fullchain.pem"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart apache2
+
+- name: Install the private key
+  ansible.builtin.copy:
+    src: "{{ open_ondemand_tls_key_src }}"
+    dest: "{{ open_ondemand_tls_dir }}/privkey.pem"
+    decrypt: true
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false
+  no_log: true
+  notify: Restart apache2
+
+# The portal's own Listen (listen_addr_port) is the only one: Debian's ports.conf
+# would add 80 and 443.
+- name: Leave Apache's other ports closed
+  ansible.builtin.copy:
+    dest: /etc/apache2/ports.conf
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    content: |
+      # Managed by DeepOps (roles/open_ondemand). Apache listens only where the Open
+      # OnDemand portal config says (listen_addr_port in /etc/ood/config/ood_portal.yml).
+  notify: Restart apache2
+
+- name: Disable the stock sites
+  ansible.builtin.file:
+    path: "/etc/apache2/sites-enabled/{{ item }}"
+    state: absent
+  loop: [000-default.conf, default-ssl.conf]
+  notify: Restart apache2
+
+- name: Enable the Apache modules the portal needs
+  community.general.apache2_module:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ open_ondemand_apache_modules }}"
+  notify: Restart apache2
+
+- name: Configure the portal
+  ansible.builtin.template:
+    src: ood_portal.yml.j2
+    dest: /etc/ood/config/ood_portal.yml
+    owner: root
+    group: root
+    mode: "0600"
+    backup: true
+  diff: false  # holds the OIDC passphrase and the LDAP bind password
+
+- name: Configure the per-user servers
+  ansible.builtin.template:
+    src: nginx_stage.yml.j2
+    dest: /etc/ood/config/nginx_stage.yml
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+
+- name: Find the cluster files
+  ansible.builtin.find:
+    paths: /etc/ood/config/clusters.d
+    patterns: ["*.yml", "*.yaml"]
+  register: open_ondemand_cluster_files
+
+# OOD shows every file here as a cluster; only the managed one stays.
+- name: Remove cluster files the role does not manage
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ open_ondemand_cluster_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: item.path | basename != open_ondemand_cluster_name ~ '.yml'
+
+- name: Describe the Slurm cluster
+  ansible.builtin.template:
+    src: cluster.yml.j2
+    dest: "/etc/ood/config/clusters.d/{{ open_ondemand_cluster_name }}.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+# Generates ood-portal.conf and the Dex config. Exit 3 means it changed them, 4 that it
+# refused because ood-portal.conf was edited by hand; anything but 0 or 3 stops the run
+# (systemd's ExecStartPre ignores its failures, so a bad config would go unnoticed).
+- name: Generate the Apache and Dex configuration
+  ansible.builtin.command:
+    argv: ["{{ open_ondemand_portal_generator }}", --detailed-exitcodes]
+  register: open_ondemand_generate
+  changed_when: open_ondemand_generate.rc == 3
+  failed_when: open_ondemand_generate.rc not in [0, 3]
+  when: not ansible_check_mode
+  notify:
+    - Restart apache2
+    - Restart ondemand-dex
+
+- name: Start the portal and Dex
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [ondemand-dex, apache2]

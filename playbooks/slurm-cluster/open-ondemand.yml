@@ -1,0 +1,11 @@
+---
+# The Open OnDemand web portal, on the Slurm controller by default.
+- hosts: "{{ hostlist | default('slurm-master') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+  tasks:
+    - name: Install and configure Open OnDemand
+      ansible.builtin.include_role:
+        name: open_ondemand
+        public: true

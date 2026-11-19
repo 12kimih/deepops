@@ -484,3 +484,46 @@ docker_registry_mirrors: "{{ groups['slurm-master'] | map('regex_replace', '^(.*
 #slurm_enable_rsyslog_client: true
 # The server is slurm-master[0]; the clients are [slurm-node].
 rsyslog_client_tcp_host: "{{ groups['slurm-master'][0] }}"
+
+################################################################################
+# Open OnDemand (playbooks/slurm-cluster/open-ondemand.yml, roles/open_ondemand) #
+################################################################################
+#slurm_install_open_ondemand: false
+
+# The portal's public name and its one port (Apache listens nowhere else).
+#open_ondemand_servername: portal.example.com  # example
+#open_ondemand_port: 443
+
+# Certificate chain and private key under the inventory; vault the key.
+#open_ondemand_tls_cert_src: "{{ inventory_dir }}/files/tls/portal.fullchain.pem"  # example
+#open_ondemand_tls_key_src: "{{ inventory_dir }}/files/tls/portal.key"  # example
+
+# Login through Dex in front of the cluster's LDAP (required). Vault bindPW and the
+# passphrase (32+ random characters).
+#open_ondemand_dex_connectors:  # example
+#  - type: ldap
+#    id: ldap
+#    name: Cluster account
+#    config:
+#      host: ldap.example.com:636
+#      bindDN: cn=ood,ou=services,dc=example,dc=com
+#      bindPW: "{{ vault_open_ondemand_ldap_bind_password }}"
+#      userSearch:
+#        baseDN: ou=people,dc=example,dc=com
+#        filter: (objectClass=posixAccount)
+#        username: uid
+#        idAttr: uid
+#        emailAttr: mail
+#        nameAttr: cn
+#        preferredUsernameAttr: uid
+#open_ondemand_oidc_crypto_passphrase: "{{ vault_open_ondemand_oidc_crypto_passphrase }}"  # example
+
+# Directories the file browser and shell may open.
+#open_ondemand_allowlist_paths:
+#  - /home
+
+# Local web services published under a path of the portal, behind its login.
+#open_ondemand_proxied_services:  # example
+#  - path: /grafana/
+#    upstream: http://127.0.0.1:3000/
+#    user_header: X-WEBAUTH-USER

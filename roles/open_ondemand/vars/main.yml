@@ -1,0 +1,22 @@
+---
+# Every package an OOD install consists of, removed together when a broken install is
+# rebuilt.
+open_ondemand_packages_all:
+  - ondemand
+  - ondemand-dex
+  - ondemand-nginx
+  - ondemand-passenger
+  - ondemand-release-web
+  - ondemand-release-web-latest
+# Packages the role installs, pinned. nginx and passenger follow from ondemand's own
+# version-bounded dependencies.
+open_ondemand_packages:
+  - "ondemand={{ open_ondemand_version }}"
+  - "ondemand-dex={{ open_ondemand_dex_version }}"
+  - "nodejs={{ open_ondemand_nodejs_version }}"
+  - libapache2-mod-auth-openidc
+# Apache modules the generated portal config and the proxied services need.
+open_ondemand_apache_modules: [ssl, rewrite, headers, proxy, proxy_http, proxy_wstunnel, lua, auth_openidc]
+open_ondemand_portal_generator: /opt/ood/ood-portal-generator/sbin/update_ood_portal
+open_ondemand_keyring: /etc/apt/keyrings/ondemand-web.asc
+open_ondemand_nodejs_keyring: /etc/apt/keyrings/nodesource.asc

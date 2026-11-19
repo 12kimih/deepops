@@ -1,0 +1,35 @@
+---
+# {{ ansible_managed }}
+# Rendered from roles/open_ondemand; run update_ood_portal after changing it.
+servername: {{ open_ondemand_servername | to_json }}
+port: {{ open_ondemand_port | int }}
+listen_addr_port: [{{ open_ondemand_port | int }}]
+# No port-80 redirect vhost: the portal's port is the only one.
+use_rewrites: false
+ssl:
+  - 'SSLCertificateFile "{{ open_ondemand_tls_dir }}/fullchain.pem"'
+  - 'SSLCertificateKeyFile "{{ open_ondemand_tls_dir }}/privkey.pem"'
+security_strict_transport: true
+host_regex: {{ open_ondemand_host_regex | to_json }}
+# node_uri, rnode_uri and their secure_ forms stay unset: the node proxies are off.
+oidc_crypto_passphrase: {{ open_ondemand_oidc_crypto_passphrase | to_json }}
+dex:
+  connectors: {{ open_ondemand_dex_connectors | to_json }}
+{% if open_ondemand_proxied_services | length > 0 %}
+custom_vhost_directives:
+{% for header in open_ondemand_proxied_services | map(attribute='user_header', default='') | select | unique %}
+  # A client never sets the user header itself (early: before any other processing).
+  - 'RequestHeader unset {{ header }} early'
+{% endfor %}
+{% for svc in open_ondemand_proxied_services %}
+  - '<Location "{{ svc.path }}">'
+  - '  AuthType openid-connect'
+  - '  Require valid-user'
+{% if svc.user_header | default('') | length > 0 %}
+  - '  RequestHeader set {{ svc.user_header }} "expr=%{REMOTE_USER}"'
+{% endif %}
+  - '  ProxyPass "{{ svc.upstream }}" upgrade=websocket'
+  - '  ProxyPassReverse "{{ svc.upstream }}"'
+  - '</Location>'
+{% endfor %}
+{% endif %}

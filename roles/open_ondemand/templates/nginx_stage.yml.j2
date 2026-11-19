@@ -1,0 +1,6 @@
+---
+# {{ ansible_managed }}
+# Settings for the per-user servers; anything not set here keeps OOD's default.
+pun_custom_env:
+  # The file browser and shell open only these directories.
+  OOD_ALLOWLIST_PATH: {{ open_ondemand_allowlist_paths | join(':') | to_json }}

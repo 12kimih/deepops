@@ -144,6 +144,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia_power_limit
 │   ├── nvidia_versions
+│   ├── open_ondemand
 │   ├── openmpi
 │   ├── os_updates
 │   ├── package_repos

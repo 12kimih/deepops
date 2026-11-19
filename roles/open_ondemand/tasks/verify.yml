@@ -1,0 +1,24 @@
+---
+# Every run: the installed OOD packages match what was shipped. Only the conffiles the
+# role writes may differ; a missing or changed file anywhere else (like the /opt/ood
+# that once vanished while dpkg still listed the package) stops the run.
+- name: Verify the OOD packages' files
+  ansible.builtin.command:
+    argv: [dpkg, -V, ondemand, ondemand-dex, ondemand-nginx, ondemand-passenger, nodejs]
+  register: open_ondemand_verify
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Check nothing else differs
+  vars:
+    open_ondemand_unexpected: >-
+      {{ open_ondemand_verify.stdout_lines
+         | reject('regex', '\s(' ~ (open_ondemand_managed_conffiles | map('regex_escape') | join('|')) ~ ')$')
+         | list }}
+  ansible.builtin.assert:
+    that: open_ondemand_unexpected | length == 0
+    fail_msg: "Files of the OOD packages differ from the packages (dpkg -V): {{ open_ondemand_unexpected | join('; ') }}"
+    quiet: true
+  # Under --check on a host still to be installed, the packages are not there yet.
+  when: not ansible_check_mode or open_ondemand_verify.rc == 0
