@@ -19,6 +19,19 @@
   tags:
     - nfs
 
+- name: Keep the shared directories at their owner and mode
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop: "{{ nfs_shared_dirs }}"
+  loop_control:
+    label: "{{ item.path }} {{ item.mode }}"
+  tags:
+    - nfs
+
 # Starting statd needs nothing else restarted, and a restart of nfs-server on a live
 # server can hang nfsd and every client with it.
 - name: Ensure statd is enabled

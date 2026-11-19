@@ -143,6 +143,10 @@ nfs_exports:
     options: "rw,sync,root_squash,no_subtree_check"
   - path: /sw      # shared software (Spack / EasyBuild / CUDA modules)
     options: "rw,sync,root_squash,no_subtree_check"
+# Directories inside the exports the server keeps at a fixed owner and mode, e.g. a
+# shared scratch [{path: /home/shared, mode: "1777"}] (sticky: each user deletes only
+# their own files):
+#nfs_shared_dirs: []
 # Client mount options, applied to every nfs_mounts entry that does not set its own
 # `options`. A starting point -- tune per your network and storage. nconnect (parallel
 # TCP connections) is the main lever: ~4 on 10/25GbE, 8-16 on 100GbE+. On a NetApp/ONTAP
