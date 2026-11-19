@@ -29,12 +29,19 @@ options:
       - C(present) records it as present at I(version); I(items) is the whole set it now
         needs, so items only an earlier version needed become orphans.
       - C(absent) drops the component; I(items) adopts what it installed before the
-        record existed (only items no other component needs become orphans).
+        record existed (only items no other component needs become orphans). A package
+        is adopted only when I(exclusive_packages) names it: a package another role also
+        installs, unrecorded, would otherwise be removed from under it.
     type: str
     choices: [begin, present, absent]
     required: true
   items:
     description: Items as KIND:ID.
+    type: list
+    elements: str
+    default: []
+  exclusive_packages:
+    description: Packages only this component installs, which C(absent) may adopt.
     type: list
     elements: str
     default: []
@@ -75,7 +82,7 @@ def load(path):
     return data
 
 
-def apply(data, name, action, items, version):
+def apply(data, name, action, items, version, exclusive=()):
     """The new record and the orphans (a pure function, for the tests)."""
     components = dict(data["components"])
     owners = {item: set(names) for item, names in data["items"].items()}
@@ -100,7 +107,9 @@ def apply(data, name, action, items, version):
     else:
         components.pop(name, None)
         for item in items:
-            owners.setdefault(item, set()).add(name)
+            kind, _, ident = item.partition(":")
+            if kind != "package" or ident in exclusive or name in owners.get(item, ()):
+                owners.setdefault(item, set()).add(name)
         for names in owners.values():
             names.discard(name)
     orphans = sorted(item for item, names in owners.items() if not names)
@@ -123,6 +132,7 @@ def main():
             "action": {"type": "str", "required": True, "choices": ["begin", "present", "absent"]},
             "items": {"type": "list", "elements": "str", "default": []},
             "version": {"type": "str", "default": ""},
+            "exclusive_packages": {"type": "list", "elements": "str", "default": []},
         },
         supports_check_mode=True,
     )
@@ -131,7 +141,9 @@ def main():
     if bad:
         module.fail_json(msg=f"items must be KIND:ID with KIND one of {', '.join(KINDS)}: {bad}")
     data = load(p["path"])
-    record, orphans, before = apply(data, p["name"], p["action"], p["items"], p["version"])
+    record, orphans, before = apply(
+        data, p["name"], p["action"], p["items"], p["version"], set(p["exclusive_packages"])
+    )
     changed = record != data
     if changed and not module.check_mode:
         os.makedirs(os.path.dirname(p["path"]), mode=0o755, exist_ok=True)

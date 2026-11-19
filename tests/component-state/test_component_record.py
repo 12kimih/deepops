@@ -56,8 +56,19 @@ class OwnerSets(unittest.TestCase):
                 self.assertEqual(run(rec, "c", "begin", *other)[0]["components"]["c"]["state"], "installing")
 
     def test_absent_adopts_what_an_unrecorded_host_has(self):
-        rec, orphans, before = run(EMPTY, "old", "absent", ["package:ypserv"])
-        self.assertEqual((before, orphans["package"], rec), ({}, ["ypserv"], EMPTY))
+        rec, orphans, before = mod.apply(
+            EMPTY, "old", "absent", ["package:ypserv", "file:/etc/yp.conf"], "", {"ypserv"}
+        )
+        self.assertEqual(
+            (before, orphans["package"], orphans["file"], rec), ({}, ["ypserv"], ["/etc/yp.conf"], EMPTY)
+        )
+
+    def test_absent_adopts_no_package_it_was_not_told_is_its_own(self):
+        # python3-docker, unrecorded on this host, may serve a role that records nothing.
+        _, orphans, _ = run(EMPTY, "old", "absent", ["package:python3-docker"])
+        self.assertEqual(orphans["package"], [])
+        rec, _, _ = run(EMPTY, "old", "present", ["package:python3-docker"])
+        self.assertEqual(run(rec, "old", "absent")[1]["package"], ["python3-docker"], "recorded: freed")
 
     def test_adoption_never_takes_an_item_another_component_needs(self):
         rec, _, _ = run(EMPTY, "ood", "present", ["package:apache2"])
