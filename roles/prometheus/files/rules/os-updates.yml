@@ -51,3 +51,27 @@ groups:
         annotations:
           summary: "apt on {{ $labels.host }} cannot plan an upgrade, so its pending-update counts mean nothing"
           description: "`apt-get -s dist-upgrade` on the host shows why (broken sources, held or conflicting packages)."
+      # Hosts drift apart between maintenance windows: an update one node took and
+      # another held back, a package or kernel changed by hand. Unattended upgrades land
+      # on each node at its own time, so a difference counts once it outlasts a day.
+      # (roles/maintenance consistency.yml is the same comparison, run on demand.)
+      - alert: OsPackageVersionsDiffer
+        expr: count by (package) (count by (package, version) (os_updates_package_info)) > 1
+        for: 26h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.package }} is installed at {{ $value }} different versions across the hosts"
+          description: >-
+            `count by (version, host) (os_updates_package_info{package="{{ $labels.package }}"})`
+            shows which host has which; `ansible-playbook -K playbooks/utilities/apt-upgrade.yml`
+            brings them level.
+      - alert: OsKernelsDiffer
+        expr: count(count by (release) (node_uname_info)) > 1
+        for: 26h
+        labels: {severity: warning}
+        annotations:
+          summary: "The hosts run {{ $value }} different kernels"
+          description: >-
+            `count by (release, host) (node_uname_info)` shows which; a node left out of the
+            last maintenance reboot runs the old one. `ansible-playbook -K
+            playbooks/utilities/apt-upgrade.yml` reboots each into the installed kernel.

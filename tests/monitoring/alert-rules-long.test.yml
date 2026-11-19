@@ -109,6 +109,42 @@ tests:
               summary: "Update status from n1 is over 3 days old"
               description: "The os-updates metrics timer stopped: `systemctl status os-updates-metrics.timer` on the host."
 
+  - name: hosts that stay apart for over a day warn, a difference that passes does not
+    interval: 1h
+    input_series:
+      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="libfoo", version="1.1"}'
+        values: '1x40'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libfoo", version="1.0"}'
+        values: '1x40'
+      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="libbar", version="2.1"}'
+        values: '1x40'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libbar", version="2.0"}'
+        values: '1x10 stale'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libbar", version="2.1"}'
+        values: '_x11 1x29'
+      - series: 'node_uname_info{host="n1", instance="n1:9100", release="6.8.0-149-generic"}'
+        values: '1x40'
+      - series: 'node_uname_info{host="n2", instance="n2:9100", release="6.8.0-147-generic"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 20h
+        alertname: OsPackageVersionsDiffer
+        exp_alerts: []
+      - eval_time: 30h
+        alertname: OsPackageVersionsDiffer
+        exp_alerts:
+          - exp_labels: {severity: warning, package: libfoo}
+            exp_annotations:
+              summary: "libfoo is installed at 2 different versions across the hosts"
+              description: "`count by (version, host) (os_updates_package_info{package=\"libfoo\"})` shows which host has which; `ansible-playbook -K playbooks/utilities/apt-upgrade.yml` brings them level."
+      - eval_time: 30h
+        alertname: OsKernelsDiffer
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "The hosts run 2 different kernels"
+              description: "`count by (release, host) (node_uname_info)` shows which; a node left out of the last maintenance reboot runs the old one. `ansible-playbook -K playbooks/utilities/apt-upgrade.yml` reboots each into the installed kernel."
+
   - name: a broken dpkg or apt warns after an hour
     interval: 1h
     input_series:

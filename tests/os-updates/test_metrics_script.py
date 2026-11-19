@@ -39,5 +39,35 @@ class PendingSinceTests(unittest.TestCase):
             self.assertIsNone(self.run_with("exit 0\n"), "nothing pending ends it")
 
 
+class PackageInfoTests(unittest.TestCase):
+    def test_every_installed_package_is_one_series_and_removed_ones_are_not(self):
+        with tempfile.TemporaryDirectory() as d:
+            bin_, state, textfile = Path(d, "bin"), Path(d, "state"), Path(d, "textfile")
+            bin_.mkdir()
+            stubs = {
+                "dpkg": "exit 0\n",
+                "apt-get": "exit 0\n",
+                "dpkg-query": "printf 'ii |libc6:amd64|2.39-0ubuntu8.6\\nrc |oldpkg|1.0\\nii |linux-image-generic|6.8.0-149.149\\n'\n",
+            }
+            for name, body in stubs.items():
+                (bin_ / name).write_text("#!/bin/sh\n" + body)
+                (bin_ / name).chmod(0o755)
+            env = dict(os.environ, PATH=f"{bin_}:{os.environ['PATH']}", OS_UPDATES_STATE=str(state),
+                       OS_UPDATES_RUN=str(state))  # fmt: skip
+            subprocess.run(["sh", str(SCRIPT), str(textfile)], env=env, check=True, capture_output=True)
+            lines = [
+                line
+                for line in (textfile / "os-updates.prom").read_text().splitlines()
+                if line.startswith("os_updates_package_info")
+            ]
+            self.assertEqual(
+                lines,
+                [
+                    'os_updates_package_info{package="libc6:amd64",version="2.39-0ubuntu8.6"} 1',
+                    'os_updates_package_info{package="linux-image-generic",version="6.8.0-149.149"} 1',
+                ],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
