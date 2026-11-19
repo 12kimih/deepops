@@ -88,7 +88,8 @@ check("A3 --gpus-per-node", submit(t), slurm.SUCCESS)
 check("A3 stamped", t.tres_per_node, "gres/gpu:a100=4")
 t = {partition = "gpu-a100", tres_per_job = "gres/gpu=8"}
 check("A4 --gpus / -G", submit(t), slurm.SUCCESS)
-check("A4 stamped", t.tres_per_job, "gres/gpu:a100=8")
+check("A4 stamped and held per node", t.tres_per_node, "gres/gpu:a100=8")
+check("A4 on one node", t.max_nodes, 1)
 t = {partition = "gpu-h100", tres_per_task = "gres/gpu=1"}
 check("A5 --gpus-per-task", submit(t), slurm.SUCCESS)
 check("A5 stamped", t.tres_per_task, "gres/gpu:h100=1")
@@ -104,7 +105,7 @@ check("B1 default type stamped", t.gres, "gpu:a100:4")
 t = {tres_per_job = "gres/gpu=4"}
 check("B2 untyped --gpus", submit(t), slurm.SUCCESS)
 check("B2 default partition", t.partition, "gpu-a100")
-check("B2 stamped", t.tres_per_job, "gres/gpu:a100=4")
+check("B2 stamped", t.tres_per_node, "gres/gpu:a100=4")
 t = {gres = "gpu:h100:2"}
 check("B3 typed request routes by type", submit(t), slurm.SUCCESS)
 check("B3 partition from type", t.partition, "gpu-h100")
@@ -162,17 +163,21 @@ check("F2 treated as a CPU job", t.partition, "cpu,gpu-a100,gpu-h100")
 
 print("== G. scontrol update cannot strip the type back off ==")
 t = {tres_per_node = "gres/gpu=4"}
-check("G1 update to an untyped request", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
+check("G1 update to an untyped request", modify(t, {partition = "gpu-a100"}, 0), slurm.SUCCESS)
 check("G1 re-stamped from the job's partition", t.tres_per_node, "gres/gpu:a100=4")
 t = {gres = "gpu:2"}
-check("G2 update on an h100 job", modify(t, {partition = "gpu-h100"}), slurm.SUCCESS)
+check("G2 update on an h100 job", modify(t, {partition = "gpu-h100"}, 0), slurm.SUCCESS)
 check("G2 stamped", t.gres, "gpu:h100:2")
 t = {partition = "gpu-h100", gres = "gpu:2"}
-check("G3 update moves partition too", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
+check("G3 update moves partition too", modify(t, {partition = "gpu-a100"}, 0), slurm.SUCCESS)
 check("G3 uses the new partition", t.gres, "gpu:h100:2")
 t = {gres = "gpu:a100:4"}
-check("G4 already typed", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
+check("G4 already typed", modify(t, {partition = "gpu-a100"}, 0), slurm.SUCCESS)
 check("G4 unchanged", t.gres, "gpu:a100:4")
+-- Above as root, who may change a GPU job and still gets the type stamped; anyone
+-- else may not change a GPU job's GPUs at all, so nothing can strip the type off.
+t = {tres_per_node = "gres/gpu=4"}
+check("G5 a user may not change a GPU job's GPUs", modify(t, {partition = "gpu-a100", gres = "gpu:a100:2"}), slurm.ERROR)
 t = {time_limit = 120}
 check("G5 non-GPU update is a no-op", modify(t, {partition = "gpu-a100"}), slurm.SUCCESS)
 t = {gres = "gpu:4"}
@@ -196,7 +201,7 @@ check("H1 untyped on a secondary partition", submit(t), slurm.SUCCESS)
 check("H1 stamped from it", t.gres, "gpu:h100:2")
 t = {partition = "h100-debug", tres_per_job = "gres/gpu=1"}
 check("H2 third partition of the type", submit(t), slurm.SUCCESS)
-check("H2 stamped", t.tres_per_job, "gres/gpu:h100=1")
+check("H2 stamped", t.tres_per_node, "gres/gpu:h100=1")
 t = {gres = "gpu:h100:4"}
 check("H3 typed, no partition", submit(t), slurm.SUCCESS)
 check("H3 routes to every partition of the type", t.partition,
@@ -442,16 +447,15 @@ check("O9 stamped", t.gres, "gpu:a10:4")
 t = {cpus_per_task = 64, min_mem_per_node = 300000}
 check("O10 CPU job resizes freely", modify(t, CPU_REC), slurm.SUCCESS)
 check("O10 kept", t.cpus_per_task, 64)
+-- slurmctld's job record carries no task counts, so a change of GPUs or nodes cannot
+-- be checked against the tasks again: a user submits again; root may.
 t = {gres = "gpu:2"}
-check("O11 GPU count change on a GPU job", modify(t, GPU_REC), slurm.SUCCESS)
+check("O11 a user may not change a GPU job's GPUs", modify(t, GPU_REC), slurm.ERROR)
+t = {gres = "gpu:2"}
+check("O11 root may, and it is stamped", modify(t, GPU_REC, 0), slurm.SUCCESS)
 check("O11 stamped from the job's partitions", t.gres, "gpu:a10:2")
--- Fewer GPUs than the job's tasks would get past the submit check.
-t = {gres = "gpu:1"}
-local TASKS_REC = {partition = A10, gres = "gres/gpu:a10:8", tres_per_node = "gres/gpu:a10:8", num_tasks = 8}
-check("O12 GPUs cut below the job's tasks", modify(t, TASKS_REC), slurm.ERROR)
 t = {min_nodes = 1}
-local NODES_REC = {partition = A10, tres_per_node = "gres/gpu:a10:8", min_nodes = 2, num_tasks = 16}
-check("O12 nodes cut below the job's tasks", modify(t, NODES_REC), slurm.ERROR)
+check("O12 a user may not change a GPU job's nodes", modify(t, {partition = A10, tres_per_node = "gres/gpu:a10:8", min_nodes = 2}), slurm.ERROR)
 -- An all-digit type is a type: one not configured here is refused by name, never
 -- silently rewritten to the default type as an untyped count would be.
 t = {gres = "gpu:4090:2"}
@@ -475,11 +479,23 @@ shape("Q5 --gpus-per-task=2 -n 2", {tres_per_task = "gres/gpu:a10=2", num_tasks 
 shape("Q6 --gpus-per-socket without sockets refused", {tres_per_socket = "gres/gpu:a10=2"}, slurm.ERROR)
 shape("Q6 --gpus-per-socket=3 x 2 sockets refused", {tres_per_socket = "gres/gpu:a10=3", sockets_per_node = 2}, slurm.ERROR)
 check("Q7 the user is told the allowed counts", logged("1, 2, 4, 8"), true)
-t = {gres = "gpu:3"}
-check("Q8 modify to 3 per node refused", modify(t, GPU_REC), slurm.ERROR)
-t = {min_nodes = 3}
-check("Q8 modify to a node count that does not split refused",
-      modify(t, {partition = A10, tres_per_job = "gres/gpu:a10=8"}), slurm.ERROR)
+t = {tres_per_job = "gres/gpu:a10=16", min_nodes = 2}
+check("Q8 a total over -N becomes the per-node request", submit(t), slurm.SUCCESS)
+check("Q8 per node", t.tres_per_node, "gres/gpu:a10=8")
+check("Q8 the total is gone", t.tres_per_job, "")
+check("Q8 held to the nodes it was checked for", t.max_nodes, 2)
+t = {tres_per_task = "gres/gpu:a10=1", num_tasks = 4}
+check("Q9 --gpus-per-task stays on one node", submit(t), slurm.SUCCESS)
+check("Q9 one node", t.max_nodes, 1)
+shape("Q9 --gpus-per-task over nodes needs --ntasks-per-node",
+      {tres_per_task = "gres/gpu:a10=1", num_tasks = 8, min_nodes = 2}, slurm.ERROR)
+shape("Q9 with --ntasks-per-node it is even",
+      {tres_per_task = "gres/gpu:a10=1", ntasks_per_node = 4, min_nodes = 2}, slurm.SUCCESS)
+shape("Q10 no GPUs is fine", {gres = "gpu:a10:0", partition = A10}, slurm.SUCCESS)
+t = {tres_per_job = "gres/gpu:a10=12", min_nodes = 2}
+check("Q11 refused with the rule, not an internal error", submit(t), slurm.ERROR)
+check("Q11 the user reads the rule", logged("A job takes 1, 2, 4, 8 GPUs per node"), true)
+check("Q11 no internal failure", logged("failed internally"), false)
 
 print("== P. a Lua runtime error rejects instead of failing open ==")
 local broken = setmetatable({}, {__index = function() error("boom") end})
