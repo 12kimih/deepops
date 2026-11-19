@@ -1,10 +1,18 @@
 ---
 # Lock the GPU clocks to gpu_clock_lock, or reset them when gpu_clock_reset is true
-# (both set in config/group_vars/all.yml)
+# (roles/deploy_defaults; set them in config/group_vars)
 - hosts: all
   gather_facts: false
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
+    - name: Require the clocks to lock
+      ansible.builtin.assert:
+        that: gpu_clock_reset or gpu_clock_lock | length > 0
+        fail_msg: Set gpu_clock_lock ("MIN,MAX" MHz), or gpu_clock_reset true.
+        quiet: true
+
     # nvidia-smi runs in a transient unit so it still sees the GPUs where the ssh
     # service has them hidden (DeviceAllow, see login-compute-setup).
     - name: Set the gpu clock to a specified amount

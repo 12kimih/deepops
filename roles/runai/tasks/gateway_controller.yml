@@ -13,7 +13,7 @@
 
 - name: Install the Gateway API CRDs (standard channel, pinned)
   ansible.builtin.command: "{{ runai_kubectl }} apply --filename {{ runai_gateway_api_crds_url }}"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
   register: runai_gw_crds_apply
   changed_when: true
   when: runai_gw_crds_before.stdout_lines | length == 0

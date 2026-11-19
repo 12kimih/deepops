@@ -20,26 +20,18 @@ from ansible_yaml import canonical, render, same_name  # noqa: E402
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 PLAY = canonical(yaml.safe_load((ROOT / "playbooks/nvidia-software/nvidia-mig.yml").read_text()))[0]
 APPLY = next(task for task in PLAY["tasks"] if same_name(task.get("name"), "Apply MIG configuration"))
-DEFAULTS = yaml.safe_load((ROOT / "config.example/group_vars/all.yml").read_text())
+DEFAULTS = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text())
 
 
 class Hooks(unittest.TestCase):
     def render(self, values):
-        variables = {
-            "mig_manager_config": "/etc/mig/config.yml",
-            "mig_manager_profile": "all-disabled",
-            **values,
-        }
+        variables = {**DEFAULTS, **values}
         rendered = render(APPLY["command"], variables)
         return shlex.split(rendered)
 
-    def test_example_defaults_do_not_require_an_unmanaged_file(self):
-        self.assertNotIn("-k", self.render(DEFAULTS))
-
-    def test_unset_or_empty_hooks_omit_flag(self):
-        for values in ({}, {"mig_manager_hooks": ""}):
-            with self.subTest(values=values):
-                self.assertNotIn("-k", self.render(values))
+    def test_the_default_does_not_require_an_unmanaged_file(self):
+        self.assertEqual(DEFAULTS["mig_manager_hooks"], "")
+        self.assertNotIn("-k", self.render({}))
 
     def test_explicit_hooks_are_preserved_as_one_argument(self):
         # Includes a missing path: do not silently bypass an operator's hooks.

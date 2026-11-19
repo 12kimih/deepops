@@ -24,5 +24,6 @@
   tags:
     - cluster-sudoers
   roles:
+    - role: proxy_defaults
     - role: cluster_sudoers
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

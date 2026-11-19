@@ -1,0 +1,5 @@
+---
+# The automount point and the NIS map that fills it (e.g. /home and auto.home_linux);
+# the role is a no-op while either is empty.
+autofs_mount: ""
+autofs_map: ""

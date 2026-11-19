@@ -15,7 +15,7 @@
     update_cache: true
     upgrade: dist
     lock_timeout: 600
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
   when: ansible_facts.os_family == 'Debian'
 
 - name: Upgrade every package (RHEL family)

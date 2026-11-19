@@ -14,6 +14,7 @@
   tags:
     - docker-socket-group
   roles:
+    - role: proxy_defaults
     - role: docker_socket_group
-      when: docker_socket_group is defined
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+      when: docker_socket_group | length > 0
+  environment: "{{ proxy_env }}"

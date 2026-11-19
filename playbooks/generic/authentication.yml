@@ -8,17 +8,17 @@
   roles:
     - role: deploy_defaults
     - role: move-home-dirs
-      when: move_home_dirs_enable | default(false) | bool
+      when: move_home_dirs_enable | bool
     - role: kerberos_client
-      when: kerberos_client_realm_name is defined
+      when: kerberos_client_realm_name | length > 0
     # Accounts from the people roster, on the host that is the account source (the NIS
     # master). Before nis_server, whose last task publishes the changed files.
     - role: people
       when: people_manage_accounts | bool
     # Run the NIS master setup before the clients so they have a server to bind to.
     - role: nis_server
-      when: (nis_make_server | bool) and (nis_domain is defined)
+      when: (nis_make_server | bool) and (nis_domain | length > 0)
     - role: nis_client
-      when: (nis_domain is defined) and (nis_server is defined)
+      when: (nis_domain | length > 0) and (nis_server | length > 0)
     - role: autofs
-      when: (autofs_mount is defined) and (autofs_map is defined)
+      when: (autofs_mount | length > 0) and (autofs_map | length > 0)

@@ -1,4 +1,7 @@
 ---
+dependencies:
+  - role: proxy_defaults  # proxy_env, which every deploy play runs its tasks with
+
 galaxy_info:
   namespace: deepops
   role_name: deploy_defaults

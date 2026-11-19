@@ -11,7 +11,7 @@
   until: nginx_docker_cache_live_ca is succeeded
   retries: 5
   delay: 10
-  when: nginx_docker_cache_ca is not defined
+  when: nginx_docker_cache_ca | length == 0
 
 - name: Set up Ubuntu client
   ansible.builtin.include_tasks: client-ubuntu.yml

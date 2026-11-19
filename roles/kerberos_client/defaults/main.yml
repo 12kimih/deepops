@@ -1,4 +1,6 @@
 ---
+# The Kerberos realm (e.g. example.com); the role is a no-op while it is empty.
+kerberos_client_realm_name: ""
 kerberos_client_kdc_hostname: kerberos
 kerberos_client_admin_hostname: kerberos
 kerberos_client_dns_lookup_realm: false

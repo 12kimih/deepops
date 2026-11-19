@@ -2,7 +2,7 @@
 - name: Assert that the required variables are defined
   ansible.builtin.assert:
     that:
-      - dns_config_servers is defined
+      - dns_config_servers | length > 0
     fail_msg: "Set dns_config_servers in config/group_vars."
     quiet: true
 

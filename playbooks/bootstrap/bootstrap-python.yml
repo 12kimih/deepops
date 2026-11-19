@@ -3,20 +3,20 @@
 - hosts: all
   become: true
   gather_facts: false
+  roles:
+    - role: proxy_defaults
   tasks:
-    - name: Install python (no proxy)
-      ansible.builtin.raw: test -e /usr/bin/python3 || (apt -y update && apt install -y python3-minimal) || (yum install -y python3)
+    # raw runs before Python exists, so the play's environment cannot reach it: the
+    # proxy variables go on the command line.
+    - name: Install python
+      ansible.builtin.raw: >-
+        test -e /usr/bin/python3
+        || ({{ _env }} apt -y update && {{ _env }} apt install -y python3-minimal)
+        || ({{ _env }} yum install -y python3)
+      vars:
+        _env: "env {% for k, v in proxy_env.items() %}{{ k }}={{ v | quote }} {% endfor %}"
       register: output
       changed_when: output.stdout != ""
-      when: proxy_env is not defined
-
-    - name: Install python (using proxy)
-      ansible.builtin.raw: test -e /usr/bin/python3 || (https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" apt -y update && https_proxy="{{
-        https_proxy }}" http_proxy="{{ http_proxy }}" apt install -y python3-minimal) || (https_proxy="{{ https_proxy }}" http_proxy="{{ http_proxy }}" yum
-        install -y python3)
-      register: output
-      changed_when: output.stdout != ""
-      when: proxy_env is defined
 
 # Install necessary Python packages for future pip and setuptools requirements
 - hosts: all

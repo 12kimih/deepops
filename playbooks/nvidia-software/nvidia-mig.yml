@@ -1,12 +1,14 @@
 ---
 # Install the NVIDIA MIG Manager tooling on all MIG-capable nodes
 # Copy over the custom MIG config to all nodes and apply them
-# Cluster-wide config is set in config/group_vars/all.yml by mig_manager_profile
-# Per-node config can be configured in the inventory file
+# The profile is mig_manager_profile (roles/deploy_defaults; override it in
+# config/group_vars or per node)
 
 # Check if MIG capabilities and software on nodes
 - hosts: all
   become: true
+  roles:
+    - role: deploy_defaults
   tasks:
     # ansible_facts.ansible_local['gpus']['count'] comes from lspci, so it reports the GPUs the
     # node has even while the Slurm login setup hides them from ssh sessions.
@@ -74,7 +76,7 @@
         systemd-run --wait --pipe --collect --quiet --
         nvidia-mig-parted apply -f {{ mig_manager_config }}
         -c {{ mig_manager_profile }}
-        {{ ('-k ' ~ (mig_manager_hooks | quote)) if mig_manager_hooks | default('') | length > 0 else '' }}
+        {{ ('-k ' ~ (mig_manager_hooks | quote)) if mig_manager_hooks | length > 0 else '' }}
       when: has_mig.rc == 0
 
     - name: Assert MIG configuration was applied

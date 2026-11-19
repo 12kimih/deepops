@@ -18,4 +18,4 @@
     install_recommends: true  # the diagnostics (NVIDIA's install guide)
     update_cache: true
     cache_valid_time: 3600
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

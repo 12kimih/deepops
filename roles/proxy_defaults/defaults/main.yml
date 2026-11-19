@@ -1,0 +1,5 @@
+---
+# The environment tasks that reach the network run with, written once for every play
+# and role (each loads this role): e.g. {http_proxy: ..., https_proxy: ...,
+# no_proxy: ...}. Empty: no proxy. Kubespray's own plays build theirs from http_proxy.
+proxy_env: {}

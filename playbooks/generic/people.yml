@@ -15,8 +15,9 @@
     # reads files first); there authentication.yml runs the role on the master only.
     - name: Refuse to create local accounts beside a directory service
       ansible.builtin.assert:
-        that: nis_domain is not defined
+        that: nis_domain | length == 0
         fail_msg: This site uses NIS (nis_domain); accounts belong on its master, through authentication.yml.
         quiet: true
   roles:
+    - role: nis_defaults  # nis_domain
     - role: people

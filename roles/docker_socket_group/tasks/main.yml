@@ -4,9 +4,8 @@
 - name: Assert the socket group is fully specified
   ansible.builtin.assert:
     that:
-      - docker_socket_group is defined
       - (docker_socket_group | trim | length) > 0
-      - docker_socket_group_gid is defined
+      - (docker_socket_group_gid | string | length) > 0
     fail_msg: >-
       docker_socket_group is enabled but docker_socket_group / docker_socket_group_gid
       are not both set. The GID must be pinned explicitly so that it is identical on

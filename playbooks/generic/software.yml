@@ -1,18 +1,13 @@
 ---
 - hosts: all
   become: true
+  # Removal has one home, roles/host_baseline; software_remove_packages is retired.
+  roles:
+    - retired_settings
+    - role: deploy_defaults
   tasks:
-    # Removal has one home, roles/host_baseline (purged, and what still runs stopped).
-    - name: Refuse the retired removal list
-      ansible.builtin.assert:
-        that: software_remove_packages is not defined
-        fail_msg: >-
-          software_remove_packages is retired: list the packages in
-          host_baseline_absent_packages (playbooks/generic/host-baseline.yml) instead.
-        quiet: true
-
     - name: Install extra packages
       ansible.builtin.package:
         name: "{{ software_extra_packages }}"
         state: present
-      when: software_extra_packages is defined
+      when: software_extra_packages | length > 0

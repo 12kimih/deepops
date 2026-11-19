@@ -94,6 +94,8 @@
 # Install 'sshpass' program for: https://github.com/ansible/ansible/issues/56629
 - hosts: all
   gather_facts: true
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Install epel
       ansible.builtin.package:
@@ -104,7 +106,7 @@
       ansible.builtin.package:
         name: sshpass
         state: present
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
   tags:
     - bootstrap
 
@@ -114,6 +116,7 @@
 - hosts: all
   gather_facts: true
   roles:
+    - role: proxy_defaults
     - role: kubespray_defaults
   tasks:
     # Only packages a host has: dpkg cannot select one it does not know.
@@ -136,7 +139,7 @@
         - container_manager != "docker"
         - ansible_facts.distribution == "Ubuntu"
         - item in ansible_facts.packages
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
 
 # Install Kubernetes
 # for configuration, see: config/group_vars/k8s_cluster.yml
@@ -216,6 +219,8 @@
   gather_facts: false
   vars:
     ansible_become: false
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Detect ansible host platform
       ansible.builtin.command: uname -sm
@@ -267,7 +272,7 @@
         mode: "0755"
         force: true
         checksum: "sha256:https://dl.k8s.io/release/{{ kubectl_ver }}/bin/{{ kubectl_os }}/{{ kubectl_arch }}/kubectl.sha256"
-      environment: "{{ proxy_env if proxy_env is defined else {} }}"
+      environment: "{{ proxy_env }}"
       register: kubectl_host_download
       until: kubectl_host_download is succeeded
       retries: 5
@@ -280,7 +285,6 @@
 - hosts: k8s_cluster
   gather_facts: false
   vars:
-    config_dir: "../config"
     venv_dir: "{{ lookup('env', 'VIRTUAL_ENV') }}"
   tasks:
     - name: Check for kubectl in artifacts

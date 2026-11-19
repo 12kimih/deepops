@@ -20,6 +20,8 @@
 
 - hosts: all
   become: true
+  roles:
+    - role: deploy_defaults  # ngc_ready_*
   tasks:
     - name: Install docker python3 module
       ansible.builtin.apt:

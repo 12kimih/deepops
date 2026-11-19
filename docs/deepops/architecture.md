@@ -150,6 +150,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── prometheus-node-exporter
 │   ├── prometheus-slurm-exporter
 │   ├── prometheus_paths
+│   ├── proxy_defaults
 │   ├── pyxis
 │   ├── quiet_install
 │   ├── recorded_files

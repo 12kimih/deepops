@@ -2,7 +2,7 @@
 - name: Assert that the required variables are defined
   ansible.builtin.assert:
     that:
-      - kerberos_client_realm_name is defined
+      - kerberos_client_realm_name | length > 0
     fail_msg: "Set kerberos_client_realm_name in config/group_vars."
     quiet: true
 

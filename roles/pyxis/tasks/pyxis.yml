@@ -35,7 +35,7 @@
 - name: Decide whether pyxis needs building
   ansible.builtin.set_fact:
     pyxis_rebuild: >-
-      {{ slurm_pyxis_force_rebuild | default(false) | bool
+      {{ slurm_pyxis_force_rebuild | bool
          or not pyxis_installed.stat.exists
          or (pyxis_built_from.stdout | trim) != pyxis_build_key }}
   tags: pyxis

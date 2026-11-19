@@ -5,9 +5,11 @@
 # CUDA served per-version through Lmod/environment modules).
 - hosts: all
   become: true
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Install the NVIDIA CUDA toolkit
       ansible.builtin.include_role:
         name: nvidia_cuda
         public: true  # nvidia_versions (a dependency) supplies its values
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"

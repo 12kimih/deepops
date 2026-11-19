@@ -2,7 +2,8 @@
 # Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle.
 # Runs on a host with the Slurm client commands and access to Prometheus.
 # No-op until a Slack bot token (chat:write, im:write, users:read.email) is set.
-slurm_usage_report_token: "{{ slack_bot_token | default('') }}"
+slack_bot_token: ""
+slurm_usage_report_token: "{{ slack_bot_token }}"
 slurm_usage_report_channel: "#gpu-usage"
 slurm_usage_report_schedule: hourly
 slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port }}"

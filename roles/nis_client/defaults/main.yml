@@ -1,6 +1,6 @@
 ---
-# nis_client -- bind this host to an NIS (YP) domain. Required vars (no defaults, the
-# role asserts them): nis_domain and nis_server.
+# nis_client -- bind this host to an NIS (YP) domain: nis_domain and nis_server
+# (roles/nis_defaults), which the role asserts are set.
 
 # The nsswitch.conf databases this role owns, as regexp/line pairs.
 #

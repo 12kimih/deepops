@@ -43,7 +43,7 @@
          + (['--wait', '--timeout', runai_helm_timeout] if _rel.wait | default(true) else [])
          + ['--values', '-'] }}
     stdin: "{{ _rel.helm_values | to_json }}"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
   no_log: "{{ _rel.sensitive | default(false) }}"
   changed_when: true
   when: _rel_needs_change | bool

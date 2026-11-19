@@ -10,6 +10,8 @@
 # Remove the grant once the node is in the cluster: cluster_sudoers_prune deletes
 # drop-ins it did not write (roles/cluster_sudoers).
 - hosts: all
+  roles:
+    - role: proxy_defaults
   tasks:
     - name: Run setup to get ansible user
       ansible.builtin.setup: gather_subset=min
@@ -35,7 +37,7 @@
       ansible.builtin.package: name=sudo
       become: true
       become_method: "{{ method }}"
-      environment: "{{ proxy_env if proxy_env is defined else {} }}"
+      environment: "{{ proxy_env }}"
 
     # 0440 root:root is the mode sudoers files are required to have: visudo rejects
     # anything else, and the default 0644 would leave a NOPASSWD rule world-readable.

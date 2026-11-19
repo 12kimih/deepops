@@ -53,7 +53,7 @@
     update_cache: true
   register: mofed_install_ubuntu
   when: ansible_facts.distribution == "Ubuntu"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
 
 - name: Install DOCA-OFED (RHEL/Rocky)
   ansible.builtin.dnf:

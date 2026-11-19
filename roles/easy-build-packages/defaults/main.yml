@@ -1,2 +1,5 @@
 ---
+# The EasyBuild recipes to clone, and whether to build the default package set.
+sm_files_url: https://github.com/DeepOps/easybuild_files.git
+sm_install_default: true
 sm_files_repo_version: "4ef7ae6cc2284f69412a8db5e10dddd92024eeab"

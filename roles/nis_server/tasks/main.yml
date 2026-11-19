@@ -4,9 +4,8 @@
 - name: Assert nis_domain is set for the NIS master
   ansible.builtin.assert:
     that:
-      - nis_domain is defined
       - (nis_domain | trim | length) > 0
-    fail_msg: "nis_make_server is true but nis_domain is not defined (set it in group_vars)."
+    fail_msg: "nis_make_server is true but nis_domain is empty (set it in group_vars)."
 
 - name: Load OS-specific NIS server variables
   ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"

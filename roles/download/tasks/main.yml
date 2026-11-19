@@ -37,7 +37,7 @@
     checksum: "{{ download_checksum }}"
     owner: "{{ download_owner }}"
     mode: "0644"
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+  environment: "{{ proxy_env }}"
   register: download_fetch
   until: download_fetch is succeeded
   retries: "{{ download_retries }}"
