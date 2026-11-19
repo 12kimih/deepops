@@ -93,7 +93,7 @@ def main():
         )
         return 2
 
-    checks = []
+    checks, info = [], {}
 
     rc, out, _ = run(["ansible", "--version"], timeout=60)
     ansible_ok = check(
@@ -109,14 +109,18 @@ def main():
         "ansible-playbook on PATH" if shutil.which("ansible-playbook") else "missing ansible-playbook",
     )
 
-    galaxy_marker = os.path.join(root, "roles", "galaxy")
+    # The pinned collections and roles at their pinned versions, as galaxy.py --check
+    # (the same check scripts/check.sh runs) decides: a non-empty roles/galaxy proved
+    # nothing about the collections most modules come from.
+    rc, out, err = run([sys.executable, os.path.join(root, "scripts", "deepops", "galaxy.py"), "--check"],
+                       timeout=120)  # fmt: skip
     check(
         checks,
         "galaxy_dependencies_installed",
-        os.path.isdir(galaxy_marker) and bool(os.listdir(galaxy_marker)),
-        "roles/galaxy populated"
-        if os.path.isdir(galaxy_marker) and os.listdir(galaxy_marker)
-        else "run ./scripts/setup.sh to install Ansible Galaxy requirements",
+        rc == 0,
+        "collections and roles match roles/requirements.yml"
+        if rc == 0
+        else ((err or out).splitlines() or ["galaxy.py --check failed"])[0] + "; run ./scripts/setup.sh",
     )
 
     kubespray_marker = os.path.join(root, "submodules", "kubespray", "cluster.yml")
@@ -198,13 +202,10 @@ def main():
             ],
             timeout=300,
         )
-        gpu_hosts = count_positive_stdout_hosts(out) if rc == 0 else 0
-        check(
-            checks,
-            "gpus_detected_on_hosts",
-            True,
-            "%d host(s) report NVIDIA PCI devices (informational)" % gpu_hosts,
-        )
+        # Facts for the operator, not checks: they cannot fail, so they are not in
+        # "checks" (where a pass that cannot fail would mean nothing); a count that
+        # could not be read is null, not 0.
+        info["gpu_hosts"] = count_positive_stdout_hosts(out) if rc == 0 else None
 
         rc, out, _ = run(
             [
@@ -220,24 +221,20 @@ def main():
             ],
             timeout=300,
         )
-        overrides = count_positive_stdout_hosts(out) if rc == 0 else 0
-        check(
-            checks,
-            "ssh_gpu_visibility_override",
-            True,
-            "%d host(s) restrict GPU device access for SSH sessions (Slurm login "
-            "GPU hiding); on those hosts direct nvidia-smi over SSH is expected to "
-            "fail and srun is the authoritative GPU test" % overrides,
-        )
+        # Hosts that hide GPUs from SSH sessions (Slurm login GPU hiding): there a
+        # direct nvidia-smi over SSH is expected to fail and srun is the GPU test.
+        info["ssh_gpu_hiding_hosts"] = count_positive_stdout_hosts(out) if rc == 0 else None
 
     ok = all(c["ok"] for c in checks)
-    result = {"ok": ok, "checks": checks}
+    result = {"ok": ok, "checks": checks, "info": info}
 
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         for c in checks:
             print("%s %s: %s" % ("PASS" if c["ok"] else "FAIL", c["name"], c["detail"]))
+        for key, value in sorted(info.items()):
+            print("INFO %s: %s" % (key, "unknown" if value is None else value))
         print("ok=%s" % ok)
     return 0 if ok else 1
 

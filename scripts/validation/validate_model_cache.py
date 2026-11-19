@@ -6,6 +6,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import subprocess
 import sys
 
 
@@ -82,6 +83,33 @@ def validate(cache_dir, repo_id, revision, required_files):
     return result
 
 
+def validate_bounded(args, timeout):
+    """validate() in a child process, given TIMEOUT seconds. A read from a hung
+    storage mount blocks in the kernel, where no signal reaches it, so the bound has
+    to sit outside the process doing the reading: the child is abandoned, and the
+    answer is a failure that says why, not a validator that never returns."""
+    cmd = [sys.executable, "-I", str(Path(__file__).resolve()), "--_worker",
+           "--cache-dir", args.cache_dir, "--repo-id", args.repo_id, "--revision", args.revision]  # fmt: skip
+    for name in args.require_file:
+        cmd += ["--require-file", name]
+    child = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    try:
+        out, _ = child.communicate(timeout=timeout)
+        return json.loads(out)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        return {
+            "schema_version": 1, "ok": False, "repo_id": args.repo_id, "revision": args.revision,
+            "snapshot_path": None, "checked_files": [],
+            "errors": ["reading the cache did not finish in %ds; is its storage mount hung?" % timeout],
+        }  # fmt: skip
+    except ValueError:
+        return {
+            "schema_version": 1, "ok": False, "repo_id": args.repo_id, "revision": args.revision,
+            "snapshot_path": None, "checked_files": [], "errors": ["the cache check failed unexpectedly"],
+        }  # fmt: skip
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache-dir", required=True, help="Explicit HF_HUB_CACHE directory")
@@ -94,8 +122,15 @@ def main():
         help="Required nonempty file relative to snapshot; repeat for every needed file",
     )
     parser.add_argument("--json", action="store_true", help="Emit schema-versioned JSON")
+    parser.add_argument(
+        "--timeout", type=int, default=300, help="seconds the whole check may take (default: 300)"
+    )
+    parser.add_argument("--_worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    result = validate(args.cache_dir, args.repo_id, args.revision, args.require_file)
+    if args._worker:
+        print(json.dumps(validate(args.cache_dir, args.repo_id, args.revision, args.require_file)))
+        return 0
+    result = validate_bounded(args, args.timeout)
     if args.json:
         print(json.dumps(result, sort_keys=True))
     elif result["ok"]:

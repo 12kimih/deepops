@@ -220,7 +220,7 @@ def main():
             )
 
     if result["api_reachable"]:
-        rc, out, _ = run(
+        rc, out, err = run(
             [
                 "kubectl",
                 "get",
@@ -233,14 +233,16 @@ def main():
             ],
             timeout=120,
         )
+        # Zero GPU Operator pods is a valid answer (a cluster on the device plugin
+        # alone); a read that failed or could not be parsed is not, and fails.
         pods_total = pods_ready = 0
-        if rc == 0:
+        if rc != 0:
+            result["failures"].append("kubectl get pods (GPU stack) failed: %s" % (err or "rc=%s" % rc))
+        else:
             try:
                 pods_total, pods_ready = summarize_gpu_pods(json.loads(out))
             except json.JSONDecodeError:
-                # Best-effort check: unparseable pod output leaves the counts
-                # at zero; the authoritative GPU signal is gpus_allocatable.
-                pods_total = pods_ready = 0
+                result["failures"].append("could not parse kubectl pod output for the GPU stack")
         result["gpu_stack_pods_total"] = pods_total
         result["gpu_stack_pods_ready"] = pods_ready
         if pods_total and pods_ready < pods_total:

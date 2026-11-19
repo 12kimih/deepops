@@ -57,6 +57,49 @@ class ModelCacheTests(unittest.TestCase):
         self.assertEqual(result["snapshot_path"], str(self.snapshot))
         self.assertEqual(result["checked_files"], ["config.json"])
 
+    def validate(self, repo_id="example/model", revision=REVISION, files=("config.json",)):
+        sys.path.insert(0, str(SCRIPT.parent))
+        import validate_model_cache
+
+        return validate_model_cache.validate(str(self.cache), repo_id, revision, list(files))
+
+    def test_each_input_check_refuses_even_where_the_file_exists(self):
+        # Every bad input below would resolve to a real, readable file: only the input
+        # check stands between it and a "ready" verdict, so each must be the reason.
+        (self.repo / "snapshots" / "main").mkdir()
+        (self.repo / "snapshots" / "main" / "config.json").write_text("{}")
+        (self.repo / "snapshots" / "config.json").write_text("{}")
+        (self.cache / "models--model").mkdir()
+        (self.cache / "models--model" / "snapshots").mkdir()
+        (self.cache / "models--model" / "snapshots" / REVISION).mkdir()
+        (self.cache / "models--model" / "snapshots" / REVISION / "config.json").write_text("{}")
+        cases = (
+            ({"revision": "main"}, "revision must be a full"),
+            ({"files": ("../config.json",)}, "normalized relative paths"),
+            ({"repo_id": "example/../model"}, "repo_id must be"),
+        )
+        for kwargs, reason in cases:
+            with self.subTest(**kwargs):
+                result = self.validate(**kwargs)
+                self.assertFalse(result["ok"])
+                self.assertTrue(any(reason in e for e in result["errors"]), result["errors"])
+
+    def test_a_check_that_does_not_finish_fails_with_the_reason(self):
+        sys.path.insert(0, str(SCRIPT.parent))
+        import argparse
+        from unittest import mock
+
+        import validate_model_cache
+
+        real = subprocess.Popen
+        hang = [sys.executable, "-c", "import time; time.sleep(30)"]
+        args = argparse.Namespace(cache_dir=str(self.cache), repo_id="example/model", revision=REVISION,
+                                  require_file=["config.json"])  # fmt: skip
+        with mock.patch.object(validate_model_cache.subprocess, "Popen", lambda cmd, **kw: real(hang, **kw)):
+            result = validate_model_cache.validate_bounded(args, 1)
+        self.assertFalse(result["ok"])
+        self.assertIn("did not finish", result["errors"][0])
+
     def test_direct_files_supported(self):
         (self.snapshot / "weights.safetensors").write_bytes(b"weights")
         self.run_validator("--require-file", "weights.safetensors")
