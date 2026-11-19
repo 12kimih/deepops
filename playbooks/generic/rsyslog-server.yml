@@ -6,7 +6,7 @@
   roles:
     - role: deploy_defaults
     - role: rsyslog_server
-      rsyslog_server_state: "{{ deepops_components.rsyslog_server }}"
+      rsyslog_server_state: "{{ deepops_components.rsyslog_server | component_phase(deepops_phase) }}"
   tags:
     - rsyslog-server
     - rsyslog

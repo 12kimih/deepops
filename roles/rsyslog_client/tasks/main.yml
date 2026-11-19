@@ -1,9 +1,10 @@
 ---
 - name: Check the component state
   ansible.builtin.assert:
-    that: rsyslog_client_state in ['present', 'absent']
-    fail_msg: "rsyslog_client_state must be present or absent, not {{ rsyslog_client_state }}."
+    that: rsyslog_client_state in ['present', 'absent', 'kept']
+    fail_msg: "rsyslog_client_state must be present, absent or kept, not {{ rsyslog_client_state }}."
     quiet: true
 
 - name: "Make rsyslog_client {{ rsyslog_client_state }}"
   ansible.builtin.include_tasks: "{{ rsyslog_client_state }}.yml"
+  when: rsyslog_client_state != 'kept'

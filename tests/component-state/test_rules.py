@@ -63,11 +63,8 @@ class Roles(unittest.TestCase):
                 defaults = yaml.safe_load((role / "defaults/main.yml").read_text())
                 self.assertEqual(defaults.get(f"{name}_state"), "present")
                 main = (role / "tasks/main.yml").read_text()
-                explicit = REGISTRY[name].get("removal") == "explicit"
-                states = "['present', 'absent', 'kept']" if explicit else "['present', 'absent']"
-                self.assertIn(f"{name}_state in {states}", main)
-                if explicit:
-                    self.assertIn(f"{name}_state != 'kept'", main, "kept does nothing")
+                self.assertIn(f"{name}_state in ['present', 'absent', 'kept']", main)
+                self.assertIn(f"{name}_state != 'kept'", main, "kept does nothing")
                 for path in ("present", "absent"):
                     text = (role / f"tasks/{path}.yml").read_text()
                     self.assertIn("name: component_record", text, f"{path}.yml records")
@@ -94,7 +91,43 @@ class Playbooks(unittest.TestCase):
             self.assertTrue(plays, name)
             for path in plays:
                 with self.subTest(playbook=str(path.relative_to(ROOT))):
-                    self.assertIn(f'{name}_state: "{{{{ deepops_components.{name} }}}}"', path.read_text())
+                    self.assertIn(
+                        f'{name}_state: "{{{{ deepops_components.{name} | component_phase(deepops_phase) }}}}"',
+                        path.read_text(),
+                    )
+
+    def test_deploys_install_needs_first_and_remove_in_reverse(self):
+        for deploy in DEPLOYS:
+            imports = []
+            for play in yaml.safe_load((ROOT / deploy).read_text()):
+                target = play.get("import_playbook")
+                if not target:
+                    continue
+                text = (ROOT / deploy).parent.joinpath(target).read_text()
+                for name in re.findall(r"deepops_components\.(\w+)", text):
+                    imports.append((name, (play.get("vars") or {}).get("deepops_phase")))
+            with self.subTest(deploy=deploy):
+                found = {name for name, _ in imports}
+                self.assertTrue(found <= set(REGISTRY))
+                install = [n for n, phase in imports if phase == "install"]
+                remove = [n for n, phase in imports if phase == "remove"]
+                self.assertEqual(sorted(install), sorted(found), "each component installs once")
+                self.assertEqual(sorted(remove), sorted(found), "and is removed once")
+                self.assertTrue(
+                    all(phase in ("install", "remove") for _, phase in imports), "a deploy sets the phase"
+                )
+                last_install = max(i for i, (_, phase) in enumerate(imports) if phase == "install")
+                first_remove = min(i for i, (_, phase) in enumerate(imports) if phase == "remove")
+                self.assertLess(last_install, first_remove, "removal comes after every install")
+                for name in found:
+                    for need in REGISTRY[name].get("needs") or []:
+                        if need in found:
+                            self.assertLess(
+                                install.index(need), install.index(name), f"{need} installs before {name}"
+                            )
+                            self.assertLess(
+                                remove.index(name), remove.index(need), f"{name} goes before {need}"
+                            )
 
 
 class Desired(unittest.TestCase):
@@ -132,6 +165,16 @@ class Desired(unittest.TestCase):
         for wrong in (["typo"], ["plain"]):
             with self.subTest(removals=wrong), self.assertRaises(Exception):
                 want({**reg, "plain": {"rules": []}}, self.GROUPS, "n1", wrong)
+
+    def test_phases(self):
+        phase = components.component_phase
+        self.assertEqual([phase(s) for s in ("present", "absent", "kept")], ["present", "absent", "kept"])
+        self.assertEqual([phase(s, "install") for s in ("present", "absent")], ["present", "kept"])
+        self.assertEqual(
+            [phase(s, "remove") for s in ("present", "absent", "kept")], ["kept", "absent", "kept"]
+        )
+        with self.assertRaises(Exception):
+            phase("present", "later")
 
     def test_order_puts_needs_first(self):
         order = components.components_order(self.REG)

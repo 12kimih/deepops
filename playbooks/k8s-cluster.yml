@@ -358,11 +358,27 @@
   import_playbook: generic/rsyslog-server.yml
   vars:
     hostlist: k8s_cluster
+    deepops_phase: install
 
 - name: Setup rsyslog client
   import_playbook: generic/rsyslog-client.yml
   vars:
     hostlist: k8s_cluster
+    deepops_phase: install
+
+# Removal phase (docs/deepops/component-state.md): the components no longer wanted on a
+# host go, in the reverse of the install order, so nothing goes from under what needs it.
+- name: Remove the rsyslog client where it is no longer wanted
+  import_playbook: generic/rsyslog-client.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+
+- name: Remove the rsyslog server where it is no longer wanted
+  import_playbook: generic/rsyslog-server.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
 
 # Last: each host records what was deployed to it (roles/deploy_record), where the next
 # preview starts (scripts/deepops/settings.py diff).
