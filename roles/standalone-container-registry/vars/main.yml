@@ -1,0 +1,7 @@
+---
+# What the component installs, for its record (roles/component_record). The image store
+# (standalone_container_registry_data_dir) is data: never an item, never removed.
+standalone_container_registry_items:
+  - "container:{{ standalone_container_registry_name }}"
+  - "file:{{ standalone_container_registry_config_dir }}/config.yml"
+  - package:python3-docker

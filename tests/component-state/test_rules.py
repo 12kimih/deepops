@@ -86,16 +86,21 @@ class Playbooks(unittest.TestCase):
                             )
 
     def test_component_plays_take_their_state_from_the_map(self):
+        # Every play that applies a component role passes its state from the map, or kept
+        # where it applies the role for something else (the NFS client part).
+        uses = {}
+        for path in sorted((ROOT / "playbooks").rglob("*.yml")):
+            for play in yaml.safe_load(path.read_text()) or []:
+                for entry in (play or {}).get("roles") or []:
+                    if isinstance(entry, dict):
+                        uses.setdefault(entry.get("role"), []).append((path, entry))
         for name in REGISTRY:
             role = components.component_role(REGISTRY, name)
-            plays = [p for p in (ROOT / "playbooks").rglob("*.yml") if f"role: {role}\n" in p.read_text()]
-            self.assertTrue(plays, name)
-            for path in plays:
-                with self.subTest(playbook=str(path.relative_to(ROOT))):
-                    self.assertIn(
-                        f'{name}_state: "{{{{ deepops_components.{name} | component_phase(deepops_phase) }}}}"',
-                        path.read_text(),
-                    )
+            self.assertIn(role, uses, name)
+            want = f"{{{{ deepops_components.{name} | component_phase(deepops_phase) }}}}"
+            for path, entry in uses[role]:
+                with self.subTest(playbook=str(path.relative_to(ROOT)), component=name):
+                    self.assertIn(" ".join(str(entry.get(f"{name}_state")).split()), (want, "kept"))
 
     def test_deploys_install_needs_first_and_remove_in_reverse(self):
         for deploy in DEPLOYS:

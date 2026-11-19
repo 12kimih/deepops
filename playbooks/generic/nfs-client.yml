@@ -3,6 +3,7 @@
   become: true
   roles:
     - role: deploy_defaults
-    - { role: nfs, nfs_is_client: true }
+    # The client part only; the server's exports are not this play's business.
+    - { role: nfs, nfs_is_client: true, nfs_state: kept }
   tags:
     - nfs_client
