@@ -27,6 +27,9 @@ doc-vars   every setting a document tells a reader to set (`name: value`) or lis
 doc-limits every `ansible-playbook -l X playbooks/...` a document shows limits to hosts the
            play targets: -l only narrows a play's own hosts, so a group outside them
            (or one config.example/inventory does not know) runs nothing there.
+retired    no config sets a setting deepops retired (the deploy would stop on it).
+removals   deepops_component_removals names only components with removal: explicit
+           in the registry (any other name fails every deploy).
 shadow     no group or host has its variables in two places (all.yml beside all/, or
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
@@ -36,6 +39,8 @@ DEEPOPS_CONFIG_DIR selects the site config (default config/). Under the commit h
 (pre-commit sets PRE_COMMIT) the site config is read as its git repository last
 committed it, and never fixed: pre-commit stashes this repository's unstaged edits but
 never the site's, so one session's half-done edit would block every other's commit.
+The site's own commit hook (scripts/deepops/config-pre-commit.sh, installed by
+scripts/setup.sh) passes what it is committing as DEEPOPS_SITE_REV.
 """
 
 import os
@@ -68,26 +73,29 @@ def tracked(*patterns):
     return [ROOT / p for p in out.stdout.split("\0") if p]
 
 
-def committed_site():
-    """Whether to read CONFIG as committed: the commit hook runs and CONFIG is a git
-    repository with at least one commit (a fresh one has nothing committed to read yet)."""
+def site_rev():
+    """The revision of CONFIG to read, or None for its working tree. The site's own
+    commit hook (scripts/deepops/config-pre-commit.sh) passes what is being committed
+    (DEEPOPS_SITE_REV, a tree); our commit hook reads the site as committed (HEAD), when
+    CONFIG has a commit (a fresh repository has nothing committed to read yet)."""
+    if os.environ.get("DEEPOPS_SITE_REV"):
+        return os.environ["DEEPOPS_SITE_REV"]
     if not (os.environ.get("PRE_COMMIT") and (CONFIG / ".git").exists()):
-        return False
+        return None
     head = subprocess.run(
         ["git", "rev-parse", "-q", "--verify", "HEAD"],
         cwd=CONFIG,
         capture_output=True,
         env=settings.CLEAN_ENV,
     )
-    return head.returncode == 0
+    return "HEAD" if head.returncode == 0 else None
 
 
 def configs():
     """(label, Tree, private) for config.example and, when present, the site config."""
     out = [("config.example", settings.Tree(EXAMPLE, tracked_only=False), False)]
     if CONFIG.is_dir():
-        rev = "HEAD" if committed_site() else None
-        out.append(("config", settings.Tree(CONFIG, rev=rev, tracked_only=False), True))
+        out.append(("config", settings.Tree(CONFIG, rev=site_rev(), tracked_only=False), True))
     return out
 
 
@@ -421,6 +429,28 @@ def check_retired():
     return problems
 
 
+REGISTRY_FILE = ROOT / "roles" / "deploy_defaults" / "vars" / "main.yml"
+
+
+def check_removals():
+    """deepops_component_removals may name only components with removal: explicit in
+    the registry; any other name fails every deploy (plugins/filter/components.py). A
+    config that names one before the code defining it lands breaks deploys at once."""
+    registry = settings.load(REGISTRY_FILE.read_text())["deepops_component_registry"]
+    explicit = {name for name, c in registry.items() if (c or {}).get("removal") == "explicit"}
+    problems = []
+    for label, tree, _ in configs():
+        for src in settings.Config(tree).sources:
+            for e in src.entries:
+                if e.active and e.name == "deepops_component_removals" and isinstance(e.value, list):
+                    problems += [
+                        f"removals: {label}/{src.rel}:{e.line}: {name} is not a component with removal: explicit"
+                        for name in e.value
+                        if name not in explicit
+                    ]
+    return problems
+
+
 def check_shadow():
     problems = []
     for label, tree, _ in configs():
@@ -455,6 +485,7 @@ CHECKS = {
     "doc-limits": check_doc_limits,
     "shadow": check_shadow,
     "retired": check_retired,
+    "removals": check_removals,
 }
 
 

@@ -77,6 +77,23 @@ class Retired(Configs):
         self.assertEqual(found, ["retired: config/group_vars/all.yml:2: old_site is retired: set x instead"])
 
 
+class Removals(Configs):
+    def test_only_explicit_removal_components_may_be_named(self):
+        self.write(
+            "#deepops_component_removals: [ghost]\n", "deepops_component_removals: [drv, plain, ghost]\n"
+        )
+        registry = (
+            "deepops_component_registry:\n  drv: {rules: [], removal: explicit}\n  plain: {rules: []}\n"
+        )
+        (Path(self.tmp.name) / "registry.yml").write_text(registry)
+        with mock.patch.object(cl, "REGISTRY_FILE", Path(self.tmp.name) / "registry.yml"):
+            found = cl.check_removals()
+        self.assertEqual(found, [
+            "removals: config/group_vars/all.yml:1: plain is not a component with removal: explicit",
+            "removals: config/group_vars/all.yml:1: ghost is not a component with removal: explicit",
+        ])  # fmt: skip
+
+
 class Redundant(Configs):
     def test_a_restated_default_is_reported_and_fixed(self):
         self.write("x: 1\nz: b\n", "# site: kept on purpose\nx: 1\ny: [1, 2]\nz: b\n")
