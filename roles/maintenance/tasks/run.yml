@@ -1,0 +1,21 @@
+---
+# The steps in maintenance_steps, in order, for each node of a batch. A node that
+# fails stops its own steps at once (it is never resumed), but the run stops only
+# after the other nodes of its batch finish theirs: failing it on the spot would end
+# the play for every node mid-step, leaving a node rebooted and never verified.
+- name: Run the maintenance steps
+  block:
+    - name: Run the step
+      ansible.builtin.include_tasks: "{{ step }}.yml"
+      loop: "{{ maintenance_steps }}"
+      loop_control:
+        loop_var: step
+  rescue:
+    - name: Note why the node failed
+      ansible.builtin.set_fact:
+        maintenance_failure: "{{ ansible_failed_task.name }}: {{ ansible_failed_result.msg | default('failed') }}"
+
+- name: Fail the node, now that its batch is done
+  ansible.builtin.fail:
+    msg: "{{ inventory_hostname }} stays drained. {{ maintenance_failure }}"
+  when: maintenance_failure is defined

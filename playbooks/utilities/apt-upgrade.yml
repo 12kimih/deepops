@@ -26,11 +26,10 @@
     - name: Take the node out, upgrade it and put it back
       ansible.builtin.include_role:
         name: maintenance
-        tasks_from: "{{ step }}"
-      loop: "{{ ['drain', 'upgrade', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
-                else ['upgrade', 'reboot', 'verify'] }}"
-      loop_control:
-        loop_var: step
+        tasks_from: run
+      vars:
+        maintenance_steps: "{{ ['drain', 'upgrade', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
+                              else ['upgrade', 'reboot', 'verify'] }}"
 
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true

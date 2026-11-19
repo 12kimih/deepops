@@ -11,7 +11,9 @@
 #   verify   the node is healthy again: slurmd, GPUs, DCGM diagnostics, NHC
 #   resume   return the node to Slurm, only if this run drained it
 #
-# playbooks/utilities/apt-upgrade.yml runs them one node at a time;
+# run.yml runs a list of them (maintenance_steps) so that a failed node stops the run
+# only once its batch is done. playbooks/utilities/apt-upgrade.yml runs them one node
+# at a time;
 # playbooks/utilities/reboot.yml runs the reboot step alone.
 
 # Slurm commands run on the controller.

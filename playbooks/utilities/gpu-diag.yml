@@ -20,10 +20,8 @@
     - name: Take the node out, test its GPUs and put it back
       ansible.builtin.include_role:
         name: maintenance
-        tasks_from: "{{ step }}"
-      loop: [drain, verify, resume]
-      loop_control:
-        loop_var: step
+        tasks_from: run
       vars:
+        maintenance_steps: [drain, verify, resume]
         maintenance_reason: "maintenance: GPU diagnostics"
         maintenance_verify_dcgm_level: 3  # -e maintenance_verify_dcgm_level=N wins (extra vars)
