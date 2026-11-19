@@ -140,13 +140,12 @@
   import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
   when: slurm_enable_monitoring
 
+# Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
-  when: slurm_enable_rsyslog_server
 
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog client
   import_playbook: generic/rsyslog-client.yml
-  when: slurm_enable_rsyslog_client
 
 - name: Set Permissions to adjust GPU Clocks speeds
   import_playbook: utilities/gpu-clocks.yml

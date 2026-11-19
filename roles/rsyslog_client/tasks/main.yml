@@ -1,15 +1,9 @@
 ---
-- name: Ensure rsyslog is installed
-  ansible.builtin.package:
-    name: rsyslog
-    state: present
+- name: Check the component state
+  ansible.builtin.assert:
+    that: rsyslog_client_state in ['present', 'absent']
+    fail_msg: "rsyslog_client_state must be present or absent, not {{ rsyslog_client_state }}."
+    quiet: true
 
-- name: Configure syslog forwarding
-  ansible.builtin.template:
-    src: "99-forward-syslog.conf"
-    dest: "/etc/rsyslog.d/99-forward-syslog.conf"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  notify:
-    - Restart rsyslog
+- name: "Make rsyslog_client {{ rsyslog_client_state }}"
+  ansible.builtin.include_tasks: "{{ rsyslog_client_state }}.yml"

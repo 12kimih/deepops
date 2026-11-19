@@ -1,0 +1,17 @@
+---
+# The components a deploy converges, each with the switches and groups that make it
+# present (docs/deepops/component-state.md, plugins/filter/components.py). Structure,
+# not settings: sites turn the switches in roles/deploy_defaults/defaults/main.yml.
+# Components move here batch by batch; one not listed is still installed by its switch.
+deepops_component_registry:
+  rsyslog_server:
+    rules:
+      - {switch: "{{ slurm_enable_rsyslog_server }}", group: slurm-master, first: true}
+      - {switch: "{{ kube_enable_rsyslog_server }}", group: kube_control_plane, first: true}
+  rsyslog_client:
+    rules:
+      - {switch: "{{ slurm_enable_rsyslog_client }}", group: slurm-node}
+      - {switch: "{{ kube_enable_rsyslog_client }}", group: k8s_cluster}
+
+# This host's desired state of each component: present or absent.
+deepops_components: "{{ deepops_component_registry | components_desired(groups, inventory_hostname) }}"
