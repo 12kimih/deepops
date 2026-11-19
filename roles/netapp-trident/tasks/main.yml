@@ -25,10 +25,13 @@
   run_once: true
 
 - name: Download and extract Trident installer
-  ansible.builtin.unarchive:
-    src: "{{ trident_installer_url }}"
-    dest: "{{ deepops_dir }}"
-    remote_src: true
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ trident_installer_url }}"
+    download_checksum: "{{ trident_checksums[trident_version] | default('') }}"
+    download_dest: "/var/cache/deepops/trident-installer-{{ trident_version }}.tar.gz"
+    download_unpack: "{{ deepops_dir }}"
   when: create_backends or copy_tridentctl_to_localhost
   run_once: true
 

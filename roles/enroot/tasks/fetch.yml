@@ -1,0 +1,20 @@
+---
+- name: Fetch an enroot release file
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ enroot_release_base_url }}/{{ item }}"
+    download_checksum: "{{ enroot_checksums[item] | default('') }}"
+    download_dest: "/var/cache/deepops/{{ item }}"
+  loop: "{{ _enroot_files }}"
+
+# Under --check a file not fetched yet is not there to install.
+- name: Note whether every release file is here
+  ansible.builtin.stat:
+    path: "/var/cache/deepops/{{ item }}"
+  loop: "{{ _enroot_files }}"
+  register: enroot_fetched
+
+- name: Remember it
+  ansible.builtin.set_fact:
+    enroot_fetched_all: "{{ enroot_fetched.results | rejectattr('stat.exists') | list | length == 0 }}"

@@ -46,19 +46,34 @@
   check_mode: false  # read-only; --check needs the result
 
 # Install NVIDIA MIG Manager Systemd service
-- name: Install MIG Manager (apt)
-  ansible.builtin.apt:
-    deb: "{{ mig_manager_url_deb }}"
+- name: Install MIG Manager
   when:
     - has_mig.rc == 0
     - has_mig_parted.rc != 0
-    - ansible_facts.os_family == "Debian"
+  vars:
+    mig_manager_url: "{{ mig_manager_url_deb if ansible_facts.os_family == 'Debian' else mig_manager_url_rpm }}"
+    mig_manager_file: "/var/cache/deepops/{{ mig_manager_url | basename }}"
+  block:
+    - name: Fetch the MIG Manager release file
+      ansible.builtin.include_role:
+        name: download
+      vars:
+        download_url: "{{ mig_manager_url }}"
+        download_checksum: "{{ mig_manager_checksums[mig_manager_url | basename] | default('') }}"
+        download_dest: "{{ mig_manager_file }}"
 
-- name: Install MIG Manager (dnf)
-  ansible.builtin.dnf:
-    name: "{{ mig_manager_url_rpm }}"
-    state: present
-  when:
-    - has_mig.rc == 0
-    - has_mig_parted.rc != 0
-    - ansible_facts.os_family == "RedHat"
+    # Under --check a file not fetched yet is not there to install.
+    - name: Install MIG Manager (apt)
+      ansible.builtin.apt:
+        deb: "{{ mig_manager_file }}"
+      when:
+        - ansible_facts.os_family == "Debian"
+        - not (ansible_check_mode and download_fetch is changed)
+
+    - name: Install MIG Manager (dnf)
+      ansible.builtin.dnf:
+        name: "{{ mig_manager_file }}"
+        state: present
+      when:
+        - ansible_facts.os_family == "RedHat"
+        - not (ansible_check_mode and download_fetch is changed)

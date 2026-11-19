@@ -1,0 +1,18 @@
+---
+# These names each had a copy per role; a site still setting one would now be
+# ignored without a word.
+- name: Refuse a retired repository setting
+  ansible.builtin.assert:
+    that: item is not defined
+    fail_msg: "{{ item }} is retired: set package_repos_cuda_base, package_repos_cuda_release or package_repos_epel_* (roles/package_repos) instead."
+    quiet: true
+  loop:
+    - nvidia_driver_ubuntu_cuda_keyring_url
+    - nvidia_driver_ubuntu_cuda_repo_baseurl
+    - nvidia_driver_rhel_cuda_repo_baseurl
+    - nvidia_driver_rhel_cuda_repo_gpgkey
+    - nvidia_driver_ubuntu_repo_release
+    - nvidia_cuda_ubuntu_repo_release
+    - nvidia_dcgm_ubuntu_repo_release
+    - epel_package
+    - epel_key_url

@@ -1,0 +1,25 @@
+---
+# download -- fetch one file over the network and verify it before anything uses it.
+# Every role that downloads goes through here (include_role: download):
+#
+#   download_url        what to fetch
+#   download_checksum   "sha256:<hex>" (or another algorithm get_url knows), required.
+#                       The calling role keeps a table of the files it may fetch next
+#                       to their versions and passes `table[key] | default('')`, so a
+#                       version bump stops with a clear message until its checksum is
+#                       added.
+#   download_dest       where to keep the file (its directory is created)
+#   download_unpack     optional: a directory to unpack the archive into
+#   download_strip      leading path components to drop when unpacking
+#   download_owner      the owner of the kept file (root)
+#
+# A file already at download_dest with the right checksum is not fetched again, and
+# a mirror (an airgap) works unchanged: the checksum does not depend on the URL.
+download_url: ""
+download_checksum: ""
+download_dest: ""
+download_unpack: ""
+download_strip: 0
+download_owner: root
+download_retries: 5
+download_delay: 10

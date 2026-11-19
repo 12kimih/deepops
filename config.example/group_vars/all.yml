@@ -135,8 +135,9 @@ deepops_set_hostname: true
 #    server: '{{ groups["slurm-master"][0] }}'
 #    path: /export/shared
 
-# Extra Packages for Enterprise Linux (RHEL/CentOS)
-epel_package: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
+# Extra Packages for Enterprise Linux (roles/package_repos; set for a mirror)
+#package_repos_epel_release: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
+#package_repos_epel_key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}"
 
 ################################################################################
 # PEOPLE                                                                       #

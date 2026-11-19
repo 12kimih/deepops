@@ -6,6 +6,9 @@
 openmpi_version: 5.0.10
 openmpi_tag: "v{{ openmpi_version.split('.')[0] }}.{{ openmpi_version.split('.')[1] }}"
 openmpi_src_url: "https://download.open-mpi.org/release/open-mpi/{{ openmpi_tag }}/openmpi-{{ openmpi_version }}.tar.bz2"
+# Per version, as published on open-mpi.org (roles/download).
+openmpi_checksums:
+  "5.0.10": "sha256:0acecc4fc218e5debdbcb8a41d182c6b0f1d29393015ed763b2a91d5d7374cc6"
 openmpi_build_dir: /tmp/openmpi-build
 openmpi_install_prefix: /usr/local
 # Default builds OpenMPI's bundled (internal) PMIx. On 5.0.x that bundled PMIx is

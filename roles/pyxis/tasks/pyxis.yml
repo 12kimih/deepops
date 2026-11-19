@@ -15,17 +15,17 @@
   register: pyxis_installed
   tags: pyxis
 
-- name: Copy pyxis source
-  ansible.builtin.unarchive:
-    src: "{{ slurm_pyxis_tarball_url }}"
-    remote_src: true
-    dest: /usr/local/src/pyxis
-    extra_opts:
-      - --strip-components=1
-  register: pyxis_download
-  until: pyxis_download is succeeded
-  retries: 5
-  delay: 10
+- name: Fetch and unpack the Pyxis source
+  ansible.builtin.include_role:
+    name: download
+    apply:
+      tags: pyxis
+  vars:
+    download_url: "{{ slurm_pyxis_tarball_url }}"
+    download_checksum: "{{ slurm_pyxis_checksums[slurm_pyxis_version] | default('') }}"
+    download_dest: "/var/cache/deepops/pyxis-{{ slurm_pyxis_version }}.tar.gz"
+    download_unpack: /usr/local/src/pyxis
+    download_strip: 1
   when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   tags: pyxis
 

@@ -151,18 +151,15 @@
     mode: "0755"
   when: slurm_build
 
-- name: Download source
-  ansible.builtin.unarchive:
-    src: "{{ slurm_src_url }}"
-    remote_src: true
-    dest: "{{ slurm_build_dir }}"
-    extra_opts:
-      - --strip-components=1
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
-  register: slurm_download
-  until: slurm_download is succeeded
-  retries: 5
-  delay: 10
+- name: Fetch and unpack the Slurm source
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ slurm_src_url }}"
+    download_checksum: "{{ slurm_checksums[slurm_version] | default('') }}"
+    download_dest: "/var/cache/deepops/{{ slurm_src_url | basename }}"
+    download_unpack: "{{ slurm_build_dir }}"
+    download_strip: 1
   when: slurm_build
 
 - name: Clean src dir

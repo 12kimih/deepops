@@ -44,18 +44,12 @@
   when: not ebsw_exe.matched
 
 - name: "Download bootstrap script"
-  ansible.builtin.get_url:
-    url: "{{ item.url }}"
-    dest: "{{ item.dest }}"
-    mode: "u=rwx,g=rwx,o=rx"
-    force: true
-  register: eb_bootstrap_download
-  until: eb_bootstrap_download is succeeded
-  retries: 5
-  delay: 10
-  with_items:
-    - url: "{{ eb_bootstrap_url }}"
-      dest: "/tmp"
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ eb_bootstrap_url }}"
+    download_checksum: "{{ eb_bootstrap_checksum }}"
+    download_dest: /tmp/bootstrap_eb.py
   when: not ebsw_exe.matched
 
 #

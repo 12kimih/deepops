@@ -201,30 +201,23 @@ reference host; distribution repositories remain a separate prerequisite.
    hpcsdk_download_url: "http://package-server/downloads/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz"
    ```
 
-   Add `enroot_release_base_url` to `config/group_vars/all.yml`. On
-   Enterprise Linux, also override `epel_package` and `epel_key_url`; several
-   default roles import the EPEL key directly, so mirroring packages alone is
-   insufficient.
+   Add `enroot_release_base_url` to `config/group_vars/all.yml`. The
+   third-party package repositories come from `roles/package_repos`: on
+   Enterprise Linux set `package_repos_epel_release` and
+   `package_repos_epel_key` to the mirrored EPEL release package and key.
 
    DCGM needs no separate file mirror: the `nvidia_dcgm` role installs
    `dcgm_pkg_name` (`datacenter-gpu-manager`) from the CUDA package
    repository, so it is covered by the CUDA repository mirror below — verify
    the DCGM package is present in the mirrored CUDA repo content.
 
-   The default Slurm configuration also enables CUDA installation, whose
-   Ubuntu and Enterprise Linux tasks fetch the CUDA repository and its
-   signing material from `developer.download.nvidia.com`. Mirroring the CUDA
-   packages alone does not redirect these tasks. On Ubuntu, the role uses
-   `nvidia_driver_ubuntu_cuda_keyring_url` only to install the keyring package;
-   it does **not** use `nvidia_driver_ubuntu_cuda_repo_baseurl` to write an APT
-   source. The keyring package writes an upstream source that must be replaced
-   on every target as shown in step 5. On Enterprise Linux, override both
-   repository variables after mirroring the metadata and GPG key:
-
-   - `nvidia_driver_ubuntu_cuda_keyring_url` (Ubuntu, plus the target-side APT
-     source replacement in step 5)
-   - `nvidia_driver_rhel_cuda_repo_baseurl` and
-     `nvidia_driver_rhel_cuda_repo_gpgkey` (Enterprise Linux)
+   The default Slurm configuration also enables CUDA installation from
+   NVIDIA's CUDA repository. Set `package_repos_cuda_base` to the mirror of
+   `https://developer.download.nvidia.com/compute/cuda/repos` (same layout
+   below it): the role installs the cuda-keyring from there, checks it
+   against `package_repos_cuda_keyring_checksums`, and points the APT source
+   (Ubuntu) or the dnf repository (Enterprise Linux) at the mirror. No step
+   on the targets is needed.
 
    Either mirror and override every enabled dependency or explicitly disable
    the optional component. Do not silently fall back to its public URL.
@@ -670,81 +663,13 @@ nvidia_container_toolkit_rpm_repo_url: "http://package-server/repos/nvidia-conta
 docker_insecure_registries:
   - "registry-host:5000"
 
-# CUDA repository mirror (required by the default Slurm path; see below)
-nvidia_driver_ubuntu_cuda_keyring_url: "http://package-server/repos/developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb"
-nvidia_driver_rhel_cuda_repo_baseurl: "http://package-server/repos/cuda-rhel9-x86_64/"
-nvidia_driver_rhel_cuda_repo_gpgkey: "http://package-server/keys/cuda-rhel9-D42D0685.pub"
+# CUDA repository mirror (required by the default Slurm path)
+package_repos_cuda_base: "http://package-server/repos/developer.download.nvidia.com/compute/cuda/repos"
 
 # EPEL mirror (Enterprise Linux; key import fails offline without this)
-epel_package: "http://package-server/repos/epel-release-latest-9.noarch.rpm"
-epel_key_url: "http://package-server/keys/RPM-GPG-KEY-EPEL-9"
+package_repos_epel_release: "http://package-server/repos/epel-release-latest-9.noarch.rpm"
+package_repos_epel_key: "http://package-server/keys/RPM-GPG-KEY-EPEL-9"
 ```
-
-For Ubuntu 24.04, prepare **every target** before running the Slurm playbook or
-any play that includes `nvidia_cuda` or `nvidia_dcgm`. Replace
-`package-server` with the real internal host first. These commands install the
-mirrored keyring, remove the public source that package creates, write the
-internal `cuda-compute-repo.list`, update that source in isolation, and then
-prove the complete APT update resolves no public NVIDIA host before allowing a
-normal update:
-
-```bash
-(
-  set -euo pipefail
-  task_cuda_repo_url='http://package-server/repos/developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64'
-  task_cuda_keyring_url="${task_cuda_repo_url}/cuda-keyring_1.1-1_all.deb"
-
-  case "${task_cuda_repo_url}" in
-    *package-server*|https://developer.download.nvidia.com/*|http://developer.download.nvidia.com/*)
-      echo 'ERROR: set task_cuda_repo_url to the internal CUDA mirror' >&2
-      exit 1
-      ;;
-  esac
-
-  task_cuda_keyring_deb=$(mktemp)
-  task_apt_uris=$(mktemp)
-  trap 'rm -f "${task_cuda_keyring_deb}" "${task_apt_uris}"' EXIT
-  curl -fsSL "${task_cuda_keyring_url}" -o "${task_cuda_keyring_deb}"
-  test -s "${task_cuda_keyring_deb}"
-  sudo dpkg -i "${task_cuda_keyring_deb}"
-
-  if [ -e /etc/apt/sources.list.d/cuda-ubuntu2404-x86_64.list ]; then
-    sudo mv --backup=numbered -- \
-      /etc/apt/sources.list.d/cuda-ubuntu2404-x86_64.list \
-      /etc/apt/sources.list.d/cuda-ubuntu2404-x86_64.list.disabled
-  fi
-  printf 'deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] %s /\n' \
-    "${task_cuda_repo_url%/}" |
-    sudo tee /etc/apt/sources.list.d/cuda-compute-repo.list >/dev/null
-
-  sudo apt-get \
-    -o Dir::Etc::sourcelist='sources.list.d/cuda-compute-repo.list' \
-    -o Dir::Etc::sourceparts='-' update
-
-  apt-get --print-uris update | tee "${task_apt_uris}"
-  task_public_nvidia_urls=$(
-    sed -n "s/^'\(https\?:\/\/[^']*\)'.*/\1/p" "${task_apt_uris}" |
-      awk -F/ '{ host = tolower($3); sub(/:.*/, "", host) }
-                host == "developer.download.nvidia.com" ||
-                host == "repo.download.nvidia.com" ||
-                host == "nvidia.github.io" { print }'
-  )
-  if [ -n "${task_public_nvidia_urls}" ]; then
-    printf 'ERROR: public NVIDIA APT URL still resolves:\n%s\n' \
-      "${task_public_nvidia_urls}" >&2
-    exit 1
-  fi
-  sudo apt-get update
-)
-```
-
-Use the matching repository directory and keyring-generated source filename on
-another Ubuntu release. Keep all other APT sources internal too: the final
-`apt-get update` intentionally checks the complete target configuration, which
-is what the role will update. Retain the
-`nvidia_driver_ubuntu_cuda_keyring_url` override so the role finds the mirrored
-package; do not set `nvidia_driver_ubuntu_cuda_repo_baseurl` expecting it to
-redirect APT.
 
 For Slurm, disable the default pull-through registry cache when upstream
 Docker Hub is unreachable. If using the site's registry, the smallest honest

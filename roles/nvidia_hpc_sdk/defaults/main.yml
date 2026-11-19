@@ -42,6 +42,10 @@ hpcsdk_file_version: "20{{ hpcsdk_major_version }}_{{ hpcsdk_major_version }}{{ 
 hpcsdk_download_name: "nvhpc_{{ hpcsdk_file_version }}_Linux_{{ hpcsdk_arch }}_cuda_{{ hpcsdk_file_cuda }}"
 hpcsdk_version_dir: "{{ hpcsdk_major_version }}.{{ hpcsdk_minor_version }}"
 hpcsdk_download_url: "https://developer.download.nvidia.com/hpc-sdk/{{ hpcsdk_version_dir }}/{{ hpcsdk_download_name }}.tar.gz"
+# Per tarball (roles/download). NVIDIA publishes no checksum for it: record the
+# sha256sum of a copy you trust, e.g. "nvhpc_..._cuda_13.1.tar.gz": "sha256:<hex>".
+# Until then the role stops before downloading.
+hpcsdk_checksums: {}
 
 # Directories for download
 hpcsdk_temp_dir: "/tmp/hpc-sdk-install"

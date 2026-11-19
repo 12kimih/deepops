@@ -82,6 +82,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── docker-login
 │   ├── docker-rootless
 │   ├── docker_socket_group
+│   ├── download
 │   ├── easy-build
 │   ├── easy-build-packages
 │   ├── enroot
@@ -125,6 +126,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia_power_limit
 │   ├── openmpi
 │   ├── os_updates
+│   ├── package_repos
 │   ├── people
 │   ├── prometheus
 │   ├── prometheus-ipmi-exporter

@@ -3,6 +3,9 @@
 
 # Version of the Trident installer package to download when tridentctl is needed
 trident_version: "26.02.1"
+# Per version, as GitHub publishes for the release asset (roles/download).
+trident_checksums:
+  "26.02.1": "sha256:6dfc08a6d92496eb09fb132eafd14abef9b9f9980500fbf50f8338f5cd11ada3"
 trident_installer_url: "https://github.com/NetApp/trident/releases/download/v{{ trident_version }}/trident-installer-{{ trident_version }}.tar.gz"
 
 # Official Trident Helm chart settings

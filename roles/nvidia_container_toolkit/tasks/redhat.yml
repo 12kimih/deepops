@@ -5,18 +5,24 @@
     state: present
   when: nvidia_container_toolkit_repo_base_url | length > 0
 
+- name: Red Hat | refuse the retired repository file setting
+  ansible.builtin.assert:
+    that: nvidia_container_toolkit_rpm_repo_url is not defined
+    fail_msg: "nvidia_container_toolkit_rpm_repo_url is retired: set nvidia_container_toolkit_repo_base_url (a mirror) instead."
+    quiet: true
+
+# Written here, as NVIDIA's .repo file defines it: the repository metadata is signed
+# (repo_gpgcheck), the packages are not.
 - name: Red Hat | configure NVIDIA Container Toolkit Yum repository
-  ansible.builtin.get_url:
-    url: "{{ nvidia_container_toolkit_rpm_repo_url }}"
-    dest: "{{ nvidia_container_toolkit_yum_repo_path }}"
-    owner: root
-    group: root
-    mode: "0644"
+  ansible.builtin.yum_repository:
+    name: nvidia-container-toolkit
+    file: nvidia-container-toolkit
+    description: nvidia-container-toolkit
+    baseurl: "{{ nvidia_container_toolkit_repo_base_url }}/stable/rpm/$basearch"
+    gpgkey: "{{ nvidia_container_toolkit_repo_gpg_url }}"
+    repo_gpgcheck: true
+    gpgcheck: false
   register: nvidia_container_toolkit_yum_repo
-  until: nvidia_container_toolkit_yum_repo is succeeded
-  retries: 5
-  delay: 10
-  environment: "{{ proxy_env if proxy_env is defined else {} }}"
 
 - name: Red Hat | install NVIDIA Container Toolkit
   ansible.builtin.dnf:

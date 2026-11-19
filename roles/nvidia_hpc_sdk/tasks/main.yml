@@ -33,28 +33,15 @@
     - "{{ hpcsdk_temp_dir }}"
     - "{{ hpcsdk_install_dir }}"
 
-- name: Download nvidia hpc sdk
+- name: Fetch and unpack the HPC SDK
   when: not nvhpc_localrc.stat.exists
-  ansible.builtin.get_url:
-    url: "{{ hpcsdk_download_url }}"
-    dest: "{{ hpcsdk_dest_download_path }}"
-    mode: "0444"
-  register: hpcsdk_download
-  until: hpcsdk_download is succeeded
-  retries: 5
-  delay: 10
-
-- name: Extract archive
-  when: not nvhpc_localrc.stat.exists
-  ansible.builtin.unarchive:
-    src: "{{ hpcsdk_dest_download_path }}"
-    dest: "{{ hpcsdk_temp_dir }}"
-    remote_src: true
-    creates: "{{ hpcsdk_temp_dir }}/{{ hpcsdk_download_name }}/install"
-  register: hpcsdk_extract
-  until: hpcsdk_extract is succeeded
-  retries: 5
-  delay: 10
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ hpcsdk_download_url }}"
+    download_checksum: "{{ hpcsdk_checksums[hpcsdk_download_url | basename] | default('') }}"
+    download_dest: "{{ hpcsdk_dest_download_path }}"
+    download_unpack: "{{ hpcsdk_temp_dir }}"
 
 - name: Run the installer
   when: not nvhpc_localrc.stat.exists
