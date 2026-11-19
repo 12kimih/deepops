@@ -14,9 +14,11 @@
         state: absent
       when: standalone_container_registry_docker.stat.exists
 
+    # The configuration (it holds the upstream credentials) goes; the image store
+    # (standalone_container_registry_data_dir) is data and stays.
     - name: Remove the registry configuration
       ansible.builtin.file:
-        path: "{{ standalone_container_registry_config_dir }}"
+        path: "{{ standalone_container_registry_config_dir }}/config.yml"
         state: absent
 
     - name: Stop here; the registry belongs elsewhere
