@@ -100,3 +100,19 @@
         nvidia-mig-parted assert -f {{ mig_manager_config }}
         -c {{ mig_manager_profile }}
       when: has_mig.rc == 0
+
+    # The CDI specification lists the MIG devices, and nvidia-cdi-refresh does not
+    # follow a MIG change (cdi-support.html, known limitations): regenerate it.
+    - name: Look for the NVIDIA CDI refresh service
+      ansible.builtin.stat:
+        path: /lib/systemd/system/nvidia-cdi-refresh.service
+      register: mig_cdi_refresh
+      when: has_mig.rc == 0
+
+    - name: Regenerate the CDI specification for the MIG layout
+      ansible.builtin.systemd:
+        name: nvidia-cdi-refresh.service
+        state: restarted
+      when:
+        - has_mig.rc == 0
+        - mig_cdi_refresh.stat.exists
