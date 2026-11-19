@@ -383,9 +383,9 @@ Performing these component-based upgrades does not require updating the DeepOps 
 To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version, with the checksum of its source tarball (the download stops without one; take it from a source independent of the download site, such as a distribution's package sources):
 
 ```yaml
-slurm_version: 26.05.6
+slurm_version: "<version>"
 slurm_checksums:
-  "26.05.6": "sha512:<checksum of slurm-26.05.6.tar.bz2>"
+  "<version>": "sha512:<checksum of slurm-<version>.tar.bz2>"
 ```
 
 Then re-run the Slurm playbook:
@@ -469,13 +469,13 @@ ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wish to use, with the checksum of every file they download (the download stops without one). GitHub publishes them with each release's assets:
 
 ```yaml
-slurm_pyxis_version: "0.24.0"
+slurm_pyxis_version: "<version>"
 slurm_pyxis_checksums:
-  "0.24.0": "sha256:<checksum of the v0.24.0 source archive>"
-enroot_version: "4.2.0"
+  "<version>": "sha256:<checksum of the v<version> source archive>"
+enroot_version: "<version>"
 enroot_checksums:
-  "enroot_4.2.0-1_amd64.deb": "sha256:<checksum>"
-  "enroot+caps_4.2.0-1_amd64.deb": "sha256:<checksum>"
+  "enroot_<version>-1_amd64.deb": "sha256:<checksum>"
+  "enroot+caps_<version>-1_amd64.deb": "sha256:<checksum>"
 ```
 
 `enroot_checksums` names each release file of the packages and architectures your hosts install (`roles/enroot/defaults/main.yml` lists the current ones); a setting in your config replaces the role's whole list.
