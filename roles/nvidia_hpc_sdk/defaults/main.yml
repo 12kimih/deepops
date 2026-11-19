@@ -41,6 +41,11 @@ hpcsdk_install_type: "single"
 hpcsdk_file_version: "20{{ hpcsdk_major_version }}_{{ hpcsdk_major_version }}{{ hpcsdk_minor_version }}"
 hpcsdk_download_name: "nvhpc_{{ hpcsdk_file_version }}_Linux_{{ hpcsdk_arch }}_cuda_{{ hpcsdk_file_cuda }}"
 hpcsdk_version_dir: "{{ hpcsdk_major_version }}.{{ hpcsdk_minor_version }}"
+# The version tree, and the record of what it was installed from (roles/build_record)
+# beside it, outside the tree an unfinished install is removed with.
+hpcsdk_tree: "{{ hpcsdk_install_dir }}/Linux_{{ hpcsdk_arch }}/{{ hpcsdk_version_dir }}"
+hpcsdk_install_record: "{{ hpcsdk_tree }}.built-from"
+hpcsdk_install_key: "{{ hpcsdk_download_name }} {{ hpcsdk_install_type }} cuda {{ hpcsdk_default_cuda }}"
 hpcsdk_download_url: "https://developer.download.nvidia.com/hpc-sdk/{{ hpcsdk_version_dir }}/{{ hpcsdk_download_name }}.tar.gz"
 # Per tarball (roles/download). NVIDIA publishes no checksum for it: record the
 # sha256sum of a copy you trust, e.g. "nvhpc_..._cuda_13.1.tar.gz": "sha256:<hex>".
