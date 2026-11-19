@@ -15,8 +15,6 @@ slurm_exporter_enabled: true
 slurm_install_prefix: /usr/local
 slurm_config_dir: /etc/slurm
 
-prometheus_config_dir: /etc/prometheus
-prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
 slurm_exporter_conf_template: "slurm-exporter.yml.j2"
 
 slurm_exporter_host_group: slurm-metric

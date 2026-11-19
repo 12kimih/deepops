@@ -1,0 +1,8 @@
+---
+# prometheus_config_dir and prometheus_cfg_endpoint_dir come from roles/prometheus_paths.
+dependencies:
+  - role: prometheus_paths
+
+galaxy_info:
+  namespace: deepops
+  role_name: prometheus
