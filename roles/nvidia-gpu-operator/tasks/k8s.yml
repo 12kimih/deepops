@@ -1,18 +1,25 @@
 ---
-# Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
-# module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
-- name: Install gpu-operator helm repo
-  ansible.builtin.command: /usr/local/bin/helm repo add nvidia "{{ gpu_operator_helm_repo }}"
-  changed_when: false
-
-- name: Update helm repos
-  ansible.builtin.command: /usr/local/bin/helm repo update
-  changed_when: false
-
-- name: Install nvidia gpu operator
-  ansible.builtin.command: /usr/local/bin/helm upgrade --install "{{ gpu_operator_release_name }}" "{{ gpu_operator_chart_name }}" --version "{{
-    gpu_operator_chart_version }}" --create-namespace --namespace {{ gpu_operator_namespace }} --set driver.version="{{ gpu_operator_driver_version }}" --set
-    mig.strategy="{{ k8s_gpu_mig_strategy | lower }}" --set driver.enabled="{{ gpu_operator_enable_driver | lower }}" --set toolkit.enabled="{{
-    gpu_operator_enable_toolkit | lower }}" --set dcgm.enabled="{{ gpu_operator_enable_dcgm | lower }}" --set migManager.enabled="{{
-    gpu_operator_enable_migmanager | lower }}" --wait
-  changed_when: false
+# One Helm release in its desired state, through the shared helm_release role (a
+# converged rerun changes nothing).
+- name: Install the NVIDIA GPU Operator
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ gpu_operator_release_name }}"
+      namespace: "{{ gpu_operator_namespace }}"
+      chart: "{{ gpu_operator_chart_name }}"
+      repo: "{{ gpu_operator_helm_repo }}"
+      version: "{{ gpu_operator_chart_version }}"
+      helm_values:
+        driver:
+          version: "{{ gpu_operator_driver_version }}"
+          enabled: "{{ gpu_operator_enable_driver | bool }}"
+        mig:
+          strategy: "{{ k8s_gpu_mig_strategy | lower }}"
+        toolkit:
+          enabled: "{{ gpu_operator_enable_toolkit | bool }}"
+        dcgm:
+          enabled: "{{ gpu_operator_enable_dcgm | bool }}"
+        migManager:
+          enabled: "{{ gpu_operator_enable_migmanager | bool }}"

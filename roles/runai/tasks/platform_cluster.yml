@@ -42,9 +42,11 @@
     or runai_cluster_current.chart | default('') != 'runai-cluster-' ~ runai_chart_version
 
 - name: Install the Run:ai cluster
-  ansible.builtin.include_tasks: helm_release.yml
+  ansible.builtin.include_role:
+    name: helm_release
   vars:
-    _rel:
+    helm_bin: "{{ runai_helm }}"
+    helm_release:
       release: "{{ runai_cluster_release_name }}"
       namespace: "{{ runai_cluster_namespace }}"
       chart: "{{ runai_cluster_chart }}"

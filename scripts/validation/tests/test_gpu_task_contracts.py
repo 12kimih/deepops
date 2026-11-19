@@ -64,6 +64,11 @@ def gpu_commands(path):
     pairs = []
     for task in tasks(path):
         command = task.get("command", task.get("shell"))
+        # The same command in any form: a string, cmd:, or an argv list.
+        if isinstance(command, dict):
+            command = command.get("cmd") or command.get("argv")
+        if isinstance(command, list):
+            command = " ".join(str(arg) for arg in command)
         if isinstance(command, str) and (
             "nvidia-smi" in command
             or "nvidia-mig-parted apply" in command
