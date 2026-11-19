@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-CONFIG = Path(os.environ.get("CONFIG_DIR", ROOT / "config"))
+CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
 spec = importlib.util.spec_from_file_location("people_filter", ROOT / "plugins" / "filter" / "people.py")
 people = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(people)

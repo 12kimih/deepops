@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-CONFIG = Path(os.environ.get("CONFIG_DIR", ROOT / "config"))
+CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
 
 
 class Loader(yaml.SafeLoader):

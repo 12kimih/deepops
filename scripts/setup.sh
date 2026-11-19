@@ -13,7 +13,8 @@ ROOT_DIR="${SCRIPT_DIR}/.."
 
 # Configuration (Python and tool versions live in pyproject.toml / uv.lock, collections
 # and Galaxy roles in roles/requirements.yml)
-CONFIG_DIR="${CONFIG_DIR:-${ROOT_DIR}/config}"            # Default configuration directory location
+# The site config directory; every tool reads DEEPOPS_CONFIG_DIR (scripts/common.sh too).
+CONFIG_DIR="${DEEPOPS_CONFIG_DIR:-${ROOT_DIR}/config}"
 DEEPOPS_TAG="${1:-master}"                      # DeepOps branch to set up
 KUBESPRAY_PYTHON="${KUBESPRAY_PYTHON:-3.13}"    # Newest Python the pinned Kubespray supports
 
@@ -125,7 +126,7 @@ fi
 
 # Install the Galaxy collections and roles (roles/requirements.yml, then config/requirements.yml)
 echo "Installing Ansible Galaxy collections and roles..."
-CONFIG_DIR="${CONFIG_DIR}" uv run scripts/deepops/galaxy.py >/dev/null || { echo "ERROR: Galaxy install failed" >&2; exit 1; }
+DEEPOPS_CONFIG_DIR="${CONFIG_DIR}" uv run scripts/deepops/galaxy.py >/dev/null || { echo "ERROR: Galaxy install failed" >&2; exit 1; }
 
 # Update submodules
 if command -v git &> /dev/null ; then

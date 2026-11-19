@@ -24,7 +24,9 @@ class VaultShow(unittest.TestCase):
         base = Path(self.tmp.name)
         (base / "pass").write_text("test-password\n")
         self.env = dict(
-            os.environ, CONFIG_DIR=str(base / "config"), ANSIBLE_VAULT_PASSWORD_FILE=str(base / "pass")
+            os.environ,
+            DEEPOPS_CONFIG_DIR=str(base / "config"),
+            ANSIBLE_VAULT_PASSWORD_FILE=str(base / "pass"),
         )
         for d in ("group_vars", "host_vars"):
             (base / "config" / d).mkdir(parents=True)
