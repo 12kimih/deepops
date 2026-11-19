@@ -20,5 +20,5 @@
     name: rsyslog
     state: restarted
   when:
-    - component_record_removed.file | length > 0
+    - component_record_result.orphans.file | length > 0
     - rsyslog_client_rsyslog.status.LoadState | default('not-found') == 'loaded'

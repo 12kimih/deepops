@@ -22,9 +22,11 @@ mofed_repo_keys:
   Debian:
     url: https://linux.mellanox.com/public/repo/doca/public_keys/nvidia-doca-debian-gpg-public-key.gpg
     checksum: "sha256:2367ec42f81ddf785040cc410b03d861d9eb2c75c35ff859d98ce4494944f4e0"
+    dest: /usr/share/keyrings/nvidia-doca.gpg
   RedHat:
     url: https://linux.mellanox.com/public/repo/doca/public_keys/nvidia-doca-rpm-gpg-public-key.asc
     checksum: "sha256:833f5dd328f6170206ee6ea6df669d0aafecc9f947cbbb2af8c97571396dd976"
+    dest: /etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-doca
 mofed_repo_key_fingerprint: "70454E6BF5D9C2D3B78709E8DC726C5E41B9CC50"
 
 # The DOCA-Host profile to install. doca-ofed = OFED drivers/libs/tools (MLNX_OFED

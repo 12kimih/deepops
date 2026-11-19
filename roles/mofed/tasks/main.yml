@@ -60,25 +60,61 @@
     - mofed_installed_version.stdout | length > 0
     - mofed_installed_version.stdout is version('2.6', '<')
 
-# --- The repository, signed by the "NVIDIA DOCA Host" key (roles/package_repos) ---
-- name: Add the DOCA repository
+# --- The repository, signed by the "NVIDIA DOCA Host" key ---
+- name: Fetch the repository signing key
   ansible.builtin.include_role:
-    name: package_repos
-    tasks_from: repo
+    name: download
   vars:
-    package_repos_repo:
-      name: nvidia-doca
-      uris: "{{ mofed_repo_base_url }}"
-      suites: ["./"]
-      key_url: "{{ mofed_repo_keys[ansible_facts.os_family].url }}"
-      key_checksum: "{{ mofed_repo_keys[ansible_facts.os_family].checksum }}"
-      key_fingerprint: "{{ mofed_repo_key_fingerprint }}"
-      # The Mellanox key and entries that signed DOCA before 3.2.2.
-      legacy_files:
-        - /usr/share/keyrings/mellanox-doca.asc
-        - /etc/apt/sources.list.d/mellanox-doca.list
-        - /etc/yum.repos.d/mellanox-doca.repo
-        - /usr/share/keyrings/nvidia-doca.gpg
+    download_url: "{{ mofed_repo_keys[ansible_facts.os_family].url }}"
+    download_checksum: "{{ mofed_repo_keys[ansible_facts.os_family].checksum }}"
+    download_dest: "{{ mofed_repo_keys[ansible_facts.os_family].dest }}"
+
+- name: Read the key's fingerprint
+  ansible.builtin.command:
+    argv: [gpg, --batch, --no-default-keyring, --show-keys, --with-colons, "{{ mofed_repo_keys[ansible_facts.os_family].dest }}"]
+  register: mofed_key_info
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Check the key is NVIDIA's
+  ansible.builtin.assert:
+    that: mofed_repo_key_fingerprint in (mofed_key_info.stdout | regex_findall('(?m)^fpr:+([0-9A-F]+):'))
+    fail_msg: "{{ mofed_repo_keys[ansible_facts.os_family].dest }} does not have fingerprint {{ mofed_repo_key_fingerprint }}; not trusting it."
+    quiet: true
+  when: not ansible_check_mode or mofed_key_info.rc == 0
+
+# The key that signed DOCA before 3.2.2, and the repository entry that used it.
+- name: Remove the old key and repository entry (Debian)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/share/keyrings/mellanox-doca.asc
+    - /etc/apt/sources.list.d/mellanox-doca.list
+  when: ansible_facts.os_family == "Debian"
+
+- name: Add the DOCA repository (Debian)
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/nvidia-doca.sources
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ mofed_repo_base_url }}
+      Suites: ./
+      Signed-By: {{ mofed_repo_keys.Debian.dest }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Add the DOCA repository (RHEL family)
+  ansible.builtin.yum_repository:
+    name: mellanox-doca
+    description: NVIDIA DOCA-Host
+    baseurl: "{{ mofed_repo_base_url }}"
+    gpgcheck: true
+    gpgkey: "file://{{ mofed_repo_keys.RedHat.dest }}"
+  when: ansible_facts.os_family == "RedHat"
 
 # --- The profile, then the firmware updater if asked for ---
 - name: Install DOCA-OFED (Debian)

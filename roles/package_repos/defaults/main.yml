@@ -4,9 +4,6 @@
 #   tasks_from: epel   EPEL on the RHEL family (a no-op elsewhere)
 #   tasks_from: cuda   NVIDIA's CUDA repository (drivers, CUDA, DCGM): the cuda-keyring
 #                      package on Ubuntu, a dnf repository on the RHEL family
-#   tasks_from: repo   any other repository, present or absent, from one declaration
-#                      (package_repos_repo; see tasks/repo.yml): a checked signing key
-#                      trusted for that repository only, a deb822 source or yum repo
 #
 # A mirror (an airgap) replaces the base URLs and keeps the layout below them.
 

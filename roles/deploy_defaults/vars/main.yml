@@ -26,17 +26,6 @@ deepops_component_registry:
       - {switch: "{{ slurm_enable_container_registry }}", group: slurm-master}
       - {switch: "{{ kube_enable_container_registry }}", group: kube_control_plane}
     needs: [docker]
-  # The registry cache proxy, and the hosts whose Docker pulls through it.
-  nginx_docker_cache:
-    role: nginx-docker-registry-cache
-    rules:
-      - {switch: "{{ slurm_enable_nginx_docker_cache }}", group: slurm-cache}
-    needs: [docker]
-  nginx_docker_cache_client:
-    role: nginx-docker-registry-cache-client
-    rules:
-      - {switch: "{{ slurm_enable_nginx_docker_cache }}", group: slurm-node}
-    needs: [docker]
   # Monitoring. An entry's key is its variable prefix (<key>_state); role names the
   # role where that differs. Prometheus scrapes each exporter where it is present.
   prometheus:

@@ -14,6 +14,19 @@ from unittest.mock import patch
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 SCRIPT = SCRIPTS / "validate_finetune.py"
+FIXTURES = SCRIPTS.parents[1] / "tests/cluster-tools/fixtures"
+
+
+def slurm_reply(kind, records):
+    """Slurm's JSON reply holding RECORDS, as scontrol --json prints it."""
+    return json.dumps({"meta": {"slurm": {"release": "test"}}, kind: records})
+
+
+def fixture(kind):
+    """The first record of the newest Slurm release's fixture: every field the tools
+    rely on, as Slurm gives it."""
+    release = sorted(FIXTURES.glob("slurm-*/" + kind + ".json"))[-1]
+    return json.loads(release.read_text())[kind][0]
 
 
 class ReadinessTests(unittest.TestCase):
@@ -40,12 +53,16 @@ class ReadinessTests(unittest.TestCase):
             timeout=5,
             gpu_smoke=False,
         )
-        self.node = (
-            "NodeName=gpu-node NodeHostName="
-            + socket.gethostname()
-            + " State=IDLE Partitions=gpu CfgTRES=cpu=8,gres/gpu=2 AllocTRES=cpu=0,gres/gpu=0"
-        )
-        self.partition = "PartitionName=gpu State=UP"
+        self.node = {
+            **fixture("nodes"),
+            "name": "gpu-node",
+            "hostname": socket.gethostname(),
+            "state": ["IDLE"],
+            "partitions": ["gpu"],
+            "tres": "cpu=8,gres/gpu=2",
+            "tres_used": "cpu=0,gres/gpu=0",
+        }
+        self.partition = {**fixture("partitions"), "name": "gpu", "partition": {"state": ["UP"]}}
         self.commands = []
         self.fail_command = None
         self.smoke_output = "0, Example GPU"
@@ -54,10 +71,10 @@ class ReadinessTests(unittest.TestCase):
         self.commands.append(command)
         if command[0] == self.fail_command:
             return 1, "private output", "private failure"
-        if command[:4] == ["scontrol", "show", "node", "--oneliner"]:
-            return 0, self.node, ""
-        if command[:4] == ["scontrol", "show", "partition", "--oneliner"]:
-            return 0, self.partition, ""
+        if command[:4] == ["scontrol", "--json", "show", "nodes"]:
+            return 0, self.node if isinstance(self.node, str) else slurm_reply("nodes", [self.node]), ""
+        if command[:4] == ["scontrol", "--json", "show", "partitions"]:
+            return 0, slurm_reply("partitions", [self.partition]), ""
         if command == ["enroot", "version"]:
             return 0, "3.5.0", ""
         if command == ["srun", "--help"]:
@@ -93,32 +110,45 @@ class ReadinessTests(unittest.TestCase):
         self.assert_not_ready("scheduler")
 
     def test_empty_or_malformed_scheduler_output_fails_closed(self):
-        for output in ("", "garbage", "NodeName=gpu-node", self.node + "\n" + self.node):
-            with self.subTest(output=output):
+        node = self.node
+        lacking = {k: v for k, v in node.items() if k != "tres_used"}
+        for output in (
+            "",
+            "garbage",
+            "[]",
+            slurm_reply("nodes", []),
+            slurm_reply("nodes", [node, node]),
+            slurm_reply("nodes", [{**node, "name": "other"}]),
+            slurm_reply("nodes", [lacking]),
+            json.dumps({"errors": [{"description": "private"}], "nodes": []}),
+        ):
+            with self.subTest(output=output[:40]):
                 self.node = output
                 self.assert_not_ready("scheduler")
 
     def test_wrong_host_cannot_attest_compute_runtime_or_cache(self):
-        self.node = self.node.replace(socket.gethostname(), "other-node.invalid")
+        self.node["hostname"] = "other-node.invalid"
         self.assert_not_ready("local_node")
 
     def test_partition_must_be_up_and_include_the_selected_node(self):
-        self.partition = "PartitionName=gpu State=DOWN"
+        self.partition["partition"] = {"state": ["DOWN"]}
         self.assert_not_ready("scheduler")
-        self.partition = "PartitionName=gpu State=UP"
-        self.node = self.node.replace("Partitions=gpu", "Partitions=other")
+        self.partition["partition"] = {"state": ["UP"]}
+        self.node["partitions"] = ["other"]
         self.assert_not_ready("scheduler")
 
     def test_no_free_gpu_and_unavailable_nodes_fail(self):
         original = self.node
-        for state in ("ALLOCATED", "MIXED", "IDLE+DRAIN", "DOWN", "IDLE*"):
+        for state in (["ALLOCATED"], ["MIXED"], ["IDLE", "DRAIN"], ["DOWN"], ["IDLE", "NOT_RESPONDING"]):
             with self.subTest(state=state):
-                self.node = original.replace("State=IDLE", "State=" + state)
+                self.node = {**original, "state": state}
                 self.assert_not_ready("gpu_capacity")
-        self.node = original.replace("gres/gpu=2", "gres/gpu=0")
+        self.node = {**original, "tres": "cpu=8,gres/gpu=0"}
         self.assert_not_ready("gpu_capacity")
-        self.node = original.replace("AllocTRES=cpu=0,gres/gpu=0", "AllocTRES=cpu=0,gres/gpu=2")
+        self.node = {**original, "tres_used": "cpu=0,gres/gpu=2"}
         self.assert_not_ready("gpu_capacity")
+        self.node = {**original, "tres_used": ""}
+        self.assertEqual(self.validate()["status"], "ready")
 
     def test_missing_runtime_or_container_plugin_fails(self):
         self.fail_command = "enroot"
@@ -141,7 +171,7 @@ class ReadinessTests(unittest.TestCase):
     def test_multiple_failure_reasons_are_preserved(self):
         (self.snapshot / "tokenizer.json").unlink()
         self.fail_command = "enroot"
-        self.node = self.node.replace("State=IDLE", "State=DOWN")
+        self.node["state"] = ["DOWN"]
         result = self.assert_not_ready("cache")
         self.assertTrue(
             {"cache", "container_support", "gpu_capacity"}.issubset({e["stage"] for e in result["errors"]})
@@ -252,7 +282,11 @@ class ReadinessTests(unittest.TestCase):
         # Run the actual CLI without any path to real Slurm/Enroot executables.
         tools = self.cache / "bin"
         tools.mkdir()
-        outputs = {"scontrol": self.node, "enroot": "3.5.0", "srun": "--container-image --container-mounts"}
+        outputs = {
+            "scontrol": slurm_reply("nodes", [self.node]),
+            "enroot": "3.5.0",
+            "srun": "--container-image --container-mounts",
+        }
         for name, output in outputs.items():
             path = tools / name
             path.write_text(
@@ -260,8 +294,8 @@ class ReadinessTests(unittest.TestCase):
                 + sys.executable
                 + "\nimport sys\n"
                 + "print("
-                + repr(self.partition)
-                + " if 'partition' in sys.argv else "
+                + repr(slurm_reply("partitions", [self.partition]))
+                + " if 'partitions' in sys.argv else "
                 + repr(output)
                 + ")\n"
             )
