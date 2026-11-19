@@ -23,6 +23,9 @@ nvidia_container_toolkit_packages:
   - libnvidia-container1
 
 nvidia_container_toolkit_configure_docker: true
+# Keep the package's CDI specification (/var/run/cdi/nvidia.yaml) generated, for
+# podman's --device nvidia.com/gpu=... (nvidia-cdi-refresh, toolkit 1.18 and newer).
+nvidia_container_toolkit_cdi: true
 # Off: a container gets GPUs only when it asks for them (--gpus or a CDI device), as
 # NVIDIA's install guide configures Docker. With nvidia as Docker's default runtime,
 # every container saw every GPU of the node, outside what Slurm gave the job. The
