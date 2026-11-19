@@ -1,0 +1,73 @@
+---
+# A directory that other packages or admins also write to cannot be emptied of
+# everything but our set, as roles/managed_dir does. Instead the names this caller
+# published are kept in a record, and a name in the record (or in
+# recorded_files_retired) that is no longer published is removed from every directory
+# in recorded_files_dirs. Nothing else in them is touched. Publish the files first,
+# then include this:
+#   - ansible.builtin.include_role:
+#       name: recorded_files
+#     vars:
+#       recorded_files_record: /var/lib/deepops/recorded/enroot-hooks
+#       recorded_files_names: "{{ enroot_hook_config_files | map(attribute='filename') }}"
+#       recorded_files_dirs: [/etc/enroot/hooks.d]
+- name: Require an absolute record and directories
+  ansible.builtin.assert:
+    that:
+      - recorded_files_record is match('/')
+      - recorded_files_dirs | reject('match', '/') | list == []
+      - recorded_files_names | select('search', '/') | list == []
+    fail_msg: recorded_files needs an absolute record path and directories, and bare file names.
+    quiet: true
+
+- name: Look for the record {{ recorded_files_record }}
+  ansible.builtin.stat:
+    path: "{{ recorded_files_record }}"
+  register: recorded_files_stat
+
+- name: Read the record {{ recorded_files_record }}
+  ansible.builtin.slurp:
+    src: "{{ recorded_files_record }}"
+  register: recorded_files_read
+  when: recorded_files_stat.stat.exists
+
+- name: Remove what is no longer published
+  ansible.builtin.file:
+    path: "{{ item.1 }}/{{ item.0 }}"
+    state: absent
+  vars:
+    recorded_files_earlier: >-
+      {{ (recorded_files_read.content | b64decode).split() if recorded_files_stat.stat.exists else [] }}
+  loop: >-
+    {{ (recorded_files_earlier + recorded_files_retired) | unique
+       | difference(recorded_files_names) | product(recorded_files_dirs) | list }}
+  loop_control:
+    label: "{{ item.1 }}/{{ item.0 }}"
+
+- name: Create the directory of {{ recorded_files_record }}
+  ansible.builtin.file:
+    path: "{{ recorded_files_record | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: recorded_files_names | length > 0
+
+# Nothing published, no record: none is the truth.
+- name: Record the published names in {{ recorded_files_record }}
+  ansible.builtin.copy:
+    content: |
+      {% for name in recorded_files_names | unique | sort %}
+      {{ name }}
+      {% endfor %}
+    dest: "{{ recorded_files_record }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: recorded_files_names | length > 0
+
+- name: Remove the record {{ recorded_files_record }}
+  ansible.builtin.file:
+    path: "{{ recorded_files_record }}"
+    state: absent
+  when: recorded_files_names | length == 0
