@@ -22,6 +22,7 @@
     owner: "root"
     group: "root"
     mode: "0400"
+  register: nginx_docker_cache_ca_key
   when: nginx_docker_cache_ca is defined
 
 - name: Add pre-defined CA certificate
@@ -31,6 +32,7 @@
     owner: "root"
     group: "root"
     mode: "0444"
+  register: nginx_docker_cache_ca_crt
   when: nginx_docker_cache_ca is defined
 
 - name: Run caching proxy
@@ -39,8 +41,9 @@
     image: "{{ nginx_docker_cache_image }}"
     state: started
     network_mode: host
-    # restart_policy gives boot persistence; a forced restart on every run would
-    # bounce the container needlessly, so it is intentionally omitted.
+    # nginx reads the mounted CA only at start: restart when it changed. restart_policy
+    # keeps the container across boots.
+    restart: "{{ nginx_docker_cache_ca_key is changed or nginx_docker_cache_ca_crt is changed }}"
     restart_policy: unless-stopped
     volumes:
       - "{{ nginx_docker_cache_mirror_path }}:/docker_mirror_cache"
