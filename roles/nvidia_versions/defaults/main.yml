@@ -6,16 +6,38 @@
 # upstream: manual https://docs.nvidia.com/datacenter/tesla/drivers/supported-drivers-and-cuda-toolkit-versions.html (the newest long-term support branch)
 nvidia_driver_branch: "580"
 
-# The oldest driver branch each CUDA major runs on (CUDA toolkit release notes,
-# "minimum required driver version"). A new CUDA major is one more line here.
+# The driver branch each CUDA release (major.minor) ships with: CUDA toolkit release
+# notes, "CUDA Toolkit and Corresponding Driver Versions" (the runfile names carry it).
+# A new CUDA release is one more line here; every relation below is computed from it.
 # https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
-nvidia_cuda_min_driver_branch:
-  11: 450
-  12: 525
-  13: 580
-# The newest CUDA major the driver branch serves; packages built per CUDA major
+nvidia_cuda_release_driver_branch:
+  "11.0": 450
+  "11.1": 455
+  "11.2": 460
+  "11.3": 465
+  "11.4": 470
+  "11.5": 495
+  "11.6": 510
+  "11.7": 515
+  "11.8": 520
+  "12.0": 525
+  "12.1": 530
+  "12.2": 535
+  "12.3": 545
+  "12.4": 550
+  "12.5": 555
+  "12.6": 560
+  "12.8": 570
+  "12.9": 575
+  "13.0": 580
+  "13.1": 590
+  "13.2": 595
+  "13.3": 610
+# The oldest driver branch each CUDA major runs on (minor version compatibility).
+nvidia_cuda_min_driver_branch: "{{ nvidia_cuda_release_driver_branch | cuda_min_driver_branch }}"
+# The CUDA release the driver branch ships with: what a build against NVML or the CUDA
+# headers must not be newer than.
+nvidia_driver_cuda_release: "{{ nvidia_cuda_release_driver_branch | cuda_release_for_driver(nvidia_driver_branch) }}"
+# The CUDA major the driver branch serves; packages built per CUDA major
 # (DCGM 4) and the CUDA toolkits follow it.
-nvidia_driver_cuda_major: >-
-  {{ nvidia_cuda_min_driver_branch | dict2items
-     | selectattr('value', 'le', nvidia_driver_branch | int)
-     | map(attribute='key') | map('int') | max }}
+nvidia_driver_cuda_major: "{{ nvidia_driver_cuda_release.split('.')[0] | int }}"

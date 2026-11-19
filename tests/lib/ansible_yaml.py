@@ -52,10 +52,13 @@ def same_name(actual, expected):
 
 
 def _templar(variables):
-    """A templar over `variables`, trusted as Ansible trusts role defaults and vars files."""
+    """A templar over `variables`, trusted as Ansible trusts role defaults and vars files,
+    with the repository's filters (plugins/filter), which ansible.cfg gives a real run."""
     from ansible.parsing.dataloader import DataLoader
+    from ansible.plugins.loader import filter_loader
     from ansible.template import Templar
 
+    filter_loader.add_directory(str(ROOT / "plugins" / "filter"))
     return Templar(loader=DataLoader(), variables=_trusted(variables))
 
 
