@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: cluster_tools_lib
+  - role: prometheus_paths  # node_exporter_prom_dir, prometheus_port
 
 galaxy_info:
   namespace: deepops

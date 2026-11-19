@@ -1,5 +1,10 @@
 ---
-# Where Prometheus keeps its config and the scrape target files the exporter roles drop
-# there: written once here, for prometheus and every exporter role, which depend on it.
+# Where Prometheus and its neighbours live, written once here for every role that
+# talks to them (prometheus, alertmanager, grafana, the exporters and the textfile
+# writers), which depend on this role.
 prometheus_config_dir: /etc/prometheus
 prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
+prometheus_port: 9090
+alertmanager_port: 9093
+# node_exporter's textfile collector directory, which every textfile writer fills.
+node_exporter_prom_dir: /run/prometheus

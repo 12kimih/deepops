@@ -6,7 +6,7 @@ global:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['localhost:{{ alertmanager_port | default(9093) }}']
+        - targets: ['localhost:{{ alertmanager_port }}']
 
 rule_files:
   - rules/*.yml
@@ -18,7 +18,7 @@ scrape_configs:
         labels: {host: '{{ inventory_hostname }}'}
   - job_name: alertmanager
     static_configs:
-      - targets: ['localhost:{{ alertmanager_port | default(9093) }}']
+      - targets: ['localhost:{{ alertmanager_port }}']
         labels: {host: '{{ inventory_hostname }}'}
   - job_name: cluster
     file_sd_configs:

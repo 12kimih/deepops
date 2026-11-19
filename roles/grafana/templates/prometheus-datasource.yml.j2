@@ -11,7 +11,7 @@ datasources:
     uid: prometheus
     type: prometheus
     access: proxy
-    url: http://localhost:{{ prometheus_port | default(9090) }}
+    url: http://localhost:{{ prometheus_port }}
     isDefault: true
     editable: false
     jsonData:

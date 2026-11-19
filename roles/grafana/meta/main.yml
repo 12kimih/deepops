@@ -1,0 +1,8 @@
+---
+# prometheus_port, alertmanager_port and the other shared paths: roles/prometheus_paths.
+dependencies:
+  - role: prometheus_paths
+
+galaxy_info:
+  namespace: deepops
+  role_name: grafana
