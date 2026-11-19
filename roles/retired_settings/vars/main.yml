@@ -44,6 +44,8 @@ retired_settings:
   nvidia_dcgm_state: dcgm_exporter_service_state (started/stopped; _state means present/absent, docs/deepops/component-state.md)
   nvidia_dcgm_enabled: dcgm_exporter_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
   nginx_docker_cache_hostgroup: the registry entry nginx_docker_cache (its group, [slurm-cache]) in roles/deploy_defaults/vars/main.yml, or nginx_docker_cache_host to point clients elsewhere
+  docker_apt_keyring: nothing (roles/package_repos names it /etc/apt/keyrings/docker.asc)
+  docker_apt_sources: nothing (roles/package_repos names it /etc/apt/sources.list.d/docker.sources)
   runai_helm: helm_bin in roles/deepops_paths (the one Helm client path)
   runai_helm_timeout: helm_timeout in roles/helm_release (every release waits as long)
   helm_cmd: helm_bin in roles/deepops_paths (the one Helm client path)

@@ -28,8 +28,6 @@ REPO_NAMES = re.compile(r"(?<![a-z])sources(?![a-z])|keyring|\.repo\b|_repo_file
 OWNER = "roles/package_repos/"
 # file -> who moves it to roles/package_repos (tasks_from: repo)
 NOT_MOVED_YET = {
-    "roles/docker/tasks/ubuntu.yml": "deepops-4",
-    "roles/docker/tasks/redhat.yml": "deepops-4",
     "roles/nvidia_container_toolkit/tasks/ubuntu.yml": "deepops or deepops-4",
     "roles/nvidia_container_toolkit/tasks/redhat.yml": "deepops or deepops-4",
     "roles/slurm/tasks/packages.yml": "deepops",
