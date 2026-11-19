@@ -55,6 +55,54 @@ class Explicit(unittest.TestCase):
                 self.assertEqual(REGISTRY[name].get("removal"), "explicit")
 
 
+# Every switch a deploy still skips an import on, and why it is not (yet) a component.
+# A name here that no gate uses any more fails the test: the list only shrinks.
+GATES = {
+    # Policies: an enum or a runtime setting, not something installed.
+    "deepops_disable_cloud_init": "policy (off re-enables cloud-init)",
+    "allow_user_set_gpu_clocks": "policy (a runtime setting, gone at reboot)",
+    # One-shot: nothing to remove.
+    "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
+    # Components still to move (docs/deepops/component-state.md, batches), by owner.
+    "chrony_install": "pending: deepops-4 (off restores the OS time sync)",
+    "slurm_install_authentication": "pending: deepops-4 (the directory work; removal explicit)",
+    "slurm_enable_nfs_client_nodes": "pending: deepops-2 (the NFS client mounts)",
+    "slurm_cluster_install_nvidia_driver": "pending: deepops (batch 3; removal explicit)",
+    "install_dcgm": "pending: deepops (batch 3)",
+    "slurm_install_nhc": "pending: deepops (batch 3)",
+    "slurm_cluster_install_openmpi": "pending: deepops (batch 3)",
+    "slurm_install_lmod": "pending: deepops (batch 3)",
+    "slurm_install_hpcsdk": "pending: deepops (batch 3)",
+    "slurm_install_enroot": "pending: deepops (batch 3)",
+    "slurm_install_pyxis": "pending: deepops (batch 3)",
+    "slurm_cluster_configure_gpu_power_limit": "pending: deepops (batch 3)",
+    "slurm_enable_dns_resolver": "pending: deepops (with egress_policy's resolver)",
+    "deepops_gpu_operator_enabled": "pending: deepops-4 (batch 5, the Kubernetes GPU stack)",
+    "gpu_operator_preinstalled_nvidia_software": "pending: deepops-4 (batch 5)",
+    "k8s_nfs_client_provisioner": "pending: deepops-4 (batch 5)",
+}
+
+
+class Gates(unittest.TestCase):
+    def test_every_switch_gate_is_classified_and_the_list_only_shrinks(self):
+        defaults = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text())
+        used = set()
+        for deploy in DEPLOYS:
+            for play in yaml.safe_load((ROOT / deploy).read_text()):
+                when = play.get("when") if "import_playbook" in play else None
+                if not when:
+                    continue
+                text = " ".join(when if isinstance(when, list) else [str(when)])
+                names = {n for n in re.findall(r"[a-z_][a-z0-9_]*", text) if n in defaults}
+                used |= names
+                for name in sorted(names):
+                    with self.subTest(deploy=deploy, play=play.get("name"), switch=name):
+                        self.assertIn(
+                            name, GATES, "a component's state comes from the map: classify it or move it"
+                        )
+        self.assertEqual(sorted(set(GATES) - used), [], "no longer a gate: drop it from GATES")
+
+
 class Roles(unittest.TestCase):
     def test_each_component_role_has_state_both_paths_and_the_record(self):
         for name in REGISTRY:
