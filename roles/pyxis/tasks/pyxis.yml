@@ -53,7 +53,6 @@
   changed_when: "result.stdout != \"make: Nothing to be done for 'all'.\""
   when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   notify:
-    - Restart slurmctld
     - Restart slurmd
   tags: pyxis
 
@@ -71,18 +70,18 @@
   changed_when: true
   when: (not pyxis_installed.stat.exists) or (slurm_pyxis_force_rebuild | default(false))
   notify:
-    - Restart slurmctld
     - Restart slurmd
   tags: pyxis
 
 # Slurm reads only plugstack.conf; this include pulls in plugstack.conf.d/*.conf.
+# SPANK plugins are loaded by slurmd and slurmstepd and by the client commands, never
+# by slurmctld, so only slurmd restarts for them.
 - name: Copy top-level plugstack file
   ansible.builtin.template:
     src: etc/slurm/plugstack.conf
     dest: "{{ slurm_config_dir }}/"
     mode: "0644"
   notify:
-    - Restart slurmctld
     - Restart slurmd
   tags: pyxis
 
@@ -99,6 +98,5 @@
     dest: "{{ slurm_config_dir }}/plugstack.conf.d/"
     mode: "0644"
   notify:
-    - Restart slurmctld
     - Restart slurmd
   tags: pyxis

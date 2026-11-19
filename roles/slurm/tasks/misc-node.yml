@@ -29,3 +29,10 @@
     - slurmd
     - slurmdbd
   failed_when: false
+
+# Clients load SPANK plugins too: without this a login node keeps a dangling pyxis
+# entry after a Slurm rebuild and cannot run srun or sbatch until the pyxis play runs.
+- name: Drop a dangling pyxis plugstack entry
+  ansible.builtin.include_tasks: plugstack.yml
+  tags:
+    - always
