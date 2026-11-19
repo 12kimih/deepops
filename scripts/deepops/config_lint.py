@@ -161,20 +161,24 @@ def check_dead():
             and path.is_file()
         ):
             sources.append((path, path.read_text(errors="ignore")))
+    # Kubespray reads many config.example settings. Without its checkout every one of
+    # them would read as dead, so a missing submodule is a failure of its own.
     kubespray = ROOT / "submodules" / "kubespray"
-    k8s_text = ""
-    if kubespray.is_dir():
-        # A commit hook sets GIT_DIR, GIT_INDEX_FILE and friends for this repository;
-        # inherited, they would make git grep read our index inside the submodule.
-        clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        k8s_text = subprocess.run(
-            ["git", "grep", "-h", "-o", "-E", r"[a-z_][a-z0-9_]*", "--", "roles", "playbooks", "inventory"],
-            cwd=kubespray,
-            capture_output=True,
-            text=True,
-            env=clean,
-        ).stdout
-    k8s_words = set(k8s_text.split())
+    if not (kubespray / "cluster.yml").is_file():
+        return ["dead: submodules/kubespray is not checked out (git submodule update --init)"]
+    # A commit hook sets GIT_DIR, GIT_INDEX_FILE and friends for this repository;
+    # inherited, they would make git grep read our index inside the submodule.
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    k8s = subprocess.run(
+        ["git", "grep", "-h", "-o", "-E", r"[a-z_][a-z0-9_]*", "--", "roles", "playbooks", "inventory"],
+        cwd=kubespray,
+        capture_output=True,
+        text=True,
+        env=clean,
+    )
+    if k8s.returncode != 0:
+        return [f"dead: cannot read Kubespray's variables: {k8s.stderr.strip() or 'git grep found nothing'}"]
+    k8s_words = set(k8s.stdout.split())
     problems = []
     for example in var_files(EXAMPLE):
         for name, line in names(example.read_text()).items():

@@ -562,7 +562,8 @@ tests:
         values: '100x30'
       - series: 'slurm_gpu_allocated{host="m", instance="m:9100", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
         values: '1x30'
-      - series: 'node_textfile_mtime_seconds{host="m", instance="m:9100", file="/run/prometheus/slurm-gpu.prom"}'
+      # Any file name: the rules read the timestamp the writer puts in the file.
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
         values: '0+60x30'
     alert_rule_test:
       - eval_time: 10m
@@ -587,7 +588,7 @@ tests:
     input_series:
       - series: 'DCGM_FI_DEV_GPU_UTIL{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
         values: '100x30'
-      - series: 'node_textfile_mtime_seconds{host="m", instance="m:9100", file="/run/prometheus/slurm-gpu.prom"}'
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
         values: '0x30'
       - series: 'node_textfile_scrape_error{host="m", instance="m:9100"}'
         values: '0x30'
@@ -598,7 +599,7 @@ tests:
       - eval_time: 25m
         alertname: SlurmGpuMetricsStale
         exp_alerts:
-          - exp_labels: {severity: warning, host: m, instance: m:9100, file: /run/prometheus/slurm-gpu.prom}
+          - exp_labels: {severity: warning, host: m, instance: m:9100}
             exp_annotations:
               summary: "Slurm GPU allocation data on m is stale or unreadable"
               description: >-
