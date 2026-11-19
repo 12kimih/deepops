@@ -1,6 +1,7 @@
 ---
 dependencies:
-  - role: deepops_paths  # deepops_dir, sm_* module paths
+  - role: deepops_paths  # deepops_dir
+  - role: retired_settings  # the snapshot manifest URL lists
 
 galaxy_info:
   namespace: deepops

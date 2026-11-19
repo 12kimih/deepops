@@ -1,0 +1,26 @@
+---
+# helm_release -- one Helm release in its desired state, idempotently: the one way a role
+# installs, upgrades or removes a chart.
+#
+#   - ansible.builtin.include_role:
+#       name: helm_release
+#     vars:
+#       helm_release:
+#         release: trident-operator          # release name
+#         namespace: trident
+#         chart: netapp-trident/trident-operator   # repo/chart, or a chart name with repo:
+#         version: "100.2610.1"
+#         repo: https://netapp.github.io/trident-helm-chart   # optional (helm --repo)
+#         helm_values: {}                    # the release's user-supplied values
+#         sensitive: false                   # values hold secrets: hide them in output
+#         wait: true                         # helm --wait (present only)
+#         state: present                     # present, or absent (helm uninstall)
+#
+# present touches the release only when it is missing, not deployed, on another chart
+# version, or its user-supplied values differ, so a converged rerun reports changed=0.
+# Values travel on stdin, never on the command line or on disk. absent uninstalls the
+# release when it exists and otherwise does nothing; CRDs and persistent volumes the
+# chart created stay (Helm keeps them, and so does this role).
+helm_release: {}
+helm_bin: /usr/local/bin/helm
+helm_timeout: "20m"

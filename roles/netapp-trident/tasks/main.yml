@@ -1,20 +1,26 @@
 ---
 # tasks file for netapp-trident role
 
-- name: Add Trident Helm repo
-  ansible.builtin.command: "/usr/local/bin/helm repo add --force-update {{ trident_helm_repo_name }} {{ trident_helm_repo_url }}"
+- name: Install Trident from its Helm chart
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ trident_helm_release_name }}"
+      namespace: "{{ trident_namespace }}"
+      chart: "{{ trident_helm_chart }}"
+      repo: "{{ trident_helm_repo_url }}"
+      version: "{{ trident_helm_chart_version }}"
+      helm_values: {}
   run_once: true
-  changed_when: false
 
-- name: Update Helm repos
-  ansible.builtin.command: /usr/local/bin/helm repo update
+# Resolved here, where this role's defaults are in scope: the download role templates
+# its arguments later, in its own scope.
+- name: Resolve the Trident working directory
+  ansible.builtin.set_fact:
+    trident_workdir_parent: "{{ deepops_dir }}"
+    trident_installer_checksum: "{{ trident_checksums[trident_version] | default('') }}"
   run_once: true
-  changed_when: false
-
-- name: Install Trident using Helm
-  ansible.builtin.command: "/usr/local/bin/helm upgrade --install {{ trident_helm_release_name }} {{ trident_helm_chart_name }} --namespace {{ trident_namespace }} --create-namespace --version {{ trident_helm_chart_version }} --wait"
-  run_once: true
-  changed_when: false
 
 - name: Create Trident working directory
   ansible.builtin.file:
@@ -29,9 +35,9 @@
     name: download
   vars:
     download_url: "{{ trident_installer_url }}"
-    download_checksum: "{{ trident_checksums[trident_version] | default('') }}"
+    download_checksum: "{{ trident_installer_checksum }}"
     download_dest: "/var/cache/deepops/trident-installer-{{ trident_version }}.tar.gz"
-    download_unpack: "{{ deepops_dir }}"
+    download_unpack: "{{ trident_workdir_parent }}"
   when: create_backends or copy_tridentctl_to_localhost
   run_once: true
 
@@ -47,8 +53,15 @@
   no_log: "{{ trident_hide_backend_details | bool }}"
 
 - name: Create Trident backend(s)
-  ansible.builtin.command: "{{ deepops_dir }}/trident-installer/tridentctl -n {{ trident_namespace }} create backend -f {{ deepops_dir }}/trident-installer/backend-{{
-    item.backendName }}.json"
+  ansible.builtin.command:
+    argv:
+      - "{{ deepops_dir }}/trident-installer/tridentctl"
+      - -n
+      - "{{ trident_namespace }}"
+      - create
+      - backend
+      - -f
+      - "{{ deepops_dir }}/trident-installer/backend-{{ item.backendName }}.json"
   with_items: "{{ backends_to_create }}"
   retries: 10
   delay: 30
@@ -80,19 +93,26 @@
   run_once: true
   changed_when: false
 
-- name: Create volume snapshot CRDs
-  ansible.builtin.command: "kubectl apply -f {{ item }}"
-  with_items: "{{ volume_snapshot_CRD_manifest_URLs }}"
+# One snapshot controller per cluster: Kubespray's, matched to its Kubernetes.
+- name: Look for the volume snapshot CRDs
+  ansible.builtin.command:
+    argv: [kubectl, get, crd, volumesnapshotclasses.snapshot.storage.k8s.io]
+  register: trident_snapshot_crd
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
   when: enable_volume_snapshots
   run_once: true
-  changed_when: false
 
-- name: Create snapshot controller
-  ansible.builtin.command: "kubectl apply -f {{ item }}"
-  with_items: "{{ snapshot_controller_manifest_URLs }}"
+- name: Require Kubespray's snapshot controller
+  ansible.builtin.assert:
+    that: trident_snapshot_crd.rc == 0
+    fail_msg: >-
+      The volume snapshot CRDs are missing. Set csi_snapshot_controller_enabled: true in
+      config/group_vars/k8s_cluster.yml and rerun playbooks/k8s-cluster.yml, then this playbook.
+    quiet: true
   when: enable_volume_snapshots
   run_once: true
-  changed_when: false
 
 - name: Copy volume snapshot class config file(s) to control node
   ansible.builtin.copy:

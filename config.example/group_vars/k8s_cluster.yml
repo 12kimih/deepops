@@ -83,6 +83,10 @@ containerd_registries_mirrors:
 # (work-around for https://github.com/kubernetes-sigs/kubespray/issues/8529)
 image_command_tool: "crictl"
 
+# Kubespray's volume snapshot CRDs and controller, matched to its Kubernetes. CSI drivers
+# that take snapshots need them (roles/netapp-trident checks for them).
+#csi_snapshot_controller_enabled: false
+
 ################################################################################
 # Logging with rsyslog                                                         #
 ################################################################################

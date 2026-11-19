@@ -106,6 +106,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── facts
 │   ├── free_space
 │   ├── grafana
+│   ├── helm_release
 │   ├── host_baseline
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
