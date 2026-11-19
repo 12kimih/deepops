@@ -1,0 +1,54 @@
+---
+# Switch the NVIDIA driver branch (nvidia_driver_branch) the way the maintenance role
+# changes a node: one node at a time, drain it in Slurm and wait for its jobs, switch
+# the driver (roles/nvidia_driver), reboot, check slurmd, the GPUs, DCGM and NHC, and
+# resume it. A failed node stops the run with that node still drained. Removing the
+# running driver breaks every GPU job until the reboot, so the driver role refuses a
+# switch on a node that still takes jobs; this playbook is the way to make one.
+#
+#   ansible-playbook -K playbooks/utilities/nvidia-driver-switch.yml -e hostlist=<node>
+#   ansible-playbook -K playbooks/utilities/nvidia-driver-switch.yml    # every compute node
+#   -e maintenance_serial=2           nodes per batch (default 1)
+#
+# A node that was already drained is switched but left drained.
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  serial: "{{ maintenance_serial | default(1) }}"
+  max_fail_percentage: 0
+  tags:
+    - nvidia_driver
+  tasks:
+    - name: Install custom facts
+      ansible.builtin.include_role:
+        name: facts
+
+    # As playbooks/nvidia-software/nvidia-driver.yml: DGX systems keep their own stack.
+    - name: Check for DGX packages
+      ansible.builtin.stat:
+        path: /etc/dgx-release
+      register: nvidia_driver_switch_dgx
+
+    - name: Drain the node, switch its driver, reboot, check and return it
+      ansible.builtin.include_role:
+        name: maintenance
+        public: true
+        tasks_from: run
+      vars:
+        maintenance_role: nvidia_driver
+        maintenance_reason: "maintenance: driver switch"
+        maintenance_steps: "{{ ['drain', 'role', 'reboot', 'verify', 'resume'] if inventory_hostname in groups['slurm-node'] | default([])
+                              else ['role', 'reboot', 'verify'] }}"
+      when: ansible_facts.ansible_local['gpus']['count'] | int > 0 and not nvidia_driver_switch_dgx.stat.exists
+  environment: "{{ proxy_env if proxy_env is defined else {} }}"
+
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  gather_facts: false
+  tags:
+    - nvidia_driver
+  tasks:
+    - name: Check the switched hosts are level
+      ansible.builtin.include_role:
+        name: maintenance
+        public: true
+        tasks_from: consistency

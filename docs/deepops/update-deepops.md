@@ -18,9 +18,6 @@ Updating a cluster deployed with DeepOps
       - [Updating NVIDIA Kubernetes components (no GPU Operator)](#updating-nvidia-kubernetes-components-no-gpu-operator)
         - [Overview](#overview-1)
         - [Updating the NVIDIA driver](#updating-the-nvidia-driver)
-          - [On DGX](#on-dgx)
-          - [On Ubuntu](#on-ubuntu)
-          - [On RHEL](#on-rhel)
         - [Updating the NVIDIA Container Toolkit](#updating-the-nvidia-container-toolkit)
         - [Updating NVIDIA GPU Feature Discovery](#updating-nvidia-gpu-feature-discovery)
         - [Updating the NVIDIA GPU Device Plugin](#updating-the-nvidia-gpu-device-plugin)
@@ -28,24 +25,21 @@ Updating a cluster deployed with DeepOps
       - [Minor version upgrades](#minor-version-upgrades)
       - [Major version upgrades](#major-version-upgrades)
     - [Updating OS packages](#updating-os-packages)
-      - [On Ubuntu](#on-ubuntu-1)
-      - [On RHEL](#on-rhel-1)
+      - [On Ubuntu](#on-ubuntu)
+      - [On RHEL](#on-rhel)
   - [Updating Slurm clusters](#updating-slurm-clusters)
     - [Overview](#overview-2)
     - [Component-based upgrades](#component-based-upgrades-1)
       - [Updating Slurm](#updating-slurm)
       - [Updating the NVIDIA driver](#updating-the-nvidia-driver-1)
-        - [On DGX](#on-dgx-1)
-        - [On Ubuntu](#on-ubuntu-2)
-        - [On RHEL](#on-rhel-2)
       - [Updating the CUDA toolkit](#updating-the-cuda-toolkit)
       - [Updating the monitoring stack (excluding dcgm-exporter)](#updating-the-monitoring-stack-excluding-dcgm-exporter)
       - [Updating dcgm-exporter](#updating-dcgm-exporter)
       - [Updating Enroot and Pyxis](#updating-enroot-and-pyxis)
     - [Installing a new HPC SDK](#installing-a-new-hpc-sdk)
     - [Updating OS packages](#updating-os-packages-1)
-      - [On Ubuntu](#on-ubuntu-3)
-      - [On RHEL](#on-rhel-3)
+      - [On Ubuntu](#on-ubuntu-1)
+      - [On RHEL](#on-rhel-1)
 
 ## Updating the DeepOps repository
 
@@ -249,7 +243,7 @@ The [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) automates the 
 
 To update to a new version of the GPU operator, set the following parameter in your DeepOps configuration:
 
-```yaml
+```bash
 gpu_operator_chart_version: "<version>"
 ```
 
@@ -269,39 +263,7 @@ DeepOps offers the option to configure each of the necessary NVIDIA components i
 
 ##### Updating the NVIDIA driver
 
-**Important**: A driver change does not reboot the node; it asks for a reboot (`/var/run/reboot-required`), which `playbooks/utilities/apt-upgrade.yml` performs with the node drained and checked afterwards. `-e maintenance_reboot_now=true` reboots at once instead, for nodes nobody uses yet.
-If you are using MIG-enabled GPUs ensure that your MIG configuration is persistent by using the [nvidia-mig-manager systemd](https://github.com/NVIDIA/mig-parted/tree/master/deployments/systemd) service
-or the [nvidia-mig-manager Kubernetes GPU Operator-included DaemonSet](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-operator-mig.html).
-
-###### On DGX
-
-To update the driver on a DGX system, we recommend following the instructions in the DGX User Guide.
-
-###### On Ubuntu
-
-On Ubuntu, DeepOps installs the `-server-open` driver package for one release branch (`nvidia_driver_branch`) from the Ubuntu archive. Updates within that branch arrive as ordinary package upgrades:
-
-```bash
-ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
-```
-
-To move to a new release branch, set it in your DeepOps configuration:
-
-```yaml
-nvidia_driver_branch: "<branch>"
-```
-
-Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, recommended for Turing and newer GPUs); set `"proprietary"` for older ones.
-
-Then run:
-
-```bash
-ansible-playbook playbooks/nvidia-software/nvidia-driver.yml [-l <list-of-nodes>]
-```
-
-###### On RHEL
-
-On RHEL and related distros, DeepOps installs the driver module stream for `nvidia_driver_branch` from NVIDIA's CUDA repository. Updates within the stream arrive with `sudo dnf upgrade` on each node, followed by a reboot; to change branch, set `nvidia_driver_branch` and re-run `playbooks/nvidia-software/nvidia-driver.yml`.
+As [for Slurm clusters](#updating-the-nvidia-driver-1), with the node cordoned and drained in Kubernetes (`kubectl drain <node> --ignore-daemonsets`) before the driver changes and uncordoned after its reboot. If you are using MIG-enabled GPUs, keep the MIG configuration persistent with the [nvidia-mig-manager systemd](https://github.com/NVIDIA/mig-parted/tree/master/deployments/systemd) service or the [GPU Operator's MIG manager](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-operator-mig.html).
 
 ##### Updating the NVIDIA Container Toolkit
 
@@ -317,7 +279,7 @@ Updating GFD should typically be non-disruptive, and does not need to be run on 
 
 To update to a new version of GFD, set the following variable in your DeepOps configuration:
 
-```yaml
+```bash
 k8s_gpu_feature_discovery_chart_version: "<version>"
 ```
 
@@ -335,7 +297,7 @@ Updating the GPU Device Plugin should typically be non-disruptive, and does not 
 
 To update to a new version, set the following variable in your DeepOps configuration:
 
-```yaml
+```bash
 k8s_gpu_plugin_chart_version: "<version>"
 ```
 
@@ -420,7 +382,7 @@ Performing these component-based upgrades does not require updating the DeepOps 
 
 To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version:
 
-```yaml
+```bash
 slurm_version: 25.11.6
 ```
 
@@ -434,37 +396,27 @@ Note that this can take a long time, as we download and build Slurm from source 
 
 #### Updating the NVIDIA driver
 
-**Important**: A driver change does not reboot the node; it asks for a reboot (`/var/run/reboot-required`), which `playbooks/utilities/apt-upgrade.yml` performs with the node drained and checked afterwards. `-e maintenance_reboot_now=true` reboots at once instead, for nodes nobody uses yet.
-
-##### On DGX
-
-To update the driver on a DGX system, we recommend following the instructions in the DGX User Guide.
-
-##### On Ubuntu
-
-On Ubuntu, DeepOps installs the `-server-open` driver package for one release branch (`nvidia_driver_branch`) from the Ubuntu archive. Updates within that branch arrive as ordinary package upgrades:
+Updates within the driver branch (`nvidia_driver_branch`) are ordinary package upgrades. They go out with the other packages, one node at a time, with the node drained, rebooted, checked and returned:
 
 ```bash
-ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
+ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 ```
 
-To move to a new release branch, set it in your DeepOps configuration:
+To move to another branch, set it in your DeepOps configuration (the CUDA toolkits, DCGM and the toolkit modules follow its CUDA major, `roles/nvidia_versions`):
 
 ```yaml
 nvidia_driver_branch: "<branch>"
 ```
 
-Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, recommended for Turing and newer GPUs); set `"proprietary"` for older ones.
-
-Then run:
+and switch the nodes, one at a time: each is drained and its jobs waited for, its driver replaced, rebooted, checked (slurmd, every GPU, DCGM, NHC) and returned; a failed node stays drained and stops the run:
 
 ```bash
-ansible-playbook playbooks/nvidia-software/nvidia-driver.yml [-l <list-of-nodes>]
+ansible-playbook -K playbooks/utilities/nvidia-driver-switch.yml -e hostlist=<one-node>   # first one, then the rest
 ```
 
-##### On RHEL
+Removing the running driver breaks every GPU job until the reboot, so `playbooks/nvidia-software/nvidia-driver.yml` (and the cluster deploy) refuses a switch on a node that still takes jobs and names this playbook. On Ubuntu the driver comes from the Ubuntu archive (`-server-open`); on RHEL and related distros from NVIDIA's CUDA repository module stream. Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, Turing and newer); set `"proprietary"` for older GPUs.
 
-On RHEL and related distros, DeepOps installs the driver module stream for `nvidia_driver_branch` from NVIDIA's CUDA repository. Updates within the stream arrive with `sudo dnf upgrade` on each node, followed by a reboot; to change branch, set `nvidia_driver_branch` and re-run `playbooks/nvidia-software/nvidia-driver.yml`.
+On DGX systems follow the DGX User Guide instead.
 
 #### Updating the CUDA toolkit
 
@@ -499,7 +451,7 @@ ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
 
 For the NVIDIA DCGM Exporter, the version and its digest are pinned together. To update, set both in your DeepOps configuration:
 
-```yaml
+```
 nvidia_dcgm_container_version: "4.5.3-4.8.2-distroless"
 nvidia_dcgm_container_digest: "sha256:<digest of that tag>"
 ```
@@ -514,7 +466,7 @@ ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 
 To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wise to use:
 
-```yaml
+```bash
 slurm_pyxis_version: "0.24.0"
 enroot_version: "4.2.0"
 ```
@@ -524,7 +476,7 @@ On RHEL-family hosts, override the RPM URLs alongside the version. The
 to `el8` artifacts in 3.4.1 and stopped publishing `el7` ones, so raising
 `enroot_version` to 3.4.1 or later on its own makes the download 404:
 
-```yaml
+```bash
 enroot_rpm_packages:
   - 'https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}/enroot-{{ enroot_version_string }}.el8.x86_64.rpm'
   - 'https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_version }}/enroot+caps-{{ enroot_version_string }}.el8.x86_64.rpm'
@@ -547,7 +499,7 @@ The NVIDIA HPC SDK is installed in versioned directories, so that new versions a
 
 To install a newer HPC SDK, first configure the version variables in your DeepOps configuration:
 
-```yaml
+```bash
 hpcsdk_major_version: "26"
 hpcsdk_minor_version: "3"
 hpcsdk_file_cuda: "13.1"
