@@ -57,12 +57,12 @@
 - name: Upgrade?
   ansible.builtin.set_fact:
     slurm_upgrade: true
-  when: slurmd_reported_version.stdout and slurmd_reported_version.stdout is version(slurm_version, '<')
+  when: slurmd_reported_version.stdout | length > 0 and slurmd_reported_version.stdout is version(slurm_version, '<')
 
 - name: Downgrade?
   ansible.builtin.set_fact:
     slurm_downgrade: true
-  when: slurmd_reported_version.stdout and slurmd_reported_version.stdout is version(slurm_version, '>')
+  when: slurmd_reported_version.stdout | length > 0 and slurmd_reported_version.stdout is version(slurm_version, '>')
 
 - name: Going to rebuild slurm?
   ansible.builtin.debug:

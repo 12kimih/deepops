@@ -13,7 +13,7 @@
   changed_when: false
   check_mode: false  # read-only; --check needs the result
   when:
-    - ansible_facts.ansible_local['gpus']['count']
+    - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists
 
 # A host upgraded from a pre-R470 driver may still carry the legacy
@@ -21,7 +21,7 @@
 # module so the two never coexist. Every step is a no-op once converged.
 - name: Use in-tree nvidia_peermem
   when:
-    - ansible_facts.ansible_local['gpus']['count']
+    - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists
     - nvidia_peermem_info.rc | default(1) == 0
   block:
@@ -48,7 +48,7 @@
 - name: Autoinstall DKMS modules
   ansible.builtin.command: dkms autoinstall
   when:
-    - ansible_facts.ansible_local['gpus']['count']
+    - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists
     - nvidia_peermem_info.rc | default(1) != 0
 
@@ -58,7 +58,7 @@
     state: present
     persistent: present  # write /etc/modules-load.d so it loads at boot
   when:
-    - ansible_facts.ansible_local['gpus']['count']
+    - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists
     - nvidia_peermem_info.rc | default(1) != 0
 
@@ -68,6 +68,6 @@
     state: started
     enabled: true  # survive reboot
   when:
-    - ansible_facts.ansible_local['gpus']['count']
+    - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists
     - nvidia_peermem_info.rc | default(1) != 0
