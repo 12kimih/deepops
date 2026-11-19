@@ -24,9 +24,11 @@
   ansible.builtin.include_tasks: platform_preflight.yml
 
 - name: Install the HAProxy ingress controller
-  ansible.builtin.include_tasks: helm_release.yml
+  ansible.builtin.include_role:
+    name: helm_release
   vars:
-    _rel:
+    helm_bin: "{{ runai_helm }}"
+    helm_release:
       release: "{{ runai_platform_ingress_release_name }}"
       namespace: "{{ runai_platform_ingress_namespace }}"
       chart: "{{ runai_platform_ingress_chart }}"
@@ -53,9 +55,11 @@
   ansible.builtin.include_tasks: platform_dns.yml
 
 - name: Install the Run:ai control plane
-  ansible.builtin.include_tasks: helm_release.yml
+  ansible.builtin.include_role:
+    name: helm_release
   vars:
-    _rel:
+    helm_bin: "{{ runai_helm }}"
+    helm_release:
       release: "{{ runai_cp_release_name }}"
       namespace: "{{ runai_cp_namespace }}"
       chart: "{{ runai_cp_chart }}"

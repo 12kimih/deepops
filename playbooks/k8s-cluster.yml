@@ -203,6 +203,8 @@
   import_playbook: container/nvidia-docker.yml
   vars:
     hostlist: "k8s_cluster"
+    # The device plugin's containers reach the GPUs through Docker's default runtime.
+    nvidia_container_toolkit_set_as_default_runtime: true
   tags:
     - nvidia
   when:

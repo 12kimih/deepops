@@ -1,8 +1,10 @@
 ---
 - name: Install KAI Scheduler
-  ansible.builtin.include_tasks: helm_release.yml
+  ansible.builtin.include_role:
+    name: helm_release
   vars:
-    _rel:
+    helm_bin: "{{ runai_helm }}"
+    helm_release:
       release: "{{ runai_kai_release_name }}"
       namespace: "{{ runai_kai_namespace }}"
       chart: "{{ runai_kai_chart }}"

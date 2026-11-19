@@ -9,6 +9,7 @@ Helm and HTTP operations are bounded doubles; nothing contacts a cluster.
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -28,9 +29,11 @@ class PlatformPath(unittest.TestCase):
         self.state = Path(self.tmp.name)
         role = self.state / "roles/runai"
         shutil.copytree(ROOT / "roles/runai", role)
-        # The roles it depends on (shared defaults such as deepops_paths) come along, as
-        # a play would load them.
+        # The roles it depends on (shared defaults such as deepops_paths) and the roles
+        # its tasks include (helm_release) come along, as a play would find them.
         deps = list((yaml.safe_load((role / "meta/main.yml").read_text()) or {}).get("dependencies") or [])
+        for tasks in sorted((role / "tasks").glob("*.yml")):
+            deps += re.findall(r"include_role:\s*\n\s*name:\s*(\S+)", tasks.read_text())
         while deps:
             dep = deps.pop()
             name = dep["role"] if isinstance(dep, dict) else dep

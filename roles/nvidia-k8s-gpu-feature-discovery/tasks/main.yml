@@ -1,16 +1,16 @@
 ---
-# Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
-# module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
-
-- name: Install nvidia k8s gpu feature discovery helm repo
-  ansible.builtin.command: /usr/local/bin/helm repo add nvgfd "{{ k8s_gpu_feature_discovery_helm_repo }}"
-  changed_when: false
-
-- name: Update helm repos
-  ansible.builtin.command: /usr/local/bin/helm repo update
-  changed_when: false
-
-- name: Install nvidia k8s gpu feature discovery
-  ansible.builtin.command: /usr/local/bin/helm upgrade --install "{{ k8s_gpu_feature_discovery_release_name }}" "{{ k8s_gpu_feature_discovery_chart_name }}"
-    --version "{{ k8s_gpu_feature_discovery_chart_version }}" --set allowDefaultNamespace=true --set "migStrategy={{ k8s_gpu_mig_strategy }}" --wait
-  changed_when: false
+# One Helm release in its desired state, through the shared helm_release role (a
+# converged rerun changes nothing).
+- name: Install NVIDIA GPU Feature Discovery
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ k8s_gpu_feature_discovery_release_name }}"
+      namespace: default
+      chart: "{{ k8s_gpu_feature_discovery_chart_name }}"
+      repo: "{{ k8s_gpu_feature_discovery_helm_repo }}"
+      version: "{{ k8s_gpu_feature_discovery_chart_version }}"
+      helm_values:
+        allowDefaultNamespace: true
+        migStrategy: "{{ k8s_gpu_mig_strategy }}"

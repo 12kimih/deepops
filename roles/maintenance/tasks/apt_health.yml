@@ -13,6 +13,8 @@
       ansible.builtin.apt:
         name: psmisc
         state: present
+        update_cache: true
+        cache_valid_time: 3600
         lock_timeout: 600
 
     # fuser exits 1 when nothing holds the lock, 0 while something does; anything else

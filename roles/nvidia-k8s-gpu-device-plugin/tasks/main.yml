@@ -1,18 +1,24 @@
 ---
-# Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
-# module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
-
-- name: Install nvidia k8s gpu device plugin helm repo
-  ansible.builtin.command: /usr/local/bin/helm repo add nvdp "{{ k8s_gpu_plugin_helm_repo }}"
-  changed_when: false
-
-- name: Update helm repos
-  ansible.builtin.command: /usr/local/bin/helm repo update
-  changed_when: false
-
-- name: Install nvidia k8s gpu device plugin
-  ansible.builtin.command: /usr/local/bin/helm upgrade --install "{{ k8s_gpu_plugin_release_name }}" "{{ k8s_gpu_plugin_chart_name }}" --version "{{
-    k8s_gpu_plugin_chart_version }}" --set "migStrategy={{ k8s_gpu_mig_strategy }}" --set "failOnInitError={{ k8s_gpu_plugin_init_error }}" --set
-    affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key="nvidia\.com\/gpu\.count",affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator="Exists"
-    --set allowDefaultNamespace=true --wait
-  changed_when: false
+# One Helm release in its desired state, through the shared helm_release role (a
+# converged rerun changes nothing).
+- name: Install the NVIDIA device plugin
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ k8s_gpu_plugin_release_name }}"
+      namespace: default
+      chart: "{{ k8s_gpu_plugin_chart_name }}"
+      repo: "{{ k8s_gpu_plugin_helm_repo }}"
+      version: "{{ k8s_gpu_plugin_chart_version }}"
+      helm_values:
+        migStrategy: "{{ k8s_gpu_mig_strategy }}"
+        failOnInitError: "{{ k8s_gpu_plugin_init_error | bool }}"
+        allowDefaultNamespace: true
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nvidia.com/gpu.count
+                      operator: Exists

@@ -136,6 +136,18 @@ srun -p PARTITION --gpus-per-task=1 \
 
 The `--container-image` flag runs the job inside the image using Pyxis/Enroot, which DeepOps installs by default. To build your own image from a Dockerfile, see [Building container images with rootless Podman](../container/podman.md).
 
+### Containers: Pyxis first, Docker only when it must
+
+Run GPU containers through Pyxis (`--container-image`). The container then is part of the job: it gets exactly the job's GPUs, CPUs and memory, it ends with the job, and its usage is accounted.
+
+A `docker run` inside a job starts the container as a child of the Docker daemon, not of the job, so Slurm's limits, cleanup and accounting do not apply to it. Use Docker only for what Pyxis cannot do, and then give the container the job's GPUs and nothing more. Docker attaches no GPU unless asked (its default runtime is not `nvidia`):
+
+```bash
+docker run --rm --gpus "\"device=$SLURM_JOB_GPUS\"" IMAGE nvidia-smi
+```
+
+`SLURM_JOB_GPUS` holds the node's own GPU indices. Inside the job `CUDA_VISIBLE_DEVICES` is renumbered from 0, so it names the wrong devices for Docker. Stop the container before the job ends; Slurm does not.
+
 ## Additional Resources
 
 - [SchedMD Slurm Quickstart Guide](https://slurm.schedmd.com/quickstart.html)

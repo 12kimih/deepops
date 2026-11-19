@@ -23,7 +23,11 @@ nvidia_container_toolkit_packages:
   - libnvidia-container1
 
 nvidia_container_toolkit_configure_docker: true
-nvidia_container_toolkit_set_as_default_runtime: true
+# Off: a container gets GPUs only when it asks for them (--gpus or a CDI device), as
+# NVIDIA's install guide configures Docker. With nvidia as Docker's default runtime,
+# every container saw every GPU of the node, outside what Slurm gave the job. The
+# Kubernetes deploy turns it on where the device plugin runs on Docker (it needs it).
+nvidia_container_toolkit_set_as_default_runtime: false
 # Ensure the docker service is enabled at boot and running. On RHEL the docker-ce
 # package does not auto-enable docker, so every docker-based service (DCGM/Slurm
 # exporters, registry, ...) would be dead after reboot without this.

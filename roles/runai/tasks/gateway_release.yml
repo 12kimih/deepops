@@ -7,9 +7,11 @@
   check_mode: false
 
 - name: "Install only missing or owned release ({{ runai_gw_release }})"
-  ansible.builtin.include_tasks: helm_release.yml
+  ansible.builtin.include_role:
+    name: helm_release
   vars:
-    _rel:
+    helm_bin: "{{ runai_helm }}"
+    helm_release:
       release: "{{ runai_gw_release }}"
       namespace: "{{ runai_gateway_controller_namespace }}"
       chart: "{{ runai_gateway_controller_crds_chart if runai_gw_release == 'kgateway-crds' else runai_gateway_controller_chart }}"
