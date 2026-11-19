@@ -25,15 +25,36 @@
 #   --override     ignore compiler/toolkit detection checks (newer host gcc)
 #   --no-man-page  skip man pages
 #   --tmpdir       scratch dir (in case /tmp is small)
+# The runfile writes nvcc early, so an install killed part-way (a full disk) would pass
+# a check for it and get a modulefile. It installs into a hidden .partial tree instead,
+# renamed to the version only once it succeeded; a leftover from an earlier attempt
+# (or a version tree without nvcc) is removed first.
+- name: Remove what an earlier attempt left for {{ cuda_toolkit.version }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ cuda_install_root }}/.{{ cuda_toolkit.version }}.partial"
+    - "{{ cuda_install_root }}/{{ cuda_toolkit.version }}"
+
 - name: Install the toolkit (never the driver) for {{ cuda_toolkit.version }}
   ansible.builtin.command:
     cmd: >-
       sh {{ cuda_cache_dir }}/{{ cuda_toolkit.runfile }}
       --silent --toolkit
-      --toolkitpath={{ cuda_install_root }}/{{ cuda_toolkit.version }}
+      --toolkitpath={{ cuda_install_root }}/.{{ cuda_toolkit.version }}.partial
       --override --no-man-page
       --tmpdir={{ cuda_cache_dir }}/tmp
-    creates: "{{ cuda_install_root }}/{{ cuda_toolkit.version }}/bin/nvcc"
+  changed_when: true
+
+- name: Put the finished toolkit in place for {{ cuda_toolkit.version }}
+  ansible.builtin.command:
+    argv:
+      - mv
+      - -T
+      - "{{ cuda_install_root }}/.{{ cuda_toolkit.version }}.partial"
+      - "{{ cuda_install_root }}/{{ cuda_toolkit.version }}"
+  changed_when: true
 
 - name: Remove the runfile of {{ cuda_toolkit.version }}
   ansible.builtin.file:

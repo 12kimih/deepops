@@ -45,6 +45,8 @@
     - "{{ cuda_modroot }}/cuda"
     - "{{ cuda_cache_dir }}/tmp"
 
+# A version tree appears only once its install finished (install_one.yml renames it
+# from a hidden .partial tree), so its nvcc means a complete toolkit.
 - name: Probe which toolkits are already installed (idempotency)
   ansible.builtin.stat:
     path: "{{ cuda_install_root }}/{{ item.version }}/bin/nvcc"
@@ -138,6 +140,23 @@
           | map('regex_replace', '^', cuda_install_root ~ '/') | list)
          + (cuda_versions | map(attribute='version') | map('regex_replace', '\.[0-9]+$', '.lua')
             | map('regex_replace', '^', cuda_modroot ~ '/cuda/') | list) }}
+
+# An install that failed for a version since dropped from cuda_versions leaves its
+# .partial tree (install_one.yml); hidden, the find above never sees it.
+- name: Find unfinished toolkit installs
+  ansible.builtin.find:
+    paths: "{{ cuda_install_root }}"
+    file_type: directory
+    hidden: true
+    patterns: ['^\.[0-9]+\.[0-9]+(\.[0-9]+)?\.partial$']
+    use_regex: true
+  register: cuda_partial
+
+- name: Remove unfinished toolkit installs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cuda_partial.files | map(attribute='path') | list }}"
 
 # The record the modulefiles were tracked with before the role owned the directory.
 - name: Remove the retired modulefile record
