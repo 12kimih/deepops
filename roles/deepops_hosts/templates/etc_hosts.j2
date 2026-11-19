@@ -37,7 +37,7 @@ ff02::2  ip6-allrouters
   {% elif ((hosts_network_interface is not mapping) and hosts_network_interface) -%}
       {% set di = hosts_network_interface -%}
   {% else -%}
-    {% set di = hostvars[host]['ansible_default_' + hosts_ip_protocol]['interface']|default(None) -%}
+    {% set di = hostvars[host]['ansible_facts'].get('default_' + hosts_ip_protocol, {}).get('interface') -%}
   {% endif -%}
   {% for interface in my_interfaces|sort -%}
     {#- look facts up by raw interface name via ansible_facts: injected ansible_* vars

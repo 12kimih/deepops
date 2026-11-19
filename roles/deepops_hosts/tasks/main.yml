@@ -5,11 +5,22 @@
 - name: Gather facts again
   ansible.builtin.setup:
 
-- name: Register hosts list if an ansible group limit is specified
-  ansible.builtin.set_fact:
-    hosts_add_ansible_managed_hosts_groups:
-      - "{{ ansible_limit }}"
-  when: ansible_limit is defined
+# Every host the file lists needs its interface facts. Under --limit the others have
+# none (or a stale cache), and dropping them would leave nodes unable to resolve the
+# controller or the NFS server; so say which, rather than write a partial file.
+- name: Require the facts of every host the file lists
+  ansible.builtin.assert:
+    that: hosts_missing_facts | length == 0
+    fail_msg: >-
+      No interface facts for {{ hosts_missing_facts | join(', ') }}: run without --limit
+      (or gather their facts first), so /etc/hosts lists every host.
+    quiet: true
+  vars:
+    hosts_missing_facts: >-
+      {{ hosts_add_ansible_managed_hosts_groups | map('extract', groups) | flatten | unique
+         | reject('in', hostvars | dict2items | selectattr('value.ansible_facts.interfaces', 'defined')
+                        | map(attribute='key') | list) | list }}
+  when: hosts_add_ansible_managed_hosts | bool and hosts_file_src is not defined
 
 - name: Install user-defined custom hosts file
   ansible.builtin.copy:

@@ -104,8 +104,15 @@ INJECTED = re.compile(
     r"(?<![\w.'\"\[-])(?<!filter=)(?:(?:in\s+|not\s+in\s+)(?:services|packages)\b|(?:services|packages)\["
     r"|ansible_(?:distribution|os_family|kernel|architecture|processor|memtotal_mb|lsb|pkg_mgr"
     r"|service_mgr|devices|mounts|interfaces|default_ipv[46]|all_ipv[46]_addresses|fqdn|hostname"
-    r"|nodename|machine_id|virtualization|system|python|date_time|env|local|product|bios|cmdline"
+    r"|nodename|machine_id|virtualization|system|python(?!_interpreter)|date_time|env|local|product|bios|cmdline"
     r"|selinux|apparmor|user_id|domain|dns|proc_cmdline|uptime_seconds|board)\w*)"
+)
+
+
+# The same facts read by name from hostvars, or by a name built at run time.
+INJECTED_INDIRECT = re.compile(
+    r"""\[\s*['"]ansible_(?!facts\b|host\b|user\b|port\b|connection\b|become|ssh_|python_interpreter)"""
+    r"""|['"]ansible_['"]?\s*[+~]"""
 )
 
 
@@ -137,17 +144,25 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "use /var/cache/deepops, never /tmp, /var/tmp or /dev/shm")
 
     def test_facts_through_ansible_facts(self):
+        def code(path):  # Jinja comments blanked, line numbers kept
+            return re.sub(r"\{#.*?#\}", lambda m: "\n" * m.group().count("\n"), path.read_text(), flags=re.S)
+
         offenders = [
             f"{path.relative_to(ROOT)}:{number}"
             for path in fact_files()
-            for number, line in enumerate(path.read_text().splitlines(), 1)
-            if not line.lstrip().startswith("#") and INJECTED.search(line)
+            for number, line in enumerate(code(path).splitlines(), 1)
+            if not line.lstrip().startswith("#") and (INJECTED.search(line) or INJECTED_INDIRECT.search(line))
         ]
         self.assertEqual(offenders, [], "read these through ansible_facts")
 
     def test_the_fact_rule_sees_injected_names(self):
         for bad in ('when: ""x.service" in services"', "{{ ansible_distribution }}", "x: packages['a']"):
             self.assertTrue(INJECTED.search(bad), bad)
+        for bad in ("hostvars[h]['ansible_hostname']", "hostvars[h]['ansible_default_' + p]"):
+            self.assertTrue(INJECTED_INDIRECT.search(bad), bad)
+        for good in ("hostvars[h]['ansible_facts']['fqdn']", "hostvars[h]['ansible_host']",
+                     "ansible_python_interpreter: /usr/bin/python3"):  # fmt: skip
+            self.assertFalse(INJECTED.search(good) or INJECTED_INDIRECT.search(good), good)
         for good in ("when: '\"x\" in ansible_facts.services'", "{{ ansible_facts.distribution }}",
                      "ansible_check_mode", "ansible_facts['packages']", "Gather service facts",
                      "ansible.builtin.setup: filter=ansible_local"):  # fmt: skip
