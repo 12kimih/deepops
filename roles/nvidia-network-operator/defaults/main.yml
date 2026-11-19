@@ -1,0 +1,3 @@
+---
+# SR-IOV virtual functions per physical function (SriovNetworkNodePolicy numVfs).
+nvidia_network_operator_num_vf: 8

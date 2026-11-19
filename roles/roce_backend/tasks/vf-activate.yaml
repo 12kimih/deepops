@@ -8,7 +8,7 @@
 
 - name: VF activation
   ansible.builtin.shell: |
-    echo {{ num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs
+    echo {{ roce_backend_num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs
   args:
     executable: /bin/bash
   when: result.rc > 0
@@ -25,6 +25,6 @@
 - name: For persistent VF activation
   ansible.builtin.lineinfile:
     path: /etc/rc.local
-    line: "echo {{ num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs"
+    line: "echo {{ roce_backend_num_vf | int }} > /sys/class/net/{{ item.pf_name }}/device/sriov_numvfs"
     insertbefore: "^exit 0"
   tags: roce_host
