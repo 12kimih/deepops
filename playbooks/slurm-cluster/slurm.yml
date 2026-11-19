@@ -20,6 +20,13 @@
         public: true
         tasks_from: version
 
+# The packages build in a container there (roles/slurm/tasks/packages-build.yml).
+- name: Install Docker on the package build host
+  import_playbook: ../container/docker.yml
+  vars:
+    hostlist: slurm-master[0]
+    deepops_phase: require  # the build needs it whatever the cluster map says
+
 # The packages of slurm_version, built once into the repository every node installs
 # from (a no-op when the repository has them).
 - hosts: slurm-master[0]

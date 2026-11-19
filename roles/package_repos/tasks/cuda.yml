@@ -22,8 +22,8 @@
     # keeps this version when the keyring is upgraded.)
     - name: Point the CUDA repository source at package_repos_cuda_url
       ansible.builtin.copy:
-        dest: "/etc/apt/sources.list.d/cuda-{{ package_repos_cuda_dir | replace('/', '-') }}.list"
-        content: "deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] {{ package_repos_cuda_url }}/ /\n"
+        dest: "{{ package_repos_cuda_source_file }}"
+        content: "deb [signed-by={{ package_repos_cuda_keyring_file }}] {{ package_repos_cuda_url }}/ /\n"
         owner: root
         group: root
         mode: "0644"

@@ -23,6 +23,10 @@ package_repos_cuda_dir: >-
   'sbsa' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}
 package_repos_cuda_url: "{{ package_repos_cuda_base }}/{{ package_repos_cuda_dir }}"
 package_repos_cuda_keyring: cuda-keyring_1.1-1_all.deb
+# Debian: the key the keyring package installs and the source that trusts only it (also
+# what a clean build container mounts to reach the repository, roles/slurm).
+package_repos_cuda_keyring_file: /usr/share/keyrings/cuda-archive-keyring.gpg
+package_repos_cuda_source_file: "/etc/apt/sources.list.d/cuda-{{ package_repos_cuda_dir | replace('/', '-') }}.list"
 # The keyring is the trust anchor for every NVIDIA package, and each directory has
 # its own build of it: sha256 per directory (developer.download.nvidia.com, 2026-11).
 package_repos_cuda_keyring_checksums:

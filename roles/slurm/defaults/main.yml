@@ -34,6 +34,14 @@ slurm_repo_dir: "{{ sm_prefix }}/.slurm-repo"
 # dependencies and publishes the result. Never under a world-writable directory.
 slurm_deb_build_dir: /var/cache/deepops/build/slurm-deb
 slurm_deb_build_user: slurmbuild
+# The container the build runs in: this host's own release, so the packages link what
+# the nodes have (pulled through the site's registry mirror, if any). Pinned per release
+# by its multi-arch index digest (Docker Hub, 2026-11-20).
+slurm_deb_build_images:
+  "22.04": "ubuntu:22.04@sha256:9abcaffc92a5279fff3a6a41635c0800ea33e528425fb389658806476e7defde"
+  "24.04": "ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8"
+slurm_deb_build_image: "{{ slurm_deb_build_images[ansible_facts.distribution_version] }}"
+slurm_deb_build_container: deepops-slurm-build
 # Build dependencies besides the Build-Depends of the shipped debian/control: NUMA,
 # readline, eBPF (cgroup/v2 device constraint), InfiniBand counters
 # (acct_gather_interconnect/ofed). Lua 5.4 replaces the control file's 5.3: the

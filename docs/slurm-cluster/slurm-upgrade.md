@@ -21,9 +21,12 @@ how to rename a cluster.
 `roles/slurm` installs SchedMD's Debian packages (`slurm-smd*`). They are built once
 per version on `slurm-master[0]` from the release tarball, checked against
 `slurm_checksums`, with the `debian/` directory the release ships
-([Slurm's procedure](https://slurm.schedmd.com/quickstart_admin.html#debuild)): root
-installs the build dependencies with `mk-build-deps`, the unprivileged account
-`slurmbuild` runs `dpkg-buildpackage`. The build uses the distribution's PMIx, hwloc,
+([Slurm's procedure](https://slurm.schedmd.com/quickstart_admin.html#debuild)), in a
+throwaway Docker container of the host's own release (`slurm_deb_build_image`), never on
+the host: nothing the host has installed (an older Slurm under `/usr/local`, other
+libraries) can reach the packages. Root in the container installs the build
+dependencies with `mk-build-deps`; the unprivileged account `slurmbuild` runs
+`dpkg-buildpackage` on the tree, which stays on the host. The build uses the distribution's PMIx, hwloc,
 Lua 5.4, curl, InfiniBand (ibmad, ibumad), MUNGE, MariaDB and PAM libraries and
 NVIDIA's `cuda-nvml-dev-<slurm_nvml_cuda_version>` (the NVML header and link stub;
 never `/usr/local/cuda`), and stops if a plugin in `slurm_deb_required_plugins` is
