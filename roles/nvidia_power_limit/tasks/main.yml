@@ -68,8 +68,8 @@
               {{ inventory_hostname }}. Check the range with: nvidia-smi -q -d POWER
           loop: "{{ nvidia_power_limit_state.stdout_lines | default([]) }}"
           when:
-            - item.split(',')[3] | trim | regex_search('^[0-9.]+$')
-            - item.split(',')[4] | trim | regex_search('^[0-9.]+$')
+            - item.split(',')[3] | trim is regex('^[0-9.]+$')
+            - item.split(',')[4] | trim is regex('^[0-9.]+$')
           loop_control:
             label: "GPU {{ item.split(',')[0] | trim }}"
 
@@ -130,7 +130,7 @@
             cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ nvidia_power_limit_watts | int }}
           loop: "{{ nvidia_power_limit_recheck.stdout_lines | default([]) }}"
           when:
-            - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
+            - item.split(',')[1] | trim is regex('^[0-9.]+$')
             - (item.split(',')[1] | trim | float) != (nvidia_power_limit_watts | float)
           loop_control:
             label: "GPU {{ item.split(',')[0] | trim }}: {{ item.split(',')[1] | trim }}W -> {{ nvidia_power_limit_watts }}W"
@@ -176,8 +176,8 @@
           loop: "{{ nvidia_power_limit_state.stdout_lines | default([]) }}"
           when:
             - nvidia_power_limit_removed is changed
-            - item.split(',')[1] | trim | regex_search('^[0-9.]+$')
-            - item.split(',')[2] | trim | regex_search('^[0-9.]+$')
+            - item.split(',')[1] | trim is regex('^[0-9.]+$')
+            - item.split(',')[2] | trim is regex('^[0-9.]+$')
             - (item.split(',')[1] | trim | float) != (item.split(',')[2] | trim | float)
           loop_control:
             label: "GPU {{ item.split(',')[0] | trim }}: {{ item.split(',')[1] | trim }}W -> default {{ item.split(',')[2] | trim }}W"

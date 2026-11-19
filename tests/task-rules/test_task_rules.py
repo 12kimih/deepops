@@ -40,7 +40,9 @@ import sys
 import unittest
 from pathlib import Path
 
+import jinja2
 import yaml
+from jinja2 import nodes
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
@@ -61,6 +63,62 @@ SECRET = re.compile(
     r"\{\{[^}]*(password|passwd|_token|\btoken\b|secret|webhook|api_key|_pass\b|heartbeat_url|munge_key)[^}]*\}\}"
 )
 MINIMUM_FILES = 200  # a scan that sees fewer has lost its way
+
+
+# Attributes of registered results and facts that hold a number, string or list.
+VALUE_ATTRS = {
+    "stdout",
+    "stderr",
+    "stdout_lines",
+    "stderr_lines",
+    "rc",
+    "count",
+    "files",
+    "results",
+    "matched",
+    "msg",
+    "content",
+    "path",
+    "size",
+}
+# Filters that return a boolean (plugins/filter adds mode_exceeds).
+BOOL_FILTERS = {"bool", "mode_exceeds"}
+JINJA = jinja2.Environment()
+
+
+def not_boolean(cond):
+    """True when a condition surely yields a number, string or list, never a boolean.
+    ansible-core 2.19+ fails a task on such a `when`; a bare variable of unknown type
+    passes (most are switches)."""
+    if "{{" in cond:
+        return False
+    try:
+        tree = JINJA.parse("{{ " + cond + " }}").body[0].nodes[0]
+    except jinja2.TemplateSyntaxError:
+        return False
+
+    def value(node):
+        if isinstance(node, (nodes.Compare, nodes.Test, nodes.Not)):
+            return False
+        if isinstance(node, (nodes.And, nodes.Or)):
+            return value(node.left) or value(node.right)
+        if isinstance(node, nodes.CondExpr):
+            return value(node.expr1) or (node.expr2 is not None and value(node.expr2))
+        if isinstance(node, nodes.Filter):
+            if node.name in ("default", "d") and node.args and isinstance(node.args[0], nodes.Const):
+                return not isinstance(node.args[0].value, bool) or value(node.node)
+            return node.name not in BOOL_FILTERS
+        if isinstance(node, nodes.Const):
+            return not isinstance(node.value, bool)
+        if isinstance(node, nodes.Getattr):
+            return node.attr in VALUE_ATTRS
+        if isinstance(node, nodes.Getitem):
+            return isinstance(node.arg, nodes.Const) and node.arg.value in VALUE_ATTRS
+        return isinstance(
+            node, (nodes.BinExpr, nodes.UnaryExpr, nodes.List, nodes.Dict, nodes.Tuple, nodes.Concat)
+        )
+
+    return value(tree)
 
 
 def rel(path):
@@ -264,17 +322,41 @@ class TaskRules(unittest.TestCase):
         scan.check(self)
 
     def test_conditions_are_boolean(self):
-        bare = re.compile(r"\|\s*(length|int)\s*$|\|\s*(default|d)\((['\"])[^'\"]*\3\)\s*$")
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
                 for key in ("when", "failed_when", "changed_when", "until"):
                     conditions = task.get(key)
                     for cond in conditions if isinstance(conditions, list) else [conditions]:
-                        if isinstance(cond, str) and bare.search(cond.strip()):
+                        if isinstance(cond, str) and not_boolean(cond):
                             offenders.append(f"{rel(path)}: {task.get('name')}: {key}: {cond}")
         self.assertEqual(offenders, [], "compare or cast these conditions to a boolean")
         scan.check(self)
+
+    def test_the_condition_classifier(self):
+        for cond in (
+            "x | length",
+            "x | default('')",
+            "r.stdout",
+            "r.stdout and r.stdout is version('1', '<')",
+            "f['gpus']['count']",
+            "x | trim | regex_search('^[0-9]+$')",
+            "r.rc",
+            "1 + 1",
+        ):
+            self.assertTrue(not_boolean(cond), cond)
+        for cond in (
+            "x | length > 0",
+            "x | bool",
+            "x is defined and x",
+            "not r.stdout",
+            "r.rc == 0",
+            "x is regex('^a')",
+            "install_dcgm",
+            "a or b | bool",
+            "'x' in r.stdout",
+        ):
+            self.assertFalse(not_boolean(cond), cond)
 
     def test_downloads_are_verified(self):
         scan, offenders = Scan(SIGNATURE_CHECKED, MINIMUM_FILES), []
