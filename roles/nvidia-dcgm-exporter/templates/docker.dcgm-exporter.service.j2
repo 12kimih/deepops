@@ -11,7 +11,12 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
-ExecStart=/usr/bin/docker run --rm --gpus all --cap-add=SYS_ADMIN --cpus="{{ nvidia_dcgm_max_cpu }}" --name %n -p {{ nvidia_dcgm_exporter_port }}:9400 -v "{{ nvidia_dcgm_container_config_dir }}/{{ nvidia_dcgm_container_custom_metrics_file }}:/etc/dcgm-exporter/default-counters.csv" {{ nvidia_dcgm_container }}
+# The GPUs come through CDI (the toolkit's generated spec), not --gpus: a container
+# given them by the legacy hook loses them on every systemd daemon-reload (NVIDIA's
+# troubleshooting guide). Host network: the node's own name labels the series, and no
+# Docker DNAT bypasses the host firewall. The collectors file is mounted read-only and
+# named, as the exporter's docs show.
+ExecStart=/usr/bin/docker run --rm --device nvidia.com/gpu=all --cap-add=SYS_ADMIN --cpus="{{ nvidia_dcgm_max_cpu }}" --name %n --network host -v "{{ nvidia_dcgm_container_config_dir }}/{{ nvidia_dcgm_container_custom_metrics_file }}:/etc/dcgm-exporter/custom-counters.csv:ro" {{ nvidia_dcgm_container }} --collectors /etc/dcgm-exporter/custom-counters.csv --address :{{ nvidia_dcgm_exporter_port }}
 
 [Install]
 WantedBy=multi-user.target

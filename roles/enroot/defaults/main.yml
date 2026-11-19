@@ -14,7 +14,7 @@
 #   https://github.com/NVIDIA/enroot/blob/main/doc/configuration.md
 
 # --- Version / packages -------------------------------------------------------
-enroot_version: "4.2.0"
+enroot_version: "4.2.1"
 enroot_release: "1"
 enroot_version_string: "{{ enroot_version }}-{{ enroot_release }}"
 
@@ -45,22 +45,24 @@ _enroot_files: >-
 # Per release file, as GitHub publishes for the release assets (roles/download); add
 # the new files when changing enroot_version.
 enroot_checksums:
-  "enroot+caps-4.2.0-1.el8.aarch64.rpm": "sha256:ac39f9f4e52b5789caff6123cbb1649e4a1ab87e31602310a18f84b52ddbc9e9"
-  "enroot+caps-4.2.0-1.el8.x86_64.rpm": "sha256:b83b7ee152deaf751ce611aaffa3f4a50a28d5e5f1a518d5f79fb3cdcd8e8ac1"
-  "enroot+caps_4.2.0-1_amd64.deb": "sha256:faf2eebf6efa7f4a58ba86ef3ba81f4e2b015bb892da865149133f20579f234c"
-  "enroot+caps_4.2.0-1_arm64.deb": "sha256:b6c7ca8e6c8dad69f5dab0b629e2d4582e8fcd330634f312f3ab3ec2f7bb97dd"
-  "enroot-4.2.0-1.el8.aarch64.rpm": "sha256:50a5084152631e6c011a88efdf3196c80cd94aa4d61f997b881fff159b8584a2"
-  "enroot-4.2.0-1.el8.x86_64.rpm": "sha256:1217f0262709d405ab03cc82a06c96c8efb709fc78557ec11d22bcd9697dfc00"
-  "enroot-hardened+caps-4.2.0-1.el8.aarch64.rpm": "sha256:c13dda5cb29c7107f9fac989ffa714d902d5091e44f778f432a5e60980dacb1b"
-  "enroot-hardened+caps-4.2.0-1.el8.x86_64.rpm": "sha256:b9d732f9eb52302863a4cf4d60717bda63ba075b88a2db68776aee7e0667c5f3"
-  "enroot-hardened+caps_4.2.0-1_amd64.deb": "sha256:abb269c368537c372f12fa0f63aa7317440d99bcc602771079231cc2c3b9cb95"
-  "enroot-hardened+caps_4.2.0-1_arm64.deb": "sha256:be5efa6ed07d3689b4b2cf17eae9cc28d22a3fc1c1015db1b34ebe7649a6d90a"
-  "enroot-hardened-4.2.0-1.el8.aarch64.rpm": "sha256:647714c3c5ce77d1210ca0ce1545d076cbce515a391fe7477812b834a5a2c41e"
-  "enroot-hardened-4.2.0-1.el8.x86_64.rpm": "sha256:58c79f5cdc2900fb6c52b74f331e57fc03e608241fe1b98f40bf9f6573c63d54"
-  "enroot-hardened_4.2.0-1_amd64.deb": "sha256:b6a8333a2251fc63a249bd2f91126d1942921ef1fc083a8ca511e595e1ace9f3"
-  "enroot-hardened_4.2.0-1_arm64.deb": "sha256:efc869f3272ab2e5b4b9171cbec706576d7f890f42a7b9462a042a7553217352"
-  "enroot_4.2.0-1_amd64.deb": "sha256:50bfcf8336bfe1a5d19481081d7800ae80300a27795595757f7d20957e079a62"
-  "enroot_4.2.0-1_arm64.deb": "sha256:ea7ccaba624c62eaed388c3aed29dbc261a9e42c7b6aaf4e95ff4037c8a2efe4"
+  "enroot_4.2.1-1_amd64.deb": "sha256:5955c51e88df0c5ed538d87abb5264609d4bad55fa8570745ed5d4ec66c8ab91"
+  "enroot_4.2.1-1_arm64.deb": "sha256:267018b335815a6b32a562915de1f3fad579f7c9d6748e98c62e7369b40be421"
+  "enroot-4.2.1-1.el8.aarch64.rpm": "sha256:6b6bc2526f0f0daa7d3cebe6dd33c0468b209e81eebd92def5777520042ec6fe"
+  "enroot-4.2.1-1.el8.x86_64.rpm": "sha256:6749195e37e3a98071ec349884900b12de7677332599da0fd5d8afb5bed9233c"
+  "enroot+caps_4.2.1-1_amd64.deb": "sha256:ca22652dcbdd3ebb6e2c68df781ef4301647c79dd7a41ed62899c2fd0f692750"
+  "enroot+caps_4.2.1-1_arm64.deb": "sha256:12b811d0c95e879e42e4ac762fa85869a5f3cc9dbb06ab483c01e12e911284a1"
+  "enroot+caps-4.2.1-1.el8.aarch64.rpm": "sha256:38cf9ae9602a9a8c3e94637bc1b34e736e8176bda656ba71d371f5e1d1e1eed9"
+  "enroot+caps-4.2.1-1.el8.x86_64.rpm": "sha256:56321a03a1f6c4e4273bf664917eb9a174714499d5506c498db4b64275a2b9c0"
+  "enroot-check_4.2.1_aarch64.run": "sha256:be1da1e830f9081808fc14b9926e979ef8695ae5d8481b04026c837d7fb1d6a7"
+  "enroot-check_4.2.1_x86_64.run": "sha256:8f39b28312d24c0fc8ae35386906bf51238934bee54df583b63ea99175ba1eea"
+  "enroot-hardened_4.2.1-1_amd64.deb": "sha256:9ac0f0852d5c8210270d959dbd83ceb24a635d9990689a3368dd90e6c9cdb7ab"
+  "enroot-hardened_4.2.1-1_arm64.deb": "sha256:f8e44935ea8a4eb9b94d19c71a806258b1650408c605d325c3314fbd74fb37ee"
+  "enroot-hardened-4.2.1-1.el8.aarch64.rpm": "sha256:8fdae7608581a891749d612504de8027d811634d296deff4de58c9124ab37a25"
+  "enroot-hardened-4.2.1-1.el8.x86_64.rpm": "sha256:11ab8a66a4978cdc0997ca01d6c8f12a83d4296b39e63550a37bdc79721b00f7"
+  "enroot-hardened+caps_4.2.1-1_amd64.deb": "sha256:61d1bb0991b0e030883bbc05f9d1bfebd37ac9a8c8eb2da648c129954a1fbd68"
+  "enroot-hardened+caps_4.2.1-1_arm64.deb": "sha256:c47ef4aec39b23e2485a50e7c588726ef7387b38b35c1c574935ec54abd75950"
+  "enroot-hardened+caps-4.2.1-1.el8.aarch64.rpm": "sha256:62130055030d88fa8153a9155c02e17c345496903fad386c8f296d375dff2549"
+  "enroot-hardened+caps-4.2.1-1.el8.x86_64.rpm": "sha256:f6591de82f48fe26a9aac70e8bff563ce07181ca594c8f5692ba951fa2cfbda4"
 
 # --- Unprivileged user namespace enablement ----------------------------------
 # Namespace counts must be > 1 on every OS (a hard enroot prerequisite).
@@ -88,10 +90,17 @@ enroot_configure_kernel_options_versions: "ALL"
 enroot_runtime_path: "/run/enroot/user-$(id -u)"
 enroot_cache_path: "/var/lib/enroot-cache/user-$(id -u)"
 enroot_data_path: "/tmp/enroot-data/user-$(id -u)"
-# Block appended to /etc/enroot/enroot.conf. Override in group_vars to customize.
+# enroot's configuration, written as /etc/enroot/enroot.conf.d/90-deepops.conf: enroot
+# reads every *.conf there after enroot.conf (configuration.md), and the package's own
+# enroot.conf stays as shipped, so an upgrade brings its new defaults.
+# Squash options as the pyxis setup guide gives them: zstd, since with
+# use_enroot_load=1 an image is never squashed on the way to a container (only by
+# --container-save), and -exit-on-error, so a read error fails the save instead of
+# leaving a corrupt image. Home directories are mounted (unlike the guide's example):
+# they are the shared NFS homes jobs expect inside the container too.
 enroot_config: |
   ENROOT_CONFIG_PATH ${HOME}/.config/enroot
-  ENROOT_SQUASH_OPTIONS -noI -noD -noF -noX -no-duplicates
+  ENROOT_SQUASH_OPTIONS -comp zstd -Xcompression-level 3 -b 1M -exit-on-error
   ENROOT_MOUNT_HOME y
   ENROOT_RESTRICT_DEV y
   ENROOT_ROOTFS_WRITABLE y

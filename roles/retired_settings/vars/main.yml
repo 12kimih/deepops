@@ -27,3 +27,4 @@ retired_settings:
   sm_install_default: easybuild_packages (empty builds nothing) in roles/easy-build-packages
   sm_sources_path: easybuild_prefix in roles/deepops_paths (sources live under it)
   sm_build_path: easybuild_home in roles/easy-build (builds unpack under it)
+  slurm_password: slurm_munge_key_file, a vaulted key file (docs/slurm-cluster/munge-key.md)

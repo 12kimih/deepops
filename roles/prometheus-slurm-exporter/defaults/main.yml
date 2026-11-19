@@ -5,8 +5,7 @@
 slurm_exporter_container: "deepops/prometheus-slurm-exporter:2.0.0"
 slurm_exporter_build_image: true
 slurm_exporter_build_dir: /opt/deepops/build/slurm-exporter
-# Port the slurm exporter listens on. The container keeps its image default (host network);
-# this only sets the scrape target.
+# Port the slurm exporter listens on (host network; -listen-address), and its scrape target.
 slurm_exporter_port: 8080
 slurm_exporter_svc_name: "docker.slurm-exporter.service"
 slurm_exporter_state: started

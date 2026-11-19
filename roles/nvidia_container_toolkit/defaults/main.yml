@@ -12,7 +12,7 @@ nvidia_container_toolkit_rpm_prerequisites:
 # Pin the toolkit to an exact package version for reproducibility (set "" to
 # track the latest). All packages in the set are pinned to the same version.
 # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
-nvidia_container_toolkit_version: "1.19.1-1"
+nvidia_container_toolkit_version: "1.20.2-1"
 # The unified toolkit package set (nvidia-docker2 / nvidia-container-runtime are
 # end-of-life and replaced by these). Pin all four together.
 nvidia_container_toolkit_packages:

@@ -21,8 +21,7 @@ ExecStart=/usr/bin/docker run --rm --network host --name %n \
 {% if prometheus_retention_size %}
   --storage.tsdb.retention.size={{ prometheus_retention_size }} \
 {% endif %}
-  --web.listen-address=:{{ prometheus_port }} \
-  --web.enable-lifecycle
+  --web.listen-address=:{{ prometheus_port }}
 
 [Install]
 WantedBy=multi-user.target

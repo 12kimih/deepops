@@ -435,11 +435,16 @@ The newest toolkits arrive by themselves up to the CUDA major the driver branch 
 
 For the single system-wide toolkit instead (`nvidia_cuda_install: true`), set the package in `cuda_version`, for example `cuda-toolkit-13-2`, and re-run `playbooks/nvidia-software/nvidia-cuda.yml`.
 
-#### Updating the monitoring stack (excluding dcgm-exporter)
+#### Updating the monitoring stack
 
-The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by tag and digest (`repo:tag@sha256:...`) in a variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `node_exporter_container`, `ipmi_exporter_container` and `nvidia_dcgm_container` (from `nvidia_dcgm_container_version` and `nvidia_dcgm_container_digest`). The playbooks pull the pinned image at deploy time (`roles/container_image`, which refuses an unpinned reference); the units only run the local image and never pull when they start, so a moved tag or a registry outage cannot change or break a restart. `slurm_exporter_container` is built locally from a Dockerfile whose base images are pinned the same way.
+The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by tag and digest (`repo:tag@sha256:...`) in one variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `node_exporter_container`, `ipmi_exporter_container` and `nvidia_dcgm_container`. The playbooks pull the pinned image at deploy time (`roles/container_image`, which refuses an unpinned reference); the units only run the local image and never pull when they start, so a moved tag or a registry outage cannot change or break a restart. `slurm_exporter_container` is built locally from a Dockerfile whose base images are pinned the same way.
 
-To upgrade, set the new tag and its digest (`docker buildx imagetools inspect repo:tag` prints it) in your DeepOps configuration and re-run the playbook. The image reference is part of the unit file, so a new pin changes the unit and the playbook restarts the service.
+To upgrade, print the new pin and set it in your DeepOps configuration (or, for a new default, in the role's defaults), then re-run the playbook. The image reference is part of the unit file, so a new pin changes the unit and the playbook restarts the service.
+
+```bash
+uv run python scripts/deepops/image_pins.py pin prom/prometheus:<new tag>   # repo:tag@sha256:..., the line to pin
+uv run python scripts/deepops/image_pins.py check                           # every pinned tag still points at its digest
+```
 
 From the provisioning node:
 
@@ -449,22 +454,10 @@ ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/grafana.yml
 ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/alertmanager.yml
 ansible-playbook -e hostlist=slurm-metric playbooks/slurm-cluster/prometheus-slurm-exporter.yml
 ansible-playbook playbooks/slurm-cluster/prometheus-node-exporter.yml
-```
-
-#### Updating dcgm-exporter
-
-For the NVIDIA DCGM Exporter, the version and its digest are pinned together. To update, set both in your DeepOps configuration:
-
-```yaml
-nvidia_dcgm_container_version: "4.5.3-4.8.2-distroless"
-nvidia_dcgm_container_digest: "sha256:<digest of that tag>"
-```
-
-Then re-run the playbook:
-
-```bash
 ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 ```
+
+dcgm-exporter 4.9.0 renames 23 fields and changes their units (Hz, J, ratios, bytes): moving to it means moving `roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv`, the Prometheus rules and the dashboards in the same change.
 
 #### Updating Enroot and Pyxis
 

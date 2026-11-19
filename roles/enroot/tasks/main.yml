@@ -32,16 +32,21 @@
     src: /usr/share/enroot/bash_completion
     state: link
 
-- name: Configure /etc/enroot/enroot.conf
-  ansible.builtin.blockinfile:
-    path: /etc/enroot/enroot.conf
-    block: "{{ enroot_config }}"
-    marker: "# {mark} ANSIBLE MANAGED BLOCK (roles/enroot)"
-    create: true
+- name: Configure enroot (/etc/enroot/enroot.conf.d/90-deepops.conf)
+  ansible.builtin.copy:
+    dest: /etc/enroot/enroot.conf.d/90-deepops.conf
+    content: "{{ enroot_config }}"
     owner: root
     group: root
     mode: "0644"
   when: enroot_config | length > 0
+
+# Earlier releases of this role edited the package's enroot.conf in place.
+- name: Leave the package's enroot.conf as shipped
+  ansible.builtin.blockinfile:
+    path: /etc/enroot/enroot.conf
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (roles/enroot)"
+    state: absent
 
 # enroot creates each user's RUNTIME/CACHE/DATA leaf (user-$(id -u)) by running
 # `mkdir -p` AS THE UNPRIVILEGED USER, so the PARENT dirs must exist sticky-1777 or

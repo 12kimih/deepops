@@ -207,7 +207,8 @@ nvidia_driver_branch: "595"
 # Docker configuration
 # Playbook: docker, nvidia-docker, k8s_cluster
 #
-# docker_install gates the in-tree roles/docker. docker_dns_servers_strict,
+# docker_install gates the in-tree roles/docker, whose engine release is
+# docker_engine_version. docker_version, docker_dns_servers_strict,
 # docker_storage_options, docker_options and docker_iptables_enabled are kubespray's,
 # read only when kubespray itself installs Docker.
 #docker_install: true

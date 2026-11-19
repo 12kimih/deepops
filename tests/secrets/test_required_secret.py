@@ -35,9 +35,9 @@ class RequiredSecret(unittest.TestCase):
         import settings
 
         for path, names in (
-            ("roles/slurm/defaults/main.yml", ("slurm_password", "slurm_db_password")),
+            ("roles/slurm/defaults/main.yml", ("slurm_db_password",)),
             ("roles/grafana/defaults/main.yml", ("grafana_cfg_pass",)),
-            ("config.example/group_vars/slurm-cluster.yml", ("slurm_password", "slurm_db_password")),
+            ("config.example/group_vars/slurm-cluster.yml", ("slurm_db_password",)),
         ):
             data = {e.name: e.value for e in settings.entries((ROOT / path).read_text())}
             for name in names:

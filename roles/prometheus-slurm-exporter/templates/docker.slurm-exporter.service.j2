@@ -11,7 +11,7 @@ Restart=always
 RestartSec=10
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
-ExecStart=/usr/bin/docker run --rm --network host --name %n{% for tool in ['sdiag', 'sinfo', 'squeue', 'sshare'] %} -v {{ slurm_install_prefix }}/bin/{{ tool }}:/usr/local/bin/{{ tool }}:ro{% endfor %} -v {{ slurm_config_dir }}:{{ slurm_config_dir }}:ro -v {{ slurm_install_prefix }}/lib:{{ slurm_install_prefix }}/lib:ro -v /etc/hosts:/etc/hosts:ro -v /var/run/munge:/var/run/munge:ro {{ slurm_exporter_container }}
+ExecStart=/usr/bin/docker run --rm --network host --name %n{% for tool in ['sdiag', 'sinfo', 'squeue', 'sshare'] %} -v {{ slurm_install_prefix }}/bin/{{ tool }}:/usr/local/bin/{{ tool }}:ro{% endfor %} -v {{ slurm_config_dir }}:{{ slurm_config_dir }}:ro -v {{ slurm_install_prefix }}/lib:{{ slurm_install_prefix }}/lib:ro -v /etc/hosts:/etc/hosts:ro -v /var/run/munge:/var/run/munge:ro {{ slurm_exporter_container }} -listen-address=:{{ slurm_exporter_port }}
 
 [Install]
 WantedBy=multi-user.target

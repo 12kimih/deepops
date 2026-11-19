@@ -6,6 +6,14 @@
     _docker_repo_url: "{{ lookup('ansible.builtin.vars', 'docker_' ~ ansible_facts.distribution | lower ~ '_repo_base_url') }}"
     _docker_repo_gpgkey: "{{ lookup('ansible.builtin.vars', 'docker_' ~ ansible_facts.distribution | lower ~ '_repo_gpgkey') }}"
 
+# "Uninstall all conflicting packages", before the repository is added.
+- name: Remove the packages that conflict with Docker Engine
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ docker_conflicting_packages.Debian }}"
+
 # "sudo apt-get install ca-certificates curl"
 - name: Install repository prerequisites
   ansible.builtin.apt:
@@ -54,10 +62,12 @@
       Architectures: {{ _docker_dpkg_arch.stdout }}
       Signed-By: {{ docker_apt_keyring }}
 
-# "sudo apt-get update" then install. lock_timeout rides out unattended-upgrades.
+# "sudo apt-get update" then install, docker-ce and docker-ce-cli at
+# docker_engine_version ("Install a specific version"); never downgraded here.
+# lock_timeout rides out unattended-upgrades.
 - name: Install Docker Engine + plugins
   ansible.builtin.apt:
-    name: "{{ docker_packages }}"
+    name: "{{ docker_packages | map('regex_replace', '^(docker-ce|docker-ce-cli)$', '\\1=5:' ~ docker_engine_version ~ '-1~*') | list }}"
     state: present
     update_cache: true
     lock_timeout: "{{ docker_apt_lock_timeout }}"

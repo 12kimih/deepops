@@ -7,7 +7,7 @@
 # binaries link that are not part of the Slurm install prefix.
 # Both stages are pinned by digest, so a rebuild uses exactly these images.
 ARG SLURM_EXPORTER_BASE_IMAGE=ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
-ARG SLURM_EXPORTER_BUILD_IMAGE=golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7d0c847f4888464e7ec9ba3a1339a1ee804
+ARG SLURM_EXPORTER_BUILD_IMAGE=golang:1.27@sha256:205c7636d74e0ffbe3d007162df7d74f859f5a8c8322dfb9f907977686c126cf
 
 FROM ${SLURM_EXPORTER_BUILD_IMAGE} AS build
 COPY exporter/ /src/

@@ -1,10 +1,9 @@
 ---
-nvidia_dcgm_container_version: "4.5.3-4.8.2-distroless"
-# The digest pins exactly what runs; change it together with the version.
-nvidia_dcgm_container_digest: "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc"
-nvidia_dcgm_container: "nvcr.io/nvidia/k8s/dcgm-exporter:{{ nvidia_dcgm_container_version }}@{{ nvidia_dcgm_container_digest }}"
-# Host port the dcgm-exporter is published on; single source of truth for the
-# published port (-p) and its scrape target (the container listens on 9400).
+# Pinned by tag and digest, like every image (scripts/deepops/image_pins.py pin <tag>).
+# 4.9.0 renames 23 fields and changes their units: moving there means moving the
+# custom metrics, the rules and the dashboards with it.
+nvidia_dcgm_container: "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003"
+# The port the exporter listens on (host network), and its scrape target.
 nvidia_dcgm_exporter_port: 9400
 nvidia_dcgm_container_config_dir: "/opt/deepops/nvidia-dcgm-exporter"
 nvidia_dcgm_container_custom_metrics_file: "dcgm-custom-metrics.csv"
