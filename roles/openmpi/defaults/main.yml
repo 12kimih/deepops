@@ -9,8 +9,11 @@ openmpi_src_url: "https://download.open-mpi.org/release/open-mpi/{{ openmpi_tag 
 # Per version, as published on open-mpi.org (roles/download).
 openmpi_checksums:
   "5.0.10": "sha256:0acecc4fc218e5debdbcb8a41d182c6b0f1d29393015ed763b2a91d5d7374cc6"
-# Root builds here, so never under a world-writable directory such as /tmp.
-openmpi_build_dir: /var/cache/deepops/build/openmpi
+# Root builds here, so never under a world-writable directory such as /tmp. Each
+# version builds in its own tree, so the installed version is uninstalled from the tree
+# that installed it; the older trees are removed.
+openmpi_build_root: /var/cache/deepops/build
+openmpi_build_dir: "{{ openmpi_build_root }}/openmpi-{{ openmpi_version }}"
 openmpi_install_prefix: /usr/local
 # Default builds OpenMPI's bundled (internal) PMIx. On 5.0.x that bundled PMIx is
 # 5.x -- the SAME major Slurm links (pmix_version 5.0.10) -- so they are
@@ -20,7 +23,11 @@ openmpi_install_prefix: /usr/local
 # ships that override. Note v5 removed --with-pmi/--with-slurm; `srun --mpi=pmix`
 # needs only PMIx. https://slurm.schedmd.com/mpi_guide.html
 openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix=internal"
+# Rebuild Open MPI even when the installed build matches its record.
 openmpi_force_rebuild: false
+# What the installed Open MPI was built from (roles/build_record).
+openmpi_build_record: "{{ openmpi_install_prefix }}/bin/ompi_info.built-from"
+openmpi_build_key: "openmpi {{ openmpi_version }}: {{ openmpi_configure }}"
 # The distribution's Open MPI, removed so it cannot shadow the build (per OS family).
 openmpi_distro_packages:
   Debian: [openmpi-bin, openmpi-common, libopenmpi-dev]
