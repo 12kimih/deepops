@@ -68,7 +68,7 @@ description: Deploy a Slurm GPU cluster with DeepOps and prove it works. Use whe
   gotchas).
 - **`gpu_job_ok: false` with driver errors**: follow
   `skills/diagnose-driver-install/`.
-- **Node shows `down` or `drained` in `node_states`**: check
+- **Node shows `down`, `idle+drain` or the like in `node_states`**: check
   `scontrol show node <name>` for the reason; after fixing, resume with
   `scontrol update nodename=<name> state=resume`.
 - **Wrong or stale host facts after reprovisioning a node**: rerun with

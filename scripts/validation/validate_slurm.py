@@ -22,10 +22,15 @@ import argparse
 import getpass
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+
+# Slurm is read through the cluster tools' one Slurm module (its JSON, its timeouts,
+# its node vocabulary), from this checkout.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+from clustertools import slurm, vocab  # noqa: E402
 
 
 def run(cmd, timeout=60):
@@ -39,88 +44,39 @@ def run(cmd, timeout=60):
         return 127, "", "command not found: %s" % cmd[0]
 
 
-def normalize_sinfo_state(state):
-    """Return a lowercase Slurm state without trailing status flags."""
-    return state.strip().rstrip("*+~#!%$@^-").lower()
+def summarize_nodes(nodes):
+    """(details, states, unavailable) from Slurm's node records (scontrol --json),
+    classified the way every cluster tool classifies them (clustertools.vocab):
+    details is [{name, state, gpus_configured}] by name, states {full state: count},
+    unavailable the names of nodes no new job can start on."""
+    nodes = sorted(nodes, key=lambda n: n["name"])
+    details = [
+        {
+            "name": n["name"],
+            "state": vocab.node_state(n["state"]),
+            "gpus_configured": sum(slurm.node_gpus(n["gres"]).values()),
+        }
+        for n in nodes
+    ]
+    states = {}
+    for d in details:
+        states[d["state"]] = states.get(d["state"], 0) + 1
+    unavailable = [n["name"] for n in nodes if not vocab.node_schedulable(n["state"])]
+    return details, states, unavailable
 
 
-def parse_sinfo_node_states(output):
-    """Parse node states, keeping the first row for each unique node."""
-    nodes = {}
-    for line in output.splitlines():
-        parts = line.split()
-        if len(parts) != 2:
-            continue
-        node, state = parts
-        if node not in nodes:
-            nodes[node] = normalize_sinfo_state(state)
-    return nodes
-
-
-# Flags sinfo appends to a state that mean the node cannot run a job now, whatever
-# its base state says: not responding (*), powered off or powering up or down (~ # % !),
-# rebooting or about to (@ ^), in a maintenance reservation ($).
-UNAVAILABLE_FLAGS = set("*~#%!@^$")
-
-
-def parse_sinfo_states(output):
-    """Parse ``sinfo -h -N -o '%n %T'`` output into node-state counts.
-
-    Returns (nodes_total, nodes_available, nodes_unavailable, states) where
-    states maps state name (lowercase, flags stripped) to a count. A node is
-    available only in a state that runs jobs AND without a flag that says it cannot
-    now: an idle* node (slurmd not responding) is unavailable.
-    """
-    states, flags = {}, {}
-    for line in output.splitlines():
-        parts = line.split()
-        if len(parts) == 2 and parts[0] not in flags:
-            raw = parts[1].strip().lower()
-            base = normalize_sinfo_state(raw)
-            flags[parts[0]] = set(raw[len(base) :])
-            states[base] = states.get(base, 0) + 1
-            flags[parts[0]].add(base)
-    available_states = {"idle", "mixed", "allocated", "completing"}
-    available = sum(1 for f in flags.values() if f & available_states and not f & UNAVAILABLE_FLAGS)
-    total = len(flags)
-    return total, available, total - available, states
-
-
-def parse_gres_gpu_counts(output):
-    """Parse configured GPU counts, keeping one value per unique node."""
-    nodes = {}
-    for line in output.splitlines():
-        parts = line.split(None, 1)
-        if len(parts) != 2 or parts[0] in nodes:
-            continue
-        count = 0
-        for match in re.finditer(r"gpu(?::[^:,(\s]+)?:(\d+)", parts[1]):
-            count += int(match.group(1))
-        nodes[parts[0]] = count
-    return nodes
-
-
-def parse_gres_gpus(output):
-    """Parse ``sinfo -h -N -o '%n %G'`` output into a total GPU count."""
-    return sum(parse_gres_gpu_counts(output).values())
-
-
-def parse_gres_gpu_types(output):
-    """Return {gpu_type: configured count} from ``sinfo -h -N -o '%n %G'`` output."""
-    types, seen = {}, set()
-    for line in output.splitlines():
-        parts = line.split(None, 1)
-        if len(parts) != 2 or parts[0] in seen:
-            continue
-        seen.add(parts[0])
-        for match in re.finditer(r"gpu:([^:,(\s]+):(\d+)", parts[1]):
-            types[match.group(1)] = types.get(match.group(1), 0) + int(match.group(2))
+def gpu_types(nodes):
+    """{gpu type: configured count} over the nodes; "" for untyped GPUs."""
+    types = {}
+    for n in nodes:
+        for gtype, count in slurm.node_gpus(n["gres"]).items():
+            types[gtype] = types.get(gtype, 0) + count
     return types
 
 
-def pick_gpu_type(output):
+def pick_gpu_type(nodes):
     """The GPU type with the most configured GPUs, "" when no GRES names a type."""
-    types = parse_gres_gpu_types(output)
+    types = {t: c for t, c in gpu_types(nodes).items() if t}
     return min(types, key=lambda t: (-types[t], t)) if types else ""
 
 
@@ -130,20 +86,6 @@ def gpu_job_command(job_name, gpu_type, partition):
     if partition:
         cmd += ["--partition", partition]
     return cmd + ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
-
-
-def build_node_details(states_output, gres_output):
-    """Return stable per-node state and configured GPU details."""
-    states = parse_sinfo_node_states(states_output)
-    gpu_counts = parse_gres_gpu_counts(gres_output)
-    return [
-        {
-            "name": name,
-            "state": states[name],
-            "gpus_configured": gpu_counts.get(name, 0),
-        }
-        for name in sorted(states)
-    ]
 
 
 def main():
@@ -167,7 +109,7 @@ def main():
     parser.add_argument(
         "--gpu-type",
         default="",
-        help="GPU type for the GPU test job (default: the most common type in sinfo's GRES)",
+        help="GPU type for the GPU test job (default: the type with the most configured GPUs)",
     )
     parser.add_argument(
         "--gpu-job-timeout",
@@ -177,8 +119,8 @@ def main():
     )
     args = parser.parse_args()
 
-    if not shutil.which("sinfo"):
-        print("error: sinfo not found; run this on a Slurm node", file=sys.stderr)
+    if not shutil.which("scontrol"):
+        print("error: scontrol not found; run this on a Slurm node", file=sys.stderr)
         return 2
 
     result = {
@@ -197,48 +139,34 @@ def main():
         "failures": [],
     }
 
-    rc, out, _ = run(["sinfo", "--version"])
-    if rc == 0 and out:
-        result["slurm_version"] = out.split()[-1]
-
-    states_output = ""
-    rc, out, err = run(["sinfo", "-h", "-N", "-o", "%n %T"])
-    if rc != 0:
-        result["failures"].append("sinfo failed: %s" % (err or "rc=%s" % rc))
+    nodes = []
+    try:
+        data = slurm.load("nodes")
+    except slurm.Error as e:
+        result["failures"].append("reading the nodes failed: %s" % e)
     else:
-        states_output = out
+        nodes = data["nodes"]
+        result["slurm_version"] = ((data.get("meta") or {}).get("slurm") or {}).get("release", "")
         result["controller_reachable"] = True
-        total, avail, unavail, states = parse_sinfo_states(out)
-        result["nodes_total"] = total
-        result["nodes_available"] = avail
-        result["nodes_unavailable"] = unavail
+        details, states, unavailable = summarize_nodes(nodes)
+        result["nodes"] = details
         result["node_states"] = states
-        if total == 0:
+        result["nodes_total"] = len(nodes)
+        result["nodes_unavailable"] = len(unavailable)
+        result["nodes_available"] = len(nodes) - len(unavailable)
+        result["gpus_configured"] = sum(gpu_types(nodes).values())
+        if not nodes:
             result["failures"].append("no nodes are defined in Slurm")
-        if unavail and not args.allow_unavailable_nodes:
-            result["failures"].append(
-                "%d node(s) unavailable: %s"
-                % (
-                    unavail,
-                    ", ".join(
-                        sorted(k for k in states if k not in ("idle", "mixed", "allocated", "completing"))
-                    ),
-                )
-            )
-
-    gres_output = ""
-    rc, out, _ = run(["sinfo", "-h", "-N", "-o", "%n %G"])
-    if rc == 0:
-        gres_output = out
-        result["gpus_configured"] = parse_gres_gpus(out)
-    result["nodes"] = build_node_details(states_output, gres_output)
-    if result["controller_reachable"] and result["gpus_configured"] == 0:
-        result["failures"].append("no GPUs (gres/gpu) configured on any node")
+        if unavailable and not args.allow_unavailable_nodes:
+            down = ", ".join("%s (%s)" % (d["name"], d["state"]) for d in details if d["name"] in unavailable)
+            result["failures"].append("%d node(s) unavailable: %s" % (len(unavailable), down))
+        if result["gpus_configured"] == 0:
+            result["failures"].append("no GPUs (gres/gpu) configured on any node")
 
     if not args.skip_gpu_job and result["controller_reachable"] and result["gpus_configured"] > 0:
         result["gpu_job_ran"] = True
         job_name = "deepops-validate-%d" % os.getpid()
-        cmd = gpu_job_command(job_name, args.gpu_type or pick_gpu_type(gres_output), args.partition)
+        cmd = gpu_job_command(job_name, args.gpu_type or pick_gpu_type(nodes), args.partition)
         rc, out, err = run(cmd, timeout=args.gpu_job_timeout)
         if rc == 124:
             # Killing srun leaves its job queued, to take a GPU later with nobody

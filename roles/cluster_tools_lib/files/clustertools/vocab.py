@@ -39,7 +39,9 @@ _DOWN = frozenset(
         "INACTIVE",
     )
 )
-_DRAIN = frozenset(("DRAIN", "DRAINING", "DRAINED", "MAINT", "REBOOT_ISSUED"))
+# MAINTENANCE is the JSON's word (a node in a maintenance reservation); sinfo's short
+# "maint" never reaches here.
+_DRAIN = frozenset(("DRAIN", "DRAINING", "DRAINED", "MAINTENANCE", "REBOOT_ISSUED"))
 _BASE = {"IDLE": "idle", "MIXED": "mix", "ALLOCATED": "alloc", "COMPLETING": "alloc", "BLOCKED": "alloc"}
 
 NODE_HELP = {
