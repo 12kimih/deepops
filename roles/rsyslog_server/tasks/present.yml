@@ -1,0 +1,65 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: rsyslog_server
+    component_record_action: begin
+    component_record_items: "{{ rsyslog_server_items }}"
+
+- name: Ensure rsyslog is installed
+  ansible.builtin.package:
+    name: rsyslog
+    state: present
+
+# Checked before it is installed (a broken file would stop all logging at the next
+# restart), and rsyslog restarts for it: that is what reads it. AppArmor lets rsyslogd
+# read only /etc/rsyslog.d, so the candidate is checked from there, under a name
+# without .conf that rsyslog never includes.
+- name: Configure syslog listener
+  ansible.builtin.template:
+    src: "01-deepops-listen.conf"
+    dest: "/etc/rsyslog.d/01-deepops-listen.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    validate: >-
+      sh -c 'f=/etc/rsyslog.d/.deepops-validate; cp "$1" "$f" && rsyslogd -N1 -f "$f"; rc=$?; rm -f "$f"; exit $rc' sh %s
+  notify:
+    - Reload rsyslog
+
+- name: Create directory for clients logs in ubuntu
+  ansible.builtin.file:
+    path: "{{ rsyslog_log_file_path }}"
+    state: directory
+    owner: "syslog"
+    group: "syslog"
+    mode: "0755"
+  when: ansible_facts['distribution'] == "Ubuntu"
+
+- name: Create directory for clients logs in rhel
+  ansible.builtin.file:
+    path: "{{ rsyslog_log_file_path }}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Expire old client logs
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/deepops-rsyslog-server.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by roles/rsyslog_server: client logs older than rsyslog_log_retention_days go.
+      e {{ rsyslog_log_file_path }} - - - {{ rsyslog_log_retention_days | int }}d
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: rsyslog_server
+    component_record_action: present
+    component_record_items: "{{ rsyslog_server_items }}"

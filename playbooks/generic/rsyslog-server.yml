@@ -1,9 +1,12 @@
 ---
-- hosts: "{{ hostlist | default('slurm-master[0]') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-    - rsyslog_server
+    - role: rsyslog_server
+      rsyslog_server_state: "{{ deepops_components.rsyslog_server }}"
   tags:
     - rsyslog-server
     - rsyslog

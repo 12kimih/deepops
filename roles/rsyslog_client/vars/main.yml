@@ -1,0 +1,5 @@
+---
+# What this component installs, for its record (roles/component_record). rsyslog itself
+# ships with the OS and stays when the component goes.
+rsyslog_client_items:
+  - file:/etc/rsyslog.d/99-forward-syslog.conf

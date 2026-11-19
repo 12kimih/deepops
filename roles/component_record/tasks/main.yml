@@ -1,0 +1,92 @@
+---
+- name: Check the request
+  ansible.builtin.assert:
+    that:
+      - component_record_name | length > 0
+      - component_record_action in ['begin', 'present', 'absent']
+    fail_msg: component_record needs a name and an action (begin, present or absent).
+    quiet: true
+
+- name: "Record the component {{ component_record_name ~ ' (' ~ component_record_action ~ ')' }}"
+  component_record:
+    path: "{{ component_record_path }}"
+    name: "{{ component_record_name }}"
+    action: "{{ component_record_action }}"
+    items: "{{ component_record_items }}"
+    version: "{{ component_record_version | string }}"
+  register: component_record_result
+
+- name: Remove what no component needs any longer
+  when: component_record_result.orphans.values() | map('length') | sum > 0
+  vars:
+    component_record_orphans: "{{ component_record_result.orphans }}"
+  block:
+    - name: Look for the Docker daemon
+      ansible.builtin.stat:
+        path: /var/run/docker.sock
+      register: component_record_docker
+      when: component_record_orphans.container | length > 0
+
+    - name: Remove containers
+      community.docker.docker_container:
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ component_record_orphans.container }}"
+      when: component_record_docker.stat.exists | default(false)
+
+    - name: Look up units
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+      loop: "{{ component_record_orphans.unit }}"
+      register: component_record_units
+      check_mode: true  # read-only: no state requested
+      failed_when: false
+
+    - name: Stop and disable units
+      ansible.builtin.systemd_service:
+        name: "{{ item.item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ component_record_units.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: item.status.LoadState | default('not-found') not in ['not-found', 'masked']
+
+    - name: Remove files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ component_record_orphans.file }}"
+
+    - name: Reload systemd after unit files went
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: component_record_orphans.unit | length > 0
+
+    # A directory goes only when empty: anything left in it is not ours to remove.
+    - name: Remove empty directories
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import os, sys
+            try:
+                os.rmdir(sys.argv[1])
+                print("removed")
+            except FileNotFoundError:
+                print("gone")
+            except OSError:
+                print("kept")
+          - "{{ item }}"
+      register: component_record_rmdir
+      changed_when: component_record_rmdir.stdout == 'removed'
+      loop: "{{ component_record_orphans.dir | sort | reverse }}"
+
+    - name: Remove packages
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        host_baseline_absent_packages: "{{ component_record_orphans.package }}"
+      when: component_record_orphans.package | length > 0

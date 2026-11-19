@@ -353,17 +353,16 @@
   import_playbook: k8s-cluster/nfs-client-provisioner.yml
   when: k8s_nfs_client_provisioner
 
+# Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Setup rsyslog server
   import_playbook: generic/rsyslog-server.yml
   vars:
-    hostlist: kube_control_plane[0]
-  when: kube_enable_rsyslog_server
+    hostlist: k8s_cluster
 
 - name: Setup rsyslog client
   import_playbook: generic/rsyslog-client.yml
   vars:
     hostlist: k8s_cluster
-  when: kube_enable_rsyslog_client
 
 # Last: each host records what was deployed to it (roles/deploy_record), where the next
 # preview starts (scripts/deepops/settings.py diff).

@@ -1,0 +1,142 @@
+#!/usr/bin/python
+"""Keep the host's record of the components deepops installed and what each needs."""
+
+DOCUMENTATION = r"""
+module: component_record
+short_description: Record a component's state and the items it needs, with owner sets
+description:
+  - Keeps one JSON file (an Ansible local fact) per host. C(components) maps a component
+    to its state (C(installing) or C(present)) and version. C(items) maps every item a
+    component needs (C(package:NAME), C(unit:NAME), C(container:NAME), C(file:PATH),
+    C(dir:PATH)) to the set of components that need it.
+  - An item that no component needs any longer is an orphan. Orphans leave the record
+    and are returned, so the caller removes exactly them and nothing another component
+    still needs (docs/deepops/component-state.md).
+  - Supports check mode; nothing is written then.
+options:
+  path:
+    description: The record file.
+    type: path
+    default: /etc/ansible/facts.d/deepops_components.fact
+  name:
+    description: The component.
+    type: str
+    required: true
+  action:
+    description:
+      - C(begin) records the component as installing and adds I(items) to what it needs,
+        before anything is installed, so a failed run leaves items absent can find.
+      - C(present) records it as present at I(version); I(items) is the whole set it now
+        needs, so items only an earlier version needed become orphans.
+      - C(absent) drops the component; I(items) adopts what it installed before the
+        record existed (only items no other component needs become orphans).
+    type: str
+    choices: [begin, present, absent]
+    required: true
+  items:
+    description: Items as KIND:ID.
+    type: list
+    elements: str
+    default: []
+  version:
+    description: The component's version, for C(begin) and C(present).
+    type: str
+    default: ""
+"""
+
+RETURN = r"""
+orphans:
+  description: Items no component needs any longer, to remove, grouped by kind.
+  type: dict
+  returned: always
+before:
+  description: The component's entry before this call (empty when it had none).
+  type: dict
+  returned: always
+"""
+
+import json
+import os
+import tempfile
+
+from ansible.module_utils.basic import AnsibleModule
+
+KINDS = ("package", "unit", "container", "file", "dir")
+
+
+def load(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        data = {}
+    data.setdefault("components", {})
+    data.setdefault("items", {})
+    return data
+
+
+def apply(data, name, action, items, version):
+    """The new record and the orphans (a pure function, for the tests)."""
+    components = dict(data["components"])
+    owners = {item: set(names) for item, names in data["items"].items()}
+    before = components.get(name, {})
+    if action == "begin":
+        components[name] = {"state": "installing", "version": version}
+        for item in items:
+            owners.setdefault(item, set()).add(name)
+    elif action == "present":
+        components[name] = {"state": "present", "version": version}
+        for item, names in owners.items():
+            if item not in items:
+                names.discard(name)
+        for item in items:
+            owners.setdefault(item, set()).add(name)
+    else:
+        components.pop(name, None)
+        for item in items:
+            owners.setdefault(item, set()).add(name)
+        for names in owners.values():
+            names.discard(name)
+    orphans = sorted(item for item, names in owners.items() if not names)
+    record = {
+        "components": components,
+        "items": {item: sorted(names) for item, names in sorted(owners.items()) if names},
+    }
+    grouped = {kind: [] for kind in KINDS}
+    for item in orphans:
+        kind, _, ident = item.partition(":")
+        grouped[kind].append(ident)
+    return record, grouped, before
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec={
+            "path": {"type": "path", "default": "/etc/ansible/facts.d/deepops_components.fact"},
+            "name": {"type": "str", "required": True},
+            "action": {"type": "str", "required": True, "choices": ["begin", "present", "absent"]},
+            "items": {"type": "list", "elements": "str", "default": []},
+            "version": {"type": "str", "default": ""},
+        },
+        supports_check_mode=True,
+    )
+    p = module.params
+    bad = [i for i in p["items"] if i.partition(":")[0] not in KINDS or not i.partition(":")[2]]
+    if bad:
+        module.fail_json(msg=f"items must be KIND:ID with KIND one of {', '.join(KINDS)}: {bad}")
+    data = load(p["path"])
+    record, orphans, before = apply(data, p["name"], p["action"], p["items"], p["version"])
+    changed = record != data
+    if changed and not module.check_mode:
+        os.makedirs(os.path.dirname(p["path"]), mode=0o755, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p["path"]))
+        with os.fdopen(fd, "w") as f:
+            json.dump(record, f, indent=1, sort_keys=True)
+            f.write("\n")
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, p["path"])
+    module.exit_json(changed=changed, orphans=orphans, before=before)
+
+
+if __name__ == "__main__":
+    main()

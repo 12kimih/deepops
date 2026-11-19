@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: component_record
+  author: DeepOps
+  description: Record what each component installed; remove what no component needs
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+dependencies: []

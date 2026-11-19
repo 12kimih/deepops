@@ -1,0 +1,26 @@
+---
+# component_record -- the host's record of what deepops installed for each component,
+# and the removal of what no component needs any longer (docs/deepops/component-state.md).
+#
+#   - ansible.builtin.include_role:
+#       name: component_record
+#     vars:
+#       component_record_name: rsyslog_server
+#       component_record_action: begin      # begin, present or absent
+#       component_record_version: ""        # begin and present
+#       component_record_items:             # KIND:ID; kinds: package, unit, container,
+#         - package:rsyslog                 # file, dir
+#         - file:/etc/rsyslog.d/01-deepops-listen.conf
+#
+# begin, before a component installs anything: it is recorded as installing with the
+# items it will add. present, after: the items are the whole set it needs now; what only
+# an earlier version needed is removed. absent: the component leaves every item's owner
+# set; items is what it installed before the record existed (adopted), and must list
+# only items no other component installs. Whatever no component needs any longer is
+# removed: containers, then units (stopped and disabled), files, empty directories, and
+# packages last (roles/host_baseline). Data is never an item, so it is never removed.
+component_record_name: ""
+component_record_action: ""
+component_record_version: ""
+component_record_items: []
+component_record_path: /etc/ansible/facts.d/deepops_components.fact
