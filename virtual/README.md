@@ -49,7 +49,7 @@ Also, using VMs and optionally GPU passthrough assumes that the host machine has
    # NOTE: 3 VMs are started by default: virtual-mgmt01, virtual-login01, virtual-gpu01
    # NOTE: 6 VMs are started if the environment variable DEEPOPS_FULL_INSTALL is set:
    #       virtual-mgmt01, virtual-mgmt02, virtual-mgmt03, virtual-login01, virtual-gpu01, virtual-gpu02
-   
+
    cd virtual
    ./vagrant_startup.sh
    ```
@@ -60,20 +60,20 @@ Also, using VMs and optionally GPU passthrough assumes that the host machine has
    # NOTE: Only Kubernetes is deployed by default. To also deploy Slurm,
    #       configure the DEEPOPS_ENABLE_SLURM variable accordingly...
    #       export DEEPOPS_ENABLE_SLURM=1
-   
+
    ./cluster_up.sh
    ```
-   
+
    This script will run the ansible playbooks to deploy DeepOps to the Vagrant VMs and should complete without errors.
-   
+
 4. Set up the Kubernetes environment.
 
    As part of `cluster_up.sh`, a fresh `kubectl` executable and the Kubernetes cluster's `admin.conf` are downloaded. To use these so commands may be run locally, a convenient script may be sourced...
-   
+
    ```sh
    source k8s_environment.sh
    ```
-   
+
    Optionally, `kubectl` can permanently be added to the PATH and `admin.conf` can be copied to `~/.kube/config`, which results in a more permanent solution.
 
 ## Using the Virtual Cluster
@@ -234,8 +234,8 @@ To support KVM, we need GPU pass through. To enable GPU pass through, we need to
 * MMIO above 4G: Advanced -> PCI Subsystem Setting -> Above 4G Encoding
 
 **DGX Station SBIOS**
-* VT-x: 
-* VT-d: 
+* VT-x:
+* VT-d:
 * MMIO above 4G: verify virtualization support is enabled in the BIOS, by looking for vmx for Intel or svm for AMD processors...
 
 ```
@@ -356,4 +356,3 @@ $ lspci -nnk -d 10de:1db1
 	Kernel driver in use: vfio-pci
 	Kernel modules: nvidiafb, nouveau, nvidia_drm, nvidia_vgpu_vfio, nvidia
 ```
-

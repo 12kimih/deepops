@@ -9,9 +9,9 @@ The tests are designed to be repeatedly run with different nodes and confirm tha
 If the expected performance is seen, the user can be confident that the nodes are working correctly.
 
 ## Differences between Burn-in and Validation
-A validation test is to determine if the systems are performing as expected.  A burn-in test is 
-repeated runs of the validation test to ensure systems continue to perform as expected over a 
-period of time.  The tests described below are for system validation.  For a burn-in test, run 
+A validation test is to determine if the systems are performing as expected.  A burn-in test is
+repeated runs of the validation test to ensure systems continue to perform as expected over a
+period of time.  The tests described below are for system validation.  For a burn-in test, run
 validation tests back-to-back for an extended period of time.
 
 ## Requirements
@@ -38,8 +38,8 @@ The NGC HPC Benchmarks container is used to run HPL.
 
 https://ngc.nvidia.com/catalog/containers/nvidia:hpc-benchmarks
 
-While the container is freely available, it is necessary to create an account on NGC to access the 
-container.  After logging into NGC, you need to create an API key to pull containers. 
+While the container is freely available, it is necessary to create an account on NGC to access the
+container.  After logging into NGC, you need to create an API key to pull containers.
 
 https://ngc.nvidia.com/setup
 
@@ -57,7 +57,7 @@ Replace <NVCR.IO API KEY> above with your nvcr.io api key for your NGC account.
 
 ### Setup Authentication for Singularity nvcr.io
 
-For Singularity, authentication to a docker registry is done through environment variables. 
+For Singularity, authentication to a docker registry is done through environment variables.
 
 ```
 export SINGULARITY_DOCKER_USERNAME='$oauthtoken'
@@ -70,7 +70,7 @@ Set these variables in the appropriate system config file (ex: syscfg-dgxa100-80
 ## Basic Launch Command
 
 ```
-./launch_hpl_experiment.sh --sys <SYSTEM> --count <NODES_PER_JOBS> --cruntime enroot 
+./launch_hpl_experiment.sh --sys <SYSTEM> --count <NODES_PER_JOBS> --cruntime enroot
 
 or
 
@@ -84,9 +84,9 @@ Where:
         * Set to the system type on which to run: dgx1v_16G, dgx1v_32G, dgx2, dgxa100_40G, dgxa100_80G, or the path of a syscfg file for any other system
    -c|--count <Count>
         * Set to the number of nodes to use per job
-   --container 
+   --container
         * Specify an alternate container URI or a local file (.sqsh for enroot, .sif for singularity)
-   --cruntime <runtime> 
+   --cruntime <runtime>
         * Specify the container runtime: singularity (the default) or enroot. `bare` is accepted but exits as not supported yet
    -h|--help
         * Provide a full list of options
@@ -177,7 +177,7 @@ Experiments are verified when all jobs are complete.  See the file verify_result
 ./launch_hpl_experiment.sh -c 1 -s dgxa100_80G --maxnodes <maximum number of nodes to use>  --cruntime enroot
 ```
 * Run multi-node jobs starting with two nodes, and increase them (four, eight, etc) until the size of the job to the next power of two would be greater than half the system.  At each node count, all runs should be completed successfully with similar performance.
-* Run two jobs at N/2 in size (N is the total number of nodes). 
+* Run two jobs at N/2 in size (N is the total number of nodes).
 * Run a job with all nodes.
 
 
@@ -196,4 +196,3 @@ Several different DGX system configurations are supported.  These include:
 * DGX A100 80GB  - `--sys dgxa100_80G` (syscfg-dgxa100-80gb.sh)
 
 Note: The network topology of the DGX A100 40GB can vary depending on whether the node has the optional additional network card added.  Please edit the configuration file to match your node configuration.
-

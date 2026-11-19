@@ -99,4 +99,3 @@ fi
 # Only delete on success to allow debugging
 kubectl -n ${CLUSTER_VERIFY_NS} delete job/${job_name}
 kubectl delete ns ${CLUSTER_VERIFY_NS}
-

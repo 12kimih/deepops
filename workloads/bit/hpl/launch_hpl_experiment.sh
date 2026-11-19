@@ -10,7 +10,7 @@
 # -- Requirements
 # - HPL runs inside the NGC hpc-benchmarks container (Singularity or Enroot).
 # - Slurm with PMI2 (srun --mpi=pmi2) and hwloc.
-#  
+#
 #
 
 export HPL_DIR=${HPL_DIR:-$(cd $(dirname $0) && pwd)} # The shared directory where scripts, data, and results are stored
@@ -61,18 +61,18 @@ Other Options:
     --usegres <Val>
 	* Enable/disable use of GRES options in Slurm (1/0).  Default is ${usegres}.
     --grestype <val>
-        * Specify if you need to specify a specific gputype when submitting to your batch system with gpu options.  
+        * Specify if you need to specify a specific gputype when submitting to your batch system with gpu options.
     --container <container URL>
         * Set container to use
     --cruntime <container runtime>
 	* Specify container runtime.  Options are singularity, enroot, and bare (bare-metal, not supported yet).  Default is ${cruntime}.
-    --hplai 
+    --hplai
         * Run HPL-AI benchmark
     --nores
 	* Do not request specific nodes or try to control how jobs are placed on the system (better for experiments while in production)
-    -w 
+    -w
         * Node include list (must overlap with nodes in the partition)
-    -x 
+    -x
         * Node exclude list
     --slurmopts
         * Use to set any slurm variables not supported by other options.  Ex: --slurmopt "--exclusive --constraint su2"
@@ -119,7 +119,7 @@ while [ $# -gt 0 ]; do
 
         --hplai) hplai=1; shift 1 ;;
         --nores) nores=1; shift 1 ;;
-        -m|--maxnodes) maxnodes="$2"; shift 2 ;;	
+        -m|--maxnodes) maxnodes="$2"; shift 2 ;;
         --mpiopts) mpiopts="$2"; shift 2 ;;
         --usegres) usegres="$2"; shift 2 ;;
         --grestype) grestype="$2"; shift 2 ;;
@@ -181,7 +181,7 @@ case ${SYSCFG} in
     fi
     ;;
 esac
-	   
+
 if [ x"${usegres}" == x"1" ]; then
     if [ x"${grestype}" != x"" ]; then
         gresstr="${grestype}:"
@@ -206,7 +206,7 @@ if [ x"${cruntime}" != x"" ]; then
             fi
             if [ ! -f ${container} ]; then
                 # Since the file doesn't exist, assume the CONTAINER is a URI
-                export CONT=docker://${container} 
+                export CONT=docker://${container}
             else
                 export CONT=${PWD}/${container}
             fi
@@ -331,7 +331,7 @@ echo ""
 echo "Experiment Variables:"
 for V in HPL_DIR HPL_SCRIPTS_DIR EXPDIR system cruntime CONT nodes_per_job gpus_per_node niters partition slurmopts maxnodes mpiopts gresstr total_nodes hpldat hplai; do
     echo -n "${V}: "
-    if [ x"${!V}" != x"" ]; then	
+    if [ x"${!V}" != x"" ]; then
         echo "${!V}"
     else
         echo "<Not Set>"
@@ -361,13 +361,13 @@ for N in $(seq ${niters}); do
 
             if [ x"${includelist}" != x"" ]; then
                 echo "Include lists are not supported with --nores"
-                ### You cannot provide an include list, you can only include the full list to use, not a range. 
+                ### You cannot provide an include list, you can only include the full list to use, not a range.
                 ### So the includelist is not supported in this mode
-                ###  DEPENDENCY="$DEPENDENCY -w ${includelist}" 
+                ###  DEPENDENCY="$DEPENDENCY -w ${includelist}"
             fi
 
             if [ x"${excludelist}" != x"" ]; then
-                DEPENDENCY="$DEPENDENCY -x ${excludelist}" 
+                DEPENDENCY="$DEPENDENCY -x ${excludelist}"
             fi
         else
             HLIST="-w $(scontrol show hostlist $(tail -n +$P ${HFILE} | head -${nodes_per_job} | sort | paste -d, -s))"
@@ -400,15 +400,15 @@ for N in $(seq ${niters}); do
         CMD+="-o ${EXPDIR}/${EXPNAME}-%j.out ${HLIST} ${DEPENDENCY} "
         CMD+="--export ALL,CONT,SYSCFG,SYSCFGVAR,GPUMEM,CRUNTIME,HPLAI,EXPDIR "
         CMD+="${HPL_DIR}/submit_hpl.sh"
-                 
+
         if [ ${verbose} -eq 1 ]; then
             echo "Submitting:  $CMD"
         fi
-            jobid=$($CMD) 
+            jobid=$($CMD)
             if [ $? -ne 0 ]; then
                 echo "ERROR: Unable to submit job.  Err=$?"
                 # Cleanup experiment
-                #exit $? 
+                #exit $?
             fi
 
             popd > /dev/null 2>&1
@@ -484,5 +484,3 @@ echo "Verify Log: ${VLOGFN}"
 echo ""
 echo "To rerun the verification: ${HPL_SCRIPTS_DIR}/verify_hpl_experiment.py ${EXPDIR}"
 echo ""
-
-

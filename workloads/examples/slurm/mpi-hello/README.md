@@ -12,7 +12,7 @@ If you haven't configured a Slurm cluster yet, see the [Slurm guide](/docs/slurm
 1. **Install the OpenMPI packages:**
     On many clusters, MPI libraries and tools are built from source to take advantage of the specific cluster hardware.
     In this example, we'll just use the OpenMPI provided by Ubuntu to demonstrate running an MPI job.
-    To install OpenMPI, run the `bootstrap-mpi.yml` Ansible playbook in this directory. 
+    To install OpenMPI, run the `bootstrap-mpi.yml` Ansible playbook in this directory.
     If you only want to install on a subset of nodes, use the `-l ${HOST_GROUP}` argument to restrict where this playbook is run.
     ```
     $ ansible-playbook -i ${INVENTORY_FILE} [-l ${HOST_GROUP}] workloads/examples/slurm/mpi-hello/bootstrap-mpi.yml
@@ -62,13 +62,13 @@ If you haven't configured a Slurm cluster yet, see the [Slurm guide](/docs/slurm
     #SBATCH -n 2                    # Number of processes
     #SBATCH -t 0:10:00              # Max wall time
     #SBATCH -o hello-job.out        # Output file name
-    
+
     # Disable the Infiniband transport for OpenMPI (not present on all clusters)
     export OMPI_MCA_btl="^openib"
-    
+
     # Run the job (assumes the batch script is submitted from the same directory)
     mpirun -np 2 ./mpi-hello
-    
+
     $ sbatch hello-job.sh
     Submitted batch job 9
     $ cat hello-job.out

@@ -68,14 +68,14 @@ if [ x"${HPLAI}" == x"1" ]; then
 fi
 
 
-echo "" 
-echo "=============================" 
-echo "HPL.dat File" 
-echo "=============================" 
+echo ""
+echo "============================="
+echo "HPL.dat File"
+echo "============================="
 cat HPL.dat
-echo "=============================" 
-echo "=============================" 
-echo "" 
+echo "============================="
+echo "============================="
+echo ""
 
 #### Set Node information
 NV_MEMCLOCK=$(source ${SYSCFGVAR} ; echo ${GPU_CLOCK} | cut -f2 -d= | cut -f1 -d, | sed 's/"//g')
@@ -88,8 +88,8 @@ echo "NV_GPUCLOCK: ${NV_GPUCLOCK}"
 LOCAL_MPIOPTS="--mca btl_openib_warn_default_gid_prefix 0"
 
 # Print the nodelist
-echo "HOSTLIST: $(scontrol show hostname $SLURM_NODELIST | paste -s -d,)" 
-echo "" 
+echo "HOSTLIST: $(scontrol show hostname $SLURM_NODELIST | paste -s -d,)"
+echo ""
 
 ## Run HPL
 if [ -f $SYSCFGVAR ]; then
@@ -126,7 +126,7 @@ case ${CRUNTIME} in
 	echo "baremetal not supported yet"
 	exit 1
 	CMD="srun --mpi=pmi2 -N ${NNODES} --ntasks-per-node=${GPUS_PER_NODE} \
-	     ./hpl.sh --config ${SYSCFGVAR} --cpu-cores-per-task ${cpucorespertask} ${USEHPLAI}  --dat ./HPL.dat" 
+	     ./hpl.sh --config ${SYSCFGVAR} --cpu-cores-per-task ${cpucorespertask} ${USEHPLAI}  --dat ./HPL.dat"
 	;;
     *)
 	echo "ERROR: Runtime ${CRUNTIME} not supported.  Exiting"
@@ -140,5 +140,3 @@ $CMD
 
 ## Cleanup Run
 cd ${HPL_DIR}
-
-

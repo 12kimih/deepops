@@ -204,7 +204,7 @@ pipeline {
           sh '''
             timeout 60 bash -x ./workloads/jenkins/scripts/test-mpi-job.sh
           '''
-          
+
           echo "Test Enroot"
           sh '''
             timeout 120 bash -x ./workloads/jenkins/scripts/test-slurm-enroot-job.sh

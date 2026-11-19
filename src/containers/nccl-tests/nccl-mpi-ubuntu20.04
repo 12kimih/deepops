@@ -135,4 +135,3 @@ WORKDIR "/examples/benchmarks"
 
 ENV LD_LIBRARY_PATH /usr/local/lib:/usr/lib:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 CMD ["/bin/bash"]
-

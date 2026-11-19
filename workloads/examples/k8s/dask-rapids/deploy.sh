@@ -88,7 +88,7 @@ function build_image() {
 	exit
 	;;
     esac
-  fi	  
+  fi
   git clone --depth=1 --single-branch --branch ${RAPIDS_DASK_DOCKER_REPO_BRANCH} "${RAPIDS_DASK_DOCKER_REPO}" "${RAPIDS_TMP_BUILD_DIR}"
   pushd "${RAPIDS_TMP_BUILD_DIR}"
 
@@ -152,7 +152,7 @@ function stand_up() {
   kubectl create -n ${RAPIDS_NAMESPACE} -f config/k8s/rapids-dask-sa.yml
 
   # kubectl create -f  config/k8s/rapids-dask-autoscale.yml # XXX: Optional install
-  kubectl wait -n ${RAPIDS_NAMESPACE} --for=condition=Ready -l "app=${app_name}" --timeout=90s pod 
+  kubectl wait -n ${RAPIDS_NAMESPACE} --for=condition=Ready -l "app=${app_name}" --timeout=90s pod
 }
 
 
@@ -160,7 +160,7 @@ function copy_config() {
   echo "Copying dask-worker yaml file into running jupyter container"
   kubectl -n ${RAPIDS_NAMESPACE} scale deployment ${RAPIDS_HELM_NAME}-dask-worker --replicas=1
   # Wait for containers to initialize
-  kubectl wait -n ${RAPIDS_NAMESPACE} --for=condition=Ready -l "app=${app_name}" --timeout=90s pod 
+  kubectl wait -n ${RAPIDS_NAMESPACE} --for=condition=Ready -l "app=${app_name}" --timeout=90s pod
 
   # Copy worker spec over to Jupyter for Manual cluster  definition
   ## Get the names of the running pods
@@ -177,7 +177,7 @@ function copy_config() {
   # XXX: This is an issue until we figure  out how to  join the existing cluster/deployment with the dask_kubernetes flow
   kubectl -n ${RAPIDS_NAMESPACE} scale deployment ${RAPIDS_HELM_NAME}-dask-worker --replicas=0
   # Wait for containers to initialize
-  kubectl wait -n ${RAPIDS_NAMESPACE} --for=condition=Ready -l "app=${app_name}" --timeout=90s pod 
+  kubectl wait -n ${RAPIDS_NAMESPACE} --for=condition=Ready -l "app=${app_name}" --timeout=90s pod
 }
 
 function get_url() {
@@ -224,4 +224,3 @@ build_image
 stand_up
 copy_config
 get_url
-

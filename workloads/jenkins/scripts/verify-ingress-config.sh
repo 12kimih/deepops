@@ -19,4 +19,3 @@ curl "http://${master_ip}:${ingress_port}"
 # Test https
 curl -k "https://${master_ip}"
 curl -k "https://${master_ip}:${ingress_https_port}"
-
