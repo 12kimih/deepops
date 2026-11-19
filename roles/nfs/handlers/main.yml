@@ -10,8 +10,8 @@
   changed_when: true
 
 # exports(5) changes take effect with exportfs -ra, without restarting nfsd: a restart
-# drops every client's state and has hung nfsd before. Restart nfs is for nfsd's own
-# settings (threads in nfs.conf).
+# drops every client's state and has hung nfsd before. nfsd's own thread count is
+# applied live too (Apply nfsd thread count); nothing here restarts nfsd.
 - name: Reload NFS exports
   ansible.builtin.command:
     cmd: exportfs -ra

@@ -50,8 +50,9 @@ func nodeState(raw string) string {
 // ParseNodes reads `sinfo -h -N -o %N|%T|%C`: a line per node and partition. A node in
 // several partitions is listed once for each, so it is counted once, by name; the
 // partition-grouped forms (-o %T,%D or %C without -N) count it once per partition or
-// print one line per partition.
-func ParseNodes(input string) (map[string]float64, map[string]float64, error) {
+// print one line per partition. A line it cannot read is skipped and counted in the
+// returned bad count, so one odd node never drops every series.
+func ParseNodes(input string) (map[string]float64, map[string]float64, int) {
 	states := map[string]float64{
 		"alloc": 0, "comp": 0, "down": 0, "drain": 0, "err": 0,
 		"fail": 0, "idle": 0, "maint": 0, "mix": 0, "other": 0,
@@ -59,6 +60,7 @@ func ParseNodes(input string) (map[string]float64, map[string]float64, error) {
 	keys := []string{"alloc", "idle", "other", "total"}
 	cpus := map[string]float64{"alloc": 0, "idle": 0, "other": 0, "total": 0}
 	seen := map[string]bool{}
+	bad := 0
 	for _, line := range strings.Split(input, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -66,26 +68,34 @@ func ParseNodes(input string) (map[string]float64, map[string]float64, error) {
 		}
 		parts := strings.Split(line, "|")
 		if len(parts) != 3 {
-			return nil, nil, fmt.Errorf("unexpected sinfo line: %q", line)
+			log.Printf("node collector: unexpected sinfo line %q", line)
+			bad++
+			continue
 		}
 		if seen[parts[0]] {
 			continue
 		}
+		fields := strings.Split(parts[2], "/")
+		values := make([]float64, 0, len(keys))
+		for _, f := range fields {
+			v, err := strconv.ParseFloat(f, 64)
+			if err != nil {
+				break
+			}
+			values = append(values, v)
+		}
+		if len(fields) != len(keys) || len(values) != len(keys) {
+			log.Printf("node collector: unexpected %%C for %s: %q", parts[0], parts[2])
+			bad++
+			continue
+		}
 		seen[parts[0]] = true
 		states[nodeState(parts[1])]++
-		fields := strings.Split(parts[2], "/")
-		if len(fields) != 4 {
-			return nil, nil, fmt.Errorf("unexpected %%C for %s: %q", parts[0], parts[2])
-		}
 		for i, k := range keys {
-			v, err := strconv.ParseFloat(fields[i], 64)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unexpected %%C field %q: %w", fields[i], err)
-			}
-			cpus[k] += v
+			cpus[k] += values[i]
 		}
 	}
-	return states, cpus, nil
+	return states, cpus, bad
 }
 
 // ParseQueueStates counts `squeue -a -r -h -o %T --states=all` job states
@@ -202,13 +212,10 @@ func collect() string {
 	errors := 0
 
 	if out, err := runCommand("sinfo", "-h", "-N", "-o", "%N|%T|%C"); err == nil {
-		if states, cpus, perr := ParseNodes(out); perr == nil {
-			m.gaugeSet("slurm_nodes_", "Count of nodes by state", states)
-			m.gaugeSet("slurm_cpus_", "Aggregate CPUs by allocation state", cpus)
-		} else {
-			log.Printf("node collector: %v", perr)
-			errors++
-		}
+		states, cpus, bad := ParseNodes(out)
+		m.gaugeSet("slurm_nodes_", "Count of nodes by state", states)
+		m.gaugeSet("slurm_cpus_", "Aggregate CPUs by allocation state", cpus)
+		errors += bad
 	} else {
 		log.Printf("node collector: %v", err)
 		errors++

@@ -51,8 +51,15 @@ def tracked(*patterns):
 
 
 def committed_site():
-    """CONFIG as committed, when the commit hook runs and CONFIG is a git repository."""
-    return bool(os.environ.get("PRE_COMMIT")) and (CONFIG / ".git").exists()
+    """CONFIG as committed, when the commit hook runs and CONFIG is a git repository
+    with at least one commit (a fresh one has nothing committed to read yet)."""
+    if not (os.environ.get("PRE_COMMIT") and (CONFIG / ".git").exists()):
+        return False
+    head = subprocess.run(
+        ["git", "rev-parse", "-q", "--verify", "HEAD"], cwd=CONFIG, capture_output=True,
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )  # fmt: skip
+    return head.returncode == 0
 
 
 def site_entries(kind):
