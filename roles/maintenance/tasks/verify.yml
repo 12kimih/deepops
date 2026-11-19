@@ -18,11 +18,15 @@
   failed_when: maintenance_gpus.rc != 0 or maintenance_gpus.stdout is not search('^GPU \\d', multiline=True)
   when: maintenance_verify_gpus | bool and not ansible_check_mode
 
-# Fails the node on any failed test; the run stops with the node still drained.
+# Fails the node on any failed test; the run stops with the node still drained. After
+# a reboot the host engine may still be starting: only that is waited for.
 - name: Run the DCGM diagnostics
   ansible.builtin.command:
     argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, dcgmi, diag, -r, "{{ maintenance_verify_dcgm_level }}"]
   register: maintenance_dcgm
+  until: maintenance_dcgm.rc == 0 or 'Unable to establish a connection' not in (maintenance_dcgm.stdout ~ maintenance_dcgm.stderr)
+  retries: 12
+  delay: 10
   changed_when: false
   when: maintenance_verify_dcgm_level | int > 0 and not ansible_check_mode
 
