@@ -7,6 +7,10 @@ slurm_config_dir: /etc/slurm
 nhc_install_dir: /usr
 nhc_program: "{{ nhc_install_dir }}/sbin/nhc"
 
+# The cluster's name (slurm.conf ClusterName, the accounting cluster), read by every role
+# that names the cluster (the Slurm config, accounting, the web portal's cluster file).
+slurm_cluster_name: deepops
+
 # A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
 # the controller group, slurmd on the compute group, client-only elsewhere.
 slurm_controller_group: slurm-master

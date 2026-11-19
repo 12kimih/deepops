@@ -45,7 +45,6 @@ slurm_force_rebuild: false
 slurm_build_lua: "{{ 'lua' in (slurm_job_submit_plugins) }}"
 slurm_contain_ssh: true
 
-slurm_cluster_name: deepops
 slurm_username: slurm
 # The MUNGE key every Slurm host shares, a file in the site config kept vault-encrypted
 # and copied verbatim. Create it with munge's own tool, or capture a running cluster's
