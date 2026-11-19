@@ -124,6 +124,19 @@ if grep -i deepops README.md >/dev/null 2>&1 ; then
     fi
 fi
 
+# The site config, when it is a git repository, checks its own commits with the same
+# settings checks (scripts/deepops/config-pre-commit.sh). A hook of its own is left
+# alone and said.
+if [ -d "${CONFIG_DIR}/.git" ] ; then
+    site_hook="${CONFIG_DIR}/.git/hooks/pre-commit"
+    want="${REPO_DIR}/scripts/deepops/config-pre-commit.sh"
+    if [ ! -e "${site_hook}" ] || [ "$(readlink -f "${site_hook}")" = "${want}" ] ; then
+        ln -sfn "${want}" "${site_hook}"
+    else
+        echo "WARNING: ${site_hook} is another hook; the config checks are not installed there" >&2
+    fi
+fi
+
 # Install the Galaxy collections and roles (roles/requirements.yml, then config/requirements.yml)
 echo "Installing Ansible Galaxy collections and roles..."
 DEEPOPS_CONFIG_DIR="${CONFIG_DIR}" uv run scripts/deepops/galaxy.py >/dev/null || { echo "ERROR: Galaxy install failed" >&2; exit 1; }
