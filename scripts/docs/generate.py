@@ -98,7 +98,10 @@ def comments_above(path):
             pending = []
             continue
         if line.startswith("#"):
-            pending.append(line.lstrip("#").strip())
+            # `# upstream:` says where a pin's releases come from (scripts/deepops/upstream.py),
+            # not what the setting means.
+            if not re.match(r"#\s*upstream:", line):
+                pending.append(line.lstrip("#").strip())
             continue
         m = re.match(r"^([a-z_][a-z0-9_]*):", line)
         if m:

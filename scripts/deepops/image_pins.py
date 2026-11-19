@@ -44,19 +44,17 @@ def split(ref):
     return host, repo, tag
 
 
-def _request(url, token=None):
+def _request(url, token=None, method="HEAD"):
     headers = {"Accept": ACCEPT, "User-Agent": "deepops-image-pins"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    return urllib.request.urlopen(urllib.request.Request(url, method="HEAD", headers=headers), timeout=30)
+    return urllib.request.urlopen(urllib.request.Request(url, method=method, headers=headers), timeout=30)
 
 
-def digest(ref):
-    """The index digest IMAGE:TAG points at now."""
-    host, repo, tag = split(ref)
-    url = f"https://{host}/v2/{repo}/manifests/{tag}"
+def _registry(url, method="HEAD"):
+    """The registry's response to URL, through the anonymous token flow when it asks."""
     try:
-        response = _request(url)
+        return _request(url, method=method)
     except urllib.error.HTTPError as e:
         if e.code != 401:
             raise
@@ -65,8 +63,26 @@ def digest(ref):
         query = urllib.parse.urlencode({k: v for k, v in challenge.items() if k in ("service", "scope")})
         with urllib.request.urlopen(f"{challenge['realm']}?{query}", timeout=30) as t:
             body = json.load(t)
-        response = _request(url, body.get("token") or body.get("access_token"))
-    return response.headers["Docker-Content-Digest"]
+        return _request(url, body.get("token") or body.get("access_token"), method=method)
+
+
+def digest(ref):
+    """The index digest IMAGE:TAG points at now."""
+    host, repo, tag = split(ref)
+    return _registry(f"https://{host}/v2/{repo}/manifests/{tag}").headers["Docker-Content-Digest"]
+
+
+def tags(ref):
+    """Every tag of IMAGE's repository (IMAGE:TAG; the tag is ignored), across pages."""
+    host, repo, _ = split(ref)
+    found, url = [], f"https://{host}/v2/{repo}/tags/list?n=1000"
+    while url:
+        with _registry(url, method="GET") as response:
+            found += json.load(response).get("tags") or []
+            # Link: </v2/<repo>/tags/list?last=...&n=1000>; rel="next"
+            link = re.search(r"<([^>]+)>;\s*rel=\"next\"", response.headers.get("Link", ""))
+        url = urllib.parse.urljoin(f"https://{host}", link.group(1)) if link else None
+    return found
 
 
 def pins():

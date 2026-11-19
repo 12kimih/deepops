@@ -16,6 +16,7 @@ container_registry_namespace: "deepops-docker"
 # with breaking config changes (the config mount moved /etc/docker/registry ->
 # /etc/distribution and needs a `configPath` value), so bumping requires reworking
 # the values template + validation -- intentionally left on 2.1.0.
+# upstream: hold the 3.x chart moved the config mount and needs configPath (see above)
 container_registry_version: "2.1.0"
 container_registry_hostname: registry.local
 container_registry_ingress_enabled: false
