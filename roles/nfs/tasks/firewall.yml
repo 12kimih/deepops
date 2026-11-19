@@ -14,37 +14,20 @@
   when:
     - ansible_facts.os_family == "RedHat"
 
+# Permanent, and also live when firewalld runs: nothing has to be restarted to load
+# them, neither firewalld nor, behind it, rpcbind and nfsd.
 - name: Configure firewall to allow NFS server
   ansible.posix.firewalld:
     service: "{{ item }}"
     permanent: true
     state: enabled
-    immediate: false
+    immediate: "{{ ansible_facts.services.get('firewalld.service', {}).get('state') == 'running' }}"
   with_items:
     - mountd
     - rpc-bind
     - nfs
-  register: nfs_firewalld_rules
   tags:
     - nfs
   when:
     - ansible_facts.os_family == "RedHat"
     - "'firewalld' in ansible_facts.packages"
-
-# The rules above are permanent-only (immediate: false), so restart firewalld to load
-# them -- only when a rule changed, so an unchanged re-run does not bounce it.
-- name: Restart firewalld if it was running
-  ansible.builtin.systemd:
-    state: restarted
-    name: firewalld
-  tags:
-    - nfs
-  notify:
-    - Restart rpcbind
-    - Restart nfs
-  when:
-    - ansible_facts.os_family == "RedHat"
-    - "'firewalld' in ansible_facts.packages"
-    - "'firewalld.service' in ansible_facts.services"
-    - ansible_facts.services['firewalld.service']['state'] == "running"
-    - nfs_firewalld_rules is changed

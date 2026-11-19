@@ -24,7 +24,6 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Restart node-exporter
 
 - name: Install systemd unit file
   ansible.builtin.template:
@@ -33,6 +32,9 @@
     owner: root
     group: root
     mode: "0644"
+  # The unit carries the image, the collectors and the limits; the scrape target file
+  # above is Prometheus's, so node-exporter restarts for the unit, never for it.
+  notify: Restart node-exporter
 
 - name: Configure service
   ansible.builtin.systemd:
