@@ -28,7 +28,9 @@ SMOKE_POD = "deepops-validate-cuda"
 def run(cmd, timeout=60, input_text=None):
     """Run a command, returning (rc, stdout, stderr) without raising."""
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=input_text)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, errors="replace", timeout=timeout, input=input_text
+        )
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout after %ss" % timeout

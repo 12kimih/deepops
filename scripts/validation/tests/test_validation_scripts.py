@@ -5,6 +5,7 @@ Run with: python3 -m unittest discover scripts/validation/tests
 
 import importlib.util
 import os
+import sys
 import unittest
 
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +21,7 @@ def load(name):
 validate_slurm = load("validate_slurm")
 validate_k8s = load("validate_k8s")
 deepops_doctor = load("deepops_doctor")
+validate_runai = load("validate_runai")
 
 
 class TestSlurmParsers(unittest.TestCase):
@@ -194,6 +196,16 @@ class TestDoctorParsers(unittest.TestCase):
             "n3 | CHANGED | rc=0 | (stdout) not-a-number\n"
         )
         self.assertEqual(deepops_doctor.count_positive_stdout_hosts(out), 1)
+
+
+class TestRunDecodes(unittest.TestCase):
+    def test_undecodable_output_is_replaced_not_raised(self):
+        # A command printing bytes that are not UTF-8 must not turn --json into a traceback.
+        cmd = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok \\xff')"]
+        for module in (validate_slurm, validate_k8s, deepops_doctor, validate_runai):
+            with self.subTest(module=module.__name__):
+                rc, out, _ = module.run(cmd)
+                self.assertEqual((rc, out), (0, "ok \ufffd"))
 
 
 if __name__ == "__main__":
