@@ -6,5 +6,7 @@ prometheus_config_dir: /etc/prometheus
 prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
 prometheus_port: 9090
 alertmanager_port: 9093
+# How often Prometheus scrapes, which Grafana also needs to size its queries.
+prometheus_cfg_scrape_interval: 15s
 # node_exporter's textfile collector directory, which every textfile writer fills.
 node_exporter_prom_dir: /run/prometheus

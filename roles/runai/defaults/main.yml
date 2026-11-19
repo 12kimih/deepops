@@ -19,7 +19,7 @@ runai_kubectl: kubectl
 runai_helm_timeout: "20m"
 # Require at least one node advertising nvidia.com/gpu before installing.
 runai_require_gpu: true
-runai_work_dir: "{{ deepops_dir | default('/opt/deepops') }}/runai"
+runai_work_dir: "{{ deepops_dir }}/runai"
 
 # ---------------------------------------------------------------- KAI Scheduler
 # Pinned chart (v0.18 is a long-term-support line). No "latest".

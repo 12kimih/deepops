@@ -16,4 +16,4 @@ datasources:
     editable: false
     jsonData:
       # Lets $__rate_interval cover at least four scrapes.
-      timeInterval: "{{ prometheus_cfg_scrape_interval | default('15s') }}"
+      timeInterval: "{{ prometheus_cfg_scrape_interval }}"

@@ -31,6 +31,21 @@ def load(path):
     return canonical(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
 
 
+def role_defaults(role):
+    """A role's defaults as a play sees them: its meta dependencies' first (recursively,
+    in order), then its own over them, as Ansible loads them. A shared value lives in
+    a defaults-only role (slurm_paths, prometheus_paths), so a test that read only the
+    role's own file would not see it."""
+    found = {}
+    meta = ROOT / "roles" / role / "meta" / "main.yml"
+    for dep in ((yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []) if meta.is_file() else []:
+        found.update(role_defaults(dep["role"] if isinstance(dep, dict) else dep))
+    own = ROOT / "roles" / role / "defaults" / "main.yml"
+    if own.is_file():
+        found.update(yaml.safe_load(own.read_text(encoding="utf-8")) or {})
+    return found
+
+
 def same_name(actual, expected):
     """Task names compare without regard to case."""
     return isinstance(actual, str) and isinstance(expected, str) and actual.casefold() == expected.casefold()

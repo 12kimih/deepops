@@ -4,8 +4,8 @@
 #
 #   -e hostlist=...              target a subset
 #   -e reboot_serial=N           rolling batch size (default 100%)
-#   -e reboot_timeout=N          seconds to wait for a node (default 1800)
-#   -e reboot_detach_nfs=false   skip the pre-reboot unmount
+#   -e maintenance_reboot_timeout=N    seconds to wait for a node (roles/maintenance)
+#   -e maintenance_detach_nfs=false    skip the pre-reboot unmount
 #
 # To take nodes out of Slurm first and check them afterwards, use apt-upgrade.yml
 # (with -e maintenance_force_reboot=true for a reboot without upgrading anything new).
@@ -21,6 +21,4 @@
         tasks_from: reboot
       vars:
         maintenance_force_reboot: true
-        maintenance_detach_nfs: "{{ reboot_detach_nfs | default(true) }}"
-        maintenance_reboot_timeout: "{{ reboot_timeout | default(1800) }}"
         maintenance_reason: reboot

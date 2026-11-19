@@ -6,7 +6,6 @@ prometheus_docker_volume_name: "deepops_prometheus_metrics"
 prometheus_state: started
 prometheus_enabled: true
 
-prometheus_cfg_scrape_interval: 15s
 prometheus_cfg_evaluation_interval: 15s
 
 # TSDB retention: whichever limit is hit first wins. Empty size disables the size cap.

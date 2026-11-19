@@ -1,6 +1,7 @@
 ---
 # prometheus_config_dir and prometheus_cfg_endpoint_dir come from roles/prometheus_paths.
 dependencies:
+  - role: slurm_paths  # slurm_install_prefix, slurm_config_dir, host groups
   - role: prometheus_paths
 
 galaxy_info:

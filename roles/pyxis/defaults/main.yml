@@ -1,7 +1,5 @@
 ---
 slurm_install_pyxis: true
-slurm_install_prefix: /usr/local
-slurm_config_dir: /etc/slurm
 # pyxis is a SPANK plugin and MUST be (re)built against the deployed Slurm
 # headers; DeepOps builds Slurm from source under slurm_install_prefix, so the
 # build points CPPFLAGS at {{ slurm_install_prefix }}/include/slurm.
@@ -19,12 +17,6 @@ pyxis_container_scope: job
 pyxis_sbatch_support: 1
 pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 
-# A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
-# the controller group, slurmd on the compute group, client-only elsewhere.
-slurm_controller_group: slurm-master
-slurm_compute_group: slurm-node
-is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"
-is_compute: "{{ inventory_hostname in (groups[slurm_compute_group] | default([])) }}"
 
 # pyxis builds a SPANK plugin against the deployed Slurm headers, so it needs a
 # compiler toolchain (build-essential / @Development Tools) in addition to the

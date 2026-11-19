@@ -11,12 +11,12 @@ import yaml
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
-from ansible_yaml import canonical, condition, render, same_name  # noqa: E402
+from ansible_yaml import canonical, condition, render, role_defaults, same_name  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 ROLE = ROOT / "roles/slurm"
 TASKS = canonical(yaml.safe_load((ROLE / "tasks/build.yml").read_text()))
-DEFAULTS = yaml.safe_load((ROLE / "defaults/main.yml").read_text())
+DEFAULTS = role_defaults("slurm")
 
 
 class LuaBuild(unittest.TestCase):

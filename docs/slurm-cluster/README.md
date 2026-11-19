@@ -337,7 +337,7 @@ through NIS resolves to its pinned GID on every node.
 
 `playbooks/utilities/reboot.yml` reboots the targeted hosts and waits for each to come
 back. `-e reboot_serial=N` reboots in batches of N instead of all at once, and
-`-e reboot_timeout=N` sets how long a node has to return -- the default 1800s allows for
+`-e maintenance_reboot_timeout=N` sets how long a node has to return -- the default 1800s allows for
 BIOS POST and memory training on a GPU server.
 
 Before rebooting, the play detaches every NFS mount. Without that, a node holding a

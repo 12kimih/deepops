@@ -76,6 +76,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── container_image
 │   ├── deepops_chrony
 │   ├── deepops_hosts
+│   ├── deepops_paths
 │   ├── default_target
 │   ├── dns-config
 │   ├── docker
@@ -145,6 +146,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── slurm
 │   ├── slurm_backup
 │   ├── slurm_metrics
+│   ├── slurm_paths
 │   ├── slurm_usage_report
 │   ├── spack
 │   └── standalone-container-registry
