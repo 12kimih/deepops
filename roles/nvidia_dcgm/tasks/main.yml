@@ -27,7 +27,7 @@
     name: "nvidia-dcgm.service"
     state: "started"
     enabled: true
-  when: '"nvidia-dcgm.service" in services'
+  when: '"nvidia-dcgm.service" in ansible_facts.services'
   tags:
     - molecule-notest
 
@@ -37,6 +37,6 @@
     name: "dcgm.service"
     state: "started"
     enabled: true
-  when: '"nvidia-dcgm.service" not in services'
+  when: '"nvidia-dcgm.service" not in ansible_facts.services'
   tags:
     - molecule-notest
