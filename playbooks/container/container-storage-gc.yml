@@ -1,0 +1,11 @@
+---
+# The daily cleanup of users' container image stores (roles/container_storage_gc):
+# podman storage and the enroot cache, on every Slurm host that keeps them.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tags:
+    - container-storage-gc
+  roles:
+    - role: deploy_defaults
+    - role: container_storage_gc
+      when: slurm_container_storage_gc

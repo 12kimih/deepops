@@ -1,0 +1,16 @@
+---
+# Users' container image stores (roles/container_storage_gc textfile metrics,
+# clustertools.container_gc). The disk itself is watched by the filesystem rules in
+# host.yml; these say when the daily cleanup stopped working.
+groups:
+  - name: container-storage
+    rules:
+      - alert: ContainerStorageCleanupStale
+        expr: time() - container_storage_gc_last_success_timestamp_seconds > 3 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "Container image stores on {{ $labels.host }} have not been cleaned up for 3 days"
+          description: >-
+            The daily cleanup failed or did not run, so podman storage and the enroot
+            cache can fill the local disk: `journalctl -u container-storage-gc` and
+            `systemctl list-timers container-storage-gc.timer` on the host.

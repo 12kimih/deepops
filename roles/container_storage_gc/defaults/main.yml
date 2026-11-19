@@ -1,0 +1,21 @@
+---
+# container_storage_gc -- a daily timer that removes users' container image stores from
+# a node's local disk: rootless podman storage (rootless_storage_path in storage.conf)
+# and the enroot layer cache (ENROOT_CACHE_PATH in enroot.conf), each read from the
+# tool's own configuration (clustertools.container_gc). A user's whole store goes when
+# the user left the roster, when it went unused for container_storage_gc_unused_days,
+# or, least recently used first, while its filesystem is above
+# container_storage_gc_max_used_percent; never while the user runs that tool. The
+# node's disk alerts are the existing filesystem rules (roles/prometheus rules
+# host.yml); roles/prometheus rules container-storage.yml alerts when the timer stops.
+
+container_storage_gc_unused_days: 14
+container_storage_gc_max_used_percent: 80
+
+# Roster-shaped mapping (login -> {uid, status}) whose active people keep their stores;
+# empty: no store is removed for its user having left.
+container_storage_gc_people: {}
+
+# When the timer runs (systemd OnCalendar), spread over the hour that follows.
+container_storage_gc_on_calendar: "*-*-* 04:00:00"
+container_storage_gc_textfile_dir: "{{ node_exporter_prom_dir }}"

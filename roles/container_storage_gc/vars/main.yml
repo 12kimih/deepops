@@ -1,0 +1,27 @@
+---
+_container_storage_gc_command: /usr/local/libexec/container-storage-gc
+_container_storage_gc_config: /etc/cluster-tools/container-storage-gc.json
+_container_storage_gc_units: [container-storage-gc.service, container-storage-gc.timer]
+# Each store: where its per-user path is set, and the programs that use it (process
+# names, matched as prefixes). A podman store is recreated empty for its user, as
+# roles/podman makes it under a root-owned parent; enroot makes its own.
+_container_storage_gc_stores:
+  - name: podman
+    kind: podman
+    config: /etc/containers/storage.conf
+    recreate: true
+    busy: [podman, conmon, crun, slirp4netns, pasta, catatonit, buildah]
+  - name: enroot-cache
+    kind: enroot
+    config: /etc/enroot/enroot.conf
+    key: ENROOT_CACHE_PATH
+    recreate: false
+    busy: [enroot, mksquashfs, unsquashfs]
+_container_storage_gc_cfg:
+  textfile: "{{ container_storage_gc_textfile_dir }}/container-storage-gc.prom"
+  unused_days: "{{ container_storage_gc_unused_days | int }}"
+  max_used_percent: "{{ container_storage_gc_max_used_percent | int }}"
+  active_uids: >-
+    {{ (container_storage_gc_people | people_active | dict2items | map(attribute='value.uid') | map('int') | list)
+       if container_storage_gc_people | length > 0 else none }}
+  stores: "{{ _container_storage_gc_stores }}"

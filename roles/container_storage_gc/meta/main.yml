@@ -1,0 +1,8 @@
+---
+dependencies:
+  - role: cluster_tools_lib  # clustertools.container_gc
+  - role: prometheus_paths  # node_exporter_prom_dir
+
+galaxy_info:
+  namespace: deepops
+  role_name: container_storage_gc

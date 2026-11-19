@@ -88,6 +88,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── cluster_tools_lib
 │   ├── component_record
 │   ├── container_image
+│   ├── container_storage_gc
 │   ├── deepops_chrony
 │   ├── deepops_hosts
 │   ├── deepops_paths
