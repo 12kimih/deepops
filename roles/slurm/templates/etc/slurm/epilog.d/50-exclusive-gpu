@@ -1,23 +1,30 @@
 #!/usr/bin/env bash
-set -ex
+# After a job that had the node to itself: no process may stay on a GPU, and the GPUs
+# go back to their default power and clocks. A process gone by the time it is killed
+# is fine; one that survives drains the node on purpose, with a reason. Anything else
+# that goes wrong is logged, never a failed part.
+set -u
 
-command -v nvidia-smi || exit 0
+command -v nvidia-smi >/dev/null || exit 0
+node_name="${SLURMD_NODENAME:-$(hostname -s)}"
 
-# Clean up processes still running.  If processes don't exit node is drained.
-if nvidia-smi pmon -c 1 | grep -v \#  | awk '{print $2}' | grep -v - > /dev/null
-then
-    for i in $(nvidia-smi pmon -c 1 | grep -v \#  | awk '{print $2}' | grep -v -)
-    do
-        logger -s -t slurm-epilog "Killing residual GPU process $i ..."
-        kill -9 "$i"
-    done
-fi
+gpu_pids() {
+    timeout 60 nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | grep -E '^[0-9]+$'
+}
+
+for pid in $(gpu_pids); do
+    logger -t slurm-epilog "Killing residual GPU process $pid" || :
+    kill -9 "$pid" 2>/dev/null || :
+done
 sleep 5
-if nvidia-smi pmon -c 1 | grep -v \# | awk '{print $2}' | grep -v - > /dev/null
-then
-    logger -s -t slurm-epilog 'Failed to kill residual GPU processes. Draining node ...'
-    scontrol update nodename="$HOSTNAME" state=drain reason='Residual GPU processes found'
+if [ -n "$(gpu_pids)" ]; then
+    logger -t slurm-epilog "Residual GPU processes survived; draining $node_name" || :
+    timeout 30 scontrol update nodename="$node_name" state=drain reason='Residual GPU processes found' \
+        || logger -t slurm-epilog "could not drain $node_name" || :
 fi
 
-{{ slurm_config_dir }}/shared/bin/set_gpu_power_levels.sh default
-{{ slurm_config_dir }}/shared/bin/set_gpu_clocks.sh default
+for helper in set_gpu_power_levels.sh set_gpu_clocks.sh; do
+    timeout 120 '{{ slurm_config_dir }}'/shared/bin/"$helper" default \
+        || logger -t slurm-epilog "$helper default failed" || :
+done
+exit 0

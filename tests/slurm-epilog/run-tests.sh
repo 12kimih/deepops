@@ -120,8 +120,8 @@ setup_runparts() {
         fake_proc "$dir/proc" 1 0 '0::/init.scope'
     fi
 
-    # The script calls squeue twice: once for the exclusive check (-o "%C %D"),
-    # once for the last-user-job count. Answer the first with a non-exclusive
+    # The script calls squeue twice: once for the exclusive check (-o "%h",
+    # OverSubscribe), once for the last-user-job count. Answer the first with a non-exclusive
     # allocation so only the second is under test.
     # The stub must honour -t. A stub that answers the same way whatever states
     # were asked for would let the pre-fix script pass the SUSPENDED case too,
@@ -133,8 +133,8 @@ setup_runparts() {
 want_states=""
 prev=""
 for arg in "$@"; do
-    if [ "$arg" = "%C %D" ]; then
-        echo "1 1"
+    if [ "$arg" = "%h" ]; then
+        echo "${SQUEUE_OVERSUBSCRIBE:-OK}"  # OverSubscribe: NO when the job is exclusive
         exit 0
     fi
     case "$prev" in
@@ -984,6 +984,33 @@ else
     fi
 fi
 
+# --- exclusive jobs ----------------------------------------------------------------
+# Exclusive is Slurm's own OverSubscribe=NO, not a CPU count, which never matched once
+# CoreSpecCount reserves cores; and the node is asked for by its Slurm name.
+echo
+echo "run-parts.sh -- exclusive parts follow OverSubscribe, squeue asks for SLURMD_NODENAME"
+dir="$(setup_runparts)" || dir=""
+if [ -z "$dir" ]; then
+    no "exclusive parts run only for an exclusive job" "harness setup failed"
+else
+    rm -f "$dir/parts/"*
+    printf '#!/usr/bin/env bash\ntouch "%s/RAN-X"\n' "$dir" > "$dir/parts/50-exclusive-x"; chmod +x "$dir/parts/50-exclusive-x"
+    runx() { PATH="$dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 SLURM_JOBID=1000 \
+             SLURMD_NODENAME=nodeA HOSTNAME=host-a SQUEUE_JOBS="" SQUEUE_RC=0 "$@" "$dir/run-parts.sh" "$dir/parts" >/dev/null 2>&1; }
+    runx env SQUEUE_OVERSUBSCRIBE=OK; shared_ran=$([ -e "$dir/RAN-X" ] && echo yes || echo no)
+    runx env SQUEUE_OVERSUBSCRIBE=NO; excl_ran=$([ -e "$dir/RAN-X" ] && echo yes || echo no)
+    if [ "$shared_ran/$excl_ran" = "no/yes" ]; then
+        ok "exclusive parts run only for an exclusive job (OverSubscribe=NO)"
+    else
+        no "exclusive parts run only for an exclusive job (OverSubscribe=NO)" "shared=$shared_ran exclusive=$excl_ran"
+    fi
+    if grep -q 'squeue_timeout' "$dir/run-parts.sh" && grep -q -- '-w "$node_name"' "$dir/run-parts.sh"; then
+        ok "squeue is bounded and asks for the node by its Slurm name"
+    else
+        no "squeue is bounded and asks for the node by its Slurm name" "see run-parts.sh"
+    fi
+fi
+
 # --- enroot paths from enroot.conf ------------------------------------------------
 # The prolog and epilog take enroot's per-user paths from enroot.conf at job time,
 # the file the enroot role writes, so they cannot disagree with it. Templated from
@@ -1018,6 +1045,40 @@ CONF
 else
     no "enroot-paths.sh renders" "render failed"
 fi
+# The prolog never acts as root inside the world-writable parents: a planted file or
+# symlink in the user's place is cleared without being followed, the directory is
+# made by the user, and anything it cannot fix is logged, never a drained node.
+ep="$ed/prolog"; rm -rf "$ep"; mkdir -p "$ep/bin" "$ep/run" "$ep/target"
+printf '#!/bin/sh\nshift 2\nexec "$@"\n' > "$ep/bin/sudo"
+printf '#!/bin/sh\nexit 0\n' > "$ep/bin/enroot"
+printf '#!/bin/sh\necho "$*" >> "%s/log"\n' "$ep" > "$ep/bin/logger"
+chmod +x "$ep/bin/"*
+printf 'ENROOT_RUNTIME_PATH %s/run/user-x\n' "$ep" > "$ep/enroot.conf"
+if render "shared/lib/enroot-paths.sh" "$ep/lib.sh" && render "prolog.d/50-all-enroot-dirs" "$ep/50" \
+   && render "epilog.d/50-lastuserjob-all-enroot-dirs" "$ep/e50"; then
+    sed -i "s#^enroot_conf=.*#enroot_conf='$ep/enroot.conf'#" "$ep/lib.sh"
+    sed -i "s#/etc/slurm/shared/lib/enroot-paths.sh#$ep/lib.sh#" "$ep/50" "$ep/e50"
+    me=$(id -u); run50() { PATH="$ep/bin:$PATH" SLURM_JOB_USER=u SLURM_JOB_UID="$1" bash "$ep/$2"; }
+    echo secret > "$ep/target/f"
+    ln -s "$ep/target" "$ep/run/user-x"
+    run50 "$me" 50; rc1=$?
+    t1=$([ -d "$ep/run/user-x" ] && [ ! -L "$ep/run/user-x" ] && [ -f "$ep/target/f" ] && echo ok)
+    rm -rf "$ep/run/user-x"; echo planted > "$ep/run/user-x"
+    run50 "$me" 50; rc2=$?
+    t2=$([ -d "$ep/run/user-x" ] && echo ok)
+    run50 99999 50; rc3=$?   # not the user's: cleared, and logged when it cannot be theirs
+    t3=$(grep -q 'no private' "$ep/log" 2>/dev/null && echo ok)
+    mkdir -p "$ep/run/user-x/sub"; run50 "$me" e50; rc4=$?
+    t4=$([ ! -e "$ep/run/user-x" ] && echo ok)
+    if [ "$rc1$rc2$rc3$rc4" = 0000 ] && [ "$t1$t2$t3$t4" = okokokok ]; then
+        ok "a planted symlink or file is cleared unfollowed, a foreign one is logged, nothing fails"
+    else
+        no "a planted symlink or file is cleared unfollowed, a foreign one is logged, nothing fails" \
+           "rc=$rc1$rc2$rc3$rc4 checks=$t1/$t2/$t3/$t4"
+    fi
+else
+    no "enroot prolog renders" "render failed"
+fi
 for t in prolog.d/50-all-enroot-dirs epilog.d/50-lastuserjob-all-enroot-dirs; do
     if render "$t" "$ed/script" && grep -q 'shared/lib/enroot-paths.sh' "$ed/script" \
        && ! grep -q '/run/enroot\|enroot-data\|enroot-cache' "$ed/script"; then
@@ -1031,7 +1092,9 @@ done
 # scope=user must render byte-for-byte what 26.09 deployed. The snapshots are the
 # 26.09 templates rendered with the same fixture values; script 41 is excluded
 # because its match fix applies in both scopes and is covered above, and script 50
-# because it now reads enroot.conf in both scopes (covered below).
+# because it now reads enroot.conf in both scopes (covered below), and run-parts.sh and
+# epilog.sh because their exclusive detection, bounded squeue and never-failing logging
+# changed in both scopes (covered by the dispatcher cases).
 echo
 echo "scope=user -- byte-identical to the 26.09 scripts"
 snap_ok() {
@@ -1045,8 +1108,6 @@ snap_ok() {
 }
 snap_ok "epilog.d/40-lastuserjob-processes"       40-lastuserjob-processes
 snap_ok "epilog.d/42-lastuserjob-cleanup"         42-lastuserjob-cleanup
-snap_ok "shared/bin/run-parts.sh"                 run-parts.sh
-snap_ok "epilog.sh"                               epilog.sh
 
 # Every template must render and parse in both scopes; StrictUndefined fails
 # the render if a template references a variable the role does not define.

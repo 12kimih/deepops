@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-set -ex
+# Drop the page cache the job left. drop_caches frees clean pages only, so no sync is
+# needed first; a sync would also flush NFS and hang the epilog with a hung server.
+set -u
 
-# Cleanup caches
-sync
-echo 3 > /proc/sys/vm/drop_caches
+echo 3 > /proc/sys/vm/drop_caches || logger -t slurm-exclusive "could not drop caches" || :
+exit 0
