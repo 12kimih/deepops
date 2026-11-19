@@ -1,0 +1,10 @@
+---
+# What the server component installs, for its record (roles/component_record). The
+# exported directories and nfs_shared_dirs are data and never items; nfs-common /
+# nfs-utils serve the client too and stay.
+nfs_items: >-
+  {{ (['package:nfs-kernel-server'] if ansible_facts.os_family == 'Debian' else [])
+     + ['unit:nfs-server.service', 'unit:nfs-server-restart.service',
+        'file:/etc/systemd/system/nfs-server-restart.service',
+        'file:/etc/systemd/system/nfs-server.service.d/auto-restart.conf',
+        'dir:/etc/systemd/system/nfs-server.service.d'] }}

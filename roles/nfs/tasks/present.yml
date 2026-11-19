@@ -1,0 +1,22 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nfs
+    component_record_action: begin
+    component_record_items: "{{ nfs_items }}"
+
+- name: Set up the server
+  ansible.builtin.include_tasks: server.yml
+
+- name: Open the firewall for it
+  ansible.builtin.include_tasks: firewall.yml
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nfs
+    component_record_action: present
+    component_record_items: "{{ nfs_items }}"

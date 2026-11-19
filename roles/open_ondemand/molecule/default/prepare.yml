@@ -1,0 +1,29 @@
+---
+# A throwaway self-signed certificate for the portal, made on the controller (the role
+# copies the TLS files from there).
+- name: Make a test certificate
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create the certificate directory
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls"
+        state: directory
+        mode: "0700"
+
+    - name: Generate a self-signed certificate
+      ansible.builtin.command:
+        argv: [openssl, req, -x509, -newkey, rsa:2048, -nodes, -days, "2", -subj, /CN=portal.example.com,
+               -keyout, "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/privkey.pem",
+               -out, "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/fullchain.pem"]
+        creates: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/fullchain.pem"
+
+- name: Prepare the node
+  hosts: all
+  become: true
+  tasks:
+    - name: Create the node exporter textfile directory
+      ansible.builtin.file:
+        path: /var/lib/node_exporter/textfile
+        state: directory
+        mode: "0755"

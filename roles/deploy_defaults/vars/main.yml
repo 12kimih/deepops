@@ -49,6 +49,19 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
     needs: [prometheus]
+  open_ondemand:
+    rules:
+      - {switch: "{{ slurm_install_open_ondemand }}", group: slurm-master, first: true}
+  cluster_tools:
+    rules:
+      - {switch: "{{ slurm_install_cluster_tools }}", group: slurm-cluster}
+  # The NFS server's exports: every node's /home may hang on them, so never removed
+  # implicitly (deepops_component_removals).
+  nfs:
+    removal: explicit
+    rules:
+      - {switch: "{{ slurm_enable_nfs_server }}", group: slurm-nfs}
+      - {switch: "{{ k8s_deploy_nfs_server }}", group: kube_control_plane, first: true}
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-

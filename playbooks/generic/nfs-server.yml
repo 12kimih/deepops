@@ -1,8 +1,13 @@
 ---
-- hosts: "{{ hostlist | default('slurm-nfs') }}"
+# The NFS server's exports: present on the deploy's NFS servers (deepops_components),
+# kept elsewhere, removed from a host only when the site lists nfs in
+# deepops_component_removals.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-    - { role: nfs, nfs_is_server: true }
+    - role: nfs
+      nfs_state: "{{ deepops_components.nfs | component_phase(deepops_phase) }}"
+      nfs_is_server: "{{ nfs_state == 'present' }}"
   tags:
     - nfs_server

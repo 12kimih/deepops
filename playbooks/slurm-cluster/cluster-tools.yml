@@ -3,13 +3,15 @@
 #
 # The commands land in PATH as executables and the defaults in /etc/profile.d, so they
 # reach job scripts and `ssh <node> <cmd>` as well as an interactive prompt. Each piece
-# is opt-in through its own cluster_tools_* variable in config/group_vars; with none set
-# it publishes nothing and removes the environment defaults, banner and per-user limits.
-- hosts: "{{ hostlist | default('all') }}"
+# is opt-in through its own cluster_tools_* variable in config/group_vars. With
+# slurm_install_cluster_tools off (deepops_components) everything is withdrawn.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   tags:
     - cluster-tools
   roles:
     - role: proxy_defaults
-    - cluster_tools
+    - role: deploy_defaults
+    - role: cluster_tools
+      cluster_tools_state: "{{ deepops_components.cluster_tools | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

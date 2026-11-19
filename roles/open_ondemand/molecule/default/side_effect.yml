@@ -1,0 +1,58 @@
+---
+# Off removes it (twice: the second run has nothing to do), on brings it back with the
+# configuration backup kept.
+- name: Remove Open OnDemand
+  hosts: all
+  become: true
+  roles:
+    - role: open_ondemand
+      open_ondemand_state: absent
+
+- name: Check it is gone
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the ondemand package status
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, '${db:Status-Abbrev}', ondemand]
+      register: ood_pkg
+      changed_when: false
+      failed_when: false
+
+    - name: Check the package went
+      ansible.builtin.assert:
+        that: ood_pkg.stdout is not match('ii')
+        fail_msg: "ondemand is still installed ({{ ood_pkg.stdout }})"
+
+    - name: Look for what must be gone and what must stay
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/apt/sources.list.d/ondemand-web.sources
+        - /etc/ssl/open-ondemand/privkey.pem
+        - /var/lib/node_exporter/textfile/open_ondemand_tls.prom
+        - /var/backups/open-ondemand
+      register: ood_paths
+
+    - name: Check removal kept only the data
+      ansible.builtin.assert:
+        that:
+          - not ood_paths.results[0].stat.exists
+          - not ood_paths.results[1].stat.exists
+          - not ood_paths.results[2].stat.exists
+          - ood_paths.results[3].stat.exists
+        fail_msg: "{{ ood_paths.results | map(attribute='item') | zip(ood_paths.results | map(attribute='stat.exists')) | list | to_json }}"
+
+- name: Remove Open OnDemand again (nothing left to do)
+  hosts: all
+  become: true
+  roles:
+    - role: open_ondemand
+      open_ondemand_state: absent
+
+- name: Bring Open OnDemand back
+  hosts: all
+  become: true
+  roles:
+    - role: open_ondemand

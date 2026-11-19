@@ -3,6 +3,10 @@
 # official OSC apt repository per https://osc.github.io/ood-documentation/latest/.
 # Debian family (Ubuntu 24.04 and later; OOD 4.2 dropped 22.04).
 
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+open_ondemand_state: present
+
 # Pinned versions. A bump changes the series, the repo path and these together; read
 # that series' release notes first (config keys and dependencies change per minor).
 open_ondemand_series: "4.2"
@@ -69,6 +73,9 @@ open_ondemand_proxied_services: []
 # Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken
 # install) before changing them.
 open_ondemand_backup_dir: /var/backups/open-ondemand
+# Data the component never removes, present or absent.
+open_ondemand_data_paths:
+  - "{{ open_ondemand_backup_dir }}"
 
 # The certificate's expiry as a node_exporter textfile metric
 # (open_ondemand_tls_cert_not_after_seconds), refreshed daily, so an alert can fire
@@ -83,3 +90,5 @@ open_ondemand_managed_conffiles:
   - /etc/ood/config/nginx_stage.yml
   - /etc/ood/config/ood_portal.sha256sum
   - /etc/apache2/sites-available/ood-portal.conf
+  - /etc/ood/dex/config.yaml
+  - /etc/ood/dex/dex.db

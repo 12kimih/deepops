@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+# {{ ansible_managed }} (roles/open_ondemand)
+"""Print what differs in the Open OnDemand packages (dpkg -V), leaving out the files
+dpkg was told not to install (path-exclude in /etc/dpkg/dpkg.cfg.d, as minimal and
+container images do for documentation) and the conffiles OOD itself rewrites.
+Exits 0 when nothing else differs, 1 otherwise. The role renders the package and
+conffile lists below from its settings; the validator runs this on the portal host.
+"""
+
+import fnmatch
+import glob
+import subprocess
+import sys
+
+PACKAGES = {{ open_ondemand_verified_packages | to_json }}
+MANAGED_CONFFILES = set({{ open_ondemand_managed_conffiles | to_json }})
+
+
+def dpkg_filters():
+    """dpkg's path-exclude / path-include rules, in order (the last match wins)."""
+    rules = []
+    for path in sorted(glob.glob("/etc/dpkg/dpkg.cfg.d/*")):
+        try:
+            with open(path) as f:
+                for line in f:
+                    # dpkg takes both "path-exclude=PATTERN" and "path-exclude PATTERN".
+                    line = line.strip()
+                    for kind in ("path-exclude", "path-include"):
+                        if line.startswith(kind) and line[len(kind) : len(kind) + 1] in ("=", " "):
+                            pattern = line[len(kind) + 1 :].strip()
+                            if pattern:
+                                rules.append((kind == "path-exclude", pattern))
+        except OSError:
+            continue
+    return rules
+
+
+def excluded(path, rules):
+    result = False
+    for exclude, pattern in rules:
+        if fnmatch.fnmatch(path, pattern):
+            result = exclude
+    return result
+
+
+def main():
+    rules = dpkg_filters()
+    out = subprocess.run(["dpkg", "-V", *PACKAGES], capture_output=True, text=True).stdout
+    differences = []
+    for line in out.splitlines():
+        path = line.split()[-1] if line.split() else ""
+        if path in MANAGED_CONFFILES:
+            continue
+        if line.startswith("missing") and excluded(path, rules):
+            continue
+        differences.append(line)
+    print("\n".join(differences))
+    return 1 if differences else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

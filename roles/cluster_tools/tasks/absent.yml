@@ -1,0 +1,24 @@
+---
+# Every piece of publish.yml removes what it published when its setting is empty, so
+# removal is the same tasks with nothing to publish: one code path, no second copy.
+# motd-news goes back to the OS default. The shared directories' copies are left: users
+# may have changed files there (data).
+- name: Withdraw everything this component published
+  ansible.builtin.include_tasks: publish.yml
+  vars:
+    cluster_tools_libs: []
+    cluster_tools_commands: []
+    cluster_tools_scripts: []
+    cluster_tools_environment: {}
+    cluster_tools_shared_dirs: []
+    cluster_tools_motd_title: ""
+    cluster_tools_motd_news: true
+    cluster_tools_user_slice_limits: {}
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cluster_tools
+    component_record_action: absent
+    component_record_items: "{{ cluster_tools_items }}"

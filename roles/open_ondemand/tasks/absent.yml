@@ -1,0 +1,91 @@
+---
+- name: Look for an Open OnDemand install
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, -f, '${db:Status-Abbrev}', ondemand]
+  register: open_ondemand_absent_pkg
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: ansible_facts.os_family == 'Debian'
+
+# The configuration goes with the package's purge: keep a copy first (data, never removed).
+- name: Archive the configuration before removing it
+  when:
+    - open_ondemand_absent_pkg.stdout | default('') is match('[ir]i')
+    - not ansible_check_mode
+  block:
+    - name: Create the backup directory
+      ansible.builtin.file:
+        path: "{{ open_ondemand_backup_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Archive /etc/ood and the portal's Apache site
+      community.general.archive:
+        path: [/etc/ood, /var/www/ood, /etc/apache2/sites-available/ood-portal.conf]
+        dest: "{{ open_ondemand_backup_dir }}/before-removal-{{ ansible_facts.date_time.iso8601_basic_short }}.tar.gz"
+        format: gz
+        owner: root
+        group: root
+        mode: "0600"
+
+# Data is never an item: nothing removal touches lies under open_ondemand_data_paths.
+- name: Check no item is data
+  ansible.builtin.assert:
+    that: >-
+      (open_ondemand_items + open_ondemand_legacy_items)
+      | map('regex_replace', '^[a-z]+:', '')
+      | select('match', '(' ~ (open_ondemand_data_paths | map('regex_escape') | join('|')) ~ ')(/|$)')
+      | list | length == 0
+    fail_msg: An open_ondemand item lies under open_ondemand_data_paths; data is never removed.
+    quiet: true
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: open_ondemand
+    component_record_action: absent
+    component_record_items: "{{ open_ondemand_items + open_ondemand_legacy_items }}"
+
+# apache2 stays (a dependency other sites may use); undo what present changed in it:
+# Debian's stock ports.conf and default site.
+- name: Look for Apache
+  ansible.builtin.stat:
+    path: /etc/apache2/apache2.conf
+  register: open_ondemand_apache
+
+- name: Give Apache back its stock ports and default site
+  when:
+    - open_ondemand_apache.stat.exists
+    - component_record_result.orphans.values() | map('length') | sum > 0
+  block:
+    - name: Restore the stock ports.conf
+      ansible.builtin.copy:
+        dest: /etc/apache2/ports.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # If you just change the port or add more ports here, you will likely also
+          # have to change the VirtualHost statement in
+          # /etc/apache2/sites-enabled/000-default.conf
+
+          Listen 80
+
+          <IfModule ssl_module>
+              Listen 443
+          </IfModule>
+
+          <IfModule mod_gnutls.c>
+              Listen 443
+          </IfModule>
+
+    - name: Re-enable the default site
+      ansible.builtin.file:
+        src: ../sites-available/000-default.conf
+        dest: /etc/apache2/sites-enabled/000-default.conf
+        state: link
+      failed_when: false

@@ -1,6 +1,10 @@
 ---
 # cluster_tools -- publish the site's own commands, shell defaults and login banner.
 # Opt-in: every setting below is empty, so the role is a no-op until config fills it in.
+
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+cluster_tools_state: present
 #
 # Commands are installed into PATH as executables rather than declared as aliases in
 # /etc/bash.bashrc. An alias exists only inside an interactive bash, so the same name

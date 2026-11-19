@@ -30,6 +30,8 @@ slurm_install_hpcsdk: false
 slurm_enable_monitoring: true
 # The Open OnDemand web portal on the controller (needs its login and TLS settings)
 slurm_install_open_ondemand: false
+# The site's commands, shell defaults, login banner and per-user limits (roles/cluster_tools)
+slurm_install_cluster_tools: true
 slurm_enable_rsyslog_server: true
 slurm_enable_rsyslog_client: true
 slurm_login_on_compute: false

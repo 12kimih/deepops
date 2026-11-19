@@ -1,11 +1,10 @@
 ---
-# The Open OnDemand web portal, on the Slurm controller by default.
-- hosts: "{{ hostlist | default('slurm-master') }}"
+# The Open OnDemand web portal: present on the Slurm controller when
+# slurm_install_open_ondemand is on (deepops_components), removed from every other host
+# this runs on.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Install and configure Open OnDemand
-      ansible.builtin.include_role:
-        name: open_ondemand
-        public: true
+    - role: open_ondemand
+      open_ondemand_state: "{{ deepops_components.open_ondemand | component_phase(deepops_phase) }}"

@@ -1,0 +1,40 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: ood-ubuntu-2404
+    image: geerlingguy/docker-ubuntu2404-ansible
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+provisioner:
+  name: ansible
+  ansible_args:
+    - -vv
+  inventory:
+    group_vars:
+      all:
+        open_ondemand_servername: portal.example.com
+        open_ondemand_port: 8443
+        open_ondemand_tls_cert_src: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/fullchain.pem"
+        open_ondemand_tls_key_src: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/privkey.pem"
+        open_ondemand_oidc_crypto_passphrase: molecule-test-passphrase-not-a-secret-0123
+        open_ondemand_host_regex: "(node1)"
+        open_ondemand_dex_connectors:
+          - type: ldap
+            id: ldap
+            name: Test
+            config:
+              host: ldap.example.com:636
+              insecureNoSSL: false
+              userSearch: {baseDN: "ou=people,dc=example,dc=com", username: uid, idAttr: uid, emailAttr: mail, nameAttr: cn}
+        open_ondemand_tls_metrics_textfile_dir: /var/lib/node_exporter/textfile
+scenario:
+  test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]
+verifier:
+  name: ansible
