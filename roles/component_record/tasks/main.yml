@@ -16,6 +16,15 @@
     version: "{{ component_record_version | string }}"
   register: component_record_result
 
+# The calling role, removed, has nothing to run again after a pending reboot.
+- name: Withdraw the removed component's reboot request
+  ansible.builtin.file:
+    path: "{{ maintenance_reboot_requests_dir }}/{{ ansible_parent_role_names | first }}"
+    state: absent
+  when:
+    - component_record_action == 'absent'
+    - ansible_parent_role_names | default([]) | length > 0
+
 - name: Remove what no component needs any longer
   when: component_record_result.orphans.values() | map('length') | sum > 0
   vars:

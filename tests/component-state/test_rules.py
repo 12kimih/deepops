@@ -128,10 +128,10 @@ class Desired(unittest.TestCase):
         self.assertEqual(want(reg, self.GROUPS, "n1")["drv"], "present")
         self.assertEqual(want(reg, self.GROUPS, "k1")["drv"], "kept", "a rule that stops holding keeps it")
         self.assertEqual(want(reg, self.GROUPS, "k1", ["drv"])["drv"], "absent", "named: removed")
-        with self.assertRaises(Exception):
-            want(reg, self.GROUPS, "n1", ["drv"])  # named while a rule still wants it
-        with self.assertRaises(Exception):
-            want(reg, self.GROUPS, "n1", ["typo"])
+        self.assertEqual(want(reg, self.GROUPS, "n1", ["drv"])["drv"], "present", "named: kept where wanted")
+        for wrong in (["typo"], ["plain"]):
+            with self.subTest(removals=wrong), self.assertRaises(Exception):
+                want({**reg, "plain": {"rules": []}}, self.GROUPS, "n1", wrong)
 
     def test_order_puts_needs_first(self):
         order = components.components_order(self.REG)

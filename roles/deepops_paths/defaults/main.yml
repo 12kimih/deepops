@@ -4,6 +4,10 @@ deepops_dir: /opt/deepops
 # The Helm client every role drives (roles/helm_release, roles/runai); Kubespray puts
 # it in its bin_dir, /usr/local/bin.
 helm_bin: /usr/local/bin/helm
+# One file per role waiting for a reboot (roles/maintenance reboot_request); the reboot
+# step runs those roles again, and a component removed meanwhile takes its file along
+# (roles/component_record).
+maintenance_reboot_requests_dir: /var/lib/deepops/reboot-requested-by
 # Node-side home of a GPU power cap (roles/nvidia_power_limit). Its unit reads it as an
 # EnvironmentFile, so the number lives in one place on the node, and anything else that
 # changes a GPU's power limit reads the cap back instead of guessing: the Slurm

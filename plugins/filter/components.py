@@ -16,7 +16,8 @@ component needs is present too.
 A component with removal: explicit (the driver, authentication, Slurm, MUNGE, the NFS
 server: removing them reboots nodes, locks users out or hangs every NFS client) is
 never removed because a rule stopped holding: it is kept (its role does nothing) unless
-the site names it in deepops_component_removals, which makes it absent.
+the site names it in deepops_component_removals, which makes it absent on every host no
+rule wants it on (and present where one does).
 
 """
 
@@ -46,7 +47,13 @@ def components_desired(registry, groups, host, removals=()):
     """component -> present, absent or kept for HOST; REMOVALS names the explicit-removal
     components the site wants absent."""
     problems = check(registry)
-    problems += [f"deepops_component_removals: unknown component {r}" for r in removals if r not in registry]
+    # The list is cluster-wide: a named component goes where no rule wants it and stays
+    # where one does. Naming one that is not removal: explicit would mean nothing.
+    problems += [
+        f"deepops_component_removals: {r} is not a component with removal: explicit"
+        for r in removals
+        if (registry.get(r) or {}).get("removal") != "explicit"
+    ]
     if problems:
         from ansible.errors import AnsibleFilterError
 
@@ -65,14 +72,6 @@ def components_desired(registry, groups, host, removals=()):
             if need not in present:
                 present.add(need)
                 todo.append(need)
-    wanted = {r for r in removals if r in present}
-    if wanted:
-        from ansible.errors import AnsibleFilterError
-
-        raise AnsibleFilterError(
-            f"{host}: deepops_component_removals names {', '.join(sorted(wanted))}, which a switch "
-            "or group still wants here: turn that off first"
-        )
 
     def state(name):
         if name in present:

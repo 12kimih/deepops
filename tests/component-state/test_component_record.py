@@ -44,6 +44,17 @@ class OwnerSets(unittest.TestCase):
         self.assertEqual(orphans["dir"], ["/sw/sdk/1"])
         self.assertEqual(rec["components"]["sdk"], {"state": "present", "version": "2"})
 
+    def test_a_converged_rerun_leaves_the_record_as_it_is(self):
+        items = ["package:x", "file:/etc/x"]
+        rec, _, _ = run(EMPTY, "c", "begin", items, "1")
+        rec, _, _ = run(rec, "c", "present", items, "1")
+        again, _, _ = run(rec, "c", "begin", items, "1")
+        self.assertEqual(again, rec)
+        self.assertEqual(run(again, "c", "present", items, "1")[0], rec)
+        for other in ((items + ["file:/etc/y"], "1"), (items, "2")):
+            with self.subTest(change=other):
+                self.assertEqual(run(rec, "c", "begin", *other)[0]["components"]["c"]["state"], "installing")
+
     def test_absent_adopts_what_an_unrecorded_host_has(self):
         rec, orphans, before = run(EMPTY, "old", "absent", ["package:ypserv"])
         self.assertEqual((before, orphans["package"], rec), ({}, ["ypserv"], EMPTY))
@@ -64,8 +75,16 @@ PLAY = """
       vars:
         component_record_path: "{{ record }}"
         component_record_name: demo
-        component_record_action: "{{ action }}"
+        component_record_action: "{{ 'begin' if action == 'present' else action }}"
         component_record_items: "{{ items }}"
+    - ansible.builtin.include_role:
+        name: component_record
+      vars:
+        component_record_path: "{{ record }}"
+        component_record_name: demo
+        component_record_action: present
+        component_record_items: "{{ items }}"
+      when: action == 'present'
 """
 
 
