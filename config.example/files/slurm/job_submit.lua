@@ -103,11 +103,15 @@ local function is_gpu_token(token)
     return string.find(token, "%f[%a]gpu%f[%A]") ~= nil
 end
 
--- The type named by a GPU token, or nil when the token is untyped. "gpu:4" has to read
--- as untyped rather than as a type literally called "4".
+-- The type named by a GPU token, or nil when the token is untyped. The fields decide,
+-- not the spelling: in "gpu:X:N" or "gpu:X=N" X is the type even when all digits (a
+-- "4090"), while a lone "gpu:4" is a count.
 local function gpu_type_of_token(token)
     local t = string.match(token, "gpu:(" .. GPU_TYPE_CHARS .. "+)[:=]%d+$")
-        or string.match(token, "gpu:(" .. GPU_TYPE_CHARS .. "+)$")
+    if t ~= nil then
+        return t
+    end
+    t = string.match(token, "gpu:(" .. GPU_TYPE_CHARS .. "+)$")
     if t == nil or string.match(t, "^%d+$") then
         return nil
     end
@@ -280,6 +284,12 @@ local function reject_tasks(opt, value, cap, where, hint)
     end
     return slurm.ERROR
 end
+
+-- The fields check_tasks reads, which a modification is merged over the job with.
+local TASK_CHECK_FIELDS = {
+    "min_nodes", "gres", "tres_per_node", "tres_per_job", "tres_per_socket", "tres_per_task",
+    "ntasks_per_tres", "ntasks_per_socket", "ntasks_per_node", "num_tasks",
+}
 
 -- Tasks may not outnumber GPUs, per job and per node. Unset node count means one
 -- node, the same assumption Slurm makes when it estimates CPUs at submit.
@@ -515,6 +525,23 @@ local function job_modify(job_desc, job_rec, part_list, modify_uid)
             slurm.log_user("GPUs cannot be added to a CPU job; submit a new " ..
                            "GPU job instead.")
             return slurm.ERROR
+        end
+        -- The task check at submit saw the job as submitted; fewer GPUs or nodes later
+        -- could leave more tasks than GPUs. Check the job as it would be: each field
+        -- from the change where it sets one, else from the job.
+        if want_gpu or is_set(job_desc.min_nodes, slurm.NO_VAL) then
+            local merged = {}
+            for _, key in ipairs(TASK_CHECK_FIELDS) do
+                local v = job_desc[key]
+                if v == nil or v == "" or v == slurm.NO_VAL or v == slurm.NO_VAL16 then
+                    v = job_rec ~= nil and job_rec[key] or nil
+                end
+                merged[key] = v
+            end
+            local rc = check_tasks(merged)
+            if rc ~= slurm.SUCCESS then
+                return rc
+            end
         end
         if wants_memory(job_desc) then
             return reject_memory(true)

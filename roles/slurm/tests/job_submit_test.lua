@@ -433,6 +433,18 @@ check("O10 kept", t.cpus_per_task, 64)
 t = {gres = "gpu:2"}
 check("O11 GPU count change on a GPU job", modify(t, GPU_REC), slurm.SUCCESS)
 check("O11 stamped from the job's partitions", t.gres, "gpu:a10:2")
+-- Fewer GPUs than the job's tasks would get past the submit check.
+t = {gres = "gpu:1"}
+local TASKS_REC = {partition = A10, gres = "gres/gpu:a10:8", tres_per_node = "gres/gpu:a10:8", num_tasks = 8}
+check("O12 GPUs cut below the job's tasks", modify(t, TASKS_REC), slurm.ERROR)
+t = {min_nodes = 1}
+local NODES_REC = {partition = A10, tres_per_node = "gres/gpu:a10:8", min_nodes = 2, num_tasks = 16}
+check("O12 nodes cut below the job's tasks", modify(t, NODES_REC), slurm.ERROR)
+-- An all-digit type is a type: one not configured here is refused by name, never
+-- silently rewritten to the default type as an untyped count would be.
+t = {gres = "gpu:4090:2"}
+check("O13 an all-digit GPU type is read as a type", modify(t, GPU_REC), slurm.ERROR)
+check("O13 not rewritten", t.gres, "gpu:4090:2")
 
 print("== P. a Lua runtime error rejects instead of failing open ==")
 local broken = setmetatable({}, {__index = function() error("boom") end})
