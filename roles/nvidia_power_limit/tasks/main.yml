@@ -18,8 +18,9 @@
 # ssh service hides them (DeviceAllow, see slurm login-compute-setup).
 #
 # Gate on a working driver rather than just GPU presence: a node can have an NVIDIA
-# card (lspci) but no driver yet, in which case nvidia-smi is absent and there is
-# nothing to cap or reset.  Skip cleanly instead of failing the run.
+# card (lspci) but no driver yet, in which case nvidia-smi is absent. With no cap set
+# there is nothing to reset, so the node passes; with a cap set, it cannot be applied,
+# so the node fails (under --check only a warning: the driver may be in the same run).
 - name: Check for nvidia-smi
   ansible.builtin.command: which nvidia-smi
   register: nvidia_power_limit_smi
@@ -27,11 +28,22 @@
   failed_when: false
   check_mode: false
 
+- name: Require nvidia-smi where a power limit is configured
+  ansible.builtin.fail:
+    msg: >-
+      nvidia_power_limit_watts is {{ nvidia_power_limit_watts }} for {{ inventory_hostname }},
+      but nvidia-smi is not found there, so the cap cannot be applied. Install the NVIDIA
+      driver first, or remove the cap from this host's config.
+  when:
+    - nvidia_power_limit_smi.rc != 0
+    - nvidia_power_limit_watts | int > 0
+    - not ansible_check_mode
+
 - name: Skip nodes without an NVIDIA driver
   ansible.builtin.debug:
     msg: >-
-      nvidia-smi not found on {{ inventory_hostname }} -- skipping GPU power-limit
-      configuration (install the NVIDIA driver first).
+      nvidia-smi not found on {{ inventory_hostname }}: no GPU power limit to
+      {{ 'apply (--check preview)' if nvidia_power_limit_watts | int > 0 else 'reset' }}.
   when: nvidia_power_limit_smi.rc != 0
 
 - name: Configure the GPU power limit
