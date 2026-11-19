@@ -140,7 +140,9 @@ The `--container-image` flag runs the job inside the image using Pyxis/Enroot, w
 
 Run GPU containers through Pyxis (`--container-image`). The container then is part of the job: it gets exactly the job's GPUs, CPUs and memory, it ends with the job, and its usage is accounted.
 
-A `docker run` inside a job starts the container as a child of the Docker daemon, not of the job, so Slurm's limits, cleanup and accounting do not apply to it. Use Docker only for what Pyxis cannot do, and then give the container the job's GPUs and nothing more. Docker attaches no GPU unless asked (its default runtime is not `nvidia`):
+To build an image from a Dockerfile, or for anything else that needs a Docker-like command, use rootless Podman inside the job ([Building container images with rootless Podman](../container/podman.md)): it runs as you, as part of the job, so the job's limits and cleanup apply to it.
+
+A `docker run` inside a job starts the container as a child of the Docker daemon, not of the job, so Slurm's limits, cleanup and accounting do not apply to it. Use Docker only for what neither Pyxis nor Podman can do, and then give the container the job's GPUs and nothing more. Docker attaches no GPU unless asked (its default runtime is not `nvidia`):
 
 ```bash
 docker run --rm --gpus "\"device=$SLURM_JOB_GPUS\"" IMAGE nvidia-smi
