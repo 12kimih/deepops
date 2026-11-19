@@ -1,0 +1,13 @@
+---
+# {{ ansible_managed }}
+# The file name is Slurm's ClusterName: OOD 4.1+ passes it to Slurm as the cluster.
+v2:
+  metadata:
+    title: {{ open_ondemand_cluster_title | to_json }}
+  login:
+    host: {{ open_ondemand_login_host | to_json }}
+  job:
+    adapter: slurm
+    bin: {{ (slurm_install_prefix ~ '/bin') | to_json }}
+    conf: {{ (slurm_config_dir ~ '/slurm.conf') | to_json }}
+    copy_environment: false

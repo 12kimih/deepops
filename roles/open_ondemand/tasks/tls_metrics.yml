@@ -1,0 +1,82 @@
+---
+- name: Publish the certificate expiry as a metric
+  when: open_ondemand_tls_metrics | bool
+  block:
+    - name: Install the certificate metrics command
+      ansible.builtin.copy:
+        src: open-ondemand-tls-metrics
+        dest: /usr/local/sbin/open-ondemand-tls-metrics
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install the certificate metrics units
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/open-ondemand-tls-metrics.{{ item.key }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: "{{ item.value }}"
+      loop: "{{ units | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        units:
+          service: |
+            # Managed by roles/open_ondemand.
+            [Unit]
+            Description=Publish the Open OnDemand certificate expiry as a node_exporter metric
+
+            [Service]
+            Type=oneshot
+            TimeoutStartSec=1min
+            ExecStart=/usr/local/sbin/open-ondemand-tls-metrics {{ open_ondemand_tls_dir }}/fullchain.pem {{ open_ondemand_tls_metrics_textfile_dir }}
+          timer: |
+            # Managed by roles/open_ondemand.
+            [Unit]
+            Description=Publish the Open OnDemand certificate expiry daily
+
+            [Timer]
+            OnCalendar=daily
+            OnBootSec=5min
+            Persistent=true
+
+            [Install]
+            WantedBy=timers.target
+      register: open_ondemand_tls_units
+
+    - name: Enable the certificate metrics timer
+      ansible.builtin.systemd_service:
+        name: open-ondemand-tls-metrics.timer
+        enabled: true
+        state: started
+        daemon_reload: "{{ open_ondemand_tls_units is changed }}"
+      when: not ansible_check_mode
+
+    # Right away, so a new certificate shows up without waiting a day.
+    - name: Publish the certificate expiry now
+      ansible.builtin.systemd_service:
+        name: open-ondemand-tls-metrics.service
+        state: started
+      changed_when: false
+      when: not ansible_check_mode
+
+- name: Remove the certificate metrics when they are off
+  when: not open_ondemand_tls_metrics | bool
+  block:
+    - name: Stop and disable the certificate metrics timer
+      ansible.builtin.systemd_service:
+        name: open-ondemand-tls-metrics.timer
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Remove the certificate metrics files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/open-ondemand-tls-metrics.timer
+        - /etc/systemd/system/open-ondemand-tls-metrics.service
+        - /usr/local/sbin/open-ondemand-tls-metrics
+        - "{{ open_ondemand_tls_metrics_textfile_dir }}/open_ondemand_tls.prom"

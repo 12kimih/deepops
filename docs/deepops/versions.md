@@ -38,6 +38,9 @@ default, edit the role's defaults and run `scripts/docs/generate.py`.
 | nvidia_hpc_sdk | `hpcsdk_major_version` | `26` |  |
 | nvidia_hpc_sdk | `hpcsdk_minor_version` | `3` |  |
 | nvidia_versions | `nvidia_driver_branch` | `580` | `595` |
+| open_ondemand | `open_ondemand_version` | `4.2.5` |  |
+| open_ondemand | `open_ondemand_dex_version` | `2.45.1.2` |  |
+| open_ondemand | `open_ondemand_nodejs_version` | `22.23.5-1nodesource1` |  |
 | openmpi | `openmpi_version` | `5.0.10` |  |
 | prometheus | `prometheus_container` | `prom/prometheus:v3.16.0@sha256:e04987641b57` |  |
 | prometheus-ipmi-exporter | `ipmi_exporter_container` | `quay.io/prometheuscommunity/ipmi-exporter:v1.10.1@sha256:0662cadaf268` |  |

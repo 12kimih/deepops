@@ -1,0 +1,17 @@
+---
+- name: Restart ondemand-dex
+  ansible.builtin.systemd_service:
+    name: ondemand-dex
+    state: restarted
+
+- name: Restart apache2
+  ansible.builtin.systemd_service:
+    name: apache2
+    state: restarted
+
+# A package upgrade leaves per-user servers running the old code; the upgrade steps end
+# by stopping them (users get a fresh one on their next request).
+- name: Stop the per-user servers
+  ansible.builtin.command:
+    argv: [/opt/ood/nginx_stage/sbin/nginx_stage, nginx_clean, -f]
+  changed_when: true

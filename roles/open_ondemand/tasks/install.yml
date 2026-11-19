@@ -1,0 +1,107 @@
+---
+# An install is rebuilt rather than upgraded when files of its packages are missing
+# (dpkg -V reports "missing") or it was built for another release: the official
+# upgrade steps assume a working install. The old configuration and site files are
+# archived first; the role writes the configuration again from config/.
+- name: Look for an existing Open OnDemand install
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, -f, '${db:Status-Abbrev} ${Package} ${Version}\n', ondemand, ondemand-release-web]
+  register: open_ondemand_installed
+  changed_when: false
+  failed_when: open_ondemand_installed.rc > 1
+  check_mode: false  # read-only; --check needs the result
+
+- name: Check the existing install's files
+  ansible.builtin.command:
+    argv: [dpkg, -V, ondemand]
+  register: open_ondemand_preverify
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: open_ondemand_installed.stdout is search('(?m)^ii ondemand ')
+
+- name: Decide whether the install must be rebuilt
+  ansible.builtin.set_fact:
+    open_ondemand_rebuild: >-
+      {{ (open_ondemand_preverify.stdout | default('')) is search('(?m)^missing ')
+         or open_ondemand_installed.stdout is search('(?m)^ii ondemand-release-web \S+-(?!' ~ ansible_facts.distribution_release ~ ')\w+$') }}
+
+- name: Rebuild a broken install
+  when: open_ondemand_rebuild | bool
+  block:
+    - name: Report the rebuild
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: the Open OnDemand install is broken or built for another
+          release ({{ open_ondemand_installed.stdout_lines | join('; ') }},
+          {{ (open_ondemand_preverify.stdout_lines | default([]) | select('match', '^missing') | list | length) }}
+          files missing); archiving /etc/ood and /var/www/ood, then purging and reinstalling.
+
+    - name: Create the backup directory
+      ansible.builtin.file:
+        path: "{{ open_ondemand_backup_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Archive the old configuration and site files
+      community.general.archive:
+        path: [/etc/ood, /var/www/ood, /etc/apache2/sites-available/ood-portal.conf]
+        dest: "{{ open_ondemand_backup_dir }}/before-rebuild-{{ ansible_facts.date_time.iso8601_basic_short }}.tar.gz"
+        format: gz
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Purge the old packages
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        host_baseline_absent_packages: "{{ open_ondemand_packages_all }}"
+
+    # Purging leaves directories that hold files no package owns (old apps, generated
+    # Dex state, a partial /opt/ood).
+    - name: Remove what the purge left behind
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: [/etc/ood, /var/www/ood, /opt/ood, /etc/apache2/sites-enabled/ood-portal.conf]
+
+    # Older OOD releases were built against system gems; a tree for a Ruby the host no
+    # longer has (left by a release upgrade) can never be loaded again.
+    - name: Find system gem trees
+      ansible.builtin.find:
+        paths: /var/lib/gems
+        file_type: directory
+      register: open_ondemand_gem_trees
+
+    - name: Check which Ruby versions are installed
+      ansible.builtin.stat:
+        path: "/usr/bin/ruby{{ item.path | basename | regex_replace('^(\\d+\\.\\d+).*$', '\\1') }}"
+      loop: "{{ open_ondemand_gem_trees.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      register: open_ondemand_gem_rubies
+
+    - name: Remove gem trees of Ruby versions no longer installed
+      ansible.builtin.file:
+        path: "{{ item.item.path }}"
+        state: absent
+      loop: "{{ open_ondemand_gem_rubies.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+      when: not item.stat.exists
+
+- name: Install the pinned packages
+  ansible.builtin.apt:
+    name: "{{ open_ondemand_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ 0 if (open_ondemand_sources is changed or open_ondemand_old_sources is changed) else 3600 }}"
+    allow_downgrade: false
+    lock_timeout: 300
+  notify:
+    - Restart apache2
+    - Stop the per-user servers

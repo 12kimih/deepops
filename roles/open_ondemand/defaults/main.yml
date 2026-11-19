@@ -1,0 +1,82 @@
+---
+# open_ondemand -- the Open OnDemand web portal for a Slurm cluster, installed from the
+# official OSC apt repository per https://osc.github.io/ood-documentation/latest/.
+# Debian family (Ubuntu 24.04 and later; OOD 4.2 dropped 22.04).
+
+# Pinned versions. A bump changes the series, the repo path and these together; read
+# that series' release notes first (config keys and dependencies change per minor).
+open_ondemand_series: "4.2"
+open_ondemand_version: "4.2.5"
+open_ondemand_dex_version: "2.45.1.2"
+# OOD 4.2 depends on nodejs >= 22, << 23, which the distribution does not ship.
+open_ondemand_nodejs_version: "22.23.5-1nodesource1"
+
+# Package repositories. Each key file is fetched with a fixed checksum, then its
+# fingerprint is checked against the publisher's, so a changed key stops the run.
+open_ondemand_repo_url: "https://apt.osc.edu/ondemand/{{ open_ondemand_series }}/web/apt"
+open_ondemand_repo_key_url: "https://apt.osc.edu/ondemand/DEB-GPG-KEY-ondemand-SHA512"
+open_ondemand_repo_key_checksum: "sha256:91b512eee95299ebdcb50153fd3d13a367381712c7f555af1ec518171cb63e17"
+open_ondemand_repo_key_fingerprint: "3D4CD7E7D4BC45263AC11388C2ADB19AFD775498"
+open_ondemand_nodejs_repo_url: "https://deb.nodesource.com/node_22.x"
+open_ondemand_nodejs_repo_key_url: "https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key"
+open_ondemand_nodejs_repo_key_checksum: "sha256:b42e0321dabdc24e892115da705cf061167eac12a317f23d329862d0aa0a271d"
+open_ondemand_nodejs_repo_key_fingerprint: "6F71F525282841EEDAF851B42F59B5F99B1BE0B4"
+
+# The portal's public name and port. Apache listens on this port only (no port 80
+# redirect, no other Listen), with TLS.
+open_ondemand_servername: ""
+open_ondemand_port: 443
+
+# TLS certificate chain and key, as files under the inventory (the key vaulted).
+# Required: the portal never serves without TLS.
+open_ondemand_tls_cert_src: ""
+open_ondemand_tls_key_src: ""
+open_ondemand_tls_dir: /etc/ssl/open-ondemand
+
+# Login: Dex (bundled with OOD) in front of the cluster's LDAP. One or more Dex
+# connectors, as in the OOD docs (type: ldap, id, name, config: {host, bindDN, bindPW,
+# userSearch, groupSearch}). Required: without connectors Dex falls back to a static
+# ood@localhost user, which the role refuses. Vault bindPW.
+open_ondemand_dex_connectors: []
+# mod_auth_openidc's session encryption passphrase; update_ood_portal refuses to run
+# without one. Vault a long random value per site.
+open_ondemand_oidc_crypto_passphrase: ""
+
+# Hosts the portal may proxy to, as a regex. Used only by the node proxies, which stay
+# off (no interactive apps); still never the allow-any default "[^/]+".
+open_ondemand_host_regex: "({{ (groups[slurm_compute_group] | default([])) | map('regex_escape') | join('|') }})"
+
+# Directories the file browser and shell may open (OOD_ALLOWLIST_PATH). Paths outside
+# them are refused. Empty = no restriction, which the role refuses.
+open_ondemand_allowlist_paths:
+  - /home
+
+# The Slurm cluster file: named after slurm.conf's ClusterName, as OOD 4.1+ passes the
+# file name to Slurm.
+open_ondemand_cluster_name: "{{ slurm_cluster_name }}"
+open_ondemand_cluster_title: "{{ open_ondemand_cluster_name }}"
+open_ondemand_login_host: "{{ inventory_hostname }}"
+
+# A local web service published under a path of the portal, behind its login, e.g.
+# Grafana: {path: /grafana/, upstream: "http://127.0.0.1:3000/", user_header:
+# X-WEBAUTH-USER}. The portal sets user_header to the logged-in user and drops any
+# value a client sends. Empty = none.
+open_ondemand_proxied_services: []
+
+# Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken
+# install) before changing them.
+open_ondemand_backup_dir: /var/backups/open-ondemand
+
+# The certificate's expiry as a node_exporter textfile metric
+# (open_ondemand_tls_cert_not_after_seconds), refreshed daily, so an alert can fire
+# before it lapses.
+open_ondemand_tls_metrics: true
+open_ondemand_tls_metrics_textfile_dir: "{{ node_exporter_prom_dir }}"
+
+# Files OOD's packages own that the role writes itself; dpkg -V may report these as
+# changed. Any other difference in an OOD package fails the run.
+open_ondemand_managed_conffiles:
+  - /etc/ood/config/ood_portal.yml
+  - /etc/ood/config/nginx_stage.yml
+  - /etc/ood/config/ood_portal.sha256sum
+  - /etc/apache2/sites-available/ood-portal.conf

@@ -1,0 +1,83 @@
+---
+# The OSC repository (the manual method of the 4.2 release notes, which the release
+# .deb automates) and NodeSource for nodejs 22, each signed by a key whose fingerprint
+# is checked before apt trusts it.
+- name: Create the apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Fetch the repository signing keys
+  ansible.builtin.include_role:
+    name: download
+  vars:
+    download_url: "{{ item.url }}"
+    download_checksum: "{{ item.checksum }}"
+    download_dest: "/var/cache/deepops/open-ondemand/{{ item.name }}.asc"
+  loop:
+    - {name: ondemand, url: "{{ open_ondemand_repo_key_url }}", checksum: "{{ open_ondemand_repo_key_checksum }}"}
+    - {name: nodesource, url: "{{ open_ondemand_nodejs_repo_key_url }}", checksum: "{{ open_ondemand_nodejs_repo_key_checksum }}"}
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Read the keys' fingerprints
+  ansible.builtin.command:
+    argv: [gpg, --batch, --no-default-keyring, --show-keys, --with-colons, "/var/cache/deepops/open-ondemand/{{ item }}.asc"]
+  register: open_ondemand_key_info
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  failed_when: false
+  loop: [ondemand, nodesource]
+
+- name: Check the keys are the publishers'
+  ansible.builtin.assert:
+    that: item.1 in (item.0.stdout | default('') | regex_findall('(?m)^fpr:+([0-9A-F]+):'))
+    fail_msg: "The {{ item.0.item }} signing key does not have fingerprint {{ item.1 }}; not trusting it."
+    quiet: true
+  loop: "{{ open_ondemand_key_info.results | zip([open_ondemand_repo_key_fingerprint, open_ondemand_nodejs_repo_key_fingerprint]) | list }}"
+  loop_control:
+    label: "{{ item.0.item }}"
+  when: not ansible_check_mode or item.0.rc == 0
+
+- name: Install the keys as apt keyrings
+  ansible.builtin.copy:
+    src: "/var/cache/deepops/open-ondemand/{{ item.name }}.asc"
+    dest: "{{ item.keyring }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - {name: ondemand, keyring: "{{ open_ondemand_keyring }}"}
+    - {name: nodesource, keyring: "{{ open_ondemand_nodejs_keyring }}"}
+  loop_control:
+    label: "{{ item.keyring }}"
+
+- name: Add the repositories (deb822)
+  ansible.builtin.copy:
+    dest: "/etc/apt/sources.list.d/{{ item.name }}.sources"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ item.url }}
+      Suites: {{ item.suite }}
+      Components: main
+      Signed-By: {{ item.keyring }}
+  loop:
+    - {name: ondemand-web, url: "{{ open_ondemand_repo_url }}", suite: "{{ ansible_facts.distribution_release }}", keyring: "{{ open_ondemand_keyring }}"}
+    - {name: nodesource, url: "{{ open_ondemand_nodejs_repo_url }}", suite: nodistro, keyring: "{{ open_ondemand_nodejs_keyring }}"}
+  loop_control:
+    label: "{{ item.name }}"
+  register: open_ondemand_sources
+
+# The release .deb and older installs leave a .list for the same repository; two
+# entries with different Signed-By make apt refuse both.
+- name: Remove other entries for the same repositories
+  ansible.builtin.file:
+    path: "/etc/apt/sources.list.d/{{ item }}"
+    state: absent
+  loop: [ondemand-web.list, nodesource.list]
+  register: open_ondemand_old_sources

@@ -112,6 +112,10 @@
   import_playbook: slurm-cluster/alertmanager.yml
   when: slurm_enable_monitoring
 
+- name: Install the Open OnDemand portal
+  import_playbook: slurm-cluster/open-ondemand.yml
+  when: slurm_install_open_ondemand
+
 - name: Install monitoring services | Install the Slack usage report
   import_playbook: slurm-cluster/slurm-usage-report.yml
   when: slurm_enable_monitoring
