@@ -12,53 +12,9 @@
     - vars
     - nfs
 
-- name: Install Ubuntu packages
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    name: nfs-common
-    state: present
-  when: ansible_facts.os_family == "Debian"
-  tags:
-    - nfs
-
-- name: Install RHEL packages
-  ansible.builtin.dnf:
-    name: nfs-utils
-    state: present
-  when: ansible_facts.os_family == "RedHat"
-  tags:
-    - nfs
-
-- name: Configure idmapd domain for nfsv4
-  ansible.builtin.lineinfile:
-    dest: /etc/idmapd.conf
-    regexp: "^Domain"
-    insertafter: "^# Domain"
-    line: "Domain = {{ nfs_idmapd_domain }}"
-    backup: true
-  tags:
-    - nfs
-
-# Raise TCP/socket buffers for the NFS data path on fast cluster networks (applies on both
-# NFS servers and clients). https://nfs.sourceforge.net/nfs-howto/ar01s05.html
-- name: Tune the network buffers for NFS
-  ansible.builtin.include_role:
-    name: host_baseline
-    tasks_from: sysctl
-    apply:
-      tags: [nfs]
-  vars:
-    host_baseline_sysctls: "{{ nfs_network_sysctls }}"
-    host_baseline_sysctl_file: /etc/sysctl.d/30-nfs-tuning.conf
-  when: nfs_tune_network | bool
-  tags:
-    - nfs
-
 # The server's exports are a component (docs/deepops/component-state.md), removed only
 # explicitly: present where the deploy wants a server, kept elsewhere, absent where the
-# site lists nfs in deepops_component_removals. The client side and the common setup
-# above serve every host.
+# site lists nfs in deepops_component_removals. The mounts are roles/nfs_client.
 - name: Check the component state
   ansible.builtin.assert:
     that: nfs_state in ['present', 'absent', 'kept']
@@ -68,12 +24,5 @@
 
 - name: "Make the NFS server {{ nfs_state }}"
   ansible.builtin.include_tasks: "{{ nfs_state }}.yml"
-  when:
-    - nfs_state != 'kept'
-    - nfs_state == 'absent' or nfs_is_server | bool
-  tags: always
-
-- name: Setup client
-  ansible.builtin.include_tasks: client.yml
-  when: nfs_is_client
+  when: nfs_state != 'kept'
   tags: always

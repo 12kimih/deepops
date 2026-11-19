@@ -9,7 +9,7 @@
 #       component_record_action: begin      # begin, present or absent
 #       component_record_version: ""        # begin and present
 #       component_record_items:             # KIND:ID; kinds: package, unit, container,
-#         - package:rsyslog                 # file, dir
+#         - package:rsyslog                 # file, dir, mount (an fstab entry)
 #         - file:/etc/rsyslog.d/01-deepops-listen.conf
 #
 # begin, before a component installs anything: it is recorded as installing with the
@@ -17,8 +17,10 @@
 # an earlier version needed is removed. absent: the component leaves every item's owner
 # set; items is what it installed before the record existed (adopted; packages only
 # those in component_record_exclusive_packages). Whatever no component needs any longer is
-# removed: containers, then units (stopped and disabled), files, empty directories, and
-# packages last (roles/host_baseline). Data is never an item, so it is never removed.
+# removed: fstab entries first (never unmounted: a live mount stays until the next boot,
+# since unmounting under logged-in users fails or, with a dead server, hangs), then
+# containers, units (stopped and disabled), files, empty directories, and packages last
+# (roles/host_baseline). Data is never an item, so it is never removed.
 # component_record_removed lists, by kind, what this call actually removed: restart or
 # rebuild on it, never on the orphans (an adopted orphan that was never there is one).
 # absent also withdraws the calling role's pending reboot request (roles/maintenance).

@@ -175,7 +175,7 @@ nfs_mounts:
     path: /sw
 
 # Detach the NFS mounts at shutdown so a server rebooting alongside its clients cannot
-# stall them. See roles/nfs/templates/nfs-detach-on-shutdown.service.j2.
+# stall them. See roles/nfs_client/templates/nfs-detach-on-shutdown.service.j2.
 #nfs_detach_on_shutdown: true
 
 # NFS performance tuning (applies on server + clients). Defaults shown below;
@@ -198,7 +198,8 @@ nfs_mounts:
 
 # NFS servers and clients are the [slurm-nfs] and [slurm-nfs-client] inventory groups.
 # To stop and remove an NFS server on every other host (one set up by hand once keeps
-# exporting otherwise), list nfs in deepops_component_removals (group_vars/all.yml).
+# exporting otherwise), list nfs in deepops_component_removals (group_vars/all.yml);
+# nfs_client there takes the mounts out of fstab on every host outside [slurm-nfs-client].
 
 ################################################################################
 # SOFTWARE MODULES (SM)                                                        #

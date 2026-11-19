@@ -3,7 +3,7 @@ galaxy_info:
   namespace: deepops
   role_name: nfs
   author: DeepOps
-  description: NFS client mounts and an NFS server's exports (a component removed only explicitly)
+  description: An NFS server's exports (a component removed only explicitly)
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:
@@ -13,3 +13,4 @@ galaxy_info:
       versions: ["8", "9"]
 dependencies:
   - role: retired_settings  # nfs_servers
+  - role: nfs_common  # its settings and items; installed by present.yml

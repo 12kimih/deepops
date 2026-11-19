@@ -75,7 +75,8 @@
 
 - name: Set up NFS filesystem | Install nfs-client
   import_playbook: generic/nfs-client.yml
-  when: slurm_enable_nfs_client_nodes
+  vars:
+    deepops_phase: install
 
 # Authentication / directory services. Each role inside is gated on its own config
 # (NIS master via nis_make_server, NIS clients via nis_domain+nis_server, Kerberos,
@@ -355,6 +356,12 @@
 
 - name: Remove the Open OnDemand portal where it is no longer wanted
   import_playbook: slurm-cluster/open-ondemand.yml
+  vars:
+    deepops_phase: remove
+
+# Only where the site lists nfs_client in deepops_component_removals (removal: explicit).
+- name: Remove the NFS mounts where they are listed for removal
+  import_playbook: generic/nfs-client.yml
   vars:
     deepops_phase: remove
 

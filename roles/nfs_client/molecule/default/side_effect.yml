@@ -1,0 +1,69 @@
+---
+# Removal takes what the client installed (no server shares it here), twice: the second
+# run has nothing left to do. Then present brings it back for verify.
+# A host set up before the record existed: its fstab entry is adopted and removed.
+- name: Leave an unrecorded fstab entry behind
+  hosts: all
+  become: true
+  tasks:
+    - name: Write an NFS entry nothing mounts
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "nfs.example.com:/export /mnt/molecule nfs rw,noauto 0 0"
+        create: true
+        mode: "0644"
+
+- name: Remove the NFS client
+  hosts: all
+  become: true
+  roles:
+    - role: nfs_client
+      nfs_client_state: absent
+      nfs_mounts: [{server: nfs.example.com, path: /export, mountpoint: /mnt/molecule}]
+
+- name: Check it is gone
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the nfs-common package status
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, '${db:Status-Abbrev}', nfs-common]
+      register: nfs_client_pkg
+      changed_when: false
+      failed_when: false
+
+    - name: Look for the detach unit
+      ansible.builtin.stat:
+        path: /etc/systemd/system/nfs-detach-on-shutdown.service
+      register: nfs_client_unit
+
+    - name: Read fstab
+      ansible.builtin.slurp:
+        src: /etc/fstab
+      register: nfs_client_fstab
+
+    - name: Check removal took all three
+      ansible.builtin.assert:
+        that:
+          - nfs_client_pkg.stdout is not match('ii')
+          - not nfs_client_unit.stat.exists
+          - "'/mnt/molecule' not in nfs_client_fstab.content | b64decode"
+        fail_msg: "left behind: nfs-common {{ nfs_client_pkg.stdout }}, unit {{ nfs_client_unit.stat.exists }}"
+
+- name: Remove it again
+  hosts: all
+  become: true
+  tasks:
+    - name: Run the removal a second time
+      ansible.builtin.include_role:
+        name: nfs_client
+      vars:
+        nfs_client_state: absent
+
+- name: Bring it back
+  hosts: all
+  become: true
+  roles:
+    - role: nfs_client
+      nfs_client_state: present

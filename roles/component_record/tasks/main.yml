@@ -30,13 +30,22 @@
 # never had it removes nothing). Callers restart or rebuild on this, never on the orphans.
 - name: Start the list of what was removed
   ansible.builtin.set_fact:
-    component_record_removed: {container: [], unit: [], file: [], dir: [], package: []}
+    component_record_removed: {mount: [], container: [], unit: [], file: [], dir: [], package: []}
 
 - name: Remove what no component needs any longer
   when: component_record_result.orphans.values() | map('length') | sum > 0
   vars:
     component_record_orphans: "{{ component_record_result.orphans }}"
   block:
+    # The fstab entry only: never an unmount (users' processes may live in it, and a
+    # dead server hangs umount). The mount goes at the next boot.
+    - name: Remove fstab entries
+      ansible.posix.mount:
+        path: "{{ item }}"
+        state: absent_from_fstab
+      loop: "{{ component_record_orphans.mount }}"
+      register: component_record_mounts
+
     - name: Look for the Docker daemon
       ansible.builtin.stat:
         path: /var/run/docker.sock
@@ -115,6 +124,7 @@
     - name: Note what was removed
       ansible.builtin.set_fact:
         component_record_removed:
+          mount: "{{ component_record_mounts.results | default([]) | select('changed') | map(attribute='item') | list }}"
           container: >-
             {{ component_record_containers.results | default([]) | select('changed') | map(attribute='item') | list }}
           unit: >-

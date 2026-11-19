@@ -1,0 +1,31 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): this host's NFS mounts. A
+# deploy sets it from deepops_components; a host that should no longer mount is cleaned
+# up only when the site lists nfs_client in deepops_component_removals.
+nfs_client_state: present
+
+# Each mount is {server, path, mountpoint, options}: options defaults to nfs_mount_options.
+nfs_mounts: []
+
+# Client mount options for any nfs_mounts entry that does not carry its own `options`,
+# so a site tunes one string instead of repeating it per mount.
+#
+# Deliberately no x-systemd.automount. A unit with ProtectHome= cannot set up its mount
+# namespace over an autofs /home: it fails with "No such device" and exits 226/NAMESPACE.
+# systemd-networkd, systemd-logind, polkit, timedated and chrony all set ProtectHome=, so
+# an automounted /home takes the node's boot apart. Set it per mount for a share nothing
+# sandboxes, never for /home.
+#
+# _netdev keeps the unit in remote-fs.target (and after the network), nofail keeps a
+# dead server from holding up the boot. Sized for a 100GbE+ fabric; see
+# docs/slurm-cluster/slurm-nfs.md for the tuning knobs and `man 5 nfs`.
+nfs_mount_options: "rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail"
+
+# Install a unit that lazily detaches the NFS mounts at shutdown, so a server rebooting
+# alongside its clients cannot stall them. Lets the mounts stay `hard`; `soft` would
+# trade the hang for silent write corruption.
+nfs_detach_on_shutdown: true
+
+# How long playbooks/utilities/nfs-mount.yml waits for a server to serve NFS before it
+# gives up on that server's mounts.
+nfs_mount_wait_timeout: 300

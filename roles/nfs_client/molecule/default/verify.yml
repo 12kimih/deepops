@@ -1,0 +1,34 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the nfs-common package status
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, '${db:Status-Abbrev}', nfs-common]
+      register: nfs_client_pkg
+      changed_when: false
+
+    - name: Read whether the detach unit is enabled
+      ansible.builtin.command:
+        argv: [systemctl, is-enabled, nfs-detach-on-shutdown.service]
+      register: nfs_client_enabled
+      changed_when: false
+
+    - name: Read the component record
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: nfs_client_record
+
+    - name: Check the client is installed and recorded
+      vars:
+        record: "{{ nfs_client_record.content | b64decode | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - nfs_client_pkg.stdout is match('ii')
+          - nfs_client_enabled.stdout == 'enabled'
+          - "'nfs_client' in record.components"
+          - "'nfs_client' in record['items']['package:nfs-common'] | default([])"
+          - "'nfs_client' in record['items']['unit:nfs-detach-on-shutdown.service'] | default([])"
+        fail_msg: "{{ nfs_client_pkg.stdout }} {{ nfs_client_enabled.stdout }} {{ record }}"

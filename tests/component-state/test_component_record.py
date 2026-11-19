@@ -65,6 +65,13 @@ class OwnerSets(unittest.TestCase):
             (before, orphans["package"], orphans["file"], rec), ({}, ["ypserv"], ["/etc/yp.conf"], EMPTY)
         )
 
+    def test_a_mount_goes_with_its_last_owner_and_is_adopted(self):
+        rec, orphans, _ = run(EMPTY, "client", "present", ["mount:/home", "mount:/sw"])
+        rec, orphans, _ = run(rec, "client", "present", ["mount:/home"])
+        self.assertEqual(orphans["mount"], ["/sw"], "a mount no longer listed goes")
+        _, orphans, _ = run(EMPTY, "client", "absent", ["mount:/scratch"])
+        self.assertEqual(orphans["mount"], ["/scratch"], "mounts adopt like files")
+
     def test_absent_adopts_no_package_it_was_not_told_is_its_own(self):
         # python3-docker, unrecorded on this host, may serve a role that records nothing.
         _, orphans, _ = run(EMPTY, "old", "absent", ["package:python3-docker"])

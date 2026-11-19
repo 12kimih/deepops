@@ -47,12 +47,15 @@ it, whatever was there before:
 host. It is the host's own, like `deploy_record`, so it stays right after a limited run
 or a run from another operator's machine.
 
-- **Items have owner sets.** For every package, unit, path and container, the record
+- **Items have owner sets.** For every package, unit, path, container and fstab entry
+  (`mount:<mountpoint>`), the record
   holds the set of components that need it, not a per-component list. A component
   going absent leaves every set; only items whose set became empty are removed
   (packages through `host_baseline`). apache2 for OOD, python3-kubernetes for the chart
   roles, dkms and headers for the driver and MOFED, Docker for everything that runs
-  containers: no special cases, and nothing another component needs is purged.
+  containers: no special cases, and nothing another component needs is purged. An
+  orphaned fstab entry is removed from fstab, never unmounted: the live mount stays
+  until the next boot (unmounting under logged-in users fails or hangs).
 - **Intent first.** `present.yml` records its component as `installing` with the items
   it will add before it changes anything, and `present` with its version after; a run
   that fails midway leaves items absent can still find.
@@ -164,7 +167,8 @@ clients before the server.
    derived dependency: deepops-4).
 3. GPU and HPC software: nvidia_dcgm, nhc, openmpi, lmod, nvidia_hpc_sdk,
    nvidia_cuda_toolkit, easy-build, podman, enroot and pyxis (deepops).
-4. Services: open_ondemand, nfs (exports only), cluster_tools (deepops-2);
+4. Services: open_ondemand, nfs (the exports), nfs_client (the mounts), cluster_tools
+   (deepops-2);
    egress_policy and the policies os_updates, node_user_policy, ai_agent_rules
    (deepops-4).
 5. Kubernetes charts: already on `helm_release` with `state`; map their switches.

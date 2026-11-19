@@ -8,7 +8,8 @@ description:
   - Keeps one JSON file (an Ansible local fact) per host. C(components) maps a component
     to its state (C(installing) or C(present)) and version. C(items) maps every item a
     component needs (C(package:NAME), C(unit:NAME), C(container:NAME), C(file:PATH),
-    C(dir:PATH)) to the set of components that need it.
+    C(dir:PATH), C(mount:MOUNTPOINT) for an fstab entry) to the set of components that
+    need it.
   - An item that no component needs any longer is an orphan. Orphans leave the record
     and are returned, so the caller removes exactly them and nothing another component
     still needs (docs/deepops/component-state.md).
@@ -53,7 +54,8 @@ options:
 
 RETURN = r"""
 orphans:
-  description: Items no component needs any longer, to remove, grouped by kind.
+  description: Items no component needs any longer, to remove, grouped by kind
+    (package, unit, container, file, dir, mount).
   type: dict
   returned: always
 before:
@@ -68,7 +70,7 @@ import tempfile
 
 from ansible.module_utils.basic import AnsibleModule
 
-KINDS = ("package", "unit", "container", "file", "dir")
+KINDS = ("package", "unit", "container", "file", "dir", "mount")
 
 
 def load(path):

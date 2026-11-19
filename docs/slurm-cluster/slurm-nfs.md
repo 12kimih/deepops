@@ -249,3 +249,7 @@ If you want to disable the use of any NFS mounts, or want to configure NFS yours
 
 - Set `slurm_enable_nfs_server` to `false`
 - Set `slurm_enable_nfs_client_nodes` to `false`
+
+Both are components removed only explicitly (docs/deepops/component-state.md): turning a
+switch off leaves what a host already has. To take an existing server or mounts away,
+list `nfs` (the exports) or `nfs_client` (the mounts) in `deepops_component_removals`.

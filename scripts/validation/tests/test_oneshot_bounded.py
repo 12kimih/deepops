@@ -18,7 +18,7 @@ from repo_scan import Scan, tracked  # noqa: E402
 
 # file -> why its oneshot units are left unbounded
 UNBOUNDED_OK = {
-    "roles/nfs/templates/nfs-detach-on-shutdown.service.j2": "runs only at shutdown, bounded by TimeoutStopSec",
+    "roles/nfs_client/templates/nfs-detach-on-shutdown.service.j2": "runs only at shutdown, bounded by TimeoutStopSec",
     "roles/nfs/templates/nfs-server-restart.service.j2": "OnFailure= restart of nfs-server, which has its own timeout",
 }
 BOUNDS = {"timeoutstartsec", "timeoutsec", "runtimemaxsec"}

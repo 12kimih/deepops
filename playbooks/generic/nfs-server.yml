@@ -8,6 +8,5 @@
     - role: deploy_defaults
     - role: nfs
       nfs_state: "{{ deepops_components.nfs | component_phase(deepops_phase) }}"
-      nfs_is_server: "{{ nfs_state == 'present' }}"
   tags:
     - nfs_server
