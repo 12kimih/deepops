@@ -2,11 +2,14 @@
 - hosts: all
   become: true
   tasks:
-    - name: Remove old/undesirable packages
-      ansible.builtin.package:
-        name: "{{ software_remove_packages }}"
-        state: absent
-      when: software_remove_packages is defined
+    # Removal has one home, roles/host_baseline (purged, and what still runs stopped).
+    - name: Refuse the retired removal list
+      ansible.builtin.assert:
+        that: software_remove_packages is not defined
+        fail_msg: >-
+          software_remove_packages is retired: list the packages in
+          host_baseline_absent_packages (playbooks/generic/host-baseline.yml) instead.
+        quiet: true
 
     - name: Install extra packages
       ansible.builtin.package:

@@ -1,0 +1,20 @@
+#!/bin/sh
+# orphan-services [PROC]: print "UNIT PATH" for each system service still running a
+# program that is no longer on disk.
+#
+# Removing a package stops the units it ships, but not a daemon started another way
+# (an init script, by hand, a unit of another package): it keeps running from the
+# deleted file, still listening. An upgraded daemon shows "(deleted)" too, but its path
+# exists again (the new file), so it is left alone. Only system.slice services count:
+# a user's own program or a job is never touched.
+proc=${1:-/proc}
+for p in "$proc"/[0-9]*; do
+    exe=$(readlink "$p/exe" 2>/dev/null) || continue
+    case $exe in
+        *" (deleted)") path=${exe% (deleted)} ;;
+        *) continue ;;
+    esac
+    [ -e "$path" ] && continue
+    unit=$(sed -n 's|^[0-9]*:[^:]*:/system\.slice/\([^/]*\.service\)$|\1|p' "$p/cgroup" 2>/dev/null | head -n 1)
+    [ -n "$unit" ] && printf '%s %s\n' "$unit" "$path"
+done | sort -u

@@ -25,9 +25,11 @@
     _dcgm_v4_re: "^datacenter-gpu-manager-4(-|$)"
 
 - name: Remove DCGM packages from the other series
-  ansible.builtin.package:
-    name: "{{ dcgm_dgx_conflicting_pkgs }}"
-    state: absent
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ dcgm_dgx_conflicting_pkgs }}"
   when: dcgm_dgx_conflicting_pkgs | length > 0
 
 - name: Install the DCGM package shipped by DGX OS

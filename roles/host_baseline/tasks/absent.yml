@@ -1,0 +1,90 @@
+---
+# The one way any role removes packages (include_role: host_baseline, tasks_from:
+# absent, with host_baseline_absent_packages set): purged, so no conffile or init script
+# is left to start the service again, and followed by stopping what still runs.
+- name: Remove the packages declared absent
+  when: host_baseline_absent_packages | length > 0
+  block:
+    - name: Make sure the package manager can work
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: apt_health
+
+    # dpkg-query resolves the wildcards; names this release lacks (a list serves several
+    # releases) and packages not installed ("?n") drop out. One removed but not purged
+    # ("rc": its conffiles and init scripts kept) counts as present: it is purged too.
+    - name: Find which of them are on the host (Debian)
+      ansible.builtin.command:
+        argv: "{{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${Package}\\n'] + host_baseline_absent_packages }}"
+      register: host_baseline_query
+      changed_when: false
+      failed_when: host_baseline_query.rc > 1
+      check_mode: false  # read-only; --check needs the result
+      when: ansible_facts.os_family == 'Debian'
+
+    - name: Note the packages to remove
+      ansible.builtin.set_fact:
+        host_baseline_present: >-
+          {{ host_baseline_query.stdout_lines | reject('match', '.n') | map('split') | map('last') | unique | list
+          if ansible_facts.os_family == 'Debian' else host_baseline_absent_packages }}
+
+    # apt-get -s works out the reverse dependencies without changing anything.
+    - name: Work out what removing them would take with them (Debian)
+      ansible.builtin.command:
+        argv: "{{ ['apt-get', '-s', '-q', 'purge'] + host_baseline_present }}"
+      register: host_baseline_plan
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - host_baseline_present | length > 0
+
+    # apt may also install a package to satisfy an alternative the removed one met
+    # (removing a web server can pull in a text browser), so both are shown.
+    - name: Report the packages that will be removed or installed in their place
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} will lose:
+          {{ host_baseline_plan.stdout | regex_findall('(?m)^Purg (\S+)') | join(', ') }}{{
+          '; will gain: ' ~ (host_baseline_plan.stdout | regex_findall('(?m)^Inst (\S+)') | join(', '))
+          if host_baseline_plan.stdout is search('(?m)^Inst ') else '' }}
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - host_baseline_present | length > 0
+        - host_baseline_plan.stdout is search('(?m)^(Purg|Inst) ')
+
+    - name: Remove the packages declared absent
+      ansible.builtin.package:
+        name: "{{ host_baseline_present }}"
+        state: absent
+        purge: "{{ true if ansible_facts.os_family == 'Debian' else omit }}"
+      when: host_baseline_present | length > 0
+
+- name: Look for services still running a removed program
+  ansible.builtin.script: orphan-services
+  register: host_baseline_orphans
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Report the services still running a removed program
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }} will stop: {{ host_baseline_orphans.stdout_lines | join(', ') }}"
+  when: host_baseline_orphans.stdout_lines | length > 0
+
+# Stopped, and disabled when a unit file still enables it at boot (a removed package
+# often leaves none, and then there is nothing to disable).
+- name: Stop the services still running a removed program
+  ansible.builtin.command:
+    argv:
+      - sh
+      - -c
+      - >-
+        systemctl stop "$1" &&
+        if [ "$(systemctl show -P UnitFileState "$1")" = enabled ];
+        then systemctl disable "$1"; fi
+      - sh
+      - "{{ item.split()[0] }}"
+  loop: "{{ host_baseline_orphans.stdout_lines }}"
+  loop_control:
+    label: "{{ item }}"
+  changed_when: true

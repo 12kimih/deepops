@@ -17,3 +17,7 @@ openmpi_install_prefix: /usr/local
 # needs only PMIx. https://slurm.schedmd.com/mpi_guide.html
 openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix=internal"
 openmpi_force_rebuild: false
+# The distribution's Open MPI, removed so it cannot shadow the build (per OS family).
+openmpi_distro_packages:
+  Debian: [openmpi-bin, openmpi-common, libopenmpi-dev]
+  RedHat: [openmpi, openmpi-devel]

@@ -25,9 +25,11 @@
     manager: rpm
 
 - name: RHEL | remove existing enroot before a version change
-  ansible.builtin.dnf:
-    name: "{{ enroot_packages }}"
-    state: absent
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ enroot_packages }}"
   when:
     - "'enroot' in ansible_facts.packages"
     # rpm reports the version without the packaging release (e.g. "4.2.0", not

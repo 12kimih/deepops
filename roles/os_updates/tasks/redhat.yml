@@ -30,7 +30,9 @@
   when: os_updates_policy == "security"
 
 - name: Remove dnf-automatic
-  ansible.builtin.dnf:
-    name: dnf-automatic
-    state: absent
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: [dnf-automatic]
   when: os_updates_policy == "off"

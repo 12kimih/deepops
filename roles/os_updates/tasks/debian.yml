@@ -14,11 +14,11 @@
   when: os_updates_policy == "security"
 
 - name: Remove unattended-upgrades
-  ansible.builtin.apt:
-    name: unattended-upgrades
-    state: absent
-    purge: true
-    lock_timeout: 600
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: [unattended-upgrades]
   when: os_updates_policy == "off"
 
 - name: Turn on the periodic unattended upgrade

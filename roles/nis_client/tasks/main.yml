@@ -81,18 +81,16 @@
 
 # Only the NIS master serves maps. A server left on a client (ypserv brings ypxfrd and
 # yppasswdd) answers map transfers and password changes for the domain from a copy
-# nobody keeps current; one was found on a compute node.
-- name: Remove the NIS server from hosts that are not the NIS master
-  ansible.builtin.package:
-    name: ypserv
-    state: absent
-  when: not (nis_make_server | default(false) | bool)
-
-- name: Remove name-service caches that would delay directory changes
-  ansible.builtin.package:
-    name: "{{ nis_client_remove_caches }}"
-    state: absent
-  when: nis_client_remove_caches | length > 0
+# nobody keeps current; one was found on a compute node, its daemons still running
+# after the package was removed. host_baseline purges and stops what still runs.
+- name: Remove the NIS server and the name-service caches
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: >-
+      {{ ([] if nis_make_server | default(false) | bool else ['ypserv'])
+      + nis_client_remove_caches }}
 
 - name: Make sure rpcbind is running
   ansible.builtin.service: name=rpcbind state=started enabled=true

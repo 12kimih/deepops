@@ -12,6 +12,10 @@ slurm_version: "25.11.6"
 slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
 slurm_build_make_clean: false
 slurm_build_dir_cleanup: false
+# Distribution packages removed before the build, per OS family, so none shadows it.
+slurm_distro_packages:
+  Debian: [slurm, slurm-wlm, slurmctld, slurmdbd, slurmd]
+  RedHat: [slurm]
 slurm_config_dir: /etc/slurm
 # Only used when slurm_conf_symlink is true (slurm.conf shared via NFS). Defaults to
 # the local config dir; set this to a path NFS-shared to all nodes (e.g. /sw/.slurm)
@@ -197,6 +201,9 @@ hwloc_install_prefix: /opt/deepops/hwloc
 # Slurm only needs the topology lib.
 hwloc_configure: "./configure --prefix={{ hwloc_install_prefix }} --enable-static --disable-cairo --disable-libxml2 --enable-plugins"
 hwloc_force_rebuild: false
+hwloc_distro_packages:
+  Debian: [hwloc, libhwloc-dev, libhwloc5]
+  RedHat: [hwloc-devel, hwloc-libs, hwloc]
 
 slurm_include_pmix: true
 # PMIx is built from source and linked into Slurm (--with-pmix) and, optionally,
@@ -211,3 +218,6 @@ pmix_src_url: "https://github.com/openpmix/openpmix/releases/download/v{{ pmix_v
 pmix_install_prefix: /opt/deepops/pmix
 pmix_configure: "./configure --prefix={{ pmix_install_prefix }} --with-hwloc={{ hwloc_install_prefix }}"
 pmix_force_rebuild: false
+pmix_distro_packages:
+  Debian: [pmix, libpmix-dev, libpmix5]
+  RedHat: [pmix-devel, pmix-libs, pmix]
