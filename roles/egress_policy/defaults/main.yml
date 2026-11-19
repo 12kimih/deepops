@@ -1,0 +1,105 @@
+---
+# egress_policy -- what users' processes may reach outside the cluster, enforced in the
+# kernel with nftables (one table, inet egress_policy, owned by this role alone), plus
+# the client SSH defaults and the metrics that report what a firewall cannot block.
+# See docs/slurm-cluster/egress-policy.md.
+
+# present applies the policy; absent removes the table, its unit, the SSH drop-in and
+# the metrics (the way back).
+egress_policy_state: present
+
+# The cluster's own networks (CIDRs, IPv4 or IPv6): users reach them on every port, and
+# with egress_policy_inbound they reach this host on every port. List every network
+# jobs talk over (an IPoIB or storage network too), or multi-node jobs break.
+# Required.
+egress_policy_internal_networks: []
+
+# Who is a user: the uids whose outside traffic is limited ("A-B" or "N"). Below 1000
+# are root and system accounts; 60001-65535 are systemd's DynamicUser range and
+# nobody, which containerized services run as. Above 65535 are subordinate uids, which
+# a rootless container's processes run as.
+egress_policy_restricted_uids: ["1000-60000", "65536-4294967294"]
+
+# Users exempt from the limits: the administrators' uids, from the people roster.
+egress_policy_exempt_uids: []
+
+# Destination ports users may reach outside the cluster: web, DNS and NTP.
+egress_policy_allowed_tcp_ports: [53, 80, 443]
+egress_policy_allowed_udp_ports: [53, 123]
+
+# Outbound SSH outside the cluster, limited per user and destination address by a
+# token bucket (burst, then rate), and for the whole node: a client looping on a
+# failing login gets the cluster's address blocked by the remote site long before a
+# person notices. New connections only; a rejected one fails at once.
+egress_policy_ssh_ports: [22]
+egress_policy_ssh_rate: 20/minute
+egress_policy_ssh_burst: 30
+egress_policy_ssh_node_rate: 60/minute
+egress_policy_ssh_node_burst: 120
+
+# Log rejected connections to the kernel log, with the uid (journalctl -k), at most
+# this often.
+egress_policy_log_rate: 10/minute
+
+# Filter inbound traffic too (the former ufw-enable.yml): allow loopback, replies,
+# ICMP, DHCP, the internal networks, the trusted interfaces and the ports below, drop
+# the rest. Turning it on stops and disables ufw, so one tool owns the host's
+# filtering. Ports published by Docker (-p) are forwarded, not delivered to the host,
+# and are not filtered here.
+egress_policy_inbound: false
+# Ports open to everyone: a number or "A-B". The SSH port on a login host.
+egress_policy_inbound_tcp_ports: []
+egress_policy_inbound_udp_ports: []
+# Interfaces whose traffic is trusted like the internal networks (a VPN such as
+# tailscale0).
+egress_policy_trusted_interfaces: []
+# Refuse to turn on inbound filtering when the SSH session Ansible (or its operator)
+# came in on would be cut: neither from an internal network or trusted interface nor
+# to an allowed port.
+egress_policy_inbound_lockout_check: true
+
+# Client SSH settings for every user (/etc/ssh/ssh_config.d; a user's ~/.ssh/config
+# wins). One attempt with a timeout, so a script cannot retry in a tight loop.
+egress_policy_ssh_client_options:
+  ConnectionAttempts: 1
+  ConnectTimeout: 10
+# One connection per destination, reused by every later ssh, scp and rsync to it
+# (`ssh -O exit HOST` ends it). Only where ~/.ssh is writable: ssh exits when it cannot
+# make the socket. {} turns it off.
+egress_policy_ssh_multiplex_options:
+  ControlMaster: auto
+  ControlPath: "~/.ssh/cm-%C"
+  ControlPersist: 10m
+egress_policy_ssh_client_file: /etc/ssh/ssh_config.d/40-egress-policy.conf
+
+# Listening sockets of users and running tunnel programs, as node_exporter textfile
+# metrics (roles/prometheus/files/rules/egress-policy.yml alerts on them).
+egress_policy_metrics: true
+egress_policy_metrics_interval: 60s
+egress_policy_metrics_textfile_dir: "{{ node_exporter_prom_dir }}"
+# Tunnel programs, by executable or script name, or "program subcommand".
+egress_policy_tunnel_programs:
+  - cloudflared
+  - ngrok
+  - frpc
+  - frps
+  - bore
+  - lt
+  - localtunnel
+  - chisel
+  - zrok
+  - rathole
+  - gost
+  - inlets
+  - pagekite.py
+  - tunnelto
+  - tmole
+  - loophole
+  - playit
+  - wstunnel
+  - devtunnel
+  - code tunnel
+  - code-tunnel
+  - tailscaled
+  - zerotier-one
+  - wireguard-go

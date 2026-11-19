@@ -187,6 +187,12 @@
   tags:
     - root-access
 
+- name: Limit where users connect outside the cluster
+  import_playbook: generic/egress-policy.yml
+  when: slurm_enable_egress_policy
+  tags:
+    - egress-policy
+
 - name: Limit what users leave running outside Slurm jobs
   import_playbook: generic/node-user-policy.yml
   tags:

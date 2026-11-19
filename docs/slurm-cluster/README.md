@@ -335,6 +335,12 @@ deliberately, or it will behave differently depending on how the user arrived:
 `playbooks/utilities/check-id-consistency.yml` asserts that every group published
 through NIS resolves to its pinned GID on every node.
 
+## Egress policy
+
+[Egress policy](./egress-policy.md) -- where users may connect outside the cluster
+(web, DNS, NTP and rate-limited SSH), client SSH defaults, inbound filtering, and
+alerts on tunnels and exposed listeners (roles/egress_policy).
+
 ## Rebooting the cluster
 
 `playbooks/utilities/reboot.yml` reboots the targeted hosts one at a time and waits for

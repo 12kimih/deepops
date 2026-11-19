@@ -1,0 +1,15 @@
+---
+# Where users' processes may connect outside the cluster, client SSH defaults, and
+# inbound filtering where configured (roles/egress_policy). Preview on one host first:
+#
+#   ansible-playbook -K --check --diff -l <host> playbooks/generic/egress-policy.yml
+#
+# Remove it again with -e egress_policy_state=absent.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tags:
+    - egress-policy
+  roles:
+    - role: deploy_defaults  # slurm_enable_egress_policy, proxy_env
+    - role: egress_policy
+  environment: "{{ proxy_env }}"

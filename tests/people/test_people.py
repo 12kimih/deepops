@@ -25,6 +25,10 @@ class Derive(unittest.TestCase):
         self.assertEqual(people.people_with_role(self.p, "admin"), ["alice"])
         self.assertEqual(people.people_with_role(self.p, "missing"), [])
 
+    def test_uids_of_a_role_are_its_active_holders(self):
+        self.assertEqual(people.people_uids(self.p, "admin"), [1001])
+        self.assertEqual(people.people_uids(self.p, "missing"), [])
+
     def test_left_people_are_listed_apart(self):
         self.assertEqual(people.people_left(self.p), ["carol"])
         self.assertNotIn("carol", people.people_active(self.p))

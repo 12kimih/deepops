@@ -58,6 +58,21 @@
 # offered to it only (nfs_export_clients, STORAGE below).
 #cluster_subnet: "10.0.0.0/16"  # example
 
+# Egress policy (roles/egress_policy, docs/slurm-cluster/egress-policy.md): outside
+# the cluster, users reach only web, DNS, NTP and rate-limited SSH; the administrators
+# and system accounts are exempt. Switched on by slurm_enable_egress_policy.
+#egress_policy_internal_networks: ["{{ cluster_subnet }}"]  # example
+#egress_policy_exempt_uids: "{{ people | people_uids('admin') }}"  # example
+#egress_policy_ssh_rate: 20/minute
+#egress_policy_ssh_burst: 30
+#egress_policy_ssh_node_rate: 60/minute
+#egress_policy_ssh_node_burst: 120
+# Inbound filtering (replaces ufw): the internal networks, plus the SSH port on the
+# login node.
+#egress_policy_inbound: true  # example
+#egress_policy_inbound_tcp_ports: "{{ [cluster_info.ssh_port] if inventory_hostname in groups['slurm-login'] | default([]) else [] }}"  # example
+#egress_policy_trusted_interfaces: [tailscale0]  # example
+
 # DNS config
 # Playbook: dns-config
 #dns_config_servers: [8.8.8.8]  # example
