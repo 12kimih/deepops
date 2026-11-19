@@ -43,11 +43,13 @@
 
 - name: Set up NGINX-based container caching | Install docker registry cache server
   import_playbook: container/nginx-docker-registry-cache-server.yml
-  when: slurm_enable_nginx_docker_cache
+  vars:
+    deepops_phase: install
 
 - name: Set up NGINX-based container caching | Install docker registry cache client
   import_playbook: container/nginx-docker-registry-cache-client.yml
-  when: slurm_enable_nginx_docker_cache
+  vars:
+    deepops_phase: install
 
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml
@@ -326,6 +328,16 @@
 
 - name: Remove the Prometheus where it is no longer wanted
   import_playbook: slurm-cluster/prometheus.yml
+  vars:
+    deepops_phase: remove
+
+- name: Stop pulling through the registry cache where it is no longer wanted
+  import_playbook: container/nginx-docker-registry-cache-client.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the registry cache where it is no longer wanted
+  import_playbook: container/nginx-docker-registry-cache-server.yml
   vars:
     deepops_phase: remove
 
