@@ -13,21 +13,20 @@
 # slurm_backup_restore_test_last_success_timestamp_seconds, ...), so an alert can fire
 # when a backup goes stale.
 #
-# Runs on the controller only. Opt-in: no destinations, no backup.
+# Runs on the controller only. Opt-in: no destinations, no backup; emptying the list
+# later stops the timers and removes the units, configuration and metrics.
 
 # Each destination: {path, owner, munge_key, daily, weekly}.
 #   owner      who writes there: root for a local disk; for an NFS export with
 #              root_squash, a service account the server lets write (the directory is
 #              created on prepare_host, the export's server).
 #   munge_key  copy the MUNGE key here (only where few can read it).
-#   daily, weekly  how many dated sets to keep (14 and 8 if unset).
+#   daily, weekly  how many dated sets to keep (14 and 8 if unset; at least 1).
 #   prepare_host   host that creates the directory (the NFS server), if not this one.
 slurm_backup_destinations: []
 
+# The restore test fetches the newest set of the first destination listed.
 slurm_backup_database: slurm_acct_db
-# Where slurmctld keeps its state. Empty = StateSaveLocation read from slurm.conf
-# (slurm_conf_template), so the path is written once.
-slurm_backup_state_dir: ""
 slurm_backup_munge_key: /etc/munge/munge.key
 
 # systemd OnCalendar expressions.
@@ -41,8 +40,10 @@ slurm_backup_config: /etc/slurm-backup.json
 # node_exporter's textfile collector directory (roles/prometheus-node-exporter).
 slurm_backup_textfile_dir: "{{ node_exporter_prom_dir }}"
 slurm_backup_textfile: slurm-backup.prom
-# Where the metrics are kept between runs and reboots (copied into the textfile dir).
-slurm_backup_metrics_file: /var/lib/slurm-backup/slurm-backup.prom
+# Root-only working directory: the set being built, the lock backup and restore-test
+# share, and the metrics kept between runs and reboots (copied into the textfile dir).
+slurm_backup_work_dir: /var/lib/slurm-backup
+slurm_backup_metrics_file: "{{ slurm_backup_work_dir }}/slurm-backup.prom"
 
 # Seconds one step (the dump, one copy to a destination, a listing) may take before it
 # is abandoned, and the whole run before systemd stops it. A hung NFS destination then

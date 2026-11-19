@@ -1,6 +1,7 @@
 """clustertools.slurm_backup: retention, metrics, and full runs against stub tools."""
 
 import gzip
+import json
 import os
 import stat
 import sys
@@ -20,7 +21,38 @@ class Pure(unittest.TestCase):
         names = ["2026-11-01", "2026-11-03", "2026-11-02", "notes", "2026-10-31"]
         self.assertEqual(sb.to_remove(names, 2), ["2026-10-31", "2026-11-01"])
         self.assertEqual(sb.to_remove(names, 10), [])
-        self.assertEqual(sb.to_remove(names, 0), ["2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03"])
+
+    def test_to_remove_takes_partial_sets_left_by_an_interrupted_run(self):
+        names = ["2026-11-02", ".2026-11-01.partial", "2026-11-03"]
+        self.assertEqual(sb.to_remove(names, 5), [".2026-11-01.partial"])
+
+    def test_problems_in_a_configuration(self):
+        good = {
+            "database": "d",
+            "state_dir": "/s",
+            "metrics_file": "/m",
+            "textfile_dir": "/t",
+            "textfile": "x.prom",
+            "work_dir": "/w",
+            "destinations": [{"path": "/a"}, {"path": "/b", "daily": 3, "weekly": 1}],
+        }
+        self.assertEqual(sb.problems_in(good), [])
+        for change, word in (
+            ({"destinations": []}, "no destinations"),
+            ({"destinations": [{"path": "/a", "daily": 0}]}, "daily"),
+            ({"destinations": [{"path": "/a", "weekly": True}]}, "weekly"),
+            ({"destinations": [{"path": "a"}]}, "absolute"),
+            ({"destinations": [{"path": "/a"}, {"path": "/a"}]}, "twice"),
+            ({"weekly_day": 8}, "weekly_day"),
+            ({"work_dir": ""}, "work_dir"),
+        ):
+            with self.subTest(change=change):
+                self.assertIn(word, " ".join(sb.problems_in({**good, **change})))
+
+    def test_series_of_removed_destinations_are_stale(self):
+        self.assertTrue(sb.stale(sb.series("last_status", destination="/old"), {"/a"}))
+        self.assertFalse(sb.stale(sb.series("last_status", destination="/a"), {"/a"}))
+        self.assertFalse(sb.stale(sb.series("restore_test_status"), {"/a"}))
 
     def test_metrics_lines(self):
         values = {sb.series("last_status", destination="/b"): 1, sb.series("last_run_timestamp_seconds"): 5}
@@ -55,6 +87,7 @@ class Backup(unittest.TestCase):
             "textfile_dir": str(base / "prom"),
             "textfile": "slurm-backup.prom",
             "metrics_file": str(base / "state" / "slurm-backup.prom"),
+            "work_dir": str(base / "state"),
             "destinations": [
                 {"path": str(base / "primary"), "munge_key": True, "daily": 2},
                 {"path": str(base / "secondary")},
@@ -96,10 +129,71 @@ class Backup(unittest.TestCase):
         self.assertEqual(os.listdir(self.base / "primary" / "weekly"), ["2026-11-22"])
         self.assertEqual(len(os.listdir(self.base / "secondary" / "daily")), 3)
 
-    def test_failed_dump_fails_the_run(self):
-        (self.base / "bin" / "mariadb-dump").write_text("#!/bin/sh\nexit 3\n")
-        with self.assertRaises(RuntimeError):
-            self.run_on("2026-11-21", 6)
+    def prom(self):
+        return (self.base / "prom" / "slurm-backup.prom").read_text()
+
+    def test_failed_dump_fails_every_destination_and_is_reported(self):
+        (self.base / "bin" / "mariadb-dump").write_text("#!/bin/sh\necho partial; exit 3\n")
+        self.assertEqual(self.run_on("2026-11-21", 6), 1)
+        for dest in ("primary", "secondary"):
+            self.assertIn(f'slurm_backup_last_status{{destination="{self.base / dest}"}} 0', self.prom())
+            self.assertFalse((self.base / dest / "daily").exists())
+        self.assertIn("slurm_backup_last_run_timestamp_seconds", self.prom())
+
+    def test_a_state_file_replaced_during_the_archive_is_skipped(self):
+        real = sb.os.walk
+
+        def walk(root):
+            for dirpath, dirnames, filenames in real(root):
+                yield dirpath, dirnames, [*filenames, "job_state.new"]  # renamed away since
+
+        with mock.patch.object(sb.os, "walk", walk):
+            self.assertEqual(self.run_on("2026-11-21", 6), 0)
+
+    def test_a_set_appears_only_when_complete(self):
+        stale = self.base / "primary" / "daily" / ".2026-11-20.partial"
+        stale.mkdir(parents=True)
+        real = sb.run_as
+
+        def run_as(owner, argv, timeout, **kwargs):
+            if argv[0] == "mv":
+                raise sb.proc.CalledProcessError(1, argv)
+            return real(owner, argv, timeout, **kwargs)
+
+        with mock.patch.object(sb, "run_as", run_as):
+            self.assertEqual(self.run_on("2026-11-21", 6), 1)
+        self.assertNotIn("2026-11-21", os.listdir(self.base / "primary" / "daily"))
+        self.assertEqual(self.run_on("2026-11-21", 6), 0)
+        self.assertEqual(os.listdir(self.base / "primary" / "daily"), ["2026-11-21"])
+
+    def test_a_removed_destination_loses_its_series(self):
+        self.run_on("2026-11-21", 6)
+        self.cfg["destinations"] = self.cfg["destinations"][:1]
+        self.run_on("2026-11-22", 7)
+        self.assertNotIn(str(self.base / "secondary"), self.prom())
+        self.assertIn(str(self.base / "primary"), self.prom())
+
+    def test_restore_test_without_a_backup_is_reported(self):
+        self.assertEqual(sb.restore_test(self.cfg), 1)
+        self.assertIn("slurm_backup_restore_test_status{} 0", self.prom())
+
+    def test_restore_test_of_a_set_without_checksums_is_reported(self):
+        self.run_on("2026-11-21", 6)
+        (self.base / "primary" / "daily" / "2026-11-21" / sb.SUMS_FILE).unlink()
+        self.assertEqual(sb.restore_test(self.cfg), 1)
+        self.assertIn("slurm_backup_restore_test_status{} 0", self.prom())
+
+    def test_fetch_checks_every_file_and_trusts_no_path(self):
+        self.run_on("2026-11-21", 6)
+        into = self.base / "fetched"
+        into.mkdir()
+        newest, problems = sb.fetch_newest(self.cfg["destinations"][0], into, 60)
+        self.assertEqual((newest.name, problems), ("2026-11-21", []))
+        sums = self.base / "primary" / "daily" / "2026-11-21" / sb.SUMS_FILE
+        sums.write_text(sums.read_text() + "0" * 64 + "  ../outside\n")
+        _, problems = sb.fetch_newest(self.cfg["destinations"][0], into, 60)
+        self.assertIn("unexpected entry", " ".join(problems))
+        self.assertFalse((self.base / "outside").exists())
 
     def test_a_hung_destination_fails_alone_and_is_reported(self):
         real = sb.run_as
@@ -126,6 +220,14 @@ class Backup(unittest.TestCase):
 class Main(unittest.TestCase):
     def test_usage(self):
         self.assertEqual(sb.main([]), 2)
+
+    def test_a_bad_configuration_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "c.json"
+            cfg.write_text(json.dumps({"destinations": [{"path": "/a", "daily": 0}]}))
+            for command in ("check", "backup", "restore-test"):
+                with self.subTest(command=command):
+                    self.assertEqual(sb.main([command, str(cfg)]), 2)
 
 
 if __name__ == "__main__":
