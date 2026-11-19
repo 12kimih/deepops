@@ -17,62 +17,24 @@ All changes should be merged with the main branch and a release tag created.
 
 ## Update software versions and dependencies for new release
 
-Create a new pull request against the main branch with changes to version numbers
-
-- Kubespray
-- Slurm
-- Ansible Galaxy dependencies
-- Slurm container dependencies
-- Helm charts
-- Misc. roles
-
-### Kubespray
-
-Update the Kubespray submodule to the latest version
+Every pinned version lives once, in the role default (or `pyproject.toml`,
+`roles/requirements.yml`, the Kubespray submodule) that uses it, with an `# upstream:`
+line naming where its releases come from. Nothing lists them by hand: compare every pin
+with its upstream, and see them all in one table, with
 
 ```bash
-cd submodules/kubespray
-git fetch --all
-git tag -l
-# pick the latest tag from the list, i.e.
-git checkout v2.15.1
+uv run python scripts/deepops/upstream.py      # behind / current, file:line of each pin
+less docs/deepops/versions.md                  # generated: scripts/docs/generate.py
 ```
 
-### Slurm
-
-Update the `slurm_version` variable in the following files:
-
-  * `config.example/group_vars/slurm-cluster.yml`
-  * `roles/slurm/defaults/main.yml`
-
-### Ansible Galaxy dependencies
-
-Update version numbers in the `roles/requirements.yml` file
-
-### Slurm container dependencies
-
-  * Update `prometheus_container` in `roles/prometheus/defaults/main.yml`
-  * Update `slurm_exporter_container` in `roles/prometheus-slurm-exporter/defaults/main.yml`
-  * Update `node_exporter_container` in `roles/prometheus-node-exporter/defaults/main.yml`
-  * Update `grafana_container` in `roles/grafana/defaults/main.yml`
-  * Update `alertmanager_container` in `roles/alertmanager/defaults/main.yml`
-
-### Helm charts
-
-  * Update `HELM_INGRESS_CHART_VERSION` in `scripts/k8s/deploy_ingress.sh`
-  * Update `HELM_PROMETHEUS_CHART_VERSION` in `scripts/k8s/deploy_monitoring.sh`
-  * Update `k8s_gpu_feature_discovery_chart_version` in `roles/nvidia-k8s-gpu-feature-discovery/defaults/main.yml`
-  * Update `k8s_gpu_plugin_chart_version` in `roles/nvidia-k8s-gpu-device-plugin/defaults/main.yml`
-  * Update `gpu_operator_driver_version` and `gpu_operator_chart_version` in `roles/nvidia-gpu-operator/defaults/main.yml`
-
-### Misc. roles
-
-  * Update `spack_version` in `roles/spack/defaults/main.yml`
-  * Update `standalone_container_registry_image` in `roles/standalone-container-registry/defaults/main.yml`
-  * Update `cuda_version` in `roles/nvidia_cuda/defaults/main.yml`
-  * Update `nvidia_network_operator_version` and `nvidia_network_operator_mpi_operator_version` (with its checksum) in `roles/nvidia-network-operator/defaults/main.yml`
-  * Update `mig_manager_url_deb` and `mig_manager_url_rpm` in `roles/nvidia-mig-manager/defaults/main.yml`
-  * Update `nginx_docker_cache_image` in `roles/nginx-docker-registry-cache/defaults/main.yml`
+For each pin to move: read that release's notes and install guide, change the one
+default (with its checksum or digest, which the download and image roles require),
+regenerate the docs (`uv run python scripts/docs/generate.py`), and run
+`scripts/check.sh`. Two pins have their own tools: `scripts/deepops/cuda_releases.py`
+regenerates the CUDA catalog, and `scripts/deepops/image_pins.py pin <repo:tag>` prints a
+container image's digest pin. Kubespray moves with its submodule
+(`git -C submodules/kubespray checkout <tag>`, then its upgrade notes and
+`./scripts/setup.sh` for its Ansible).
 
 ## Create PR with release notes
 
