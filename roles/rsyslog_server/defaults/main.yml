@@ -1,6 +1,17 @@
 ---
+# 0 turns a listener off.
 rsyslog_server_tcp_port: 514
 rsyslog_server_udp_port: 514
-rsyslog_enable_journal: true
+# Senders the listeners accept (address or CIDR, e.g. the cluster network); empty
+# accepts any, which on a reachable port lets anyone fill the disk.
+rsyslog_allowed_senders: []
+# journald already forwards to rsyslog on Ubuntu, and RHEL's rsyslog.conf loads
+# imjournal itself: loading it here as well logged every line twice, and without a
+# state file re-read the whole journal at each restart.
+rsyslog_enable_journal: false
 rsyslog_log_file_path: "/var/log/deepops-hosts"
-rsyslog_log_file_path_pattern: "{{ rsyslog_log_file_path }}/%HOSTNAME%/%$YEAR%-%$MONTH%-%$DAY%/syslog.log"
+# The sender's host name is sanitised (secpath-replace), so it cannot climb out.
+rsyslog_log_file_path_pattern: "{{ rsyslog_log_file_path }}/%HOSTNAME:::secpath-replace%/%$YEAR%-%$MONTH%-%$DAY%/syslog.log"
+# Client logs older than this are removed (systemd-tmpfiles), so they cannot fill the
+# filesystem slurmctld keeps its state on.
+rsyslog_log_retention_days: 90

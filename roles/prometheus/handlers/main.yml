@@ -1,8 +1,11 @@
 ---
+# Both only while Prometheus is meant to run: a restart would start one set to stopped,
+# and a reload would fail against it after its retries.
 - name: Restart prometheus
   ansible.builtin.service:
     name: "{{ prometheus_svc_name }}"
     state: restarted
+  when: prometheus_state == 'started'
 
 # Needs --web.enable-lifecycle; retries cover a restart that is still starting up.
 - name: Reload prometheus
@@ -13,3 +16,4 @@
   until: prometheus_reload is succeeded
   retries: 10
   delay: 3
+  when: prometheus_state == 'started'

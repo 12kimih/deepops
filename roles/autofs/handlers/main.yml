@@ -1,3 +1,7 @@
 ---
+# A reload rereads the maps; a restart would drop every user's mounts.
 - name: Restart autofs
-  ansible.builtin.service: name=autofs state=restarted enabled=yes
+  ansible.builtin.service:
+    name: autofs
+    state: reloaded
+    enabled: true
