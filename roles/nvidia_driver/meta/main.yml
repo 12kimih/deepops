@@ -19,4 +19,5 @@ galaxy_info:
     - nvidia
     - gpu
     - driver
-dependencies: []
+dependencies:
+  - role: nvidia_versions  # nvidia_driver_branch

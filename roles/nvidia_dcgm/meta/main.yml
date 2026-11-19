@@ -1,0 +1,7 @@
+---
+dependencies:
+  - role: nvidia_versions  # nvidia_driver_cuda_major
+
+galaxy_info:
+  namespace: deepops
+  role_name: nvidia_dcgm

@@ -126,6 +126,7 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 │   ├── nvidia_driver
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia_power_limit
+│   ├── nvidia_versions
 │   ├── openmpi
 │   ├── os_updates
 │   ├── package_repos

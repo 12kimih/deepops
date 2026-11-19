@@ -12,4 +12,5 @@
     - name: Configure DCGM on GPU nodes only
       ansible.builtin.include_role:
         name: nvidia_dcgm
+        public: true  # nvidia_versions (a dependency) supplies its values
       when: ansible_facts.ansible_local['gpus']['count'] | int > 0
