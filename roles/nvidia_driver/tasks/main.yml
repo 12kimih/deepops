@@ -45,9 +45,9 @@
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
 
 # Re-read the loaded version AFTER the possible reboot and confirm it now matches the
-# on-disk module. Persistence/verify run only when the module is genuinely loaded and
-# current, so a pending reboot (or a module that fails to load) skips them with a clear
-# warning instead of a cryptic systemd failure.
+# on-disk module. Persistence/verify run only when the module is loaded and current.
+# No module on disk after the install, or a module still not loaded with no reboot
+# pending (so it failed to load), fails the host; a pending reboot is stated.
 - name: Re-read the running NVIDIA kernel module version (after any reboot)
   ansible.builtin.command: cat /proc/driver/nvidia/version
   register: nvidia_driver_loaded_version_post
@@ -62,15 +62,46 @@
          (nvidia_driver_ondisk_version.stdout | trim)
            in (nvidia_driver_loaded_version_post.stdout | default('')) }}
 
-- name: Warn that a manual reboot is needed (NVIDIA module not loaded/current)
+# Under --check nothing was installed, so an empty modinfo proves nothing there.
+- name: Require an NVIDIA kernel module on disk after the install
+  ansible.builtin.fail:
+    msg: >-
+      No NVIDIA kernel module is installed on {{ inventory_hostname }} after the driver
+      install (modinfo nvidia: {{ nvidia_driver_ondisk_version.stderr | default('') | trim }}).
+      Check the DKMS build or the kernel module package for the running kernel.
+  when:
+    - not ansible_check_mode
+    - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length == 0
+
+- name: Check whether a reboot is pending
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: nvidia_driver_reboot_pending
+  check_mode: false
+  when: not (nvidia_driver_module_loaded | bool)
+
+- name: Require the NVIDIA module loaded when no reboot is pending
+  ansible.builtin.fail:
+    msg: >-
+      The NVIDIA module {{ nvidia_driver_ondisk_version.stdout | trim }} is on disk but not
+      running on {{ inventory_hostname }}, and no reboot is pending: it failed to load.
+      See `dmesg | grep -i nvidia` (open vs proprietary modules, Secure Boot).
+  when:
+    - not ansible_check_mode
+    - not (nvidia_driver_module_loaded | bool)
+    - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0
+    - not nvidia_driver_reboot_pending.stat.exists
+
+- name: State that the NVIDIA driver waits for a reboot
   ansible.builtin.debug:
     msg: >-
-      The on-disk NVIDIA module ({{ nvidia_driver_ondisk_version.stdout | default('?') | trim }})
-      is not the one running on {{ inventory_hostname }}; skipping persistence/verify
-      until the reboot asked for above loads it.
+      REBOOT PENDING: {{ inventory_hostname }} still runs the old NVIDIA module; the
+      installed {{ nvidia_driver_ondisk_version.stdout | default('?') | trim }} is not in use.
+      Persistence daemon, Fabric Manager and GPU checks were NOT done; rerun this
+      playbook after the reboot.
   when:
-    - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0
     - not (nvidia_driver_module_loaded | bool)
+    - nvidia_driver_reboot_pending.stat.exists | default(false)
 
 # NVIDIA recommends the persistence daemon over the legacy `nvidia-smi -pm 1`
 # ("the daemon approach provides a more elegant and robust solution"; legacy
