@@ -247,8 +247,8 @@ Boot-persistence / idempotency fixes:
   release, so the operator confirms the repo URL/version for their adapter+OS on the
   DOCA downloads page; untestable here without IB hardware). `roce_backend`'s bundled
   MLNX_OFED 4.7 / Ubuntu 18.04 ISO is flagged legacy and points at the `mofed` role.
-- **ufw firewall -- DONE as a playbook** (section 40): `config.example/playbooks/ufw-enable.yml`
-  takes the subnets and ports as vars; it was not made a role.
+- **ufw firewall -- DONE as a playbook** (section 40): `ufw-enable.yml` took the subnets and
+  ports as vars; it was later absorbed into `roles/egress_policy` (nftables).
 
 ---
 
@@ -723,8 +723,8 @@ pruned.
 ## 40. Housekeeping  (`c6ebda7c`, `f6c7c112`)
 
 - `ansible.cfg` sets `vault_password_file = ./config/.vault-pass`, read only when a vaulted
-  value is used, and `config.example/playbooks/ufw-enable.yml` is a generalized firewall
-  playbook to pair with `ufw-disable.yml`.
+  value is used, and `ufw-enable.yml` is a generalized firewall playbook to pair with
+  `ufw-disable.yml` (later absorbed into `roles/egress_policy`).
 - `move-home-dirs` is opt-in (`move_home_dirs_enable`) rather than running on every
   `authentication.yml`.
 

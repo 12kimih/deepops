@@ -11,7 +11,7 @@
   - [Slurm](#slurm)
     - [Slurm services](#slurm-services)
     - [MPI traffic](#mpi-traffic)
-  - [Host firewall playbooks (UFW)](#host-firewall-playbooks-ufw)
+  - [Host firewall (roles/egress_policy)](#host-firewall-rolesegress_policy)
 
 ## Introduction
 
@@ -107,16 +107,17 @@ This is often best for performance as well, as it removes any source of contenti
 
 If you are using a single network for both MPI and management traffic, you should generally allow all TCP and UDP traffic between the nodes in the cluster.
 
-## Host firewall playbooks (UFW)
+## Host firewall (roles/egress_policy)
 
-`config.example/playbooks/` has two optional playbooks for Ubuntu hosts:
+`roles/egress_policy` owns the host's filtering in one nftables table: what users may
+reach outside the cluster, and, with `egress_policy_inbound`, inbound traffic (only
+the internal networks, trusted interfaces and the listed ports). It replaced the
+former `ufw-enable.yml` and disables ufw when it takes inbound over. See
+[Egress policy](../slurm-cluster/egress-policy.md).
 
-- `ufw-enable.yml` denies incoming traffic by default and allows the internal cluster subnet
-  (`ufw_cluster_subnet`) and the Docker bridge on every node. Only the head node also
-  allows SSH (`ufw_ssh_port`) and any extra TCP ports (`ufw_extra_tcp_ports`, a port or
-  `start:end` range each). It starts with `ufw --force reset`, so any rule not in these
-  variables is removed on each run.
-- `ufw-disable.yml` stops and disables UFW on all nodes.
+`config.example/playbooks/ufw-disable.yml` stops and disables UFW on all nodes, for a
+fresh Ubuntu install whose UFW would block Slurm, munge or NFS.
 
-Ports published with `docker run -p` bypass UFW, because Docker writes its own iptables
-rules. Bind such ports to `127.0.0.1` or filter them in the `DOCKER-USER` chain.
+Ports published with `docker run -p` bypass the input filter, because Docker forwards
+them to the container instead of delivering them to the host. Bind such ports to
+`127.0.0.1` or an internal address, or use host networking.
