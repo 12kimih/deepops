@@ -7,6 +7,8 @@
 #
 #   ansible-playbook -K playbooks/utilities/apt-upgrade.yml                  # compute nodes
 #   ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=master
+#     (run from master itself, it is upgraded and checked but not rebooted: the
+#     reboot would end the run; `sudo systemctl reboot` afterwards if it asks for one)
 #   -e maintenance_serial=2           nodes per batch (default 1)
 #   -e maintenance_force_reboot=true  reboot every node, needed or not
 #

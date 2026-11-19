@@ -4,8 +4,44 @@
     path: /var/run/reboot-required
   register: maintenance_reboot_required
 
-- name: Reboot
+# The machine Ansible runs on (the controller, when the playbook is started there)
+# cannot be rebooted by the play: the reboot kills the run halfway. Its reboot is left
+# pending (/var/run/reboot-required, reported by the os_updates metrics) for its
+# operator to do once the run has finished.
+- name: Read whether this host is the machine running Ansible
+  ansible.builtin.slurp:
+    src: /etc/machine-id
+  register: maintenance_machine_id
   when: maintenance_force_reboot | bool or maintenance_reboot_required.stat.exists
+
+- name: Note whether this host is the machine running Ansible
+  ansible.builtin.set_fact:
+    maintenance_reboot_self: >-
+      {{ maintenance_machine_id is not skipped
+         and (maintenance_machine_id.content | b64decode | trim) == (lookup('ansible.builtin.file', '/etc/machine-id') | trim) }}
+
+- name: Leave the reboot of the machine running Ansible to its operator
+  when: maintenance_reboot_self | bool
+  block:
+    - name: Ask for the reboot
+      ansible.builtin.copy:
+        dest: /var/run/reboot-required
+        content: "*** System restart required ***\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Say how to finish it
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} runs this playbook, so it is not rebooted now.
+          When the run has finished: `sudo systemctl reboot` there, then
+          playbooks/utilities/fleet-consistency.yml.
+
+- name: Reboot
+  when:
+    - maintenance_force_reboot | bool or maintenance_reboot_required.stat.exists
+    - not maintenance_reboot_self | bool
   block:
     # Every reboot comes through here, so this is where a node that runs jobs is
     # protected: a compute node Slurm knows must be drained (or down) first. One it
