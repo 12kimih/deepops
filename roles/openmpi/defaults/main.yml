@@ -1,14 +1,15 @@
 ---
-# OpenMPI built from source for the Slurm cluster. 5.0.x is the current stable
-# series (5.0.10, Feb 2026); 4.0.x is EOL. When built against the external PMIx
+# OpenMPI built from source for the Slurm cluster, from the current stable 5.0.x
+# series (4.0.x is EOL). When built against the external PMIx
 # (config.example's override below), it must move in step with pmix_version because
 # OpenMPI compiles against the PMIx headers (5.0.x needs PMIx >= 4.2.0).
-openmpi_version: 5.0.10
+# upstream: git https://github.com/open-mpi/ompi v(\d+)\.(\d+)\.(\d+)
+openmpi_version: 5.0.11
 openmpi_tag: "v{{ openmpi_version.split('.')[0] }}.{{ openmpi_version.split('.')[1] }}"
 openmpi_src_url: "https://download.open-mpi.org/release/open-mpi/{{ openmpi_tag }}/openmpi-{{ openmpi_version }}.tar.bz2"
 # Per version, as published on open-mpi.org (roles/download).
 openmpi_checksums:
-  "5.0.10": "sha256:0acecc4fc218e5debdbcb8a41d182c6b0f1d29393015ed763b2a91d5d7374cc6"
+  "5.0.11": "sha256:e668a3c4acd50c41dc204c8a6dd98a611e0f26af89cf677577fa9be8a2698003"
 # Root builds here, so never under a world-writable directory such as /tmp. Each
 # version builds in its own tree, so the installed version is uninstalled from the tree
 # that installed it; the older trees are removed.
@@ -16,7 +17,7 @@ openmpi_build_root: /var/cache/deepops/build
 openmpi_build_dir: "{{ openmpi_build_root }}/openmpi-{{ openmpi_version }}"
 openmpi_install_prefix: /usr/local
 # Default builds OpenMPI's bundled (internal) PMIx. On 5.0.x that bundled PMIx is
-# 5.x -- the SAME major Slurm links (pmix_version 5.0.10) -- so they are
+# 5.x -- the SAME major Slurm links (pmix_version) -- so they are
 # wire-compatible with no cross-version risk, and it builds anywhere without a
 # prebuilt external PMIx. For the tightest coupling you can instead build against
 # the SAME external PMIx + hwloc Slurm uses (SchedMD best practice); config.example

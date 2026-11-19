@@ -371,21 +371,19 @@ reference host; distribution repositories remain a separate prerequisite.
    digest (`repo:tag@sha256:...`; the deploy refuses unpinned references), so mirror
    with a tool that keeps the manifest list intact (`skopeo copy --all`, or
    `docker buildx imagetools create`) and keep the same `@sha256:` suffix. The Slurm exporter is a
-   special case: its default `slurm_exporter_build_image: true` builds from
-   `golang:1.24` and `ubuntu:24.04`, and the runtime stage runs `apt-get`.
+   special case: its default `slurm_exporter_build_image: true` builds from the
+   images its Dockerfile pins, and the runtime stage runs `apt-get`.
    Build it while connected, archive it with the other images, and use the
    prebuilt image offline:
 
    ```bash
-   for image in prom/prometheus:v3.15.0 grafana/grafana:13.2.4 \
-     prom/alertmanager:v0.34.1 quay.io/prometheus/node-exporter:v1.12.1 \
-     nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless; do
-     docker pull "${image}"
-   done
-   docker save -o /tmp/images/slurm-monitoring.tar \
-     prom/prometheus:v3.15.0 grafana/grafana:13.2.4 \
-     prom/alertmanager:v0.34.1 quay.io/prometheus/node-exporter:v1.12.1 \
-     nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless
+   # Every image the roles pin (repo:tag@sha256), from the roles themselves.
+   uv run python scripts/deepops/image_pins.py list | grep -v Dockerfile \
+     | awk '{print $1}' > /tmp/images/pins.txt
+   while read -r pin; do
+     docker pull "${pin}" && docker tag "${pin}" "${pin%@*}"
+   done < /tmp/images/pins.txt
+   docker save -o /tmp/images/deepops-images.tar $(sed 's/@.*//' /tmp/images/pins.txt)
    docker build -t deepops/prometheus-slurm-exporter:2.0.0 \
      roles/prometheus-slurm-exporter/files/docker
    docker save -o /tmp/images/prometheus-slurm-exporter-2.0.0.tar \
@@ -564,17 +562,14 @@ sha256sum -c SHA256SUMS
    docker tag deepops/prometheus-slurm-exporter:2.0.0 \
      127.0.0.1:5000/deepops/prometheus-slurm-exporter:2.0.0
    docker push 127.0.0.1:5000/deepops/prometheus-slurm-exporter:2.0.0
-   docker load -i /tmp/images/slurm-monitoring.tar
-   while read -r source target; do
-     docker tag "${source}" "${target}"
-     docker push "${target}"
-   done <<'EOF'
-   prom/prometheus:v3.15.0 127.0.0.1:5000/prom/prometheus:v3.15.0
-   grafana/grafana:13.2.4 127.0.0.1:5000/grafana/grafana:13.2.4
-   prom/alertmanager:v0.34.1 127.0.0.1:5000/prom/alertmanager:v0.34.1
-   quay.io/prometheus/node-exporter:v1.12.1 127.0.0.1:5000/prometheus/node-exporter:v1.12.1
-   nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless 127.0.0.1:5000/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless
-   EOF
+   docker load -i /tmp/images/deepops-images.tar
+   # The local registry keeps each repository path, without the source registry's host.
+   while read -r pin; do
+     image="${pin%@*}"
+     case "${image%%/*}" in *.*) path="${image#*/}" ;; *) path="${image}" ;; esac
+     docker tag "${image}" "127.0.0.1:5000/${path}"
+     docker push "127.0.0.1:5000/${path}"
+   done < /tmp/images/pins.txt
    ```
 
 5. Extract the initialized DeepOps checkout on the provisioning machine:
@@ -679,11 +674,12 @@ slurm_enable_container_registry: false
 standalone_container_registry_cache_enable: false
 slurm_exporter_build_image: false
 slurm_exporter_container: "registry-host:5000/deepops/prometheus-slurm-exporter:2.0.0@sha256:<digest>"
-prometheus_container: "registry-host:5000/prom/prometheus:v3.15.0@sha256:<digest>"
-grafana_container: "registry-host:5000/grafana/grafana:13.2.4@sha256:<digest>"
-alertmanager_container: "registry-host:5000/prom/alertmanager:v0.34.1@sha256:<digest>"
-node_exporter_container: "registry-host:5000/prometheus/node-exporter:v1.12.1@sha256:<digest>"
-nvidia_dcgm_container: "registry-host:5000/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless@sha256:<digest>"
+# Each with the tag the role pins (docs/deepops/versions.md) and the mirror's digest.
+prometheus_container: "registry-host:5000/prom/prometheus:<tag>@sha256:<digest>"
+grafana_container: "registry-host:5000/grafana/grafana:<tag>@sha256:<digest>"
+alertmanager_container: "registry-host:5000/prom/alertmanager:<tag>@sha256:<digest>"
+node_exporter_container: "registry-host:5000/prometheus/node-exporter:<tag>@sha256:<digest>"
+nvidia_dcgm_container: "registry-host:5000/nvidia/k8s/dcgm-exporter:<tag>@sha256:<digest>"
 ```
 
 Mirror and override the Slurm source/archive variables listed above. If their

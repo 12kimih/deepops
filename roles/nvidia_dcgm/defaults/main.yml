@@ -4,13 +4,18 @@
 # that, known before the driver loads). The recommended packages it pulls in carry
 # the diagnostics. The 3.x package supports CUDA 12 at most: on a CUDA 13 driver
 # `dcgmi diag` stops with "Detected unsupported Cuda version".
+# One exception from the same guide: "Maxwell, Volta, and Pascal GPUs on driver 580
+# should use the -cuda12 package", so a host whose GPUs are older than Turing (compute
+# capability below 7.5) on a CUDA 13 driver gets the CUDA 12 build (tasks/main.yml reads
+# the GPUs into _dcgm_cuda_major).
 # https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/getting-started.html
-dcgm_pkg_name: "datacenter-gpu-manager-4-cuda{{ nvidia_driver_cuda_major }}"
+_dcgm_cuda_major: "{{ nvidia_driver_cuda_major }}"
+dcgm_pkg_name: "datacenter-gpu-manager-4-cuda{{ _dcgm_cuda_major }}"
 # Removed first: the 3.x series and every DCGM 4 package built for another CUDA major
 # (-cuda12, -cuda12-cublas, -multinode-cuda12, ...; globs, resolved by host_baseline).
 dcgm_other_pkgs: >-
   {{ ['datacenter-gpu-manager', 'datacenter-gpu-manager-config']
-     + nvidia_cuda_min_driver_branch | list | map('string') | reject('equalto', nvidia_driver_cuda_major | string)
+     + nvidia_cuda_min_driver_branch | list | map('string') | reject('equalto', _dcgm_cuda_major | string)
        | map('regex_replace', '^', 'datacenter-gpu-manager-4-*cuda') | map('regex_replace', '$', '*') | list }}
 
 # DGX OS ships its own DCGM and the package name differs per release.

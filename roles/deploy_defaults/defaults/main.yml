@@ -59,12 +59,17 @@ k8s_nfs_mkdir: true
 k8s_nfs_export_path: /export/deepops_nfs
 # Component playbooks run on their own
 # NVIDIA MIG Manager (playbooks/nvidia-software/nvidia-mig.yml,
-# https://github.com/NVIDIA/mig-parted): the profile, its config file, and an
-# optional, site-managed hooks file passed to `nvidia-mig-parted apply -k` (DeepOps
-# does not create it; set a path only after reviewing the hooks on every target)
+# https://github.com/NVIDIA/mig-parted): the profile; the site's mig-parted config
+# (mig_manager_config_src) and where it lands on the node; and the hooks file. The
+# hooks are what keeps a layout across reboots: the package's apply-start hook writes
+# the config, hooks and profile into the service's override.conf, which reapplies
+# them at boot. The package links hooks.yaml to the hooks that fit the GPU (minimal
+# ones from Hopper on); they also stop and restart the GPU's services around a mode
+# change.
 mig_manager_profile: all-disabled
+mig_manager_config_src: "{{ inventory_dir }}/nvidia-mig-config.yml"
 mig_manager_config: /etc/nvidia-mig-manager/config.yml
-mig_manager_hooks: ""
+mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 # The containers playbooks/ngc-ready-server.yml tests
 ngc_ready_cuda_container: nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
 ngc_ready_pytorch_container: nvcr.io/nvidia/pytorch:26.05-py3

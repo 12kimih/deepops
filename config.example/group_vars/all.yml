@@ -419,11 +419,10 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 
 # Default profile when using NVIDIA MIG Manager: https://github.com/NVIDIA/mig-parted
 #mig_manager_profile: all-disabled
+#mig_manager_config_src: "{{ inventory_dir }}/nvidia-mig-config.yml"
 #mig_manager_config: /etc/nvidia-mig-manager/config.yml
-# Optional, site-managed hooks file passed to `nvidia-mig-parted apply -k`.
-# DeepOps does not create this file. Leave empty to apply without custom hooks;
-# set a path only after provisioning and reviewing the hooks on every target.
-#mig_manager_hooks: ""
+# The hooks file; the package's keeps the layout across reboots (roles/deploy_defaults).
+#mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 
 ################################################################################
 # Node networking                                                              #

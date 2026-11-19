@@ -119,8 +119,5 @@ works), so `config.example` keeps only the NFS warning + an NVMe override exampl
 
 ## Component versions (role defaults, not config.example)
 
-For reference, the matching component pins (in `roles/*/defaults/`) advanced too:
-Slurm 25.11.6, PMIx 5.0.10, OpenMPI 5.0.10, hwloc 2.13.0, enroot 4.2.0, pyxis 0.24.0,
-nvidia-container-toolkit 1.19.1, DCGM-exporter 4.5.3-4.8.2, Prometheus v3.12.0,
-Grafana 13.0.2, Alertmanager v0.32.2, node-exporter v1.11.1, HPC SDK 26.3,
-SingularityCE 4.4.2, GPU Operator chart v26.3.2. See MODERNIZATION.md for the full list.
+The component pins themselves (in `roles/*/defaults/`) are listed in the generated
+[version table](versions.md), never restated here.

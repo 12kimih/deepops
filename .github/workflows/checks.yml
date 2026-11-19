@@ -13,12 +13,12 @@ jobs:
       # Kubespray is a submodule: config_lint reads its variables and the full check
       # syntax-checks the playbook that imports it.
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: true
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
 

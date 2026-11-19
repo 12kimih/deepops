@@ -16,6 +16,13 @@
       ansible.builtin.include_role:
         name: facts
 
+    # The GPU Operator runs its own MIG manager on Kubernetes nodes: one manager only.
+    - name: Leave MIG to the GPU Operator on its nodes
+      ansible.builtin.meta: end_host
+      when:
+        - inventory_hostname in groups['k8s_cluster'] | default([])
+        - deepops_gpu_operator_enabled | bool
+
     # nvidia-smi runs in a transient unit so the probe also works on nodes where
     # the Slurm login setup hides GPUs from ssh sessions. The query is kept apart
     # from the match so its exit status survives: piping the two together reports
@@ -59,24 +66,32 @@
       when:
         - has_mig.rc == 0
 
-    # TODO: Consider storing a custom copy of the hooks.yaml configuration alongside the config.yaml
-    - name: Copy cluster-wide mig config file
+    - name: Copy the site's mig-parted configuration
       ansible.builtin.copy:
-        src: "../../config/nvidia-mig-config.yml"
+        src: "{{ mig_manager_config_src }}"
         dest: "{{ mig_manager_config }}"
+        mode: "0644"
       when: has_mig.rc == 0
 
-    # DeepOps does not manage a hooks file. Only request hooks when the site
-    # explicitly configures them; a missing configured file must still fail.
-    # nvidia-mig-parted drives the same GPUs as the probe, so it needs the same
-    # isolation from the ssh cgroup. A failure here is left unhandled on purpose:
-    # a MIG layout that could not be applied must not pass as applied.
+    # As the package's own service applies it (service.sh): the configuration, hooks
+    # and profile in the environment, so the apply-start hook persists all three for
+    # the boot-time reapply. nvidia-mig-parted drives the same GPUs as the probe, so it
+    # needs the same isolation from the ssh cgroup. A failure is left unhandled on
+    # purpose: a MIG layout that could not be applied must not pass as applied.
     - name: Apply MIG configuration
-      ansible.builtin.command: >-
-        systemd-run --wait --pipe --collect --quiet --
-        nvidia-mig-parted apply -f {{ mig_manager_config }}
-        -c {{ mig_manager_profile }}
-        {{ ('-k ' ~ (mig_manager_hooks | quote)) if mig_manager_hooks | length > 0 else '' }}
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - --wait
+          - --pipe
+          - --collect
+          - --quiet
+          - "--setenv=MIG_PARTED_CONFIG_FILE={{ mig_manager_config }}"
+          - "--setenv=MIG_PARTED_HOOKS_FILE={{ mig_manager_hooks }}"
+          - "--setenv=MIG_PARTED_SELECTED_CONFIG={{ mig_manager_profile }}"
+          - --
+          - nvidia-mig-parted
+          - apply
       when: has_mig.rc == 0
 
     - name: Assert MIG configuration was applied

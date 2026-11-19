@@ -4,7 +4,8 @@
 # Keep the two maps separate so a single ansible_facts.architecture value resolves
 # to the right token for each package type.
 # 'arm64' matches existing practice in roles/nvidia-dgx/vars/ubuntu-24.04.yml.
-mig_manager_version: "0.15.1"
+# upstream: git https://github.com/NVIDIA/mig-parted v(\d+)\.(\d+)\.(\d+)
+mig_manager_version: "0.15.2"
 mig_manager_release: "1"
 
 mig_manager_deb_arch_map:
@@ -24,7 +25,7 @@ mig_manager_url_deb: https://github.com/NVIDIA/mig-parted/releases/download/v{{ 
 mig_manager_url_rpm: https://github.com/NVIDIA/mig-parted/releases/download/v{{ mig_manager_version }}/nvidia-mig-manager-{{ mig_manager_version }}-{{ mig_manager_release }}.{{ mig_manager_rpm_arch }}.rpm
 # Per release file, as GitHub publishes for the release assets (roles/download).
 mig_manager_checksums:
-  "nvidia-mig-manager-0.15.1-1.aarch64.rpm": "sha256:696788c8ad0c92a7f9de4b83a3726cfa459c72878c2dc56ebc8fb3d5cd285ba2"
-  "nvidia-mig-manager-0.15.1-1.x86_64.rpm": "sha256:13587efda4598d35866272633129288b9a9e9a451269c3e1a13ee90625547304"
-  "nvidia-mig-manager_0.15.1-1_amd64.deb": "sha256:0652e149602bab7cfb01b3c32d70c483e318030598a76808f1cf35508f168aa3"
-  "nvidia-mig-manager_0.15.1-1_arm64.deb": "sha256:7cb54f469a4a618ff966f246462f10d655095b04b467a20ef767ecdc28372386"
+  "nvidia-mig-manager-0.15.2-1.aarch64.rpm": "sha256:f555e8151d01d022f580fbde3973e2b58de88560c412e2c239c3328a7c93d970"
+  "nvidia-mig-manager-0.15.2-1.x86_64.rpm": "sha256:190ae59c0b7b27c4e37bc7f8a8c0abc7819249015849e32f068094c2722f77b5"
+  "nvidia-mig-manager_0.15.2-1_amd64.deb": "sha256:b792b6e3e3c3daaf343e49b44a90b7c28dc7e61a53e1460c809620dbf376f47d"
+  "nvidia-mig-manager_0.15.2-1_arm64.deb": "sha256:66275e688319a6b18487ec241b20908fbbf33a0f0318f1017c065d3e084c9b64"
