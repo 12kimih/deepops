@@ -29,7 +29,7 @@
   when: runai_gw_crds_apply is not skipped
 
 - name: Look for existing KGateway releases
-  ansible.builtin.command: "{{ runai_helm }} list --all --namespace {{ runai_gateway_controller_namespace }} --output json"
+  ansible.builtin.command: "{{ helm_bin }} list --all --namespace {{ runai_gateway_controller_namespace }} --output json"
   register: runai_gw_helm_before
   changed_when: false
   check_mode: false

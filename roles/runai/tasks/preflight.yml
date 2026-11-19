@@ -6,7 +6,7 @@
   check_mode: false
 
 - name: List installed Helm releases
-  ansible.builtin.command: "{{ runai_helm }} list --all-namespaces --output json"
+  ansible.builtin.command: "{{ helm_bin }} list --all-namespaces --output json"
   register: runai_all_releases
   changed_when: false
   check_mode: false

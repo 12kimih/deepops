@@ -60,6 +60,9 @@ k8s_nfs_client_provisioner: true
 k8s_deploy_nfs_server: true
 k8s_nfs_mkdir: true
 k8s_nfs_export_path: /export/deepops_nfs
+# The in-cluster registry's name (playbooks/k8s-cluster/container-registry.yml): its
+# ingress host and the name every node resolves to the control plane.
+container_registry_hostname: registry.local
 # Component playbooks run on their own
 # NVIDIA MIG Manager (playbooks/nvidia-software/nvidia-mig.yml,
 # https://github.com/NVIDIA/mig-parted): the profile; the site's mig-parted config

@@ -11,3 +11,4 @@ galaxy_info:
       versions: [jammy, noble]
 dependencies:
   - role: proxy_defaults  # proxy_env
+  - role: deepops_paths  # helm_bin

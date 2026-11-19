@@ -24,5 +24,4 @@
 # release when it exists and otherwise does nothing; CRDs and persistent volumes the
 # chart created stay (Helm keeps them, and so does this role).
 helm_release: {}
-helm_bin: /usr/local/bin/helm
 helm_timeout: "20m"

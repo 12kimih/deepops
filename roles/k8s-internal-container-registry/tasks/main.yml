@@ -1,32 +1,31 @@
 ---
-# Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
-# module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
-
-- name: Add the docker-registry helm repository
-  ansible.builtin.command: "{{ helm_cmd }} repo add {{ container_registry_repo_name }} {{ container_registry_chart_location }}"
-  changed_when: false
-
-- name: Update helm repos
-  ansible.builtin.command: "{{ helm_cmd }} repo update"
-  changed_when: false
-
-- name: Create the directory for values.yaml
-  ansible.builtin.file:
-    path: "{{ container_registry_values_path | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Copy values.yaml into place
-  ansible.builtin.template:
-    src: "{{ container_registry_values_template }}"
-    dest: "{{ container_registry_values_path }}"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-
-- name: Install container-registry
-  ansible.builtin.command: "{{ helm_cmd }} upgrade --install -f {{ container_registry_values_path }} --version {{ container_registry_version }} --create-namespace
-    --namespace {{ container_registry_namespace }} {{ container_registry_installed_name }} {{ container_registry_chart_name }}"
-  changed_when: false
+- name: Install the in-cluster container registry
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ container_registry_installed_name }}"
+      namespace: "{{ container_registry_namespace }}"
+      chart: "{{ container_registry_chart_name }}"
+      repo: "{{ container_registry_chart_location }}"
+      version: "{{ container_registry_version }}"
+      helm_values:
+        persistence: >-
+          {{ {'enabled': container_registry_persistence_enabled | bool,
+              'deleteEnabled': container_registry_delete_enabled | bool}
+             | combine({'size': container_registry_storage_size}
+                       if container_registry_persistence_enabled | bool else {}) }}
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+        service: >-
+          {{ {'type': container_registry_service_type}
+             | combine({'nodePort': container_registry_node_port | int}
+                       if container_registry_service_type == 'NodePort' else {}) }}
+        ingress:
+          enabled: "{{ container_registry_ingress_enabled | bool }}"
+          hosts: ["{{ container_registry_hostname }}"]
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/ssl-redirect: "false"
+            nginx.ingress.kubernetes.io/rewrite-target: /
+            nginx.ingress.kubernetes.io/proxy-body-size: "{{ container_registry_ingress_size }}"

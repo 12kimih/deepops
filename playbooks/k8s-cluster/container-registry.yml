@@ -5,14 +5,15 @@
     - name: Install helm chart for container registry
       ansible.builtin.include_role:
         name: k8s-internal-container-registry
+        public: true  # its own settings reach the helm_release role it includes
       run_once: true
   tags:
     - container-registry
 
 - hosts: kube_node
   become: true
-  vars:
-    container_registry_hostname: registry.local
+  roles:
+    - role: deploy_defaults  # container_registry_hostname
   tasks:
     - name: Set registry hostname in /etc/hosts
       ansible.builtin.lineinfile:

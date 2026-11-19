@@ -9,7 +9,7 @@ gpu_operator_helm_repo: "https://helm.ngc.nvidia.com/nvidia"
 gpu_operator_chart_name: "gpu-operator"
 gpu_operator_release_name: "nvidia-gpu-operator"
 gpu_operator_nvaie_helm_repo: "https://helm.ngc.nvidia.com/nvaie"
-gpu_operator_nvaie_chart_name: "nvaie/gpu-operator"
+gpu_operator_nvaie_chart_name: "gpu-operator"
 
 # NVAIE GPU Operator may require different version, check NGC enterprise collection.
 # upstream: helm https://helm.ngc.nvidia.com/nvidia gpu-operator

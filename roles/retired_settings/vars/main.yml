@@ -35,6 +35,12 @@ retired_settings:
   trident_helm_repo_name: trident_helm_repo_url (installed with helm --repo, no named repository) in roles/netapp-trident
   trident_helm_chart_name: trident_helm_chart (the chart name; the repository is trident_helm_repo_url) in roles/netapp-trident
   k8s_nfs_client_repo_name: k8s_nfs_client_helm_repo (installed with helm --repo, no named repository) in roles/nfs-client-provisioner
+  runai_helm: helm_bin in roles/deepops_paths (the one Helm client path)
+  runai_helm_timeout: helm_timeout in roles/helm_release (every release waits as long)
+  helm_cmd: helm_bin in roles/deepops_paths (the one Helm client path)
+  container_registry_repo_name: container_registry_chart_location (installed with helm --repo, no named repository) in roles/k8s-internal-container-registry
+  container_registry_values_template: the chart values are set in roles/k8s-internal-container-registry/tasks/main.yml from the container_registry_* settings
+  container_registry_values_path: nothing (the values travel on stdin, never on disk; roles/helm_release)
   k8s_nfs_client_chart_name: k8s_nfs_client_chart (the chart name; the repository is k8s_nfs_client_helm_repo) in roles/nfs-client-provisioner
   sriov_resources: nvidia_network_operator_interfaces in roles/nvidia-network-operator (roles/roce_backend is retired; NVIDIA Network Operator manages SR-IOV/RDMA)
   roce_backend_num_vf: nvidia_network_operator_num_vf in roles/nvidia-network-operator (roles/roce_backend is retired)

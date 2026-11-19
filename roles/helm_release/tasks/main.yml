@@ -26,7 +26,7 @@
 
 - name: "Remove the release ({{ helm_release.release }})"
   ansible.builtin.command:
-    argv: ["{{ helm_bin }}", uninstall, "{{ helm_release.release }}", --namespace, "{{ helm_release.namespace }}", --wait]
+    argv: ["{{ helm_bin }}", uninstall, "{{ helm_release.release }}", --namespace, "{{ helm_release.namespace }}", --wait, --timeout, "{{ helm_timeout }}"]
   environment: "{{ proxy_env }}"
   changed_when: true
   when:

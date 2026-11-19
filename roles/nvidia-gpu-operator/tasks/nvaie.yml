@@ -55,28 +55,37 @@
   changed_when: "'unchanged' not in gpu_operator_registry_secret.stdout"
   no_log: true
 
-# Drives the helm CLI directly. This predates kubernetes.core.helm; the Ansible helm
-# module bug it worked around (https://github.com/ansible/ansible/pull/57897) is long fixed.
-- name: Install NVAIE gpu-operator helm repo
-  ansible.builtin.command:
-    argv: [/usr/local/bin/helm, repo, add, --force-update, nvaie, "{{ gpu_operator_nvaie_helm_repo }}",
-           "--username={{ gpu_operator_registry_username }}", --password-stdin]
-    stdin: "{{ gpu_operator_registry_password }}"
-  changed_when: false
-  no_log: true
-
-- name: Update helm repos
-  ansible.builtin.command: /usr/local/bin/helm repo update
-  changed_when: false
-
-# Installs into the gpu_operator_namespace (created if missing), not the default namespace.
+# Installs into gpu_operator_namespace, from the NGC repository that needs the
+# registry login (the helm_release role passes it on stdin, never on the command line).
 # https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html
-- name: Install nvidia gpu operator
-  ansible.builtin.command: /usr/local/bin/helm upgrade --install "{{ gpu_operator_release_name }}" "{{ gpu_operator_nvaie_chart_name }}" --version "{{
-    gpu_operator_chart_version }}" --namespace "{{ gpu_operator_namespace }}" --create-namespace --set driver.licensingConfig.configMapName=licensing-config
-   --set driver.licensingConfig.nlsEnabled="{{ gpu_operator_nvaie_nls_enabled }}" --set driver.imagePullSecrets[0]="registry-secret" --set
-    operator.imagePullSecrets[0]="registry-secret" --set driver.repository="{{ gpu_operator_driver_registry }}" --set driver.version="{{
-    gpu_operator_driver_version }}" --set mig.strategy="{{ k8s_gpu_mig_strategy }}" --set driver.enabled="{{ gpu_operator_enable_driver }}" --set
-    toolkit.enabled="{{ gpu_operator_enable_toolkit }}" --set dcgm.enabled="{{ gpu_operator_enable_dcgm }}" --set migManager.enabled="{{
-    gpu_operator_enable_migmanager }}" --wait
-  changed_when: false
+- name: Install the NVIDIA GPU Operator (NVIDIA AI Enterprise)
+  ansible.builtin.include_role:
+    name: helm_release
+  vars:
+    helm_release:
+      release: "{{ gpu_operator_release_name }}"
+      namespace: "{{ gpu_operator_namespace }}"
+      chart: "{{ gpu_operator_nvaie_chart_name }}"
+      repo: "{{ gpu_operator_nvaie_helm_repo }}"
+      repo_username: "{{ gpu_operator_registry_username }}"
+      repo_password: "{{ gpu_operator_registry_password }}"
+      version: "{{ gpu_operator_chart_version }}"
+      helm_values:
+        operator:
+          imagePullSecrets: [registry-secret]
+        driver:
+          licensingConfig:
+            configMapName: licensing-config
+            nlsEnabled: "{{ gpu_operator_nvaie_nls_enabled | bool }}"
+          imagePullSecrets: [registry-secret]
+          repository: "{{ gpu_operator_driver_registry }}"
+          version: "{{ gpu_operator_driver_version }}"
+          enabled: "{{ gpu_operator_enable_driver | bool }}"
+        mig:
+          strategy: "{{ k8s_gpu_mig_strategy | lower }}"
+        toolkit:
+          enabled: "{{ gpu_operator_enable_toolkit | bool }}"
+        dcgm:
+          enabled: "{{ gpu_operator_enable_dcgm | bool }}"
+        migManager:
+          enabled: "{{ gpu_operator_enable_migmanager | bool }}"
