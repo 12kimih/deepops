@@ -1,15 +1,16 @@
 ---
-# Download + install the toolkits, then generate one Lmod modulefile per
-# installed version. Runs only on the software-tree host.
+# Download + install the toolkits in cuda_versions, write one Lmod modulefile per CUDA
+# minor, and remove what left the range. Runs only on the software-tree host. This role
+# owns cuda_install_root and cuda_modroot/cuda: every version-named entry there is its.
 
-- name: Assert the install host is x86_64 (CUDA runfiles are x86_64 only)
+- name: Assert the install host is x86_64 (the catalog holds the x86_64 runfiles)
   ansible.builtin.assert:
     that: ansible_facts.architecture == "x86_64"
-    fail_msg: "CUDA runfiles are x86_64 only (this host is {{ ansible_facts.architecture }})."
+    fail_msg: "The CUDA catalog holds x86_64 runfiles (this host is {{ ansible_facts.architecture }})."
 
 # A toolkit runs on a driver of its own CUDA major or newer (minor version
-# compatibility within a major): one the nodes' driver branch cannot run is refused
-# here, not discovered by a user's first job.
+# compatibility within a major). cuda_versions stops at the driver's major by itself;
+# a site's own list that goes further is refused here, not by a user's first job.
 - name: Refuse toolkits the nodes' driver cannot run
   ansible.builtin.assert:
     that:
@@ -24,6 +25,15 @@
   loop: "{{ cuda_versions }}"
   loop_control:
     label: "{{ item.version }}"
+
+- name: Say which catalog releases the driver keeps out
+  ansible.builtin.debug:
+    msg: >-
+      Not installed until the driver branch serves their CUDA major:
+      {{ _too_new | map(attribute='version') | join(', ') }}
+  vars:
+    _too_new: "{{ cuda_releases | rejectattr('version', 'version', (nvidia_driver_cuda_major | int + 1) ~ '.0', '<') | list }}"
+  when: _too_new | length > 0
 
 - name: Ensure the CUDA install, module, and cache directories exist
   ansible.builtin.file:
@@ -52,7 +62,7 @@
     name: download
   vars:
     download_url: "{{ cuda_base_url }}/{{ item.version }}/local_installers/{{ item.runfile }}"
-    download_checksum: "{{ cuda_runfile_checksums[item.runfile] | default('') }}"
+    download_checksum: "{{ item.checksum }}"
     download_dest: "{{ cuda_cache_dir }}/{{ item.runfile }}"
   loop: "{{ cuda_to_install }}"
   loop_control:
@@ -78,33 +88,52 @@
   loop_control:
     label: "{{ item.version }}"
 
-- name: Re-probe installed toolkits (post-install, for modulefile generation)
-  ansible.builtin.stat:
-    path: "{{ cuda_install_root }}/{{ item.version }}/bin/nvcc"
+# Named by minor: a patch release changes what cuda/12.4 points at, never the name a
+# job script loads.
+- name: Generate one Lmod modulefile per CUDA minor
+  ansible.builtin.template:
+    src: "cuda.lua.j2"
+    dest: "{{ cuda_modroot }}/cuda/{{ item.version | regex_replace('\\.[0-9]+$', '') }}.lua"
+    mode: "0644"
   loop: "{{ cuda_versions }}"
   loop_control:
     label: "{{ item.version }}"
-  register: cuda_nvcc_post
+  when: not ansible_check_mode or item not in cuda_to_install
 
-- name: Record which toolkits are installed
-  ansible.builtin.set_fact:
-    cuda_installed: "{{ cuda_nvcc_post.results | selectattr('stat.exists') | map(attribute='item') | list }}"
-
-- name: Generate one Lmod modulefile per installed toolkit
+# Every patch level loads its minor (cuda/12.4.1 is cuda/12.4), and a bare `module
+# load cuda` takes the newest. https://lmod.readthedocs.io/en/latest/060_locating.html
+- name: Write the module aliases and default
   ansible.builtin.template:
-    src: "cuda.lua.j2"
-    dest: "{{ cuda_modroot }}/cuda/{{ item.version }}.lua"
+    src: "modulerc.lua.j2"
+    dest: "{{ cuda_modroot }}/cuda/.modulerc.lua"
     mode: "0644"
-  loop: "{{ cuda_installed }}"
-  loop_control:
-    label: "{{ item.version }}"
 
-# The modules directory is shared with every other module tree; a version dropped from
-# cuda_versions leaves its modulefile behind unless recorded.
-- name: Remove modulefiles of toolkits no longer installed
-  ansible.builtin.include_role:
-    name: recorded_files
+# What left the range goes: a minor below cuda_toolkit_oldest, a previous patch of a
+# minor, and their modulefiles (a running job that loaded one loses it, so change the
+# range in a maintenance window). A toolkit only the driver keeps out loses its
+# modulefile but keeps its tree: a lowered driver branch must not delete software.
+- name: Find what the software tree holds
+  ansible.builtin.find:
+    paths: ["{{ cuda_install_root }}", "{{ cuda_modroot }}/cuda"]
+    file_type: any
+    patterns: ['^[0-9]+\.[0-9]+(\.[0-9]+)?(\.lua)?$']
+    use_regex: true
+  register: cuda_present
+
+- name: Remove toolkits and modulefiles no longer offered
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cuda_present.files | map(attribute='path') | reject('in', _keep) | list }}"
   vars:
-    recorded_files_record: /var/lib/deepops/recorded/cuda-modulefiles
-    recorded_files_names: "{{ cuda_installed | map(attribute='version') | map('regex_replace', '$', '.lua') | list }}"
-    recorded_files_dirs: ["{{ cuda_modroot }}/cuda"]
+    _keep: >-
+      {{ (cuda_releases | selectattr('version', 'version', cuda_toolkit_oldest, '>=') | map(attribute='version')
+          | map('regex_replace', '^', cuda_install_root ~ '/') | list)
+         + (cuda_versions | map(attribute='version') | map('regex_replace', '\.[0-9]+$', '.lua')
+            | map('regex_replace', '^', cuda_modroot ~ '/cuda/') | list) }}
+
+# The record the modulefiles were tracked with before the role owned the directory.
+- name: Remove the retired modulefile record
+  ansible.builtin.file:
+    path: /var/lib/deepops/recorded/cuda-modulefiles
+    state: absent
