@@ -17,14 +17,18 @@ DeepOps Testing, CI/CD, and Validation
 yamllint, `ansible-lint` with the project [`.ansible-lint`](../../.ansible-lint)
 configuration, playbook syntax checks and the unit suites. CI runs it in
 [checks.yml](../../.github/workflows/checks.yml), and the pre-commit hook runs
-`scripts/check.sh --fast` on each commit. To skip roles that have known issues or are
+`scripts/check.sh --fast` on each commit. The hook
+([`scripts/deepops/pre-commit.sh`](../../scripts/deepops/pre-commit.sh)) runs the
+checks on a copy of what is staged, in a throwaway worktree: the working tree is never
+stashed or touched (a shared clone's other edits stay put), nothing untracked in it
+counts, and a fix a hook would make is shown for you to apply. To skip roles that have known issues or are
 still in development, list them under `exclude_paths` in `.ansible-lint`.
 
 ### Secrets and site data
 
 [`scripts/deepops/sensitive_guard.py`](../../scripts/deepops/sensitive_guard.py) keeps
-secrets and site-specific facts out of history. `pre-commit install` (run by
-`scripts/setup.sh`) wires it into three hooks: staged lines (pre-commit), the commit
+secrets and site-specific facts out of history. `scripts/setup.sh` wires it into
+three hooks: staged lines (pre-commit), the commit
 message (commit-msg) and every commit a push would publish (pre-push).
 
 - Built-in rules catch generic secret formats (private keys, Slack, GitHub and AWS

@@ -11,22 +11,14 @@ set -euo pipefail
 tree="$(git write-tree)"
 site="$(git rev-parse --show-toplevel)"
 deepops="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)"
+# shellcheck source=scripts/deepops/export-tree.sh
+. "${deepops}/scripts/deepops/export-tree.sh"
 # The hook runs with this repository's GIT_DIR and index; the checks read deepops too.
-while IFS='=' read -r name _; do
-    unset "${name}"
-done < <(env | grep -E '^GIT_[A-Z_]+=' || true)
+clear_git_env
 
 work="$(mktemp -d)"
-cleanup() { git -C "${deepops}" worktree remove --force "${work}/deepops" >/dev/null 2>&1 || true; rmdir "${work}" 2>/dev/null || true; }
-trap cleanup EXIT
-git -C "${deepops}" worktree add --quiet --detach "${work}/deepops" HEAD
-# What the checks read but HEAD does not hold: the Kubespray checkout, Galaxy content.
-for path in submodules/kubespray roles/galaxy collections; do
-    if [ -e "${deepops}/${path}" ]; then
-        rmdir "${work}/deepops/${path}" 2>/dev/null || true  # the empty submodule directory
-        [ -e "${work}/deepops/${path}" ] || ln -s "${deepops}/${path}" "${work}/deepops/${path}"
-    fi
-done
+trap 'drop_tree "${deepops}" "${work}/deepops"; rm -rf "${work}"' EXIT
+export_tree "${deepops}" HEAD "${work}/deepops"
 
 cd "${work}/deepops"
 DEEPOPS_CONFIG_DIR="${site}" DEEPOPS_SITE_REV="${tree}" \
