@@ -1,0 +1,28 @@
+---
+# Read before the record drops it: only the host that installed the SDK removes the
+# tree, which every other host sees on shared storage.
+- name: Note whether this host installed the HPC SDK
+  ansible.builtin.set_fact:
+    hpcsdk_installed_here: "{{ 'hpcsdk' in (ansible_facts.ansible_local.deepops_components.components | default({})) }}"
+
+- name: Take the HPC SDK modulefiles tree off Lmod
+  ansible.builtin.include_role:
+    name: lmod
+    tasks_from: register
+  vars:
+    lmod_register_name: nvidia_hpc_sdk
+    lmod_register_paths: []
+
+- name: Remove the HPC SDK tree where it was installed from
+  ansible.builtin.file:
+    path: "{{ hpcsdk_install_dir }}"
+    state: absent
+  when: hpcsdk_installed_here | bool
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: hpcsdk
+    component_record_action: absent
+    component_record_items: "{{ hpcsdk_items }}"

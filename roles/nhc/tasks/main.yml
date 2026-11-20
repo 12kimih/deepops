@@ -1,4 +1,10 @@
 ---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: nhc_state in ['present', 'absent', 'kept']
+    fail_msg: "nhc_state must be present, absent or kept, not {{ nhc_state }}."
+    quiet: true
+
 - name: Gather OS specific variables
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
@@ -12,104 +18,6 @@
   tags:
     - always
 
-# An nhc on disk is not ours at this version (a distribution or hand install, or an
-# older nhc_version): only the record of our last build says so (roles/source_build).
-- name: Install build dependencies
-  ansible.builtin.package:
-    name: "{{ item }}"
-    state: present
-  with_items: "{{ nhc_build_deps }}"
-
-# Resolved here, in this role's scope: source_build evaluates its arguments in its own.
-- name: Describe the NHC build
-  ansible.builtin.set_fact:
-    nhc_source_build:
-      name: nhc
-      version: "{{ nhc_version }}"
-      url: "{{ nhc_src_url }}"
-      checksum: "{{ nhc_checksums[nhc_version] | default('') }}"
-      steps: "{{ [nhc_configure | split] + ([nhc_test | split] if nhc_run_test | bool else []) }}"
-      install: "{{ nhc_make | split }}"
-      record: "{{ nhc_build_record }}"
-      key: "{{ nhc_build_key }}"
-      installed: ["{{ nhc_program }}"]
-      force: "{{ nhc_force_reinstall }}"
-
-- name: Build and install NHC
-  ansible.builtin.include_role:
-    name: source_build
-  vars:
-    source_build: "{{ nhc_source_build }}"
-
-# Earlier versions built in, and kept, this tree.
-- name: Remove the build tree earlier versions kept
-  ansible.builtin.file:
-    path: /opt/deepops/build/nhc
-    state: absent
-
-- name: Add deepops checks to nhc
-  ansible.builtin.copy:
-    src: "deepops.nhc"
-    dest: "{{ nhc_config_dir }}/nhc/scripts/deepops.nhc"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-
-- name: Install NHC config
-  ansible.builtin.template:
-    src: "{{ nhc_config_template }}"
-    dest: "{{ nhc_config_dir }}/nhc/nhc.conf"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-
-- name: Create sysconfig dir
-  ansible.builtin.file:
-    path: "{{ nhc_sysconfig_dir }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Add sysconfig to use slurm
-  ansible.builtin.template:
-    src: "{{ nhc_sysconfig_template }}"
-    dest: "{{ nhc_sysconfig_dir }}/nhc"
-    owner: root
-    group: root
-    mode: "0644"
-
-# NHC picks its directories at run time (by version, distribution and its own path),
-# not from the build: a settings file it never reads loses NHC_RM, and a helper path
-# that does not exist means a failed check never drains the node. So the installed nhc
-# is asked where it looks, as root as slurmd runs it.
-- name: Read the version and directories the installed NHC uses
-  ansible.builtin.command:
-    argv: ["{{ nhc_program }}", -V, -V, -V]
-  register: nhc_info
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-  when: not (ansible_check_mode and source_build_built | bool)
-
-- name: Look for the helper that drains a node
-  ansible.builtin.stat:
-    path: "{{ nhc_libexec_dir }}/nhc/node-mark-offline"
-  register: nhc_offline_helper
-  when: nhc_info is not skipped
-
-- name: Refuse an NHC that is not this version or reads other directories
-  ansible.builtin.assert:
-    that:
-      - nhc_info.stdout is search('^LBNL NHC version ' ~ (nhc_version | regex_escape) ~ '$', multiline=True)
-      - "' SYSCONFIGDIR=\"' ~ nhc_sysconfig_dir ~ '\"' in nhc_info.stdout"
-      - "' LIBEXECDIR=\"' ~ nhc_libexec_dir ~ '\"' in nhc_info.stdout"
-      - "' CONFDIR=\"' ~ nhc_config_dir ~ '/nhc\"' in nhc_info.stdout"
-      - "' RM \"slurm\"' in nhc_info.stdout"
-      - "'OFFLINE_NODE=\"' ~ nhc_libexec_dir ~ '/nhc/node-mark-offline\"' in nhc_info.stdout"
-      - nhc_offline_helper.stat.executable | default(false)
-    fail_msg: >-
-      {{ nhc_program }} is not NHC {{ nhc_version }} reading {{ nhc_sysconfig_dir }}/nhc
-      (NHC_RM=slurm), {{ nhc_config_dir }}/nhc and helpers in {{ nhc_libexec_dir }}/nhc.
-      It reports: {{ nhc_info.stdout_lines | select('search', 'version|RM |DIR=|OFFLINE_NODE') | join(' ') }}
-    quiet: true
-  when: nhc_info is not skipped
+- name: "Make NHC {{ nhc_state }}"
+  ansible.builtin.include_tasks: "{{ nhc_state }}.yml"
+  when: nhc_state != 'kept'

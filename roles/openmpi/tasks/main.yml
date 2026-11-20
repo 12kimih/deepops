@@ -1,4 +1,10 @@
 ---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: openmpi_state in ['present', 'absent', 'kept']
+    fail_msg: "openmpi_state must be present, absent or kept, not {{ openmpi_state }}."
+    quiet: true
+
 - name: Gather os specific variables
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
@@ -11,120 +17,6 @@
   tags:
     - always
 
-- name: Configure alternative library path
-  ansible.builtin.template:
-    src: ld-openmpi.conf.j2
-    dest: /etc/ld.so.conf.d/openmpi.conf
-    mode: "0644"
-  register: updated_openmpi_ld
-
-- name: Update ld cache
-  ansible.builtin.command: ldconfig
-  when: updated_openmpi_ld.changed # noqa no-handler
-
-# The installed version names the tree to uninstall from, and is adopted once for an
-# install from before the build record (roles/build_record).
-- name: Check installed openmpi version
-  ansible.builtin.shell: "{{ openmpi_install_prefix }}/bin/ompi_info | grep 'Open MPI:' | awk '{print $3}'"
-  register: openmpi_info_version
-  failed_when: false
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-
-# An install from before the manifest (source_build) is uninstalled from the tree that
-# installed it, its version's or the single unversioned tree of older releases, before
-# the new release goes in; after that the manifest knows every file.
-- name: Look for the manifest of the installed openmpi
-  ansible.builtin.stat:
-    path: "{{ source_build_manifests }}/openmpi.json"
-  register: openmpi_manifest
-
-- name: Find the tree an install from before the manifest was built in
-  ansible.builtin.stat:
-    path: "{{ item }}/Makefile"
-    get_checksum: false
-  loop: >-
-    {{ ([source_build_root ~ '/openmpi-' ~ openmpi_info_version.stdout] if openmpi_info_version.stdout | length > 0 else [])
-       + [source_build_root ~ '/openmpi'] }}
-  register: openmpi_old_trees
-  when: not openmpi_manifest.stat.exists
-
-- name: Install openmpi build dependencies
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    name: "{{ openmpi_deps }}"
-  when: ansible_facts.distribution == 'Ubuntu'
-
-- name: Install openmpi build dependencies
-  ansible.builtin.dnf:
-    name: "{{ openmpi_deps }}"
-    state: present
-  when: ansible_facts.os_family == 'RedHat'
-
-# The distribution's Open MPI would shadow the build on PATH and the linker path.
-- name: Remove the distribution's Open MPI
-  ansible.builtin.include_role:
-    name: host_baseline
-    tasks_from: absent
-  vars:
-    host_baseline_absent_packages: "{{ openmpi_distro_packages[ansible_facts.os_family] }}"
-
-# Resolved here, in this role's scope: source_build evaluates its arguments in its own.
-- name: Describe the openmpi build
-  ansible.builtin.set_fact:
-    openmpi_source_build:
-      name: openmpi
-      version: "{{ openmpi_version }}"
-      url: "{{ openmpi_src_url }}"
-      checksum: "{{ openmpi_checksums[openmpi_version] | default('') }}"
-      steps: ["{{ openmpi_configure | split }}", [make, "-j{{ ansible_facts.processor_nproc }}"]]
-      record: "{{ openmpi_build_record }}"
-      key: "{{ openmpi_build_key }}"
-      installed: ["{{ openmpi_install_prefix }}/bin/ompi_info"]
-      force: "{{ openmpi_force_rebuild }}"
-      adopt: "{{ openmpi_info_version.stdout == openmpi_version }}"
-
-- name: Decide whether openmpi builds
-  ansible.builtin.include_role:
-    name: source_build
-    tasks_from: check
-  vars:
-    source_build: "{{ openmpi_source_build }}"
-
-- name: Uninstall an install from before the manifest, from its own tree
-  ansible.builtin.command:
-    argv: [make, -j, uninstall]
-    chdir: "{{ (openmpi_old_trees.results | selectattr('stat.exists') | first).item }}"
-  failed_when: false  # a tree whose configure failed has nothing to uninstall
-  changed_when: true
-  when:
-    - source_build_built | bool
-    - openmpi_old_trees.results | default([]) | selectattr('stat', 'defined') | selectattr('stat.exists') | list | length > 0
-  tags:
-    - uninstall
-
-- name: Build and install openmpi
-  ansible.builtin.include_role:
-    name: source_build
-    tasks_from: build
-  vars:
-    source_build: "{{ openmpi_source_build }}"
-
-# The trees earlier versions kept for `make uninstall`: the manifest replaces them.
-- name: Find the openmpi build trees earlier versions kept
-  ansible.builtin.find:
-    paths: "{{ source_build_root }}"
-    patterns: ["openmpi", "openmpi-*"]
-    file_type: directory
-  register: openmpi_trees
-
-- name: Remove them
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop: "{{ openmpi_trees.files | map(attribute='path') | list }}"
-
-- name: Run ldconfig to ensure libs are found
-  ansible.builtin.command: ldconfig
-  when: source_build_built | bool
+- name: "Make Open MPI {{ openmpi_state }}"
+  ansible.builtin.include_tasks: "{{ openmpi_state }}.yml"
+  when: openmpi_state != 'kept'

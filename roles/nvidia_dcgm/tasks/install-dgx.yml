@@ -29,7 +29,7 @@
     name: host_baseline
     tasks_from: absent
   vars:
-    host_baseline_absent_packages: "{{ dcgm_dgx_conflicting_pkgs }}"
+    host_baseline_absent_packages: "{{ _dcgm_dgx_conflicting_packages }}"
   when: dcgm_dgx_conflicting_pkgs | length > 0
 
 - name: Install the DCGM package shipped by DGX OS

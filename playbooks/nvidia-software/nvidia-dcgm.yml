@@ -1,18 +1,11 @@
 ---
-# DCGM talks to the GPUs through NVML, so it only makes sense on nodes that have
-# a GPU. Gate the role on GPU detection -- otherwise the dcgm service-start fails
-# on a CPU-only slurm-node (or the login/head node) and breaks the run. Mirrors
-# the GPU gate used by nvidia-driver.yml and nvidia-docker.yml.
-- hosts: "{{ hostlist | default('slurm-node') }}"
+# NVIDIA DCGM on the GPU nodes (roles/nvidia_dcgm). Every host it runs on converges to
+# deepops_components (present on slurm-node while install_dcgm is on, removed
+# elsewhere); a node without GPUs has nothing to install (roles/facts reports them).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Install custom facts module (provides ansible_facts.ansible_local.gpus.count)
-      ansible.builtin.include_role:
-        name: facts
-    - name: Configure DCGM on GPU nodes only
-      ansible.builtin.include_role:
-        name: nvidia_dcgm
-        public: true  # nvidia_versions (a dependency) supplies its values
-      when: ansible_facts.ansible_local['gpus']['count'] | int > 0
+    - role: facts
+    - role: nvidia_dcgm
+      dcgm_state: "{{ deepops_components.dcgm | component_phase(deepops_phase) }}"

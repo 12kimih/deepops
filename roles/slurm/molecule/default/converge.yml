@@ -5,8 +5,10 @@
     - name: "Build the Slurm packages"
       ansible.builtin.include_role:
         name: "slurm"
+        public: true  # the role needs its dependencies' values in what it includes (tests/include-scope)
         tasks_from: packages-build
 
     - name: "Include slurm"
       ansible.builtin.include_role:
         name: "slurm"
+        public: true  # the role needs its dependencies' values in what it includes (tests/include-scope)

@@ -1,10 +1,21 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Read the installed DCGM packages
+      ansible.builtin.command: dpkg-query -W -f='${Package} ${db:Status-Abbrev}\n' 'datacenter-gpu-manager*'
+      register: dcgm_pkgs
+      changed_when: false
+      failed_when: false
+
+    - name: Read the component record
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: record
+
+    - name: Assert DCGM is installed and recorded
       ansible.builtin.assert:
-        that: true
+        that:
+          - dcgm_pkgs.stdout_lines | select('search', '^datacenter-gpu-manager-4-cuda\\d+ ii') | list | length == 1
+          - "'dcgm' in (record.content | b64decode | from_json).components"

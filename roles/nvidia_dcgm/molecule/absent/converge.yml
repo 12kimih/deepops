@@ -1,0 +1,11 @@
+---
+# DCGM installed (prepare), then the component goes absent: every DCGM package and its
+# record entry go; a rerun changes nothing.
+- name: Converge
+  hosts: all
+  tasks:
+    - name: Remove DCGM
+      ansible.builtin.include_role:
+        name: nvidia_dcgm
+      vars:
+        dcgm_state: absent

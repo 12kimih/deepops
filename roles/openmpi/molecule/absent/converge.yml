@@ -1,0 +1,11 @@
+---
+# Open MPI built and installed (prepare), then the component goes absent: the build's
+# files go with its manifest, the library path with the record; a rerun changes nothing.
+- name: Converge
+  hosts: all
+  tasks:
+    - name: Remove Open MPI
+      ansible.builtin.include_role:
+        name: openmpi
+      vars:
+        openmpi_state: absent

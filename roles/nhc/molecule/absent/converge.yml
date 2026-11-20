@@ -1,0 +1,11 @@
+---
+# NHC installed (prepare), then the component goes absent: the build's files go with
+# its manifest, the configuration with the record; a rerun changes nothing.
+- name: Converge
+  hosts: all
+  tasks:
+    - name: Remove NHC
+      ansible.builtin.include_role:
+        name: nhc
+      vars:
+        nhc_state: absent

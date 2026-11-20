@@ -1,0 +1,9 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install Open MPI as a node has it
+      ansible.builtin.include_role:
+        name: openmpi
+      vars:
+        openmpi_state: present

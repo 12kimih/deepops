@@ -148,7 +148,14 @@ class IncludeScope(unittest.TestCase):
                     else:
                         needs_public.add(role)
         private_sites = []
-        for path in ansible_files():
+        # Molecule's playbooks include roles too, privately unless they say otherwise: a
+        # role that works only included publicly broke there first (nvidia_dcgm).
+        molecule = sorted(
+            path
+            for stage in ("converge", "prepare", "side_effect", "verify", "cleanup")
+            for path in ROOT.glob(f"roles/*/molecule/*/{stage}.yml")
+        )
+        for path in list(ansible_files()) + molecule:
             for task in tasks(path):
                 name, args = module(task)
                 if name == "include_role" and args.get("name") in needs_public and not args.get("public"):

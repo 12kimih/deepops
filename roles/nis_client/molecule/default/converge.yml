@@ -5,3 +5,4 @@
     - name: "Include nis_client"
       ansible.builtin.include_role:
         name: "nis_client"
+        public: true  # the role needs its dependencies' values in what it includes (tests/include-scope)

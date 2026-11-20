@@ -157,6 +157,34 @@ deepops_component_registry:
   nvidia_power_limit:
     rules:
       - {switch: "{{ slurm_cluster_configure_gpu_power_limit }}", group: slurm-node}
+  # The NVIDIA HPC SDK, installed by the first login node into shared storage; it
+  # registers with Lmod.
+  hpcsdk:
+    role: nvidia_hpc_sdk
+    rules:
+      - {switch: "{{ slurm_install_hpcsdk }}", group: slurm-login, first: true}
+  # enroot on login and compute hosts; pyxis's node setup needs it (its Slurm plugin
+  # follows the same switches in roles/slurm).
+  enroot:
+    rules:
+      - {switch: "{{ slurm_install_enroot }}", group: slurm-cluster}
+  pyxis:
+    rules:
+      - {switch: "{{ slurm_install_enroot and slurm_install_pyxis }}", group: slurm-cluster}
+    needs: [enroot]
+  # Open MPI built from source, where users build and run MPI programs.
+  openmpi:
+    rules:
+      - {switch: "{{ slurm_cluster_install_openmpi }}", group: slurm-cluster}
+  # Node Health Check on the compute nodes; slurmd's health check follows the switch.
+  nhc:
+    rules:
+      - {switch: "{{ slurm_install_nhc }}", group: slurm-node}
+  # NVIDIA DCGM on the GPU nodes (a node without GPUs gets nothing).
+  dcgm:
+    role: nvidia_dcgm
+    rules:
+      - {switch: "{{ install_dcgm }}", group: slurm-node}
   # Blocks tunnel services by name; absent hands DNS back to systemd-resolved's stub.
   dns_resolver:
     rules:

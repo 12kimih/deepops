@@ -1,0 +1,58 @@
+---
+# What the build installed goes with its manifest and build record (roles/source_build).
+# An install from before the manifest is uninstalled from the tree that built it, where
+# that tree is still there; the library path goes through the record.
+- name: Look for the manifest of the installed openmpi
+  ansible.builtin.stat:
+    path: "{{ source_build_manifests }}/openmpi.json"
+  register: openmpi_manifest
+
+- name: Find the tree an install from before the manifest was built in
+  ansible.builtin.find:
+    paths: "{{ source_build_root }}"
+    patterns: ["openmpi", "openmpi-*"]
+    file_type: directory
+  register: openmpi_trees
+  when: not openmpi_manifest.stat.exists
+
+- name: Uninstall an install from before the manifest, from its own tree
+  ansible.builtin.command:
+    argv: [make, -j, uninstall]
+    chdir: "{{ item.path }}"
+    removes: "{{ item.path }}/Makefile"
+  loop: "{{ openmpi_trees.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  failed_when: false  # a tree whose configure failed has nothing to uninstall
+
+- name: Remove the trees earlier versions kept
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ openmpi_trees.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+# Resolved here: source_build evaluates its arguments in its own scope.
+- name: Describe the openmpi build to remove
+  ansible.builtin.set_fact:
+    openmpi_source_build_absent: {name: openmpi, record: "{{ openmpi_build_record }}"}
+
+- name: Remove what the openmpi build installed
+  ansible.builtin.include_role:
+    name: source_build
+    tasks_from: absent
+  vars:
+    source_build: "{{ openmpi_source_build_absent }}"
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: openmpi
+    component_record_action: absent
+    component_record_items: "{{ openmpi_items }}"
+
+- name: Refresh the library cache without it
+  ansible.builtin.command: ldconfig
+  changed_when: false  # a cache of what is on disk

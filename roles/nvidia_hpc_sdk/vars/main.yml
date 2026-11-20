@@ -1,0 +1,6 @@
+---
+# What the component installs on this host, for its record (roles/component_record):
+# the profile scripts. The tree on shared storage goes by the record (tasks/absent.yml).
+hpcsdk_items:
+  - file:/etc/profile.d/z95_nvhpc.sh
+  - file:/etc/profile.d/z95_nvhpc.csh

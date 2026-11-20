@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read the DCGM packages and those only DCGM pulled in
+      ansible.builtin.command: >-
+        dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'datacenter-gpu-manager*' dcgmi libdcgm nv-hostengine
+      register: dcgm_pkgs
+      changed_when: false
+      failed_when: false
+
+    - name: Assert none of them is installed
+      ansible.builtin.assert:
+        that: dcgm_pkgs.stdout_lines | select('match', '.i ') | list | length == 0
+        fail_msg: "still installed: {{ dcgm_pkgs.stdout_lines | select('match', '.i ') | list }}"

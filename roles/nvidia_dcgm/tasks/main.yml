@@ -1,59 +1,14 @@
 ---
-# Through a transient unit: on a Slurm node the ssh session does not see the GPUs.
-- name: Read the GPUs' compute capability
-  ansible.builtin.command: systemd-run --wait --pipe --collect --quiet -- nvidia-smi --query-gpu=compute_cap --format=csv,noheader
-  register: dcgm_compute_caps
-  changed_when: false
-  failed_when: false
-  check_mode: false  # read-only
+- name: Check the component state
+  ansible.builtin.assert:
+    that: dcgm_state in ['present', 'absent', 'kept']
+    fail_msg: "dcgm_state must be present, absent or kept, not {{ dcgm_state }}."
+    quiet: true
 
-# Before the first reboot into a new driver nvidia-smi does not answer; the PCI device
-# IDs tell the generation then: every Turing and newer GPU has one from 0x1E00 up (the
-# first in NVIDIA's open kernel module support list is 0x1E02), every older one below.
-# Taking an unanswered query for "no old GPU" put the wrong build on Pascal and Volta.
-- name: Read the GPUs' PCI device IDs
-  ansible.builtin.command:
-    argv: [lspci, -n, -d, "10de:"]
-  register: dcgm_pci_ids
-  changed_when: false
-  check_mode: false  # read-only
-  when: dcgm_compute_caps.rc != 0
-
-- name: Use the CUDA 12 build for GPUs older than Turing on a CUDA 13 driver
-  ansible.builtin.set_fact:
-    _dcgm_cuda_major: "12"
-  vars:
-    _old_by_capability: "{{ dcgm_compute_caps.stdout_lines | map('float') | select('lt', 7.5) | list }}"
-    _old_by_id: >-
-      {{ dcgm_pci_ids.stdout | default('') | regex_findall('(?m)^[^ ]+ 030[02]: 10de:([0-9a-f]{4})')
-         | map('int', base=16) | select('lt', 7680) | list }}
+# DCGM talks to the GPUs through NVML: a node without them has nothing to install
+# (ansible_facts.ansible_local.gpus, roles/facts) and nothing it could have.
+- name: "Make DCGM {{ dcgm_state }}"
+  ansible.builtin.include_tasks: "{{ dcgm_state }}.yml"
   when:
-    - nvidia_driver_cuda_major | int >= 13
-    - (_old_by_capability if dcgm_compute_caps.rc == 0 else _old_by_id) | length > 0
-
-- name: Check for DGX
-  ansible.builtin.set_fact:
-    dcgm_is_dgx: true
-  when: ansible_facts.product_name is search("DGX")
-
-- name: DGX tasks
-  ansible.builtin.include_tasks: install-dgx.yml
-  when: dcgm_is_dgx
-
-- name: Ubuntu tasks
-  ansible.builtin.include_tasks: install-ubuntu.yml
-  when: (ansible_facts.distribution == "Ubuntu") and not dcgm_is_dgx
-
-- name: Red Hat family tasks
-  ansible.builtin.include_tasks: install-redhat.yml
-  when: (ansible_facts.os_family == "RedHat") and not dcgm_is_dgx
-
-# DCGM 4 ships nvidia-dcgm.service (dcgm.service was the 2.x/3.x name).
-- name: Start the nvidia-dcgm service
-  ansible.builtin.systemd:
-    daemon_reload: true
-    name: nvidia-dcgm.service
-    state: started
-    enabled: true
-  tags:
-    - molecule-notest
+    - dcgm_state != 'kept'
+    - dcgm_state == 'absent' or (ansible_facts.ansible_local.gpus.count | default(0) | int) > 0

@@ -1,0 +1,30 @@
+---
+# The hook, environment and mount files this role configured go (roles/recorded_files),
+# the RHEL kernel arguments come off (roles/host_baseline, kernel_args), then the
+# packages and the files of the record. The running sysctl values stay until a reboot.
+- name: Remove the enroot files this role configured
+  ansible.builtin.include_role:
+    name: recorded_files
+  vars:
+    recorded_files_record: "/var/lib/deepops/recorded/enroot-{{ item }}"
+    recorded_files_names: []
+    recorded_files_dirs: ["/etc/enroot/{{ item }}"]
+  loop: [environ.d, hooks.d, mounts.d]
+
+- name: Take the enroot kernel arguments off (RHEL/Rocky)
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+  vars:
+    host_baseline_kernel_args_owner: enroot
+    host_baseline_kernel_args: []
+  when: ansible_facts.os_family == 'RedHat'
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: enroot
+    component_record_action: absent
+    component_record_items: "{{ enroot_items }}"
+    component_record_exclusive_packages: "{{ enroot_packages }}"

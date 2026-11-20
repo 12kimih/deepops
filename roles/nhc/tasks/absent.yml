@@ -1,0 +1,22 @@
+---
+# What the build installed goes with its manifest and build record (roles/source_build),
+# then the configuration this role wrote, through the record.
+# Resolved here: source_build evaluates its arguments in its own scope.
+- name: Describe the NHC build to remove
+  ansible.builtin.set_fact:
+    nhc_source_build_absent: {name: nhc, record: "{{ nhc_build_record }}"}
+
+- name: Remove what the NHC build installed
+  ansible.builtin.include_role:
+    name: source_build
+    tasks_from: absent
+  vars:
+    source_build: "{{ nhc_source_build_absent }}"
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nhc
+    component_record_action: absent
+    component_record_items: "{{ nhc_items }}"

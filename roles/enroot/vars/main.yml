@@ -1,0 +1,7 @@
+---
+# What the component installs, for its record (roles/component_record). The files it
+# writes in environ.d, hooks.d and mounts.d are recorded by roles/recorded_files.
+enroot_items: >-
+  {{ (enroot_packages | map('regex_replace', '^', 'package:') | list)
+     + ['file:/etc/enroot/enroot.conf.d/90-deepops.conf', 'file:/etc/tmpfiles.d/enroot.conf',
+        'file:/etc/sysctl.d/90-enroot.conf', 'file:/etc/bash_completion.d/enroot.bash_completion'] }}

@@ -77,12 +77,6 @@ GATES = {
     "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
     # Components still to move (docs/deepops/component-state.md, batches), by owner.
     "slurm_cluster_install_nvidia_driver": "pending: deepops (batch 3; removal explicit)",
-    "install_dcgm": "pending: deepops (batch 3)",
-    "slurm_install_nhc": "pending: deepops (batch 3)",
-    "slurm_cluster_install_openmpi": "pending: deepops (batch 3)",
-    "slurm_install_hpcsdk": "pending: deepops (batch 3)",
-    "slurm_install_enroot": "pending: deepops (batch 3)",
-    "slurm_install_pyxis": "pending: deepops (batch 3)",
     # The GPU Operator's switch also gates the driver and the toolkit on Kubernetes nodes.
     "deepops_gpu_operator_enabled": "pending: deepops (the driver and toolkit gates, with batch 3)",
     "gpu_operator_preinstalled_nvidia_software": "pending: deepops (the driver and toolkit gates, with batch 3)",

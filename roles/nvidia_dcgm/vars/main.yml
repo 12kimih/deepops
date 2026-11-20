@@ -1,2 +1,8 @@
 ---
 dcgm_is_dgx: false
+# What the component installs, for its record (roles/component_record): every DCGM
+# package (the one for the driver's CUDA major and what it recommends) and its service.
+# Nothing on DGX OS, whose DCGM is the OS's.
+dcgm_items: >-
+  {{ [] if dcgm_is_dgx | bool
+     else ['package:datacenter-gpu-manager*', 'unit:nvidia-dcgm.service'] }}

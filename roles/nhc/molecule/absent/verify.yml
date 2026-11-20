@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Look for what NHC installed
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/usr/sbin/nhc, /etc/nhc/nhc.conf, /etc/nhc/scripts/deepops.nhc, /etc/sysconfig/nhc,
+             /var/lib/deepops/source-builds/nhc.json, /usr/libexec/nhc/node-mark-offline]
+      register: left
+
+    - name: Assert nothing of NHC is left
+      ansible.builtin.assert:
+        that: left.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: "left: {{ left.results | selectattr('stat.exists') | map(attribute='item') | list }}"

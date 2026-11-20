@@ -1,28 +1,16 @@
 ---
-# enroot and pyxis are installed on both login (slurm-master) and compute
-# (slurm-node) hosts so containers can be imported and launched from either.
-- hosts: slurm-cluster
-  become: true
-  roles:
-    - role: deploy_defaults
-    - role: enroot
-  tasks:
-    # enroot's NVIDIA hook runs nvidia-container-cli for every image that asks for GPUs
-    # (CUDA images all do); without the toolkit it fails "Command not found". Only the
-    # packages: Docker's runtime is container/nvidia-docker.yml's business.
-    - name: Read whether this host has GPUs
-      ansible.builtin.include_role:
-        name: facts
+# Run alone it brings the enroot it needs; a deploy imports enroot itself, before it
+# (and removes pyxis before enroot).
+- name: Install enroot
+  import_playbook: enroot.yml
+  when: deepops_phase == 'converge'
 
-    - name: Install the NVIDIA Container Toolkit for enroot's GPU hook
-      ansible.builtin.include_role:
-        name: nvidia_container_toolkit
-      vars:
-        nvidia_container_toolkit_configure_docker: false
-      when: ansible_facts.ansible_local['gpus']['count'] | int > 0
-
-- hosts: slurm-cluster
+# pyxis's node setup (roles/pyxis; its Slurm plugin and package are roles/slurm's).
+# Every host it runs on converges to deepops_components (present on slurm-cluster while
+# slurm_install_enroot and slurm_install_pyxis are on, removed elsewhere).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
     - role: pyxis
+      pyxis_state: "{{ deepops_components.pyxis | component_phase(deepops_phase) }}"
