@@ -2,7 +2,7 @@
 # Hosts that should be identical: the same running kernel, the same version of every
 # package two or more of them have, the same maintenance_consistency_sysctls, and each
 # running what it has installed (no pending reboot, the NVIDIA module loaded at its
-# installed version). Run on
+# installed version), and no two sharing /etc/machine-id. Run on
 # all the hosts at once (no serial); the comparison runs once, over every host in the
 # play, and fails listing each difference and where it is.
 - name: Read the running kernel  # facts may predate the maintenance reboot
@@ -23,9 +23,10 @@
   changed_when: false
   check_mode: false
 
-# Three lines: the loaded NVIDIA module, the one the running kernel would load next
+# Four lines: the loaded NVIDIA module, the one the running kernel would load next
 # ("" where none), the pending reboot (the packages that asked for it, "yes" when they
-# are not listed, "" when none). reboot_request.yml and dnf's upgrade write the marker.
+# are not listed, "" when none; reboot_request.yml and dnf's upgrade write the marker),
+# the machine ID.
 - name: Read whether this host runs what it has installed
   ansible.builtin.shell:
     cmd: |
@@ -37,6 +38,7 @@
       else
         echo
       fi
+      cat /etc/machine-id 2>/dev/null || echo
   register: maintenance_running
   changed_when: false
   check_mode: false
@@ -52,6 +54,7 @@
       nvidia_loaded: "{{ maintenance_running.stdout_lines[0] | default('') | trim }}"
       nvidia_on_disk: "{{ maintenance_running.stdout_lines[1] | default('') | trim }}"
       # the machine running Ansible: reboot.yml has just told its operator to finish it
+      machine_id: "{{ maintenance_running.stdout_lines[3] | default('') | trim }}"
       reboot_pending: "{{ '' if maintenance_reboot_self | default(false) | bool else maintenance_running.stdout_lines[2] | default('') | trim }}"
 
 - name: Compare the hosts
