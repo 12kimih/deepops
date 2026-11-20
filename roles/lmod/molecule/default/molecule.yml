@@ -13,5 +13,7 @@ provisioner:
   name: ansible
   ansible_args:
     - -vv
+scenario:
+  test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]
 verifier:
   name: ansible

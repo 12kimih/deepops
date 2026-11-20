@@ -35,3 +35,17 @@ lmod_shells:
     comment: "#"
     rc: {}
     hook: ""
+
+# Where Lmod's shell init is linked in.
+lmod_init_links:
+  - /etc/profile.d/z00_lmod.sh
+  - /etc/profile.d/z00_lmod.csh
+  - /etc/fish/conf.d/z00_lmod.fish
+# What this component installs, for its record (roles/component_record), besides the
+# install itself (roles/source_build's manifest) and the rc-file hooks (blocks, removed
+# by absent.yml). The module path file holds other roles' trees too (tasks_from:
+# register); they mean nothing without Lmod. Its build tools stay: other software may
+# need them.
+lmod_items: >-
+  {{ lmod_init_links | map('regex_replace', '^', 'file:') | list
+     + ['file:/etc/lmod/.modulespath', 'dir:/etc/lmod'] }}

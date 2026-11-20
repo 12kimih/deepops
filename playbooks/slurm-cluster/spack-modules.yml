@@ -1,10 +1,14 @@
 # Deploy the Spack package manager
 ---
-# Lmod and Spack's module tree on every node.
+# Lmod as the deploy has it (slurm_install_lmod, deepops_components).
+- name: Lmod on every node
+  import_playbook: lmod.yml
+  vars:
+    deepops_phase: install
+
+# Spack's module tree on every node's module path.
 - hosts: "{{ hostlist | default('all') }}"
   become: true
-  roles:
-    - lmod
   tasks:
     - name: Register the Spack module tree
       ansible.builtin.include_role:

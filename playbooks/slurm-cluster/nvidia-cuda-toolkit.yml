@@ -10,11 +10,11 @@
 # node. Trim roles/nvidia_cuda_toolkit/defaults/main.yml's cuda_versions (or override
 # it in config/group_vars/) to choose which toolkits to install.
 ---
-- name: Ensure Lmod is present on all nodes
-  hosts: "{{ hostlist | default('all') }}"
-  become: true
-  roles:
-    - lmod
+# Lmod as the deploy has it (slurm_install_lmod, deepops_components).
+- name: Lmod on every node
+  import_playbook: lmod.yml
+  vars:
+    deepops_phase: install
 
 - name: Register the site modulefiles tree with Lmod on all nodes
   hosts: "{{ hostlist | default('all') }}"

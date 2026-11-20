@@ -1,0 +1,189 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: lmod
+    component_record_action: begin
+    component_record_items: "{{ lmod_items }}"
+    component_record_version: "{{ lmod_version }}"
+
+- name: Read the OS-specific package names
+  ansible.builtin.include_vars: "{{ ansible_facts.os_family | lower }}.yml"
+
+- name: Add EPEL (RHEL family)
+  ansible.builtin.include_role:
+    name: package_repos
+    tasks_from: epel
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Install Lmod's prerequisites (Debian)
+  ansible.builtin.apt:
+    name: "{{ lmod_build_deps }}"
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+# EPEL's Lua packages expect CodeReady Builder for their dependencies: "powertools" on
+# EL8, "crb" on EL9+.
+- name: Install Lmod's prerequisites (RHEL family)
+  ansible.builtin.dnf:
+    name: "{{ lmod_build_deps }}"
+    state: present
+    enablerepo: "{{ 'powertools' if ansible_facts.distribution_major_version == '8' else 'crb' }}"
+  when: ansible_facts.os_family == "RedHat"
+
+# The distribution's older Lmod would shadow this one (its profile.d script defines
+# `module` too).
+- name: Remove the distribution's Lmod
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ lmod_distro_packages }}"
+
+# An Lmod on disk is not ours at this version (an older lmod_version, or none yet): only
+# the record of our last build says so (roles/source_build). "./configure
+# --prefix=/opt/apps" then "make install": the version directory plus the
+# <prefix>/lmod/lmod link to it. Resolved here, in this role's scope: source_build
+# evaluates its arguments in its own.
+- name: Describe the Lmod build
+  ansible.builtin.set_fact:
+    lmod_source_build:
+      name: lmod
+      version: "{{ lmod_version }}"
+      url: "{{ lmod_src_url }}"
+      checksum: "{{ lmod_checksums[lmod_version] | default('') }}"
+      steps: [[./configure, "--prefix={{ lmod_install_prefix }}"]]
+      record: "{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/.built-from"
+      key: "lmod {{ lmod_version }}: --prefix={{ lmod_install_prefix }}"
+      installed: ["{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/libexec/lmod"]
+      force: "{{ lmod_force_reinstall }}"
+
+- name: Build and install Lmod
+  ansible.builtin.include_role:
+    name: source_build
+  vars:
+    source_build: "{{ lmod_source_build }}"
+
+- name: Note whether Lmod was built
+  ansible.builtin.set_fact:
+    lmod_build: "{{ source_build_built }}"
+
+# Earlier versions built in, and kept, this tree.
+- name: Remove the build tree earlier versions kept
+  ansible.builtin.file:
+    path: "{{ deepops_dir }}/build/lmod"
+    state: absent
+
+# Root's: every user loads what is here.
+- name: Create the shared software and module trees
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ sm_software_path }}"
+    - "{{ sm_module_root }}"
+    - "{{ sm_module_path }}"
+
+- name: Register the module trees
+  ansible.builtin.include_tasks: register.yml
+  vars:
+    lmod_register_name: lmod
+    lmod_register_paths: "{{ lmod_module_paths }}"
+
+# The docs' shell integration (https://lmod.readthedocs.io/en/latest/030_installing.html):
+# init/profile and init/cshrc linked as z00_lmod.* define `module` in every login shell
+# (roles/login_shells makes each login read /etc/profile.d); the hooks below add the
+# shells that start without a login, in each installed shell's system rc file.
+- name: Link Lmod's shell init into /etc/profile.d
+  ansible.builtin.file:
+    src: "{{ lmod_install_prefix }}/lmod/lmod/init/{{ item.src }}"
+    dest: "/etc/profile.d/{{ item.dest }}"
+    state: link
+    force: true
+    follow: false
+  loop:
+    - {src: profile, dest: z00_lmod.sh}
+    - {src: cshrc, dest: z00_lmod.csh}
+  when: not ansible_check_mode or not lmod_build
+
+- name: Find the installed shells
+  ansible.builtin.stat:
+    path: "{{ item.value.binary }}"
+  loop: "{{ lmod_shells | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: lmod_shell_binaries
+
+- name: Note the installed shells
+  ansible.builtin.set_fact:
+    lmod_installed_shells: >-
+      {{ lmod_shell_binaries.results | selectattr('stat.exists') | map(attribute='item.key') | list }}
+
+# Each hook comes first in its file, before any early return for shells that are not
+# interactive: Debian's bash.bashrc returns at once in those, yet bash reads it for a
+# command run over ssh (`ssh node module load ...`), which must find `module` too. A
+# shell started from a session inherits the definition, or BASH_ENV, and skips the hook.
+- name: Define module in each installed shell that starts without a login
+  ansible.builtin.blockinfile:
+    path: "{{ lmod_shells[item].rc[ansible_facts.os_family] }}"
+    marker: "{{ lmod_shells[item].comment }} {mark} DeepOps: Lmod in every shell (roles/lmod)"
+    insertbefore: BOF
+    block: "{{ lmod_shells[item].hook }}"
+  loop: "{{ lmod_installed_shells }}"
+  when: lmod_shells[item].rc[ansible_facts.os_family] | default('') | length > 0
+
+# The hooks above replace these: they sat at the end of the file, after bash.bashrc's
+# early return.
+- name: Remove the earlier hooks
+  ansible.builtin.blockinfile:
+    path: "{{ item }}"
+    marker: "# {mark} DeepOps: Lmod (roles/lmod)"
+    state: absent
+  loop: [/etc/bash.bashrc, /etc/csh.cshrc]
+  when: ansible_facts.os_family == "Debian"
+
+- name: Link Lmod's fish init into /etc/fish/conf.d
+  ansible.builtin.file:
+    src: "{{ lmod_install_prefix }}/lmod/lmod/init/profile.fish"
+    dest: /etc/fish/conf.d/z00_lmod.fish
+    state: link
+    force: true
+    follow: false
+  when:
+    - "'fish' in lmod_installed_shells"
+    - not ansible_check_mode or not lmod_build
+
+# Superseded: the trees used to reach Lmod through LMOD_SITE_MODULEPATH snippets, which
+# only bash and csh login shells read; /etc/lmod/.modulespath covers every shell.
+- name: Remove the old module-path snippets
+  ansible.builtin.file:
+    path: "/etc/profile.d/{{ item }}"
+    state: absent
+  loop: [00-modulepath.sh, 00-modulepath.csh]
+
+# As a user would meet it: an unprivileged account with a clean environment, in every
+# way each installed shell starts (login, interactive, a command over ssh, a script).
+- name: Check every shell finds this Lmod
+  ansible.builtin.script:
+    cmd: >-
+      lmod-shell-check.py --version {{ lmod_version | quote }}
+      --shells {{ lmod_installed_shells | join(',') | quote }}
+      --ssh-reads-system-rc {{ (ansible_facts.os_family == 'Debian') | string | lower }}
+    executable: python3
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: not ansible_check_mode or not lmod_build
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: lmod
+    component_record_action: present
+    component_record_items: "{{ lmod_items }}"
+    component_record_version: "{{ lmod_version }}"
