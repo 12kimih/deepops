@@ -13,8 +13,8 @@ fail=0
 pass() { echo "ok   - $1"; }
 bad()  { echo "FAIL - $1"; fail=1; }
 
-run() {  # run <name> <extra ansible args...>; sets $out, $rc; fresh state per call unless STATE is set
-  local name="$1"; shift
+run() {  # run <label> <extra ansible args...>; sets $out, $rc; fresh state per call unless STATE is set
+  shift  # the label names the case where it is called
   : "${STATE:=$(mktemp -d)}"; export FAKE_STATE="$STATE"
   out="$(ansible-playbook -i localhost, "$HERE/site.yml" "$@" 2>&1)"; rc=$?
 }
@@ -48,13 +48,13 @@ P
 unset STATE
 
 # 4. kai refuses to run beside the Run:ai cluster chart (two KAIs)
-export FAKE_STATE="$(mktemp -d)"; echo '{"runai/runai-cluster":{"ns":"runai","chart":"runai-cluster-3.0.20","values":{}}}' > "$FAKE_STATE/releases.json"
+FAKE_STATE="$(mktemp -d)"; export FAKE_STATE; echo '{"runai/runai-cluster":{"ns":"runai","chart":"runai-cluster-3.0.20","values":{}}}' > "$FAKE_STATE/releases.json"
 STATE="$FAKE_STATE"; run two -e runai_mode=kai
 [ $rc -ne 0 ] && grep -q "ships its own KAI" <<<"$out" && pass "kai refused beside runai-cluster" || bad "two-KAI guard (kai)"
 unset STATE
 
 # 5. platform refuses when standalone KAI is present
-export FAKE_STATE="$(mktemp -d)"; echo '{"kai-scheduler/kai-scheduler":{"ns":"kai-scheduler","chart":"kai-scheduler-v0.18.5","values":{}}}' > "$FAKE_STATE/releases.json"
+FAKE_STATE="$(mktemp -d)"; export FAKE_STATE; echo '{"kai-scheduler/kai-scheduler":{"ns":"kai-scheduler","chart":"kai-scheduler-v0.18.5","values":{}}}' > "$FAKE_STATE/releases.json"
 STATE="$FAKE_STATE"; run two2 -e runai_mode=platform -e runai_platform_domain=runai.lab.test -e 'runai_platform_admin_password=Passw0rd!x'
 [ $rc -ne 0 ] && grep -q "standalone KAI" <<<"$out" && pass "platform refused beside standalone KAI" || bad "two-KAI guard (platform)"
 unset STATE
@@ -68,7 +68,7 @@ unset STATE
 STATE=""; FAKE_DRIVER_MAJOR=580 run frac -e runai_mode=kai -e runai_kai_gpu_fractioning=true
 [ $rc -ne 0 ] && grep -q "GPU Operator" <<<"$out" && pass "fractioning refused without GPU Operator v26.7.1" || bad "fractioning operator guard"
 unset STATE
-export FAKE_STATE="$(mktemp -d)"; echo '{"gpu-operator/nvidia-gpu-operator":{"ns":"gpu-operator","chart":"gpu-operator-v26.7.1","values":{}}}' > "$FAKE_STATE/releases.json"
+FAKE_STATE="$(mktemp -d)"; export FAKE_STATE; echo '{"gpu-operator/nvidia-gpu-operator":{"ns":"gpu-operator","chart":"gpu-operator-v26.7.1","values":{}}}' > "$FAKE_STATE/releases.json"
 STATE="$FAKE_STATE"; FAKE_DRIVER_MAJOR=580 run frac2 -e runai_mode=kai -e runai_kai_gpu_fractioning=true
 [ $rc -ne 0 ] && grep -q "r615" <<<"$out" && pass "fractioning refused on driver r580" || bad "fractioning driver guard"
 FAKE_DRIVER_MAJOR=615 run frac3 -e runai_mode=kai -e runai_kai_gpu_fractioning=true
@@ -98,8 +98,8 @@ grep -q "weak" <<<"$out" && bad "login value leaked into output" || pass "login 
 unset STATE
 
 # 10. exposure: address selection and Gateway API (fake helm/kubectl)
-gw() {  # gw <name> <extra ansible args...>
-  local name="$1"; shift
+gw() {  # gw <label> <extra ansible args...>; the label names the case where it is called
+  shift
   : "${STATE:=$(mktemp -d)}"; export FAKE_STATE="$STATE"
   out="$(ansible-playbook -i localhost, "$HERE/gateway.yml" "$@" 2>&1)"; rc=$?
 }

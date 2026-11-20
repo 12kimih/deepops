@@ -68,7 +68,7 @@ if [ -z "$pods_output" ]; then
 	exit 1
 fi
 
-string_array=($pods_output)
+read -r -d '' -a string_array <<< "$pods_output" || true  # every word, across lines
 number_pods=${#string_array[@]}
 
 # loop through all pod from each node

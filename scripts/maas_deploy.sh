@@ -35,8 +35,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # MAAS status codes
 STATUS_READY=4
 STATUS_DEPLOYED=6
-STATUS_DEPLOYING=9
-STATUS_RELEASING=12
 
 # Known test tags, cleared before applying a profile
 KNOWN_TEST_TAGS=(

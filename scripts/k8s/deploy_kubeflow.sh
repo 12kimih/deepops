@@ -111,7 +111,7 @@ function install_dependencies() {
   fi
 
   # Proxies
-  if [ ${http_proxy} -o ${https_proxy} -o ${no_proxy} ]; then
+  if [ -n "${http_proxy:-}" ] || [ -n "${https_proxy:-}" ] || [ -n "${no_proxy:-}" ]; then
       echo "Proxy detected. This could cause problems with a default Kubeflow installation."
       echo "Refer to the workaround here: https://github.com/kubeflow/kfctl/issues/237"
       echo "After applying the workaround run: KUBEFLOW_PROXY_WORKAROUND=true ./${0}"
@@ -129,7 +129,7 @@ function clone_repo() {
     exit 1
   fi
   mkdir -p "${KUBEFLOW_MANIFESTS_DEST}"
-  pushd "${KUBEFLOW_MANIFESTS_DEST}"
+  pushd "${KUBEFLOW_MANIFESTS_DEST}" || exit 1
   git clone -b "${KUBEFLOW_MANIFESTS_VERSION}" "${KUBEFLOW_MANIFESTS_URL}" .
 
   # Inject custom dex config
@@ -149,7 +149,7 @@ function clone_repo() {
   sed -i 's:VWA_APP_SECURE_COOKIES=true:VWA_APP_SECURE_COOKIES=false:' "${KUBEFLOW_MANIFESTS_DEST}/apps/volumes-web-app/upstream/base/params.env"
   sed -i 's:TWA_APP_SECURE_COOKIES=true:TWA_APP_SECURE_COOKIES=false:' "${KUBEFLOW_MANIFESTS_DEST}/apps/tensorboard/tensorboards-web-app/upstream/base/params.env"
 
-  popd
+  popd || exit 1
   echo "Kubeflow manifests repo:"
   echo "- Cloned from: ${KUBEFLOW_MANIFESTS_URL}"
   echo "- Git branch or tag: ${KUBEFLOW_MANIFESTS_VERSION}"
@@ -157,8 +157,8 @@ function clone_repo() {
 }
 
 function stand_up() {
-  pushd .
-  pushd "${KUBEFLOW_MANIFESTS_DEST}"
+  pushd . || exit 1
+  pushd "${KUBEFLOW_MANIFESTS_DEST}" || exit 1
 
   wget -O "${KUSTOMIZE}.tgz" "${KUSTOMIZE_URL}"
   tar -xvf "${KUSTOMIZE}.tgz" -C "${CONFIG_DIR}"
@@ -168,10 +168,10 @@ function stand_up() {
   timeout "${KUBEFLOW_DEPLOY_TIMEOUT}" bash -c -- "while ! ${KUSTOMIZE} build example | kubectl apply -f -; do sleep 10; done"
   if [ $? -eq 124 ]; then
     echo "Timed out attempt to deploy Kubeflow"
-    popd
+    popd || exit 1
     exit 1
   fi
-  popd
+  popd || exit 1
 }
 
 
@@ -264,7 +264,7 @@ function print_info() {
 }
 
 
-get_opts ${@}
+get_opts "$@"
 
 if [ ${KUBEFLOW_PRINT} ] && [ ${KUBEFLOW_DELETE} ]; then
   echo "Cannot specify print flag and delete flag"

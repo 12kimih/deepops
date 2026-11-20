@@ -10,7 +10,7 @@ import unittest
 
 ROOT = __import__("pathlib").Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import tracked  # noqa: E402
+from repo_scan import shell_scripts  # noqa: E402
 
 PIPEFAIL = re.compile(
     r"^\s*set\s+-[a-z]*o\s+pipefail|^\s*set\s+-o\s+pipefail|set -euo pipefail|set -uo pipefail", re.M
@@ -18,21 +18,10 @@ PIPEFAIL = re.compile(
 EARLY_READER = re.compile(r"\|\s*grep\s+-[A-Za-z]*[qm]")
 
 
-def shell_files():
-    for path in tracked("*.sh", "*.bash", "scripts/*", "tests/*", "roles/*/files/*", "roles/*/templates/*"):
-        try:
-            text = path.read_text()
-        except (UnicodeDecodeError, OSError):
-            continue
-        first = text.split("\n", 1)[0]
-        if path.suffix in (".sh", ".bash") or ("sh" in first and first.startswith("#!")):
-            yield path, text
-
-
 class Pipefail(unittest.TestCase):
     def test_no_early_reader_in_a_pipefail_script(self):
         offenders, scanned = [], 0
-        for path, text in shell_files():
+        for path, text in shell_scripts():
             if not PIPEFAIL.search(text):
                 continue
             scanned += 1

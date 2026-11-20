@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # edit the proxy details
 #
 # export http_proxy="http://10.0.2.5:3128"

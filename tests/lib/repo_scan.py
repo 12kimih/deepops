@@ -47,6 +47,25 @@ def tracked(*patterns):
     return [ROOT / n for n in sorted(filter(None, out.split("\0"))) if (ROOT / n).is_file()]
 
 
+def shell_scripts(templates=True):
+    """(path, text) of every tracked shell script: *.sh and *.bash, and files whose #!
+    line names sh, bash or dash (not zsh, csh or fish). templates=False leaves out role
+    templates, which only parse as shell once rendered."""
+    shebang = re.compile(r"#!\s*\S*?(?:/env\s+)?\S*?\b(?:ba|da)?sh\b")
+    other = re.compile(r"#!.*\b(?:zsh|t?csh|fish|python\d*|perl|ruby)\b")
+    for path in tracked("*", ":!submodules", ":!roles/galaxy"):
+        rel = path.relative_to(ROOT).as_posix()
+        if not templates and ("/templates/" in rel or rel.endswith(".j2")):
+            continue
+        try:
+            text = path.read_text()
+        except (UnicodeDecodeError, OSError):
+            continue
+        first = text.split("\n", 1)[0]
+        if path.suffix in (".sh", ".bash") or (shebang.match(first) and not other.match(first)):
+            yield path, text
+
+
 def _ours(path):
     rel = path.relative_to(ROOT).as_posix()
     return not rel.startswith("roles/galaxy/") and "/molecule/" not in rel
