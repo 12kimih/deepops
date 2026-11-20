@@ -131,12 +131,33 @@
   notify: Nvidia-persistenced unit changed
   when: nvidia_driver_persistenced | bool
 
-# The drop-in earlier versions of this role could write; the unit above replaces it.
+# The drop-in earlier versions of this role could write (override.conf, told by its
+# text); the unit above replaces it. A site's own drop-ins there stay, and so does the
+# directory while it holds any.
+- name: Read the persistence drop-in earlier versions wrote
+  ansible.builtin.slurp:
+    src: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
+  register: nvidia_driver_old_dropin
+  failed_when: false
+
 - name: Remove the retired persistence drop-in
   ansible.builtin.file:
-    path: /etc/systemd/system/nvidia-persistenced.service.d
+    path: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
     state: absent
+  when:
+    - nvidia_driver_old_dropin.content is defined
+    - >-
+      "ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode"
+      in (nvidia_driver_old_dropin.content | b64decode)
   notify: Nvidia-persistenced unit changed
+
+- name: Remove the drop-in directory when nothing else is in it
+  ansible.builtin.command:
+    argv: [rmdir, /etc/systemd/system/nvidia-persistenced.service.d]
+    removes: /etc/systemd/system/nvidia-persistenced.service.d
+  register: nvidia_driver_dropin_dir
+  failed_when: nvidia_driver_dropin_dir.rc != 0 and 'not empty' not in nvidia_driver_dropin_dir.stderr
+  changed_when: nvidia_driver_dropin_dir.rc == 0
 
 # Enabled now, whatever module runs: after a pending reboot it starts with the new one.
 - name: Enable the NVIDIA persistence daemon at boot
