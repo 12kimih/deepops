@@ -113,13 +113,14 @@
     - molecule-notest
 
 # Build the NIS database once. ypinit -m reads the list of NIS servers from stdin;
-# empty stdin (immediate EOF) accepts THIS host as the sole master. Idempotent via
-# `creates`. The last task of this role keeps the maps current afterwards.
-# https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypinit(8)
+# empty stdin (immediate EOF) accepts THIS host as the sole master. The evidence it
+# finished is a built map: ypinit makes /var/yp/<domain> before it builds them, so a
+# failed run leaves the directory and is tried again. The last task of this role keeps
+# the maps current afterwards. https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , ypinit(8)
 - name: Initialize the NIS master database (first run only)
   ansible.builtin.command:
     cmd: "{{ nis_server_ypinit }} -m"
-    creates: "/var/yp/{{ nis_domain }}"
+    creates: "/var/yp/{{ nis_domain }}/passwd.byname"
     stdin: ""
   tags:
     - molecule-notest

@@ -56,15 +56,19 @@
 
 # apache2 stays (a dependency other sites may use); undo what present changed in it:
 # Debian's stock ports.conf and default site.
-- name: Look for Apache
-  ansible.builtin.stat:
-    path: /etc/apache2/apache2.conf
-  register: open_ondemand_apache
+# On evidence, not on this run's removal: a run that failed after removing the packages
+# would otherwise leave the portal's ports.conf for good. The ports.conf present wrote
+# says so in its first line.
+- name: Read Apache's ports.conf
+  ansible.builtin.command:
+    argv: [grep, -qF, "Managed by DeepOps (roles/open_ondemand)", /etc/apache2/ports.conf]
+  register: open_ondemand_ports_ours
+  changed_when: false
+  failed_when: open_ondemand_ports_ours.rc > 2
+  check_mode: false  # read-only; --check needs the result
 
 - name: Give Apache back its stock ports and default site
-  when:
-    - open_ondemand_apache.stat.exists
-    - component_record_removed.values() | map('length') | sum > 0
+  when: open_ondemand_ports_ours.rc == 0
   block:
     - name: Restore the stock ports.conf
       ansible.builtin.copy:
