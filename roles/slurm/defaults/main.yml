@@ -15,8 +15,12 @@ slurm_src_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar
 # 26.05.6: sha256sum of the download, whose sha512 matches Fedora's sources file.
 slurm_checksums:
   "26.05.6": "sha256:386a0d624fa7c730cf4dfa9171bf6dc66b6816b5683242c5271879999a54a9a7"
-# The package version the shipped debian/changelog gives a release.
-slurm_deb_version: "{{ slurm_version }}-1"
+# The package version: the shipped debian/changelog's, with the revision of what
+# packages-build.yml changes in it. Raise slurm_deb_packaging with any change to what
+# the packages hold: the repository holds one build per version, so only a new version
+# builds again and moves the hosts to it (a same-release change, no upgrade playbook).
+slurm_deb_packaging: 2  # 2: slurm-smd-contribs
+slurm_deb_version: "{{ slurm_version }}-1+deepops{{ slurm_deb_packaging }}"
 # Rebuild the packages even when the repository already holds this version.
 slurm_force_rebuild: false
 # The most major releases one upgrade may cross. SchedMD allows three from 24.11 on
@@ -83,6 +87,13 @@ slurm_pyxis_container_scope: job
 slurm_pyxis_sbatch_support: 1
 slurm_pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 
+# The contribs the build adds as slurm-smd-contribs (SchedMD's debian/ has none of
+# them): the contribs/ directories it installs, the commands and manual pages packaged.
+slurm_deb_contribs:
+  dirs: [seff, sgather, sjobexit]
+  commands: [seff, sgather, sjobexitmod, sjstat, smail]
+  manpages: [man1/sgather.1]
+
 # Plugins the packages must contain: a missing build dependency drops its plugin
 # without failing the build, so the build checks for these.
 slurm_deb_required_plugins:
@@ -96,8 +107,9 @@ slurm_deb_required_plugins:
   - task_cgroup.so
 
 # Packages per kind of host, installed at slurm_deb_version. slurm-smd-dev is on
-# every host: the headers anything built against Slurm needs.
-slurm_packages_common: [slurm-smd, slurm-smd-client, slurm-smd-dev]
+# every host: the headers anything built against Slurm needs; slurm-smd-contribs
+# too: seff and the other contributed commands.
+slurm_packages_common: [slurm-smd, slurm-smd-client, slurm-smd-contribs, slurm-smd-dev]
 slurm_packages_controller: [slurm-smd-slurmctld, slurm-smd-slurmdbd]
 slurm_packages_compute: [slurm-smd-slurmd, slurm-smd-libpam-slurm-adopt, slurm-smd-libpmi2-0]
 # Hosts with neither slurmd nor slurmctld (login nodes): sackd fetches the
