@@ -4,6 +4,7 @@
 #   scripts/check.sh --fast   the quick subset pre-commit runs on each commit (style,
 #                             generated docs, linters, sensitive data, the unit suites
 #                             not marked .slow); CI runs everything
+#   scripts/check.sh --missing-tools   the packages of the tools it needs that are missing
 #
 # The checks are independent, so they run in parallel (CHECK_JOBS at a time, default
 # the CPU count): the run takes about as long as its slowest check, not their sum.
@@ -14,6 +15,19 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# The commands the full check runs from outside .venv, as <command>:<Debian/Ubuntu
+# package>. scripts/setup.sh and CI install the missing ones (--missing-tools prints
+# their packages); golang-go may be older than go.mod asks, go then fetches that toolchain.
+tools=(lua5.4:lua5.4 go:golang-go gofmt:golang-go)
+missing_tools() {
+    local tool seen=" "
+    for tool in "${tools[@]}"; do
+        command -v "${tool%%:*}" >/dev/null && continue
+        [[ "${seen}" == *" ${tool#*:} "* ]] || { seen+="${tool#*:} "; echo "${tool#*:}"; }
+    done
+}
+if [ "${1:-}" = "--missing-tools" ]; then missing_tools; exit 0; fi
 fast=false
 [ "${1:-}" = "--fast" ] && fast=true
 
@@ -75,6 +89,11 @@ for test_file in "${test_files[@]}"; do
 done
 
 if ! "${fast}"; then
+    mapfile -t missing < <(missing_tools)
+    if [ "${#missing[@]}" -gt 0 ]; then
+        echo "Missing tools; run scripts/setup.sh, or: sudo apt-get install ${missing[*]}" >&2
+        exit 2
+    fi
     step "unit tests (scripts/validation/tests)" "${isolated[@]}" "${python}" -m unittest discover -s scripts/validation/tests -q
     step "ansible-lint" ansible-lint -q
     for playbook in playbooks/slurm-cluster.yml playbooks/k8s-cluster.yml; do

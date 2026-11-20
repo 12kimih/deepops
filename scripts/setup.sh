@@ -108,6 +108,14 @@ fi
 command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
 cd "${REPO_DIR}" || exit 1
 uv sync --locked || { echo "ERROR: uv sync failed" >&2; exit 1; }
+# The tools scripts/check.sh runs from outside .venv, the missing ones (CI does the same).
+mapfile -t CHECK_DEB < <(scripts/check.sh --missing-tools)
+if [ "${#CHECK_DEB[@]}" -gt 0 ] ; then
+    case "$ID" in
+        ubuntu*|debian*) as_sudo apt-get -yq install --no-install-recommends "${CHECK_DEB[@]}" ;;
+        *) echo "NOTE: scripts/check.sh also needs (Debian names): ${CHECK_DEB[*]}" >&2 ;;
+    esac
+fi
 # git hooks live in the clone's common directory, shared by all its worktrees, and run
 # scripts from the tree that installed them; so only the main worktree installs them
 # (one run from a linked worktree pointed every worktree's hooks into a tree that could
