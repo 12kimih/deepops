@@ -1,14 +1,6 @@
 ---
-# Lookups stop asking SSSD, then it goes; libpam-sss's purge takes its PAM profile off.
-# RHEL keeps its authselect profile: nss_sss answers nothing once sssd is gone.
-- name: Stop reading accounts from SSSD (Debian)
-  ansible.builtin.include_role:
-    name: nsswitch
-  vars:
-    nsswitch_source: sss
-    nsswitch_state: absent
-  when: ansible_facts.os_family == 'Debian'
-
+# libpam-sss's purge takes its PAM profile off. RHEL keeps its authselect profile:
+# nss_sss answers nothing once sssd is gone.
 - name: Remove what this component installed
   ansible.builtin.include_role:
     name: component_record
@@ -17,3 +9,17 @@
     component_record_action: absent
     component_record_items: "{{ sssd_client_items }}"
     component_record_exclusive_packages: "{{ sssd_client_packages }}"
+
+# Lookups stop asking SSSD only where deepops ran it (its record, or what it just
+# removed): a host whose SSSD the site runs itself keeps its nsswitch.conf.
+- name: Stop reading accounts from SSSD (Debian)
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: sss
+    nsswitch_state: absent
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - >-
+      component_record_result.before | length > 0
+      or component_record_removed.values() | map('length') | sum > 0

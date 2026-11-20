@@ -55,6 +55,8 @@ jobs:
           # Molecule runs from the role, outside the reach of the repository's ansible.cfg.
           ANSIBLE_ROLES_PATH: "${{ github.workspace }}/${{ github.repository }}/roles/galaxy:${{ github.workspace }}/${{ github.repository }}/roles"
           ANSIBLE_COLLECTIONS_PATH: "${{ github.workspace }}/${{ github.repository }}/collections"
+          ANSIBLE_MODULE_UTILS: "${{ github.workspace }}/${{ github.repository }}/plugins/module_utils"
+          ANSIBLE_FILTER_PLUGINS: "${{ github.workspace }}/${{ github.repository }}/plugins/filter"
         run: |
           cd "${{ github.repository }}/roles/${{ matrix.deepops-role }}"
           uv run --locked molecule test

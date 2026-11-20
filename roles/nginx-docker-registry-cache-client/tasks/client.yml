@@ -1,0 +1,41 @@
+---
+- name: Create the docker.service drop-in directory
+  ansible.builtin.file:
+    path: "{{ nginx_docker_cache_docker_config_dest | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: nginx_docker_cache_dockerd_clients
+
+- name: Configure docker to use nginx proxy via http
+  ansible.builtin.template:
+    src: "{{ nginx_docker_cache_docker_config_src }}"
+    dest: "{{ nginx_docker_cache_docker_config_dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: nginx_docker_cache_dockerd_clients
+  notify:
+    - Restart docker
+
+# The site's own CA when it gave one, else the one the proxy made (read from the cache
+# host above).
+- name: Install the proxy's CA certificate
+  ansible.builtin.copy:
+    src: "{{ nginx_docker_cache_ca.crt if nginx_docker_cache_ca | length > 0 else omit }}"
+    content: "{{ omit if nginx_docker_cache_ca | length > 0 else nginx_docker_cache_live_ca.content | b64decode }}"
+    dest: "{{ _nginx_docker_cache_client_crt }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+# Debian builds its bundle from the certificates its list names.
+- name: Add the CA certificate to the list (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/ca-certificates.conf
+    line: "{{ nginx_docker_cache_ca_client_name }}"
+  when: ansible_facts.os_family == 'Debian'
+
+- name: Bring the trust store up to date
+  ansible.builtin.include_tasks: trust.yml

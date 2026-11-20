@@ -8,30 +8,17 @@
     component_record_items: >-
       {{ ['file:' ~ _nginx_docker_cache_client_crt, 'file:' ~ nginx_docker_cache_docker_config_dest] }}
 
-# The trust store is rebuilt from what is left, so the proxy's CA is trusted no more.
-- name: Forget the proxy's CA (Debian)
+# The proxy's CA leaves the trust store: off the list (Debian), and the store rebuilt
+# whenever it is older than its sources, also after a run that failed before rebuilding.
+- name: Drop the CA from the certificate list (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/ca-certificates.conf
+    line: "{{ nginx_docker_cache_ca_client_name }}"
+    state: absent
   when: ansible_facts.os_family == 'Debian'
-  block:
-    - name: Drop the CA from the certificate list
-      ansible.builtin.lineinfile:
-        path: /etc/ca-certificates.conf
-        line: "{{ nginx_docker_cache_ca_client_name }}"
-        state: absent
-      register: nginx_docker_cache_client_ca_line
 
-    - name: Rebuild the trust store
-      ansible.builtin.command: update-ca-certificates --fresh
-      changed_when: true
-      when: >-
-        nginx_docker_cache_client_ca_line is changed
-        or _nginx_docker_cache_client_crt in component_record_removed.file
-
-- name: Rebuild the trust store (RHEL family)
-  ansible.builtin.command: update-ca-trust
-  changed_when: true
-  when:
-    - ansible_facts.os_family == 'RedHat'
-    - _nginx_docker_cache_client_crt in component_record_removed.file
+- name: Bring the trust store up to date
+  ansible.builtin.include_tasks: trust.yml
 
 - name: Restart Docker without the proxy
   ansible.builtin.include_tasks: restart_docker.yml

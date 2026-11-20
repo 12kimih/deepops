@@ -6,3 +6,16 @@ _nginx_docker_cache_client_crt: >-
 nginx_docker_cache_client_items: >-
   {{ ['file:' ~ _nginx_docker_cache_client_crt]
      + (['file:' ~ nginx_docker_cache_docker_config_dest] if nginx_docker_cache_dockerd_clients | bool else []) }}
+
+# The system trust store of each family: the bundle its update command builds from the
+# certificate sources, and those sources (the certificate's directory, and Debian's
+# list). A bundle older than any source is out of date, whatever this run changed.
+_nginx_docker_cache_trust:
+  Debian:
+    bundle: /etc/ssl/certs/ca-certificates.crt
+    sources: ["{{ nginx_docker_cache_ca_client_crt_ubuntu | dirname }}", /etc/ca-certificates.conf]
+    update: [update-ca-certificates, --fresh]
+  RedHat:
+    bundle: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+    sources: ["{{ nginx_docker_cache_ca_client_crt_el | dirname }}"]
+    update: [update-ca-trust, extract]

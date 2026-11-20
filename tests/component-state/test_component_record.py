@@ -6,11 +6,19 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# The module imports the shared marks as Ansible ships module_utils to the host.
+marks_spec = importlib.util.spec_from_file_location(
+    "deepops_marks", ROOT / "plugins/module_utils/deepops_marks.py"
+)
+marks = importlib.util.module_from_spec(marks_spec)
+marks_spec.loader.exec_module(marks)
+sys.modules["ansible.module_utils.deepops_marks"] = marks
 spec = importlib.util.spec_from_file_location(
     "component_record", ROOT / "roles/component_record/library/component_record.py"
 )
@@ -58,12 +66,44 @@ class OwnerSets(unittest.TestCase):
                 self.assertEqual(run(rec, "c", "begin", *other)[0]["components"]["c"]["state"], "installing")
 
     def test_absent_adopts_what_an_unrecorded_host_has(self):
+        marked = {("file", "/etc/yp.conf")}
         rec, orphans, before = mod.apply(
-            EMPTY, "old", "absent", ["package:ypserv", "file:/etc/yp.conf"], "", {"ypserv"}
-        )
+            EMPTY, "old", "absent", ["package:ypserv", "file:/etc/yp.conf"], "", {"ypserv"},
+            lambda kind, ident: (kind, ident) in marked,
+        )  # fmt: skip
         self.assertEqual(
             (before, orphans["package"], orphans["file"], rec), ({}, ["ypserv"], ["/etc/yp.conf"], EMPTY)
         )
+
+    def test_without_evidence_a_sites_own_file_or_service_is_never_adopted(self):
+        # Docker's documented proxy drop-in name, a site's own: no mark, so it stays.
+        items = ["file:/etc/systemd/system/docker.service.d/http-proxy.conf", "unit:unbound"]
+        _, orphans, _ = mod.apply(EMPTY, "cache_client", "absent", items, "")
+        self.assertEqual((orphans["file"], orphans["unit"]), ([], []))
+
+    def test_containers_and_directories_follow_their_evidence(self):
+        items = [
+            "unit:docker.prometheus.service", "container:docker.prometheus.service",
+            "container:registry", "container:deepops-registry",
+            "file:/etc/prometheus/prometheus.yml", "dir:/etc/prometheus", "dir:/etc/site", "dir:/etc/deepops/ca",
+        ]  # fmt: skip
+        marked = {("unit", "docker.prometheus.service"), ("file", "/etc/prometheus/prometheus.yml")}
+        got = mod.adoptable(
+            items, set(), (), lambda kind, ident: (kind, ident) in marked or "deepops" in ident
+        )
+        self.assertEqual(
+            sorted(got),
+            sorted([
+                "unit:docker.prometheus.service", "container:docker.prometheus.service",
+                "container:deepops-registry", "file:/etc/prometheus/prometheus.yml",
+                "dir:/etc/prometheus", "dir:/etc/deepops/ca",
+            ]),
+        )  # fmt: skip
+
+    def test_a_recorded_item_needs_no_evidence(self):
+        rec, _, _ = run(EMPTY, "client", "present", ["file:/etc/generic.conf"])
+        _, orphans, _ = run(rec, "client", "absent", ["file:/etc/generic.conf"])
+        self.assertEqual(orphans["file"], ["/etc/generic.conf"])
 
     def test_a_mount_goes_with_its_last_owner_and_is_adopted(self):
         rec, orphans, _ = run(EMPTY, "client", "present", ["mount:/home", "mount:/sw"])

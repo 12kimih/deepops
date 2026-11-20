@@ -24,10 +24,12 @@
                 | reject('in', node_user_policy_linger_users) | list }}"
       changed_when: true
 
+# Only the rule this role wrote goes: a site's own of the same name stays.
 - name: Remove the lingering rule when the policy is off
-  ansible.builtin.file:
-    path: /etc/polkit-1/rules.d/50-linger.rules
-    state: absent
+  ansible.builtin.include_role:
+    name: marked_files
+  vars:
+    marked_files_absent: [/etc/polkit-1/rules.d/50-linger.rules]
   when: not node_user_policy_manage_linger | bool
 
 - name: Limit crontabs to the allowed users
@@ -43,8 +45,10 @@
       {% endfor %}
   when: node_user_policy_cron_users is not none
 
+# Only the list this role wrote goes: a hand-made allow list keeps closing cron.
 - name: Leave cron open when no allow list is set
-  ansible.builtin.file:
-    path: /etc/cron.allow
-    state: absent
+  ansible.builtin.include_role:
+    name: marked_files
+  vars:
+    marked_files_absent: [/etc/cron.allow]
   when: node_user_policy_cron_users is none

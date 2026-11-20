@@ -1,7 +1,8 @@
 {{ ansible_managed | comment }}
 # Loads the egress policy table (roles/egress_policy) before the network comes up.
 # `systemctl stop` removes the table (the policy is off until the next start);
-# `systemctl reload` replaces it in one transaction. Ordered after nftables.service
+# `systemctl reload` replaces it in one transaction. After each load the file's checksum
+# goes to {{ _egress_policy_loaded }}: what the kernel holds. Ordered after nftables.service
 # and restarted with it, because its `flush ruleset` would remove the table too.
 [Unit]
 Description=Egress policy nftables table
@@ -22,8 +23,11 @@ StandardInput=null
 ProtectSystem=full
 ProtectHome=true
 ExecStart=/usr/sbin/nft -f {{ _egress_policy_ruleset }}
+ExecStartPost=/bin/sh -c 'sha256sum {{ _egress_policy_ruleset }} > {{ _egress_policy_loaded }}'
 ExecReload=/usr/sbin/nft -f {{ _egress_policy_ruleset }}
+ExecReload=/bin/sh -c 'sha256sum {{ _egress_policy_ruleset }} > {{ _egress_policy_loaded }}'
 ExecStop=-/usr/sbin/nft delete table inet egress_policy
+ExecStopPost=-/bin/rm -f {{ _egress_policy_loaded }}
 
 [Install]
 WantedBy=sysinit.target
