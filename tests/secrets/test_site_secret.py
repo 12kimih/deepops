@@ -37,6 +37,18 @@ class Password(unittest.TestCase):
             got = run(path=f"{tmp}/p", kind="password", length=8, vault=False)
             self.assertTrue(got.get("failed"))
 
+    def test_a_size_limited_password(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "snmp-community"
+            got = run(path=str(path), kind="password", chars=18, vault=False)
+            self.assertTrue(got["changed"], got)
+            self.assertRegex(path.read_text(), r"^[A-Za-z0-9_-]{18}$")
+
+    def test_chars_floor_and_kind(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(run(path=f"{tmp}/a", kind="password", chars=15, vault=False).get("failed"))
+            self.assertTrue(run(path=f"{tmp}/b", kind="random", chars=18, vault=False).get("failed"))
+
 
 if __name__ == "__main__":
     unittest.main()

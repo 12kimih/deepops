@@ -1,0 +1,27 @@
+---
+# A suite left out of bmc_cipher_suites stops the role's own out-of-band calls
+# (chassis.yml, power.yml); the KCS interface this role configures through never uses
+# one, so a mistake stays repairable in-band.
+- name: Require the out-of-band cipher suite among those left open
+  ansible.builtin.assert:
+    that: (bmc_cipher_suite | int) in (bmc_cipher_suites | map('int'))
+    fail_msg: >-
+      bmc_cipher_suites {{ bmc_cipher_suites }} must hold bmc_cipher_suite
+      ({{ bmc_cipher_suite }}), which out-of-band power control uses.
+    quiet: true
+  tags:
+    - bmc
+
+# bmc_cipher_privs refuses a suite the BMC does not list.
+- name: Work out the cipher suite privileges
+  ansible.builtin.set_fact:
+    bmc_cipher_privs_want: "{{ bmc_lan_now | bmc_cipher_privs(bmc_cipher_suites) }}"
+  tags:
+    - bmc
+
+- name: Close every other cipher suite
+  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} cipher_privs {{ bmc_cipher_privs_want }}"
+  when: bmc_cipher_privs_want != bmc_lan_now.cipher_privs
+  changed_when: true
+  tags:
+    - bmc

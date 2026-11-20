@@ -25,9 +25,15 @@ options:
     choices: [random, password, gpg_signing]
     required: true
   length:
-    description: Bytes of randomness in a C(random) secret or a C(password).
+    description: Bytes of randomness in a C(random) secret or a C(password) (at least 32).
     type: int
     default: 1024
+  chars:
+    description:
+      - A C(password) of exactly this many URL-safe characters (6 bits each) instead of
+        I(length) bytes, for a field with a size limit (a BMC's SNMP community holds 18
+        bytes). At least 16 (96 bits).
+    type: int
   uid:
     description: User ID of a C(gpg_signing) key.
     type: str
@@ -65,10 +71,14 @@ import hashlib
 import os
 import secrets
 import shutil
+import string
 import subprocess
 import tempfile
 
 from ansible.module_utils.basic import AnsibleModule
+
+# The alphabet of secrets.token_urlsafe: a password made by chars matches one made by length.
+URLSAFE = string.ascii_letters + string.digits + "-_"
 
 
 def gpg_pair(module, uid):
@@ -135,6 +145,7 @@ def main():
             "path": {"type": "path", "required": True},
             "kind": {"type": "str", "required": True, "choices": ["random", "password", "gpg_signing"]},
             "length": {"type": "int", "default": 1024},
+            "chars": {"type": "int"},
             "uid": {"type": "str"},
             "public_path": {"type": "path"},
             "vault": {"type": "bool", "default": True},
@@ -175,14 +186,21 @@ def main():
             module.fail_json(msg=f"the copy read from {p['adopt_from']} does not match the agreed checksum")
         write_new(module, p["path"], data, mode, p["vault"])
         module.exit_json(changed=True, created=[], adopted=adopted)
+    if p["chars"] is not None and p["kind"] != "password":
+        module.fail_json(msg="chars is for a password only")
     if p["kind"] in ("random", "password"):
-        if p["length"] < 32:
+        if p["chars"] is not None:
+            if p["chars"] < 16:
+                module.fail_json(msg="chars must be at least 16 (96 bits)")
+            made = "".join(secrets.choice(URLSAFE) for _ in range(p["chars"])).encode()
+        elif p["length"] < 32:
             module.fail_json(msg="length must be at least 32 bytes")
-        made = (
-            secrets.token_bytes(p["length"])
-            if p["kind"] == "random"
-            else secrets.token_urlsafe(p["length"]).encode()
-        )
+        else:
+            made = (
+                secrets.token_bytes(p["length"])
+                if p["kind"] == "random"
+                else secrets.token_urlsafe(p["length"]).encode()
+            )
         write_new(module, p["path"], made, mode, p["vault"])
     else:
         secret, public = gpg_pair(module, p["uid"])

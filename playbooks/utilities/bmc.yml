@@ -5,6 +5,18 @@
 # Deliberately not imported by playbooks/slurm-cluster.yml: this writes firmware
 # settings rather than OS state, and a wrong bmc_ipaddr puts a BMC out of reach.
 # Run it when you mean to. See docs/deepops/bmc.md.
+- name: Create the BMC's missing secrets
+  hosts: "{{ hostlist | default('all') }}"
+  gather_facts: false
+  become: false
+  tags:
+    - always
+  tasks:
+    - name: Create the BMC's missing secret files
+      ansible.builtin.include_role:
+        name: bmc
+        tasks_from: secrets
+
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   roles:

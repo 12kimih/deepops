@@ -77,7 +77,9 @@
 
     - name: Read the BMC LAN channel
       ansible.builtin.include_tasks: lan_facts.yml
-      when: (bmc_ipaddr | length > 0) or (bmc_snmp_community | length > 0)
+      when: >-
+        (bmc_ipaddr | length > 0) or (bmc_snmp_community | length > 0)
+        or (bmc_auth_types | length > 0) or (bmc_cipher_suites | length > 0)
 
     - name: Configure the BMC LAN channel
       ansible.builtin.include_tasks: lan.yml
@@ -86,6 +88,14 @@
     - name: Set the BMC SNMP community
       ansible.builtin.include_tasks: snmp.yml
       when: bmc_snmp_community | length > 0
+
+    - name: Set the IPMI 1.5 authentication types
+      ansible.builtin.include_tasks: auth.yml
+      when: bmc_auth_types | length > 0
+
+    - name: Close the cipher suites not listed
+      ansible.builtin.include_tasks: ciphers.yml
+      when: bmc_cipher_suites | length > 0
 
     - name: Set the BMC password
       ansible.builtin.include_tasks: password.yml

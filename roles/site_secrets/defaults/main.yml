@@ -2,7 +2,8 @@
 # The secret files a site needs, each created on the controller when missing and never
 # replaced: {path, kind, vault (default true), mode (default "0600")}, where kind is
 # random (length bytes, default 1024), password (the same, printable: for a service's
-# configuration file) or gpg_signing (uid; public_path gets the armored public key,
+# configuration file; or chars, exactly that many characters, for a field with a size
+# limit) or gpg_signing (uid; public_path gets the armored public key,
 # never vaulted). A random secret may name adopt, the path where the play's
 # hosts install it: if any host holds that file, it is adopted (all copies must agree,
 # sha256) instead of generated, so a running cluster never gets a new key. Each owning
