@@ -108,6 +108,33 @@
         tasks_from: cuda
         public: true  # its source and keyring paths, for the build container
 
+    # Before the account had fixed IDs this role let the OS number it. It is local and
+    # owns nothing but its build directory (its home), so it takes the registry's
+    # numbers here, its directory with it; any other account of that name, with another
+    # home, is left for local_accounts to refuse.
+    - name: Read the build account as it is
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ slurm_deb_build_user }}"
+        service: files
+        fail_key: false
+
+    - name: Give the build account the registry's numbers
+      ansible.builtin.shell:
+        cmd: |
+          set -e
+          groupmod -g {{ _gid }} {{ slurm_deb_build_user | quote }}
+          usermod -u {{ _slurm_build_account.uid }} -g {{ _gid }} {{ slurm_deb_build_user | quote }}
+          chown -R {{ _slurm_build_account.uid }}:{{ _gid }} {{ _slurm_build_account.home | quote }}
+      vars:
+        _gid: "{{ _slurm_build_account.gid | default(_slurm_build_account.uid) }}"
+        _now: "{{ ansible_facts.getent_passwd[slurm_deb_build_user] | default(none) }}"
+      changed_when: true
+      when:
+        - _now is not none
+        - _now[4] == _slurm_build_account.home
+        - (_now[1] | int) != _slurm_build_account.uid or (_now[2] | int) != (_gid | int)
+
     # Resolved here: local_accounts evaluates its arguments in its own scope.
     - name: Note the build account
       ansible.builtin.set_fact:
