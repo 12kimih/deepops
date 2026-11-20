@@ -1,7 +1,8 @@
 ---
 # Rootless Podman on the compute nodes (roles/podman): users build images from a
-# Dockerfile inside a CPU job and import them into enroot. Switched by
-# slurm_install_podman; docs/container/podman.md is the user guide.
+# Dockerfile inside a CPU job and import them into enroot. Every host it runs on
+# converges to deepops_components (present on slurm-node while slurm_install_podman is
+# on, removed elsewhere); docs/container/podman.md is the user guide.
 
 # docker-rootless is retired; remove what it installed wherever it may have run.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
@@ -14,11 +15,11 @@
         name: podman
         tasks_from: retire-docker-rootless
 
-- hosts: "{{ hostlist | default('slurm-node') }}"
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   tags:
     - podman
   roles:
     - role: deploy_defaults
     - role: podman
-      when: slurm_install_podman
+      podman_state: "{{ deepops_components.podman | component_phase(deepops_phase) }}"

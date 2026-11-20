@@ -8,6 +8,10 @@
 # so every node writes the same files; both files are owned by this role. A user
 # without a range cannot run podman.
 
+# present or absent (docs/deepops/component-state.md): a deploy passes the state from
+# deepops_components (slurm_install_podman, on slurm-node).
+podman_state: present
+
 # The distribution packages (podman 4.9 on Ubuntu 24.04). uidmap/shadow-utils provide
 # newuidmap and newgidmap; slirp4netns is the rootless network of podman 4; apparmor
 # ships the profiles that let podman, crun and slirp4netns create user namespaces

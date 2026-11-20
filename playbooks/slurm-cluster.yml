@@ -220,10 +220,10 @@
   tags:
     - pyxis
 
-# Not gated as a whole: its first play removes the retired docker-rootless; the role
-# itself is switched by slurm_install_podman.
 - name: Install rootless Podman for image builds
   import_playbook: container/podman.yml
+  vars:
+    deepops_phase: install
   tags:
     - podman
 
@@ -316,6 +316,13 @@
     deepops_phase: remove
   tags:
     - pyxis
+
+- name: Remove rootless Podman where it is no longer wanted
+  import_playbook: container/podman.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - podman
 
 - name: Remove enroot where it is no longer wanted
   import_playbook: container/enroot.yml

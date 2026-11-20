@@ -83,7 +83,6 @@ GATES = {
     # Gates on a role or an include inside a component playbook (Gates.ROLE_GATES).
     "people_manage_accounts": "accounts are never removed (they own files on shared storage)",
     "slurm_login_on_compute": "policy (who may log in to the compute nodes)",
-    "slurm_install_podman": "to move: roles/podman is not a component yet",
 }
 
 
