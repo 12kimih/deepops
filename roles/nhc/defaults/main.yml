@@ -41,3 +41,12 @@ nhc_build_key: "nhc {{ nhc_version }}: {{ nhc_configure }}"
 # keep the check list in step with what the nfs role actually mounts; set it explicitly
 # to check a filesystem DeepOps does not manage.
 nhc_check_mounts: "{{ nfs_mounts | default([]) | map(attribute='mountpoint') | list }}"
+
+# GPU faults that drain a node until it reboots: the XIDs whose immediate action in
+# NVIDIA's XID catalog (docs.nvidia.com/deploy/xid-errors) is a GPU reset or a reboot.
+# Faults of the application (13, 31, 43, 45, 94...) leave the node in service. [] turns
+# the check off; a node drained by it returns by itself once a reboot clears the fault.
+nhc_gpu_drain_xids: [46, 48, 62, 64, 74, 79, 95, 109, 110, 119, 120, 136, 140, 143, 155, 156, 158]
+# Drain a GPU node whose row remapping is pending (needs a GPU reset) or has failed
+# (out of spare rows, NVIDIA's RMA criterion).
+nhc_gpu_check_remapped_rows: true
