@@ -40,6 +40,18 @@
       vars:
         slurm_upgrade: true
 
+    # Slurm's order starts at the controllers, and the packages build on the first;
+    # a --limit without them would upgrade nodes past their slurmctld, or install
+    # packages never built (after draining the nodes and removing their old Slurm).
+    - name: Refuse a limited run without the controllers
+      ansible.builtin.assert:
+        that: groups['slurm-master'] | difference(ansible_play_hosts_all) | length == 0
+        fail_msg: >-
+          The upgrade must include the controllers ({{ groups['slurm-master'] | join(', ') }}):
+          widen --limit to them.
+        quiet: true
+      run_once: true
+
 # The packages build in a container there (roles/slurm/tasks/packages-build.yml).
 - name: Install Docker on the package build host
   import_playbook: ../container/docker.yml

@@ -18,13 +18,13 @@
   changed_when: false
   failed_when: false
   check_mode: false  # read-only; --check needs the result
-  when: open_ondemand_installed.stdout is search('(?m)^ii ondemand ')
+  when: open_ondemand_installed.stdout is search('(?m)^.i ondemand ')
 
 - name: Decide whether the install must be rebuilt
   ansible.builtin.set_fact:
     open_ondemand_rebuild: >-
       {{ (open_ondemand_preverify.stdout | default('')) is search('(?m)^missing ')
-         or open_ondemand_installed.stdout is search('(?m)^ii ondemand-release-web \S+-(?!' ~ ansible_facts.distribution_release ~ ')\w+$') }}
+         or open_ondemand_installed.stdout is search('(?m)^.i ondemand-release-web \S+-(?!' ~ ansible_facts.distribution_release ~ ')\w+$') }}
 
 - name: Rebuild a broken install
   when: open_ondemand_rebuild | bool

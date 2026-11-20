@@ -72,3 +72,32 @@
     update_only: true
     nobest: "{{ maintenance_dnf_nobest | bool }}"
   when: ansible_facts.os_family == 'RedHat'
+
+# dnf writes no /var/run/reboot-required, the marker the reboot step and the os_updates
+# metrics read (Debian's packages write it): a new kernel was installed and never
+# booted. `dnf needs-restarting -r` (dnf-plugins-core) exits 1 when the kernel or a
+# core library changed.
+- name: Find out whether the upgrade needs a reboot (RHEL family)
+  when: ansible_facts.os_family == 'RedHat'
+  block:
+    - name: Install dnf needs-restarting
+      ansible.builtin.dnf:
+        name: dnf-plugins-core
+        state: present
+
+    - name: Ask dnf whether a reboot is needed
+      ansible.builtin.command:
+        argv: [dnf, needs-restarting, -r]
+      register: maintenance_dnf_restart
+      changed_when: false
+      failed_when: maintenance_dnf_restart.rc not in [0, 1]
+      check_mode: false  # read-only
+
+    - name: Ask for the reboot
+      ansible.builtin.copy:
+        dest: /var/run/reboot-required
+        content: "*** System restart required ***\n"
+        owner: root
+        group: root
+        mode: "0644"
+      when: maintenance_dnf_restart.rc == 1

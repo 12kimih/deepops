@@ -27,8 +27,10 @@
 
 - name: Note the installed Slurm
   vars:
+    # Status-Abbrev: wanted state, then the package's state; installed is "?i" (a held
+    # package is hi, and must count: matching ii alone skipped the version guards for it).
     _deb: "{{ slurm_installed_deb.stdout.split() if slurm_installed_deb.rc == 0 else [] }}"
-    _deb_version: "{{ (_deb[1] | regex_replace('-[^-]*$', '')) if (_deb | length == 2 and _deb[0] == 'ii') else '' }}"
+    _deb_version: "{{ (_deb[1] | regex_replace('-[^-]*$', '')) if (_deb | length == 2 and _deb[0][1:2] == 'i') else '' }}"
     _source_version: "{{ (slurm_source_version.stdout | default('')).split() | last | default('') }}"
   ansible.builtin.set_fact:
     slurm_source_build: "{{ slurm_source_version is not skipped }}"
@@ -64,3 +66,9 @@
       packages. Changing it needs the daemons upgraded in order with a backup first:
       playbooks/slurm-cluster/slurm-upgrade.yml (docs/slurm-cluster/slurm-upgrade.md).
     quiet: true
+
+# For the build host (slurm_pyxis_wanted_anywhere): role defaults are not visible in
+# another host's hostvars, facts are.
+- name: Note whether this host wants pyxis
+  ansible.builtin.set_fact:
+    slurm_host_wants_pyxis: "{{ slurm_pyxis_wanted | bool }}"
