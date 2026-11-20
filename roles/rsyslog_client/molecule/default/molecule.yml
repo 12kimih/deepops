@@ -1,3 +1,6 @@
 ---
-# Everything from .config/molecule/config.yml.
-{}
+provisioner:
+  inventory:
+    group_vars:
+      all:
+        rsyslog_client_tcp_host: logs.example.com

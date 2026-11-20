@@ -1,10 +1,23 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Read the package state and the two files the role writes
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop: [/etc/default/cachefilesd, /etc/cachefilesd.conf]
+      register: cachefilesd_files
+
+    - name: Check cachefilesd is installed
+      ansible.builtin.command: dpkg-query -W -f=${Status} cachefilesd
+      register: cachefilesd_pkg
+      changed_when: false
+
+    - name: The daemon is enabled on the default cache directory
       ansible.builtin.assert:
-        that: true
+        that:
+          - cachefilesd_pkg.stdout == 'install ok installed'
+          - "'RUN=yes' in (cachefilesd_files.results[0].content | b64decode)"
+          - "'dir /var/cache/fscache' in (cachefilesd_files.results[1].content | b64decode)"
+          - "'\ntag ' not in (cachefilesd_files.results[1].content | b64decode)"

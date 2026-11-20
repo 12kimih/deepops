@@ -1,10 +1,31 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
+# A message sent to the listener lands in its sender's own file.
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Send a message to the TCP listener
+      ansible.builtin.command:
+        argv: [logger, --tcp, --server, 127.0.0.1, --port, "514", --tag, deepops-verify, "molecule {{ ansible_facts.date_time.epoch }}"]
+      changed_when: false
+
+    - name: Wait for it in the per-host log
+      ansible.builtin.shell:
+        cmd: grep -rl 'molecule {{ ansible_facts.date_time.epoch }}' /var/log/deepops-hosts
+      register: rsyslog_received
+      until: rsyslog_received.rc == 0
+      retries: 10
+      delay: 1
+      changed_when: false
+
+    - name: Read the client log expiry
+      ansible.builtin.slurp:
+        src: /etc/tmpfiles.d/deepops-rsyslog-server.conf
+      register: rsyslog_expiry
+
+    - name: The file is the sender's, under the day, and old logs expire
       ansible.builtin.assert:
-        that: true
+        that:
+          - rsyslog_received.stdout_lines | length == 1
+          - rsyslog_received.stdout is match('^/var/log/deepops-hosts/[^/]+/\\d{4}-\\d{2}-\\d{2}/syslog\\.log$')
+          - "'e /var/log/deepops-hosts - - - 90d' in (rsyslog_expiry.content | b64decode)"

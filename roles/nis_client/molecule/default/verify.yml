@@ -1,10 +1,34 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Read the NIS settings and the name service switch
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop: [/etc/yp.conf, /etc/defaultdomain, /etc/nsswitch.conf]
+      register: nis_files
+
+    - name: Read the installed NIS packages
+      ansible.builtin.package_facts:
+
+    - name: Check rpcbind is running
+      ansible.builtin.command: systemctl is-active rpcbind
+      changed_when: false
+
+    # ypbind itself is not started: there is no server to bind to in the container.
+    - name: The client is bound to the domain and server, and no NIS server is left
       ansible.builtin.assert:
-        that: true
+        that:
+          - "'domain example.com server nis.example.com' in yp_conf"
+          - defaultdomain == 'example.com\n'
+          - nsswitch is search('(?m)^passwd:.*\\bnis\\b')
+          - nsswitch is search('(?m)^netgroup:.*\\bnis\\b')
+          - "'sss' not in nsswitch"
+          - "'ypbind-mt' in ansible_facts.packages"
+          - "'yp-tools' in ansible_facts.packages"
+          - "'ypserv' not in ansible_facts.packages"
+      vars:
+        yp_conf: "{{ nis_files.results[0].content | b64decode }}"
+        defaultdomain: "{{ nis_files.results[1].content | b64decode }}"
+        nsswitch: "{{ nis_files.results[2].content | b64decode }}"
