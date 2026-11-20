@@ -63,6 +63,18 @@ class BranchGuard(unittest.TestCase):
         self.assertEqual(git(self.other, "branch", "-f", "topic", "HEAD~1").returncode, 0)
         self.assertFalse(self.moved())
 
+    def test_gc_from_another_worktree_passes(self):
+        # pack-refs writes main into packed-refs with its own value, then deletes the
+        # loose ref: no move, and gc --auto runs it after any commit or fetch.
+        self.assertEqual(git(self.other, "pack-refs", "--all").returncode, 0)
+        self.assertEqual(git(self.other, "gc", "-q").returncode, 0)
+        self.assertFalse(self.moved())
+
+    def test_the_owner_moves_it_from_inside_its_git_directory(self):
+        git(self.main, "commit", "-q", "--allow-empty", "-m", "two")
+        result = git(self.main / ".git", "update-ref", "refs/heads/main", "HEAD~1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
