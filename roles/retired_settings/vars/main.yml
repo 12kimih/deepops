@@ -148,3 +148,4 @@ retired_settings:
   slurm_user_gid: system_accounts.slurm.gid in roles/system_accounts
   slurm_groupname: nothing, the slurm account's group is named like it (roles/local_accounts)
   slurm_manage_user_gid: nothing, roles/local_accounts pins the group's GID and refuses to renumber
+  docker_login_disable_log_password: nothing, roles/docker-login never logs credentials

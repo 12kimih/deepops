@@ -376,16 +376,10 @@ docker_iptables_enabled: true
 # read live from /root/.ssh/*.pub there and pinned to their address with from=: a
 # host's root_access_source (host_vars), else its ansible_host; it must be an IP.
 #root_access_from_hosts: "{{ groups['slurm-master'][:1] }}"  # example
-# Docker daemon logins
-#   Note: example only! you should put these in an Ansible Vault file for security!
-#
-#docker_login_registries:  # example
-#- registry: docker.io
-#  username: myuser
-#  password: mypassword
-#- registry: nvcr.io
-#  username: '$oauthtoken'
-#  password: mypassword
+# Docker daemon logins (root's; keep the passwords in Ansible Vault), each
+# {registry, username, password}, e.g. registry nvcr.io, username $oauthtoken. A
+# registry dropped from the list is logged out on the next run.
+#docker_login_registries: []
 
 # Enroot configuration
 # Playbook: slurm, slurm-cluster

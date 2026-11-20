@@ -1,0 +1,8 @@
+---
+dependencies:
+  - role: deepops_paths  # deepops_state_dir, where the role records its logins
+  - role: retired_settings  # docker_login_disable_log_password
+
+galaxy_info:
+  namespace: deepops
+  role_name: docker_login

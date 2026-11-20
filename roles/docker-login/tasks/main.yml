@@ -4,12 +4,49 @@
     name: python3-docker
     state: present
 
-- name: Log into docker registry
+- name: Read the registries this role logged into
+  ansible.builtin.slurp:
+    src: "{{ docker_login_record }}"
+  register: docker_login_recorded
+  failed_when: false
+
+- name: Note the registries to be logged into and out of
+  ansible.builtin.set_fact:
+    docker_login_wanted: "{{ docker_login_registries | map(attribute='registry') | list if docker_login_state == 'present' else [] }}"
+    docker_login_before: "{{ (docker_login_recorded.content | b64decode | from_json) if docker_login_recorded.content is defined else [] }}"
+
+# Credentials are never logged, whatever the verbosity.
+- name: Log into the listed registries
   community.docker.docker_login:
-    state: "{{ docker_login_state }}"
     registry: "{{ item.registry }}"
     username: "{{ item.username }}"
     password: "{{ item.password }}"
     reauthorize: "{{ docker_login_reauth }}"
-  with_items: "{{ docker_login_registries }}"
-  no_log: "{{ docker_login_disable_log_password }}"
+  loop: "{{ docker_login_registries if docker_login_state == 'present' else [] }}"
+  loop_control:
+    label: "{{ item.registry }}"
+  no_log: true
+
+# A registry dropped from the list keeps its credential in root's Docker config otherwise.
+- name: Log out of the registries no longer listed
+  community.docker.docker_login:
+    registry: "{{ item }}"
+    state: absent
+  loop: "{{ (docker_login_before + (docker_login_registries | map(attribute='registry') | list if docker_login_state == 'absent' else []))
+            | unique | difference(docker_login_wanted) }}"
+
+- name: Create deepops' state directory
+  ansible.builtin.file:
+    path: "{{ docker_login_record | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Record the registries this role logged into
+  ansible.builtin.copy:
+    dest: "{{ docker_login_record }}"
+    content: "{{ docker_login_wanted | to_nice_json }}\n"
+    owner: root
+    group: root
+    mode: "0644"
