@@ -53,7 +53,8 @@ out-of-date copy of a file, committed on top of newer history, puts the file bac
 older version and undoes the commits in between without anyone saying so.
 [`scripts/deepops/no_silent_revert.py`](../../scripts/deepops/no_silent_revert.py), a
 pre-push hook, refuses such a commit and names the commits it would undo. A commit that
-means it says so in its message (revert, reapply, restore) and passes. Rebase onto the
+means it names a commit it undoes in its message (as `git revert` writes "This reverts
+commit <hash>.") and passes; merges are checked against their first parent. Rebase onto the
 remote and redo the change otherwise. Both push guards run from git's own pre-push hook,
 [`scripts/deepops/pre-push.sh`](../../scripts/deepops/pre-push.sh), and check exactly
 the commits each pushed ref sends, a detached HEAD's too
