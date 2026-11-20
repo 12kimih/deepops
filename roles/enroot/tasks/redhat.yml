@@ -47,26 +47,13 @@
   loop: "{{ _enroot_files }}"
   when: not ansible_check_mode or enroot_fetched_all
 
-# On RHEL, unprivileged user namespaces are enabled via the kernel cmdline.
+# On RHEL, unprivileged user namespaces are enabled on the kernel command line.
 # https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
-- name: RHEL | read kernel cmdline
-  ansible.builtin.command:
-    cmd: cat /proc/cmdline
-  register: enroot_kernel_cmdline
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-
-- name: RHEL | enable unprivileged userns on the kernel cmdline
-  ansible.builtin.command:
-    cmd: "grubby --update-kernel={{ enroot_configure_kernel_options_versions }} --args='namespace.unpriv_enable=1 user_namespace.enable=1'"
-  when:
-    - enroot_configure_kernel_options | bool
-    - >
-      'namespace.unpriv_enable=1' not in enroot_kernel_cmdline.stdout
-      or 'user_namespace.enable=1' not in enroot_kernel_cmdline.stdout
-  changed_when: true
-  register: enroot_kernel_args_set
-
-- name: Ask for a reboot when that changed it
-  ansible.builtin.include_tasks: reboot.yml
-  when: enroot_kernel_args_set is changed
+- name: RHEL | enable unprivileged user namespaces on the kernel command line
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+  vars:
+    host_baseline_kernel_args_owner: enroot
+    host_baseline_kernel_args: "{{ ['namespace.unpriv_enable=1', 'user_namespace.enable=1'] if enroot_configure_kernel_options | bool else [] }}"
+    host_baseline_kernel_args_reason: apply the enroot kernel settings
