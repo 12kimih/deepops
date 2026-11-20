@@ -40,7 +40,7 @@
         etcd_deployment_type: docker
         gpu_operator_default_runtime: "docker"
       when: container_manager == "docker"
-    # For the plays below that do not load kubespray_defaults (container/nvidia-docker.yml).
+    # For the plays below that do not load kubespray_defaults (container/nvidia-container-toolkit.yml).
     - name: Note whether Docker is the container runtime
       ansible.builtin.set_fact:
         _k8s_runtime_is_docker: "{{ container_manager == 'docker' }}"
@@ -208,25 +208,26 @@
   tags:
     - local
 
+# Host drivers and toolkit unless the GPU Operator brings them (deepops_components).
 - name: Install NVIDIA driver on GPU servers
   import_playbook: nvidia-software/nvidia-driver.yml
   vars:
     hostlist: "k8s_cluster"
+    deepops_phase: install
   tags:
     - nvidia
-  when: deepops_gpu_operator_enabled | bool == false or gpu_operator_preinstalled_nvidia_software
 
+# Under containerd and CRI-O the GPU Operator's toolkit configures the runtime.
 - name: Install the NVIDIA Container Toolkit on GPU servers
-  import_playbook: container/nvidia-docker.yml
+  import_playbook: container/nvidia-container-toolkit.yml
   vars:
     hostlist: "k8s_cluster"
+    deepops_phase: install
     # The device plugin's containers reach the GPUs through Docker's default runtime.
     nvidia_container_toolkit_set_as_default_runtime: true
   tags:
     - nvidia
-  when:
-    - deepops_gpu_operator_enabled | bool == false or gpu_operator_preinstalled_nvidia_software
-    - _k8s_runtime_is_docker | bool
+  when: _k8s_runtime_is_docker | bool
 
 # Manage kubectl binary -- handles cross-platform (e.g., Linux cluster -> macOS controller)
 - hosts: kube_control_plane
@@ -435,6 +436,23 @@
   import_playbook: k8s-cluster/nvidia-k8s-gpu-feature-discovery.yml
   vars:
     deepops_phase: remove
+
+- name: Remove the NVIDIA Container Toolkit where nothing needs it
+  import_playbook: container/nvidia-container-toolkit.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+  tags:
+    - nvidia
+  when: _k8s_runtime_is_docker | bool
+
+- name: Remove the NVIDIA driver where it is listed for removal
+  import_playbook: nvidia-software/nvidia-driver.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+  tags:
+    - nvidia
 
 - name: Remove the cluster container registry where it is no longer wanted
   import_playbook: container/standalone-container-registry.yml

@@ -1,0 +1,27 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read the NVIDIA packages left
+      ansible.builtin.shell:
+        cmd: dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' '*nvidia*' 2>/dev/null | awk '$1 !~ /^.n/ {print $2}'
+      register: left
+      changed_when: false
+
+    - name: Look for the role's files and the reboot request
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/systemd/system/nvidia-persistenced.service
+        - /etc/apt/preferences.d/deepops-nvidia-driver
+        - /var/run/reboot-required
+        - /var/lib/deepops/reboot-requested-by/nvidia_driver
+      register: files
+
+    - name: Assert the driver and its files are gone and a reboot is asked for
+      ansible.builtin.assert:
+        that:
+          - left.stdout_lines == []
+          - files.results | map(attribute='stat.exists') | list == [false, false, true, false]
+        fail_msg: "left: {{ left.stdout_lines }}"

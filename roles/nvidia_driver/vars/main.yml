@@ -1,0 +1,49 @@
+---
+# What the component installs, for its record (roles/component_record). The packages by
+# family, as patterns the package manager resolves: the branch and the kernel flavour
+# are in their names, a branch switch is purge.yml's, and what they pulled in goes with
+# them (roles/host_baseline). Never the container toolkit's (nvidia-container-*,
+# libnvidia-container*), a component of its own.
+_nvidia_driver_packages:
+  Debian:
+    - linux-modules-nvidia-*
+    - linux-objects-nvidia-*
+    - linux-signatures-nvidia-*
+    - nvidia-headless-*
+    - nvidia-utils-*
+    - nvidia-compute-utils-*
+    - nvidia-kernel-common-*
+    - nvidia-kernel-source-*
+    - nvidia-dkms-*
+    - nvidia-firmware-*
+    - nvidia-driver-*
+    - nvidia-open*
+    - cuda-drivers*
+    - nvidia-fabricmanager*
+    - libnvidia-nscq*
+    - libnvidia-cfg1-*
+    - libnvidia-common-*
+    - libnvidia-compute-*
+    - libnvidia-decode-*
+    - libnvidia-encode-*
+    - libnvidia-extra-*
+    - libnvidia-fbc1-*
+    - libnvidia-gl-*
+  RedHat:
+    - nvidia-driver*
+    - nvidia-open*
+    - cuda-drivers*
+    - kmod-nvidia*
+    - nvidia-kmod*
+    - nvidia-persistenced*
+    - nvidia-modprobe*
+    - nvidia-settings*
+    - nvidia-xconfig*
+    - nvidia-libXNVCtrl*
+    - nvidia-fabricmanager*
+    - libnvidia-nscq*
+nvidia_driver_packages_owned: "{{ _nvidia_driver_packages[ansible_facts.os_family] | default([]) }}"
+nvidia_driver_items: >-
+  {{ nvidia_driver_packages_owned | map('regex_replace', '^', 'package:') | list
+     + ['unit:nvidia-persistenced.service', 'file:/etc/systemd/system/nvidia-persistenced.service',
+        'file:/etc/apt/preferences.d/deepops-nvidia-driver'] }}

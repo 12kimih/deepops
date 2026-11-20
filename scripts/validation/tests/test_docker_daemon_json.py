@@ -21,10 +21,8 @@ from repo_scan import Scan, ansible_files, module, tasks  # noqa: E402
 
 # (file, task) -> why it may touch the file
 EXCEPTIONS = {
-    ("roles/nvidia_container_toolkit/tasks/docker.yml", "Docker | check NVIDIA runtime configuration"):
-        "reads the runtime block, writes nothing",
-    ("roles/nvidia_container_toolkit/tasks/docker.yml", "Docker | configure NVIDIA runtime"):
-        "nvidia-ctk writes only its own runtimes block; default-runtime goes through docker_daemon_json",
+    ("roles/nvidia_container_toolkit/tasks/docker.yml", "Docker | look for the Docker daemon's settings"):
+        "a stat: whether roles/docker keeps the file, writes nothing",
 }  # fmt: skip
 TOUCHES = re.compile(r"daemon\.json|nvidia-ctk\s+runtime\s+configure|--default-runtime")
 

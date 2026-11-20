@@ -1,43 +1,21 @@
 ---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: nvidia_container_toolkit_state in ['present', 'absent', 'kept']
+    fail_msg: "nvidia_container_toolkit_state must be present, absent or kept, not {{ nvidia_container_toolkit_state }}."
+    quiet: true
+
 - name: Verify supported distribution
   ansible.builtin.assert:
     that:
       - ansible_facts.distribution == "Ubuntu" or ansible_facts.os_family == "RedHat"
     fail_msg: "The nvidia_container_toolkit role supports Ubuntu and Red Hat family hosts only."
+  when: nvidia_container_toolkit_state == 'present'
 
-- name: Ubuntu | install NVIDIA Container Toolkit
-  ansible.builtin.include_tasks: ubuntu.yml
-  when: ansible_facts.distribution == "Ubuntu"
-
-- name: Red Hat | install NVIDIA Container Toolkit
-  ansible.builtin.include_tasks: redhat.yml
-  when: ansible_facts.os_family == "RedHat"
-
-# The CDI specification podman and other CDI clients use (--device nvidia.com/gpu=all).
-# Since 1.18 the package's nvidia-cdi-refresh units write /var/run/cdi/nvidia.yaml on
-# install, driver changes and boot; they are kept on, and a missing spec is made now.
-# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html
-- name: Keep the CDI specification refreshed
-  ansible.builtin.systemd:
-    name: nvidia-cdi-refresh.path
-    enabled: true
-    state: started
-  when: nvidia_container_toolkit_cdi | bool
-
-- name: Check for the CDI specification
-  ansible.builtin.stat:
-    path: /var/run/cdi/nvidia.yaml
-  register: nvidia_container_toolkit_cdi_spec
-  when: nvidia_container_toolkit_cdi | bool
-
-- name: Generate the CDI specification
-  ansible.builtin.systemd:
-    name: nvidia-cdi-refresh.service
-    state: started
+# The toolkit hands a container the host's GPUs: a host without them has nothing to
+# install (ansible_facts.ansible_local.gpus, roles/facts).
+- name: "Make the NVIDIA Container Toolkit {{ nvidia_container_toolkit_state }}"
+  ansible.builtin.include_tasks: "{{ nvidia_container_toolkit_state }}.yml"
   when:
-    - nvidia_container_toolkit_cdi | bool
-    - not nvidia_container_toolkit_cdi_spec.stat.exists
-
-- name: Docker | configure NVIDIA runtime
-  ansible.builtin.include_tasks: docker.yml
-  when: nvidia_container_toolkit_configure_docker | bool
+    - nvidia_container_toolkit_state != 'kept'
+    - nvidia_container_toolkit_state == 'absent' or (ansible_facts.ansible_local.gpus.count | default(0) | int) > 0

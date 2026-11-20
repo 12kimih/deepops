@@ -16,6 +16,12 @@
 #   RHEL/Rocky dnf module streams (nvidia-driver:<branch>-open + nvidia-open):
 #     https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/red-hat-enterprise-linux.html
 
+# present or absent (docs/deepops/component-state.md): a deploy passes the state from
+# deepops_components. absent removes the driver from a drained node and asks for a
+# reboot; a deploy does that only where the site lists nvidia_driver in
+# deepops_component_removals.
+nvidia_driver_state: present
+
 # --- Package selection -------------------------------------------------------
 # The effective package is built from the toggles below, OR you can override it
 # completely with nvidia_driver_package (Ubuntu) / nvidia_driver_rhel_package

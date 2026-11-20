@@ -1,56 +1,48 @@
 ---
-- name: Docker | ensure Docker configuration directory exists
-  ansible.builtin.file:
-    path: /etc/docker
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
+# Docker's NVIDIA keys in /etc/docker/daemon.json, through roles/docker_daemon_json (the
+# one way a role changes it), where roles/docker keeps that file: the runtime (default only when
+# nvidia_container_toolkit_set_as_default_runtime asks), and the NGC defaults.
+# nvidia_container_toolkit_docker_wanted false takes them out again; a key nvidia-ctk
+# wrote before the record existed goes by its value.
+- name: Docker | look for the Docker daemon's settings
+  ansible.builtin.stat:
+    path: /etc/docker/daemon.json
+  register: nvidia_container_toolkit_daemon_json
 
-- name: Docker | ensure the docker service is enabled and running
-  ansible.builtin.service:
-    name: docker
-    state: started
-    enabled: true
-  when: nvidia_container_toolkit_enable_docker | bool
-
-# NGC/NCCL workloads run via bare `docker run` need a larger /dev/shm and unlimited
-# memlock (pinned GPU memory) + a large stack; docker's 64 MiB shm default breaks
-# multi-GPU NCCL. Merge these daemon-wide defaults BEFORE nvidia-ctk writes its
-# runtime block (nvidia-ctk merges into the existing daemon.json, preserving these).
-# Idempotent: only writes + reports changed when a key actually differs.
-# https://docs.nvidia.com/deeplearning/frameworks/user-guide/
-- name: Docker | apply daemon defaults for NGC/NCCL workloads (shm-size + ulimits)
-  ansible.builtin.include_role:
-    name: docker_daemon_json
+# Resolved here: docker_daemon_json evaluates its arguments in its own scope.
+- name: Docker | work out the NVIDIA keys
+  ansible.builtin.set_fact:
+    _nvidia_container_toolkit_tuning_keys: >-
+      {{ nvidia_container_toolkit_docker_tuning
+         if nvidia_container_toolkit_docker_wanted | bool and nvidia_container_toolkit_set_docker_tuning | bool
+         else {} }}
+    _nvidia_container_toolkit_runtime_keys: >-
+      {{ (_nvidia_container_toolkit_docker_runtime | combine({'default-runtime': 'nvidia'} if _default | bool else {}))
+         if nvidia_container_toolkit_docker_wanted | bool else {} }}
+    _nvidia_container_toolkit_runtime_drop: >-
+      {{ ({} if nvidia_container_toolkit_docker_wanted | bool else _nvidia_container_toolkit_docker_runtime)
+         | combine({} if _default | bool else {'default-runtime': 'nvidia'}) }}
   vars:
-    docker_daemon_json_owner: nvidia-tuning
-    docker_daemon_json_keys: "{{ nvidia_container_toolkit_docker_tuning if nvidia_container_toolkit_set_docker_tuning | bool else {} }}"
-    # nvidia-ctk writes default-runtime and never takes it back; once the NVIDIA
-    # runtime is not to be the default, it goes.
-    docker_daemon_json_drop_if: "{{ {} if nvidia_container_toolkit_set_as_default_runtime | bool else {'default-runtime': 'nvidia'} }}"
+    _default: "{{ nvidia_container_toolkit_docker_wanted | bool and nvidia_container_toolkit_set_as_default_runtime | bool }}"
+  when: nvidia_container_toolkit_daemon_json.stat.exists
 
-- name: Docker | check NVIDIA runtime configuration
-  ansible.builtin.command:
-    cmd: >-
-      python3 -c 'import json, pathlib, sys;
-      p = pathlib.Path("/etc/docker/daemon.json");
-      required_default = {{ nvidia_container_toolkit_set_as_default_runtime | bool | ternary("True", "False") }};
-      data = {};
-      text = p.read_text().strip() if p.exists() else "";
-      data = json.loads(text) if text else {};
-      runtime = data.get("runtimes", {}).get("nvidia", {});
-      ok = runtime.get("path") in ("nvidia-container-runtime", "/usr/bin/nvidia-container-runtime");
-      ok = ok and (not required_default or data.get("default-runtime") == "nvidia");
-      sys.exit(0 if ok else 1)'
-  register: nvidia_container_toolkit_docker_runtime
-  failed_when: false
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
+- name: Docker | configure the NVIDIA runtime and the NGC defaults
+  when: nvidia_container_toolkit_daemon_json.stat.exists
+  block:
+    # NGC/NCCL workloads run via bare `docker run` need a larger /dev/shm and unlimited
+    # memlock (pinned GPU memory) + a large stack; docker's 64 MiB shm default breaks
+    # multi-GPU NCCL. https://docs.nvidia.com/deeplearning/frameworks/user-guide/
+    - name: Docker | apply daemon defaults for NGC/NCCL workloads (shm-size + ulimits)
+      ansible.builtin.include_role:
+        name: docker_daemon_json
+      vars:
+        docker_daemon_json_owner: nvidia-tuning
+        docker_daemon_json_keys: "{{ _nvidia_container_toolkit_tuning_keys }}"
 
-- name: Docker | configure NVIDIA runtime
-  ansible.builtin.command:
-    cmd: "nvidia-ctk runtime configure --runtime=docker{{ ' --set-as-default' if nvidia_container_toolkit_set_as_default_runtime | bool else '' }}"
-  when: nvidia_container_toolkit_docker_runtime.rc != 0
-  changed_when: true
-  notify: Restart dockerd
+    - name: Docker | register the NVIDIA runtime
+      ansible.builtin.include_role:
+        name: docker_daemon_json
+      vars:
+        docker_daemon_json_owner: nvidia-runtime
+        docker_daemon_json_keys: "{{ _nvidia_container_toolkit_runtime_keys }}"
+        docker_daemon_json_drop_if: "{{ _nvidia_container_toolkit_runtime_drop }}"

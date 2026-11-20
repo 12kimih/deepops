@@ -1,0 +1,55 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nvidia_container_toolkit
+    component_record_action: begin
+    component_record_items: "{{ nvidia_container_toolkit_items }}"
+
+- name: Ubuntu | install NVIDIA Container Toolkit
+  ansible.builtin.include_tasks: ubuntu.yml
+  when: ansible_facts.distribution == "Ubuntu"
+
+- name: Red Hat | install NVIDIA Container Toolkit
+  ansible.builtin.include_tasks: redhat.yml
+  when: ansible_facts.os_family == "RedHat"
+
+# The CDI specification podman and other CDI clients use (--device nvidia.com/gpu=all).
+# Since 1.18 the package's nvidia-cdi-refresh units write /var/run/cdi/nvidia.yaml on
+# install, driver changes and boot; they are kept on, and a missing spec is made now.
+# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html
+- name: Keep the CDI specification refreshed
+  ansible.builtin.systemd:
+    name: nvidia-cdi-refresh.path
+    enabled: true
+    state: started
+  when: nvidia_container_toolkit_cdi | bool
+
+- name: Check for the CDI specification
+  ansible.builtin.stat:
+    path: /var/run/cdi/nvidia.yaml
+  register: nvidia_container_toolkit_cdi_spec
+  when: nvidia_container_toolkit_cdi | bool
+
+- name: Generate the CDI specification
+  ansible.builtin.systemd:
+    name: nvidia-cdi-refresh.service
+    state: started
+  when:
+    - nvidia_container_toolkit_cdi | bool
+    - not nvidia_container_toolkit_cdi_spec.stat.exists
+
+- name: Docker | configure NVIDIA runtime
+  ansible.builtin.include_tasks: docker.yml
+  vars:
+    nvidia_container_toolkit_docker_wanted: "{{ nvidia_container_toolkit_configure_docker | bool }}"
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nvidia_container_toolkit
+    component_record_action: present
+    component_record_items: "{{ nvidia_container_toolkit_items }}"
+    component_record_version: "{{ nvidia_container_toolkit_version }}"

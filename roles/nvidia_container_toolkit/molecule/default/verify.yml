@@ -1,0 +1,33 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read the installed toolkit packages
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, "${Package} ${db:Status-Abbrev}\n", "nvidia-container-toolkit*", "libnvidia-container*"]
+      register: nct_pkgs
+      changed_when: false
+
+    - name: Read the component record
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: record
+
+    - name: Read daemon.json
+      ansible.builtin.slurp:
+        src: /etc/docker/daemon.json
+      register: daemon
+
+    - name: Assert the toolkit is installed, recorded and registered with Docker
+      vars:
+        _daemon: "{{ daemon.content | b64decode | from_json }}"
+        _record: "{{ record.content | b64decode | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - nct_pkgs.stdout_lines | select('search', ' ii $') | list | length == 4
+          - _record.components.nvidia_container_toolkit.state == 'present'
+          - _daemon.runtimes.nvidia.path == 'nvidia-container-runtime'
+          - "'default-runtime' not in _daemon"
+          - _daemon['live-restore']
+          - _daemon['default-shm-size'] == '1G'

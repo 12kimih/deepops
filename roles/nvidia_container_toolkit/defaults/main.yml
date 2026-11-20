@@ -1,4 +1,9 @@
 ---
+# present or absent (docs/deepops/component-state.md): a deploy passes the state from
+# deepops_components; present where something needs it (enroot's GPU hook, a GPU
+# container under Docker, the Kubernetes deploy with host drivers).
+nvidia_container_toolkit_state: present
+
 nvidia_container_toolkit_repo_base_url: "https://nvidia.github.io/libnvidia-container"
 nvidia_container_toolkit_repo_gpg_url: "{{ nvidia_container_toolkit_repo_base_url }}/gpgkey"
 # The signing key, checked on download.
@@ -19,6 +24,8 @@ nvidia_container_toolkit_packages:
   - libnvidia-container-tools
   - libnvidia-container1
 
+# Register the NVIDIA runtime with Docker (daemon.json, roles/docker_daemon_json) on a
+# host where Docker is installed; containers ask for GPUs with --gpus.
 nvidia_container_toolkit_configure_docker: true
 # Keep the package's CDI specification (/var/run/cdi/nvidia.yaml) generated, for
 # podman's --device nvidia.com/gpu=... (nvidia-cdi-refresh, toolkit 1.18 and newer).
@@ -28,17 +35,12 @@ nvidia_container_toolkit_cdi: true
 # every container saw every GPU of the node, outside what Slurm gave the job. The
 # Kubernetes deploy turns it on where the device plugin runs on Docker (it needs it).
 nvidia_container_toolkit_set_as_default_runtime: false
-# Ensure the docker service is enabled at boot and running. On RHEL the docker-ce
-# package does not auto-enable docker, so every docker-based service (DCGM/Slurm
-# exporters, registry, ...) would be dead after reboot without this.
-nvidia_container_toolkit_enable_docker: true
-
 # Daemon-wide docker defaults for NGC/PyTorch/NCCL workloads launched via bare
 # `docker run`: the NGC deep-learning containers need a large /dev/shm and unlimited
 # memlock (pinned GPU memory) + a big stack (docker's 64 MiB shm default breaks
-# multi-GPU NCCL). Merged into /etc/docker/daemon.json before nvidia-ctk adds its
-# runtime block. Slurm+pyxis/enroot and k8s set these through their own mechanisms,
-# so this only affects plain `docker run`. Set false to leave docker's defaults alone.
+# multi-GPU NCCL). Merged into /etc/docker/daemon.json. Slurm+pyxis/enroot and k8s
+# set these through their own mechanisms, so this only affects plain `docker run`.
+# Set false to leave docker's defaults alone.
 nvidia_container_toolkit_set_docker_tuning: true
 nvidia_container_toolkit_docker_tuning:
   default-shm-size: "1G"

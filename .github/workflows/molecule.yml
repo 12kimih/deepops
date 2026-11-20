@@ -19,7 +19,10 @@ jobs:
           - login_shells
           - nfs_client
           - nhc
+          - nvidia_container_toolkit
           - nvidia_dcgm
+          - nvidia_driver
+          - nvidia_power_limit
           - openmpi
           - os_updates
           - package_repos
@@ -50,6 +53,7 @@ jobs:
           key: molecule-galaxy-${{ hashFiles(format('{0}/roles/requirements.yml', github.repository)) }}
       - name: install the galaxy collections and roles
         run: cd "${{ github.repository }}" && uv run --locked scripts/deepops/galaxy.py
+      # Every scenario of the role: a component's absent path is a scenario of its own.
       - name: run molecule test
         env:
           # Molecule runs from the role, outside the reach of the repository's ansible.cfg.
@@ -59,4 +63,4 @@ jobs:
           ANSIBLE_FILTER_PLUGINS: "${{ github.workspace }}/${{ github.repository }}/plugins/filter"
         run: |
           cd "${{ github.repository }}/roles/${{ matrix.deepops-role }}"
-          uv run --locked molecule test
+          uv run --locked molecule test --all

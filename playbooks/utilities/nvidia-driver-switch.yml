@@ -25,7 +25,7 @@
       ansible.builtin.include_role:
         name: facts
 
-    # As playbooks/nvidia-software/nvidia-driver.yml: DGX systems keep their own stack.
+    # As roles/nvidia_driver: DGX systems keep their own stack.
     - name: Check for DGX packages
       ansible.builtin.stat:
         path: /etc/dgx-release

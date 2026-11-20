@@ -1,0 +1,14 @@
+---
+# No record yet (a host deployed before component records): the driver is found by its
+# packages and removed with what it pulled in, and a reboot is asked for; a rerun finds
+# nothing and changes nothing.
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Remove the NVIDIA driver
+      ansible.builtin.include_role:
+        name: nvidia_driver
+        public: true  # nvidia_versions (a dependency) supplies its values
+      vars:
+        nvidia_driver_state: absent

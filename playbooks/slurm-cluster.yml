@@ -62,7 +62,13 @@
 
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml
-  when: slurm_cluster_install_nvidia_driver
+  vars:
+    deepops_phase: install
+
+- name: Install the NVIDIA Container Toolkit where GPU containers run
+  import_playbook: container/nvidia-container-toolkit.yml
+  vars:
+    deepops_phase: install
 
 # The role installs it only with nvidia_cuda_install: true, its one switch.
 - name: Install NVIDIA CUDA Toolkit
@@ -364,6 +370,16 @@
 
 - name: Remove the DCGM exporter where it is no longer wanted
   import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the NVIDIA Container Toolkit where nothing needs it
+  import_playbook: container/nvidia-container-toolkit.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the NVIDIA driver where it is listed for removal
+  import_playbook: nvidia-software/nvidia-driver.yml
   vars:
     deepops_phase: remove
 

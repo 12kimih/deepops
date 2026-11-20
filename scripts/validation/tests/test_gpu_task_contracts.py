@@ -10,6 +10,7 @@ Run with: python3 -m unittest discover scripts/validation/tests
 """
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "lib"))
+import repo_scan  # noqa: E402
 from ansible_yaml import canonical, same_name  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -27,54 +29,35 @@ TRANSIENT_SERVICE = "systemd-run --wait --pipe --collect --quiet --"
 PROBE_NAME = "check for MIG capable devices"
 MIG_PLAYBOOK = "playbooks/nvidia-software/nvidia-mig.yml"
 MIG_ROLE = "roles/nvidia-mig-manager/tasks/main.yml"
-GPU_TASK_PATHS = (
-    "playbooks/nvidia-software/nvidia-driver.yml",
-    "playbooks/nvidia-software/nvidia-cuda.yml",
-    "playbooks/utilities/gpu-clocks.yml",
-    "playbooks/utilities/nvidia-set-gpu-clocks.yml",
-    MIG_PLAYBOOK,
-    MIG_ROLE,
-)
 
 
 def load(path):
     return canonical(yaml.safe_load((ROOT / path).read_text(encoding="utf-8")))
 
 
-def tasks(path):
-    """Every command/shell task in a playbook or task file, flattened."""
-    found = []
-
-    def visit(value):
-        if isinstance(value, dict):
-            if "command" in value or "shell" in value:
-                found.append(value)
-            for child in value.values():
-                visit(child)
-        elif isinstance(value, list):
-            for child in value:
-                visit(child)
-
-    visit(load(path))
-    return found
-
-
 def gpu_commands(path):
-    """The (task, normalized command) pairs that drive the GPUs."""
+    """The (task, normalized command) pairs of PATH's command and shell tasks that drive
+    the GPUs (finding nvidia-smi on PATH does not)."""
     pairs = []
-    for task in tasks(path):
-        command = task.get("command", task.get("shell"))
+    for task in repo_scan.tasks(ROOT / path):
+        name, args = repo_scan.module(task)
+        if name not in ("command", "shell"):
+            continue
+        # The raw text of a free-form command: its words are shell, not key=value pairs.
+        raw = next((v for k, v in task.items() if repo_scan.canonical(k) == name), None)
+        command = raw if isinstance(raw, str) else args.get("cmd") or args.get("argv")
         # The same command in any form: a string, cmd:, or an argv list.
-        if isinstance(command, dict):
-            command = command.get("cmd") or command.get("argv")
         if isinstance(command, list):
             command = " ".join(str(arg) for arg in command)
-        if isinstance(command, str) and (
-            "nvidia-smi" in command
+        if not isinstance(command, str):
+            continue
+        command = " ".join(command.split())
+        if (
+            re.search(r"(?<!which )(?<!command -v )\bnvidia-smi\b", command)
             or "nvidia-mig-parted apply" in command
             or "nvidia-mig-parted assert" in command
         ):
-            pairs.append((task, " ".join(command.split())))
+            pairs.append((task, command))
     return pairs
 
 
@@ -127,12 +110,16 @@ class TransientExecutionContract(unittest.TestCase):
     """Nothing that touches a GPU may run directly in the ssh context."""
 
     def test_every_gpu_command_runs_in_a_transient_unit(self):
-        for path in GPU_TASK_PATHS:
+        # Every task and playbook: a hand list missed what moved into a role.
+        seen = 0
+        for path in (p.relative_to(ROOT).as_posix() for p in repo_scan.ansible_files()):
             for task, command in gpu_commands(path):
+                seen += 1
                 with self.subTest(path=path, task=task.get("name")):
                     self.assertIn(TRANSIENT_SERVICE, command)
                     driven = "nvidia-smi" if "nvidia-smi" in command else "nvidia-mig-parted"
                     self.assertLess(command.index(TRANSIENT_SERVICE), command.index(driven))
+        self.assertGreater(seen, 15, "the scan finds the GPU commands at all")
 
     def test_mig_administration_is_covered_too(self):
         # The probe is useless on its own: once it succeeds, apply and assert

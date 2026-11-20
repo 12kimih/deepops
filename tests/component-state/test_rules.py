@@ -75,11 +75,6 @@ GATES = {
     "allow_user_set_gpu_clocks": "policy (a runtime setting, gone at reboot)",
     # One-shot: nothing to remove.
     "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
-    # Components still to move (docs/deepops/component-state.md, batches), by owner.
-    "slurm_cluster_install_nvidia_driver": "pending: deepops (batch 3; removal explicit)",
-    # The GPU Operator's switch also gates the driver and the toolkit on Kubernetes nodes.
-    "deepops_gpu_operator_enabled": "pending: deepops (the driver and toolkit gates, with batch 3)",
-    "gpu_operator_preinstalled_nvidia_software": "pending: deepops (the driver and toolkit gates, with batch 3)",
 }
 
 

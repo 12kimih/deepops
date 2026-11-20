@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: nvidia_driver
+  namespace: deepops
   author: DeepOps
   description: Install the NVIDIA data-center GPU driver (open kernel modules by default)
   license: BSD-3-Clause

@@ -272,7 +272,7 @@ As [for Slurm clusters](#updating-the-nvidia-driver-1), with the node cordoned a
 The NVIDIA Container Toolkit is pinned by `nvidia_container_toolkit_version` (empty installs the latest). Set the version in your DeepOps configuration and re-run:
 
 ```bash
-ansible-playbook playbooks/container/nvidia-docker.yml [-l <list-of-nodes>]
+ansible-playbook playbooks/container/nvidia-container-toolkit.yml [-l <list-of-nodes>]
 ```
 
 ##### Updating NVIDIA GPU Feature Discovery
@@ -418,7 +418,9 @@ and switch the nodes, one at a time: each is drained and its jobs waited for, it
 ansible-playbook -K playbooks/utilities/nvidia-driver-switch.yml -e hostlist=<one-node>   # first one, then the rest
 ```
 
-Removing the running driver breaks every GPU job until the reboot, so `playbooks/nvidia-software/nvidia-driver.yml` (and the cluster deploy) refuses a switch on a node that still takes jobs and names this playbook. On Ubuntu the driver comes from the Ubuntu archive (`-server-open`); on RHEL and related distros from NVIDIA's CUDA repository module stream. Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, Turing and newer); set `"proprietary"` for older GPUs.
+Removing the running driver breaks every GPU job until the reboot, so `playbooks/nvidia-software/nvidia-driver.yml` (and the cluster deploy) refuses a branch switch on a node that still takes jobs and names this playbook. On Ubuntu the driver comes from the Ubuntu archive (`-server-open`); on RHEL and related distros from NVIDIA's CUDA repository module stream. Open kernel modules are the default (`nvidia_driver_kernel_modules: "open"`, Turing and newer); set `"proprietary"` for older GPUs.
+
+To take the driver off hosts (the GPU Operator brings its own, or the hosts left GPU work), turn its switch off (`slurm_cluster_install_nvidia_driver: false`, or on Kubernetes `gpu_operator_preinstalled_nvidia_software: false`) and name it in `deepops_component_removals: [nvidia_driver]`; a switch alone leaves it installed. The deploy refuses a Slurm node that still takes or runs jobs, purges the driver's packages with what only they pulled in, its persistence unit and archive pin, and asks for a reboot to unload the module (`playbooks/utilities/apt-upgrade.yml` reboots it drained). The container toolkit and DCGM are components of their own, with their own switches.
 
 On DGX systems follow the DGX User Guide instead.
 

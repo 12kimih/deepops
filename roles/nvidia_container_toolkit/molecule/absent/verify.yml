@@ -1,0 +1,34 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read the toolkit packages
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, "${Package} ${db:Status-Abbrev}\n", "nvidia-container-toolkit*", "libnvidia-container*"]
+      register: nct_pkgs
+      changed_when: false
+      failed_when: false
+
+    - name: Read the component record
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: record
+
+    - name: Read daemon.json
+      ansible.builtin.slurp:
+        src: /etc/docker/daemon.json
+      register: daemon
+
+    - name: Look for the repository source
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/nvidia-container-toolkit.sources
+      register: source
+
+    - name: Assert the toolkit, its repository and its Docker keys are gone, Docker's own kept
+      ansible.builtin.assert:
+        that:
+          - nct_pkgs.stdout_lines | reject('search', ' un $|^$') | list | length == 0
+          - "'nvidia_container_toolkit' not in (record.content | b64decode | from_json).components"
+          - "(daemon.content | b64decode | from_json) == {'live-restore': true}"
+          - not source.stat.exists

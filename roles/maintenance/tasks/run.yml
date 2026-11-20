@@ -9,7 +9,7 @@
 - name: Find the Slurm commands on the controller
   ansible.builtin.stat:
     path: "{{ maintenance_slurm_bin }}/scontrol"
-  delegate_to: "{{ maintenance_slurm_controller }}"
+  delegate_to: "{{ maintenance_slurm_delegate }}"
   register: maintenance_scontrol
   run_once: true
   check_mode: false

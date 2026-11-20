@@ -173,7 +173,9 @@ clients before the server.
    exporters, slurm_metrics: deepops-3); containers (registry, nginx cache, Docker as a
    derived dependency: deepops-4).
 3. GPU and HPC software: nvidia_dcgm, nhc, openmpi, lmod, nvidia_hpc_sdk,
-   nvidia_cuda_toolkit, easy-build, podman, enroot and pyxis (deepops).
+   nvidia_cuda_toolkit, easy-build, podman, enroot and pyxis, the NVIDIA driver
+   (removal: explicit) and the container toolkit (needed by enroot and the DCGM
+   exporter) (deepops).
 4. Services: open_ondemand, nfs (the exports), nfs_client (the mounts), cluster_tools
    (deepops-2);
    egress_policy and the policies os_updates, node_user_policy, ai_agent_rules

@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Install the NVIDIA Container Toolkit
+      ansible.builtin.include_role:
+        name: nvidia_container_toolkit
+      vars:
+        nvidia_container_toolkit_state: present
+        docker_daemon_restart: false  # no dockerd in the container
+        nvidia_container_toolkit_cdi: false  # the refresh writes no spec without a GPU

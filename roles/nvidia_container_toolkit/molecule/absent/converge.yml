@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Remove the NVIDIA Container Toolkit
+      ansible.builtin.include_role:
+        name: nvidia_container_toolkit
+      vars:
+        nvidia_container_toolkit_state: absent
+        docker_daemon_restart: false
+        nvidia_container_toolkit_cdi: false  # the refresh writes no spec without a GPU

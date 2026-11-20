@@ -1,4 +1,8 @@
 ---
+# The NVIDIA driver (roles/nvidia_driver) on GPU hosts; DGX OS keeps its own. Every host
+# it runs on converges to deepops_components: present where a deploy's switch wants it,
+# left as it is elsewhere (removal: explicit; deepops_component_removals takes it away,
+# from drained nodes, with a reboot request).
 - hosts: "{{ hostlist | default('all') }}"
   become: true
   tags:
@@ -6,23 +10,7 @@
     - nvidia_driver
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Check for DGX packages
-      ansible.builtin.stat:
-        path: /etc/dgx-release
-      register: is_dgx
-
-    - name: Install custom facts
-      ansible.builtin.include_role:
-        name: facts
-
-    # DGX systems ship their own driver stack (see the nvidia-dgx role), so the
-    # driver is only installed on non-DGX hosts that have GPUs (or when forced).
-    - name: Install the NVIDIA driver
-      ansible.builtin.include_role:
-        name: nvidia_driver
-        public: true  # nvidia_versions (a dependency) supplies its values
-      when: >-
-        (ansible_facts.ansible_local['gpus']['count'] | int > 0 and not is_dgx.stat.exists)
-        or (nvidia_driver_force_install | bool)
+    - role: facts
+    - role: nvidia_driver
+      nvidia_driver_state: "{{ deepops_components.nvidia_driver | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

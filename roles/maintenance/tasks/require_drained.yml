@@ -9,7 +9,7 @@
 - name: Read the node's Slurm state before {{ maintenance_change }}
   ansible.builtin.command:
     argv: ["{{ maintenance_slurm_bin }}/scontrol", --json, show, node, "{{ inventory_hostname }}"]
-  delegate_to: "{{ maintenance_slurm_controller }}"
+  delegate_to: "{{ maintenance_slurm_delegate }}"
   register: maintenance_slurm_node
   changed_when: false
   failed_when: false
