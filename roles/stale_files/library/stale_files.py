@@ -41,10 +41,11 @@ With audit, the report also lists what changes how the host behaves without a
 package's or a rule's say, again only for a person to judge (nothing is removed):
 
     unowned_config     files in `config_dirs` that no package owns, no rule matched
-                       and no component record claims; "(deepops)" marks one whose
-                       text says a deepops role wrote it
+                       and no component record claims; "(deepops)" marks one named
+                       deepops-* or whose text names deepops or its role (roles/x)
     unit_overrides     unit files and drop-ins under /etc/systemd/system no package
-                       owns (enable links and snapd's generated units left out)
+                       owns (enable links and snapd's generated units left out),
+                       marked "(deepops)" like unowned_config
     prompt_copies      copies conffile prompts and editors leave beside a file under
                        /etc (.dpkg-old, .dpkg-dist, .ucf-dist, .bak, ...): a -dist one
                        is the package's newer version that was never merged
@@ -355,8 +356,9 @@ PROMPT_COPY = re.compile(
 )
 # Directories whose *.old files are a package's own working copies, not a person's.
 PROMPT_COPY_SKIP = ("/etc/xml/",)
-# A deepops role says so in what it writes.
-DEEPOPS_MARK = r"(?i)ansible managed|deepops"
+# A deepops role says so in what it writes: "Ansible managed", "DeepOps", or the role by
+# its path ("# roles/nvidia_driver: ..."), the one convention a header follows.
+DEEPOPS_MARK = r"(?i)ansible managed|deepops|\broles/[a-z0-9_-]+"
 
 
 def run_lines(argv):
@@ -364,6 +366,12 @@ def run_lines(argv):
         return subprocess.run(argv, capture_output=True, text=True, check=False).stdout.splitlines()
     except OSError:
         return []
+
+
+def labelled(path):
+    """path, marked "(deepops)" when its name or text says a deepops role wrote it."""
+    ours = "deepops" in os.path.basename(path) or text_matches(path, DEEPOPS_MARK)
+    return f"{path} (deepops)" if ours else path
 
 
 def unowned_config(config_dirs, owned, claimed):
@@ -377,8 +385,7 @@ def unowned_config(config_dirs, owned, claimed):
                 continue
             if os.path.isdir(path) and not os.path.islink(path):
                 continue
-            ours = "deepops" in name or text_matches(path, DEEPOPS_MARK)
-            found.append(f"{path} (deepops)" if ours else path)
+            found.append(labelled(path))
     return found
 
 
@@ -392,7 +399,7 @@ def unit_overrides(owned, root="/etc/systemd/system"):
             if path in owned or os.path.islink(path) or text_matches(path, r"X-Snappy=yes"):
                 continue
             found.append(path)
-    return sorted(found)
+    return [labelled(p) for p in sorted(found)]
 
 
 def prompt_copies(root="/etc"):
