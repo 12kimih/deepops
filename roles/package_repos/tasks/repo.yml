@@ -34,7 +34,8 @@
 # source (ansible.builtin.deb822_repository) trusts only it (signed-by), never apt-key or
 # trusted.gpg.d. RHEL family: the key goes to /etc/pki/rpm-gpg/RPM-GPG-KEY-<name> and the
 # yum repository checks packages against it. Either way the package index is refreshed
-# only when something changed (package_repos_changed).
+# only when something changed or, on Debian, apt lacks the source's index (index.yml):
+# package_repos_changed.
 - name: Check the repository request
   ansible.builtin.assert:
     that:
@@ -222,11 +223,18 @@
                     + ([] if package_repos_r.pin is defined else ['/etc/apt/preferences.d/' ~ package_repos_r.name ~ '.pref']) }}"
           register: package_repos_stale
 
+        - name: Look for the source's package index
+          ansible.builtin.include_tasks: index.yml
+          vars:
+            package_repos_index_uris: "{{ [package_repos_r.uris] if package_repos_r.uris is string else package_repos_r.uris }}"
+
+        # A changed key or pin, or an index apt lacks (an earlier run's update failed).
         - name: Note whether the repository changed
           ansible.builtin.set_fact:
             package_repos_changed: >-
               {{ package_repos_key_installed is changed or package_repos_source is changed
-                 or package_repos_pin is changed or package_repos_stale is changed or package_repos_legacy is changed }}
+                 or package_repos_pin is changed or package_repos_stale is changed or package_repos_legacy is changed
+                 or package_repos_index_missing | bool }}
 
     - name: Add the repository (RHEL family)
       when:
