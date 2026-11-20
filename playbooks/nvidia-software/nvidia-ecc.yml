@@ -1,0 +1,11 @@
+---
+# Every NVIDIA GPU of a host in the ECC mode the site declares (roles/nvidia_ecc,
+# nvidia_ecc_mode: enabled or disabled; empty leaves the GPUs alone). The mode is stored
+# on the GPU: a change is set at once and applied by the next reboot, which the role
+# requests (a drained maintenance reboot: playbooks/utilities/apt-upgrade.yml).
+#
+#   ansible-playbook -K playbooks/nvidia-software/nvidia-ecc.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-node') }}"
+  become: true
+  roles:
+    - role: nvidia_ecc

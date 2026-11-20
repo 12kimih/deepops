@@ -1,0 +1,42 @@
+---
+- name: Set the GPUs' ECC mode
+  when: nvidia_ecc_mode | length > 0
+  block:
+    - name: Check the ECC mode
+      ansible.builtin.assert:
+        that: nvidia_ecc_mode in ['enabled', 'disabled']
+        fail_msg: nvidia_ecc_mode must be enabled, disabled or "" (leave it), not {{ nvidia_ecc_mode }}.
+        quiet: true
+
+    # A host without the driver has no GPU that answers; the driver's role comes first.
+    - name: Look for nvidia-smi
+      ansible.builtin.stat:
+        path: /usr/bin/nvidia-smi
+      register: nvidia_ecc_smi
+
+    - name: Read each GPU's ECC mode
+      ansible.builtin.command:
+        argv: [nvidia-smi, --query-gpu=index,ecc.mode.current,ecc.mode.pending, --format=csv,noheader]
+      register: nvidia_ecc_report
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when: nvidia_ecc_smi.stat.exists
+
+    - name: Plan the change
+      ansible.builtin.set_fact:
+        nvidia_ecc_plan: "{{ nvidia_ecc_report.stdout | default('') | gpu_ecc_plan(nvidia_ecc_mode) }}"
+
+    - name: Set the pending ECC mode
+      ansible.builtin.command:
+        argv: [nvidia-smi, -i, "{{ item }}", -e, "{{ '1' if nvidia_ecc_mode == 'enabled' else '0' }}"]
+      loop: "{{ nvidia_ecc_plan.set }}"
+      changed_when: true
+
+    - name: Ask for the reboot that applies it
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: reboot_request
+      vars:
+        maintenance_reason: "run GPU ECC {{ nvidia_ecc_mode }} (GPUs {{ nvidia_ecc_plan.reboot | join(', ') }} still run the other mode)"
+        maintenance_reboot_requester: nvidia_ecc
+      when: nvidia_ecc_plan.reboot | length > 0

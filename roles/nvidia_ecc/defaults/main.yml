@@ -1,0 +1,8 @@
+---
+# The ECC mode every NVIDIA GPU of a host runs: "enabled", "disabled", or "" to leave
+# each GPU as it is. ECC catches GPU memory errors (and NHC drains on the ones that need
+# a reset, roles/nhc) at the price of memory: on GPUs with GDDR memory about a
+# sixteenth of it is reserved. The mode is stored on the GPU, so the role sets it once
+# and asks for a reboot (roles/maintenance, reboot_request) for the GPUs still running
+# the other mode; a drained reboot applies it.
+nvidia_ecc_mode: ""
