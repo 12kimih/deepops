@@ -54,8 +54,3 @@
   tags:
     - rsyslog
     - logging
-
-- name: Setup undrain
-  ansible.builtin.include_tasks: undrain.yml
-  when: is_compute
-  tags: always

@@ -1,7 +1,37 @@
 ---
+# Only a node this run took out (drain.yml: maintenance_drained_here), and only while it
+# is still out for this run's reason: one a person took out meanwhile, for another
+# reason, stays out for them; one already back in service needs nothing.
+- name: Read the node's Slurm state before returning it
+  ansible.builtin.command:
+    argv: ["{{ maintenance_slurm_bin }}/scontrol", --json, show, node, "{{ inventory_hostname }}"]
+  delegate_to: "{{ maintenance_slurm_delegate }}"
+  register: maintenance_node_now
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: maintenance_drained_here | default(false) | bool
+
 - name: Return the node to Slurm
+  vars:
+    _node: "{{ maintenance_node_now.stdout | slurm_node(maintenance_reason) }}"
   ansible.builtin.command:
     argv: ["{{ maintenance_slurm_bin }}/scontrol", update, "nodename={{ inventory_hostname }}", state=resume]
   delegate_to: "{{ maintenance_slurm_delegate }}"
   changed_when: true
-  when: maintenance_drained_here | default(false) | bool
+  when:
+    - maintenance_node_now is not skipped
+    - _node.found
+    - _node.drain or _node.down
+    - _node.ours
+
+- name: Say who keeps the node out
+  vars:
+    _node: "{{ maintenance_node_now.stdout | slurm_node(maintenance_reason) }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} was taken out again during the run ({{ _node.state }}: {{ _node.reason }});
+      it stays out for whoever did that.
+  when:
+    - maintenance_node_now is not skipped
+    - _node.found
+    - not _node.ours
