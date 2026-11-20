@@ -318,6 +318,11 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #nvidia_power_limit_watts_by_model:  # example
 #  "NVIDIA A30": 150
 
+# GPU ECC (roles/nvidia_ecc): "enabled" or "disabled" on every GPU of the nodes, ""
+# leaves each GPU as it is. ECC reserves about a sixteenth of a GDDR GPU's memory; a
+# change is applied by the next (drained) reboot, which the role requests.
+#nvidia_ecc_mode: ""
+
 ################################################################################
 # Cluster Tools (site commands, shell defaults, login banner)                  #
 ################################################################################

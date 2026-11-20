@@ -216,6 +216,9 @@
   vars:
     deepops_phase: install
 
+- name: Set the GPUs' ECC mode
+  import_playbook: nvidia-software/nvidia-ecc.yml
+
 - name: Install enroot
   import_playbook: container/enroot.yml
   vars:

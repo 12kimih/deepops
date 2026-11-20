@@ -54,6 +54,7 @@ reboots each as it empties and returns it to service. See
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
 | `nvidia-software/nvidia-power-limit.yml` | slurm-cluster | persistent GPU power cap: the GPU model's (`nvidia_power_limit_watts_by_model`) or the host's (`nvidia_power_limit_watts`); a node with neither has its cap removed |
+| `nvidia-software/nvidia-ecc.yml` | slurm-node | every GPU in the ECC mode `nvidia_ecc_mode` declares (enabled or disabled; empty leaves them); a change is set at once and applied by the next reboot, which it requests |
 | `utilities/gpu-diag.yml` | slurm-node | GPU burn-in: one node at a time, drain it, run the DCGM diagnostics (`dcgmi diag -r 3`, `-e maintenance_verify_dcgm_level=N`) with the other verify checks, resume; a failing node stays drained |
 | `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS and IOMMU state; read-only |
 | `utilities/disable-acs.yml` | slurm-node | disables PCIe ACS for GPU peer-to-peer, persistently |

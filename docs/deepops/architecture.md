@@ -156,6 +156,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── nvidia_cuda_toolkit
 │   ├── nvidia_dcgm
 │   ├── nvidia_driver
+│   ├── nvidia_ecc
 │   ├── nvidia_hpc_sdk
 │   ├── nvidia_power_limit
 │   ├── nvidia_versions
