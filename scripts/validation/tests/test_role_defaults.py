@@ -11,14 +11,15 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "validation"))
 from role_defaults import role_default  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 
 class RoleDefaultTest(unittest.TestCase):
     def test_every_plain_scalar_reads_as_yaml_does(self):
         checked = 0
-        for path in sorted(ROOT.glob("roles/*/defaults/main.yml")):
+        for path in tracked("roles/*/defaults/main.yml"):
             role = path.parts[-3]
-            if role == "galaxy":
-                continue
             for name, value in (yaml.safe_load(path.read_text()) or {}).items():
                 # Single-token strings: what a validator reads (an image, a path, a name).
                 if isinstance(value, str) and value and not any(c in value for c in " #'\"{"):

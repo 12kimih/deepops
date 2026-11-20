@@ -3,12 +3,16 @@ the registry: a state setting, both paths, the record in both, no switch-gated i
 
 import importlib.util
 import re
+import sys
 import unittest
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 spec = importlib.util.spec_from_file_location("components", ROOT / "plugins/filter/components.py")
 components = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(components)
@@ -157,7 +161,7 @@ class Playbooks(unittest.TestCase):
         # name) or an include_role task, passes its state from the map, or kept where it
         # applies the role for something else (the NFS client part).
         uses = {}
-        for path in sorted((ROOT / "playbooks").rglob("*.yml")):
+        for path in tracked("playbooks/*.yml", "playbooks/*.yaml"):
             for play in yaml.safe_load(path.read_text()) or []:
                 for entry in (play or {}).get("roles") or []:
                     entry = entry if isinstance(entry, dict) else {"role": entry}
@@ -267,7 +271,9 @@ class Marks(unittest.TestCase):
                 norm(f"{{{{ {v} }}}}")
                 for v in re.findall(r"'file:'\s*~\s*([a-z_][a-z0-9_]*)\b(?!\s*~)", items)
             }
-            for path in role.glob("tasks/**/*.yml"):
+            for path in tracked(
+                f"{role.relative_to(ROOT)}/tasks/*.yml", f"{role.relative_to(ROOT)}/tasks/*.yaml"
+            ):
                 for task in _tasks(path):
                     for module in ("ansible.builtin.template", "ansible.builtin.copy"):
                         args = task.get(module)

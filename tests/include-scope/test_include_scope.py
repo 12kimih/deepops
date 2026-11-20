@@ -26,7 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import ansible_files, module, tasks  # noqa: E402
+from repo_scan import ansible_files, module, tasks, tracked  # noqa: E402
 
 # Ansible's own defaults, not the repository's ansible.cfg (whose settings and
 # fact cache would hide what a role does elsewhere): only the paths it adds are kept.
@@ -57,7 +57,7 @@ MINIMUM_INCLUDES = 30  # a check that evaluates fewer has lost its way
 
 def task_files(role):
     base = ROOT / "roles" / role / "tasks"
-    return sorted(p.relative_to(base).as_posix() for p in base.rglob("*.y*ml")) if base.is_dir() else []
+    return [p.relative_to(base).as_posix() for p in tracked(f"roles/{role}/tasks/*.y*ml")]
 
 
 def leaves(blocks):
@@ -133,9 +133,7 @@ class IncludeScope(unittest.TestCase):
     def test_include_arguments_mean_the_same_in_the_included_role(self):
         ansible, counter = Ansible(), [0]
         broken, needs_public = [], set()
-        for role in sorted(p.name for p in (ROOT / "roles").iterdir() if (p / "tasks").is_dir()):
-            if role == "galaxy":
-                continue
+        for role in sorted({p.relative_to(ROOT).parts[1] for p in tracked("roles/*/tasks/*")}):
             for tasks_from in task_files(role):
                 private = mismatches(ansible, role, tasks_from, False, counter)
                 if not private:
@@ -153,7 +151,7 @@ class IncludeScope(unittest.TestCase):
         molecule = sorted(
             path
             for stage in ("converge", "prepare", "side_effect", "verify", "cleanup")
-            for path in ROOT.glob(f"roles/*/molecule/*/{stage}.yml")
+            for path in tracked(f"roles/*/molecule/*/{stage}.yml")
         )
         for path in list(ansible_files()) + molecule:
             for task in tasks(path):

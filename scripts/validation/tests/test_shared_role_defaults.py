@@ -361,7 +361,7 @@ def ansible_sources():
 def example_settings():
     """{name: value} that config.example sets or shows commented."""
     found = {}
-    for path in sorted((ROOT / "config.example" / "group_vars").glob("*.yml")):
+    for path in tracked("config.example/group_vars/*.yml"):
         for entry in settings.entries(path.read_text()):
             found.setdefault(entry.name, entry.value)
     return found

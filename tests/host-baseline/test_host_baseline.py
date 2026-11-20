@@ -10,6 +10,7 @@ or a job inside slurmd running a deleted file must never stop those.
 
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,9 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import ansible_files  # noqa: E402
+
 SCRIPT = ROOT / "roles" / "host_baseline" / "files" / "orphan-services"
 PACKAGE_MODULES = {
     f"{prefix}{m}" for prefix in ("", "ansible.builtin.") for m in ("apt", "dnf", "yum", "package")
@@ -120,9 +124,8 @@ class OrphanServices(unittest.TestCase):
 class OneRemovalPath(unittest.TestCase):
     def test_only_host_baseline_removes_packages(self):
         offenders = []
-        files = sorted(ROOT.glob("roles/*/tasks/**/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml"))
-        for path in files:
-            if "galaxy" in path.parts or path.parts[-3:-1] == ("host_baseline", "tasks"):
+        for path in ansible_files():
+            if path.parts[-3:-1] == ("host_baseline", "tasks"):
                 continue
             data = yaml.safe_load(path.read_text())
             if not isinstance(data, list):

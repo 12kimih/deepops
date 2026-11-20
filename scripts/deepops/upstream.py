@@ -43,6 +43,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cuda_releases  # noqa: E402
 import image_pins  # noqa: E402
+from repo_files import tracked  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 ANNOTATION = re.compile(r"^\s*#\s*upstream:\s*(\S+)\s*(.*)$")
@@ -136,18 +137,9 @@ def newest(kind, args):
 def annotated_pins():
     """[(variable, value, kind, args, file:line)] for every `# upstream:` line in the
     roles' defaults and vars, with the pin on the line below it."""
-    files = subprocess.run(
-        ["git", "ls-files", "-z", "roles/*/defaults/main.yml", "roles/*/vars/*.yml", "roles/*/vars/*.yaml"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        errors="surrogateescape",
-        check=True,
-    ).stdout.split("\0")
     found = []
-    for rel in filter(None, files):
-        if rel.startswith("roles/galaxy/"):
-            continue
+    for path in tracked("roles/*/defaults/main.yml", "roles/*/vars/*.yml", "roles/*/vars/*.yaml"):
+        rel = path.relative_to(ROOT).as_posix()
         lines = (ROOT / rel).read_text().splitlines()
         for number, line in enumerate(lines, 1):
             m = ANNOTATION.match(line)

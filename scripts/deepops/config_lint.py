@@ -51,6 +51,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings  # noqa: E402
+from repo_files import tracked  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config.example"
@@ -63,19 +64,6 @@ PATH = re.compile(
 RETIRED_FILE = ROOT / "roles" / "retired_settings" / "vars" / "main.yml"
 # Read by Ansible itself or by tools outside the repository, not by our code.
 READ_ELSEWHERE = {"ansible_user", "ansible_host", "ansible_python_interpreter", "ansible_become"}
-
-
-def tracked(*patterns):
-    """Tracked files: what a commit holds, never untracked work in the tree."""
-    out = subprocess.run(
-        ["git", "ls-files", "-z", "--", *patterns],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        errors="surrogateescape",
-        check=True,
-    )
-    return [ROOT / p for p in out.stdout.split("\0") if p]
 
 
 def site_rev():
@@ -297,7 +285,7 @@ def check_dead():
                 found.setdefault(e.name, e.line)
             key = f"{label}/{src.rel}"
             named.append((key, key, private, found, tree.text(src.rel) or ""))
-    for path in [p for p in tracked("roles/*/defaults/main.yml") if "galaxy" not in p.parts]:
+    for path in tracked("roles/*/defaults/main.yml"):
         text = path.read_text()
         found = {e.name: e.line for e in settings.entries(text) if e.active}
         named.append((str(path), str(path.relative_to(ROOT)), False, found, text))

@@ -29,6 +29,7 @@ class TrackedTests(unittest.TestCase):
     def test_only_tracked_files_are_read(self):
         # In a throwaway repository, never the shared working tree: a probe left in
         # roles/ by a killed run would be seen by every other session's tools.
+        import functools
         import os
         import subprocess
         import tempfile
@@ -42,7 +43,12 @@ class TrackedTests(unittest.TestCase):
                 (root / "roles" / role / "defaults" / "main.yml").write_text(f"{role}_version: 1.0\n")
             subprocess.run(["git", "init", "-q"], cwd=root, check=True, env=env)
             subprocess.run(["git", "add", "roles/kept"], cwd=root, check=True, env=env)
-            with mock.patch.object(gen, "ROOT", root), mock.patch.dict(os.environ, env, clear=True):
+            listing = functools.partial(gen.tracked, root=root)  # scripts/deepops/repo_files.py
+            with (
+                mock.patch.object(gen, "ROOT", root),
+                mock.patch.object(gen, "tracked", listing),
+                mock.patch.dict(os.environ, env, clear=True),
+            ):
                 self.assertEqual(gen.roles(), ["kept"])
                 self.assertNotIn("stray", gen.gen_role_tree(""))
 

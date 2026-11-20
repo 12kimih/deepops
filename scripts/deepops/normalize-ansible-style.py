@@ -28,8 +28,11 @@ Usage: normalize-ansible-style.py [--check] PATH...
 
 import os
 import re
-import subprocess
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from repo_files import tracked  # noqa: E402
 
 BUILTIN = set(
     """
@@ -457,27 +460,13 @@ def targets(paths):
         if os.path.isfile(p):
             yield p
             continue
-        listed = subprocess.run(
-            [
-                "git",
-                "ls-files",
-                "-z",
-                "--cached",
-                "--",
-                f"{p}/*.yml",
-                f"{p}/*.yaml",
-                f"{p}/*.j2",
-                f"{p}/**/templates/**",
-            ],
-            capture_output=True,
-            text=True,
-            errors="surrogateescape",
-            check=True,
-        ).stdout
-        for f in sorted(set(listed.split("\0")) - {""}):
+        for path in tracked(
+            f"{p}/*.yml", f"{p}/*.yaml", f"{p}/*.j2", f"{p}/**/templates/**", root=Path.cwd()
+        ):
+            f = os.path.relpath(path)
             # Templates are not YAML until rendered; only their Jinja is normalized.
-            if os.path.isfile(f) and (is_template(f) or not TEMPLATES.search(f)):
-                yield os.path.relpath(f)
+            if is_template(f) or not TEMPLATES.search(f):
+                yield f
 
 
 def main(argv):
