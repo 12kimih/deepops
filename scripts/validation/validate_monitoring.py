@@ -75,23 +75,32 @@ def absent_ok(metric):
     return next((why for why, pattern in ABSENT_OK.items() if re.fullmatch(pattern, metric)), None)
 
 
-# Where each metric comes from, first match wins: a missing metric is a rollout gap only
-# when its source reports others (a component switched off reports none). Three write
-# slurm_ names: the GPU allocation textfile (its names, from the writer itself), the
-# backups, and slurmctld.
+# Where each metric comes from, first full match wins: a missing metric is a rollout gap
+# only when its source reports others (a component switched off reports none). Every
+# metric the rules and dashboards read has one (tests), so a new writer cannot go
+# unchecked. Three write slurm_ names: the GPU allocation textfile (its names, from the
+# writer itself), the backups, and slurmctld.
 SLURM_METRICS = set(re.findall(r"^# TYPE (\S+) ", slurm_metrics.textfile({"jobs": []}, {"nodes": []}), re.M))
-SOURCES = (
-    ("slurm_metrics", lambda m: m in SLURM_METRICS),
-    ("slurm_backup", lambda m: m.startswith("slurm_backup_")),
-    ("slurmctld", lambda m: m.startswith("slurm_")),
-    *((p.rstrip("_"), lambda m, p=p: m.startswith(p))
-      for p in ("DCGM_", "node_", "os_updates_", "ipmi_", "container_storage_gc_", "egress_policy_")),
-)  # fmt: skip
+SOURCES = {
+    "slurm_metrics": "|".join(map(re.escape, sorted(SLURM_METRICS))),
+    "slurm_backup": r"slurm_backup_\w+",
+    "slurmctld": r"slurm_\w+",
+    "DCGM": r"DCGM_\w+",
+    "node": r"node_\w+",
+    "ipmi": r"ipmi_\w+",
+    "os_updates": r"os_updates_\w+",
+    "container_storage_gc": r"container_storage_gc_\w+",
+    "egress_policy": r"egress_policy_\w+",
+    "tls": r"\w+_tls_cert_\w+",  # each service's certificate (rules/tls.yml)
+    "prometheus": r"prometheus_\w+|up|scrape_\w+|ALERTS|ALERTS_FOR_STATE",
+    "alertmanager": r"alertmanager_\w+",
+    "process": r"process_\w+",  # every exporter's own process
+}
 
 
 def source(metric):
-    """The SOURCES name METRIC comes from, or None (Prometheus' and Alertmanager's own)."""
-    return next((name for name, matches in SOURCES if matches(metric)), None)
+    """The SOURCES name METRIC comes from, or None."""
+    return next((name for name, pattern in SOURCES.items() if re.fullmatch(pattern, metric)), None)
 
 
 # How recent a sample must be for its metric to count as present (seconds; many scrape

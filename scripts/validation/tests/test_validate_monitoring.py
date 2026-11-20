@@ -66,7 +66,19 @@ class Checks(unittest.TestCase):
         self.assertEqual(vm.source("slurm_gpu_configured"), "slurm_metrics")
         self.assertEqual(vm.source("slurm_node_gpus"), "slurmctld")
         self.assertEqual(vm.source("slurm_backup_last_status"), "slurm_backup")
-        self.assertIsNone(vm.source("prometheus_tsdb_compactions_failed_total"))
+        self.assertEqual(vm.source("prometheus_tsdb_compactions_failed_total"), "prometheus")
+
+    def test_every_metric_the_repository_reads_has_a_source(self):
+        # A metric without one is never a gap: a new writer must name its source.
+        reads, recorded = vm.repo_metrics()
+        sourceless = sorted(
+            metric
+            for name in reads
+            for metric in recorded.get(name, {name})
+            if metric not in recorded and vm.source(metric) is None
+        )
+        self.assertEqual(sourceless, [], "add each to validate_monitoring.SOURCES")
+        self.assertEqual(vm.source("open_ondemand_tls_cert_not_after_seconds"), "tls")
 
     def test_metrics_that_may_be_absent_are_listed_by_why_not_missing(self):
         names = {"DCGM_FI_DEV_GPU_UTIL_RATIO", "node_uname_info", "up"}
