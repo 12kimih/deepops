@@ -8,10 +8,14 @@ one branch). For each commit being pushed, and each file it changes, this looks 
 file's earlier versions on the first-parent line: content equal to one of them, other
 than the parent's own, is a step back and refused. Exactly inverting a hunk of a recent
 commit while the file has other edits too is reported as a warning (on its own it is as
-often a deliberate reversal). In a refused commit, deleting a file a recent
-commit added is listed too (a stale tree lacks the newer files); a deletion alone is
-the ordinary end of a refactor and passes. A commit whose message says it reverts, reapplies or restores is meant to, and passes; the
-commits it would undo are printed so the author can tell.
+often a deliberate reversal). In a refused commit, deleting a file a recent commit added
+is listed too (a stale tree lacks the newer files); a deletion alone is the ordinary end
+of a refactor and passes.
+
+A reversal that is meant names a commit it undoes in the message (git revert writes
+"This reverts commit <hash>."): a word like "revert" alone is not enough, since messages
+about backups say "restore". A merge is checked against its first parent, as the change
+it lands, and its message includes those of the commits it merges.
 
   no_silent_revert.py push            as a pre-push hook (the pushed commits)
   no_silent_revert.py range REV...    any rev-list arguments, e.g. origin/main..HEAD
@@ -26,8 +30,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from push_range import push_revs  # noqa: E402
 
-# git revert writes "Revert ..." and, reverting a revert, "Reapply ...".
-ESCAPE = re.compile(r"\b(revert|reapply|restor)", re.IGNORECASE)
+# An abbreviated commit hash in a message (git's shortest default is 7 digits).
+HASH = re.compile(r"\b[0-9a-f]{7,40}\b")
 # How far back a deleted file counts as recently added, and a hunk as recent.
 RECENT = 30
 # A hunk this many changed lines or more is too specific to be inverted by chance.
@@ -96,15 +100,29 @@ def inverted_hunk(parent: str, commit: str, path: str, revs: list[str]) -> str |
     return None
 
 
+def named(message: str, revs: list[str]) -> bool:
+    """Whether the message names one of revs by a hash prefix."""
+    words = HASH.findall(message.lower())
+    return any(rev.startswith(word) for word in words for rev in revs)
+
+
 def findings_for(commit: str) -> tuple[list[str], list[str]]:
     """(refusals, warnings) for one commit. A whole file back to an older version, or a
     recently deleted one back as it was, is a refusal, with the newer files the same
-    commit deletes; an exactly inverted hunk
-    alone is a warning (in history it marked deliberate reversals as often as not)."""
+    commit deletes; an exactly inverted hunk alone is a warning (in history it marked
+    deliberate reversals as often as not). A finding whose undone commit the message
+    names is meant and dropped."""
     parents = git("rev-list", "--parents", "-n", "1", commit).split()[1:]
-    if len(parents) != 1 or ESCAPE.search(git("log", "-1", "--format=%B", commit)):
-        return [], []  # a root, a merge, or a declared revert
-    parent, back, deleted, inverted = parents[0], [], [], []
+    if not parents:
+        return [], []  # a root has nothing to undo
+    parent = parents[0]
+    # A merge lands what it merges: its message stands with theirs.
+    message = (
+        git("log", "--format=%B", f"{parent}..{commit}")
+        if len(parents) > 1
+        else git("log", "-1", "--format=%B", commit)
+    )
+    back, deleted, inverted = [], [], []  # (text, the commits it undoes)
     changes = git("diff-tree", "-r", "--no-commit-id", "--no-renames", "--name-status", parent, commit)
     recent = set(git("rev-list", "--first-parent", "-n", str(RECENT), parent).split())
     for line in changes.splitlines():
@@ -114,34 +132,35 @@ def findings_for(commit: str) -> tuple[list[str], list[str]]:
             touching = git("log", "--first-parent", "--format=%H", parent, "--", path).split()
             for k, rev in enumerate(touching):
                 if blob(f"{rev}^", path) == new:
-                    undone = ", ".join(subject(r) for r in touching[: k + 1])
-                    back.append(f"{path} goes back to its content before {undone}")
+                    undone = touching[: k + 1]
+                    text = ", ".join(subject(r) for r in undone)
+                    back.append((f"{path} goes back to its content before {text}", undone))
                     break
             else:
                 rev = inverted_hunk(parent, commit, path, [r for r in touching if r in recent])
                 if rev:
-                    inverted.append(f"{path} undoes a change of {subject(rev)}")
+                    inverted.append((f"{path} undoes a change of {subject(rev)}", [rev]))
         elif status == "A":
             # A recently deleted file back exactly as it was: a stale tree resurrects it.
             gone = git(
                 "log", "--first-parent", "--diff-filter=D", "-n", "1", "--format=%H", parent, "--", path
-            )
-            gone = gone.strip()
+            ).strip()
             if gone in recent and blob(f"{gone}^", path) == blob(commit, path):
-                back.append(f"{path} comes back as it was before {subject(gone)} deleted it")
+                back.append((f"{path} comes back as it was before {subject(gone)} deleted it", [gone]))
         elif status == "D":
             added = git("log", "--first-parent", "--diff-filter=A", "--format=%H", parent, "--", path).split()
             if added and added[0] in recent:
-                deleted.append(f"{path} is deleted, added by {subject(added[0])}")
+                deleted.append((f"{path} is deleted, added by {subject(added[0])}", [added[0]]))
+    back, inverted = ([f for f in found if not named(message, f[1])] for found in (back, inverted))
     head = subject(commit)
     if back:  # a stale tree: everything it undid is part of the refusal
-        return [f"{head}: {f}" for f in back + inverted + deleted], []
-    return [], [f"{head}: {f}" for f in inverted]
+        return [f"{head}: {text}" for text, _ in back + inverted + deleted], []
+    return [], [f"{head}: {text}" for text, _ in inverted]
 
 
 def check(revs: list[str]) -> tuple[list[str], list[str]]:
     refused, warned = [], []
-    for commit in git("rev-list", "--reverse", "--no-merges", *revs).split():
+    for commit in git("rev-list", "--reverse", *revs).split():
         r, w = findings_for(commit)
         refused += r
         warned += w
@@ -164,13 +183,14 @@ def main(argv: list[str]) -> int:
         refused += r
         warned += w
     if warned:
-        print("Check that these reversals are meant (say revert/restore in the message to silence this):")
+        print("Check that these reversals are meant (name the commit undone in the message to silence this):")
         print("\n".join(f"  {f}" for f in warned))
     if refused:
         print("A commit undoes newer commits without saying so (an out-of-date copy committed on top?):")
         print("\n".join(f"  {f}" for f in refused))
         print(
-            "Rebase onto the remote and redo the change, or say revert/restore in the message if it is meant."
+            "Rebase onto the remote and redo the change, or name the commit it undoes in the message"
+            " if it is meant (git revert does)."
         )
         return 1
     return 0

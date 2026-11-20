@@ -111,11 +111,45 @@ class NoSilentRevertTests(unittest.TestCase):
     def test_a_declared_revert_passes(self):
         r = self.repo
         r.commit("a", {"f": "1\n"})
-        r.commit("b", {"f": "2\n"})
-        r.commit('Revert "b"', {"f": "1\n"})
-        r.commit('Reapply "b"', {"f": "2\n"})
-        r.commit("e: restore what d reverted by mistake", {"f": "1\n"})
+        b = r.commit("b", {"f": "2\n"})
+        r.git("revert", "--no-edit", b)  # "This reverts commit <b>."
+        r.git("revert", "--no-edit", "HEAD")  # Reapply, naming the revert
+        reapply = r.git("rev-parse", "HEAD")
+        r.commit(f"e: take b out again, undoing {reapply[:9]}", {"f": "1\n"})
         self.assertEqual(r.guard("range", "HEAD~3..HEAD").returncode, 0)
+
+    def test_a_word_alone_does_not_declare_a_revert(self):
+        # Backup messages say "restore": only naming the undone commit counts.
+        r = self.repo
+        r.commit("a", {"f": "1\n"})
+        r.commit("b", {"f": "2\n"})
+        r.commit("c: restore the backup timer", {"f": "1\n"})
+        self.assertEqual(r.guard("range", "HEAD~1..HEAD").returncode, 1)
+
+    def test_a_merge_that_takes_a_stale_side_is_refused(self):
+        r = self.repo
+        r.commit("a", {"f": "1\n"})
+        r.git("checkout", "-q", "-b", "side")
+        r.commit("side: unrelated", {"g": "x\n"})
+        r.git("checkout", "-q", "main")
+        r.commit("b: main moves on", {"f": "2\n"})
+        r.git("merge", "-q", "--no-ff", "--no-commit", "side")
+        (r.path / "f").write_text("1\n")  # a conflict resolved with the stale copy
+        r.git("add", "f")
+        r.git("commit", "-q", "-m", "merge side")
+        out = r.guard("range", "HEAD^..HEAD")
+        self.assertEqual(out.returncode, 1, out.stdout)
+        self.assertIn("f goes back to its content before", out.stdout)
+
+    def test_an_ordinary_merge_passes(self):
+        r = self.repo
+        r.commit("a", {"f": "1\n"})
+        r.git("checkout", "-q", "-b", "side")
+        r.commit("side: g", {"g": "x\n"})
+        r.git("checkout", "-q", "main")
+        r.commit("b: main moves on", {"f": "2\n"})
+        r.git("merge", "-q", "--no-ff", "-m", "merge side", "side")
+        self.assertEqual(r.guard("range", "HEAD^..HEAD").returncode, 0)
 
     def test_a_stale_tree_also_lists_the_newer_files_it_drops(self):
         r = self.repo
@@ -161,8 +195,8 @@ class NoSilentRevertTests(unittest.TestCase):
         r.commit("b: turn it off", {"switch": "false\n"})
         r.commit("c: turn it on again", {"switch": "true\n"})
         self.assertEqual(r.guard("range", "HEAD~1..HEAD").returncode, 1)
-        r.commit("d: off", {"switch": "false\n"})
-        r.commit("e: restore the switch to on", {"switch": "true\n"})
+        d = r.commit("d: off", {"switch": "false\n"})
+        r.commit(f"e: on again, undoing {d[:8]}", {"switch": "true\n"})
         self.assertEqual(r.guard("range", "HEAD~1..HEAD").returncode, 0)
 
 
