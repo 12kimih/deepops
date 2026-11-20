@@ -37,9 +37,9 @@ For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./m
 
 Container images are only needed if you want to run the tests built into the playbook:
 
-- nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
-- nvcr.io/nvidia/pytorch:26.05-py3
-- nvcr.io/nvidia/tensorflow:25.02-tf2-py3
+`ngc_ready_cuda_container`, `ngc_ready_pytorch_container` and
+`ngc_ready_tensorflow_container`, each pinned by tag and digest in
+[versions.md](../deepops/versions.md).
 
 For instructions on setting up a Docker registry mirror, see the [doc on Docker mirrors](./mirror-docker-images.md).
 
@@ -62,9 +62,9 @@ For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./m
 
 Container images (how to mirror) are only needed if you want to run the tests built into the playbook:
 
-- nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
-- nvcr.io/nvidia/pytorch:26.05-py3
-- nvcr.io/nvidia/tensorflow:25.02-tf2-py3
+`ngc_ready_cuda_container`, `ngc_ready_pytorch_container` and
+`ngc_ready_tensorflow_container`, each pinned by tag and digest in
+[versions.md](../deepops/versions.md).
 
 For instructions on setting up a Docker registry mirror, see the [doc on Docker mirrors](./mirror-docker-images.md).
 
@@ -176,10 +176,13 @@ must serve NVIDIA's file unchanged.
 If running the container tests as part of the NGC-Ready playbook, set the following variables in your DeepOps configuration:
 
 ```yaml
-ngc_ready_cuda_container: "<your-container-registry>/nvidia/cuda:13.2.1-base-ubuntu24.04"
-ngc_ready_pytorch_container: "<your-container-registry>/nvidia/pytorch:26.05-py3"
-ngc_ready_tensorflow_container: "<your-container-registry>/nvidia/tensorflow:25.02-tf2-py3"
+ngc_ready_cuda_container: "<your-container-registry>/nvidia/cuda:<tag>@sha256:<digest>"
+ngc_ready_pytorch_container: "<your-container-registry>/nvidia/pytorch:<tag>@sha256:<digest>"
+ngc_ready_tensorflow_container: "<your-container-registry>/nvidia/tensorflow:<tag>@sha256:<digest>"
 ```
+
+Keep each default's tag and digest: a mirror made as in the Docker mirrors doc keeps
+the digest, so the pin still proves the image is the one reviewed.
 
 ## Running the NGC-Ready playbook
 

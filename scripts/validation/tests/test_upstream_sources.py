@@ -40,6 +40,18 @@ class UpstreamSources(unittest.TestCase):
             missing, [], "add `# upstream: <kind> <args>` above it (see scripts/deepops/upstream.py)"
         )
 
+    def test_every_annotation_is_one_upstream_py_reads(self):
+        """A `registry` line narrows the image pin below it and is read by the image pass;
+        every other line is a version source upstream.py resolves (or lists, held)."""
+        sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+        import upstream
+
+        kinds = {kind for _, _, kind, _, _ in upstream.annotated_pins()}
+        self.assertNotIn("registry", kinds)
+        self.assertLessEqual(kinds, {"git", "pypi", "helm", "deb", "oci", "cuda", "manual", "hold"})
+        narrowed = [where for _, _, where in upstream.image_pins.pins() if upstream.annotation_above(where)]
+        self.assertTrue(any("deploy_defaults" in w for w in narrowed), "the CUDA check image is narrowed")
+
 
 if __name__ == "__main__":
     unittest.main()

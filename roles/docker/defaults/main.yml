@@ -103,9 +103,12 @@ docker_live_restore: true
 docker_log_driver: local
 
 # Registries pulled from over plain HTTP (host:port), and mirrors tried before Docker
-# Hub (URLs); daemon.json insecure-registries and registry-mirrors. Since Docker 29 a
-# loopback registry (localhost:5000) is no longer trusted implicitly: list it too.
+# Hub (URLs); daemon.json insecure-registries and registry-mirrors, each written only
+# when not empty. Since Docker 29, a listed insecure registry ends the implicit trust
+# of loopback ones: list a local registry (localhost:5000) too. Empty, the key is left
+# out and loopback registries stay insecure by default.
 # https://docs.docker.com/reference/cli/dockerd/#insecure-registries
+# https://docs.docker.com/engine/release-notes/29/
 docker_insecure_registries: []
 docker_registry_mirrors: []
 # Options of the logging driver (daemon.json log-opts), e.g. {max-size: 50m, max-file:

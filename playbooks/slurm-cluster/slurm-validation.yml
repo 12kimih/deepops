@@ -8,10 +8,13 @@
 #     -e '{cleanup: True}'
 - hosts: slurm-master[0]
 
+  roles:
+    - role: deploy_defaults  # ngc_ready_pytorch_container
+
   vars:
-    # String; Container for nccl performance/validation tests. Either docker
-    #   repo or can be path to sqsh file.
-    base_container: "nvcr.io/nvidia/pytorch:26.04-py3"
+    # String; Container for nccl performance/validation tests. Either an image
+    #   (the pinned NGC PyTorch by default) or a path to a sqsh file.
+    base_container: "{{ ngc_ready_pytorch_container }}"
     # String; Container to be created or one that might exist with nccl tests.
     #   If `compile_nccl_tests` is True, it must be a sqsh file.
     nccl_tests_container: "${HOME}/enroot_images/nccl_tests_slurm_val.sqsh"

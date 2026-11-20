@@ -8,9 +8,11 @@ verdict logic; they do not prove a real GPU job ran (that needs a live run).
 import importlib.util
 import json
 import os
+import sys
 import unittest
 
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, SCRIPTS_DIR)  # its shared modules (role_defaults), as when run as a script
 spec = importlib.util.spec_from_file_location(
     "validate_runai", os.path.join(SCRIPTS_DIR, "validate_runai.py")
 )

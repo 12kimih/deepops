@@ -95,7 +95,7 @@ spec:
   schedulerName: kai-scheduler
   containers:
     - name: main
-      image: nvcr.io/nvidia/cuda:13.0.2-base-ubuntu24.04
+      image: nvcr.io/nvidia/cuda:<tag>  # ngc_ready_cuda_container in docs/deepops/versions.md
       command: ["nvidia-smi", "-L"]
 ```
 

@@ -348,27 +348,18 @@ reference host; distribution repositories remain a separate prerequisite.
    failed pull, or an unparseable rendered image as a collection failure; do not
    continue with a partial archive.
 
-4. Pull and archive the CUDA validator plus the images used by enabled Slurm
-   monitoring/registry roles. For the current validator and registry images:
-
-   ```bash
-   mkdir -p /tmp/images
-   docker pull nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-   docker save -o /tmp/images/nvidia-cuda-12.4.1-base-ubuntu22.04.tar \
-     nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-   docker pull registry:3.1.2
-   docker save -o /tmp/images/registry-3.1.2.tar registry:3.1.2
-   ```
-
-   When Slurm monitoring stays enabled, also mirror the images selected by
-   `prometheus_container`, `grafana_container`, `alertmanager_container`,
-   `node_exporter_container`, and `dcgm_exporter_container`, then override those
-   variables with their internal registry paths. Every image must stay pinned by
+4. Pull and archive every image the roles pin: the validators' CUDA image
+   (`ngc_ready_cuda_container`), the registry, and, when Slurm monitoring stays
+   enabled, the images of `prometheus_container`, `grafana_container`,
+   `alertmanager_container`, `node_exporter_container` and
+   `dcgm_exporter_container`. Override those variables with their internal
+   registry paths. Every image must stay pinned by
    digest (`repo:tag@sha256:...`; the deploy refuses unpinned references), so mirror
    with a tool that keeps the manifest list intact (`skopeo copy --all`, or
    `docker buildx imagetools create`) and keep the same `@sha256:` suffix:
 
    ```bash
+   mkdir -p /tmp/images
    # Every image the roles pin (repo:tag@sha256), from the roles themselves.
    uv run python scripts/deepops/image_pins.py list | grep -v Dockerfile \
      | awk '{print $1}' > /tmp/images/pins.txt
@@ -519,14 +510,16 @@ sha256sum -c SHA256SUMS
 
 3. Load the registry image and start the isolated registry if the site does
    not already provide one. Run this fallback on the registry host itself. It
-   is plain HTTP, so the imports below push through Docker's IPv4 loopback
-   exception (`127.0.0.1:5000`); cluster nodes use the reachable
+   is plain HTTP, so the imports below push through Docker's loopback exception
+   (`127.0.0.1:5000`), which holds only while that daemon lists no
+   `insecure-registries` (Docker 29 and later; otherwise list `127.0.0.1:5000`
+   there too, `docker_insecure_registries`); cluster nodes use the reachable
    `registry-host:5000` name configured later. Do not push to
    `registry-host:5000` from the importer unless that Docker daemon has been
    separately and deliberately configured for the insecure endpoint:
 
    ```bash
-   docker load -i /tmp/images/registry-3.1.2.tar
+   docker load -i /tmp/images/deepops-images.tar   # every pin, the registry among them
    docker volume create registry-images
    docker run -d -p 5000:5000 --restart=always --name registry \
      -v registry-images:/var/lib/registry registry:3.1.2
@@ -539,11 +532,7 @@ sha256sum -c SHA256SUMS
    pushed as `127.0.0.1:5000/nvidia/cuda:...`:
 
    ```bash
-   docker load -i /tmp/images/nvidia-cuda-12.4.1-base-ubuntu22.04.tar
-   docker tag nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04 \
-     127.0.0.1:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
-   docker push 127.0.0.1:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
-   docker load -i /tmp/images/deepops-images.tar
+   # deepops-images.tar was loaded in step 3.
    # The local registry keeps each repository path, without the source registry's host.
    while read -r pin; do
      image="${pin%@*}"
@@ -782,7 +771,7 @@ the public default CUDA image with the imported registry image:
 
 ```bash
 python3 scripts/validation/validate_k8s.py --json --cuda-smoke \
-  --cuda-image registry-host:5000/nvidia/cuda:12.4.1-base-ubuntu22.04
+  --cuda-image "registry-host:5000/nvidia/cuda:<tag>"   # ngc_ready_cuda_container's tag
 ```
 
 Require exit code `0`, `"ok": true`, `nodes_ready == nodes_total`,

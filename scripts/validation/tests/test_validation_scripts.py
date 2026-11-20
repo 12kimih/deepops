@@ -14,6 +14,7 @@ import unittest
 from unittest import mock
 
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, SCRIPTS_DIR)  # their shared modules (role_defaults), as when run as scripts
 
 
 def load(name):
