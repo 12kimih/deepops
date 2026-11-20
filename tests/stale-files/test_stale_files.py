@@ -164,16 +164,19 @@ class Evidence(unittest.TestCase):
         conf = self.tmp / "profile.d"
         hand = self.put("profile.d/ssh-key.sh", "ssh-keygen\n")
         named = self.put("profile.d/deepops-env.sh", "export X=1\n")
+        role = self.put("profile.d/zz-unit.sh", "# roles/nvidia_driver: persistence mode on\n")
         ours = self.put("profile.d/z10-cluster-tools.sh", "# Ansible managed\n")
         owned = self.put("profile.d/bash_completion.sh")
         recorded = self.put("profile.d/recorded.sh")
         self.put("profile.d/claimed/inside.sh")  # a directory: never listed itself
         found = mod.unowned_config([str(conf), str(self.tmp / "missing")], {owned}, ())
-        self.assertEqual(found, [f"{named} (deepops)", recorded, hand, f"{ours} (deepops)"])
+        self.assertEqual(
+            found, [f"{named} (deepops)", recorded, hand, f"{ours} (deepops)", f"{role} (deepops)"]
+        )
         # What a component record claims reaches it as owned (files) or claimed (trees).
         self.assertEqual(
             mod.unowned_config([str(conf)], {owned, recorded}, ()),
-            [f"{named} (deepops)", hand, f"{ours} (deepops)"],
+            [f"{named} (deepops)", hand, f"{ours} (deepops)", f"{role} (deepops)"],
         )
 
     def test_unit_overrides_leave_out_enable_links_and_snapd_units(self):
@@ -185,8 +188,9 @@ class Evidence(unittest.TestCase):
         (root / "multi-user.target.wants" / "docker.service").symlink_to(copy)
         self.put("system/multi-user.target.wants/stray.service")
         (root / "alias.service").symlink_to(copy)
-        self.assertEqual(mod.unit_overrides(set(), str(root)), sorted([copy, dropin]))
-        self.assertEqual(mod.unit_overrides({copy}, str(root)), [dropin])
+        ours = self.put("system/nvidia-persistenced.service", "# roles/nvidia_driver: persistence on\n")
+        self.assertEqual(mod.unit_overrides(set(), str(root)), sorted([copy, dropin]) + [f"{ours} (deepops)"])
+        self.assertEqual(mod.unit_overrides({copy}, str(root)), [dropin, f"{ours} (deepops)"])
 
     def test_prompt_copies_are_listed_and_package_working_copies_are_not(self):
         root = self.tmp / "etc"
