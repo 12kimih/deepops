@@ -32,6 +32,14 @@ NVIDIA's `cuda-nvml-dev-<slurm_nvml_cuda_version>` (the NVML header and link stu
 never `/usr/local/cuda`), and stops if a plugin in `slurm_deb_required_plugins` is
 missing or `job_submit_lua.so` does not link Lua 5.4. dpkg never starts or restarts a
 Slurm daemon (the build passes `--no-start`): the role restarts them in Slurm's order.
+SchedMD's `debian/` directory packages none of the contribs its RPMs ship
+(`slurm-contribs`: `seff`, `smail`, `sjobexitmod`, `sjstat`, and `sgather`); the build
+adds them as `slurm-smd-contribs`, installed on every host.
+
+The packages are versioned `<slurm_version>-1+deepops<slurm_deb_packaging>`. The
+repository holds one build per version, so a change to what the build puts in the
+packages raises `slurm_deb_packaging`: the next run builds the new version and moves
+every host to it, a change within the release that needs no upgrade playbook.
 
 pyxis (`slurm_pyxis_version`) is built in the same container from NVIDIA's own
 `debian/` directory, against the `slurm-smd-dev` of this version, as

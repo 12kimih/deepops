@@ -31,6 +31,10 @@ Build-Depends:
  python3,
 Homepage: http://slurm.schedmd.com
 """
+CHANGELOG = """slurm-smd (26.05.6-1) UNRELEASED; urgency=medium
+
+  * Initial release.
+"""
 RULES = """override_dh_auto_configure:
 \tdh_auto_configure -- --sysconfdir=/etc/slurm --disable-debug --with-pmix --enable-pam
 
@@ -120,6 +124,39 @@ class PackageBuild(unittest.TestCase):
         ]
         self.assertEqual(block, "override_dh_shlibdeps:\n\tdh_shlibdeps -Xgpu_nvml.so")
 
+    def test_the_version_carries_the_packaging_revision(self):
+        self.assertEqual(render(DEFAULTS["slurm_deb_version"], variables()), "26.05.6-1+deepops2")
+        out = replace(CHANGELOG, "Version the packages {{ slurm_deb_version }}")
+        self.assertTrue(out.startswith("slurm-smd (26.05.6-1+deepops2) UNRELEASED;"), out)
+
+    def test_the_contribs_are_installed_and_packaged(self):
+        """SchedMD's debian/ packages no contribs; seff is in the user guide."""
+        values = variables()
+        rules = render(
+            find(BUILD, "Install the contribs debian/rules leaves out")["blockinfile"]["block"], values
+        )
+        self.assertTrue(rules.startswith("execute_after_dh_auto_install:\n"))
+        for line in rules.splitlines()[1:]:
+            self.assertTrue(line.startswith("\t"), line)  # a make recipe line
+        for contrib in ("seff", "sgather", "sjobexit"):
+            self.assertIn(f"/contribs/{contrib} install DESTDIR=$(CURDIR)/debian/tmp", rules)
+        self.assertIn("install -D -m755 contribs/sjstat debian/tmp/usr/bin/sjstat", rules)
+        files = find(BUILD, "Package the contribs")
+        listed = {item["name"]: render(item["lines"], values) for item in files["loop"]}
+        self.assertEqual(
+            sorted(listed["slurm-smd-contribs.install"]),
+            [f"usr/bin/{c}" for c in ("seff", "sgather", "sjobexitmod", "sjstat", "smail")],
+        )
+        self.assertIn("slurm-smd-contribs", DEFAULTS["slurm_packages_common"])
+
+    def test_the_contribs_package_is_a_paragraph_of_its_own(self):
+        block = render(find(BUILD, "Declare the contribs package")["blockinfile"]["block"], variables())
+        control = CONTROL + "# BEGIN slurm-smd-contribs\n" + block + "\n# END slurm-smd-contribs\n"
+        paragraphs = [p for p in re.split(r"\n\s*\n", control) if p.strip()]
+        self.assertEqual(len(paragraphs), 2)
+        self.assertRegex(paragraphs[1], r"(?m)^Package: slurm-smd-contribs$")
+        self.assertIn(" slurm-smd-libslurm-perl (>= ${source:Version}),", paragraphs[1])
+
     def test_required_plugins_include_lua_nvml_metrics_pmix(self):
         for plugin in ("job_submit_lua.so", "gpu_nvml.so", "metrics_openmetrics.so", "mpi_pmix.so"):
             self.assertIn(plugin, DEFAULTS["slurm_deb_required_plugins"])
@@ -154,6 +191,13 @@ class VersionCheck(unittest.TestCase):
     def test_down_is_refused(self):
         self.assertFalse(self.supported("26.05.6", "25.11.6"))
         self.assertFalse(self.supported("26.05.7", "26.05.6"))
+
+    def test_a_packaging_revision_is_no_version_change(self):
+        note = find(VERSION, "Note the installed Slurm")
+        values = variables(slurm_installed_deb={"rc": 0, "stdout": "ii 26.05.6-1"})
+        values["_deb"] = render(note["vars"]["_deb"], values)
+        self.assertEqual(render(note["vars"]["_deb_version"], values), "26.05.6")
+        self.assertTrue(self.allowed("26.05.6", "26.05.6", upgrade=False))
 
     def test_a_change_needs_the_upgrade_playbook(self):
         self.assertFalse(self.allowed("25.11.6", "26.05.6", upgrade=False))
@@ -254,7 +298,7 @@ class PyxisPackage(unittest.TestCase):
         return render(render(DEFAULTS["slurm_pyxis_deb_version"], variables()), variables())
 
     def test_the_version_names_this_slurm(self):
-        self.assertEqual(self.deb_version(), "0.24.0-1+slurm26.05.6.1")
+        self.assertEqual(self.deb_version(), "0.24.0-1+slurm26.05.6.1+deepops2")
 
     def test_only_the_first_changelog_entry_is_renamed(self):
         values = variables()
@@ -263,12 +307,12 @@ class PyxisPackage(unittest.TestCase):
         out = re.sub(
             render(task["regexp"], values), render(task["replace"], values), PYXIS_CHANGELOG, flags=re.M
         )
-        self.assertTrue(out.startswith("nvslurm-plugin-pyxis (0.24.0-1+slurm26.05.6.1) UNRELEASED;"))
+        self.assertTrue(out.startswith("nvslurm-plugin-pyxis (0.24.0-1+slurm26.05.6.1+deepops2) UNRELEASED;"))
         self.assertIn("nvslurm-plugin-pyxis (0.23.0-1) UNRELEASED;", out)
 
     def test_it_depends_on_exactly_this_slurm_not_on_enroot(self):
         out = replace(PYXIS_CONTROL, "Make pyxis depend on this Slurm")
-        self.assertIn("Depends: ${shlibs:Depends}, ${misc:Depends}, slurm-smd (= 26.05.6-1)\n", out)
+        self.assertIn("Depends: ${shlibs:Depends}, ${misc:Depends}, slurm-smd (= 26.05.6-1+deepops2)\n", out)
         self.assertNotIn("enroot", out)
         self.assertIn("Build-Depends: debhelper (>= 10), slurm-smd-dev | libslurm-dev", out)
 

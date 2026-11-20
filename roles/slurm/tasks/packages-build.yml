@@ -156,6 +156,13 @@
         # its package path (never /usr/local/cuda), no dpkg dependency on the driver's
         # libnvidia-ml (gpu_nvml.so loads it from the driver on GPU nodes only), and no
         # daemon started or restarted by dpkg: the role restarts them in Slurm's order.
+        - name: Version the packages {{ slurm_deb_version }}
+          ansible.builtin.replace:
+            path: "{{ _tree }}/debian/changelog"
+            regexp: '\Aslurm-smd \([^)]*\)'
+            replace: "slurm-smd ({{ slurm_deb_version }})"
+          register: slurm_deb_patch_version
+
         - name: Build against Lua {{ slurm_deb_lua_dev }}
           ansible.builtin.replace:
             path: "{{ _tree }}/debian/control"
@@ -195,15 +202,59 @@
             block: "override_dh_shlibdeps:\n\tdh_shlibdeps -Xgpu_nvml.so"  # noqa: no-tabs
           register: slurm_deb_patch_shlibs
 
+        # The contribs SchedMD's RPMs ship (slurm-contribs, and sgather in slurm) and its
+        # debian/ leaves out: without them the move from the source build lost seff, which
+        # the user guide teaches.
+        - name: Install the contribs debian/rules leaves out
+          ansible.builtin.blockinfile:
+            path: "{{ _tree }}/debian/rules"
+            marker: "# {mark} slurm-smd-contribs"
+            # A make recipe line must start with a tab.
+            block: "execute_after_dh_auto_install:\n{% for dir in slurm_deb_contribs.dirs %}\t$(MAKE) -C obj-$(DEB_BUILD_GNU_TYPE)/contribs/{{ dir }} install DESTDIR=$(CURDIR)/debian/tmp\n{% endfor %}\tinstall -D -m755 contribs/sjstat debian/tmp/usr/bin/sjstat"  # noqa: no-tabs yaml[line-length]
+          register: slurm_deb_patch_contribs_rules
+
+        - name: Package the contribs
+          ansible.builtin.copy:
+            dest: "{{ _tree }}/debian/{{ item.name }}"
+            content: "{{ item.lines | join('\n') }}\n"
+            owner: "{{ slurm_deb_build_user }}"
+            mode: "0644"
+          loop:
+            - {name: slurm-smd-contribs.install, lines: "{{ slurm_deb_contribs.commands | map('regex_replace', '^', 'usr/bin/') }}"}
+            - {name: slurm-smd-contribs.manpages, lines: "{{ slurm_deb_contribs.manpages | map('regex_replace', '^', 'debian/tmp/usr/share/man/') }}"}
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Declare the contribs package
+          ansible.builtin.blockinfile:
+            path: "{{ _tree }}/debian/control"
+            marker: "# {mark} slurm-smd-contribs"
+            # The empty line ends the paragraph before; a comment line does not.
+            block: |-
+
+              Package: slurm-smd-contribs
+              Architecture: all
+              Depends:
+               slurm-smd-client (>= ${source:Version}),
+               slurm-smd-libslurm-perl (>= ${source:Version}),
+               ${perl:Depends},
+               ${misc:Depends}
+              Description: Contributed Slurm tools
+                {{ slurm_deb_contribs.commands | join(', ') }}: what SchedMD's RPMs ship as
+                slurm-contribs (and sgather in slurm).
+          register: slurm_deb_patch_contribs_control
+
         - name: Check every packaging change applied
           ansible.builtin.assert:
             that: >-
-              [slurm_deb_patch_lua, slurm_deb_patch_deps, slurm_deb_patch_nvml, slurm_deb_patch_start,
-               slurm_deb_patch_shlibs] | select('changed') | list | length == 5
+              [slurm_deb_patch_version, slurm_deb_patch_lua, slurm_deb_patch_deps, slurm_deb_patch_nvml,
+               slurm_deb_patch_start, slurm_deb_patch_shlibs, slurm_deb_patch_contribs_rules,
+               slurm_deb_patch_contribs_control] | select('changed') | list | length == 8
             fail_msg: >-
               The debian/ directory of Slurm {{ slurm_version }} no longer has what the build
-              adjusts (liblua5.x-dev, Build-Depends:, dh_auto_configure, dh_installsystemd);
-              update roles/slurm/tasks/packages-build.yml for it.
+              adjusts (its changelog's first entry, liblua5.x-dev, Build-Depends:,
+              dh_auto_configure, dh_installsystemd) or already has what it adds
+              (slurm-smd-contribs); update roles/slurm/tasks/packages-build.yml for it.
             quiet: true
           when: not ansible_check_mode
 
@@ -384,6 +435,26 @@
         quiet: true
       vars:
         _missing: "{{ slurm_deb_required_plugins | reject('in', slurm_deb_contents.stdout) | list }}"
+      when: not ansible_check_mode and slurm_deb_build_slurm
+
+    - name: List what the contribs package holds
+      ansible.builtin.command:
+        argv: [dpkg-deb, --contents, "{{ slurm_deb_build_dir }}/slurm-smd-contribs_{{ slurm_deb_version }}_all.deb"]
+      register: slurm_deb_contribs_contents
+      changed_when: false
+      when: not ansible_check_mode and slurm_deb_build_slurm
+
+    - name: Check the contribs package holds every contributed command
+      ansible.builtin.assert:
+        that: _missing | length == 0
+        fail_msg: >-
+          slurm-smd-contribs {{ slurm_deb_version }} lacks {{ _missing | join(', ') }}: the
+          contribs/ Makefiles of Slurm {{ slurm_version }} install them elsewhere or no longer.
+        quiet: true
+      vars:
+        _missing: >-
+          {{ slurm_deb_contribs.commands | map('regex_replace', '^', './usr/bin/')
+             | reject('in', slurm_deb_contribs_contents.stdout) | list }}
       when: not ansible_check_mode and slurm_deb_build_slurm
 
     - name: Read what the pyxis package holds and needs
