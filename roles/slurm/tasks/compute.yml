@@ -197,18 +197,6 @@
   when: slurm_enable_prolog_epilog
   tags: always
 
-# slurmd fetches slurm.conf, gres.conf, cgroup.conf and plugstack.conf from slurmctld
-# (--conf-server, above) and caches them in /run/slurm/conf, where the commands on the
-# node find them too. A local copy would be read by the commands instead, and go stale.
-- name: Remove local copies of the configuration slurmctld serves
-  ansible.builtin.file:
-    path: "{{ slurm_config_dir }}/{{ item }}"
-    state: absent
-  loop: [slurm.conf, cgroup.conf, gres.conf]
-  when: not is_controller
-  tags:
-    - config
-
 - name: Configure the SPANK plugins (pyxis)
   ansible.builtin.include_tasks: plugstack.yml
   tags:
@@ -226,6 +214,30 @@
     state: started
     enabled: true
     daemon_reload: true
+
+# slurmd fetches slurm.conf, gres.conf, cgroup.conf and plugstack.conf from slurmctld
+# (--conf-server, above) and caches them in /run/slurm/conf, where the commands on the
+# node find them too. A local copy would be read by the commands instead, and go stale.
+# Removed only once the running slurmd has that cache: every Slurm client on the node,
+# pam_slurm_adopt in sshd among them, dies with "Could not establish a configuration
+# source" when it finds neither (2026-11-20: a slurmd that failed to start, with the
+# copies already gone, closed every SSH login to the nodes).
+- name: Wait for slurmd's copy of the configuration
+  ansible.builtin.wait_for:
+    path: /run/slurm/conf/slurm.conf
+    timeout: 120
+  when: not is_controller and not ansible_check_mode
+  tags:
+    - config
+
+- name: Remove local copies of the configuration slurmctld serves
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/{{ item }}"
+    state: absent
+  loop: [slurm.conf, cgroup.conf, gres.conf]
+  when: not is_controller
+  tags:
+    - config
 
 # The file used to add whoever ran the play as well, so access depended on who deployed
 # last and outlived removal from the list. It is now exactly slurm_allow_ssh_user;
@@ -260,8 +272,12 @@
     - people
 
 # A wrong -account line in /etc/pam.d/sshd locks operators out, so confirm the module
-# (slurm-smd-libpam-slurm-adopt) is where
-# slurm_pam_lib_dir says before writing either block.
+# (slurm-smd-libpam-slurm-adopt) is where slurm_pam_lib_dir says before writing either
+# block. The operators (/etc/localusers) are let in before pam_slurm_adopt runs:
+# pam_slurm_adopt initialises Slurm for every user but root and fatal()s the sshd
+# process when it cannot (no slurm.conf, no slurmd cache, no slurmctld), so behind it
+# any Slurm failure locked the operators out with everyone (2026-11-20). Someone in the
+# list is not adopted into a job of theirs; everyone else is, as before.
 - name: Locate the pam_slurm_adopt module
   ansible.builtin.stat:
     path: "{{ slurm_pam_lib_dir }}/pam_slurm_adopt.so"
@@ -288,7 +304,6 @@
   ansible.builtin.blockinfile:
     path: /etc/pam.d/sshd
     block: |
-      -account sufficient {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so action_no_jobs=ignore
       -account sufficient pam_listfile.so item=user sense=allow file=/etc/localusers
       -account required {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so
     insertafter: EOF
@@ -303,8 +318,8 @@
   ansible.builtin.blockinfile:
     path: /etc/pam.d/sshd
     block: |
-      -account sufficient {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so action_no_jobs=ignore
       -account sufficient pam_listfile.so item=user sense=allow file=/etc/localusers
+      -account sufficient {{ slurm_pam_lib_dir }}/pam_slurm_adopt.so action_no_jobs=ignore
     insertafter: EOF
     marker: "# {mark} ANSIBLE MANAGED BLOCK (ansible-role-slurm)"
   tags:
