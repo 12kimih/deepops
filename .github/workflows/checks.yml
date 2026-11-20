@@ -22,10 +22,10 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install Lua for the job_submit.lua tests
+      - name: Install the tools the checks run from outside .venv
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends lua5.4
+          scripts/check.sh --missing-tools | xargs -r sudo apt-get install -y --no-install-recommends
 
       - name: Install the Galaxy collections and roles
         run: uv run --locked scripts/deepops/galaxy.py

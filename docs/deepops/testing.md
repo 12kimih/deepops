@@ -15,7 +15,9 @@ DeepOps Testing, CI/CD, and Validation
 
 `scripts/check.sh` runs every repository check: the style normalizer, generated docs,
 yamllint, `ansible-lint` with the project [`.ansible-lint`](../../.ansible-lint)
-configuration, playbook syntax checks and the unit suites. CI runs it in
+configuration, playbook syntax checks and the unit suites. The few tools it runs from
+outside `.venv` (Lua 5.4, Go) are listed in it once: `scripts/setup.sh` and CI install the
+missing ones (`scripts/check.sh --missing-tools`). CI runs it in
 [checks.yml](../../.github/workflows/checks.yml), and the pre-commit hook runs
 `scripts/check.sh --fast` on each commit. The hook
 ([`scripts/deepops/pre-commit.sh`](../../scripts/deepops/pre-commit.sh)) runs the
