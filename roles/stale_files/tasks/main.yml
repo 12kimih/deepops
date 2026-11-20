@@ -4,6 +4,8 @@
     rules: "{{ stale_files_rules }}"
     state: "{{ stale_files_state }}"
     report: "{{ stale_files_report }}"
+    audit: "{{ stale_files_audit | bool }}"
+    config_dirs: "{{ stale_files_config_dirs }}"
     # What deepops records installing (roles/component_record) is its own, not a leftover.
     ignore: >-
       {{ stale_files_ignore + (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
@@ -15,4 +17,5 @@
     msg:
       removed_or_found: "{{ stale_files_result.stale }}"
       unowned_unmatched: "{{ stale_files_result.unowned }}"
+      audit: "{{ stale_files_result.audit }}"
   when: stale_files_state == 'report' or stale_files_result is changed

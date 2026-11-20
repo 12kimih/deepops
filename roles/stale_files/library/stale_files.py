@@ -22,10 +22,30 @@ Each rule names its evidence, never a guess from a file name alone:
                files pip recorded installing from it elsewhere (dist-info/RECORD:
                its console scripts), and the scripts under `dirs` whose #! names
                that interpreter
+    files      files under `dirs` whose name matches `pattern` (a regex on the
+               whole name) and, with `contains`, whose text matches it: a file a tool is
+               known to leave behind (an installer's temporary config, the copies
+               Ansible's backup: true writes)
 
 Nothing a package owns is touched, whatever a rule says. With report, files under
 `report` that no package owns and no rule matched are listed too (counted per
 directory), for a person to judge.
+
+With audit, the report also lists what changes how the host behaves without a
+package's or a rule's say, again only for a person to judge (nothing is removed):
+
+    unowned_config     files in `config_dirs` that no package owns, no rule matched
+                       and no component record claims; "(deepops)" marks one whose
+                       text says a deepops role wrote it
+    unit_overrides     unit files and drop-ins under /etc/systemd/system no package
+                       owns (enable links and snapd's generated units left out)
+    prompt_copies      copies conffile prompts and editors leave beside a file under
+                       /etc (.dpkg-old, .dpkg-dist, .ucf-dist, .bak, ...): a -dist one
+                       is the package's newer version that was never merged
+    changed_conffiles  a package's configuration files changed from what it ships
+    removed_packages   packages removed without purging, whose files stay (dpkg rc)
+    orphan_modules     /lib/modules trees no installed package owns, other than the
+                       running kernel's
 """
 
 import glob
@@ -45,12 +65,19 @@ options:
   state: {type: str, choices: [absent, report], default: absent}
   report: {type: list, elements: path, default: []}
   ignore: {type: list, elements: path, default: []}
+  audit: {type: bool, default: false}
+  config_dirs: {type: list, elements: path, default: []}
 """
 
 
 # --- package ownership ---------------------------------------------------------------
+UCF_REGISTRY = "/var/lib/ucf/registry"
+
+
 def owned_paths():
-    """Every path a package owns (dpkg, else rpm)."""
+    """Every path a package owns (dpkg, else rpm). On Debian that includes the
+    configuration files a package's scripts keep through ucf (/etc/ssh/sshd_config,
+    /etc/default/grub): dpkg does not list them, ucf's registry does."""
     paths = set()
     info = "/var/lib/dpkg/info"
     if os.path.isdir(info):
@@ -58,6 +85,9 @@ def owned_paths():
             if name.endswith(".list"):
                 with open(os.path.join(info, name), errors="replace") as listing:
                     paths.update(line.rstrip("\n") for line in listing if line.strip())
+        if os.path.isfile(UCF_REGISTRY):
+            with open(UCF_REGISTRY, errors="replace") as registry:
+                paths.update(line.split()[-1] for line in registry if len(line.split()) > 1)
         return paths
     try:
         out = subprocess.run(["rpm", "-qal"], capture_output=True, text=True, check=False).stdout
@@ -227,6 +257,13 @@ def match_rule(rule):
             for path in files_in(rule.get("dirs", [])):
                 if shebang(path) in (interpreter, os.path.basename(interpreter)):
                     found.append(path)
+    elif kind == "files":
+        pattern = re.compile(rule["pattern"])
+        for path in files_in(rule["dirs"]):
+            if pattern.fullmatch(os.path.basename(path)) and (
+                "contains" not in rule or text_matches(path, rule["contains"])
+            ):
+                found.append(path)
     else:
         raise ValueError(f"unknown rule type {kind!r}")
     return sorted(set(found))
@@ -262,6 +299,97 @@ def remove(path, within=()):
         parent = os.path.dirname(parent)
 
 
+# --- audit ----------------------------------------------------------------------------
+# Copies a conffile prompt (dpkg, ucf), an editor or a hand edit leaves beside a file.
+PROMPT_COPY = re.compile(
+    r".+(\.dpkg-(old|dist|new|bak|tmp)|\.ucf-(old|dist|new)|\.update-old|\.bak|\.orig|\.save|\.old|~)"
+)
+# Directories whose *.old files are a package's own working copies, not a person's.
+PROMPT_COPY_SKIP = ("/etc/xml/",)
+# A deepops role says so in what it writes.
+DEEPOPS_MARK = r"(?i)ansible managed|deepops"
+
+
+def run_lines(argv):
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, check=False).stdout.splitlines()
+    except OSError:
+        return []
+
+
+def unowned_config(config_dirs, owned, claimed):
+    found = []
+    for top in config_dirs:
+        if not os.path.isdir(top):
+            continue
+        for name in sorted(os.listdir(top)):
+            path = os.path.join(top, name)
+            if path in owned or path.startswith(claimed):
+                continue
+            if os.path.isdir(path) and not os.path.islink(path):
+                continue
+            found.append(f"{path} (deepops)" if text_matches(path, DEEPOPS_MARK) else path)
+    return found
+
+
+def unit_overrides(owned, root="/etc/systemd/system"):
+    found = []
+    for top, _, names in os.walk(root):
+        if top != root and not top.endswith(".d"):
+            continue  # .wants/.requires hold enable links
+        for name in sorted(names):
+            path = os.path.join(top, name)
+            if path in owned or os.path.islink(path) or text_matches(path, r"X-Snappy=yes"):
+                continue
+            found.append(path)
+    return sorted(found)
+
+
+def prompt_copies(root="/etc"):
+    found = []
+    for top, _, names in os.walk(root):
+        if (top + "/").startswith(PROMPT_COPY_SKIP):
+            continue
+        found += [os.path.join(top, n) for n in names if PROMPT_COPY.fullmatch(n)]
+    return sorted(found)
+
+
+def changed_conffiles():
+    if os.path.isdir("/var/lib/dpkg/info"):
+        # dpkg --verify: "??5?????? c /etc/x" for a conffile whose checksum differs.
+        return sorted(
+            {ln.split()[-1] for ln in run_lines(["dpkg", "--verify"]) if ln[2:3] == "5" and " c " in ln}
+        )
+    return sorted({ln.split()[-1] for ln in run_lines(["rpm", "-Va", "--configfiles"]) if ln[2:3] == "5"})
+
+
+def removed_packages():
+    lines = run_lines(["dpkg-query", "-W", "-f", "${db:Status-Abbrev} ${binary:Package}\n"])
+    return sorted(ln.split()[1] for ln in lines if ln.startswith("rc"))
+
+
+def orphan_modules(owned, root="/lib/modules"):
+    if not os.path.isdir(root):
+        return []
+    keep = {os.uname().release}
+    for path in owned:
+        for prefix in ("/lib/modules/", "/usr/lib/modules/"):
+            if path.startswith(prefix) and path.count("/") > prefix.count("/"):
+                keep.add(path[len(prefix) :].split("/")[0])
+    return [os.path.join(root, v) for v in sorted(os.listdir(root)) if v not in keep]
+
+
+def audit(config_dirs, owned, claimed):
+    return {
+        "unowned_config": unowned_config(config_dirs, owned, claimed),
+        "unit_overrides": unit_overrides(owned),
+        "prompt_copies": prompt_copies(),
+        "changed_conffiles": changed_conffiles(),
+        "removed_packages": removed_packages(),
+        "orphan_modules": orphan_modules(owned),
+    }
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -269,6 +397,8 @@ def main():
             "state": {"type": "str", "choices": ["absent", "report"], "default": "absent"},
             "report": {"type": "list", "elements": "path", "default": []},
             "ignore": {"type": "list", "elements": "path", "default": []},
+            "audit": {"type": "bool", "default": False},
+            "config_dirs": {"type": "list", "elements": "path", "default": []},
         },
         supports_check_mode=True,
     )
@@ -292,18 +422,24 @@ def main():
         for path in sorted(every, key=len):
             if os.path.lexists(path):
                 remove(path, within.get(path, ()))
+    claimed = tuple(p.rstrip("/") + "/" for p in every) + tuple(
+        p.rstrip("/") + "/" for p in module.params["ignore"]
+    )
+    ignored = set(every) | {p.rstrip("/") for p in module.params["ignore"]}
     unowned = {}
     if module.params["report"]:
-        claimed = tuple(p.rstrip("/") + "/" for p in every) + tuple(
-            p.rstrip("/") + "/" for p in module.params["ignore"]
-        )
         for path in files_in(module.params["report"]):
-            if path in owned or path in every or path.startswith(claimed):
+            if path in owned or path in ignored or path.startswith(claimed):
                 continue
             top = "/".join(path.split("/")[:5])
             unowned[top] = unowned.get(top, 0) + 1
+    found = audit(module.params["config_dirs"], owned | ignored, claimed) if module.params["audit"] else {}
     module.exit_json(
-        changed=bool(removing), stale=stale, owned_kept=sorted(kept), unowned=dict(sorted(unowned.items()))
+        changed=bool(removing),
+        stale=stale,
+        owned_kept=sorted(kept),
+        unowned=dict(sorted(unowned.items())),
+        audit=found,
     )
 
 
