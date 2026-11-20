@@ -133,7 +133,10 @@ Following [Slurm's upgrade guide](https://slurm.schedmd.com/upgrades.html):
    major release converts the database first; the role waits up to
    `slurm_dbd_wait_timeout`) and then `slurmctld`; checks `scontrol version` and
    `ping`, `sinfo`, `sacct`, the accounting cluster and, with the Lua plugin, a
-   test-only submission through `job_submit.lua`. Running jobs keep running.
+   test-only submission through `job_submit.lua`. Running jobs keep running. A
+   test-only submission only weighs nodes in service, so while every node is drained
+   (a maintenance window) Slurm refuses it with "Requested node configuration is not
+   available"; the check accepts that refusal then, and reports the node states.
 4. Compute nodes, `maintenance_serial` at a time (roles/maintenance): drain and wait
    for the node's jobs, install (pyxis with it) and restart `slurmd`, check
    `slurmd`, the GPUs, DCGM and NHC, resume the node. A failing node stops the run

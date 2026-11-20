@@ -2,6 +2,11 @@
 # After an upgrade, on a controller: the new slurmctld answers, accounting works, and
 # the job_submit plugin runs. A test-only submission goes through job_submit.lua
 # (slurmctld runs it for will-run requests as for real ones) and starts nothing.
+# A will-run request only weighs nodes that are neither DOWN nor DRAINED
+# (job_scheduler.c, job_start_data), so with every node out of service (a drained
+# maintenance window) it is refused with ESLURM_REQUESTED_NODE_CONFIG_UNAVAILABLE
+# after job_submit.lua passed it, and slurmctld logs nothing. That refusal is accepted
+# only while no node is in service; any other refusal fails the check.
 - name: Read the controller's Slurm version
   ansible.builtin.command:
     argv: ["{{ slurm_install_prefix }}/bin/scontrol", version]
@@ -19,9 +24,10 @@
   changed_when: false
   check_mode: false  # read-only; --check needs the result
 
-- name: List the nodes
+- name: Read the node states
   ansible.builtin.command:
-    argv: ["{{ slurm_install_prefix }}/bin/sinfo", -h]
+    argv: ["{{ slurm_install_prefix }}/bin/sinfo", -h, -o, "%T %D"]
+  register: slurm_verify_nodes
   changed_when: false
   check_mode: false  # read-only; --check needs the result
 
@@ -55,15 +61,27 @@
   when: "'lua' in slurm_job_submit_plugins"
 
 - name: Check the upgraded controller
+  vars:
+    # sinfo's long state names of a node that takes jobs; a suffix (* not responding,
+    # ~ powered off, ...) or a drain/down state means it does not.
+    _in_service: "{{ slurm_verify_nodes.stdout_lines | map('split') | map('first')
+                     | select('in', ['idle', 'mixed', 'allocated', 'completing', 'planned'])
+                     | list | length > 0 }}"
+    _submit_out: "{{ (slurm_verify_submit.stdout | default('')) ~ (slurm_verify_submit.stderr | default('')) }}"
   ansible.builtin.assert:
     that:
       - slurm_verify_version.stdout | trim == 'slurm ' ~ slurm_version
       - slurm_verify_ping.stdout is search('is UP')
       - slurm_cluster_name in slurm_verify_clusters.stdout_lines
       - "'lua' not in slurm_job_submit_plugins or slurm_verify_config.stdout is search('JobSubmitPlugins *=.*lua')"
-      - slurm_verify_submit is skipped or slurm_verify_submit.rc == 0
+      - >-
+        slurm_verify_submit is skipped or slurm_verify_submit.rc == 0 or
+        (not _in_service and _submit_out is search('Requested node configuration is not available'))
     fail_msg: >-
       After the upgrade: {{ slurm_verify_version.stdout | trim }}; ping:
       {{ slurm_verify_ping.stdout | trim }}; clusters: {{ slurm_verify_clusters.stdout_lines | join(', ') }};
-      test-only submission: {{ (slurm_verify_submit.stdout | default('')) ~ (slurm_verify_submit.stderr | default('')) }}
-    quiet: true
+      nodes: {{ slurm_verify_nodes.stdout_lines | join(', ') }}; test-only submission: {{ _submit_out }}
+    success_msg: >-
+      {{ 'No node is in service (' ~ slurm_verify_nodes.stdout_lines | join(', ') ~ '): the test-only
+      submission passed job_submit and was refused only for want of a node.'
+      if slurm_verify_submit is not skipped and slurm_verify_submit.rc != 0 else 'Controller checked.' }}
