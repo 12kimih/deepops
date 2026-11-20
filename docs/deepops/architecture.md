@@ -109,6 +109,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── egress_policy
 │   ├── enroot
 │   ├── facts
+│   ├── fail2ban
 │   ├── free_space
 │   ├── grafana
 │   ├── helm_release
@@ -188,6 +189,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── slurm_usage_report
 │   ├── source_build
 │   ├── spack
+│   ├── sshd
 │   ├── sssd_client
 │   ├── stale_files
 │   ├── standalone-container-registry

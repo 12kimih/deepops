@@ -1,0 +1,18 @@
+---
+# A host whose sshd_config was edited by hand, as the site's were.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install the OpenSSH server
+      ansible.builtin.apt:
+        name: openssh-server
+        state: present
+        update_cache: true
+
+    - name: Edit sshd_config by hand
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: "{{ item }}"
+        insertafter: "^Include"
+      loop: ["Port 22", "LoginGraceTime 30"]

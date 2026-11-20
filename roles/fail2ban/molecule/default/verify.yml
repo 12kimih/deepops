@@ -1,0 +1,26 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Look for the hand copy
+      ansible.builtin.stat:
+        path: /etc/fail2ban/jail.local
+      register: fail2ban_local
+
+    - name: Read the effective sshd jail
+      ansible.builtin.command:
+        argv: [fail2ban-client, --dp]
+      register: fail2ban_dump
+      changed_when: false
+
+    - name: Check the copy went and the site's settings apply to sshd
+      ansible.builtin.assert:
+        that:
+          - not fail2ban_local.stat.exists
+          - fail2ban_dump.stdout is search("\\['set', 'sshd', 'bantime', '-1'\\]")
+          - fail2ban_dump.stdout is search("\\['set', 'sshd', 'maxretry', '?5'?\\]")
+          - fail2ban_dump.stdout is search("192\\.0\\.2\\.0/24")
+          - fail2ban_dump.stdout is search("allports")
+        fail_msg: "{{ fail2ban_dump.stdout_lines | select('search', 'sshd') | list | join('\n') }}"

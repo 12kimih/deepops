@@ -1,0 +1,46 @@
+---
+# A setting sshd refuses: the run fails and the working configuration stays.
+- name: Try a configuration sshd refuses
+  hosts: all
+  become: true
+  tasks:
+    - name: Read the drop-in before
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config.d/10-deepops.conf
+      register: dropin_before
+
+    # The refusal is what this checks: the role must fail, after putting things back.
+    - name: Apply a bad setting
+      block:
+        - name: Run the role with it
+          ansible.builtin.include_role:
+            name: sshd
+          vars:
+            sshd_settings: {NotAKeyword: "yes"}
+
+        - name: Note that it was taken
+          ansible.builtin.set_fact:
+            sshd_refused: false
+      rescue:
+        - name: Note that it was refused
+          ansible.builtin.set_fact:
+            sshd_refused: true
+
+    - name: Read the drop-in after
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config.d/10-deepops.conf
+      register: dropin_after
+
+    - name: Look for rollback copies left behind
+      ansible.builtin.find:
+        paths: [/etc/ssh, /etc/ssh/sshd_config.d]
+        patterns: ["*~"]
+      register: sshd_copies
+
+    - name: Check the working configuration is back and nothing is left over
+      ansible.builtin.assert:
+        that:
+          - sshd_refused | bool
+          - dropin_after.content == dropin_before.content
+          - sshd_copies.matched == 0
+        fail_msg: "drop-in changed or copies left: {{ sshd_copies.files | map(attribute='path') | list }}"

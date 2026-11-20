@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: fail2ban_state in ['present', 'absent', 'kept']
+    fail_msg: "fail2ban_state must be present, absent or kept, not {{ fail2ban_state }}."
+    quiet: true
+
+- name: "Make fail2ban {{ fail2ban_state }}"
+  ansible.builtin.include_tasks: "{{ fail2ban_state }}.yml"
+  when: fail2ban_state != 'kept'

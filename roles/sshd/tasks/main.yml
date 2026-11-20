@@ -1,0 +1,170 @@
+---
+- name: Manage the OpenSSH server's settings
+  when: sshd_manage | bool
+  block:
+    - name: Check the settings
+      ansible.builtin.assert:
+        that:
+          - sshd_ports | length > 0
+          - sshd_ports | map('int') | select('gt', 0) | select('lt', 65536) | list | length == sshd_ports | length
+          - "'Port' not in sshd_settings and 'Include' not in sshd_settings"
+        fail_msg: sshd_ports needs one or more ports (1-65535); ports go there, not in sshd_settings, and Include is the package's.
+        quiet: true
+
+    - name: Install the OpenSSH server (Debian family)
+      ansible.builtin.apt:
+        name: openssh-server
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Install the OpenSSH server (RHEL family)
+      ansible.builtin.dnf:
+        name: openssh-server
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+
+    # Where ssh.socket starts sshd, its ports come from the configuration: a generator
+    # turns the Port lines into the socket's ListenStream at daemon-reload.
+    - name: Look for socket activation
+      ansible.builtin.command:
+        argv: [systemctl, is-enabled, ssh.socket]
+      register: sshd_socket
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    # sshd -t and -T need its privilege separation directory, which systemd makes only
+    # when it starts sshd: a socket-started sshd that has had no login yet lacks it.
+    - name: Make sshd's privilege separation directory (Debian family)
+      ansible.builtin.file:
+        path: /run/sshd
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Read the ports sshd listens on now
+      ansible.builtin.command:
+        argv: [sshd, -T]
+      register: sshd_before
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    # A configuration sshd rejects would leave no way in: both files are written, sshd
+    # checks them together, and anything it refuses is put back as it was.
+    - name: Write and check the configuration
+      block:
+        - name: Write the site's settings
+          ansible.builtin.template:
+            src: 10-deepops.conf.j2
+            dest: /etc/ssh/sshd_config.d/10-deepops.conf
+            owner: root
+            group: root
+            mode: "0644"
+            backup: true
+          register: sshd_dropin
+
+        # The package's file: its hand edits move to the drop-in (sshd_settings).
+        - name: Put back the package's own sshd_config (Debian family)
+          ansible.builtin.copy:
+            src: /usr/share/openssh/sshd_config
+            dest: /etc/ssh/sshd_config
+            remote_src: true
+            owner: root
+            group: root
+            mode: "0644"
+            backup: true
+          register: sshd_main
+          when: ansible_facts.os_family == "Debian"
+
+        - name: Let sshd check the whole configuration
+          ansible.builtin.command:
+            argv: [sshd, -t]
+          changed_when: false
+          when: sshd_dropin is changed or sshd_main is changed
+      rescue:
+        - name: Put the previous files back
+          ansible.builtin.copy:
+            src: "{{ item.backup_file }}"
+            dest: "{{ item.dest }}"
+            remote_src: true
+            mode: "0644"
+          loop: "{{ [sshd_dropin | default({}), sshd_main | default({})] | selectattr('backup_file', 'defined') | list }}"
+          loop_control:
+            label: "{{ item.dest }}"
+
+        - name: Remove a drop-in that was not there before
+          ansible.builtin.file:
+            path: /etc/ssh/sshd_config.d/10-deepops.conf
+            state: absent
+          when: sshd_dropin | default({}) is changed and sshd_dropin.backup_file is not defined
+
+        - name: Report the refused configuration
+          ansible.builtin.fail:
+            msg: sshd refused the new configuration; the previous files are back in place.
+      # The copies exist only for the rollback.
+      always:
+        - name: Remove the copies kept for the rollback
+          ansible.builtin.file:
+            path: "{{ item.backup_file }}"
+            state: absent
+          loop: "{{ [sshd_dropin | default({}), sshd_main | default({})] | selectattr('backup_file', 'defined') | list }}"
+          loop_control:
+            label: "{{ item.backup_file }}"
+
+    - name: Read the ports the new configuration gives
+      ansible.builtin.command:
+        argv: [sshd, -T]
+      register: sshd_after
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when: not ansible_check_mode
+
+    - name: Apply it
+      when:
+        - not ansible_check_mode
+        - sshd_dropin is changed or sshd_main is changed
+      vars:
+        _ports_before: "{{ sshd_before.stdout_lines | select('match', '^port ') | sort | list }}"
+        _ports_after: "{{ sshd_after.stdout_lines | select('match', '^port ') | sort | list }}"
+        _socket: "{{ sshd_socket.stdout | default('') in ['enabled', 'enabled-runtime', 'static'] }}"
+        _service: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
+      block:
+        # New ports reach the socket only through the generator; the sessions in place
+        # are their own processes and stay.
+        - name: Move ssh.socket to the new ports
+          ansible.builtin.systemd_service:
+            name: ssh.socket
+            state: restarted
+            daemon_reload: true
+          when: _socket | bool and _ports_before != _ports_after
+
+        # Socket-started sshd that is idle reads the file at the next login: nothing to
+        # reload then.
+        - name: Look at the sshd service
+          ansible.builtin.command:
+            argv: [systemctl, is-active, "{{ _service }}"]
+          register: sshd_service
+          changed_when: false
+          failed_when: false
+          check_mode: false  # read-only
+
+        - name: Reload sshd
+          ansible.builtin.systemd_service:
+            name: "{{ _service }}"
+            state: reloaded
+          when:
+            - not (_socket | bool) or _ports_before == _ports_after
+            - sshd_service.stdout == 'active' or not (_socket | bool)
+
+    - name: Check sshd answers on every port
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ item | int }}"
+        timeout: 30
+      loop: "{{ sshd_ports }}"
+      when: not ansible_check_mode

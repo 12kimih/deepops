@@ -1,0 +1,12 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): fail2ban, banning an address
+# after repeated failed logins. A deploy sets it from deepops_components
+# (slurm_enable_fail2ban, kube_enable_fail2ban).
+fail2ban_state: present
+
+# [DEFAULT] settings of the site's jail.d/deepops.local, over the distribution's
+# defaults (Debian: nftables bans, the systemd journal): bantime (-1 bans for good),
+# findtime, maxretry. fail2ban's own: 10m, 10m, 5.
+fail2ban_settings: {}
+# Addresses never banned, besides the host's own.
+fail2ban_ignoreip: []

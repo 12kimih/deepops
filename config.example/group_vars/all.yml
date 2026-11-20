@@ -106,6 +106,17 @@
 ################################################################################
 # SOFTWARE                                                                     #
 ################################################################################
+# The OpenSSH server (roles/sshd): with sshd_manage, sshd_config is the package's own and
+# the site's settings are one drop-in, checked by sshd before it is kept.
+#sshd_manage: false
+#sshd_ports: [22]
+#sshd_settings: {}  # e.g. {LoginGraceTime: 20}
+
+# fail2ban (roles/fail2ban; switch slurm_enable_fail2ban / kube_enable_fail2ban): the
+# site's [DEFAULT] settings over the distribution's, and addresses never banned.
+#fail2ban_settings: {}  # e.g. {bantime: 1h, findtime: 10m, maxretry: 5}
+#fail2ban_ignoreip: []  # e.g. ["{{ cluster_subnet }}"]
+
 # The shells people log in with: installed on every host, each reading /etc/profile.d
 # (roles/login_shells). Default: every shell people.yml gives an active person, and bash.
 # Lmod hooks into every installed shell.

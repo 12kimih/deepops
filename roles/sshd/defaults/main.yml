@@ -1,0 +1,15 @@
+---
+# roles/sshd: the OpenSSH server's settings, owned by the repository. With sshd_manage,
+# /etc/ssh/sshd_config is the package's own (Debian ships it as
+# /usr/share/openssh/sshd_config), so an upgrade never stops at a conffile prompt, and
+# the site's settings are one drop-in, /etc/ssh/sshd_config.d/10-deepops.conf, which
+# sshd reads first (the first value of a setting wins). Off: sshd is left as it is.
+sshd_manage: false
+
+# The ports sshd listens on. Ubuntu 24.04+ starts sshd from ssh.socket, whose listening
+# ports a generator takes from these; a change restarts the socket, never a session.
+sshd_ports: [22]
+
+# Further sshd_config(5) settings, written as given: {LoginGraceTime: 20}. true and false
+# are written yes and no; a list value repeats the keyword once per item.
+sshd_settings: {}

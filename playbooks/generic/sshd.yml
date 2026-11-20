@@ -1,0 +1,10 @@
+---
+# The OpenSSH server's settings (roles/sshd): the package's own sshd_config and one
+# drop-in with the site's, where sshd_manage is on; nothing changes elsewhere.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: sshd
+  tags:
+    - sshd
