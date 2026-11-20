@@ -10,6 +10,36 @@
 stale_files_rules: "{{ stale_files_host_rules }}"
 stale_files_state: absent
 stale_files_report: []
+# With a report, also audit what changes how the host behaves without a package's or a
+# rule's say (library/stale_files.py: audit), for a person to judge; the unowned files
+# are looked for in these directories.
+stale_files_audit: "{{ stale_files_state == 'report' }}"
+stale_files_config_dirs:
+  - /etc/profile.d
+  - /etc/bash_completion.d
+  - /etc/environment.d
+  - /etc/cron.d
+  - /etc/cron.hourly
+  - /etc/cron.daily
+  - /etc/cron.weekly
+  - /etc/cron.monthly
+  - /etc/sudoers.d
+  - /etc/apt/sources.list.d
+  - /etc/apt/apt.conf.d
+  - /etc/apt/preferences.d
+  - /etc/apt/keyrings
+  - /etc/yum.repos.d
+  - /etc/sysctl.d
+  - /etc/modprobe.d
+  - /etc/modules-load.d
+  - /etc/ld.so.conf.d
+  - /etc/udev/rules.d
+  - /etc/security/limits.d
+  - /etc/tmpfiles.d
+  - /etc/update-motd.d
+  - /etc/ssh/sshd_config.d
+  - /etc/rsyslog.d
+  - /etc/logrotate.d
 # Where a report looks for files nothing claims.
 stale_files_report_paths: [/usr/local, /opt/deepops]
 stale_files_ignore: []
@@ -41,6 +71,21 @@ stale_files_host_rules:
     glob: /usr/local/share/perl/*
     version: '/perl/(\d+\.\d+\.\d+)$'
     interpreter: /usr/bin/perl{0}
+  # Subiquity writes this for the unattended-upgrades run during an install and is
+  # meant to remove it; left behind, it overrides the site's unattended-upgrades
+  # settings (MinimalSteps, the allowed origins) from the end of apt.conf.d.
+  - name: the Ubuntu installer's temporary unattended-upgrades config
+    type: files
+    dirs: [/etc/apt/apt.conf.d]
+    pattern: zzzz-temp-installer-unattended-upgrade
+    contains: "unattended-upgrades run to avoid failing on battery power"
+  # What a task with backup: true writes beside a file on each change, never removed
+  # (Ansible's own naming: <file>.<pid>.<YYYY-MM-DD@HH:MM:SS>~); tests/task-rules keeps
+  # deepops from writing more.
+  - name: the copies Ansible's backup option left
+    type: files
+    dirs: [/etc]
+    pattern: '.+\.\d+\.\d{4}-\d\d-\d\d@\d\d:\d\d:\d\d~'
   - name: libtool archives of a library that is gone
     type: libtool
     globs: [/usr/local/lib/*.la, /usr/local/lib/*/*.la]

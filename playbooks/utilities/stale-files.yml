@@ -2,7 +2,10 @@
 # What retired installs left on each host (roles/stale_files), and the files under
 # stale_files_report_paths (/usr/local, /opt/deepops) that no package owns, no rule
 # matches and no component record claims, counted per directory for a person to
-# judge. Changes nothing; the deploy's own runs remove what the rules match
+# judge, with an audit of what else changes how the host behaves without a package's
+# say (stale_files_audit: hand-made config, unit overrides, conffile prompt copies,
+# changed conffiles, packages removed but not purged, orphan kernel module trees).
+# Changes nothing; the deploy's own runs remove what the rules match
 # (roles/host_baseline, roles/slurm).
 #
 #   ansible-playbook playbooks/utilities/stale-files.yml [-l <hosts>]

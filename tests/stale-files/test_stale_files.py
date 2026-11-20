@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
@@ -108,6 +109,94 @@ class Evidence(unittest.TestCase):
         mod.remove(self.put("perl/5.38.2/auto/Slurm/Slurm.so"), (str(self.tmp / "perl/5.38.2"),))
         self.assertFalse((self.tmp / "perl/5.38.2/auto").exists())
         self.assertTrue((self.tmp / "perl/5.38.2").is_dir())
+
+    def test_a_named_file_needs_its_name_and_what_it_says(self):
+        hit = self.put(
+            "apt/zzzz-temp-installer-unattended-upgrade", "# for the run to avoid failing on battery\n"
+        )
+        self.put("apt/zzzz-temp-installer-unattended-upgrade.mine", "avoid failing on battery\n")
+        self.put("apt/other/zzzz-temp-installer-unattended-upgrade", "a site's own file\n")
+        rule = {
+            "type": "files",
+            "dirs": [str(self.tmp / "apt")],
+            "pattern": "zzzz-temp-installer-unattended-upgrade",
+            "contains": "avoid failing on battery",
+        }
+        self.assertEqual(mod.match_rule(rule), [hit])
+
+    def test_ansible_backup_copies_are_told_by_their_name(self):
+        name = next(
+            r["pattern"]
+            for r in __import__("yaml").safe_load((ROOT / "roles/stale_files/defaults/main.yml").read_text())[
+                "stale_files_host_rules"
+            ]
+            if r["type"] == "files" and "@" in r["pattern"]
+        )
+        copy = self.put("etc/default/grub.3831733.2026-09-04@19:35:39~")
+        self.put("etc/default/grub")
+        self.put("etc/default/grub~")  # an editor's, not Ansible's
+        self.put("etc/default/grub.ucf-dist")
+        rule = {"type": "files", "dirs": [str(self.tmp / "etc")], "pattern": name}
+        self.assertEqual(mod.match_rule(rule), [copy])
+
+    def test_ucf_kept_configuration_counts_as_owned(self):
+        registry = self.put("ucf/registry", "openssh-server \t /etc/ssh/sshd_config\n")
+        with mock.patch.object(mod, "UCF_REGISTRY", registry):
+            self.assertIn("/etc/ssh/sshd_config", mod.owned_paths())
+
+    def test_unowned_config_is_listed_and_deepops_files_are_marked(self):
+        conf = self.tmp / "profile.d"
+        hand = self.put("profile.d/ssh-key.sh", "ssh-keygen\n")
+        ours = self.put("profile.d/z10-cluster-tools.sh", "# Ansible managed\n")
+        owned = self.put("profile.d/bash_completion.sh")
+        recorded = self.put("profile.d/recorded.sh")
+        self.put("profile.d/claimed/inside.sh")  # a directory: never listed itself
+        found = mod.unowned_config([str(conf), str(self.tmp / "missing")], {owned}, ())
+        self.assertEqual(found, [recorded, hand, f"{ours} (deepops)"])
+        # What a component record claims reaches it as owned (files) or claimed (trees).
+        self.assertEqual(mod.unowned_config([str(conf)], {owned, recorded}, ()), [hand, f"{ours} (deepops)"])
+
+    def test_unit_overrides_leave_out_enable_links_and_snapd_units(self):
+        root = self.tmp / "system"
+        copy = self.put("system/docker.service", "[Service]\n")
+        dropin = self.put("system/docker.service.d/options.conf", "[Service]\n")
+        self.put("system/snap-core22.mount", "[Unit]\nX-Snappy=yes\n")
+        (root / "multi-user.target.wants").mkdir()
+        (root / "multi-user.target.wants" / "docker.service").symlink_to(copy)
+        self.put("system/multi-user.target.wants/stray.service")
+        (root / "alias.service").symlink_to(copy)
+        self.assertEqual(mod.unit_overrides(set(), str(root)), sorted([copy, dropin]))
+        self.assertEqual(mod.unit_overrides({copy}, str(root)), [dropin])
+
+    def test_prompt_copies_are_listed_and_package_working_copies_are_not(self):
+        root = self.tmp / "etc"
+        found = [
+            self.put("etc/ssh/sshd_config.ucf-dist"),
+            self.put("etc/sudoers.dpkg-old"),
+            self.put("etc/fstab.bak"),
+        ]
+        self.put("etc/ssh/sshd_config")
+        with mock.patch.object(mod, "PROMPT_COPY_SKIP", (str(root / "xml") + "/",)):
+            self.put("etc/xml/catalog.old")
+            self.assertEqual(mod.prompt_copies(str(root)), sorted(found))
+
+    def test_package_state_is_read_from_dpkg(self):
+        verify = ["??5??????   /usr/bin/x", "??5?????? c /etc/bash.bashrc", "missing   c /etc/gone"]
+        status = ["ii  bash", "rc  linux-image-6.8.0-1-generic", "rc  mariadb-server-10.6"]
+        with mock.patch.object(
+            mod, "run_lines", side_effect=lambda argv: verify if argv[0] == "dpkg" else status
+        ):
+            with mock.patch.object(mod.os.path, "isdir", return_value=True):
+                self.assertEqual(mod.changed_conffiles(), ["/etc/bash.bashrc"])
+            self.assertEqual(mod.removed_packages(), ["linux-image-6.8.0-1-generic", "mariadb-server-10.6"])
+
+    def test_orphan_module_trees_keep_installed_and_running_kernels(self):
+        root = self.tmp / "modules"
+        running = mod.os.uname().release
+        for version in ("5.15.0-1-generic", "6.8.0-2-generic", running):
+            self.put(f"modules/{version}/modules.dep")
+        owned = {"/lib/modules/6.8.0-2-generic/kernel/x.ko"}
+        self.assertEqual(mod.orphan_modules(owned, str(root)), [str(root / "5.15.0-1-generic")])
 
 
 if __name__ == "__main__":

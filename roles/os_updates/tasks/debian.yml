@@ -71,6 +71,28 @@
     group: root
     mode: "0644"
 
+# Unattended-upgrades and autoremove remove an old kernel without purging it: its
+# configuration and /lib/modules/<version> (modules.* files depmod wrote) stay with the
+# package in state rc, one set per kernel ever installed. Only kernel packages are
+# purged here: another rc package's purge can take data with it (a database server's).
+- name: Find the kernels removed without their files
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, -f, '${db:Status-Abbrev} ${binary:Package}\n']
+  register: os_updates_dpkg_status
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Purge what the removed kernels left
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: >-
+      {{ os_updates_dpkg_status.stdout_lines | select('match', '^rc ') | map('split') | map('last')
+         | map('regex_replace', ':.*$', '')
+         | select('match', '^linux-(image|modules|modules-extra|headers)-[0-9]') | list }}
+  when: host_baseline_absent_packages | length > 0
+
 # A hold keeps a package back from every upgrade, the maintenance window's included.
 - name: Read the apt holds
   ansible.builtin.command:
