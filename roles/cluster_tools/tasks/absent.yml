@@ -3,7 +3,18 @@
 # removal is the same tasks with nothing to publish: one code path, no second copy.
 # motd-news goes back to the OS default. The shared directories' copies are left: users
 # may have changed files there (data).
+# Only where the component was: withdrawing on a host that never had it would turn the
+# OS's own motd-news back on and edit pam.d/cron. The evidence is its record, or on a
+# host set up before records existed, the profile file it publishes.
+- name: Look for what this component published
+  ansible.builtin.stat:
+    path: "/etc/profile.d/{{ cluster_tools_profile_file }}"
+  register: cluster_tools_published
+
 - name: Withdraw everything this component published
+  when: >-
+    'cluster_tools' in (ansible_facts.ansible_local.deepops_components.components | default({}))
+    or cluster_tools_published.stat.exists
   ansible.builtin.include_tasks: publish.yml
   vars:
     cluster_tools_libs: []
