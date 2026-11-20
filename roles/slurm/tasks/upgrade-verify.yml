@@ -73,7 +73,7 @@
         slurm_verify_submit is skipped or slurm_verify_submit.rc == 0 or
         (not _in_service and _submit_out is search('Requested node configuration is not available'))
     fail_msg: >-
-      After the upgrade: slurmctld {{ slurm_verify_config.stdout | regex_search('(?m)^SLURM_VERSION *= *(.*)$', '\\1') | first | default('version unknown') }}; ping:
+      After the upgrade: slurmctld {{ slurm_verify_config.stdout | regex_search('(?m)^SLURM_VERSION *= *(.*)$', '\1') | first | default('version unknown') }}; ping:
       {{ slurm_verify_ping.stdout | trim }}; clusters: {{ slurm_verify_clusters.stdout_lines | join(', ') }};
       nodes: {{ slurm_verify_nodes.stdout_lines | join(', ') }}; test-only submission: {{ _submit_out }}
     success_msg: >-
