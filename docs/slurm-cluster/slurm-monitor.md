@@ -61,7 +61,7 @@ fixed UID, so links survive renames:
 | Dashboard | UID | Shows | Installed by |
 |---|---|---|---|
 | GPU / Nodes | `gpu-nodes` | one GPU node: GPUs (DCGM), host resources, system power | `grafana` |
-| Slurm / GPU allocation | `slurm-gpu-allocation` | who holds which GPU, by user, account, type and node; GPUs busy with no job | `slurm_metrics` |
+| Slurm / GPU allocation | `slurm-gpu-allocation` | who holds which GPU, by user, account, type and node; each job's GPU utilisation and memory; GPUs busy with no job | `slurm_metrics` |
 | Slurm / Scheduler | `slurm-scheduler` | nodes, CPUs, GPUs, jobs and scheduler statistics (slurmctld's metrics) | `grafana` |
 | Node Exporter / Hosts | `node-exporter-hosts` | per-host detail (grafana.com 1860 "Node Exporter Full", revision 46) | `grafana` |
 
@@ -118,6 +118,14 @@ recording rule `host_device:slurm_gpu_allocated:max` keys them like DCGM series,
 alert `GpuBusyWithoutJob` fires when a GPU stays busy for 15 minutes with no job holding it
 (a process outside Slurm, or one a finished job left behind). `SlurmGpuMetricsStale` warns
 when the file stops updating, which also pauses that alert.
+
+Per-job GPU usage comes from the same join: `job_device:dcgm_gpu_util_ratio:max` and
+`job_device:dcgm_fb_used_bytes:max` carry each held GPU's utilisation and memory with the
+job's labels (`job_id`, `user`, `account`, `partition`). The dashboard's "by job" panels
+show them, with each job's mean and peak over the selected range. They cover jobs that ran
+for at least one allocation interval (a minute), for as long as Prometheus keeps data.
+Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only with
+`AutoDetect=nvml` in gres.conf.
 
 Grafana allows you to view custom time-slices, set the polling duration, and many other dashboard customizations.
 

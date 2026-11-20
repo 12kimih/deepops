@@ -27,11 +27,15 @@ groups:
           or label_replace(max by (host, gpu) (DCGM_FI_DEV_GPU_MINOR_NUMBER) == 13, "device", "nvidia13", "", "")
           or label_replace(max by (host, gpu) (DCGM_FI_DEV_GPU_MINOR_NUMBER) == 14, "device", "nvidia14", "", "")
           or label_replace(max by (host, gpu) (DCGM_FI_DEV_GPU_MINOR_NUMBER) == 15, "device", "nvidia15", "", "")) * 0 + 1
-      # GPU utilisation keyed by the device Slurm means: what the alerts, the allocation
-      # dashboard and the usage report compare with allocation.
+      # GPU utilisation and memory keyed by the device Slurm means: what the alerts, the
+      # allocation dashboard and the usage report compare with allocation.
       - record: host_device:dcgm_gpu_util_ratio:max
         expr: |
           max by (host, gpu) (DCGM_FI_DEV_GPU_UTIL_RATIO)
+          * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
+      - record: host_device:dcgm_fb_used_bytes:max
+        expr: |
+          max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES)
           * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
       # Allocation keyed the same way: host is the Slurm node name, device nvidia<IDX>.
       # One definition for the alerts and the Slurm / GPU allocation dashboard.
@@ -42,6 +46,16 @@ groups:
               max by (node, gpu, gpu_type, user, account, partition, job_id) (slurm_gpu_allocated),
               "host", "$1", "node", "(.*)"),
             "device", "nvidia$1", "gpu", "(.*)")
+      # Each GPU a job holds with what it used, labelled with the job (job_id, user,
+      # account, partition): per-job GPU usage, kept for the retention period.
+      - record: job_device:dcgm_gpu_util_ratio:max
+        expr: |
+          host_device:slurm_gpu_allocated:max
+          * on (host, device) group_left () host_device:dcgm_gpu_util_ratio:max
+      - record: job_device:dcgm_fb_used_bytes:max
+        expr: |
+          host_device:slurm_gpu_allocated:max
+          * on (host, device) group_left () host_device:dcgm_fb_used_bytes:max
       # Only while the allocation data is fresh, so a stale file never pages, and never
       # on a drained node: maintenance (a DCGM diagnostic, a burn-in) uses its GPUs
       # outside Slurm on purpose.

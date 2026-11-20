@@ -3,7 +3,8 @@
 From roles/slurm_metrics (clustertools.metrics: slurm_gpu_allocated, slurm_gpu_configured,
 slurm_node_state, slurm_node_drain, slurm_node_schedulable) and the recording rule
 host_device:slurm_gpu_allocated:max (rules/slurm.yml), joined with DCGM utilisation
-through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering.
+through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering, and
+per job through job_device:dcgm_gpu_util_ratio:max and job_device:dcgm_fb_used_bytes:max.
 """
 
 from grafana import STATE_COLORS, bars, dashboard, query, stat, table, timeseries
@@ -15,6 +16,9 @@ NODE_GPUS = "max by (node, gpu_type) (slurm_gpu_configured)"
 SCHEDULABLE = "max by (node) (slurm_node_schedulable)"
 USABLE = f"{NODE_GPUS} * on (node) group_left () {SCHEDULABLE}"
 ALLOCATED = f"(count({ALLOC}) or vector(0))"
+JOB_UTIL = "job_device:dcgm_gpu_util_ratio:max"
+JOB_MEMORY = "job_device:dcgm_fb_used_bytes:max"
+JOB = "job_id, user, account"
 NONE_ALLOCATED = "No GPU allocated"
 
 
@@ -128,6 +132,33 @@ def build():
             value=("Utilization", "percentunit", "continuous-RdYlGr"),
             no_value=NONE_ALLOCATED,
             description="Each GPU a running job holds, with its current utilisation (DCGM).",
+        ),
+        timeseries(
+            "GPU utilization by job",
+            [query(f"avg by ({JOB}) ({JOB_UTIL})", "{{job_id}} {{user}}")],
+            unit="percentunit",
+            max=1,
+            decimals=0,
+            w=12,
+            h=10,
+            legend="table",
+            calcs=("mean", "max", "lastNotNull"),
+            fill=0,
+            no_value=NONE_ALLOCATED,
+            description="Each job's mean utilisation over the GPUs it holds (DCGM, Slurm's GPU numbering); "
+            "the legend's mean and max cover the time range.",
+        ),
+        timeseries(
+            "GPU memory by job",
+            [query(f"sum by ({JOB}) ({JOB_MEMORY})", "{{job_id}} {{user}}")],
+            unit="bytes",
+            w=12,
+            h=10,
+            legend="table",
+            calcs=("mean", "max", "lastNotNull"),
+            fill=0,
+            no_value=NONE_ALLOCATED,
+            description="GPU memory each job uses, summed over the GPUs it holds (DCGM framebuffer used).",
         ),
         table(
             "GPUs busy without a job",
