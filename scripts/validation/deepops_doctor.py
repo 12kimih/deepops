@@ -16,22 +16,20 @@ Exit codes: 0 = all checks passed, 1 = one or more checks failed,
 """
 
 import argparse
+import functools
 import json
 import os
 import shutil
-import subprocess
 import sys
+from pathlib import Path
+
+# The validators start processes the cluster tools' one way (clustertools.proc).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+from clustertools import proc  # noqa: E402
 
 
-def run(cmd, timeout=120, env=None):
-    """Run a command, returning (rc, stdout, stderr) without raising."""
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout, env=env)
-        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return 124, "", "timeout after %ss" % timeout
-    except FileNotFoundError:
-        return 127, "", "command not found: %s" % cmd[0]
+# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+run = functools.partial(proc.outcome, timeout=120)
 
 
 def check(checks, name, ok, detail):

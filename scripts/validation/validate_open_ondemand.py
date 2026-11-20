@@ -7,12 +7,12 @@ Run as root on the portal host:
 """
 
 import argparse
+import functools
 import json
 import re
 import shutil
 import socket
 import ssl
-import subprocess
 import sys
 import time
 import urllib.error
@@ -20,18 +20,18 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
+# The validators start processes the cluster tools' one way (clustertools.proc).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+from clustertools import proc  # noqa: E402
+
 PACKAGES = ["ondemand", "ondemand-dex", "ondemand-nginx", "ondemand-passenger", "nodejs"]
 # The role installs this check with its package and conffile lists (one source).
 DPKG_VERIFY = "/usr/local/sbin/open-ondemand-dpkg-verify"
 CLUSTERS_D = Path("/etc/ood/config/clusters.d")
 
 
-def run(argv):
-    try:
-        p = subprocess.run(argv, capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return 127, "", str(exc)
-    return p.returncode, p.stdout, p.stderr
+# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+run = functools.partial(proc.outcome, timeout=60)
 
 
 def check_services(result):

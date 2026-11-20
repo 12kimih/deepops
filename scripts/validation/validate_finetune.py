@@ -13,7 +13,6 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import socket
-import subprocess
 import sys
 
 from validate_model_cache import validate as validate_cache
@@ -21,7 +20,7 @@ from validate_model_cache import validate as validate_cache
 # Slurm's replies are read by the cluster tools' one Slurm module (its JSON queries, its
 # per-release field check), from this checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import slurm  # noqa: E402
+from clustertools import proc, slurm  # noqa: E402
 
 
 class BadInput(ValueError):
@@ -30,11 +29,8 @@ class BadInput(ValueError):
 
 def run(command, timeout):
     """Bound local probes; never invoke a shell or expose command output on failure."""
-    try:
-        process = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
-        return process.returncode, process.stdout.strip(), ""
-    except (OSError, subprocess.TimeoutExpired, UnicodeError):
-        return 1, "", "command unavailable or timed out"
+    rc, out, _ = proc.outcome(command, timeout=timeout)
+    return rc, out, ""
 
 
 def new_result():

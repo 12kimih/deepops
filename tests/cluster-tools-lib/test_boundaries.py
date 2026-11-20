@@ -62,6 +62,17 @@ class BoundaryTests(unittest.TestCase):
         out = proc.run(["printf", "job\\377name"], timeout=5, capture_output=True, text=True).stdout
         self.assertEqual(out, "job\ufffdname")
 
+    def test_outcome_reports_instead_of_raising(self):
+        # The validators' form: a failed probe is a finding, never a traceback.
+        self.assertEqual(
+            proc.outcome(["sh", "-c", "echo out; echo err >&2; exit 3"], timeout=5), (3, "out", "err")
+        )
+        self.assertEqual(proc.outcome(["printf", "a\\377"], timeout=5), (0, "a\ufffd", ""))
+        self.assertEqual(proc.outcome(["cat"], timeout=5, input="in\n"), (0, "in", ""))
+        self.assertEqual(proc.outcome(["sleep", "5"], timeout=0.2), (124, "", "timeout after 0.2s"))
+        self.assertEqual(proc.outcome(["no-such-command-x"], timeout=5)[0], 127)
+        self.assertEqual(proc.outcome(["/"], timeout=5)[0], 126)
+
     @staticmethod
     def slurm_argvs(tree):
         """Lines of every argv (a list or tuple literal) that starts with a Slurm command,

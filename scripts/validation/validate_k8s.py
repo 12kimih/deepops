@@ -15,27 +15,23 @@ Exit codes: 0 = all checks passed, 1 = one or more checks failed,
 """
 
 import argparse
+import functools
 import json
 import shutil
-import subprocess
 import sys
 import time
+from pathlib import Path
+
+# The validators start processes the cluster tools' one way (clustertools.proc).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+from clustertools import proc  # noqa: E402
 
 SMOKE_NAMESPACE = "deepops-validate"
 SMOKE_POD = "deepops-validate-cuda"
 
 
-def run(cmd, timeout=60, input_text=None):
-    """Run a command, returning (rc, stdout, stderr) without raising."""
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, errors="replace", timeout=timeout, input=input_text
-        )
-        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return 124, "", "timeout after %ss" % timeout
-    except FileNotFoundError:
-        return 127, "", "command not found: %s" % cmd[0]
+# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+run = functools.partial(proc.outcome, timeout=60)
 
 
 def parse_gpu_count(value):
@@ -126,7 +122,7 @@ def run_cuda_smoke(result, image, timeout):
         return
     rc, _, err = run(
         ["kubectl", "apply", "-f", "-"],
-        input_text=json.dumps(smoke_pod_manifest(image)),
+        input=json.dumps(smoke_pod_manifest(image)),
     )
     if rc != 0:
         result["failures"].append("could not create smoke pod: %s" % err)

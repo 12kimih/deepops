@@ -386,7 +386,7 @@ class TestPlatformAndUninstall(unittest.TestCase):
 
     def test_uninstalled_clean(self):
         orig = vr.run
-        vr.run = lambda cmd, timeout=60, input_text=None: (0, "[]", "")
+        vr.run = lambda cmd, timeout=60, input=None: (0, "[]", "")
         try:
             result = vr.validate(args("--verify-uninstalled"), {}, FakeKube())
         finally:
@@ -397,7 +397,7 @@ class TestPlatformAndUninstall(unittest.TestCase):
 
     def test_uninstalled_finds_leftovers(self):
         orig = vr.run
-        vr.run = lambda cmd, timeout=60, input_text=None: (0, "[]", "")
+        vr.run = lambda cmd, timeout=60, input=None: (0, "[]", "")
         try:
             ns = {"items": [{"metadata": {"name": "runai"}}]}
             result = vr.validate(args("--verify-uninstalled"), {}, FakeKube(namespaces=ns))
@@ -947,7 +947,7 @@ class TestPendingHints(unittest.TestCase):
     def test_only_fixed_labels_no_text(self):
         orig = vr.run
         secret = "Bearer SECRETTOKEN123 password=hunter2"
-        vr.run = lambda cmd, timeout=60, input_text=None: (
+        vr.run = lambda cmd, timeout=60, input=None: (
             0,
             "Unschedulable not enough GPU quota " + secret,
             "",
@@ -965,7 +965,7 @@ class TestPendingHints(unittest.TestCase):
 
     def test_command_failure_is_empty(self):
         orig = vr.run
-        vr.run = lambda cmd, timeout=60, input_text=None: (1, "", "token=abc")
+        vr.run = lambda cmd, timeout=60, input=None: (1, "", "token=abc")
         try:
             h = vr.pending_hints(object(), "ns", "p")
         finally:
@@ -988,12 +988,12 @@ class TestNamespaceOwnership(unittest.TestCase):
     def _kube(self, existing, uid="uid-1", delete_status=200):
         cmds, deletes = _Cmds(), []
 
-        def fake_run(cmd, timeout=60, input_text=None):
+        def fake_run(cmd, timeout=60, input=None):
             cmds.append(cmd)
             if cmd[:3] == ["kubectl", "get", "namespace"]:
                 return 0, ("namespace/" + cmd[3]) if cmd[3] in existing else "", ""
             if cmd[:2] == ["kubectl", "create"]:
-                name = json.loads(input_text)["metadata"]["name"]
+                name = json.loads(input)["metadata"]["name"]
                 if name in existing:  # lost the race: server says AlreadyExists
                     return 1, "", "AlreadyExists"
                 return 0, json.dumps({"metadata": {"name": name, "uid": uid}}), ""
@@ -1019,13 +1019,13 @@ class TestNamespaceOwnership(unittest.TestCase):
 
     def test_unknown_existence_is_treated_as_existing(self):
         kube, cmds = self._kube(set())
-        vr.run = lambda cmd, timeout=60, input_text=None: (1, "", "refused")
+        vr.run = lambda cmd, timeout=60, input=None: (1, "", "refused")
         self.assertNotEqual(kube.ensure_namespace("x")[0], 0)
 
     def test_concurrent_creation_is_refused_and_not_owned(self):
         kube, cmds = self._kube(set())
 
-        def racing(cmd, timeout=60, input_text=None):
+        def racing(cmd, timeout=60, input=None):
             if cmd[:3] == ["kubectl", "get", "namespace"]:
                 return 0, "", ""  # looked free ...
             return 1, "", "AlreadyExists"  # ... but someone created it first
@@ -1037,7 +1037,7 @@ class TestNamespaceOwnership(unittest.TestCase):
 
     def test_unreadable_uid_means_not_owned(self):
         kube, cmds = self._kube(set())
-        vr.run = lambda cmd, timeout=60, input_text=None: (
+        vr.run = lambda cmd, timeout=60, input=None: (
             (0, "not json", "") if cmd[:2] == ["kubectl", "create"] else (0, "", "")
         )
         self.assertNotEqual(kube.ensure_namespace("x")[0], 0)

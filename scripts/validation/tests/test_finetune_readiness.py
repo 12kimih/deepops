@@ -273,7 +273,7 @@ class ReadinessTests(unittest.TestCase):
 
     def test_command_failures_are_safe(self):
         for exception in (FileNotFoundError(), PermissionError(), subprocess.TimeoutExpired("private", 5)):
-            with patch.object(self.validator.subprocess, "run", side_effect=exception):
+            with patch.object(self.validator.proc.subprocess, "Popen", side_effect=exception):
                 rc, out, err = self.validator.run(["missing"], timeout=1)
             self.assertNotEqual(rc, 0)
             self.assertNotIn("private", out + err)
