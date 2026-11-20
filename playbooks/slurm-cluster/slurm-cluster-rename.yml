@@ -53,9 +53,13 @@
         fail_msg: The cluster is already named {{ slurm_cluster_name }}; nothing to rename.
         quiet: true
 
+    # squeue's default listing: every job not yet finished (pending, running, suspended,
+    # completing; vocab.job_active). `-t all` also lists the jobs that ended within
+    # MinJobAge, which already have their accounting records, so a run right after
+    # scancel was refused over jobs that no longer exist.
     - name: List the jobs in the queue
       ansible.builtin.command:
-        argv: ["{{ slurm_install_prefix }}/bin/squeue", -h, -t, all, -o, "%i %T %u"]
+        argv: ["{{ slurm_install_prefix }}/bin/squeue", -h, -o, "%i %T %u"]
       register: slurm_rename_queue
       changed_when: false
       check_mode: false  # read-only; --check needs the result
@@ -64,7 +68,8 @@
       ansible.builtin.assert:
         that: slurm_rename_queue.stdout_lines | length == 0
         fail_msg: >-
-          {{ slurm_rename_queue.stdout_lines | length }} jobs are in the queue; under a new name
+          {{ slurm_rename_queue.stdout_lines | length }} jobs are in the queue
+          ({{ slurm_rename_queue.stdout_lines[:5] | join(', ') }}{{ ', ...' if slurm_rename_queue.stdout_lines | length > 5 else '' }}); under a new name
           their accounting records and associations would not exist. Drain the partitions
           (scontrol update partitionname=<p> state=drain), let them end or scancel them, and
           run this again.
