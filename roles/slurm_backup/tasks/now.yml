@@ -1,6 +1,6 @@
 ---
 # A backup now, for a step that cannot be undone otherwise (a Slurm upgrade, a cluster
-# rename): refuses without destinations, installs the backup as main.yml does, and runs
+# rename): refuses without destinations, installs the backup as a deploy does, and runs
 # it to the end (a oneshot: the start returns when it has finished or failed).
 - name: Require backup destinations
   ansible.builtin.assert:
@@ -11,7 +11,7 @@
     quiet: true
 
 - name: Install the backups
-  ansible.builtin.include_tasks: main.yml
+  ansible.builtin.include_tasks: present.yml
 
 - name: Back up the accounting database, the controller state and the MUNGE key now
   ansible.builtin.systemd:

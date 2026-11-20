@@ -89,6 +89,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 # test loads the dump into a scratch database. Use two disks: a local one (root only,
 # holds the MUNGE key) and an NFS export, written as `owner` because root_squash maps
 # this host's root to nobody there (its directory is made on prepare_host, the server).
+# Off, or no destinations: the units, configuration and metrics go; the sets stay.
+#slurm_enable_backup: true
 #slurm_backup_destinations:  # example
 #  - {path: /backup/slurm, munge_key: true}
 #  - {path: /scratch/.slurm-backup, owner: slurm, prepare_host: nfs-server-host}
@@ -418,7 +420,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 # The daily cleanup of users' podman storage and enroot cache: a user's whole store
 # goes when they left the roster, after it went unused, or least recently used first
 # while the disk is above the limit; never while they use that tool.
-#slurm_container_storage_gc: true
+#slurm_enable_container_storage_gc: true
 #container_storage_gc_people: "{{ people }}"  # example
 #container_storage_gc_unused_days: 14
 #container_storage_gc_max_used_percent: 80

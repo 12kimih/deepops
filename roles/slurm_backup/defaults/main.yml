@@ -13,8 +13,13 @@
 # slurm_backup_restore_test_last_success_timestamp_seconds, ...), so an alert can fire
 # when a backup goes stale.
 #
-# Runs on the controller only. Opt-in: no destinations, no backup; emptying the list
-# later stops the timers and removes the units, configuration and metrics.
+# Runs on the first controller. Opt-in: no destinations, no backup; emptying the list
+# later, or slurm_enable_backup off, stops the timers and removes the units,
+# configuration and metrics (the backup sets stay).
+
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+slurm_backup_state: present
 
 # Each destination: {path, owner, munge_key, daily, weekly}.
 #   owner      who writes there: root for a local disk; for an NFS export with

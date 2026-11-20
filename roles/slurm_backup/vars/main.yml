@@ -1,7 +1,16 @@
 ---
-# The two timed commands, and every unit file the role installs (removed together when
-# the backups are switched off).
+# The two timed commands, and every unit file the role installs.
 slurm_backup_timers:
   - {command: backup, schedule: "{{ slurm_backup_schedule }}"}
   - {command: restore-test, schedule: "{{ slurm_backup_restore_test_schedule }}"}
 slurm_backup_unit_files: "{{ ['slurm-backup@.service'] + slurm_backup_timers | map(attribute='command') | map('regex_replace', '^(.*)$', 'slurm-backup-\\1.timer') | list }}"
+# What this component installs, for its record (roles/component_record): the units
+# (the timers, and the publish instance enabled for boot) before their files. The
+# backup sets and the work directory's lock stay.
+slurm_backup_items: >-
+  {{ slurm_backup_timers | map(attribute='command') | map('regex_replace', '^', 'unit:slurm-backup-')
+     | map('regex_replace', '$', '.timer') | list
+     + ['unit:slurm-backup@publish.service']
+     + slurm_backup_unit_files | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ slurm_backup_script, 'file:' ~ slurm_backup_config, 'file:' ~ slurm_backup_metrics_file,
+        'file:' ~ slurm_backup_textfile_dir ~ '/' ~ slurm_backup_textfile, 'dir:' ~ slurm_backup_work_dir] }}

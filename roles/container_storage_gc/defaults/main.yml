@@ -9,6 +9,10 @@
 # node's disk alerts are the existing filesystem rules (roles/prometheus rules
 # host.yml); roles/prometheus rules container-storage.yml alerts when the timer stops.
 
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+container_storage_gc_state: present
+
 container_storage_gc_unused_days: 14
 container_storage_gc_max_used_percent: 80
 

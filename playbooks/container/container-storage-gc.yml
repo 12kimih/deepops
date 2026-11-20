@@ -1,11 +1,12 @@
 ---
 # The daily cleanup of users' container image stores (roles/container_storage_gc):
 # podman storage and the enroot cache, on every Slurm host that keeps them.
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
-  tags:
-    - container-storage-gc
   roles:
     - role: deploy_defaults
     - role: container_storage_gc
-      when: slurm_container_storage_gc
+      container_storage_gc_state: "{{ deepops_components.container_storage_gc | component_phase(deepops_phase) }}"
+  tags: ['container-storage-gc']

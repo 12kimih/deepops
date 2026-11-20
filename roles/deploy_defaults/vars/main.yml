@@ -126,6 +126,11 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
     needs: [node_exporter]
+  # Daily controller backups with a monthly restore test, on the first controller; the
+  # role is absent until slurm_backup_destinations names one. The backup sets stay.
+  slurm_backup:
+    rules:
+      - {switch: "{{ slurm_enable_backup }}", group: slurm-master, first: true}
   slurm_usage_report:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
@@ -187,6 +192,11 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_install_enroot and slurm_install_pyxis }}", group: slurm-cluster}
     needs: [enroot]
+  # The daily cleanup of users' podman storage and enroot cache; the stores themselves
+  # are users' data and stay when it goes.
+  container_storage_gc:
+    rules:
+      - {switch: "{{ slurm_enable_container_storage_gc }}", group: slurm-cluster}
   # Open MPI built from source, where users build and run MPI programs.
   openmpi:
     rules:

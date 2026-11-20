@@ -1,10 +1,13 @@
 ---
-# Daily Slurm controller backups with a monthly restore test (roles/slurm_backup).
-# No-op until slurm_backup_destinations is set. Run one now with
+# Daily Slurm controller backups with a monthly restore test (roles/slurm_backup), on
+# the first controller; no-op until slurm_backup_destinations is set. Run one now with
 #   sudo systemctl start slurm-backup@backup.service
-- hosts: "{{ hostlist | default('slurm-master[0]') }}"
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
-  tags:
-    - slurm-backup
   roles:
+    - role: deploy_defaults
     - role: slurm_backup
+      slurm_backup_state: "{{ deepops_components.slurm_backup | component_phase(deepops_phase) }}"
+  tags: ['slurm-backup']

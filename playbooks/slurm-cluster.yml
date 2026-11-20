@@ -117,6 +117,8 @@
 
 - name: Back up the Slurm controller daily, with a monthly restore test
   import_playbook: slurm-cluster/slurm-backup.yml
+  vars:
+    deepops_phase: install
   tags:
     - slurm-backup
 
@@ -227,6 +229,8 @@
 
 - name: Clean up users' container image stores daily
   import_playbook: container/container-storage-gc.yml
+  vars:
+    deepops_phase: install
   tags:
     - container-storage-gc
 
@@ -294,6 +298,13 @@
   tags:
     - cluster-tools
 
+- name: Remove the container storage cleanup where it is no longer wanted
+  import_playbook: container/container-storage-gc.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - container-storage-gc
+
 - name: Remove the HPC SDK where it is no longer wanted
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml
   vars:
@@ -318,6 +329,13 @@
   import_playbook: slurm-cluster/openmpi.yml
   vars:
     deepops_phase: remove
+
+- name: Remove the controller backups where they are no longer wanted
+  import_playbook: slurm-cluster/slurm-backup.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - slurm-backup
 
 - name: Remove Node Health Check where it is no longer wanted
   import_playbook: slurm-cluster/nhc.yml
