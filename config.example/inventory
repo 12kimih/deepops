@@ -41,6 +41,8 @@ kube_node
 
 ######
 # SLURM
+# These group names are what the playbooks and roles look for (a play's hosts cannot
+# be templated, so they are fixed): rename none of them.
 ######
 [slurm-master]
 #login01

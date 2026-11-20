@@ -77,7 +77,7 @@ slurm_pyxis_wanted: "{{ slurm_install_enroot | bool and slurm_install_pyxis | bo
 # host runs before the build. Its own setting alone left the nodes asking for a package
 # never built.
 slurm_pyxis_wanted_anywhere: >-
-  {{ slurm_pyxis_wanted | bool or groups[slurm_cluster_group] | default([]) | map('extract', hostvars)
+  {{ slurm_pyxis_wanted | bool or groups['slurm-cluster'] | default([]) | map('extract', hostvars)
      | selectattr('slurm_host_wants_pyxis', 'defined') | map(attribute='slurm_host_wants_pyxis') | select | list | length > 0 }}
 # pyxis SPANK plugin options, written into plugstack.conf.d/pyxis.conf.
 # https://github.com/NVIDIA/pyxis/wiki/Setup
@@ -127,7 +127,7 @@ slurm_dbd_wait_timeout: 3600
 # Where slurmd and sackd fetch the configuration (configless): the controllers, in
 # order (SlurmctldHost order in slurm.conf).
 slurm_conf_servers: >-
-  {{ (groups[slurm_controller_group] if slurm_enable_ha else groups[slurm_controller_group][:1])
+  {{ (groups['slurm-master'] if slurm_enable_ha else groups['slurm-master'][:1])
      | map('regex_replace', '$', ':' ~ slurm_slurmctld_port) | join(',') }}
 # Distribution packages removed first, per OS family, so none shadows the packages.
 slurm_distro_packages:

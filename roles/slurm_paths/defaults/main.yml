@@ -60,13 +60,11 @@ slurm_site_secrets:
 # Renaming a running cluster is its own step: playbooks/slurm-cluster/slurm-cluster-rename.yml.
 slurm_cluster_name: deepops
 
-# A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
-# the controller group, slurmd on the compute group, client-only elsewhere.
-slurm_cluster_group: slurm-cluster  # every host with any part of Slurm
-slurm_controller_group: slurm-master
-slurm_compute_group: slurm-node
-is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"
-is_compute: "{{ inventory_hostname in (groups[slurm_compute_group] | default([])) }}"
+# A host's Slurm duties follow from its inventory groups (config.example/inventory names
+# them, the one contract: a play's hosts cannot be templated, so the names are fixed):
+# slurmctld and slurmdbd on slurm-master, slurmd on slurm-node, client-only elsewhere.
+is_controller: "{{ inventory_hostname in (groups['slurm-master'] | default([])) }}"
+is_compute: "{{ inventory_hostname in (groups['slurm-node'] | default([])) }}"
 
 slurm_enable_ha: false
 # HA StateSaveLocation. Must be on storage shared by all controllers when HA is on;

@@ -54,7 +54,7 @@ open_ondemand_oidc_crypto_passphrase: ""
 
 # Hosts the portal may proxy to, as a regex. Used only by the node proxies, which stay
 # off (no interactive apps); still never the allow-any default "[^/]+".
-open_ondemand_host_regex: "({{ (groups[slurm_compute_group] | default([])) | map('regex_escape') | join('|') }})"
+open_ondemand_host_regex: "({{ (groups['slurm-node'] | default([])) | map('regex_escape') | join('|') }})"
 
 # Directories the file browser and shell may open (OOD_ALLOWLIST_PATH). Paths outside
 # them are refused. Empty = no restriction, which the role refuses.

@@ -20,7 +20,7 @@ prometheus_retention_size: 50GB
 # redirects there. jobs-users-accts is left out: one series per user and account grows
 # without bound. Empty targets: no Slurm, no scrape.
 prometheus_slurmctld_metrics: [jobs, nodes, partitions, scheduler]
-prometheus_slurmctld_targets: "{{ (groups[slurm_controller_group] | default([]))[:1] | map('regex_replace', '$', ':' ~ slurm_slurmctld_port) | list }}"
+prometheus_slurmctld_targets: "{{ (groups['slurm-master'] | default([]))[:1] | map('regex_replace', '$', ':' ~ slurm_slurmctld_port) | list }}"
 
 # Extra rule files from the site config, e.g.
 # ["{{ inventory_dir }}/files/prometheus/rules/site.yml"]
