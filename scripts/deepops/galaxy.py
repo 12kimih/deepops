@@ -4,8 +4,11 @@
 roles/requirements.yml is the one place their versions are set (ansible-core
 ships no collections). They go where ansible.cfg looks: collections/ and
 roles/galaxy/. An install builds both afresh beside the old ones and then swaps
-them in, so nothing outside the requirements is left behind and a playbook
-running meanwhile never sees them missing. config/requirements.yml (or
+them in, so nothing outside the requirements is left behind; on Linux the swap is
+one atomic exchange, so a playbook running meanwhile never sees them missing.
+Installs in one checkout take turns (a lock), so two never remove each other's
+staging. A live directory may be a symlink (a worktree borrowing another
+checkout's): the install replaces the link, never what it points to. config/requirements.yml (or
 $DEEPOPS_CONFIG_DIR/requirements.yml), when a site has one, is installed on top.
 
 Usage:
@@ -15,6 +18,9 @@ Usage:
                        at its pinned version
 """
 
+import ctypes
+import errno
+import fcntl
 import json
 import os
 import shutil
@@ -49,12 +55,62 @@ def galaxy(kind, req, dest):
     raise SystemExit(f"ansible-galaxy {args[0]} install failed after 5 attempts")
 
 
+LOCK = ROOT / ".galaxy.lock"
+AT_FDCWD = -100
+RENAME_EXCHANGE = 2
+
+
+def remove(path):
+    """Remove path whatever it is, and say so when that fails: a symlink or file is
+    unlinked (never what a link points to), a directory removed with its contents."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+def exchange(a, b):
+    """Swap two existing paths in one step (Linux renameat2 RENAME_EXCHANGE); False
+    where the system cannot, so the caller falls back to two renames."""
+    if not sys.platform.startswith("linux"):
+        return False
+    renameat2 = getattr(ctypes.CDLL(None, use_errno=True), "renameat2", None)
+    if renameat2 is None:
+        return False
+    if renameat2(AT_FDCWD, os.fsencode(a), AT_FDCWD, os.fsencode(b), RENAME_EXCHANGE) == 0:
+        return True
+    err = ctypes.get_errno()
+    if err in (errno.EINVAL, errno.ENOSYS):  # a file system or kernel without it
+        return False
+    raise OSError(err, os.strerror(err), str(a), None, str(b))
+
+
+def swap(live, new):
+    """Put new in live's place and remove what live was."""
+    if not (live.exists() or live.is_symlink()):
+        new.rename(live)
+    elif exchange(new, live):
+        remove(new)  # now the old set
+    else:
+        old = live.with_name(f".{live.name}.old")
+        remove(old)
+        live.rename(old)
+        new.rename(live)
+        remove(old)
+
+
 def install():
+    with LOCK.open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)  # another install in this checkout finishes first
+        return install_locked()
+
+
+def install_locked():
     if not problems():
         return 0
     staged = {live: live.with_name(f".{live.name}.new") for live in (COLLECTIONS, ROLES)}
     for new in staged.values():
-        shutil.rmtree(new, ignore_errors=True)
+        remove(new)
     for req in (r for r in REQUIREMENTS if r.exists()):
         data = yaml.safe_load(req.read_text()) or {}
         if data.get("collections"):
@@ -70,12 +126,8 @@ def install():
             "staged install is incomplete, left the installed set alone:\n  " + "\n  ".join(incomplete)
         )
     for live, new in staged.items():
-        old = live.with_name(f".{live.name}.old")
-        shutil.rmtree(old, ignore_errors=True)
-        if live.exists():
-            live.rename(old)
-        new.rename(live)
-        shutil.rmtree(old, ignore_errors=True)
+        remove(live.with_name(f".{live.name}.old"))  # what an older version left
+        swap(live, new)
     return 0
 
 
