@@ -8,52 +8,40 @@ victim: bash's array-length expansion contains a brace followed by a hash,
 which opens a Jinja comment and aborts the render with "Missing end of comment
 tag".
 
-Only syntax is checked. Templates are parsed, never rendered, so no variables
-are needed. Unknown filters (ternary, password_hash and other Ansible-provided
-ones) raise TemplateAssertionError rather than a plain syntax error and are
-reported as skipped, because plain Jinja has no way to know about them.
+Only syntax is checked, with Jinja's parser alone: templates are never compiled
+or rendered, so neither variables nor Ansible's filters and tests are needed and
+every template is checked. Ansible enables no Jinja extensions by default, so
+plain Jinja accepts exactly what a deploy does.
+
+    check-template-syntax.py    every tracked roles/*/templates/** file
 """
 
-import os
 import sys
+from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
-from jinja2.exceptions import TemplateAssertionError, TemplateSyntaxError
+from jinja2 import Environment
+from jinja2.exceptions import TemplateSyntaxError
 
-ROLES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "roles")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
+from repo_files import ROOT, tracked  # noqa: E402
 
 
-def main():
-    roles_dir = os.path.normpath(ROLES)
-    checked = skipped = 0
+def main(argv):
+    cli.parser(__doc__).parse_args(argv)
+    env = Environment()
+    templates = tracked("roles/*/templates/*")
     failures = []
-
-    for role in sorted(os.listdir(roles_dir)):
-        templates = os.path.join(roles_dir, role, "templates")
-        if not os.path.isdir(templates):
-            continue
-        env = Environment(loader=FileSystemLoader(templates), autoescape=True)
-        for root, _, files in os.walk(templates):
-            for name in sorted(files):
-                rel = os.path.relpath(os.path.join(root, name), templates)
-                try:
-                    env.get_template(rel)
-                except TemplateAssertionError as err:
-                    # Ansible filter or test, unknown to plain Jinja.
-                    skipped += 1
-                    print(f"skip  {role}/{rel}: {err}")
-                except TemplateSyntaxError as err:
-                    failures.append((role, rel, err))
-                else:
-                    checked += 1
-
-    print(f"\n{checked} templates parsed, {skipped} skipped, {len(failures)} failed")
-    for role, rel, err in failures:
-        print(f"FAIL  roles/{role}/templates/{rel}")
-        print(f"      line {err.lineno}: {err.message}")
-
+    for path in templates:
+        try:
+            env.parse(path.read_text(encoding="utf-8"))
+        except TemplateSyntaxError as err:
+            failures.append(f"{path.relative_to(ROOT)}:{err.lineno}: {err.message}")
+    for failure in failures:
+        print(failure, file=sys.stderr)
+    print(f"{len(templates)} templates parsed, {len(failures)} failed")
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

@@ -42,6 +42,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 import cuda_releases  # noqa: E402
 import image_pins  # noqa: E402
 from repo_files import tracked  # noqa: E402
@@ -262,8 +263,12 @@ def report():
 
 
 def main(argv):
+    parser = cli.parser(__doc__)
+    parser.add_argument("--check", action="store_true", help="exit 1 when any pin is behind or unreadable")
+    parser.add_argument("--json", action="store_true", help="the report as JSON")
+    args = parser.parse_args(argv)
     rows = report()
-    if "--json" in argv:
+    if args.json:
         print(json.dumps(rows, indent=2))
     else:
         for r in sorted(rows, key=lambda r: (r["status"] != "behind", r["status"] != "unknown", r["pin"])):
@@ -277,7 +282,7 @@ def main(argv):
             )
             print(f"{r['status']:8} {r['pin']} {r['current']}{latest}  {r['where']}{extra}")
     bad = [r for r in rows if r["status"] in ("behind", "unknown")]
-    return 1 if "--check" in argv and bad else 0
+    return 1 if args.check and bad else 0
 
 
 if __name__ == "__main__":

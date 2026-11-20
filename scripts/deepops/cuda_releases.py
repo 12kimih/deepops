@@ -22,6 +22,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULTS = ROOT / "roles" / "nvidia_cuda_toolkit" / "defaults" / "main.yml"
 BASE = "https://developer.download.nvidia.com/compute/cuda"
@@ -78,6 +81,9 @@ def current_block(text):
 
 
 def main(argv):
+    parser = cli.parser(__doc__)
+    parser.add_argument("--check", action="store_true", help="exit 1 if NVIDIA lists newer releases")
+    args = parser.parse_args(argv)
     versions = newest_per_minor(releases_in(fetch(f"{BASE}/redist/")))
     entries = []
     for v in versions:
@@ -85,7 +91,7 @@ def main(argv):
         entries.append((v, runfile, md5))
     text = DEFAULTS.read_text()
     block = render(entries)
-    if "--check" in argv:
+    if args.check:
         if current_block(text) != block:
             print(
                 f"{DEFAULTS.relative_to(ROOT)}: NVIDIA lists newer CUDA releases; run {Path(__file__).name}"

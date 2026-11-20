@@ -50,6 +50,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 import settings  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
@@ -508,17 +509,27 @@ CHECKS = {
 
 
 def main(argv):
-    fix = Fixes() if "--fix" in argv else None
-    wanted = [a for a in argv if a != "--fix"] or list(CHECKS)
-    unknown = [c for c in wanted if c not in CHECKS]
+    parser = cli.parser(__doc__)
+    parser.add_argument(
+        "--fix", action="store_true", help="write what the fixable checks can, then check again"
+    )
+    parser.add_argument(
+        "checks", nargs="*", metavar="CHECK", help=f"some of: {', '.join(CHECKS)} (default: all)"
+    )
+    args = parser.parse_args(argv)
+    unknown = [c for c in args.checks if c not in CHECKS]
     if unknown:
-        print(f"unknown check: {', '.join(unknown)}", file=sys.stderr)
-        return 2
+        parser.error(f"unknown check: {', '.join(unknown)}")
+    return run(args.checks or list(CHECKS), Fixes() if args.fix else None)
+
+
+def run(wanted, fix):
+    """Run the WANTED checks; with FIX, apply what they can fix and run them again."""
     problems = [p for c in wanted for p in (CHECKS[c](fix) if c in FIXABLE else CHECKS[c]())]
     if fix is not None:
         for path in fix.apply():
             print(f"fixed {path}", file=sys.stderr)
-        return main([a for a in argv if a != "--fix"])
+        return run(wanted, None)
     for p in problems:
         print(p, file=sys.stderr)
     return 1 if problems else 0

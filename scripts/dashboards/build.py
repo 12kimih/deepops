@@ -13,12 +13,17 @@ import slurm_gpu_allocation
 import slurm_scheduler
 from grafana import render
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deepops"))
+import cli  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 DASHBOARDS = [gpu_nodes, slurm_scheduler, slurm_gpu_allocation]
 
 
 def main(argv):
-    check = "--check" in argv
+    parser = cli.parser(__doc__)
+    parser.add_argument("--check", action="store_true", help="report stale files and exit 1, writing nothing")
+    check = parser.parse_args(argv).check
     stale = []
     for module in DASHBOARDS:
         path = ROOT / module.PATH

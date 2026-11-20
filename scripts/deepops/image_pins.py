@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 PINNED = re.compile(r"""(?<![\w.:/-])((?:[\w.-]+(?::\d+)?/)?[\w./-]+:[\w.-]+)@(sha256:[0-9a-f]{64})""")
@@ -104,16 +105,19 @@ def pins():
 
 
 def main(argv):
-    if not argv or argv[0] not in ("list", "check", "pin"):
-        print(__doc__, file=sys.stderr)
-        return 2
-    if argv[0] == "pin":
-        for ref in argv[1:]:
+    parser = cli.parser(__doc__)
+    parser.add_argument("command", choices=["list", "check", "pin"])
+    parser.add_argument("refs", nargs="*", metavar="IMAGE:TAG", help="pin: the images to resolve")
+    args = parser.parse_args(argv)
+    if args.refs and args.command != "pin":
+        parser.error(f"{args.command} takes no IMAGE:TAG")
+    if args.command == "pin":
+        for ref in args.refs:
             print(f"{ref}@{digest(ref)}")
         return 0
     failed = 0
     for ref, sha, where in pins():
-        if argv[0] == "list":
+        if args.command == "list":
             print(f"{ref}@{sha}  {where}")
             continue
         now = digest(ref)

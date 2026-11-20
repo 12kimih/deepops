@@ -27,6 +27,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "tests/cluster-tools/slurm-names.json"
 RAW = "https://raw.githubusercontent.com/SchedMD/slurm"
@@ -143,8 +146,11 @@ def names(version):
 
 
 def main(argv):
+    parser = cli.parser(__doc__)
+    parser.add_argument("--check", action="store_true", help="exit 1 when the file is stale")
+    args = parser.parse_args(argv)
     text = json.dumps(names(pinned_version()), indent=1) + "\n"
-    if "--check" in argv:
+    if args.check:
         if not OUT.is_file() or OUT.read_text() != text:
             print(f"{OUT.relative_to(ROOT)} is stale: run scripts/deepops/slurm_names.py", file=sys.stderr)
             return 1

@@ -21,7 +21,6 @@ for every host instead. Nothing is decrypted (a vaulted value is compared as its
 ciphertext) and nothing connects to a host.
 """
 
-import argparse
 import json
 import os
 import re
@@ -32,6 +31,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 KUBESPRAY = "submodules/kubespray"
@@ -568,7 +570,7 @@ def cmd_show(args):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = cli.parser(__doc__)
     parser.add_argument("--config", default=os.environ.get("DEEPOPS_CONFIG_DIR", str(ROOT / "config")))
     sub = parser.add_subparsers(dest="command", required=True)
     diff = sub.add_parser("diff", help="per-host setting changes since a revision")
