@@ -36,12 +36,13 @@
   loop:
     - "{{ grafana_data_dir }}"
 
-# The provisioned dashboards were kept in the data directory before; they are
-# configuration and live in grafana_dashboards_dir now (every role writes its own there).
-- name: Remove the dashboards from the data directory
-  ansible.builtin.file:
-    path: "{{ grafana_data_dir }}/dashboards"
-    state: absent
+# Before the provider config and the restart: Grafana starts with every file in place,
+# so a changed provider path never leaves it without the dashboards. A file picked up
+# by a provider still on an old folder is re-homed by the reconcile below.
+- name: Install the deepops dashboards
+  ansible.builtin.include_tasks: dashboards.yml
+  vars:
+    grafana_dashboard_set: "{{ grafana_dashboard_set_own }}"
 
 - name: Install datasource config
   ansible.builtin.template:
@@ -122,12 +123,13 @@
   changed_when: true
   when: grafana_service_state != "stopped" and (grafana_login.status | default(200)) == 401
 
-# After the restart above: a dashboard provisioned while the old provider config was
-# still loaded would land in the old folder.
-- name: Install the deepops dashboards
-  ansible.builtin.include_tasks: dashboards.yml
-  vars:
-    grafana_dashboard_set: "{{ grafana_dashboard_set_own }}"
+# Earlier layouts kept the provisioned dashboards in the data directory. Removed only
+# after the restart above loaded the provider on grafana_dashboards_dir: while the old
+# provider still watches it, Grafana deletes each dashboard whose file goes.
+- name: Remove the dashboards from the data directory
+  ansible.builtin.file:
+    path: "{{ grafana_data_dir }}/dashboards"
+    state: absent
 
 # Provisioning never moves a dashboard to a changed folder, renames the folder or removes
 # a dashboard it stopped managing; this converges those (see the script).
