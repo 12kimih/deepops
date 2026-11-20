@@ -8,8 +8,9 @@
 #
 #   1. refuse unless every host already holds the vaulted MUNGE key (slurm_munge_key_file):
 #      the key once derived from the cluster name, so the key comes first
-#   2. refuse unless no job is pending or running (drain the partitions, let the jobs
-#      end or cancel them first)
+#   2. drain every partition, so nothing new is submitted while the name changes, and
+#      refuse unless no job is left unfinished (let them end or scancel them first);
+#      a refusal puts each partition back as it was
 #   3. a backup now; the new cluster in accounting
 #   4. stop slurmctld, set the old clustername file aside, deploy the controller under
 #      the new name (slurm.conf, accounting associations from slurm_accounting_file)
@@ -53,27 +54,59 @@
         fail_msg: The cluster is already named {{ slurm_cluster_name }}; nothing to rename.
         quiet: true
 
-    # squeue's default listing: every job not yet finished (pending, running, suspended,
-    # completing; vocab.job_active). `-t all` also lists the jobs that ended within
-    # MinJobAge, which already have their accounting records, so a run right after
-    # scancel was refused over jobs that no longer exist.
-    - name: List the jobs in the queue
+    # The partitions as they are now, to put back if the run stops here. Past this point
+    # slurmctld restarts without -R, which takes every partition's state from slurm.conf
+    # again (slurmctld(8)): the drain below ends with the rename.
+    - name: Read the partitions' states
       ansible.builtin.command:
-        argv: ["{{ slurm_install_prefix }}/bin/squeue", -h, -o, "%i %T %u"]
-      register: slurm_rename_queue
+        argv: ["{{ slurm_install_prefix }}/bin/sinfo", -h, -o, "%R %a"]
+      register: slurm_rename_partitions
       changed_when: false
       check_mode: false  # read-only; --check needs the result
 
-    - name: Require an empty queue
-      ansible.builtin.assert:
-        that: slurm_rename_queue.stdout_lines | length == 0
-        fail_msg: >-
-          {{ slurm_rename_queue.stdout_lines | length }} jobs are in the queue
-          ({{ slurm_rename_queue.stdout_lines[:5] | join(', ') }}{{ ', ...' if slurm_rename_queue.stdout_lines | length > 5 else '' }}); under a new name
-          their accounting records and associations would not exist. Drain the partitions
-          (scontrol update partitionname=<p> state=drain), let them end or scancel them, and
-          run this again.
-        quiet: true
+    - name: Stop new jobs and require an empty queue
+      block:
+        # A drained partition refuses submissions: a job submitted between the owner's
+        # scancel and this run (it happened) cannot arrive under the old name now.
+        - name: Drain every partition
+          ansible.builtin.command:
+            argv: ["{{ slurm_install_prefix }}/bin/scontrol", update, "partitionname={{ item.split()[0] }}", state=drain]
+          loop: "{{ slurm_rename_partitions.stdout_lines | unique }}"
+          when: item.split()[1] != 'drain'
+          changed_when: true
+
+        # squeue's default listing: every job not yet finished (pending, running,
+        # suspended, completing; vocab.job_active). `-t all` also lists the jobs that
+        # ended within MinJobAge, which already have their accounting records.
+        - name: List the jobs in the queue
+          ansible.builtin.command:
+            argv: ["{{ slurm_install_prefix }}/bin/squeue", -h, -o, "%i %T %u"]
+          register: slurm_rename_queue
+          changed_when: false
+          check_mode: false  # read-only; --check needs the result
+
+        - name: Require an empty queue
+          ansible.builtin.assert:
+            that: slurm_rename_queue.stdout_lines | length == 0
+            fail_msg: >-
+              {{ slurm_rename_queue.stdout_lines | length }} jobs are in the queue
+              ({{ slurm_rename_queue.stdout_lines[:5] | join(', ') }}{{ ', ...' if slurm_rename_queue.stdout_lines | length > 5 else '' }});
+              under a new name their accounting records and associations would not
+              exist. Let them end or scancel them (with their owners' agreement), and
+              run this again.
+            quiet: true
+      rescue:
+        # sinfo's %a abbreviates INACTIVE; scontrol takes the full word.
+        - name: Put each partition back as it was
+          ansible.builtin.command:
+            argv: ["{{ slurm_install_prefix }}/bin/scontrol", update, "partitionname={{ item.split()[0] }}", "state={{ {'inact': 'inactive'}.get(item.split()[1], item.split()[1]) }}"]
+          loop: "{{ slurm_rename_partitions.stdout_lines | unique }}"
+          when: item.split()[1] != 'drain'
+          changed_when: true
+
+        - name: Stop the rename
+          ansible.builtin.fail:
+            msg: "{{ ansible_failed_result.msg | default('the queue check failed') }}"
 
     - name: Back up the controller now
       ansible.builtin.include_role:
