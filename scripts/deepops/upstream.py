@@ -13,7 +13,8 @@ pin says where its releases are published, so the pin and its source sit togethe
 
   git URL REGEX      the repository's tags (git ls-remote, no API limits); REGEX matches
                      a release tag whole, its groups are the version's numbers
-  pypi NAME          PyPI's newest release of NAME
+  pypi NAME [PY]     PyPI's newest release of NAME; with PY (3.9), the newest final
+                     release whose Requires-Python admits that interpreter
   helm INDEX CHART   the newest non-prerelease version of CHART in a chart index.yaml
   deb PACKAGES NAME  the newest version of NAME in an APT Packages index (.gz or plain)
   oci REF REGEX      the tags of an OCI artifact (a Helm chart in a registry) matching
@@ -88,8 +89,48 @@ def newest_tag(names, pattern):
     return max(found, key=numbers) if found else None
 
 
-def newest_pypi(name):
-    return json.loads(fetch(f"https://pypi.org/pypi/{name}/json"))["info"]["version"]
+def newest_pypi(name, python=None):
+    data = json.loads(fetch(f"https://pypi.org/pypi/{name}/json"))
+    if python is None:
+        return data["info"]["version"]
+    found = [
+        version
+        for version, files in data["releases"].items()
+        if re.fullmatch(r"\d+(\.\d+)*", version)
+        and files
+        and not all(f.get("yanked") for f in files)
+        and all(admits(f.get("requires_python"), python) for f in files if not f.get("yanked"))
+    ]
+    return max(found, key=numbers) if found else None
+
+
+def admits(spec, python):
+    """Whether a Requires-Python SPEC (">=3.9, !=3.10.*") admits the interpreter PYTHON
+    ("3.9"): the comparisons Requires-Python uses, over release numbers."""
+    have = numbers(python)
+    for clause in filter(None, (c.strip() for c in (spec or "").split(","))):
+        op, version = re.fullmatch(r"(~=|==|!=|<=|>=|<|>)\s*(\S+)", clause).groups()
+        if version.endswith(".*"):
+            want = numbers(version[:-2])
+            same = have[: len(want)] == want
+            if (op == "==") != same:
+                return False
+            continue
+        want = numbers(version)
+        size = max(len(want), len(have))
+        a, b = have + (0,) * (size - len(have)), want + (0,) * (size - len(want))
+        ok = {
+            "==": a == b,
+            "!=": a != b,
+            "<=": a <= b,
+            ">=": a >= b,
+            "<": a < b,
+            ">": a > b,
+            "~=": a >= b and have[: len(want) - 1] == want[:-1],
+        }[op]
+        if not ok:
+            return False
+    return True
 
 
 def newest_helm(index, chart):
@@ -121,7 +162,7 @@ def newest(kind, args):
     if kind == "git":
         return newest_git(*args.split(None, 1))
     if kind == "pypi":
-        return newest_pypi(args)
+        return newest_pypi(*args.split())
     if kind == "helm":
         return newest_helm(*args.split())
     if kind == "deb":

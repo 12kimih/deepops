@@ -4,7 +4,7 @@
 easybuild_state: present
 # EasyBuild installed with pip into a root-owned venv, one per version:
 # {{ sm_software_path }}/EasyBuild/<version>, loaded as `module load EasyBuild/<version>`.
-# upstream: pypi easybuild
+# upstream: pypi easybuild 3.9
 easybuild_version: "5.4.2"
 # sha256 of each sdist pip installs, per version (pypi.org); a version without its row stops.
 easybuild_sha256:
@@ -14,8 +14,9 @@ easybuild_sha256:
     easybuild-easyblocks: 6af03a367baa46dfcf9378cf6dc40c545c79985484177313cfe81627d33aa6de
     easybuild-easyconfigs: 5d47d26c73dcb1d1cb468c741ab9520ad2700a6ffb7755cf08f8ad6a82ffd2b3
 # The sdists build with setuptools (setup.py only); pinned here so pip fetches nothing
-# unverified. 82.x is the newest that still runs on Python 3.9.
-# upstream: pypi setuptools
+# unverified. Kept on a release that runs on easybuild_python's oldest supported
+# interpreter (3.9, RHEL 9's python3): 83 and later need 3.10.
+# upstream: pypi setuptools 3.9
 easybuild_setuptools_version: "82.0.1"
 easybuild_setuptools_sha256: a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb
 # Interpreter for the venv: Python 3.9 or newer.

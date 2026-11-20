@@ -53,5 +53,28 @@ class UpstreamSources(unittest.TestCase):
         self.assertTrue(any("deploy_defaults" in w for w in narrowed), "the CUDA check image is narrowed")
 
 
+class RequiresPython(unittest.TestCase):
+    """`pypi NAME PY` reports the newest release that runs on PY: setuptools 83 needs
+    Python 3.10, so a plain newest-release check asked for a bump that breaks RHEL 9."""
+
+    def test_admits(self):
+        sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+        import upstream
+
+        for spec, python, expected in (
+            (None, "3.9", True),
+            (">=3.9", "3.9", True),
+            (">=3.10", "3.9", False),
+            (">=3.8, !=3.9.*", "3.9", False),
+            (">=3.8, !=3.9.*", "3.12", True),
+            ("==3.*", "3.9", True),
+            ("<3.9", "3.9", False),
+            ("~=3.9", "3.12", True),
+            ("~=3.9.0", "3.10", False),
+        ):
+            with self.subTest(spec=spec, python=python):
+                self.assertIs(upstream.admits(spec, python), expected)
+
+
 if __name__ == "__main__":
     unittest.main()
