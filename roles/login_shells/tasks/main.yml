@@ -1,14 +1,17 @@
 ---
 - name: Check the login shells are supported
   ansible.builtin.assert:
-    that: login_shells | difference(login_shells_supported) | length == 0
-    fail_msg: "login_shells may name {{ login_shells_supported | join(', ') }}, not {{ login_shells | difference(login_shells_supported) | join(', ') }}."
+    that: login_shells | difference(login_shells_supported + login_shells_builtin) | length == 0
+    fail_msg: >-
+      login_shells (from the people roster unless set) may name
+      {{ (login_shells_supported + login_shells_builtin) | join(', ') }}, not
+      {{ login_shells | difference(login_shells_supported + login_shells_builtin) | join(', ') }}.
     quiet: true
 
 # A shell is never removed here: an account may still log in with it.
 - name: Install the login shells (Debian family)
   ansible.builtin.apt:
-    name: "{{ login_shells }}"
+    name: "{{ login_shells | difference(login_shells_builtin) }}"
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -16,7 +19,7 @@
 
 - name: Install the login shells (RHEL family)
   ansible.builtin.dnf:
-    name: "{{ login_shells }}"
+    name: "{{ login_shells | difference(login_shells_builtin) }}"
     state: present
   when: ansible_facts.os_family == "RedHat"
 
