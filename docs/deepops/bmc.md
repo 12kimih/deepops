@@ -39,6 +39,10 @@ when they are not.
 | `bmc_netmask`, `bmc_gateway` | site | the rest of the LAN configuration |
 | `bmc_password` | site | vault this; empty means "leave the password alone" |
 | `bmc_password_format` | site | `20` on newer BMCs, `16` on older ones |
+| `bmc_snmp_community_file` | site | a site secret file holding the SNMP community, made when missing (random, vaulted, 18 characters) |
+| `bmc_snmp_community` | site | an explicit community instead (vault it); both empty leave it alone |
+| `bmc_auth_types` | site | IPMI 1.5 authentication types left enabled at every level, e.g. `[md5]` |
+| `bmc_cipher_suites` | site | RMCP+ suites left open (up to ADMIN), e.g. `[3, 17]`; every other one is closed |
 | `bmc_mgmt_interface`, `bmc_mgmt_address` | **host** | this host's leg on the management network |
 
 Every value is empty by default, and an empty value means the role leaves that setting
@@ -221,6 +225,28 @@ Suite 3 (HMAC-SHA1 + AES-128) is the default here because it is the one every IP
 implementation offers. Raise it only after checking that every board in the fleet lists
 the suite you pick.
 
+`bmc_cipher_suites` closes every suite it does not list, computed from that list in the
+same positional way (`plugins/filter/bmc.py`): `[3, 17]` on the board above writes
+`XXaXXXXXXXaXXXX`. The role refuses a suite the board does not offer, and a list without
+`bmc_cipher_suite`, which would cut off its own out-of-band power control. It configures
+over KCS, which uses no suite, so a mistake stays repairable in-band.
+
+## Hardening
+
+Factory BMCs leave weak paths open next to the strong ones. On a fleet that offers them:
+
+```yaml
+bmc_auth_types: [md5]          # IPMI 1.5: drops none, password (clear text) and md2
+bmc_cipher_suites: [3, 17]     # RMCP+: AES with SHA1 or SHA256 integrity only
+bmc_snmp_community_file: "{{ inventory_dir }}/files/bmc/snmp-community"   # not "public"
+```
+
+No setting fixes IPMI 2.0's RAKP exchange, which hands any client that names a valid
+user a salted hash of its password to crack offline. Keep the management network
+reachable from the management host alone; that, not the suites, is the boundary.
+Preview with `--check --diff`, apply to one host, check out-of-band power control from
+the management host (`playbooks/utilities/power.yml -e hostlist=<host>`), then the rest.
+
 ## Caveats
 
 - **Wrong passwords lock the account.** BMCs typically disable an account after three
@@ -228,7 +254,8 @@ the suite you pick.
   and never sweep an inventory with a guess.
 - **`netplan apply`** runs on the control node when the management interface changes.
   It only adds an interface, but it does touch networking.
-- **The password appears briefly in the managed host's process arguments** while
-  `ipmitool` runs. The tasks set `no_log`, so it stays out of Ansible's output.
+- **Secrets never reach `ipmitool`'s arguments.** The password and the SNMP community go
+  in on stdin (`ipmitool exec /dev/stdin`), where `ps` cannot show them, and the tasks
+  set `no_log`.
 - **Changing a BMC's LAN address drops any active out-of-band session.** The role runs
   in-band, so it is unaffected, but a console you have open elsewhere will disconnect.

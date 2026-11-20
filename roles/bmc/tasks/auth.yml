@@ -1,0 +1,34 @@
+---
+- name: Require known IPMI 1.5 authentication types
+  ansible.builtin.assert:
+    that:
+      - bmc_auth_types | map('lower') | difference(['none', 'md2', 'md5', 'password', 'oem']) | length == 0
+      - "'none' not in (bmc_auth_types | map('lower'))"
+    fail_msg: >-
+      bmc_auth_types takes md2, md5, password and oem ({{ bmc_auth_types }}); none would
+      let a session in without authentication.
+    quiet: true
+  tags:
+    - bmc
+
+# One call sets every level: ipmitool copies the current enables and replaces the named
+# levels' with the listed types.
+- name: Set the IPMI 1.5 authentication types
+  ansible.builtin.command:
+    argv:
+      - ipmitool
+      - -I
+      - open
+      - lan
+      - set
+      - "{{ bmc_channel }}"
+      - auth
+      - callback,user,operator,admin
+      - "{{ bmc_auth_types | map('lower') | join(',') }}"
+  when: >-
+    ['callback', 'user', 'operator', 'admin']
+    | map('extract', bmc_lan_now.auth) | map('sort') | unique
+    != [bmc_auth_types | map('lower') | sort]
+  changed_when: true
+  tags:
+    - bmc

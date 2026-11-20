@@ -72,6 +72,7 @@
     path: "{{ item.decl.path }}"
     kind: "{{ item.decl.kind }}"
     length: "{{ item.decl.length | default(omit) }}"
+    chars: "{{ item.decl.chars | default(omit) }}"
     uid: "{{ item.decl.uid | default(omit) }}"
     public_path: "{{ item.decl.public_path | default(omit) }}"
     vault: "{{ item.decl.vault | default(true) }}"

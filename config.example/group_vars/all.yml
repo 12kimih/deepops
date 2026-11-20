@@ -540,10 +540,15 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 #bmc_netmask: 255.255.255.0  # example
 #bmc_gateway: 10.0.0.1  # example
 # Vault it: ansible-vault encrypt_string 'secret' --name bmc_password
-# Same, for the SNMP community: v1/v2c sends it in clear and the shipped default is
-# the first thing a scanner tries. Empty leaves it alone.
-#bmc_snmp_community: ""
 #bmc_password: ""
+# The SNMP community: v1/v2c sends it in clear and the shipped default is the first
+# thing a scanner tries. A site secret file made when missing (random, vaulted); an
+# explicit vaulted bmc_snmp_community wins over it; neither leaves it alone.
+#bmc_snmp_community_file: "{{ inventory_dir }}/files/bmc/snmp-community"  # example
+# Hardening (docs/deepops/bmc.md): IPMI 1.5 authentication types and RMCP+ cipher
+# suites left open; empty leaves them alone.
+#bmc_auth_types: [md5]  # example
+#bmc_cipher_suites: [3, 17]  # example
 
 ################################################################################
 # Container registry                                                           #
