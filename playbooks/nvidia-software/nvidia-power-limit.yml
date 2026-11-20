@@ -21,11 +21,12 @@
 #
 # Every host it runs on converges to deepops_components (present on slurm-node while
 # slurm_cluster_configure_gpu_power_limit is on, removed elsewhere). A host without the
-# driver has no cap to apply or reset.
+# driver has no cap to reset, and fails where a cap could apply to its GPUs.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
+    - role: facts  # the GPUs on the PCIe bus, before a driver answers
     - role: nvidia_power_limit
       nvidia_power_limit_state: "{{ deepops_components.nvidia_power_limit | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"
