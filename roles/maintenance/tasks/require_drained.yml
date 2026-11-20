@@ -15,7 +15,7 @@
   failed_when: false
   check_mode: false  # read-only; --check needs the result
   when:
-    - inventory_hostname in groups[slurm_compute_group] | default([])
+    - inventory_hostname in groups['slurm-node'] | default([])
     - maintenance_slurm_controller | length > 0
     - not maintenance_undrained_ok | bool
 

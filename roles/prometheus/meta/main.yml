@@ -3,7 +3,7 @@
 # the component registry each exporter's scrape targets follow, from roles/deploy_defaults.
 dependencies:
   - role: prometheus_paths
-  - role: slurm_paths  # slurm_controller_group, slurm_slurmctld_port
+  - role: slurm_paths  # slurm_slurmctld_port
   - role: deploy_defaults
 
 galaxy_info:

@@ -53,6 +53,10 @@
    ("Empty hostname produced from delegate_to"). The driver's removal on a host with no
    Slurm controller stopped there (require_drained, 2026-11). Delegate to a value that
    falls back to a host (maintenance_slurm_delegate).
+17. An inventory group is named by its name (groups['slurm-node']), never through a
+   role setting that holds it (slurm_compute_group: slurm-node): a play's hosts cannot
+   be templated, so overriding such a setting would move half the code and not the
+   rest. config.example/inventory names the groups, the one contract.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -633,6 +637,19 @@ class TaskRules(unittest.TestCase):
                 if "Status-Abbrev" in text or "dpkg-query" in text:
                     offenders += [f"{rel(path)}: {m.group(0)}" for m in wanted.finditer(text)]
         self.assertEqual(offenders, [], "installed is the second letter: '.i', [1:2] == 'i'")
+
+    def test_inventory_groups_are_named_not_held_in_settings(self):
+        inventory = (ROOT / "config.example" / "inventory").read_text()
+        groups = set(re.findall(r"^\[([\w.-]+?)(?::children)?\]", inventory, re.M)) - {"all"}
+        self.assertIn("slurm-node", groups, "config.example/inventory lost its groups")
+        scan, offenders = Scan(minimum=50), []
+        for path in map(scan.seen, role_var_files()):
+            data = yaml.safe_load(path.read_text()) or {}
+            for key, value in data.items() if isinstance(data, dict) else ():
+                if isinstance(value, str) and value.strip() in groups:
+                    offenders.append(f"{rel(path)}: {key}: {value}")
+        self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
+        scan.check(self)
 
     def test_templates_in_yaml_hold_single_backslashes(self):
         jinja = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)

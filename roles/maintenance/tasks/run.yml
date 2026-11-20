@@ -28,7 +28,7 @@
   check_mode: false
   when:
     - maintenance_slurm_controller | length > 0
-    - ansible_play_hosts | intersect(groups[slurm_compute_group] | default([])) | length > 0
+    - ansible_play_hosts | intersect(groups['slurm-node'] | default([])) | length > 0
     - maintenance_steps | intersect(['drain', 'reboot', 'verify', 'resume']) | length > 0
 
 - name: Require the Slurm commands this checkout installs

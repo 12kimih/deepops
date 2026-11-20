@@ -40,7 +40,7 @@
         tasks_from: packages-build
 
 # One pass over every Slurm host: each one's duties (controller, compute or client
-# only) follow from its inventory groups (slurm_controller_group, slurm_compute_group).
+# only) follow from its inventory groups (slurm-master, slurm-node).
 - hosts: slurm-cluster
   become: true
   roles:

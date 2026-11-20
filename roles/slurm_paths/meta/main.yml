@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: deepops_paths
+  - role: retired_settings  # slurm_*_group (the group names are fixed)
 
 galaxy_info:
   namespace: deepops

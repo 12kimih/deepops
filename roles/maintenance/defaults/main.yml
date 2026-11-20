@@ -72,13 +72,13 @@ maintenance_reboot_requester: "{{ (ansible_parent_role_names | default([]) | fir
 # Rebooting one is allowed while jobs run: they run on the compute nodes and survive
 # it (I/O to a hard NFS mount waits for the server to come back).
 maintenance_shared_host: >-
-  {{ inventory_hostname in (groups[slurm_controller_group] | default([])) + (groups['slurm-nfs'] | default([])) }}
+  {{ inventory_hostname in (groups['slurm-master'] | default([])) + (groups['slurm-nfs'] | default([])) }}
 
 # verify: the units that must be active (what the deploy runs on each kind of host),
 # and whether to require GPUs and NHC.
 maintenance_verify_units: >-
-  {{ (['slurmd'] if inventory_hostname in groups[slurm_compute_group] | default([]) else [])
-     + (['mariadb', 'munge', 'slurmdbd', 'slurmctld'] if inventory_hostname in groups[slurm_controller_group] | default([]) else [])
+  {{ (['slurmd'] if inventory_hostname in groups['slurm-node'] | default([]) else [])
+     + (['mariadb', 'munge', 'slurmdbd', 'slurmctld'] if inventory_hostname in groups['slurm-master'] | default([]) else [])
      + (['nfs-server'] if inventory_hostname in groups['slurm-nfs'] | default([]) else []) }}
 # A compute node without GPUs (maintenance_gpus_baseline: lspci when the run started)
 # is checked without them.

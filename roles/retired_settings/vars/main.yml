@@ -37,6 +37,9 @@ retired_settings:
   volume_snapshot_CRD_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster
   snapshot_controller_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster
   trident_helm_repo_name: trident_helm_repo_url (installed with helm --repo, no named repository) in roles/netapp-trident
+  slurm_cluster_group: the inventory group names are fixed (slurm-cluster; config.example/inventory)
+  slurm_controller_group: the inventory group names are fixed (slurm-master; config.example/inventory)
+  slurm_compute_group: the inventory group names are fixed (slurm-node; config.example/inventory)
   trident_helm_chart_name: trident_helm_chart (the chart name; the repository is trident_helm_repo_url) in roles/netapp-trident
   k8s_nfs_client_repo_name: k8s_nfs_client_helm_repo (installed with helm --repo, no named repository) in roles/nfs-client-provisioner
   prometheus_enabled: prometheus_service_enabled (started/stopped; _state means present/absent, docs/deepops/component-state.md)
