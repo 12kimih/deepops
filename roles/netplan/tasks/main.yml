@@ -36,6 +36,14 @@
     - name: Report that the configuration was rejected
       ansible.builtin.fail:
         msg: "netplan rejected {{ netplan_file }}; the previous configuration is back in place"
+  # The copy exists only to put back a rejected file; once the run decided, it goes
+  # (Ansible's timestamped backups otherwise pile up in /etc/netplan).
+  always:
+    - name: Remove the copy kept for the rollback
+      ansible.builtin.file:
+        path: "{{ netplan_written.backup_file }}"
+        state: absent
+      when: netplan_written.backup_file is defined
 
 - name: Keep the other network manager out of the way
   when: netplan_conflicting_manager | length > 0
