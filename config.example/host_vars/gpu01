@@ -5,6 +5,6 @@
 # Don't install the CUDA toolkit on this host
 #nvidia_cuda_install: false
 
-# Cap this host's GPUs at 450W (roles/nvidia_power_limit). Hosts without this have any
-# cap removed instead, so this is the only place a per-node cap should live.
+# This host's GPU cap when it must differ from its model's
+# (nvidia_power_limit_watts_by_model in group_vars; roles/nvidia_power_limit).
 #nvidia_power_limit_watts: 450  # example

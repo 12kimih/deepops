@@ -54,8 +54,8 @@ These are additive -- upstream had no equivalent default:
   templates under `config/files/slurm/` pointed to by `slurm_conf_template` (and the
   cgroup/gres/dbd equivalents), rendered verbatim. `config.example/files/slurm/job_submit.lua`
   is a ready-to-edit Lua submit filter (DeepOps generates none).
-- **GPU power cap** -- `slurm_cluster_configure_gpu_power_limit`, and `nvidia_power_limit_watts`
-  per host.
+- **GPU power cap** -- `slurm_cluster_configure_gpu_power_limit`, the cap per GPU model
+  (`nvidia_power_limit_watts_by_model`), and `nvidia_power_limit_watts` for a host that differs.
 - **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner
   and shared directories (`group_vars/slurm-cluster.yml`), and the login-node limits
   (`group_vars/slurm-login.yml`).

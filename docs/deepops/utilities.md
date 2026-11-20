@@ -42,7 +42,7 @@ reboots each as it empties and returns it to service. See
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `nvidia-software/nvidia-power-limit.yml` | slurm-node | persistent GPU power cap from `nvidia_power_limit_watts`; a host without one has its cap removed |
+| `nvidia-software/nvidia-power-limit.yml` | slurm-node | persistent GPU power cap: the GPU model's (`nvidia_power_limit_watts_by_model`) or the host's (`nvidia_power_limit_watts`); a node with neither has its cap removed |
 | `utilities/gpu-diag.yml` | slurm-node | GPU burn-in: one node at a time, drain it, run the DCGM diagnostics (`dcgmi diag -r 3`, `-e maintenance_verify_dcgm_level=N`) with the other verify checks, resume; a failing node stays drained |
 | `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS and IOMMU state; read-only |
 | `utilities/disable-acs.yml` | slurm-node | disables PCIe ACS for GPU peer-to-peer, persistently |

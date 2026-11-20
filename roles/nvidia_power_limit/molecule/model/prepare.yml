@@ -1,0 +1,23 @@
+---
+# The cap comes from the GPU model alone (no nvidia_power_limit_watts).
+# There are no real GPUs in CI, so drop in a stub nvidia-smi that answers the
+# --query-gpu reads the role makes and accepts -pl / -pm. This lets the converge
+# exercise the real code path (validate range -> template unit -> enable/start ->
+# read back) instead of just the "no driver, skip" branch. The stub reports a GPU
+# already at 450W so a second converge has nothing to change.
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install stub nvidia-smi
+      ansible.builtin.copy:
+        dest: /usr/bin/nvidia-smi
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          case "$*" in
+            *query-gpu=name*)  echo "NVIDIA A30" ;;
+            *power.min_limit*) echo "0, 450.00, 600.00, 100.00, 600.00" ;;
+            *power.limit*)     echo "450.00 W" ;;
+            *) : ;;
+          esac
+          exit 0
