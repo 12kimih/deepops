@@ -324,5 +324,34 @@ class PyxisEntry(unittest.TestCase):
                 self.assertNotIn("plugstack.conf", path.read_text(), str(path))
 
 
+class NodeAccess(unittest.TestCase):
+    """pam_slurm_adopt fatal()s the sshd process when it cannot initialise Slurm, which
+    closed every SSH login to the nodes on 2026-11-20: the operators must never reach it,
+    and the configuration it reads must not go before slurmd has its own copy."""
+
+    COMPUTE = load("roles/slurm/tasks/compute.yml")
+
+    def test_the_operators_list_comes_before_pam_slurm_adopt(self):
+        blocks = [
+            t["blockinfile"]["block"]
+            for t in self.COMPUTE
+            if t.get("blockinfile", {}).get("path") == "/etc/pam.d/sshd"
+        ]
+        self.assertEqual(len(blocks), 2)
+        for block in blocks:
+            lines = block.splitlines()
+            self.assertIn("pam_listfile.so", lines[0])
+            self.assertTrue(all("pam_slurm_adopt" not in line for line in lines[:1]))
+            self.assertTrue(any("pam_slurm_adopt" in line for line in lines[1:]))
+
+    def test_local_configuration_goes_only_after_slurmd_has_its_copy(self):
+        names = [t.get("name") for t in self.COMPUTE]
+        remove = names.index("Remove local copies of the configuration slurmctld serves")
+        self.assertLess(names.index("Start slurmd"), remove)
+        wait = names.index("Wait for slurmd's copy of the configuration")
+        self.assertLess(wait, remove)
+        self.assertEqual(self.COMPUTE[wait]["wait_for"]["path"], "/run/slurm/conf/slurm.conf")
+
+
 if __name__ == "__main__":
     unittest.main()
