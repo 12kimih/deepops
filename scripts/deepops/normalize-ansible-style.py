@@ -67,8 +67,8 @@ COLLECTION = {
     "docker_login": "community.docker",
     "docker_image": "community.docker",
     "docker_network": "community.docker",
-    "mysql_user": "ansible.mysql",
-    "mysql_db": "ansible.mysql",
+    "mariadb_user": "ansible.mariadb",
+    "mariadb_db": "ansible.mariadb",
 }
 # Keys that mark a list item as a task (or play), besides a module key.
 TASK_MARKERS = {
