@@ -18,7 +18,7 @@ dashboard_port=$(kubectl -n kube-system get svc kubernetes-dashboard --no-header
 master_ip=$(kubectl get nodes -l node-role.kubernetes.io/control-plane= --no-headers -o custom-columns=IP:.status.addresses.*.address | cut -f1 -d, | head -1)
 
 # Get access token
-token=$(kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}') | grep ^token: | awk '{print $2}')
+token=$(kubectl -n kube-system describe secret "$(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')" | grep ^token: | awk '{print $2}')
 
 export dashboard_url="https://${master_ip}:${dashboard_port}"
 

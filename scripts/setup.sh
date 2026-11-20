@@ -21,51 +21,50 @@ KUBESPRAY_PYTHON="${KUBESPRAY_PYTHON:-3.13}"    # Newest Python the pinned Kubes
 ###
 
 # Set distro-specific variables
+# shellcheck source=/dev/null
 . /etc/os-release
 DEPS_DEB=(git curl sshpass wget)
 DEPS_EL=(git curl python3-libselinux sshpass wget)
-EPEL_VERSION="$(echo ${VERSION_ID} | sed  's/^[^0-9]*//;s/[^0-9].*$//')"
+EPEL_VERSION="${VERSION_ID%%.*}"
 EPEL_URL="https://dl.fedoraproject.org/pub/epel/epel-release-latest-${EPEL_VERSION}.noarch.rpm"
-PROXY_USE=`grep -v ^# ${SCRIPT_DIR}/deepops/proxy.sh 2>/dev/null | grep -v ^$ | wc -l`
+PROXY_FILE="${SCRIPT_DIR}/deepops/proxy.sh"
 
 # Disable interactive prompts from Apt
 export DEBIAN_FRONTEND=noninteractive
 
 # Exit if run as root
-if [ $(id -u) -eq 0 ] ; then
+if [ "$(id -u)" -eq 0 ] ; then
     echo "Please run as a regular user" >&2
     exit 1
 fi
 
-# Proxy wrapper
-as_sudo(){
-    if [ $PROXY_USE -gt 0 ] ; then
-        cmd="sudo -H bash -c '. ${SCRIPT_DIR}/deepops/proxy.sh && $@'"
+# Run a command (its words as given, never re-parsed) as root or as this user, with the
+# proxy settings of deepops/proxy.sh when it sets any.
+proxy_in_use() { grep -qvE '^[[:space:]]*(#|$)' "${PROXY_FILE}" 2>/dev/null; }
+as_sudo() {
+    if proxy_in_use ; then
+        sudo -H bash -c '. "$0" && exec "$@"' "${PROXY_FILE}" "$@"
     else
-        cmd="sudo bash -c '$@'"
+        sudo "$@"
     fi
-    eval $cmd
 }
-
-# Proxy wrapper
-as_user(){
-    if [ $PROXY_USE -gt 0 ] ; then
-        cmd="bash -c '. ${SCRIPT_DIR}/deepops/proxy.sh && $@'"
+as_user() {
+    if proxy_in_use ; then
+        bash -c '. "$0" && exec "$@"' "${PROXY_FILE}" "$@"
     else
-        cmd="bash -c '$@'"
+        "$@"
     fi
-    eval $cmd
 }
 
 # Install software dependencies
 case "$ID" in
     rhel*|centos*)
-        as_sudo "yum -y -q install ${EPEL_URL} |& grep -v 'Nothing to do'"       # Enable EPEL (required for sshpass package)
-        as_sudo "yum -y -q install ${DEPS_EL[@]}"
+        as_sudo yum -y -q install "${EPEL_URL}"     # EPEL, for sshpass
+        as_sudo yum -y -q install "${DEPS_EL[@]}"
         ;;
     ubuntu*)
-        as_sudo "apt-get -q update"
-        as_sudo "apt-get -yq install ${DEPS_DEB[@]}"
+        as_sudo apt-get -q update
+        as_sudo apt-get -yq install "${DEPS_DEB[@]}"
         ;;
     *)
         # Not an error: this branch is an escape hatch. Everything after this
@@ -83,9 +82,9 @@ esac
 if ! (cd "${SCRIPT_DIR}/.." && grep -i deepops README.md >/dev/null 2>&1 ) ; then
     if command -v git &> /dev/null ; then
         if ! test -d deepops ; then
-            as_user git clone --branch ${DEEPOPS_TAG} https://github.com/NVIDIA/deepops.git
+            as_user git clone --branch "${DEEPOPS_TAG}" https://github.com/NVIDIA/deepops.git
         fi
-        cd deepops
+        cd deepops || exit 1
     else
         echo "ERROR: Unable to check out DeepOps git repo, 'git' command not found"
         exit
@@ -93,16 +92,21 @@ if ! (cd "${SCRIPT_DIR}/.." && grep -i deepops README.md >/dev/null 2>&1 ) ; the
 fi
 
 # Install the locked Python environment from the checkout (standalone runs have just cloned it)
-REPO_DIR="$( (cd "${SCRIPT_DIR}/.." && grep -qi deepops README.md 2>/dev/null) && cd "${SCRIPT_DIR}/.." && pwd || pwd)"
+if (cd "${SCRIPT_DIR}/.." && grep -qi deepops README.md 2>/dev/null) ; then
+    REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+    REPO_DIR="$(pwd)"
+fi
 # uv provides the Python interpreter and the locked environment (.venv); its own
 # version is the one pyproject.toml requires.
 export PATH="${HOME}/.local/bin:${PATH}"
 UV_VERSION="$(sed -n 's/^required-version = "==\(.*\)"/\1/p' "${REPO_DIR}/pyproject.toml" 2>/dev/null)"
 if ! command -v uv >/dev/null 2>&1 || { [ -n "${UV_VERSION}" ] && [ "$(uv --version | awk '{print $2}')" != "${UV_VERSION}" ]; } ; then
-    as_user "curl -LsSf https://astral.sh/uv/${UV_VERSION:+${UV_VERSION}/}install.sh | sh"
+    # shellcheck disable=SC2016  # $0 is the URL, expanded by the inner shell
+    as_user bash -c 'set -o pipefail; curl -LsSf "$0" | sh' "https://astral.sh/uv/${UV_VERSION:+${UV_VERSION}/}install.sh"
 fi
 command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
-cd "${REPO_DIR}"
+cd "${REPO_DIR}" || exit 1
 uv sync --locked || { echo "ERROR: uv sync failed" >&2; exit 1; }
 # git hooks live in the clone's common directory, shared by all its worktrees, and run
 # scripts from the tree that installed them; so only the main worktree installs them
@@ -179,8 +183,11 @@ if [ -f submodules/kubespray/requirements.txt ] ; then
     uv pip install -q --python .venv-kubespray -r submodules/kubespray/requirements.txt
 fi
 
-# Earlier versions activated /opt/deepops/env from ~/.bashrc; uv run replaces that.
-sed -i.bak '\|^source /opt/deepops/env/bin/activate$|d' "${HOME}/.bashrc" 2>/dev/null || true
+# Earlier versions activated /opt/deepops/env from ~/.bashrc; uv run replaces that. Only
+# a file that has the line is edited, and no backup copy is left beside it.
+if grep -qx 'source /opt/deepops/env/bin/activate' "${HOME}/.bashrc" 2>/dev/null ; then
+    sed -i '\|^source /opt/deepops/env/bin/activate$|d' "${HOME}/.bashrc"
+fi
 
 echo
 echo "*** Setup complete ***"

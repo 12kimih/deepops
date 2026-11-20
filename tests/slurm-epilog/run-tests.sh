@@ -968,9 +968,8 @@ if [ -z "$dir" ]; then
     no "enroot cleanup is skipped when another job is present" "harness setup failed"
 else
     rm -f "$dir/parts/"*
-    for n in 50-lastuserjob-all-enroot-dirs; do
-        printf '#!/usr/bin/env bash\ntouch "%s/RAN-50"\n' "$dir" > "$dir/parts/$n"; chmod +x "$dir/parts/$n"
-    done
+    n=50-lastuserjob-all-enroot-dirs
+    printf '#!/usr/bin/env bash\ntouch "%s/RAN-50"\n' "$dir" > "$dir/parts/$n"; chmod +x "$dir/parts/$n"
     proc_other_job_v2 "$dir/proc"
     PATH="$dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 HOSTNAME=node1 \
         SLURM_JOBID=1000 SQUEUE_JOBS="" SQUEUE_RC=0 "$dir/run-parts.sh" "$dir/parts" >/dev/null 2>&1

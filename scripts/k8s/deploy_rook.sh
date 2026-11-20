@@ -12,7 +12,6 @@ ROOT_DIR="${SCRIPT_DIR}/../.."
 # Source common libraries and env variables
 source ${ROOT_DIR}/scripts/common.sh
 
-CHART_VERSION="1.22.1"
 HELM_ROOK_CHART_REPO="${HELM_ROOK_CHART_REPO:-https://charts.rook.io/release}"
 HELM_ROOK_CHART_VERSION="${HELM_ROOK_CHART_VERSION:-v1.1.1}"
 
@@ -86,7 +85,8 @@ function delete_rook() {
 
 function print_rook() {
   # Get Rook Ceph Tools POD name
-  export rook_toolspod=$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools --no-headers -o custom-columns=:.metadata.name)
+  rook_toolspod=$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools --no-headers -o custom-columns=:.metadata.name)
+  export rook_toolspod
 
   # Get IP of first master
   master_ip=$(kubectl get nodes -l node-role.kubernetes.io/control-plane= --no-headers -o custom-columns=IP:.status.addresses.*.address | cut -f1 -d, | head -1)
@@ -112,7 +112,8 @@ function print_rook() {
 
 function create_ceph_user() {
   # Get Rook Ceph Tools POD name
-  export rook_toolspod=$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools --no-headers -o custom-columns=:.metadata.name)
+  rook_toolspod=$(kubectl -n rook-ceph get pod -l app=rook-ceph-tools --no-headers -o custom-columns=:.metadata.name)
+  export rook_toolspod
   kubectl -n rook-ceph exec -ti ${rook_toolspod} -- ceph dashboard set-login-credentials ${DEEPOPS_ROOK_USER} ${DEEPOPS_ROOK_PASS}
 }
 
@@ -200,7 +201,7 @@ function install_rook() {
 }
 
 
-get_opts ${@}
+get_opts "$@"
 
 if [ ${ROOK_DELETE} ]; then
   delete_rook

@@ -10,10 +10,10 @@ DOCKER_COMPOSE_URL="${DOCKER_COMPOSE_URL:-https://github.com/docker/compose/rele
 type docker >/dev/null 2>&1
 if [ $? -ne 0 ] ; then
     get_docker=$(mktemp)
-    curl -fsSL get.docker.com -o ${get_docker}
-    sudo sh ${get_docker}
-    sudo rm -f ${get_docker}
-    sudo usermod -aG docker $(whoami)
+    curl -fsSL get.docker.com -o "${get_docker}"
+    sudo sh "${get_docker}"
+    sudo rm -f "${get_docker}"
+    sudo usermod -aG docker "$(whoami)"
 fi
 
 type docker-compose >/dev/null 2>&1

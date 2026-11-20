@@ -83,9 +83,8 @@ if ! "${fast}"; then
     step "slurm epilog tests" bash tests/slurm-epilog/run-tests.sh
     # Fake helm and kubectl; about eight minutes, so the full check only.
     step "runai role tests" bash tests/runai/run-tests.sh
-    for plugin in config.example/files/slurm/job_submit.lua; do
-        step "job_submit.lua tests (Lua 5.4, as slurmctld runs it)" lua5.4 roles/slurm/tests/job_submit_test.lua "${plugin}"
-    done
+    step "job_submit.lua tests (Lua 5.4, as slurmctld runs it)" \
+        lua5.4 roles/slurm/tests/job_submit_test.lua config.example/files/slurm/job_submit.lua
     # The Slurm exporter is Go; nothing else would run its tests.
     step "Slurm exporter: gofmt, vet, tests" bash -c \
         'cd roles/prometheus-slurm-exporter/files/exporter && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
