@@ -7,6 +7,17 @@
     patterns: "*_{{ slurm_deb_version }}_*.deb"
   register: slurm_stale_debs
 
+# Without them the rules that tell a leftover by name match nothing, silently: a report
+# then lists every leftover as unclaimed and a run keeps them (2026-11-20, a report run
+# before the repository held the packages of a new slurm_deb_version).
+- name: Require the Slurm packages of this version in the repository
+  ansible.builtin.assert:
+    that: slurm_stale_debs.matched > 0
+    fail_msg: >-
+      {{ slurm_repo_dir }} holds no package of Slurm {{ slurm_deb_version }}, whose names tell
+      a leftover by name. Build them first: playbooks/slurm-cluster/slurm.yml.
+    quiet: true
+
 - name: List what the Slurm packages install
   ansible.builtin.command:
     argv: [dpkg-deb, --contents, "{{ item.path }}"]
