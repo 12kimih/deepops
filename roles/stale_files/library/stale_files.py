@@ -27,7 +27,9 @@ Each rule names its evidence, never a guess from a file name alone:
                known to leave behind (an installer's temporary config, the copies
                Ansible's backup: true writes)
 
-Nothing a package owns is touched, whatever a rule says. With report, files under
+Nothing a package owns is touched, whatever a rule says, nor anything the manifest of
+a staged install in `manifests` lists (roles/source_build: a build from source owns its
+files that way). With report, files under
 `report` that no package owns and no rule matched are listed too (counted per
 directory), for a person to judge.
 
@@ -49,6 +51,7 @@ package's or a rule's say, again only for a person to judge (nothing is removed)
 """
 
 import glob
+import json
 import os
 import re
 import shutil
@@ -67,6 +70,7 @@ options:
   ignore: {type: list, elements: path, default: []}
   audit: {type: bool, default: false}
   config_dirs: {type: list, elements: path, default: []}
+  manifests: {type: path, description: The directory of staged_install manifests (*.json).}
 """
 
 
@@ -94,6 +98,18 @@ def owned_paths():
         paths.update(line for line in out.splitlines() if line.startswith("/"))
     except OSError:
         pass
+    return paths
+
+
+def staged_paths(manifests):
+    """Every file and directory a staged install's manifest in MANIFESTS lists."""
+    paths = set()
+    if not manifests:
+        return paths
+    for manifest in glob.glob(os.path.join(manifests, "*.json")):
+        with open(manifest) as f:
+            data = json.load(f)
+        paths.update(data.get("files", []), data.get("dirs", []))
     return paths
 
 
@@ -399,10 +415,11 @@ def main():
             "ignore": {"type": "list", "elements": "path", "default": []},
             "audit": {"type": "bool", "default": False},
             "config_dirs": {"type": "list", "elements": "path", "default": []},
+            "manifests": {"type": "path"},
         },
         supports_check_mode=True,
     )
-    owned = owned_paths()
+    owned = owned_paths() | staged_paths(module.params["manifests"])
     stale, kept, within = {}, [], {}
     for rule in module.params["rules"]:
         try:
