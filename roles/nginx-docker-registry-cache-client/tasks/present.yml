@@ -29,13 +29,8 @@
   delay: 10
   when: nginx_docker_cache_ca | length == 0
 
-- name: Set up Ubuntu client
-  ansible.builtin.include_tasks: client-ubuntu.yml
-  when: ansible_facts.distribution == 'Ubuntu'
-
-- name: Set up RHEL client
-  ansible.builtin.include_tasks: client-el.yml
-  when: ansible_facts.os_family == 'RedHat'
+- name: Set up the client
+  ansible.builtin.include_tasks: client.yml
 
 - name: Record the component as present
   ansible.builtin.include_role:

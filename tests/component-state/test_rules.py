@@ -240,6 +240,81 @@ class Playbooks(unittest.TestCase):
                             )
 
 
+MARKS_SPEC = importlib.util.spec_from_file_location(
+    "deepops_marks", ROOT / "plugins/module_utils/deepops_marks.py"
+)
+marks = importlib.util.module_from_spec(MARKS_SPEC)
+MARKS_SPEC.loader.exec_module(marks)
+# Files a component writes that cannot carry a mark, and why leaving them on a host
+# deployed before component records is right (absent adopts only what shows deepops
+# made it; plugins/module_utils/deepops_marks.py).
+UNMARKABLE = {
+    "/etc/defaultdomain": "the NIS domain name alone; NIS is removed only explicitly",
+}
+
+
+def _tasks(path):
+    stack = list(yaml.safe_load(path.read_text()) or [])
+    while stack:
+        task = stack.pop()
+        if isinstance(task, dict):
+            yield task
+            for key in ("block", "rescue", "always"):
+                stack.extend(task.get(key) or [])
+
+
+class Marks(unittest.TestCase):
+    def test_every_file_a_component_writes_shows_deepops_made_it(self):
+        # Without a mark, absent on a host deployed before component records leaves the
+        # file (a site's own of the same name must never go), so each file a role writes
+        # carries one: ansible_managed or roles/<name> in its text, or deepops in its path.
+        def norm(text):
+            return " ".join(str(text).replace('"', "").replace("'", "").split())
+
+        used = set()
+        for name in REGISTRY:
+            role = ROOT / "roles" / components.component_role(REGISTRY, name)
+            items = str((yaml.safe_load((role / "vars/main.yml").read_text()) or {}).get(f"{name}_items", ""))
+            # file:PATH literals, and 'file:' ~ setting in an expression.
+            files = {norm(f) for f in re.findall(r"file:([^'\",\]\n]+)", items)} | {
+                norm(f"{{{{ {v} }}}}")
+                for v in re.findall(r"'file:'\s*~\s*([a-z_][a-z0-9_]*)\b(?!\s*~)", items)
+            }
+            for path in role.glob("tasks/**/*.yml"):
+                for task in _tasks(path):
+                    for module in ("ansible.builtin.template", "ansible.builtin.copy"):
+                        args = task.get(module)
+                        if not isinstance(args, dict) or norm(args.get("dest", "")) not in files:
+                            continue
+                        dest = norm(args["dest"])
+                        if marks.named_deepops(dest) or args.get("remote_src"):
+                            continue
+                        if dest in UNMARKABLE:
+                            used.add(dest)
+                            continue
+                        if "content" in args:
+                            text = str(args["content"])
+                            if not re.sub(r"\{\{.*?\}\}", "", text).strip():
+                                continue  # all of it rendered at run time
+                        else:
+                            folder = "templates" if module.endswith("template") else "files"
+                            defaults = yaml.safe_load((role / "defaults/main.yml").read_text()) or {}
+                            # A src named by a setting reads that setting's default.
+                            src = re.sub(
+                                r"\{\{\s*(\w+)\s*\}\}",
+                                lambda m: str(defaults.get(m[1], m[0])),
+                                str(args["src"]),
+                            )
+                            src = src.removeprefix(f"{folder}/")
+                            text = (role / folder / src).read_text(errors="replace")
+                        with self.subTest(component=name, file=dest):
+                            self.assertTrue(
+                                marks.MARK.search(text) or "ansible_managed" in text,
+                                "write ansible_managed (or roles/<name>) into it",
+                            )
+        self.assertEqual(sorted(set(UNMARKABLE) - used), [], "no longer written: drop it from UNMARKABLE")
+
+
 class Desired(unittest.TestCase):
     GROUPS = {
         "slurm-master": ["m1", "m2"],

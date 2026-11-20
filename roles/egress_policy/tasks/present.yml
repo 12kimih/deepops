@@ -112,18 +112,32 @@
     enabled: true
     state: started
     daemon_reload: true
-  register: egress_policy_started
   when: not ansible_check_mode
 
+# What the kernel holds against the file, not whether this run wrote it: a run that
+# failed after writing would otherwise leave the old table loaded until a reboot.
+- name: Read the checksum of the ruleset the kernel holds
+  ansible.builtin.command:
+    argv: [cat, "{{ _egress_policy_loaded }}"]
+  register: egress_policy_loaded
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the checksum of the ruleset file
+  ansible.builtin.stat:
+    path: "{{ _egress_policy_ruleset }}"
+    checksum_algorithm: sha256
+  register: egress_policy_file
+
 # Reload replaces the table in one transaction; there is no moment without the policy.
-- name: Load a changed ruleset
+- name: Load the ruleset the kernel does not hold yet
   ansible.builtin.systemd:
     name: "{{ _egress_policy_unit }}"
     state: reloaded
   when:
     - not ansible_check_mode
-    - egress_policy_ruleset is changed or egress_policy_unit is changed
-    - egress_policy_started is not changed
+    - (egress_policy_loaded.stdout.split() + [''])[0] != egress_policy_file.stat.checksum | default('')
 
 # ufw's rules (the former ufw-enable.yml) would still drop what this table allows.
 - name: Hand inbound filtering over from ufw

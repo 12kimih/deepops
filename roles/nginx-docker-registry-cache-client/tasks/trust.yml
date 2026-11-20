@@ -1,0 +1,20 @@
+---
+# Rebuild the system trust store when it is older than its sources: a certificate added,
+# changed or removed, or Debian's list edited, in this run or in one that failed before
+# its rebuild.
+- name: Read when the trust store and its sources last changed
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: false
+  loop: "{{ [_nginx_docker_cache_trust[ansible_facts.os_family].bundle, _nginx_docker_cache_client_crt]
+            + _nginx_docker_cache_trust[ansible_facts.os_family].sources }}"
+  register: nginx_docker_cache_client_trust
+
+- name: Rebuild the trust store
+  ansible.builtin.command:
+    argv: "{{ _nginx_docker_cache_trust[ansible_facts.os_family].update }}"
+  changed_when: true
+  vars:
+    nginx_docker_cache_client_times: >-
+      {{ nginx_docker_cache_client_trust.results | map(attribute='stat') | map(attribute='mtime', default=0) | list }}
+  when: nginx_docker_cache_client_times[1:] | max > nginx_docker_cache_client_times[0]

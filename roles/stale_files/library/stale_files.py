@@ -64,6 +64,7 @@ import struct
 import subprocess
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.deepops_marks import named_deepops, text_marked
 
 DOCUMENTATION = r"""
 module: stale_files
@@ -356,9 +357,6 @@ PROMPT_COPY = re.compile(
 )
 # Directories whose *.old files are a package's own working copies, not a person's.
 PROMPT_COPY_SKIP = ("/etc/xml/",)
-# A deepops role says so in what it writes: "Ansible managed", "DeepOps", or the role by
-# its path ("# roles/nvidia_driver: ..."), the one convention a header follows.
-DEEPOPS_MARK = r"(?i)ansible managed|deepops|\broles/[a-z0-9_-]+"
 
 
 def run_lines(argv):
@@ -370,7 +368,8 @@ def run_lines(argv):
 
 def labelled(path):
     """path, marked "(deepops)" when its name or text says a deepops role wrote it."""
-    ours = "deepops" in os.path.basename(path) or text_matches(path, DEEPOPS_MARK)
+    # The one convention deepops' roles follow (plugins/module_utils/deepops_marks.py).
+    ours = named_deepops(os.path.basename(path)) or text_marked(path)
     return f"{path} (deepops)" if ours else path
 
 

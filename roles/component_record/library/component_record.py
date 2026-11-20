@@ -30,9 +30,13 @@ options:
       - C(present) records it as present at I(version); I(items) is the whole set it now
         needs, so items only an earlier version needed become orphans.
       - C(absent) drops the component; I(items) adopts what it installed before the
-        record existed (only items no other component needs become orphans). A package
-        is adopted only when I(exclusive_packages) names it: a package another role also
-        installs, unrecorded, would otherwise be removed from under it.
+        record existed (only items no other component needs become orphans), and only
+        what shows deepops made it, so a site's own file or service of the same name is
+        never removed: a file whose name or text says so (module_utils/deepops_marks.py);
+        a unit whose unit file does; a container named deepops, or named as such a unit;
+        a directory named deepops or holding an adopted file; a package named in
+        I(exclusive_packages) (another role may install it unrecorded); an fstab entry as
+        named (only explicit removals have them).
     type: str
     choices: [begin, present, absent]
     required: true
@@ -69,6 +73,7 @@ import os
 import tempfile
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.deepops_marks import made_by_deepops, named_deepops
 
 KINDS = ("package", "unit", "container", "file", "dir", "mount")
 
@@ -84,7 +89,32 @@ def load(path):
     return data
 
 
-def apply(data, name, action, items, version, exclusive=()):
+def adoptable(items, owned, exclusive=(), evidence=lambda kind, ident: False):
+    """The ITEMS absent may take on without a record of them (OWNED: those it has one
+    for), by what shows deepops made each: EVIDENCE(kind, ident) for a file, a unit or a
+    directory's name (a pure function, for the tests)."""
+    split = [(item, *item.partition(":")[::2]) for item in items]
+    taken = {i for i, kind, ident in split if i in owned}
+    for item, kind, ident in split:
+        if kind == "package" and ident in exclusive:
+            taken.add(item)
+        elif kind in ("file", "unit") and evidence(kind, ident):
+            taken.add(item)
+        elif kind == "mount":
+            taken.add(item)
+    files = [i.partition(":")[2] for i in taken if i.startswith("file:")]
+    units = {i.partition(":")[2] for i in taken if i.startswith("unit:")}
+    for item, kind, ident in split:
+        if kind == "container" and ("deepops" in ident.lower() or ident in units):
+            taken.add(item)
+        elif kind == "dir" and (
+            evidence("dir", ident) or any(f.startswith(ident.rstrip("/") + "/") for f in files)
+        ):
+            taken.add(item)
+    return taken
+
+
+def apply(data, name, action, items, version, exclusive=(), evidence=lambda kind, ident: False):
     """The new record and the orphans (a pure function, for the tests)."""
     components = dict(data["components"])
     owners = {item: set(names) for item, names in data["items"].items()}
@@ -108,10 +138,9 @@ def apply(data, name, action, items, version, exclusive=()):
             owners.setdefault(item, set()).add(name)
     else:
         components.pop(name, None)
-        for item in items:
-            kind, _, ident = item.partition(":")
-            if kind != "package" or ident in exclusive or name in owners.get(item, ()):
-                owners.setdefault(item, set()).add(name)
+        owned = {item for item in items if name in owners.get(item, ())}
+        for item in adoptable(items, owned, exclusive, evidence):
+            owners.setdefault(item, set()).add(name)
         for names in owners.values():
             names.discard(name)
     orphans = sorted(item for item, names in owners.items() if not names)
@@ -143,8 +172,17 @@ def main():
     if bad:
         module.fail_json(msg=f"items must be KIND:ID with KIND one of {', '.join(KINDS)}: {bad}")
     data = load(p["path"])
+
+    def evidence(kind, ident):
+        if kind == "file":
+            return made_by_deepops(ident)
+        if kind == "dir":
+            return named_deepops(ident)
+        rc, out, _ = module.run_command(["systemctl", "show", "-P", "FragmentPath", ident])
+        return rc == 0 and bool(out.strip()) and made_by_deepops(out.strip())
+
     record, orphans, before = apply(
-        data, p["name"], p["action"], p["items"], p["version"], set(p["exclusive_packages"])
+        data, p["name"], p["action"], p["items"], p["version"], set(p["exclusive_packages"]), evidence
     )
     changed = record != data
     if changed and not module.check_mode:

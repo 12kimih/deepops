@@ -1,3 +1,4 @@
+{{/* Written by roles/alertmanager; edits are overwritten. */}}
 {{ define "slack.color" -}}
 {{ if eq .Status "resolved" }}good{{ else if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}
 {{- end }}

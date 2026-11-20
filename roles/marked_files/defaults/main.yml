@@ -1,0 +1,11 @@
+---
+# marked_files -- remove files a role wrote at paths a site may also use, only where
+# they show deepops made them (plugins/module_utils/deepops_marks.py):
+#
+#   - ansible.builtin.include_role:
+#       name: marked_files
+#     vars:
+#       marked_files_absent: [/etc/cron.allow]
+#
+# marked_files_result.removed and .kept list what went and what stayed (a site's own).
+marked_files_absent: []

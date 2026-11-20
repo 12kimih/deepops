@@ -2,6 +2,10 @@
 # Where the role keeps what it installs; fixed, so absent finds what present wrote.
 _egress_policy_ruleset: /etc/egress-policy.nft
 _egress_policy_unit: egress-policy.service
+# The checksum of the ruleset the kernel holds, written by the unit right after nft took
+# it: what a run compares the file with, so a run that failed between writing the file
+# and loading it is caught by the next.
+_egress_policy_loaded: /run/egress-policy.loaded
 _egress_policy_metrics_command: /usr/local/libexec/egress-policy-metrics
 _egress_policy_metrics_config: /etc/cluster-tools/egress-policy-metrics.json
 _egress_policy_metrics_units: [egress-policy-metrics.service, egress-policy-metrics.timer]

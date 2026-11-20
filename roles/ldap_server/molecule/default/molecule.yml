@@ -20,9 +20,6 @@ provisioner:
   name: ansible
   ansible_args:
     - -vv
-  env:
-    # Molecule runs from the role, outside the repository's ansible.cfg.
-    ANSIBLE_FILTER_PLUGINS: ${MOLECULE_PROJECT_DIRECTORY}/../../plugins/filter
   inventory:
     group_vars:
       all:

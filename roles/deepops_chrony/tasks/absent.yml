@@ -1,7 +1,7 @@
 ---
-# A host is never left without time sync: the OS's own service comes back first (on
-# Ubuntu and Debian, systemd-timesyncd conflicts with chrony, so apt takes chrony out
-# as it installs it), then the record drops chrony.
+# A host is never left without time sync: where chrony runs, the OS's own service comes
+# back first (on Ubuntu and Debian, systemd-timesyncd conflicts with chrony, so apt takes
+# chrony out as it installs it), then the record drops chrony.
 - name: Refuse to remove the OS's own time service
   ansible.builtin.assert:
     that: ansible_facts.os_family == 'Debian'
@@ -10,18 +10,32 @@
       deepops_component_removals there (chrony_install: false leaves it to the site).
     quiet: true
 
-- name: Hand time sync back to systemd-timesyncd
-  ansible.builtin.apt:
-    name: systemd-timesyncd
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
+# Only a host that runs chrony hands over: one keeping time another way (ntpsec, ntp,
+# its own timesyncd) is left as it is; installing timesyncd there would make apt take
+# that daemon out (both provide time-daemon).
+- name: Look for chrony
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, -f, "${db:Status-Abbrev}", chrony]
+  register: chrony_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
 
-- name: Start systemd-timesyncd
-  ansible.builtin.systemd_service:
-    name: systemd-timesyncd
-    state: started
-    enabled: true
+- name: Hand time sync back to systemd-timesyncd
+  when: chrony_installed.stdout[1:2] == 'i'
+  block:
+    - name: Install systemd-timesyncd
+      ansible.builtin.apt:
+        name: systemd-timesyncd
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Start systemd-timesyncd
+      ansible.builtin.systemd_service:
+        name: systemd-timesyncd
+        state: started
+        enabled: true
 
 - name: Remove what this component installed
   ansible.builtin.include_role:

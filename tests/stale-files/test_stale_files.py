@@ -1,6 +1,7 @@
 """roles/stale_files/library/stale_files.py: each kind of evidence, on a scratch tree."""
 
 import importlib.util
+import sys
 import os
 import shutil
 import tempfile
@@ -9,6 +10,12 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
+# The module imports the shared marks as Ansible ships module_utils to the host.
+_marks = importlib.util.spec_from_file_location(
+    "deepops_marks", ROOT / "plugins/module_utils/deepops_marks.py"
+)
+sys.modules["ansible.module_utils.deepops_marks"] = importlib.util.module_from_spec(_marks)
+_marks.loader.exec_module(sys.modules["ansible.module_utils.deepops_marks"])
 spec = importlib.util.spec_from_file_location(
     "stale_files", ROOT / "roles" / "stale_files" / "library" / "stale_files.py"
 )
