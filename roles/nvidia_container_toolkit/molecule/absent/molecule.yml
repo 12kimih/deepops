@@ -1,18 +1,3 @@
 ---
-dependency:
-  name: galaxy
-driver:
-  name: docker
-platforms:
-  - name: nct-absent-ubuntu-2204
-    image: geerlingguy/docker-ubuntu2204-ansible
-    command: ""
-    cgroupns_mode: host
-    pre_build_image: true
-    privileged: true
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-provisioner:
-  name: ansible
-verifier:
-  name: ansible
+# Everything from .config/molecule/config.yml.
+{}

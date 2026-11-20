@@ -1,26 +1,14 @@
 ---
 # The directory and a client of it in one container: slapd filled from a roster, SSSD
 # reading it over StartTLS with the cluster CA (docs/deepops/accounts.md).
-dependency:
-  name: galaxy
-driver:
-  name: docker
-platforms:
-  - name: ldap-ubuntu-2404
-    image: geerlingguy/docker-ubuntu2404-ansible
-    command: ""
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    cgroupns_mode: host
-    privileged: true
-    pre_build_image: true
-    groups:
-      - ldap-server
 provisioner:
-  name: ansible
-  ansible_args:
-    - -vv
   inventory:
+    hosts:
+      all:
+        children:
+          ldap-server:
+            hosts:
+              ${DEEPOPS_MOLECULE_INSTANCE:-instance}-${MOLECULE_SCENARIO_NAME}: {}
     group_vars:
       all:
         people:
@@ -37,5 +25,3 @@ provisioner:
           - {name: cluster_admins, users: [alice]}
 scenario:
   test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]
-verifier:
-  name: ansible

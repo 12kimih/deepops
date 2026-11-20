@@ -1,21 +1,5 @@
 ---
-dependency:
-  name: galaxy
-driver:
-  name: docker
-platforms:
-  - name: nfs-client-ubuntu-2404
-    image: geerlingguy/docker-ubuntu2404-ansible
-    command: ""
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    cgroupns_mode: host
-    privileged: true
-    pre_build_image: true
 provisioner:
-  name: ansible
-  ansible_args:
-    - -vv
   inventory:
     group_vars:
       all:
@@ -25,5 +9,3 @@ provisioner:
         nfs_tune_network: false
 scenario:
   test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]
-verifier:
-  name: ansible

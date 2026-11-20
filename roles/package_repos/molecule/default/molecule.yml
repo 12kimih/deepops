@@ -1,18 +1,5 @@
 ---
-dependency:
-  name: galaxy
-driver:
-  name: docker
-platforms:
-  - name: repos-ubuntu-2404
-    image: geerlingguy/docker-ubuntu2404-ansible
-    cgroupns_mode: host
-    privileged: true
-    pre_build_image: true
 provisioner:
-  name: ansible
-  ansible_args:
-    - -vv
   inventory:
     group_vars:
       all:
@@ -29,5 +16,3 @@ provisioner:
           legacy_files: [/etc/apt/sources.list.d/nodesource.list]
 scenario:
   test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]
-verifier:
-  name: ansible

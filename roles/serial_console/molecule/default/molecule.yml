@@ -1,17 +1,8 @@
 ---
-dependency:
-  name: galaxy
-driver:
-  name: docker
-platforms:
-  - name: serial-console-ubuntu-2204
-    image: geerlingguy/docker-ubuntu2204-ansible
-    cgroupns_mode: host
-    pre_build_image: true
-    privileged: true
 provisioner:
-  name: ansible
-  ansible_args:
-    - -vv
-verifier:
-  name: ansible
+  inventory:
+    group_vars:
+      all:
+        # The boot loader files are what this role writes; no boot configuration is
+        # built in the container (it has no /boot/grub/grub.cfg) and no reboot is asked.
+        deepops_containerized: false

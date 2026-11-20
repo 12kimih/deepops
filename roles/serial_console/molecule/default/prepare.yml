@@ -1,7 +1,9 @@
 ---
-- hosts: all
+- name: Prepare
+  hosts: all
   become: true
   tasks:
+    # With the block earlier versions appended, which the role takes out again.
     - name: Provide a grub defaults file to edit
       ansible.builtin.copy:
         dest: /etc/default/grub
@@ -9,4 +11,7 @@
           GRUB_TIMEOUT_STYLE=hidden
           GRUB_TIMEOUT=0
           GRUB_CMDLINE_LINUX=""
+          # BEGIN ANSIBLE MANAGED -- serial console
+          GRUB_TERMINAL="console serial"
+          # END ANSIBLE MANAGED -- serial console
         mode: "0644"

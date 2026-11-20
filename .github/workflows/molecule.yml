@@ -4,35 +4,24 @@ on:
   - push
   - pull_request
 jobs:
+  # The roles with a scenario, from the repository (scripts/deepops/molecule.py), so a
+  # new scenario runs in CI the day it lands and none is left out by a hand list.
+  roles:
+    runs-on: ubuntu-24.04
+    outputs:
+      roles: ${{ steps.list.outputs.roles }}
+    steps:
+      - name: check out repo
+        uses: actions/checkout@v7
+      - id: list
+        run: echo "roles=$(python3 scripts/deepops/molecule.py list)" >> "$GITHUB_OUTPUT"
   build:
+    needs: roles
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        deepops-role:
-          - cachefilesd
-          - facts
-          - fail2ban
-          - kerberos_client
-          - ldap_server
-          - lmod
-          - login_shells
-          - nfs_client
-          - nhc
-          - nvidia_container_toolkit
-          - nvidia_dcgm
-          - nvidia_driver
-          - nvidia_power_limit
-          - openmpi
-          - os_updates
-          - package_repos
-          - mofed
-          - spack
-          - sshd
-          # Excluded from Docker CI (require systemd services that can't
-          # run in containers): nis_client, rsyslog_client, rsyslog_server,
-          # slurm. Tested end-to-end on real MAAS VMs instead.
-          # Also excluded: singularity_wrapper (broken upstream Galaxy dep)
+        deepops-role: ${{ fromJSON(needs.roles.outputs.roles) }}
     steps:
       - name: check out repo
         uses: actions/checkout@v7
@@ -53,14 +42,7 @@ jobs:
           key: molecule-galaxy-${{ hashFiles(format('{0}/roles/requirements.yml', github.repository)) }}
       - name: install the galaxy collections and roles
         run: cd "${{ github.repository }}" && uv run --locked scripts/deepops/galaxy.py
-      # Every scenario of the role: a component's absent path is a scenario of its own.
+      # Every scenario of the role (a component's absent path is a scenario of its own),
+      # from .config/molecule/config.yml: the platform and the repository's Ansible paths.
       - name: run molecule test
-        env:
-          # Molecule runs from the role, outside the reach of the repository's ansible.cfg.
-          ANSIBLE_ROLES_PATH: "${{ github.workspace }}/${{ github.repository }}/roles/galaxy:${{ github.workspace }}/${{ github.repository }}/roles"
-          ANSIBLE_COLLECTIONS_PATH: "${{ github.workspace }}/${{ github.repository }}/collections"
-          ANSIBLE_MODULE_UTILS: "${{ github.workspace }}/${{ github.repository }}/plugins/module_utils"
-          ANSIBLE_FILTER_PLUGINS: "${{ github.workspace }}/${{ github.repository }}/plugins/filter"
-        run: |
-          cd "${{ github.repository }}/roles/${{ matrix.deepops-role }}"
-          uv run --locked molecule test --all
+        run: cd "${{ github.repository }}" && uv run --locked scripts/deepops/molecule.py test "${{ matrix.deepops-role }}"

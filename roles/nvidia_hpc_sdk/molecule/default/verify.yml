@@ -1,10 +1,31 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Look for the profile scripts
+      ansible.builtin.stat:
+        path: "/etc/profile.d/z95_nvhpc.{{ item }}"
+      loop: [sh, csh]
+      register: hpcsdk_profile
+
+    - name: The HPC SDK is off the profile
       ansible.builtin.assert:
-        that: true
+        that: hpcsdk_profile.results | selectattr('stat.exists') | list | length == 0
+
+    - name: Present without a checksum stops before the download
+      block:
+        - name: Apply the role with the SDK present
+          ansible.builtin.include_role:
+            name: nvidia_hpc_sdk
+            public: true  # deepops_paths (a dependency) supplies its directories
+          vars:
+            hpcsdk_state: present
+            hpcsdk_install_free_gb: 0  # the check before it reads the runner's disk
+        - name: Never reached
+          ansible.builtin.fail:
+            msg: the role downloaded the HPC SDK without a checksum
+      rescue:
+        - name: Check it was the missing checksum that stopped it
+          ansible.builtin.assert:
+            that: "'No checksum for' in ansible_failed_result.msg"
