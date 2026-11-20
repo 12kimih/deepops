@@ -614,6 +614,37 @@ tests:
         alertname: SlurmGpuMetricsStale
         exp_alerts: []
 
+  # NVML GPU 0 is /dev/nvidia1, the one Slurm's IDX 1 holds for job 7: the job's usage
+  # is NVML 0's, never NVML 1's (no job holds it).
+  - name: a job's GPU usage is the GPU its allocation names
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0.25x10'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '1x10'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1024x10'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '4096x10'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x10'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0x10'
+      - series: 'slurm_gpu_allocated{host="m", instance="m:9100", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: job_device:dcgm_gpu_util_ratio:max
+        eval_time: 5m
+        exp_samples:
+          - labels: 'job_device:dcgm_gpu_util_ratio:max{host="n1", device="nvidia1", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+            value: 0.25
+      - expr: job_device:dcgm_fb_used_bytes:max
+        eval_time: 5m
+        exp_samples:
+          - labels: 'job_device:dcgm_fb_used_bytes:max{host="n1", device="nvidia1", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+            value: 1024
+
   - name: stale allocation data warns and silences the busy-GPU alert
     interval: 1m
     input_series:

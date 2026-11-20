@@ -1093,6 +1093,142 @@
       "id": 13
     },
     {
+      "type": "timeseries",
+      "title": "GPU utilization by job",
+      "description": "Each job's mean utilisation over the GPUs it holds (DCGM, Slurm's GPU numbering); the legend's mean and max cover the time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "noValue": "No GPU allocated"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "avg by (job_id, user, account) (job_device:dcgm_gpu_util_ratio:max)",
+          "legendFormat": "{{job_id}} {{user}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 10
+      },
+      "id": 14
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU memory by job",
+      "description": "GPU memory each job uses, summed over the GPUs it holds (DCGM framebuffer used).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "noValue": "No GPU allocated"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (job_id, user, account) (job_device:dcgm_fb_used_bytes:max)",
+          "legendFormat": "{{job_id}} {{user}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 10
+      },
+      "id": 15
+    },
+    {
       "type": "table",
       "title": "GPUs busy without a job",
       "description": "From the GpuBusyWithoutJob alert: pending for the first 15 minutes, then firing.",
@@ -1164,11 +1300,11 @@
       ],
       "gridPos": {
         "x": 0,
-        "y": 41,
+        "y": 51,
         "w": 24,
         "h": 6
       },
-      "id": 14
+      "id": 16
     }
   ]
 }
