@@ -17,19 +17,13 @@
 #   ansible-playbook -l <host1>,<host2> playbooks/nvidia-software/nvidia-power-limit.yml \
 #       -e nvidia_power_limit_watts=450
 #
-# The GPU gate (ansible_facts.ansible_local.gpus.count) mirrors nvidia-dcgm.yml / nvidia-driver.yml so
-# a CPU-only head/login node in the target set is skipped instead of failing the run.
-- hosts: "{{ hostlist | default('slurm-node') }}"
+# Every host it runs on converges to deepops_components (present on slurm-node while
+# slurm_cluster_configure_gpu_power_limit is on, removed elsewhere). A host without the
+# driver has no cap to apply or reset.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Install custom facts module (provides ansible_facts.ansible_local.gpus.count)
-      ansible.builtin.include_role:
-        name: facts
-
-    - name: Configure the GPU power limit on GPU nodes only
-      ansible.builtin.include_role:
-        name: nvidia_power_limit
-      when: ansible_facts.ansible_local['gpus']['count'] | int > 0
+    - role: nvidia_power_limit
+      nvidia_power_limit_state: "{{ deepops_components.nvidia_power_limit | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

@@ -145,6 +145,10 @@ deepops_component_registry:
     removal: explicit
     rules:
       - {switch: "{{ slurm_enable_nfs_client_nodes }}", group: slurm-nfs-client}
+  # The cap on GPU nodes; removing it resets each GPU to its default limit.
+  nvidia_power_limit:
+    rules:
+      - {switch: "{{ slurm_cluster_configure_gpu_power_limit }}", group: slurm-node}
   egress_policy:
     rules:
       - {switch: "{{ slurm_enable_egress_policy }}", group: slurm-cluster}

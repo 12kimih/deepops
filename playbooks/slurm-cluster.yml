@@ -178,10 +178,11 @@
   when: allow_user_set_gpu_clocks
 
 # Declarative: nodes with nvidia_power_limit_watts get the cap, nodes without have any
-# cap removed. Turn the whole step off with slurm_cluster_configure_gpu_power_limit.
+# cap removed; slurm_cluster_configure_gpu_power_limit off removes it everywhere.
 - name: Configure the GPU power limit
   import_playbook: nvidia-software/nvidia-power-limit.yml
-  when: slurm_cluster_configure_gpu_power_limit
+  vars:
+    deepops_phase: install
 
 - name: Install Enroot and Pyxis
   import_playbook: container/pyxis.yml
@@ -265,6 +266,11 @@
     deepops_phase: remove
   tags:
     - cluster-tools
+
+- name: Remove the GPU power limit where it is no longer wanted
+  import_playbook: nvidia-software/nvidia-power-limit.yml
+  vars:
+    deepops_phase: remove
 
 - name: Remove the egress policy where it is no longer wanted
   import_playbook: generic/egress-policy.yml

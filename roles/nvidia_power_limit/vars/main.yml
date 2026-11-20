@@ -1,0 +1,8 @@
+---
+# What the component installs, for its record (roles/component_record): the unit and
+# the wattage file only while a wattage is set, so taking it out removes them.
+nvidia_power_limit_items: >-
+  {{ ['unit:' ~ nvidia_power_limit_service_name,
+      'file:/etc/systemd/system/' ~ nvidia_power_limit_service_name,
+      'file:' ~ nvidia_power_limit_conf_file]
+     if nvidia_power_limit_watts | string | trim | length > 0 else [] }}
