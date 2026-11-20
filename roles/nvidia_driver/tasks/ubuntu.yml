@@ -145,7 +145,7 @@
     state: present
     update_cache: true
   vars:
-    # NVIDIA's repo drops the branch from these names from the 590 series on (the pin
+    # NVIDIA's repo drops the branch from these names from the 580 series on (the pin
     # selects the branch); the Canonical archive keeps it (nvidia-fabricmanager-580).
-    _suffix: "{{ '' if nvidia_driver_install_method == 'nvidia_repo' and nvidia_driver_branch | int >= 590 else '-' ~ nvidia_driver_branch }}"
+    _suffix: "{{ '' if nvidia_driver_install_method == 'nvidia_repo' and nvidia_driver_branch | int >= 580 else '-' ~ nvidia_driver_branch }}"
   when: nvidia_driver_fabricmanager | bool
