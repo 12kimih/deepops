@@ -132,16 +132,12 @@ if [ -z "${MAIN_WORKTREE}" ] ; then
 elif [ "$(cd "${MAIN_WORKTREE}" && pwd -P)" != "$(cd "${REPO_DIR}" && pwd -P)" ] ; then
     echo "NOTE: git hooks are installed from the main worktree (${MAIN_WORKTREE}), not from here" >&2
 else
-    # The repository checks on every commit (see .pre-commit-config.yaml): pre-commit.sh
-    # runs them on a copy of what is staged, and pre-commit installs the commit-msg
-    # hook. They include the guard that keeps site data out of this public repository,
-    # so a failed install is said, never swallowed: pre-commit refuses, for one, when
-    # core.hooksPath is set.
+    # The repository checks on every commit (see .pre-commit-config.yaml), through git's
+    # own hooks: pre-commit.sh on a copy of what is staged, commit-msg.sh on the message.
+    # They include the guard that keeps site data out of this public repository;
+    # install_hook says when it cannot install one, and replaces pre-commit's own hooks.
     install_hook "${REPO_DIR}" pre-commit pre-commit.sh
-    if ! hook_out="$(uv run pre-commit install 2>&1)" ; then
-        echo "WARNING: the commit message hook was not installed:" >&2
-        echo "${hook_out}" >&2
-    fi
+    install_hook "${REPO_DIR}" commit-msg commit-msg.sh
     # The push guards see every ref a push sends (pre-push.sh), and a branch checked
     # out in one worktree moves only from there (branch-guard.sh).
     install_hook "${REPO_DIR}" pre-push pre-push.sh

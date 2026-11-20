@@ -6,12 +6,13 @@
 # runs itself under uv, so the tool versions come from pyproject.toml / uv.lock
 # alone. CI runs the full scripts/check.sh.
 minimum_pre_commit_version: "3.5.0"
-# Hooks run at pre-commit unless they say so. git's own hooks run them: the pre-commit
-# stage from scripts/deepops/pre-commit.sh, on a copy of what is staged (pre-commit's
-# stash of unstaged changes would empty a shared working tree meanwhile), and the push
+# Hooks run at pre-commit unless they say so. git's own hooks run them, installed by
+# scripts/setup.sh (never `pre-commit install`: pre-commit's hooks stash every unstaged
+# change in the working tree while they run, which empties a shared clone meanwhile):
+# the pre-commit stage from scripts/deepops/pre-commit.sh, on a copy of what is staged,
+# the commit-msg stage from scripts/deepops/commit-msg.sh, on the message, and the push
 # guards from scripts/deepops/pre-push.sh, which sees every ref a push sends.
-# `pre-commit install` sets up only the commit-msg hook.
-default_install_hook_types: [commit-msg]
+default_install_hook_types: []
 default_stages: [pre-commit]
 
 # Vendored / generated / site-specific trees are never checked here.
