@@ -193,6 +193,12 @@ deepops_component_registry:
     role: nvidia_cuda_toolkit
     rules:
       - {switch: "{{ slurm_install_cuda_toolkit }}", group: slurm-master, first: true}
+  # EasyBuild, installed by the first controller into the shared software tree; what it
+  # built is data.
+  easybuild:
+    role: easy-build
+    rules:
+      - {switch: "{{ slurm_install_easybuild }}", group: slurm-master, first: true}
   # enroot on login and compute hosts (its GPU hook runs the container toolkit); pyxis's
   # node setup needs it (its Slurm plugin follows the same switches in roles/slurm).
   enroot:

@@ -143,6 +143,11 @@
   vars:
     deepops_phase: install
 
+- name: Install EasyBuild
+  import_playbook: slurm-cluster/easybuild-modules.yml
+  vars:
+    deepops_phase: install
+
 - name: Install the Open OnDemand portal
   import_playbook: slurm-cluster/open-ondemand.yml
   vars:
@@ -310,6 +315,11 @@
     deepops_phase: remove
   tags:
     - container-storage-gc
+
+- name: Remove EasyBuild where it is no longer wanted
+  import_playbook: slurm-cluster/easybuild-modules.yml
+  vars:
+    deepops_phase: remove
 
 - name: Remove the CUDA toolkits where they are no longer wanted
   import_playbook: slurm-cluster/nvidia-cuda-toolkit.yml

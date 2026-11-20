@@ -1,20 +1,19 @@
-# Install EasyBuild and build software modules with it.
-#
-#   ansible-playbook playbooks/slurm-cluster/easybuild-modules.yml
-#
-# Lmod is the deploy's (slurm_install_lmod), with EasyBuild's module tree on its path
-# everywhere. EasyBuild and its builds go once on the host that owns the shared tree:
-# slurm-master[0] unless you pass -e hostlist=<host> (group_vars cannot pick a play's
-# hosts).
 ---
-# Lmod as the deploy has it (slurm_install_lmod, deepops_components).
-- name: Lmod on every node
-  import_playbook: lmod.yml
-  vars:
-    deepops_phase: install
-
-- name: Install EasyBuild and build easybuild_packages on the software-tree host
-  hosts: "{{ hostlist | default('slurm-master[0]') }}"
+# EasyBuild and the easyconfigs in easybuild_packages, built into the shared software
+# tree (roles/easy-build).
+#
+#   ansible-playbook -K playbooks/slurm-cluster/easybuild-modules.yml
+#
+# Every host it runs on converges to deepops_components: present on the first
+# slurm-master while slurm_install_easybuild is on (it owns the shared tree, so the
+# modules are on every node), absent elsewhere (EasyBuild itself goes only from the host
+# that installed it; what it built stays). Users see the modules through Lmod
+# (slurm-cluster/lmod.yml).
+- name: EasyBuild in the shared software tree
+  hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
-    - easy-build-packages
+    - role: deploy_defaults
+    - role: easy-build
+      easybuild_state: "{{ deepops_components.easybuild | component_phase(deepops_phase) }}"
+  environment: "{{ proxy_env }}"

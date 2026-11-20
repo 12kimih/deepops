@@ -1,5 +1,5 @@
 ---
-# Builds easybuild_packages with `eb --robot` as the build account (roles/easy-build).
+# Builds easybuild_packages with `eb --robot` as the build account.
 - name: Install the build host's compilers and system libraries (Debian family)
   become: true
   ansible.builtin.apt:
