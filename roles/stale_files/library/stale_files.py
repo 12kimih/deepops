@@ -26,6 +26,10 @@ Each rule names its evidence, never a guess from a file name alone:
                whole name) and, with `contains`, whose text matches it: a file a tool is
                known to leave behind (an installer's temporary config, the copies
                Ansible's backup: true writes)
+    kernel_trees  /lib/modules/<version> trees of kernels no package installs, never
+               the running kernel's (an rc kernel's purge or a hand install left them)
+    ld_conf    files under `dirs` (ld.so.conf.d) every directory of which is gone: a
+               removed install's library path (a CUDA runfile's /usr/local/cuda-X.Y)
 
 Nothing a package owns is touched, whatever a rule says, nor anything the manifest of
 a staged install in `manifests` lists (roles/source_build: a build from source owns its
@@ -295,6 +299,20 @@ def match_rule(rule):
                 "contains" not in rule or text_matches(path, rule["contains"])
             ):
                 found.append(path)
+    elif kind == "kernel_trees":
+        running = os.uname().release
+        for top in rule.get("dirs", ["/lib/modules"]):
+            if os.path.isdir(top):
+                found += [os.path.join(top, v) for v in os.listdir(top) if v != running]
+    elif kind == "ld_conf":
+        for path in files_in(rule["dirs"]):
+            if not path.endswith(".conf") or os.path.islink(path):
+                continue
+            with open(path, errors="replace") as f:
+                dirs = [ln.split("#")[0].strip() for ln in f]
+            dirs = [d for d in dirs if d and not d.startswith("include")]
+            if dirs and not any(os.path.isdir(d) for d in dirs):
+                found.append(path)
     else:
         raise ValueError(f"unknown rule type {kind!r}")
     return sorted(set(found))
@@ -359,7 +377,8 @@ def unowned_config(config_dirs, owned, claimed):
                 continue
             if os.path.isdir(path) and not os.path.islink(path):
                 continue
-            found.append(f"{path} (deepops)" if text_matches(path, DEEPOPS_MARK) else path)
+            ours = "deepops" in name or text_matches(path, DEEPOPS_MARK)
+            found.append(f"{path} (deepops)" if ours else path)
     return found
 
 

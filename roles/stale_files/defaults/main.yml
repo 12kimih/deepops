@@ -86,6 +86,17 @@ stale_files_host_rules:
     type: files
     dirs: [/etc]
     pattern: '.+\.\d+\.\d{4}-\d\d-\d\d@\d\d:\d\d:\d\d~'
+  # A kernel removed without purging, or by hand, leaves its module tree: one per kernel
+  # ever installed. An installed kernel's tree is a package's and never taken; nor is
+  # the running kernel's.
+  - name: module trees of kernels no package installs
+    type: kernel_trees
+    dirs: [/lib/modules]
+  # A removed install's library path (a CUDA runfile's /usr/local/cuda-X.Y) stays in
+  # ld.so.conf.d after its directories went.
+  - name: library paths whose directories are gone
+    type: ld_conf
+    dirs: [/etc/ld.so.conf.d]
   - name: libtool archives of a library that is gone
     type: libtool
     globs: [/usr/local/lib/*.la, /usr/local/lib/*/*.la]

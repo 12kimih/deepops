@@ -163,14 +163,18 @@ class Evidence(unittest.TestCase):
     def test_unowned_config_is_listed_and_deepops_files_are_marked(self):
         conf = self.tmp / "profile.d"
         hand = self.put("profile.d/ssh-key.sh", "ssh-keygen\n")
+        named = self.put("profile.d/deepops-env.sh", "export X=1\n")
         ours = self.put("profile.d/z10-cluster-tools.sh", "# Ansible managed\n")
         owned = self.put("profile.d/bash_completion.sh")
         recorded = self.put("profile.d/recorded.sh")
         self.put("profile.d/claimed/inside.sh")  # a directory: never listed itself
         found = mod.unowned_config([str(conf), str(self.tmp / "missing")], {owned}, ())
-        self.assertEqual(found, [recorded, hand, f"{ours} (deepops)"])
+        self.assertEqual(found, [f"{named} (deepops)", recorded, hand, f"{ours} (deepops)"])
         # What a component record claims reaches it as owned (files) or claimed (trees).
-        self.assertEqual(mod.unowned_config([str(conf)], {owned, recorded}, ()), [hand, f"{ours} (deepops)"])
+        self.assertEqual(
+            mod.unowned_config([str(conf)], {owned, recorded}, ()),
+            [f"{named} (deepops)", hand, f"{ours} (deepops)"],
+        )
 
     def test_unit_overrides_leave_out_enable_links_and_snapd_units(self):
         root = self.tmp / "system"
@@ -205,6 +209,23 @@ class Evidence(unittest.TestCase):
             with mock.patch.object(mod.os.path, "isdir", return_value=True):
                 self.assertEqual(mod.changed_conffiles(), ["/etc/bash.bashrc"])
             self.assertEqual(mod.removed_packages(), ["linux-image-6.8.0-1-generic", "mariadb-server-10.6"])
+
+    def test_kernel_trees_never_take_the_running_kernel(self):
+        running = mod.os.uname().release
+        old = self.put("modules/5.15.0-1-generic/modules.dep")
+        self.put(f"modules/{running}/modules.dep")
+        rule = {"type": "kernel_trees", "dirs": [str(self.tmp / "modules")]}
+        self.assertEqual(mod.match_rule(rule), [str(Path(old).parent)])
+
+    def test_a_library_path_goes_once_every_directory_is_gone(self):
+        lib = self.tmp / "cuda-12.4" / "lib64"
+        lib.mkdir(parents=True)
+        gone = self.put("ld/cuda-11-8.conf", f"{self.tmp}/cuda-11.8/lib64\n# a comment\n")
+        self.put("ld/cuda-12-4.conf", f"{self.tmp}/cuda-11.8/lib64\n{lib}\n")
+        self.put("ld/empty.conf", "# nothing listed\n")
+        self.put("ld/README", f"{self.tmp}/nowhere\n")
+        rule = {"type": "ld_conf", "dirs": [str(self.tmp / "ld")]}
+        self.assertEqual(mod.match_rule(rule), [gone])
 
     def test_orphan_module_trees_keep_installed_and_running_kernels(self):
         root = self.tmp / "modules"
