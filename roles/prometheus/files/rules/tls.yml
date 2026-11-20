@@ -1,6 +1,7 @@
 ---
 # TLS certificates the roles install, each published by its role as a textfile metric
-# <service>_tls_cert_not_after_seconds (the certificate's notAfter, Unix time).
+# <service>_tls_cert_not_after_seconds (the certificate's notAfter, Unix time) and
+# <service>_tls_cert_readable (0 when it cannot be read, and then no expiry).
 groups:
   - name: tls
     rules:
@@ -20,3 +21,11 @@ groups:
         annotations:
           summary: "The {{ $labels.service }} TLS certificate on {{ $labels.host }} has expired"
           description: "Clients refuse the service. Renew it in the site config's vault and deploy the role that installs it."
+      - alert: TlsCertificateUnreadable
+        expr: |
+          label_replace({__name__=~".+_tls_cert_readable"}, "service", "$1", "__name__", "(.+)_tls_cert_readable") == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "The {{ $labels.service }} TLS certificate on {{ $labels.host }} cannot be read"
+          description: "Its expiry is unknown, so the expiry alerts are blind. Check the file the role installs (missing, unreadable or not PEM) and deploy the role again."

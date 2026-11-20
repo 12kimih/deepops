@@ -812,3 +812,23 @@ tests:
             exp_annotations:
               summary: "n1 has reported no egress policy metrics for 15 minutes"
               description: "`systemctl status egress-policy-metrics.timer` and `journalctl -u egress-policy-metrics` on the host."
+
+  - name: an unreadable TLS certificate warns, and never reads as expired
+    interval: 1m
+    input_series:
+      - series: 'open_ondemand_tls_cert_readable{host="ctl", instance="ctl:9100"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: TlsCertificateUnreadable
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: TlsCertificateUnreadable
+        exp_alerts:
+          - exp_labels: {severity: warning, service: open_ondemand, host: ctl, instance: "ctl:9100"}
+            exp_annotations:
+              summary: "The open_ondemand TLS certificate on ctl cannot be read"
+              description: "Its expiry is unknown, so the expiry alerts are blind. Check the file the role installs (missing, unreadable or not PEM) and deploy the role again."
+      - eval_time: 12m
+        alertname: TlsCertificateExpired
+        exp_alerts: []
