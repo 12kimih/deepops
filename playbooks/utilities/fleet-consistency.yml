@@ -1,7 +1,9 @@
 ---
-# Are the hosts level? The running kernel, every package two or more of them have and
-# the kernel policy sysctls (roles/maintenance consistency.yml) must agree; fails
-# listing each difference and the hosts on each side. Read-only.
+# Are the hosts level? The running kernel, every package two or more of them have, the
+# loaded NVIDIA module and the kernel policy sysctls (roles/maintenance consistency.yml)
+# must agree, and no host may have a reboot pending or a module loaded at another
+# version than it has installed; fails listing each difference and the hosts on each
+# side. Read-only.
 #
 #   ansible-playbook -K playbooks/utilities/fleet-consistency.yml
 #   ansible-playbook -K playbooks/utilities/fleet-consistency.yml -e hostlist=slurm-node

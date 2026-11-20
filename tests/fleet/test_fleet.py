@@ -10,8 +10,15 @@ fleet = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fleet)
 
 
-def state(kernel="6.8.0-149", packages=None, sysctl=None):
-    return {"kernel": kernel, "packages": packages or {}, "sysctl": sysctl or {}}
+def state(kernel="6.8.0-149", packages=None, sysctl=None, loaded="", on_disk="", reboot=""):
+    return {
+        "kernel": kernel,
+        "packages": packages or {},
+        "sysctl": sysctl or {},
+        "nvidia_loaded": loaded,
+        "nvidia_on_disk": on_disk,
+        "reboot_pending": reboot,
+    }
 
 
 class FleetDrift(unittest.TestCase):
@@ -41,6 +48,29 @@ class FleetDrift(unittest.TestCase):
             {"a": state(packages={"curl": "8.5"}), "b": state(packages={"curl": "8.4"})}
         )
         self.assertEqual(drift, ["package curl: 8.4 on b; 8.5 on a"])
+
+    def test_a_driver_loaded_at_another_version_than_installed_is(self):
+        drift = fleet.fleet_drift(
+            {
+                "a": state(loaded="580.95.05", on_disk="580.95.05"),
+                "b": state(loaded="580.82.07", on_disk="580.95.05"),
+                "ctl": state(),  # no GPU: no module, not drift
+            }
+        )
+        self.assertEqual(
+            drift,
+            [
+                "nvidia module loaded: 580.82.07 on b; 580.95.05 on a",
+                "nvidia module on b: 580.82.07 loaded, 580.95.05 installed",
+            ],
+        )
+
+    def test_a_module_installed_but_not_loaded_is_not_a_version_mismatch(self):
+        self.assertEqual(fleet.fleet_drift({"a": state(on_disk="580.95.05"), "b": state()}), [])
+
+    def test_a_pending_reboot_is_drift_even_on_level_packages(self):
+        drift = fleet.fleet_drift({"a": state(reboot="linux-image-6.8.0-150-generic"), "b": state()})
+        self.assertEqual(drift, ["reboot pending on a: linux-image-6.8.0-150-generic"])
 
 
 if __name__ == "__main__":

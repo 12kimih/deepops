@@ -1,6 +1,8 @@
 ---
 # Hosts that should be identical: the same running kernel, the same version of every
-# package two or more of them have, the same maintenance_consistency_sysctls. Run on
+# package two or more of them have, the same maintenance_consistency_sysctls, and each
+# running what it has installed (no pending reboot, the NVIDIA module loaded at its
+# installed version). Run on
 # all the hosts at once (no serial); the comparison runs once, over every host in the
 # play, and fails listing each difference and where it is.
 - name: Read the running kernel  # facts may predate the maintenance reboot
@@ -21,6 +23,24 @@
   changed_when: false
   check_mode: false
 
+# Three lines: the loaded NVIDIA module, the one the running kernel would load next
+# ("" where none), the pending reboot (the packages that asked for it, "yes" when they
+# are not listed, "" when none). reboot_request.yml and dnf's upgrade write the marker.
+- name: Read whether this host runs what it has installed
+  ansible.builtin.shell:
+    cmd: |
+      cat /sys/module/nvidia/version 2>/dev/null || echo
+      modinfo -F version nvidia 2>/dev/null || echo
+      if [ -e /var/run/reboot-required ]; then
+        p=$(sort -u /var/run/reboot-required.pkgs 2>/dev/null | paste -sd, -)
+        echo "${p:-yes}"
+      else
+        echo
+      fi
+  register: maintenance_running
+  changed_when: false
+  check_mode: false
+
 - name: Record this host's state
   ansible.builtin.set_fact:
     maintenance_fleet_state:
@@ -29,6 +49,10 @@
                     | zip(ansible_facts.packages | dict2items | map(attribute='value')
                           | map('map', attribute='version') | map('join', ','))) }}"
       sysctl: "{{ dict(maintenance_consistency_sysctls | zip(maintenance_sysctl.stdout_lines | default([]))) }}"
+      nvidia_loaded: "{{ maintenance_running.stdout_lines[0] | default('') | trim }}"
+      nvidia_on_disk: "{{ maintenance_running.stdout_lines[1] | default('') | trim }}"
+      # the machine running Ansible: reboot.yml has just told its operator to finish it
+      reboot_pending: "{{ '' if maintenance_reboot_self | default(false) | bool else maintenance_running.stdout_lines[2] | default('') | trim }}"
 
 - name: Compare the hosts
   run_once: true
@@ -43,4 +67,5 @@
       {{ _drift | length }} differences between {{ _hosts | join(', ') }}:
       {{ _drift[:60] | join(_nl) }}{{ _nl ~ '...' if _drift | length > 60 else '' }}
       Bring them level with playbooks/utilities/apt-upgrade.yml (and the role that owns
-      a differing sysctl).
+      a differing sysctl); a pending reboot or a stale NVIDIA module goes with
+      playbooks/utilities/reboot.yml.
