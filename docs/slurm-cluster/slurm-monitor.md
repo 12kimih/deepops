@@ -137,11 +137,12 @@ are checked with `promtool` before they are written, then applied with a live re
 
 After a monitoring deploy, `scripts/validation/validate_monitoring.py --json` (from a
 checkout on any host that reaches Prometheus; read-only) must report `"ok": true`. It
-checks that every target is up and every rule group evaluates, that the Watchdog alert
-reaches Alertmanager, that every metric the alert rules and dashboards read has samples
-in the last minutes, that every GPU joins Slurm's device numbering,
-and that the timestamped textfile metrics are fresh. A metric missing while its
-exporter reports others is a rollout gap: deploy that exporter's playbook to its hosts.
+checks that every target is up, that every rule the repository ships is loaded and every
+rule group evaluates, that the Watchdog alert reaches Alertmanager, that every metric the
+alert rules and dashboards read has samples in the last minutes, that every GPU joins
+Slurm's device numbering, and that no staleness alert (below) fires. A rule not loaded,
+or a metric missing while its source reports others, is a rollout gap: deploy that
+component's playbook to its hosts.
 Some metrics may legitimately be absent, and are listed under `absent_ok` instead
 (`ABSENT_OK` in the script):
 

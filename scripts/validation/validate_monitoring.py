@@ -9,7 +9,8 @@ any host that reaches Prometheus (read-only HTTP API; nothing is changed):
 Checks:
   ready        Prometheus answers /-/ready.
   targets      every scrape target is up.
-  rules        every rule group evaluates without error.
+  rules        every rule the repository ships is loaded and every rule group evaluates
+               without error (one missing is a rollout gap: deploy prometheus.yml).
   alerting     an Alertmanager is attached and the Watchdog alert reaches it (the
                always-firing alert that proves the alert path end to end).
   metrics      every metric the repository's alert rules and dashboards read exists,
@@ -18,7 +19,9 @@ Checks:
                dashboard reached Prometheus before the exporter config it needs.
   gpu_join     every GPU DCGM reports joins Slurm's device numbering (the join the
                allocation alerts and dashboard stand on).
-  freshness    the textfile metrics with an update timestamp were written recently.
+  freshness    no staleness alert fires: every timer writing textfile metrics wrote
+               lately (the rules' ...Stale and ...NeverReported alerts, whose windows
+               are the only ones).
 
 Exit codes: 0 = all checks passed, 1 = a check failed, 2 = Prometheus unreachable.
 """
@@ -106,8 +109,8 @@ def source(metric):
 # How recent a sample must be for its metric to count as present (seconds; many scrape
 # intervals).
 PRESENT_WINDOW = 300
-# Textfile writers that stamp each write, and how old a stamp may be.
-FRESH = {"slurm_metrics_updated_timestamp_seconds": 300}
+# The alerts saying a textfile writer stopped or never reported (rules/*.yml).
+FRESHNESS_ALERT = r"\w+(Stale|NeverReported)"
 PROMQL_WORDS = {
     "by", "on", "and", "or", "unless", "without", "ignoring", "group_left", "group_right",
     "offset", "bool", "time", "vector", "scalar", "inf", "nan", "le", "count", "sum", "max",
@@ -135,19 +138,28 @@ def metric_names(expr):
     return names
 
 
+def repo_rules():
+    """(file name, rule) for every alert and recording rule the repository ships."""
+    for path in tracked(f"{RULES.relative_to(ROOT)}/*.yml"):
+        for group in yaml.safe_load(path.read_text())["groups"]:
+            for rule in group["rules"]:
+                yield path.name, rule
+
+
+def freshness_alerts():
+    """The names of the repository's staleness alerts (FRESHNESS_ALERT)."""
+    return sorted(r["alert"] for _, r in repo_rules() if re.fullmatch(FRESHNESS_ALERT, r.get("alert", "")))
+
+
 def repo_metrics():
     """{metric: [where it is read]} over the alert rules and dashboards, recording rules
     expanded to what they read."""
     reads, recorded = {}, {}
-    for path in tracked(f"{RULES.relative_to(ROOT)}/*.yml"):
-        for group in yaml.safe_load(path.read_text())["groups"]:
-            for rule in group["rules"]:
-                if "record" in rule:
-                    recorded[rule["record"]] = metric_names(rule["expr"])
-                for name in metric_names(rule["expr"]):
-                    reads.setdefault(name, []).append(
-                        f"{path.name}:{rule.get('alert') or rule.get('record')}"
-                    )
+    for file, rule in repo_rules():
+        if "record" in rule:
+            recorded[rule["record"]] = metric_names(rule["expr"])
+        for name in metric_names(rule["expr"]):
+            reads.setdefault(name, []).append(f"{file}:{rule.get('alert') or rule.get('record')}")
     for path in DASHBOARDS:
         dash = json.loads(path.read_text())
         panels = [p for top in dash.get("panels", []) for p in [top, *top.get("panels", [])]]
@@ -191,7 +203,13 @@ def check(prom):
         for r in g["rules"]
         if r.get("health") not in ("ok", None)
     ]
-    record("rules", not broken and bool(groups), {"groups": len(groups), "errors": broken})
+    loaded = {r.get("name") for g in groups for r in g["rules"]}
+    unloaded = sorted({r.get("alert") or r.get("record") for _, r in repo_rules()} - loaded)
+    record(
+        "rules",
+        not broken and not unloaded and bool(groups),
+        {"groups": len(groups), "errors": broken, "not_loaded": unloaded},
+    )
 
     managers = prom.get("/api/v1/alertmanagers")["data"]["activeAlertmanagers"]
     watchdog = prom.query('ALERTS{alertname="Watchdog", alertstate="firing"}')
@@ -228,14 +246,10 @@ def check(prom):
         "gpu_join", reporting <= joined, {"gpu_hosts": len(reporting), "unjoined": sorted(reporting - joined)}
     )
 
-    stale = {}
-    now = time.time()
-    for metric, limit in FRESH.items():
-        for series in prom.query(metric):
-            age = now - float(series["value"][1])
-            if age > limit:
-                stale[f"{metric}{{host={series['metric'].get('host')}}}"] = round(age)
-    record("freshness", not stale, {"stale_seconds": stale})
+    alerts = freshness_alerts()
+    firing = prom.query(f'ALERTS{{alertstate="firing", alertname=~"{"|".join(alerts)}"}}')
+    stale = sorted(f"{r['metric'].get('alertname')}{{host={r['metric'].get('host')}}}" for r in firing)
+    record("freshness", not stale, {"alerts": len(alerts), "firing": stale})
     return results
 
 

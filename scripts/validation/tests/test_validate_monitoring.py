@@ -10,11 +10,23 @@ vm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(vm)
 
 
+# Every rule the repository ships, loaded and healthy.
+LOADED = [
+    {
+        "name": "g",
+        "rules": [
+            {"name": n, "health": "ok"}
+            for n in {r.get("alert") or r.get("record") for _, r in vm.repo_rules()}
+        ],
+    }
+]
+
+
 class FakePrometheus:
     def __init__(self, names, queries=None, targets=None, rules=None):
         self.names, self.queries = names, queries or {}
         self.targets = targets if targets is not None else [{"health": "up", "labels": {}}]
-        self.rules = rules if rules is not None else [{"name": "g", "rules": [{"health": "ok"}]}]
+        self.rules = rules if rules is not None else LOADED
 
     def get(self, path, **params):
         self.params = getattr(self, "params", {})
@@ -114,6 +126,26 @@ class Checks(unittest.TestCase):
         self.assertEqual(result["targets"]["detail"]["down"], ["cluster/n1:9100"])
         self.assertFalse(result["rules"]["ok"])
         self.assertFalse(result["alerting"]["ok"])
+
+    def test_a_firing_staleness_alert_fails_freshness(self):
+        # The rules hold each writer's window; the validator only asks which fire.
+        alerts = vm.freshness_alerts()
+        self.assertIn("SlurmGpuMetricsStale", alerts)
+        self.assertIn("ContainerStorageCleanupNeverReported", alerts)
+        self.assertIn("SlurmBackupStale", alerts)
+        expr = f'ALERTS{{alertstate="firing", alertname=~"{"|".join(alerts)}"}}'
+        firing = [{"metric": {"alertname": "OsUpdatesMetricsStale", "host": "n1"}}]
+        result = vm.check(FakePrometheus({"up"}, {WATCHDOG: [{}], expr: firing}))
+        self.assertEqual(result["freshness"]["detail"]["firing"], ["OsUpdatesMetricsStale{host=n1}"])
+        self.assertFalse(result["freshness"]["ok"])
+        self.assertTrue(vm.check(FakePrometheus({"up"}, {WATCHDOG: [{}]}))["freshness"]["ok"])
+
+    def test_a_shipped_rule_prometheus_has_not_loaded_is_a_rollout_gap(self):
+        self.assertTrue(vm.check(FakePrometheus({"up"}, {WATCHDOG: [{}]}))["rules"]["ok"])
+        rules = [{"name": "g", "rules": [r for r in LOADED[0]["rules"] if r["name"] != "SlurmBackupStale"]}]
+        result = vm.check(FakePrometheus({"up"}, {WATCHDOG: [{}]}, rules=rules))
+        self.assertFalse(result["rules"]["ok"])
+        self.assertEqual(result["rules"]["detail"]["not_loaded"], ["SlurmBackupStale"])
 
     def test_a_gpu_host_without_the_slurm_join_fails(self):
         queries = {
