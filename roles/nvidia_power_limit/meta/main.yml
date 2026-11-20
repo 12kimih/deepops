@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: retired_settings  # nvidia_power_limit_persistence_mode
   - role: deepops_paths  # nvidia_power_limit_conf_file
 
 galaxy_info:

@@ -23,7 +23,9 @@
           - unit.stat.exists
           - "'EnvironmentFile=/etc/nvidia-power-limit.conf' in (unit_contents.content | b64decode)"
           - "'nvidia-smi -pl ${NVIDIA_POWER_LIMIT_WATTS}' in (unit_contents.content | b64decode)"
-          - "'nvidia-smi -pm 1' in (unit_contents.content | b64decode)"
+          - "'nvidia-smi -pm' not in (unit_contents.content | b64decode)"
+          - "'Before=slurmd.service' in (unit_contents.content | b64decode)"
+          - "'After=nvidia-persistenced.service' in (unit_contents.content | b64decode)"
         fail_msg: "nvidia-power-limit.service was not installed with the expected ExecStart"
 
     - name: Assert the conf file carries the requested cap
