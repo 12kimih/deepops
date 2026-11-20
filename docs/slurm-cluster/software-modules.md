@@ -26,7 +26,7 @@ login, an interactive shell without a login (`srun --pty bash`), a command over 
 (`ssh node module list`), a non-interactive zsh, and a bash script started from any of
 them, as the [Lmod docs](https://lmod.readthedocs.io/en/latest/030_installing.html) ask.
 
-- `roles/login_shells` installs the shells in `login_shells` on every host (an account
+- `roles/login_shells` installs every shell `people.yml` gives an active person, and bash (`login_shells`), on every host (an account
   whose shell a node lacks cannot log in there) and makes each login read
   `/etc/profile.d`, the one place roles put the login environment. Debian's zsh and tcsh
   read none of it on their own.

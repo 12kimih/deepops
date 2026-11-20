@@ -107,8 +107,9 @@
 # SOFTWARE                                                                     #
 ################################################################################
 # The shells people log in with: installed on every host, each reading /etc/profile.d
-# (roles/login_shells; bash, zsh, tcsh, fish). Lmod hooks into every installed shell.
-#login_shells: [bash, zsh]  # example
+# (roles/login_shells). Default: every shell people.yml gives an active person, and bash.
+# Lmod hooks into every installed shell.
+#login_shells: "{{ (['bash'] + people | people_shells(people_default_shell) | map('basename') | list) | unique | list }}"
 
 # Extra software to install (removal: HOST BASELINE below)
 # Playbook: software

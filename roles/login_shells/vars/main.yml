@@ -1,2 +1,4 @@
 ---
-login_shells_supported: [bash, zsh, tcsh, fish]
+login_shells_supported: [bash, zsh, tcsh, fish, ksh]
+# Part of every system: nothing to install.
+login_shells_builtin: [sh, dash]
