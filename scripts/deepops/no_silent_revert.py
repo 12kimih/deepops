@@ -39,12 +39,17 @@ HUNK_LINES = 3
 
 
 def git(*args: str, check: bool = True) -> str:
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=check).stdout
+    return subprocess.run(
+        ["git", *args], capture_output=True, text=True, errors="surrogateescape", check=check
+    ).stdout
 
 
 def blob(rev: str, path: str) -> str | None:
     out = subprocess.run(
-        ["git", "rev-parse", "--verify", "-q", f"{rev}:{path}"], capture_output=True, text=True
+        ["git", "rev-parse", "--verify", "-q", f"{rev}:{path}"],
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
     )
     return out.stdout.strip() or None
 
@@ -58,7 +63,10 @@ def hunks(old: str, new: str, path: str) -> list[tuple[Counter, Counter]]:
     either side is missing (a root commit has no parent to compare with)."""
     out, removed, added = [], Counter(), Counter()
     diff = subprocess.run(
-        ["git", "diff", "-U0", "--no-color", old, new, "--", path], capture_output=True, text=True
+        ["git", "diff", "-U0", "--no-color", old, new, "--", path],
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
     )
     if diff.returncode != 0:
         return []
@@ -123,10 +131,13 @@ def findings_for(commit: str) -> tuple[list[str], list[str]]:
         else git("log", "-1", "--format=%B", commit)
     )
     back, deleted, inverted = [], [], []  # (text, the commits it undoes)
-    changes = git("diff-tree", "-r", "--no-commit-id", "--no-renames", "--name-status", parent, commit)
+    # -z: paths as they are; without it git quotes a name that is not ASCII ("caf\351"),
+    # which then names no file and the check passes it by.
+    fields = git("diff-tree", "-r", "-z", "--no-commit-id", "--no-renames", "--name-status", parent, commit)
+    fields = fields.split("\0")
+    changes = list(zip(fields[0:-1:2], fields[1::2]))
     recent = set(git("rev-list", "--first-parent", "-n", str(RECENT), parent).split())
-    for line in changes.splitlines():
-        status, _, path = line.partition("\t")
+    for status, path in changes:
         if status == "M":
             new = blob(commit, path)
             touching = git("log", "--first-parent", "--format=%H", parent, "--", path).split()
@@ -168,6 +179,9 @@ def check(revs: list[str]) -> tuple[list[str], list[str]]:
 
 
 def main(argv: list[str]) -> int:
+    # Paths and messages keep git's bytes (surrogateescape, so a path goes back to git
+    # as it came) and print as those bytes, as git and ls print them; never a traceback.
+    sys.stdout.reconfigure(errors="surrogateescape")
     if not argv or argv[0] not in ("push", "range"):
         print(__doc__, file=sys.stderr)
         return 2

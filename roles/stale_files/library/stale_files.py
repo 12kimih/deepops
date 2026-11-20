@@ -62,6 +62,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.deepops_marks import named_deepops, text_marked
@@ -82,6 +83,10 @@ options:
 
 # --- package ownership ---------------------------------------------------------------
 UCF_REGISTRY = "/var/lib/ucf/registry"
+# Paths read from a file or a command are decoded as the OS decodes file names
+# (os.fsdecode), so a name that is not UTF-8 equals the one os.walk yields: decoded with
+# errors="replace", a package's own file would not match itself and count as unowned.
+FS = {"encoding": sys.getfilesystemencoding(), "errors": sys.getfilesystemencodeerrors()}
 
 
 def owned_paths():
@@ -93,14 +98,14 @@ def owned_paths():
     if os.path.isdir(info):
         for name in os.listdir(info):
             if name.endswith(".list"):
-                with open(os.path.join(info, name), errors="replace") as listing:
+                with open(os.path.join(info, name), **FS) as listing:
                     paths.update(line.rstrip("\n") for line in listing if line.strip())
         if os.path.isfile(UCF_REGISTRY):
-            with open(UCF_REGISTRY, errors="replace") as registry:
+            with open(UCF_REGISTRY, **FS) as registry:
                 paths.update(line.split()[-1] for line in registry if len(line.split()) > 1)
         return paths
     try:
-        out = subprocess.run(["rpm", "-qal"], capture_output=True, text=True, check=False).stdout
+        out = subprocess.run(["rpm", "-qal"], capture_output=True, check=False, **FS).stdout
         paths.update(line for line in out.splitlines() if line.startswith("/"))
     except OSError:
         pass
@@ -113,7 +118,7 @@ def staged_paths(manifests):
     if not manifests:
         return paths
     for manifest in glob.glob(os.path.join(manifests, "*.json")):
-        with open(manifest) as f:
+        with open(manifest, **FS) as f:
             data = json.load(f)
         paths.update(data.get("files", []), data.get("dirs", []))
     return paths
@@ -234,7 +239,7 @@ def match_rule(rule):
         modules = {}
         for pattern in rule["globs"]:
             for packlist in glob.glob(pattern):
-                with open(packlist, errors="replace") as listing:
+                with open(packlist, **FS) as listing:
                     found += [
                         line.split()[0]
                         for line in listing
@@ -254,7 +259,7 @@ def match_rule(rule):
     elif kind == "libtool":
         for pattern in rule["globs"]:
             for archive in glob.glob(pattern):
-                with open(archive, errors="replace") as f:
+                with open(archive, **FS) as f:
                     fields = dict(re.findall(r"^(\w+)='([^']*)'", f.read(), re.M))
                 lib = os.path.dirname(archive)
                 if fields.get("dlname") and not os.path.lexists(os.path.join(lib, fields["dlname"])):
@@ -286,7 +291,7 @@ def match_rule(rule):
             found.append(tree)
             for record in glob.glob(os.path.join(tree, "**", "*.dist-info", "RECORD"), recursive=True):
                 site = os.path.dirname(os.path.dirname(record))
-                with open(record, errors="replace") as f:
+                with open(record, **FS) as f:
                     for line in f:
                         listed = os.path.normpath(os.path.join(site, line.split(",")[0]))
                         if not listed.startswith(tree.rstrip("/") + "/") and os.path.lexists(listed):
@@ -310,7 +315,7 @@ def match_rule(rule):
         for path in files_in(rule["dirs"]):
             if not path.endswith(".conf") or os.path.islink(path):
                 continue
-            with open(path, errors="replace") as f:
+            with open(path, **FS) as f:
                 dirs = [ln.split("#")[0].strip() for ln in f]
             dirs = [d for d in dirs if d and not d.startswith("include")]
             if dirs and not any(os.path.isdir(d) for d in dirs):
@@ -361,7 +366,7 @@ PROMPT_COPY_SKIP = ("/etc/xml/",)
 
 def run_lines(argv):
     try:
-        return subprocess.run(argv, capture_output=True, text=True, check=False).stdout.splitlines()
+        return subprocess.run(argv, capture_output=True, check=False, **FS).stdout.splitlines()
     except OSError:
         return []
 

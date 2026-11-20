@@ -52,7 +52,13 @@ class Tree:
 
     def _git(self, *args, check=True):
         return subprocess.run(
-            ["git", *args], cwd=self.root, capture_output=True, text=True, env=CLEAN_ENV, check=check
+            ["git", *args],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            errors="surrogateescape",
+            env=CLEAN_ENV,
+            check=check,
         )
 
     def files(self, prefix=""):
@@ -478,7 +484,7 @@ def deployed(config_dir, hosts):
     out = subprocess.run(
         [str(ansible) if ansible.exists() else "ansible", "-i", str(Path(config_dir) / "inventory"),
          ":".join(hosts), "-m", "ansible.builtin.debug", "-a", "var=ansible_local.deepops_deploy"],
-        cwd=ROOT, capture_output=True, text=True, env=env,
+        cwd=ROOT, capture_output=True, text=True, errors="replace", env=env,
     )  # fmt: skip
     try:
         results = json.loads(out.stdout)["plays"][0]["tasks"][0]["hosts"]

@@ -471,6 +471,7 @@ def targets(paths):
             ],
             capture_output=True,
             text=True,
+            errors="surrogateescape",
             check=True,
         ).stdout
         for f in sorted(set(listed.split("\0")) - {""}):

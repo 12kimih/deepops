@@ -89,11 +89,11 @@ def pins():
     """[(image:tag, digest, file:line)] for every pin in the roles' defaults, vars and
     Dockerfiles (a build stage's base image)."""
     files = subprocess.run(
-        ["git", "ls-files", "roles/*/defaults/*", "roles/*/vars/*", "roles/**/Dockerfile"], cwd=ROOT,
-        capture_output=True, text=True, check=True,
-    ).stdout.split()  # fmt: skip
+        ["git", "ls-files", "-z", "roles/*/defaults/*", "roles/*/vars/*", "roles/**/Dockerfile"], cwd=ROOT,
+        capture_output=True, text=True, errors="surrogateescape", check=True,
+    ).stdout.split("\0")  # fmt: skip
     found = []
-    for rel in files:
+    for rel in filter(None, files):
         if rel.startswith("roles/galaxy/"):
             continue
         for number, line in enumerate((ROOT / rel).read_text(errors="ignore").splitlines(), 1):

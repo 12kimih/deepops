@@ -80,7 +80,7 @@ while IFS= read -r name; do isolated+=(-u "${name}"); done < <(compgen -e | grep
 # The tracked tests/<suite>/test_*.py, like every other check, one check per file so a
 # slow suite's files run side by side; each runs from its suite directory, as discover
 # would run it.
-mapfile -t test_files < <(git ls-files -- 'tests/*/test_*.py')
+mapfile -d '' -t test_files < <(git ls-files -z -- 'tests/*/test_*.py')
 for test_file in "${test_files[@]}"; do
     suite="$(dirname "${test_file}")"
     if "${fast}" && [ -e "${suite}/.slow" ]; then continue; fi

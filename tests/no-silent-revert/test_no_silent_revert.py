@@ -33,13 +33,13 @@ class Repo:
             ["git", *args], cwd=self.path, env=ENV, input=stdin, capture_output=True, text=True, check=True
         ).stdout.strip()
 
-    def commit(self, message: str, files: dict[str, str | None]) -> str:
+    def commit(self, message: str, files: dict[str, str | bytes | None]) -> str:
         for name, content in files.items():
             target = self.path / name
             if content is None:
                 self.git("rm", "-q", name)
             else:
-                target.write_text(content)
+                target.write_bytes(content if isinstance(content, bytes) else content.encode())
                 self.git("add", name)
         self.git("commit", "-q", "-m", message)
         return self.git("rev-parse", "HEAD")
@@ -52,6 +52,7 @@ class Repo:
             input=stdin,
             capture_output=True,
             text=True,
+            errors="surrogateescape",
         )
 
 
@@ -73,6 +74,20 @@ class NoSilentRevertTests(unittest.TestCase):
         self.assertEqual(out.returncode, 1, out.stdout)
         self.assertIn("vars.yml goes back to its content before", out.stdout)
         self.assertIn(b[:12], out.stdout, "names the commit it would undo")
+
+    def test_a_file_that_is_not_utf8_is_judged_not_a_traceback(self):
+        # Latin-1 content and a Latin-1 file name: decoded strictly, the hook raised
+        # UnicodeDecodeError and refused every push that touched such a file.
+        r = self.repo
+        name = "caf\udce9.txt"  # b"caf\xe9.txt" as os.fsdecode spells it
+        r.commit("a", {name: b"caf\xe9 one\n"})
+        b = r.commit("b", {name: b"caf\xe9 two\n"})
+        r.commit("c", {name: b"caf\xe9 one\n"})
+        out = r.guard("range", "HEAD~1..HEAD")
+        self.assertEqual(out.returncode, 1, out.stdout + out.stderr)
+        self.assertIn("goes back to its content before", out.stdout)
+        self.assertIn(b[:12], out.stdout)
+        self.assertIn(f"c: {name} goes back", out.stdout, "the name prints as its bytes")
 
     def test_a_stale_copy_with_own_edits_is_reported(self):
         # 2185112b's shape with an edit of its own: the file is new as a whole, but a

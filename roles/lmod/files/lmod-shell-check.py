@@ -71,6 +71,7 @@ def run(shell: str, case: str, args: list[str], user: pwd.struct_passwd) -> subp
             env=env,
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=60,
             preexec_fn=drop,
             cwd="/",

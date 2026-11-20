@@ -37,7 +37,12 @@ def tracked(*patterns):
     """Tracked files, as paths: what a commit holds, never another checkout's half-done
     work lying in the shared tree."""
     out = subprocess.run(
-        ["git", "ls-files", "-z", "--", *patterns], cwd=ROOT, capture_output=True, text=True, check=True
+        ["git", "ls-files", "-z", "--", *patterns],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
+        check=True,
     ).stdout
     return [ROOT / name for name in out.split("\0") if name]
 
