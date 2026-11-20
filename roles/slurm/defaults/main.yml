@@ -163,6 +163,19 @@ slurm_stale_files_rules:
       - "{{ slurm_source_build_prefix }}/lib/*/perl*/*/auto/Slurm*/.packlist"
       - "{{ slurm_source_build_prefix }}/lib/perl*/*/auto/Slurm*/.packlist"
       - "{{ slurm_source_build_prefix }}/share/perl*/*/auto/Slurm*/.packlist"
+  # Their files elsewhere, told by their text: the library path (/etc/ld.so.conf.d) and
+  # the log import into the local syslog, which roles/rsyslog_client's forwarding
+  # replaced (it stored every line twice).
+  - name: the library path the retired build added
+    type: files
+    dirs: [/etc/ld.so.conf.d]
+    pattern: slurm\.conf
+    contains: '\A{{ slurm_source_build_prefix }}/lib\s+{{ slurm_source_build_prefix }}/lib64\s*\Z'
+  - name: the Slurm log import into the local syslog
+    type: files
+    dirs: [/etc/rsyslog.d]
+    pattern: 99-slurm\.conf
+    contains: Tag="slurm-prolog-epilog"
   - name: What the retired builds left where they installed
     type: glob
     globs: >-

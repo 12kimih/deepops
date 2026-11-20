@@ -23,3 +23,10 @@
   ansible.builtin.command: ldconfig
   changed_when: true
   when: stale_files_result is changed
+
+# Its Slurm log import gone, rsyslog stops reading the logs a second time.
+- name: Restart rsyslog without the Slurm log import
+  ansible.builtin.systemd:
+    name: rsyslog
+    state: restarted
+  when: "'the Slurm log import into the local syslog' in (stale_files_result.stale | default({}))"

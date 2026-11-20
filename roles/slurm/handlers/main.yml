@@ -53,8 +53,3 @@
     state: restarted
     enabled: true
   when: is_compute
-
-- name: Restart rsyslog
-  ansible.builtin.service:
-    name: rsyslog
-    state: restarted

@@ -30,17 +30,8 @@
   changed_when: true
   failed_when: false
 
-- name: Remove the library path the source build added
-  ansible.builtin.file:
-    path: /etc/ld.so.conf.d/slurm.conf
-    state: absent
-  register: slurm_migrate_ld
-
-- name: Refresh the library cache
-  ansible.builtin.command: ldconfig
-  changed_when: true
-  when: slurm_migrate_ld is changed
-
+# Its library path in /etc/ld.so.conf.d goes with the other leftovers (stale-files.yml,
+# by its text), which refreshes the library cache.
 # The packages ship their units in /lib/systemd/system; copies here would shadow them.
 # The drop-in directories (slurmdbd's start timeout) stay.
 - name: Remove the source build's systemd units
