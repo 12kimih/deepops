@@ -5,7 +5,8 @@
 # roles/egress_policy users may send DNS to it alone, so the block holds. See
 # docs/slurm-cluster/egress-policy.md. Hosts with systemd-resolved (Ubuntu).
 
-# present runs the resolver; absent puts systemd-resolved's own stub back.
+# present runs the resolver; absent puts systemd-resolved's own stub back; kept does
+# nothing. A deploy sets it from deepops_components (slurm_enable_dns_resolver).
 dns_resolver_state: present
 
 # The site's resolvers unbound forwards every query to (IP addresses). Empty: unbound

@@ -1,4 +1,21 @@
 ---
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+# The host reaches unbound through systemd-resolved, as unbound's own guide sets it up.
+- name: Check for systemd-resolved
+  ansible.builtin.assert:
+    that: "'systemd-resolved.service' in ansible_facts.services"
+    fail_msg: "{{ inventory_hostname }} has no systemd-resolved, which this role points at the resolver."
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: dns_resolver
+    component_record_action: begin
+    component_record_items: "{{ dns_resolver_items }}"
+
 - name: Install unbound
   ansible.builtin.package:
     name: unbound
@@ -77,3 +94,11 @@
     src: /run/systemd/resolve/resolv.conf
     state: link
     force: true
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: dns_resolver
+    component_record_action: present
+    component_record_items: "{{ dns_resolver_items }}"

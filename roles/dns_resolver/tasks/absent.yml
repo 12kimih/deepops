@@ -1,5 +1,19 @@
 ---
-# Ubuntu's own setup comes back: resolved's stub, and resolv.conf naming it.
+# Ubuntu's own setup comes back: resolved's stub, and resolv.conf naming it. Only on a
+# host this resolver was set up on (its drop-in, or resolv.conf naming resolved's
+# upstream file as present links it): the switch is off by default, so absent runs on
+# every host, and a resolv.conf the site set up otherwise stays as it is.
+- name: Look for this resolver's configuration
+  ansible.builtin.stat:
+    path: "{{ _dns_resolver_conf }}"
+  register: dns_resolver_conf_found
+
+- name: Look at what /etc/resolv.conf names
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+    follow: false
+  register: dns_resolver_resolv_conf
+
 - name: Remove the systemd-resolved drop-in
   ansible.builtin.file:
     path: "{{ _dns_resolver_resolved_dropin }}"
@@ -18,15 +32,19 @@
     src: /run/systemd/resolve/stub-resolv.conf
     state: link
     force: true
+  when: >-
+    dns_resolver_dropin is changed
+    or (dns_resolver_resolv_conf.stat.lnk_source | default('')) == '/run/systemd/resolve/resolv.conf'
 
-- name: Remove the unbound configuration
-  ansible.builtin.file:
-    path: "{{ _dns_resolver_conf }}"
-    state: absent
-
-- name: Stop unbound
-  ansible.builtin.systemd:
-    name: unbound
-    state: stopped
-    enabled: false
-  when: "'unbound.service' in ansible_facts.services"
+# Then unbound goes with what else it installed, once nothing points at it. Without a
+# record, unbound is this component's only where its configuration or drop-in is: a
+# site's own unbound elsewhere stays.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    _evidence: "{{ dns_resolver_conf_found.stat.exists or dns_resolver_dropin is changed }}"
+    component_record_name: dns_resolver
+    component_record_action: absent
+    component_record_items: "{{ dns_resolver_items if _evidence else [] }}"
+    component_record_exclusive_packages: "{{ ['unbound'] if _evidence else [] }}"

@@ -191,7 +191,7 @@ at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts
 <!-- BEGIN GENERATED: role-variables:dns_resolver -->
 | Variable | Default | Description |
 |---|---|---|
-| `dns_resolver_state` | `present` | present runs the resolver; absent puts systemd-resolved's own stub back. |
+| `dns_resolver_state` | `present` | present runs the resolver; absent puts systemd-resolved's own stub back; kept does nothing. A deploy sets it from deepops_components (slurm_enable_dns_resolver). |
 | `dns_resolver_upstreams` | `[]` | The site's resolvers unbound forwards every query to (IP addresses). Empty: unbound resolves from the root servers itself, which needs outbound DNS to anywhere. |
 | `dns_resolver_dnssec` | `true` | Validate DNSSEC (unbound's default on Ubuntu). Turn off only when the upstreams strip DNSSEC records, which makes every signed name fail. |
 | `dns_resolver_blocked_domains` | `[ngrok.io, ngrok.com, ngrok.app, ngrok.dev, ngrok-free.app, ngrok-free.dev, ngrok-agent.com, trycloudflare.com, cfargotunnel.com, argotunnel.com, devtunnels.ms, tunnels.api.visualstudio.com, loca.lt, localtunnel.me, localhost.run, lhr.life, serveo.net, serveousercontent.com, bore.pub, pinggy.io, pinggy.link, pinggy.online, zrok.io, playit.gg, localxpose.io, loclx.io, tunnelmole.com, tunnelmole.net, telebit.cloud]` | Names answered NXDOMAIN, with every name below them: tunnel and expose services (an agent's control connection and the public URLs it hands out). The tailscale control plane is not here: the administrators' tailscaled needs it, and users cannot run a tunnel through it without a tailscaled of their own, which the metrics report. |

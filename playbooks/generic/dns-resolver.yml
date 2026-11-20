@@ -4,7 +4,8 @@
 #
 #   ansible-playbook -K --check --diff -l <host> playbooks/generic/dns-resolver.yml
 #
-# Put systemd-resolved's stub back with -e dns_resolver_state=absent.
+# Every host it runs on converges to deepops_components (slurm_enable_dns_resolver):
+# absent puts systemd-resolved's stub back.
 - hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   tags:
@@ -12,4 +13,5 @@
   roles:
     - role: deploy_defaults  # slurm_enable_dns_resolver, proxy_env
     - role: dns_resolver
+      dns_resolver_state: "{{ deepops_components.dns_resolver | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"
