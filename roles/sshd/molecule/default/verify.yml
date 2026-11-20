@@ -22,7 +22,29 @@
           - "'port 2222' in sshd_effective.stdout_lines"
           - "'logingracetime 20' in sshd_effective.stdout_lines"
           - "'x11forwarding no' in sshd_effective.stdout_lines"
-        fail_msg: "{{ sshd_effective.stdout_lines | select('match', '^(port|logingracetime|x11forwarding) ') | list }}"
+          - "'passwordauthentication yes' in sshd_effective.stdout_lines"
+        fail_msg: "{{ sshd_effective.stdout_lines | select('match', '^(port|logingracetime|x11forwarding|passwordauthentication) ') | list }}"
+
+    - name: List sshd_config.d
+      ansible.builtin.find:
+        paths: /etc/ssh/sshd_config.d
+        file_type: any
+        hidden: true
+      register: sshd_dropins
+
+    - name: Find the drop-in set aside
+      ansible.builtin.find:
+        paths: /var/backups/sshd
+        recurse: true
+        patterns: [50-cloud-init.conf]
+      register: sshd_aside
+
+    - name: Check sshd_config.d holds the site's drop-in alone and the other was kept
+      ansible.builtin.assert:
+        that:
+          - sshd_dropins.files | map(attribute='path') | list == ['/etc/ssh/sshd_config.d/10-deepops.conf']
+          - sshd_aside.files | map(attribute='mode') | list == ['0600']
+        fail_msg: "sshd_config.d: {{ sshd_dropins.files | map(attribute='path') | list }}; set aside: {{ sshd_aside.files | map(attribute='path') | list }}"
 
     - name: Check sshd answers on both ports
       ansible.builtin.wait_for:

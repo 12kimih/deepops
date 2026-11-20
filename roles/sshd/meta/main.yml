@@ -3,7 +3,7 @@ galaxy_info:
   namespace: deepops
   role_name: sshd
   author: DeepOps
-  description: The OpenSSH server's settings as one drop-in beside the package's own sshd_config
+  description: The OpenSSH server's settings as the one drop-in beside the package's own sshd_config
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:

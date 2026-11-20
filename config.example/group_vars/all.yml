@@ -107,7 +107,8 @@
 # SOFTWARE                                                                     #
 ################################################################################
 # The OpenSSH server (roles/sshd): with sshd_manage, sshd_config is the package's own and
-# the site's settings are one drop-in, checked by sshd before it is kept.
+# the site's settings are one drop-in, checked by sshd before it is kept. Other files in
+# sshd_config.d (cloud-init's) are moved to sshd_backup_dir and reported.
 #sshd_manage: false
 #sshd_ports: [22]
 #sshd_settings: {}  # e.g. {LoginGraceTime: 20}

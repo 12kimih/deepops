@@ -1,5 +1,6 @@
 ---
-# A setting sshd refuses: the run fails and the working configuration stays.
+# A setting sshd refuses: the run fails and the working configuration stays, with the
+# drop-in it had set aside back in place.
 - name: Try a configuration sshd refuses
   hosts: all
   become: true
@@ -8,6 +9,12 @@
       ansible.builtin.slurp:
         src: /etc/ssh/sshd_config.d/10-deepops.conf
       register: dropin_before
+
+    - name: Leave a drop-in the role did not write
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/60-other.conf
+        content: "MaxAuthTries 3\n"
+        mode: "0640"
 
     # The refusal is what this checks: the role must fail, after putting things back.
     - name: Apply a bad setting
@@ -31,6 +38,11 @@
         src: /etc/ssh/sshd_config.d/10-deepops.conf
       register: dropin_after
 
+    - name: Look at the other drop-in
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config.d/60-other.conf
+      register: other_after
+
     - name: Look for rollback copies left behind
       ansible.builtin.find:
         paths: [/etc/ssh, /etc/ssh/sshd_config.d]
@@ -43,4 +55,12 @@
           - sshd_refused | bool
           - dropin_after.content == dropin_before.content
           - sshd_copies.matched == 0
-        fail_msg: "drop-in changed or copies left: {{ sshd_copies.files | map(attribute='path') | list }}"
+          - other_after.stat.exists and other_after.stat.mode == '0640'
+        fail_msg: >-
+          drop-in changed, copies left ({{ sshd_copies.files | map(attribute='path') | list }})
+          or the other drop-in not back ({{ other_after.stat }})
+
+    - name: Remove the other drop-in again
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d/60-other.conf
+        state: absent
