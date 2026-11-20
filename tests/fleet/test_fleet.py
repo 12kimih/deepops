@@ -10,7 +10,7 @@ fleet = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fleet)
 
 
-def state(kernel="6.8.0-149", packages=None, sysctl=None, loaded="", on_disk="", reboot=""):
+def state(kernel="6.8.0-149", packages=None, sysctl=None, loaded="", on_disk="", reboot="", machine_id=""):
     return {
         "kernel": kernel,
         "packages": packages or {},
@@ -18,6 +18,7 @@ def state(kernel="6.8.0-149", packages=None, sysctl=None, loaded="", on_disk="",
         "nvidia_loaded": loaded,
         "nvidia_on_disk": on_disk,
         "reboot_pending": reboot,
+        "machine_id": machine_id,
     }
 
 
@@ -71,6 +72,13 @@ class FleetDrift(unittest.TestCase):
     def test_a_pending_reboot_is_drift_even_on_level_packages(self):
         drift = fleet.fleet_drift({"a": state(reboot="linux-image-6.8.0-150-generic"), "b": state()})
         self.assertEqual(drift, ["reboot pending on a: linux-image-6.8.0-150-generic"])
+
+    def test_hosts_sharing_a_machine_id_are_named(self):
+        drift = fleet.fleet_drift(
+            {"a": state(machine_id="1f"), "b": state(machine_id="1f"), "c": state(machine_id="2e")}
+        )
+        self.assertEqual(len(drift), 1)
+        self.assertTrue(drift[0].startswith("machine-id shared by a,b:"), drift)
 
 
 if __name__ == "__main__":

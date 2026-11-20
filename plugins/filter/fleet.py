@@ -6,7 +6,8 @@
                                                     "sysctl": {name: value},
                                                     "nvidia_loaded": str,
                                                     "nvidia_on_disk": str,
-                                                    "reboot_pending": str}}
+                                                    "reboot_pending": str,
+                                                    "machine_id": str}}
 
 Nodes upgraded at different times run different kernels and package versions, so a
 job behaves differently depending on where it lands, and a fix applied "everywhere"
@@ -19,6 +20,10 @@ runs other than what it has installed, a pending reboot (reboot_pending: the
 packages that asked for it, or "yes") or an NVIDIA module loaded at another version
 than the one on disk (nvidia_loaded vs nvidia_on_disk, "" where none). The loaded
 module is compared like a package: between the hosts that have one.
+
+One value must differ instead: /etc/machine-id. Hosts cloned from one image share it
+until it is regenerated, and systemd (journald, networkd's DHCP identity, D-Bus) then
+takes them for one machine.
 """
 
 
@@ -53,6 +58,15 @@ def fleet_drift(states):
             spread = _spread(installed[name])
             if spread:
                 lines.append(f"package {name}: {spread}")
+    by_id = {}
+    for host, state in sorted(states.items()):
+        if state.get("machine_id"):
+            by_id.setdefault(state["machine_id"], []).append(host)
+    for hosts in sorted(hs for hs in by_id.values() if len(hs) > 1):
+        lines.append(
+            f"machine-id shared by {','.join(hosts)}: on each but one, "
+            "rm /etc/machine-id && systemd-machine-id-setup, then reboot"
+        )
     loaded = {h: s["nvidia_loaded"] for h, s in states.items() if s.get("nvidia_loaded")}
     if len(loaded) > 1:
         spread = _spread(loaded)
