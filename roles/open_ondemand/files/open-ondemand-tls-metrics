@@ -8,18 +8,20 @@ dir=$2
 out="$dir/open_ondemand_tls.prom"
 tmp="$out.$$"
 
-if end=$(openssl x509 -in "$cert" -noout -enddate 2>/dev/null); then
-    not_after=$(date -d "${end#notAfter=}" +%s)
-    ok=1
-else
-    not_after=0
-    ok=0
-fi
-
-cat > "$tmp" <<EOF
+# An unreadable certificate publishes no expiry: a made-up one would read as expired.
+if end=$(openssl x509 -in "$cert" -noout -enddate 2>/dev/null) &&
+    not_after=$(date -d "${end#notAfter=}" +%s); then
+    cat > "$tmp" <<EOF
 # HELP open_ondemand_tls_cert_not_after_seconds Expiry of the Open OnDemand portal certificate (Unix time).
 # TYPE open_ondemand_tls_cert_not_after_seconds gauge
 open_ondemand_tls_cert_not_after_seconds $not_after
+EOF
+    ok=1
+else
+    : > "$tmp"
+    ok=0
+fi
+cat >> "$tmp" <<EOF
 # HELP open_ondemand_tls_cert_readable Whether the portal certificate could be read.
 # TYPE open_ondemand_tls_cert_readable gauge
 open_ondemand_tls_cert_readable $ok
