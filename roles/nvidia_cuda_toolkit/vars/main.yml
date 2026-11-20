@@ -1,0 +1,7 @@
+---
+# What the component installs, for its record (roles/component_record): the trees this
+# role owns whole (defaults/main.yml), on the host that installs them.
+cuda_toolkit_items:
+  - "file:{{ cuda_install_root }}"
+  - "file:{{ cuda_modroot }}/cuda"
+  - "file:{{ cuda_cache_dir }}"

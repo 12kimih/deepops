@@ -1,9 +1,13 @@
 ---
-# CUDA modulefiles land in cuda_modroot (default sm_module_path), a tree the lmod role
-# registers with Lmod (lmod_module_paths). A cuda_modroot outside those trees needs to be
-# added there. The download+install path runs only where the playbook sets
-# nvidia_cuda_toolkit_install.
+# CUDA toolkits in the shared software tree, one Lmod module per minor (present.yml).
+# The component lives on the host that owns the tree (deepops_components); every other
+# host sees the toolkits through the shared tree and has nothing of its own.
+- name: Check the component state
+  ansible.builtin.assert:
+    that: cuda_toolkit_state in ['present', 'absent', 'kept']
+    fail_msg: "cuda_toolkit_state must be present, absent or kept, not {{ cuda_toolkit_state }}."
+    quiet: true
 
-- name: Install CUDA toolkits from the official runfiles
-  ansible.builtin.import_tasks: install.yml
-  when: nvidia_cuda_toolkit_install | bool
+- name: "Make the CUDA toolkits {{ cuda_toolkit_state }}"
+  ansible.builtin.include_tasks: "{{ cuda_toolkit_state }}.yml"
+  when: cuda_toolkit_state != 'kept'

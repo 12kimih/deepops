@@ -1,30 +1,21 @@
-# Install NVIDIA CUDA toolkits from the official runfiles into the shared
-# software tree and expose each one as an Lmod module on every node.
-#
-#   ansible-playbook playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
-#
-# The driver is never touched (runfile installed with --toolkit only). The
-# toolkits install once on the host that owns the shared tree -- slurm-master[0]
-# unless you pass -e hostlist=<host> (group_vars cannot pick a play's hosts);
-# because that tree is shared, `module avail cuda` then lists them on every
-# node. Trim roles/nvidia_cuda_toolkit/defaults/main.yml's cuda_versions (or override
-# it in config/group_vars/) to choose which toolkits to install.
 ---
-# Lmod as the deploy has it (slurm_install_lmod, deepops_components).
-- name: Lmod on every node
-  import_playbook: lmod.yml
-  vars:
-    deepops_phase: install
-
-- name: Register the site modulefiles tree with Lmod on all nodes
-  hosts: "{{ hostlist | default('all') }}"
+# NVIDIA CUDA toolkits from the official runfiles in the shared software tree, each
+# minor an Lmod module on every node (roles/nvidia_cuda_toolkit). The driver is never
+# touched (runfile --toolkit only).
+#
+#   ansible-playbook -K playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
+#
+# Every host it runs on converges to deepops_components: present on the first
+# slurm-master while slurm_install_cuda_toolkit is on (it owns the shared tree, so
+# `module avail cuda` lists them everywhere), absent elsewhere (the tree goes only
+# from the host that installed it). Which toolkits: cuda_toolkit_oldest and the
+# driver branch (roles/nvidia_cuda_toolkit/defaults/main.yml). Users see them through
+# Lmod (slurm-cluster/lmod.yml), which reads the tree they land in.
+- name: CUDA toolkits in the shared software tree
+  hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
-    - nvidia_cuda_toolkit
-
-- name: Install CUDA toolkits and generate modulefiles on the software-tree host
-  hosts: "{{ hostlist | default('slurm-master[0]') }}"
-  become: true
-  roles:
+    - role: deploy_defaults
     - role: nvidia_cuda_toolkit
-      nvidia_cuda_toolkit_install: true
+      cuda_toolkit_state: "{{ deepops_components.cuda_toolkit | component_phase(deepops_phase) }}"
+  environment: "{{ proxy_env }}"

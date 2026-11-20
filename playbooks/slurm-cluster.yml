@@ -137,6 +137,11 @@
   vars:
     deepops_phase: install
 
+- name: Install the CUDA toolkits as modules
+  import_playbook: slurm-cluster/nvidia-cuda-toolkit.yml
+  vars:
+    deepops_phase: install
+
 - name: Install the Open OnDemand portal
   import_playbook: slurm-cluster/open-ondemand.yml
   vars:
@@ -304,6 +309,11 @@
     deepops_phase: remove
   tags:
     - container-storage-gc
+
+- name: Remove the CUDA toolkits where they are no longer wanted
+  import_playbook: slurm-cluster/nvidia-cuda-toolkit.yml
+  vars:
+    deepops_phase: remove
 
 - name: Remove the HPC SDK where it is no longer wanted
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml

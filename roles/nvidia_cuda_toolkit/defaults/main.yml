@@ -3,15 +3,13 @@
 # into a shared (NFS) software tree and expose each one as an Lmod module.
 #
 # The host GPU driver is never touched: the runfile is invoked with --toolkit
-# only. The heavy download+install path runs on ONE host (the node that owns the
-# shared software tree); because that tree is shared, the modules become visible
-# on every node that mounts it. See playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
+# only. The toolkits install on ONE host, the one that owns the shared software tree
+# (deepops_components: slurm_install_cuda_toolkit, the first slurm-master); because
+# that tree is shared, the modules become visible on every node that mounts it. See
+# playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
 
-# Whether the download+install path runs on this host. The playbook turns this on only for
-# the software-tree host (the one that owns /sw); everywhere else the role is a near no-op
-# (the shared module tree is registered once by the lmod role, not here). Override with -e
-# or in config/ if your software tree lives on a different host.
-nvidia_cuda_toolkit_install: false
+# present, absent or kept (docs/deepops/component-state.md); the playbook sets it.
+cuda_toolkit_state: present
 
 # Install + module layout: the shared tree (sm_* in roles/deepops_paths), whose module
 # directory the lmod role registers with Lmod (lmod_module_paths), so CUDA needs no

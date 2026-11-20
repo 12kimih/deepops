@@ -60,7 +60,7 @@ reboots each as it empties and returns it to service. See
 | `utilities/nvidia-driver-switch.yml` | slurm-node | switches the NVIDIA driver branch one node at a time: drain, switch, reboot, verify, resume |
 | `utilities/nvidia-set-gpu-clocks.yml` | slurm-node | locks the GPU clocks to `gpu_clock_lock`, or resets them (`gpu_clock_reset`), on hosts with GPUs; runtime only |
 | `utilities/gpu-clocks.yml` | slurm-node | lets users change application clocks (`nvidia-smi -acp`); `slurm-cluster.yml` runs it when `allow_user_set_gpu_clocks` |
-| `slurm-cluster/nvidia-cuda-toolkit.yml` | all | CUDA toolkits as Lmod modules, installed once into the shared tree |
+| `slurm-cluster/nvidia-cuda-toolkit.yml` | slurm-cluster | CUDA toolkits as Lmod modules, installed by the first slurm-master into the shared tree while `slurm_install_cuda_toolkit` is on, removed from it when off |
 
 ## Site tooling
 

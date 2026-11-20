@@ -182,6 +182,12 @@ deepops_component_registry:
     role: nvidia_hpc_sdk
     rules:
       - {switch: "{{ slurm_install_hpcsdk }}", group: slurm-login, first: true}
+  # CUDA toolkits as Lmod modules, installed by the first controller into the shared
+  # software tree every node mounts.
+  cuda_toolkit:
+    role: nvidia_cuda_toolkit
+    rules:
+      - {switch: "{{ slurm_install_cuda_toolkit }}", group: slurm-master, first: true}
   # enroot on login and compute hosts (its GPU hook runs the container toolkit); pyxis's
   # node setup needs it (its Slurm plugin follows the same switches in roles/slurm).
   enroot:

@@ -47,7 +47,9 @@ development tools and scientific software packages, making it easier to install 
 without a tedious manual build process.
 
 For **CUDA specifically**, the `nvidia_cuda_toolkit` role
-(`playbooks/slurm-cluster/nvidia-cuda-toolkit.yml`) installs the newest patch of every
+(`slurm_install_cuda_toolkit: true`; `slurm-cluster.yml` or
+`playbooks/slurm-cluster/nvidia-cuda-toolkit.yml` deploys it on the first slurm-master,
+which owns the shared tree, and turning it off removes the toolkits) installs the newest patch of every
 CUDA minor from `cuda_toolkit_oldest` (default 11.8) up to the newest the driver branch
 runs, from the official NVIDIA runfiles into a shared `/sw/cuda/<version>` tree, with one
 Lmod modulefile per minor: users `module load cuda/12.4` on any node (`cuda/12.4.1` loads

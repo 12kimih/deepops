@@ -242,8 +242,10 @@ nfs_mounts:
 # CUDA toolkits as Lmod modules (playbooks/slurm-cluster/nvidia-cuda-toolkit.yml).
 # Installs CUDA toolkits from the official runfiles into {{ sm_prefix }}/cuda and
 # exposes each minor as `module load cuda/<major.minor>` (the full version loads too;
-# a bare `module load cuda` takes the newest). Driver is never touched. Opt-in: run
-# the playbook explicitly. Installs once on the NFS server, visible on every node.
+# a bare `module load cuda` takes the newest). Driver is never touched. Opt-in; the
+# first slurm-master installs them into the shared tree, visible on every node, and
+# turning it off removes them from there:
+#slurm_install_cuda_toolkit: false
 # Offered: the newest patch of every CUDA minor from cuda_toolkit_oldest up to the
 # newest the driver branch runs, from the role's catalog (regenerated with
 # scripts/deepops/cuda_releases.py when NVIDIA releases). A minor that leaves the
@@ -256,8 +258,6 @@ nfs_mounts:
 # Free space (GB) each toolkit install needs on the cache and install disks before it
 # starts; the toolkits install one at a time and each runfile is removed after:
 #cuda_install_free_gb: 30
-# The toolkits install on slurm-master[0], which owns the shared /sw tree; another host
-# only with -e hostlist=<host> on playbooks/slurm-cluster/nvidia-cuda-toolkit.yml.
 
 ################################################################################
 # NVIDIA HPC SDK                                                               #

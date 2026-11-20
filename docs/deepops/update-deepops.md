@@ -430,7 +430,7 @@ CUDA is served as Lmod modules, one per CUDA minor, by default. When NVIDIA rele
 
 ```bash
 python3 scripts/deepops/cuda_releases.py      # rewrites cuda_releases in roles/nvidia_cuda_toolkit/defaults
-ansible-playbook playbooks/slurm-cluster/nvidia-cuda-toolkit.yml
+ansible-playbook -K playbooks/slurm-cluster/nvidia-cuda-toolkit.yml   # slurm_install_cuda_toolkit: true
 ```
 
 The newest toolkits arrive by themselves up to the CUDA major the driver branch serves (`nvidia_driver_branch`); a new CUDA major needs the driver raised first. `cuda_toolkit_oldest` sets how far back the modules go.
