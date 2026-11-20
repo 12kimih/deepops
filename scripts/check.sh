@@ -59,7 +59,10 @@ step "no secrets or site data in tracked files" "${python}" scripts/deepops/sens
 # itself slow with a .slow file and then runs only in the full check. They run without
 # the GIT_* variables a git hook exports, so a test that drives git in a temporary
 # repository cannot reach this repository's index.
-isolated=(env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR)
+# Every GIT_* variable, not a list of names: GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT and
+# GIT_CONFIG_KEY_n carry `git -c` settings into every git the tests run.
+isolated=(env)
+while IFS= read -r name; do isolated+=(-u "${name}"); done < <(compgen -e | grep '^GIT_' || true)
 # The tracked tests/<suite>/test_*.py, like every other check, one check per file so a
 # slow suite's files run side by side; each runs from its suite directory, as discover
 # would run it.
