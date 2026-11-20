@@ -34,6 +34,18 @@ groups:
         annotations:
           summary: "Update status from {{ $labels.host }} is over 3 days old"
           description: "The os-updates metrics timer stopped: `systemctl status os-updates-metrics.timer` on the host."
+      # No timestamp at all on a host with the unit installed (never ran, or every run
+      # failed since it was installed or since a boot emptied the textfile directory):
+      # the alert above has nothing to compare, so the unit's presence stands in.
+      - alert: OsUpdatesMetricsNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="os-updates-metrics.service"})
+          unless on (instance) os_updates_metrics_timestamp_seconds
+        for: 3d
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has reported no update status for 3 days"
+          description: "`systemctl status os-updates-metrics.timer` and `journalctl -u os-updates-metrics` on the host."
       # Either one leaves the counts above meaningless and blocks every update.
       - alert: OsDpkgBroken
         expr: os_updates_dpkg_problems > 0

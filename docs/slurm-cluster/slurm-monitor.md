@@ -138,10 +138,17 @@ are checked with `promtool` before they are written, then applied with a live re
 After a monitoring deploy, `scripts/validation/validate_monitoring.py --json` (from a
 checkout on any host that reaches Prometheus; read-only) must report `"ok": true`. It
 checks that every target is up and every rule group evaluates, that the Watchdog alert
-reaches Alertmanager, that every metric the alert rules and dashboards read exists
-(except those only some hardware has), that every GPU joins Slurm's device numbering,
+reaches Alertmanager, that every metric the alert rules and dashboards read has samples
+in the last minutes, that every GPU joins Slurm's device numbering,
 and that the timestamped textfile metrics are fresh. A metric missing while its
 exporter reports others is a rollout gap: deploy that exporter's playbook to its hosts.
+Some metrics may legitimately be absent, and are listed under `absent_ok` instead
+(`ABSENT_OK` in the script):
+
+- metrics that only some hardware or kernels have (fans, PSUs, HBM temperature, IRQ pressure)
+- collectors left off on purpose
+- series that exist only while in use
+- results that appear only after the first run
 
 ## Alertmanager
 
@@ -152,6 +159,13 @@ ECC, RAID, NIC errors), GPU (XID, missing GPUs, row remapping, temperature, PCIe
 power (PSU, BMC sensors, and chassis intrusion as a warning, since it is a latched event cleared in the BMC) and the monitoring stack itself. Add site rules with
 `prometheus_extra_rule_files`. Check rule state at http://\<slurm-metric ip\>:9090/alerts.
 The alert-rules test files in `tests/monitoring/` (one per evaluation interval) unit-test the rules with `promtool test rules`.
+
+Each timer that writes textfile metrics has a staleness alert on its last timestamp, and
+that alert also covers a job that never reported at all. The Slurm backups count from when
+each destination and the restore test were first configured, a time `slurm-backup` keeps.
+The other jobs have a `...NeverReported` companion, which fires when the job's systemd
+unit is installed on a host but its timestamp is missing for the same window. Without one
+of these, a job that never ran or failed every run would stay silent.
 
 The always-firing `Watchdog` alert proves the whole path works. Point
 `alertmanager_heartbeat_url` at an external check (for example a healthchecks.io ping

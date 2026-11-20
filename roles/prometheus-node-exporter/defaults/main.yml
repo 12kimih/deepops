@@ -4,10 +4,15 @@
 node_exporter_state: present
 node_exporter_container: "quay.io/prometheus/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0"
 # Collectors beyond the defaults: systemd feeds the failed-unit alert, processes the
-# PID and thread limits.
-node_exporter_extra_collectors: [systemd, processes]
-# Units the systemd collector reports; services and mounts are what alerts watch.
-node_exporter_systemd_unit_include: ".+[.](service|mount)"
+# PID and thread limits, tcpstat the hosts dashboard's TCP states. interrupts stays off:
+# one series per CPU per IRQ, more than every other collector together.
+node_exporter_extra_collectors: [systemd, processes, tcpstat]
+# Default collectors turned off: rapl's energy counters are readable by root only, and
+# the exporter runs unprivileged.
+node_exporter_disabled_collectors: [rapl]
+# Units the systemd collector reports; services, mounts and sockets are what alerts and
+# the hosts dashboard watch.
+node_exporter_systemd_unit_include: ".+[.](service|mount|socket)"
 node_exporter_svc_name: "docker.node-exporter.service"
 node_exporter_service_state: started
 node_exporter_service_enabled: true

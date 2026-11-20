@@ -13,7 +13,7 @@ Checks:
   alerting     an Alertmanager is attached and the Watchdog alert reaches it (the
                always-firing alert that proves the alert path end to end).
   metrics      every metric the repository's alert rules and dashboards read exists,
-               except those only some hardware has (OPTIONAL). A metric missing while
+               except those that may be absent (ABSENT_OK, by why). A metric missing while
                others from its exporter exist is a rollout gap: a newer rule or
                dashboard reached Prometheus before the exporter config it needs.
   gpu_join     every GPU DCGM reports joins Slurm's device numbering (the join the
@@ -45,21 +45,37 @@ DASHBOARDS = [
     ].values()
     for name in names
 ]
-# Metrics only some hardware or some exporter versions produce; their absence is no
-# failure (the panels reading them say so, the alerts reading them stay quiet).
-OPTIONAL = re.compile(
-    r"^(DCGM_FI_DEV_NVLINK_.*|DCGM_FI_PROF_.*"
-    r"|node_infiniband_.*|node_hwmon_power_.*|ipmi_.*|.+_tls_cert_not_after_seconds"
-    r"|ALERTS|ALERTS_FOR_STATE)$"
-)
-# Metrics that exist only while what they count does: a GPU some job holds, an XID or a
-# clock event in the exporter's window, the last XID since the exporter started.
-WHILE_IN_USE = re.compile(
-    r"^(slurm_gpu_allocated|DCGM_EXP_XID_ERRORS_COUNT|DCGM_EXP_CLOCK_EVENTS_COUNT|DCGM_FI_DEV_XID_ERROR)$"
-)
+# Metrics whose absence is no failure, by why: the panels reading them stay empty, the
+# alerts reading them quiet.
+ABSENT_OK = {
+    "hardware": (  # only some GPUs, boards, CPUs or fabrics have them
+        r"DCGM_FI_DEV_NVLINK_.*|DCGM_FI_PROF_.*|node_infiniband_.*|ipmi_.*|node_power_supply_.*"
+        r"|node_hwmon_(?!temp_celsius$|chip_names$|sensor_label$).*|node_cpu_(core|package)_throttles_total"
+        r"|DCGM_FI_DEV_MEMORY_(MAX_OP_)?TEMP_CELSIUS"  # HBM GPUs only; GDDR ones report none
+    ),
+    "kernel": r"node_kernel_hung_tasks_total|node_pressure_irq_.*",  # newer or other kernel builds
+    "off by choice": r"node_interrupts_total",  # one series per CPU per IRQ (prometheus-node-exporter)
+    "only while in use": (  # a GPU some job holds, an XID or clock event in the exporter's window
+        r"slurm_gpu_allocated|DCGM_EXP_XID_ERRORS_COUNT|DCGM_EXP_CLOCK_EVENTS_COUNT|DCGM_FI_DEV_XID_ERROR"
+    ),
+    # A backup's results; until then its configured time stands in (rules/backup.yml).
+    "after the first run": r"slurm_backup_(restore_test_)?(status|last_\w+)",
+    "optional component": r".+_tls_cert_not_after_seconds",  # a service that serves TLS (rules/tls.yml)
+    "Prometheus' own": r"ALERTS|ALERTS_FOR_STATE",
+}
+
+
+def absent_ok(metric):
+    """Why METRIC may be absent (an ABSENT_OK key), or None."""
+    return next((why for why, pattern in ABSENT_OK.items() if re.fullmatch(pattern, metric)), None)
+
+
 # Exporters by metric prefix: a missing metric is a rollout gap only when its exporter
 # reports others.
-EXPORTERS = ("DCGM_", "node_", "slurm_", "os_updates_", "ipmi_")
+EXPORTERS = ("DCGM_", "node_", "slurm_", "os_updates_", "ipmi_", "container_storage_gc_", "egress_policy_")
+# How recent a sample must be for its metric to count as present (seconds; many scrape
+# intervals).
+PRESENT_WINDOW = 300
 # Textfile writers that stamp each write, and how old a stamp may be.
 FRESH = {"slurm_metrics_updated_timestamp_seconds": 300}
 PROMQL_WORDS = {
@@ -155,23 +171,24 @@ def check(prom):
         {"alertmanagers": len(managers), "watchdog_firing": bool(watchdog)},
     )
 
-    present = set(prom.get("/api/v1/label/__name__/values")["data"])
+    # Names with samples now: without a start the API lists every name in the retained
+    # data, so a metric gone since (a renamed field, a broken exporter) would count.
+    present = set(prom.get("/api/v1/label/__name__/values", start=time.time() - PRESENT_WINDOW)["data"])
     reads, recorded = repo_metrics()
-    gaps = {}
+    gaps, allowed = {}, {}
     for name, where in sorted(reads.items()):
-        inputs = recorded.get(name, {name})
-        for metric in inputs:
-            if (
-                metric in present
-                or metric in recorded
-                or OPTIONAL.match(metric)
-                or WHILE_IN_USE.match(metric)
-            ):
+        for metric in sorted(recorded.get(name, {name})):
+            if metric in present or metric in recorded:
+                continue
+            why = absent_ok(metric)
+            if why:
+                allowed.setdefault(why, set()).add(metric)
                 continue
             prefix = next((p for p in EXPORTERS if metric.startswith(p)), None)
             if prefix and any(m.startswith(prefix) for m in present):
                 gaps.setdefault(metric, sorted(set(where)))
-    record("metrics", not gaps, {"read": len(reads), "missing": gaps})
+    detail = {"read": len(reads), "missing": gaps, "absent_ok": {w: sorted(m) for w, m in allowed.items()}}
+    record("metrics", not gaps, detail)
 
     reporting = {r["metric"].get("host") for r in prom.query("count by (host) (DCGM_FI_DEV_GPU_UTIL_RATIO)")}
     joined = {

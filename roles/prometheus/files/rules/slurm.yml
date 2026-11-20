@@ -70,6 +70,18 @@ groups:
           description: >-
             `systemctl status slurm-gpu-metrics` and `journalctl -u slurm-gpu-metrics` on
             the host say why; GpuBusyWithoutJob is off meanwhile.
+      # No timestamp at all on a host with the unit installed (never ran, or every run
+      # failed since it was installed or since a boot emptied the textfile directory):
+      # the alert above has nothing to compare, so the unit's presence stands in.
+      - alert: SlurmGpuMetricsNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="slurm-gpu-metrics.service"})
+          unless on (instance) slurm_metrics_updated_timestamp_seconds
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has written no Slurm GPU allocation data for 5 minutes"
+          description: "`systemctl status slurm-gpu-metrics` and `journalctl -u slurm-gpu-metrics` on the host; GpuBusyWithoutJob is off meanwhile."
       # The join above needs the DCGM fields of roles/nvidia-dcgm-exporter's metrics file.
       # A GPU node still running an older file reports utilisation without them, which
       # silently turns GpuBusyWithoutJob and the allocation dashboard's utilisation off.

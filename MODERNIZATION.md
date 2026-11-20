@@ -530,7 +530,8 @@ NFS exports/mounts, job_submit routing, ports) and diffed against `config.exampl
 Default install posture set to:
 driver **on** (branch 595, GPU-gated), system CUDA **off** (served as Lmod modules),
 HPC SDK **off**, spack build **off**. node_exporter now mounts the host rootfs
-(`--path.rootfs=/host`) so its filesystem metrics describe the node, not the container.
+(`--path.rootfs=/host`) so its filesystem metrics describe the node, not the container
+(later also `--path.procfs`/`--path.sysfs` under `/host`, past what Docker masks).
 
 ## 25. Dead-code removal + disambiguation guide  (`e7495ca3`)
 

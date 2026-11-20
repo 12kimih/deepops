@@ -17,6 +17,8 @@ class FakePrometheus:
         self.rules = rules if rules is not None else [{"name": "g", "rules": [{"health": "ok"}]}]
 
     def get(self, path, **params):
+        self.params = getattr(self, "params", {})
+        self.params[path] = params
         return {
             "/api/v1/targets": {"data": {"activeTargets": self.targets}},
             "/api/v1/rules": {"data": {"groups": self.rules}},
@@ -52,6 +54,30 @@ class Checks(unittest.TestCase):
             "DCGM_FI_DEV_NVLINK_THROUGHPUT_BYTES_PER_SECOND", result["metrics"]["detail"]["missing"]
         )
         self.assertNotIn("slurm_gpu_allocated", result["metrics"]["detail"]["missing"])
+
+    def test_metrics_that_may_be_absent_are_listed_by_why_not_missing(self):
+        names = {"DCGM_FI_DEV_GPU_UTIL_RATIO", "node_uname_info", "up"}
+        detail = vm.check(FakePrometheus(names, {WATCHDOG: [{}]}))["metrics"]["detail"]
+        for metric, why in (
+            ("node_hwmon_fan_rpm", "hardware"),
+            ("DCGM_FI_DEV_MEMORY_TEMP_CELSIUS", "hardware"),
+            ("node_pressure_irq_stalled_seconds_total", "kernel"),
+            ("node_interrupts_total", "off by choice"),
+            ("slurm_backup_restore_test_status", "after the first run"),
+        ):
+            self.assertNotIn(metric, detail["missing"])
+            self.assertIn(metric, detail["absent_ok"][why])
+        # The base hwmon series every board has, and the backups' configured times, count.
+        self.assertIsNone(vm.absent_ok("node_hwmon_temp_celsius"))
+        self.assertIsNone(vm.absent_ok("slurm_backup_restore_test_configured_timestamp_seconds"))
+
+    def test_only_names_sampled_recently_count_as_present(self):
+        # Without a start the API lists every name in the retained data, a renamed or
+        # vanished metric included.
+        prom = FakePrometheus({"up"}, {WATCHDOG: [{}]})
+        vm.check(prom)
+        start = prom.params["/api/v1/label/__name__/values"]["start"]
+        self.assertAlmostEqual(start, vm.time.time() - vm.PRESENT_WINDOW, delta=60)
 
     def test_down_targets_rule_errors_and_a_silent_watchdog_fail(self):
         prom = FakePrometheus(

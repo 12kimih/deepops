@@ -14,3 +14,15 @@ groups:
             The daily cleanup failed or did not run, so podman storage and the enroot
             cache can fill the local disk: `journalctl -u container-storage-gc` and
             `systemctl list-timers container-storage-gc.timer` on the host.
+      # No timestamp at all on a host with the unit installed (never ran, or every run
+      # failed since it was installed or since a boot emptied the textfile directory):
+      # the alert above has nothing to compare, so the unit's presence stands in.
+      - alert: ContainerStorageCleanupNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="container-storage-gc.service"})
+          unless on (instance) container_storage_gc_last_success_timestamp_seconds
+        for: 3d
+        labels: {severity: warning}
+        annotations:
+          summary: "The container storage cleanup on {{ $labels.host }} has reported no success for 3 days"
+          description: "`journalctl -u container-storage-gc` and `systemctl list-timers container-storage-gc.timer` on the host."
