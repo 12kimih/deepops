@@ -14,11 +14,9 @@
 
 - name: Note whether this run takes the node out
   vars:
-    _node: "{{ maintenance_node.stdout | slurm_node }}"
+    _node: "{{ maintenance_node.stdout | slurm_node(maintenance_reason) }}"
   ansible.builtin.set_fact:
-    maintenance_drained_here: >-
-      {{ not (_node.drain or _node.down) or _node.reason == maintenance_reason
-         or _node.reason.startswith(maintenance_reason ~ ' : ') }}
+    maintenance_drained_here: "{{ _node.ours }}"
     maintenance_needs_drain: "{{ not _node.drain }}"
     # A later step that needs the node out of service (require_drained) knows this run
     # drains it first, so a --check preview, where the drain does not happen, can say so.

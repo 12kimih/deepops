@@ -1,6 +1,8 @@
 """slurm_node: one node as Slurm sees it, from `scontrol --json show node <name>`.
 
     {{ reply.stdout | slurm_node }}
+    {{ reply.stdout | slurm_node(reason) }}   also `ours`: a drain the step that drains
+                                             with REASON may undo
 
 Slurm reports a base state and flags (["MIXED", "DRAIN"]). The maintenance steps read
 `scontrol show node -o`'s State= with regular expressions before, and each misread it
@@ -19,6 +21,9 @@ questions those steps ask:
     invalid         its last registration did not match the configuration
     reason          why it is drained or down, as Slurm records it
     slurmd_started  when the slurmd that last registered started (UNIX time), or None
+    ours            (with a reason) the node is in service, or out with exactly that
+                    reason (slurmctld may append " : Not responding"): out for any
+                    other reason, a person took it out and only they return it
 """
 
 import sys
@@ -30,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles" / "cluster_
 from clustertools import slurm, vocab  # noqa: E402
 
 
-def slurm_node(text):
+def slurm_node(text, reason=None):
     try:
         nodes = slurm.parse("nodes", text)["nodes"]
     except slurm.SchemaError as err:
@@ -41,17 +46,23 @@ def slurm_node(text):
         raise AnsibleFilterError(f"slurm_node: expected one node, Slurm gave {len(nodes)}")
     node = nodes[0]
     flags = {f.upper() for f in node["state"]}
-    return {
+    drain = vocab.node_drain(node["state"])
+    down = vocab.node_base(node["state"]) == "down"
+    said = node.get("reason") or ""
+    found = {
         "found": True,
         "state": vocab.node_state(node["state"]),
-        "drain": vocab.node_drain(node["state"]),
-        "down": vocab.node_base(node["state"]) == "down",
+        "drain": drain,
+        "down": down,
         "busy": bool(flags & {"ALLOCATED", "MIXED", "COMPLETING"}),
         "responding": "NOT_RESPONDING" not in flags,
         "invalid": "INVALID_REG" in flags,
-        "reason": node.get("reason") or "",
+        "reason": said,
         "slurmd_started": slurm.num(node.get("slurmd_start_time")),
     }
+    if reason is not None:
+        found["ours"] = not (drain or down) or said == reason or said.startswith(f"{reason} : ")
+    return found
 
 
 class FilterModule:

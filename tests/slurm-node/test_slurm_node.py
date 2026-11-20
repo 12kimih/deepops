@@ -48,6 +48,16 @@ class SlurmNode(unittest.TestCase):
         with self.assertRaises(mod.AnsibleFilterError):
             mod.slurm_node('{"meta": {}, "errors": [{"description": "Unable to contact slurm controller"}]}')
 
+    def test_ours_is_in_service_or_out_for_exactly_that_reason(self):
+        ours = lambda *state, reason="": mod.slurm_node(reply(*state, reason=reason), "maintenance")["ours"]  # noqa: E731
+        self.assertTrue(ours("IDLE"))
+        self.assertTrue(ours("IDLE", "DRAIN", reason="maintenance"))
+        self.assertTrue(ours("DOWN", "DRAIN", reason="maintenance : Not responding"))
+        # A person took it out meanwhile, or before the run: theirs to return.
+        self.assertFalse(ours("IDLE", "DRAIN", reason="BMC power cycle"))
+        self.assertFalse(ours("DOWN", reason="maintenance window ends Friday"))
+        self.assertNotIn("ours", mod.slurm_node(reply("IDLE")))
+
 
 if __name__ == "__main__":
     unittest.main()
