@@ -69,9 +69,9 @@ if [ "$apt_ok" = 1 ]; then
 fi
 security_since=$(cat "$state/security-pending-since" 2>/dev/null || echo 0)
 reboot_state
-# One series per installed package ("ii"); label values escaped as the format requires.
+# One series per installed package ("?i": held ones too); label values escaped as the format requires.
 packages=$(dpkg-query -W -f '${db:Status-Abbrev}|${binary:Package}|${Version}\n' 2>/dev/null \
-    | awk -F'|' '$1 ~ /^ii/ { gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
+    | awk -F'|' '$1 ~ /^.i/ { gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
         printf "os_updates_package_info{package=\"%s\",version=\"%s\"} 1\n", $2, $3 }')
 tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS

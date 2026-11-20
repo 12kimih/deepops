@@ -84,7 +84,7 @@
   ansible.builtin.set_fact:
     slurm_deb_build_slurm: "{{ slurm_force_rebuild | bool or not slurm_repo_has_version.stat.exists }}"
     slurm_deb_build_pyxis: >-
-      {{ slurm_pyxis_wanted | bool
+      {{ slurm_pyxis_wanted_anywhere | bool
          and (slurm_force_rebuild | bool or not slurm_repo_has_version.stat.exists or not slurm_repo_has_pyxis.stat.exists) }}
 
 - name: Build the packages

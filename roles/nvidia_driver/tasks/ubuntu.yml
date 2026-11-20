@@ -57,7 +57,7 @@
   ansible.builtin.shell:
     cmd: >-
       dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null
-      | awk '$1 ~ /^[ih]i/ {print $2}'
+      | awk '$1 ~ /^.i/ {print $2}'
       | grep -E '^(nvidia-|libnvidia-|linux-(modules|objects|signatures)-nvidia-)'
       | grep -vE 'container' || true
   register: nvidia_driver_existing_packages

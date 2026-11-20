@@ -11,7 +11,7 @@
 # The configuration goes with the package's purge: keep a copy first (data, never removed).
 - name: Archive the configuration before removing it
   when:
-    - open_ondemand_absent_pkg.stdout | default('') is match('[ir]i')
+    - open_ondemand_absent_pkg.stdout | default('') is match('.i')
     - not ansible_check_mode
   block:
     - name: Create the backup directory

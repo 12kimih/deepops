@@ -30,6 +30,10 @@
 11. A tag on a dynamic include (include_tasks, include_role) other than `always` is
    also passed on with apply: tags on the include select only the include itself, so
    `--tags build` ran the include and none of the tasks it loads.
+12. A dpkg status abbreviation (${db:Status-Abbrev}) is read by its second letter, the
+   package's state: installed is "?i". The first is only what is wanted (h for a held
+   package), so matching "ii" missed held packages: the Slurm version guards and the
+   package metrics skipped them.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -521,6 +525,20 @@ class TaskRules(unittest.TestCase):
                         offenders.append(f"{rel(path)}: {task.get('name')}: loops over {var}.stdout_lines")
         self.assertEqual(offenders, [], "filter the lines: | map('trim') | select | list")
         scan.check(self)
+
+    def test_dpkg_status_is_read_by_the_package_state(self):
+        wanted = re.compile(r"""\^ii\b|\^\[[a-z]+\]i\b|['"]ii['" ]|match\(['"]\[[a-z]+\]i['"]""")
+        offenders = []
+        for path in sorted(ROOT.glob("roles/**/*")):
+            if (
+                path.is_file()
+                and path.suffix in ("", ".yml", ".sh", ".j2", ".py")
+                and "molecule" not in path.parts
+            ):
+                text = path.read_text(errors="ignore")
+                if "Status-Abbrev" in text or "dpkg-query" in text:
+                    offenders += [f"{rel(path)}: {m.group(0)}" for m in wanted.finditer(text)]
+        self.assertEqual(offenders, [], "installed is the second letter: '.i', [1:2] == 'i'")
 
 
 if __name__ == "__main__":

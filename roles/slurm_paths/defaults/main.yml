@@ -62,6 +62,7 @@ slurm_cluster_name: deepops
 
 # A host's Slurm duties follow from its inventory groups: slurmctld and slurmdbd on
 # the controller group, slurmd on the compute group, client-only elsewhere.
+slurm_cluster_group: slurm-cluster  # every host with any part of Slurm
 slurm_controller_group: slurm-master
 slurm_compute_group: slurm-node
 is_controller: "{{ inventory_hostname in (groups[slurm_controller_group] | default([])) }}"

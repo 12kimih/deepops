@@ -7,13 +7,29 @@
   failed_when: false
   check_mode: false  # read-only
 
+# Before the first reboot into a new driver nvidia-smi does not answer; the PCI device
+# IDs tell the generation then: every Turing and newer GPU has one from 0x1E00 up (the
+# first in NVIDIA's open kernel module support list is 0x1E02), every older one below.
+# Taking an unanswered query for "no old GPU" put the wrong build on Pascal and Volta.
+- name: Read the GPUs' PCI device IDs
+  ansible.builtin.command:
+    argv: [lspci, -n, -d, "10de:"]
+  register: dcgm_pci_ids
+  changed_when: false
+  check_mode: false  # read-only
+  when: dcgm_compute_caps.rc != 0
+
 - name: Use the CUDA 12 build for GPUs older than Turing on a CUDA 13 driver
   ansible.builtin.set_fact:
     _dcgm_cuda_major: "12"
+  vars:
+    _old_by_capability: "{{ dcgm_compute_caps.stdout_lines | map('float') | select('lt', 7.5) | list }}"
+    _old_by_id: >-
+      {{ dcgm_pci_ids.stdout | default('') | regex_findall('(?m)^[^ ]+ 030[02]: 10de:([0-9a-f]{4})')
+         | map('int', base=16) | select('lt', 7680) | list }}
   when:
     - nvidia_driver_cuda_major | int >= 13
-    - dcgm_compute_caps.rc == 0
-    - dcgm_compute_caps.stdout_lines | map('float') | select('lt', 7.5) | list | length > 0
+    - (_old_by_capability if dcgm_compute_caps.rc == 0 else _old_by_id) | length > 0
 
 - name: Check for DGX
   ansible.builtin.set_fact:
