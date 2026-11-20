@@ -1,27 +1,29 @@
 ---
 - name: Verify
   hosts: all
+  become: true
   gather_facts: false
   tasks:
-    - name: Ask each shell for Lmod's version
-      ansible.builtin.command:
-        argv: "{{ item }}"
-      environment:
-        LMOD_REDIRECT: "no"
-      register: lmod_versions
+    # The role's own check, again, from outside the run that installed it.
+    - name: Ask every shell, in every way it starts, for Lmod's version
+      ansible.builtin.script:
+        cmd: ../../files/lmod-shell-check.py --version 9.4.5 --shells bash,zsh,tcsh,fish --ssh-reads-system-rc true
+        executable: python3
       changed_when: false
-      loop:
-        - [/bin/bash, -lc, module --version]
-        - [/bin/bash, -ic, module --version]
-        - [/bin/tcsh, -c, module --version]
 
-    - name: Check every shell runs the pinned Lmod
+    - name: Read the hooks' place in bash.bashrc
+      ansible.builtin.command:
+        argv: [grep, -n, -e, "DeepOps: Lmod", -e, 'PS1" ] && return', /etc/bash.bashrc]
+      register: lmod_bashrc
+      changed_when: false
+
+    - name: Check the bash hook comes before the early return, once
       ansible.builtin.assert:
-        that: "'Version 9.4.5' in (item.stdout ~ item.stderr)"
-        fail_msg: "{{ item.item | join(' ') }}: {{ item.stdout ~ item.stderr }}"
-      loop: "{{ lmod_versions.results }}"
-      loop_control:
-        label: "{{ item.item[0] }} {{ item.item[1] }}"
+        that:
+          - lmod_bashrc.stdout_lines | length == 3
+          - "'BEGIN DeepOps: Lmod in every shell' in lmod_bashrc.stdout_lines[0]"
+          - "'return' in lmod_bashrc.stdout_lines[2]"
+        fail_msg: "{{ lmod_bashrc.stdout }}"
 
     - name: Read the initial module path
       ansible.builtin.command:

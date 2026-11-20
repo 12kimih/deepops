@@ -19,6 +19,27 @@ This makes it easy to install multiple versions of the same software package and
 DeepOps installs the Lmod tool for managing your Environment Modules.
 The [Lmod documentation](https://lmod.readthedocs.io/en/latest/) provides more information on using Lmod and writing Modules.
 
+### `module` in every shell
+
+Users never edit their startup files: `module` works in bash, zsh, tcsh and fish, in a
+login, an interactive shell without a login (`srun --pty bash`), a command over ssh
+(`ssh node module list`), a non-interactive zsh, and a bash script started from any of
+them, as the [Lmod docs](https://lmod.readthedocs.io/en/latest/030_installing.html) ask.
+
+- `roles/login_shells` installs the shells in `login_shells` on every host (an account
+  whose shell a node lacks cannot log in there) and makes each login read
+  `/etc/profile.d`, the one place roles put the login environment. Debian's zsh and tcsh
+  read none of it on their own.
+- `roles/lmod` links Lmod's init as `/etc/profile.d/z00_lmod.{sh,csh}` and
+  `/etc/fish/conf.d/z00_lmod.fish`, and puts a hook first in each installed shell's
+  system rc file (`/etc/bash.bashrc`, `/etc/zsh/zshenv`, `/etc/csh.cshrc`), before any
+  early return for shells that are not interactive.
+- Each deploy proves it: `roles/lmod/files/lmod-shell-check.py` runs `module --version`
+  as `nobody` with a clean environment in every way each installed shell starts.
+
+A script must start with `#!/bin/bash` (bash reads `BASH_ENV`; `#!/bin/sh` does not).
+A cron job has no session: begin it with `. /etc/profile.d/z00_lmod.sh`.
+
 DeepOps also provides tooling for managing Environment Modules with two general build
 frameworks -- EasyBuild and Spack -- plus a dedicated `nvidia_cuda_toolkit` role for CUDA.
 The two build frameworks provide a selection of tested build recipes for common

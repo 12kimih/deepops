@@ -1,0 +1,30 @@
+---
+# A variable /etc/profile.d publishes reaches a login of every shell that reads it.
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Publish a test variable
+      ansible.builtin.copy:
+        dest: "/etc/profile.d/zz-molecule.{{ item }}"
+        content: "{{ 'export' if item == 'sh' else 'setenv' }} DEEPOPS_MOLECULE{{ '=' if item == 'sh' else ' ' }}seen\n"
+        mode: "0644"
+      loop: [sh, csh]
+
+    # tcsh takes -l only alone, so every login reads the command from stdin.
+    - name: Read it from each login shell
+      ansible.builtin.command:
+        argv: [runuser, -u, nobody, --, "{{ item }}", -l]
+        stdin: echo $DEEPOPS_MOLECULE
+      register: login_shells_seen
+      changed_when: false
+      loop: [/bin/bash, /bin/zsh, /bin/tcsh]
+
+    - name: Check every login read /etc/profile.d
+      ansible.builtin.assert:
+        that: item.stdout_lines[-1] | default('') == 'seen'  # tcsh warns of no tty first
+        fail_msg: "{{ item.item }}: {{ item.stdout }} {{ item.stderr }}"
+      loop: "{{ login_shells_seen.results }}"
+      loop_control:
+        label: "{{ item.item }}"

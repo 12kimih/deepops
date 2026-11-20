@@ -28,18 +28,18 @@
     lmod_src_archive: "{{ lmod_build_dir }}/Lmod-{{ lmod_version }}.tar.gz"
     lmod_src_checksum: "{{ lmod_checksums[lmod_version] | default('') }}"
 
-- name: Install the shells and Lmod's prerequisites (Debian)
+- name: Install Lmod's prerequisites (Debian)
   ansible.builtin.apt:
-    name: "{{ ['bash', 'tcsh'] + lmod_build_deps }}"
+    name: "{{ lmod_build_deps }}"
     state: present
     update_cache: true
   when: ansible_facts.os_family == "Debian"
 
 # EPEL's Lua packages expect CodeReady Builder for their dependencies: "powertools" on
 # EL8, "crb" on EL9+.
-- name: Install the shells and Lmod's prerequisites (RHEL family)
+- name: Install Lmod's prerequisites (RHEL family)
   ansible.builtin.dnf:
-    name: "{{ ['bash', 'tcsh'] + lmod_build_deps }}"
+    name: "{{ lmod_build_deps }}"
     state: present
     enablerepo: "{{ 'powertools' if ansible_facts.distribution_major_version == '8' else 'crb' }}"
   when: ansible_facts.os_family == "RedHat"
@@ -115,8 +115,10 @@
     lmod_register_name: lmod
     lmod_register_paths: "{{ lmod_module_paths }}"
 
-# The docs' shell integration: init/profile and init/cshrc linked as z00_lmod.*, so every
-# login shell defines `module`.
+# The docs' shell integration (https://lmod.readthedocs.io/en/latest/030_installing.html):
+# init/profile and init/cshrc linked as z00_lmod.* define `module` in every login shell
+# (roles/login_shells makes each login read /etc/profile.d); the hooks below add the
+# shells that start without a login, in each installed shell's system rc file.
 - name: Link Lmod's shell init into /etc/profile.d
   ansible.builtin.file:
     src: "{{ lmod_install_prefix }}/lmod/lmod/init/{{ item.src }}"
@@ -129,29 +131,52 @@
     - {src: cshrc, dest: z00_lmod.csh}
   when: not ansible_check_mode or not lmod_build
 
-# Debian's /etc/bash.bashrc and /etc/csh.cshrc do not read /etc/profile.d (RHEL's do), so
-# an interactive non-login bash and every tcsh would have no `module`; the docs have the
-# system rc files read Lmod's init. bash.bashrc returns early for non-interactive shells,
-# so the block below runs only in interactive ones.
-- name: Load Lmod in interactive non-login bash (Debian)
+- name: Find the installed shells
+  ansible.builtin.stat:
+    path: "{{ item.value.binary }}"
+  loop: "{{ lmod_shells | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: lmod_shell_binaries
+
+- name: Note the installed shells
+  ansible.builtin.set_fact:
+    lmod_installed_shells: >-
+      {{ lmod_shell_binaries.results | selectattr('stat.exists') | map(attribute='item.key') | list }}
+
+# Each hook comes first in its file, before any early return for shells that are not
+# interactive: Debian's bash.bashrc returns at once in those, yet bash reads it for a
+# command run over ssh (`ssh node module load ...`), which must find `module` too. A
+# shell started from a session inherits the definition, or BASH_ENV, and skips the hook.
+- name: Define module in each installed shell that starts without a login
   ansible.builtin.blockinfile:
-    path: /etc/bash.bashrc
+    path: "{{ lmod_shells[item].rc[ansible_facts.os_family] }}"
+    marker: "{{ lmod_shells[item].comment }} {mark} DeepOps: Lmod in every shell (roles/lmod)"
+    insertbefore: BOF
+    block: "{{ lmod_shells[item].hook }}"
+  loop: "{{ lmod_installed_shells }}"
+  when: lmod_shells[item].rc[ansible_facts.os_family] | default('') | length > 0
+
+# The hooks above replace these: they sat at the end of the file, after bash.bashrc's
+# early return.
+- name: Remove the earlier hooks
+  ansible.builtin.blockinfile:
+    path: "{{ item }}"
     marker: "# {mark} DeepOps: Lmod (roles/lmod)"
-    block: |
-      if ! type module >/dev/null 2>&1 && [ -r /etc/profile.d/z00_lmod.sh ]; then
-        . /etc/profile.d/z00_lmod.sh
-      fi
+    state: absent
+  loop: [/etc/bash.bashrc, /etc/csh.cshrc]
   when: ansible_facts.os_family == "Debian"
 
-- name: Load Lmod in every tcsh (Debian)
-  ansible.builtin.blockinfile:
-    path: /etc/csh.cshrc
-    marker: "# {mark} DeepOps: Lmod (roles/lmod)"
-    block: |
-      if ( -r /etc/profile.d/z00_lmod.csh ) then
-        source /etc/profile.d/z00_lmod.csh
-      endif
-  when: ansible_facts.os_family == "Debian"
+- name: Link Lmod's fish init into /etc/fish/conf.d
+  ansible.builtin.file:
+    src: "{{ lmod_install_prefix }}/lmod/lmod/init/profile.fish"
+    dest: /etc/fish/conf.d/z00_lmod.fish
+    state: link
+    force: true
+    follow: false
+  when:
+    - "'fish' in lmod_installed_shells"
+    - not ansible_check_mode or not lmod_build
 
 # Superseded: the trees used to reach Lmod through LMOD_SITE_MODULEPATH snippets, which
 # only bash and csh login shells read; /etc/lmod/.modulespath covers every shell.
@@ -161,19 +186,15 @@
     state: absent
   loop: [00-modulepath.sh, 00-modulepath.csh]
 
-# A login bash reads /etc/profile.d; tcsh reads /etc/csh.cshrc even without -l.
+# As a user would meet it: an unprivileged account with a clean environment, in every
+# way each installed shell starts (login, interactive, a command over ssh, a script).
 - name: Check every shell finds this Lmod
-  ansible.builtin.command:
-    argv: "{{ item }}"
-  environment:
-    LMOD_REDIRECT: "no"
-  register: lmod_shell_check
+  ansible.builtin.script:
+    cmd: >-
+      lmod-shell-check.py --version {{ lmod_version | quote }}
+      --shells {{ lmod_installed_shells | join(',') | quote }}
+      --ssh-reads-system-rc {{ (ansible_facts.os_family == 'Debian') | string | lower }}
+    executable: python3
   changed_when: false
-  failed_when: lmod_version not in (lmod_shell_check.stdout ~ lmod_shell_check.stderr)
   check_mode: false  # read-only; --check needs the result
-  loop:
-    - [/bin/bash, -lc, module --version]
-    - [/bin/tcsh, -c, module --version]
-  loop_control:
-    label: "{{ item[0] }}"
   when: not ansible_check_mode or not lmod_build

@@ -106,6 +106,10 @@
 ################################################################################
 # SOFTWARE                                                                     #
 ################################################################################
+# The shells people log in with: installed on every host, each reading /etc/profile.d
+# (roles/login_shells; bash, zsh, tcsh, fish). Lmod hooks into every installed shell.
+#login_shells: [bash, zsh]  # example
+
 # Extra software to install (removal: HOST BASELINE below)
 # Playbook: software
 #software_extra_packages:  # example

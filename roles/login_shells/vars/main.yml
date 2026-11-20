@@ -1,0 +1,2 @@
+---
+login_shells_supported: [bash, zsh, tcsh, fish]
