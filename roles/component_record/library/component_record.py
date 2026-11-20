@@ -121,9 +121,13 @@ def apply(data, name, action, items, version, exclusive=(), evidence=lambda kind
     before = components.get(name, {})
     if action == "begin":
         # A converged rerun (present at this version, every item already its own) leaves
-        # the record as it is; new items or another version go through installing.
-        converged = before == {"state": "present", "version": version} and all(
-            name in owners.get(item, ()) for item in items
+        # the record as it is; new items or another version go through installing. A
+        # begin given no version (most roles name it only once installed, at present)
+        # compares the state and the items alone: a rerun must not rewrite the record.
+        converged = (
+            before.get("state") == "present"
+            and version in ("", before.get("version"))
+            and all(name in owners.get(item, ()) for item in items)
         )
         if not converged:
             components[name] = {"state": "installing", "version": version}

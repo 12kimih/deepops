@@ -61,6 +61,9 @@ class OwnerSets(unittest.TestCase):
         again, _, _ = run(rec, "c", "begin", items, "1")
         self.assertEqual(again, rec)
         self.assertEqual(run(again, "c", "present", items, "1")[0], rec)
+        # A role that names the version only at present (begin without one) converges too.
+        again, _, _ = run(rec, "c", "begin", items, "")
+        self.assertEqual(again, rec)
         for other in ((items + ["file:/etc/y"], "1"), (items, "2")):
             with self.subTest(change=other):
                 self.assertEqual(run(rec, "c", "begin", *other)[0]["components"]["c"]["state"], "installing")
