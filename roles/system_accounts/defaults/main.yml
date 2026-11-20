@@ -21,7 +21,7 @@ system_accounts:
     comment: Slurm
   slurmbuild:
     uid: 22079
-    home: /var/lib/slurmbuild
+    home: /var/cache/deepops/build/slurm-deb
     comment: Slurm package builder
   easybuild:
     uid: 22080

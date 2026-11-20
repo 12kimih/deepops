@@ -17,7 +17,7 @@ easybuild_setuptools_version: "82.0.1"
 easybuild_setuptools_sha256: a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb
 # Interpreter for the venv: Python 3.9 or newer.
 easybuild_python: python3
-# EasyBuild refuses to run as root, so builds run as this system account. It owns only
-# easybuild_prefix (roles/deepops_paths) and its home, where builds unpack (local disk).
+# EasyBuild refuses to run as root, so builds run as this system account (its IDs and
+# home in roles/system_accounts). It owns only easybuild_prefix (roles/deepops_paths)
+# and its home, where builds unpack (local disk).
 easybuild_user: easybuild
-easybuild_home: /var/lib/easybuild

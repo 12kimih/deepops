@@ -1,3 +1,5 @@
 ---
 # Derived, not a setting: one venv per EasyBuild version.
 easybuild_venv: "{{ sm_software_path }}/EasyBuild/{{ easybuild_version }}"
+# The build account as roles/system_accounts declares it.
+_easybuild_account: "{{ system_accounts[easybuild_user] }}"

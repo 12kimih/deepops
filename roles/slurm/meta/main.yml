@@ -6,6 +6,7 @@ dependencies:
   - role: deploy_defaults  # slurm_install_enroot, slurm_install_pyxis, slurm_install_nhc
   - role: retired_settings  # the source build's settings
   - role: nvidia_versions  # nvidia_driver_cuda_release (the NVML headers the build uses)
+  - role: system_accounts  # system_accounts: the slurm and build accounts
 
 galaxy_info:
   namespace: deepops
