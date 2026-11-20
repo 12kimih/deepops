@@ -1,10 +1,26 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Read the forwarding configuration
+      ansible.builtin.slurp:
+        src: /etc/rsyslog.d/99-forward-syslog.conf
+      register: forward_conf
+
+    # rsyslog's own check of the whole configuration, the file above included.
+    - name: Check rsyslog accepts its configuration
+      ansible.builtin.command: rsyslogd -N1
+      changed_when: false
+
+    - name: Check rsyslog is running
+      ansible.builtin.command: systemctl is-active rsyslog
+      changed_when: false
+
+    - name: Everything goes to the log server over TCP
       ansible.builtin.assert:
-        that: true
+        that:
+          - "'Target=\"logs.example.com\" Port=\"514\" Protocol=\"tcp\"' in content"
+          - "'call deepops_forward' in content"
+      vars:
+        content: "{{ forward_conf.content | b64decode }}"

@@ -67,6 +67,20 @@ class Molecule(unittest.TestCase):
             with self.subTest(path=str(path.relative_to(ROOT))):
                 self.assertNotIn("policy-rc.d", path.read_text())
 
+    def test_every_verify_checks_something(self):
+        """A scenario that converges and verifies nothing passes whatever the role does:
+        seven once carried molecule's template, `assert: that: true`."""
+        verifies = tracked("roles/*/molecule/*/verify.yml")
+        scenarios = [p.parent for p in tracked("roles/*/molecule/*/molecule.yml")]
+        self.assertEqual(
+            sorted(p.parent for p in verifies), sorted(scenarios), "every scenario has a verify.yml"
+        )
+        for path in verifies:
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                text = path.read_text()
+                self.assertNotIn("Example assertion", text)
+                self.assertNotRegex(text, r"that:\s*true\b")
+
     def test_ci_runs_every_role_with_a_scenario(self):
         listed = json.loads(
             subprocess.run(

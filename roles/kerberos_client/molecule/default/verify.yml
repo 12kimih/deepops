@@ -1,10 +1,25 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Read the client configuration
+      ansible.builtin.slurp:
+        src: /etc/krb5.conf
+      register: krb5_conf
+
+    - name: Check the client tools are installed
+      ansible.builtin.command: dpkg-query -W -f=${Status} krb5-user libpam-krb5
+      register: krb5_pkgs
+      changed_when: false
+
+    - name: The realm and its servers come from kerberos_client_realm_name
       ansible.builtin.assert:
-        that: true
+        that:
+          - krb5_pkgs.stdout == 'install ok installedinstall ok installed'
+          - "'default_realm = EXAMPLE.COM' in content"
+          - "'kdc = kerberos.example.com' in content"
+          - "'admin_server = kerberos.example.com' in content"
+          - "'.example.com = EXAMPLE.COM' in content"
+      vars:
+        content: "{{ krb5_conf.content | b64decode }}"

@@ -1,5 +1,6 @@
 ---
-- hosts: all
+- name: Prepare
+  hosts: all
   become: true
   tasks:
     - name: Ensure apt cache is updated

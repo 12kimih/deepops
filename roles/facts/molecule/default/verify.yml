@@ -1,10 +1,21 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
+  gather_facts: true
   tasks:
-    - name: Example assertion
+    - name: Look for the custom facts
+      ansible.builtin.stat:
+        path: "/etc/ansible/facts.d/{{ item }}.fact"
+      loop: [gpus, memory, topology]
+      register: facts_files
+
+    # Each fact is an executable root runs at every setup: it must answer, as JSON.
+    - name: Every fact is installed, executable and read by setup
       ansible.builtin.assert:
-        that: true
+        that:
+          - facts_files.results | rejectattr('stat.exists') | list | length == 0
+          - facts_files.results | map(attribute='stat.mode') | unique == ['0755']
+          - ansible_facts.ansible_local.gpus is mapping
+          - ansible_facts.ansible_local.memory is mapping
+          - ansible_facts.ansible_local.topology is mapping

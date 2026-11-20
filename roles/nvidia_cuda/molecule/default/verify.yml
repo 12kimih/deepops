@@ -1,10 +1,21 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
-  gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Run the installed compiler
+      ansible.builtin.command: /usr/local/cuda/bin/nvcc --version
+      register: cuda_nvcc
+      changed_when: false
+
+    # A login shell reads the profile script: the toolkit is on everyone's PATH.
+    - name: Find nvcc as a login shell does
+      ansible.builtin.command: bash -lc 'command -v nvcc'
+      register: cuda_login_nvcc
+      changed_when: false
+
+    - name: The toolkit is installed and on the default PATH
       ansible.builtin.assert:
-        that: true
+        that:
+          - "'Cuda compilation tools' in cuda_nvcc.stdout"
+          - cuda_login_nvcc.stdout is search('/cuda[^/]*/bin/nvcc$')
