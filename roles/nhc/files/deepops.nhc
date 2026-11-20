@@ -87,11 +87,34 @@ check_num_nvme_devs() {
 	return 0
 }
 
-check_xid_errors() {
-	excluded_xid='94'
-	xid_list=$(journalctl -b 0  --since "1 hour ago" --no-pager 2> /dev/null | grep "NVRM: Xid" | sed 's/^.*\] \(.*\)/\1/' | awk '{print $9}' | sed 's/,//' | sort -n | uniq | grep -v -E "${excluded_xid}" | paste -s -d,)
-	if [ x"$xid_list" != x"" ]; then
-		echo "Found XID errors: $xid_list"
+# The GPU faults NVIDIA lists as needing a GPU reset or a reboot (XID catalog), in this
+# boot's kernel log: the GPU stays unusable until then, so the node is drained until it
+# reboots, and NHC puts it back on its own once the new boot logs none of them.
+# Arguments: the XIDs that drain, each one argument.
+check_nv_xid() {
+	local found
+	found="$(journalctl -k -b 0 --no-pager -o cat 2>/dev/null \
+		| sed -n -E 's/.*NVRM: Xid \(([^)]*)\): ([0-9]+).*/\2 \1/p' \
+		| awk -v drain=" $* " 'index(drain, " " $1 " ") { print "XID " $1 " on " $2 }' \
+		| sort -u | paste -s -d ',')"
+	if [ -n "$found" ]; then
+		echo "GPU fault, reboot to clear: $found"
+		return 1
+	fi
+	return 0
+}
+
+# Row remapping (Ampere and newer): a pending remap takes effect only at the next GPU
+# reset, a failed one means the GPU is out of spare rows (NVIDIA's RMA criterion).
+# GPUs without row remapping report N/A and pass.
+check_nv_remapped_rows() {
+	local found
+	found="$(timeout 60 nvidia-smi --query-remapped-rows=gpu_bus_id,remapped_rows.pending,remapped_rows.failure \
+		--format=csv,noheader 2>/dev/null \
+		| awk -F', *' 'tolower($2) ~ /^(yes|1)$/ { print $1 " pending" } tolower($3) ~ /^(yes|1)$/ { print $1 " failed" }' \
+		| paste -s -d ',')"
+	if [ -n "$found" ]; then
+		echo "GPU row remapping: $found"
 		return 1
 	fi
 	return 0

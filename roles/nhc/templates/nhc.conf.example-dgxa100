@@ -122,6 +122,7 @@
 
  * || check_cmd_output -m '!/LNetError/' '/bin/journalctl -b'
 
-# Check for XID errors
+# GPU faults that need a reset or a reboot, and row remapping (nhc_gpu_drain_xids)
 
- * || check_xid_errors
+ * || check_nv_xid {{ nhc_gpu_drain_xids | join(' ') }}
+ * || check_nv_remapped_rows

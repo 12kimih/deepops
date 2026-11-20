@@ -27,12 +27,14 @@ FACTS = {
 }
 
 
-def conf(varfile, family):
+def conf(varfile, family, gpus=0, **overrides):
+    local = {**FACTS["ansible_local"], "gpus": {"count": gpus}}
     variables = {
         **role_defaults("nhc"),
         **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
         "ansible_managed": "",
-        "ansible_facts": {**FACTS, "os_family": family},
+        "ansible_facts": {**FACTS, "os_family": family, "ansible_local": local},
+        **overrides,
     }
     return render((ROLE / "templates" / "nhc.conf.j2").read_text(), variables)
 
@@ -48,6 +50,19 @@ class NhcConf(unittest.TestCase):
                 self.assertNotIn("check_ps_service", text)
                 self.assertIn(f"systemctl is-active --quiet {ssh}", text)
                 self.assertIn("systemctl is-active --quiet slurmd.service", text)
+
+    def test_gpu_faults_drain_gpu_nodes_only(self):
+        xids = " ".join(str(x) for x in role_defaults("nhc")["nhc_gpu_drain_xids"])
+        gpu = conf("debian.yml", "Debian", gpus=8)
+        self.assertIn(f"check_nv_xid {xids}\n", gpu)
+        self.assertIn("check_nv_remapped_rows", gpu)
+        cpu = conf("debian.yml", "Debian")
+        self.assertNotIn("check_nv_", cpu)
+
+    def test_each_gpu_check_turns_off(self):
+        text = conf("debian.yml", "Debian", gpus=8, nhc_gpu_drain_xids=[], nhc_gpu_check_remapped_rows=False)
+        self.assertNotIn("check_nv_xid", text)
+        self.assertNotIn("check_nv_remapped_rows", text)
 
 
 if __name__ == "__main__":

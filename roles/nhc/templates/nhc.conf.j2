@@ -40,6 +40,16 @@
 
 # Check GPU count
  {{ ansible_facts.hostname }} || check_nv_gpu_count {{ ansible_facts.ansible_local.gpus.count }}
+{% if nhc_gpu_drain_xids | length > 0 %}
+
+# GPU faults that need a GPU reset or a reboot (nhc_gpu_drain_xids)
+ {{ ansible_facts.hostname }} || check_nv_xid {{ nhc_gpu_drain_xids | join(' ') }}
+{% endif %}
+{% if nhc_gpu_check_remapped_rows | bool %}
+
+# Row remapping pending (needs a GPU reset) or failed (out of spare rows)
+ {{ ansible_facts.hostname }} || check_nv_remapped_rows
+{% endif %}
 
 # Optional: run Data Center GPU Manager diagnostic as health check.
 # Requires that DCGM be installed.
