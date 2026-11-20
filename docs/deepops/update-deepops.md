@@ -435,7 +435,7 @@ ansible-playbook -K playbooks/slurm-cluster/nvidia-cuda-toolkit.yml   # slurm_in
 
 The newest toolkits arrive by themselves up to the CUDA major the driver branch serves (`nvidia_driver_branch`); a new CUDA major needs the driver raised first. `cuda_toolkit_oldest` sets how far back the modules go.
 
-For the single system-wide toolkit instead (`nvidia_cuda_install: true`), set the package in `cuda_version`, for example `cuda-toolkit-13-2`, and re-run `playbooks/nvidia-software/nvidia-cuda.yml`.
+For the single system-wide toolkit instead (`slurm_install_cuda: true`), set the package in `cuda_version`, for example `cuda-toolkit-13-2`, and re-run `playbooks/nvidia-software/nvidia-cuda.yml`.
 
 #### Updating the monitoring stack
 

@@ -1,0 +1,44 @@
+---
+- name: Record the CUDA toolkit as installing
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cuda
+    component_record_action: begin
+    component_record_items: "{{ cuda_items }}"
+
+- name: DGX install tasks
+  ansible.builtin.include_tasks: install-dgx.yml
+  when: is_dgx.stat.exists
+
+- name: Ubuntu install tasks
+  ansible.builtin.include_tasks: install-ubuntu.yml
+  when:
+    - ansible_facts.distribution == "Ubuntu"
+    - not is_dgx.stat.exists
+
+- name: RedHat family install tasks
+  ansible.builtin.include_tasks: install-redhat.yml
+  when:
+    - ansible_facts.os_family == "RedHat"
+    - not is_dgx.stat.exists
+
+- name: Add profile script to set environment for toolkit
+  ansible.builtin.copy:
+    src: "cuda-vars.sh"
+    dest: "/etc/profile.d/cuda-vars.sh"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: cuda_toolkit_add_profile_script | bool
+
+# The profile script, or an earlier toolkit version's package, goes when no longer in
+# cuda_items.
+- name: Record the CUDA toolkit as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cuda
+    component_record_action: present
+    component_record_items: "{{ cuda_items }}"
+    component_record_version: "{{ cuda_version }}"

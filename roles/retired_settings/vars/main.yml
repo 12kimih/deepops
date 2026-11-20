@@ -19,7 +19,8 @@ retired_settings:
   epel_key_url: package_repos_epel_* in roles/package_repos
   software_remove_packages: host_baseline_absent_packages (playbooks/generic/host-baseline.yml)
   nvidia_cuda_toolkit_install: slurm_install_cuda_toolkit in roles/deploy_defaults (the first slurm-master installs; off removes)
-  slurm_cluster_install_cuda: nvidia_cuda_install, the one switch, in roles/nvidia_cuda
+  slurm_cluster_install_cuda: slurm_install_cuda in roles/deploy_defaults (off removes the toolkit)
+  nvidia_cuda_install: slurm_install_cuda in roles/deploy_defaults (off removes the toolkit)
   nvidia_driver_ubuntu_use_open_kernel_modules: nvidia_driver_kernel_modules (open or proprietary) in roles/nvidia_driver
   ngc_ready_pytorch: ngc_ready_pytorch_container in roles/deploy_defaults
   ngc_ready_tensorflow: ngc_ready_tensorflow_container in roles/deploy_defaults

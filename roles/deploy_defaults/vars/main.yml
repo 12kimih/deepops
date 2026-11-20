@@ -182,6 +182,11 @@ deepops_component_registry:
     role: nvidia_hpc_sdk
     rules:
       - {switch: "{{ slurm_install_hpcsdk }}", group: slurm-login, first: true}
+  # One system-wide CUDA toolkit from NVIDIA's repository.
+  cuda:
+    role: nvidia_cuda
+    rules:
+      - {switch: "{{ slurm_install_cuda }}", group: slurm-cluster}
   # CUDA toolkits as Lmod modules, installed by the first controller into the shared
   # software tree every node mounts.
   cuda_toolkit:

@@ -1,7 +1,7 @@
 ---
 dependencies:
   - role: nvidia_versions  # nvidia_driver_cuda_major
-  - role: retired_settings  # slurm_cluster_install_cuda
+  - role: retired_settings  # slurm_cluster_install_cuda, nvidia_cuda_install
 
 galaxy_info:
   namespace: deepops
