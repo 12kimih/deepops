@@ -3,6 +3,19 @@
 # fails stops its own steps at once (it is never resumed), but the run stops only
 # after the other nodes of its batch finish theirs: failing it on the spot would end
 # the play for every node mid-step, leaving a node rebooted and never verified.
+
+# The GPUs the node has now, before any step changes it: what verify requires to answer
+# again after the reboot. Read from the host, not the fact cache (a day old, and maybe
+# taken after a GPU dropped off), and kept in a fact of its own, which a role rerun
+# after the reboot cannot refresh.
+- name: Read the node's GPUs before any step
+  ansible.builtin.setup:
+    filter: ansible_local
+
+- name: Note the GPUs verify expects back
+  ansible.builtin.set_fact:
+    maintenance_gpus_baseline: "{{ ansible_facts.ansible_local.gpus.count | default(0) | int }}"
+
 # The steps that talk to Slurm call the commands this checkout installs. A controller
 # still on another install (the source build before slurm-upgrade.yml moved it to the
 # packages) has none there: say so once, before any node is touched.

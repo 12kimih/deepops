@@ -1,11 +1,11 @@
 ---
-# Every GPU the node had when this play started (the gpus local fact, from lspci
-# at fact gathering, before the reboot) must answer again. Checked first: a missing
-# GPU is what a failed slurmd or NHC would only hint at.
+# Every GPU the node had when this run started (maintenance_gpus_baseline, read by run
+# before any step) must answer again. Checked first: a missing GPU is what a failed
+# slurmd or NHC would only hint at.
 - name: Check every GPU answers
   when: maintenance_verify_gpus | bool and not ansible_check_mode
   vars:
-    maintenance_gpus_expected: "{{ ansible_facts.ansible_local.gpus.count | default(0) | int }}"
+    maintenance_gpus_expected: "{{ maintenance_gpus_baseline }}"
   block:
     # In a transient unit: nvidia-smi run directly from a session leaks into its cgroup.
     - name: List the GPUs the driver answers for
