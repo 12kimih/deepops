@@ -2,21 +2,8 @@
 # A file that merely exists (is nhc there, does --version match) says nothing about
 # how it was built: a dependency bump, a changed configure line or an install killed
 # part-way all pass it. The record names what the install was built from and is
-# written only after the install succeeded:
-#   - ansible.builtin.include_role:
-#       name: build_record
-#     vars:
-#       build_record_path: "{{ nhc_program }}.built-from"
-#       build_record_key: "nhc {{ nhc_version }}: {{ nhc_configure }}"
-#       build_record_installed: ["{{ nhc_program }}"]
-#   - ansible.builtin.set_fact:
-#       nhc_build: "{{ build_record_stale }}"
-#   (the install, when: nhc_build)
-#   - ansible.builtin.include_role:
-#       name: build_record
-#       tasks_from: write
-#     vars: {build_record_path: ..., build_record_key: ...}
-#     when: nhc_build
+# written only after the install succeeded. roles/source_build is its caller for a
+# build from source (check here, build, write.yml).
 # A stale record is marked incomplete at once, so an install that stops part-way is
 # redone on the next run even when the key did not change (a forced rebuild).
 - name: Require an absolute record and a one-line key

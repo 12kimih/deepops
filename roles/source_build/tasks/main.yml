@@ -1,0 +1,6 @@
+---
+- name: Decide whether to build
+  ansible.builtin.include_tasks: check.yml
+
+- name: Build when due
+  ansible.builtin.include_tasks: build.yml

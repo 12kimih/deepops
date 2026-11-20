@@ -13,8 +13,6 @@ openmpi_checksums:
 # Root builds here, so never under a world-writable directory such as /tmp. Each
 # version builds in its own tree, so the installed version is uninstalled from the tree
 # that installed it; the older trees are removed.
-openmpi_build_root: /var/cache/deepops/build
-openmpi_build_dir: "{{ openmpi_build_root }}/openmpi-{{ openmpi_version }}"
 openmpi_install_prefix: /usr/local
 # Default builds OpenMPI's bundled (internal) PMIx. On 5.0.x that bundled PMIx is
 # 5.x -- the SAME major as the distribution PMIx Slurm loads (5.0 on Ubuntu 24.04) -- so they are

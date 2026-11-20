@@ -115,6 +115,11 @@ retired_settings:
   pyxis_src_dir: none; pyxis is packaged with Slurm (roles/slurm, slurm_pyxis_package)
   pyxis_build_record: none; pyxis is packaged with Slurm (roles/slurm, slurm_pyxis_package)
   slurm_pyxis_force_rebuild: slurm_force_rebuild in roles/slurm (pyxis is built with the Slurm packages)
+  openmpi_build_root: source_build_root in roles/deepops_paths (roles/source_build builds every release there)
+  openmpi_build_dir: none; roles/source_build names the tree and removes it once installed
+  nhc_build_dir: none; roles/source_build names the tree and removes it once installed
+  nhc_extract_dir: none; roles/source_build unpacks the release with its top directory stripped
+  lmod_build_dir: none; roles/source_build names the tree and removes it once installed
   pyxis_runtime_path: slurm_pyxis_runtime_path in roles/slurm (pyxis is configured with its package)
   pyxis_execute_entrypoint: slurm_pyxis_execute_entrypoint in roles/slurm (pyxis is configured with its package)
   pyxis_container_scope: slurm_pyxis_container_scope in roles/slurm (pyxis is configured with its package)

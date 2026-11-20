@@ -1,0 +1,37 @@
+---
+# roles/source_build: build a release from source and install it the way a package
+# manager would, for software no package provides at the version wanted. This role
+# decides whether to build (roles/build_record), builds in a fresh tree, installs into
+# a stage (`make install DESTDIR=...`), puts the stage in place under a manifest
+# (library/staged_install.py: what an older build installed and this one does not is
+# removed), records what it was built from, and removes the tree and the stage:
+# nothing is kept for a later `make uninstall`. tasks/absent.yml removes it all.
+# The caller sets what to build in one dictionary, source_build:
+#   name       a short name: the tree, the stage and the manifest are named by it
+#   version
+#   url, checksum   the release archive, verified (roles/download)
+#   strip      leading archive path components to drop (1: one top directory)
+#   steps      argv lists run in the tree before the install (configure, make)
+#   install    argv of the install; DESTDIR=<stage> is appended
+#   record     absolute path of the build record (roles/build_record)
+#   key        one line naming everything the install is built from
+#   installed  paths the install must have (a missing one rebuilds it)
+#   force      rebuild even when the record matches
+#   adopt      take an install from before the record as this build
+#   root       where the stage goes (/; another for an image or a chroot)
+# source_build_built tells the caller whether this run built it.
+source_build: {}
+source_build_keys:
+  name: ""
+  version: ""
+  url: ""
+  checksum: ""
+  strip: 1
+  steps: []
+  install: [make, install]
+  record: ""
+  key: ""
+  installed: []
+  force: false
+  adopt: false
+  root: /

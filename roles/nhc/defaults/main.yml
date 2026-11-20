@@ -14,10 +14,8 @@ nhc_config_dir: "/etc"
 # Where NHC looks for its helpers and its settings file: NHC's own defaults, which the
 # role checks the installed nhc reports (nhc -VVV), since nothing in the build sets them.
 nhc_libexec_dir: "/usr/libexec"
-nhc_build_dir: "/opt/deepops/build/nhc"
 nhc_sysconfig_dir: "/etc/sysconfig"
 
-nhc_extract_dir: "{{ nhc_build_dir }}/lbnl-nhc-{{ nhc_version }}"
 # --localstatedir: the default ($prefix/var) creates /usr/var.
 nhc_configure: "./configure --prefix={{ nhc_install_dir }} --sysconfdir={{ nhc_config_dir }} --libexecdir={{ nhc_libexec_dir }} --localstatedir=/var"
 nhc_test: "make test"

@@ -27,3 +27,9 @@ easybuild_module_path: "{{ easybuild_prefix }}/modules/all"
 # the host, so kernel settings and similar host-wide steps are skipped in one.
 deepops_container_types: [docker, container, containerd, podman, lxc, systemd-nspawn]
 deepops_containerized: "{{ ansible_facts.virtualization_type | default('') in deepops_container_types }}"
+
+# Source builds (roles/source_build), root's and never world-writable: the trees (gone
+# once installed), the release archives, and the manifest of what each installed.
+source_build_root: /var/cache/deepops/build
+source_build_archives: /var/cache/deepops/src
+source_build_manifests: /var/lib/deepops/source-builds
