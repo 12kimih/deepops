@@ -136,14 +136,16 @@ This will produce less-optimized but more generic builds.
 
 [EasyBuild](https://docs.easybuild.io/) is a software build and installation framework that allows you to manage (scientific) software on HPC systems in an efficient way.
 
-To install EasyBuild using DeepOps, you can run:
+To install EasyBuild using DeepOps, set `slurm_install_easybuild: true`; `slurm-cluster.yml`
+deploys it, or on its own:
 
 ```bash
-ansible-playbook playbooks/slurm-cluster/easybuild-modules.yml
+ansible-playbook -K playbooks/slurm-cluster/easybuild-modules.yml
 ```
 
-Lmod goes on every node. EasyBuild and its builds go once on the host that owns the shared
-tree, `slurm-master[0]` unless you pass `-e hostlist=<host>`. The `easy-build` role follows
+EasyBuild and its builds go once on the host that owns the shared tree, the first
+slurm-master; turning the switch off removes EasyBuild's venvs, modulefiles and
+configuration from there, never what it built (`easybuild_prefix`). The `easy-build` role follows
 the [official pip installation](https://docs.easybuild.io/installation/):
 
 - **EasyBuild itself:** `pip install --require-hashes` into a root-owned venv per version,

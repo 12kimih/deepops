@@ -20,7 +20,7 @@ nodes with no GPU.
 ## Software-module build systems (all emit Lmod modulefiles)
 
 - `lmod` -- the module engine; required by all three below.
-- `easy-build` / `easy-build-packages` -- build software with **EasyBuild**.
+- `easy-build` -- build software with **EasyBuild**.
 - `spack` -- build software with **Spack**.
 - `nvidia_cuda_toolkit` -- CUDA toolkits as modules (above).
 

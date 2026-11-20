@@ -105,7 +105,6 @@ reader writes `| default(...)` for a defined variable;
 │   ├── docker_socket_group
 │   ├── download
 │   ├── easy-build
-│   ├── easy-build-packages
 │   ├── egress_policy
 │   ├── enroot
 │   ├── facts

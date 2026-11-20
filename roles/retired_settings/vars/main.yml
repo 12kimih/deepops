@@ -25,10 +25,10 @@ retired_settings:
   ngc_ready_pytorch: ngc_ready_pytorch_container in roles/deploy_defaults
   ngc_ready_tensorflow: ngc_ready_tensorflow_container in roles/deploy_defaults
   rootlessdocker_install_dir: slurm_install_podman (rootless Podman, roles/podman, replaces the retired docker-rootless)
-  sm_files_path: easybuild_packages (easyconfig names or paths) in roles/easy-build-packages
-  sm_files_url: easybuild_packages (easyconfig names or paths) in roles/easy-build-packages
-  sm_files_repo_version: easybuild_packages (easyconfig names or paths) in roles/easy-build-packages
-  sm_install_default: easybuild_packages (empty builds nothing) in roles/easy-build-packages
+  sm_files_path: easybuild_packages (easyconfig names or paths) in roles/easy-build
+  sm_files_url: easybuild_packages (easyconfig names or paths) in roles/easy-build
+  sm_files_repo_version: easybuild_packages (easyconfig names or paths) in roles/easy-build
+  sm_install_default: easybuild_packages (empty builds nothing) in roles/easy-build
   sm_sources_path: easybuild_prefix in roles/deepops_paths (sources live under it)
   sm_build_path: system_accounts.easybuild.home in roles/system_accounts (builds unpack under it)
   slurm_password: slurm_munge_key_file, a vaulted key file (docs/slurm-cluster/munge-key.md)

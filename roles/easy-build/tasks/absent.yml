@@ -1,0 +1,12 @@
+---
+# EasyBuild's venvs and modulefiles go by the record: only the host that installed them
+# holds it, and every other host sees the same tree on shared storage, so only the
+# host's own configuration is adopted. What it built (easybuild_prefix) and the build
+# account (it owns those files) stay.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: easybuild
+    component_record_action: absent
+    component_record_items: [file:/etc/xdg/easybuild.d/deepops.cfg, dir:/etc/xdg/easybuild.d]

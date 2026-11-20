@@ -1,5 +1,15 @@
 ---
 # Derived, not a setting: one venv per EasyBuild version.
 easybuild_venv: "{{ sm_software_path }}/EasyBuild/{{ easybuild_version }}"
+# What the component installs, for its record (roles/component_record): this version's
+# venv and modulefile, the system configuration, and the directories that hold them.
+# Never easybuild_prefix (what it built) or the account.
+easybuild_items:
+  - "file:{{ easybuild_venv }}"
+  - "file:{{ sm_module_path }}/EasyBuild/{{ easybuild_version }}.lua"
+  - file:/etc/xdg/easybuild.d/deepops.cfg
+  - "dir:{{ sm_software_path }}/EasyBuild"
+  - "dir:{{ sm_module_path }}/EasyBuild"
+  - dir:/etc/xdg/easybuild.d
 # The build account as roles/system_accounts declares it.
 _easybuild_account: "{{ system_accounts[easybuild_user] }}"
