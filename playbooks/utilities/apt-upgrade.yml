@@ -17,7 +17,8 @@
 # here.
 #
 # A last play compares the upgraded hosts (fleet-consistency.yml) and fails on any
-# kernel, package or kernel-policy difference left between them.
+# kernel, package or kernel-policy difference left between them, and on a host left
+# running other than what it has installed (a reboot or driver reload still pending).
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   serial: "{{ maintenance_serial | default(1) }}"

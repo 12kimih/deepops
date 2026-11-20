@@ -3,13 +3,22 @@
     {{ hosts | map('extract', hostvars, 'maintenance_fleet_state') ... }}
     {{ states | fleet_drift }}      states: {host: {"kernel": str,
                                                     "packages": {name: version},
-                                                    "sysctl": {name: value}}}
+                                                    "sysctl": {name: value},
+                                                    "nvidia_loaded": str,
+                                                    "nvidia_on_disk": str,
+                                                    "reboot_pending": str}}
 
 Nodes upgraded at different times run different kernels and package versions, so a
 job behaves differently depending on where it lands, and a fix applied "everywhere"
 is not. One line per difference, naming which hosts have which value. A package
 counts only where it is installed on two or more hosts: a package only one host has
 (the controller's database) is a role difference, not drift.
+
+Equal package versions do not mean equal running code: a host also drifts when it
+runs other than what it has installed, a pending reboot (reboot_pending: the
+packages that asked for it, or "yes") or an NVIDIA module loaded at another version
+than the one on disk (nvidia_loaded vs nvidia_on_disk, "" where none). The loaded
+module is compared like a package: between the hosts that have one.
 """
 
 
@@ -44,6 +53,17 @@ def fleet_drift(states):
             spread = _spread(installed[name])
             if spread:
                 lines.append(f"package {name}: {spread}")
+    loaded = {h: s["nvidia_loaded"] for h, s in states.items() if s.get("nvidia_loaded")}
+    if len(loaded) > 1:
+        spread = _spread(loaded)
+        if spread:
+            lines.append(f"nvidia module loaded: {spread}")
+    for host, state in sorted(states.items()):
+        on_disk = state.get("nvidia_on_disk", "")
+        if state.get("nvidia_loaded") and on_disk and state["nvidia_loaded"] != on_disk:
+            lines.append(f"nvidia module on {host}: {state['nvidia_loaded']} loaded, {on_disk} installed")
+        if state.get("reboot_pending"):
+            lines.append(f"reboot pending on {host}: {state['reboot_pending']}")
     return lines
 
 
