@@ -34,7 +34,7 @@ class SlurmNamesTests(unittest.TestCase):
         self.assertEqual(sorted(words - slurm - self.TEXT_ONLY), [])
 
     def test_every_job_state_word_is_slurms_and_every_state_has_a_code(self):
-        words = set(vocab.JOB_CODES) | vocab._HOLDS | vocab._FINISHED
+        words = set(vocab.JOB_CODES) | vocab.JOB_HOLDS | vocab._FINISHED
         self.assertEqual(sorted(words - set(NAMES["job_states"])), [])
 
     def test_every_reason_rule_matches_a_slurm_reason(self):

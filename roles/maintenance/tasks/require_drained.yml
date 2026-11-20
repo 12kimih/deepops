@@ -29,27 +29,45 @@
     - maintenance_slurm_node.rc != 0
     - maintenance_slurm_node.rc != 2 or maintenance_slurm_node.msg | default('') is not search('No such file')
 
+# The node's state misses some jobs: Slurm counts a node whose jobs are all suspended
+# as idle (they keep their processes and memory, not their CPUs). The jobs are asked
+# for by state (vocab.JOB_HOLDS), as the drain waits for them.
+- name: Read the jobs that hold the node before {{ maintenance_change }}
+  ansible.builtin.command:
+    argv: "{{ maintenance_node_jobs_argv }}"
+  delegate_to: "{{ maintenance_slurm_delegate }}"
+  register: maintenance_node_jobs
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when:
+    - maintenance_slurm_node is not skipped
+    - maintenance_slurm_node.rc == 0
+    - (maintenance_slurm_node.stdout | slurm_node).found
+
 # Under --check the drain step of this run (maintenance drain.yml) changes nothing, so the
 # node still takes jobs here; a real run would have drained and emptied it first. The
 # preview says so instead of refusing; with no drain step before, it refuses as a run would.
 - name: Refuse on a node that takes or runs jobs, before {{ maintenance_change }}
   vars:
     _node: "{{ maintenance_slurm_node.stdout | slurm_node }}"
+    _jobs: "{{ maintenance_node_jobs.stdout_lines | default([]) | map('trim') | select | list }}"
     _preview: "{{ ansible_check_mode and maintenance_drained_by_run | default(false) | bool }}"
   ansible.builtin.fail:
     msg: >-
-      {{ inventory_hostname }} is {{ _node.state }} in Slurm: {{ 'it still runs jobs' if _node.busy
-      else 'it takes jobs' }}, and {{ maintenance_change }} would break them. {{ maintenance_drain_hint }}
+      {{ inventory_hostname }} is {{ _node.state }} in Slurm: {{ ('it still holds jobs ' ~ _jobs | join(', ')) if _jobs
+      else 'it still runs jobs' if _node.busy else 'it takes jobs' }}, and {{ maintenance_change }} would break
+      them. {{ maintenance_drain_hint }}
   when:
     - maintenance_slurm_node is not skipped
     - maintenance_slurm_node.rc == 0
     - _node.found
-    - _node.busy or not (_node.drain or _node.down)
+    - _node.busy or _jobs | length > 0 or not (_node.drain or _node.down)
     - not _preview | bool
 
 - name: Say the preview drains before {{ maintenance_change }}
   vars:
     _node: "{{ maintenance_slurm_node.stdout | slurm_node }}"
+    _jobs: "{{ maintenance_node_jobs.stdout_lines | default([]) | map('trim') | select | list }}"
   ansible.builtin.debug:
     msg: >-
       --check: {{ inventory_hostname }} is {{ _node.state }} in Slurm; this run drains it and waits
@@ -60,4 +78,4 @@
     - maintenance_slurm_node is not skipped
     - maintenance_slurm_node.rc == 0
     - _node.found
-    - _node.busy or not (_node.drain or _node.down)
+    - _node.busy or _jobs | length > 0 or not (_node.drain or _node.down)

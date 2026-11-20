@@ -24,6 +24,10 @@ questions those steps ask:
     ours            (with a reason) the node is in service, or out with exactly that
                     reason (slurmctld may append " : Not responding"): out for any
                     other reason, a person took it out and only they return it
+
+slurm_job_states: the job states that hold a node, for `squeue -t`:
+
+    {{ 'holding' | slurm_job_states | join(',') }}
 """
 
 import sys
@@ -65,6 +69,13 @@ def slurm_node(text, reason=None):
     return found
 
 
+def slurm_job_states(kind):
+    """The job state names of a kind, sorted. Only 'holding' (vocab.JOB_HOLDS)."""
+    if kind != "holding":
+        raise AnsibleFilterError(f"slurm_job_states: unknown kind {kind!r} (holding)")
+    return sorted(vocab.JOB_HOLDS)
+
+
 class FilterModule:
     def filters(self):
-        return {"slurm_node": slurm_node}
+        return {"slurm_node": slurm_node, "slurm_job_states": slurm_job_states}

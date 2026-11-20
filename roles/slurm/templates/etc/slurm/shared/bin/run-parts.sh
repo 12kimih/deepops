@@ -61,11 +61,13 @@ fi
 # /tmp and /dev/shm, and its enroot directories; a job that is CONFIGURING or
 # RESIZING has an allocation on this node and is about to. None of those appear
 # under "-t running", so the *-lastuserjob-* scripts would run and reap them.
+# The states are the ones that hold a node (clustertools vocab.JOB_HOLDS, the
+# list the maintenance drain waits on), less one:
 #
 # COMPLETING is deliberately absent. The epilog runs while its own job is in
 # that state, so including it would make every job find itself, leave
 # last_user_job at 0, and disable the cleanup entirely.
-lastuserjob_states='running,suspended,stopped,configuring,resizing'
+lastuserjob_states='{{ 'holding' | slurm_job_states | reject('eq', 'COMPLETING') | join(',') | lower }}'
 last_user_job=0
 if user_jobs=$(timeout "$squeue_timeout" "$squeue_bin" -h -u "$SLURM_JOB_USER" -w "$node_name" -t "$lastuserjob_states" -o '%i' 2>/dev/null); then
     # Drop this job's own entry defensively. It should not be in the states

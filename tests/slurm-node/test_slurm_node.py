@@ -59,5 +59,16 @@ class SlurmNode(unittest.TestCase):
         self.assertNotIn("ours", mod.slurm_node(reply("IDLE")))
 
 
+class SlurmJobStates(unittest.TestCase):
+    def test_holding_is_the_vocabulary_set_sorted(self):
+        states = mod.slurm_job_states("holding")
+        self.assertEqual(states, sorted(mod.vocab.JOB_HOLDS))
+        self.assertTrue({"RUNNING", "SUSPENDED", "STOPPED", "COMPLETING"} <= set(states))
+
+    def test_an_unknown_kind_is_refused(self):
+        with self.assertRaises(mod.AnsibleFilterError):
+            mod.slurm_job_states("finished")
+
+
 if __name__ == "__main__":
     unittest.main()
