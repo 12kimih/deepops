@@ -148,7 +148,11 @@ def main_worktree(root: Path) -> Path:
     """The clone's main worktree, where the git-ignored config/ lives; a linked worktree
     has none of its own (and read only the built-in rules before)."""
     listing = subprocess.run(
-        ["git", "worktree", "list", "--porcelain"], cwd=root, capture_output=True, text=True
+        ["git", "worktree", "list", "--porcelain"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
     ).stdout
     first = listing.splitlines()[0] if listing else ""
     return Path(first.removeprefix("worktree ")) if first.startswith("worktree ") else root
@@ -158,7 +162,10 @@ def site_file(root: Path, explicit: str | None) -> Path:
     configured = explicit or os.environ.get("DEEPOPS_SENSITIVE_PATTERNS")
     if not configured:
         configured = subprocess.run(
-            ["git", "config", "--get", "deepops.sensitivePatterns"], capture_output=True, text=True
+            ["git", "config", "--get", "deepops.sensitivePatterns"],
+            capture_output=True,
+            text=True,
+            errors="surrogateescape",
         ).stdout.strip()
     return Path(configured) if configured else main_worktree(root) / DEFAULT_SITE_FILE
 

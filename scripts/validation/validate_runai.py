@@ -422,6 +422,7 @@ def delete_with_uid(path, uid, timeout=60):
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
+            errors="replace",
         )
     except OSError as exc:
         return 0, "kubectl proxy: %s" % type(exc).__name__

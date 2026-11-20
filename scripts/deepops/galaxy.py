@@ -137,6 +137,7 @@ def installed_collections(where=COLLECTIONS):
         cwd=ROOT,
         capture_output=True,
         text=True,
+        errors="replace",
     )
     # Nothing installed yet is an empty answer; a failure is not, and would read as
     # "have none" for every collection.

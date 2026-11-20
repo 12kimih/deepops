@@ -68,7 +68,12 @@ READ_ELSEWHERE = {"ansible_user", "ansible_host", "ansible_python_interpreter", 
 def tracked(*patterns):
     """Tracked files: what a commit holds, never untracked work in the tree."""
     out = subprocess.run(
-        ["git", "ls-files", "-z", "--", *patterns], cwd=ROOT, capture_output=True, text=True, check=True
+        ["git", "ls-files", "-z", "--", *patterns],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
+        check=True,
     )
     return [ROOT / p for p in out.stdout.split("\0") if p]
 
@@ -197,7 +202,7 @@ def read_words():
     clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     k8s = subprocess.run(
         ["git", "grep", "-h", "-o", "-E", r"[a-z_][a-z0-9_]*", "--", "roles", "playbooks", "inventory"],
-        cwd=kubespray, capture_output=True, text=True, env=clean,
+        cwd=kubespray, capture_output=True, text=True, errors="replace", env=clean,
     )  # fmt: skip
     if not (kubespray / "cluster.yml").is_file() or k8s.returncode != 0:
         return None
@@ -275,6 +280,7 @@ def check_dead():
         cwd=kubespray,
         capture_output=True,
         text=True,
+        errors="replace",
         env=clean,
     )
     if k8s.returncode != 0:

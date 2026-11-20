@@ -155,6 +155,27 @@ class Evidence(unittest.TestCase):
         with mock.patch.object(mod, "UCF_REGISTRY", registry):
             self.assertIn("/etc/ssh/sshd_config", mod.owned_paths())
 
+    def test_a_name_that_is_not_utf8_is_owned_as_the_os_spells_it(self):
+        # A package's file named in Latin-1: read with errors="replace" it would not equal
+        # the name os.walk yields, count as unowned and be removed by a matching rule.
+        name = os.fsencode(str(self.tmp)) + b"/caf\xe9.conf"
+        open(name, "wb").close()
+        (self.tmp / "ucf").mkdir()
+        registry = self.tmp / "ucf" / "registry"
+        registry.write_bytes(b"pkg \t " + name + b"\n")
+        with mock.patch.object(mod, "UCF_REGISTRY", str(registry)):
+            owned = mod.owned_paths()
+        walked = [p for p in mod.files_in([str(self.tmp)]) if p.endswith(".conf")]
+        self.assertEqual(walked, [os.fsdecode(name)])
+        self.assertTrue(mod.owned_below(walked[0], owned))
+
+        # A library path in Latin-1 that exists keeps its ld.so.conf.d file.
+        lib = os.fsencode(str(self.tmp)) + b"/lib\xe9"
+        os.mkdir(lib)
+        (self.tmp / "ld").mkdir()
+        (self.tmp / "ld" / "x.conf").write_bytes(lib + b"\n")
+        self.assertEqual(mod.match_rule({"type": "ld_conf", "dirs": [str(self.tmp / "ld")]}), [])
+
     def test_what_a_staged_install_lists_counts_as_owned(self):
         manifests = self.tmp / "source-builds"
         self.put(

@@ -73,6 +73,7 @@ def newest_git(url, pattern):
         ["git", "ls-remote", "--tags", "--refs", url],
         capture_output=True,
         text=True,
+        errors="replace",
         timeout=TIMEOUT,
         check=True,
     ).stdout
@@ -136,14 +137,15 @@ def annotated_pins():
     """[(variable, value, kind, args, file:line)] for every `# upstream:` line in the
     roles' defaults and vars, with the pin on the line below it."""
     files = subprocess.run(
-        ["git", "ls-files", "roles/*/defaults/main.yml", "roles/*/vars/*.yml", "roles/*/vars/*.yaml"],
+        ["git", "ls-files", "-z", "roles/*/defaults/main.yml", "roles/*/vars/*.yml", "roles/*/vars/*.yaml"],
         cwd=ROOT,
         capture_output=True,
         text=True,
+        errors="surrogateescape",
         check=True,
-    ).stdout.split()
+    ).stdout.split("\0")
     found = []
-    for rel in files:
+    for rel in filter(None, files):
         if rel.startswith("roles/galaxy/"):
             continue
         lines = (ROOT / rel).read_text().splitlines()

@@ -87,12 +87,13 @@ def main(argv):
     if len(found) > 1:
         sys.exit(several(args.name, found, "set it once, or for the host in host_vars and pass --host"))
     vault = shutil.which("ansible-vault", path=str(Path(sys.executable).parent)) or "ansible-vault"
+    # The secret as bytes, exactly: decoding could change one that is not UTF-8.
     result = subprocess.run(
-        [vault, "decrypt", "--output", "-"], input=found[0][1], cwd=ROOT, capture_output=True, text=True
+        [vault, "decrypt", "--output", "-"], input=found[0][1].encode(), cwd=ROOT, capture_output=True
     )
     if result.returncode != 0:
-        sys.exit(result.stderr.strip())
-    print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+        sys.exit(result.stderr.decode(errors="replace").strip())
+    sys.stdout.buffer.write(result.stdout if result.stdout.endswith(b"\n") else result.stdout + b"\n")
 
 
 if __name__ == "__main__":

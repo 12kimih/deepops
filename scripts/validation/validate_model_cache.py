@@ -92,7 +92,9 @@ def validate_bounded(args, timeout):
            "--cache-dir", args.cache_dir, "--repo-id", args.repo_id, "--revision", args.revision]  # fmt: skip
     for name in args.require_file:
         cmd += ["--require-file", name]
-    child = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    child = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, errors="replace"
+    )
     try:
         out, _ = child.communicate(timeout=timeout)
         return json.loads(out)
