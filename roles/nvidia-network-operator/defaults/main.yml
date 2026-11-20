@@ -7,7 +7,7 @@
 nvidia_network_operator_state: present
 
 # upstream: helm https://helm.ngc.nvidia.com/nvidia network-operator
-nvidia_network_operator_version: "26.7.1"
+nvidia_network_operator_version: "26.10.0"
 nvidia_network_operator_repo: "https://helm.ngc.nvidia.com/nvidia"
 nvidia_network_operator_namespace: "network-operator"
 

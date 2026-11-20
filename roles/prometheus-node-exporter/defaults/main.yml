@@ -2,7 +2,7 @@
 # present or absent (docs/deepops/component-state.md); a deploy sets it from
 # deepops_components.
 node_exporter_state: present
-node_exporter_container: "quay.io/prometheus/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0"
+node_exporter_container: "quay.io/prometheus/node-exporter:v1.13.1@sha256:011e2d12c5bff759b90804bda642664775d7b4b127bf5148539bb82d3f590bb7"
 # Collectors beyond the defaults: systemd feeds the failed-unit alert, processes the
 # PID and thread limits, tcpstat the hosts dashboard's TCP states. interrupts stays off:
 # one series per CPU per IRQ, more than every other collector together.
