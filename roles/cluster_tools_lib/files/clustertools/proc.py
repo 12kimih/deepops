@@ -1,6 +1,7 @@
 """proc: the one way the package starts a process, and it is always bounded.
 
     proc.run(argv, timeout=SECONDS, **subprocess.run options)
+    rc, out, err = proc.outcome(argv, timeout=SECONDS, input=None, env=None)
 
 A process that never answers (a Slurm RPC the client retries for ever, a read from a
 hung NFS mount) hangs whatever waits for it, so a call without a positive timeout is
@@ -12,6 +13,11 @@ or a file must not stop a tool for everyone.
 The process runs in a session of its own, and on a timeout (or an interrupt) the whole
 session is killed: subprocess.run kills only the process it started, so the commands a
 shell pipeline or runuser starts (a database dump and its gzip) would outlive it.
+
+outcome() is run() for a check that reports instead of stopping (the validators): it
+never raises, and gives the exit status with the stripped text output, 124 for a
+timeout, 127 for a missing command and 126 for one that cannot be started, as a shell
+would.
 Python 3.9 or newer, standard library only.
 """
 
@@ -47,3 +53,16 @@ def run(argv, *, timeout, check=True, input=None, capture_output=False, **kwargs
     if check and child.returncode:
         raise CalledProcessError(child.returncode, argv, out, err)
     return subprocess.CompletedProcess(argv, child.returncode, out, err)
+
+
+def outcome(argv, *, timeout, input=None, env=None):
+    """(returncode, stdout, stderr) of ARGV, text and stripped; never raises."""
+    try:
+        done = run(argv, timeout=timeout, check=False, input=input, env=env, capture_output=True, text=True)
+    except TimeoutExpired:
+        return 124, "", f"timeout after {timeout}s"
+    except FileNotFoundError:
+        return 127, "", f"command not found: {argv[0]}"
+    except OSError as e:
+        return 126, "", f"{argv[0]}: {e.strerror or e}"
+    return done.returncode, done.stdout.strip(), done.stderr.strip()

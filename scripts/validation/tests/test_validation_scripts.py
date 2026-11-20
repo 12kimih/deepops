@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import unittest
 from unittest import mock
@@ -280,3 +281,23 @@ class TestSlurmGpuJob(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestValidatorsStartProcessesOneWay(unittest.TestCase):
+    """A validator's one-shot command goes through clustertools.proc (bounded, its whole
+    session killed on a timeout, undecodable bytes replaced, never raising): six copies of
+    a run() helper had drifted, one without errors="replace" and one without a timeout
+    message. Popen stays for what must outlive a call (a port-forward, a stream)."""
+
+    def test_no_validator_runs_a_command_itself(self):
+        one_shot = re.compile(
+            r"\bsubprocess\.(run|call|check_call|check_output|getoutput|getstatusoutput)\b|\bos\.(system|popen)\b"
+        )
+        offenders = [
+            f"{name}:{n}"
+            for name in sorted(os.listdir(SCRIPTS_DIR))
+            if name.endswith(".py")
+            for n, line in enumerate(open(os.path.join(SCRIPTS_DIR, name)).read().splitlines(), 1)
+            if one_shot.search(line)
+        ]
+        self.assertEqual(offenders, [], "run commands with clustertools.proc (outcome or run)")

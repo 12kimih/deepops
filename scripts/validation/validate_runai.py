@@ -26,6 +26,7 @@ Exit codes: 0 = ok, 1 = not ok, 2 = bad input or kubectl missing.
 """
 
 import argparse
+import functools
 import http.client
 import json
 import re
@@ -36,6 +37,11 @@ import subprocess
 import sys
 import time
 import urllib.parse
+from pathlib import Path
+
+# The validators start processes the cluster tools' one way (clustertools.proc).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+from clustertools import proc  # noqa: E402
 
 SCHEMA_VERSION = 1
 OWNER_LABEL = "deepops.nvidia.com/runai-validate"
@@ -65,17 +71,8 @@ ALLOC_SCRIPT = (
 )
 
 
-def run(cmd, timeout=60, input_text=None):
-    """Run a command, returning (rc, stdout, stderr) without raising."""
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, errors="replace", timeout=timeout, input=input_text
-        )
-        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return 124, "", "timeout after %ss" % timeout
-    except FileNotFoundError:
-        return 127, "", "command not found: %s" % cmd[0]
+# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+run = functools.partial(proc.outcome, timeout=60)
 
 
 # ---------------------------------------------------------------- pure parsers
@@ -329,7 +326,7 @@ class Kube:
             return None, "unparseable kubectl output"
 
     def apply(self, manifest):
-        return run(["kubectl", "apply", "-f", "-"], input_text=json.dumps(manifest))
+        return run(["kubectl", "apply", "-f", "-"], input=json.dumps(manifest))
 
     def wait_phase(self, namespace, pod, phases, timeout):
         deadline = time.time() + timeout
@@ -397,7 +394,7 @@ class Kube:
             "kind": "Namespace",
             "metadata": {"name": namespace, "labels": {OWNER_LABEL: OWNER_VALUE}},
         }
-        rc, out, err = run(["kubectl", "create", "-f", "-", "-o", "json"], input_text=json.dumps(manifest))
+        rc, out, err = run(["kubectl", "create", "-f", "-", "-o", "json"], input=json.dumps(manifest))
         if rc != 0:
             return rc, out, err
         try:
