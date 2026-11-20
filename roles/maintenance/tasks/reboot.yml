@@ -95,6 +95,7 @@
             tasks_from: chassis
           vars:
             bmc_power_action: cycle
+            bmc_power_undrained: "{{ maintenance_reboot_undrained }}"
 
         - name: Wait for the host to come back
           ansible.builtin.wait_for_connection:

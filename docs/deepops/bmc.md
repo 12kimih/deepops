@@ -155,6 +155,9 @@ ansible-playbook playbooks/utilities/power.yml -e hostlist=gpu01 -e bmc_power_ac
 
 `bmc_power_action` takes `status`, `on`, `off`, `cycle`, `reset`, `soft` or `diag`. The play
 runs from the control node against `bmc_ipaddr`, so it reaches a node whose OS is gone.
+Anything but `status` and `on` refuses the machine running Ansible, and a Slurm compute
+node that takes or runs jobs, as a reboot does: drain it first (a hung node Slurm
+already counts DOWN passes), or pass `-e bmc_power_undrained=true` to act anyway.
 
 For the console, use `ipmitool` directly -- it is interactive, so it does not belong in
 a playbook. Pass the same `-C` the role uses, or ipmitool negotiates its own and a board

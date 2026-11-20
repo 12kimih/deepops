@@ -23,6 +23,10 @@ bmc_snmp_community: ""
 
 # Chassis power action driven out-of-band by playbooks/utilities/power.yml.
 bmc_power_action: status
+# off, cycle, reset, soft and diag stop a node's jobs, so a Slurm compute node must be
+# drained and empty first (maintenance require_drained, as for a reboot); a hung node
+# Slurm already counts DOWN passes. true acts anyway, losing its jobs.
+bmc_power_undrained: false
 
 # RMCP+ cipher suite for out-of-band sessions. Pinned rather than negotiated: ipmitool
 # asks for the strongest suite it knows, and a BMC that does not offer it answers
