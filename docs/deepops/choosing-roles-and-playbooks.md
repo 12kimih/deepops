@@ -10,7 +10,7 @@ pairs are duplicates.
 | You want | Use | What it does |
 |---|---|---|
 | A single CUDA in the default PATH on each GPU node | `nvidia_cuda` role / `playbooks/nvidia-software/nvidia-cuda.yml` | Installs **one** CUDA toolkit from the NVIDIA apt/dnf repo (the driver is `nvidia-driver.yml`'s). Only with `nvidia_cuda_install: true`. |
-| Several CUDA versions users pick per job | `nvidia_cuda_toolkit` role / `playbooks/slurm-cluster/nvidia-cuda-toolkit.yml` | Installs **many** CUDA versions from the official `.run` files into `/sw` as Lmod modules (`module load cuda/<ver>`). Never touches the driver. Opt-in. |
+| Several CUDA versions users pick per job | `nvidia_cuda_toolkit` role / `playbooks/slurm-cluster/nvidia-cuda-toolkit.yml` | Installs **many** CUDA versions from the official `.run` files into `/sw` as Lmod modules (`module load cuda/<ver>`). Never touches the driver. Opt-in: `slurm_install_cuda_toolkit: true`, then `slurm-cluster.yml` deploys it. |
 
 They are mutually exclusive: when serving CUDA as modules, leave
 `nvidia_cuda_install: false` (the default). The host **driver** is installed once by

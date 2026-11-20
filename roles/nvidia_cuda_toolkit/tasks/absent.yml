@@ -1,0 +1,17 @@
+---
+# The toolkits, their modulefiles and the runfile cache go by the record: only the host
+# that installed them holds it. Every other host sees the same tree on shared storage,
+# so nothing of it is adopted here (an unrecorded tree stays: a site's own, or one
+# installed before the record existed, is removed by hand). The host-wide files a root
+# runfile run writes exist only where the runfiles ran, the same host.
+- name: Remove the host-wide files the runfiles left where they ran
+  ansible.builtin.include_tasks: system_files.yml
+  when: "'cuda_toolkit' in (ansible_facts.ansible_local.deepops_components.components | default({}))"
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cuda_toolkit
+    component_record_action: absent
+    component_record_items: []

@@ -3,6 +3,14 @@
 # minor, and remove what left the range. Runs only on the software-tree host. This role
 # owns cuda_install_root and cuda_modroot/cuda: every version-named entry there is its.
 
+- name: Record the CUDA toolkits as installing
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cuda_toolkit
+    component_record_action: begin
+    component_record_items: "{{ cuda_toolkit_items }}"
+
 - name: Assert the install host is x86_64 (the catalog holds the x86_64 runfiles)
   ansible.builtin.assert:
     that: ansible_facts.architecture == "x86_64"
@@ -163,3 +171,12 @@
   ansible.builtin.file:
     path: "{{ deepops_state_dir }}/recorded/cuda-modulefiles"
     state: absent
+
+- name: Record the CUDA toolkits as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cuda_toolkit
+    component_record_action: present
+    component_record_items: "{{ cuda_toolkit_items }}"
+    component_record_version: "{{ cuda_versions | map(attribute='version') | join(',') }}"

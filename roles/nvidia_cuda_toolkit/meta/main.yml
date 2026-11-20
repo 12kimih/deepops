@@ -2,6 +2,7 @@
 dependencies:
   - role: deepops_paths  # deepops_dir, sm_* module paths
   - role: nvidia_versions  # nvidia_cuda_min_driver_branch, nvidia_driver_cuda_major
+  - role: retired_settings  # nvidia_cuda_toolkit_install
 
 galaxy_info:
   namespace: deepops

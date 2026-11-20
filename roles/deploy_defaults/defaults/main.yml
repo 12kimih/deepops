@@ -39,6 +39,9 @@ slurm_install_nhc: true
 slurm_cluster_install_openmpi: false
 slurm_install_lmod: true
 slurm_install_hpcsdk: false
+# CUDA toolkits from NVIDIA's runfiles as `module load cuda/<minor>` (roles/
+# nvidia_cuda_toolkit): about 8 GB of shared software tree per CUDA minor
+slurm_install_cuda_toolkit: false
 slurm_enable_monitoring: true
 # Daily backups of the controller with a monthly restore test (roles/slurm_backup);
 # nothing until slurm_backup_destinations is set
