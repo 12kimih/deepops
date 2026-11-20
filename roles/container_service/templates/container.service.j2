@@ -1,0 +1,29 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description={{ _container_service.description }}
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+PartOf=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+RestartSec=10
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStart=/usr/bin/docker run --rm --name %n \
+{% for option in _container_service.options %}
+  {{ option }} \
+{% endfor %}
+{% for mount in _container_service.mounts %}
+  --mount type={{ mount.type | default('bind') }},src={{ mount.src }},dst={{ mount.dst }}
+{{- ',readonly' if mount.readonly | default(false) else '' }}
+{{- (',bind-propagation=' ~ mount.propagation) if mount.propagation | default('') else '' }} \
+{% endfor %}
+  {{ _container_service.image }}{% for arg in _container_service.args %} \
+  {{ arg }}{% endfor %}
+
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,3 @@
+---
+# The request with its defaults filled in.
+_container_service: "{{ container_service_keys | combine(container_service) }}"

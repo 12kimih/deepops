@@ -9,12 +9,12 @@
     state: started
 
 - name: Check firmware manifest
-  ansible.builtin.shell: "docker run -ti --rm --privileged  -v /:/hostfs {{ firmware_update_repo }}:{{ firmware_update_tag }} show_fw_manifest | tee {{ fw_dir }}/fw-manifests{{ run_diagnostics_type }}.log"
+  ansible.builtin.shell: "docker run -ti --rm --privileged  --mount type=bind,src=/,dst=/hostfs {{ firmware_update_repo }}:{{ firmware_update_tag }} show_fw_manifest | tee {{ fw_dir }}/fw-manifests{{ run_diagnostics_type }}.log"
   register: firmware_manifest
 
 # Checking the firmware versions can take a long time; the output is kept in fw-versions<type>.log
 - name: Check firmware version
-  ansible.builtin.shell: "docker run -ti --rm --privileged  -v /:/hostfs {{ firmware_update_repo }}:{{ firmware_update_tag }} show_version | tee {{ fw_dir }}/fw-versions{{ run_diagnostics_type }}.log"
+  ansible.builtin.shell: "docker run -ti --rm --privileged  --mount type=bind,src=/,dst=/hostfs {{ firmware_update_repo }}:{{ firmware_update_tag }} show_version | tee {{ fw_dir }}/fw-versions{{ run_diagnostics_type }}.log"
   register: firmware_versions_response
 
 - name: Print show_fw_manifest output

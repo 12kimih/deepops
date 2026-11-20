@@ -41,7 +41,7 @@
   vars:
     managed_dir_path: "{{ prometheus_config_dir }}/rules"
     managed_dir_sources: "{{ prometheus_rule_sources }}"
-    managed_dir_validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check rules /check.yml"
+    managed_dir_validate: "docker run --rm -u 0 --entrypoint promtool --mount type=bind,src=%s,dst=/check.yml,readonly {{ prometheus_container }} check rules /check.yml"
     managed_dir_notify: [Reload prometheus]
 
 # The targets of every exporter, from the component map; the endpoint directory holds
@@ -65,7 +65,7 @@
     owner: root
     group: root
     mode: "0644"
-    validate: "docker run --rm -u 0 --entrypoint promtool -v %s:/check.yml:ro {{ prometheus_container }} check config --syntax-only /check.yml"
+    validate: "docker run --rm -u 0 --entrypoint promtool --mount type=bind,src=%s,dst=/check.yml,readonly {{ prometheus_container }} check config --syntax-only /check.yml"
   notify: Reload prometheus
 
 - name: Create a persistent docker volume for metrics
@@ -73,21 +73,26 @@
     name: "{{ prometheus_docker_volume_name }}"
     state: present
 
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.prometheus.service.j2
-    dest: "/etc/systemd/system/{{ prometheus_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart prometheus
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ prometheus_svc_name }}"
-    state: "{{ prometheus_service_state }}"
-    enabled: "{{ prometheus_service_enabled }}"
-    daemon_reload: true
+- name: Run Prometheus
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ prometheus_svc_name }}"
+      description: Prometheus
+      image: "{{ prometheus_container }}"
+      options: [--network host]
+      mounts:
+        - {src: "{{ prometheus_config_dir }}", dst: /etc/prometheus, readonly: true}
+        - {src: "{{ prometheus_docker_volume_name }}", dst: /prometheus, type: volume}
+      args: >-
+        {{ ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.path=/prometheus',
+            '--storage.tsdb.retention.time=' ~ prometheus_retention_time]
+           + (['--storage.tsdb.retention.size=' ~ prometheus_retention_size] if prometheus_retention_size else [])
+           + ['--web.listen-address=:' ~ prometheus_port] }}
+      state: "{{ prometheus_service_state }}"
+      enabled: "{{ prometheus_service_enabled }}"
+      notify: [Restart prometheus]
 
 - name: Record the component as present
   ansible.builtin.include_role:

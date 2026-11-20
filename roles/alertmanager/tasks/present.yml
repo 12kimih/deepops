@@ -46,7 +46,7 @@
     owner: root
     group: "65534"
     mode: "0640"
-    validate: "docker run --rm -u 0 --entrypoint amtool -v %s:/check.yml:ro {{ alertmanager_container }} check-config /check.yml"
+    validate: "docker run --rm -u 0 --entrypoint amtool --mount type=bind,src=%s,dst=/check.yml,readonly {{ alertmanager_container }} check-config /check.yml"
   notify: Restart alertmanager
 
 - name: Create a persistent docker volume for state
@@ -54,21 +54,26 @@
     name: "{{ alertmanager_docker_volume_name }}"
     state: present
 
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.alertmanager.service.j2
-    dest: "/etc/systemd/system/{{ alertmanager_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart alertmanager
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ alertmanager_svc_name }}"
-    state: "{{ alertmanager_service_state }}"
-    enabled: "{{ alertmanager_service_enabled }}"
-    daemon_reload: true
+- name: Run Alertmanager
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ alertmanager_svc_name }}"
+      description: Alertmanager
+      image: "{{ alertmanager_container }}"
+      options: [--network host]
+      mounts:
+        - {src: "{{ alertmanager_config_dir }}", dst: /etc/alertmanager, readonly: true}
+        - {src: "{{ alertmanager_docker_volume_name }}", dst: /alertmanager, type: volume}
+      args:
+        - --config.file=/etc/alertmanager/alertmanager.yml
+        - --storage.path=/alertmanager
+        - --web.listen-address=:{{ alertmanager_port }}
+        - --cluster.listen-address=
+      state: "{{ alertmanager_service_state }}"
+      enabled: "{{ alertmanager_service_enabled }}"
+      notify: [Restart alertmanager]
 
 - name: Record the component as present
   ansible.builtin.include_role:

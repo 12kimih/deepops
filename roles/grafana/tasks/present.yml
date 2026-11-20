@@ -72,21 +72,21 @@
     mode: "0640"
   notify: Restart grafana
 
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.grafana.service.j2
-    dest: "/etc/systemd/system/{{ grafana_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart grafana
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ grafana_svc_name }}"
-    state: "{{ grafana_service_state }}"
-    enabled: "{{ grafana_service_enabled }}"
-    daemon_reload: true
+- name: Run Grafana
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ grafana_svc_name }}"
+      description: Grafana
+      image: "{{ grafana_container }}"
+      options: [--network host]
+      mounts:
+        - {src: "{{ grafana_config_dir }}", dst: /etc/grafana, readonly: true}
+        - {src: "{{ grafana_data_dir }}", dst: /var/lib/grafana}
+      state: "{{ grafana_service_state }}"
+      enabled: "{{ grafana_service_enabled }}"
+      notify: [Restart grafana]
 
 - name: Apply pending restarts
   ansible.builtin.meta: flush_handlers

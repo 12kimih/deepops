@@ -43,6 +43,11 @@
    leaves `<file>.<pid>.<date>@<time>~` beside it, never removed, so /etc fills with
    stale copies (and copies of secrets). The repository is the history; a task that
    needs the old file to roll back removes the copy itself.
+15. A container sees a host path only through a bind mount (`--mount type=bind`,
+   docker_container `mounts:`), never `-v`/`--volume` or `volumes:`: given a source
+   that does not exist yet, those create it as an empty root-owned directory, so a file
+   written later went inside it and the container never read it (the registry's
+   config.yml, 2026-06 to 2026-11). A bind refuses the missing source instead.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -516,6 +521,31 @@ class TaskRules(unittest.TestCase):
                         offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "drop backup: true; the repository is the file's history")
         scan.check(self)
+
+    def test_containers_see_host_paths_only_through_binds(self):
+        run_volume = re.compile(r"\b(docker|podman)\b[^\n]*\brun\b[^\n]*\s(-v|--volume)(\s|=)")
+        argv_volume = re.compile(r"""["'](-v|--volume)["']""")
+        offenders, scan = [], Scan(minimum=MINIMUM_FILES)
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if name == "docker_container" and isinstance(args, dict) and "volumes" in args:
+                    offenders.append(f"{rel(path)}: {task.get('name')}: volumes:")
+        texts = [
+            p
+            for top in ("roles", "playbooks", "scripts", "tests")
+            for p in (ROOT / top).rglob("*")
+            if p.is_file() and p.suffix in (".yml", ".yaml", ".j2", ".sh", ".py", ".service")
+        ]
+        for path in texts:
+            if path == Path(__file__).resolve():
+                continue
+            text = path.read_text(errors="replace")
+            offenders += [f"{rel(path)}: {m.group(0)[:80]}" for m in run_volume.finditer(text)]
+            if path.suffix == ".py" and re.search(r"\bdocker\b", text):
+                offenders += [f"{rel(path)}: {m.group(0)}" for m in argv_volume.finditer(text)]
+        scan.check(self)
+        self.assertEqual(offenders, [], "bind with --mount type=bind,src=,dst= (docker_container: mounts:)")
 
     def test_no_handler_includes_a_role(self):
         # ansible-core refuses include_role in a handler, also through an included task

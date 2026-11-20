@@ -53,9 +53,10 @@
     # keeps the container across boots.
     restart: "{{ nginx_docker_cache_ca_key is changed or nginx_docker_cache_ca_crt is changed }}"
     restart_policy: unless-stopped
-    volumes:
-      - "{{ nginx_docker_cache_mirror_path }}:/docker_mirror_cache"
-      - "{{ nginx_docker_cache_ca_path }}:/ca"
+    # Binds, never volumes: a bind refuses a missing source (roles/container_service).
+    mounts:
+      - {type: bind, source: "{{ nginx_docker_cache_mirror_path }}", target: /docker_mirror_cache}
+      - {type: bind, source: "{{ nginx_docker_cache_ca_path }}", target: /ca}
     env:
       REGISTRIES: "{{ nginx_docker_cache_registry_string }}"
       ENABLE_MANIFEST_CACHE: "{{ nginx_docker_cache_manifests }}"
