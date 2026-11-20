@@ -1,24 +1,55 @@
 ---
-# Each directory/auth role runs only when its required config is provided, so the
-# playbook is a clean no-op with the default config and never trips a role's
-# "variable not defined" assert. Configure the relevant vars (in config/group_vars)
-# to enable a role.
-- hosts: all
+# Accounts and logins (docs/deepops/accounts.md): the people roster's accounts and homes
+# on the account source, the directory servers, then each host's directory client.
+# Every part is on when configured: the directories by directory_service, nis_domain and
+# ldap_suffix (roles/deploy_defaults), the rest by their own settings, so with the
+# default config nothing changes.
+# The directory's secret files the site config lacks (its read-only accounts'
+# passwords), made on the controller, never replaced (roles/site_secrets).
+- name: Create the directory's missing secrets
+  hosts: "{{ hostlist | default('all') }}"
+  gather_facts: false
+  become: false
+  tags:
+    - always
+  roles:
+    - role: directory_defaults
+    - role: site_secrets
+      site_secrets: "{{ directory_site_secrets }}"
+
+- hosts: "{{ hostlist | default('all') }}"
   become: true
+  tags:
+    - people
   roles:
     - role: deploy_defaults
     - role: move-home-dirs
       when: move_home_dirs_enable | bool
     - role: kerberos_client
       when: kerberos_client_realm_name | length > 0
-    # Accounts from the people roster, on the host that is the account source (the NIS
-    # master). Before nis_server, whose last task publishes the changed files.
+    # The roster's homes, and its local accounts where no LDAP directory holds them, on
+    # the account source; before the servers that publish them.
     - role: people
+      people_local_accounts_enabled: "{{ directory_service != 'ldap' }}"
       when: people_manage_accounts | bool
-    # Run the NIS master setup before the clients so they have a server to bind to.
-    - role: nis_server
-      when: (nis_make_server | bool) and (nis_domain | length > 0)
-    - role: nis_client
-      when: (nis_domain | length > 0) and (nis_server | length > 0)
+
+# Servers before the clients that bind to them.
+- name: Serve the LDAP directory
+  import_playbook: ldap-server.yml
+
+- name: Serve NIS
+  import_playbook: nis-server.yml
+
+- name: Read accounts from NIS
+  import_playbook: nis-client.yml
+
+- name: Read accounts from LDAP
+  import_playbook: sssd-client.yml
+
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - people
+  roles:
     - role: autofs
       when: (autofs_mount | length > 0) and (autofs_map | length > 0)

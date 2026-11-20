@@ -1,0 +1,19 @@
+---
+- name: Check the trust request
+  ansible.builtin.assert:
+    that: internal_ca_trust_path | length > 0
+    fail_msg: internal_ca trust needs internal_ca_trust_path.
+    quiet: true
+
+- name: Find the CA
+  ansible.builtin.include_tasks: ca.yml
+
+- name: Trust the CA
+  ansible.builtin.copy:
+    content: "{{ internal_ca_certificate }}"
+    dest: "{{ internal_ca_trust_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: internal_ca_trust_result
+  when: internal_ca_certificate | length > 0

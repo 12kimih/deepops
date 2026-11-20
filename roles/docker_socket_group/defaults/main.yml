@@ -13,11 +13,11 @@
 # and being in `docker` on the submit node grants whatever group holds that same
 # number on the compute node -- which may be something else entirely.
 #
-# System GIDs also cannot be published through NIS: /var/yp/Makefile filters the
-# group map to GID >= GID_MIN (normally 1000), so `docker` at e.g. 998 is silently
-# never exported. The fix is to point dockerd at a group whose GID is pinned and
-# inside the exportable range, published cluster-wide (see nis_export_groups in the
-# nis_server role), and to chown the socket to THAT group on every node.
+# System GIDs also cannot be published: no directory serves the OS's own range (NIS's
+# /var/yp/Makefile drops GIDs below GID_MIN without a word). The fix is to point dockerd
+# at a group whose GID is pinned and 1000 or more, published cluster-wide
+# (directory_groups in roles/directory_defaults), and to chown the socket to THAT group
+# on every node.
 #
 # Set both to enable (e.g. dockerusers and 4000); keep them identical to the values the
 # group is published with. Empty: the role is a no-op.

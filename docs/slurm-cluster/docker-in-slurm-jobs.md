@@ -29,10 +29,11 @@ The `docker` group is especially prone to this. It is created by the Docker pack
 with a distro-assigned **system** GID, which depends on the order packages were
 installed on each node, so it routinely differs across a cluster.
 
-NIS cannot paper over it either: `/var/yp/Makefile` filters the group map to
-`GID >= MINGID`, taken from `GID_MIN` in `/etc/login.defs` (normally 1000). A system
-group numbered below that is **dropped from the map without a warning**, so it can
-never be published no matter how often the maps are rebuilt.
+A directory cannot paper over it either: no directory publishes the OS's own range.
+NIS's `/var/yp/Makefile` filters the group map to `GID >= MINGID`, taken from `GID_MIN`
+in `/etc/login.defs` (normally 1000), so a system group numbered below that is
+**dropped from the map without a warning**; the LDAP directory holds only the cluster
+groups it is given, at 1000 or more.
 
 ## The fix
 
@@ -53,21 +54,24 @@ group that is designed to be cluster-wide:
    for h in <nodes>; do ssh $h "getent group 4000 >/dev/null || echo $h free"; done
    ```
 
-2. Publish it from the NIS master (`config/group_vars/nis-master.yml`). The
-   `nis_server` role creates the group, adds the members, and rebuilds the maps:
+2. Publish it through the directory (`directory_groups` in
+   `config/group_vars/all.yml`). The directory server creates the group with its
+   members (`nis_server` in the master's files and its maps, `ldap_server` as a
+   `posixGroup` entry):
 
    ```yaml
-   nis_export_groups:
+   directory_groups:
      - name: "{{ cluster_docker_group_name }}"
        gid: "{{ cluster_docker_group_gid }}"
        members:
          - alice
    ```
 
-   The role asserts each GID is `>= GID_MIN`. Membership is **declarative** -- deleting
-   a name here revokes that person's access on the next run. Set
-   `nis_export_groups_exclusive: false` to make the list additive instead, for a group
-   other tooling also writes to.
+   Each GID is checked to be 1000 or more and no person's UID. Membership is
+   **declarative** -- deleting a name here revokes that person's access on the next
+   run. Set `directory_groups_exclusive: false` to make the list additive instead, for
+   a group other tooling also writes to. In practice the members are
+   `people | people_with_role('docker')`, from the people roster.
 
 3. Chown the socket to it on every node (`config/group_vars/slurm-cluster.yml`):
 
@@ -78,7 +82,7 @@ group that is designed to be cluster-wide:
 
    The `docker_socket_group` role writes `group` into `/etc/docker/daemon.json`,
    creates the group locally with the same GID (so dockerd can resolve the name at
-   boot even before the NIS client has bound), and drops a `SocketGroup=` override
+   boot even before the directory answers), and drops a `SocketGroup=` override
    into `docker.socket`. Both are written because which one decides depends on how the
    daemon was started: under socket activation (`dockerd -H fd://`) systemd creates the
    socket and `SocketGroup=` wins, while a daemon started any other way creates and
@@ -99,7 +103,7 @@ group that is designed to be cluster-wide:
 
 `playbooks/slurm-cluster.yml` runs this after `authentication.yml`, so the group is
 published before the nodes are asked to resolve it. Both pieces are no-ops until
-`docker_socket_group` and `nis_export_groups` are set.
+`docker_socket_group` and `directory_groups` are set.
 
 ## Verifying
 
@@ -142,10 +146,12 @@ newgrp <group>    # nested shell with the group list re-resolved
 
 ### If the group is missing from `id -nG <user>` too
 
-Check in this order: the maps were rebuilt on the master (`ypcat group | grep <name>`),
-the node is bound (`ypwhich`), and no **local** group of the same name shadows the NIS
-one -- `nsswitch.conf` resolves `files` before `nis`, so `getent group <name>` on a
-client can report an empty member list while the NIS map is correct.
+Check in this order: the directory has it (NIS: `ypcat group | grep <name>`; LDAP:
+`getent -s sss group <name>`, after `sss_cache -E` if it changed in the last minutes),
+the node reaches its directory (`ypwhich`, or `sssctl domain-status cluster`), and no
+**local** group of the same name shadows the directory's -- `nsswitch.conf` resolves
+`files` first, so `getent group <name>` on a client can report an empty member list
+while the directory is correct.
 
 ### If the group is present but `docker ps` is still refused
 

@@ -1,0 +1,67 @@
+---
+# What the directory roles agree on, written once: the cluster groups and netgroups
+# every directory server publishes (roles/nis_server, roles/ldap_server), and how hosts
+# reach the LDAP server (roles/ldap_server, roles/sssd_client, Dex in roles/open_ondemand).
+# Which directory a host reads accounts from is the deploy switch directory_service, and
+# the LDAP tree's suffix is ldap_suffix (roles/deploy_defaults). docs/deepops/accounts.md.
+
+# Groups that mean the same on every node: {name, gid, members}. Anything that has to
+# mean the same inside a Slurm job belongs here: Slurm resolves a job's groups on the
+# controller and ships the numeric GIDs (send_gids), so a node-local group with another
+# GID silently grants whatever group holds that number on the compute node. GIDs are
+# 1000 or more (below is the OS's own range, and NIS drops them from its map), and never
+# a person's UID (their per-user group). Members are active people in the roster.
+#
+#   directory_groups:
+#     - name: "{{ cluster_docker_group_name }}"
+#       gid: "{{ cluster_docker_group_gid }}"
+#       members: "{{ people | people_with_role('docker') }}"
+directory_groups: []
+
+# true: members is the whole membership, so taking someone off the list revokes it on
+# the next run. false: members are only added (for a group other tooling also fills).
+directory_groups_exclusive: true
+
+# Netgroups: {name, users}. Matched by name, never by number, so they give the same
+# answer inside a Slurm job and over SSH; sudo's +netgroup is the main use
+# (roles/cluster_sudoers). The list is the whole membership.
+#
+#   directory_netgroups:
+#     - name: "{{ cluster_sudoers_netgroup }}"
+#       users: "{{ cluster_admins }}"
+directory_netgroups: []
+
+# Name-service caches no node runs: nscd keeps answers up to an hour, so a revoked
+# admin kept sudo; SSSD keeps its own cache, with invalidation, and its docs say not to
+# run nscd beside it.
+directory_remove_caches: [nscd, unscd]
+
+# --- LDAP (with ldap_suffix set) ---------------------------------------------------
+# The server: the first host of the [ldap-server] group. Clients reach it by the first
+# of ldap_server_names, all of which its certificate names (add its FQDN or address if
+# clients use those).
+ldap_server_host: "{{ (groups['ldap-server'] | default([]) + [''])[0] }}"
+ldap_server_names: ["{{ ldap_server_host }}"]
+ldap_uri: "ldap://{{ ldap_server_names | first }}"
+# The cluster's own CA for the directory (roles/internal_ca), trusted at this path on
+# every host that talks to it. It lives on the server; nothing to buy or renew by hand.
+ldap_ca_name: ldap
+ldap_ca_file: /etc/ldap/deepops-ca.crt
+
+# Read-only accounts that search the directory: nothing is readable without one
+# (anonymous binds see nothing). sssd is every node's; add dex for Open OnDemand's login.
+# Each one's password is a file in the site config, made when missing (roles/
+# site_secrets, vaulted; authentication.yml's first play) and set in the directory from
+# there, so none is ever typed or chosen. A lost file is made again and the directory and
+# the clients follow on the next run.
+ldap_readers: [sssd]
+ldap_secrets_dir: "{{ inventory_dir }}/files/ldap"
+# reader -> password, as the roles read them.
+ldap_reader_passwords: >-
+  {{ dict(ldap_readers | zip(query('ansible.builtin.file',
+       *(ldap_readers | map('regex_replace', '^', ldap_secrets_dir ~ '/') | map('regex_replace', '$', '.password'))))) }}
+# The files roles/site_secrets makes, while the site has a directory.
+directory_site_secrets: >-
+  {{ [] if ldap_suffix | length == 0 else
+     ldap_readers | map('regex_replace', '^', ldap_secrets_dir ~ '/') | map('regex_replace', '$', '.password')
+     | map('community.general.dict_kv', 'path') | map('combine', {'kind': 'password', 'length': 32}) | list }}

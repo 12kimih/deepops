@@ -1,0 +1,12 @@
+---
+- name: Restart sssd
+  ansible.builtin.service:
+    name: sssd
+    state: restarted
+  notify: Flush the sssd cache
+
+# Answers cached under the old settings would otherwise live out their timeout.
+- name: Flush the sssd cache
+  ansible.builtin.command:
+    argv: [sss_cache, -E]
+  changed_when: true

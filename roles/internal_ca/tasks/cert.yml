@@ -1,0 +1,87 @@
+---
+- name: Check the certificate request
+  ansible.builtin.assert:
+    that:
+      - internal_ca_cert_names | length > 0
+      - internal_ca_cert_path | length > 0
+      - internal_ca_key_path | length > 0
+    fail_msg: internal_ca cert needs internal_ca_cert_names, internal_ca_cert_path and internal_ca_key_path.
+    quiet: true
+
+- name: Find the CA
+  ansible.builtin.include_tasks: ca.yml
+
+- name: Install the certificate library
+  ansible.builtin.package:
+    name: python3-cryptography
+    state: present
+
+# The key is made here and never copied anywhere.
+- name: Create the key
+  community.crypto.openssl_privatekey:
+    path: "{{ internal_ca_key_path }}"
+    type: ECC
+    curve: secp256r1
+    owner: "{{ internal_ca_key_owner }}"
+    group: "{{ internal_ca_key_group }}"
+    mode: "{{ internal_ca_key_mode }}"
+  register: internal_ca_host_key
+
+- name: Issue the certificate
+  when:
+    - internal_ca_certificate | length > 0
+    - not ansible_check_mode or not internal_ca_host_key.changed
+  vars:
+    # An address is an IP name (IPv4 digits and dots, or IPv6 with colons), anything
+    # else a DNS name.
+    internal_ca_ips: "{{ internal_ca_cert_names | select('match', '^[0-9.]+$|^.*:') | list }}"
+  block:
+    - name: Make the certificate request
+      community.crypto.openssl_csr_pipe:
+        privatekey_path: "{{ internal_ca_key_path }}"
+        common_name: "{{ internal_ca_cert_names | first }}"
+        subject_alt_name: >-
+          {{ internal_ca_ips | map('regex_replace', '^', 'IP:') | list
+          + internal_ca_cert_names | reject('in', internal_ca_ips) | map('regex_replace', '^', 'DNS:') | list }}
+        key_usage: [digitalSignature, keyAgreement]
+        extended_key_usage: [serverAuth]
+      register: internal_ca_host_csr
+      changed_when: false
+
+    - name: Read the current certificate
+      ansible.builtin.slurp:
+        src: "{{ internal_ca_cert_path }}"
+      register: internal_ca_current
+      failed_when: false
+
+    - name: Check whether the current certificate is still valid long enough
+      community.crypto.x509_certificate_info:
+        content: "{{ internal_ca_current.content | b64decode }}"
+        valid_at:
+          renew: "+{{ internal_ca_renew_days }}d"
+      register: internal_ca_current_info
+      when: internal_ca_current.content is defined
+
+    # Signed on the CA host; a certificate with other names, from another CA, or expiring
+    # soon is replaced.
+    - name: Sign the certificate
+      community.crypto.x509_certificate_pipe:
+        provider: ownca
+        csr_content: "{{ internal_ca_host_csr.csr }}"
+        content: "{{ internal_ca_current.content | b64decode if internal_ca_current.content is defined else omit }}"
+        ownca_path: "{{ internal_ca_dir }}/ca.crt"
+        ownca_privatekey_path: "{{ internal_ca_dir }}/ca.key"
+        ownca_not_after: "+{{ internal_ca_cert_days }}d"
+        force: "{{ not (internal_ca_current_info.valid_at.renew | default(false)) }}"
+      delegate_to: "{{ internal_ca_host }}"
+      register: internal_ca_signed
+      changed_when: false
+
+    - name: Install the certificate
+      ansible.builtin.copy:
+        content: "{{ internal_ca_signed.certificate }}"
+        dest: "{{ internal_ca_cert_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      register: internal_ca_cert_result

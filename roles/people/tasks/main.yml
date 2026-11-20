@@ -20,6 +20,7 @@
   vars:
     local_accounts: "{{ people | people_local_accounts(people_home_root, people_default_shell) }}"
     local_accounts_shell: "{{ people_default_shell }}"
+  when: people_local_accounts_enabled | bool
   tags:
     - people
 
@@ -42,6 +43,34 @@
   loop_control:
     label: "{{ item.key }}"
   register: people_homes
+  tags:
+    - people
+
+# useradd makes a local account's home; a directory account's is made here, from
+# /etc/skel, owned by the roster's numbers (they resolve once the directory answers).
+- name: Create the homes of active people who have none
+  ansible.builtin.file:
+    path: "{{ people_home_root }}/{{ item.item.key }}"
+    state: directory
+    owner: "{{ item.item.value.uid }}"
+    group: "{{ item.item.value.uid }}"
+    mode: "{{ people_home_mode }}"
+  loop: "{{ people_homes.results | rejectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  tags:
+    - people
+
+- name: Fill the new homes from /etc/skel
+  ansible.builtin.copy:
+    src: /etc/skel/
+    dest: "{{ people_home_root }}/{{ item.item.key }}/"
+    remote_src: true
+    owner: "{{ item.item.value.uid }}"
+    group: "{{ item.item.value.uid }}"
+  loop: "{{ people_homes.results | rejectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item.key }}"
   tags:
     - people
 

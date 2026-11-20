@@ -1,0 +1,16 @@
+---
+dependencies:
+  - role: directory_defaults  # ldap_uri, ldap_ca_file, ldap_reader_passwords, directory_remove_caches
+
+galaxy_info:
+  namespace: deepops
+  role_name: sssd_client
+  author: DeepOps
+  description: Accounts and logins from the cluster's LDAP directory through SSSD
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

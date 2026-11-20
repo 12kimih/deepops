@@ -1,0 +1,19 @@
+---
+# nsswitch -- one directory client's source in /etc/nsswitch.conf (library/nsswitch_source.py).
+#
+#   - ansible.builtin.include_role:
+#       name: nsswitch
+#     vars:
+#       nsswitch_source: sss              # the client's token
+#       nsswitch_databases: [passwd, group, netgroup]
+#       nsswitch_replaces: [nis]          # what it takes over from
+#       nsswitch_state: present           # absent takes the token away
+#
+# A client owns its token, never whole lines: NIS and SSSD side by side during a
+# migration, or one removed after the other, never undo each other. nsswitch_result
+# says whether the file changed (restart or flush caches on it).
+nsswitch_source: ""
+nsswitch_databases: []
+nsswitch_replaces: []
+nsswitch_state: present
+nsswitch_path: /etc/nsswitch.conf

@@ -32,16 +32,17 @@ EXPLICIT = {
 }
 
 
-JINJA = {"not", "and", "or", "bool", "true", "false"}
+JINJA = {"not", "and", "or", "bool", "true", "false", "length", "in"}
+
+
+def words(switch):
+    """The variable names a switch expression reads (string literals are not names)."""
+    return set(re.findall(r"[a-z_][a-z0-9_]*", re.sub(r"'[^']*'|\"[^\"]*\"", "", str(switch)))) - JINJA
 
 
 def switches(name):
     """The deploy switches a component's rules read."""
-    return {
-        w
-        for rule in REGISTRY[name].get("rules") or []
-        for w in re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))
-    } - JINJA
+    return {w for rule in REGISTRY[name].get("rules") or [] for w in words(rule["switch"])}
 
 
 class Registry(unittest.TestCase):
@@ -54,9 +55,9 @@ class Registry(unittest.TestCase):
         defaults = yaml.safe_load((ROOT / "roles/deploy_defaults/defaults/main.yml").read_text())
         for name in REGISTRY:
             for rule in REGISTRY[name].get("rules") or []:
-                words = set(re.findall(r"[a-z_][a-z0-9_]*", str(rule["switch"]))) - JINJA
+                names = words(rule["switch"])
                 with self.subTest(component=name, switch=rule["switch"]):
-                    self.assertTrue(words and words <= set(defaults), "a rule's switch names deploy switches")
+                    self.assertTrue(names and names <= set(defaults), "a rule's switch names deploy switches")
 
 
 class Explicit(unittest.TestCase):
@@ -75,7 +76,6 @@ GATES = {
     # One-shot: nothing to remove.
     "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
     # Components still to move (docs/deepops/component-state.md, batches), by owner.
-    "slurm_install_authentication": "pending: deepops-4 (the directory work; removal explicit)",
     "slurm_cluster_install_nvidia_driver": "pending: deepops (batch 3; removal explicit)",
     "install_dcgm": "pending: deepops (batch 3)",
     "slurm_install_nhc": "pending: deepops (batch 3)",
@@ -194,13 +194,28 @@ class Playbooks(unittest.TestCase):
     def test_deploys_install_needs_first_and_remove_in_reverse(self):
         for deploy in DEPLOYS:
             imports = []
-            for play in yaml.safe_load((ROOT / deploy).read_text()):
-                target = play.get("import_playbook")
-                if not target:
-                    continue
-                text = (ROOT / deploy).parent.joinpath(target).read_text()
-                for name in dict.fromkeys(re.findall(r"deepops_components\.(\w+)", text)):
-                    imports.append((name, (play.get("vars") or {}).get("deepops_phase")))
+
+            def walk(path, phase):
+                # An imported playbook's own imports run with the phase it was given; a
+                # component a file's plays name more than once counts once.
+                seen = set()
+                for play in yaml.safe_load(path.read_text()) or []:
+                    target = (play or {}).get("import_playbook")
+                    # An import only a playbook run alone makes (the Docker a component
+                    # brings with it) is not part of a deploy.
+                    if target and "deepops_phase == 'converge'" not in str(play.get("when")):
+                        walk(path.parent / target, (play.get("vars") or {}).get("deepops_phase") or phase)
+                    if target:
+                        continue
+                    for name in re.findall(r"deepops_components\.(\w+)", yaml.safe_dump(play)):
+                        if name not in seen:
+                            seen.add(name)
+                            imports.append((name, phase))
+
+            walk(ROOT / deploy, None)
+            # require installs a component for one playbook whatever the map says (the
+            # Slurm build host's Docker): not the deploy's install or removal.
+            imports = [(name, phase) for name, phase in imports if phase != "require"]
             with self.subTest(deploy=deploy):
                 found = {name for name, _ in imports}
                 self.assertTrue(found <= set(REGISTRY))

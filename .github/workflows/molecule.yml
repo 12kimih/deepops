@@ -13,6 +13,7 @@ jobs:
           - cachefilesd
           - facts
           - kerberos_client
+          - ldap_server
           - lmod
           - login_shells
           - nfs_client

@@ -1,0 +1,157 @@
+---
+# slapd's configuration and tree, per the Ubuntu Server guides (install-openldap,
+# ldap-and-tls) and slapd-config(5): the suffix through debconf, everything else in
+# cn=config over the local socket.
+- name: Check the directory settings
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == 'Debian'
+      - ldap_suffix is match('^dc=[a-z0-9-]+(,dc=[a-z0-9-]+)*$')
+      - ldap_server_password_source in ['ldap', 'shadow']
+      - ldap_server_names | length > 0
+    fail_msg: >-
+      ldap_server runs on Debian and Ubuntu (RHEL 8 and later ship no slapd), with
+      ldap_suffix of dc= parts (dc=example,dc=internal), ldap_server_password_source ldap
+      or shadow, and ldap_server_names.
+    quiet: true
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ldap_server
+    component_record_action: begin
+    component_record_items: "{{ ldap_server_items }}"
+
+# Read once, at the first install; the suffix is checked against the server below.
+- name: Answer slapd's install questions
+  ansible.builtin.debconf:
+    name: slapd
+    question: "{{ item.question }}"
+    vtype: "{{ item.vtype }}"
+    value: "{{ item.value }}"
+  loop:
+    - {question: slapd/no_configuration, vtype: boolean, value: "false"}
+    - {question: slapd/domain, vtype: string, value: "{{ ldap_suffix | regex_replace('dc=', '') | replace(',', '.') }}"}
+    - {question: shared/organization, vtype: string, value: "{{ ldap_server_organization }}"}
+    - {question: slapd/purge_database, vtype: boolean, value: "false"}
+    - {question: slapd/move_old_database, vtype: boolean, value: "true"}
+  loop_control:
+    label: "{{ item.question }}"
+
+- name: Install slapd, its tools and the Python LDAP library
+  ansible.builtin.apt:
+    name: [slapd, ldap-utils, python3-ldap]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Start slapd
+  ansible.builtin.service:
+    name: slapd
+    state: started
+    enabled: true
+
+# A server made with another suffix (an earlier install) would be filled under a tree
+# nothing reads: stop instead.
+- name: Read the server's suffix
+  ansible.builtin.command:
+    argv: [ldapsearch, -Q, -LLL, -Y, EXTERNAL, -H, "ldapi:///", -b, cn=config, "(olcSuffix=*)", olcSuffix]
+  register: ldap_server_suffix
+  changed_when: false
+  # Under --check on a host without slapd yet there is nothing to read; what follows
+  # waits for a real run.
+  failed_when: ldap_server_suffix.rc != 0 and not ansible_check_mode
+  check_mode: false  # read-only; --check needs the result
+
+- name: Check the server serves ldap_suffix
+  ansible.builtin.assert:
+    that: "('olcSuffix: ' ~ ldap_suffix) in ldap_server_suffix.stdout_lines"
+    fail_msg: >-
+      slapd serves {{ ldap_server_suffix.stdout_lines | select('match', '^olcSuffix:') | list }},
+      not {{ ldap_suffix }}: it was installed with another domain. Remove the server (name
+      ldap_server in deepops_component_removals, then delete /var/lib/ldap) or set ldap_suffix
+      to the one it serves.
+    quiet: true
+  when: ldap_server_suffix.rc == 0
+
+- name: Create the TLS directory
+  ansible.builtin.file:
+    path: "{{ ldap_server_tls_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Issue the server's certificate
+  ansible.builtin.include_role:
+    name: internal_ca
+    tasks_from: cert
+  vars:
+    internal_ca_name: "{{ ldap_ca_name }}"
+    internal_ca_host: "{{ ldap_server_host }}"
+    internal_ca_cert_names: "{{ ldap_server_names }}"
+    internal_ca_cert_path: "{{ ldap_server_tls_dir }}/server.crt"
+    internal_ca_key_path: "{{ ldap_server_tls_dir }}/server.key"
+    internal_ca_key_group: openldap
+
+- name: Trust the cluster CA
+  ansible.builtin.include_role:
+    name: internal_ca
+    tasks_from: trust
+  vars:
+    internal_ca_name: "{{ ldap_ca_name }}"
+    internal_ca_host: "{{ ldap_server_host }}"
+    internal_ca_trust_path: "{{ ldap_ca_file }}"
+
+# slapd reads the files when cn=config names them, and again only at a restart.
+- name: Load a renewed certificate
+  ansible.builtin.debug:
+    msg: The server certificate or the CA changed; slapd restarts.
+  changed_when: true
+  notify: Restart slapd
+  when: >-
+    (internal_ca_cert_result | default({})) is changed
+    or (internal_ca_trust_result | default({})) is changed
+
+- name: Configure the server
+  ldap_tree:
+    entries: "{{ ldap_server_config }}"
+  when: ldap_server_suffix.rc == 0
+
+- name: Fill the directory
+  ansible.builtin.include_tasks: directory.yml
+  when: ldap_server_suffix.rc == 0
+
+- name: Install the backup script
+  ansible.builtin.template:
+    src: slapd-backup.sh.j2
+    dest: "{{ ldap_server_backup_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the backup units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [slapd-backup.service, slapd-backup.timer]
+  register: ldap_server_units
+
+- name: Run the backup daily
+  ansible.builtin.systemd_service:
+    name: slapd-backup.timer
+    state: started
+    enabled: true
+    daemon_reload: "{{ ldap_server_units is changed }}"
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ldap_server
+    component_record_action: present
+    component_record_items: "{{ ldap_server_items }}"

@@ -13,6 +13,25 @@ deepops_component_registry:
     rules:
       - {switch: "{{ chrony_install }}", group: slurm-cluster}
       - {switch: "{{ chrony_install }}", group: k8s_cluster}
+  # Accounts (docs/deepops/accounts.md): taking a directory away locks its users out, so
+  # no switch or group does; the site retires one in deepops_component_removals (NIS,
+  # after every host reads LDAP). Servers first, then the clients that bind to them.
+  ldap_server:
+    removal: explicit
+    rules:
+      - {switch: "{{ ldap_suffix | length > 0 }}", group: ldap-server, first: true}
+  nis_server:
+    removal: explicit
+    rules:
+      - {switch: "{{ nis_domain | length > 0 }}", group: nis-master, first: true}
+  nis_client:
+    removal: explicit
+    rules:
+      - {switch: "{{ directory_service == 'nis' }}", group: all}
+  sssd_client:
+    removal: explicit
+    rules:
+      - {switch: "{{ directory_service == 'ldap' }}", group: all}
   rsyslog_server:
     rules:
       - {switch: "{{ slurm_enable_rsyslog_server }}", group: slurm-master, first: true}

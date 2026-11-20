@@ -1,0 +1,19 @@
+---
+# The people roster and what every account it declares shares, written once for the
+# roles that make accounts from it: roles/people (local accounts and homes) and
+# roles/ldap_server (the directory). config.example/people.yml, plugins/filter/people.py.
+
+# login -> person, as validated by people_check. Opt-in: empty does nothing.
+people: {}
+
+# Shell for a person who does not set one.
+people_default_shell: /bin/bash
+
+# Where home directories live; a new account's home is created from /etc/skel.
+people_home_root: /home
+
+# The most an active person's home directory may allow (a stricter mode is kept), and
+# the mode useradd gives new homes (HOME_MODE in /etc/login.defs). 0750 with the
+# per-user group keeps one user's files away from the others; share through a group
+# directory instead.
+people_home_mode: "0750"

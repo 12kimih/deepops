@@ -20,7 +20,10 @@ from repo_scan import Scan, ansible_files, module, tasks  # noqa: E402
 INSTALLERS = {"copy", "template", "synchronize"}
 GLOBS = ("fileglob", "filetree")
 # file -> why a glob install there must not remove what it did not install
-SHARED = {}
+SHARED = {
+    # A new home is filled from /etc/skel once, as useradd does; it is its user's then.
+    "roles/people/tasks/main.yml": "a new home's first files, the user's from then on",
+}
 
 
 def uses_recorded_files(path):

@@ -1,0 +1,35 @@
+---
+# The tree from the roster (plugins/filter/directory.py). The hashes are read from this
+# host's own files, go straight into the directory, and are never shown.
+- name: Read the account source's password hashes
+  ansible.builtin.getent:
+    database: shadow
+    service: files
+  no_log: true
+  when: ldap_server_password_source == 'shadow'
+
+- name: Make the directory match the roster
+  ldap_tree:
+    entries: "{{ ldap_server_tree.entries }}"
+    secrets: "{{ ldap_server_tree.secrets }}"
+    passwords: "{{ ldap_server_tree.passwords }}"
+    prune: "{{ ldap_server_tree.prune }}"
+    report: "{{ ldap_server_tree.report }}"
+  vars:
+    ldap_server_tree: >-
+      {{ people | directory_entries(ldap_suffix,
+           groups=directory_groups, netgroups=directory_netgroups, readers=ldap_reader_passwords,
+           home_root=people_home_root, shell=people_default_shell,
+           shadow=(ansible_facts.getent_shadow if ldap_server_password_source == 'shadow' else none),
+           exclusive=directory_groups_exclusive) }}
+  register: ldap_server_sync
+
+# A person is never deleted from the directory: one the roster does not know stays until
+# the roster gains it (status: left), so the UID stays reserved and the account locked.
+- name: Check the directory holds no one the roster does not know
+  ansible.builtin.assert:
+    that: ldap_server_sync.undeclared | length == 0
+    fail_msg: >-
+      The directory has accounts the roster does not list: {{ ldap_server_sync.undeclared | join(', ') }}.
+      Add each to people.yml (status: left if they are gone); none was changed.
+    quiet: true

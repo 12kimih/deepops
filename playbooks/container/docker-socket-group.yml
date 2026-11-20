@@ -3,8 +3,8 @@
 # inside a Slurm job. Slurm resolves supplementary groups on the submit/controller
 # node and ships the resulting NUMERIC GIDs into the job (send_gids, on by default
 # since 20.11), so membership in a node-local `docker` group -- whose system GID
-# differs per node and cannot be published through NIS -- has no effect inside a job.
-# Pair this with nis_export_groups (roles/nis_server) which publishes the group under
+# differs per node and no directory publishes -- has no effect inside a job. Pair this
+# with directory_groups (roles/directory_defaults), which the directory publishes under
 # one pinned GID cluster-wide.
 #
 # No-op until docker_socket_group is set in config/group_vars.

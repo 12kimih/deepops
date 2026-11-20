@@ -1,0 +1,16 @@
+---
+# Applies to the [ldap-server] inventory group -- the ONE node that runs the cluster's
+# LDAP directory (OpenLDAP) when ldap_suffix is set (AUTH in group_vars/all.yml). The
+# ldap_server role (run by authentication.yml, which slurm-cluster.yml imports) installs
+# slapd with TLS from the cluster's own CA, and fills the tree from the people roster
+# with the groups and netgroups in AUTH. docs/deepops/accounts.md.
+
+# Where people's passwords come from: ldap (the directory keeps them; users change them
+# with passwd) or shadow (mirrored each run from this host's /etc/shadow, the account
+# source while NIS still serves, so users keep their passwords through the move).
+#ldap_server_password_source: ldap
+
+# A daily dump of the configuration and the tree, the newest kept.
+#ldap_server_backup_dir: /var/backups/slapd
+#ldap_server_backup_keep: 14
+#ldap_server_backup_schedule: "*-*-* 02:45:00"

@@ -1,6 +1,7 @@
 ---
 dependencies:
-  - role: nis_defaults  # nis_make_server
+  - role: directory_defaults  # directory_groups, directory_netgroups, nis_domain
+  - role: retired_settings  # nis_make_server, nis_export_*
 
 galaxy_info:
   namespace: deepops

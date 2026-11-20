@@ -1,0 +1,18 @@
+---
+# Lookups stop asking NIS first, then the client goes.
+- name: Stop reading accounts from NIS
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: nis
+    nsswitch_state: absent
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nis_client
+    component_record_action: absent
+    component_record_items: "{{ nis_client_items }}"
+    # yp-tools comes with the NIS server too; only its record frees it.
+    component_record_exclusive_packages: "{{ nis_client_packages | difference(['yp-tools']) }}"

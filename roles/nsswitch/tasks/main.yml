@@ -1,0 +1,17 @@
+---
+- name: Check the request
+  ansible.builtin.assert:
+    that:
+      - nsswitch_source | length > 0
+      - nsswitch_state in ['present', 'absent']
+    fail_msg: nsswitch needs a source and a state (present or absent).
+    quiet: true
+
+- name: Set the name-service source
+  nsswitch_source:
+    path: "{{ nsswitch_path }}"
+    source: "{{ nsswitch_source }}"
+    databases: "{{ nsswitch_databases }}"
+    replaces: "{{ nsswitch_replaces }}"
+    state: "{{ nsswitch_state }}"
+  register: nsswitch_result

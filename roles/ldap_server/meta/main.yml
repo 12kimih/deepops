@@ -1,0 +1,15 @@
+---
+dependencies:
+  - role: directory_defaults  # ldap_* settings, directory_groups, directory_netgroups
+  - role: people_defaults  # people, people_home_root, people_default_shell
+
+galaxy_info:
+  namespace: deepops
+  role_name: ldap_server
+  author: DeepOps
+  description: The cluster's OpenLDAP directory, filled from the people roster
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]

@@ -59,8 +59,9 @@ These are additive -- upstream had no equivalent default:
 - **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner
   and shared directories (`group_vars/slurm-cluster.yml`), and the login-node limits
   (`group_vars/slurm-login.yml`).
-- **Identity** -- a NIS master (`group_vars/nis-master.yml`: `nis_export_groups`,
-  `nis_export_netgroups`), the docker socket group and the sudo netgroup
+- **Identity** -- the directory (NIS or LDAP: `directory_service`, `directory_groups`,
+  `directory_netgroups` in `group_vars/all.yml`; `group_vars/nis-master.yml`,
+  `group_vars/ldap-server.yml`), the docker socket group and the sudo netgroup
   (`cluster_docker_group_*`, `cluster_sudoers_*` in `group_vars/all.yml`).
 - **Node operations** (`group_vars/all.yml`) -- `docker_daemon_options` / `docker_sysctls`,
   `hosts_internal_subnet_prefix`, `ansible_python_interpreter`, and the netplan, serial
@@ -101,8 +102,9 @@ These are additive -- upstream had no equivalent default:
 - **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner
   and shared directories (`group_vars/slurm-cluster.yml`), and the login-node limits
   (`group_vars/slurm-login.yml`).
-- **Identity** -- a NIS master (`group_vars/nis-master.yml`: `nis_export_groups`,
-  `nis_export_netgroups`), the docker socket group and the sudo netgroup
+- **Identity** -- the directory (NIS or LDAP: `directory_service`, `directory_groups`,
+  `directory_netgroups` in `group_vars/all.yml`; `group_vars/nis-master.yml`,
+  `group_vars/ldap-server.yml`), the docker socket group and the sudo netgroup
   (`cluster_docker_group_*`, `cluster_sudoers_*` in `group_vars/all.yml`).
 - **Node operations** (`group_vars/all.yml`) -- `docker_daemon_options` / `docker_sysctls`,
   `hosts_internal_subnet_prefix`, `ansible_python_interpreter`, and the netplan, serial

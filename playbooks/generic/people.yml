@@ -1,9 +1,10 @@
 ---
 # Create and lock the people roster's accounts (roles/people) on the given hosts.
 #
-# With a directory service the accounts live on its master only, and authentication.yml
-# runs the role there (people_manage_accounts). Use this playbook where there is none,
-# so every node gets the same accounts with the same UIDs:
+# With a directory the accounts live there (NIS: the master's files; LDAP: the
+# directory) and authentication.yml keeps them on the account source
+# (people_manage_accounts). Use this playbook where there is none, so every node gets
+# the same accounts with the same UIDs:
 #
 #   ansible-playbook -K playbooks/generic/people.yml
 - hosts: "{{ hostlist | default('all') }}"
@@ -11,13 +12,15 @@
   tags:
     - people
   pre_tasks:
-    # With NIS, local accounts on every node would shadow the directory's (nsswitch
-    # reads files first); there authentication.yml runs the role on the master only.
-    - name: Refuse to create local accounts beside a directory service
+    # Local accounts on every node would shadow the directory's (nsswitch reads files
+    # first).
+    - name: Refuse to create local accounts beside a directory
       ansible.builtin.assert:
-        that: nis_domain | length == 0
-        fail_msg: This site uses NIS (nis_domain); accounts belong on its master, through authentication.yml.
+        that: directory_service == 'none'
+        fail_msg: >-
+          This host reads accounts from {{ directory_service }} (directory_service); they
+          belong in the directory, through authentication.yml.
         quiet: true
   roles:
-    - role: nis_defaults  # nis_domain
+    - role: deploy_defaults  # directory_service
     - role: people

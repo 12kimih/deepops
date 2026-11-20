@@ -66,8 +66,8 @@ Roles run as part of the various playbooks. Includes default values and tasks as
 Every variable has one default, in one role, at the lowest precedence, so `config/`
 sets only what differs and an upgrade that adds a variable never breaks it. A value
 several roles read lives in a defaults-only role they depend on (`slurm_paths`,
-`prometheus_paths`, `deepops_paths`, `nis_defaults`). What a deploy includes, the
-switches its imports and plays read, lives in `deploy_defaults`. A play or role reading
+`prometheus_paths`, `deepops_paths`, `directory_defaults`, `people_defaults`). What a
+deploy includes, the switches its imports and plays read, lives in `deploy_defaults`. A play or role reading
 another role's default loads that role (a play lists it in its roles, as Kubespray's
 plays list `kubespray_defaults`; a role names it in its meta dependencies), and no
 reader writes `| default(...)` for a defined variable;
@@ -95,6 +95,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── default_target
 │   ├── deploy_defaults
 │   ├── deploy_record
+│   ├── directory_defaults
 │   ├── dns-config
 │   ├── dns_resolver
 │   ├── docker
@@ -111,8 +112,10 @@ reader writes `| default(...)` for a defined variable;
 │   ├── grafana
 │   ├── helm_release
 │   ├── host_baseline
+│   ├── internal_ca
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
+│   ├── ldap_server
 │   ├── lmod
 │   ├── local_accounts
 │   ├── locale
@@ -133,9 +136,9 @@ reader writes `| default(...)` for a defined variable;
 │   ├── nginx_docker_cache_defaults
 │   ├── nhc
 │   ├── nis_client
-│   ├── nis_defaults
 │   ├── nis_server
 │   ├── node_user_policy
+│   ├── nsswitch
 │   ├── nvidia-dcgm-exporter
 │   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware
@@ -159,6 +162,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── os_updates
 │   ├── package_repos
 │   ├── people
+│   ├── people_defaults
 │   ├── podman
 │   ├── prometheus
 │   ├── prometheus-ipmi-exporter
@@ -183,6 +187,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── slurm_usage_report
 │   ├── source_build
 │   ├── spack
+│   ├── sssd_client
 │   ├── stale_files
 │   ├── standalone-container-registry
 │   └── system_accounts

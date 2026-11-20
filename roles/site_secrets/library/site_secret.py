@@ -3,7 +3,7 @@
 
 DOCUMENTATION = r"""
 module: site_secret
-short_description: Create a missing secret file (random bytes or a GPG signing key pair)
+short_description: Create a missing secret file (random bytes, a password or a GPG signing key pair)
 description:
   - Runs on the controller. Does nothing when the file exists, so a site keeps its keys.
   - With I(adopt_from), writes I(content) (a host's installed copy) instead of a new
@@ -17,12 +17,15 @@ options:
     type: path
     required: true
   kind:
-    description: C(random) bytes from the OS CSPRNG, or a C(gpg_signing) key pair.
+    description:
+      - C(random) bytes from the OS CSPRNG; a C(password), the same made printable
+        (URL-safe base64, for a service's configuration file); or a C(gpg_signing) key
+        pair.
     type: str
-    choices: [random, gpg_signing]
+    choices: [random, password, gpg_signing]
     required: true
   length:
-    description: Bytes of a C(random) secret.
+    description: Bytes of randomness in a C(random) secret or a C(password).
     type: int
     default: 1024
   uid:
@@ -130,7 +133,7 @@ def main():
     module = AnsibleModule(
         argument_spec={
             "path": {"type": "path", "required": True},
-            "kind": {"type": "str", "required": True, "choices": ["random", "gpg_signing"]},
+            "kind": {"type": "str", "required": True, "choices": ["random", "password", "gpg_signing"]},
             "length": {"type": "int", "default": 1024},
             "uid": {"type": "str"},
             "public_path": {"type": "path"},
@@ -172,10 +175,15 @@ def main():
             module.fail_json(msg=f"the copy read from {p['adopt_from']} does not match the agreed checksum")
         write_new(module, p["path"], data, mode, p["vault"])
         module.exit_json(changed=True, created=[], adopted=adopted)
-    if p["kind"] == "random":
+    if p["kind"] in ("random", "password"):
         if p["length"] < 32:
             module.fail_json(msg="length must be at least 32 bytes")
-        write_new(module, p["path"], secrets.token_bytes(p["length"]), mode, p["vault"])
+        made = (
+            secrets.token_bytes(p["length"])
+            if p["kind"] == "random"
+            else secrets.token_urlsafe(p["length"]).encode()
+        )
+        write_new(module, p["path"], made, mode, p["vault"])
     else:
         secret, public = gpg_pair(module, p["uid"])
         write_new(module, p["path"], secret.encode(), mode, p["vault"])

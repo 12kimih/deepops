@@ -1,7 +1,8 @@
 ---
-# Verify that every group published through NIS resolves to its pinned GID on every
-# node. Read-only; changes nothing. Fails the play on the first mismatch so it can
-# gate a maintenance run.
+# Verify that every cluster group (directory_groups, roles/directory_defaults) resolves
+# to its pinned GID on every node, whichever directory publishes it (NIS or LDAP).
+# Read-only; changes nothing. Fails the play on the first mismatch so it can gate a
+# maintenance run.
 #
 #   ansible-playbook playbooks/utilities/check-id-consistency.yml
 #
@@ -15,35 +16,26 @@
 #
 # The same asymmetry makes `usermod -aG <group> <user>` on a compute node a no-op
 # inside jobs -- that node's group file is never consulted for job credentials. Groups
-# that must be meaningful inside a job therefore have to be published through NIS with
-# a pinned GID (nis_export_groups in roles/nis_server). This playbook checks that it
-# took effect on every node.
+# that must be meaningful inside a job therefore have to be published by the directory
+# with a pinned GID. This playbook checks that it took effect on every node.
 - hosts: "{{ hostlist | default('all') }}"
   become: false
   gather_facts: false
   tags:
     - check-id-consistency
-  vars:
-    # nis_export_groups is declared for the NIS master (group_vars/nis-master.yml), so
-    # it is undefined on the nodes this playbook exists to check. Read it out of the
-    # master's hostvars, which is where the cluster-wide answer lives.
-    check_id_from_master: >-
-      {{ (groups['nis-master'] | default([]))
-         | map('extract', hostvars, 'nis_export_groups') | select('defined') | list }}
-    check_id_groups: >-
-      {{ nis_export_groups if nis_export_groups is defined
-         else (check_id_from_master | first | default([])) }}
+  roles:
+    - role: directory_defaults  # directory_groups
   tasks:
-    - name: Skip when no groups are published through NIS
+    - name: Skip when the directory publishes no groups
       ansible.builtin.meta: end_host
-      when: (check_id_groups | length) == 0
+      when: (directory_groups | length) == 0
 
     - name: Resolve each published group on this node
       ansible.builtin.getent:
         database: group
         key: "{{ item.name }}"
         fail_key: false
-      loop: "{{ check_id_groups }}"
+      loop: "{{ directory_groups }}"
       loop_control:
         label: "{{ item.name }}"
       register: check_id_resolved
@@ -63,9 +55,10 @@
           Group '{{ item.item.name }}' does not resolve to gid {{ item.item.gid }} on
           {{ inventory_hostname }}
           (got {{ (check_id_entry | length >= 2) | ternary(check_id_entry[1] | default(''), 'no such group') }}).
-          Either the NIS maps were not rebuilt on the master (`make -C /var/yp`), this
-          node is not bound to NIS (`ypwhich`), or a LOCAL group of the same name
-          shadows the NIS one -- nsswitch resolves `files` before `nis`.
+          Either the directory has not published it yet (NIS: `make -C /var/yp` on the
+          master; LDAP: a deploy, then `sss_cache -E` here), this node does not reach
+          its directory (`ypwhich`, `sssctl domain-status cluster`), or a LOCAL group of
+          the same name shadows the directory's -- nsswitch resolves `files` first.
         success_msg: "{{ item.item.name }} = gid {{ item.item.gid }}"
       loop: "{{ check_id_resolved.results }}"
       loop_control:

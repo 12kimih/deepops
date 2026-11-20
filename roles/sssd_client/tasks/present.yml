@@ -1,0 +1,144 @@
+---
+- name: Check the directory settings
+  ansible.builtin.assert:
+    that:
+      - ldap_suffix | length > 0
+      - ldap_server_host | length > 0
+      - "'sssd' in ldap_readers"
+    fail_msg: >-
+      SSSD needs the directory: ldap_suffix, an [ldap-server] host, and its read-only
+      account (sssd in ldap_readers).
+    quiet: true
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: sssd_client
+    component_record_action: begin
+    component_record_items: "{{ sssd_client_items }}"
+
+- name: Trust the cluster CA
+  ansible.builtin.include_role:
+    name: internal_ca
+    tasks_from: trust
+  vars:
+    internal_ca_name: "{{ ldap_ca_name }}"
+    internal_ca_host: "{{ ldap_server_host }}"
+    internal_ca_trust_path: "{{ ldap_ca_file }}"
+
+- name: Install SSSD
+  ansible.builtin.package:
+    name: "{{ sssd_client_packages }}"
+    state: present
+
+# Holds the read-only account's password: root's alone, and never shown in a diff.
+- name: Configure SSSD
+  ansible.builtin.template:
+    src: sssd.conf.j2
+    dest: /etc/sssd/sssd.conf
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false
+  register: sssd_client_conf
+
+- name: Restart SSSD for a new CA or configuration
+  ansible.builtin.debug:
+    msg: The SSSD configuration or the CA changed; sssd restarts and its cache is flushed.
+  changed_when: true
+  notify: Restart sssd
+  when: sssd_client_conf is changed or (internal_ca_trust_result | default({})) is changed
+
+# Debian: libpam-sss's profile (pam-auth-update), enabled by default at install; turned
+# back on if someone took it off. Home directories are made on the account source, never
+# by pam_mkhomedir: over NFS with root_squash it would fail or leave root-owned homes.
+- name: Read whether PAM asks SSSD (Debian)
+  ansible.builtin.command:
+    argv: [grep, -q, pam_sss.so, /etc/pam.d/common-auth]
+  register: sssd_client_pam
+  changed_when: false
+  failed_when: sssd_client_pam.rc > 1
+  check_mode: false  # read-only; --check needs the result
+  when: ansible_facts.os_family == 'Debian'
+
+- name: Let PAM ask SSSD (Debian)
+  ansible.builtin.command:
+    argv: [pam-auth-update, --enable, sss]
+  changed_when: true
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - sssd_client_pam.rc == 1
+
+# RHEL: authselect owns PAM and nsswitch.conf; its sssd profile is both.
+- name: Read the authselect profile (RHEL)
+  ansible.builtin.command:
+    argv: [authselect, current, --raw]
+  register: sssd_client_authselect
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: ansible_facts.os_family == 'RedHat'
+
+- name: Select the sssd profile (RHEL)
+  ansible.builtin.command:
+    argv: [authselect, select, sssd, --force]
+  changed_when: true
+  when:
+    - ansible_facts.os_family == 'RedHat'
+    - sssd_client_authselect.stdout | default('') is not match('^sssd')
+
+- name: Read accounts from SSSD (Debian)
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: sss
+    nsswitch_databases: "{{ sssd_client_databases }}"
+    nsswitch_replaces: [nis]
+  when: ansible_facts.os_family == 'Debian'
+
+- name: Remove the name-service caches
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: "{{ directory_remove_caches }}"
+
+- name: Start SSSD
+  ansible.builtin.service:
+    name: sssd
+    state: started
+    enabled: true
+
+# After the server was away (a restart for a renewed certificate) SSSD retries on a
+# growing backoff, answering from its cache meanwhile; SIGUSR2 makes it go online now
+# (sssd(8)), so what this run changed in the directory is seen at once.
+- name: Read whether SSSD reaches the directory
+  ansible.builtin.command:
+    argv: [sssctl, domain-status, "{{ sssd_client_domain }}", --online]
+  register: sssd_client_online
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Bring SSSD back online
+  ansible.builtin.command:
+    argv: [systemctl, kill, --signal=SIGUSR2, sssd]
+  changed_when: true
+  when: sssd_client_online.stdout is search('Offline')
+
+# A roster change this run made in the directory (a revoked admin, a new member) takes
+# effect at once rather than when the cached answers expire.
+- name: Forget cached answers the directory changed this run
+  ansible.builtin.command:
+    argv: [sss_cache, -E]
+  changed_when: true
+  when: (hostvars[ldap_server_host].ldap_server_sync | default({})) is changed
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: sssd_client
+    component_record_action: present
+    component_record_items: "{{ sssd_client_items }}"

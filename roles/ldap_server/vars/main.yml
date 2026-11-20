@@ -1,0 +1,58 @@
+---
+# What this component installs, for its record (roles/component_record). The database
+# (/var/lib/ldap) and the backups are data and stay; the CA goes with the server and a
+# new one is made, and trusted everywhere, if the server comes back.
+ldap_server_items:
+  - package:slapd
+  - package:ldap-utils
+  - package:python3-ldap
+  # Stopped before the package goes: its init script forks it, and systemd may not
+  # know the process to stop when the package's files are already gone.
+  - unit:slapd
+  - unit:slapd-backup.timer
+  - file:/etc/systemd/system/slapd-backup.timer
+  - file:/etc/systemd/system/slapd-backup.service
+  - file:{{ ldap_server_backup_script }}
+  - file:{{ ldap_server_tls_dir }}/server.crt
+  - file:{{ ldap_server_tls_dir }}/server.key
+  - dir:{{ ldap_server_tls_dir }}
+  - file:{{ ldap_ca_file }}
+  - file:/etc/deepops/ca/{{ ldap_ca_name }}/ca.crt
+  - file:/etc/deepops/ca/{{ ldap_ca_name }}/ca.key
+  - dir:/etc/deepops/ca/{{ ldap_ca_name }}
+
+# The identity root has over the local socket (SASL EXTERNAL), which manages everything.
+ldap_server_root: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
+
+# The server's settings, as ldap_tree entries (cn=config). Access: a password only to
+# its owner (to change it) and to a bind; the read-only accounts' own entries only to
+# themselves; everything else to anyone who bound (SSSD, Dex, a person), nothing to
+# anonymous. olcSecurity ssf=71 refuses every operation not over TLS or the local socket.
+ldap_server_config:
+  - dn: cn=config
+    attributes:
+      olcTLSCACertificateFile: ["{{ ldap_ca_file }}"]
+      olcTLSCertificateFile: ["{{ ldap_server_tls_dir }}/server.crt"]
+      olcTLSCertificateKeyFile: ["{{ ldap_server_tls_dir }}/server.key"]
+      olcPasswordCryptSaltFormat: ["$6$%.16s"]
+      olcSecurity: [ssf=71]
+  - dn: olcDatabase={-1}frontend,cn=config
+    attributes:
+      olcPasswordHash: ["{CRYPT}"]
+  - dn: olcDatabase={1}mdb,cn=config
+    attributes:
+      olcAccess:
+        - >-
+          {0}to attrs=userPassword
+          by dn.exact="{{ ldap_server_root }}" manage
+          by self write by anonymous auth by * none
+        - >-
+          {1}to dn.subtree="ou=services,{{ ldap_suffix }}"
+          by dn.exact="{{ ldap_server_root }}" manage
+          by self read by * none
+        - >-
+          {2}to *
+          by dn.exact="{{ ldap_server_root }}" manage
+          by users read by * none
+      olcDbIndex: "{{ ldap_server_indexes }}"
+      olcRootPW: []
