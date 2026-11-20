@@ -92,6 +92,41 @@ def configs():
     return out
 
 
+def known_paths(files):
+    """Each of FILES (relative paths) and every directory holding one."""
+    known = set()
+    for rel in files:
+        known.add(rel)
+        known.update(str(parent) for parent in Path(rel).parents)
+    return known
+
+
+def documents():
+    """(shown, text, site) for each Markdown page that names deepops' paths, settings
+    and commands: deepops' own (but MODERNIZATION.md, the change log, which names what
+    was removed on purpose) and the site config's (its admin and user guides hand out
+    deepops' playbooks too; config.example's are deepops' own already). `site` is None
+    for deepops' pages, else (the site's own paths, its inventory's words): a site page
+    also names its own files (its docs/) and hosts (-l <node>). A site page is private."""
+    for doc in tracked("*.md"):
+        if doc.is_file() and doc.name != "MODERNIZATION.md":
+            yield str(doc.relative_to(ROOT)), doc.read_text(errors="ignore"), None
+    for _, tree, private in configs():
+        if not private:
+            continue
+        files = tree.files()
+        site = (known_paths(files), set(re.findall(r"[A-Za-z0-9_.-]+", tree.text("inventory") or "")))
+        for rel in files:
+            text = tree.text(rel) if rel.endswith(".md") else None
+            if text is not None:
+                yield f"config/{rel}", text, site
+
+
+def found(check, shown, number, what, site):
+    """One problem line; a site page shows only where (config/ is private)."""
+    return f"{check}: {shown}:{number}" + ("" if site else f": {what}")
+
+
 class Fixes:
     """Line edits to files, applied bottom-up so earlier line numbers stay valid."""
 
@@ -229,16 +264,14 @@ def check_doc_vars():
     if words is None:
         return ["doc-vars: submodules/kubespray is not checked out (git submodule update --init)"]
     gone, problems = retired(), []
-    for doc in tracked("*.md"):
-        # MODERNIZATION.md is the change log: it names settings that were removed.
-        if not doc.is_file() or doc.name == "MODERNIZATION.md":
-            continue
-        for number, name in doc_settings(doc.read_text()):
-            where = f"doc-vars: {doc.relative_to(ROOT)}:{number}"
+    for shown, text, site in documents():
+        for number, name in doc_settings(text):
             if name in gone:
-                problems.append(f"{where}: {name} is retired: set {gone[name]} instead")
+                problems.append(
+                    found("doc-vars", shown, number, f"{name} is retired: set {gone[name]} instead", site)
+                )
             elif name not in words:
-                problems.append(f"{where}: nothing reads {name}")
+                problems.append(found("doc-vars", shown, number, f"nothing reads {name}", site))
     return problems
 
 
@@ -322,22 +355,15 @@ def source_key(path):
 def check_doc_paths():
     # A path counts when git tracks it (a file, or a directory holding tracked files):
     # a doc naming a file only this checkout has would pass here and fail in CI.
-    known = set()
-    for path in tracked():
-        rel = path.relative_to(ROOT)
-        known.add(str(rel))
-        known.update(str(parent) for parent in rel.parents)
+    known = known_paths(str(path.relative_to(ROOT)) for path in tracked())
     problems = []
-    for doc in tracked("*.md", "skills"):
-        # MODERNIZATION.md is the change log: it names files that were removed on purpose.
-        if not doc.is_file() or doc.suffix != ".md" or doc.name == "MODERNIZATION.md":
-            continue
-        for number, line in enumerate(doc.read_text().splitlines(), 1):
+    for shown, text, site in documents():
+        for number, line in enumerate(text.splitlines(), 1):
             for path in PATH.findall(line):
                 if any(c in path for c in "*<>{}") or path.endswith("/..."):
                     continue
-                if path.rstrip("/") not in known:
-                    problems.append(f"doc-paths: {doc.relative_to(ROOT)}:{number}: {path} does not exist")
+                if path.rstrip("/") not in known and not (site and path.rstrip("/") in site[0]):
+                    problems.append(found("doc-paths", shown, number, f"{path} does not exist", site))
     return problems
 
 
@@ -381,10 +407,9 @@ def check_doc_limits():
 
     problems = []
     command = re.compile(r"ansible-playbook\b[^\n`]*")
-    for doc in tracked("*.md"):
-        if not doc.is_file():
-            continue
-        for number, line in enumerate(doc.read_text(errors="ignore").splitlines(), 1):
+    for shown, text, site in documents():
+        hosts = names | site[1] if site else names
+        for number, line in enumerate(text.splitlines(), 1):
             for cmd in command.findall(line):
                 limit = re.search(r"(?:-l|--limit)[ =](\S+)", cmd)
                 playbook = re.search(r"(playbooks/[\w./-]+\.ya?ml)", cmd)
@@ -397,15 +422,14 @@ def check_doc_limits():
                     name = name.lstrip("!&")
                     if not name or re.search(r"[<>{}$*]", name) or name == "localhost":
                         continue
-                    where = f"doc-limits: {doc.relative_to(ROOT)}:{number}: -l {name}"
-                    if name not in names:
-                        problems.append(f"{where}: config.example/inventory has no such group or host")
+                    if name not in hosts:
+                        why = f"-l {name}: the inventory has no such group or host"
+                        problems.append(found("doc-limits", shown, number, why, site))
                     elif name in groups and not any(
                         t == "all" or t not in groups or reach(name) & reach(t) for t in targets
                     ):
-                        problems.append(
-                            f"{where}: outside {playbook.group(1)}'s hosts ({', '.join(targets)})"
-                        )
+                        why = f"-l {name}: outside {playbook.group(1)}'s hosts ({', '.join(targets)})"
+                        problems.append(found("doc-limits", shown, number, why, site))
     return problems
 
 

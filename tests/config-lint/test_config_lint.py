@@ -155,6 +155,7 @@ class DocVars(unittest.TestCase):
             doc.write_text(text)
             with (
                 mock.patch.object(cl, "ROOT", Path(d)),
+                mock.patch.object(cl, "CONFIG", Path(d) / "no-site"),
                 mock.patch.object(cl, "tracked", return_value=[doc]),
                 mock.patch.object(cl, "read_words", return_value={"slurm_install_nhc"}),
             ):
@@ -174,6 +175,31 @@ class DocVars(unittest.TestCase):
 
     def test_read_settings_and_prose_words_pass(self):
         self.assertEqual(self.problems("set `slurm_install_nhc: true`; the `no_wdelay` option\n"), [])
+
+
+class SiteDocs(Configs):
+    """The site's own guides hand out deepops' playbooks: a page there kept sending
+    admins to playbooks deepops had removed, since only deepops' pages were checked."""
+
+    def page(self, text):
+        (self.site / "docs").mkdir()
+        (self.site / "docs" / "own.md").write_text("x\n")
+        (self.site / "admin-docs").mkdir()
+        (self.site / "admin-docs" / "page.md").write_text(text)
+
+    def test_a_gone_path_is_reported_by_position_only(self):
+        self.page(
+            "run playbooks/utilities/no-such-playbook.yml\nsee docs/own.md and playbooks/utilities/power.yml\n"
+        )
+        self.assertEqual(cl.check_doc_paths(), ["doc-paths: config/admin-docs/page.md:1"])
+
+    def test_a_limit_to_a_site_host_passes_and_an_unknown_name_does_not(self):
+        (self.example / "inventory").write_text((ROOT / "config.example" / "inventory").read_text())
+        self.page(
+            "`ansible-playbook -l h1 playbooks/utilities/stale-files.yml`\n"
+            "`ansible-playbook -l nosuchhost playbooks/utilities/stale-files.yml`\n"
+        )
+        self.assertEqual(cl.check_doc_limits(), ["doc-limits: config/admin-docs/page.md:2"])
 
 
 class Shadow(unittest.TestCase):
