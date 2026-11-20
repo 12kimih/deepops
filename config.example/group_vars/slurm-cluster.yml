@@ -334,8 +334,9 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #cluster_tools_scripts: []
 
 # The cluster commands the role ships (Python, on the shared clustertools library):
-# sq (queue, users, why jobs wait, pools) and qos (the QoS you may use, quotas).
-#cluster_tools_commands: [sq, qos]  # example
+# sq (queue, users, why jobs wait, pools), qos (the QoS you may use, quotas) and
+# gpu-usage (what a job's GPUs did, from Slurm's accounting or Prometheus).
+#cluster_tools_commands: [sq, qos, gpu-usage]  # example
 
 # Commands and libraries published before the role recorded what it publishes, to remove
 # from every host (for example a command a site has retired).
@@ -364,11 +365,11 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 
 # Site facts Slurm cannot know (roles/cluster_tools_lib), set once here and read by the
 # cluster's commands, login banner and alerts; refer to them below rather than restating
-# a value. A key left empty is left out. dashboard_url derives from grafana_root_url.
+# a value. A key left empty is left out. Two more are published with them, derived:
+# dashboard_url (grafana_root_url) and prometheus_url (the prometheus component's host).
 #cluster_info:  # example
 #  name: "my-cluster"  # system ID, <org>-<kind>
 #  docs_url: "https://docs.example.edu/cluster/"  # public user docs
-#  dashboard_url: "{{ grafana_root_url | default('') }}"
 #  login_host: "cluster.example.edu"  # what users ssh to
 #  ssh_port: 22
 
@@ -382,7 +383,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #cluster_tools_motd_links:  # example
 #  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
-#  - { name: dashboard,    text: "{{ cluster_info.dashboard_url }}" }
+#  - { name: dashboard,    text: "{{ grafana_root_url }}" }
 
 # Ubuntu's motd-news fetches advertising from motd.ubuntu.com into the login banner. On
 # hosts without internet access each run fails and stays a failed systemd unit, so

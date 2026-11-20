@@ -31,7 +31,8 @@ COMPLETERS = {
 
 class Opt:
     """One option. FLAGS as in argparse; BRIEF puts it in -h; NEGATE adds a --no- form;
-    COMPLETE names a COMPLETERS entry for its value; SECTION groups it under --help."""
+    COMPLETE names a COMPLETERS entry for its value; SECTION groups it under --help. A
+    single flag without a dash is a positional argument named METAVAR (required)."""
 
     def __init__(
         self,
@@ -58,8 +59,19 @@ class Opt:
     def takes_value(self):
         return self.metavar is not None
 
+    @property
+    def positional(self):
+        return not self.flags[0].startswith("-")
+
     def add_to(self, parser):
         kw = {"help": self.help}
+        if self.positional:
+            # Optional to argparse, so -h, --help and --completion work without it;
+            # Command.parse requires it after those.
+            parser.add_argument(
+                self.flags[0], metavar=self.metavar, help=self.help, type=self.type, nargs="?"
+            )
+            return
         if self.dest:
             kw["dest"] = self.dest
         if self.negate:
@@ -79,6 +91,8 @@ class Opt:
         parser.add_argument(*self.flags, **kw)
 
     def label(self):
+        if self.positional:
+            return self.metavar
         flags = ", ".join(self.flags)
         if self.negate:
             long = next(f for f in self.flags if f.startswith("--"))
@@ -192,13 +206,14 @@ class Command:
 
     def completion(self):
         """A bash completion function for this command, generated from its options."""
+        flagged = [o for o in self.options if not o.positional]
         words = sorted(
-            {f for o in self.options for f in o.flags}
-            | {f"--no-{f[2:]}" for o in self.options if o.negate for f in o.flags if f.startswith("--")}
+            {f for o in flagged for f in o.flags}
+            | {f"--no-{f[2:]}" for o in flagged if o.negate for f in o.flags if f.startswith("--")}
             | {"-h", "--help"}
         )
         cases = []
-        for o in self.options:
+        for o in flagged:
             if o.takes_value:
                 # A named completer, else the option's own choices: a fixed set needs no command.
                 src = COMPLETERS.get(o.complete) or (o.choices and "printf '%s\\n' " + " ".join(o.choices))
@@ -240,6 +255,11 @@ class Command:
         if args._completion:
             sys.stdout.write(self.completion())
             raise SystemExit(0)
+        missing = [
+            o.metavar for o in self.options if o.positional and getattr(args, o.flags[0]) in (None, "")
+        ]
+        if missing:
+            self.parser().error(f"{' '.join(missing)} is required (usage: {self.usage})")
         if self.machine and getattr(args, self.machine.lstrip("-").replace("-", "_"), False):
             args.color = "never"
         flavour = args.theme or env.get("CLUSTER_THEME") or (self.theme_env and env.get(self.theme_env))

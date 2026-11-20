@@ -127,6 +127,13 @@ for at least one allocation interval (a minute), for as long as Prometheus keeps
 Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only with
 `AutoDetect=nvml` in gres.conf.
 
+`gpu-usage JOB` (a `cluster_tools_commands` entry) prints one job's figures, running or
+finished: Slurm's per step where the job has them, else Prometheus' per GPU, each row
+naming its source (`--source slurm|prometheus` asks for one, `--json` for scripts). The
+two differ in meaning: Slurm keeps each task's high-water mark, Prometheus the mean and
+max over the run. It reads Prometheus at the site facts' `prometheus_url`, the first host
+of the prometheus component, so every host running it must reach that port.
+
 Grafana allows you to view custom time-slices, set the polling duration, and many other dashboard customizations.
 
 For more information on creating custom dashboards and the available GPU metrics provided by Prometheus refer to the [DCGM Exporter README](https://github.com/NVIDIA/dcgm-exporter) or [Grafana home page](https://grafana.com/).
@@ -202,7 +209,7 @@ http://\<slurm-metric ip\>:9093 to view and silence alerts.
 monitoring host that posts a GPU usage report to Slack every hour
 (`slurm_usage_report_schedule`). The top-level message is a summary card (GPUs allocated,
 average utilisation, idle jobs, pending jobs, drained nodes, and a link to
-`cluster_info.dashboard_url`); the thread lists idle jobs, drain/down nodes with
+`grafana_root_url`); the thread lists idle jobs, drain/down nodes with
 reasons, pending jobs per user, and every running GPU job per user as a table with a
 utilisation bar and GPU memory.
 

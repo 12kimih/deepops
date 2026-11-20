@@ -11,10 +11,22 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 import clustertools  # noqa: E402
 
-PROGRAMS = {"sq", "qos", "usage_report", "metrics", "slurm_backup", "egress_metrics", "container_gc"}
+PROGRAMS = {
+    "sq",
+    "qos",
+    "gpu_usage",
+    "usage_report",
+    "metrics",
+    "slurm_backup",
+    "egress_metrics",
+    "container_gc",
+}
 
 
 class ProgramTests(unittest.TestCase):
@@ -31,6 +43,14 @@ class ProgramTests(unittest.TestCase):
                 module = importlib.import_module(f"clustertools.{name}")
                 self.assertTrue(callable(module.main))
                 self.assertIn('if __name__ == "__main__":', Path(module.__file__).read_text())
+
+    def test_every_built_in_command_is_the_module_it_publishes(self):
+        # roles/cluster_tools publishes NAME as clustertools.<NAME, - as _>.
+        defaults = yaml.safe_load((ROOT / "roles/cluster_tools/defaults/main.yml").read_text())
+        for name in defaults["cluster_tools_builtin"]:
+            with self.subTest(command=name):
+                module = importlib.import_module(f"clustertools.{name.replace('-', '_')}")
+                self.assertEqual(module.COMMAND.name, name)
 
     def test_modules_are_imported_never_run_as_files(self):
         # Commands reach a module through its wrapper or `python3 -m`; a shebang or an

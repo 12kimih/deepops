@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: prometheus_paths  # grafana_root_url
+  - role: prometheus_paths  # grafana_root_url, prometheus_url
 
 galaxy_info:
   namespace: deepops

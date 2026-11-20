@@ -31,9 +31,6 @@ import json
 import re
 import sys
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 import yaml
@@ -42,6 +39,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "scripts/deepops"))
 from clustertools import metrics as slurm_metrics  # noqa: E402
+from clustertools.prometheus import Error as PrometheusError  # noqa: E402
+from clustertools.prometheus import Prometheus  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 RULES = ROOT / "roles" / "prometheus" / "files" / "rules"
@@ -170,20 +169,6 @@ def repo_metrics():
     return reads, recorded
 
 
-class Prometheus:
-    def __init__(self, url):
-        self.url = url.rstrip("/")
-
-    def get(self, path, **params):
-        query = f"?{urllib.parse.urlencode(params)}" if params else ""
-        with urllib.request.urlopen(self.url + path + query, timeout=30) as resp:
-            body = resp.read()
-        return json.loads(body) if body.strip().startswith(b"{") else body.decode()
-
-    def query(self, expr):
-        return self.get("/api/v1/query", query=expr)["data"]["result"]
-
-
 def check(prom):
     results = {}
 
@@ -262,8 +247,9 @@ def main(argv=None):
     try:
         ready = "Ready" in str(prom.get("/-/ready"))
         results = {"ready": {"ok": ready, "detail": {}}, **check(prom)}
-    except (urllib.error.URLError, OSError, ValueError, KeyError) as e:
-        out = {"ok": False, "error": f"{args.url}: {e}"}
+    except (PrometheusError, KeyError) as e:
+        error = str(e) if isinstance(e, PrometheusError) else f"{args.url}: no {e} in a reply"
+        out = {"ok": False, "error": error}
         print(json.dumps(out) if args.json else out["error"], file=sys.stdout if args.json else sys.stderr)
         return 2
     ok = all(r["ok"] for r in results.values())

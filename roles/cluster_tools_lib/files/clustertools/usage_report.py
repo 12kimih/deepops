@@ -17,6 +17,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 
 from .files import write_atomic
+from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
 from .slurm import (
@@ -108,45 +109,33 @@ def collect_slurm(now):
 # --- Prometheus -----------------------------------------------------------------
 
 
-class Prometheus:
-    def __init__(self, url):
-        self.url = url.rstrip("/")
+def per_gpu(prom, expr):
+    """{(host, Slurm GPU index): value} for a per-GPU DCGM expression.
 
-    def query(self, expr):
-        req = f"{self.url}/api/v1/query?" + urllib.parse.urlencode({"query": expr})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = json.load(resp)
-        if body.get("status") != "success":
-            raise RuntimeError(f"Prometheus query failed: {expr}: {body}")
-        return body["data"]["result"]
-
-    def per_gpu(self, expr):
-        """{(host, Slurm GPU index): value} for a per-GPU DCGM expression.
-
-        Slurm numbers GPUs by device minor number (/dev/nvidiaN); dcgm-exporter's gpu and
-        device labels are both the NVML index, in PCI order, which can differ. Keyed on
-        either, a busy job could read another GPU's idleness and be cancelled. So the
-        expression is relabelled through host_gpu:dcgm_slurm_device:info (rules/slurm.yml),
-        made from the minor number DCGM reports: one mapping for the alerts, the
-        dashboard and this report. A GPU the mapping lacks has no data, never idle."""
-        expr = f"max by (host, gpu) ({expr}) * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info"
-        out = {}
-        for r in self.query(expr):
-            m = r["metric"]
-            dev = re.fullmatch(r"nvidia(\d+)", m.get("device", ""))
-            if not dev:
-                continue  # not a GPU series: no index Slurm would know
-            host = m.get("host") or m.get("instance", "").rsplit(":", 1)[0]
-            out[(host, int(dev.group(1)))] = float(r["value"][1])
-        return out
+    Slurm numbers GPUs by device minor number (/dev/nvidiaN); dcgm-exporter's gpu and
+    device labels are both the NVML index, in PCI order, which can differ. Keyed on
+    either, a busy job could read another GPU's idleness and be cancelled. So the
+    expression is relabelled through host_gpu:dcgm_slurm_device:info (rules/slurm.yml),
+    made from the minor number DCGM reports: one mapping for the alerts, the
+    dashboard and this report. A GPU the mapping lacks has no data, never idle."""
+    expr = f"max by (host, gpu) ({expr}) * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info"
+    out = {}
+    for r in prom.query(expr):
+        m = r["metric"]
+        dev = re.fullmatch(r"nvidia(\d+)", m.get("device", ""))
+        if not dev:
+            continue  # not a GPU series: no index Slurm would know
+        host = m.get("host") or m.get("instance", "").rsplit(":", 1)[0]
+        out[(host, int(dev.group(1)))] = float(r["value"][1])
+    return out
 
 
 def collect_gpus(prom, window):
     return {
         # Percent, the unit idle_util_threshold is set in; DCGM reports a 0 to 1 ratio.
-        "util_max": prom.per_gpu(f"100 * max_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[{window}s])"),
-        "util": prom.per_gpu("100 * avg_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[10m])"),
-        "mem_gib": prom.per_gpu("DCGM_FI_DEV_FB_USED_BYTES / 2^30"),
+        "util_max": per_gpu(prom, f"100 * max_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[{window}s])"),
+        "util": per_gpu(prom, "100 * avg_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[10m])"),
+        "mem_gib": per_gpu(prom, "DCGM_FI_DEV_FB_USED_BYTES / 2^30"),
     }
 
 

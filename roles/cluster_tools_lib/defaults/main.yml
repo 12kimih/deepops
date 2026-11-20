@@ -25,8 +25,13 @@ cluster_tools_lib_python: /usr/bin/python3
 cluster_info:
   name: ""  # system ID, e.g. <org>-<kind>
   docs_url: ""  # public user docs
-  dashboard_url: "{{ grafana_root_url }}"
   login_host: ""  # what users ssh to
   ssh_port: 22
+# Facts derived from other settings, published with cluster_info (a key set there wins).
+# Kept apart because a site's cluster_info replaces the whole dict: one listed there
+# would silently go missing at every site that sets its own.
+cluster_tools_lib_derived_info:
+  dashboard_url: "{{ grafana_root_url }}"
+  prometheus_url: "{{ prometheus_url }}"  # gpu-usage reads Prometheus here
 # clustertools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.
 cluster_tools_lib_info_file: /etc/cluster-tools/cluster.json

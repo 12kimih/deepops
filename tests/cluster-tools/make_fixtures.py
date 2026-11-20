@@ -5,7 +5,9 @@ Capture on a Slurm client (read-only):
     scontrol --json show nodes > nodes.json;  scontrol --json show partitions > partitions.json
     scontrol -d --json show jobs > jobs.json; sacctmgr --json show qos > qos.json
     sacctmgr --json show assoc > assoc.json
+    sacct --json -a -S now-3days -E now > accounting.json
 then run:  make_fixtures.py CAPTURE_DIR fixtures/slurm-<release>
+Only the files the capture holds are written, so a part can be refreshed alone.
 
 Only the fields the tools read are kept, and every site-specific name is replaced by a
 generic one derived from the data itself (GPU types by order, users, accounts, QoS team
@@ -66,7 +68,23 @@ JOB_FIELDS = (
 )
 QOS_FIELDS = ("name", "priority", "preempt", "flags", "limits")
 ASSOC_FIELDS = ("account", "user", "qos", "default", "is_default", "partition")
+ACCOUNTING_FIELDS = (
+    "job_id",
+    "user",
+    "account",
+    "partition",
+    "nodes",
+    "state",
+    "time",
+    "array",
+    "steps",
+    "tres",
+)
+STEP_FIELDS = ("step", "state")
+ACCOUNTING_KEPT = 12  # each record carries its steps' TRES lists
+STEP_NAMES = {"batch", "extern", "interactive"}  # Slurm's own; others are commands
 JOBS_KEPT = 40
+FILES = ("nodes", "partitions", "jobs", "qos", "assoc", "accounting")
 
 
 def _whole(name):
@@ -80,38 +98,80 @@ def pick(d, fields):
     return {k: d[k] for k in fields if k in d}
 
 
+def accounting_jobs(jobs):
+    """Finished jobs that used something, one per state and array kind first (an array
+    task among them), each with only the fields the tools read (TRESUsageIn max and
+    average of each step, the allocation, the run's times); command step names become
+    step<N>."""
+    used = [j for j in jobs if any(s["tres"]["requested"]["max"] for s in j["steps"])]
+    seen, kept = set(), []
+    for j in used:
+        kind = (tuple(j["state"]["current"]), bool(j["array"]["job_id"]))
+        if kind not in seen:
+            seen.add(kind)
+            kept.append(j)
+    kept += [j for j in used if j not in kept][: max(0, ACCOUNTING_KEPT - len(kept))]
+    out = []
+    for j in kept:
+        job = pick(j, ACCOUNTING_FIELDS)
+        job["steps"] = []
+        for i, s in enumerate(j["steps"]):
+            step = pick(s, STEP_FIELDS)
+            name = s["step"]["name"]
+            step["step"] = {"id": s["step"]["id"], "name": name if name in STEP_NAMES else f"step{i}"}
+            step["tres"] = {"requested": pick(s["tres"]["requested"], ("max", "average"))}
+            job["steps"].append(step)
+        job["array"] = pick(j["array"], ("job_id", "task_id", "task"))
+        job["time"] = pick(j["time"], ("start", "end", "elapsed"))
+        job["state"] = pick(j["state"], ("current",))
+        job["tres"] = pick(j["tres"], ("allocated",))
+        out.append(job)
+    return out
+
+
 def main(src, dst):
     src, dst = Path(src), Path(dst)
-    raw = {
-        f: json.loads((src / f"{f}.json").read_text())
-        for f in ("nodes", "partitions", "jobs", "qos", "assoc")
-    }
+    raw = {f: json.loads((src / f"{f}.json").read_text()) for f in FILES if (src / f"{f}.json").exists()}
+    if not raw:
+        sys.exit(f"{src}: none of {', '.join(f + '.json' for f in FILES)}")
+    empty = {"nodes": [], "jobs": [], "qos": [], "associations": []}
+    nodes = raw.get("nodes", empty)["nodes"]
+    jobs = raw.get("jobs", empty)["jobs"]
+    assoc = raw.get("assoc", empty)["associations"]
+    accounting = raw.get("accounting", empty)["jobs"]
 
     # Names to replace, discovered from the data.
     names = {}
     types = sorted(
-        {t for n in raw["nodes"]["nodes"] for t in re.findall(r"gpu:([^:,(]+):", n.get("gres") or "")}
+        {t for n in nodes for t in re.findall(r"gpu:([^:,(]+):", n.get("gres") or "")}
+        | {
+            t["name"][4:]
+            for j in accounting
+            for t in j["tres"]["allocated"]
+            if t.get("name", "").startswith("gpu:")
+        }
     )
     for real, generic in zip(types, GPU_NAMES):
         names[real] = generic
     users = sorted(
-        {j["user_name"] for j in raw["jobs"]["jobs"]}
-        | {a["user"] for a in raw["assoc"]["associations"] if a.get("user")}
-        | {n.get("reason_set_by_user") for n in raw["nodes"]["nodes"]} - {None, ""}
+        {j["user_name"] for j in jobs}
+        | {j["user"] for j in accounting}
+        | {a["user"] for a in assoc if a.get("user")}
+        | {n.get("reason_set_by_user") for n in nodes} - {None, ""}
     )
     for i, u in enumerate(u for u in users if u not in KEEP_WORDS):
         names[u] = f"user{i + 1}"
-    accounts = sorted({a["account"] for a in raw["assoc"]["associations"]})
+    accounts = sorted({a["account"] for a in assoc} | {j["account"] for j in accounting})
     for i, a in enumerate(a for a in accounts if a not in KEEP_WORDS and a not in names):
         names[a] = f"acct{i + 1}"
-    suffixes = sorted({q["name"].split("_", 1)[1] for q in raw["qos"]["qos"] if "_" in q["name"]})
+    qos = raw.get("qos", empty)["qos"]
+    suffixes = sorted({q["name"].split("_", 1)[1] for q in qos if "_" in q["name"]})
     for i, s in enumerate(suffixes):
         names[f"_{s}"] = f"_t{i + 1}"  # numbered: a letter could equal a real suffix
-    for q in raw["qos"]["qos"]:
+    for q in qos:
         if "_" not in q["name"] and q["name"] not in KEEP_WORDS:
             names[q["name"]] = f"qos{len(names)}"
 
-    jobs = raw["jobs"]["jobs"]
     seen, kept = set(), []
     for j in jobs:  # one job per kind first, then fill up
         kind = (tuple(j["job_state"]), j.get("state_reason"), j.get("qos"), bool(j.get("array_task_string")))
@@ -120,33 +180,27 @@ def main(src, dst):
             kept.append(j)
     kept += [j for j in jobs if j not in kept][: max(0, JOBS_KEPT - len(kept))]
 
-    out = {
-        "nodes": {
-            "meta": raw["nodes"]["meta"],
-            "nodes": [pick(n, NODE_FIELDS) for n in raw["nodes"]["nodes"]],
-        },
-        "partitions": {
-            "meta": raw["partitions"]["meta"],
+    build = {
+        "nodes": lambda d: {"nodes": [pick(n, NODE_FIELDS) for n in d["nodes"]]},
+        "partitions": lambda d: {
             "partitions": [
                 {
                     "name": p["name"],
                     "partition": {"state": p["partition"]["state"]},
                     "nodes": {"configured": p["nodes"]["configured"]},
                 }
-                for p in raw["partitions"]["partitions"]
-            ],
+                for p in d["partitions"]
+            ]
         },
-        "jobs": {
-            "meta": raw["jobs"]["meta"],
-            "jobs": [dict(pick(j, JOB_FIELDS), name=f"job{i + 1}") for i, j in enumerate(kept)],
+        "jobs": lambda d: {
+            "jobs": [dict(pick(j, JOB_FIELDS), name=f"job{i + 1}") for i, j in enumerate(kept)]
         },
-        "qos": {"meta": raw["qos"]["meta"], "qos": [pick(q, QOS_FIELDS) for q in raw["qos"]["qos"]]},
-        "assoc": {
-            "meta": raw["assoc"]["meta"],
-            "associations": [pick(a, ASSOC_FIELDS) for a in raw["assoc"]["associations"]],
-        },
+        "qos": lambda d: {"qos": [pick(q, QOS_FIELDS) for q in d["qos"]]},
+        "assoc": lambda d: {"associations": [pick(a, ASSOC_FIELDS) for a in d["associations"]]},
+        "accounting": lambda d: {"jobs": accounting_jobs(accounting)},
     }
-    for n in out["nodes"]["nodes"]:
+    out = {f: {"meta": d["meta"], **build[f](d)} for f, d in raw.items()}
+    for n in out.get("nodes", {"nodes": []})["nodes"]:
         if n.get("reason") not in KEEP_WORDS:
             n["reason"] = "admin note"
     for d in out.values():
@@ -178,10 +232,10 @@ def main(src, dst):
     dst.mkdir(parents=True, exist_ok=True)
     for f, text in texts.items():
         (dst / f"{f}.json").write_text(text + "\n")
-    print(
-        f"wrote {dst}: {len(out['jobs']['jobs'])} jobs, {len(out['nodes']['nodes'])} nodes, "
-        f"{len(names)} names replaced"
+    counts = ", ".join(
+        f"{f} {len(next(v for v in d.values() if isinstance(v, list)))}" for f, d in out.items()
     )
+    print(f"wrote {dst}: {counts}; {len(names)} names replaced")
 
 
 if __name__ == "__main__":
