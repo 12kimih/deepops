@@ -28,41 +28,22 @@
     path: /sys/fs/cgroup/cgroup.controllers
   register: slurm_cgroup_v2
 
-- name: Add cgroups to grub options
+# The line earlier versions appended to /etc/default/grub; the arguments now live in
+# their own file (roles/host_baseline, kernel_args).
+- name: Remove the cgroup line from the grub defaults
   ansible.builtin.lineinfile:
-    dest: /etc/default/grub
-    insertafter: "^GRUB_CMDLINE_LINUX=[^\\\\$]"
+    path: /etc/default/grub
     line: 'GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} cgroup_enable=memory swapaccount=1"'
-  register: update_grub
-  when: not slurm_cgroup_v2.stat.exists
+    state: absent
 
-- name: Update grub
-  when: update_grub.changed and ansible_facts.os_family == "Debian"
-  block:
-    - name: Update grub
-      ansible.builtin.command: update-grub
-      register: update_grub_cmd
-      changed_when: update_grub_cmd.rc == 0
-    - name: Ask for a reboot to apply the cgroup kernel options
-      ansible.builtin.include_role:
-        name: maintenance
-        tasks_from: reboot_request
-      vars:
-        maintenance_reason: "apply the cgroup kernel options"
-
-- name: Update grub
-  when: update_grub.changed and ansible_facts.os_family == "RedHat"
-  block:
-    - name: Update grub
-      ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
-      register: grub2_mkconfig_cmd
-      changed_when: grub2_mkconfig_cmd.rc == 0
-    - name: Ask for a reboot to apply the cgroup kernel options
-      ansible.builtin.include_role:
-        name: maintenance
-        tasks_from: reboot_request
-      vars:
-        maintenance_reason: "apply the cgroup kernel options"
+- name: Set the cgroup kernel arguments (cgroup v1 only)
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+  vars:
+    host_baseline_kernel_args_owner: slurm-cgroup
+    host_baseline_kernel_args: "{{ [] if slurm_cgroup_v2.stat.exists else ['cgroup_enable=memory', 'swapaccount=1'] }}"
+    host_baseline_kernel_args_reason: apply the cgroup kernel options
 
 - name: Create sysconfig dir
   ansible.builtin.file:

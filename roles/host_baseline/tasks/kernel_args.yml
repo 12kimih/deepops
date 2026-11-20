@@ -1,0 +1,195 @@
+---
+# Kernel arguments and boot loader settings a role owns, decided by evidence, never by
+# what this run changed: the boot configuration is rebuilt while a source of it is newer
+# than what it built, and a reboot is asked for while the running kernel lacks an
+# argument the role wants, so a run that fails in between is finished by the next.
+#   Debian family: /etc/default/grub.d/deepops-<owner>.cfg (grub-mkconfig reads it after
+#   /etc/default/grub), then update-grub.
+#   RHEL family: grubby on every installed kernel; other GRUB_* settings in a block of
+#   the owner's own in /etc/default/grub, then grub2-mkconfig.
+# A reboot is asked for only with a reason: without one the arguments take effect at
+# the next boot. An argument the role no longer wants leaves the boot configuration; the
+# running kernel keeps it until its next reboot (no reboot is asked for that).
+- name: Check the request
+  ansible.builtin.assert:
+    that:
+      - host_baseline_kernel_args_owner is match('^[a-z0-9][a-z0-9-]*$')
+      - host_baseline_kernel_args | select('search', '[\s"\']') | list | length == 0
+    fail_msg: >-
+      kernel_args takes an owner (lowercase, digits, -) and arguments without spaces or
+      quotes.
+    quiet: true
+
+# Resolved here: inside roles/maintenance the parent role is this one.
+- name: Note the role asking
+  ansible.builtin.set_fact:
+    host_baseline_kernel_args_requester: "{{ ansible_parent_role_names | default([]) | first | default('') }}"
+
+- name: Read the running kernel's arguments
+  ansible.builtin.slurp:
+    src: /proc/cmdline
+  register: host_baseline_cmdline
+  when: not deepops_containerized | bool
+
+- name: Set the boot loader settings (Debian family)
+  when: ansible_facts.os_family == 'Debian' and not deepops_containerized | bool
+  vars:
+    _file: /etc/default/grub.d/deepops-{{ host_baseline_kernel_args_owner }}.cfg
+    _wanted: "{{ host_baseline_kernel_args | length > 0 or host_baseline_kernel_args_grub | length > 0 }}"
+  block:
+    - name: Create the grub defaults directory
+      ansible.builtin.file:
+        path: /etc/default/grub.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: _wanted
+
+    - name: Write the boot loader settings
+      ansible.builtin.copy:
+        dest: "{{ _file }}"
+        content: |
+          # deepops: roles/{{ host_baseline_kernel_args_requester }} ({{ host_baseline_kernel_args_owner }})
+          {% if host_baseline_kernel_args | length > 0 %}
+          GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} {{ host_baseline_kernel_args | join(' ') }}"
+          {% endif %}
+          {% for name, value in host_baseline_kernel_args_grub.items() %}
+          {{ name }}="{{ value }}"
+          {% endfor %}
+        owner: root
+        group: root
+        mode: "0644"
+      when: _wanted
+
+    - name: Remove the boot loader settings no longer wanted
+      ansible.builtin.file:
+        path: "{{ _file }}"
+        state: absent
+      when: not _wanted
+
+    # A source newer than grub.cfg: the defaults, the drop-in directory (a removed
+    # drop-in changes it) or a drop-in in it.
+    - name: Compare the boot configuration with its sources
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          cfg=/boot/grub/grub.cfg
+          [ -e "$cfg" ] || { echo none; exit 0; }
+          for src in /etc/default/grub /etc/default/grub.d /etc/default/grub.d/*.cfg; do
+            [ -e "$src" ] && [ "$src" -nt "$cfg" ] && { echo stale; exit 0; }
+          done
+          echo current
+        executable: /bin/bash
+      register: host_baseline_grub_state
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    # grub-mkconfig builds grub.cfg.new and checks it before moving it into place.
+    - name: Rebuild the boot configuration
+      ansible.builtin.command: update-grub
+      changed_when: true
+      when: host_baseline_grub_state.stdout == 'stale'
+
+# grubby edits every installed kernel's entry; what this role added is recorded, so an
+# argument it no longer wants is taken out again (the Debian drop-in is its own record).
+- name: Set the kernel arguments (RHEL family)
+  when: ansible_facts.os_family == 'RedHat' and not deepops_containerized | bool
+  vars:
+    _record: /var/lib/deepops/kernel-args/{{ host_baseline_kernel_args_owner }}
+    _recorded: "{{ (host_baseline_kernel_args_record.content | default('') | b64decode).split() }}"
+    _kernels: >-
+      {{ host_baseline_grubby.stdout_lines | select('match', '^args=')
+         | map('regex_replace', '^args="?(.*?)"?$', '\1') | map('split') | list }}
+    _unwanted: "{{ _recorded | difference(host_baseline_kernel_args) }}"
+  block:
+    - name: Read what this role added before
+      ansible.builtin.slurp:
+        src: "{{ _record }}"
+      register: host_baseline_kernel_args_record
+      failed_when: false
+
+    - name: Read the installed kernels' arguments
+      ansible.builtin.command:
+        argv: [grubby, --info=ALL]
+      register: host_baseline_grubby
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Add the kernel arguments to every installed kernel
+      ansible.builtin.command:
+        argv: [grubby, --update-kernel=ALL, "--args={{ host_baseline_kernel_args | join(' ') }}"]
+      changed_when: true
+      when: >-
+        host_baseline_kernel_args | length > 0
+        and (_kernels | map('intersect', host_baseline_kernel_args) | map('length') | min) < host_baseline_kernel_args | length
+
+    - name: Take out the kernel arguments no longer wanted
+      ansible.builtin.command:
+        argv: [grubby, --update-kernel=ALL, "--remove-args={{ _unwanted | join(' ') }}"]
+      changed_when: true
+      when: _unwanted | length > 0 and (_kernels | map('intersect', _unwanted) | map('length') | max) > 0
+
+    - name: Create the directory of kernel argument records
+      ansible.builtin.file:
+        path: "{{ _record | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: host_baseline_kernel_args | length > 0
+
+    - name: Record the kernel arguments this role added
+      ansible.builtin.copy:
+        dest: "{{ _record }}"
+        content: "{{ host_baseline_kernel_args | join('\n') }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+      when: host_baseline_kernel_args | length > 0
+
+    - name: Remove the record of kernel arguments no longer wanted
+      ansible.builtin.file:
+        path: "{{ _record }}"
+        state: absent
+      when: host_baseline_kernel_args | length == 0
+
+    # RHEL reads no grub.d: the other settings go in a block of their own in the defaults.
+    - name: Set the other boot loader settings
+      ansible.builtin.blockinfile:
+        path: /etc/default/grub
+        marker: "# {mark} deepops {{ host_baseline_kernel_args_owner }}"
+        block: |
+          {% for name, value in host_baseline_kernel_args_grub.items() %}
+          {{ name }}="{{ value }}"
+          {% endfor %}
+        state: "{{ 'present' if host_baseline_kernel_args_grub | length > 0 else 'absent' }}"
+
+    - name: Compare the boot configuration with its defaults
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          cfg=/boot/grub2/grub.cfg
+          [ -e "$cfg" ] || { echo none; exit 0; }
+          [ /etc/default/grub -nt "$cfg" ] && echo stale || echo current
+        executable: /bin/bash
+      register: host_baseline_grub2_state
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Rebuild the boot configuration
+      ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
+      changed_when: true
+      when: host_baseline_grub2_state.stdout == 'stale'
+
+- name: Ask for a reboot for the kernel arguments
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: reboot_request
+  vars:
+    maintenance_reason: "{{ host_baseline_kernel_args_reason }}"
+    maintenance_reboot_requester: "{{ host_baseline_kernel_args_requester }}"
+  when:
+    - not deepops_containerized | bool
+    - host_baseline_kernel_args_reason | length > 0
+    - host_baseline_kernel_args | reject('in', (host_baseline_cmdline.content | default('') | b64decode).split()) | list | length > 0

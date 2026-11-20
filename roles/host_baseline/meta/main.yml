@@ -6,6 +6,6 @@ galaxy_info:
   namespace: deepops
   role_name: host_baseline
   author: DeepOps
-  description: Remove what must not be on a host; the one way roles set kernel settings
+  description: Remove what must not be on a host; the one way roles set kernel settings and kernel arguments
   license: BSD-3-Clause
   min_ansible_version: "2.15"

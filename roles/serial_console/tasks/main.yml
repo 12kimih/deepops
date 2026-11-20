@@ -1,32 +1,32 @@
 ---
-- name: Gather OS specific variables
-  ansible.builtin.include_vars: "{{ item }}"
-  with_first_found:
-    - files:
-        - "{{ ansible_facts.os_family | lower }}.yml"
-      paths:
-        - ../vars
-      skip: true
-  tags:
-    - vars
-    - serial_console
-
-# Appended, so these assignments win over anything the file set earlier -- which is how
-# /etc/default/grub is read. Removing the block reverts the node (no backup copies: the
-# block is the whole change).
-- name: Configure the serial console in the grub defaults
+# The block earlier versions appended to /etc/default/grub; the settings now live in
+# their own file (roles/host_baseline, kernel_args), which grub-mkconfig reads after it.
+- name: Remove the serial console block from the grub defaults
   ansible.builtin.blockinfile:
     path: /etc/default/grub
     marker: "# {mark} ANSIBLE MANAGED -- serial console"
-    block: |
-      GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} console=tty0 console={{ serial_console_port }},{{ serial_console_speed }}n8"
-      GRUB_TERMINAL="console serial"
-      GRUB_SERIAL_COMMAND="serial --speed={{ serial_console_speed }} --unit={{ serial_console_port | regex_replace('^ttyS', '') }} --word=8 --parity=no --stop=1"
-      {% if serial_console_grub_menu | bool %}
-      GRUB_TIMEOUT={{ serial_console_grub_timeout }}
-      GRUB_TIMEOUT_STYLE=menu
-      {% endif %}
-    mode: "0644"
-  notify: Update grub
+    state: absent
+  tags:
+    - serial_console
+
+# The kernel's console on the serial line too, and GRUB's terminal; they take effect at
+# the next boot (no reboot is asked for).
+- name: Configure the serial console
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+    apply:
+      tags: [serial_console]
+  vars:
+    host_baseline_kernel_args_owner: serial-console
+    host_baseline_kernel_args:
+      - console=tty0
+      - "console={{ serial_console_port }},{{ serial_console_speed }}n8"
+    host_baseline_kernel_args_grub: >-
+      {{ {'GRUB_TERMINAL': 'console serial',
+          'GRUB_SERIAL_COMMAND': 'serial --speed=' ~ serial_console_speed ~ ' --unit='
+            ~ (serial_console_port | regex_replace('^ttyS', '')) ~ ' --word=8 --parity=no --stop=1'}
+         | combine({'GRUB_TIMEOUT': serial_console_grub_timeout | string, 'GRUB_TIMEOUT_STYLE': 'menu'}
+                   if serial_console_grub_menu | bool else {}) }}
   tags:
     - serial_console

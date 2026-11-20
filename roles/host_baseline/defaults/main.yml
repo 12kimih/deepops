@@ -17,3 +17,13 @@ host_baseline_absent_packages: []
 # Kernel settings (tasks_from: sysctl): the including role passes both.
 host_baseline_sysctls: {}
 host_baseline_sysctl_file: ""
+
+# Kernel command line and boot loader settings (tasks_from: kernel_args), the one way
+# roles set them: a role's own file, never an edit of /etc/default/grub. The including
+# role passes host_baseline_kernel_args_owner (names the file), the arguments it needs
+# ([] removes them), any other GRUB_* settings (name: value), and why the running kernel
+# must take them now (a reboot request; empty: at the next boot).
+host_baseline_kernel_args_owner: ""
+host_baseline_kernel_args: []
+host_baseline_kernel_args_grub: {}
+host_baseline_kernel_args_reason: ""
