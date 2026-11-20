@@ -33,14 +33,6 @@
     force: true
   when: is_compute
 
-- name: Pyxis tasks
-  ansible.builtin.include_tasks:
-    file: pyxis.yml
-    apply:
-      tags: [pyxis]
-  when: slurm_install_pyxis
-  tags: pyxis
-
 # Resize /run temporary file system, which is used to import docker image.
 #  - Default pyxis runtime_path is: /run/pyxis
 # If image is bigger than the file system, the importing will be failed

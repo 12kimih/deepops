@@ -209,7 +209,7 @@
   tags:
     - config
 
-- name: Drop a dangling pyxis plugstack entry
+- name: Configure the SPANK plugins (pyxis)
   ansible.builtin.include_tasks: plugstack.yml
   tags:
     - always

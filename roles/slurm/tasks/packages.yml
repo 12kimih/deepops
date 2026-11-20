@@ -70,3 +70,12 @@
     - Restart slurmctld
     - Restart slurmd
     - Restart sackd
+
+# Switched off, pyxis goes (plugstack.yml drops its entry in the same run).
+- name: Remove pyxis
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: ["{{ slurm_pyxis_package }}"]
+  when: not slurm_pyxis_wanted | bool

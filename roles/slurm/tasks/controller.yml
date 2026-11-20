@@ -181,8 +181,7 @@
   tags:
     - config
 
-# Commands run here too; a dangling required pyxis entry would break them after a rebuild.
-- name: Drop a dangling pyxis plugstack entry
+- name: Configure the SPANK plugins (pyxis)
   ansible.builtin.include_tasks: plugstack.yml
   tags:
     - always

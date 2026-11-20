@@ -65,8 +65,16 @@ slurm_pyxis_checksums:
   "0.24.0": "sha256:9c4cdb79a67301d8ea05951aa4d2c205f40cf6145e338214b0191add8b36d6c4"
 slurm_pyxis_package: nvslurm-plugin-pyxis
 slurm_pyxis_deb_version: "{{ slurm_pyxis_version }}-1+slurm{{ slurm_deb_version | replace('-', '.') }}"
-# Where pyxis goes: where its play runs (playbooks/container/pyxis.yml).
+# pyxis is on every Slurm host when both switches are on, and removed (package and
+# plugstack entry) from every host otherwise.
 slurm_pyxis_wanted: "{{ slurm_install_enroot | bool and slurm_install_pyxis | bool }}"
+# pyxis SPANK plugin options, written into plugstack.conf.d/pyxis.conf.
+# https://github.com/NVIDIA/pyxis/wiki/Setup
+slurm_pyxis_runtime_path: /run/pyxis
+slurm_pyxis_execute_entrypoint: 0
+slurm_pyxis_container_scope: job
+slurm_pyxis_sbatch_support: 1
+slurm_pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
 
 # Plugins the packages must contain: a missing build dependency drops its plugin
 # without failing the build, so the build checks for these.

@@ -40,7 +40,9 @@ exactly that `slurm-smd` (instead of enroot, which `roles/enroot` installs from
 NVIDIA's releases) and is installed in the same apt transaction as Slurm wherever
 `slurm_install_enroot` and `slurm_install_pyxis` are on. A SPANK plugin loads only in
 the Slurm it was built for, so the two always change together; nothing is compiled
-on the nodes.
+on the nodes. The same run rewrites `plugstack.conf.d/pyxis.conf` to the plugin's
+path (`slurm_pyxis_*` options), or removes the entry and the package where pyxis is
+switched off: a `required` SPANK plugin that cannot load stops `slurmd`.
 
 The packages go into a flat apt repository in `slurm_repo_dir` (default
 `/sw/.slurm-repo`, on the shared software filesystem), signed with

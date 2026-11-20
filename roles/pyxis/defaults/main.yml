@@ -1,14 +1,7 @@
 ---
-# pyxis is packaged with the Slurm packages (roles/slurm, packages-build.yml) and
-# installed with them; this role configures it and enroot's hooks.
-
-# pyxis SPANK plugin options written into plugstack.conf.d/pyxis.conf.
-# https://github.com/NVIDIA/pyxis/wiki/Setup
-pyxis_runtime_path: /run/pyxis
-pyxis_execute_entrypoint: 0
-pyxis_container_scope: job
-pyxis_sbatch_support: 1
-pyxis_use_enroot_load: 1  # single-step `enroot load` (requires enroot >= 4.0.0)
+# pyxis itself (package, plugstack entry and options) is roles/slurm's: it is packaged,
+# installed and configured with the Slurm it was built for. This role adds what pyxis
+# needs around it: its job-time helpers, enroot's Slurm hooks and the /run size.
 
 # Helpers pyxis runs at job time (column, hexdump).
 pyxis_ubuntu_deps:
