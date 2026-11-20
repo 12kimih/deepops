@@ -114,6 +114,20 @@ if git rev-parse --git-dir >/dev/null 2>&1 ; then
     fi
 fi
 
+# A branch checked out in one worktree moves only from there (branch-guard.sh), in this
+# repository and in the site config's. A hook of its own is left alone and said.
+install_branch_guard() {
+    hooks="$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/hooks" || return 0
+    guard="${hooks}/reference-transaction"
+    want="${REPO_DIR}/scripts/deepops/branch-guard.sh"
+    if [ ! -e "${guard}" ] || [ "$(readlink -f "${guard}")" = "${want}" ] ; then
+        mkdir -p "${hooks}" && ln -sfn "${want}" "${guard}"
+    else
+        echo "WARNING: ${guard} is another hook; branch-guard is not installed there" >&2
+    fi
+}
+git -C "${REPO_DIR}" rev-parse --git-dir >/dev/null 2>&1 && install_branch_guard "${REPO_DIR}"
+
 # Copy default configuration
 if grep -i deepops README.md >/dev/null 2>&1 ; then
     if [ ! -d "${CONFIG_DIR}" ] ; then
@@ -135,6 +149,7 @@ if [ -d "${CONFIG_DIR}/.git" ] ; then
     else
         echo "WARNING: ${site_hook} is another hook; the config checks are not installed there" >&2
     fi
+    install_branch_guard "${CONFIG_DIR}"
 fi
 
 # Install the Galaxy collections and roles (roles/requirements.yml, then config/requirements.yml)

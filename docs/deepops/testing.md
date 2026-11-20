@@ -61,6 +61,15 @@ place, [`scripts/deepops/push_range.py`](../../scripts/deepops/push_range.py).
 scripts/deepops/no_silent_revert.py range origin/main..HEAD   # before pushing by hand
 ```
 
+The same undoing starts locally when one clone has several worktrees: a branch checked
+out in one of them, moved from another (`checkout -B`, `branch -f`, `update-ref`),
+leaves the first worktree's index and files at the old commit, so its next commit
+reverts everything in between. git 2.44 refuses `checkout -B` there; older git does not.
+[`scripts/deepops/branch-guard.sh`](../../scripts/deepops/branch-guard.sh), the
+reference-transaction hook `scripts/setup.sh` installs in this repository and in the
+site config's, refuses any such move: a branch moves only from the worktree that has it
+checked out. Work in another worktree on a detached HEAD or a branch of its own.
+
 ## DeepOps end-to-end testing
 
 Public DeepOps pull requests are validated with GitHub Actions for setup, linting, CodeQL, and selected Molecule role tests. Those checks catch many packaging and role-regression issues, but they do not replace deployment validation on real GPU systems.
