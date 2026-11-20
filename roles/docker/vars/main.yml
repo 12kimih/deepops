@@ -5,9 +5,9 @@
 # The repository's files, named by roles/package_repos.
 _docker_repo_items:
   Debian: [file:/etc/apt/sources.list.d/docker.sources, file:/etc/apt/keyrings/docker.asc,
-           file:/var/cache/deepops/package-repos/docker.key]
+           "file:{{ deepops_cache_dir }}/package-repos/docker.key"]
   RedHat: [file:/etc/yum.repos.d/docker.repo, file:/etc/pki/rpm-gpg/RPM-GPG-KEY-docker,
-           file:/var/cache/deepops/package-repos/docker.key]
+           "file:{{ deepops_cache_dir }}/package-repos/docker.key"]
 _docker_prune_items:
   - unit:docker-image-prune.timer
   - unit:docker-image-prune.service

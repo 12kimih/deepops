@@ -18,7 +18,7 @@
       # The release .deb's entry and this role's earlier key copies.
       legacy_files:
         - /etc/apt/sources.list.d/ondemand-web.list
-        - /var/cache/deepops/open-ondemand/ondemand.asc
+        - "{{ deepops_cache_dir }}/open-ondemand/ondemand.asc"
     - name: nodesource
       uris: "{{ open_ondemand_nodejs_repo_url }}"
       suites: [nodistro]
@@ -28,6 +28,6 @@
       key_fingerprint: "{{ open_ondemand_nodejs_repo_key_fingerprint }}"
       legacy_files:
         - /etc/apt/sources.list.d/nodesource.list
-        - /var/cache/deepops/open-ondemand/nodesource.asc
+        - "{{ deepops_cache_dir }}/open-ondemand/nodesource.asc"
   loop_control:
     label: "{{ item.name }}"

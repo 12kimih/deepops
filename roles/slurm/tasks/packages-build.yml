@@ -153,15 +153,14 @@
         owner: "{{ slurm_deb_build_user }}"
         mode: "0755"
 
+    - name: Start from an empty build directory
+      ansible.builtin.include_tasks: packages-build-clean.yml
+
     - name: Prepare the Slurm tree
       when: slurm_deb_build_slurm
       block:
-        # A fresh tree each build: the patches below apply to the release as shipped.
-        - name: Remove an earlier build of this version
-          ansible.builtin.file:
-            path: "{{ _tree }}"
-            state: absent
-
+        # A fresh tree each build (the directory starts empty): the patches below apply
+        # to the release as shipped.
         - name: Create the build directory
           ansible.builtin.file:
             path: "{{ _tree }}"
@@ -175,7 +174,7 @@
           vars:
             download_url: "{{ slurm_src_url }}"
             download_checksum: "{{ slurm_checksums[slurm_version] | default('') }}"
-            download_dest: "/var/cache/deepops/{{ slurm_src_url | basename }}"
+            download_dest: "{{ deepops_cache_dir }}/{{ slurm_src_url | basename }}"
             download_unpack: "{{ _tree }}"
             download_strip: 1
             download_owner: "{{ slurm_deb_build_user }}"
@@ -291,11 +290,6 @@
     - name: Prepare the pyxis tree
       when: slurm_deb_build_pyxis
       block:
-        - name: Remove an earlier pyxis tree
-          ansible.builtin.file:
-            path: "{{ _pyxis_tree }}"
-            state: absent
-
         - name: Create the pyxis tree
           ansible.builtin.file:
             path: "{{ _pyxis_tree }}"
@@ -309,7 +303,7 @@
           vars:
             download_url: "{{ slurm_pyxis_tarball_url }}"
             download_checksum: "{{ slurm_pyxis_checksums[slurm_pyxis_version] | default('') }}"
-            download_dest: "/var/cache/deepops/pyxis-{{ slurm_pyxis_version }}.tar.gz"
+            download_dest: "{{ deepops_cache_dir }}/pyxis-{{ slurm_pyxis_version }}.tar.gz"
             download_unpack: "{{ _pyxis_tree }}"
             download_strip: 1
             download_owner: "{{ slurm_deb_build_user }}"
@@ -538,10 +532,13 @@
   loop_control:
     label: "{{ item.path | basename }}"
 
+- name: Empty the build directory once its packages are published
+  ansible.builtin.include_tasks: packages-build-clean.yml
+
 - name: Keep the public key to check the signature against
   ansible.builtin.copy:
     src: "{{ slurm_repo_signing_pubkey_file }}"
-    dest: /var/cache/deepops/slurm-repo.asc
+    dest: "{{ deepops_cache_dir }}/slurm-repo.asc"
     owner: root
     group: root
     mode: "0644"
@@ -553,11 +550,11 @@
   ansible.builtin.shell:
     cmd: |
       set -eu
-      work=$(mktemp -d /var/cache/deepops/slurm-repo-check.XXXXXX)
+      work=$(mktemp -d {{ deepops_cache_dir }}/slurm-repo-check.XXXXXX)
       trap 'rm -rf "$work"' EXIT
       cd {{ slurm_repo_dir | quote }}
       apt-ftparchive packages . | cmp -s - Packages || { echo stale; exit 0; }
-      gpg --homedir "$work" --batch --quiet --import /var/cache/deepops/slurm-repo.asc
+      gpg --homedir "$work" --batch --quiet --import {{ deepops_cache_dir }}/slurm-repo.asc
       gpg --homedir "$work" --batch --quiet --verify InRelease 2>/dev/null || { echo unsigned; exit 0; }
       grep -q "$(sha256sum Packages | cut -d' ' -f1)" InRelease || { echo stale; exit 0; }
       echo current
@@ -573,7 +570,7 @@
   ansible.builtin.shell:
     cmd: |
       set -eu
-      work=$(mktemp -d /var/cache/deepops/slurm-repo-sign.XXXXXX)
+      work=$(mktemp -d {{ deepops_cache_dir }}/slurm-repo-sign.XXXXXX)
       trap 'rm -rf "$work"' EXIT
       mkdir -m 0700 "$work/sign" "$work/check" "$work/index"
       gpg --homedir "$work/sign" --batch --quiet --import
@@ -583,7 +580,7 @@
       cd "$work/index"
       apt-ftparchive -o APT::FTPArchive::Release::Origin=deepops -o APT::FTPArchive::Release::Label=slurm release . > "$work/Release"
       gpg --homedir "$work/sign" --batch --yes --clearsign -o "$work/index/InRelease" "$work/Release"
-      gpg --homedir "$work/check" --batch --quiet --import /var/cache/deepops/slurm-repo.asc
+      gpg --homedir "$work/check" --batch --quiet --import {{ deepops_cache_dir }}/slurm-repo.asc
       gpg --homedir "$work/check" --batch --verify "$work/index/InRelease"
       install -m 0644 "$work/index/Packages" "$work/index/Packages.gz" {{ slurm_repo_dir | quote }}/
       install -m 0644 "$work/index/InRelease" {{ slurm_repo_dir | quote }}/

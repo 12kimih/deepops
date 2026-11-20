@@ -36,7 +36,7 @@
   vars:
     download_url: "{{ trident_installer_url }}"
     download_checksum: "{{ trident_installer_checksum }}"
-    download_dest: "/var/cache/deepops/trident-installer-{{ trident_version }}.tar.gz"
+    download_dest: "{{ deepops_cache_dir }}/trident-installer-{{ trident_version }}.tar.gz"
     download_unpack: "{{ trident_workdir_parent }}"
   when: create_backends or copy_tridentctl_to_localhost
   run_once: true

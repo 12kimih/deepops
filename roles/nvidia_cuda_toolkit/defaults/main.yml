@@ -22,7 +22,7 @@ cuda_modroot: "{{ sm_module_path }}"  # module  -> <modroot>/cuda/<version>.lua
 
 # Where a runfile waits for its install (removed once installed; kept off /tmp in case
 # it is small).
-cuda_cache_dir: /var/cache/deepops/cuda  # root runs the runfiles from here: never /var/tmp
+cuda_cache_dir: "{{ deepops_cache_dir }}/cuda"  # root runs the runfiles from here: never /var/tmp
 # The free space (GB) a toolkit install needs on the cache and install disks before it
 # starts: runfile (~4.5), its unpacked copy (~8), the tree (~8), and room left over.
 cuda_install_free_gb: 30

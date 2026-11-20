@@ -20,7 +20,7 @@
       - download_unpack is not match('/(tmp|var/tmp|dev/shm)(/|$)')
     fail_msg: >-
       {{ download_dest }} {{ download_unpack }}: root fetches and unpacks here, so it must
-      not be under /tmp, /var/tmp or /dev/shm; use /var/cache/deepops.
+      not be under /tmp, /var/tmp or /dev/shm; use {{ deepops_cache_dir }}.
     quiet: true
 
 - name: Create the download directory

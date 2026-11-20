@@ -5,13 +5,13 @@
   vars:
     download_url: "{{ enroot_release_base_url }}/{{ item }}"
     download_checksum: "{{ enroot_checksums[item] | default('') }}"
-    download_dest: "/var/cache/deepops/{{ item }}"
+    download_dest: "{{ deepops_cache_dir }}/{{ item }}"
   loop: "{{ _enroot_files }}"
 
 # Under --check a file not fetched yet is not there to install.
 - name: Note whether every release file is here
   ansible.builtin.stat:
-    path: "/var/cache/deepops/{{ item }}"
+    path: "{{ deepops_cache_dir }}/{{ item }}"
   loop: "{{ _enroot_files }}"
   register: enroot_fetched
 

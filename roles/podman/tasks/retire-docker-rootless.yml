@@ -10,7 +10,7 @@
     - /etc/profile.d/00-rootlessdocker-modulepath.sh
     - /etc/profile.d/00-rootlessdocker-modulepath.csh
     - /etc/profile.d/z96_rootlessdocker_modules.sh
-    - /var/cache/deepops/rootless_docker_setup.sh
+    - "{{ deepops_cache_dir }}/rootless_docker_setup.sh"
 
 # Its boot settings have names anything may use: each goes only when it says exactly
 # what docker-rootless wrote, and the br_netfilter load stays where Kubernetes needs it.

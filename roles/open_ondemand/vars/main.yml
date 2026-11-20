@@ -26,7 +26,7 @@ open_ondemand_items: >-
       'package:nodejs', 'package:libapache2-mod-auth-openidc',
       'file:/etc/apt/sources.list.d/ondemand-web.sources', 'file:/etc/apt/sources.list.d/nodesource.sources',
       'file:/etc/apt/keyrings/ondemand-web.asc', 'file:/etc/apt/keyrings/nodesource.asc',
-      'file:/var/cache/deepops/package-repos/ondemand-web.key', 'file:/var/cache/deepops/package-repos/nodesource.key',
+      'file:{{ deepops_cache_dir }}/package-repos/ondemand-web.key', 'file:{{ deepops_cache_dir }}/package-repos/nodesource.key',
       'file:' ~ open_ondemand_tls_dir ~ '/fullchain.pem', 'file:' ~ open_ondemand_tls_dir ~ '/privkey.pem',
       'dir:' ~ open_ondemand_tls_dir, 'file:/usr/local/sbin/open-ondemand-dpkg-verify']
      + (['unit:open-ondemand-tls-metrics.timer', 'unit:open-ondemand-tls-metrics.service',

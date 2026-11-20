@@ -96,7 +96,7 @@
 - name: Set the kernel arguments (RHEL family)
   when: ansible_facts.os_family == 'RedHat' and not deepops_containerized | bool
   vars:
-    _record: /var/lib/deepops/kernel-args/{{ host_baseline_kernel_args_owner }}
+    _record: "{{ deepops_state_dir }}/kernel-args/{{ host_baseline_kernel_args_owner }}"
     _recorded: "{{ (host_baseline_kernel_args_record.content | default('') | b64decode).split() }}"
     _kernels: >-
       {{ host_baseline_grubby.stdout_lines | select('match', '^args=')

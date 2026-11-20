@@ -56,7 +56,7 @@
   ansible.builtin.set_fact:
     package_repos_r: "{{ package_repos_repo }}"
     package_repos_state: "{{ package_repos_repo.state | default('present') }}"
-    package_repos_key_fetched: "/var/cache/deepops/package-repos/{{ package_repos_repo.name }}.key"
+    package_repos_key_fetched: "{{ deepops_cache_dir }}/package-repos/{{ package_repos_repo.name }}.key"
     package_repos_rpm_key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-{{ package_repos_repo.name }}"
     package_repos_changed: false
 
@@ -87,7 +87,7 @@
 
     - name: Create the key cache directory
       ansible.builtin.file:
-        path: /var/cache/deepops/package-repos
+        path: "{{ deepops_cache_dir }}/package-repos"
         state: directory
         owner: root
         group: root

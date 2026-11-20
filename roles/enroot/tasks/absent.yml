@@ -6,7 +6,7 @@
   ansible.builtin.include_role:
     name: recorded_files
   vars:
-    recorded_files_record: "/var/lib/deepops/recorded/enroot-{{ item }}"
+    recorded_files_record: "{{ deepops_state_dir }}/recorded/enroot-{{ item }}"
     recorded_files_names: []
     recorded_files_dirs: ["/etc/enroot/{{ item }}"]
   loop: [environ.d, hooks.d, mounts.d]

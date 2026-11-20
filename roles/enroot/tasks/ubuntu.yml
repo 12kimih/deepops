@@ -50,7 +50,7 @@
 
 - name: Ubuntu | install enroot from the release .deb
   ansible.builtin.apt:
-    deb: "/var/cache/deepops/{{ item }}"
+    deb: "{{ deepops_cache_dir }}/{{ item }}"
     state: "{{ enroot_package_state }}"
   loop: "{{ _enroot_files }}"
   register: enroot_install

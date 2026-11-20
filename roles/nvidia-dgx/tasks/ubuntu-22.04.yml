@@ -19,7 +19,7 @@
   vars:
     download_url: "{{ dgx_os6_repo_files_url }}"
     download_checksum: "{{ dgx_repo_files_checksums[dgx_os6_repo_files_url] | default('') }}"
-    download_dest: "/var/cache/deepops/dgx-os6-{{ ansible_facts.architecture }}-repo-files.tgz"
+    download_dest: "{{ deepops_cache_dir }}/dgx-os6-{{ ansible_facts.architecture }}-repo-files.tgz"
     download_unpack: /
 
 - name: Update apt cache for DGX OS 6 repositories

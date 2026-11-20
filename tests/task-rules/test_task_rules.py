@@ -57,6 +57,9 @@
    role setting that holds it (slurm_compute_group: slurm-node): a play's hosts cannot
    be templated, so overriding such a setting would move half the code and not the
    rest. config.example/inventory names the groups, the one contract.
+18. deepops' own directories on a host are named once, deepops_state_dir and
+   deepops_cache_dir in roles/deepops_paths: no task, default or template spells out
+   /var/lib/deepops or /var/cache/deepops (41 places did, each a copy to keep in step).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -567,6 +570,19 @@ class TaskRules(unittest.TestCase):
                 offenders += [f"{rel(path)}: {m.group(0)}" for m in argv_volume.finditer(text)]
         scan.check(self)
         self.assertEqual(offenders, [], "bind with --mount type=bind,src=,dst= (docker_container: mounts:)")
+
+    def test_deepops_directories_are_named_once(self):
+        literal = re.compile(r"/var/(lib|cache)/deepops\b")
+        offenders, scan = [], Scan(minimum=MINIMUM_FILES)
+        for path in map(scan.seen, tracked("roles/**/*.yml", "roles/**/*.j2", "playbooks/**/*.yml")):
+            r = rel(path)
+            if r == "roles/deepops_paths/defaults/main.yml" or "/molecule/" in r:
+                continue
+            for n, line in enumerate(path.read_text().splitlines(), 1):
+                if literal.search(line) and not line.lstrip().startswith("#"):
+                    offenders.append(f"{r}:{n}")
+        scan.check(self)
+        self.assertEqual(offenders, [], "name them through deepops_state_dir / deepops_cache_dir")
 
     def test_a_skippable_task_never_delegates_to_an_empty_host(self):
         # Settings whose default may render empty: "" or a `default('')` fallback.

@@ -1,4 +1,7 @@
 ---
+dependencies:
+  - role: deepops_paths  # deepops_state_dir, where callers keep their records
+
 galaxy_info:
   namespace: deepops
   role_name: recorded_files

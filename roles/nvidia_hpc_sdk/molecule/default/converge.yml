@@ -6,3 +6,4 @@
     - name: "Include nvidia_hpc_sdk"
       ansible.builtin.include_role:
         name: "nvidia_hpc_sdk"
+        public: true  # deepops_paths (a dependency) supplies its directories

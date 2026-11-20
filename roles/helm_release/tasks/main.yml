@@ -82,7 +82,7 @@
       block:
         - name: Create root's scratch directory
           ansible.builtin.file:
-            path: /var/cache/deepops
+            path: "{{ deepops_cache_dir }}"
             state: directory
             owner: root
             group: root
@@ -91,7 +91,7 @@
         - name: Create a private Helm repository config
           ansible.builtin.tempfile:
             state: directory
-            path: /var/cache/deepops
+            path: "{{ deepops_cache_dir }}"
             prefix: helm-repo-
           register: helm_release_repo_dir
 
