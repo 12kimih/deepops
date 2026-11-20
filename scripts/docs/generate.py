@@ -27,6 +27,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import cli  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 BLOCK = re.compile(
@@ -149,7 +150,9 @@ def malformed(text):
 
 
 def main(argv):
-    check = "--check" in argv
+    parser = cli.parser(__doc__)
+    parser.add_argument("--check", action="store_true", help="report stale files and exit 1, writing nothing")
+    check = parser.parse_args(argv).check
     stale = []
     for path in sorted(tracked("*.md")):
         if not path.is_file():

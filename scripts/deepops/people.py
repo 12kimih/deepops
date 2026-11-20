@@ -9,13 +9,15 @@ The rules live in plugins/filter/people.py (check), which the playbooks apply th
 the people_check filter, so a roster that passes here is one the deploy accepts.
 """
 
-import argparse
 import importlib.util
 import os
 import sys
 from pathlib import Path
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
@@ -29,7 +31,7 @@ def default_files():
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = cli.parser(__doc__)
     parser.add_argument("command", choices=["check"])
     parser.add_argument("files", nargs="*", type=Path)
     args = parser.parse_args(argv)

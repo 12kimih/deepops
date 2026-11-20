@@ -33,7 +33,6 @@ runs. Findings name the place and the rule, never the matched text. A line conta
 
 from __future__ import annotations
 
-import argparse
 import os
 import re
 import subprocess
@@ -42,6 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 from push_range import ZERO_SHA, push_revs  # noqa: E402  (one push range for every push hook)
 
 ALLOW = "sensitive-guard: allow"
@@ -240,7 +240,7 @@ def replace_text(rules: list[Rule]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = cli.parser(__doc__)
     parser.add_argument(
         "--patterns",
         help=f"site file (default: $DEEPOPS_SENSITIVE_PATTERNS, "

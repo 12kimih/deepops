@@ -11,7 +11,6 @@ Usage (from the deepops directory):
   uv run scripts/deepops/vault_show.py bmc_password --host gpu3  # a host override wins
 """
 
-import argparse
 import os
 import shutil
 import subprocess
@@ -19,6 +18,9 @@ import sys
 from pathlib import Path
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
@@ -70,7 +72,7 @@ def several(name, found, hint):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = cli.parser(__doc__)
     parser.add_argument("name")
     parser.add_argument("--host", help="look in this host's host_vars first")
     args = parser.parse_args(argv)

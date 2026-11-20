@@ -21,6 +21,7 @@ it lands, and its message includes those of the commits it merges.
   no_silent_revert.py range REV...    any rev-list arguments, e.g. origin/main..HEAD
 """
 
+import argparse
 import re
 import subprocess
 import sys
@@ -28,6 +29,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 from push_range import push_revs  # noqa: E402
 
 # An abbreviated commit hash in a message (git's shortest default is 7 digits).
@@ -182,11 +184,14 @@ def main(argv: list[str]) -> int:
     # Paths and messages keep git's bytes (surrogateescape, so a path goes back to git
     # as it came) and print as those bytes, as git and ls print them; never a traceback.
     sys.stdout.reconfigure(errors="surrogateescape")
-    if not argv or argv[0] not in ("push", "range"):
-        print(__doc__, file=sys.stderr)
-        return 2
-    if argv[0] == "range":
-        sets = [argv[1:]]
+    parser = cli.parser(__doc__)
+    parser.add_argument("command", choices=["push", "range"])
+    parser.add_argument("revs", nargs=argparse.REMAINDER, metavar="REV", help="range: rev-list arguments")
+    args = parser.parse_args(argv)
+    if args.command == "push" and args.revs:
+        parser.error("push takes no REV")
+    if args.command == "range":
+        sets = [args.revs]
     else:
         sets = push_revs()
         if sets is None:

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 from repo_files import ROOT, tracked  # noqa: E402
 
 
@@ -55,13 +56,16 @@ def test(names):
 
 
 def main(argv):
-    if argv[:1] == ["list"] and len(argv) == 1:
+    parser = cli.parser(__doc__)
+    parser.add_argument("command", choices=["list", "test"])
+    parser.add_argument("roles", nargs="*", metavar="ROLE", help="test: the roles (default: every one)")
+    args = parser.parse_args(argv)
+    if args.command == "list":
+        if args.roles:
+            parser.error("list takes no ROLE")
         print(json.dumps(roles()))
         return 0
-    if argv[:1] == ["test"]:
-        return test(argv[1:])
-    print(__doc__, file=sys.stderr)
-    return 2
+    return test(args.roles)
 
 
 if __name__ == "__main__":

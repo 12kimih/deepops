@@ -32,6 +32,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 BUILTIN = set(
@@ -470,8 +471,14 @@ def targets(paths):
 
 
 def main(argv):
-    check = "--check" in argv
-    paths = [a for a in argv if a != "--check"] or ["."]
+    parser = cli.parser(__doc__)
+    parser.add_argument(
+        "--check", action="store_true", help="list what would change and exit 1, writing nothing"
+    )
+    parser.add_argument("paths", nargs="*", default=["."], help="files or directories (default: .)")
+    args = parser.parse_args(argv)
+    check = args.check
+    paths = args.paths
     changed = []
     for f in targets(paths):
         text = open(f, encoding="utf-8").read()

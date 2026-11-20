@@ -31,6 +31,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cli  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 COLLECTIONS = ROOT / "collections"
 ROLES = ROOT / "roles" / "galaxy"
@@ -183,5 +186,13 @@ def check():
     return 1 if found else 0
 
 
+def main(argv):
+    parser = cli.parser(__doc__)
+    parser.add_argument(
+        "--check", action="store_true", help="exit 1 unless everything is installed as pinned"
+    )
+    return check() if parser.parse_args(argv).check else install()
+
+
 if __name__ == "__main__":
-    sys.exit(check() if "--check" in sys.argv[1:] else install())
+    sys.exit(main(sys.argv[1:]))
