@@ -16,8 +16,13 @@ offline: true
 # Exclude external/vendored roles and hardware-specific roles
 exclude_paths:
   - roles/galaxy/
-  # Galaxy collections installed by scripts/deepops/galaxy.py, not part of the repository.
+  # Galaxy collections installed by scripts/deepops/galaxy.py, not part of the repository,
+  # and its staging beside both while an install runs.
   - collections/
+  - .collections.new/
+  - .collections.old/
+  - roles/.galaxy.new/
+  - roles/.galaxy.old/
   - roles/nvidia-dgx/
   - roles/nvidia-dgx-firmware/
   - submodules/

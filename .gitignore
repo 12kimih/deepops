@@ -28,11 +28,13 @@ __pycache__/
 /admin.conf
 /config*/
 !/config.example/
-# Installed by scripts/deepops/galaxy.py (.*.new and .*.old only while it runs)
-/roles/galaxy/
-/roles/.galaxy.*/
-/collections/
-/.collections.*/
+# Installed by scripts/deepops/galaxy.py (.*.new and .*.old only while it runs; no
+# trailing slash, so a symlink there is ignored too: git sees a link as a file)
+/roles/galaxy
+/roles/.galaxy.*
+/collections
+/.collections.*
+/.galaxy.lock
 /k8s-config/
 # The same names as links (a scratch worktree links them to a full clone): a pattern
 # ending in / matches only a directory, so `git add -A` would stage the link itself.
