@@ -194,6 +194,10 @@ deepops_component_registry:
     needs: [enroot]
   # The daily cleanup of users' podman storage and enroot cache; the stores themselves
   # are users' data and stay when it goes.
+  # Rootless Podman for image builds in CPU jobs (the users' stores stay when it goes).
+  podman:
+    rules:
+      - {switch: "{{ slurm_install_podman }}", group: slurm-node}
   container_storage_gc:
     rules:
       - {switch: "{{ slurm_enable_container_storage_gc }}", group: slurm-cluster}

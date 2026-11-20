@@ -5,3 +5,13 @@ podman_subids: "{{ podman_people | people_subids(podman_subid_base, podman_subid
 podman_apparmor_profiles: [podman, crun, slirp4netns]
 # Where the retired docker-rootless role installed (its rootlessdocker_install_dir default).
 podman_retired_docker_rootless_dir: "{{ sm_software_path }}/rootless-docker"
+# What the component installs, for its record (roles/component_record): the packages
+# it names but the OS's own (apparmor, shadow-utils: never removed with it) and its
+# settings files. The users' stores under podman_storage_root are data.
+_podman_os_packages: [apparmor, shadow-utils]
+podman_items: >-
+  {{ podman_packages[ansible_facts.os_family] | default([]) | reject('in', _podman_os_packages)
+     | map('regex_replace', '^', 'package:') | list
+     + ['file:/etc/containers/storage.conf',
+        'file:/etc/containers/containers.conf.d/50-deepops-rootless.conf',
+        'dir:/etc/containers/containers.conf.d'] }}
