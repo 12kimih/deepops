@@ -1,8 +1,11 @@
 ---
 # Lock the GPU clocks to gpu_clock_lock, or reset them when gpu_clock_reset is true
-# (roles/deploy_defaults; set them in config/group_vars)
-- hosts: all
-  gather_facts: false
+# (roles/deploy_defaults; set them in config/group_vars). Runtime only: a reboot resets
+# them. Hosts without a GPU (the gpus fact) are skipped.
+#
+#   ansible-playbook playbooks/utilities/nvidia-set-gpu-clocks.yml
+#   ansible-playbook playbooks/utilities/nvidia-set-gpu-clocks.yml -e hostlist=gpu01
+- hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   roles:
     - role: deploy_defaults
@@ -13,16 +16,23 @@
         fail_msg: Set gpu_clock_lock ("MIN,MAX" MHz), or gpu_clock_reset true.
         quiet: true
 
-    # nvidia-smi runs in a transient unit so it still sees the GPUs where the ssh
-    # service has them hidden (DeviceAllow, see login-compute-setup).
-    - name: Set the gpu clock to a specified amount
-      ansible.builtin.command: >-
-        systemd-run --wait --pipe --collect --quiet --
-        nvidia-smi -lgc {{ gpu_clock_lock }}
-      when: not gpu_clock_reset
+    - name: Install custom facts
+      ansible.builtin.include_role:
+        name: facts
 
-    - name: Reset the gpu clock to the default
-      ansible.builtin.command: >-
-        systemd-run --wait --pipe --collect --quiet --
-        nvidia-smi -rgc
-      when: gpu_clock_reset
+    - name: Change the clocks where there are GPUs
+      when: ansible_facts.ansible_local['gpus']['count'] | int > 0
+      block:
+        # nvidia-smi runs in a transient unit so it still sees the GPUs where the ssh
+        # service has them hidden (DeviceAllow, see login-compute-setup).
+        - name: Set the gpu clock to a specified amount
+          ansible.builtin.command: >-
+            systemd-run --wait --pipe --collect --quiet --
+            nvidia-smi -lgc {{ gpu_clock_lock }}
+          when: not gpu_clock_reset
+
+        - name: Reset the gpu clock to the default
+          ansible.builtin.command: >-
+            systemd-run --wait --pipe --collect --quiet --
+            nvidia-smi -rgc
+          when: gpu_clock_reset
