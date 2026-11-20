@@ -23,13 +23,14 @@
   when: not ansible_check_mode
 
 # Before the host depends on it: unbound must resolve, and answer NXDOMAIN for a
-# blocked name.
+# blocked name. Only a listed one proves the block: any .invalid name is NXDOMAIN anyway.
 - name: Resolve through unbound
   ansible.builtin.command:
     argv: [python3, -c, "{{ _dns_resolver_query }}", 127.0.0.1, "{{ item.name }}", "{{ item.type }}"]
-  loop:
-    - {name: ".", type: 2, rcode: "0"}
-    - {name: "{{ dns_resolver_blocked_domains | first | default('blocked.invalid') }}", type: 1, rcode: "3"}
+  loop: >-
+    {{ [{'name': '.', 'type': 2, 'rcode': '0'}]
+       + ([{'name': dns_resolver_blocked_domains | first, 'type': 1, 'rcode': '3'}]
+          if dns_resolver_blocked_domains | length > 0 else []) }}
   loop_control:
     label: "{{ item.name }}"
   register: dns_resolver_answer

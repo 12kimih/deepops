@@ -1,6 +1,7 @@
 ---
-# The facts in a hand-maintained gres.conf must match the node: as many GPUs as it
-# lists, and every /dev/nvidiaN it names present. Site policy in it (Cores, the Type
+# The facts in a hand-maintained gres.conf must hold on the node: every /dev/nvidiaN it
+# names present, and at least as many GPUs answering. A GPU it leaves out on purpose (one
+# kept from Slurm's jobs) is no mismatch: Slurm hands out only what gres.conf lists. Site policy in it (Cores, the Type
 # names users request) is never compared. A GPU that died or moved shows up here,
 # before slurmd would mark the node INVALID; with AutoDetect Slurm checks it itself.
 - name: Read the GPU devices gres.conf gives this node
@@ -34,13 +35,14 @@
     - name: Refuse a gres.conf the node's GPUs do not match
       ansible.builtin.assert:
         that:
-          - _present | sort == slurm_gres_expected
-          - slurm_gres_gpus.stdout_lines | select | list | length == slurm_gres_expected | length
+          - slurm_gres_expected | difference(_present) | length == 0
+          - slurm_gres_gpus.stdout_lines | select | list | length >= slurm_gres_expected | length
         fail_msg: >-
           gres.conf gives {{ inventory_hostname }} {{ slurm_gres_expected | length }} GPUs
           ({{ slurm_gres_expected | join(' ') }}); the node has
           {{ slurm_gres_gpus.stdout_lines | select | list | length }} answering and the device files
-          {{ _present | join(' ') or 'none' }}. Fix gres.conf (and Gres= in slurm.conf) or the hardware.
+          {{ _present | join(' ') or 'none' }}{{ (' (missing: ' ~ (slurm_gres_expected | difference(_present) | join(' ')) ~ ')')
+          if slurm_gres_expected | difference(_present) | length > 0 else '' }}. Fix gres.conf (and Gres= in slurm.conf) or the hardware.
         quiet: true
       vars:
         _present: "{{ slurm_gres_files.stdout_lines | map('trim') | select | list }}"
