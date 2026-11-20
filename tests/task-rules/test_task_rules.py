@@ -48,6 +48,11 @@
    that does not exist yet, those create it as an empty root-owned directory, so a file
    written later went inside it and the container never read it (the registry's
    config.yml, 2026-06 to 2026-11). A bind refuses the missing source instead.
+16. A task's delegate_to never names a setting that may be empty while the task can be
+   skipped: ansible-core resolves delegate_to before `when`, so the skipped task fails
+   ("Empty hostname produced from delegate_to"). The driver's removal on a host with no
+   Slurm controller stopped there (require_drained, 2026-11). Delegate to a value that
+   falls back to a host (maintenance_slurm_delegate).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -547,6 +552,32 @@ class TaskRules(unittest.TestCase):
                 offenders += [f"{rel(path)}: {m.group(0)}" for m in argv_volume.finditer(text)]
         scan.check(self)
         self.assertEqual(offenders, [], "bind with --mount type=bind,src=,dst= (docker_container: mounts:)")
+
+    def test_a_skippable_task_never_delegates_to_an_empty_host(self):
+        # Settings whose default may render empty: "" or a `default('')` fallback.
+        maybe_empty = set()
+        for path in role_var_files():
+            for key, value in (yaml.safe_load(path.read_text()) or {}).items():
+                if value == "" or (
+                    isinstance(value, str) and re.search(r"default\(\s*(''|\"\")\s*\)\s*\}\}\s*$", value)
+                ):
+                    maybe_empty.add(key)
+        # (file, task): an assert earlier in the file stops on an empty host first.
+        asserted = {
+            ("roles/internal_ca/tasks/ca.yml", "Make the CA certificate"),
+            ("roles/nginx-docker-registry-cache-client/tasks/present.yml", "Read the proxy's CA certificate from the cache host"),
+        }  # fmt: skip
+        offenders, scan = [], Scan(asserted, minimum=MINIMUM_FILES)
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                target = task.get("delegate_to")
+                named = re.fullmatch(r"\{\{\s*(\w+)\s*\}\}", str(target or "").strip())
+                if named and named.group(1) in maybe_empty and "when" in task:
+                    if scan.excuse((rel(path), task.get("name"))):
+                        continue
+                    offenders.append(f"{rel(path)}: {task.get('name')}: {target}")
+        scan.check(self)
+        self.assertEqual(offenders, [], "delegate to a value that falls back to a host")
 
     def test_no_handler_includes_a_role(self):
         # ansible-core refuses include_role in a handler, also through an included task

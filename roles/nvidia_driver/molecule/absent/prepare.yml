@@ -1,0 +1,31 @@
+---
+# A GPU host as the role leaves it, short of the kernel modules (a container runs the
+# host's kernel): the archive's userspace and tools, the persistence unit and the pin.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install the driver's userspace and tools from the Ubuntu archive
+      ansible.builtin.apt:
+        name: [nvidia-headless-no-dkms-580-server-open, nvidia-utils-580-server]
+        install_recommends: false
+        update_cache: true
+
+    - name: Write the role's persistence unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/nvidia-persistenced.service
+        content: |
+          # roles/nvidia_driver: persistence mode on, started at boot
+          [Service]
+          ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
+        mode: "0644"
+
+    - name: Write the role's archive pin
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/deepops-nvidia-driver
+        content: |
+          # roles/nvidia_driver (nvidia_driver_install_method: ubuntu_repo)
+          Package: *nvidia*
+          Pin: origin developer.download.nvidia.com
+          Pin-Priority: -1
+        mode: "0644"

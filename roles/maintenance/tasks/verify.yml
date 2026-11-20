@@ -93,7 +93,7 @@
     - name: Read the node as Slurm sees it after this slurmd registered
       ansible.builtin.command:
         argv: ["{{ maintenance_slurm_bin }}/scontrol", --json, show, node, "{{ inventory_hostname }}"]
-      delegate_to: "{{ maintenance_slurm_controller }}"
+      delegate_to: "{{ maintenance_slurm_delegate }}"
       register: maintenance_slurm_view
       vars:
         _node: "{{ maintenance_slurm_view.stdout | slurm_node }}"

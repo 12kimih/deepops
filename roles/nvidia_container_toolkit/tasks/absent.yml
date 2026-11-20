@@ -1,0 +1,16 @@
+---
+# Docker forgets the runtime first (its keys go, other owners' stay), then the packages,
+# the repository and the CDI specification go through the record.
+- name: Docker | drop the NVIDIA runtime
+  ansible.builtin.include_tasks: docker.yml
+  vars:
+    nvidia_container_toolkit_docker_wanted: false
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nvidia_container_toolkit
+    component_record_action: absent
+    component_record_items: "{{ nvidia_container_toolkit_items }}"
+    component_record_exclusive_packages: "{{ nvidia_container_toolkit_packages }}"

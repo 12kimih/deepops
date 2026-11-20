@@ -21,6 +21,9 @@
 
 # Slurm commands run on the controller.
 maintenance_slurm_controller: "{{ (groups['slurm-master'] | default([]) | first) | default('') }}"
+# Where those tasks are delegated. ansible-core resolves delegate_to before `when`, so a
+# task skipped for want of a controller still needs a host name: its own.
+maintenance_slurm_delegate: "{{ maintenance_slurm_controller or inventory_hostname }}"
 maintenance_slurm_bin: "{{ slurm_install_prefix }}/bin"
 # The reason recorded on the nodes this run drains; resume only touches those (and
 # those an earlier run drained with the same reason).

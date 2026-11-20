@@ -1,0 +1,17 @@
+---
+# The NVIDIA Container Toolkit on GPU hosts (roles/nvidia_container_toolkit). Every
+# host it runs on converges to deepops_components: present where something needs it
+# (enroot's GPU hook, the DCGM exporter's container, the Kubernetes deploy with host
+# drivers), removed elsewhere; a host without GPUs has nothing to install. Where Docker
+# runs, the NVIDIA runtime is registered with it.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  tags:
+    - nvidia
+    - nvidia_container_toolkit
+  roles:
+    - role: deploy_defaults
+    - role: facts
+    - role: nvidia_container_toolkit
+      nvidia_container_toolkit_state: "{{ deepops_components.nvidia_container_toolkit | component_phase(deepops_phase) }}"
+  environment: "{{ proxy_env }}"

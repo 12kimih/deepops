@@ -1,0 +1,61 @@
+---
+# Only when the site names nvidia_driver in deepops_component_removals (the GPU Operator
+# brings its own driver, say): removing the running driver breaks every GPU job until
+# the reboot, so a Slurm node that takes or runs jobs is refused first, and the module
+# leaves the kernel only at the reboot this asks for. The packages, the persistence
+# unit and the archive pin go through the record.
+
+# The package manager resolves the patterns; packages not installed ("?n") drop out, one
+# removed but not purged ("rc") counts.
+- name: Find the driver's packages on the host
+  ansible.builtin.command:
+    argv: >-
+      {{ (['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${Package}\n']
+          if ansible_facts.os_family == 'Debian' else ['rpm', '-qa', '--qf', '%{NAME}\n'])
+         + nvidia_driver_packages_owned }}
+  register: nvidia_driver_query
+  changed_when: false
+  failed_when: nvidia_driver_query.rc > 1
+  check_mode: false  # read-only; --check needs the result
+
+- name: Note the driver's packages on the host
+  ansible.builtin.set_fact:
+    nvidia_driver_found: >-
+      {{ nvidia_driver_query.stdout_lines | reject('match', '.n') | map('split') | map('last') | list
+         if ansible_facts.os_family == 'Debian' else nvidia_driver_query.stdout_lines }}
+
+- name: Read the record
+  ansible.builtin.set_fact:
+    nvidia_driver_recorded: "{{ 'nvidia_driver' in (ansible_facts.ansible_local.deepops_components.components | default({})) }}"
+
+- name: Remove the driver from a drained node
+  when: nvidia_driver_found | length > 0 or nvidia_driver_recorded | bool
+  block:
+    - name: Require the node drained
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: require_drained
+      vars:
+        maintenance_change: "the NVIDIA driver's removal"
+        maintenance_drain_hint: >-
+          Drain it first (scontrol update nodename={{ inventory_hostname }} state=drain
+          reason=driver-removal), wait for its jobs to end, and run the deploy again.
+
+    - name: Remove what this component installed
+      ansible.builtin.include_role:
+        name: component_record
+      vars:
+        component_record_name: nvidia_driver
+        component_record_action: absent
+        component_record_items: "{{ nvidia_driver_items }}"
+        component_record_exclusive_packages: "{{ nvidia_driver_packages_owned }}"
+
+    # No role waits for this reboot: there is nothing of the driver's to check after it.
+    - name: Ask for a reboot to unload the NVIDIA kernel module
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: reboot_request
+      vars:
+        maintenance_reason: "unload the removed NVIDIA driver"
+        maintenance_reboot_requester: ""
+      when: component_record_removed.package | length > 0

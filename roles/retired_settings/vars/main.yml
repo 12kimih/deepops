@@ -5,6 +5,7 @@
 # or config that still names one. Add a name here when a setting is renamed or removed.
 retired_settings:
   docker_rh_repo_url: docker_rh_repo_base_url (and docker_rh_repo_gpgkey) in roles/docker
+  nvidia_container_toolkit_enable_docker: roles/docker enables and starts Docker (docker_service_enabled, docker_service_state)
   nvidia_container_toolkit_rpm_repo_url: nvidia_container_toolkit_repo_base_url (a mirror) in roles/nvidia_container_toolkit
   nvidia_driver_ubuntu_cuda_keyring_url: package_repos_cuda_base in roles/package_repos
   nvidia_driver_ubuntu_cuda_repo_baseurl: package_repos_cuda_base in roles/package_repos

@@ -9,9 +9,13 @@
 
 - name: Install NVIDIA driver
   import_playbook: nvidia-software/nvidia-driver.yml
+  vars:
+    deepops_phase: require  # this server's GPUs, whatever the cluster map says
 
 - name: Install the NVIDIA Container Toolkit
-  import_playbook: container/nvidia-docker.yml
+  import_playbook: container/nvidia-container-toolkit.yml
+  vars:
+    deepops_phase: require
 
 - name: Install NVIDIA DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
@@ -48,103 +52,41 @@
           - docker
         state: present
       when: ansible_facts.os_family == "RedHat"
-    - name: Pull CUDA container
+    # -t test: each NGC container sees this server's GPUs. Docker hands a container GPUs
+    # only when it asks (no nvidia default runtime), so each asks for all of them, and
+    # each is removed once it exits.
+    - name: Run the GPU check in each NGC container
       community.docker.docker_container:
-        name: gpu-test-pull
-        image: "{{ ngc_ready_cuda_container }}"
-        auto_remove: true
-        pull: true
-      tags:
-        - test
-        - never
-    - name: Test CUDA container
-      community.docker.docker_container:
-        name: gpu-test
-        image: "{{ ngc_ready_cuda_container }}"
+        name: "ngc-ready-{{ item.name }}"
+        image: "{{ item.image }}"
+        command: "{{ item.command }}"
         detach: false
-        command: nvidia-smi -L
-      register: cuda
+        cleanup: true
+        device_requests:
+          - driver: nvidia
+            count: -1
+            capabilities: [[gpu]]
+      loop:
+        - {name: cuda, image: "{{ ngc_ready_cuda_container }}", command: nvidia-smi -L}
+        - name: pytorch
+          image: "{{ ngc_ready_pytorch_container }}"
+          command: [python, -c, "import torch; assert torch.cuda.is_available(); print(torch.cuda.device_count(), 'GPUs')"]
+        - name: tensorflow
+          image: "{{ ngc_ready_tensorflow_container }}"
+          command: [python, -c, "import tensorflow as tf; g = tf.config.list_physical_devices('GPU'); assert g; print(len(g), 'GPUs')"]
+      loop_control:
+        label: "{{ item.name }}"
+      register: ngc_ready_checks
       tags:
         - test
         - never
-    - name: Functional test output
+
+    - name: Show what each container saw
       ansible.builtin.debug:
-        var: cuda.ansible_facts.docker_container.Output
-      tags:
-        - test
-        - never
-    - name: Remove CUDA container
-      community.docker.docker_container:
-        name: gpu-test
-        state: absent
-      tags:
-        - test
-        - never
-    - name: Pull pytorch container
-      community.docker.docker_container:
-        name: pytorch-pull
-        image: "{{ ngc_ready_pytorch_container }}"
-        auto_remove: true
-        pull: true
-      tags:
-        - test
-        - never
-    - name: Test pytorch
-      community.docker.docker_container:
-        name: pytorch
-        image: "{{ ngc_ready_pytorch_container }}"
-        working_dir: /opt/pytorch/examples/upstream/mnist
-        detach: false
-        network_mode: host
-        command: "python main.py"
-      register: pytorch
-      tags:
-        - test
-        - never
-    - name: Pytorch test output
-      ansible.builtin.debug:
-        var: pytorch.ansible_facts.docker_container.Output
-      tags:
-        - test
-        - never
-    - name: Remove pytorch container
-      community.docker.docker_container:
-        name: pytorch-test
-        state: absent
-      tags:
-        - test
-        - never
-    - name: Pull tensorflow container
-      community.docker.docker_container:
-        name: tensorflow-pull
-        image: "{{ ngc_ready_tensorflow_container }}"
-        auto_remove: true
-        pull: true
-      tags:
-        - test
-        - never
-    - name: Test tensorflow
-      community.docker.docker_container:
-        name: tensorflow
-        image: "{{ ngc_ready_tensorflow_container }}"
-        working_dir: /opt/tensorflow/tensorflow/examples/tutorials/mnist
-        detach: false
-        network_mode: host
-        command: "python mnist_with_summaries.py"
-      register: tensorflow
-      tags:
-        - test
-        - never
-    - name: Tensorflow test output
-      ansible.builtin.debug:
-        var: tensorflow.ansible_facts.docker_container.Output
-      tags:
-        - test
-        - never
-    - name: Remove tensorflow container
-      community.docker.docker_container:
-        name: tensorflow-test
-        state: absent
+        msg: "{{ item.item.name }}: {{ item.container.Output | default('') | trim }}"
+      loop: "{{ ngc_ready_checks.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
       tags:
         - test
         - never

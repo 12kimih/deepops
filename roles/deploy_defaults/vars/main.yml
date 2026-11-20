@@ -120,7 +120,7 @@ deepops_component_registry:
     role: nvidia-dcgm-exporter
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-node}
-    needs: [docker]
+    needs: [docker, nvidia_container_toolkit]
   # Text files node_exporter publishes; the report reads Prometheus.
   slurm_metrics:
     rules:
@@ -153,6 +153,20 @@ deepops_component_registry:
     removal: explicit
     rules:
       - {switch: "{{ slurm_enable_nfs_client_nodes }}", group: slurm-nfs-client}
+  # The NVIDIA driver on GPU hosts (DGX OS keeps its own): on Slurm hosts with the
+  # switch, on Kubernetes hosts unless the GPU Operator brings it. Removing it breaks
+  # every GPU job and needs a reboot, so only deepops_component_removals does.
+  nvidia_driver:
+    removal: explicit
+    rules:
+      - {switch: "{{ slurm_cluster_install_nvidia_driver }}", group: slurm-cluster}
+      - {switch: "{{ not deepops_gpu_operator_enabled | bool or gpu_operator_preinstalled_nvidia_software | bool }}", group: k8s_cluster}
+  # The NVIDIA Container Toolkit on GPU hosts: what runs GPU containers needs it (enroot's
+  # hook, the DCGM exporter under Docker), and Kubernetes hosts unless the GPU Operator
+  # brings it with the driver.
+  nvidia_container_toolkit:
+    rules:
+      - {switch: "{{ not deepops_gpu_operator_enabled | bool or gpu_operator_preinstalled_nvidia_software | bool }}", group: k8s_cluster}
   # The cap on GPU nodes; removing it resets each GPU to its default limit.
   nvidia_power_limit:
     rules:
@@ -163,11 +177,12 @@ deepops_component_registry:
     role: nvidia_hpc_sdk
     rules:
       - {switch: "{{ slurm_install_hpcsdk }}", group: slurm-login, first: true}
-  # enroot on login and compute hosts; pyxis's node setup needs it (its Slurm plugin
-  # follows the same switches in roles/slurm).
+  # enroot on login and compute hosts (its GPU hook runs the container toolkit); pyxis's
+  # node setup needs it (its Slurm plugin follows the same switches in roles/slurm).
   enroot:
     rules:
       - {switch: "{{ slurm_install_enroot }}", group: slurm-cluster}
+    needs: [nvidia_container_toolkit]
   pyxis:
     rules:
       - {switch: "{{ slurm_install_enroot and slurm_install_pyxis }}", group: slurm-cluster}

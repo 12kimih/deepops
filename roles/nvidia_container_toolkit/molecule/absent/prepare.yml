@@ -1,0 +1,22 @@
+---
+# A host as earlier versions left it: the toolkit installed (by the role, so its
+# record exists) and nvidia-ctk's default runtime, written outside the record.
+- name: Prepare
+  import_playbook: ../default/prepare.yml
+
+- name: Install the toolkit as a GPU host has it
+  hosts: all
+  become: true
+  tasks:
+    - name: Install the NVIDIA Container Toolkit
+      ansible.builtin.include_role:
+        name: nvidia_container_toolkit
+      vars:
+        nvidia_container_toolkit_state: present
+        docker_daemon_restart: false
+        nvidia_container_toolkit_cdi: false  # the refresh writes no spec without a GPU
+
+    - name: Make nvidia Docker's default runtime, as nvidia-ctk --set-as-default did
+      ansible.builtin.command:
+        argv: [nvidia-ctk, runtime, configure, --runtime=docker, --set-as-default]
+      changed_when: true

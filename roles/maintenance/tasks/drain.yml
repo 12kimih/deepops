@@ -7,7 +7,7 @@
 - name: Read the node's Slurm state
   ansible.builtin.command:
     argv: ["{{ maintenance_slurm_bin }}/scontrol", --json, show, node, "{{ inventory_hostname }}"]
-  delegate_to: "{{ maintenance_slurm_controller }}"
+  delegate_to: "{{ maintenance_slurm_delegate }}"
   register: maintenance_node
   changed_when: false
   check_mode: false  # read-only; --check needs the result
@@ -25,14 +25,14 @@
   ansible.builtin.command:
     argv: ["{{ maintenance_slurm_bin }}/scontrol", update, "nodename={{ inventory_hostname }}", state=drain,
            "reason={{ maintenance_reason }}"]
-  delegate_to: "{{ maintenance_slurm_controller }}"
+  delegate_to: "{{ maintenance_slurm_delegate }}"
   changed_when: true
   when: maintenance_needs_drain | bool
 
 - name: Wait for the jobs on the node to finish
   ansible.builtin.command:
     argv: ["{{ maintenance_slurm_bin }}/squeue", -h, -t, "RUNNING,COMPLETING,SUSPENDED", -w, "{{ inventory_hostname }}", -o, "%i"]
-  delegate_to: "{{ maintenance_slurm_controller }}"
+  delegate_to: "{{ maintenance_slurm_delegate }}"
   register: maintenance_jobs
   until: maintenance_jobs.stdout | trim | length == 0
   retries: "{{ (maintenance_drain_timeout | int) // (maintenance_drain_poll | int) }}"

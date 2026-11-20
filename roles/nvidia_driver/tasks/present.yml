@@ -1,0 +1,242 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nvidia_driver
+    component_record_action: begin
+    component_record_items: "{{ nvidia_driver_items }}"
+
+- name: Install the NVIDIA driver (Ubuntu)
+  ansible.builtin.include_tasks: ubuntu.yml
+  when: ansible_facts.distribution == 'Ubuntu'
+
+- name: Install the NVIDIA driver (RHEL/Rocky)
+  ansible.builtin.include_tasks: redhat.yml
+  when: ansible_facts.os_family == 'RedHat'
+
+# A reboot is needed when this run installed the driver, or when the running module does
+# not match the one on disk. The second case matters on re-runs: apt reports no change, so
+# gating on install.changed alone would never re-fire a reboot that was skipped, leaving
+# the node on the old module with nvidia-persistenced failing on a version mismatch.
+- name: Read the running NVIDIA kernel module version
+  ansible.builtin.command: cat /proc/driver/nvidia/version
+  register: nvidia_driver_loaded_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Read the on-disk NVIDIA kernel module version
+  ansible.builtin.command: modinfo -F version nvidia
+  register: nvidia_driver_ondisk_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine whether the NVIDIA driver needs a reboot
+  ansible.builtin.set_fact:
+    nvidia_driver_reboot_needed: >-
+      {{ (nvidia_driver_install is defined and nvidia_driver_install.changed) or
+         ((nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0 and
+          (nvidia_driver_ondisk_version.stdout | trim)
+            not in (nvidia_driver_loaded_version.stdout | default(''))) }}
+
+- name: Ask for a reboot to load the new NVIDIA kernel module
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: reboot_request
+  vars:
+    maintenance_reason: "load the new NVIDIA driver"
+  when: nvidia_driver_reboot_needed | bool
+
+# Post-installation actions, run after the reboot so the new module is loaded.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
+
+# Re-read the loaded version AFTER the possible reboot and confirm it now matches the
+# on-disk module. Persistence/verify run only when the module is loaded and current.
+# No module on disk after the install, or a module still not loaded with no reboot
+# pending (so it failed to load), fails the host; a pending reboot is stated.
+- name: Re-read the running NVIDIA kernel module version (after any reboot)
+  ansible.builtin.command: cat /proc/driver/nvidia/version
+  register: nvidia_driver_loaded_version_post
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine whether the NVIDIA kernel module is loaded and current
+  ansible.builtin.set_fact:
+    nvidia_driver_module_loaded: >-
+      {{ (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0 and
+         (nvidia_driver_ondisk_version.stdout | trim)
+           in (nvidia_driver_loaded_version_post.stdout | default('')) }}
+
+# Under --check nothing was installed, so an empty modinfo proves nothing there.
+- name: Require an NVIDIA kernel module on disk after the install
+  ansible.builtin.fail:
+    msg: >-
+      No NVIDIA kernel module is installed on {{ inventory_hostname }} after the driver
+      install (modinfo nvidia: {{ nvidia_driver_ondisk_version.stderr | default('') | trim }}).
+      Check the DKMS build or the kernel module package for the running kernel.
+  when:
+    - not ansible_check_mode
+    - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length == 0
+
+- name: Check whether a reboot is pending
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: nvidia_driver_reboot_pending
+  check_mode: false
+  when: not (nvidia_driver_module_loaded | bool)
+
+- name: Require the NVIDIA module loaded when no reboot is pending
+  ansible.builtin.fail:
+    msg: >-
+      The NVIDIA module {{ nvidia_driver_ondisk_version.stdout | trim }} is on disk but not
+      running on {{ inventory_hostname }}, and no reboot is pending: it failed to load.
+      See `dmesg | grep -i nvidia` (open vs proprietary modules, Secure Boot).
+  when:
+    - not ansible_check_mode
+    - not (nvidia_driver_module_loaded | bool)
+    - (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0
+    - not nvidia_driver_reboot_pending.stat.exists
+
+- name: State that the NVIDIA driver waits for a reboot
+  ansible.builtin.debug:
+    msg: >-
+      REBOOT PENDING: {{ inventory_hostname }} still runs the old NVIDIA module; the
+      installed {{ nvidia_driver_ondisk_version.stdout | default('?') | trim }} is not in use.
+      The persistence daemon and Fabric Manager start at boot; the GPU checks run when
+      the maintenance reboot runs this role again (roles/maintenance, reboot_request).
+  when:
+    - not (nvidia_driver_module_loaded | bool)
+    - nvidia_driver_reboot_pending.stat.exists | default(false)
+
+# NVIDIA recommends the persistence daemon (not the legacy `nvidia-smi -pm 1`) with
+# persistence mode on. The distribution units do not give that: Ubuntu's runs
+# --no-persistence-mode, stops when unneeded and cannot be enabled (no [Install]). The
+# role owns the unit (/etc/systemd/system takes precedence), after NVIDIA's template.
+# https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/post-installation-actions.html
+# https://github.com/NVIDIA/nvidia-persistenced/blob/main/init/systemd/nvidia-persistenced.service.template
+- name: Own the persistence daemon's unit, persistence mode on
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nvidia-persistenced.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # roles/nvidia_driver: persistence mode on, started at boot
+      [Unit]
+      Description=NVIDIA Persistence Daemon
+      Wants=syslog.target
+
+      [Service]
+      Type=forking
+      ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
+      ExecStopPost=/bin/rm -rf /var/run/nvidia-persistenced
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Nvidia-persistenced unit changed
+  when: nvidia_driver_persistenced | bool
+
+# The drop-in earlier versions of this role could write (override.conf, told by its
+# text); the unit above replaces it. A site's own drop-ins there stay, and so does the
+# directory while it holds any.
+- name: Read the persistence drop-in earlier versions wrote
+  ansible.builtin.slurp:
+    src: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
+  register: nvidia_driver_old_dropin
+  failed_when: false
+
+- name: Remove the retired persistence drop-in
+  ansible.builtin.file:
+    path: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
+    state: absent
+  when:
+    - nvidia_driver_old_dropin.content is defined
+    - >-
+      "ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode"
+      in (nvidia_driver_old_dropin.content | b64decode)
+  notify: Nvidia-persistenced unit changed
+
+- name: Remove the drop-in directory when nothing else is in it
+  ansible.builtin.command:
+    argv: [rmdir, /etc/systemd/system/nvidia-persistenced.service.d]
+    removes: /etc/systemd/system/nvidia-persistenced.service.d
+  register: nvidia_driver_dropin_dir
+  failed_when: nvidia_driver_dropin_dir.rc != 0 and 'not empty' not in nvidia_driver_dropin_dir.stderr
+  changed_when: nvidia_driver_dropin_dir.rc == 0
+
+# Enabled now, whatever module runs: after a pending reboot it starts with the new one.
+- name: Enable the NVIDIA persistence daemon at boot
+  ansible.builtin.systemd:
+    name: nvidia-persistenced
+    enabled: true
+    daemon_reload: true
+  when: nvidia_driver_persistenced | bool
+
+- name: Start the NVIDIA persistence daemon
+  ansible.builtin.systemd:
+    name: nvidia-persistenced
+    state: started
+  when:
+    - nvidia_driver_persistenced | bool
+    - nvidia_driver_module_loaded | bool
+
+- name: Read the persistence mode of every GPU
+  ansible.builtin.command:
+    argv: [systemd-run, --wait, --pipe, --collect, --quiet, --, nvidia-smi, --query-gpu=persistence_mode, "--format=csv,noheader"]
+  register: nvidia_driver_persistence
+  changed_when: false
+  check_mode: false
+  when:
+    - nvidia_driver_persistenced | bool
+    - nvidia_driver_verify | bool
+    - nvidia_driver_module_loaded | bool
+
+- name: Fail when a GPU is not in persistence mode
+  ansible.builtin.assert:
+    that: nvidia_driver_persistence.stdout_lines | map('trim') | reject('eq', 'Enabled') | list | length == 0
+    fail_msg: "Persistence mode is not on for every GPU: {{ nvidia_driver_persistence.stdout_lines | join(', ') }}"
+    quiet: true
+  when: nvidia_driver_persistence is not skipped
+
+# NVSwitch HGX baseboards require Fabric Manager, branch-matched to the driver.
+# https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
+- name: Enable NVIDIA Fabric Manager at boot
+  ansible.builtin.systemd:
+    name: nvidia-fabricmanager
+    enabled: true
+  when: nvidia_driver_fabricmanager | bool
+
+- name: Start NVIDIA Fabric Manager
+  ansible.builtin.systemd:
+    name: nvidia-fabricmanager
+    state: started
+  when:
+    - nvidia_driver_fabricmanager | bool
+    - nvidia_driver_module_loaded | bool
+
+- name: Verify the loaded NVIDIA driver version
+  ansible.builtin.command: cat /proc/driver/nvidia/version
+  changed_when: false
+  when:
+    - nvidia_driver_verify | bool
+    - nvidia_driver_module_loaded | bool
+
+# A transient unit sees the GPUs even where the ssh service hides them (DeviceAllow).
+- name: Verify GPUs are visible with nvidia-smi
+  ansible.builtin.command: systemd-run --wait --pipe --collect --quiet -- nvidia-smi
+  changed_when: false
+  when:
+    - nvidia_driver_verify | bool
+    - nvidia_driver_module_loaded | bool
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nvidia_driver
+    component_record_action: present
+    component_record_items: "{{ nvidia_driver_items }}"
+    component_record_version: "{{ nvidia_driver_branch }}"
