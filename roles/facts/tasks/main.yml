@@ -47,7 +47,7 @@
   ansible.builtin.include_role:
     name: recorded_files
   vars:
-    recorded_files_record: /var/lib/deepops/recorded/facts.d
+    recorded_files_record: "{{ deepops_state_dir }}/recorded/facts.d"
     recorded_files_names: "{{ facts_files | map('basename') | list }}"
     recorded_files_dirs: [/etc/ansible/facts.d]
 

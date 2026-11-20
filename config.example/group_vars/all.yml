@@ -205,7 +205,7 @@
 #    comment: Slurm
 #  slurmbuild:
 #    uid: 22079
-#    home: /var/cache/deepops/build/slurm-deb
+#    home: "{{ deepops_cache_dir }}/build/slurm-deb"
 #    comment: Slurm package builder
 #  easybuild:
 #    uid: 22080

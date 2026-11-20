@@ -3,7 +3,7 @@
 nvidia_network_operator_image_tag: "network-operator-v{{ nvidia_network_operator_version }}"
 nvidia_network_operator_mpi_operator_url: >-
   https://github.com/kubeflow/mpi-operator/releases/download/{{ nvidia_network_operator_mpi_operator_version }}/mpi-operator.yaml
-nvidia_network_operator_mpi_operator_manifest: "/var/cache/deepops/mpi-operator-{{ nvidia_network_operator_mpi_operator_version }}.yaml"
+nvidia_network_operator_mpi_operator_manifest: "{{ deepops_cache_dir }}/mpi-operator-{{ nvidia_network_operator_mpi_operator_version }}.yaml"
 # The kinds of resource the role creates per interface (present.yml), removed by absent.
 nvidia_network_operator_owned_kinds:
   - {api: sriovnetwork.openshift.io/v1, kind: SriovIBNetwork}

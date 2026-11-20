@@ -41,7 +41,7 @@
 # Verified by checksum on download (fetch.yml); the GPG check stays off as before.
 - name: RHEL | install enroot from the release .rpm
   ansible.builtin.dnf:
-    name: "/var/cache/deepops/{{ item }}"
+    name: "{{ deepops_cache_dir }}/{{ item }}"
     state: "{{ enroot_package_state }}"
     disable_gpg_check: true
   loop: "{{ _enroot_files }}"

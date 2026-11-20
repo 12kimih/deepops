@@ -24,7 +24,7 @@
         - name: Fetch the EPEL release package
           ansible.builtin.get_url:  # no fixed checksum: verified by signature below
             url: "{{ package_repos_epel_release }}"
-            dest: /var/cache/deepops/epel-release.rpm
+            dest: "{{ deepops_cache_dir }}/epel-release.rpm"
             mode: "0644"
             force: true
           environment: "{{ proxy_env }}"
@@ -32,7 +32,7 @@
 
         - name: Check the package is signed by the EPEL key
           ansible.builtin.command:
-            argv: [rpm, --checksig, /var/cache/deepops/epel-release.rpm]
+            argv: [rpm, --checksig, "{{ deepops_cache_dir }}/epel-release.rpm"]
           register: package_repos_epel_sig
           changed_when: false
           check_mode: false  # read-only; --check needs the result
@@ -40,5 +40,5 @@
 
         - name: Install the verified EPEL release package
           ansible.builtin.dnf:
-            name: /var/cache/deepops/epel-release.rpm
+            name: "{{ deepops_cache_dir }}/epel-release.rpm"
             state: present

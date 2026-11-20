@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir
   - role: proxy_defaults  # proxy_env
 
 galaxy_info:

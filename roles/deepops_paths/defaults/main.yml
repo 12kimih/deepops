@@ -2,13 +2,18 @@
 # Where DeepOps puts things on a host, and what kind of host it is, written once for
 # every role that uses it.
 deepops_dir: /opt/deepops
+# deepops' own directories on every host, root's and never world-writable: its state
+# (records of what it installed, read back by later runs) and its cache (downloads and
+# builds, which a run may recreate). Every role names them through these.
+deepops_state_dir: /var/lib/deepops
+deepops_cache_dir: /var/cache/deepops
 # The Helm client every role drives (roles/helm_release, roles/runai); Kubespray puts
 # it in its bin_dir, /usr/local/bin.
 helm_bin: /usr/local/bin/helm
 # One file per role waiting for a reboot (roles/maintenance reboot_request); the reboot
 # step runs those roles again, and a component removed meanwhile takes its file along
 # (roles/component_record).
-maintenance_reboot_requests_dir: /var/lib/deepops/reboot-requested-by
+maintenance_reboot_requests_dir: "{{ deepops_state_dir }}/reboot-requested-by"
 # Node-side home of a GPU power cap (roles/nvidia_power_limit). Its unit reads it as an
 # EnvironmentFile, so the number lives in one place on the node, and anything else that
 # changes a GPU's power limit reads the cap back instead of guessing: the Slurm
@@ -30,6 +35,6 @@ deepops_containerized: "{{ ansible_facts.virtualization_type | default('') in de
 
 # Source builds (roles/source_build), root's and never world-writable: the trees (gone
 # once installed), the release archives, and the manifest of what each installed.
-source_build_root: /var/cache/deepops/build
-source_build_archives: /var/cache/deepops/src
-source_build_manifests: /var/lib/deepops/source-builds
+source_build_root: "{{ deepops_cache_dir }}/build"
+source_build_archives: "{{ deepops_cache_dir }}/src"
+source_build_manifests: "{{ deepops_state_dir }}/source-builds"

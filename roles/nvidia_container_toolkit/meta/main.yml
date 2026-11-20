@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir
   # A site still setting a name this role read before stops the deploy.
   - role: retired_settings
   - role: proxy_defaults  # proxy_env

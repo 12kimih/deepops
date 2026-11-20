@@ -14,4 +14,4 @@ docker_daemon_json_unit_changed: false
 # Unit files the caller removes in this run (gone already, or under --check still there):
 # the flag check leaves them out.
 docker_daemon_json_retiring: []
-docker_daemon_json_record_dir: /var/lib/deepops/docker-daemon-json
+docker_daemon_json_record_dir: "{{ deepops_state_dir }}/docker-daemon-json"

@@ -8,11 +8,11 @@
       vars:
         download_url: "{{ package_repos_cuda_url }}/{{ package_repos_cuda_keyring }}"
         download_checksum: "{{ package_repos_cuda_keyring_checksums[package_repos_cuda_dir] | default('') }}"
-        download_dest: "/var/cache/deepops/{{ package_repos_cuda_dir | replace('/', '-') }}-{{ package_repos_cuda_keyring }}"
+        download_dest: "{{ deepops_cache_dir }}/{{ package_repos_cuda_dir | replace('/', '-') }}-{{ package_repos_cuda_keyring }}"
 
     - name: Install the CUDA keyring
       ansible.builtin.apt:
-        deb: "/var/cache/deepops/{{ package_repos_cuda_dir | replace('/', '-') }}-{{ package_repos_cuda_keyring }}"
+        deb: "{{ deepops_cache_dir }}/{{ package_repos_cuda_dir | replace('/', '-') }}-{{ package_repos_cuda_keyring }}"
       register: package_repos_cuda_keyring_install
       # Under --check a keyring not yet fetched is not there to install.
       when: not (ansible_check_mode and download_fetch is changed)

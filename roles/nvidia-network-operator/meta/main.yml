@@ -10,5 +10,6 @@ galaxy_info:
     - name: Ubuntu
       versions: [jammy, noble]
 dependencies:
+  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir
   - role: deploy_defaults  # deepops_gpu_operator_enabled
   - role: retired_settings  # the role's old unprefixed setting names
