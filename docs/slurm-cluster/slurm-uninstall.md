@@ -237,31 +237,38 @@ mysql -e "DROP DATABASE IF EXISTS slurm_acct_db; DROP USER IF EXISTS 'slurm'@'lo
 
 ### 7. Optional components
 
-The Slurm cluster playbook also installs these when their flags are enabled.
-Each is independent of Slurm and can stay in place if it is still useful.
+The Slurm cluster playbook also installs these when their switches are on. Each is
+a component ([component state](../deepops/component-state.md)): turn its switch off
+in `config/` and rerun `playbooks/slurm-cluster.yml` (or the component's own
+playbook), and its removal phase takes away what deepops installed for it on every
+host, in reverse dependency order. Data is never removed. Each is independent of
+Slurm and can stay in place if it is still useful. The NFS server and mounts go
+only when also listed in `deepops_component_removals`.
 
-| Component | Flag | What to remove |
+| Component | Switch | What stays |
 |---|---|---|
-| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` (default on) | Pyxis configuration is under `/etc/slurm` (`plugstack.conf`, `plugstack.conf.d/pyxis.conf`); the plugin `{{ slurm_plugin_dir }}/spank_pyxis.so` is the package `nvslurm-plugin-pyxis`, purged with the Slurm packages in step 2. Remove Enroot only if no other workloads use it; see the AppArmor policy cleanup below. |
-| Node Health Check | `slurm_install_nhc` | `/etc/nhc`, `/etc/sysconfig/nhc`, `/usr/sbin/nhc*`, `/usr/libexec/nhc`, `/opt/deepops/build/nhc` |
-| OpenMPI | `slurm_cluster_install_openmpi` (example inventory: off; unset: on) | Built into `/usr/local` from `/tmp/openmpi-build`; `cd` to that directory and `make uninstall` if it still exists |
-| Lmod / software modules | `slurm_install_lmod` | See `roles/lmod/defaults/main.yml` for `sm_software_path` and `sm_module_path`; profile scripts in `/etc/profile.d/` |
-| EasyBuild | `playbooks/slurm-cluster/easybuild-modules.yml` | On the software-tree host: `easybuild_prefix`, the venvs in `{{ sm_software_path }}/EasyBuild`, the modulefiles in `{{ sm_module_path }}/EasyBuild`, `/etc/xdg/easybuild.d/deepops.cfg`, and the `easybuild_user` account with its home. Drop the EasyBuild tree from `lmod_module_paths` before rerunning the Lmod role |
-| Rootless Podman | `slurm_install_podman` (default on) | The `podman`, `uidmap` and `slirp4netns` packages; `/etc/subuid`, `/etc/subgid`, `/etc/containers/storage.conf`, `/etc/containers/containers.conf.d/50-deepops-rootless.conf`; the users' storage under `podman_storage_root` (default `/var/lib/podman-storage`). |
-| Container storage cleanup | `slurm_enable_container_storage_gc` (default on) | A component: set the switch to false and rerun the deploy (or `playbooks/container/container-storage-gc.yml`); its timer, service, command, configuration and metrics go, users' stores stay. |
-| Monitoring | `slurm_enable_monitoring` | The listed monitoring units, including `docker.alertmanager.service` (stopped in step 1), their unit files in `/etc/systemd/system/`, and their matching containers. Inspect names and other users before removing containers; do not remove unrelated `docker.*` services. Run `systemctl daemon-reload` after removing unit files. Back up retained monitoring data; remove configuration and volumes only if no longer needed. |
-| Centralized syslog | `slurm_enable_rsyslog_client` (default on) | `/etc/rsyslog.d/99-forward-syslog.conf` on compute nodes, then `systemctl restart rsyslog` |
-| NFS | `slurm_enable_nfs_server`, `slurm_enable_nfs_client_nodes` | Exports and mounts configured by the NFS roles; see [Slurm and NFS](./slurm-nfs.md) |
+| Enroot and Pyxis | `slurm_install_enroot`, `slurm_install_pyxis` | users' enroot data; the running sysctl values until a reboot (see the AppArmor note below) |
+| Node Health Check | `slurm_install_nhc` | |
+| OpenMPI | `slurm_cluster_install_openmpi` | |
+| Lmod | `slurm_install_lmod` | the module trees and the software in them |
+| EasyBuild | `slurm_install_easybuild` | what it built (`easybuild_prefix`) and the `easybuild_user` account |
+| CUDA toolkits as modules | `slurm_install_cuda_toolkit` | a tree it did not record (installed before the record existed) |
+| System-wide CUDA toolkit | `slurm_install_cuda` | toolkits installed by hand under another package name |
+| NVIDIA HPC SDK | `slurm_install_hpcsdk` | |
+| Rootless Podman | `slurm_install_podman` | the users' stores under `podman_storage_root`, `/etc/subuid`, `/etc/subgid` |
+| Container storage cleanup | `slurm_enable_container_storage_gc` | the users' stores |
+| Monitoring | `slurm_enable_monitoring` | the metrics and dashboards' data volumes |
+| Centralized syslog | `slurm_enable_rsyslog_client`, `slurm_enable_rsyslog_server` | the collected logs |
+| NFS | `slurm_enable_nfs_server`, `slurm_enable_nfs_client_nodes` (+ `deepops_component_removals`) | the exported data; a live mount until the next boot ([Slurm and NFS](./slurm-nfs.md)) |
 
 When retiring Enroot, restore the site's intended AppArmor policy, not just
 its files. The enroot package ships the scoped profile `/etc/apparmor.d/enroot`
 and removing the package removes it. If `enroot_apparmor_global_disable` was
-enabled, inspect `/etc/sysctl.d/90-enroot.conf`: it sets
-`kernel.apparmor_restrict_unprivileged_userns=0` for the whole host. Remove only
-that override, then restore and apply the site's intended value with the
-distribution's sysctl tooling, and verify it with
+enabled, `/etc/sysctl.d/90-enroot.conf` set
+`kernel.apparmor_restrict_unprivileged_userns=0` for the whole host; the removal
+deletes that file, but not the running kernel value. Apply the site's intended
+value with the distribution's sysctl tooling (or reboot), and verify it with
 `sysctl kernel.apparmor_restrict_unprivileged_userns` where the knob exists.
-Deleting the file alone does not restore the running kernel value.
 
 The NVIDIA driver, CUDA toolkit, container toolkit, Docker, chrony, and the
 `/etc/hosts` and hostname changes made by the generic playbooks are not Slurm
