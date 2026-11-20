@@ -3,7 +3,7 @@
 
     config_lint.py [--fix]              run every check
     config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
-                                        doc-vars, doc-limits, shadow
+                                        doc-vars, doc-limits, duplicates, shadow
 
 A role's defaults own each setting's default and a config states only what differs
 (scripts/deepops/settings.py models both):
@@ -30,6 +30,8 @@ doc-limits every `ansible-playbook -l X playbooks/...` a document shows limits t
 retired    no config sets a setting deepops retired (the deploy would stop on it).
 removals   deepops_component_removals names only components with removal: explicit
            in the registry (any other name fails every deploy).
+duplicates no variable file sets a key twice in one mapping: Ansible keeps the last and
+           only warns, so the first value is lost without a failure.
 shadow     no group or host has its variables in two places (all.yml beside all/, or
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
@@ -493,6 +495,25 @@ def check_shadow():
     return problems
 
 
+def check_duplicates():
+    problems = []
+    for label, tree, private in configs():
+        for rel in tree.files():
+            if rel.split("/", 1)[0] not in ("group_vars", "host_vars"):
+                continue
+            for number, key in settings.duplicate_keys(tree.text(rel)):
+                problems.append(
+                    found(
+                        "duplicates",
+                        f"{label}/{rel}",
+                        number,
+                        f"{key} is set again here; Ansible drops the first",
+                        private,
+                    )
+                )
+    return problems
+
+
 # A check that can fix takes a Fixes to collect its edits in.
 FIXABLE = {"commented", "redundant"}
 CHECKS = {
@@ -502,6 +523,7 @@ CHECKS = {
     "doc-paths": check_doc_paths,
     "doc-vars": check_doc_vars,
     "doc-limits": check_doc_limits,
+    "duplicates": check_duplicates,
     "shadow": check_shadow,
     "retired": check_retired,
     "removals": check_removals,
