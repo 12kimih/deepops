@@ -113,7 +113,7 @@ Slurm / Scheduler provides the following information about running jobs and the 
 
 Slurm / GPU allocation comes from `roles/slurm_metrics`: a timer on the controller writes
 `slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job_id}` (1 per GPU a job
-holds) and `slurm_node_gpus{node,gpu_type}` every minute as a node_exporter text file. The
+holds) and `slurm_gpu_configured{node,gpu_type}` every minute as a node_exporter text file. The
 recording rule `host_device:slurm_gpu_allocated:max` keys them like DCGM series, and the
 alert `GpuBusyWithoutJob` fires when a GPU stays busy for 15 minutes with no job holding it
 (a process outside Slurm, or one a finished job left behind). `SlurmGpuMetricsStale` warns

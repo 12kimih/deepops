@@ -2,7 +2,7 @@
 
 Slurm's own exporters report jobs and nodes, not which GPU each job holds. This writes:
   slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job_id} 1 per allocated GPU
-  slurm_node_gpus{node,gpu_type}                                    GPUs configured
+  slurm_gpu_configured{node,gpu_type}                               GPUs configured
   slurm_node_state{node,state}         1 per node, Slurm's base state (idle, mixed, down...)
   slurm_node_drain{node}               1 when the drain flag is set beside that state
   slurm_node_schedulable{node}         1 when a new job can start there (vocab.node_schedulable,
@@ -12,6 +12,8 @@ so a dashboard can show who holds which GPU, and an alert can compare DCGM utili
 with allocation (a busy GPU no job holds). Label names avoid those the scrape attaches
 itself, which would be renamed exported_*: `job` and `instance` (Prometheus's own) and
 `host` (this site's target label). Hence `node`, as in Slurm's own metrics, and `job_id`.
+No name is one slurmctld serves itself (MetricsType=metrics/openmetrics): two sources
+of one name add up in every sum (tests/cluster-tools/test_metrics.py checks it).
 
 `metrics PATH` writes the text file atomically (a temporary file in the same directory,
 fsync, rename), which node_exporter's textfile collector needs so it never reads half a
@@ -50,10 +52,13 @@ def textfile(jobs_data, nodes_data, now=None):
                 "job_id": slurm.job_label(job),
             }  # fmt: skip
             lines.append(series("slurm_gpu_allocated", labels, 1))
-    lines += ["# HELP slurm_node_gpus GPUs configured on a node, by type.", "# TYPE slurm_node_gpus gauge"]
+    lines += [
+        "# HELP slurm_gpu_configured GPUs configured on a node, by type.",
+        "# TYPE slurm_gpu_configured gauge",
+    ]
     for node in nodes_data["nodes"]:
         for gtype, count in sorted(slurm.node_gpus(node.get("gres")).items()):
-            lines.append(series("slurm_node_gpus", {"node": node["name"], "gpu_type": gtype}, count))
+            lines.append(series("slurm_gpu_configured", {"node": node["name"], "gpu_type": gtype}, count))
     # No reason text as a label: it is free text, so every new reason would be a new series.
     for name, help_text, value in (
         ("slurm_node_state", "Slurm's base state of a node, 1 for the current one.", None),

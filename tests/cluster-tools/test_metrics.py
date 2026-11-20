@@ -1,12 +1,13 @@
 """Tests for clustertools.metrics: GPU allocation as node_exporter textfile metrics."""
 
+import json
 import re
 import tempfile
 import unittest
 from pathlib import Path
 
-from common import load, run_tool
-from clustertools import metrics
+from common import HERE, load, run_tool
+from clustertools import metrics, slurm_backup
 
 
 def value(n):
@@ -36,8 +37,22 @@ class TextfileTests(unittest.TestCase):
         self.assertIn('node="gpu3",gpu="0",gpu_type="a30",user="bob"', text)
         self.assertIn('job_id="9_3"', text)
         self.assertNotIn("carol", text)
-        self.assertIn('slurm_node_gpus{node="gpu4",gpu_type="a30"} 7', text)
+        self.assertIn('slurm_gpu_configured{node="gpu4",gpu_type="a30"} 7', text)
         self.assertIn("# TYPE slurm_gpu_allocated gauge", text)
+
+    def test_no_name_is_one_slurmctld_serves(self):
+        # slurmctld serves its own metrics (MetricsType=metrics/openmetrics), scraped too:
+        # a name both write adds up twice in every sum. slurm_node_gpus did, and the GPU
+        # dashboards counted every GPU twice. The served names come from the pinned
+        # release's source (scripts/deepops/slurm_names.py), so a Slurm bump that takes
+        # one of these names fails here.
+        served = {m for names in json.loads((HERE / "slurm-names.json").read_text())["metrics"].values()
+                  for m in names}  # fmt: skip
+        text = metrics.textfile({"jobs": [running(1, "alice", "gpu1", ["gpu:a10:1(IDX:0)"])]}, load("nodes"))
+        written = set(re.findall(r"^# TYPE (\S+) ", text, re.M))
+        self.assertGreaterEqual(len(written), 6)
+        self.assertEqual(sorted(written & served), [])
+        self.assertEqual([m for m in served if m.startswith(slurm_backup.PREFIX)], [], "slurm_backup's names")
 
     def test_the_file_says_when_it_was_read(self):
         # The stale alerts read this, so they hold whatever the file is called.
@@ -64,7 +79,7 @@ class TextfileTests(unittest.TestCase):
         self.assertIn('node="gpu2",gpu="3",gpu_type="a30"', text)
         # Untyped: the same empty type on the allocation and the node, so the two join.
         self.assertIn('node="gpu3",gpu="1",gpu_type=""', text)
-        self.assertIn('slurm_node_gpus{node="gpu3",gpu_type=""} 2', text)
+        self.assertIn('slurm_gpu_configured{node="gpu3",gpu_type=""} 2', text)
 
     def test_node_state_drain_and_schedulable(self):
         nodes = {"nodes": [{"name": "gpu1", "gres": "gpu:a10:4", "state": ["MIXED", "DRAIN"]},
@@ -86,7 +101,7 @@ class WriteTests(unittest.TestCase):
             path = Path(d) / "slurm_gpu.prom"
             r = run_tool("metrics", str(path))
             self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertIn("slurm_node_gpus{", path.read_text())
+            self.assertIn("slurm_gpu_configured{", path.read_text())
             path.write_text("previous\n")
             r = run_tool("metrics", str(path), env={"FAKE_FAIL": "slurm_load_jobs error: down"})
             self.assertEqual(r.returncode, 1)

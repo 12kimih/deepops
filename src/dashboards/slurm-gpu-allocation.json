@@ -76,7 +76,7 @@
       },
       "targets": [
         {
-          "expr": "sum(max by (node, gpu_type) (slurm_node_gpus))",
+          "expr": "sum(max by (node, gpu_type) (slurm_gpu_configured))",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -139,7 +139,7 @@
       },
       "targets": [
         {
-          "expr": "sum(max by (node, gpu_type) (slurm_node_gpus) * on (node) group_left () max by (node) (slurm_node_schedulable))",
+          "expr": "sum(max by (node, gpu_type) (slurm_gpu_configured) * on (node) group_left () max by (node) (slurm_node_schedulable))",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -259,7 +259,7 @@
       },
       "targets": [
         {
-          "expr": "(count(host_device:slurm_gpu_allocated:max) or vector(0)) / sum(max by (node, gpu_type) (slurm_node_gpus) * on (node) group_left () max by (node) (slurm_node_schedulable))",
+          "expr": "(count(host_device:slurm_gpu_allocated:max) or vector(0)) / sum(max by (node, gpu_type) (slurm_gpu_configured) * on (node) group_left () max by (node) (slurm_node_schedulable))",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -494,7 +494,7 @@
       },
       "targets": [
         {
-          "expr": "sum(max by (node, gpu_type) (slurm_node_gpus))",
+          "expr": "sum(max by (node, gpu_type) (slurm_gpu_configured))",
           "legendFormat": "Configured",
           "datasource": {
             "type": "prometheus",
@@ -503,7 +503,7 @@
           "refId": "A"
         },
         {
-          "expr": "sum(max by (node, gpu_type) (slurm_node_gpus) * on (node) group_left () max by (node) (slurm_node_schedulable))",
+          "expr": "sum(max by (node, gpu_type) (slurm_gpu_configured) * on (node) group_left () max by (node) (slurm_node_schedulable))",
           "legendFormat": "Usable",
           "datasource": {
             "type": "prometheus",
@@ -629,7 +629,7 @@
       },
       "targets": [
         {
-          "expr": "label_replace((max by (node, gpu_type) (slurm_node_gpus) * on (node) group_left (state) max by (node, state) (slurm_node_state)) and on (node) (max by (node) (slurm_node_drain) == 1), \"state\", \"$1, drain\", \"state\", \"(.+)\") or ((max by (node, gpu_type) (slurm_node_gpus) * on (node) group_left (state) max by (node, state) (slurm_node_state)) unless on (node) (max by (node) (slurm_node_drain) == 1))",
+          "expr": "label_replace((max by (node, gpu_type) (slurm_gpu_configured) * on (node) group_left (state) max by (node, state) (slurm_node_state)) and on (node) (max by (node) (slurm_node_drain) == 1), \"state\", \"$1, drain\", \"state\", \"(.+)\") or ((max by (node, gpu_type) (slurm_gpu_configured) * on (node) group_left (state) max by (node, state) (slurm_node_state)) unless on (node) (max by (node) (slurm_node_drain) == 1))",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -860,7 +860,7 @@
       },
       "targets": [
         {
-          "expr": "(sum by (gpu_type) (count by (gpu_type, host, device) (host_device:slurm_gpu_allocated:max)) or 0 * sum by (gpu_type) (max by (node, gpu_type) (slurm_node_gpus))) / sum by (gpu_type) (max by (node, gpu_type) (slurm_node_gpus))",
+          "expr": "(sum by (gpu_type) (count by (gpu_type, host, device) (host_device:slurm_gpu_allocated:max)) or 0 * sum by (gpu_type) (max by (node, gpu_type) (slurm_gpu_configured))) / sum by (gpu_type) (max by (node, gpu_type) (slurm_gpu_configured))",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -930,7 +930,7 @@
       },
       "targets": [
         {
-          "expr": "(sum by (node) (count by (node, host, device) (host_device:slurm_gpu_allocated:max)) or 0 * sum by (node) (max by (node, gpu_type) (slurm_node_gpus))) / sum by (node) (max by (node, gpu_type) (slurm_node_gpus))",
+          "expr": "(sum by (node) (count by (node, host, device) (host_device:slurm_gpu_allocated:max)) or 0 * sum by (node) (max by (node, gpu_type) (slurm_gpu_configured))) / sum by (node) (max by (node, gpu_type) (slurm_gpu_configured))",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",

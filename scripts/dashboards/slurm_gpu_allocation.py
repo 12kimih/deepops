@@ -1,6 +1,6 @@
 """Slurm / GPU allocation: who holds which GPU, against what the cluster can offer.
 
-From roles/slurm_metrics (clustertools.metrics: slurm_gpu_allocated, slurm_node_gpus,
+From roles/slurm_metrics (clustertools.metrics: slurm_gpu_allocated, slurm_gpu_configured,
 slurm_node_state, slurm_node_drain, slurm_node_schedulable) and the recording rule
 host_device:slurm_gpu_allocated:max (rules/slurm.yml), joined with DCGM utilisation
 through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering.
@@ -11,7 +11,7 @@ from grafana import STATE_COLORS, bars, dashboard, query, stat, table, timeserie
 PATH = "src/dashboards/slurm-gpu-allocation.json"
 
 ALLOC = "host_device:slurm_gpu_allocated:max"
-NODE_GPUS = "max by (node, gpu_type) (slurm_node_gpus)"
+NODE_GPUS = "max by (node, gpu_type) (slurm_gpu_configured)"
 SCHEDULABLE = "max by (node) (slurm_node_schedulable)"
 USABLE = f"{NODE_GPUS} * on (node) group_left () {SCHEDULABLE}"
 ALLOCATED = f"(count({ALLOC}) or vector(0))"
