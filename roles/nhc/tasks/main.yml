@@ -13,71 +13,39 @@
     - always
 
 # An nhc on disk is not ours at this version (a distribution or hand install, or an
-# older nhc_version): only the record of our last build says so.
-- name: Check what the installed NHC was built from
-  ansible.builtin.include_role:
-    name: build_record
-  vars:
-    build_record_path: "{{ nhc_build_record }}"
-    build_record_key: "{{ nhc_build_key }}"
-    build_record_installed: ["{{ nhc_program }}"]
-    build_record_force: "{{ nhc_force_reinstall }}"
-
-- name: Decide whether NHC needs building
-  ansible.builtin.set_fact:
-    nhc_build: "{{ build_record_stale }}"
-
+# older nhc_version): only the record of our last build says so (roles/source_build).
 - name: Install build dependencies
   ansible.builtin.package:
     name: "{{ item }}"
     state: present
   with_items: "{{ nhc_build_deps }}"
 
-- name: Ensure build dir exists
+# Resolved here, in this role's scope: source_build evaluates its arguments in its own.
+- name: Describe the NHC build
+  ansible.builtin.set_fact:
+    nhc_source_build:
+      name: nhc
+      version: "{{ nhc_version }}"
+      url: "{{ nhc_src_url }}"
+      checksum: "{{ nhc_checksums[nhc_version] | default('') }}"
+      steps: "{{ [nhc_configure | split] + ([nhc_test | split] if nhc_run_test | bool else []) }}"
+      install: "{{ nhc_make | split }}"
+      record: "{{ nhc_build_record }}"
+      key: "{{ nhc_build_key }}"
+      installed: ["{{ nhc_program }}"]
+      force: "{{ nhc_force_reinstall }}"
+
+- name: Build and install NHC
+  ansible.builtin.include_role:
+    name: source_build
+  vars:
+    source_build: "{{ nhc_source_build }}"
+
+# Earlier versions built in, and kept, this tree.
+- name: Remove the build tree earlier versions kept
   ansible.builtin.file:
-    path: "{{ nhc_build_dir }}"
-    state: "directory"
-    owner: "root"
-    group: "root"
-    mode: "0755"
-  when: nhc_build
-
-- name: Fetch and unpack the NHC source
-  ansible.builtin.include_role:
-    name: download
-  vars:
-    download_url: "{{ nhc_src_url }}"
-    download_checksum: "{{ nhc_checksums[nhc_version] | default('') }}"
-    download_dest: "{{ nhc_build_dir }}/{{ nhc_src_url | basename }}"
-    download_unpack: "{{ nhc_build_dir }}"
-  when: nhc_build
-
-- name: Configure nhc
-  ansible.builtin.command: "{{ nhc_configure }}"
-  args:
-    chdir: "{{ nhc_extract_dir }}"
-  when: nhc_build
-
-- name: Test nhc src
-  ansible.builtin.command: "{{ nhc_test }}"
-  args:
-    chdir: "{{ nhc_extract_dir }}"
-  when: nhc_build and nhc_run_test
-
-- name: Make and install nhc
-  ansible.builtin.command: "{{ nhc_make }}"
-  args:
-    chdir: "{{ nhc_extract_dir }}"
-  when: nhc_build
-
-- name: Record what NHC was built from
-  ansible.builtin.include_role:
-    name: build_record
-    tasks_from: write
-  vars:
-    build_record_path: "{{ nhc_build_record }}"
-    build_record_key: "{{ nhc_build_key }}"
-  when: nhc_build
+    path: /opt/deepops/build/nhc
+    state: absent
 
 - name: Add deepops checks to nhc
   ansible.builtin.copy:
@@ -121,7 +89,7 @@
   register: nhc_info
   changed_when: false
   check_mode: false  # read-only; --check needs the result
-  when: not (ansible_check_mode and nhc_build)
+  when: not (ansible_check_mode and source_build_built | bool)
 
 - name: Look for the helper that drains a node
   ansible.builtin.stat:

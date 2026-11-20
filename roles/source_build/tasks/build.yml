@@ -1,0 +1,69 @@
+---
+# The build, when check.yml found it due.
+- name: "Build and install: {{ _source_build.name }}"
+  when: source_build_built | bool
+  block:
+    # Resolved here: an included role (download) evaluates its arguments in its own scope,
+    # where deepops_paths' settings are not.
+    - name: Name the tree, the stage and the archive
+      ansible.builtin.set_fact:
+        _source_build_tree: "{{ source_build_root }}/{{ _source_build.name }}-{{ _source_build.version }}"
+        _source_build_stage: "{{ source_build_root }}/{{ _source_build.name }}-{{ _source_build.version }}.stage"
+        _source_build_archive: "{{ source_build_archives }}/{{ _source_build.url | basename }}"
+        _source_build_request: "{{ _source_build }}"
+
+    # Fresh every time: never configured over a failed attempt.
+    - name: Remove an earlier tree and stage
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: ["{{ _source_build_tree }}", "{{ _source_build_stage }}"]
+
+    - name: Create the build tree
+      ansible.builtin.file:
+        path: "{{ _source_build_tree }}"
+        state: directory
+        mode: "0755"
+
+    - name: "Fetch and unpack the release: {{ _source_build.name ~ ' ' ~ _source_build.version }}"
+      ansible.builtin.include_role:
+        name: download
+      vars:
+        download_url: "{{ _source_build_request.url }}"
+        download_checksum: "{{ _source_build_request.checksum }}"
+        download_dest: "{{ _source_build_archive }}"
+        download_unpack: "{{ _source_build_tree }}"
+        download_strip: "{{ _source_build_request.strip }}"
+
+    - name: "Build: {{ _source_build.name }}"
+      ansible.builtin.command:
+        argv: "{{ item }}"
+        chdir: "{{ _source_build_tree }}"
+      loop: "{{ _source_build.steps }}"
+      changed_when: true
+
+    - name: "Install into the stage: {{ _source_build.name }}"
+      ansible.builtin.command:
+        argv: "{{ _source_build.install + ['DESTDIR=' ~ _source_build_stage] }}"
+        chdir: "{{ _source_build_tree }}"
+      changed_when: true
+
+    - name: "Put the stage in place under its manifest: {{ _source_build.name }}"
+      staged_install:
+        stage: "{{ _source_build_stage }}"
+        manifest: "{{ source_build_manifests }}/{{ _source_build.name }}.json"
+        root: "{{ _source_build.root }}"
+
+    - name: "Record what the install was built from: {{ _source_build.name }}"
+      ansible.builtin.include_role:
+        name: build_record
+        tasks_from: write
+      vars:
+        build_record_path: "{{ _source_build_request.record }}"
+        build_record_key: "{{ _source_build_request.key }}"
+
+    - name: Remove the tree and the stage
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: ["{{ _source_build_tree }}", "{{ _source_build_stage }}"]

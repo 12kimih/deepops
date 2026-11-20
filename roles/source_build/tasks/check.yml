@@ -1,0 +1,31 @@
+---
+# Whether the build is due (roles/build_record); sets source_build_built. main.yml runs
+# it before build.yml; a caller with work in between (an uninstall from an old tree)
+# includes the two itself.
+- name: Require what to build
+  ansible.builtin.assert:
+    that:
+      - _source_build.name is match('^[A-Za-z0-9._-]+$')
+      - _source_build.version | string | length > 0
+      - _source_build.steps | length > 0
+      - _source_build.install | length > 0
+    fail_msg: source_build needs a name, a version, steps and an install command.
+    quiet: true
+
+- name: Resolve the request for the roles this one includes
+  ansible.builtin.set_fact:
+    _source_build_request: "{{ _source_build }}"
+
+- name: "Check what the installed build was built from: {{ _source_build.name }}"
+  ansible.builtin.include_role:
+    name: build_record
+  vars:
+    build_record_path: "{{ _source_build_request.record }}"
+    build_record_key: "{{ _source_build_request.key }}"
+    build_record_installed: "{{ _source_build_request.installed }}"
+    build_record_force: "{{ _source_build_request.force }}"
+    build_record_adopt: "{{ _source_build_request.adopt }}"
+
+- name: "Note whether it builds: {{ _source_build.name }}"
+  ansible.builtin.set_fact:
+    source_build_built: "{{ build_record_stale | bool }}"

@@ -1,0 +1,14 @@
+---
+# What a source build installed goes with its manifest, and its record with it: the
+# symmetric of main.yml.
+- name: "Remove what the build installed: {{ _source_build.name }}"
+  staged_install:
+    manifest: "{{ source_build_manifests }}/{{ _source_build.name }}.json"
+    state: absent
+    root: "{{ _source_build.root }}"
+
+- name: "Remove the build record: {{ _source_build.name }}"
+  ansible.builtin.file:
+    path: "{{ _source_build.record }}"
+    state: absent
+  when: _source_build.record | length > 0

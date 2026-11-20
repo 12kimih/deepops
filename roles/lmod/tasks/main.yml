@@ -8,26 +8,6 @@
     tasks_from: epel
   when: ansible_facts.os_family == "RedHat"
 
-# An Lmod on disk is not ours at this version (an older lmod_version, or none yet): only
-# the record of our last build says so.
-- name: Check what the installed Lmod was built from
-  ansible.builtin.include_role:
-    name: build_record
-  vars:
-    build_record_path: "{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/.built-from"
-    build_record_key: "lmod {{ lmod_version }}: --prefix={{ lmod_install_prefix }}"
-    build_record_installed: ["{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/libexec/lmod"]
-    build_record_force: "{{ lmod_force_reinstall }}"
-
-# Resolved here, where this role's defaults are in scope: the download role templates
-# its arguments later, in its own scope.
-- name: Decide whether Lmod needs building
-  ansible.builtin.set_fact:
-    lmod_build: "{{ build_record_stale }}"
-    lmod_src_dir: "{{ lmod_build_dir }}/Lmod-{{ lmod_version }}"
-    lmod_src_archive: "{{ lmod_build_dir }}/Lmod-{{ lmod_version }}.tar.gz"
-    lmod_src_checksum: "{{ lmod_checksums[lmod_version] | default('') }}"
-
 - name: Install Lmod's prerequisites (Debian)
   ansible.builtin.apt:
     name: "{{ lmod_build_deps }}"
@@ -53,48 +33,39 @@
   vars:
     host_baseline_absent_packages: "{{ lmod_distro_packages }}"
 
+# An Lmod on disk is not ours at this version (an older lmod_version, or none yet): only
+# the record of our last build says so (roles/source_build). "./configure
+# --prefix=/opt/apps" then "make install": the version directory plus the
+# <prefix>/lmod/lmod link to it. Resolved here, in this role's scope: source_build
+# evaluates its arguments in its own.
+- name: Describe the Lmod build
+  ansible.builtin.set_fact:
+    lmod_source_build:
+      name: lmod
+      version: "{{ lmod_version }}"
+      url: "{{ lmod_src_url }}"
+      checksum: "{{ lmod_checksums[lmod_version] | default('') }}"
+      steps: [[./configure, "--prefix={{ lmod_install_prefix }}"]]
+      record: "{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/.built-from"
+      key: "lmod {{ lmod_version }}: --prefix={{ lmod_install_prefix }}"
+      installed: ["{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/libexec/lmod"]
+      force: "{{ lmod_force_reinstall }}"
+
 - name: Build and install Lmod
-  when: lmod_build
-  block:
-    - name: Create the build directory
-      ansible.builtin.file:
-        path: "{{ lmod_build_dir }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
+  ansible.builtin.include_role:
+    name: source_build
+  vars:
+    source_build: "{{ lmod_source_build }}"
 
-    - name: Fetch and unpack the Lmod source
-      ansible.builtin.include_role:
-        name: download
-      vars:
-        download_url: "{{ lmod_src_url }}"
-        download_checksum: "{{ lmod_src_checksum }}"
-        download_dest: "{{ lmod_src_archive }}"
-        download_unpack: "{{ lmod_src_dir }}"
-        download_strip: 1
+- name: Note whether Lmod was built
+  ansible.builtin.set_fact:
+    lmod_build: "{{ source_build_built }}"
 
-    # "./configure --prefix=/opt/apps" then "make install": the version directory plus the
-    # <prefix>/lmod/lmod link to it.
-    - name: Configure Lmod
-      ansible.builtin.command:
-        argv: [./configure, "--prefix={{ lmod_install_prefix }}"]
-        chdir: "{{ lmod_src_dir }}"
-      changed_when: true
-
-    - name: Install Lmod
-      ansible.builtin.command:
-        argv: [make, install]
-        chdir: "{{ lmod_src_dir }}"
-      changed_when: true
-
-    - name: Record what Lmod was built from
-      ansible.builtin.include_role:
-        name: build_record
-        tasks_from: write
-      vars:
-        build_record_path: "{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/.built-from"
-        build_record_key: "lmod {{ lmod_version }}: --prefix={{ lmod_install_prefix }}"
+# Earlier versions built in, and kept, this tree.
+- name: Remove the build tree earlier versions kept
+  ansible.builtin.file:
+    path: "{{ deepops_dir }}/build/lmod"
+    state: absent
 
 # Root's: every user loads what is here.
 - name: Create the shared software and module trees

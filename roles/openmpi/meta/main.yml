@@ -1,0 +1,7 @@
+---
+dependencies:
+  - role: deepops_paths  # source_build_root, source_build_manifests
+
+galaxy_info:
+  namespace: deepops
+  role_name: openmpi

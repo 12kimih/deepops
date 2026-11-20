@@ -10,7 +10,6 @@ lmod_checksums:
   "9.4.5": "sha256:05292b7a1d9285a869129726f1429f86393fe274bf12d311828e16df27cdaaf3"
 # The docs' prefix: Lmod installs into <prefix>/lmod/<version> and links <prefix>/lmod/lmod.
 lmod_install_prefix: /opt/apps
-lmod_build_dir: "{{ deepops_dir }}/build/lmod"
 # Rebuild Lmod even when the installed build matches its record.
 lmod_force_reinstall: false
 
