@@ -1,20 +1,74 @@
 ---
-# A SPANK plugin marked `required` in plugstack.conf must load, or slurmd aborts
-# initialization and srun and sbatch fail, on every node that reads it. The pyxis
-# package is installed with the Slurm it was built for (packages.yml), so the plugin
-# matches whenever it is there; where it is not (pyxis switched off, or a host not
-# converted yet), its entry goes. https://slurm.schedmd.com/spank.html
-- name: Check for the pyxis SPANK plugin
-  ansible.builtin.stat:
-    path: "{{ slurm_plugin_dir }}/spank_pyxis.so"
-  register: slurm_pyxis_plugin
-  tags:
-    - config
+# pyxis's SPANK configuration follows its package, which packages.yml installs or
+# removes in this same run: where pyxis is wanted, plugstack.conf.d/pyxis.conf names the
+# plugin where the package puts it; elsewhere the entry goes. The entry is rendered here,
+# not left to a play that may not run, because a `required` plugin that cannot load
+# aborts slurmd (2026-11-20: an entry naming the retired /usr/local/lib/slurm outlived
+# the source build and stopped every slurmd). Clients load SPANK plugins too; slurmctld
+# never does. https://slurm.schedmd.com/spank.html
+#
+# Slurm reads only plugstack.conf, which includes plugstack.conf.d/*.conf from each
+# host's own disk. plugstack.conf lives on the controllers: slurmctld serves it to
+# slurmd and sackd (configless), so a host other than a controller keeps no copy.
+- name: Configure the top-level plugstack file
+  ansible.builtin.template:
+    src: etc/slurm/plugstack.conf
+    dest: "{{ slurm_config_dir }}/plugstack.conf"
+    mode: "0644"
+  when: is_controller
+  notify: Reconfigure slurmd
+  tags: config
 
-- name: Drop a pyxis plugstack entry without its plugin
+- name: Remove a local plugstack file slurmctld serves
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/plugstack.conf"
+    state: absent
+  when: not is_controller
+  tags: config
+
+- name: Create the plugstack.conf.d directory
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/plugstack.conf.d"
+    state: directory
+    mode: "0755"
+  when: slurm_pyxis_wanted | bool
+  tags: config
+
+- name: Configure pyxis
+  ansible.builtin.template:
+    src: etc/slurm/plugstack.conf.d/pyxis.conf
+    dest: "{{ slurm_config_dir }}/plugstack.conf.d/pyxis.conf"
+    mode: "0644"
+  when: slurm_pyxis_wanted | bool
+  notify:
+    - Restart slurmd
+  tags: config
+
+- name: Remove pyxis's plugstack entry
   ansible.builtin.file:
     path: "{{ slurm_config_dir }}/plugstack.conf.d/pyxis.conf"
     state: absent
-  when: not slurm_pyxis_plugin.stat.exists
-  tags:
-    - config
+  when: not slurm_pyxis_wanted | bool
+  notify:
+    - Restart slurmd
+  tags: config
+
+# Earlier versions built pyxis on every host: a source tree under /usr/local/src
+# (pyxis, later pyxis-<version>), `make install`'s /usr/local/share/pyxis and a record
+# of the build next to the plugin.
+- name: Find the source trees earlier versions built pyxis in
+  ansible.builtin.find:
+    paths: /usr/local/src
+    patterns: ["pyxis", "pyxis-*"]
+    file_type: directory
+  register: slurm_pyxis_old_trees
+  tags: config
+
+- name: Remove what the on-host pyxis builds left
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ slurm_pyxis_old_trees.files | map(attribute='path') | list
+       + ['/usr/local/share/pyxis', slurm_plugin_dir ~ '/spank_pyxis.so.built-from'] }}
+  tags: config

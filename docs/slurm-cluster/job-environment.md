@@ -12,7 +12,7 @@ name order by `shared/bin/run-parts.sh` (prolog, epilog) and `task-prolog.sh`.
 | enroot runtime (`/run/enroot/user-<uid>`) | `enroot_runtime_path`, written to `/etc/enroot/enroot.conf.d/90-deepops.conf` | prolog `50-all-enroot-dirs` (as the user) | epilog `50-lastuserjob-all-enroot-dirs`, last job |
 | enroot data, unpacked containers (`/tmp/enroot-data/user-<uid>`) | `enroot_data_path` (same file) | prolog `50-all-enroot-dirs` | named containers of the job: pyxis (`container_scope=job`); the rest: epilog `50-lastuserjob-all-enroot-dirs`, last job |
 | enroot cache, image layers (`/var/lib/enroot-cache/user-<uid>`) | `enroot_cache_path` (same file) | prolog `50-all-enroot-dirs` | `container-storage-gc` daily: unused 14 days, user left, or disk full |
-| pyxis runtime (`/run/pyxis/<uid>`) | `pyxis_runtime_path` (plugstack.conf) | pyxis | its squashfs files by pyxis; the directory is empty after each step |
+| pyxis runtime (`/run/pyxis/<uid>`) | `slurm_pyxis_runtime_path` (plugstack.conf) | pyxis | its squashfs files by pyxis; the directory is empty after each step |
 | podman storage (`/var/lib/podman-storage/<uid>`) | `podman_storage_root`, written to `/etc/containers/storage.conf` | `roles/podman`, per roster person | `container-storage-gc` daily, as for the enroot cache |
 | podman runtime (`$XDG_RUNTIME_DIR/containers`, `libpod`) | the job runtime dir | podman | with the job runtime dir |
 
@@ -37,7 +37,7 @@ environment from the job's submitted environment, not from these exports.
   [pyxis setup guide](https://github.com/NVIDIA/pyxis/wiki/Setup) recommends, except
   `ENROOT_MOUNT_HOME y` (the NFS homes are expected inside containers). The layer
   cache had no cleanup before `container-storage-gc`.
-- **Pyxis** (`roles/pyxis`, 0.24.0): `container_scope=job` removes a job's named
+- **Pyxis** (packaged and configured by `roles/slurm`, 0.24.0): `container_scope=job` removes a job's named
   containers in pyxis' own job epilog, which runs enroot as the job user, so the
   `$(id -u)` paths expand correctly. `use_enroot_load=1` takes only registry images
   and squashfs files: a `podman://` image is imported to a squashfs file first

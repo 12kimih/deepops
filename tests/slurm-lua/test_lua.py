@@ -283,5 +283,46 @@ class PyxisPackage(unittest.TestCase):
                 self.assertIsNone(re.search(rf"\b{word}\b", text), f"{path.name} mentions {word}")
 
 
+class PyxisEntry(unittest.TestCase):
+    """The slurm role that installs pyxis also writes its `required` plugstack entry, in
+    every run: an entry left by another play named a plugin path the upgrade deleted and
+    stopped every slurmd (2026-11-20)."""
+
+    PLUGSTACK = load("roles/slurm/tasks/plugstack.yml")
+
+    def runs(self, name, wanted):
+        task = find(self.PLUGSTACK, name)
+        self.assertIsNotNone(task, name)
+        return condition(task.get("when"), variables(slurm_pyxis_wanted=wanted))
+
+    def test_the_entry_is_rendered_wherever_pyxis_is_wanted(self):
+        self.assertTrue(self.runs("Configure pyxis", True))
+        self.assertFalse(self.runs("Configure pyxis", False))
+        self.assertIn("Restart slurmd", find(self.PLUGSTACK, "Configure pyxis")["notify"])
+
+    def test_the_entry_names_the_path_the_package_is_checked_for(self):
+        entry = (ROOT / "roles/slurm/templates/etc/slurm/plugstack.conf.d/pyxis.conf").read_text()
+        self.assertTrue(entry.startswith("required {{ slurm_plugin_dir }}/spank_pyxis.so "))
+        check = find(BUILD, "Check the pyxis package puts the plugin where Slurm loads it, for this Slurm")
+        self.assertIn(
+            "slurm_plugin_dir ~ '/spank_pyxis.so'", " ".join(check["assert"]["that"]).replace('"', "'")
+        )
+
+    def test_switched_off_the_entry_and_the_package_go(self):
+        self.assertTrue(self.runs("Remove pyxis's plugstack entry", False))
+        self.assertFalse(self.runs("Remove pyxis's plugstack entry", True))
+        remove = find(load("roles/slurm/tasks/packages.yml"), "Remove pyxis")
+        self.assertEqual(remove["include_role"], {"name": "host_baseline", "tasks_from": "absent"})
+        self.assertFalse(condition(remove["when"], variables(slurm_pyxis_wanted=True)))
+        self.assertTrue(condition(remove["when"], variables(slurm_pyxis_wanted=False)))
+
+    def test_no_other_role_writes_the_entry(self):
+        for role in sorted((ROOT / "roles").iterdir()):
+            if role.name == "slurm":
+                continue
+            for path in sorted(role.glob("tasks/**/*.yml")) + sorted(role.glob("templates/**/*plugstack*")):
+                self.assertNotIn("plugstack.conf", path.read_text(), str(path))
+
+
 if __name__ == "__main__":
     unittest.main()
