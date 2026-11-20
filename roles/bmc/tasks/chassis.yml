@@ -2,7 +2,8 @@
 # One chassis power action (bmc_power_action) through the host's BMC, the one place the
 # repository drives ipmitool: playbooks/utilities/bmc-power and the maintenance reboot
 # of a host that must be power-cycled both come here. Refuses the machine running
-# Ansible for anything but status and on: powering it off cuts the run off.
+# Ansible for anything but status and on: powering it off cuts the run off; and a
+# compute node that takes or runs jobs, as a reboot does (bmc_power_undrained).
 - name: Require a BMC address and credentials
   ansible.builtin.assert:
     that:
@@ -25,6 +26,18 @@
       would cut the run off. Leave it out of hostlist, or run the playbook from another
       machine.
     quiet: true
+  when: bmc_power_action not in ["status", "on"]
+
+- name: Require the node drained before chassis power {{ bmc_power_action }}
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: require_drained
+  vars:
+    maintenance_change: chassis power {{ bmc_power_action }}
+    maintenance_undrained_ok: "{{ bmc_power_undrained }}"
+    maintenance_drain_hint: >-
+      Drain it and wait for its jobs (playbooks/utilities/reboot.yml does both), or pass
+      -e bmc_power_undrained=true to act anyway, losing its jobs.
   when: bmc_power_action not in ["status", "on"]
 
 - name: "Chassis power {{ bmc_power_action }}"
