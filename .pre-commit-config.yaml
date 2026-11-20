@@ -6,8 +6,10 @@
 # runs itself under uv, so the tool versions come from pyproject.toml / uv.lock
 # alone. CI runs the full scripts/check.sh.
 minimum_pre_commit_version: "3.5.0"
-# `pre-commit install` sets up all three; hooks run at pre-commit unless they say so.
-default_install_hook_types: [pre-commit, commit-msg, pre-push]
+# `pre-commit install` sets up both; hooks run at pre-commit unless they say so. The push
+# guards are git's own pre-push hook (scripts/deepops/pre-push.sh), which sees every ref
+# a push sends; pre-commit would pass on only the first.
+default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
 
 # Vendored / generated / site-specific trees are never checked here.
@@ -55,19 +57,3 @@ repos:
         entry: scripts/deepops/sensitive_guard.py message
         language: system
         stages: [commit-msg]
-      - id: sensitive-guard-push
-        name: sensitive data (commits to push)
-        entry: scripts/deepops/sensitive_guard.py push
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-      # A commit built on an out-of-date copy and pushed on top undoes newer commits
-      # without saying so; see scripts/deepops/no_silent_revert.py.
-      - id: no-silent-revert
-        name: no silent revert (commits to push)
-        entry: scripts/deepops/no_silent_revert.py push
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]

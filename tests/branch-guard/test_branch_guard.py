@@ -75,6 +75,43 @@ class BranchGuard(unittest.TestCase):
         result = git(self.main / ".git", "update-ref", "refs/heads/main", "HEAD~1")
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_a_branch_held_twice_moves_from_neither(self):
+        # checkout -B to the same commit is no move, but leaves main checked out twice;
+        # a commit in either would leave the other behind.
+        git(self.other, "checkout", "-q", "-B", "main", "main")
+        result = git(self.main, "commit", "-q", "--allow-empty", "-m", "two")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(str(self.other.resolve()), result.stderr)
+        self.assertFalse(self.moved())
+
+    def test_a_branch_being_rebased_elsewhere_is_held(self):
+        git(self.main, "checkout", "-q", "-b", "topic")
+        (self.main / "f").write_text("topic\n")
+        git(self.main, "add", "f")
+        git(self.main, "commit", "-q", "-m", "topic")
+        git(self.main, "checkout", "-q", "main")
+        (self.main / "f").write_text("main\n")
+        git(self.main, "add", "f")
+        git(self.main, "commit", "-q", "-m", "main")
+        git(self.other, "checkout", "-q", "topic")
+        self.assertNotEqual(git(self.other, "rebase", "-q", "main").returncode, 0)  # conflict
+        result = git(self.main, "update-ref", "refs/heads/topic", "main")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("checked out in", result.stderr)
+
+    def test_a_bare_repositorys_head_is_no_checkout(self):
+        bare = self.main.parent / "b.git"
+        self.assertEqual(
+            git(self.main.parent, "clone", "-q", "--bare", str(self.main), str(bare)).returncode, 0
+        )
+        (bare / "hooks" / "reference-transaction").symlink_to(GUARD)
+        work = self.main.parent / "bw"
+        self.assertEqual(git(bare, "worktree", "add", "-q", str(work), "main").returncode, 0)
+        git(work, "commit", "-q", "--allow-empty", "-m", "two")
+        result = git(bare, "update-ref", "refs/heads/main", "main~1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(str(work.resolve()), result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

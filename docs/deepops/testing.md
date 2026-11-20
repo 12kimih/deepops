@@ -54,8 +54,13 @@ older version and undoes the commits in between without anyone saying so.
 [`scripts/deepops/no_silent_revert.py`](../../scripts/deepops/no_silent_revert.py), a
 pre-push hook, refuses such a commit and names the commits it would undo. A commit that
 means it says so in its message (revert, reapply, restore) and passes. Rebase onto the
-remote and redo the change otherwise. Both push hooks read the pushed commits from one
-place, [`scripts/deepops/push_range.py`](../../scripts/deepops/push_range.py).
+remote and redo the change otherwise. Both push guards run from git's own pre-push hook,
+[`scripts/deepops/pre-push.sh`](../../scripts/deepops/pre-push.sh), and check exactly
+the commits each pushed ref sends, a detached HEAD's too
+([`scripts/deepops/push_range.py`](../../scripts/deepops/push_range.py)); pre-commit
+would hand them only the first ref. `scripts/setup.sh` installs the hooks from the
+main worktree only: they are shared by every worktree of the clone, and the site rules
+(`config/sensitive-patterns`) are read from the main worktree too.
 
 ```bash
 scripts/deepops/no_silent_revert.py range origin/main..HEAD   # before pushing by hand

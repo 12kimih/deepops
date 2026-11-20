@@ -20,7 +20,6 @@ ENV = {
     "GIT_CONFIG_GLOBAL": os.devnull,
     "GIT_CONFIG_SYSTEM": os.devnull,
 }
-ENV.pop("PRE_COMMIT_REMOTE_NAME", None)
 
 
 class Repo:
@@ -126,6 +125,25 @@ class NoSilentRevertTests(unittest.TestCase):
         out = r.guard("range", "HEAD~1..HEAD")
         self.assertEqual(out.returncode, 1, out.stdout)
         self.assertIn(f"role.yml is deleted, added by {added[:12]}", out.stdout)
+
+    def test_a_stale_tree_that_only_adds_and_deletes_files_is_refused(self):
+        r = self.repo
+        r.commit("base", {"gone.txt": "old gone\n"})
+        r.commit("peer: add new.txt, drop gone.txt", {"new.txt": "n\n", "gone.txt": None})
+        stale = r.commit(
+            "mine on a stale copy", {"gone.txt": "old gone\n", "new.txt": None, "mine.txt": "m\n"}
+        )
+        out = r.guard("range", f"{stale}~1..{stale}")
+        self.assertEqual(out.returncode, 1, out.stdout)
+        self.assertIn("gone.txt comes back as it was before", out.stdout)
+        self.assertIn("new.txt is deleted", out.stdout)
+
+    def test_a_new_file_of_the_same_name_passes(self):
+        r = self.repo
+        r.commit("base", {"gone.txt": "old gone\n"})
+        r.commit("drop gone.txt", {"gone.txt": None})
+        fresh = r.commit("a new gone.txt", {"gone.txt": "something else\n"})
+        self.assertEqual(r.guard("range", f"{fresh}~1..{fresh}").returncode, 0)
 
     def test_deleting_a_recent_file_alone_passes(self):
         # The end of a refactor: the file moved, nothing else went back.
