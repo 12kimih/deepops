@@ -189,5 +189,21 @@ class Owners(unittest.TestCase):
         self.assertGreater(len(found), 1500)
 
 
+class DuplicateKeys(unittest.TestCase):
+    """A key set twice in one mapping: Ansible keeps the last and only warns, so a
+    duplicate added at the top of a host's file silently loses the first value."""
+
+    def test_top_level_and_nested(self):
+        text = "---\na: 1\nb:\n  x: 1\n  x: 2\nlist:\n  - {k: 1, k: 2}\na: 3\n"
+        self.assertEqual(S.duplicate_keys(text), [(5, "x"), (7, "k"), (8, "a")])
+
+    def test_clean_merge_vault_and_broken(self):
+        self.assertEqual(S.duplicate_keys("a: 1\nb: {a: 1}\n"), [])
+        self.assertEqual(S.duplicate_keys("base: &b {x: 1}\nc:\n  <<: *b\n  y: 2\n"), [])
+        self.assertEqual(S.duplicate_keys("$ANSIBLE_VAULT;1.1;AES256\n6162\n"), [])
+        self.assertEqual(S.duplicate_keys("a: [\n"), [])
+        self.assertEqual(S.duplicate_keys("s: !vault |\n  x\ns: 2\n"), [(3, "s")])
+
+
 if __name__ == "__main__":
     unittest.main()

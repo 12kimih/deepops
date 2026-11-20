@@ -138,6 +138,32 @@ def load(text):
         return None
 
 
+def duplicate_keys(text):
+    """(line, key) for each key that appears twice in one mapping of TEXT, its later
+    occurrences: Ansible keeps the last and only warns, so the first is silently lost.
+    Nothing for a vault-encrypted file or text that is not YAML."""
+    if text is None or text.lstrip().startswith("$ANSIBLE_VAULT"):
+        return []
+    try:
+        nodes = list(yaml.compose_all(text, Loader=_Loader))
+    except yaml.YAMLError:
+        return []
+    found, stack = [], [n for n in nodes if n is not None]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, yaml.MappingNode):
+            seen = set()
+            for key, value in node.value:
+                if isinstance(key, yaml.ScalarNode) and key.value != "<<":
+                    if key.value in seen:
+                        found.append((key.start_mark.line + 1, key.value))
+                    seen.add(key.value)
+                stack.append(value)
+        elif isinstance(node, yaml.SequenceNode):
+            stack.extend(node.value)
+    return sorted(found)
+
+
 def plain(value):
     """VALUE with Ansible's tagged str/int/... subclasses turned back into Python's own."""
     if isinstance(value, dict):
