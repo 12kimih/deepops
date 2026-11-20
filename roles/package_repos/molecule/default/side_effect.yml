@@ -1,4 +1,45 @@
 ---
+# An earlier run wrote the source and then its `apt update` failed: the source is in
+# place, its index is not. The rerun refreshes on that evidence.
+- name: Recover from a failed index refresh
+  hosts: all
+  become: true
+  tasks:
+    - name: Find the repository's index files
+      ansible.builtin.find:
+        paths: /var/lib/apt/lists
+        patterns: ["deb.nodesource.com_*"]
+      register: repos_lists
+
+    - name: Lose them, as a failed update leaves them
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ repos_lists.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Run the role again, nothing else changed
+      ansible.builtin.include_role:
+        name: package_repos
+        tasks_from: repo
+      vars:
+        package_repos_repo: "{{ repos_test_repo }}"
+
+    - name: Check apt knows the repository again
+      ansible.builtin.command:
+        argv: [apt-cache, policy, nodejs]
+      register: repos_policy_again
+      changed_when: false
+
+    - name: Check the index came back
+      ansible.builtin.assert:
+        that:
+          - repos_lists.matched > 0
+          - package_repos_changed | bool
+          - repos_policy_again.stdout is search('https://deb.nodesource.com/node_22.x nodistro/main')
+        fail_msg: "{{ repos_policy_again.stdout }}"
+
 - name: Remove the repository
   hosts: all
   become: true

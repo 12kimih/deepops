@@ -29,11 +29,19 @@
         mode: "0644"
       register: package_repos_cuda_source
 
+    - name: Look for the CUDA repository's package index
+      ansible.builtin.include_tasks: index.yml
+      vars:
+        package_repos_index_uris: ["{{ package_repos_cuda_url }}"]
+
+    # Also when apt lacks the index: an earlier run's update failed.
     - name: Read the CUDA repository index
       ansible.builtin.apt:
         update_cache: true
       environment: "{{ proxy_env }}"
-      when: package_repos_cuda_keyring_install is changed or package_repos_cuda_source is changed
+      when: >-
+        package_repos_cuda_keyring_install is changed or package_repos_cuda_source is changed
+        or package_repos_index_missing | bool
 
 # Earlier setups downloaded NVIDIA's own .repo file, which defines the repository a
 # second time.

@@ -1,0 +1,35 @@
+---
+# Whether apt lacks the package index of a source (Debian family): the evidence to
+# refresh on, not this run's change. A source written by a run whose `apt update` then
+# failed (a mirror timeout) has no index; the rerun refreshes because of that.
+#
+#   - ansible.builtin.include_role:
+#       name: package_repos
+#       tasks_from: index
+#     vars:
+#       package_repos_index_uris: [https://download.docker.com/linux/ubuntu]
+#   -> package_repos_index_missing (bool)
+#
+# apt itself names the index files a source gives (apt-get indextargets), so its own
+# file naming is never copied here. A file's time is the server's, not the download's,
+# so only whether it exists is evidence.
+- name: Ask apt which index files the source gives
+  ansible.builtin.command:
+    argv: [apt-get, indextargets, --format, "$(FILENAME)", "Created-By: Packages", "Repo-URI: {{ item | regex_replace('/*$', '/') }}"]
+  loop: "{{ package_repos_index_uris }}"
+  register: package_repos_index_targets
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Look for them
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: false
+  loop: "{{ package_repos_index_targets.results | map(attribute='stdout_lines') | flatten | select | list }}"
+  register: package_repos_index_files
+
+- name: Note whether an index is missing
+  ansible.builtin.set_fact:
+    package_repos_index_missing: >-
+      {{ package_repos_index_targets.results | map(attribute='stdout_lines') | flatten | select | list | length == 0
+         or package_repos_index_files.results | rejectattr('stat.exists') | list | length > 0 }}
