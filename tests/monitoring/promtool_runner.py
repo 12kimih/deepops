@@ -28,7 +28,7 @@ def run(args, cwd, mounts=()):
     if not shutil.which("docker"):
         raise unittest.SkipTest("promtool not found: set PROMTOOL or install docker")
     dirs = sorted({str(Path(d).resolve()) for d in (cwd, *mounts)})
-    volumes = [arg for d in dirs for arg in ("-v", f"{d}:{d}:ro")]
+    binds = [arg for d in dirs for arg in ("--mount", f"type=bind,src={d},dst={d},readonly")]
     return subprocess.run(
         [
             "docker",
@@ -36,7 +36,7 @@ def run(args, cwd, mounts=()):
             "--rm",
             "-u",
             f"{os.getuid()}:{os.getgid()}",
-            *volumes,
+            *binds,
             "-w",
             str(Path(cwd).resolve()),
             "--entrypoint",

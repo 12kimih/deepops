@@ -20,7 +20,7 @@
       update_performed: true
 
   - name: Update firmware if required
-    ansible.builtin.shell: "docker run --rm -ti --privileged -v /:/hostfs -e NVSM_MODE=1 {{ firmware_update_repo }}:{{ firmware_update_tag }} set_flags AUTO=1 update_fw {{ target_fw }} {{ inactive_parameter }} {{ force_parameter }} > {{ fw_dir }}/fw-update.json"
+    ansible.builtin.shell: "docker run --rm -ti --privileged --mount type=bind,src=/,dst=/hostfs -e NVSM_MODE=1 {{ firmware_update_repo }}:{{ firmware_update_tag }} set_flags AUTO=1 update_fw {{ target_fw }} {{ inactive_parameter }} {{ force_parameter }} > {{ fw_dir }}/fw-update.json"
 
   - name: "Parse FW Update output"
     ansible.builtin.command: "python3 {{ fw_dir }}/parse_manifest.py parse_update_json {{ fw_dir }}/fw-update.json"

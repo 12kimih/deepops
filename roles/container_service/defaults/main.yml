@@ -1,0 +1,29 @@
+---
+# roles/container_service: one container run as a systemd unit, from the one template
+# every such service shares: `docker run --rm` named after the unit, removed and
+# restarted by systemd, started after Docker and stopped with it. The caller pulls the
+# image first (roles/container_image) and sets the service in one dictionary,
+# container_service:
+#   unit         the unit's name (docker.<service>.service); the container's name too
+#   description
+#   image        what runs
+#   options      docker run flags other than the mounts (--network host, --cpus=1)
+#   mounts       host paths and volumes the container sees, each
+#                {src, dst, type: bind | volume, readonly: false, propagation: ""}:
+#                always --mount, which refuses a bind whose source is missing; -v
+#                creates it as an empty directory, so a file not yet written became a
+#                directory that hid the file forever after (the registry's config.yml)
+#   args         the container's arguments
+#   state, enabled   the service's (started, true)
+#   notify       the caller's handlers to notify when the unit changes
+container_service: {}
+container_service_keys:
+  unit: ""
+  description: ""
+  image: ""
+  options: []
+  mounts: []
+  args: []
+  state: started
+  enabled: true
+  notify: []

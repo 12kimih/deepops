@@ -37,22 +37,28 @@
   when: has_gpus
   notify: Restart dcgm
 
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.dcgm-exporter.service.j2
-    dest: "/etc/systemd/system/{{ dcgm_exporter_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  when: has_gpus
-  notify: Restart dcgm
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ dcgm_exporter_svc_name }}"
-    state: "{{ dcgm_exporter_service_state }}"
-    enabled: "{{ dcgm_exporter_service_enabled }}"
-    daemon_reload: true
+# The GPUs come through CDI (the toolkit's generated spec), not --gpus: a container
+# given them by the legacy hook loses them on every systemd daemon-reload (NVIDIA's
+# troubleshooting guide). Host network: the node's own name labels the series, and no
+# Docker DNAT bypasses the host firewall. The collectors file is mounted read-only and
+# named, as the exporter's docs show.
+- name: Run dcgm-exporter
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ dcgm_exporter_svc_name }}"
+      description: NVIDIA DCGM Exporter
+      image: "{{ dcgm_exporter_container }}"
+      options: [--device nvidia.com/gpu=all, --cap-add=SYS_ADMIN, "--cpus={{ dcgm_exporter_max_cpu }}", --network host]
+      mounts:
+        - src: "{{ dcgm_exporter_config_dir }}/{{ dcgm_exporter_counters_file }}"
+          dst: /etc/dcgm-exporter/custom-counters.csv
+          readonly: true
+      args: [--collectors /etc/dcgm-exporter/custom-counters.csv, "--address :{{ dcgm_exporter_port }}"]
+      state: "{{ dcgm_exporter_service_state }}"
+      enabled: "{{ dcgm_exporter_service_enabled }}"
+      notify: [Restart dcgm]
   when: has_gpus
 
 - name: Record the component as present

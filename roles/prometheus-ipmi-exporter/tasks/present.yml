@@ -56,21 +56,21 @@
         mode: "0644"
       notify: Restart ipmi-exporter
 
-    - name: Install systemd unit file
-      ansible.builtin.template:
-        src: docker.ipmi-exporter.service.j2
-        dest: "/etc/systemd/system/{{ ipmi_exporter_svc_name }}"
-        owner: root
-        group: root
-        mode: "0644"
-      notify: Restart ipmi-exporter
-
-    - name: Configure service
-      ansible.builtin.systemd:
-        name: "{{ ipmi_exporter_svc_name }}"
-        state: "{{ ipmi_exporter_service_state }}"
-        enabled: "{{ ipmi_exporter_service_enabled }}"
-        daemon_reload: true
+    - name: Run ipmi-exporter
+      ansible.builtin.include_role:
+        name: container_service
+      vars:
+        container_service:
+          unit: "{{ ipmi_exporter_svc_name }}"
+          description: Prometheus IPMI Exporter
+          image: "{{ ipmi_exporter_container }}"
+          options: [--network host, --user 0, "--cpus={{ ipmi_exporter_max_cpu }}", --device /dev/ipmi0]
+          mounts:
+            - {src: "{{ ipmi_exporter_config_dir }}", dst: /config, readonly: true}
+          args: [--config.file=/config/config.yml, "--web.listen-address=:{{ ipmi_exporter_port }}"]
+          state: "{{ ipmi_exporter_service_state }}"
+          enabled: "{{ ipmi_exporter_service_enabled }}"
+          notify: [Restart ipmi-exporter]
 
 - name: Record the component as present
   ansible.builtin.include_role:

@@ -1,0 +1,39 @@
+---
+# A mount is one comma-separated --mount value: a comma or a space in a path, or an
+# unknown type, would change what it means.
+- name: Require a unit name and an image
+  ansible.builtin.assert:
+    that:
+      - _container_service.unit is match('^[A-Za-z0-9_.@-]+[.]service$')
+      - _container_service.image | length > 0
+    fail_msg: "container_service needs unit (a .service name) and image: {{ _container_service }}"
+    quiet: true
+
+- name: Refuse a mount Docker would read otherwise
+  ansible.builtin.assert:
+    that:
+      - (item.type | default('bind')) in ['bind', 'volume']
+      - item.src | length > 0 and item.src is not search('[, ]')
+      - item.dst is match('/') and item.dst is not search('[, ]')
+      - (item.type | default('bind')) == 'bind' or not (item.propagation | default(''))
+    fail_msg: "{{ _container_service.unit }}: mount {{ item }} has no unambiguous --mount form."
+    quiet: true
+  loop: "{{ _container_service.mounts }}"
+  loop_control:
+    label: "{{ item.dst }}"
+
+- name: Install the unit {{ _container_service.unit }}
+  ansible.builtin.template:
+    src: container.service.j2
+    dest: /etc/systemd/system/{{ _container_service.unit }}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: "{{ _container_service.notify }}"
+
+- name: Configure the service {{ _container_service.unit }}
+  ansible.builtin.systemd:
+    name: "{{ _container_service.unit }}"
+    state: "{{ _container_service.state }}"
+    enabled: "{{ _container_service.enabled }}"
+    daemon_reload: true

@@ -20,24 +20,39 @@
   vars:
     container_image: "{{ node_exporter_container }}"
 
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.node-exporter.service.j2
-    dest: "/etc/systemd/system/{{ node_exporter_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  # The unit carries the image, the collectors and the limits; the scrape target file
-  # above is Prometheus's, so node-exporter restarts for the unit, never for it.
-  notify: Restart node-exporter
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ node_exporter_svc_name }}"
-    state: "{{ node_exporter_service_state }}"
-    enabled: "{{ node_exporter_service_enabled }}"
-    daemon_reload: true
-  notify: Restart node-exporter
+# The host's /proc and /sys come through the root bind (rslave, so a mount made after
+# the start, NFS or /scratch, shows too): Docker masks parts of the container's own
+# (/proc/interrupts, /sys/.../thermal_throttle, powercap). The systemd collector needs
+# D-Bus, which Docker's default AppArmor profile blocks. The unit carries the image, the
+# collectors and the limits; the scrape targets are Prometheus's, so node-exporter
+# restarts for the unit, never for them.
+- name: Run node-exporter
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    _systemd: "{{ 'systemd' in node_exporter_extra_collectors }}"
+    container_service:
+      unit: "{{ node_exporter_svc_name }}"
+      description: Prometheus Node Exporter
+      image: "{{ node_exporter_container }}"
+      options: >-
+        {{ ['--network host', '--pid=host', '--cpus=' ~ node_exporter_max_cpu]
+           + (['--security-opt apparmor=unconfined'] if _systemd else []) }}
+      mounts: >-
+        {{ [{'src': '/', 'dst': '/host', 'readonly': true, 'propagation': 'rslave'},
+            {'src': node_exporter_prom_dir, 'dst': node_exporter_prom_dir, 'readonly': true}]
+           + ([{'src': '/run/dbus/system_bus_socket', 'dst': '/var/run/dbus/system_bus_socket', 'readonly': true}]
+              if _systemd else []) }}
+      args: >-
+        {{ ['--path.rootfs=/host', '--path.procfs=/host/proc', '--path.sysfs=/host/sys',
+            '--path.udev.data=/host/run/udev/data', '--web.listen-address=:' ~ node_exporter_port,
+            '--collector.textfile.directory=' ~ node_exporter_prom_dir]
+           + node_exporter_extra_collectors | map('regex_replace', '^', '--collector.') | list
+           + node_exporter_disabled_collectors | map('regex_replace', '^', '--no-collector.') | list
+           + (["--collector.systemd.unit-include='" ~ node_exporter_systemd_unit_include ~ "'"] if _systemd else []) }}
+      state: "{{ node_exporter_service_state }}"
+      enabled: "{{ node_exporter_service_enabled }}"
+      notify: [Restart node-exporter]
 
 - name: Record the component as present
   ansible.builtin.include_role:

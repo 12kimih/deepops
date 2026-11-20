@@ -1,0 +1,44 @@
+---
+# Before a file a container mounts is written: a directory in its place is the one
+# `docker run -v` made when the file was missing (2026-06: the registry's config.yml),
+# and goes when it holds nothing or only the file a later template wrote into it.
+# Anything else in it stops the run instead of being removed.
+#   ansible.builtin.include_role:
+#     name: container_service
+#     tasks_from: file_sources
+#   vars:
+#     container_service_files: [/opt/deepops/registry/config.yml]
+- name: Look at where the container's files go
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ container_service_files }}"
+  register: container_service_file_places
+
+- name: List the directories in a file's place
+  ansible.builtin.find:
+    paths: "{{ item.item }}"
+    file_type: any
+    hidden: true
+  loop: "{{ container_service_file_places.results | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: container_service_file_dirs
+
+- name: Refuse a directory in a file's place that holds more than Docker and the template left
+  ansible.builtin.assert:
+    that: item.files | map(attribute='path') | map('basename') | difference([item.item.item | basename]) | length == 0
+    fail_msg: >-
+      {{ item.item.item }} is a directory holding {{ item.files | map(attribute='path') | join(', ') }}, where
+      a container expects a file; move what it holds and remove it.
+    quiet: true
+  loop: "{{ container_service_file_dirs.results }}"
+  loop_control:
+    label: "{{ item.item.item }}"
+
+- name: Remove the directory Docker made in a file's place
+  ansible.builtin.file:
+    path: "{{ item.item.item }}"
+    state: absent
+  loop: "{{ container_service_file_dirs.results }}"
+  loop_control:
+    label: "{{ item.item.item }}"

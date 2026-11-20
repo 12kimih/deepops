@@ -15,6 +15,13 @@
     group: "root"
     mode: "0700"
 
+- name: Replace a directory Docker made in the config file's place
+  ansible.builtin.include_role:
+    name: container_service
+    tasks_from: file_sources
+  vars:
+    container_service_files: ["{{ standalone_container_registry_config_dir }}/config.yml"]
+
 - name: Add config file
   diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
@@ -74,9 +81,10 @@
     restart_policy: unless-stopped
     # The registry exports traces to localhost:4318 unless told not to (its docs).
     env: "{{ proxy_env | combine({'OTEL_TRACES_EXPORTER': 'none'}) }}"
-    volumes:
-      - "{{ standalone_container_registry_config_dir }}/config.yml:/etc/docker/registry/config.yml"
-      - "{{ standalone_container_registry_data_dir }}:/var/lib/registry"
+    # Binds, never volumes: a bind refuses a missing source (roles/container_service).
+    mounts:
+      - {type: bind, source: "{{ standalone_container_registry_config_dir }}/config.yml", target: /etc/docker/registry/config.yml, read_only: true}
+      - {type: bind, source: "{{ standalone_container_registry_data_dir }}", target: /var/lib/registry}
 
 - name: Record the component as present
   ansible.builtin.include_role:

@@ -77,22 +77,30 @@
     container_image: "{{ slurm_exporter_container }}"
   when: not slurm_exporter_build_image
 
-- name: Install systemd unit file
-  ansible.builtin.template:
-    src: templates/docker.slurm-exporter.service.j2
-    dest: "/etc/systemd/system/{{ slurm_exporter_svc_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart slurm-exporter
-
-- name: Configure service
-  ansible.builtin.systemd:
-    name: "{{ slurm_exporter_svc_name }}"
-    state: "{{ slurm_exporter_service_state }}"
-    enabled: "{{ slurm_exporter_service_enabled }}"
-    daemon_reload: true
-  notify: Restart slurm-exporter
+# The exporter runs the host's Slurm commands, with its configuration, plugins, name
+# resolution and MUNGE socket.
+- name: Run slurm-exporter
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ slurm_exporter_svc_name }}"
+      description: Prometheus Slurm Exporter
+      image: "{{ slurm_exporter_container }}"
+      options: [--network host]
+      mounts:
+        - {src: "{{ slurm_install_prefix }}/bin/sdiag", dst: /usr/local/bin/sdiag, readonly: true}
+        - {src: "{{ slurm_install_prefix }}/bin/sinfo", dst: /usr/local/bin/sinfo, readonly: true}
+        - {src: "{{ slurm_install_prefix }}/bin/squeue", dst: /usr/local/bin/squeue, readonly: true}
+        - {src: "{{ slurm_install_prefix }}/bin/sshare", dst: /usr/local/bin/sshare, readonly: true}
+        - {src: "{{ slurm_config_dir }}", dst: "{{ slurm_config_dir }}", readonly: true}
+        - {src: "{{ slurm_plugin_dir }}", dst: "{{ slurm_plugin_dir }}", readonly: true}
+        - {src: /etc/hosts, dst: /etc/hosts, readonly: true}
+        - {src: /var/run/munge, dst: /var/run/munge, readonly: true}
+      args: ["-listen-address=:{{ slurm_exporter_port }}"]
+      state: "{{ slurm_exporter_service_state }}"
+      enabled: "{{ slurm_exporter_service_enabled }}"
+      notify: [Restart slurm-exporter]
 
 - name: Record the component as present
   ansible.builtin.include_role:
