@@ -128,3 +128,5 @@ f52357ed8777: Pull complete
 ```
 
 **_Note that only the root user will use these credentials. Other users of the cluster should provide their own docker logins to use private containers._**
+
+To stop using a registry, remove it from `docker_login_registries` and run the playbook again: the role records the registries it logged into and logs out of one no longer listed, so its credential leaves root's Docker configuration. `docker_login_state: absent` logs out of all of them.
