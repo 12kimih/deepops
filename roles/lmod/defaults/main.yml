@@ -1,4 +1,8 @@
 ---
+# present, absent or kept (docs/deepops/component-state.md): Lmod and its shell
+# integration. A deploy sets it from deepops_components (slurm_install_lmod).
+lmod_state: present
+
 # Lmod built from TACC's release source, as https://lmod.readthedocs.io/en/latest/030_installing.html
 # describes. Distribution packages lag far behind (Ubuntu 24.04 ships 8.6.19 from 2022,
 # without the 9.4 security fix for CVE-2026-85013), so the role builds the release.

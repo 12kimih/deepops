@@ -1,6 +1,11 @@
 ---
-- hosts: "{{ hostlist | default('all') }}"
+# Lmod and its shell integration: present where deepops_components says so
+# (slurm_install_lmod), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
+    - role: lmod
+      lmod_state: "{{ deepops_components.lmod | component_phase(deepops_phase) }}"
+  tags:
     - lmod

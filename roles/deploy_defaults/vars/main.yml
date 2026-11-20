@@ -133,6 +133,10 @@ deepops_component_registry:
   open_ondemand:
     rules:
       - {switch: "{{ slurm_install_open_ondemand }}", group: slurm-master, first: true}
+  # Lmod and the hooks that give every shell `module`; the module trees are data.
+  lmod:
+    rules:
+      - {switch: "{{ slurm_install_lmod }}", group: slurm-cluster}
   cluster_tools:
     rules:
       - {switch: "{{ slurm_install_cluster_tools }}", group: slurm-cluster}

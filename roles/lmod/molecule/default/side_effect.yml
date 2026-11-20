@@ -1,0 +1,62 @@
+---
+# Removal takes Lmod, its links and its hooks, and keeps the shared trees (data); then
+# present brings it back for verify.
+- name: Remove Lmod
+  hosts: all
+  become: true
+  roles:
+    - role: lmod
+      lmod_state: absent
+
+- name: Check it is gone
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Look for what must be gone and what must stay
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /opt/apps/lmod/lmod
+        - /etc/profile.d/z00_lmod.sh
+        - /etc/fish/conf.d/z00_lmod.fish
+        - /etc/lmod/.modulespath
+        - /sw/modules/all
+      register: lmod_paths
+
+    - name: Read the shells' rc files for the hooks
+      ansible.builtin.command:
+        argv: [grep, -l, "DeepOps: Lmod", /etc/bash.bashrc, /etc/zsh/zshenv, /etc/csh.cshrc]
+      register: lmod_hooks
+      changed_when: false
+      failed_when: lmod_hooks.rc > 1
+
+    - name: Check removal took Lmod and kept the trees
+      vars:
+        exists: "{{ lmod_paths.results | map(attribute='stat.exists') | list }}"
+      ansible.builtin.assert:
+        that:
+          - exists == [false, false, false, false, true]
+          - lmod_hooks.stdout_lines | length == 0
+        fail_msg: "{{ dict(lmod_paths.results | map(attribute='item') | zip(exists)) }} hooks: {{ lmod_hooks.stdout_lines }}"
+
+    - name: Check a login no longer finds module, and says nothing about it
+      ansible.builtin.command:
+        argv: [runuser, -u, nobody, --, /bin/bash, -lc, "type module 2>/dev/null || echo none"]
+      register: lmod_login
+      changed_when: false
+
+    - name: Check the login is clean
+      ansible.builtin.assert:
+        that:
+          - lmod_login.stdout_lines[-1] == 'none'
+          - lmod_login.stderr | length == 0
+        fail_msg: "{{ lmod_login.stdout }} {{ lmod_login.stderr }}"
+
+- name: Bring it back
+  hosts: all
+  become: true
+  roles:
+    - role: login_shells
+      login_shells: [bash, zsh, tcsh, fish]
+    - role: lmod

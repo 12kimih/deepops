@@ -2,15 +2,16 @@
 #
 #   ansible-playbook playbooks/slurm-cluster/easybuild-modules.yml
 #
-# Lmod goes on every node, so EasyBuild's module tree is found everywhere. EasyBuild and
-# its builds go once on the host that owns the shared tree: slurm-master[0] unless you
-# pass -e hostlist=<host> (group_vars cannot pick a play's hosts).
+# Lmod is the deploy's (slurm_install_lmod), with EasyBuild's module tree on its path
+# everywhere. EasyBuild and its builds go once on the host that owns the shared tree:
+# slurm-master[0] unless you pass -e hostlist=<host> (group_vars cannot pick a play's
+# hosts).
 ---
-- name: Ensure Lmod is present on all nodes
-  hosts: "{{ hostlist | default('all') }}"
-  become: true
-  roles:
-    - lmod
+# Lmod as the deploy has it (slurm_install_lmod, deepops_components).
+- name: Lmod on every node
+  import_playbook: lmod.yml
+  vars:
+    deepops_phase: install
 
 - name: Install EasyBuild and build easybuild_packages on the software-tree host
   hosts: "{{ hostlist | default('slurm-master[0]') }}"

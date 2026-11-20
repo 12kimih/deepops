@@ -1,0 +1,47 @@
+---
+# Lmod goes with every place present put it: the install (its manifest), the shell init
+# links, the hooks in the shells' system rc files and the module path file. The shared
+# software and module trees are data and stay.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: lmod
+    component_record_action: absent
+    component_record_items: "{{ lmod_items }}"
+
+# On a host set up before the record, a link is told as Lmod's by where it points:
+# left behind, a login would source a file that is gone.
+- name: Look at the shell init links
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ lmod_init_links }}"
+  register: lmod_links
+
+- name: Remove the links into this Lmod
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: absent
+  loop: "{{ lmod_links.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - item.stat.islnk | default(false)
+    - item.stat.lnk_source | default('') is match(lmod_install_prefix ~ '/lmod/')
+
+- name: Remove the hooks from the shells' rc files
+  ansible.builtin.blockinfile:
+    path: "{{ lmod_shells[item].rc[ansible_facts.os_family] }}"
+    marker: "{{ lmod_shells[item].comment }} {mark} DeepOps: Lmod in every shell (roles/lmod)"
+    state: absent
+  loop: "{{ lmod_shells | dict2items | selectattr('value.rc') | map(attribute='key') | list }}"
+  when: lmod_shells[item].rc[ansible_facts.os_family] | default('') | length > 0
+
+- name: Remove the Lmod install
+  ansible.builtin.include_role:
+    name: source_build
+    tasks_from: absent
+  vars:
+    source_build:
+      name: lmod
+      record: "{{ lmod_install_prefix }}/lmod/{{ lmod_version }}/.built-from"

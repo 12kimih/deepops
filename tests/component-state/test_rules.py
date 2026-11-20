@@ -80,7 +80,6 @@ GATES = {
     "install_dcgm": "pending: deepops (batch 3)",
     "slurm_install_nhc": "pending: deepops (batch 3)",
     "slurm_cluster_install_openmpi": "pending: deepops (batch 3)",
-    "slurm_install_lmod": "pending: deepops (batch 3)",
     "slurm_install_hpcsdk": "pending: deepops (batch 3)",
     "slurm_install_enroot": "pending: deepops (batch 3)",
     "slurm_install_pyxis": "pending: deepops (batch 3)",

@@ -118,7 +118,8 @@
 
 - name: Install Lmod
   import_playbook: slurm-cluster/lmod.yml
-  when: slurm_install_lmod
+  vars:
+    deepops_phase: install
 
 - name: Install the NVIDIA HPC SDK
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml
@@ -374,6 +375,11 @@
 
 - name: Remove the Open OnDemand portal where it is no longer wanted
   import_playbook: slurm-cluster/open-ondemand.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove Lmod where it is no longer wanted
+  import_playbook: slurm-cluster/lmod.yml
   vars:
     deepops_phase: remove
 
