@@ -508,12 +508,6 @@
   loop: "{{ slurm_deb_built.files }}"
   loop_control:
     label: "{{ item.path | basename }}"
-  register: slurm_repo_published
-
-- name: Look for the repository signature
-  ansible.builtin.stat:
-    path: "{{ slurm_repo_dir }}/InRelease"
-  register: slurm_repo_inrelease
 
 - name: Keep the public key to check the signature against
   ansible.builtin.copy:
@@ -522,7 +516,26 @@
     owner: root
     group: root
     mode: "0644"
-  register: slurm_repo_pubkey_file
+
+# Whether the index lists exactly the packages there, hashed by an InRelease the key the
+# nodes trust signed: decided by that evidence, not by this run having copied a package,
+# so a run that failed between the copy and the signature is finished by the next one.
+- name: Check the repository's index and signature
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      work=$(mktemp -d /var/cache/deepops/slurm-repo-check.XXXXXX)
+      trap 'rm -rf "$work"' EXIT
+      cd {{ slurm_repo_dir | quote }}
+      apt-ftparchive packages . | cmp -s - Packages || { echo stale; exit 0; }
+      gpg --homedir "$work" --batch --quiet --import /var/cache/deepops/slurm-repo.asc
+      gpg --homedir "$work" --batch --quiet --verify InRelease 2>/dev/null || { echo unsigned; exit 0; }
+      grep -q "$(sha256sum Packages | cut -d' ' -f1)" InRelease || { echo stale; exit 0; }
+      echo current
+    executable: /bin/bash
+  register: slurm_repo_index
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 # The index, then Release (its hashes) signed by the key from stdin, in a throwaway
 # keyring; then the signature is checked against slurm_repo_signing_pubkey_file, the key
@@ -549,4 +562,4 @@
     stdin: "{{ lookup('ansible.builtin.file', slurm_repo_signing_key_file) }}"  # decrypts the vaulted file
   no_log: true
   changed_when: true
-  when: slurm_repo_published is changed or slurm_repo_pubkey_file is changed or not slurm_repo_inrelease.stat.exists
+  when: slurm_repo_index.stdout != 'current'
