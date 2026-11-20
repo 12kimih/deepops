@@ -3,7 +3,7 @@
     slurm-backup backup CONFIG.json        daily: dump, archive, copy, prune, report
     slurm-backup restore-test CONFIG.json  monthly: load the newest dump into a scratch
                                            database and compare it with the live one
-    slurm-backup publish CONFIG.json       at boot: republish the kept metrics
+    slurm-backup publish CONFIG.json       at boot and deploy: republish the kept metrics
     slurm-backup check CONFIG.json         refuse a configuration the others cannot run
 
 What is backed up: the accounting database (mariadb-dump, one consistent snapshot
@@ -139,31 +139,30 @@ def locked(cfg):
         yield work
 
 
-def publish(cfg):
-    """Publish the kept metrics, with one series per configured destination: a
-    destination no backup has reached yet has no result series, and only this one says
-    it should (rules/backup.yml SlurmBackupNeverRan)."""
-    kept = Path(cfg["metrics_file"])
-    values = parse(kept.read_text()) if kept.exists() else {}
-    for dest in cfg["destinations"]:
-        values[series("destination_configured", destination=dest["path"])] = 1
-    Path(cfg["textfile_dir"]).mkdir(parents=True, exist_ok=True)
-    write_atomic(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), render(values))
-    return 0
+def publish(cfg, values=None):
+    """Merge VALUES into the kept metrics (the other command's series stay, those of
+    removed destinations go) and copy them into the textfile directory.
 
-
-def write_metrics(cfg, values):
-    """Merge values into the kept metrics (the other command's series stay, those of
-    removed destinations go), then publish."""
+    Each destination, and the restore test, also gets the time it was first configured,
+    kept from then on: the staleness alerts count from the last success or, while there
+    is none (never run, or every run killed before it wrote a result), from that time
+    (rules/backup.yml)."""
     kept = Path(cfg["metrics_file"])
     paths = {d["path"] for d in cfg["destinations"]}
-    merged = {
-        k: v for k, v in (parse(kept.read_text()) if kept.exists() else {}).items() if not stale(k, paths)
-    }
-    merged.update(values)
-    kept.parent.mkdir(parents=True, exist_ok=True)
-    write_atomic(str(kept), render(merged))
-    publish(cfg)
+    old = parse(kept.read_text()) if kept.exists() else {}
+    merged = {k: v for k, v in old.items() if not stale(k, paths)}
+    merged.update(values or {})
+    now = int(dt.datetime.now().timestamp())
+    for path in sorted(paths):
+        merged.setdefault(series("destination_configured_timestamp_seconds", destination=path), now)
+    merged.setdefault(series("restore_test_configured_timestamp_seconds"), now)
+    text = render(merged)
+    if merged != old:
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        write_atomic(str(kept), text)
+    Path(cfg["textfile_dir"]).mkdir(parents=True, exist_ok=True)
+    write_atomic(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), text)
+    return 0
 
 
 def add_tree(tar, root):
@@ -258,7 +257,7 @@ def backup(cfg):
                     print(f"{dest['path']}: {exc}", file=sys.stderr)
                 values[series("last_status", **where)] = 0
                 failed = True
-        write_metrics(cfg, values)
+        publish(cfg, values)
     return 1 if failed else 0
 
 
@@ -360,7 +359,7 @@ def restore_test(cfg):
         }
         if not problems:
             values[series("restore_test_last_success_timestamp_seconds")] = now
-        write_metrics(cfg, values)
+        publish(cfg, values)
     for p in problems:
         print(f"{newest}: {p}", file=sys.stderr)
     print(f"restore test of {newest}: {'FAILED' if problems else 'ok'}")

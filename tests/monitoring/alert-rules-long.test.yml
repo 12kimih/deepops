@@ -37,7 +37,7 @@ tests:
               summary: "No Slurm backup to /b has succeeded for 36 hours"
               description: "The daily backup did not run or stopped before writing its result: `systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on m."
 
-  - name: restore test failure warns; a stale test warns after 40 days
+  - name: restore test failure warns; a stale or never-run test warns after 40 days
     interval: 1d
     input_series:
       - series: 'slurm_backup_restore_test_status{host="m", instance="m:9100"}'
@@ -45,6 +45,13 @@ tests:
       - series: 'slurm_backup_restore_test_status{host="m2", instance="m2:9100"}'
         values: '1x45'
       - series: 'slurm_backup_restore_test_last_success_timestamp_seconds{host="m2", instance="m2:9100"}'
+        values: '0x45'
+      # Configured, the test never ran (m3), or ran and failed (m) or passed (m2) since.
+      - series: 'slurm_backup_restore_test_configured_timestamp_seconds{host="m", instance="m:9100"}'
+        values: '0x45'
+      - series: 'slurm_backup_restore_test_configured_timestamp_seconds{host="m2", instance="m2:9100"}'
+        values: '0x45'
+      - series: 'slurm_backup_restore_test_configured_timestamp_seconds{host="m3", instance="m3:9100"}'
         values: '0x45'
     alert_rule_test:
       - eval_time: 1d
@@ -63,7 +70,11 @@ tests:
           - exp_labels: {severity: warning, host: m2, instance: "m2:9100"}
             exp_annotations:
               summary: "No Slurm backup restore test has passed on m2 for 40 days"
-              description: "The monthly restore test did not run: `systemctl list-timers slurm-backup*`."
+              description: "The monthly restore test did not run, or never has: `systemctl list-timers slurm-backup*`."
+          - exp_labels: {severity: warning, host: m3, instance: "m3:9100"}
+            exp_annotations:
+              summary: "No Slurm backup restore test has passed on m3 for 40 days"
+              description: "The monthly restore test did not run, or never has: `systemctl list-timers slurm-backup*`."
 
   - name: long-pending security updates and reboots warn; stale update metrics warn
     interval: 1d
@@ -195,26 +206,31 @@ tests:
               summary: "The open_ondemand TLS certificate on ctl has expired"
               description: "Clients refuse the service. Renew it in the site config's vault and deploy the role that installs it."
 
-  - name: a configured backup destination that never reports a result pages after 36 hours
+  - name: a configured backup destination that never succeeds pages 36 hours after it was configured
     interval: 1h
     input_series:
-      - series: 'slurm_backup_destination_configured{host="m", instance="m:9100", destination="/backup/a"}'
-        values: '1x50'
-      - series: 'slurm_backup_destination_configured{host="m", instance="m:9100", destination="/backup/b"}'
-        values: '1x50'
-      - series: 'slurm_backup_last_status{host="m", instance="m:9100", destination="/backup/b"}'
-        values: '1x50'
+      # /backup/a never ran; /backup/b succeeds every hour; /backup/c fails (SlurmBackupFailed).
+      - series: 'slurm_backup_destination_configured_timestamp_seconds{host="m", instance="m:9100", destination="/backup/a"}'
+        values: '0x50'
+      - series: 'slurm_backup_destination_configured_timestamp_seconds{host="m", instance="m:9100", destination="/backup/b"}'
+        values: '0x50'
+      - series: 'slurm_backup_last_success_timestamp_seconds{host="m", instance="m:9100", destination="/backup/b"}'
+        values: '0+3600x50'
+      - series: 'slurm_backup_destination_configured_timestamp_seconds{host="m", instance="m:9100", destination="/backup/c"}'
+        values: '0x50'
+      - series: 'slurm_backup_last_status{host="m", instance="m:9100", destination="/backup/c"}'
+        values: '0x50'
     alert_rule_test:
       - eval_time: 30h
-        alertname: SlurmBackupNeverRan
+        alertname: SlurmBackupStale
         exp_alerts: []
       - eval_time: 40h
-        alertname: SlurmBackupNeverRan
+        alertname: SlurmBackupStale
         exp_alerts:
           - exp_labels: {severity: critical, host: m, instance: "m:9100", destination: /backup/a}
             exp_annotations:
-              summary: "No Slurm backup to /backup/a has run for 36 hours"
-              description: "`systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on m; the accounting database and controller state have no copy there."
+              summary: "No Slurm backup to /backup/a has succeeded for 36 hours"
+              description: "The daily backup did not run or stopped before writing its result: `systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on m."
 
   - name: container storage cleanup that stopped warns after 3 days
     interval: 1h
@@ -234,3 +250,40 @@ tests:
             exp_annotations:
               summary: "Container image stores on n1 have not been cleaned up for 3 days"
               description: "The daily cleanup failed or did not run, so podman storage and the enroot cache can fill the local disk: `journalctl -u container-storage-gc` and `systemctl list-timers container-storage-gc.timer` on the host."
+
+  - name: a periodic job installed on a host that never reports warns after its window
+    interval: 1h
+    input_series:
+      - series: 'node_systemd_unit_state{host="n1", instance="n1:9100", name="container-storage-gc.service", state="inactive"}'
+        values: '1x80'
+      - series: 'node_systemd_unit_state{host="n2", instance="n2:9100", name="container-storage-gc.service", state="inactive"}'
+        values: '1x80'
+      - series: 'container_storage_gc_last_success_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '0+3600x80'
+      - series: 'node_systemd_unit_state{host="n1", instance="n1:9100", name="os-updates-metrics.service", state="inactive"}'
+        values: '1x80'
+      - series: 'node_systemd_unit_state{host="n2", instance="n2:9100", name="os-updates-metrics.service", state="inactive"}'
+        values: '1x80'
+      - series: 'os_updates_metrics_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '0+3600x80'
+    alert_rule_test:
+      - eval_time: 70h
+        alertname: ContainerStorageCleanupNeverReported
+        exp_alerts: []
+      - eval_time: 74h
+        alertname: ContainerStorageCleanupNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "The container storage cleanup on n1 has reported no success for 3 days"
+              description: "`journalctl -u container-storage-gc` and `systemctl list-timers container-storage-gc.timer` on the host."
+      - eval_time: 70h
+        alertname: OsUpdatesMetricsNeverReported
+        exp_alerts: []
+      - eval_time: 74h
+        alertname: OsUpdatesMetricsNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "n1 has reported no update status for 3 days"
+              description: "`systemctl status os-updates-metrics.timer` and `journalctl -u os-updates-metrics` on the host."

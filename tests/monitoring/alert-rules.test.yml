@@ -775,3 +775,40 @@ tests:
       - eval_time: 20m
         alertname: GpuBusyWithoutJob
         exp_alerts: []
+
+  - name: a frequent metrics job installed on a host that never reports warns after its window
+    interval: 1m
+    input_series:
+      - series: 'node_systemd_unit_state{host="n1", instance="n1:9100", name="slurm-gpu-metrics.service", state="inactive"}'
+        values: '1x30'
+      - series: 'node_systemd_unit_state{host="n2", instance="n2:9100", name="slurm-gpu-metrics.service", state="inactive"}'
+        values: '1x30'
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '0+60x30'
+      - series: 'node_systemd_unit_state{host="n1", instance="n1:9100", name="egress-policy-metrics.service", state="inactive"}'
+        values: '1x30'
+      - series: 'node_systemd_unit_state{host="n2", instance="n2:9100", name="egress-policy-metrics.service", state="inactive"}'
+        values: '1x30'
+      - series: 'egress_policy_metrics_timestamp_seconds{host="n2", instance="n2:9100"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: SlurmGpuMetricsNeverReported
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: SlurmGpuMetricsNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "n1 has written no Slurm GPU allocation data for 5 minutes"
+              description: "`systemctl status slurm-gpu-metrics` and `journalctl -u slurm-gpu-metrics` on the host; GpuBusyWithoutJob is off meanwhile."
+      - eval_time: 14m
+        alertname: EgressPolicyMetricsNeverReported
+        exp_alerts: []
+      - eval_time: 17m
+        alertname: EgressPolicyMetricsNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "n1 has reported no egress policy metrics for 15 minutes"
+              description: "`systemctl status egress-policy-metrics.timer` and `journalctl -u egress-policy-metrics` on the host."

@@ -11,9 +11,12 @@ groups:
           description: >-
             `journalctl -u slurm-backup@backup` on {{ $labels.host }} says why; the accounting
             database and controller state have no fresh copy there.
+      # Counted from the last success or, while there is none (never run, or every run
+      # killed before it wrote a result), from when the destination was configured.
       - alert: SlurmBackupStale
         expr: |
-          time() - slurm_backup_last_success_timestamp_seconds > 36 * 3600
+          time() - (slurm_backup_last_success_timestamp_seconds or slurm_backup_destination_configured_timestamp_seconds)
+            > 36 * 3600
           unless on (instance, destination) slurm_backup_last_status == 0
         labels: {severity: critical}
         annotations:
@@ -22,20 +25,6 @@ groups:
             The daily backup did not run or stopped before writing its result:
             `systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on
             {{ $labels.host }}.
-      # A destination no backup has reported on (never run, or every run killed before
-      # it wrote a result): the result series above do not exist yet, so only the
-      # configured one shows it.
-      - alert: SlurmBackupNeverRan
-        expr: |
-          slurm_backup_destination_configured
-          unless on (instance, destination) slurm_backup_last_status
-        for: 36h
-        labels: {severity: critical}
-        annotations:
-          summary: "No Slurm backup to {{ $labels.destination }} has run for 36 hours"
-          description: >-
-            `systemctl list-timers slurm-backup*` and `journalctl -u slurm-backup@backup` on
-            {{ $labels.host }}; the accounting database and controller state have no copy there.
       - alert: SlurmBackupRestoreTestFailed
         expr: slurm_backup_restore_test_status == 0
         labels: {severity: warning}
@@ -44,9 +33,10 @@ groups:
           description: "A backup that does not restore is no backup: `journalctl -u slurm-backup@restore-test`."
       - alert: SlurmBackupRestoreTestStale
         expr: |
-          time() - slurm_backup_restore_test_last_success_timestamp_seconds > 40 * 86400
+          time() - (slurm_backup_restore_test_last_success_timestamp_seconds or slurm_backup_restore_test_configured_timestamp_seconds)
+            > 40 * 86400
           unless on (instance) slurm_backup_restore_test_status == 0
         labels: {severity: warning}
         annotations:
           summary: "No Slurm backup restore test has passed on {{ $labels.host }} for 40 days"
-          description: "The monthly restore test did not run: `systemctl list-timers slurm-backup*`."
+          description: "The monthly restore test did not run, or never has: `systemctl list-timers slurm-backup*`."

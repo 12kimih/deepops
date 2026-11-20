@@ -233,13 +233,28 @@ class Backup(unittest.TestCase):
         self.assertEqual(sb.publish(self.cfg), 0)
         self.assertIn("slurm_backup_last_success_timestamp_seconds", published.read_text())
 
-    def test_publish_names_every_destination_before_its_first_backup(self):
-        # No backup has run: without this series SlurmBackupNeverRan has nothing to see.
+    def test_publish_dates_every_destination_and_the_restore_test_before_their_first_run(self):
+        # Nothing has run: these times are what the staleness alerts count from.
         self.assertEqual(sb.publish(self.cfg), 0)
         text = (self.base / "prom" / "slurm-backup.prom").read_text()
         for dest in self.cfg["destinations"]:
-            self.assertIn(f'slurm_backup_destination_configured{{destination="{dest["path"]}"}} 1', text)
+            self.assertIn(
+                f'slurm_backup_destination_configured_timestamp_seconds{{destination="{dest["path"]}"}}', text
+            )
+        self.assertIn("slurm_backup_restore_test_configured_timestamp_seconds{}", text)
         self.assertNotIn("last_status", text)
+
+    def test_the_configured_times_are_kept_and_a_new_destination_gets_its_own(self):
+        self.run_on("2026-11-20", 5)
+        first = sb.parse((self.base / "state" / "slurm-backup.prom").read_text())
+        self.cfg["destinations"].append({"path": str(self.base / "third")})
+        self.run_on("2026-11-22", 0)
+        later = sb.parse((self.base / "prom" / "slurm-backup.prom").read_text())
+        for k, v in first.items():
+            if "configured" in k[0]:
+                self.assertEqual(later[k], v)
+        third = sb.series("destination_configured_timestamp_seconds", destination=str(self.base / "third"))
+        self.assertEqual(int(later[third]), int(sb.dt.datetime(2026, 11, 22).timestamp()))
 
 
 class Main(unittest.TestCase):

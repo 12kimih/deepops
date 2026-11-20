@@ -22,6 +22,18 @@ groups:
         annotations:
           summary: "Egress policy metrics from {{ $labels.host }} are over 15 minutes old"
           description: "The metrics timer stopped: `systemctl status egress-policy-metrics.timer` on the host."
+      # No timestamp at all on a host with the unit installed (never ran, or every run
+      # failed since it was installed or since a boot emptied the textfile directory):
+      # the alert above has nothing to compare, so the unit's presence stands in.
+      - alert: EgressPolicyMetricsNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="egress-policy-metrics.service"})
+          unless on (instance) egress_policy_metrics_timestamp_seconds
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has reported no egress policy metrics for 15 minutes"
+          description: "`systemctl status egress-policy-metrics.timer` and `journalctl -u egress-policy-metrics` on the host."
       # A tunnel publishes a service inside the cluster to the internet over an allowed
       # port (or relays a login into it), past both the egress and the inbound policy.
       - alert: EgressTunnelRunning
