@@ -1,6 +1,7 @@
 """Tests for clustertools.site and its agreement with the role that writes the file."""
 
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -37,9 +38,21 @@ class SiteTests(unittest.TestCase):
     def test_the_role_writes_where_the_module_reads(self):
         defaults = load(ROOT / "roles/cluster_tools_lib/defaults/main.yml")
         self.assertEqual(defaults["cluster_tools_lib_info_file"], site.PATH)
-        self.assertEqual(
-            set(defaults["cluster_info"]), {"name", "docs_url", "dashboard_url", "login_host", "ssh_port"}
-        )
+        self.assertEqual(set(defaults["cluster_info"]), {"name", "docs_url", "login_host", "ssh_port"})
+        self.assertEqual(set(defaults["cluster_tools_lib_derived_info"]), {"dashboard_url", "prometheus_url"})
+
+    def test_every_fact_a_program_reads_is_published(self):
+        # A key read but published by neither dict is always missing on a host.
+        defaults = load(ROOT / "roles/cluster_tools_lib/defaults/main.yml")
+        published = set(defaults["cluster_info"]) | set(defaults["cluster_tools_lib_derived_info"])
+        package = ROOT / "roles/cluster_tools_lib/files/clustertools"
+        read = {
+            key
+            for path in package.glob("*.py")
+            for key in re.findall(r"""site_info\(\)(?:\.get\(|\[)["'](\w+)""", path.read_text())
+        }
+        self.assertTrue(read, "no reader found: the pattern is stale")
+        self.assertLessEqual(read, published)
 
 
 if __name__ == "__main__":

@@ -346,7 +346,7 @@ class GpuIndexTests(unittest.TestCase):
                 {"metric": {"host": "n", "gpu": "1", "device": "nvidia0"}, "value": [0, "0"]},
                 {"metric": {"host": "n", "gpu": "2"}, "value": [0, "5"]}]  # fmt: skip
         with mock.patch.object(prom, "query", lambda expr: asked.append(expr) or rows):
-            self.assertEqual(prom.per_gpu("q"), {("n", 1): 70.0, ("n", 0): 0.0})
+            self.assertEqual(report.per_gpu(prom, "q"), {("n", 1): 70.0, ("n", 0): 0.0})
         self.assertIn("group_left (device) host_gpu:dcgm_slurm_device:info", asked[0])
 
 

@@ -119,6 +119,22 @@ class CliTests(unittest.TestCase):
         self.assertIn(f'-p|--partition) COMPREPLY=($(compgen -W "$({COMPLETERS["partitions"]})"', script)
         self.assertIn("--theme)", script)
 
+    def test_a_positional_argument_is_required_after_help(self):
+        cmd = Command(
+            "one", "takes a job", [Opt("job", metavar="JOB", brief=True, help="the job")], usage="one JOB"
+        )
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as done:
+            cmd.parse(["-h"], ENV)
+        self.assertEqual(done.exception.code, 0)
+        self.assertIn("  JOB", out.getvalue())
+        self.assertEqual(cmd.parse(["42"], ENV)[0].job, "42")
+        with contextlib.redirect_stderr(io.StringIO()) as err, self.assertRaises(SystemExit) as done:
+            cmd.parse([], ENV)
+        self.assertEqual(done.exception.code, 2)
+        self.assertIn("JOB is required", err.getvalue())
+        self.assertNotIn(" job ", cmd.completion())
+
     def test_themes_lists_flavours(self):
         code, out, _, _ = run(["--themes"])
         self.assertEqual(code, 0)

@@ -5,6 +5,12 @@
 prometheus_config_dir: /etc/prometheus
 prometheus_cfg_endpoint_dir: "{{ prometheus_config_dir }}/endpoints"
 prometheus_port: 9090
+# Where other hosts reach Prometheus' HTTP API (the cluster's commands): the first host
+# the prometheus component is on (deepops_components); empty without one.
+prometheus_host: >-
+  {{ deepops_component_registry | component_hosts(groups, 'prometheus', deepops_component_removals)
+     | first | default('') }}
+prometheus_url: "{{ 'http://' ~ prometheus_host ~ ':' ~ prometheus_port if prometheus_host else '' }}"
 alertmanager_port: 9093
 # The exporters' ports (host network), which they listen on and Prometheus scrapes.
 node_exporter_port: 9100

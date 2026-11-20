@@ -1,4 +1,7 @@
 ---
+dependencies:
+  - role: deploy_defaults  # deepops_component_registry, deepops_component_removals
+
 galaxy_info:
   namespace: deepops
   role_name: prometheus_paths

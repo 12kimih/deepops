@@ -69,6 +69,16 @@ class JobTests(unittest.TestCase):
         }
         self.assertEqual(slurm.job_label(record), "9_[0-11%1]")
 
+    def test_an_accounting_record_has_the_label_squeue_and_the_metrics_give(self):
+        self.assertEqual(
+            slurm.accounting_label({"job_id": 5, "array": {"job_id": 0, "task_id": {"set": False}}}), "5"
+        )
+        task = {"job_id": 83634, "array": {"job_id": 82731, "task_id": value(31), "task": ""}}
+        self.assertEqual(slurm.accounting_label(task), "82731_31")
+        # The record of an array's unstarted tasks: sacct gives their set as a bitmap.
+        pending = {"job_id": 83728, "array": {"job_id": 83728, "task_id": {"set": False}, "task": "0x3"}}
+        self.assertEqual(slurm.accounting_label(pending), "83728")
+
     def test_gpus_per_node_and_mismatch(self):
         job = {"job_id": 1, "nodes": "gpu[1-2]", "gres_detail": ["gpu:a10:1(IDX:5)", "gpu:a10:2(IDX:0-1)"]}
         gpus, types = slurm.job_gpus(job)
@@ -145,6 +155,7 @@ FIXTURE_FILE = {
     "jobs_detail": "jobs",
     "qos": "qos",
     "associations": "assoc",
+    "accounting": "accounting",
 }
 
 
@@ -158,8 +169,11 @@ class SchemaTests(unittest.TestCase):
         return found
 
     def test_every_fixture_has_every_field_the_tools_read(self):
+        # A release may hold part of a capture (make_fixtures.py writes what it was given).
         for release in self.releases():
             for kind, name in FIXTURE_FILE.items():
+                if not (release / f"{name}.json").exists():
+                    continue
                 with self.subTest(release=release.name, kind=kind):
                     data = json.loads((release / f"{name}.json").read_text())
                     slurm.check(kind, data)
@@ -168,6 +182,9 @@ class SchemaTests(unittest.TestCase):
     def test_every_query_has_fields_and_a_fixture(self):
         self.assertEqual(set(slurm.QUERIES), set(slurm.FIELDS))
         self.assertEqual(set(slurm.QUERIES), set(FIXTURE_FILE))
+        for kind, name in FIXTURE_FILE.items():
+            with self.subTest(kind=kind):
+                self.assertTrue(any((r / f"{name}.json").exists() for r in self.releases()), "no fixture")
 
     def test_a_renamed_field_is_named(self):
         data = json.loads((self.releases()[0] / "jobs.json").read_text())
@@ -235,6 +252,15 @@ class TresTests(unittest.TestCase):
         tres = slurm.tres_str("cpu=8,gres/gpu:a10=4,gres/gpu=2")
         self.assertEqual((tres["gres/gpu"], tres["gres/gpu:a10"]), ("2", "4"))
         self.assertEqual(slurm.tres_str(""), {})
+
+    def test_step_usage_is_tres_usage_in(self):
+        # sacct's TRESUsageInMax of a batch step, as its JSON carries it (tres.requested).
+        step = {"tres": {"requested": {"max": [{"type": "mem", "name": "", "count": 367648768},
+                                               {"type": "gres", "name": "gpuutil", "count": 87}],
+                                       "average": [{"type": "gres", "name": "gpuutil", "count": 60}]}}}  # fmt: skip
+        self.assertEqual(slurm.step_usage(step), {"mem": 367648768, "gres/gpuutil": 87})
+        self.assertEqual(slurm.step_usage(step, "average"), {"gres/gpuutil": 60})
+        self.assertEqual(slurm.step_usage({}), {})
 
     def test_memory_units(self):
         for text, mib in (

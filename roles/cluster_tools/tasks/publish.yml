@@ -39,7 +39,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ cluster_tools_bin_dir }}/{{ item }}"
-      module: "clustertools.{{ item }}"
+      module: "clustertools.{{ item | replace('-', '_') }}"
   loop: "{{ cluster_tools_commands }}"
 
 # bash-completion loads this on the first <TAB> after the command, and the command

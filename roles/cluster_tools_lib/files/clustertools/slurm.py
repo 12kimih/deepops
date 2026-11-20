@@ -97,6 +97,8 @@ QUERIES = {
     "jobs_detail": (("scontrol", "-d", "--json", "show", "jobs"), "jobs"),
     "qos": (("sacctmgr", "--json", "show", "qos"), "qos"),
     "associations": (("sacctmgr", "--json", "show", "assoc"), "associations"),
+    # Running and finished jobs from the accounting database; the job ids follow -j.
+    "accounting": (("sacct", "--json", "-j"), "jobs"),
 }
 _JOB_FIELDS = (
     "job_id",
@@ -145,6 +147,18 @@ FIELDS = {
     "jobs_detail": (*_JOB_FIELDS, "gres_detail"),
     "qos": ("name", "priority", "preempt", "flags", "limits"),
     "associations": ("account", "user", "qos", "default", "is_default"),
+    "accounting": (
+        "job_id",
+        "user",
+        "account",
+        "partition",
+        "nodes",
+        "state",
+        "time",
+        "array",
+        "steps",
+        "tres",
+    ),
 }
 
 
@@ -307,15 +321,31 @@ def job_tasks(job):
     return array_tasks(job["array_task_string"]) if job.get("array_task_string") else 1
 
 
+def _label(job_id, array, task, pending=""):
+    if array and task is not None:
+        return f"{array}_{task}"
+    if array and pending:
+        return f"{array}_[{pending}]"
+    return str(job_id)
+
+
 def job_label(job):
     """The job as squeue names it: ARRAY_TASK for an array task (task 0 included), and
     ARRAY_[TASKS] for the record holding an array's tasks that have not started."""
-    array, task = num(job.get("array_job_id")), num(job.get("array_task_id"))
-    if array and task is not None:
-        return f"{array}_{task}"
-    if array and job.get("array_task_string"):
-        return f"{array}_[{job['array_task_string']}]"
-    return str(job["job_id"])
+    return _label(
+        job["job_id"],
+        num(job.get("array_job_id")),
+        num(job.get("array_task_id")),
+        job.get("array_task_string"),
+    )
+
+
+def accounting_label(job):
+    """job_label for a record of sacct --json (the accounting query): the same name, so
+    a job is one label in Slurm's output and in the metrics alike. The record of an
+    array's unstarted tasks keeps its own id: sacct gives their set as a bitmap."""
+    array = job.get("array") or {}
+    return _label(job["job_id"], num(array.get("job_id")), num(array.get("task_id")))
 
 
 # --- Generic resources (GRES) -------------------------------------------------------
@@ -388,6 +418,13 @@ def tres_list(items):
         if key and t.get("count") is not None:
             out[key] = t["count"]
     return out
+
+
+def step_usage(step, stat="max"):
+    """{tres: count} a step of the accounting query used, by STAT over its tasks (max,
+    min, average or total): sacct's TRESUsageIn<Stat>, which Slurm's JSON keeps under
+    tres.requested. Memory TRES (mem, gres/gpumem) count bytes, cpu milliseconds."""
+    return tres_list(((step.get("tres") or {}).get("requested") or {}).get(stat))
 
 
 def tres_str(text):
