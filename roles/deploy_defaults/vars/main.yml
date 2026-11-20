@@ -153,6 +153,10 @@ deepops_component_registry:
   nvidia_power_limit:
     rules:
       - {switch: "{{ slurm_cluster_configure_gpu_power_limit }}", group: slurm-node}
+  # Blocks tunnel services by name; absent hands DNS back to systemd-resolved's stub.
+  dns_resolver:
+    rules:
+      - {switch: "{{ slurm_enable_dns_resolver }}", group: slurm-cluster}
   egress_policy:
     rules:
       - {switch: "{{ slurm_enable_egress_policy }}", group: slurm-cluster}

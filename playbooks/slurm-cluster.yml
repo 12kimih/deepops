@@ -232,7 +232,8 @@
 
 - name: Run a local resolver that blocks tunnel services by name
   import_playbook: generic/dns-resolver.yml
-  when: slurm_enable_dns_resolver
+  vars:
+    deepops_phase: install
   tags:
     - dns-resolver
 
@@ -274,6 +275,13 @@
     deepops_phase: remove
   tags:
     - cluster-tools
+
+- name: Remove the local resolver where it is no longer wanted
+  import_playbook: generic/dns-resolver.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - dns-resolver
 
 - name: Remove the GPU power limit where it is no longer wanted
   import_playbook: nvidia-software/nvidia-power-limit.yml

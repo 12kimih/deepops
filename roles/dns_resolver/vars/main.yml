@@ -1,6 +1,12 @@
 ---
 _dns_resolver_conf: /etc/unbound/unbound.conf.d/deepops.conf
 _dns_resolver_resolved_dropin: /etc/systemd/resolved.conf.d/60-dns-resolver.conf
+# What the component installs, for its record (roles/component_record).
+dns_resolver_items:
+  - package:unbound
+  - unit:unbound.service
+  - "file:{{ _dns_resolver_conf }}"
+  - "file:{{ _dns_resolver_resolved_dropin }}"
 # One DNS query over UDP: SERVER NAME TYPE -> "RCODE ANSWERS". The check runs before
 # the host is pointed at the resolver, so it needs no client tool installed.
 _dns_resolver_query: |
