@@ -1,0 +1,25 @@
+---
+# The leftovers of the retired source builds (slurm_stale_files_rules), after the
+# packages that replace them are in, so no command is missing in between. The names of
+# the packages' commands and manual pages tell a leftover script or page by name;
+# torque's and openlava's wrappers share names with other software (an MPI's mpiexec),
+# which the rule's evidence (a script that names Slurm) keeps apart, and their manual
+# pages are left out.
+- name: Learn the packages' names
+  ansible.builtin.include_tasks: stale-names.yml
+
+- name: Remove what the retired builds left
+  ansible.builtin.include_role:
+    name: stale_files
+  vars:
+    # A report (playbooks/utilities/stale-files.yml) covers the host's own rules and
+    # counts the files nothing claims; a run removes only Slurm's.
+    _report: "{{ slurm_stale_files_state == 'report' }}"
+    stale_files_rules: "{{ slurm_stale_files_rules + (stale_files_host_rules if _report else []) }}"
+    stale_files_state: "{{ slurm_stale_files_state }}"
+    stale_files_report: "{{ stale_files_report_paths if _report else [] }}"
+
+- name: Refresh the library cache without them
+  ansible.builtin.command: ldconfig
+  changed_when: true
+  when: stale_files_result is changed

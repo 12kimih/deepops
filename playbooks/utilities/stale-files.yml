@@ -1,0 +1,28 @@
+---
+# What retired installs left on each host (roles/stale_files), and the files under
+# stale_files_report_paths (/usr/local, /opt/deepops) that no package owns, no rule
+# matches and no component record claims, counted per directory for a person to
+# judge. Changes nothing; the deploy's own runs remove what the rules match
+# (roles/host_baseline, roles/slurm).
+#
+#   ansible-playbook playbooks/utilities/stale-files.yml [-l <hosts>]
+- hosts: slurm-cluster
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Report what retired installs left (Slurm hosts, with Slurm's rules)
+      ansible.builtin.include_role:
+        name: slurm
+        tasks_from: stale-files
+        public: true
+      vars:
+        slurm_stale_files_state: report
+
+- hosts: all:!slurm-cluster
+  become: true
+  gather_facts: true
+  roles:
+    - role: stale_files
+      vars:
+        stale_files_state: report
+        stale_files_report: "{{ stale_files_report_paths }}"

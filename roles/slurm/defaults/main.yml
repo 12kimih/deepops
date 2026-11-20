@@ -128,6 +128,39 @@ slurm_source_build_prefix: /usr/local
 slurm_source_build_dirs: [/opt/deepops/build/slurm, /opt/deepops/build/hwloc, /opt/deepops/build/pmix]
 slurm_source_build_trees: [/opt/deepops/hwloc, /opt/deepops/pmix]
 
+# What the retired source builds (Slurm with its contrib, the Perl API, hwloc and PMIx;
+# pyxis, built on every host) left, found by evidence (roles/stale_files) on every run,
+# so a host converted before a rule existed is cleaned too. stale-files.yml fills the
+# command and manual page names from the packages that replaced them.
+slurm_stale_files_state: absent
+slurm_package_commands: []  # filled by stale-names.yml
+slurm_package_manpages: []  # filled by stale-names.yml
+slurm_stale_files_rules:
+  - name: Slurm programs of the retired build
+    type: links
+    dirs: "{{ ['bin', 'sbin', 'lib', 'libexec'] | map('regex_replace', '^', slurm_source_build_prefix ~ '/') | list }}"
+    needed: "^libslurm"
+  - name: Slurm scripts of the retired build
+    type: scripts
+    dirs: ["{{ slurm_source_build_prefix }}/bin", "{{ slurm_source_build_prefix }}/sbin"]
+    names: "{{ slurm_package_commands }}"
+    contains: "(?i)slurm"
+  - name: Slurm's Perl API of the retired build
+    type: packlist
+    globs:
+      - "{{ slurm_source_build_prefix }}/lib/*/perl*/*/auto/Slurm*/.packlist"
+      - "{{ slurm_source_build_prefix }}/lib/perl*/*/auto/Slurm*/.packlist"
+      - "{{ slurm_source_build_prefix }}/share/perl*/*/auto/Slurm*/.packlist"
+  - name: What the retired builds left where they installed
+    type: glob
+    globs: >-
+      {{ (slurm_package_manpages | map('regex_replace', '^', 'share/man/') | list)
+         + ['lib/libslurm*', 'lib/libnss_slurm*', 'lib/slurm', 'include/slurm', 'share/doc/slurm-*',
+            'lib/*/slurm-wlm', 'src/pyxis', 'src/pyxis-*', 'share/pyxis']
+         | map('regex_replace', '^', slurm_source_build_prefix ~ '/') | list
+         + slurm_source_build_dirs + slurm_source_build_trees
+         + [slurm_plugin_dir ~ '/spank_pyxis.so.built-from'] }}
+
 slurm_sysconf_dir: /etc/sysconfig
 slurm_contain_ssh: true
 

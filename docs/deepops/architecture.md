@@ -181,6 +181,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── slurm_paths
 │   ├── slurm_usage_report
 │   ├── spack
+│   ├── stale_files
 │   ├── standalone-container-registry
 │   └── system_accounts
 ```

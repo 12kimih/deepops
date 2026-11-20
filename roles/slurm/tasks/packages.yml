@@ -46,50 +46,6 @@
   ansible.builtin.include_tasks: migrate-source-build.yml
   when: slurm_source_build | bool
 
-# What it can leave in its library directory after the commands are gone (and with
-# them what makes it detectable above): static and libtool archives, which no package
-# replaces, and the sonames of older releases. libtool follows a stale .la to a library
-# that is not there, so a later build that searches the directory fails. Every run
-# looks, so a host converted before this existed is cleaned too. libpmi is a common
-# name: its archives go only once their shared library is gone (the migration removes
-# Slurm's), when nothing can link against them anyway.
-- name: Find what the retired source build left in its library directory
-  ansible.builtin.find:
-    paths: "{{ slurm_source_build_prefix }}/lib"
-    patterns: ["libslurm*", "libnss_slurm*"]
-    file_type: any
-  register: slurm_source_libs
-
-- name: Find the PMI libtool archives there
-  ansible.builtin.find:
-    paths: "{{ slurm_source_build_prefix }}/lib"
-    patterns: ["libpmi.la", "libpmi2.la"]
-  register: slurm_source_pmi
-
-- name: Look for their shared libraries
-  ansible.builtin.stat:
-    path: "{{ item.path | regex_replace('[.]la$', '.so') }}"
-  loop: "{{ slurm_source_pmi.files }}"
-  loop_control:
-    label: "{{ item.path }}"
-  register: slurm_source_pmi_so
-
-- name: Remove them
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  vars:
-    _dangling: "{{ slurm_source_pmi_so.results | rejectattr('stat.exists') | map(attribute='item.path') | list }}"
-  loop: >-
-    {{ slurm_source_libs.files | map(attribute='path') | list + _dangling
-       + _dangling | map('regex_replace', '[.]la$', '.a') | list }}
-  register: slurm_source_libs_removed
-
-- name: Refresh the library cache without them
-  ansible.builtin.command: ldconfig
-  changed_when: true
-  when: slurm_source_libs_removed is changed
-
 # dpkg starts and restarts no Slurm daemon (the packages are built that way); the
 # handlers restart them in Slurm's order: slurmdbd, slurmctld, slurmd. pyxis is in the
 # same transaction: it depends on exactly this slurm-smd, so the plugin and the Slurm
@@ -123,3 +79,6 @@
   vars:
     host_baseline_absent_packages: ["{{ slurm_pyxis_package }}"]
   when: not slurm_pyxis_wanted | bool
+
+- name: Remove what the retired source builds left
+  ansible.builtin.include_tasks: stale-files.yml

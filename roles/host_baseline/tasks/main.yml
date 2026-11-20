@@ -1,3 +1,9 @@
 ---
 - name: Remove the packages declared absent
   ansible.builtin.include_tasks: absent.yml
+
+# What a host keeps after its interpreters change (roles/stale_files): an OS release
+# upgrade left python3.10's, ruby 3.0's and perl 5.34's trees and scripts behind.
+- name: Remove what retired runtimes left
+  ansible.builtin.include_role:
+    name: stale_files

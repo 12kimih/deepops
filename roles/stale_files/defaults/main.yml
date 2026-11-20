@@ -1,0 +1,46 @@
+---
+# roles/stale_files: the leftovers of retired installs, found by evidence and removed
+# (library/stale_files.py says what each rule type takes). A component's own rules
+# live with it (roles/slurm: slurm_stale_files_rules); the ones here fit any host.
+#   stale_files_rules   the rules to apply (default: stale_files_host_rules)
+#   stale_files_state   absent removes what they match; report only lists it
+#   stale_files_report  with report: also count the files under these no package owns
+#                       and no rule matched, for a person to judge
+#   stale_files_ignore  paths the count leaves out (what deepops itself installs there)
+stale_files_rules: "{{ stale_files_host_rules }}"
+stale_files_state: absent
+stale_files_report: []
+# Where a report looks for files nothing claims.
+stale_files_report_paths: [/usr/local, /opt/deepops]
+stale_files_ignore: []
+
+# What a host keeps after its interpreters change (an OS release upgrade replaces
+# python3.10, ruby3.0, perl 5.34): their site trees under /usr/local and /var/lib/gems,
+# and the entry scripts that still name them; and libtool archives whose shared library
+# is gone, which send a later build that searches /usr/local/lib to nothing.
+stale_files_host_rules:
+  - name: python of a release no longer installed
+    type: runtime
+    glob: /usr/local/lib/python3.*
+    version: 'python(\d+\.\d+)$'
+    interpreter: /usr/bin/python{0}
+    dirs: [/usr/local/bin]
+  - name: ruby gems of a release no longer installed
+    type: runtime
+    glob: /var/lib/gems/*
+    version: '/(\d+\.\d+)\.\d+$'
+    interpreter: /usr/bin/ruby{0}
+    dirs: [/usr/local/bin]
+  - name: perl modules of a release no longer installed
+    type: runtime
+    glob: /usr/local/lib/*/perl/*
+    version: '/perl/(\d+\.\d+\.\d+)$'
+    interpreter: /usr/bin/perl{0}
+  - name: perl modules of a release no longer installed (shared)
+    type: runtime
+    glob: /usr/local/share/perl/*
+    version: '/perl/(\d+\.\d+\.\d+)$'
+    interpreter: /usr/bin/perl{0}
+  - name: libtool archives of a library that is gone
+    type: libtool
+    globs: [/usr/local/lib/*.la, /usr/local/lib/*/*.la]

@@ -52,23 +52,3 @@
   notify:
     - Restart slurmd
   tags: config
-
-# Earlier versions built pyxis on every host: a source tree under /usr/local/src
-# (pyxis, later pyxis-<version>), `make install`'s /usr/local/share/pyxis and a record
-# of the build next to the plugin.
-- name: Find the source trees earlier versions built pyxis in
-  ansible.builtin.find:
-    paths: /usr/local/src
-    patterns: ["pyxis", "pyxis-*"]
-    file_type: directory
-  register: slurm_pyxis_old_trees
-  tags: config
-
-- name: Remove what the on-host pyxis builds left
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop: >-
-    {{ slurm_pyxis_old_trees.files | map(attribute='path') | list
-       + ['/usr/local/share/pyxis', slurm_plugin_dir ~ '/spank_pyxis.so.built-from'] }}
-  tags: config
