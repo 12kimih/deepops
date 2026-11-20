@@ -39,7 +39,6 @@
     owner: root
     group: root
     mode: "0700"
-  register: standalone_container_registry_data
 
 - name: Add EPEL (RHEL family)
   ansible.builtin.include_role:
@@ -52,21 +51,25 @@
     state: present
 
 # A registry started before its storage was a host directory kept it in an anonymous
-# volume: copy that into the new directory once, before the container is recreated.
+# volume: copied into the directory, from the volume's own host path, while the
+# container still uses that volume. Decided by that evidence, not by this run having
+# made the directory, so a run that failed in between finishes it; docker cp is not
+# used, since it remounts the old container's binds (one may have become a file).
 - name: Look for an earlier registry container
   community.docker.docker_container_info:
     name: "{{ standalone_container_registry_name }}"
   register: standalone_container_registry_earlier
-  when: standalone_container_registry_data is changed
 
 - name: Keep what the earlier registry stored
   ansible.builtin.command:
-    argv: [docker, cp, "{{ standalone_container_registry_name }}:/var/lib/registry/.", "{{ standalone_container_registry_data_dir }}/"]
-  when:
-    - standalone_container_registry_data is changed
-    - standalone_container_registry_earlier.exists | default(false)
-    - standalone_container_registry_earlier.container.Mounts | selectattr('Destination', 'equalto', '/var/lib/registry')
-      | selectattr('Type', 'equalto', 'volume') | list | length > 0
+    argv: [cp, -a, --no-clobber, "{{ _volume.Source }}/.", "{{ standalone_container_registry_data_dir }}/"]
+  vars:
+    _volume: >-
+      {{ (standalone_container_registry_earlier.container.Mounts | default([])
+          | selectattr('Destination', 'equalto', '/var/lib/registry')
+          | selectattr('Type', 'equalto', 'volume') | selectattr('Driver', 'equalto', 'local') | list
+          + [{}]) | first }}
+  when: _volume.Source is defined
   changed_when: true
 
 - name: Run registry docker container
