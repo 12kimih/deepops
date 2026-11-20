@@ -1,0 +1,19 @@
+---
+# The one hold on daemon starts (Debian's invoke-rc.d and deb-systemd-invoke ask
+# /usr/sbin/policy-rc.d before a package starts or restarts a service; exit 101 refuses).
+# Its text is the evidence that the file is deepops' own: release removes only that,
+# whichever run wrote it, so an interrupted install or upgrade is undone by the next run.
+_quiet_install_policy_path: /usr/sbin/policy-rc.d
+_quiet_install_policy: |
+  #!/bin/sh
+  # deepops: daemon starts held back during an install or upgrade (roles/quiet_install)
+  exit 101
+# What earlier versions wrote (roles/quiet_install's file, roles/maintenance's text).
+_quiet_install_policies_retired:
+  - "#!/bin/sh\necho \"All runlevel operations denied by policy\" >&2\nexit 101\n"
+  - "#!/bin/sh\n# deepops maintenance: no service starts or restarts during the upgrade\nexit 101\n"
+# Whether the policy found is someone else's.
+_foreign: >-
+  {{ quiet_install_policy_found.content is defined
+     and (quiet_install_policy_found.content | b64decode)
+         not in [_quiet_install_policy] + _quiet_install_policies_retired }}

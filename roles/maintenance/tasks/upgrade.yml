@@ -10,35 +10,20 @@
     tasks_from: phased
   when: ansible_facts.os_family == 'Debian'
 
-# invoke-rc.d (and deb-systemd-invoke) ask /usr/sbin/policy-rc.d before a package
-# starts or restarts a service; exit 101 refuses. Only this run's file is removed.
+# On a shared host no package upgrade starts or restarts a service (roles/quiet_install's
+# hold, which refuses a site's own policy-rc.d here); it is released by its text, also
+# after an interrupted upgrade.
 - name: Upgrade every package, the held-back stacks included (Ubuntu)
   when: ansible_facts.os_family == 'Debian'
   vars:
     _hold: "{{ maintenance_shared_host | bool }}"
-    _policy: "#!/bin/sh\n# deepops maintenance: no service starts or restarts during the upgrade\nexit 101\n"
   block:
-    - name: Look for a service policy someone else set
-      ansible.builtin.slurp:
-        src: /usr/sbin/policy-rc.d
-      register: maintenance_policy_rc
-      failed_when: false
-      when: _hold
-
-    - name: Refuse to replace it
-      ansible.builtin.assert:
-        that: maintenance_policy_rc.content is not defined or (maintenance_policy_rc.content | b64decode) == _policy
-        fail_msg: /usr/sbin/policy-rc.d exists and is not this role's; remove it or upgrade this host by hand.
-        quiet: true
-      when: _hold
-
     - name: Hold every service where it is for the upgrade
-      ansible.builtin.copy:
-        dest: /usr/sbin/policy-rc.d
-        content: "{{ _policy }}"
-        owner: root
-        group: root
-        mode: "0755"
+      ansible.builtin.include_role:
+        name: quiet_install
+        tasks_from: hold
+      vars:
+        quiet_install_foreign_policy: refuse
       when: _hold
 
     - name: Upgrade every package
@@ -58,12 +43,9 @@
       when: _hold and maintenance_apt_upgrade is changed
   always:
     - name: Let services start again
-      ansible.builtin.file:
-        path: /usr/sbin/policy-rc.d
-        state: absent
-      when: >-
-        _hold and maintenance_policy_rc is defined
-        and (maintenance_policy_rc.content is not defined or (maintenance_policy_rc.content | b64decode) == _policy)
+      ansible.builtin.include_role:
+        name: quiet_install
+        tasks_from: release
 
 - name: Upgrade every package (RHEL family)
   ansible.builtin.dnf:
