@@ -8,11 +8,14 @@
     component_record_items: "{{ ipmi_exporter_items }}"
 
 # Prometheus generates every exporter's scrape targets (roles/prometheus); the file this
-# role wrote on each host before goes.
+# role wrote on each host before goes. Not on a Prometheus host: there the prometheus
+# role replaces it with the generated targets, and removing it first, by an exporter
+# run ahead of that one, would stop the scrape until then.
 - name: Remove the scrape target file this role wrote before
   ansible.builtin.file:
     path: "{{ prometheus_cfg_endpoint_dir }}/ipmi-exporter.yml"
     state: absent
+  when: inventory_hostname not in deepops_component_registry | component_hosts(groups, 'prometheus', deepops_component_removals)
 
 - name: Pull the image
   ansible.builtin.include_role:
