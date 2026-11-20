@@ -4,8 +4,9 @@
 # policy-rc.d (exit 101) holds the start back during the install. It blocks every
 # service start on the host while present, so it is written only for an install that
 # will happen, never over a site's own policy-rc.d (which stays in charge), and removed
-# in `always`, so a failed install cannot leave later upgrades unable to restart
-# anything. RHEL does not start daemons on install; there it is a plain install.
+# in `always` by its text (tasks/release.yml), so not even an interrupted run can leave
+# later upgrades unable to restart anything. tasks_from: hold / release serve any
+# other caller (roles/maintenance's upgrade). RHEL does not start daemons on install; there it is a plain install.
 #   - ansible.builtin.include_role:
 #       name: quiet_install
 #     vars:
@@ -20,6 +21,12 @@
   ansible.builtin.package_facts:
   when: ansible_facts.os_family == "Debian"
 
+# A hold an interrupted run left blocks every start on the host, also when nothing is
+# left to install.
+- name: Release a hold an earlier run left
+  ansible.builtin.include_tasks: release.yml
+  when: ansible_facts.os_family == "Debian"
+
 - name: Install the packages without starting their daemons
   when:
     - ansible_facts.os_family == "Debian"
@@ -28,14 +35,7 @@
     quiet_install_missing: "{{ quiet_install_packages | reject('in', ansible_facts.packages) | list }}"
   block:
     - name: Hold back daemon starts during the install
-      ansible.builtin.copy:
-        src: policy-rc.d
-        dest: /usr/sbin/policy-rc.d
-        owner: root
-        group: root
-        mode: "0700"
-        force: false
-      register: quiet_install_policy
+      ansible.builtin.include_tasks: hold.yml
 
     - name: Install {{ quiet_install_missing | join(', ') }}
       ansible.builtin.apt:
@@ -44,8 +44,5 @@
         name: "{{ quiet_install_missing }}"
         state: present
   always:
-    - name: Remove the hold on daemon starts
-      ansible.builtin.file:
-        path: /usr/sbin/policy-rc.d
-        state: absent
-      when: quiet_install_policy is defined and quiet_install_policy is changed
+    - name: Let daemons start again
+      ansible.builtin.include_tasks: release.yml

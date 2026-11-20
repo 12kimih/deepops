@@ -1,0 +1,14 @@
+---
+# Let daemons start again: the policy goes when its text is deepops' (this run's, or one
+# an interrupted run left), never a site's own.
+- name: Look for the hold on daemon starts
+  ansible.builtin.slurp:
+    src: "{{ _quiet_install_policy_path }}"
+  register: quiet_install_policy_found
+  failed_when: false
+
+- name: Remove the hold on daemon starts
+  ansible.builtin.file:
+    path: "{{ _quiet_install_policy_path }}"
+    state: absent
+  when: quiet_install_policy_found.content is defined and not _foreign

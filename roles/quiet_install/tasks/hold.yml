@@ -1,0 +1,26 @@
+---
+# Hold back daemon starts. A policy-rc.d that is not deepops' stays in charge: with
+# quiet_install_foreign_policy keep (an install) the install runs under it; with refuse
+# (an upgrade, which must restart nothing) the run stops.
+- name: Look for a service policy
+  ansible.builtin.slurp:
+    src: "{{ _quiet_install_policy_path }}"
+  register: quiet_install_policy_found
+  failed_when: false
+
+- name: Refuse a service policy that is not deepops'
+  ansible.builtin.assert:
+    that: not _foreign or quiet_install_foreign_policy == 'keep'
+    fail_msg: >-
+      {{ _quiet_install_policy_path }} exists and is not deepops'; remove it, or do this on
+      {{ inventory_hostname }} by hand.
+    quiet: true
+
+- name: Hold back daemon starts
+  ansible.builtin.copy:
+    dest: "{{ _quiet_install_policy_path }}"
+    content: "{{ _quiet_install_policy }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: not _foreign
