@@ -129,7 +129,7 @@ To run a deep learning job with multiple processes, use MPI:
 
 ```bash
 srun -p PARTITION --gpus-per-task=1 \
-  --container-image=nvcr.io/nvidia/tensorflow:19.05-py3 \
+  --container-image=nvcr.io/nvidia/tensorflow:<tag> \
   bash -c "cd /opt/tensorflow/nvidia-examples/cnn/ && \
     mpiexec --allow-run-as-root -np 2 python resnet.py --layers=50 --batch_size=32 --precision=fp16 --num_iter=50"
 ```

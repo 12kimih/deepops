@@ -149,8 +149,8 @@ def annotated_pins():
         lines = (ROOT / rel).read_text().splitlines()
         for number, line in enumerate(lines, 1):
             m = ANNOTATION.match(line)
-            if not m:
-                continue
+            if not m or m.group(1) == "registry":
+                continue  # a registry line narrows the image pin below it: the image pass reads it
             pin = re.match(
                 r"^([a-z_][a-z0-9_]*):\s*\"?([^\"#]*?)\"?\s*(#.*)?$",
                 lines[number] if number < len(lines) else "",

@@ -17,9 +17,10 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | Role | Variable | Default | config.example |
 |---|---|---|---|
 | alertmanager | `alertmanager_container` | `prom/alertmanager:v0.35.0@sha256:e638797febd0` |  |
-| deploy_defaults | `ngc_ready_cuda_container` | `nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04` |  |
-| deploy_defaults | `ngc_ready_pytorch_container` | `nvcr.io/nvidia/pytorch:26.05-py3` |  |
-| deploy_defaults | `ngc_ready_tensorflow_container` | `nvcr.io/nvidia/tensorflow:25.02-tf2-py3` |  |
+| deploy_defaults | `ngc_ready_cuda_container` | `nvcr.io/nvidia/cuda:13.5.0-base-ubuntu24.04@sha256:8c30b31b13a9` |  |
+| deploy_defaults | `ngc_ready_pytorch_container` | `nvcr.io/nvidia/pytorch:26.11-py3@sha256:0d31ce7e80cd` |  |
+| deploy_defaults | `ngc_ready_tensorflow_container` | `nvcr.io/nvidia/tensorflow:25.02-tf2-py3@sha256:c83b37d26f19` |  |
+| deploy_defaults | `validation_python_container` | `python:3.15-slim@sha256:65a65fc7b30b` |  |
 | docker | `docker_engine_version` | `29.10.0` |  |
 | easy-build | `easybuild_version` | `5.4.2` |  |
 | easy-build | `easybuild_setuptools_version` | `82.0.1` |  |

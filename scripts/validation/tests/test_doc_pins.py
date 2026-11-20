@@ -73,7 +73,8 @@ class DocPinTests(unittest.TestCase):
         for doc in docs:
             for number, line in enumerate(doc.read_text().splitlines(), 1):
                 for repo, tags in pinned.items():
-                    for m in re.finditer(rf"(?<![\w.-]){re.escape(repo)}:([\w.-]+)", line):
+                    # A tag starts with a word character: "nvidia/cuda:..." is prose.
+                    for m in re.finditer(rf"(?<![\w.-]){re.escape(repo)}:(\w[\w.-]*)", line):
                         if m.group(1) not in tags:
                             stale.append(f"{doc.relative_to(ROOT)}:{number}: {repo}:{m.group(1)}")
         self.assertEqual(stale, [], "name the pinned tag, or none (docs/deepops/versions.md lists them)")

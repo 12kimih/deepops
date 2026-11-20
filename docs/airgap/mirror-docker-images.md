@@ -23,6 +23,15 @@ Then determine the list of images by:
   which containers you used
 - If using Pyxis/Enroot with Slurm: check your `slurmd` logs for a list of images
   downloaded by Pyxis
+- The images DeepOps itself pins: `uv run python scripts/deepops/image_pins.py list`
+  (every one is listed with its tag in [versions.md](../deepops/versions.md))
+
+The examples below mirror NVIDIA's CUDA base image, the one the GPU checks run. Set
+its tag first, from `ngc_ready_cuda_container` in versions.md:
+
+```bash
+export SOURCE_TAG="<tag>"   # the part after "nvidia/cuda:" and before "@sha256"
+```
 
 ## Downloading images with Skopeo
 
@@ -48,7 +57,7 @@ equal the source digest or the transport is unsuitable for this workflow:
 ```bash
 (
 set -euo pipefail
-SOURCE="docker://nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04"
+SOURCE="docker://nvcr.io/nvidia/cuda:${SOURCE_TAG}"
 CHECK_DIR="$(mktemp -d)"
 trap 'rm -rf "${CHECK_DIR}"' EXIT
 SOURCE_DIGEST="$(skopeo inspect --format '{{.Digest}}' "${SOURCE}")"
@@ -78,7 +87,6 @@ set -euo pipefail
 umask 077
 
 SOURCE_REPOSITORY="nvcr.io/nvidia/cuda"
-SOURCE_TAG="13.2.1-base-ubuntu24.04"
 IMAGE_NAME="nvidia-cuda-${SOURCE_TAG}"
 TRANSFER_ROOT="/tmp/images"
 TRUSTED_RECORD_DIR="${TRUSTED_RECORD_DIR:-${HOME}/deepops-trusted-records}"
@@ -183,15 +191,15 @@ export DOCKER_CONFIG="${DOCKER_AUTH_DIR}"
 mkdir -p /tmp/images
 docker login nvcr.io --username '$oauthtoken'
 
-docker pull nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
+docker pull "nvcr.io/nvidia/cuda:${SOURCE_TAG}"
 docker save \
-    -o /tmp/images/nvidia-cuda-13.2.1-base-ubuntu24.04.tar \
-    nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04
+    -o "/tmp/images/nvidia-cuda-${SOURCE_TAG}.tar" \
+    "nvcr.io/nvidia/cuda:${SOURCE_TAG}"
 docker logout nvcr.io
 (
     cd /tmp/images
-    sha256sum nvidia-cuda-13.2.1-base-ubuntu24.04.tar \
-        > nvidia-cuda-13.2.1-base-ubuntu24.04.tar.sha256
+    sha256sum "nvidia-cuda-${SOURCE_TAG}.tar" \
+        > "nvidia-cuda-${SOURCE_TAG}.tar.sha256"
 )
 )
 ```
@@ -254,7 +262,7 @@ umask 077
 # Install the ISO tool separately, then run the remaining commands unprivileged.
 sudo apt install genisoimage
 TRANSFER_ROOT="/tmp/images"
-CUDA_NAME="nvidia-cuda-13.2.1-base-ubuntu24.04"
+CUDA_NAME="nvidia-cuda-${SOURCE_TAG}"
 REGISTRY_NAME="registry-3.1.2"
 ISO_STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/deepops-image-iso.XXXXXX")"
 chmod 0700 "${ISO_STAGING_DIR}"
@@ -386,7 +394,6 @@ extracted image so an exit or interruption removes both:
 set -euo pipefail
 umask 077
 
-SOURCE_TAG="13.2.1-base-ubuntu24.04"
 IMAGE_NAME="nvidia-cuda-${SOURCE_TAG}"
 TRANSFER_ROOT="/tmp/images"
 TRUSTED_RECORD_DIR="${TRUSTED_RECORD_DIR:-${HOME}/deepops-trusted-records}"
@@ -459,9 +466,9 @@ with Docker:
 (
 set -euo pipefail
 cd /tmp/images
-sha256sum --check nvidia-cuda-13.2.1-base-ubuntu24.04.tar.sha256
-docker load -i /tmp/images/nvidia-cuda-13.2.1-base-ubuntu24.04.tar
-docker tag nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04 registry-host:5000/nvidia/cuda:13.2.1-base-ubuntu24.04
-docker push registry-host:5000/nvidia/cuda:13.2.1-base-ubuntu24.04
+sha256sum --check "nvidia-cuda-${SOURCE_TAG}.tar.sha256"
+docker load -i "/tmp/images/nvidia-cuda-${SOURCE_TAG}.tar"
+docker tag "nvcr.io/nvidia/cuda:${SOURCE_TAG}" "registry-host:5000/nvidia/cuda:${SOURCE_TAG}"
+docker push "registry-host:5000/nvidia/cuda:${SOURCE_TAG}"
 )
 ```

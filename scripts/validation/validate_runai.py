@@ -43,6 +43,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
 from clustertools import proc  # noqa: E402
 
+from role_defaults import role_default
+
 SCHEMA_VERSION = 1
 OWNER_LABEL = "deepops.nvidia.com/runai-validate"
 OWNER_VALUE = "owned"
@@ -1231,9 +1233,15 @@ def parse_args(argv):
     p.add_argument("--queue", default="default-queue")
     p.add_argument("--queue-label-key", default="kai.scheduler/queue")
     p.add_argument("--scheduler-name", default="kai-scheduler")
-    p.add_argument("--image", default="nvcr.io/nvidia/cuda:13.0.2-base-ubuntu24.04")
     p.add_argument(
-        "--memory-image", default="python:3.12-slim", help="image with python3 for the GPU-memory check"
+        "--image",
+        default=role_default("deploy_defaults", "ngc_ready_cuda_container"),
+        help="CUDA image for the GPU pods (default: ngc_ready_cuda_container)",
+    )
+    p.add_argument(
+        "--memory-image",
+        default=role_default("deploy_defaults", "validation_python_container"),
+        help="image with python3 for the GPU-memory check (default: validation_python_container)",
     )
     p.add_argument("--job-timeout", type=int, default=300, help="seconds per pod (default 300)")
     p.add_argument(

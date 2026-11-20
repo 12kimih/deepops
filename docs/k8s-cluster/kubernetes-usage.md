@@ -104,7 +104,7 @@ To access the NGC container registry via Kubernetes, add a secret which will be 
            - name: nvcr.dgxkey
          containers:
            - name: pytorch-container
-             image: nvcr.io/nvidia/pytorch:26.04-py3
+             image: nvcr.io/nvidia/pytorch:<tag>  # ngc_ready_pytorch_container in docs/deepops/versions.md
              command: ["/bin/sh"]
              args: ["-c", "python -c 'import torch; print(\"cuda_available=\", torch.cuda.is_available()); print(\"device_count=\", torch.cuda.device_count())'"]
              resources:

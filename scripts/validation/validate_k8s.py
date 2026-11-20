@@ -26,6 +26,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
 from clustertools import proc  # noqa: E402
 
+from role_defaults import role_default
+
 SMOKE_NAMESPACE = "deepops-validate"
 SMOKE_POD = "deepops-validate-cuda"
 
@@ -158,8 +160,8 @@ def main():
     )
     parser.add_argument(
         "--cuda-image",
-        default="nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04",
-        help="image for the CUDA smoke pod",
+        default=role_default("deploy_defaults", "ngc_ready_cuda_container"),
+        help="image for the CUDA smoke pod (default: ngc_ready_cuda_container)",
     )
     parser.add_argument(
         "--smoke-timeout",

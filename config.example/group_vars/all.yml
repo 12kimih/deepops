@@ -561,17 +561,17 @@ standalone_container_registry_cache_enable: true
 
 # Registries Docker pulls from over plain HTTP, and mirrors it tries before Docker Hub
 # (daemon.json, roles/docker). group_vars/slurm-cluster.yml and k8s_cluster.yml point
-# them at the controller's registry cache. Since Docker 29 a loopback registry
-# (localhost:5000) needs listing too.
+# them at the controller's registry cache. Since Docker 29, once any registry is
+# listed, a loopback one (localhost:5000) needs listing too.
 #docker_insecure_registries: []
 #docker_registry_mirrors: []
 
 ################################################################################
 # Configuration for NGC-Ready playbook                                         #
 ################################################################################
-#ngc_ready_cuda_container: "nvcr.io/nvidia/cuda:13.2.1-base-ubuntu24.04"
-#ngc_ready_pytorch_container: "nvcr.io/nvidia/pytorch:26.05-py3"
-#ngc_ready_tensorflow_container: "nvcr.io/nvidia/tensorflow:25.02-tf2-py3"
+# The images its checks run, also slurm-validation.yml's and the validators': the
+# ngc_ready_*_container pins in roles/deploy_defaults (docs/deepops/versions.md). A
+# mirror sets its own path with the same tag and digest (docs/airgap/ngc-ready.md).
 
 ################################################################################
 # Kubespray runtime defaults                                                   #

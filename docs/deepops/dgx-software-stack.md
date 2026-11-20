@@ -126,7 +126,7 @@ driver was installed, then verify:
 
 ```bash
 nvidia-smi
-sudo docker run --gpus=all --rm nvcr.io/nvidia/cuda:12.3.2-base-ubuntu22.04 nvidia-smi
+sudo docker run --gpus=all --rm "$IMAGE" nvidia-smi   # IMAGE: ngc_ready_cuda_container (docs/deepops/versions.md)
 ```
 
 Use the RHEL UBI CUDA image from the official guide when validating the RHEL
