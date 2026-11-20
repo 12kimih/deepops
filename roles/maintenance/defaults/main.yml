@@ -80,11 +80,11 @@ maintenance_verify_units: >-
   {{ (['slurmd'] if inventory_hostname in groups[slurm_compute_group] | default([]) else [])
      + (['mariadb', 'munge', 'slurmdbd', 'slurmctld'] if inventory_hostname in groups[slurm_controller_group] | default([]) else [])
      + (['nfs-server'] if inventory_hostname in groups['slurm-nfs'] | default([]) else []) }}
-# A compute node without GPUs (the gpus fact, from lspci at the start of the play) is
-# checked without them.
+# A compute node without GPUs (maintenance_gpus_baseline: lspci when the run started)
+# is checked without them.
 maintenance_verify_gpus: >-
   {{ inventory_hostname in groups['slurm-node'] | default([])
-     and ansible_facts.ansible_local.gpus.count | default(0) | int > 0 }}
+     and maintenance_gpus_baseline | default(0) | int > 0 }}
 # The DCGM diagnostic run level (dcgmi diag -r): 0 off, 1 quick (seconds), 2 medium
 # (about two minutes), 3 long stress (about half an hour), 4 extended. It loads every
 # GPU, so it runs only here, on a node this run drained. Level 1 by default wherever
