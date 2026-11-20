@@ -97,8 +97,9 @@ def inverted_hunk(parent: str, commit: str, path: str, revs: list[str]) -> str |
 
 
 def findings_for(commit: str) -> tuple[list[str], list[str]]:
-    """(refusals, warnings) for one commit. A whole file back to an older version is a
-    refusal, with the newer files the same commit deletes; an exactly inverted hunk
+    """(refusals, warnings) for one commit. A whole file back to an older version, or a
+    recently deleted one back as it was, is a refusal, with the newer files the same
+    commit deletes; an exactly inverted hunk
     alone is a warning (in history it marked deliberate reversals as often as not)."""
     parents = git("rev-list", "--parents", "-n", "1", commit).split()[1:]
     if len(parents) != 1 or ESCAPE.search(git("log", "-1", "--format=%B", commit)):
@@ -120,6 +121,14 @@ def findings_for(commit: str) -> tuple[list[str], list[str]]:
                 rev = inverted_hunk(parent, commit, path, [r for r in touching if r in recent])
                 if rev:
                     inverted.append(f"{path} undoes a change of {subject(rev)}")
+        elif status == "A":
+            # A recently deleted file back exactly as it was: a stale tree resurrects it.
+            gone = git(
+                "log", "--first-parent", "--diff-filter=D", "-n", "1", "--format=%H", parent, "--", path
+            )
+            gone = gone.strip()
+            if gone in recent and blob(f"{gone}^", path) == blob(commit, path):
+                back.append(f"{path} comes back as it was before {subject(gone)} deleted it")
         elif status == "D":
             added = git("log", "--first-parent", "--diff-filter=A", "--format=%H", parent, "--", path).split()
             if added and added[0] in recent:

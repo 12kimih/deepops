@@ -9,6 +9,10 @@ import unittest
 from pathlib import Path
 
 GUARD = Path(__file__).resolve().parents[2] / "scripts" / "deepops" / "sensitive_guard.py"
+PRE_PUSH = GUARD.parent / "pre-push.sh"
+# The user's own git configuration (deepops.sensitivePatterns among it) stays out.
+ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull}
+ENV.pop("DEEPOPS_SENSITIVE_PATTERNS", None)
 # Secret-shaped strings are assembled at run time so this file never trips the guard.
 SLACK_TOKEN = "xo" + "xb-" + "1234567890-abcdefghij"
 SITE_HOST = "login.site" + ".invalid"
@@ -52,7 +56,7 @@ class GuardTest(unittest.TestCase):
 
     def git(self, *args):
         return subprocess.run(
-            ["git", *args], cwd=self.repo, check=True, capture_output=True, text=True
+            ["git", *args], cwd=self.repo, check=True, capture_output=True, text=True, env=ENV
         ).stdout
 
     def commit(self, message, files):
@@ -68,7 +72,7 @@ class GuardTest(unittest.TestCase):
             input=stdin if stdin is not None else "",
             text=True,
             capture_output=True,
-            env={**os.environ, **(env or {})},
+            env={**ENV, **(env or {})},
         )
         return run.returncode, run.stdout + run.stderr
 
@@ -182,24 +186,53 @@ class GuardTest(unittest.TestCase):
         self.assertEqual(self.guard("push", stdin=delete)[0], 0)
         self.assertEqual(self.guard("push")[0], 2, "no refs at all is not a clean push")
 
-    def test_push_under_pre_commit_checks_every_branch_the_remote_lacks(self):
-        # pre-commit passes on only the first ref; a leak on another branch, or on a
-        # remote that has nothing yet, must still be found.
+    def remote(self):
         remote = Path(self.tmp.name + "-remote")
-        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(remote)])
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True, env=ENV)
         self.git("remote", "add", "origin", str(remote))
         self.git("push", "-q", "origin", "main")
-        self.git("fetch", "-q", "origin")
-        env = {"PRE_COMMIT_REMOTE_NAME": "origin", "PRE_COMMIT_FROM_REF": "x", "PRE_COMMIT_TO_REF": "main"}
-        self.assertEqual(self.guard("push", env=env)[0], 0)
-        self.git("checkout", "-q", "-b", "leak")
+        (self.repo / ".git" / "hooks" / "pre-push").symlink_to(PRE_PUSH)
+
+    def push(self, *refspec):
+        run = subprocess.run(
+            ["git", "push", "-q", "origin", *refspec], cwd=self.repo, capture_output=True, text=True, env=ENV
+        )
+        return run.returncode, run.stdout + run.stderr
+
+    def test_a_push_from_a_detached_head_is_checked(self):
+        # The workflow branch-guard asks for: commit on a detached HEAD, push HEAD:main.
+        # Under pre-commit nothing was checked (no branch held the commit).
+        self.remote()
+        self.git("checkout", "-q", "--detach")
         self.commit("leak", {"k.txt": "port 48123\n"})
+        code, out = self.push("HEAD:main")
+        self.assertNotEqual(code, 0, out)
+        self.assertIn("k.txt:1: site rule 3", out)
+        self.git("reset", "-q", "--hard", "HEAD~1")
+        self.commit("fine", {"k.txt": "fine\n"})
+        self.assertEqual(self.push("HEAD:main")[0], 0)
+
+    def test_a_peers_unpushed_branch_does_not_block_a_push(self):
+        self.remote()
+        self.git("checkout", "-q", "-b", "peer-wip")
+        self.commit("peer leak", {"k.txt": "port 48123\n"})
         self.git("checkout", "-q", "main")
-        self.assertEqual(self.guard("push", env=env)[0], 1)
-        # A new remote: what origin already has is not rescanned, the unpushed leak is.
-        self.assertEqual(self.guard("push", env=dict(env, PRE_COMMIT_REMOTE_NAME="fresh"))[0], 1)
-        self.git("branch", "-D", "leak")
-        self.assertEqual(self.guard("push", env=dict(env, PRE_COMMIT_REMOTE_NAME="fresh"))[0], 0)
+        self.commit("mine", {"m.txt": "fine\n"})
+        code, out = self.push("main")
+        self.assertEqual(code, 0, out)
+
+    def test_a_linked_worktree_reads_the_site_rules(self):
+        # config/ is git-ignored, so only the main worktree has it.
+        linked = Path(self.tmp.name + "-linked")
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(linked)])
+        self.git("worktree", "add", "-q", "--detach", str(linked))
+        (linked / "w.txt").write_text(f"ssh {SITE_HOST}\n")
+        subprocess.run(["git", "add", "w.txt"], cwd=linked, check=True, env=ENV)
+        run = subprocess.run(
+            [sys.executable, str(GUARD), "staged"], cwd=linked, capture_output=True, text=True, env=ENV
+        )
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
 
     def test_tree(self):
         self.assertEqual(self.guard("tree")[0], 0)
