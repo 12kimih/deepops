@@ -48,7 +48,7 @@
     nvidia_driver_switch: >-
       {{ (nvidia_driver_target_package | trim) not in ansible_facts.packages
          or (nvidia_driver_install_method == 'nvidia_repo'
-             and ansible_facts.packages[nvidia_driver_target_package | trim][0].version is not match(nvidia_driver_branch ~ '\\.')) }}
+             and ansible_facts.packages[nvidia_driver_target_package | trim][0].version is not match(nvidia_driver_branch ~ '\.')) }}
   when: nvidia_driver_purge_existing | bool
 
 # The Canonical archive's precompiled modules (linux-modules-, linux-objects-,

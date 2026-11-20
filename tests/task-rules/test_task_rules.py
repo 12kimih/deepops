@@ -34,6 +34,11 @@
    package's state: installed is "?i". The first is only what is wanted (h for a held
    package), so matching "ii" missed held packages: the Slurm version guards and the
    package metrics skipped them.
+13. A template in a YAML value (`{{ }}`, `{% %}`) holds single backslashes once YAML is
+   read: ansible-core passes its string literals to the filter as written, so `'\\1'`
+   or `'\\.'` reached regex_search and match doubled (a backreference that failed the
+   task, a version that never matched). Conditionals and .j2 files unescape them, so
+   they do not count.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -539,6 +544,30 @@ class TaskRules(unittest.TestCase):
                 if "Status-Abbrev" in text or "dpkg-query" in text:
                     offenders += [f"{rel(path)}: {m.group(0)}" for m in wanted.finditer(text)]
         self.assertEqual(offenders, [], "installed is the second letter: '.i', [1:2] == 'i'")
+
+    def test_templates_in_yaml_hold_single_backslashes(self):
+        jinja = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)
+        offenders = []
+
+        def walk(value, where):
+            if isinstance(value, dict):
+                for item in value.values():
+                    walk(item, where)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item, where)
+            elif isinstance(value, str):
+                offenders.extend(
+                    f"{where}: {m.group(0)[:80]}" for m in jinja.finditer(value) if "\\\\" in m.group(0)
+                )
+
+        scan = Scan(minimum=MINIMUM_FILES)
+        variables = sorted(ROOT.glob("roles/*/defaults/*.yml")) + sorted(ROOT.glob("roles/*/vars/*.yml"))
+        for path in [scan.seen(p) for p in ansible_files()] + variables:
+            for doc in yaml.safe_load_all(path.read_text()):
+                walk(doc, rel(path))
+        scan.check(self)
+        self.assertEqual(offenders, [], "write one backslash: YAML keeps it, ansible passes it on as is")
 
 
 if __name__ == "__main__":
