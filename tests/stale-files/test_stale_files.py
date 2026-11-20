@@ -110,6 +110,10 @@ class Evidence(unittest.TestCase):
         self.assertFalse((self.tmp / "perl/5.38.2/auto").exists())
         self.assertTrue((self.tmp / "perl/5.38.2").is_dir())
 
+    def test_a_script_rule_without_names_is_refused(self):
+        with self.assertRaises(ValueError):
+            mod.match_rule({"type": "scripts", "dirs": [str(self.tmp)], "names": [], "contains": "x"})
+
     def test_a_named_file_needs_its_name_and_what_it_says(self):
         hit = self.put(
             "apt/zzzz-temp-installer-unattended-upgrade", "# for the run to avoid failing on battery\n"

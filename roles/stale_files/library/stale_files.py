@@ -203,8 +203,23 @@ def files_in(dirs):
                     yield path
 
 
+# The lists each rule type needs: an empty one (a name list computed from packages not
+# built yet) would make the rule match nothing, silently.
+REQUIRED_LISTS = {
+    "glob": ("globs",),
+    "packlist": ("globs",),
+    "libtool": ("globs",),
+    "links": ("dirs",),
+    "scripts": ("dirs", "names"),
+    "files": ("dirs",),
+}
+
+
 def match_rule(rule):
     kind = rule["type"]
+    empty = [key for key in REQUIRED_LISTS.get(kind, ()) if not rule[key]]
+    if empty:
+        raise ValueError(f"empty {', '.join(empty)}: the rule would match nothing")
     found = []
     if kind == "glob":
         for pattern in rule["globs"]:
