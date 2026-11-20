@@ -3,8 +3,12 @@
 # /etc/ssh/sshd_config is the package's own (Debian ships it as
 # /usr/share/openssh/sshd_config), so an upgrade never stops at a conffile prompt, and
 # the site's settings are one drop-in, /etc/ssh/sshd_config.d/10-deepops.conf, which
-# sshd reads first (the first value of a setting wins). Off: sshd is left as it is.
+# sshd reads first (the first value of a setting wins). The role owns sshd_config.d: any
+# other file there (cloud-init's 50-cloud-init.conf) could decide a setting the drop-in
+# leaves out, so it is moved to sshd_backup_dir and reported. Off: sshd is left as it is.
 sshd_manage: false
+# Where drop-ins the role did not write are kept, one directory per run.
+sshd_backup_dir: /var/backups/sshd
 
 # The ports sshd listens on. Ubuntu 24.04+ starts sshd from ssh.socket, whose listening
 # ports a generator takes from these; a change restarts the socket, never a session.

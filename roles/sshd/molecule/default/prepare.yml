@@ -1,5 +1,6 @@
 ---
-# A host whose sshd_config was edited by hand, as the site's were.
+# A host whose sshd_config was edited by hand, as the site's were, with cloud-init's
+# drop-in beside it.
 - name: Prepare
   hosts: all
   become: true
@@ -16,3 +17,9 @@
         line: "{{ item }}"
         insertafter: "^Include"
       loop: ["Port 22", "LoginGraceTime 30"]
+
+    - name: Leave a drop-in of cloud-init's
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/50-cloud-init.conf
+        content: "PasswordAuthentication no\n"
+        mode: "0600"

@@ -1,6 +1,8 @@
 ---
 - name: Manage the OpenSSH server's settings
   when: sshd_manage | bool
+  vars:
+    sshd_aside_dir: "{{ sshd_backup_dir }}/{{ ansible_facts.date_time.iso8601_basic_short }}"
   block:
     - name: Check the settings
       ansible.builtin.assert:
@@ -54,7 +56,25 @@
       failed_when: false
       check_mode: false  # read-only; --check needs the result
 
-    # A configuration sshd rejects would leave no way in: both files are written, sshd
+    # Anything else in sshd_config.d is read beside the drop-in and may set what it leaves
+    # to the defaults: the directory holds the drop-in alone.
+    - name: Find the drop-ins this role did not write
+      ansible.builtin.find:
+        paths: /etc/ssh/sshd_config.d
+        file_type: any
+        hidden: true
+        excludes: [10-deepops.conf]
+      register: sshd_foreign
+
+    - name: Report the drop-ins set aside
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Would move' if ansible_check_mode else 'Moving' }}
+          {{ sshd_foreign.files | map(attribute='path') | sort | join(', ') }} to {{ sshd_aside_dir }}:
+          sshd_config.d holds only the site's drop-in; set what they set in sshd_settings.
+      when: sshd_foreign.matched > 0
+
+    # A configuration sshd rejects would leave no way in: the files are written, sshd
     # checks them together, and anything it refuses is put back as it was.
     - name: Write and check the configuration
       block:
@@ -81,12 +101,37 @@
           register: sshd_main
           when: ansible_facts.os_family == "Debian"
 
+        - name: Make the directory for the drop-ins set aside
+          ansible.builtin.file:
+            path: "{{ sshd_aside_dir }}"
+            state: directory
+            owner: root
+            group: root
+            mode: "0700"
+          when: sshd_foreign.matched > 0
+
+        # mv keeps each file as it was (owner, mode, a symlink as a symlink).
+        - name: Set aside the drop-ins this role did not write
+          ansible.builtin.command:
+            argv: [mv, --, "{{ item }}", "{{ sshd_aside_dir }}/"]
+          loop: "{{ sshd_foreign.files | map(attribute='path') | sort }}"
+          register: sshd_aside
+          changed_when: true
+
         - name: Let sshd check the whole configuration
           ansible.builtin.command:
             argv: [sshd, -t]
           changed_when: false
-          when: sshd_dropin is changed or sshd_main is changed
+          when: sshd_dropin is changed or sshd_main is changed or sshd_aside is changed
       rescue:
+        - name: Put the drop-ins set aside back
+          ansible.builtin.command:
+            argv: [mv, --, "{{ sshd_aside_dir }}/{{ item.item | basename }}", /etc/ssh/sshd_config.d/]
+          loop: "{{ sshd_aside.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'eq', 0) }}"
+          loop_control:
+            label: "{{ item.item }}"
+          changed_when: true
+
         - name: Put the previous files back
           ansible.builtin.copy:
             src: "{{ item.backup_file }}"
@@ -127,7 +172,7 @@
     - name: Apply it
       when:
         - not ansible_check_mode
-        - sshd_dropin is changed or sshd_main is changed
+        - sshd_dropin is changed or sshd_main is changed or sshd_aside is changed
       vars:
         _ports_before: "{{ sshd_before.stdout_lines | select('match', '^port ') | sort | list }}"
         _ports_after: "{{ sshd_after.stdout_lines | select('match', '^port ') | sort | list }}"
