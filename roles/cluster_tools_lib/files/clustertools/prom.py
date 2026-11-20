@@ -1,9 +1,9 @@
 """prom: the Prometheus text format node_exporter's textfile collector reads.
 
-    key("slurm_node_gpus", node="gpu1")    -> a hashable series identity
-    series(name, {labels}, value)          -> one line
-    render({key: value})                   -> the lines, sorted, newline-terminated
-    parse(text)                            -> {key: value}, the inverse of render
+    key("slurm_gpu_configured", node="gpu1")  -> a hashable series identity
+    series(name, {labels}, value)            -> one line
+    render({key: value})                     -> the lines, sorted, newline-terminated
+    parse(text)                              -> {key: value}, the inverse of render
 
 Label values are escaped (backslash, quote, newline) as the format requires. Python
 3.9 or newer, standard library only.

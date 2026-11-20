@@ -55,6 +55,19 @@ class Checks(unittest.TestCase):
         )
         self.assertNotIn("slurm_gpu_allocated", result["metrics"]["detail"]["missing"])
 
+    def test_a_source_switched_off_is_not_a_gap_beside_another_writing_slurm_names(self):
+        # slurmctld, the GPU allocation textfile and the backups all write slurm_ names:
+        # one present says nothing about the others (backups or the textfile off).
+        names = {"slurm_nodes", "slurm_jobs_running", "up"}
+        missing = vm.check(FakePrometheus(names, {WATCHDOG: [{}]}))["metrics"]["detail"]["missing"]
+        self.assertNotIn("slurm_backup_destination_configured_timestamp_seconds", missing)
+        self.assertNotIn("slurm_metrics_updated_timestamp_seconds", missing)
+        self.assertIn("slurm_nodes_down", missing, "slurmctld's own names are one source")
+        self.assertEqual(vm.source("slurm_gpu_configured"), "slurm_metrics")
+        self.assertEqual(vm.source("slurm_node_gpus"), "slurmctld")
+        self.assertEqual(vm.source("slurm_backup_last_status"), "slurm_backup")
+        self.assertIsNone(vm.source("prometheus_tsdb_compactions_failed_total"))
+
     def test_metrics_that_may_be_absent_are_listed_by_why_not_missing(self):
         names = {"DCGM_FI_DEV_GPU_UTIL_RATIO", "node_uname_info", "up"}
         detail = vm.check(FakePrometheus(names, {WATCHDOG: [{}]}))["metrics"]["detail"]

@@ -36,6 +36,11 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
+sys.path.insert(0, str(ROOT / "scripts/deepops"))
+from clustertools import metrics as slurm_metrics  # noqa: E402
+from repo_files import tracked  # noqa: E402
+
 RULES = ROOT / "roles" / "prometheus" / "files" / "rules"
 # Every dashboard deepops provisions (grafana_dashboard_sets, roles/prometheus_paths).
 DASHBOARDS = [
@@ -70,9 +75,25 @@ def absent_ok(metric):
     return next((why for why, pattern in ABSENT_OK.items() if re.fullmatch(pattern, metric)), None)
 
 
-# Exporters by metric prefix: a missing metric is a rollout gap only when its exporter
-# reports others.
-EXPORTERS = ("DCGM_", "node_", "slurm_", "os_updates_", "ipmi_", "container_storage_gc_", "egress_policy_")
+# Where each metric comes from, first match wins: a missing metric is a rollout gap only
+# when its source reports others (a component switched off reports none). Three write
+# slurm_ names: the GPU allocation textfile (its names, from the writer itself), the
+# backups, and slurmctld.
+SLURM_METRICS = set(re.findall(r"^# TYPE (\S+) ", slurm_metrics.textfile({"jobs": []}, {"nodes": []}), re.M))
+SOURCES = (
+    ("slurm_metrics", lambda m: m in SLURM_METRICS),
+    ("slurm_backup", lambda m: m.startswith("slurm_backup_")),
+    ("slurmctld", lambda m: m.startswith("slurm_")),
+    *((p.rstrip("_"), lambda m, p=p: m.startswith(p))
+      for p in ("DCGM_", "node_", "os_updates_", "ipmi_", "container_storage_gc_", "egress_policy_")),
+)  # fmt: skip
+
+
+def source(metric):
+    """The SOURCES name METRIC comes from, or None (Prometheus' and Alertmanager's own)."""
+    return next((name for name, matches in SOURCES if matches(metric)), None)
+
+
 # How recent a sample must be for its metric to count as present (seconds; many scrape
 # intervals).
 PRESENT_WINDOW = 300
@@ -109,7 +130,7 @@ def repo_metrics():
     """{metric: [where it is read]} over the alert rules and dashboards, recording rules
     expanded to what they read."""
     reads, recorded = {}, {}
-    for path in sorted(RULES.glob("*.yml")):
+    for path in tracked(f"{RULES.relative_to(ROOT)}/*.yml"):
         for group in yaml.safe_load(path.read_text())["groups"]:
             for rule in group["rules"]:
                 if "record" in rule:
@@ -176,6 +197,7 @@ def check(prom):
     present = set(prom.get("/api/v1/label/__name__/values", start=time.time() - PRESENT_WINDOW)["data"])
     reads, recorded = repo_metrics()
     gaps, allowed = {}, {}
+    reporting_sources = {source(m) for m in present}
     for name, where in sorted(reads.items()):
         for metric in sorted(recorded.get(name, {name})):
             if metric in present or metric in recorded:
@@ -184,8 +206,7 @@ def check(prom):
             if why:
                 allowed.setdefault(why, set()).add(metric)
                 continue
-            prefix = next((p for p in EXPORTERS if metric.startswith(p)), None)
-            if prefix and any(m.startswith(prefix) for m in present):
+            if source(metric) and source(metric) in reporting_sources:
                 gaps.setdefault(metric, sorted(set(where)))
     detail = {"read": len(reads), "missing": gaps, "absent_ok": {w: sorted(m) for w, m in allowed.items()}}
     record("metrics", not gaps, detail)
