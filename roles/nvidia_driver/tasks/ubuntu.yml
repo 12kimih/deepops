@@ -135,6 +135,9 @@
   ansible.builtin.set_fact:
     nvidia_driver_install: "{{ nvidia_driver_install_archive if nvidia_driver_install_method == 'ubuntu_repo' else nvidia_driver_install_repo }}"
 
+- name: Remove the nouveau blacklists the packages make redundant (Ubuntu)
+  ansible.builtin.include_tasks: nouveau.yml
+
 # --- Fabric Manager (opt-in, NVSwitch HGX) -----------------------------------
 - name: Install NVIDIA Fabric Manager and NSCQ (Ubuntu)
   ansible.builtin.apt:
