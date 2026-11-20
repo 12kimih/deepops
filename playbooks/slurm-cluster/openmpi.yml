@@ -1,6 +1,10 @@
 ---
-- hosts: all
+# Open MPI built from source (roles/openmpi). Every host it runs on converges to
+# deepops_components (present on slurm-cluster while slurm_cluster_install_openmpi is
+# on, removed elsewhere).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-    - openmpi
+    - role: openmpi
+      openmpi_state: "{{ deepops_components.openmpi | component_phase(deepops_phase) }}"

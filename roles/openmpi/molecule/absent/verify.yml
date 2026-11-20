@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Look for what Open MPI installed
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/usr/local/bin/ompi_info, /usr/local/bin/mpirun, /etc/ld.so.conf.d/openmpi.conf,
+             /var/lib/deepops/source-builds/openmpi.json, /usr/local/bin/ompi_info.built-from]
+      register: left
+
+    - name: Assert nothing of Open MPI is left
+      ansible.builtin.assert:
+        that: left.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: "left: {{ left.results | selectattr('stat.exists') | map(attribute='item') | list }}"

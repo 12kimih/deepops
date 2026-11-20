@@ -1,13 +1,11 @@
 ---
-- hosts: "{{ hostlist | default('slurm-node') }}"
+# Node Health Check on the compute nodes (roles/nhc). Every host it runs on converges to
+# deepops_components (present on slurm-node while slurm_install_nhc is on, removed
+# elsewhere); slurmd's HealthCheckProgram follows the same switch (roles/slurm).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-  tasks:
-    - name: Gather custom facts
-      ansible.builtin.include_role:
-        name: facts
-    - name: Install Node Health Check
-      ansible.builtin.include_role:
-        name: nhc
-        public: true
+    - role: facts
+    - role: nhc
+      nhc_state: "{{ deepops_components.nhc | component_phase(deepops_phase) }}"

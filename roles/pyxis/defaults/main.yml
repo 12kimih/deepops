@@ -1,4 +1,10 @@
 ---
+# pyxis's node setup as a component (the plugin and its package are roles/slurm's):
+# present, absent or kept (do nothing). A deploy sets it from deepops_components
+# (slurm_install_enroot and slurm_install_pyxis); absent removes the enroot hooks it
+# links. The /run size it sets in fstab stays: nothing tells it from a site's own.
+pyxis_state: present
+
 # pyxis itself (package, plugstack entry and options) is roles/slurm's: it is packaged,
 # installed and configured with the Slurm it was built for. This role adds what pyxis
 # needs around it: its job-time helpers, enroot's Slurm hooks and the /run size.

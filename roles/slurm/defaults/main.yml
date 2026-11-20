@@ -280,9 +280,9 @@ slurm_max_job_timelimit: INFINITE
 slurm_default_job_timelimit: ""
 
 # The node health check slurmd runs on every node, allocated ones too (HealthCheckNodeState
-# ANY,CYCLE): {{ nhc_program }} where playbooks/slurm-cluster/nhc.yml installs NHC;
-# empty: none.
-slurm_health_check_program: ""
+# ANY,CYCLE): NHC while slurm_install_nhc installs it (roles/nhc), none otherwise, so a
+# node never runs a check that is not there. Set it only for another program.
+slurm_health_check_program: "{{ nhc_program if slurm_install_nhc | bool else '' }}"
 
 # Set up prolog and epilog
 slurm_enable_prolog_epilog: true

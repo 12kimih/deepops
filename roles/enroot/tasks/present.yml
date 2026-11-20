@@ -1,0 +1,150 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: enroot
+    component_record_action: begin
+    component_record_items: "{{ enroot_items }}"
+
+# enroot requires user.max_user_namespaces and user.max_mnt_namespaces > 1 on
+# every supported OS (a hard prerequisite for the container start path).
+# https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
+- name: Set the user and mount namespace limits
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: sysctl
+  vars:
+    host_baseline_sysctls:
+      user.max_user_namespaces: "{{ enroot_max_user_namespaces }}"
+      user.max_mnt_namespaces: "{{ enroot_max_mnt_namespaces }}"
+    host_baseline_sysctl_file: /etc/sysctl.d/90-enroot.conf
+
+- name: Install enroot (Ubuntu)
+  ansible.builtin.include_tasks: ubuntu.yml
+  when: ansible_facts.distribution == 'Ubuntu'
+
+- name: Install enroot (RHEL/Rocky)
+  ansible.builtin.include_tasks: redhat.yml
+  when: ansible_facts.os_family == 'RedHat'
+
+- name: Install enroot bash completion
+  ansible.builtin.file:
+    path: /etc/bash_completion.d/enroot.bash_completion
+    src: /usr/share/enroot/bash_completion
+    state: link
+
+- name: Configure enroot (/etc/enroot/enroot.conf.d/90-deepops.conf)
+  ansible.builtin.copy:
+    dest: /etc/enroot/enroot.conf.d/90-deepops.conf
+    content: "{{ enroot_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: enroot_config | length > 0
+
+# Earlier releases edited the package's enroot.conf in place, each with its own marker:
+# this role, and the Galaxy role it replaced (ansible-role-enroot). Both blocks go, or
+# the settings stay doubled beside enroot.conf.d.
+- name: Leave the package's enroot.conf as shipped
+  ansible.builtin.blockinfile:
+    path: /etc/enroot/enroot.conf
+    marker: "# {mark} ANSIBLE MANAGED BLOCK ({{ item }})"
+    state: absent
+  loop: [roles/enroot, ansible-role-enroot]
+
+# enroot creates each user's RUNTIME/CACHE/DATA leaf (user-$(id -u)) by running
+# `mkdir -p` AS THE UNPRIVILEGED USER, so the PARENT dirs must exist sticky-1777 or
+# interactive `enroot` fails ("mkdir /run/enroot: Permission denied", enroot#23).
+# /run is tmpfs, so this tmpfiles.d drop-in recreates /run/enroot every boot. (The
+# Slurm prolog also makes the per-job leaf, but only for jobs -- not interactive use.)
+- name: Provision sticky enroot runtime/cache/data parent dirs (tmpfiles.d)
+  ansible.builtin.template:
+    src: enroot-tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/enroot.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: enroot_tmpfiles
+
+- name: Apply the enroot tmpfiles.d entries now
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/enroot.conf
+  changed_when: false
+  when:
+    - enroot_tmpfiles is changed
+    - not deepops_containerized | bool
+  tags:
+    - molecule-notest
+
+# System-wide extension dirs run hooks with full capabilities before switch_root,
+# so they must be root-write-only (a user-writable hook is a privesc vector).
+- name: Ensure enroot system extension directories are root-owned
+  ansible.builtin.file:
+    path: "/etc/enroot/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - environ.d
+    - hooks.d
+    - mounts.d
+
+- name: Configure enroot environ.d files
+  ansible.builtin.copy:
+    dest: "/etc/enroot/environ.d/{{ item.filename }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ enroot_environ_config_files }}"
+  loop_control:
+    label: "{{ item.filename }}"
+
+- name: Configure enroot hooks.d files
+  ansible.builtin.copy:
+    dest: "/etc/enroot/hooks.d/{{ item.filename }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ enroot_hook_config_files }}"
+  loop_control:
+    label: "{{ item.filename }}"
+
+- name: Configure enroot mounts.d files
+  ansible.builtin.copy:
+    dest: "/etc/enroot/mounts.d/{{ item.filename }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ enroot_mount_config_files }}"
+  loop_control:
+    label: "{{ item.filename }}"
+
+# These directories also hold the package's own hooks and the pyxis links, so only the
+# files configured here are recorded and, once dropped from the config, removed: a hook
+# left behind would still run, as root, in every container.
+- name: Remove enroot files no longer configured
+  ansible.builtin.include_role:
+    name: recorded_files
+  vars:
+    recorded_files_record: "/var/lib/deepops/recorded/enroot-{{ item.dir }}"
+    recorded_files_names: "{{ item.files | map(attribute='filename') | list }}"
+    recorded_files_dirs: ["/etc/enroot/{{ item.dir }}"]
+  loop:
+    - { dir: environ.d, files: "{{ enroot_environ_config_files }}" }
+    - { dir: hooks.d, files: "{{ enroot_hook_config_files }}" }
+    - { dir: mounts.d, files: "{{ enroot_mount_config_files }}" }
+  loop_control:
+    label: "{{ item.dir }}"
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: enroot
+    component_record_action: present
+    component_record_items: "{{ enroot_items }}"
+    component_record_version: "{{ enroot_version_string }}"

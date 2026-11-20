@@ -1,0 +1,23 @@
+---
+# enroot on login and compute hosts (roles/enroot), so containers can be imported and
+# launched from either. Every host it runs on converges to deepops_components (present
+# on slurm-cluster while slurm_install_enroot is on, removed elsewhere).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: facts
+    - role: enroot
+      enroot_state: "{{ deepops_components.enroot | component_phase(deepops_phase) }}"
+  tasks:
+    # enroot's NVIDIA hook runs nvidia-container-cli for every image that asks for GPUs
+    # (CUDA images all do); without the toolkit it fails "Command not found". Only the
+    # packages: Docker's runtime is container/nvidia-docker.yml's business.
+    - name: Install the NVIDIA Container Toolkit for enroot's GPU hook
+      ansible.builtin.include_role:
+        name: nvidia_container_toolkit
+      vars:
+        nvidia_container_toolkit_configure_docker: false
+      when:
+        - (deepops_components.enroot | component_phase(deepops_phase)) == 'present'
+        - ansible_facts.ansible_local['gpus']['count'] | int > 0

@@ -1,10 +1,23 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Read the installed NHC's version
+      ansible.builtin.command: /usr/sbin/nhc -V -V -V
+      register: nhc_v
+      changed_when: false
+
+    - name: Assert NHC is installed from its manifest and recorded
       ansible.builtin.assert:
-        that: true
+        that:
+          - nhc_v.stdout is search('LBNL NHC version')
+
+    - name: Look for the manifest of the build
+      ansible.builtin.stat:
+        path: /var/lib/deepops/source-builds/nhc.json
+      register: manifest
+
+    - name: Assert the build has a manifest
+      ansible.builtin.assert:
+        that: manifest.stat.exists

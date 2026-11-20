@@ -16,6 +16,9 @@
 - name: Install NVIDIA DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
   when: install_dcgm
+  vars:
+    hostlist: all
+    deepops_phase: require  # this server's GPUs, whatever the cluster map says
 
 - hosts: all
   become: true

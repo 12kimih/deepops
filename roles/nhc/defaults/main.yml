@@ -1,4 +1,9 @@
 ---
+# NHC as a component: present, absent or kept (do nothing). A deploy sets it from
+# deepops_components (slurm_install_nhc, on slurm-node); absent removes what the build
+# installed (its manifest, roles/source_build) and the configuration this role wrote.
+nhc_state: present
+
 # 1.5+ finds its settings in /etc/sysconfig and its helpers in /usr/libexec on every
 # distribution; 1.4 used /etc/default and /usr/lib on Debian and Ubuntu, so the
 # settings this role writes were never read and a failed check never drained the node.

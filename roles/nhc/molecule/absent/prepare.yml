@@ -1,0 +1,9 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install NHC as a compute node has it
+      ansible.builtin.include_role:
+        name: nhc
+      vars:
+        nhc_state: present

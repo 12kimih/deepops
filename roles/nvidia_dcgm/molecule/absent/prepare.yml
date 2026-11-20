@@ -1,0 +1,42 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Ensure man directories exist in minimal ubuntu image
+      ansible.builtin.file:
+        path: "/usr/share/man/man1"
+        owner: "root"
+        group: "root"
+        state: "directory"
+        mode: "0755"
+      when: ansible_facts.distribution == "Ubuntu"
+
+    - name: Ensure dependencies are present for apt key management
+      ansible.builtin.apt:
+        update_cache: true
+        name: "gpg-agent"
+        state: present
+      when: ansible_facts.distribution == "Ubuntu"
+
+    # No GPU in CI: report one, so the role installs as on a GPU node (roles/facts).
+    - name: Create the custom facts directory
+      ansible.builtin.file:
+        path: /etc/ansible/facts.d
+        state: directory
+        mode: "0755"
+
+    - name: Report one GPU
+      ansible.builtin.copy:
+        dest: /etc/ansible/facts.d/gpus.fact
+        content: '{"count": 1}'
+        mode: "0644"
+
+    - name: Read the reported GPU
+      ansible.builtin.setup:
+        filter: ansible_local
+
+    - name: Install DCGM as a GPU node has it
+      ansible.builtin.include_role:
+        name: nvidia_dcgm
+      vars:
+        dcgm_state: present

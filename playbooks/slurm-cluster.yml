@@ -98,11 +98,13 @@
 
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
-  when: install_dcgm
+  vars:
+    deepops_phase: install
 
 - name: Install Node Health Check
   import_playbook: slurm-cluster/nhc.yml
-  when: slurm_install_nhc
+  vars:
+    deepops_phase: install
 
 - name: Install Slurm
   import_playbook: slurm-cluster/slurm.yml
@@ -114,7 +116,8 @@
 
 - name: Install OpenMPI
   import_playbook: slurm-cluster/openmpi.yml
-  when: slurm_cluster_install_openmpi
+  vars:
+    deepops_phase: install
 
 - name: Install Lmod
   import_playbook: slurm-cluster/lmod.yml
@@ -123,7 +126,8 @@
 
 - name: Install the NVIDIA HPC SDK
   import_playbook: nvidia-software/nvidia-hpc-sdk.yml
-  when: slurm_install_hpcsdk
+  vars:
+    deepops_phase: install
 
 - name: Install the Open OnDemand portal
   import_playbook: slurm-cluster/open-ondemand.yml
@@ -193,11 +197,18 @@
   vars:
     deepops_phase: install
 
-- name: Install Enroot and Pyxis
+- name: Install enroot
+  import_playbook: container/enroot.yml
+  vars:
+    deepops_phase: install
+  tags:
+    - enroot
+    - pyxis
+
+- name: Install pyxis's node setup
   import_playbook: container/pyxis.yml
-  when:
-    - slurm_install_enroot
-    - slurm_install_pyxis
+  vars:
+    deepops_phase: install
   tags:
     - pyxis
 
@@ -276,6 +287,41 @@
     deepops_phase: remove
   tags:
     - cluster-tools
+
+- name: Remove the HPC SDK where it is no longer wanted
+  import_playbook: nvidia-software/nvidia-hpc-sdk.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove pyxis's node setup where it is no longer wanted
+  import_playbook: container/pyxis.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - pyxis
+
+- name: Remove enroot where it is no longer wanted
+  import_playbook: container/enroot.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - enroot
+    - pyxis
+
+- name: Remove Open MPI where it is no longer wanted
+  import_playbook: slurm-cluster/openmpi.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove Node Health Check where it is no longer wanted
+  import_playbook: slurm-cluster/nhc.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove DCGM where it is no longer wanted
+  import_playbook: nvidia-software/nvidia-dcgm.yml
+  vars:
+    deepops_phase: remove
 
 - name: Remove the local resolver where it is no longer wanted
   import_playbook: generic/dns-resolver.yml

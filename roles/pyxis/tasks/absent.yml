@@ -1,0 +1,8 @@
+---
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: pyxis
+    component_record_action: absent
+    component_record_items: "{{ pyxis_items }}"

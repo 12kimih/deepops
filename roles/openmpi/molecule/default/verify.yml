@@ -1,10 +1,20 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Read the installed Open MPI's version
+      ansible.builtin.command: /usr/local/bin/ompi_info --version
+      register: ompi
+      changed_when: false
+
+    - name: Look for the manifest of the build
+      ansible.builtin.stat:
+        path: /var/lib/deepops/source-builds/openmpi.json
+      register: manifest
+
+    - name: Assert Open MPI is installed from its manifest
       ansible.builtin.assert:
-        that: true
+        that:
+          - ompi.stdout is search('Open MPI')
+          - manifest.stat.exists

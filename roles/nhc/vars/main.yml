@@ -1,0 +1,7 @@
+---
+# The configuration this role writes beside what the build installs (the build's own
+# files go with its manifest: roles/source_build), for its record.
+nhc_items:
+  - "file:{{ nhc_config_dir }}/nhc/scripts/deepops.nhc"
+  - "file:{{ nhc_config_dir }}/nhc/nhc.conf"
+  - "file:{{ nhc_sysconfig_dir }}/nhc"

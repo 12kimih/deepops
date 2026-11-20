@@ -1,0 +1,6 @@
+---
+# What the component installs, for its record (roles/component_record): the Slurm hooks
+# it links into enroot's hooks.d on compute nodes.
+pyxis_items:
+  - file:/etc/enroot/hooks.d/50-slurm-pmi.sh
+  - file:/etc/enroot/hooks.d/50-slurm-pytorch.sh

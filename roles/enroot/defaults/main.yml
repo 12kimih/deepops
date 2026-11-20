@@ -1,4 +1,9 @@
 ---
+# enroot as a component: present, absent or kept (do nothing). A deploy sets it from
+# deepops_components (slurm_install_enroot, on slurm-cluster); absent removes the
+# packages and every file this role wrote (pyxis, which needs it, goes first).
+enroot_state: present
+
 # In-tree NVIDIA enroot role (replaces the nvidia.enroot Galaxy role, which was
 # pinned to an EOL 3.x release and did not handle the unprivileged user namespace
 # restriction that modern Ubuntu (23.10+/24.04) enables by default).

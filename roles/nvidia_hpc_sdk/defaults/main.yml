@@ -1,4 +1,11 @@
 ---
+# The HPC SDK as a component: present, absent or kept (do nothing). A deploy sets it
+# from deepops_components (slurm_install_hpcsdk, on the first login node, which installs
+# it into hpcsdk_install_dir on shared storage). absent takes it off Lmod and the
+# profile on every host, and removes the tree only on the host whose record says it
+# installed it: elsewhere the tree is everyone's, seen over NFS.
+hpcsdk_state: present
+
 # The HPC SDK is downloaded from a URL that looks like this:
 #   https://developer.download.nvidia.com/hpc-sdk/20.9/nvhpc_2020_209_Linux_x86_64_cuda_11.0.tar.gz
 #

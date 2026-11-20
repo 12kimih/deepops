@@ -9,7 +9,7 @@
     name: host_baseline
     tasks_from: absent
   vars:
-    host_baseline_absent_packages: "{{ dcgm_other_pkgs }}"
+    host_baseline_absent_packages: "{{ _dcgm_other_packages }}"
 
 - name: Ubuntu | install package
   ansible.builtin.apt:

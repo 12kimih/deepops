@@ -1,4 +1,9 @@
 ---
+# Open MPI as a component: present, absent or kept (do nothing). A deploy sets it from
+# deepops_components (slurm_cluster_install_openmpi); absent removes what the build
+# installed (its manifest, roles/source_build) and the library path.
+openmpi_state: present
+
 # OpenMPI built from source for the Slurm cluster. 5.0.x is the current stable
 # series; 4.0.x is EOL. When built against the distribution PMIx
 # (config.example's override below), it compiles against the libpmix-dev headers Slurm

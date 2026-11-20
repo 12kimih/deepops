@@ -3,7 +3,7 @@ dependencies:
   - role: slurm_paths  # slurm_install_prefix, slurm_plugin_dir, slurm_config_dir, host groups
   - role: deepops_paths  # nvidia_power_limit_conf_file, sm_prefix
   - role: facts
-  - role: deploy_defaults  # slurm_install_enroot, slurm_install_pyxis
+  - role: deploy_defaults  # slurm_install_enroot, slurm_install_pyxis, slurm_install_nhc
   - role: retired_settings  # the source build's settings
   - role: nvidia_versions  # nvidia_driver_cuda_release (the NVML headers the build uses)
 

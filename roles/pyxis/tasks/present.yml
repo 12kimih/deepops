@@ -1,0 +1,62 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: pyxis
+    component_record_action: begin
+    component_record_items: "{{ pyxis_items if is_compute else [] }}"
+
+- name: Install dependencies (Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ pyxis_ubuntu_deps }}"
+  when: ansible_facts.distribution == "Ubuntu"
+
+- name: Install dependencies (EL)
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ pyxis_el_deps }}"
+  when: ansible_facts.os_family == "RedHat"
+
+# Link the hooks so they follow enroot package upgrades. force replaces the plain
+# copies earlier versions of this role installed.
+- name: Install slurm-pmi hook
+  ansible.builtin.file:
+    path: /etc/enroot/hooks.d/50-slurm-pmi.sh
+    state: link
+    src: /usr/share/enroot/hooks.d/50-slurm-pmi.sh
+    force: true
+  when: is_compute
+
+- name: Install slurm-pytorch hook
+  ansible.builtin.file:
+    path: /etc/enroot/hooks.d/50-slurm-pytorch.sh
+    state: link
+    src: /usr/share/enroot/hooks.d/50-slurm-pytorch.sh
+    force: true
+  when: is_compute
+
+# Resize /run temporary file system, which is used to import docker image.
+#  - Default pyxis runtime_path is: /run/pyxis
+# If image is bigger than the file system, the importing will be failed
+- name: Resize /run partition
+  ansible.posix.mount:
+    name: /run
+    src: tmpfs
+    opts: size={{ pyxis_run_tmpfs_size }}
+    fstype: tmpfs
+    state: mounted
+  when: resize_run_partition
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: pyxis
+    component_record_action: present
+    component_record_items: "{{ pyxis_items if is_compute else [] }}"

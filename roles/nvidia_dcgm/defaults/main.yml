@@ -1,4 +1,9 @@
 ---
+# DCGM as a component: present, absent or kept (do nothing). A deploy sets it from
+# deepops_components (install_dcgm, on slurm-node); a node without GPUs gets nothing.
+# DGX OS ships its own DCGM: absent leaves it.
+dcgm_state: present
+
 # DCGM 4, built per CUDA major: the one matching the driver branch (NVIDIA's DCGM
 # install guide picks it from the driver's CUDA version; nvidia_driver_cuda_major is
 # that, known before the driver loads). The recommended packages it pulls in carry

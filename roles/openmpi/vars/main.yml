@@ -1,0 +1,5 @@
+---
+# The library path this role writes beside what the build installs (the build's files
+# go with its manifest: roles/source_build), for its record.
+openmpi_items:
+  - file:/etc/ld.so.conf.d/openmpi.conf

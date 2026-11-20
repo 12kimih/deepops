@@ -1,0 +1,15 @@
+---
+# The service stops and every DCGM package goes through the record; DGX OS keeps its own.
+- name: Check for DGX
+  ansible.builtin.set_fact:
+    dcgm_is_dgx: true
+  when: ansible_facts.product_name is search("DGX")
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: dcgm
+    component_record_action: absent
+    component_record_items: "{{ dcgm_items }}"
+    component_record_exclusive_packages: "{{ [] if dcgm_is_dgx | bool else ['datacenter-gpu-manager*'] }}"

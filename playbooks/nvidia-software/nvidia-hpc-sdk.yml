@@ -1,6 +1,11 @@
 ---
-- hosts: "{{ hostlist | default('slurm-login[0]') }}"
+# The NVIDIA HPC SDK (roles/nvidia_hpc_sdk), installed by the first login node into
+# shared storage. Every host it runs on converges to deepops_components (present there
+# while slurm_install_hpcsdk is on, absent elsewhere: off Lmod and the profile, the tree
+# only where it was installed from).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
     - role: deploy_defaults
-    - nvidia_hpc_sdk
+    - role: nvidia_hpc_sdk
+      hpcsdk_state: "{{ deepops_components.hpcsdk | component_phase(deepops_phase) }}"
