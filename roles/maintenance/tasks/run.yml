@@ -37,9 +37,16 @@
       loop_control:
         loop_var: step
   rescue:
+    # A failed command's msg is generic and a wait that ran out sets none: the reason is
+    # in its stderr, or stdout (the last lines are kept).
     - name: Note why the node failed
+      vars:
+        _result: "{{ ansible_failed_result | default({}) }}"
+        _said: >-
+          {{ [_result.msg | default(''), _result.stderr | default('', true) or _result.stdout | default('')]
+             | map('string') | map('trim') | select | join(': ') or 'failed (rc ' ~ (_result.rc | default('?')) ~ ')' }}
       ansible.builtin.set_fact:
-        maintenance_failure: "{{ ansible_failed_task.name }}: {{ ansible_failed_result.msg | default('failed') }}"
+        maintenance_failure: "{{ ansible_failed_task.name }}: {{ (_said | string).splitlines()[-20:] | join(' / ') }}"
 
 - name: Fail the node, now that its batch is done
   ansible.builtin.fail:
