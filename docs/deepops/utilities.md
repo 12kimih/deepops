@@ -1,7 +1,8 @@
 # Utility playbooks
 
 Playbooks for running a cluster once it is deployed. None of them is imported by
-`playbooks/slurm-cluster.yml`, so each runs only when you mean it to. The configuration
+`playbooks/slurm-cluster.yml` (except `gpu-clocks.yml`, behind a switch), so each runs
+only when you mean it to. The configuration
 playbooks converge and can be re-run; the action playbooks (power, reboot) act every time.
 
 Most take their targets from `-e hostlist=<pattern>`, and it has to come from the command
@@ -37,19 +38,32 @@ reboots each as it empties and returns it to service. See
 | `utilities/netplan.yml` | all | node networking from `netplan_config`, one host at a time; see [netplan.md](netplan.md) |
 | `utilities/default-target.yml` | all | the systemd boot target, from the next boot |
 | `utilities/check-id-consistency.yml` | all | asserts that NIS groups resolve to their pinned GID on every node; read-only |
+| `utilities/fleet-consistency.yml` | slurm-cluster | are the hosts level: running kernel, shared packages, loaded NVIDIA driver, kernel policy sysctls, pending reboots, shared machine-ids; read-only |
+| `utilities/mofed.yml` | all | NVIDIA DOCA-OFED for InfiniBand or RoCE adapters |
+| `utilities/retire-local-accounts.yml` | all | the last step of a move to LDAP: removes the local copies of directory accounts; see [accounts.md](accounts.md) |
+
+## Audits
+
+| Playbook | Default hosts | Does |
+| --- | --- | --- |
+| `utilities/security-audit.yml` | all | read-only security inventory of every host, compared across hosts |
+| `utilities/stale-files.yml` | slurm-cluster | what retired installs left behind and what no package, rule or component claims; changes nothing |
 
 ## GPUs
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `nvidia-software/nvidia-power-limit.yml` | slurm-node | persistent GPU power cap: the GPU model's (`nvidia_power_limit_watts_by_model`) or the host's (`nvidia_power_limit_watts`); a node with neither has its cap removed |
+| `nvidia-software/nvidia-power-limit.yml` | slurm-cluster | persistent GPU power cap: the GPU model's (`nvidia_power_limit_watts_by_model`) or the host's (`nvidia_power_limit_watts`); a node with neither has its cap removed |
 | `utilities/gpu-diag.yml` | slurm-node | GPU burn-in: one node at a time, drain it, run the DCGM diagnostics (`dcgmi diag -r 3`, `-e maintenance_verify_dcgm_level=N`) with the other verify checks, resume; a failing node stays drained |
 | `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS and IOMMU state; read-only |
 | `utilities/disable-acs.yml` | slurm-node | disables PCIe ACS for GPU peer-to-peer, persistently |
+| `utilities/nvidia-driver-switch.yml` | slurm-node | switches the NVIDIA driver branch one node at a time: drain, switch, reboot, verify, resume |
+| `utilities/nvidia-set-gpu-clocks.yml` | slurm-node | locks the GPU clocks to `gpu_clock_lock`, or resets them (`gpu_clock_reset`), on hosts with GPUs; runtime only |
+| `utilities/gpu-clocks.yml` | slurm-node | lets users change application clocks (`nvidia-smi -acp`); `slurm-cluster.yml` runs it when `allow_user_set_gpu_clocks` |
 | `slurm-cluster/nvidia-cuda-toolkit.yml` | all | CUDA toolkits as Lmod modules, installed once into the shared tree |
 
 ## Site tooling
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `slurm-cluster/cluster-tools.yml` | all | site commands, shell defaults, login banner, per-user login limits and shared documentation |
+| `slurm-cluster/cluster-tools.yml` | slurm-cluster | site commands, shell defaults, login banner, per-user login limits and shared documentation |
