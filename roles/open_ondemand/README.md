@@ -14,9 +14,11 @@ What it sets up:
 - **One port, TLS only.** Apache listens only on `open_ondemand_port`, with the
   certificate from the inventory. No port-80 redirect, and the stock sites are
   disabled.
-- **Login through Dex.** At least one Dex connector (usually the cluster's LDAP)
-  is required. Without one, Dex would serve a static `ood@localhost` user, so
-  the role refuses to run.
+- **Login through Dex.** With the cluster's own LDAP (`ldap_suffix`), Dex connects
+  to it by itself: StartTLS against the cluster CA, bound as the `dex` reader whose
+  password `roles/site_secrets` makes (`roles/directory_defaults`). At least one
+  connector is required; without one Dex would serve a static `ood@localhost` user,
+  so the role refuses to run.
 - **Core apps only.** The node proxies (`node_uri`, `rnode_uri`) stay off,
   `host_regex` is never allow-any, and the file browser is limited to
   `open_ondemand_allowlist_paths` (`OOD_ALLOWLIST_PATH`).
@@ -74,7 +76,8 @@ the portal host.
 | `open_ondemand_tls_cert_src` | `''` | TLS certificate chain and key, as files under the inventory (the key vaulted). Required: the portal never serves without TLS. |
 | `open_ondemand_tls_key_src` | `''` |  |
 | `open_ondemand_tls_dir` | `/etc/ssl/open-ondemand` |  |
-| `open_ondemand_dex_connectors` | `[]` | Login: Dex (bundled with OOD) in front of the cluster's LDAP. One or more Dex connectors, as in the OOD docs (type: ldap, id, name, config: {host, bindDN, bindPW, userSearch, groupSearch}). Required: without connectors Dex falls back to a static ood@localhost user, which the role refuses. Vault bindPW. |
+| `open_ondemand_dex_connectors` | `'{{ [open_ondemand_dex_ldap_connector] if ldap_suffix \| length > 0 else [] }}'` | Login: Dex (bundled with OOD) in front of the cluster's own LDAP once the site has one (ldap_suffix): open_ondemand_dex_ldap_connector, which binds as the dex reader whose password roles/site_secrets makes (roles/directory_defaults). Or one or more Dex connectors of your own, as in the OOD docs (type, id, name, config). Required: without a connector Dex falls back to a static ood@localhost user, which the role refuses. |
+| `open_ondemand_dex_ldap_name` | `'{{ open_ondemand_cluster_title }}'` | The name on the login page's button for the cluster's LDAP. |
 | `open_ondemand_oidc_crypto_passphrase` | `''` | mod_auth_openidc's session encryption passphrase; update_ood_portal refuses to run without one. Vault a long random value per site. |
 | `open_ondemand_host_regex` | `({{ (groups[slurm_compute_group] \| default([])) \| map('regex_escape') \| join('\|') }})` | Hosts the portal may proxy to, as a regex. Used only by the node proxies, which stay off (no interactive apps); still never the allow-any default "[^/]+". |
 | `open_ondemand_allowlist_paths` | `[/home]` | Directories the file browser and shell may open (OOD_ALLOWLIST_PATH). Paths outside them are refused. Empty = no restriction, which the role refuses. |

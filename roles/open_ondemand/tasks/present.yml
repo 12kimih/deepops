@@ -28,6 +28,19 @@
       allow-any, an allowlist and a cluster name.
     quiet: true
 
+# Every connector names the server it binds to: the built-in one reads it from the
+# [ldap-server] group, which an inventory may lack while ldap_suffix is set.
+- name: Check every Dex connector has its server
+  ansible.builtin.assert:
+    that: >-
+      open_ondemand_dex_connectors | selectattr('type', 'eq', 'ldap') | map(attribute='config.host')
+      | select('match', '^:|^$') | list | length == 0
+    fail_msg: >-
+      A Dex LDAP connector has no server ({{ open_ondemand_dex_connectors | selectattr('type', 'eq', 'ldap')
+      | map(attribute='config.host') | join(', ') }}): with ldap_suffix set, put the LDAP server in
+      the [ldap-server] inventory group (roles/directory_defaults: ldap_server_names).
+    quiet: true
+
 - name: Add the package repositories
   ansible.builtin.import_tasks: repos.yml
 
