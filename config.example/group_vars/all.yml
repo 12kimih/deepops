@@ -275,6 +275,15 @@ gpu_clock_lock: "1507,1507"
 #docker_dns_servers_strict: false
 docker_storage_options: -s overlay2
 #docker_options: "--bip=192.168.99.1/24"  # example
+# Options of the logging driver (daemon.json log-opts); empty keeps the driver's own.
+#docker_log_opts: {}
+# Unit files or drop-ins for docker.service something else wrote (kubespray's full unit
+# copy, its docker-options.conf passing DOCKER_OPTS): backed up and removed, so the
+# package's unit and daemon.json decide. Move their flags into these settings first; a
+# flag daemon.json also sets stops the deploy, naming the file.
+#docker_retired_unit_files:  # example
+#  - /etc/systemd/system/docker.service
+#  - /etc/systemd/system/docker.service.d/docker-options.conf
 # Enable docker iptables
 # If this isn't set, containers won't have access to the outside net
 # See https://github.com/kubernetes-sigs/kubespray/issues/2002
@@ -550,11 +559,12 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 standalone_container_registry_cache_enable: true
 #standalone_container_registry_port: "5000"
 
-# To configure some set of hosts as insecure registries, list them here.
-# Slurm and K8s cluster playbooks will automatically use the master nodes for
-# these if not specified.
-#docker_insecure_registries: ["<host>:<port>"]  # example
-#docker_registry_mirrors: ["http://<host>:<port>"]  # example
+# Registries Docker pulls from over plain HTTP, and mirrors it tries before Docker Hub
+# (daemon.json, roles/docker). group_vars/slurm-cluster.yml and k8s_cluster.yml point
+# them at the controller's registry cache. Since Docker 29 a loopback registry
+# (localhost:5000) needs listing too.
+#docker_insecure_registries: []
+#docker_registry_mirrors: []
 
 ################################################################################
 # Configuration for NGC-Ready playbook                                         #

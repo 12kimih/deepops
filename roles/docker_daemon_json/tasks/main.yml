@@ -13,6 +13,39 @@
     fail_msg: docker_daemon_json needs docker_daemon_json_owner, a short name such as docker.
     quiet: true
 
+# dockerd will not start with an option both on its command line and in daemon.json, and
+# a restart is when that shows: a unit or drop-in passing flags (a kubespray-era
+# DOCKER_OPTS) stops the run here instead, naming the file.
+- name: Read the files that make up docker.service
+  ansible.builtin.command:
+    argv: [systemctl, show, -P, FragmentPath, -P, DropInPaths, docker.service]
+  register: docker_daemon_json_unit
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Look for options the unit passes as flags that daemon.json also sets
+  ansible.builtin.command:
+    argv: [python3, -I, -c, "{{ lookup('ansible.builtin.file', 'flag-conflicts.py') }}"]
+    stdin: >-
+      {{ {'daemon_json': '/etc/docker/daemon.json', 'keys': docker_daemon_json_keys | list,
+          'units': docker_daemon_json_unit.stdout | default('') | split
+                   | reject('in', docker_daemon_json_retiring) | list} | to_json }}
+  register: docker_daemon_json_flags
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Refuse options set both as a flag and in daemon.json, before writing any
+  ansible.builtin.assert:
+    that: (docker_daemon_json_flags.stdout | from_json).conflicts | length == 0
+    fail_msg: >-
+      dockerd would refuse to start: {{ (docker_daemon_json_flags.stdout | from_json).conflicts | join(', ') }}
+      set both in /etc/docker/daemon.json and on its command line, from
+      {{ (docker_daemon_json_flags.stdout | from_json).files | join(', ') }}. Move those
+      options into the role's settings and name the file in docker_retired_unit_files
+      (roles/docker), which backs it up and removes it.
+    quiet: true
+
 - name: Apply the daemon.json keys of {{ docker_daemon_json_owner }}
   ansible.builtin.command:
     argv: [python3, -I, -c, "{{ lookup('ansible.builtin.file', 'daemon-json.py') }}"]
@@ -24,3 +57,10 @@
   changed_when: docker_daemon_json_result.rc == 10
   failed_when: docker_daemon_json_result.rc not in [0, 10]
   notify: Restart dockerd
+
+- name: Restart dockerd for its changed unit
+  ansible.builtin.debug:
+    msg: The unit files of docker.service changed; dockerd restarts.
+  changed_when: true
+  notify: Restart dockerd
+  when: docker_daemon_json_unit_changed | bool

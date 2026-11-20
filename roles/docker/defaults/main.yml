@@ -102,6 +102,24 @@ docker_live_restore: true
 # https://docs.docker.com/engine/logging/configure/
 docker_log_driver: local
 
+# Registries pulled from over plain HTTP (host:port), and mirrors tried before Docker
+# Hub (URLs); daemon.json insecure-registries and registry-mirrors. Since Docker 29 a
+# loopback registry (localhost:5000) is no longer trusted implicitly: list it too.
+# https://docs.docker.com/reference/cli/dockerd/#insecure-registries
+docker_insecure_registries: []
+docker_registry_mirrors: []
+# Options of the logging driver (daemon.json log-opts), e.g. {max-size: 50m, max-file:
+# "5"}; empty keeps the driver's own (local: 20m, 5 files).
+docker_log_opts: {}
+
+# Unit files or drop-ins for docker.service that something else wrote (a kubespray-era
+# full copy of the unit, a docker-options.conf passing DOCKER_OPTS): named here, each is
+# copied under /var/backups/deepops-docker-units and removed, so the package's unit and
+# daemon.json decide again, and dockerd restarts once. Only what the site names goes: an
+# unnamed file passing a flag daemon.json also sets stops the run instead (dockerd would
+# refuse to start), naming the file. Move its flags into the settings above first.
+docker_retired_unit_files: []
+
 # Kernel limits a container host reaches long before it runs out of CPU or memory.
 # Both are ceilings: raising them permits more and costs nothing while unused. The
 # kernel defaults predate routine container density, which is why container-oriented

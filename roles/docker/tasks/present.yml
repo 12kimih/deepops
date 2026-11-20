@@ -66,6 +66,42 @@
       uses them today. Choose a base outside every prefix in `ip route`.
   when: docker_daemon_options.get("default-address-pools", []) | length > 0
 
+# The unit files the site retires go before daemon.json is written: their flags would
+# make dockerd refuse daemon.json's keys for the same options.
+- name: Retire the unit files the site names
+  when: docker_retired_unit_files | length > 0
+  block:
+    - name: Look for the retired unit files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        get_checksum: false
+      loop: "{{ docker_retired_unit_files }}"
+      register: docker_retired_units
+
+    - name: Keep a copy of each
+      ansible.builtin.copy:
+        src: "{{ item.stat.path }}"
+        dest: "/var/backups/deepops-docker-units/{{ item.stat.path | regex_replace('^/', '') | replace('/', '_') }}"
+        remote_src: true
+        mode: preserve
+      loop: "{{ docker_retired_units.results | selectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Remove them
+      ansible.builtin.file:
+        path: "{{ item.stat.path }}"
+        state: absent
+      loop: "{{ docker_retired_units.results | selectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+      register: docker_retired_removed
+
+    - name: Reload systemd without them
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: docker_retired_removed is changed
+
 # nvidia_container_toolkit and docker_socket_group own other keys in this file; each
 # goes through docker_daemon_json, which also removes a key its owner no longer sets.
 - name: Apply the daemon-wide Docker options
@@ -75,7 +111,13 @@
     docker_daemon_json_owner: docker
     docker_daemon_json_keys: >-
       {{ docker_daemon_options | combine({'live-restore': docker_live_restore | bool})
-         | combine({'log-driver': docker_log_driver} if docker_log_driver | length > 0 else {}) }}
+         | combine({'log-driver': docker_log_driver} if docker_log_driver | length > 0 else {})
+         | combine({'log-opts': docker_log_opts} if docker_log_opts | length > 0 else {})
+         | combine({'insecure-registries': docker_insecure_registries} if docker_insecure_registries | length > 0 else {})
+         | combine({'registry-mirrors': docker_registry_mirrors} if docker_registry_mirrors | length > 0 else {}) }}
+    # dockerd picks up a changed unit only when it restarts.
+    docker_daemon_json_unit_changed: "{{ (docker_retired_removed | default({})) is changed }}"
+    docker_daemon_json_retiring: "{{ docker_retired_unit_files }}"
 
 - name: Raise the kernel limits a container host runs into
   ansible.builtin.include_role:
