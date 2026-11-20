@@ -78,6 +78,15 @@
 - name: Apply the OS update policy
   import_playbook: generic/os-updates.yml
 
+- name: Configure the OpenSSH server
+  import_playbook: generic/sshd.yml
+
+- name: Ban repeated failed logins
+  import_playbook: generic/fail2ban.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: install
+
 - name: Configure hostnames, /etc/hosts
   import_playbook: generic/hosts.yml
 
@@ -441,6 +450,12 @@
     deepops_phase: remove
 
 # Only where the site named chrony in deepops_component_removals (the OS time sync takes over).
+- name: Remove fail2ban where it is no longer wanted
+  import_playbook: generic/fail2ban.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+
 - name: Hand time sync back to the OS where chrony is no longer wanted
   import_playbook: generic/chrony-client.yml
   vars:

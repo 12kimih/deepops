@@ -1,0 +1,10 @@
+---
+# Removing it lifts every ban.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: fail2ban
+    component_record_action: absent
+    component_record_items: "{{ fail2ban_items }}"
+    component_record_exclusive_packages: [fail2ban]

@@ -1,0 +1,18 @@
+---
+# A host set up by hand, as the site's were: jail.conf copied to jail.local and edited.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: [fail2ban, openssh-server]
+        state: present
+        update_cache: true
+
+    - name: Copy jail.conf to jail.local
+      ansible.builtin.copy:
+        src: /etc/fail2ban/jail.conf
+        dest: /etc/fail2ban/jail.local
+        remote_src: true
+        mode: "0644"

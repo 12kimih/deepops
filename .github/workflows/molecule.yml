@@ -12,6 +12,7 @@ jobs:
         deepops-role:
           - cachefilesd
           - facts
+          - fail2ban
           - kerberos_client
           - ldap_server
           - lmod
@@ -24,6 +25,7 @@ jobs:
           - package_repos
           - mofed
           - spack
+          - sshd
           # Excluded from Docker CI (require systemd services that can't
           # run in containers): nis_client, rsyslog_client, rsyslog_server,
           # slurm. Tested end-to-end on real MAAS VMs instead.

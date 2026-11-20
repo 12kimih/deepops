@@ -1,0 +1,33 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Compare sshd_config with the package's
+      ansible.builtin.command:
+        argv: [cmp, /etc/ssh/sshd_config, /usr/share/openssh/sshd_config]
+      changed_when: false
+
+    - name: Read the effective settings
+      ansible.builtin.command:
+        argv: [sshd, -T]
+      register: sshd_effective
+      changed_when: false
+
+    - name: Check the site's settings take effect
+      ansible.builtin.assert:
+        that:
+          - "'port 22' in sshd_effective.stdout_lines"
+          - "'port 2222' in sshd_effective.stdout_lines"
+          - "'logingracetime 20' in sshd_effective.stdout_lines"
+          - "'x11forwarding no' in sshd_effective.stdout_lines"
+        fail_msg: "{{ sshd_effective.stdout_lines | select('match', '^(port|logingracetime|x11forwarding) ') | list }}"
+
+    - name: Check sshd answers on both ports
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ item }}"
+        timeout: 10
+        search_regex: SSH-2.0
+      loop: [22, 2222]

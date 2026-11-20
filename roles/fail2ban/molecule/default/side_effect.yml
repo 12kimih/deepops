@@ -1,0 +1,32 @@
+---
+# Removal takes fail2ban and its settings; then present brings it back for verify.
+- name: Remove fail2ban
+  hosts: all
+  become: true
+  roles:
+    - role: fail2ban
+      fail2ban_state: absent
+
+- name: Check it is gone
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the package status
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, '${db:Status-Abbrev}', fail2ban]
+      register: fail2ban_pkg
+      changed_when: false
+      failed_when: false
+
+    - name: Check the package and the drop-in went
+      ansible.builtin.assert:
+        that: fail2ban_pkg.stdout is not match('.i')
+        fail_msg: "fail2ban is still installed ({{ fail2ban_pkg.stdout }})"
+
+- name: Bring it back
+  hosts: all
+  become: true
+  roles:
+    - role: fail2ban
+      fail2ban_state: present

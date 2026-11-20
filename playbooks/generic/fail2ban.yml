@@ -1,0 +1,11 @@
+---
+# fail2ban: present where deepops_components says so (slurm_enable_fail2ban,
+# kube_enable_fail2ban), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: fail2ban
+      fail2ban_state: "{{ deepops_components.fail2ban | component_phase(deepops_phase) }}"
+  tags:
+    - fail2ban

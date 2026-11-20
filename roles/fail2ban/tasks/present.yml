@@ -1,0 +1,73 @@
+---
+- name: Check the platform
+  ansible.builtin.assert:
+    that: ansible_facts.os_family == "Debian"
+    fail_msg: roles/fail2ban supports the Debian family (its defaults are Debian's jail.d).
+    quiet: true
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: fail2ban
+    component_record_action: begin
+    component_record_items: "{{ fail2ban_items }}"
+
+- name: Install fail2ban
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Write the site's settings
+  ansible.builtin.template:
+    src: deepops.local.j2
+    dest: "{{ fail2ban_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+# Evidence only: a jail.local a site wrote for itself stays.
+- name: Look for jail.local
+  ansible.builtin.stat:
+    path: /etc/fail2ban/jail.local
+  register: fail2ban_local
+
+- name: Read whether it is a copy of jail.conf
+  ansible.builtin.command:
+    argv: [grep, -qF, "{{ fail2ban_copied_jail_local }}", /etc/fail2ban/jail.local]
+  register: fail2ban_copy
+  changed_when: false
+  failed_when: fail2ban_copy.rc > 1
+  check_mode: false  # read-only; --check needs the result
+  when: fail2ban_local.stat.exists
+
+- name: Remove the copy, which overrides every default
+  ansible.builtin.file:
+    path: /etc/fail2ban/jail.local
+    state: absent
+  when: fail2ban_local.stat.exists and fail2ban_copy.rc == 0
+  notify: Restart fail2ban
+
+# Before the restart: a configuration fail2ban refuses would stop it banning at all.
+- name: Let fail2ban check the configuration
+  ansible.builtin.command:
+    argv: [fail2ban-client, --test]
+  changed_when: false
+  when: not ansible_check_mode  # under --check it may not be installed yet
+
+- name: Run fail2ban
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    enabled: true
+    state: started
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: fail2ban
+    component_record_action: present
+    component_record_items: "{{ fail2ban_items }}"

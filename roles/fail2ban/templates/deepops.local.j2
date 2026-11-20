@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# roles/fail2ban: the site's settings over the distribution's (jail.d/*.conf), read after
+# jail.local.
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1{% for address in fail2ban_ignoreip %} {{ address }}{% endfor %}
+
+{% for key, value in fail2ban_settings | dictsort %}
+{{ key }} = {{ value }}
+{% endfor %}
+
+# A banned address is cut off from every port, not only sshd's.
+[sshd]
+enabled = true
+banaction = %(banaction_allports)s
