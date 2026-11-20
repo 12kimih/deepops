@@ -1,13 +1,4 @@
 ---
-# Forwarding the Slurm logs is roles/rsyslog_client's (rsyslog_client_forward_files): this
-# file fed them into the local syslog as well, a second copy of every line.
-- name: Remove the Slurm log import into the local syslog
-  ansible.builtin.file:
-    path: /etc/rsyslog.d/99-slurm.conf
-    state: absent
-  notify:
-    - Restart rsyslog
-
 - name: Rotate the slurm logs
   ansible.builtin.template:
     src: "etc/logrotate.d/slurm"
