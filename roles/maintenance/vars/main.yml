@@ -1,0 +1,13 @@
+---
+# The jobs that still hold this node (vocab.JOB_HOLDS: running, suspended, stopped,
+# completing...), one ID per line: the drain waits for none, a change that breaks jobs
+# refuses while any is left.
+maintenance_node_jobs_argv:
+  - "{{ maintenance_slurm_bin }}/squeue"
+  - -h
+  - -t
+  - "{{ 'holding' | slurm_job_states | join(',') }}"
+  - -w
+  - "{{ inventory_hostname }}"
+  - -o
+  - "%i"

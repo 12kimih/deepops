@@ -15,7 +15,9 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+sys.path.insert(0, str(ROOT / "plugins" / "filter"))
 from repo_files import tracked  # noqa: E402
+from slurm_node import FilterModule  # noqa: E402  (the repository's filters the templates use)
 
 
 def role_defaults(*names):
@@ -80,6 +82,7 @@ def main():
         trim_blocks=True,
         autoescape=False,
     )
+    env.filters.update(FilterModule().filters())
     rendered = env.get_template(template_path.lstrip("/")).render(slurm_epilog_cleanup_scope=scope, **VARS)
 
     with open(output_path, "w") as handle:

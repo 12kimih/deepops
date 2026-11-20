@@ -135,9 +135,12 @@ JOB_CODES = {
     "STAGE_OUT": "SO",
     "REVOKED": "RV",
 }
-# States that still own their allocation. A finished job keeps a stale allocation
-# until the controller forgets it, so counting every allocation over-counts.
-_HOLDS = frozenset(
+# States that still own their allocation (and so its node: its processes, memory and
+# files). A finished job keeps a stale allocation until the controller forgets it, so
+# counting every allocation over-counts. Ansible reads it through the slurm_job_states
+# filter (plugins/filter/slurm_node.py): the maintenance drain and the epilog's
+# last-user-job check ask squeue for exactly these.
+JOB_HOLDS = frozenset(
     ("RUNNING", "COMPLETING", "CONFIGURING", "RESIZING", "SIGNALING", "SUSPENDED", "STOPPED", "STAGE_OUT")
 )
 _FINISHED = frozenset(
@@ -167,7 +170,7 @@ def job_code(state):
 
 def job_holds(state):
     """Does a job in this state still own its allocation?"""
-    return bool(_HOLDS & {f.upper() for f in state or []})
+    return bool(JOB_HOLDS & {f.upper() for f in state or []})
 
 
 def job_active(state):

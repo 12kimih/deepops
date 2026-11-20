@@ -32,7 +32,7 @@
 
 - name: Wait for the jobs on the node to finish
   ansible.builtin.command:
-    argv: ["{{ maintenance_slurm_bin }}/squeue", -h, -t, "RUNNING,COMPLETING,SUSPENDED", -w, "{{ inventory_hostname }}", -o, "%i"]
+    argv: "{{ maintenance_node_jobs_argv }}"
   delegate_to: "{{ maintenance_slurm_delegate }}"
   register: maintenance_jobs
   until: maintenance_jobs.stdout | trim | length == 0
