@@ -246,6 +246,9 @@ nfs_mounts:
 # first slurm-master installs them into the shared tree, visible on every node, and
 # turning it off removes them from there:
 #slurm_install_cuda_toolkit: false
+# Instead, one system-wide toolkit from NVIDIA's repository on every host (cuda_version
+# in all.yml; playbooks/nvidia-software/nvidia-cuda.yml):
+#slurm_install_cuda: false
 # Offered: the newest patch of every CUDA minor from cuda_toolkit_oldest up to the
 # newest the driver branch runs, from the role's catalog (regenerated with
 # scripts/deepops/cuda_releases.py when NVIDIA releases). A minor that leaves the

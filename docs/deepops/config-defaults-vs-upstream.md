@@ -10,7 +10,7 @@ code). Values you set in your own gitignored `config/` always win over these.
 | Setting | Upstream | This fork | Why |
 |---|---|---|---|
 | `slurm_cluster_install_nvidia_driver` | `yes` | `true` | driver on by default (GPU-gated, so CPU nodes skip it) |
-| `nvidia_cuda_install` (replaces upstream `slurm_cluster_install_cuda`) | `yes` | `false` | CUDA served as per-version Lmod modules (`nvidia_cuda_toolkit`) instead of one system CUDA |
+| `slurm_install_cuda` (replaces upstream `slurm_cluster_install_cuda`) | `yes` | `false` | CUDA served as per-version Lmod modules (`nvidia_cuda_toolkit`) instead of one system CUDA |
 | `slurm_install_hpcsdk` | `true` | `false` | opt-in; most sites don't need the full HPC SDK |
 | `slurm_install_nhc` | `yes` | `true` | unchanged intent; boolean normalized |
 

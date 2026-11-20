@@ -1,7 +1,7 @@
 ---
-# Install the system-wide CUDA toolkit (off by default). Leave false to skip it, e.g.
-# when CUDA is provided per-version through Lmod/environment modules instead.
-nvidia_cuda_install: false
+# present, absent or kept (docs/deepops/component-state.md); the playbook sets it from
+# slurm_install_cuda (roles/deploy_defaults).
+cuda_state: present
 
 # The newest toolkit of the CUDA major the driver branch serves (nvidia_versions):
 # the unversioned cuda-toolkit would follow NVIDIA's newest release past what the

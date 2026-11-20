@@ -1,15 +1,14 @@
 ---
-# Install the NVIDIA CUDA toolkit. The driver is nvidia-driver.yml's (run it first).
+# One system-wide NVIDIA CUDA toolkit from NVIDIA's repository (roles/nvidia_cuda). The
+# driver is nvidia-driver.yml's (run it first).
 #
-# The role installs it only with nvidia_cuda_install: true (its default is false, for
-# CUDA served per-version through Lmod/environment modules).
-- hosts: all
+# Every host it runs on converges to deepops_components: present while
+# slurm_install_cuda is on (off by default, for CUDA served per minor as modules:
+# slurm-cluster/nvidia-cuda-toolkit.yml), its package and profile script removed when off.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
   become: true
   roles:
-    - role: proxy_defaults
-  tasks:
-    - name: Install the NVIDIA CUDA toolkit
-      ansible.builtin.include_role:
-        name: nvidia_cuda
-        public: true  # nvidia_versions (a dependency) supplies its values
+    - role: deploy_defaults
+    - role: nvidia_cuda
+      cuda_state: "{{ deepops_components.cuda | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"

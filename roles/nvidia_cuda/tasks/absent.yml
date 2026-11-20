@@ -1,0 +1,12 @@
+---
+# The toolkit package this role installs (what it pulled in goes with it,
+# roles/host_baseline) and the profile script; adopted where installed before the
+# record. Only that package name: a toolkit installed by hand under another stays.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cuda
+    component_record_action: absent
+    component_record_items: "{{ ['package:' ~ cuda_version, 'file:/etc/profile.d/cuda-vars.sh'] }}"
+    component_record_exclusive_packages: ["{{ cuda_version }}"]

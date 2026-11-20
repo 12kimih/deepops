@@ -1,0 +1,6 @@
+---
+# What the component installs, for its record (roles/component_record): the toolkit
+# package (DGX OS's is by model and stays DGX OS's) and the profile script.
+cuda_items: >-
+  {{ ([] if is_dgx.stat.exists | default(false) else ['package:' ~ cuda_version])
+     + (['file:/etc/profile.d/cuda-vars.sh'] if cuda_toolkit_add_profile_script | bool else []) }}

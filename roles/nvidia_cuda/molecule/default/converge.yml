@@ -5,3 +5,4 @@
     - name: "Include nvidia_cuda"
       ansible.builtin.include_role:
         name: "nvidia_cuda"
+        public: true  # component_record reads deepops_paths' values

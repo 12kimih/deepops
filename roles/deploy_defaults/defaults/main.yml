@@ -39,6 +39,9 @@ slurm_install_nhc: true
 slurm_cluster_install_openmpi: false
 slurm_install_lmod: true
 slurm_install_hpcsdk: false
+# One system-wide CUDA toolkit from NVIDIA's repository on every host (roles/nvidia_cuda);
+# leave off where CUDA is served per minor as modules (slurm_install_cuda_toolkit)
+slurm_install_cuda: false
 # CUDA toolkits from NVIDIA's runfiles as `module load cuda/<minor>` (roles/
 # nvidia_cuda_toolkit): about 8 GB of shared software tree per CUDA minor
 slurm_install_cuda_toolkit: false

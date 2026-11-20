@@ -70,9 +70,10 @@
   vars:
     deepops_phase: install
 
-# The role installs it only with nvidia_cuda_install: true, its one switch.
-- name: Install NVIDIA CUDA Toolkit
+- name: Install the system-wide CUDA toolkit
   import_playbook: nvidia-software/nvidia-cuda.yml
+  vars:
+    deepops_phase: install
 
 - name: Install software
   import_playbook: generic/software.yml
@@ -405,6 +406,11 @@
 
 - name: Remove the DCGM exporter where it is no longer wanted
   import_playbook: slurm-cluster/nvidia-dcgm-exporter.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the system-wide CUDA toolkit where it is no longer wanted
+  import_playbook: nvidia-software/nvidia-cuda.yml
   vars:
     deepops_phase: remove
 

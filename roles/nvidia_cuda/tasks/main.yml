@@ -1,36 +1,18 @@
 ---
+# One system-wide CUDA toolkit from NVIDIA's repository (present.yml). DGX systems keep
+# DGX OS's own: there it is installed by model, never removed.
+- name: Check the component state
+  ansible.builtin.assert:
+    that: cuda_state in ['present', 'absent', 'kept']
+    fail_msg: "cuda_state must be present, absent or kept, not {{ cuda_state }}."
+    quiet: true
+
 - name: Check if we are running on DGX
   ansible.builtin.stat:
-    path: "/etc/dgx-release"
+    path: /etc/dgx-release
   register: is_dgx
+  when: cuda_state != 'kept'
 
-- name: DGX install tasks
-  ansible.builtin.include_tasks: install-dgx.yml
-  when:
-    - nvidia_cuda_install | bool
-    - is_dgx.stat.exists
-
-- name: Ubuntu install tasks
-  ansible.builtin.include_tasks: install-ubuntu.yml
-  when:
-    - nvidia_cuda_install | bool
-    - ansible_facts.distribution == "Ubuntu"
-    - not is_dgx.stat.exists
-
-- name: RedHat family install tasks
-  ansible.builtin.include_tasks: install-redhat.yml
-  when:
-    - nvidia_cuda_install | bool
-    - ansible_facts.os_family == "RedHat"
-    - not is_dgx.stat.exists
-
-- name: Add profile script to set environment for toolkit
-  ansible.builtin.copy:
-    src: "cuda-vars.sh"
-    dest: "/etc/profile.d/cuda-vars.sh"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  when:
-    - nvidia_cuda_install | bool
-    - cuda_toolkit_add_profile_script | bool
+- name: "Make the CUDA toolkit {{ cuda_state }}"
+  ansible.builtin.include_tasks: "{{ cuda_state }}.yml"
+  when: cuda_state != 'kept' and (cuda_state == 'present' or not is_dgx.stat.exists)
