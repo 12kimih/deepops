@@ -1,0 +1,20 @@
+---
+# The cap goes the way an empty wattage takes it off, GPUs back on their defaults; then
+# the record drops the component.
+- name: Check for nvidia-smi
+  ansible.builtin.command: which nvidia-smi
+  register: nvidia_power_limit_smi
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Take the cap off
+  ansible.builtin.include_tasks: uncap.yml
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nvidia_power_limit
+    component_record_action: absent
+    component_record_items: "{{ nvidia_power_limit_items }}"

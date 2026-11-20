@@ -1,4 +1,9 @@
 ---
+# The GPU power limit as a component: present, absent or kept (do nothing). A deploy sets
+# it from deepops_components (slurm_cluster_configure_gpu_power_limit, on slurm-node);
+# absent takes any cap off as an empty wattage does and drops the record.
+nvidia_power_limit_state: present
+
 # Target GPU power limit in watts, applied to *every* NVIDIA GPU on the node with
 # `nvidia-smi -pl <watts>`. There is deliberately no usable default: the range is
 # card-specific (an H100 SXM defaults to 700W, an L40S to 350W, ...) and the useful

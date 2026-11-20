@@ -1,0 +1,58 @@
+---
+# Takes the cap off: the unit and its configuration go, and each GPU is put back on its
+# own default limit when this removed a cap (present with no wattage, and absent).
+- name: Read the current and supported GPU power limits
+  ansible.builtin.command:
+    cmd: >-
+      systemd-run --wait --pipe --collect --quiet --
+      nvidia-smi
+      --query-gpu=index,power.limit,power.default_limit,power.min_limit,power.max_limit
+      --format=csv,noheader,nounits
+  register: nvidia_power_limit_readings
+  changed_when: false
+  check_mode: false
+  when: nvidia_power_limit_smi.rc == 0
+
+- name: Look for a power-limit unit left behind by an earlier run
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+  register: nvidia_power_limit_unit
+
+# daemon_reload so a unit file that was dropped in but never loaded is still
+# known to systemd when it is stopped.
+- name: Stop and disable the GPU power-limit service
+  ansible.builtin.systemd:
+    name: "{{ nvidia_power_limit_service_name }}"
+    state: stopped
+    enabled: false
+    daemon_reload: true
+  when: nvidia_power_limit_unit.stat.exists
+
+# The conf file goes with the unit: left behind, it would keep telling the Slurm
+# prolog/epilog that this node is capped.
+- name: Remove the GPU power-limit unit and configuration
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+    - "{{ nvidia_power_limit_conf_file }}"
+  register: nvidia_power_limit_removed
+  notify: Reload systemd
+
+# Removing the unit only stops the cap coming back at boot; the running driver
+# keeps its limit until reset here, per GPU against that card's own default.
+# Only when this run removed a cap: otherwise the limits are a job's (the
+# exclusive-job prolog raises them to the maximum), and a routine run would
+# lower them mid-job.
+- name: Reset each GPU to its default power limit
+  ansible.builtin.command:
+    cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
+  loop: "{{ nvidia_power_limit_readings.stdout_lines | default([]) }}"
+  when:
+    - nvidia_power_limit_removed is changed
+    - item.split(',')[1] | trim is regex('^[0-9.]+$')
+    - item.split(',')[2] | trim is regex('^[0-9.]+$')
+    - (item.split(',')[1] | trim | float) != (item.split(',')[2] | trim | float)
+  loop_control:
+    label: "GPU {{ item.split(',')[0] | trim }}: {{ item.split(',')[1] | trim }}W -> default {{ item.split(',')[2] | trim }}W"

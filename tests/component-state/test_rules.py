@@ -84,7 +84,6 @@ GATES = {
     "slurm_install_hpcsdk": "pending: deepops (batch 3)",
     "slurm_install_enroot": "pending: deepops (batch 3)",
     "slurm_install_pyxis": "pending: deepops (batch 3)",
-    "slurm_cluster_configure_gpu_power_limit": "pending: deepops (batch 3)",
     "slurm_enable_dns_resolver": "pending: deepops (with egress_policy's resolver)",
     # The GPU Operator's switch also gates the driver and the toolkit on Kubernetes nodes.
     "deepops_gpu_operator_enabled": "pending: deepops (the driver and toolkit gates, with batch 3)",

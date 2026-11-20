@@ -1,0 +1,12 @@
+---
+# A capped node whose component goes absent: the cap comes off even though a wattage is
+# still configured, and the record drops it.
+- name: Converge
+  hosts: all
+  vars:
+    nvidia_power_limit_watts: 450
+    nvidia_power_limit_state: absent
+  tasks:
+    - name: "Include nvidia_power_limit"
+      ansible.builtin.include_role:
+        name: "nvidia_power_limit"
