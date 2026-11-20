@@ -49,12 +49,13 @@ ldap_ca_name: ldap
 ldap_ca_file: /etc/ldap/deepops-ca.crt
 
 # Read-only accounts that search the directory: nothing is readable without one
-# (anonymous binds see nothing). sssd is every node's; add dex for Open OnDemand's login.
+# (anonymous binds see nothing). sssd is every node's; dex is Open OnDemand's login,
+# there whenever the portal is (slurm_install_open_ondemand).
 # Each one's password is a file in the site config, made when missing (roles/
 # site_secrets, vaulted; authentication.yml's first play) and set in the directory from
 # there, so none is ever typed or chosen. A lost file is made again and the directory and
 # the clients follow on the next run.
-ldap_readers: [sssd]
+ldap_readers: "{{ ['sssd'] + (['dex'] if slurm_install_open_ondemand | bool else []) }}"
 ldap_secrets_dir: "{{ inventory_dir }}/files/ldap"
 # reader -> password, as the roles read them.
 ldap_reader_passwords: >-

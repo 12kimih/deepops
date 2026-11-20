@@ -40,11 +40,14 @@ open_ondemand_tls_cert_src: ""
 open_ondemand_tls_key_src: ""
 open_ondemand_tls_dir: /etc/ssl/open-ondemand
 
-# Login: Dex (bundled with OOD) in front of the cluster's LDAP. One or more Dex
-# connectors, as in the OOD docs (type: ldap, id, name, config: {host, bindDN, bindPW,
-# userSearch, groupSearch}). Required: without connectors Dex falls back to a static
-# ood@localhost user, which the role refuses. Vault bindPW.
-open_ondemand_dex_connectors: []
+# Login: Dex (bundled with OOD) in front of the cluster's own LDAP once the site has one
+# (ldap_suffix): open_ondemand_dex_ldap_connector, which binds as the dex reader whose
+# password roles/site_secrets makes (roles/directory_defaults). Or one or more Dex
+# connectors of your own, as in the OOD docs (type, id, name, config). Required: without
+# a connector Dex falls back to a static ood@localhost user, which the role refuses.
+open_ondemand_dex_connectors: "{{ [open_ondemand_dex_ldap_connector] if ldap_suffix | length > 0 else [] }}"
+# The name on the login page's button for the cluster's LDAP.
+open_ondemand_dex_ldap_name: "{{ open_ondemand_cluster_title }}"
 # mod_auth_openidc's session encryption passphrase; update_ood_portal refuses to run
 # without one. Vault a long random value per site.
 open_ondemand_oidc_crypto_passphrase: ""

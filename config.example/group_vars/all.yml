@@ -416,9 +416,10 @@ docker_iptables_enabled: true
 # The names the server's certificate carries; clients use the first. Default: its
 # inventory name.
 #ldap_server_names: ["{{ ldap_server_host }}"]
-# Read-only accounts that search the directory; add dex for Open OnDemand's login.
-# Their passwords are files under ldap_secrets_dir, made (vaulted) when missing.
-#ldap_readers: [sssd]
+# Read-only accounts that search the directory: sssd, and dex while the Open OnDemand
+# portal is on. Their passwords are files under ldap_secrets_dir, made (vaulted) when
+# missing.
+#ldap_readers: "{{ ['sssd'] + (['dex'] if slurm_install_open_ondemand | bool else []) }}"
 #ldap_secrets_dir: "{{ inventory_dir }}/files/ldap"
 #
 # Groups every directory publishes under one GID on every node. Anything that has to

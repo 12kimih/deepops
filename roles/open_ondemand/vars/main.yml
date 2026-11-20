@@ -42,3 +42,35 @@ open_ondemand_legacy_items:
   - package:ondemand-release-web-latest
 # The packages the per-run check verifies.
 open_ondemand_verified_packages: [ondemand, ondemand-dex, ondemand-nginx, ondemand-passenger, nodejs]
+
+# Dex's connector to the cluster's LDAP (roles/directory_defaults, docs/deepops/accounts.md;
+# https://dexidp.io/docs/connectors/ldap/): StartTLS on 389 against the cluster's own CA,
+# bound as the dex reader. The people tree gives the login (uid) as the email claim too:
+# the portal maps that claim to the local account, and the directory has no mail. People
+# who left have no password and an expired account, so their binds fail.
+open_ondemand_dex_ldap_connector:
+  type: ldap
+  id: ldap
+  name: "{{ open_ondemand_dex_ldap_name }}"
+  config:
+    host: "{{ ldap_server_names | first }}:389"
+    startTLS: true
+    rootCA: "{{ ldap_ca_file }}"
+    bindDN: "{{ 'dex' | ldap_reader_dn(ldap_suffix) }}"
+    bindPW: "{{ ldap_reader_passwords.dex }}"
+    usernamePrompt: Username
+    userSearch:
+      baseDN: "ou=people,{{ ldap_suffix }}"
+      filter: "(objectClass=posixAccount)"
+      username: uid
+      idAttr: uid
+      emailAttr: uid
+      nameAttr: cn
+      preferredUsernameAttr: uid
+    groupSearch:
+      baseDN: "ou=groups,{{ ldap_suffix }}"
+      filter: "(objectClass=posixGroup)"
+      userMatchers:
+        - userAttr: uid
+          groupAttr: memberUid
+      nameAttr: cn

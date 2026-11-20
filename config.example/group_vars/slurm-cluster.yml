@@ -510,24 +510,12 @@ rsyslog_client_tcp_host: "{{ groups['slurm-master'][0] }}"
 #open_ondemand_tls_cert_src: "{{ inventory_dir }}/files/tls/portal.fullchain.pem"  # example
 #open_ondemand_tls_key_src: "{{ inventory_dir }}/files/tls/portal.key"  # example
 
-# Login through Dex in front of the cluster's LDAP (required). Vault bindPW and the
-# passphrase (32+ random characters).
-#open_ondemand_dex_connectors:  # example
-#  - type: ldap
-#    id: ldap
-#    name: Cluster account
-#    config:
-#      host: ldap.example.com:636
-#      bindDN: cn=ood,ou=services,dc=example,dc=com
-#      bindPW: "{{ vault_open_ondemand_ldap_bind_password }}"
-#      userSearch:
-#        baseDN: ou=people,dc=example,dc=com
-#        filter: (objectClass=posixAccount)
-#        username: uid
-#        idAttr: uid
-#        emailAttr: mail
-#        nameAttr: cn
-#        preferredUsernameAttr: uid
+# Login through Dex (required). With the cluster's own LDAP (ldap_suffix) the role
+# connects to it by itself (roles/open_ondemand: open_ondemand_dex_ldap_connector, the
+# dex reader's password made by roles/site_secrets); set connectors only for another
+# identity source. Vault the passphrase (32+ random characters).
+#open_ondemand_dex_connectors: "{{ [open_ondemand_dex_ldap_connector] if ldap_suffix | length > 0 else [] }}"
+#open_ondemand_dex_ldap_name: "{{ open_ondemand_cluster_title }}"
 #open_ondemand_oidc_crypto_passphrase: "{{ vault_open_ondemand_oidc_crypto_passphrase }}"  # example
 
 # Directories the file browser and shell may open.
