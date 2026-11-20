@@ -48,9 +48,10 @@
     enabled: true
     daemon_reload: true
 
-# The MySQL modules moved to ansible.mysql; community.mysql 5.x only redirects there.
+# The database is MariaDB, whose modules are ansible.mariadb's (ansible.mysql warns
+# that it drops MariaDB in 6.0.0).
 - name: Setup slurm db user
-  ansible.mysql.mysql_user:
+  ansible.mariadb.mariadb_user:
     name: "{{ slurm_db_username }}"
     password: "{{ slurm_db_password }}"
     host: localhost
@@ -60,7 +61,6 @@
     # root@localhost uses unix_socket auth by default. Path is OS-specific.
     login_user: root
     login_unix_socket: "{{ '/var/run/mysqld/mysqld.sock' if ansible_facts.os_family == 'Debian' else '/var/lib/mysql/mysql.sock' }}"
-    column_case_sensitive: true
   become: true
 
 
