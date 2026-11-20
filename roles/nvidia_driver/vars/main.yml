@@ -41,7 +41,10 @@ _nvidia_driver_packages:
     - nvidia-xconfig*
     - nvidia-libXNVCtrl*
     - nvidia-fabricmanager*
+    - nvidia-fabric-manager*
     - libnvidia-nscq*
+    - nvidia-imex*
+    - libnvsdm*
 nvidia_driver_packages_owned: "{{ _nvidia_driver_packages[ansible_facts.os_family] | default([]) }}"
 nvidia_driver_items: >-
   {{ nvidia_driver_packages_owned | map('regex_replace', '^', 'package:') | list
