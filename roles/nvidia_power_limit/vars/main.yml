@@ -1,8 +1,15 @@
 ---
-# What the component installs, for its record (roles/component_record): the unit and
-# the wattage file only while a wattage is set, so taking it out removes them.
-nvidia_power_limit_items: >-
-  {{ ['unit:' ~ nvidia_power_limit_service_name,
-      'file:/etc/systemd/system/' ~ nvidia_power_limit_service_name,
-      'file:' ~ nvidia_power_limit_conf_file]
-     if nvidia_power_limit_watts | string | trim | length > 0 else [] }}
+# What the component installs, for its record (roles/component_record). Without a cap
+# the role takes the unit and the file away itself (tasks/uncap.yml).
+nvidia_power_limit_items:
+  - "unit:{{ nvidia_power_limit_service_name }}"
+  - "file:/etc/systemd/system/{{ nvidia_power_limit_service_name }}"
+  - "file:{{ nvidia_power_limit_conf_file }}"
+
+# The caps of this node's GPU models ("" for a model the site does not cap), once each.
+_nvidia_power_limit_models: "{{ nvidia_power_limit_models.stdout_lines | default([]) | map('trim') | unique | list }}"
+_nvidia_power_limit_caps: >-
+  {{ (nvidia_power_limit_watts_by_model | dict2items | selectattr('key', 'in', _nvidia_power_limit_models)
+      | map(attribute='value') | map('string') | list
+      + ([''] if _nvidia_power_limit_models | reject('in', nvidia_power_limit_watts_by_model) | list | length > 0 else []))
+     | unique | list }}

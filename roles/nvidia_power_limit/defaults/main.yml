@@ -11,18 +11,24 @@ nvidia_power_limit_state: present
 # inside every GPU's supported Min/Max range before doing anything.
 # Read the range a card actually supports with: nvidia-smi -q -d POWER
 #
-# Set it wherever it makes sense for your layout:
-#   * cluster-wide  -> config/group_vars/all.yml
-#   * per group     -> config/group_vars/slurm-node.yml    (nvidia_power_limit_watts: 450)
+# A node's own cap, overriding its GPU model's (nvidia_power_limit_watts_by_model below,
+# the usual way: one entry per model covers every node with it):
 #   * per host      -> config/host_vars/<hostname>.yml     (nvidia_power_limit_watts: 400)
+#   * per group     -> config/group_vars/<group>.yml
 #   * ad hoc        -> -e nvidia_power_limit_watts=450 on the command line
-# Per-host/per-group values are how you cap only *specific* compute nodes.
 #
-# LEFT EMPTY the role REMOVES the cap: it deletes the systemd unit and puts every GPU
+# With neither, the role REMOVES the cap: it deletes the systemd unit and puts every GPU
 # back on its own default limit. A run over a whole group is therefore declarative, so
 # an ad-hoc `-e nvidia_power_limit_watts=...` value does not survive -- write it into
 # config/ or the next cluster run undoes it.
 nvidia_power_limit_watts: ""    # e.g. 450
+
+# The site's cap per GPU model, by the name nvidia-smi reports: every node whose GPUs
+# are that model is capped, so a node added later needs no entry of its own. A node's
+# nvidia_power_limit_watts (host or group) overrides it; a model not listed is uncapped.
+#   nvidia_power_limit_watts_by_model:
+#     "NVIDIA A30": 150
+nvidia_power_limit_watts_by_model: {}
 
 # Name of the systemd unit installed under /etc/systemd/system/. It re-applies the cap
 # on every boot (nvidia-smi resets the power limit to the card default across a reboot

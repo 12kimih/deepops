@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    nvidia_power_limit_watts_by_model:
+      "NVIDIA A30": 450
+      "NVIDIA A10": 150
+  tasks:
+    - name: "Include nvidia_power_limit"
+      ansible.builtin.include_role:
+        name: "nvidia_power_limit"

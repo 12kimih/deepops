@@ -2,15 +2,17 @@
 # Set (and persist across reboots) the NVIDIA GPU power limit on compute nodes.
 #
 # nvidia-smi resets the power limit to the card default on every boot, so this installs
-# a small oneshot systemd unit (nvidia-power-limit.service) that re-applies the cap --
-# and, optionally, persistence mode -- at boot. See roles/nvidia_power_limit.
+# a small oneshot systemd unit (nvidia-power-limit.service) that re-applies the cap at
+# boot, before slurmd. See roles/nvidia_power_limit.
 #
-# The role converges in both directions: a node with no nvidia_power_limit_watts has any
-# cap REMOVED and its GPUs put back on their default limit. Running this over a whole
-# group is therefore declarative, and slurm-cluster.yml runs it that way. Cap specific
-# nodes by setting the wattage per host or group:
+# The cap comes from the GPU model (nvidia_power_limit_watts_by_model, the name
+# nvidia-smi reports), or from a host's own nvidia_power_limit_watts, which overrides
+# it. A node with neither has any cap REMOVED and its GPUs put back on their default
+# limit, so running this over a whole group is declarative:
 #
-#   # config/host_vars/<node>:  nvidia_power_limit_watts: 450
+#   # config/group_vars/all.yml
+#   nvidia_power_limit_watts_by_model:
+#     "NVIDIA A30": 150
 #   ansible-playbook playbooks/nvidia-software/nvidia-power-limit.yml
 #
 #   # one-off, not written to config (undone by the next cluster run)
