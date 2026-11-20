@@ -20,6 +20,9 @@
       {{ not (_node.drain or _node.down) or _node.reason == maintenance_reason
          or _node.reason.startswith(maintenance_reason ~ ' : ') }}
     maintenance_needs_drain: "{{ not _node.drain }}"
+    # A later step that needs the node out of service (require_drained) knows this run
+    # drains it first, so a --check preview, where the drain does not happen, can say so.
+    maintenance_drained_by_run: true
 
 - name: Drain the node
   ansible.builtin.command:
