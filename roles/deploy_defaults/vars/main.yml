@@ -40,7 +40,10 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_rsyslog_client }}", group: slurm-node}
       - {switch: "{{ kube_enable_rsyslog_client }}", group: k8s_cluster}
+  # Removing it lifts every ban, and a site often installed it by hand before deepops
+  # managed it: a switch left off never takes it away; deepops_component_removals does.
   fail2ban:
+    removal: explicit
     rules:
       - {switch: "{{ slurm_enable_fail2ban }}", group: slurm-cluster}
       - {switch: "{{ kube_enable_fail2ban }}", group: k8s_cluster}

@@ -113,8 +113,9 @@ exporters, then their dashboards, then Alertmanager, then Prometheus and Grafana
 report and metrics before cluster_tools_lib; HPC SDK registration before Lmod; NFS
 clients before the server.
 - Reboot-class and access-class components never go implicitly: the NVIDIA driver,
-  authentication (NIS, the directory, Kerberos), Slurm itself and MUNGE, and the NFS
-  server (unexporting /home hangs every client, as on 2026-11-18). Their registry entry
+  authentication (NIS, the directory, Kerberos), fail2ban (its removal lifts every
+  ban), Slurm itself and MUNGE, and the NFS server (unexporting /home hangs every
+  client, as on 2026-11-18). Their registry entry
   says `removal: explicit`; where no rule holds the map gives `kept` and the role does
   nothing. The site retires one by naming it in `deepops_component_removals`: it goes
   from every host no rule wants it on and stays where one does. Naming a component

@@ -21,9 +21,10 @@ REGISTRY = yaml.safe_load((ROOT / "roles/deploy_defaults/vars/main.yml").read_te
 ]
 DEPLOYS = ("playbooks/slurm-cluster.yml", "playbooks/k8s-cluster.yml")
 ROLE_INCLUDES = ("include_role", "import_role", "ansible.builtin.include_role", "ansible.builtin.import_role")
-# Removing these reboots nodes, locks users out or hangs every NFS client: a switch or a
-# group never removes them, only deepops_component_removals does.
+# Removing these reboots nodes, locks users out, lifts every login ban or hangs every
+# NFS client: a switch or a group never removes them, only deepops_component_removals does.
 EXPLICIT = {
+    "fail2ban",
     "nvidia_driver",
     "slurm",
     "nfs",
