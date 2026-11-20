@@ -1,3 +1,4 @@
 ---
 dependencies:
+  - role: people_defaults  # people, people_home_root, people_default_shell, people_home_mode
   - role: system_accounts  # system_accounts: the IDs a person may not take

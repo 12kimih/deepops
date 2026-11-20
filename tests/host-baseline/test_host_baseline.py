@@ -34,15 +34,17 @@ def walk(tasks):
 
 class OrphanServices(unittest.TestCase):
     def proc(self, entries, main=None):
-        """A fake /proc of (exe, cgroup) entries from pid 100 on, and a fake systemctl
-        that reports `main` ({unit: pid}) as each unit's MainPID (default: pid 100)."""
+        """A fake /proc of (exe, cgroup[, parent pid]) entries from pid 100 on (parent 1
+        unless given), and a fake systemctl that reports `main` ({unit: pid}) as each
+        unit's MainPID (default: pid 100)."""
         root = Path(tempfile.mkdtemp())
         self.addCleanup(subprocess.run, ["rm", "-rf", str(root)])
-        for pid, (exe, cgroup) in enumerate(entries, start=100):
+        for pid, (exe, cgroup, *parent) in enumerate(entries, start=100):
             d = root / str(pid)
             d.mkdir()
             os.symlink(exe, d / "exe")
             (d / "cgroup").write_text(cgroup + "\n")
+            (d / "status").write_text(f"Name:\tx\nPPid:\t{parent[0] if parent else 1}\n")
         cases = "".join(f"  {unit}) echo {pid} ;;\n" for unit, pid in (main or {}).items())
         stub = root / "systemctl"
         stub.write_text(f'#!/bin/sh\ncase "$4" in\n{cases}  *) echo 100 ;;\nesac\n')
@@ -89,6 +91,26 @@ class OrphanServices(unittest.TestCase):
             main={"ssh.service": 100},
         )
         self.assertEqual(self.run_script(root), "")
+
+    def test_a_forked_daemon_systemd_has_no_main_pid_for(self):
+        # slapd from its init script: MainPID 0; the daemon's parent is init.
+        root = self.proc(
+            [("/nonexistent/slapd (deleted)", "0::/system.slice/slapd.service")], main={"slapd.service": 0}
+        )
+        self.assertEqual(self.run_script(root), "slapd.service /nonexistent/slapd\n")
+
+    def test_without_a_main_pid_a_child_never_counts(self):
+        root = self.proc(
+            [("/nonexistent/tool (deleted)", "0::/system.slice/ssh.service", 4242)], main={"ssh.service": 0}
+        )
+        self.assertEqual(self.run_script(root), "")
+
+    def test_a_systemd_inside_a_container_cgroup(self):
+        # cgroupns=host: the host's services sit under the container's scope.
+        root = self.proc(
+            [("/nonexistent/x (deleted)", "0::/system.slice/docker-1.scope/system.slice/x.service")]
+        )
+        self.assertEqual(self.run_script(root), "x.service /nonexistent/x\n")
 
     def test_leaves_running_programs(self):
         root = self.proc([("/usr/sbin/sshd", "0::/system.slice/ssh.service")])

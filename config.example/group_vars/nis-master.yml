@@ -1,13 +1,14 @@
 ---
 # Applies to the [nis-master] inventory group -- the ONE node that runs the NIS master
-# (ypserv). The nis_server role (run by authentication.yml, which slurm-cluster.yml
-# imports) installs ypserv, sets the NIS domain, writes securenets, and builds the maps
-# with `ypinit -m` (skipped if /var/yp/<domain> already exists, so an existing manual
-# database is preserved). Clients bind to it via nis_domain/nis_server in group_vars/all.yml.
-#nis_make_server: true  # example
+# (ypserv) when nis_domain is set. The nis_server role (run by authentication.yml, which
+# slurm-cluster.yml imports) installs ypserv, sets the NIS domain, writes securenets,
+# and builds the maps with `ypinit -m` (skipped if /var/yp/<domain> already exists, so
+# an existing manual database is preserved). It publishes the groups and netgroups in
+# AUTH of group_vars/all.yml. Clients bind to it via nis_domain/nis_server there.
 
-# Create and lock the people roster's accounts here (roles/people, run by
-# authentication.yml just before nis_server publishes them). See PEOPLE in all.yml.
+# Keep the people roster's accounts and homes here, the account source (roles/people,
+# run by authentication.yml just before the directory servers publish them). See PEOPLE
+# in all.yml.
 #people_manage_accounts: true  # example
 
 # Which client networks may query this NIS server ("NETMASK NETWORK" lines).
@@ -15,31 +16,3 @@
 #nis_server_securenets:  # example
 #  - "255.0.0.0       127.0.0.0"   # localhost
 #  - "255.255.255.0   10.0.0.0"   # the cluster's internal subnet
-
-# Groups defined on the NIS master and published through the group map, so that one
-# group name means one GID on every node. Anything that has to be meaningful inside a
-# Slurm job belongs here: Slurm ships NUMERIC GIDs into jobs (send_gids), so a
-# node-local group with a per-node GID silently grants a DIFFERENT group on the
-# compute node instead of failing. GIDs must be >= GID_MIN (/etc/login.defs, normally
-# 1000) or /var/yp/Makefile drops them from the map without warning -- the role
-# asserts this. Membership is declarative and comes from the people roster: taking
-# the role away there revokes that person's access on the next run. Set
-# nis_export_groups_exclusive: false to make the list additive instead, for a group
-# other tooling also writes to.
-#nis_export_groups:  # example
-#  - name: "{{ cluster_docker_group_name }}"
-#    gid: "{{ cluster_docker_group_gid }}"
-#    members: "{{ people | people_with_role('docker') }}"
-
-# Netgroups published through the netgroup maps. Use these, not a group, for anything
-# that must give the same answer inside a Slurm job and over a direct SSH login:
-# a netgroup is matched by NAME, so it is subject to neither the GID_MIN export filter
-# nor the numeric-gid list Slurm ships into jobs. Administrator sudo is the main case
-# (see cluster_sudoers_netgroup in group_vars/all.yml).
-#
-# Membership here is DECLARATIVE -- /etc/netgroup is rendered whole, so taking the
-# admin role away in the people roster revokes their access on the next run. That is
-# the difference from nis_export_groups above, which manages only the groups it lists.
-#nis_export_netgroups:  # example
-#  - name: "{{ cluster_sudoers_netgroup }}"
-#    users: "{{ cluster_admins }}"

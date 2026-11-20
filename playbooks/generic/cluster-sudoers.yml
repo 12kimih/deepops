@@ -6,8 +6,8 @@
 # resolved on the SUBMIT node (send_gids), while a direct SSH login resolves groups on
 # the node itself. Membership granted on one side is invisible to the other.
 #
-# A NIS netgroup is matched by name rather than by a numeric gid, so it is immune to
-# both: publish it once on the NIS master (nis_export_netgroups) and every node answers
+# A netgroup is matched by name rather than by a numeric gid, so it is immune to
+# both: publish it once in the directory (directory_netgroups) and every node answers
 # the same way. This playbook installs the matching sudoers rule.
 #
 # Until cluster_sudoers_netgroup is set in config/group_vars this only makes sure no

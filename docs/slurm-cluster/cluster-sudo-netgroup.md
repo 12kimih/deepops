@@ -1,8 +1,8 @@
-# Administrator sudo on a Slurm + NIS cluster
+# Administrator sudo on a Slurm cluster with a directory
 
 Granting sudo through the `sudo` **group** gives two different answers on the same
 node depending on how you got there. This document explains why, and how this repo
-grants it through a NIS **netgroup** instead.
+grants it through a directory **netgroup** (NIS or LDAP) instead.
 
 ## The problem
 
@@ -20,9 +20,9 @@ some people hold root inside jobs on every compute node while having no sudo at 
 over SSH, and others the other way around. Neither state is visible from looking at
 one node.
 
-Making the group consistent is not possible. `sudo` is gid 27 -- below `GID_MIN` -- and
-`/var/yp/Makefile` filters the NIS group map to `GID >= GID_MIN`, so the group can
-never be published. Editing `/etc/group` on each node by hand fixes only the SSH path,
+Making the group consistent is not possible. `sudo` is gid 27, in the OS's own range,
+which no directory publishes (NIS's `/var/yp/Makefile` drops every GID below
+`GID_MIN`; an LDAP directory holds only the cluster's own groups). Editing `/etc/group` on each node by hand fixes only the SSH path,
 because job credentials never consult it.
 
 There is a second, independent thing to check: whether a password can be verified on the
@@ -36,21 +36,23 @@ sudo -v        # prompts and returns 0 => a password-requiring rule works here
 ## The fix: a netgroup
 
 A netgroup is matched by **name** through `innetgr(3)`, not by a numeric id. That
-sidesteps both the `GID_MIN` filter and the numeric-GID path, so one definition on the
-NIS master gives every node the same answer by every path.
+sidesteps both the GID range and the numeric-GID path, so one definition in the
+directory gives every node the same answer by every path.
 
-1. Publish the netgroup from the NIS master (`config/group_vars/nis-master.yml`):
+1. Publish the netgroup (`directory_netgroups` in `config/group_vars/all.yml`):
 
    ```yaml
-   nis_export_netgroups:
+   directory_netgroups:
      - name: "{{ cluster_sudoers_netgroup }}"
        users:
          - alice
          - bob
    ```
 
-   The `nis_server` role renders `/etc/netgroup` and rebuilds the maps. Membership is
-   **declarative** -- deleting a name here revokes that person's sudo on the next run.
+   The directory server publishes it (`nis_server` renders `/etc/netgroup` and rebuilds
+   the maps; `ldap_server` writes a `nisNetgroup` entry). Membership is **declarative**
+   -- deleting a name here revokes that person's sudo on the next run. In practice the
+   users are `cluster_admins`, from the people roster.
 
 2. Name it once in `config/group_vars/all.yml`:
 
@@ -82,12 +84,13 @@ ansible-playbook -l <one-node> playbooks/generic/cluster-sudoers.yml
 
 **Break-glass.** The stock `%sudo ALL=(ALL:ALL) ALL` rule in `/etc/sudoers` is left
 untouched, so a **local** account that is in the local `sudo` group *and* has a local
-password entry keeps sudo even if NIS is unreachable. Set `cluster_sudoers_local_group:
+password entry keeps sudo even if the directory is unreachable. Set `cluster_sudoers_local_group:
 sudo` and `cluster_sudoers_local_members` (normally the netgroup's member list) and the
 role keeps that group to exactly the listed administrators who have a local account on
 each node; someone taken off the list loses it on the next run. Confirm at least one
-such account exists on every node: if NIS goes down and no local path exists, nobody
-can sudo anywhere.
+such account exists on every node: if the directory goes down and no local path exists
+(SSSD's cache carries logins only for those who logged in before), nobody can sudo
+anywhere.
 
 ## Unmanaged drop-ins
 

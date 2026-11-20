@@ -1,0 +1,44 @@
+---
+# The directory and a client of it in one container: slapd filled from a roster, SSSD
+# reading it over StartTLS with the cluster CA (docs/deepops/accounts.md).
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: ldap-ubuntu-2404
+    image: geerlingguy/docker-ubuntu2404-ansible
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - ldap-server
+provisioner:
+  name: ansible
+  ansible_args:
+    - -vv
+  env:
+    # Molecule runs from the role, outside the repository's ansible.cfg.
+    ANSIBLE_FILTER_PLUGINS: ${MOLECULE_PROJECT_DIRECTORY}/../../plugins/filter
+  inventory:
+    group_vars:
+      all:
+        people:
+          alice: {uid: 1001, name: Alice Example, roles: [admin, docker]}
+          bob: {uid: 1002, shell: /bin/sh}
+          carol: {uid: 1003, status: left}
+        ldap_suffix: dc=example,dc=internal
+        # The read-only account's password file, written by prepare.yml.
+        ldap_secrets_dir: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/ldap"
+        directory_service: ldap
+        directory_groups:
+          - {name: dockerusers, gid: 4000, members: [alice]}
+        directory_netgroups:
+          - {name: cluster_admins, users: [alice]}
+scenario:
+  test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]
+verifier:
+  name: ansible

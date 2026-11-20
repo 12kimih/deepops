@@ -21,11 +21,14 @@ accounts, people = load("accounts"), load("people")
 SYSTEM = yaml.safe_load((ROOT / "roles/system_accounts/defaults/main.yml").read_text())["system_accounts"]
 EXAMPLE = yaml.safe_load((ROOT / "config.example" / "people.yml").read_text())["people"]
 # Tasks that still set IDs themselves, each to leave this list when it moves over:
-# the slurm user (deepops' Slurm work moves it onto system_accounts.slurm) and the NIS
-# cluster groups (the directory work, item 6, gives groups one registry too).
+# the slurm user (deepops' Slurm work moves it onto system_accounts.slurm).
 PENDING = {
     "roles/slurm/tasks/setup-user.yml",
-    "roles/nis_server/tasks/main.yml",
+}
+# Tasks that set IDs from a registry other than roles/system_accounts: the NIS master's
+# copy of the cluster groups (directory_groups in roles/directory_defaults).
+REGISTRY_READERS = {
+    "roles/nis_server/tasks/present.yml",
 }
 
 
@@ -75,7 +78,11 @@ class Registry(unittest.TestCase):
                 for module in ("ansible.builtin.user", "ansible.builtin.group"):
                     args = task.get(module) if isinstance(task, dict) else None
                     rel = str(path.relative_to(ROOT))
-                    if isinstance(args, dict) and "local_accounts" not in rel and rel not in PENDING:
+                    if (
+                        isinstance(args, dict)
+                        and "local_accounts" not in rel
+                        and rel not in PENDING | REGISTRY_READERS
+                    ):
                         with self.subTest(path=rel, task=task.get("name")):
                             self.assertNotIn("uid", args)
                             self.assertNotIn("gid", args)
@@ -104,6 +111,14 @@ class People(unittest.TestCase):
         )
         self.assertEqual(got["bob"], {"uid": 1002, "shell": "/bin/zsh", "home": "/home/bob", "system": False})
         self.assertEqual(accounts.check(got), [])
+
+    def test_shells_are_the_rosters_and_the_default(self):
+        roster = {
+            **EXAMPLE,
+            "erin": {"uid": 1005, "shell": "/usr/bin/zsh"},
+            "gone": {"uid": 1006, "shell": "/bin/ksh", "status": "left"},
+        }
+        self.assertEqual(people.people_shells(roster), ["/bin/bash", "/usr/bin/zsh"])
 
 
 if __name__ == "__main__":

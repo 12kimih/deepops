@@ -1,0 +1,24 @@
+---
+# sssd_client -- read accounts, groups and netgroups from the cluster's LDAP directory
+# (roles/ldap_server) through SSSD, and check passwords against it: on hosts whose
+# directory_service is ldap (roles/deploy_defaults). Per the Ubuntu Server guide
+# (sssd/with-ldap), sssd.conf(5) and sssd-ldap(5); docs/deepops/accounts.md.
+
+# present, absent, or kept (do nothing) (docs/deepops/component-state.md); a deploy
+# sets it from deepops_components. Absent only when named in deepops_component_removals:
+# the host then reads no accounts from LDAP.
+sssd_client_state: present
+
+# The SSSD domain's name (sssctl domain-status <name>).
+sssd_client_domain: cluster
+
+# Seconds an answer is used before SSSD asks the directory again; a roster change
+# reaches a node within this (sss_cache -E makes it at once). Entries are refreshed in
+# the background before they expire, and a node that cannot reach the directory keeps
+# answering from its cache and lets cached users log in (cache_credentials).
+sssd_client_cache_timeout: 600
+
+# The databases SSSD answers (roles/nsswitch adds the sss source to each and takes nis
+# away): the ones libnss-sss itself adds, so a package upgrade and a deploy never undo
+# each other.
+sssd_client_databases: [passwd, group, shadow, services, netgroup]

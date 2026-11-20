@@ -82,6 +82,12 @@ def people_local_accounts(people, home_root="/home", shell="/bin/bash"):
     }
 
 
+def people_shells(people, default="/bin/bash"):
+    """Sorted login shells the roster gives active people (DEFAULT for those who set
+    none): what every host must have installed for them to log in."""
+    return sorted({p.get("shell") or default for p in _active(people).values()} | {default})
+
+
 def people_accounting(people):
     """{login: {accounts, default_account}} for active people with Slurm accounts.
 
@@ -214,6 +220,7 @@ class FilterModule:
             "people_attr": people_attr,
             "people_accounting": people_accounting,
             "people_local_accounts": people_local_accounts,
+            "people_shells": people_shells,
             "people_subids": people_subids,
             "people_check": people_check,
         }

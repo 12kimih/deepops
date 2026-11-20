@@ -1,0 +1,28 @@
+---
+- name: Load OS-specific NIS server variables
+  ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"
+
+# The netgroup source is removed only where this role wrote it.
+- name: Check whether /etc/netgroup was written by this role
+  ansible.builtin.command:
+    cmd: grep -q -F "Written by roles/nis_server" /etc/netgroup
+    removes: /etc/netgroup  # no file: nothing of ours (skipped, no rc)
+  register: nis_server_netgroup_ours
+  changed_when: false
+  failed_when: nis_server_netgroup_ours.rc | default(0) > 1
+  check_mode: false  # read-only; --check needs the result
+
+- name: Remove the netgroup source this role wrote
+  ansible.builtin.file:
+    path: /etc/netgroup
+    state: absent
+  when: nis_server_netgroup_ours.rc | default(1) == 0
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nis_server
+    component_record_action: absent
+    component_record_items: "{{ nis_server_items }}"
+    component_record_exclusive_packages: [ypserv]

@@ -1,8 +1,8 @@
 ---
-# nis_server -- set up an NIS (YP) MASTER server (ypserv) so clients configured by
-# the nis_client role can bind to it. Opt-in: the authentication.yml playbook runs
-# this role only on the host where `nis_make_server` is true, and only when
-# `nis_domain` is set.
+# nis_server -- an NIS (YP) master (ypserv) for the clients roles/nis_client binds: on the
+# [nis-master] host when nis_domain is set (roles/deploy_defaults). It publishes the
+# account source's files and the cluster groups and netgroups (directory_groups,
+# directory_netgroups in roles/directory_defaults).
 #
 # NOTE: NIS-server setup is environment-sensitive (domain resolution, the ypinit
 # database build). Validate on your cluster after first run:
@@ -10,8 +10,9 @@
 #   ypcat passwd          # should print NIS passwd entries
 # Refs: https://wiki.debian.org/BullseyeNis , man ypinit(8), man ypserv(8)
 
-# nis_domain (the domain this server is master for) and nis_make_server (is this host
-# the NIS master?) come from roles/nis_defaults.
+# present, absent, or kept (do nothing) (docs/deepops/component-state.md); a deploy
+# sets it from deepops_components. Absent only when named in deepops_component_removals.
+nis_server_state: present
 
 # /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client
 # networks may query this server, as "NETMASK NETWORK" lines. The default allows
@@ -55,57 +56,3 @@ nis_server_ypserv_rules:
 nis_server_ypserv_protected_maps:
   - shadow.byname
   - passwd.adjunct.byname
-
-# Cluster-wide groups to define on this node and publish through the NIS group map.
-# Each entry is {name, gid, members}; empty by default, so nothing is exported.
-#
-#   nis_export_groups:
-#     - name: dockerusers
-#       gid: 4000
-#       members: [alice, bob]
-#
-# WHY the GID must be pinned here rather than left to the OS:
-# Slurm resolves a job's supplementary groups on the SUBMIT/controller node and ships
-# the resulting *numeric* GID list into the job (send_gids, on by default since
-# 20.11). The compute node never re-resolves them -- it just renders those numbers
-# through its own group database. So a node-local group whose GID differs between
-# nodes does not fail closed; it silently grants whatever OTHER group happens to hold
-# that number on the compute node. Publishing the group through NIS under one fixed
-# GID is what makes the name mean the same thing everywhere.
-#
-# WHY the GID must be >= GID_MIN:
-# /var/yp/Makefile filters the group map to GID >= MINGID (taken from GID_MIN in
-# /etc/login.defs, normally 1000). A group numbered below that is dropped from the
-# map without a warning, so clients never see it no matter how often the maps are
-# rebuilt. This role asserts the range.
-nis_export_groups: []
-
-# Whether `members` is the complete membership or only a set of additions.
-#
-#   true   the listed members are the membership. Removing a name from the list
-#          revokes that person's access on the next run, matching how
-#          nis_export_netgroups already behaves.
-#   false  members are only ever added; a name removed from the list keeps its
-#          membership until someone runs `gpasswd -d` on this node.
-#
-# Users outside `members` are never touched either way, so a group that other
-# tooling also writes to should set this false.
-nis_export_groups_exclusive: true
-
-# Netgroups to define on this node and publish through the netgroup maps. Each entry
-# is {name, users}; empty by default, so /etc/netgroup is left alone.
-#
-#   nis_export_netgroups:
-#     - name: cluster_admins
-#       users: [alice, bob]
-#
-# A netgroup is matched by NAME, so it sidesteps both problems a group has here: it is
-# not subject to the GID_MIN export filter, and it does not depend on every node
-# agreeing what a number means. That makes it the right mechanism for anything that
-# must mean the same thing whether it is evaluated inside a Slurm job (where the gid
-# list comes from the submit node) or on a direct SSH login (where it comes from the
-# node itself) -- sudoers `+netgroup` being the main example.
-#
-# WARNING: this manages /etc/netgroup as a whole. Any hand-written entries in that
-# file are replaced once this list is non-empty.
-nis_export_netgroups: []

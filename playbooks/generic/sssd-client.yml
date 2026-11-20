@@ -1,0 +1,13 @@
+---
+# The SSSD client (docs/deepops/accounts.md): every host it runs on converges to what
+# deepops_components says (roles/deploy_defaults/vars/main.yml). Taking it away is
+# explicit only (deepops_component_removals).
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: sssd_client
+      sssd_client_state: "{{ deepops_components.sssd_client | component_phase(deepops_phase) }}"
+  tags:
+    - people
+    - sssd-client

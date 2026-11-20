@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: internal_ca
+  author: DeepOps
+  description: A private CA for the cluster's own services and the certificates it issues
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
+dependencies: []

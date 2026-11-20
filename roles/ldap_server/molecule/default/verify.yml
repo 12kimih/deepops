@@ -1,0 +1,63 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    verify_reader: [-x, -ZZ, -LLL, -H, "ldap://{{ inventory_hostname }}", -D, "cn=sssd,ou=services,dc=example,dc=internal", -w, molecule-only]
+  environment:
+    LDAPTLS_CACERT: /etc/ldap/deepops-ca.crt
+  tasks:
+    - name: Look up the roster through SSSD
+      ansible.builtin.command:
+        argv: [getent, -s, sss, passwd, alice, bob, carol]
+      register: verify_passwd
+      changed_when: false
+
+    - name: Read alice's groups and the admin netgroup
+      ansible.builtin.command:
+        argv: [sh, -c, "id -nG alice; getent netgroup cluster_admins"]
+      register: verify_groups
+      changed_when: false
+
+    - name: Search as the reader, asking for a password too
+      ansible.builtin.command:
+        argv: "{{ ['ldapsearch'] + verify_reader + ['-b', 'dc=example,dc=internal', 'uid=alice', 'uid', 'userPassword'] }}"
+      register: verify_reader_search
+      changed_when: false
+
+    - name: Search anonymously
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -ZZ, -LLL, -H, "ldap://{{ inventory_hostname }}", -b, "dc=example,dc=internal", uid=alice]
+      register: verify_anonymous
+      changed_when: false
+      failed_when: false
+
+    - name: Bind without TLS
+      ansible.builtin.command:
+        argv: [ldapwhoami, -x, -H, "ldap://{{ inventory_hostname }}", -D, "cn=sssd,ou=services,dc=example,dc=internal", -w, molecule-only]
+      register: verify_plain
+      changed_when: false
+      failed_when: false
+
+    - name: Check the account of someone who left
+      ansible.builtin.command:
+        argv: [sssctl, user-checks, carol, -s, sshd, -a, acct]
+      register: verify_left
+      changed_when: false
+      failed_when: false
+
+    - name: Check what the directory serves and to whom
+      ansible.builtin.assert:
+        that:
+          - "'alice:*:1001:1001:Alice Example:/home/alice:/bin/bash' in verify_passwd.stdout_lines"
+          - "'bob:*:1002:1002:bob:/home/bob:/bin/sh' in verify_passwd.stdout_lines"
+          - "'carol:*:1003:1003:carol:/home/carol:/usr/sbin/nologin' in verify_passwd.stdout_lines"
+          - "'dockerusers' in verify_groups.stdout_lines[0].split()"
+          - "',alice,)' in verify_groups.stdout_lines[1]"
+          - "'uid: alice' in verify_reader_search.stdout"
+          - "'userPassword' not in verify_reader_search.stdout"
+          - "'uid=alice' not in verify_anonymous.stdout"
+          - verify_plain.rc != 0
+          - (verify_left.stdout ~ verify_left.stderr) is search('expired')
+        quiet: true

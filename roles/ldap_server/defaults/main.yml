@@ -1,0 +1,46 @@
+---
+# ldap_server -- the cluster's OpenLDAP directory (slapd) and what it holds: the people
+# roster's accounts, their per-user groups, the cluster groups and netgroups, and the
+# read-only accounts SSSD and Dex search with (plugins/filter/directory.py). On the
+# [ldap-server] host when ldap_suffix is set (roles/deploy_defaults);
+# docs/deepops/accounts.md has the layout, the move from NIS and the checks.
+#
+# Only TLS (StartTLS on 389, with the cluster's own CA, roles/internal_ca) or the local
+# socket (root, over ldapi) reach anything; anonymous binds see nothing. The tree is
+# managed whole each run (roles/ldap_server/library/ldap_tree.py): a roster change is
+# in the directory after the next run, and nothing else is.
+
+# present, absent, or kept (do nothing) (docs/deepops/component-state.md); a deploy
+# sets it from deepops_components. Absent only when named in deepops_component_removals;
+# the database and the dumps stay (tasks/absent.yml).
+ldap_server_state: present
+
+# The organization the top entry names.
+ldap_server_organization: DeepOps
+
+# Where people's passwords come from:
+#   ldap    the directory keeps them; users change them with passwd (SSSD sends the
+#           change to the directory, which hashes it as sha512-crypt).
+#   shadow  mirrored each run from this host's /etc/shadow (the account source while
+#           NIS is still serving), so users keep their passwords through the move; the
+#           hashes never leave this host. Switch to ldap once every node reads LDAP.
+ldap_server_password_source: ldap
+
+# The server's key and certificate, signed by the cluster CA for ldap_server_names.
+ldap_server_tls_dir: /etc/ldap/tls
+
+# Equality indexes for what SSSD searches by: a user's or group's name and number, and a
+# user's groups (memberUid), which every login and every Slurm job asks for.
+ldap_server_indexes:
+  - objectClass eq
+  - cn,uid eq
+  - uidNumber,gidNumber eq
+  - member,memberUid eq
+
+# A daily dump of the configuration and the tree (slapcat), the newest kept; the tree's
+# dump holds password hashes, so the directory is root's alone. A restore is
+# `slapadd` of both into an empty server (docs/deepops/accounts.md).
+ldap_server_backup_dir: /var/backups/slapd
+ldap_server_backup_keep: 14
+ldap_server_backup_schedule: "*-*-* 02:45:00"
+ldap_server_backup_script: /usr/local/sbin/slapd-backup

@@ -1,0 +1,16 @@
+#!/bin/bash
+{{ ansible_managed | comment }}
+# A dump of slapd's configuration (0) and tree (1), keeping the newest {{ ldap_server_backup_keep }} of each.
+set -euo pipefail
+umask 077
+dir={{ ldap_server_backup_dir | quote }}
+keep={{ ldap_server_backup_keep | int }}
+stamp=$(date +%Y%m%d-%H%M%S)
+mkdir -p "${dir}"
+for db in 0 1; do
+    out="${dir}/slapd-${db}-${stamp}.ldif.gz"
+    slapcat -n "${db}" | gzip >"${out}.tmp"
+    mv "${out}.tmp" "${out}"
+    find "${dir}" -maxdepth 1 -name "slapd-${db}-*.ldif.gz" -printf '%f\n' | sort -r \
+        | tail -n "+$((keep + 1))" | while read -r old; do rm -f -- "${dir}/${old}"; done
+done

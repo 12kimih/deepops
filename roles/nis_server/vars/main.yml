@@ -1,0 +1,13 @@
+---
+# What this component installs, for its record (roles/component_record). rpcbind stays:
+# the NFS client needs it too. The groups it creates in the local files stay (accounts
+# are never removed; an LDAP directory publishes the same ones).
+nis_server_items:
+  - package:ypserv
+  - package:yp-tools
+  - unit:{{ nis_server_service }}
+  - unit:{{ nis_server_yppasswdd_service }}
+  - unit:{{ nis_server_ypxfrd_service }}
+  - file:{{ nis_server_securenets_path }}
+  - file:/etc/ypserv.conf
+  - file:/etc/defaultdomain

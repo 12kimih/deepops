@@ -20,8 +20,20 @@ slurm_enable_nginx_docker_cache: false
 slurm_cluster_install_nvidia_driver: true
 slurm_enable_nfs_server: true
 slurm_enable_nfs_client_nodes: true
-slurm_install_authentication: true
-# The people role creates the roster's accounts on the account source (the NIS master)
+# Accounts (docs/deepops/accounts.md). Which directory each host reads accounts from:
+# nis (roles/nis_client), ldap (roles/sssd_client) or none. A host moving from NIS to
+# LDAP sets ldap in its host_vars first (a canary); the client it leaves stays until
+# the site names it in deepops_component_removals (a directory goes only explicitly).
+directory_service: "{{ 'nis' if nis_domain | length > 0 and nis_server | length > 0 else 'none' }}"
+# The NIS domain and the server its clients bind to; the [nis-master] host serves it
+# (roles/nis_server). Empty: no NIS.
+nis_domain: ""
+nis_server: ""
+# The LDAP tree's suffix (dc=example,dc=internal); set, the [ldap-server] host serves it
+# (roles/ldap_server). Empty: no LDAP.
+ldap_suffix: ""
+# The people role keeps the roster's homes, and their local accounts where no LDAP
+# directory holds them, on the account source (the host with /home on its own disk)
 people_manage_accounts: false
 slurm_install_nhc: true
 slurm_cluster_install_openmpi: false

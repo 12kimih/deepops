@@ -125,3 +125,10 @@ retired_settings:
   pyxis_container_scope: slurm_pyxis_container_scope in roles/slurm (pyxis is configured with its package)
   pyxis_sbatch_support: slurm_pyxis_sbatch_support in roles/slurm (pyxis is configured with its package)
   pyxis_use_enroot_load: slurm_pyxis_use_enroot_load in roles/slurm (pyxis is configured with its package)
+  slurm_install_authentication: "directory_service, nis_domain and ldap_suffix in roles/deploy_defaults (each directory is on when configured; deepops_component_removals retires one)"
+  nis_make_server: the [nis-master] inventory group (its host serves nis_domain, roles/deploy_defaults)
+  nis_export_groups: directory_groups in roles/directory_defaults (NIS and LDAP publish the same groups)
+  nis_export_groups_exclusive: directory_groups_exclusive in roles/directory_defaults
+  nis_export_netgroups: directory_netgroups in roles/directory_defaults (NIS and LDAP publish the same netgroups)
+  nis_client_remove_caches: directory_remove_caches in roles/directory_defaults
+  nis_client_nsswitch: none; each directory client adds its own source to nsswitch.conf (roles/nsswitch)

@@ -1,84 +1,10 @@
 ---
-- name: Assert that the required variables are defined
+- name: Check the component state
   ansible.builtin.assert:
-    that:
-      - nis_domain | length > 0
-      - nis_server | length > 0
-    fail_msg: "Set nis_domain and nis_server in config/group_vars."
+    that: nis_client_state in ['present', 'absent', 'kept']
+    fail_msg: "nis_client_state must be present, absent or kept, not {{ nis_client_state }}."
     quiet: true
 
-# Install the CLIENT packages directly, not the `nis` meta-package: on Ubuntu 20.04+ /
-# Debian 11+ `nis` pulls in ypserv (the NIS *server*) too, which a client must not run.
-# ypbind-mt provides the ypbind.service client daemon; yp-tools gives ypwhich/ypcat.
-# https://wiki.debian.org/BullseyeNis
-- name: Install the NIS client packages without starting their daemons yet
-  ansible.builtin.include_role:
-    name: quiet_install
-  vars:
-    quiet_install_packages: "{{ ['ypbind'] if ansible_facts.os_family == 'RedHat' else ['ypbind-mt', 'yp-tools', 'rpcbind'] }}"
-
-- name: Ensure rpcbind is running
-  ansible.builtin.service: name=rpcbind state=started enabled=true
-
-- name: Set server
-  ansible.builtin.lineinfile:
-    dest: /etc/yp.conf
-    regexp: "^domain"
-    line: "domain {{ nis_domain }} server {{ nis_server }}"
-  notify: "Restart nis"
-
-# /etc/defaultdomain holds exactly the NIS domain. The old lineinfile used
-# regexp "^" (matches the start of EVERY line) which clobbers line 1 of any
-# multi-line file; a single-value copy is both correct and idempotent.
-- name: Configure the NIS domain name
-  ansible.builtin.copy:
-    dest: /etc/defaultdomain
-    content: "{{ nis_domain }}\n"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: "Restart nis"
-
-# Every database NIS serves must be listed, or nodes drift: a database left unmanaged
-# keeps whatever the OS install or another package left behind, and then the same
-# lookup resolves differently depending on which node it runs on. `netgroup` has no
-# `files` backend on glibc, so it is nis-only by design.
-- name: Configure nsswitch.conf
-  ansible.builtin.lineinfile:
-    dest: /etc/nsswitch.conf
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-  loop: "{{ nis_client_nsswitch }}"
-  loop_control:
-    label: "{{ item.line }}"
-  notify: "Restart nis"
-
-# Only the NIS master serves maps. A server left on a client (ypserv brings ypxfrd and
-# yppasswdd) answers map transfers and password changes for the domain from a copy
-# nobody keeps current; one was found on a compute node, its daemons still running
-# after the package was removed. host_baseline purges and stops what still runs.
-- name: Remove the NIS server and the name-service caches
-  ansible.builtin.include_role:
-    name: host_baseline
-    tasks_from: absent
-  vars:
-    host_baseline_absent_packages: >-
-      {{ ([] if nis_make_server | bool else ['ypserv'])
-      + nis_client_remove_caches }}
-
-- name: Make sure rpcbind is running
-  ansible.builtin.service: name=rpcbind state=started enabled=true
-
-# The NIS client daemon is ypbind.service on BOTH families: ypbind-mt on Debian/
-# Ubuntu (there is no nis.service since Debian bullseye / Ubuntu 20.04) and ypbind on
-# the RHEL family. ypbind will not bind without a reachable NIS server, so the start
-# is skipped under molecule (no server in the container).
-# https://wiki.debian.org/BullseyeNis
-- name: Make sure the NIS client (ypbind) is running
-  ansible.builtin.service:
-    name: ypbind
-    state: started
-    enabled: true
-    daemon_reload: true
-  tags:
-    - molecule-notest
+- name: "Make nis_client {{ nis_client_state }}"
+  ansible.builtin.include_tasks: "{{ nis_client_state }}.yml"
+  when: nis_client_state != 'kept'

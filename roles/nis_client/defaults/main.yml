@@ -1,28 +1,13 @@
 ---
 # nis_client -- bind this host to an NIS (YP) domain: nis_domain and nis_server
-# (roles/nis_defaults), which the role asserts are set.
+# (roles/deploy_defaults), on hosts whose directory_service is nis.
 
-# The nsswitch.conf databases this role owns, as regexp/line pairs.
-#
-# Keep every database NIS actually serves in this list. One left out is not "left at
-# the default" -- it keeps whatever each node's OS install or some package happened to
-# write, so the same lookup silently resolves differently per node. That asymmetry is
-# what makes group and netgroup membership behave inconsistently across a cluster.
-#
-# `files` before `nis` means a LOCAL entry shadows the directory one, which is usually
-# what you want for system accounts but is also how a stray local group ends up
-# overriding a cluster-wide one. `netgroup` has no `files` backend on glibc, so it is
-# nis-only by design.
-nis_client_nsswitch:
-  - { regexp: "^passwd", line: "passwd: files nis" }
-  - { regexp: "^group", line: "group: files nis" }
-  - { regexp: "^shadow", line: "shadow: files nis" }
-  - { regexp: "^automount", line: "automount: files nis" }
-  - { regexp: "^netgroup", line: "netgroup: nis" }
+# present, absent, or kept (do nothing) (docs/deepops/component-state.md); a deploy
+# sets it from deepops_components. Absent only when named in deepops_component_removals:
+# the host then reads no accounts from NIS.
+nis_client_state: present
 
-# Name-service caches to remove. nscd keeps passwd, group and netgroup answers for up to
-# an hour, so a group, sudo or access change made in the directory reaches a node that
-# much later: a revoked admin kept sudo, a new docker member stayed out. The directory
-# answers fast enough for a cluster this size; a later SSSD client brings its own cache
-# with explicit invalidation, and its docs say not to run nscd beside it.
-nis_client_remove_caches: [nscd, unscd]
+# The databases NIS answers (roles/nsswitch adds the nis source to each and takes sss
+# away). `files` first: a local entry shadows the directory's, which keeps system
+# accounts local but also lets a stray local group override a cluster-wide one.
+nis_client_databases: [passwd, group, shadow, netgroup, automount]

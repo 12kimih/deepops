@@ -1,0 +1,99 @@
+---
+- name: Assert that the required variables are defined
+  ansible.builtin.assert:
+    that:
+      - nis_domain | length > 0
+      - nis_server | length > 0
+    fail_msg: "Set nis_domain and nis_server in config/group_vars."
+    quiet: true
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nis_client
+    component_record_action: begin
+    component_record_items: "{{ nis_client_items }}"
+
+# Install the CLIENT packages directly, not the `nis` meta-package: on Ubuntu 20.04+ /
+# Debian 11+ `nis` pulls in ypserv (the NIS *server*) too, which a client must not run.
+# ypbind-mt provides the ypbind.service client daemon; yp-tools gives ypwhich/ypcat.
+# https://wiki.debian.org/BullseyeNis
+- name: Install the NIS client packages without starting their daemons yet
+  ansible.builtin.include_role:
+    name: quiet_install
+  vars:
+    quiet_install_packages: "{{ nis_client_packages + ['rpcbind'] }}"
+
+- name: Ensure rpcbind is running
+  ansible.builtin.service:
+    name: rpcbind
+    state: started
+    enabled: true
+
+- name: Set server
+  ansible.builtin.lineinfile:
+    dest: /etc/yp.conf
+    regexp: "^domain"
+    line: "domain {{ nis_domain }} server {{ nis_server }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: "Restart nis"
+
+# /etc/defaultdomain holds exactly the NIS domain.
+- name: Configure the NIS domain name
+  ansible.builtin.copy:
+    dest: /etc/defaultdomain
+    content: "{{ nis_domain }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: "Restart nis"
+
+# Every database NIS serves reads it, or nodes drift: one left unmanaged keeps whatever
+# the OS install or another package wrote, and the same lookup resolves differently per
+# node. SSSD's source goes (one directory client per host).
+- name: Read accounts from NIS
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: nis
+    nsswitch_databases: "{{ nis_client_databases }}"
+    nsswitch_replaces: [sss]
+
+# Only the NIS master serves maps. A server left on a client (ypserv brings ypxfrd and
+# yppasswdd) answers map transfers and password changes for the domain from a copy
+# nobody keeps current; one was found on a compute node, its daemons still running
+# after the package was removed. host_baseline purges and stops what still runs.
+- name: Remove the NIS server and the name-service caches
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: absent
+  vars:
+    host_baseline_absent_packages: >-
+      {{ ([] if inventory_hostname in groups['nis-master'] | default([]) else ['ypserv'])
+      + directory_remove_caches }}
+
+# The NIS client daemon is ypbind.service on BOTH families: ypbind-mt on Debian/
+# Ubuntu (there is no nis.service since Debian bullseye / Ubuntu 20.04) and ypbind on
+# the RHEL family. ypbind will not bind without a reachable NIS server, so the start
+# is skipped under molecule (no server in the container).
+# https://wiki.debian.org/BullseyeNis
+- name: Make sure the NIS client (ypbind) is running
+  ansible.builtin.service:
+    name: ypbind
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - molecule-notest
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nis_client
+    component_record_action: present
+    component_record_items: "{{ nis_client_items }}"

@@ -52,9 +52,14 @@ kube_node
 #gpu01
 #gpu02
 
-# NIS master node (runs ypserv via the nis_server role; set nis_make_server in
+# NIS master node (runs ypserv via the nis_server role when nis_domain is set;
 # group_vars/nis-master.yml). One host only; leave empty if you don't use NIS.
 [nis-master]
+#login01
+
+# LDAP directory node (runs slapd via the ldap_server role when ldap_suffix is set;
+# group_vars/ldap-server.yml). One host only; leave empty if you don't use LDAP.
+[ldap-server]
 #login01
 
 # The following groups are used to break out individual cluster services onto

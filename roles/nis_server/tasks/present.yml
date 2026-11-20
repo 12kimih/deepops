@@ -1,0 +1,276 @@
+---
+# Set up an NIS (YP) master server. Steps follow the LBNL/TLDP NIS-HOWTO and the
+# ypinit(8)/ypserv(8) man pages. https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html
+- name: Assert nis_domain is set for the NIS master
+  ansible.builtin.assert:
+    that:
+      - (nis_domain | trim | length) > 0
+    fail_msg: "The NIS master needs nis_domain (group_vars/all.yml)."
+    quiet: true
+
+- name: Load OS-specific NIS server variables
+  ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nis_server
+    component_record_action: begin
+    component_record_items: "{{ nis_server_items }}"
+
+# On Debian, installing ypserv tries to start it before the database exists (it
+# would fail).
+- name: Install the NIS server packages without starting their daemons yet
+  ansible.builtin.include_role:
+    name: quiet_install
+  vars:
+    quiet_install_packages: "{{ nis_server_packages }}"
+
+# The NIS domain must be set (kernel domainname) before ypinit/ypserv, and persist
+# across reboot.
+- name: Set the NIS domain for the running system
+  ansible.builtin.command: "nisdomainname {{ nis_domain }}"
+  changed_when: false
+
+- name: Persist the NIS domain (Debian /etc/defaultdomain)
+  ansible.builtin.copy:
+    dest: /etc/defaultdomain
+    content: "{{ nis_domain }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Persist the NIS domain (RHEL /etc/sysconfig/network)
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/network
+    regexp: "^NISDOMAIN="
+    line: "NISDOMAIN={{ nis_domain }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_facts.os_family == "RedHat"
+
+# Restrict which client networks may query this server (security).
+- name: Configure NIS securenets
+  ansible.builtin.copy:
+    dest: "{{ nis_server_securenets_path }}"
+    content: |
+      # Ansible managed -- edits will be overwritten (roles/nis_server).
+      # NETMASK         NETWORK   -- hosts/networks allowed to query this NIS server.
+      {% for line in nis_server_securenets %}
+      {{ line }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ypserv
+
+# --- ypserv access rules -------------------------------------------------------
+# Assert before writing: a protected map that is unrestricted, or listed after a
+# catch-all that ypserv matches first, is served to anything securenets allows.
+- name: Assert the protected maps are restricted and ordered ahead of any catch-all
+  vars:
+    nis_ypserv_maps: "{{ nis_server_ypserv_rules | map(attribute='map') | list }}"
+    nis_ypserv_catchall: >-
+      {{ nis_ypserv_maps.index('*') if '*' in nis_ypserv_maps else (nis_ypserv_maps | length) }}
+    nis_ypserv_rule: >-
+      {{ (nis_server_ypserv_rules | selectattr('map', 'eq', item) | list | first) | default({}) }}
+  ansible.builtin.assert:
+    that:
+      - item in nis_ypserv_maps
+      - nis_ypserv_rule.security | default('none') in ['port', 'deny', 'des']
+      - (nis_ypserv_maps.index(item) | int) < (nis_ypserv_catchall | int)
+    fail_msg: >-
+      nis_server_ypserv_rules does not protect '{{ item }}'. It must appear with
+      security port/deny/des AND before the catch-all `*` rule, because ypserv applies
+      the first match -- otherwise the map is served to any unprivileged caller
+      securenets allows, which publishes every password hash.
+  loop: "{{ nis_server_ypserv_protected_maps }}"
+  when: nis_server_manage_ypserv_conf | bool
+
+- name: Configure ypserv access rules
+  ansible.builtin.template:
+    src: ypserv.conf.j2
+    dest: /etc/ypserv.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: nis_server_manage_ypserv_conf | bool
+  notify: Restart ypserv
+
+- name: Ensure rpcbind and ypserv are enabled and running
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - rpcbind
+    - "{{ nis_server_service }}"
+  tags:
+    - molecule-notest
+
+# Build the NIS database once. ypinit -m reads the list of NIS servers from stdin;
+# empty stdin (immediate EOF) accepts THIS host as the sole master. Idempotent via
+# `creates`. The last task of this role keeps the maps current afterwards.
+# https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypinit(8)
+- name: Initialize the NIS master database (first run only)
+  ansible.builtin.command:
+    cmd: "{{ nis_server_ypinit }} -m"
+    creates: "/var/yp/{{ nis_domain }}"
+    stdin: ""
+  tags:
+    - molecule-notest
+
+# Optional daemons: yppasswdd lets users change NIS passwords (yppasswd); ypxfrd
+# speeds map transfer to NIS SLAVE servers. Best-effort -- the systemd unit name can
+# vary by distro/version; if one does not start, enable it by hand and adjust
+# nis_server_yppasswdd_service / nis_server_ypxfrd_service.
+- name: Enable optional NIS server daemons (yppasswdd / ypxfrd)
+  ansible.builtin.service:
+    name: "{{ item.name }}"
+    state: started
+    enabled: true
+  loop:
+    - { name: "{{ nis_server_yppasswdd_service }}", want: "{{ nis_server_enable_yppasswdd }}" }
+    - { name: "{{ nis_server_ypxfrd_service }}", want: "{{ nis_server_enable_ypxfrd }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.want | bool
+  failed_when: false
+  tags:
+    - molecule-notest
+
+# --- Cluster groups published through the NIS group map -----------------------
+# See directory_groups in roles/directory_defaults for why the GID has to be pinned and
+# why it has to be >= GID_MIN.
+- name: Read GID_MIN (the NIS group-map export threshold)
+  ansible.builtin.command:
+    cmd: awk '$1 == "GID_MIN" { print $2 }' /etc/login.defs
+  register: nis_gid_min
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: directory_groups | length > 0
+
+- name: Assert exported group GIDs fall inside the NIS map range
+  ansible.builtin.assert:
+    that:
+      - item.gid | int >= ((nis_gid_min.stdout | trim) | default('1000', true) | int)
+    fail_msg: >-
+      Group '{{ item.name }}' has gid {{ item.gid }}, below GID_MIN
+      ({{ (nis_gid_min.stdout | trim) | default('1000', true) }}). /var/yp/Makefile
+      drops such groups from the group map, so NIS clients would never see it.
+      Choose a gid >= GID_MIN.
+  loop: "{{ directory_groups }}"
+  loop_control:
+    label: "{{ item.name }} (gid {{ item.gid }})"
+  when: directory_groups | length > 0
+
+- name: Create the NIS-exported cluster groups
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid }}"
+    state: present
+  loop: "{{ directory_groups }}"
+  loop_control:
+    label: "{{ item.name }} (gid {{ item.gid }})"
+
+- name: Add members to the NIS-exported cluster groups
+  ansible.builtin.user:
+    name: "{{ item.1 }}"
+    groups: "{{ item.0.name }}"
+    append: true
+  loop: "{{ directory_groups | subelements('members', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1 }} -> {{ item.0.name }}"
+
+# `ansible.builtin.user` can only add, so removals are computed from the group's
+# current membership and applied with gpasswd. Only the groups listed in
+# directory_groups are read, so accounts outside them are never touched.
+- name: Read the current membership of the NIS-exported cluster groups
+  ansible.builtin.getent:
+    database: group
+    key: "{{ item.name }}"
+    fail_key: false
+  loop: "{{ directory_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: nis_group_members
+  when: directory_groups_exclusive | bool
+
+- name: Determine which members are no longer listed
+  vars:
+    # getent_group[name] is [password, gid, "a,b,c"]; absent groups give null.
+    nis_group_entry: >-
+      {{ ((item.1.ansible_facts | default({})).getent_group | default({})).get(item.0.name) or ['', '', ''] }}
+  ansible.builtin.set_fact:
+    nis_group_removals: >-
+      {{ (nis_group_removals | default([]))
+         + ([item.0.name] | product(nis_group_entry[2] | default('') | split(',')
+                                    | reject('equalto', '')
+                                    | difference(item.0.members | default([]))) | list) }}
+  loop: "{{ directory_groups | zip(nis_group_members.results | default([])) | list }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+  when: directory_groups_exclusive | bool
+
+- name: Remove members no longer listed for the NIS-exported cluster groups
+  ansible.builtin.command:
+    cmd: "gpasswd -d {{ item.1 }} {{ item.0 }}"
+  loop: "{{ nis_group_removals | default([]) }}"
+  loop_control:
+    label: "{{ item.1 }} -> {{ item.0 }}"
+  changed_when: true
+
+# --- Netgroups published through the netgroup maps -----------------------------
+# Unlike a group, a netgroup is matched by name, so it escapes both the GID_MIN export
+# filter and the numeric-gid path Slurm uses. See directory_netgroups in
+# roles/directory_defaults. Membership here is DECLARATIVE -- the file is rendered whole, so
+# removing a user from the list removes their access on the next run.
+#
+# An empty list leaves a hand-written /etc/netgroup alone, but a file this role wrote
+# is rendered empty: emptying the list must revoke what it granted.
+- name: Check whether /etc/netgroup was written by this role
+  ansible.builtin.command:
+    cmd: grep -q -F "Written by roles/nis_server" /etc/netgroup
+    removes: /etc/netgroup  # no file: nothing of ours (skipped, no rc)
+  register: nis_netgroup_ours
+  changed_when: false
+  failed_when: nis_netgroup_ours.rc | default(0) > 1
+  check_mode: false  # read-only; --check needs the result
+  when: directory_netgroups | length == 0
+
+- name: Publish the NIS netgroups
+  ansible.builtin.template:
+    src: netgroup.j2
+    dest: /etc/netgroup
+    owner: root
+    group: root
+    mode: "0644"
+  when: directory_netgroups | length > 0 or nis_netgroup_ours.rc | default(1) == 0
+
+# The maps are generated from the source files (/etc/passwd, /etc/group, /etc/netgroup,
+# ...); a source edit reaches NIS clients only once they are rebuilt. Run on every
+# pass rather than as a handler, so a change made outside this role (useradd, passwd,
+# the people role) is published too. `make` rebuilds only the maps whose source
+# changed and prints "Updating <map>" for each.
+# https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypmake(8)
+- name: Bring the NIS maps up to date with their source files
+  ansible.builtin.command:
+    cmd: make
+    chdir: /var/yp
+  register: nis_make
+  changed_when: "'Updating' in nis_make.stdout"
+  # Needs the database ypinit builds, which molecule skips.
+  tags:
+    - molecule-notest
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: nis_server
+    component_record_action: present
+    component_record_items: "{{ nis_server_items }}"

@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: ldap_server_state in ['present', 'absent', 'kept']
+    fail_msg: "ldap_server_state must be present, absent or kept, not {{ ldap_server_state }}."
+    quiet: true
+
+- name: "Make ldap_server {{ ldap_server_state }}"
+  ansible.builtin.include_tasks: "{{ ldap_server_state }}.yml"
+  when: ldap_server_state != 'kept'

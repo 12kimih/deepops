@@ -1,0 +1,9 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Dump the LDAP directory (slapcat)
+After=slapd.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=1h
+ExecStart={{ ldap_server_backup_script }}

@@ -1,0 +1,114 @@
+---
+# The last step of a move to LDAP (docs/deepops/accounts.md): take the people roster's
+# accounts and the cluster groups out of a host's local files once the directory serves
+# them there, so the local copies stop shadowing it (nsswitch reads files first, and
+# `passwd` would change the local password instead of the directory's).
+#
+#   uv run ansible-playbook -K playbooks/utilities/retire-local-accounts.yml -l <host> --check
+#   uv run ansible-playbook -K playbooks/utilities/retire-local-accounts.yml -l <host>
+#
+# Any host reading LDAP may hold such copies (the account source does: roles/people made
+# them); one reading another directory stops the run.
+# Only an entry the directory answers with the same number goes (plugins/filter/
+# directory.py directory_local_leftovers), after a copy of passwd, group, shadow and
+# gshadow is kept under retire_local_accounts_backup. Homes and files stay: the numbers
+# do not change. The break-glass administrators keep their local accounts: the members
+# of the local group the stock %sudo rule grants (retire_local_accounts_keep_group,
+# roles/cluster_sudoers keeps it). An account still logged in is skipped and reported;
+# run it again later.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  gather_facts: false
+  roles:
+    - role: directory_defaults  # directory_groups, directory_service
+    - role: people_defaults  # people
+  vars:
+    retire_local_accounts_keep_group: sudo
+    retire_local_accounts_backup: /var/backups/deepops-local-accounts
+  tasks:
+    - name: Check the host reads accounts from LDAP
+      ansible.builtin.assert:
+        that: directory_service == 'ldap'
+        fail_msg: "{{ inventory_hostname }} reads accounts from {{ directory_service }}; its local accounts are the source."
+        quiet: true
+
+    - name: Read the local accounts and groups
+      ansible.builtin.getent:
+        database: "{{ item }}"
+        service: files
+      loop: [passwd, group]
+      register: retire_local_files
+
+    # rc 2: some name is not in the directory, which only keeps it local.
+    - name: Ask the directory for the same names
+      ansible.builtin.command:
+        argv: "{{ ['getent', '-s', 'sss', item.database] + item.names }}"
+      loop:
+        - {database: passwd, names: "{{ people | list }}"}
+        - {database: group, names: "{{ people | list + directory_groups | map(attribute='name') | list }}"}
+      loop_control:
+        label: "{{ item.database }}"
+      register: retire_local_directory
+      changed_when: false
+      failed_when: retire_local_directory.rc not in [0, 2]
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Work out what to retire
+      vars:
+        retire_local_accounts_keep: >-
+          {{ (retire_local_files.results[1].ansible_facts.getent_group[retire_local_accounts_keep_group]
+          | default(['', '', '']))[2] | split(',') | select | list }}
+      ansible.builtin.set_fact:
+        retire_local_kept: "{{ retire_local_accounts_keep }}"
+        retire_local_stamp: "{{ now(fmt='%Y%m%d-%H%M%S') }}"
+        retire_local: >-
+          {{ people | directory_local_leftovers(directory_groups,
+               retire_local_files.results[0].ansible_facts.getent_passwd,
+               retire_local_files.results[1].ansible_facts.getent_group,
+               retire_local_directory.results[0].stdout_lines,
+               retire_local_directory.results[1].stdout_lines,
+               retire_local_accounts_keep) }}
+
+    - name: Report what goes and what does not match
+      ansible.builtin.debug:
+        msg: >-
+          retire users {{ retire_local.users }}, groups {{ retire_local.groups }};
+          kept {{ retire_local_kept }}; another number in the directory (fix
+          before anything else): {{ retire_local.mismatched }}
+
+    - name: Keep a copy of the account files
+      ansible.builtin.copy:
+        src: "/etc/{{ item }}"
+        dest: "{{ retire_local_accounts_backup }}/{{ retire_local_stamp }}/"
+        remote_src: true
+        mode: preserve
+      loop: [passwd, group, shadow, gshadow]
+      when: retire_local.users | length + retire_local.groups | length > 0
+      register: retire_local_backup
+
+    # userdel never takes the home (no -r); it refuses (8) while the user is logged in.
+    - name: Remove the local accounts
+      ansible.builtin.command:
+        argv: [userdel, "{{ item }}"]
+      loop: "{{ retire_local.users }}"
+      register: retire_local_userdel
+      changed_when: retire_local_userdel.rc == 0
+      failed_when: retire_local_userdel.rc not in [0, 8]
+
+    # userdel takes a per-user group with its user; groupdel would still find that name
+    # through the directory and fail on the local file, so the files are read again.
+    - name: Read the local groups left
+      ansible.builtin.getent:
+        database: group
+        service: files
+
+    - name: Remove the local groups
+      ansible.builtin.command:
+        argv: [groupdel, "{{ item }}"]
+      loop: "{{ retire_local.groups | select('in', ansible_facts.getent_group) | list }}"
+      changed_when: true
+
+    - name: Report accounts still logged in
+      ansible.builtin.debug:
+        msg: "Still logged in, kept for now: {{ retire_local_userdel.results | selectattr('rc', 'defined') | selectattr('rc', 'eq', 8) | map(attribute='item') | list }}"
+      when: retire_local_userdel.results | selectattr('rc', 'defined') | selectattr('rc', 'eq', 8) | list | length > 0

@@ -1,0 +1,19 @@
+---
+# Lookups stop asking SSSD, then it goes; libpam-sss's purge takes its PAM profile off.
+# RHEL keeps its authselect profile: nss_sss answers nothing once sssd is gone.
+- name: Stop reading accounts from SSSD (Debian)
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: sss
+    nsswitch_state: absent
+  when: ansible_facts.os_family == 'Debian'
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: sssd_client
+    component_record_action: absent
+    component_record_items: "{{ sssd_client_items }}"
+    component_record_exclusive_packages: "{{ sssd_client_packages }}"

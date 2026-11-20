@@ -2,10 +2,11 @@
 # people -- create and lock the user accounts a people roster declares (see
 # config.example/people.yml and plugins/filter/people.py).
 #
-# Run it on the host whose passwd/group files are the account source: the NIS master,
-# whose maps the nis_server role then publishes. Every other access list (sudo, group
-# members, Slurm associations) is derived from the same roster elsewhere; this role
-# only owns the accounts themselves.
+# Run it on the account source, the host whose /home is on its own disk: with NIS its
+# passwd/group files are what the nis_server role publishes; with LDAP the directory
+# holds the accounts (roles/ldap_server) and this role keeps only the homes. Every other
+# access list (sudo, group members, Slurm associations) is derived from the same roster
+# elsewhere; this role only owns the accounts and their homes.
 #
 # Active people get an account with the roster's UID, a per-user group with GID = UID,
 # the name as the comment and the shell. Someone who has left is locked (password
@@ -16,17 +17,9 @@
 # A UID that differs from the roster fails the run instead of being changed: usermod -u
 # would leave every file the account owns on shared storage with a stale owner.
 
-# login -> person, as validated by people_check. Opt-in: empty does nothing.
-people: {}
+# people, people_default_shell, people_home_root and people_home_mode come from
+# roles/people_defaults (the directory reads them too).
 
-# Shell for a person who does not set one.
-people_default_shell: /bin/bash
-
-# Where home directories live; a new account's home is created from /etc/skel.
-people_home_root: /home
-
-# The most an active person's home directory may allow (a stricter mode is kept), and
-# the mode useradd gives new homes (HOME_MODE in /etc/login.defs). 0750 with the
-# per-user group keeps one user's files away from the others; share through a group
-# directory instead.
-people_home_mode: "0750"
+# Create the roster's accounts in the local files (passwd, group). Where an LDAP
+# directory holds them (directory_service ldap) only the homes are kept here.
+people_local_accounts_enabled: true

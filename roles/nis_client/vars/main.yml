@@ -1,0 +1,7 @@
+---
+# What this component installs, for its record (roles/component_record). rpcbind stays:
+# the NFS client needs it too.
+nis_client_packages: "{{ ['ypbind'] if ansible_facts.os_family == 'RedHat' else ['ypbind-mt', 'yp-tools'] }}"
+nis_client_items: >-
+  {{ nis_client_packages | map('regex_replace', '^', 'package:') | list
+  + ['unit:ypbind', 'file:/etc/yp.conf', 'file:/etc/defaultdomain'] }}

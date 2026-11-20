@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: directory_defaults
+  author: DeepOps
+  description: What the directory roles (NIS, LDAP, SSSD) agree on
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
+dependencies:
+  - role: deploy_defaults  # directory_service, ldap_suffix, nis_domain

@@ -1,0 +1,45 @@
+---
+# internal_ca -- a private certificate authority for the cluster's own services, and the
+# certificates it issues. The CA key never leaves its host; certificates are signed
+# there from a request each host makes with its own key.
+#
+#   - ansible.builtin.include_role:       # a server certificate for this host
+#       name: internal_ca
+#       tasks_from: cert
+#     vars:
+#       internal_ca_name: ldap            # one CA per purpose, under internal_ca_dir
+#       internal_ca_host: "{{ ldap_server_host }}"
+#       internal_ca_cert_names: [ldap.example.internal, 10.0.0.1]  # DNS names and IPs
+#       internal_ca_cert_path: /etc/ldap/tls/server.crt
+#       internal_ca_key_path: /etc/ldap/tls/server.key
+#       internal_ca_key_group: openldap
+#
+#   - ansible.builtin.include_role:       # trust the CA on this host
+#       name: internal_ca
+#       tasks_from: trust
+#     vars:
+#       internal_ca_name: ldap
+#       internal_ca_host: "{{ ldap_server_host }}"
+#       internal_ca_trust_path: /etc/ldap/deepops-ca.crt
+#
+# The CA is made on first use and lasts internal_ca_days; a certificate is renewed when
+# it would expire within internal_ca_renew_days, or when its names or its CA changed.
+# internal_ca_cert_result and internal_ca_trust_result say whether the file changed
+# (restart the service on it). Under --check a CA that does not exist yet is reported,
+# not made, and nothing is issued from it.
+internal_ca_name: ""
+internal_ca_host: ""
+internal_ca_dir: "/etc/deepops/ca/{{ internal_ca_name }}"
+internal_ca_subject: "DeepOps {{ internal_ca_name }} CA"
+internal_ca_days: 7300
+internal_ca_cert_days: 825
+internal_ca_renew_days: 30
+
+internal_ca_cert_names: []
+internal_ca_cert_path: ""
+internal_ca_key_path: ""
+internal_ca_key_owner: root
+internal_ca_key_group: root
+internal_ca_key_mode: "0640"
+
+internal_ca_trust_path: ""

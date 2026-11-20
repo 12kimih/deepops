@@ -79,11 +79,7 @@ ROLE_READS_OK = {
 }
 # Plays that read a role default without its role, where the fallback they write is
 # that default.
-PLAY_READS_OK = {
-    # nis_export_groups is the NIS master's; the check reads it from that host's
-    # hostvars and treats a host without it as publishing nothing, the default.
-    ("playbooks/utilities/check-id-consistency.yml", "nis_export_groups"),
-}
+PLAY_READS_OK: set = set()
 
 
 def role_defaults():

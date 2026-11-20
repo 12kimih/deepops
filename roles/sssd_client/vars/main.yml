@@ -1,0 +1,8 @@
+---
+# What this component installs, for its record (roles/component_record). The cache
+# (/var/lib/sss) goes with the packages.
+sssd_client_packages: >-
+  {{ ['sssd-ldap', 'sssd-tools'] + (['libnss-sss', 'libpam-sss'] if ansible_facts.os_family == 'Debian' else []) }}
+sssd_client_items: >-
+  {{ sssd_client_packages | map('regex_replace', '^', 'package:') | list
+  + ['unit:sssd', 'file:/etc/sssd/sssd.conf', 'file:' ~ ldap_ca_file] }}

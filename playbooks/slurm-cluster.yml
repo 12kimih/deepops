@@ -78,13 +78,13 @@
   vars:
     deepops_phase: install
 
-# Authentication / directory services. Each role inside is gated on its own config
-# (NIS master via nis_make_server, NIS clients via nis_domain+nis_server, Kerberos,
-# autofs, move-home-dirs), so this is a clean no-op unless you configure one of them
-# in config/group_vars. Runs after NFS (so /home is mounted) and before Slurm.
-- name: Configure authentication (NIS server + client, Kerberos, autofs, home dirs)
+# Accounts and logins (docs/deepops/accounts.md): the roster's accounts and homes, the
+# directory servers, each host's directory client. After NFS (so /home is mounted) and
+# before Slurm, which resolves every user.
+- name: Configure accounts and logins (the roster, NIS or LDAP, Kerberos, autofs)
   import_playbook: generic/authentication.yml
-  when: slurm_install_authentication
+  vars:
+    deepops_phase: install
   tags:
     - people
 
@@ -352,6 +352,28 @@
 
 - name: Remove the Open OnDemand portal where it is no longer wanted
   import_playbook: slurm-cluster/open-ondemand.yml
+  vars:
+    deepops_phase: remove
+
+# Only where the site lists them in deepops_component_removals (removal: explicit):
+# clients before the servers they bind to.
+- name: Stop reading accounts from LDAP where it is listed for removal
+  import_playbook: generic/sssd-client.yml
+  vars:
+    deepops_phase: remove
+
+- name: Stop reading accounts from NIS where it is listed for removal
+  import_playbook: generic/nis-client.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the NIS master where it is listed for removal
+  import_playbook: generic/nis-server.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the LDAP server where it is listed for removal
+  import_playbook: generic/ldap-server.yml
   vars:
     deepops_phase: remove
 

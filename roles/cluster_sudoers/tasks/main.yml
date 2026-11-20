@@ -40,9 +40,9 @@
     fail_msg: >-
       Netgroup '{{ cluster_sudoers_netgroup }}' does not resolve on
       {{ inventory_hostname }}, so `+{{ cluster_sudoers_netgroup }}` would match
-      nobody. Publish it first (nis_export_netgroups on the NIS master, then the maps
-      are rebuilt), check `nsswitch.conf` has a `netgroup:` line, and confirm this
-      node is bound with `ypwhich`.
+      nobody. Publish it first (directory_netgroups; with NIS the maps are rebuilt on the
+      master), check `nsswitch.conf` has a `netgroup:` line, and that this node reaches
+      its directory (`ypwhich`, or `sssctl domain-status cluster`).
   when: cluster_sudoers_require_netgroup | bool
 
 # `validate` runs visudo against the candidate file BEFORE it is installed, so a
@@ -52,7 +52,7 @@
   ansible.builtin.copy:
     content: |
       # Ansible managed -- edits will be overwritten (roles/cluster_sudoers).
-      # Membership lives in the NIS netgroup '{{ cluster_sudoers_netgroup }}', not in a
+      # Membership lives in the netgroup '{{ cluster_sudoers_netgroup }}', not in a
       # local group, so jobs and SSH logins get the same answer.
       +{{ cluster_sudoers_netgroup }} {{ cluster_sudoers_privilege }} {{ 'NOPASSWD:ALL' if cluster_sudoers_nopasswd | bool else 'ALL' }}
     dest: "/etc/sudoers.d/{{ cluster_sudoers_file }}"
@@ -61,8 +61,8 @@
     mode: "0440"
     validate: "visudo -cf %s"
 
-# Local files only: the group exists for when NIS cannot answer, so only accounts that
-# exist without NIS can use it.
+# Local files only: the group exists for when the directory cannot answer, so only
+# accounts that exist without it can use it.
 - name: Read the local accounts and the local sudo group
   ansible.builtin.getent:
     database: "{{ item }}"

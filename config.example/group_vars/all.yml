@@ -175,8 +175,7 @@
 # Users and their access come from one roster, people.yml next to the inventory
 # (format and rules: config.example/people.yml). Every per-person list (the admin
 # netgroup and local sudo group, compute-node SSH, the Docker group, Slurm
-# associations, chat IDs) is derived from it here, in nis-master.yml and in
-# slurm-cluster.yml. Change people.yml, check it, then apply it everywhere:
+# associations, chat IDs) is derived from it here and in slurm-cluster.yml. Change people.yml, check it, then apply it everywhere:
 #   uv run scripts/deepops/people.py check
 #   uv run ansible-playbook -K playbooks/slurm-cluster.yml --tags people
 # people_check validates the roster wherever it is used.
@@ -302,36 +301,35 @@ docker_iptables_enabled: true
 # Cluster-wide group granting access to the Docker daemon socket.
 # Playbook: slurm-cluster (container/docker-socket-group.yml), authentication
 #
-# Defined ONCE here because two places must agree on it exactly: the NIS master
-# publishes it (nis_export_groups in group_vars/nis-master.yml) and every node chowns
-# /run/docker.sock to it (docker_socket_group in group_vars/slurm-cluster.yml).
+# Defined ONCE here because two places must agree on it exactly: the directory
+# publishes it (directory_groups in AUTH below) and every node chowns /run/docker.sock
+# to it (docker_socket_group in group_vars/slurm-cluster.yml).
 #
 # The package-default `docker` group cannot do this job. Slurm resolves a job's
 # supplementary groups on the submit/controller node and ships the resulting NUMERIC
 # GIDs into the job (send_gids, on by default since 20.11); the compute node renders
 # those numbers through its own group database. `docker` gets a distro-assigned
-# system GID that differs per node, and system GIDs are below GID_MIN so /var/yp/Makefile
-# never exports them -- so the number that arrives means a different group on the
-# compute node. Pick a GID that is >= GID_MIN (so NIS exports it) and free on EVERY
-# node, then verify before enabling:
+# system GID that differs per node, in the OS's own range no directory publishes -- so
+# the number that arrives means a different group on the compute node. Pick a GID of
+# 1000 or more that no person's UID takes and is free on EVERY node, then verify before
+# enabling:
 #   for h in <all nodes>; do ssh $h "getent group <gid> || echo $h free"; done
 #cluster_docker_group_name: dockerusers  # example
 #cluster_docker_group_gid: 4000  # example
 
-# NIS netgroup whose members get administrator sudo on every node.
+# Netgroup whose members get administrator sudo on every node.
 # Playbook: slurm-cluster (generic/cluster-sudoers.yml), authentication
 #
 # A group cannot do this job. Slurm ships the numeric gid list resolved on the submit
 # node into jobs (send_gids) while a direct SSH login resolves groups on the node, so
 # `sudo` group membership gives two different answers depending on how you arrived --
-# and `sudo` is gid 27, below GID_MIN, so NIS cannot make the number consistent
-# either. A netgroup is matched by NAME through innetgr(3), so neither problem
-# applies. The members are cluster_admins (PEOPLE above), published by
-# nis_export_netgroups in group_vars/nis-master.yml.
+# and `sudo` is gid 27, in the OS's own range, which no directory publishes. A netgroup
+# is matched by NAME through innetgr(3), so neither problem applies. The members are
+# cluster_admins (PEOPLE above), published by directory_netgroups in AUTH below.
 #
 # BEFORE ENABLING: confirm a LOCAL account exists that is in the local sudo group and
-# has a local password, on every node. That is the break-glass path if NIS becomes
-# unreachable; the stock `%sudo` rule is deliberately left in place for it.
+# has a local password, on every node. That is the break-glass path if the directory
+# becomes unreachable; the stock `%sudo` rule is deliberately left in place for it.
 # cluster_sudoers_local_group keeps that local group to exactly the administrators
 # who have a local account on each node.
 #cluster_sudoers_netgroup: cluster_admins  # example
@@ -396,13 +394,52 @@ docker_iptables_enabled: true
 ################################################################################
 # AUTH                                                                         #
 ################################################################################
-# NIS configuration
-# Playbook: authentication (also runs inside slurm-cluster.yml)
-# CLIENTS: set nis_domain + nis_server (the master's hostname/IP) to bind nodes to NIS.
+# Accounts come from one directory: NIS or the cluster's LDAP directory (OpenLDAP on
+# the [ldap-server] host, SSSD on every node), both filled from the PEOPLE roster.
+# Playbook: authentication (also runs inside slurm-cluster.yml). docs/deepops/accounts.md
+# has the layout and the move from NIS to LDAP.
+#
+# Which directory each host reads accounts from: nis, ldap or none. The default is nis
+# when nis_domain and nis_server are set, else none. Moving to LDAP: set it to ldap in
+# one node's host_vars first, then here.
+#directory_service: "{{ 'nis' if nis_domain | length > 0 and nis_server | length > 0 else 'none' }}"
+#
+# NIS: the domain, and the master clients bind to (the [nis-master] host serves it;
+# group_vars/nis-master.yml).
 #nis_domain: example.com  # example
 #nis_server: 10.0.0.1  # example
-# MASTER SERVER (ypserv): configure it in group_vars/nis-master.yml (a one-host
-# [nis-master] inventory group). See that file.
+#
+# LDAP: the tree's suffix; set, the [ldap-server] host serves it
+# (group_vars/ldap-server.yml).
+#ldap_suffix: dc=example,dc=internal  # example
+# The names the server's certificate carries; clients use the first. Default: its
+# inventory name.
+#ldap_server_names: ["{{ ldap_server_host }}"]
+# Read-only accounts that search the directory; add dex for Open OnDemand's login.
+# Their passwords are files under ldap_secrets_dir, made (vaulted) when missing.
+#ldap_readers: [sssd]
+#ldap_secrets_dir: "{{ inventory_dir }}/files/ldap"
+#
+# Groups every directory publishes under one GID on every node. Anything that has to
+# mean the same inside a Slurm job belongs here: Slurm ships NUMERIC GIDs into jobs
+# (send_gids), so a node-local group with a per-node GID silently grants a DIFFERENT
+# group on the compute node instead of failing. GIDs are 1000 or more and no person's
+# UID. Membership comes from the people roster and is the whole membership: taking the
+# role away there revokes it on the next run (directory_groups_exclusive: false makes
+# the list additive, for a group other tooling also fills).
+#directory_groups:  # example
+#  - name: "{{ cluster_docker_group_name }}"
+#    gid: "{{ cluster_docker_group_gid }}"
+#    members: "{{ people | people_with_role('docker') }}"
+#directory_groups_exclusive: true
+#
+# Netgroups every directory publishes. Use these, not a group, for anything that must
+# give the same answer inside a Slurm job and over a direct SSH login: a netgroup is
+# matched by NAME, so neither the numeric GID list Slurm ships into jobs nor the OS's
+# GID range applies. Administrator sudo is the main case (cluster_sudoers_netgroup).
+#directory_netgroups:  # example
+#  - name: "{{ cluster_sudoers_netgroup }}"
+#    users: "{{ cluster_admins }}"
 
 # Kerberos configuration
 # Playbook: authentication

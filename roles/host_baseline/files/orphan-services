@@ -7,7 +7,11 @@
 # Only a unit's MAIN process counts: a session or job process inside ssh, cron or
 # slurmd that runs a deleted file says nothing about the daemon, and stopping that unit
 # would cut off logins or jobs. An upgraded daemon shows "(deleted)" too, but its path
-# exists again (the new file), so it is left alone.
+# exists again (the new file), so it is left alone. A daemon an init script forked is
+# often one systemd could not name the main process of (MainPID 0): there the process
+# counts when it is the daemon itself, whose parent is init, never a session's child.
+# The unit is the last service under a system.slice, so a host whose systemd runs in
+# a container's cgroup (cgroupns=host) reads its own services too.
 proc=${1:-/proc}
 systemctl=${SYSTEMCTL:-systemctl}
 for p in "$proc"/[0-9]*; do
@@ -17,8 +21,13 @@ for p in "$proc"/[0-9]*; do
         *) continue ;;
     esac
     [ -e "$path" ] && continue
-    unit=$(sed -n 's|^[0-9]*:[^:]*:/system\.slice/\([^/]*\.service\)$|\1|p' "$p/cgroup" 2>/dev/null | head -n 1)
+    unit=$(sed -n 's|^[0-9]*:[^:]*:.*/system\.slice/\([^/]*\.service\)$|\1|p' "$p/cgroup" 2>/dev/null | head -n 1)
     [ -n "$unit" ] || continue
-    [ "$("$systemctl" show -P MainPID "$unit" 2>/dev/null)" = "${p##*/}" ] || continue
+    main=$("$systemctl" show -P MainPID "$unit" 2>/dev/null)
+    if [ "$main" = 0 ]; then
+        [ "$(sed -n 's/^PPid:[[:space:]]*//p' "$p/status" 2>/dev/null)" = 1 ] || continue
+    else
+        [ "$main" = "${p##*/}" ] || continue
+    fi
     printf '%s %s\n' "$unit" "$path"
 done | sort -u

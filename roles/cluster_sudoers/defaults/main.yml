@@ -1,5 +1,5 @@
 ---
-# cluster_sudoers -- grant administrator sudo through a NIS NETGROUP.
+# cluster_sudoers -- grant administrator sudo through a directory NETGROUP (NIS or LDAP).
 # Opt-in: while cluster_sudoers_netgroup is empty the role only removes its own rule,
 # so turning it off revokes what turning it on granted.
 #
@@ -11,19 +11,19 @@
 # therefore grants sudo inside jobs on every compute node but not over SSH to those
 # same nodes, and membership on a compute node does the reverse.
 #
-# The group cannot be made consistent either: `sudo` is gid 27, below GID_MIN, so
-# /var/yp/Makefile does not export it. A netgroup is matched by NAME through
-# innetgr(3), so neither the GID_MIN filter nor the numeric gid path applies. Publish
-# it with nis_export_netgroups in the nis_server role.
+# The group cannot be made consistent either: `sudo` is gid 27, in the OS's own range,
+# which no directory publishes. A netgroup is matched by NAME through innetgr(3), so
+# neither the range nor the numeric gid path applies. Publish it with
+# directory_netgroups (roles/directory_defaults).
 #
 # The stock `%sudo ALL=(ALL:ALL) ALL` rule in /etc/sudoers is left alone, so a LOCAL
-# account in the local sudo group with a local password keeps sudo when NIS is
-# unreachable. See cluster_sudoers_local_group below to keep that group in step.
+# account in the local sudo group with a local password keeps sudo when the directory
+# is unreachable. See cluster_sudoers_local_group below to keep that group in step.
 cluster_sudoers_netgroup: ""
 
 # The local group the stock `%sudo` rule grants, kept to exactly the administrators who
-# have a LOCAL account on this node: the path that still works when NIS is down (a
-# directory-only account cannot even log in then). Membership is exact, so someone
+# have a LOCAL account on this node: the path that still works when the directory is
+# down and nothing is cached (a directory-only account may not log in then). Membership is exact, so someone
 # taken off cluster_sudoers_local_members loses it on the next run. Usually the same
 # list as the netgroup's members. Empty name = the group is left alone.
 cluster_sudoers_local_group: ""

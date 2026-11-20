@@ -1,0 +1,13 @@
+---
+# Data stays: slapd keeps its database at the purge (slapd/purge_database false) and
+# moves it under /var/backups when installed again (slapd/move_old_database), and the
+# daily dumps stay. A server installed again is filled from the roster; passwords come
+# back with a restore from a dump (docs/deepops/accounts.md).
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ldap_server
+    component_record_action: absent
+    component_record_items: "{{ ldap_server_items }}"
+    component_record_exclusive_packages: [slapd]

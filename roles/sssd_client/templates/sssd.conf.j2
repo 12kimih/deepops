@@ -1,0 +1,31 @@
+{{ ansible_managed | comment }}
+# sssd.conf(5), sssd-ldap(5). docs/deepops/accounts.md.
+[sssd]
+services = nss, pam
+domains = {{ sssd_client_domain }}
+
+[domain/{{ sssd_client_domain }}]
+id_provider = ldap
+auth_provider = ldap
+chpass_provider = ldap
+# Expired accounts (shadowExpire: people who have left) are refused, SSH keys too.
+access_provider = ldap
+ldap_access_order = expire
+ldap_account_expire_policy = shadow
+
+ldap_uri = {{ ldap_uri }}
+ldap_search_base = {{ ldap_suffix }}
+ldap_schema = rfc2307
+ldap_id_use_start_tls = true
+ldap_tls_reqcert = demand
+ldap_tls_cacert = {{ ldap_ca_file }}
+ldap_default_bind_dn = {{ 'sssd' | ldap_reader_dn(ldap_suffix) }}
+ldap_default_authtok_type = password
+ldap_default_authtok = {{ ldap_reader_passwords.sssd }}
+
+# Only the roster's range; system accounts stay in the local files.
+min_id = 1000
+enumerate = false
+cache_credentials = true
+entry_cache_timeout = {{ sssd_client_cache_timeout }}
+refresh_expired_interval = {{ (sssd_client_cache_timeout | int * 3) // 4 }}
