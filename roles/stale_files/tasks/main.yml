@@ -6,6 +6,7 @@
     report: "{{ stale_files_report }}"
     audit: "{{ stale_files_audit | bool }}"
     config_dirs: "{{ stale_files_config_dirs }}"
+    manifests: "{{ source_build_manifests }}"  # what a build from source installed is owned
     # What deepops records installing (roles/component_record) is its own, not a leftover.
     ignore: >-
       {{ stale_files_ignore + (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()

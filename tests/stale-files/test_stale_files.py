@@ -144,6 +144,18 @@ class Evidence(unittest.TestCase):
         with mock.patch.object(mod, "UCF_REGISTRY", registry):
             self.assertIn("/etc/ssh/sshd_config", mod.owned_paths())
 
+    def test_what_a_staged_install_lists_counts_as_owned(self):
+        manifests = self.tmp / "source-builds"
+        self.put(
+            "source-builds/lmod.json",
+            '{"files": ["/usr/local/share/zsh/site-functions/ml"], "dirs": ["/opt/lmod"]}',
+        )
+        self.put("source-builds/lmod.json.tmp", '{"files": ["/elsewhere"]}')
+        owned = mod.staged_paths(str(manifests))
+        self.assertEqual(owned, {"/usr/local/share/zsh/site-functions/ml", "/opt/lmod"})
+        self.assertEqual(mod.staged_paths(str(self.tmp / "absent")), set())
+        self.assertEqual(mod.staged_paths(None), set())
+
     def test_unowned_config_is_listed_and_deepops_files_are_marked(self):
         conf = self.tmp / "profile.d"
         hand = self.put("profile.d/ssh-key.sh", "ssh-keygen\n")
