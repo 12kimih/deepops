@@ -2,7 +2,7 @@
 # What the retired docker-rootless role installed outside users' homes. Users' own
 # daemon state (/var/tmp/docker-container-storage-UID, /var/tmp/xdg_runtime_dir_UID)
 # is theirs to delete.
-- name: Remove the docker-rootless login scripts and boot settings
+- name: Remove the docker-rootless login scripts
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -10,9 +10,23 @@
     - /etc/profile.d/00-rootlessdocker-modulepath.sh
     - /etc/profile.d/00-rootlessdocker-modulepath.csh
     - /etc/profile.d/z96_rootlessdocker_modules.sh
-    - /etc/sysctl.d/51-rootless.conf
-    - /etc/modules-load.d/br_netfilter.conf
     - /var/cache/deepops/rootless_docker_setup.sh
+
+# Its boot settings have names anything may use: each goes only when it says exactly
+# what docker-rootless wrote, and the br_netfilter load stays where Kubernetes needs it.
+- name: Remove the docker-rootless boot settings
+  ansible.builtin.include_role:
+    name: stale_files
+  vars:
+    stale_files_state: absent
+    stale_files_rules: >-
+      {{ [{'name': 'the user namespace limit docker-rootless set', 'type': 'files',
+           'dirs': ['/etc/sysctl.d'], 'pattern': '51-rootless\.conf',
+           'contains': '\Auser\.max_user_namespaces = 28633\s*\Z'}]
+         + ([{'name': 'the br_netfilter load docker-rootless set', 'type': 'files',
+              'dirs': ['/etc/modules-load.d'], 'pattern': 'br_netfilter\.conf',
+              'contains': '\Abr_netfilter\s*\Z'}]
+            if inventory_hostname not in groups.get('k8s_cluster', []) else []) }}
 
 # The tree is on the shared software prefix. Over NFS (root squashed) a client cannot
 # remove it, so only a host where it is local does: the NFS server.

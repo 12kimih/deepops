@@ -65,13 +65,24 @@
 # slurm_user_runtime_root). Earlier releases of this role used a podman wrapper and a
 # runtime directory of their own.
 - name: Remove the earlier podman wrapper and runtime directories
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /usr/local/bin/podman
-    - /etc/tmpfiles.d/podman-users.conf
-    - /run/podman-users
+  ansible.builtin.include_role:
+    name: stale_files
+  vars:
+    stale_files_state: absent
+    stale_files_rules:
+      - name: the podman wrapper earlier releases installed
+        type: files
+        dirs: [/usr/local/bin]
+        pattern: podman
+        contains: roles/podman keeps for this user
+      - name: their runtime directories at boot
+        type: files
+        dirs: [/etc/tmpfiles.d]
+        pattern: podman-users\.conf
+        contains: Rootless podman runtime directories, one per user
+      - name: their runtime root
+        type: glob
+        globs: [/run/podman-users]
 
 - name: Let podman create user namespaces under AppArmor
   ansible.builtin.include_tasks: apparmor.yml
