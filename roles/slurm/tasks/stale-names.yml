@@ -1,0 +1,31 @@
+---
+# The command and manual page names of the Slurm packages, which slurm_stale_files_rules
+# tell a leftover script or page by (stale-files.yml; playbooks/utilities/stale-files.yml).
+- name: Find the Slurm packages
+  ansible.builtin.find:
+    paths: "{{ slurm_repo_dir }}"
+    patterns: "*_{{ slurm_deb_version }}_*.deb"
+  register: slurm_stale_debs
+
+- name: List what the Slurm packages install
+  ansible.builtin.command:
+    argv: [dpkg-deb, --contents, "{{ item.path }}"]
+  loop: "{{ slurm_stale_debs.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  register: slurm_stale_contents
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Note the packages' command and manual page names
+  vars:
+    # dpkg-deb --contents: permissions, owner, size, date, time, path (-> target).
+    _all: "{{ slurm_stale_contents.results | map(attribute='stdout_lines') | flatten | map('split') | map(attribute=5) | unique }}"
+    _own: >-
+      {{ slurm_stale_contents.results | rejectattr('item.path', 'search', '/slurm-smd-(torque|openlava)_')
+         | map(attribute='stdout_lines') | flatten | map('split') | map(attribute=5) | unique }}
+  ansible.builtin.set_fact:
+    slurm_package_commands: "{{ _all | select('match', '[.]/usr/s?bin/[^/]+$') | map('basename') | unique | list }}"
+    slurm_package_manpages: >-
+      {{ _own | select('match', '[.]/usr/share/man/man[0-9]/[^/]+[.]gz$')
+         | map('regex_replace', '^[.]/usr/share/man/', '') | map('regex_replace', '[.]gz$', '') | list }}

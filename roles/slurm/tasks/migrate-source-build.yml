@@ -1,9 +1,9 @@
 ---
-# Remove the retired source build (make install under slurm_source_build_prefix, with
-# its own hwloc and PMIx) before the packages go in: its commands come first in PATH
-# (/usr/local/bin before /usr/bin), so any one left behind would shadow the packaged
-# one. make uninstall where the build tree is still there, then whatever the packages
-# now provide under the old prefix, then the build's own files elsewhere.
+# Retire the source build (make install under slurm_source_build_prefix, with its own
+# hwloc and PMIx) before the packages go in: its daemons stop, make uninstall runs
+# where the build tree is still there, and its library path and systemd units go.
+# What make uninstall misses (contrib, the Perl API, other releases' files) is
+# stale-files.yml's, on every run.
 - name: Stop the source-built daemons
   ansible.builtin.systemd:
     name: "{{ item }}"
@@ -29,43 +29,6 @@
   register: slurm_source_uninstall
   changed_when: true
   failed_when: false
-
-- name: Find the packages being installed
-  ansible.builtin.find:
-    paths: "{{ slurm_repo_dir }}"
-    patterns: "*_{{ slurm_deb_version }}_*.deb"
-    # Their wrappers (qsub, mpiexec, bsub...) share names with other software
-    # under /usr/local, an MPI's mpiexec among them.
-    excludes: ["slurm-smd-torque_*", "slurm-smd-openlava_*"]
-  register: slurm_migrate_debs
-
-- name: List what the packages install
-  ansible.builtin.command:
-    argv: [dpkg-deb, --contents, "{{ item.path }}"]
-  loop: "{{ slurm_migrate_debs.files }}"
-  loop_control:
-    label: "{{ item.path | basename }}"
-  register: slurm_migrate_contents
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-
-# The same commands, libraries and manual pages under the old prefix (where make
-# uninstall missed them, or the tree was gone), the plugin and header directories,
-# the hwloc and PMIx builds, and the build trees.
-- name: Remove the source build's leftovers
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  vars:
-    # dpkg-deb --contents: permissions, owner, size, date, time, path (-> target).
-    _paths: "{{ slurm_migrate_contents.results | map(attribute='stdout_lines') | flatten | map('split') | map(attribute=5) | unique }}"
-    _commands: "{{ _paths | select('match', '[.]/usr/s?bin/[^/]+$') | map('regex_replace', '^[.]/usr/', '') | list }}"
-    _libs: "{{ _paths | select('match', '[.]/usr/lib/[^/]+/lib(slurm|pmi|nss_slurm)[^/]*$') | map('regex_replace', '^[.]/usr/lib/[^/]+/', '') | list }}"
-    _man: "{{ _paths | select('match', '[.]/usr/share/man/man[0-9]/[^/]+[.]gz$') | map('regex_replace', '^[.]/usr/', '') | map('regex_replace', '[.]gz$', '') | list }}"
-    _under_prefix: >-
-      {{ _commands | union(_libs | map('regex_replace', '^', 'lib/')) | union(_man)
-         | union(['lib/slurm', 'include/slurm']) | map('regex_replace', '^', slurm_source_build_prefix ~ '/') }}
-  loop: "{{ _under_prefix | union(slurm_source_build_trees) | union(slurm_source_build_dirs) }}"
 
 - name: Remove the library path the source build added
   ansible.builtin.file:

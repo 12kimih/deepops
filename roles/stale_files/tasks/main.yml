@@ -1,0 +1,18 @@
+---
+- name: Find the leftovers of retired installs
+  stale_files:
+    rules: "{{ stale_files_rules }}"
+    state: "{{ stale_files_state }}"
+    report: "{{ stale_files_report }}"
+    # What deepops records installing (roles/component_record) is its own, not a leftover.
+    ignore: >-
+      {{ stale_files_ignore + (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
+         | select('match', '(file|dir):') | map('regex_replace', '^(file|dir):', '') | list }}
+  register: stale_files_result
+
+- name: Report the leftovers
+  ansible.builtin.debug:
+    msg:
+      removed_or_found: "{{ stale_files_result.stale }}"
+      unowned_unmatched: "{{ stale_files_result.unowned }}"
+  when: stale_files_state == 'report' or stale_files_result is changed
