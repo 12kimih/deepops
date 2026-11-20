@@ -195,14 +195,16 @@ reason. With the new name set:
 ansible-playbook -K playbooks/slurm-cluster/slurm-cluster-rename.yml
 ```
 
-It refuses unless every host already holds `slurm_munge_key_file`'s key, and unless the queue is
-empty: drain the partitions (`scontrol update partitionname=<p> state=drain`) and let
-the jobs end, or cancel them. Then it takes a backup, adds the new cluster to
+It refuses unless every host already holds `slurm_munge_key_file`'s key. It drains every
+partition, so nothing new is submitted while the name changes, then refuses unless no job
+is left unfinished (let the jobs end, or cancel them, and run it again); a refusal puts
+each partition back as it was. Then it takes a backup, adds the new cluster to
 accounting, stops `slurmctld`, sets the old `clustername` file aside (kept as
 `clustername.<old name>.<time>`), deploys the controller under the new name (the
 accounting associations from `slurm_accounting_file` are created for it), and restarts
-`slurmd` and `sackd`, which fetch the new configuration. Resume the partitions
-afterwards. The old cluster's history stays in the database:
+`slurmd` and `sackd`, which fetch the new configuration. The restarted `slurmctld` takes
+each partition's state from `slurm.conf` again (it starts without `-R`), so the drain
+ends with the rename. The old cluster's history stays in the database:
 `sacct -M <old name>`, `sreport -M <old name>`.
 
 Everything else that shows the name follows `slurm_cluster_name`; a portal (Open
