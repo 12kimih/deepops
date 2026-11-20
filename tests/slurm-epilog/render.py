@@ -14,15 +14,16 @@ import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+from repo_files import tracked  # noqa: E402
 
 
 def role_defaults(*names):
     """The named settings as the roles define them (their defaults may template each
     other), so the tests render with the deployed values, never a copy of them."""
     found = {}
-    for path in sorted(ROOT.glob("roles/*/defaults/main.yml")):
-        if "galaxy" not in path.parts:
-            found.update(yaml.safe_load(path.read_text()) or {})
+    for path in tracked("roles/*/defaults/main.yml"):
+        found.update(yaml.safe_load(path.read_text()) or {})
     env = Environment(undefined=StrictUndefined, autoescape=False)  # noqa: S701 (not HTML)
 
     def resolve(value):

@@ -17,6 +17,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 import image_pins  # noqa: E402
+from repo_files import tracked  # noqa: E402
 
 PIN = re.compile(
     r"\b([a-z][a-z0-9_]*(?:version|_container|_image|_tag)[a-z0-9_]*)\s*[:=]\s*[\"']?([vV]?\d[\w.\-:/]*)"
@@ -25,9 +26,7 @@ PIN = re.compile(
 
 def role_defaults():
     found = {}
-    for path in ROOT.glob("roles/*/defaults/main.yml"):
-        if "galaxy" in path.parts:
-            continue
+    for path in tracked("roles/*/defaults/main.yml"):
         for name, value in (yaml.safe_load(path.read_text()) or {}).items():
             if isinstance(value, (str, int, float)) and "{{" not in str(value):
                 found.setdefault(name, str(value))
@@ -36,7 +35,7 @@ def role_defaults():
 
 def example_values():
     found = {}
-    for path in ROOT.glob("config.example/group_vars/*.yml"):
+    for path in tracked("config.example/group_vars/*.yml"):
         for line in path.read_text().splitlines():
             m = re.match(r"^([a-z][a-z0-9_]+):\s*[\"']?([^\"'#\s]+)", line)
             if m:
@@ -47,7 +46,7 @@ def example_values():
 class DocPinTests(unittest.TestCase):
     def test_quoted_pins_match_defaults(self):
         defaults, examples = role_defaults(), example_values()
-        docs = list(ROOT.glob("docs/**/*.md")) + list(ROOT.glob("roles/*/README.md")) + [ROOT / "README.md"]
+        docs = tracked("docs/*.md", "roles/*/README.md", "README.md")
         for doc in docs:
             for number, line in enumerate(doc.read_text().splitlines(), 1):
                 for name, value in PIN.findall(line):
@@ -67,8 +66,7 @@ class DocPinTests(unittest.TestCase):
                 continue
             _, path, tag = image_pins.split(ref)
             pinned.setdefault(path.removeprefix("library/"), set()).add(tag)
-        docs = [*ROOT.glob("docs/**/*.md"), *ROOT.glob("roles/*/README.md"), *ROOT.glob("skills/**/*.md"),
-                ROOT / "README.md", ROOT / "AGENTS.md"]  # fmt: skip
+        docs = tracked("docs/*.md", "roles/*/README.md", "skills/*.md", "README.md", "AGENTS.md")
         stale = []
         for doc in docs:
             for number, line in enumerate(doc.read_text().splitlines(), 1):

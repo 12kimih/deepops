@@ -8,6 +8,7 @@ uses are defined in the shipped rule files, so a renamed rule cannot leave a pan
 
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
 
@@ -15,6 +16,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 RULES = ROOT / "roles/prometheus/files/rules"
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
 
 
 # Every dashboard deepops provisions, set -> files in src/dashboards/.
@@ -47,7 +50,7 @@ class DashboardConventionTests(unittest.TestCase):
         cls.dashboards = list(dashboards())
         cls.recorded = {
             rule["record"]
-            for path in RULES.glob("*.yml")
+            for path in tracked(f"{RULES.relative_to(ROOT)}/*.yml")
             for group in yaml.safe_load(path.read_text())["groups"]
             for rule in group["rules"]
             if "record" in rule
@@ -59,9 +62,12 @@ class DashboardConventionTests(unittest.TestCase):
     def test_every_dashboard_file_is_provisioned_and_no_set_shares_one(self):
         listed = [name for names in SETS.values() for name in names]
         self.assertEqual(len(listed), len(set(listed)))
-        self.assertEqual(sorted(listed), sorted(p.name for p in (ROOT / "src/dashboards").glob("*.json")))
-        stray = [str(p.relative_to(ROOT)) for p in ROOT.glob("roles/*/files/**/*.json")
-                 if "galaxy" not in p.parts and "panels" in json.loads(p.read_text())]  # fmt: skip
+        self.assertEqual(sorted(listed), sorted(p.name for p in tracked("src/dashboards/*.json")))
+        stray = [
+            str(p.relative_to(ROOT))
+            for p in tracked("roles/*/files/*.json")
+            if "panels" in json.loads(p.read_text())
+        ]
         self.assertEqual(stray, [], "dashboards live in src/dashboards/, listed in grafana_dashboard_sets")
 
     def test_names_and_uids(self):

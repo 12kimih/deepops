@@ -14,7 +14,6 @@ nvcr.io, ghcr.io). Nothing is pulled.
 
 import json
 import re
-import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -22,6 +21,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from repo_files import tracked  # noqa: E402
+
 PINNED = re.compile(r"""(?<![\w.:/-])((?:[\w.-]+(?::\d+)?/)?[\w./-]+:[\w.-]+)@(sha256:[0-9a-f]{64})""")
 ACCEPT = ", ".join([
     "application/vnd.oci.image.index.v1+json",
@@ -88,15 +90,10 @@ def tags(ref):
 def pins():
     """[(image:tag, digest, file:line)] for every pin in the roles' defaults, vars and
     Dockerfiles (a build stage's base image)."""
-    files = subprocess.run(
-        ["git", "ls-files", "-z", "roles/*/defaults/*", "roles/*/vars/*", "roles/**/Dockerfile"], cwd=ROOT,
-        capture_output=True, text=True, errors="surrogateescape", check=True,
-    ).stdout.split("\0")  # fmt: skip
     found = []
-    for rel in filter(None, files):
-        if rel.startswith("roles/galaxy/"):
-            continue
-        for number, line in enumerate((ROOT / rel).read_text(errors="ignore").splitlines(), 1):
+    for path in tracked("roles/*/defaults/*", "roles/*/vars/*", "roles/**/Dockerfile"):
+        rel = path.relative_to(ROOT).as_posix()
+        for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
             if line.lstrip().startswith("#"):
                 continue
             for ref, sha in PINNED.findall(line):

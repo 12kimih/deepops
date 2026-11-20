@@ -16,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from ansible_yaml import condition, load, render, role_defaults, same_name  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 DEFAULTS = role_defaults("slurm")
 BUILD = load("roles/slurm/tasks/packages-build.yml")
 VERSION = load("roles/slurm/tasks/version.yml")
@@ -321,7 +324,7 @@ class PyxisPackage(unittest.TestCase):
         self.assertIn("slurm_pyxis_package", install["apt"]["name"])
 
     def test_no_host_builds_pyxis(self):
-        for path in sorted((ROOT / "roles" / "pyxis" / "tasks").glob("*.yml")):
+        for path in tracked("roles/pyxis/tasks/*.yml", root=ROOT):
             text = path.read_text()
             for word in ("make", "gcc", "build-essential"):
                 self.assertIsNone(re.search(rf"\b{word}\b", text), f"{path.name} mentions {word}")
@@ -361,10 +364,8 @@ class PyxisEntry(unittest.TestCase):
         self.assertTrue(condition(remove["when"], variables(slurm_pyxis_wanted=False)))
 
     def test_no_other_role_writes_the_entry(self):
-        for role in sorted((ROOT / "roles").iterdir()):
-            if role.name == "slurm":
-                continue
-            for path in sorted(role.glob("tasks/**/*.yml")) + sorted(role.glob("templates/**/*plugstack*")):
+        for path in tracked("roles/*/tasks/*.yml", "roles/*/templates/*plugstack*", root=ROOT):
+            if path.relative_to(ROOT).parts[1] != "slurm":
                 self.assertNotIn("plugstack.conf", path.read_text(), str(path))
 
 

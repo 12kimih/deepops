@@ -461,10 +461,8 @@ class TaskRules(unittest.TestCase):
         # failed there, and a node with residual GPU processes was never drained.
         bare = re.compile(r"(?<![\w/${}.-])(scontrol|squeue|sinfo|sacct|scancel|srun|sbatch)\s")
         scan, offenders = Scan(minimum=10), []
-        base = ROOT / "roles" / "slurm" / "templates" / "etc" / "slurm"
-        for path in sorted(p for sub in ("prolog.d", "epilog.d", "shared") for p in (base / sub).rglob("*")):
-            if not path.is_file():
-                continue
+        base = "roles/slurm/templates/etc/slurm"
+        for path in tracked(*(f"{base}/{sub}/*" for sub in ("prolog.d", "epilog.d", "shared"))):
             scan.seen(path)
             for number, line in lines_of(path):
                 code = re.sub(r"(['\"]).*?\1", "", line)  # messages may name a command
@@ -494,16 +492,30 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "ask with roles/maintenance reboot_request instead")
         scan.check(self)
 
-    def test_suites_list_files_through_repo_scan(self):
-        # A suite running git ls-files itself sees files deleted but not yet staged and
-        # fails on them; repo_scan.tracked is the one listing (tracked and present).
-        own = ROOT / "tests" / "lib" / "repo_scan.py"
-        offenders = [
-            rel(path)
-            for path in tracked("tests/*.py", "scripts/validation/tests/*.py")
-            if path != own and path.name != Path(__file__).name and '"ls-files"' in path.read_text()
-        ]
-        self.assertEqual(offenders, [], "use tests/lib/repo_scan.py tracked()")
+    def test_the_repository_is_listed_one_way(self):
+        # What the tools and tests read is what git tracks (scripts/deepops/repo_files.py).
+        # Each listing its own way drifted: copies without -z split on spaces, saw files
+        # deleted but not yet staged, or needed their own roles/galaxy exception; and a
+        # glob of the tree judged Galaxy's roles and a peer's unfinished file.
+        own = {"scripts/deepops/repo_files.py"}
+        # Readers of another repository or revision, under their own git environment.
+        other_repo = {"scripts/deepops/settings.py", "scripts/deepops/sensitive_guard.py"}
+        this = rel(Path(__file__).resolve())
+        tree_glob = re.compile(
+            r"\b(ROOT|ROLES|REPO)\b[^#\n]*\.(r?glob|iterdir|walk)\(|os\.walk\(\s*(ROOT|ROLES|REPO)\b"
+        )
+        offenders = []
+        for path in tracked("*.py"):
+            name = rel(path)
+            if name == this or name.startswith("submodules/"):
+                continue
+            text = path.read_text()
+            if '"ls-files"' in text and name not in own | other_repo:
+                offenders.append(f"{name}: git ls-files")
+            offenders += [f"{name}:{n}: globs the tree" for n, line in enumerate(text.splitlines(), 1)
+                          if tree_glob.search(line)]  # fmt: skip
+        self.assertEqual(offenders, [], "list files with repo_files.tracked (tests: repo_scan.tracked)")
+        self.assertGreater(len(tracked("*.py")), 50)
 
     def test_only_host_baseline_sets_kernel_settings(self):
         # A sysctl written straight to a file was undone at boot by a later file (a hand
@@ -539,9 +551,8 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {task.get('name')}: volumes:")
         texts = [
             p
-            for top in ("roles", "playbooks", "scripts", "tests")
-            for p in (ROOT / top).rglob("*")
-            if p.is_file() and p.suffix in (".yml", ".yaml", ".j2", ".sh", ".py", ".service")
+            for p in tracked("roles", "playbooks", "scripts", "tests")
+            if p.suffix in (".yml", ".yaml", ".j2", ".sh", ".py", ".service")
         ]
         for path in texts:
             if path == Path(__file__).resolve():
@@ -584,7 +595,7 @@ class TaskRules(unittest.TestCase):
         # file, and only when the handler runs: a reboot request there failed on the
         # rare run that needed it. Act on the registered result in a task instead.
         offenders = []
-        for path in sorted(ROOT.glob("roles/*/handlers/*.yml")):
+        for path in tracked("roles/*/handlers/*.yml", "roles/*/handlers/*.yaml"):
             role_tasks = path.parents[1] / "tasks"
             for task in tasks(path):
                 name, args = module(task)
@@ -616,12 +627,8 @@ class TaskRules(unittest.TestCase):
     def test_dpkg_status_is_read_by_the_package_state(self):
         wanted = re.compile(r"""\^ii\b|\^\[[a-z]+\]i\b|['"]ii['" ]|match\(['"]\[[a-z]+\]i['"]""")
         offenders = []
-        for path in sorted(ROOT.glob("roles/**/*")):
-            if (
-                path.is_file()
-                and path.suffix in ("", ".yml", ".sh", ".j2", ".py")
-                and "molecule" not in path.parts
-            ):
+        for path in tracked("roles"):
+            if path.suffix in ("", ".yml", ".sh", ".j2", ".py") and "molecule" not in path.parts:
                 text = path.read_text(errors="ignore")
                 if "Status-Abbrev" in text or "dpkg-query" in text:
                     offenders += [f"{rel(path)}: {m.group(0)}" for m in wanted.finditer(text)]
@@ -644,7 +651,7 @@ class TaskRules(unittest.TestCase):
                 )
 
         scan = Scan(minimum=MINIMUM_FILES)
-        variables = sorted(ROOT.glob("roles/*/defaults/*.yml")) + sorted(ROOT.glob("roles/*/vars/*.yml"))
+        variables = role_var_files()
         for path in [scan.seen(p) for p in ansible_files()] + variables:
             for doc in yaml.safe_load_all(path.read_text()):
                 walk(doc, rel(path))

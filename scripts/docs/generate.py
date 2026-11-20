@@ -20,31 +20,19 @@ Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
 
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+from repo_files import tracked  # noqa: E402
+
 BLOCK = re.compile(
     r"(<!-- BEGIN GENERATED: (?P<name>[\w:.-]+) -->\n)(?P<body>.*?)(<!-- END GENERATED: (?P=name) -->)", re.S
 )
 PIN = re.compile(r"(version|_container|_image|_tag|_branch)$|_version_|_chart_version$")
-
-
-def tracked(*patterns):
-    """Tracked files, as paths: what a commit holds, never another checkout's half-done
-    work lying in the shared tree."""
-    out = subprocess.run(
-        ["git", "ls-files", "-z", "--", *patterns],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        errors="surrogateescape",
-        check=True,
-    ).stdout
-    return [ROOT / name for name in out.split("\0") if name]
 
 
 def literal(value):
@@ -66,7 +54,7 @@ def example_values():
 
 
 def roles():
-    return sorted({p.parts[-3] for p in tracked("roles/*/defaults/main.yml")} - {"galaxy"})
+    return sorted({p.parts[-3] for p in tracked("roles/*/defaults/main.yml")})
 
 
 def cell(text):

@@ -8,12 +8,15 @@ is true when it just added a repository) or directly follows a task that
 refreshes the cache.
 """
 
-from pathlib import Path
+import sys
 import unittest
+from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import ansible_files  # noqa: E402
 
 
 def refreshes(task):
@@ -43,12 +46,7 @@ def task_lists(data):
 
 
 def offenders():
-    files = [
-        p
-        for p in sorted(ROOT.glob("roles/*/tasks/**/*.yml")) + sorted(ROOT.glob("playbooks/**/*.yml"))
-        if "galaxy" not in p.parts
-    ]
-    for path in files:
+    for path in ansible_files():
         try:
             data = yaml.safe_load(path.read_text())
         except yaml.YAMLError:

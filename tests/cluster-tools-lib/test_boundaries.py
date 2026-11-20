@@ -19,8 +19,11 @@ ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
 from clustertools import cli, proc, slurm  # noqa: E402
 
+sys.path.insert(0, str(ROLES.parent / "tests/lib"))
+from repo_scan import tracked  # noqa: E402
+
 # All of the cluster's own Python: the clustertools package.
-SOURCES = list(ROLES.glob("cluster_tools_lib/files/**/*.py"))
+SOURCES = tracked("roles/cluster_tools_lib/files/*.py")
 READER = ROLES / "cluster_tools_lib/files/clustertools/slurm.py"
 PROC = ROLES / "cluster_tools_lib/files/clustertools/proc.py"
 SLURM = (

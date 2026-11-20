@@ -6,6 +6,7 @@ let defects through: a test that globbed *.yml never saw a .yaml file, none read
 handlers, a free-form `copy: src=x dest=y` or an `args:` block hid a task's arguments,
 and an empty tree passed every test. Here is the one walker they all use:
 
+  tracked(*pathspecs)  tracked files present in the tree (scripts/deepops/repo_files.py)
   ansible_files()      tracked task, handler and playbook files (.yml and .yaml)
   role_var_files()     tracked role defaults and vars files
   tasks(path)          every task, in plays, blocks, rescues, always and handlers
@@ -18,12 +19,14 @@ and an empty tree passed every test. Here is the one walker they all use:
 
 import re
 import shlex
-import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+from repo_files import tracked  # noqa: E402
 
 # Keys that are a task's own settings, never its module.
 TASK_KEYS = {
@@ -37,14 +40,6 @@ TASK_KEYS = {
 }  # fmt: skip
 PLAY_LISTS = ("pre_tasks", "tasks", "post_tasks", "handlers")
 NESTED = ("block", "rescue", "always")
-
-
-def tracked(*patterns):
-    """Tracked files matching git pathspecs that exist in the working tree."""
-    out = subprocess.run(
-        ["git", "ls-files", "-z", "--", *patterns], cwd=ROOT, capture_output=True, text=True, check=True
-    ).stdout
-    return [ROOT / n for n in sorted(filter(None, out.split("\0"))) if (ROOT / n).is_file()]
 
 
 def shell_scripts(templates=True):

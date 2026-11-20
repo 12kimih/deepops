@@ -7,12 +7,16 @@ their own tags. An untagged include of tagged tasks hides them, so
 tasks carries tags itself (normally `always`).
 """
 
-from pathlib import Path
+import sys
 import unittest
+from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 # Markers that look like tags but select nothing.
 NOT_TAGS = {"always", "skip_ansible_lint"}
 
@@ -36,9 +40,7 @@ def tags_in(tasks):
 
 
 def hidden():
-    for path in sorted(ROOT.glob("roles/*/tasks/**/*.yml")):
-        if "galaxy" in path.parts:
-            continue
+    for path in tracked("roles/*/tasks/*.yml"):
         for task in load(path):
             target = task.get("ansible.builtin.include_tasks") if isinstance(task, dict) else None
             if not isinstance(target, str) or "{{" in target or task.get("tags"):
