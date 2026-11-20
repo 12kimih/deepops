@@ -36,7 +36,6 @@
     owner: root
     group: root
     mode: "0644"
-    backup: true
     content: |
       # Managed by DeepOps (roles/open_ondemand). Apache listens only where the Open
       # OnDemand portal config says (listen_addr_port in /etc/ood/config/ood_portal.yml).
@@ -63,7 +62,6 @@
     owner: root
     group: root
     mode: "0600"
-    backup: true
   diff: false  # holds the OIDC passphrase and the LDAP bind password
 
 - name: Configure the per-user servers
@@ -73,7 +71,6 @@
     owner: root
     group: root
     mode: "0644"
-    backup: true
 
 - name: Find the cluster files
   ansible.builtin.find:

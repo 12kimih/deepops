@@ -12,7 +12,8 @@
     - serial_console
 
 # Appended, so these assignments win over anything the file set earlier -- which is how
-# /etc/default/grub is read. Removing the block reverts the node.
+# /etc/default/grub is read. Removing the block reverts the node (no backup copies: the
+# block is the whole change).
 - name: Configure the serial console in the grub defaults
   ansible.builtin.blockinfile:
     path: /etc/default/grub
@@ -25,7 +26,6 @@
       GRUB_TIMEOUT={{ serial_console_grub_timeout }}
       GRUB_TIMEOUT_STYLE=menu
       {% endif %}
-    backup: true
     mode: "0644"
   notify: Update grub
   tags:

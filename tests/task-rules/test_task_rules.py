@@ -39,6 +39,10 @@
    or `'\\.'` reached regex_search and match doubled (a backreference that failed the
    task, a version that never matched). Conditionals and .j2 files unescape them, so
    they do not count.
+14. No task keeps Ansible's backup copy (`backup: true`) of a host file: each change
+   leaves `<file>.<pid>.<date>@<time>~` beside it, never removed, so /etc fills with
+   stale copies (and copies of secrets). The repository is the history; a task that
+   needs the old file to roll back removes the copy itself.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -194,6 +198,11 @@ WORLD_WRITABLE_OK = {
     "roles/nvidia-dgx-firmware/tasks/clean.yml": "upstream DGX: removes that same nvsm dump",
     "roles/ai_agent_rules/tasks/main.yml": "fetched on the controller, as the operator (become: false)",
     "roles/download/tasks/main.yml": "the assert that refuses these paths names them",
+}
+# file -> why it keeps Ansible's backup copy
+BACKUP_OK = {
+    "roles/netplan/tasks/main.yml": "puts back a file netplan rejects, then removes the copy (always:)",
+    "playbooks/k8s-cluster.yml": "the operator's own ~/.kube/config on the controller, not a host file",
 }
 # file -> why a secret on its command line is acceptable
 SECRET_ARGV_OK = {
@@ -495,6 +504,17 @@ class TaskRules(unittest.TestCase):
                 if module(task)[0] == "sysctl" and rel(path) != "roles/host_baseline/tasks/sysctl.yml":
                     offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "include_role host_baseline, tasks_from: sysctl")
+        scan.check(self)
+
+    def test_no_backup_copies_of_host_files(self):
+        scan, offenders = Scan(BACKUP_OK, MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                args = module(task)[1]
+                if isinstance(args, dict) and str(args.get("backup", "")).lower() in ("true", "yes"):
+                    if not scan.excuse(rel(path)):
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "drop backup: true; the repository is the file's history")
         scan.check(self)
 
     def test_no_handler_includes_a_role(self):

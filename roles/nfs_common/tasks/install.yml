@@ -21,7 +21,6 @@
     regexp: "^Domain"
     insertafter: "^# Domain"
     line: "Domain = {{ nfs_idmapd_domain }}"
-    backup: true
 
 # Raise TCP/socket buffers for the NFS data path on fast cluster networks.
 # https://nfs.sourceforge.net/nfs-howto/ar01s05.html
