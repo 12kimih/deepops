@@ -50,6 +50,9 @@ Each run makes the tree match the roster (`roles/ldap_server/library/ldap_tree.p
 Under groups, netgroups and services, anything the roster does not declare is removed.
 People are never removed. An account the roster does not list stops the run, so the
 roster gains it as `status: left`.
+Setting someone back to `status: active` gives the account back: the entry loses its
+expiry and nologin shell (a new password is set, since leaving removed it), and a local
+account loses the lock `roles/people` put on it (expiry day 1, the `!` before the hash).
 
 Access rules:
 

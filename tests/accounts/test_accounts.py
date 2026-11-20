@@ -30,6 +30,7 @@ OTHER_ACCOUNT_TASKS = {
     ("roles/move-home-dirs/tasks/move_users.yml", "Create temporary user"): "a probe account, removed in the same run",
     ("roles/move-home-dirs/tasks/move_users.yml", "Delete temporary user"): "removes the probe account",
     ("roles/people/tasks/main.yml", "Lock the accounts of people who have left"): "locks existing accounts",
+    ("roles/people/tasks/main.yml", "Give back the accounts of people active again"): "unlocks accounts read from /etc/shadow",
     # The NIS master's copy of the cluster groups, from directory_groups.
     ("roles/nis_server/tasks/present.yml", "Create the NIS-exported cluster groups"): "IDs from directory_groups",
     ("roles/nis_server/tasks/present.yml", "Add members to the NIS-exported cluster groups"): "membership only",
