@@ -271,13 +271,6 @@
 - name: Remove the repository
   when: package_repos_state == 'absent'
   block:
-    - name: Remove the source (Debian)
-      ansible.builtin.deb822_repository:
-        name: "{{ package_repos_r.name }}"
-        state: absent
-      register: package_repos_source_removed
-      when: ansible_facts.os_family == 'Debian'
-
     - name: Remove the yum repository (RHEL family)
       ansible.builtin.yum_repository:
         name: "{{ package_repos_r.name }}"
@@ -285,12 +278,16 @@
       register: package_repos_yum_removed
       when: ansible_facts.os_family == 'RedHat'
 
-    - name: Remove the key, the pin and what earlier setups left
+    # The Debian source is a file of its own (all deb822_repository's absent removes),
+    # deleted as one: removing a repository installs nothing, so python3-debian and a
+    # reachable mirror are needed only to add one.
+    - name: Remove the source, the key, the pin and what earlier setups left
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop: >-
-        {{ ['/etc/apt/keyrings/' ~ package_repos_r.name ~ '.asc', '/etc/apt/keyrings/' ~ package_repos_r.name ~ '.gpg',
+        {{ ['/etc/apt/sources.list.d/' ~ package_repos_r.name ~ '.sources',
+            '/etc/apt/keyrings/' ~ package_repos_r.name ~ '.asc', '/etc/apt/keyrings/' ~ package_repos_r.name ~ '.gpg',
             '/etc/apt/preferences.d/' ~ package_repos_r.name ~ '.pref', package_repos_rpm_key, package_repos_key_fetched]
            + package_repos_r.legacy_files | default([]) }}
       register: package_repos_files_removed
@@ -298,7 +295,7 @@
     - name: Note whether the repository changed
       ansible.builtin.set_fact:
         package_repos_changed: >-
-          {{ package_repos_source_removed is changed or package_repos_yum_removed is changed
+          {{ package_repos_yum_removed is changed
              or package_repos_files_removed is changed }}
 
 - name: Refresh the package index
