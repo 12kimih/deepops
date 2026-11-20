@@ -1,0 +1,10 @@
+---
+# The backup sets on each destination are data and stay, as do the dumps' scratch
+# database and the destinations' directories.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: slurm_backup
+    component_record_action: absent
+    component_record_items: "{{ slurm_backup_items }}"

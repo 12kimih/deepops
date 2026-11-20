@@ -1,0 +1,94 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: slurm_backup
+    component_record_action: begin
+    component_record_items: "{{ slurm_backup_items }}"
+
+# The program is clustertools.slurm_backup, shipped with the library it imports.
+- name: Install the backup command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ slurm_backup_script }}"
+      module: clustertools.slurm_backup
+
+# A destination on an NFS export with root_squash cannot be created by this host's
+# root, so its directory is made on the export's server, owned by the writer.
+- name: Create each destination directory
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.owner | default('root') }}"
+    mode: "0700"
+  delegate_to: "{{ item.prepare_host | default(inventory_hostname) }}"
+  loop: "{{ slurm_backup_destinations }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+# The program's own check refuses what it could not run (a keep count below 1
+# would delete the set just written), so the deploy fails, not the 3 a.m. run.
+- name: Write the backup configuration
+  ansible.builtin.copy:
+    dest: "{{ slurm_backup_config }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: "{{ {'database': slurm_backup_database, 'state_dir': slurm_state_save_location,
+                  'munge_key': slurm_backup_munge_key, 'weekly_day': slurm_backup_weekly_day,
+                  'textfile_dir': slurm_backup_textfile_dir, 'textfile': slurm_backup_textfile,
+                  'work_dir': slurm_backup_work_dir, 'metrics_file': slurm_backup_metrics_file,
+                  'step_timeout': slurm_backup_step_timeout,
+                  'destinations': slurm_backup_destinations} | to_nice_json }}\n"
+    validate: "{{ slurm_backup_script }} check %s"
+
+- name: Install the backup service
+  ansible.builtin.template:
+    src: slurm-backup@.service.j2
+    dest: /etc/systemd/system/slurm-backup@.service
+    mode: "0644"
+
+- name: Install the backup and restore-test timers
+  ansible.builtin.template:
+    src: slurm-backup.timer.j2
+    dest: "/etc/systemd/system/slurm-backup-{{ item.command }}.timer"
+    mode: "0644"
+  loop: "{{ slurm_backup_timers }}"
+  loop_control:
+    label: "{{ item.command }}"
+
+# The textfile directory is usually tmpfs: the publish instance copies the kept
+# metrics back at boot so the series never go absent until the next backup. Run
+# now too, so each configured destination is known before its first backup.
+- name: Republish the kept metrics at boot, and now
+  ansible.builtin.systemd:
+    name: slurm-backup@publish.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+# Under --check the unit files above are not written, so there is nothing to enable.
+- name: Enable the timers
+  ansible.builtin.systemd:
+    name: "slurm-backup-{{ item.command }}.timer"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ slurm_backup_timers }}"
+  loop_control:
+    label: "{{ item.command }}"
+  when: not ansible_check_mode
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: slurm_backup
+    component_record_action: present
+    component_record_items: "{{ slurm_backup_items }}"

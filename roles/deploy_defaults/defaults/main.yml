@@ -40,6 +40,9 @@ slurm_cluster_install_openmpi: false
 slurm_install_lmod: true
 slurm_install_hpcsdk: false
 slurm_enable_monitoring: true
+# Daily backups of the controller with a monthly restore test (roles/slurm_backup);
+# nothing until slurm_backup_destinations is set
+slurm_enable_backup: true
 # The Open OnDemand web portal on the controller (needs its login and TLS settings)
 slurm_install_open_ondemand: false
 # The site's commands, shell defaults, login banner and per-user limits (roles/cluster_tools)
@@ -56,7 +59,7 @@ slurm_install_pyxis: true
 # Rootless Podman on compute nodes, for Dockerfile builds in CPU jobs (roles/podman)
 slurm_install_podman: true
 # The daily cleanup of users' podman storage and enroot cache (roles/container_storage_gc)
-slurm_container_storage_gc: true
+slurm_enable_container_storage_gc: true
 # Where users may connect outside the cluster (roles/egress_policy); needs
 # egress_policy_internal_networks
 slurm_enable_egress_policy: false

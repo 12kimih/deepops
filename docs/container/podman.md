@@ -151,7 +151,7 @@ Ubuntu 24.04):
   and at boot, and by `playbooks/nvidia-software/nvidia-mig.yml` after a MIG change),
   which `--device nvidia.com/gpu=...` reads
   ([CDI support](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html)).
-- **Cleanup.** `roles/container_storage_gc` (`slurm_container_storage_gc`) runs
+- **Cleanup.** `roles/container_storage_gc` (`slurm_enable_container_storage_gc`) runs
   `container-storage-gc` daily on every Slurm host. It reads the per-user store paths
   from storage.conf and enroot.conf, and removes a user's whole store when they left
   `container_storage_gc_people`, after `container_storage_gc_unused_days` without a

@@ -1,0 +1,9 @@
+---
+# Users' stores are their data and stay; only the cleanup goes.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: container_storage_gc
+    component_record_action: absent
+    component_record_items: "{{ container_storage_gc_items }}"

@@ -20,6 +20,7 @@ REGISTRY = yaml.safe_load((ROOT / "roles/deploy_defaults/vars/main.yml").read_te
     "deepops_component_registry"
 ]
 DEPLOYS = ("playbooks/slurm-cluster.yml", "playbooks/k8s-cluster.yml")
+ROLE_INCLUDES = ("include_role", "import_role", "ansible.builtin.include_role", "ansible.builtin.import_role")
 # Removing these reboots nodes, locks users out or hangs every NFS client: a switch or a
 # group never removes them, only deepops_component_removals does.
 EXPLICIT = {
@@ -79,6 +80,10 @@ GATES = {
     "allow_user_set_gpu_clocks": "policy (a runtime setting, gone at reboot)",
     # One-shot: nothing to remove.
     "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
+    # Gates on a role or an include inside a component playbook (Gates.ROLE_GATES).
+    "people_manage_accounts": "accounts are never removed (they own files on shared storage)",
+    "slurm_login_on_compute": "policy (who may log in to the compute nodes)",
+    "slurm_install_podman": "to move: roles/podman is not a component yet",
 }
 
 
@@ -99,7 +104,35 @@ class Gates(unittest.TestCase):
                         self.assertIn(
                             name, GATES, "a component's state comes from the map: classify it or move it"
                         )
+        used |= self.role_gates(defaults)
         self.assertEqual(sorted(set(GATES) - used), [], "no longer a gate: drop it from GATES")
+
+    def role_gates(self, defaults):
+        """The switches a play's role entry or role include is skipped on: as much a gate
+        as an import's (the container storage cleanup stayed installed with its switch
+        off that way), so classified alike."""
+        used = set()
+        for path in tracked("playbooks/*.yml", "playbooks/*.yaml"):
+            for play in yaml.safe_load(path.read_text()) or []:
+                if not isinstance(play, dict) or "import_playbook" in play:
+                    continue
+                entries = [r for r in play.get("roles") or [] if isinstance(r, dict)]
+                entries += [
+                    t
+                    for key in ("pre_tasks", "tasks", "post_tasks")
+                    for t in play.get(key) or []
+                    if isinstance(t, dict) and any(m in t for m in ROLE_INCLUDES)
+                ]
+                for entry in entries:
+                    when = entry.get("when") or []
+                    text = " ".join(when if isinstance(when, list) else [str(when)])
+                    for name in sorted(n for n in re.findall(r"[a-z_][a-z0-9_]*", text) if n in defaults):
+                        used.add(name)
+                        with self.subTest(playbook=str(path.relative_to(ROOT)), switch=name):
+                            self.assertIn(
+                                name, GATES, "a component's state comes from the map: classify it or move it"
+                            )
+        return used
 
 
 class Roles(unittest.TestCase):
