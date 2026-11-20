@@ -7,13 +7,6 @@
 # maintenance window) it is refused with ESLURM_REQUESTED_NODE_CONFIG_UNAVAILABLE
 # after job_submit.lua passed it, and slurmctld logs nothing. That refusal is accepted
 # only while no node is in service; any other refusal fails the check.
-- name: Read the controller's Slurm version
-  ansible.builtin.command:
-    argv: ["{{ slurm_install_prefix }}/bin/scontrol", version]
-  register: slurm_verify_version
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-
 - name: Ask the controllers whether they are up
   ansible.builtin.command:
     argv: ["{{ slurm_install_prefix }}/bin/scontrol", ping]
@@ -44,7 +37,9 @@
   changed_when: false
   check_mode: false  # read-only; --check needs the result
 
-- name: Read the configured job_submit plugins
+# The running slurmctld's own version and plugins (`scontrol version` would be the
+# client's: an old daemon still running would pass with the new packages on disk).
+- name: Read the running controller's version and plugins
   ansible.builtin.command:
     argv: ["{{ slurm_install_prefix }}/bin/scontrol", show, config]
   register: slurm_verify_config
@@ -70,7 +65,7 @@
     _submit_out: "{{ (slurm_verify_submit.stdout | default('')) ~ (slurm_verify_submit.stderr | default('')) }}"
   ansible.builtin.assert:
     that:
-      - slurm_verify_version.stdout | trim == 'slurm ' ~ slurm_version
+      - slurm_verify_config.stdout is search('^SLURM_VERSION *= *' ~ slurm_version ~ '$', multiline=True)
       - slurm_verify_ping.stdout is search('is UP')
       - slurm_cluster_name in slurm_verify_clusters.stdout_lines
       - "'lua' not in slurm_job_submit_plugins or slurm_verify_config.stdout is search('JobSubmitPlugins *=.*lua')"
@@ -78,7 +73,7 @@
         slurm_verify_submit is skipped or slurm_verify_submit.rc == 0 or
         (not _in_service and _submit_out is search('Requested node configuration is not available'))
     fail_msg: >-
-      After the upgrade: {{ slurm_verify_version.stdout | trim }}; ping:
+      After the upgrade: slurmctld {{ slurm_verify_config.stdout | regex_search('(?m)^SLURM_VERSION *= *(.*)$', '\\1') | first | default('version unknown') }}; ping:
       {{ slurm_verify_ping.stdout | trim }}; clusters: {{ slurm_verify_clusters.stdout_lines | join(', ') }};
       nodes: {{ slurm_verify_nodes.stdout_lines | join(', ') }}; test-only submission: {{ _submit_out }}
     success_msg: >-

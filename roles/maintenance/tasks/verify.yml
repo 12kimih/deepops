@@ -34,7 +34,7 @@
           some; see dmesg | grep -E 'NVRM|Xid'.
       when: >-
         maintenance_gpus.rc != 0 or
-        maintenance_gpus.stdout_lines | select('match', 'GPU [0-9]') | list | length < [maintenance_gpus_expected | int, 1] | max
+        maintenance_gpus.stdout_lines | select('match', 'GPU [0-9]') | list | length < maintenance_gpus_expected | int
 
 # A service that does not come up fails the node with its journal from this boot,
 # which says why; its systemd properties do not.
@@ -70,33 +70,57 @@
     label: "{{ item.item.item }}"
   when: not ansible_check_mode
 
-# Slurm must see the node as declared: after slurmd registers, a GRES it finds unlike
-# slurm.conf (a GPU missing, another type, AutoDetect naming a type the config does not)
-# marks the node INVALID with the reason. Checked here so such a node is never resumed.
-- name: Read the node as Slurm sees it after slurmd registered
-  ansible.builtin.command:
-    argv: ["{{ maintenance_slurm_bin }}/scontrol", show, node, -o, "{{ inventory_hostname }}"]
-  delegate_to: "{{ maintenance_slurm_controller }}"
-  register: maintenance_slurm_view
-  until: maintenance_slurm_view.stdout is search('State=\S*(DRAIN|IDLE|ALLOC|MIX)') or maintenance_slurm_view.stdout is search('INVAL')
-  retries: 12
-  delay: 10
-  changed_when: false
-  check_mode: false  # read-only
+# Slurm must see the node as declared: when the slurmd started above registers, a GRES
+# it finds unlike slurm.conf (a GPU missing, another type) marks the node INVALID_REG
+# with the reason. The state before that registration says nothing (a drained node is
+# IDLE+DRAIN before and after, NOT_RESPONDING too after a reboot), and slurmd tells
+# systemd it is ready before it registers; so this waits until Slurm records a slurmd
+# start no earlier than this one's and hears from it. plugins/filter/slurm_node.py
+# reads the state.
+- name: Check Slurm sees the node as declared
   when:
     - "'slurmd' in maintenance_verify_units"
     - maintenance_slurm_controller | length > 0
     - not ansible_check_mode
+  block:
+    - name: Read when this slurmd started
+      ansible.builtin.shell:
+        cmd: date -d "$(systemctl show slurmd --property=ExecMainStartTimestamp --value)" +%s
+      register: maintenance_slurmd_start
+      changed_when: false
+      check_mode: false  # read-only
 
-- name: Fail when Slurm finds the node unlike its declaration
-  ansible.builtin.fail:
-    msg: >-
-      Slurm marks {{ inventory_hostname }} {{ maintenance_slurm_view.stdout | regex_search('State=\S+') }}:
-      {{ maintenance_slurm_view.stdout | regex_search('Reason=.*?(?= \w+=|$)') or 'no reason given' }}.
-      Compare slurm.conf's Gres= for the node with what it found (scontrol show node, slurmd -G).
-  when:
-    - maintenance_slurm_view is not skipped
-    - maintenance_slurm_view.stdout is search('State=\S*INVAL') or maintenance_slurm_view.stdout is search('Reason=[^=]*(?i:gres)')
+    - name: Read the node as Slurm sees it after this slurmd registered
+      ansible.builtin.command:
+        argv: ["{{ maintenance_slurm_bin }}/scontrol", --json, show, node, "{{ inventory_hostname }}"]
+      delegate_to: "{{ maintenance_slurm_controller }}"
+      register: maintenance_slurm_view
+      vars:
+        _node: "{{ maintenance_slurm_view.stdout | slurm_node }}"
+      until: >-
+        maintenance_slurm_view.rc == 0 and _node.found and (_node.invalid or (_node.responding
+        and _node.slurmd_started | default(0, true) | int >= maintenance_slurmd_start.stdout | int))
+      retries: 18
+      delay: 10
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only
+
+    - name: Fail when Slurm finds the node unlike its declaration, or never hears from it
+      vars:
+        _node: "{{ maintenance_slurm_view.stdout | slurm_node }}"
+      ansible.builtin.fail:
+        msg: >-
+          {% if maintenance_slurm_view.rc != 0 %}Could not read {{ inventory_hostname }} from Slurm:
+          {{ maintenance_slurm_view.stderr }}{% elif _node.invalid %}Slurm marks {{ inventory_hostname }}
+          {{ _node.state }}: {{ _node.reason or 'no reason given' }}. Compare slurm.conf's Gres= for the node
+          with what it found (scontrol show node, slurmd -G).{% else %}Slurm has not heard from the slurmd
+          started at {{ maintenance_slurmd_start.stdout }} on {{ inventory_hostname }} after three minutes
+          (state {{ _node.state | default('unknown') }}, slurmd start it knows {{ _node.slurmd_started | default('none') }}):
+          see journalctl -u slurmd on the node (MUNGE key, firewall, --conf-server).{% endif %}
+      when: >-
+        maintenance_slurm_view.rc != 0 or not _node.found or _node.invalid or not (_node.responding
+        and _node.slurmd_started | default(0, true) | int >= maintenance_slurmd_start.stdout | int)
 
 # Fails the node on any failed test; the run stops with the node still drained. After
 # a reboot the host engine may still be starting: only that is waited for. A hung run is
