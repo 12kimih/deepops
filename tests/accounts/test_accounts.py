@@ -2,12 +2,15 @@
 service-account registry (roles/system_accounts), and the people roster's share."""
 
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import Scan, ansible_files, module, tasks  # noqa: E402
 
 
 def load(name):
@@ -20,16 +23,17 @@ def load(name):
 accounts, people = load("accounts"), load("people")
 SYSTEM = yaml.safe_load((ROOT / "roles/system_accounts/defaults/main.yml").read_text())["system_accounts"]
 EXAMPLE = yaml.safe_load((ROOT / "config.example" / "people.yml").read_text())["people"]
-# Tasks that still set IDs themselves, each to leave this list when it moves over:
-# the slurm user (deepops' Slurm work moves it onto system_accounts.slurm).
-PENDING = {
-    "roles/slurm/tasks/setup-user.yml",
-}
-# Tasks that set IDs from a registry other than roles/system_accounts: the NIS master's
-# copy of the cluster groups (directory_groups in roles/directory_defaults).
-REGISTRY_READERS = {
-    "roles/nis_server/tasks/present.yml",
-}
+# Tasks that use the user or group module outside roles/local_accounts, each with why:
+# none creates an account of its own (left to the OS, its number differs per host).
+OTHER_ACCOUNT_TASKS = {
+    ("roles/move-home-dirs/tasks/move_user.yml", "Move home directory for {{ user }}"): "moves an existing home",
+    ("roles/move-home-dirs/tasks/move_users.yml", "Create temporary user"): "a probe account, removed in the same run",
+    ("roles/move-home-dirs/tasks/move_users.yml", "Delete temporary user"): "removes the probe account",
+    ("roles/people/tasks/main.yml", "Lock the accounts of people who have left"): "locks existing accounts",
+    # The NIS master's copy of the cluster groups, from directory_groups.
+    ("roles/nis_server/tasks/present.yml", "Create the NIS-exported cluster groups"): "IDs from directory_groups",
+    ("roles/nis_server/tasks/present.yml", "Add members to the NIS-exported cluster groups"): "membership only",
+}  # fmt: skip
 
 
 class Check(unittest.TestCase):
@@ -71,28 +75,19 @@ class Registry(unittest.TestCase):
     def test_no_example_person_takes_a_service_id(self):
         self.assertEqual(accounts.overlap(people.people_local_accounts(EXAMPLE), SYSTEM), [])
 
-    def test_no_role_sets_its_own_service_ids(self):
-        # The IDs live in roles/system_accounts alone; a role creates its account there.
-        for path in sorted((ROOT / "roles").glob("*/tasks/**/*.yml")):
-            for task in yaml.safe_load(path.read_text()) or []:
-                for module in ("ansible.builtin.user", "ansible.builtin.group"):
-                    args = task.get(module) if isinstance(task, dict) else None
-                    rel = str(path.relative_to(ROOT))
-                    if (
-                        isinstance(args, dict)
-                        and "local_accounts" not in rel
-                        and rel not in PENDING | REGISTRY_READERS
-                    ):
-                        with self.subTest(path=rel, task=task.get("name")):
-                            self.assertNotIn("uid", args)
-                            self.assertNotIn("gid", args)
-
-    def test_pending_entries_still_need_it(self):
-        for rel in sorted(PENDING):
-            with self.subTest(path=rel):
-                self.assertRegex(
-                    (ROOT / rel).read_text(), r"\n\s+(uid|gid): ", "moved over: drop it from PENDING"
-                )
+    def test_only_local_accounts_creates_accounts(self):
+        # The IDs live in roles/system_accounts (and the roster) alone; a role creates its
+        # account through roles/local_accounts, blocks included.
+        scan, offenders = Scan(OTHER_ACCOUNT_TASKS, minimum=200), []
+        for path in map(scan.seen, ansible_files()):
+            rel = path.relative_to(ROOT).as_posix()
+            if rel.startswith("roles/local_accounts/"):
+                continue
+            for task in tasks(path):
+                if module(task)[0] in ("user", "group") and not scan.excuse((rel, task.get("name"))):
+                    offenders.append(f"{rel}: {task.get('name')}")
+        scan.check(self)
+        self.assertEqual(offenders, [], "create the account through roles/local_accounts")
 
 
 class People(unittest.TestCase):

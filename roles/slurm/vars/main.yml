@@ -1,0 +1,4 @@
+---
+# Derived, not settings: the service accounts as roles/system_accounts declares them.
+_slurm_user_account: "{{ system_accounts[slurm_username] }}"
+_slurm_build_account: "{{ system_accounts[slurm_deb_build_user] }}"

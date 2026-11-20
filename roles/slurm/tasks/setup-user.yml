@@ -1,27 +1,18 @@
 ---
-- name: Create slurm user home
+# The slurm account with the IDs and home roles/system_accounts gives it (the same on
+# every host), through roles/local_accounts, which refuses to renumber an existing one.
+- name: Create the slurm account's home
   ansible.builtin.file:
-    path: "{{ slurm_user_home }}"
-    recurse: true
+    path: "{{ _slurm_user_account.home }}"
     state: directory
 
-# Pin the group's gid as well as the user's uid. Left to the OS, each node picks
-# whatever number is free when the role first runs, so nodes provisioned at different
-# times disagree -- see slurm_user_gid in defaults/main.yml for why numeric agreement
-# matters.
-- name: Create slurm group
-  ansible.builtin.group:
-    name: "{{ slurm_groupname }}"
-    gid: "{{ slurm_user_gid }}"
-    state: present
-    system: true
-  when: slurm_manage_user_gid | bool
+# Resolved here: local_accounts evaluates its arguments in its own scope.
+- name: Note the slurm account
+  ansible.builtin.set_fact:
+    _slurm_user_accounts: "{{ {slurm_username: _slurm_user_account} }}"
 
-- name: Create slurm user
-  ansible.builtin.user:
-    name: "{{ slurm_username }}"
-    state: present
-    system: true
-    home: "{{ slurm_user_home }}"
-    uid: "{{ slurm_user_uid }}"
-    group: "{{ slurm_groupname if slurm_manage_user_gid | bool else omit }}"
+- name: Create the slurm account
+  ansible.builtin.include_role:
+    name: local_accounts
+  vars:
+    local_accounts: "{{ _slurm_user_accounts }}"

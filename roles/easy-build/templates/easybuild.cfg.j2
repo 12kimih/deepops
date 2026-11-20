@@ -4,7 +4,7 @@
 prefix = {{ easybuild_prefix }}
 installpath-modules = {{ easybuild_module_path | dirname }}
 suffix-modules-path = {{ easybuild_module_path | basename }}
-buildpath = {{ easybuild_home }}/build
+buildpath = {{ _easybuild_account.home }}/build
 modules-tool = Lmod
 module-syntax = Lua
 

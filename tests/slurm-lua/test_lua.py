@@ -249,7 +249,7 @@ class TestCleanBuild(unittest.TestCase):
         self.assertEqual(
             targets,
             [
-                "{{ slurm_deb_build_dir }}",
+                "{{ _slurm_build_account.home }}",
                 "{{ slurm_repo_dir }}",
                 "{{ package_repos_cuda_keyring_file }}",
                 "{{ package_repos_cuda_source_file }}",
@@ -267,7 +267,7 @@ class TestCleanBuild(unittest.TestCase):
     def test_the_build_runs_as_the_build_account(self):
         clean = find(BUILD, "Build in a clean container")
         task = find(clean["block"], "Build the packages")["docker_container_exec"]
-        self.assertIn("slurm_deb_build_account.uid", task["user"])
+        self.assertIn("_slurm_build_account.uid", task["user"])
         self.assertEqual(task["argv"][0], "dpkg-buildpackage")
 
 

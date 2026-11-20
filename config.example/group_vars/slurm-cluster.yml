@@ -6,7 +6,6 @@
 # Playbook: slurm, slurm-cluster, slurm-validation; changing slurm_version on a running
 # cluster: slurm-upgrade.yml (docs/slurm-cluster/slurm-upgrade.md)
 #slurm_version: 26.05.6
-#slurm_user_home: /local/slurm
 #slurm_manage_gpus: true
 # ClusterName. Renaming a running cluster is its own playbook (slurm-cluster-rename.yml).
 #slurm_cluster_name: my-cluster  # example

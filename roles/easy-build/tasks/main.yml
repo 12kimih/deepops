@@ -32,14 +32,20 @@
     state: absent
   loop: [z01_eb.sh, z01_eb.csh]
 
+# With the IDs and home roles/system_accounts gives it (the same on every host: it owns
+# files on shared storage), through roles/local_accounts. Resolved here: local_accounts
+# evaluates its arguments in its own scope.
+- name: Note the build account
+  ansible.builtin.set_fact:
+    _easybuild_accounts: "{{ {easybuild_user: _easybuild_account} }}"
+
 - name: Create the build account
-  become: true
-  ansible.builtin.user:
-    name: "{{ easybuild_user }}"
-    system: true
-    home: "{{ easybuild_home }}"
-    create_home: true
-    shell: /usr/sbin/nologin
+  ansible.builtin.include_role:
+    name: local_accounts
+    apply:
+      become: true
+  vars:
+    local_accounts: "{{ _easybuild_accounts }}"
 
 # Only the account's home and EasyBuild's own prefix are the account's, never more of
 # the shared tree; EasyBuild creates what it needs below them.
@@ -52,7 +58,7 @@
     group: "{{ easybuild_user }}"
     mode: "0755"
   loop:
-    - "{{ easybuild_home }}"
+    - "{{ _easybuild_account.home }}"
     - "{{ easybuild_prefix }}"
 
 - name: Create the root-owned EasyBuild directories
@@ -126,6 +132,6 @@
       - check
       - "{{ easybuild_version }}"
       - "{{ easybuild_prefix }}"
-    chdir: "{{ easybuild_home }}"
+    chdir: "{{ _easybuild_account.home }}"
   changed_when: false
   when: not ansible_check_mode  # a first --check has no account to become yet

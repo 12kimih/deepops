@@ -27,7 +27,7 @@ retired_settings:
   sm_files_repo_version: easybuild_packages (easyconfig names or paths) in roles/easy-build-packages
   sm_install_default: easybuild_packages (empty builds nothing) in roles/easy-build-packages
   sm_sources_path: easybuild_prefix in roles/deepops_paths (sources live under it)
-  sm_build_path: easybuild_home in roles/easy-build (builds unpack under it)
+  sm_build_path: system_accounts.easybuild.home in roles/system_accounts (builds unpack under it)
   slurm_password: slurm_munge_key_file, a vaulted key file (docs/slurm-cluster/munge-key.md)
   enroot_configure_kernel_options_versions: every installed kernel gets the arguments (roles/host_baseline, kernel_args)
   nvidia_power_limit_persistence_mode: persistence mode is the persistence daemon's (roles/nvidia_driver)
@@ -70,7 +70,7 @@ retired_settings:
   mpi_raw_url: nvidia_network_operator_mpi_operator_version (the release manifest, checksummed) in roles/nvidia-network-operator
   nvidia_network_operator_url: nvidia_network_operator_repo in roles/nvidia-network-operator
   # Slurm from SchedMD's packages (roles/slurm) instead of a source build
-  slurm_build_dir: nothing, Slurm comes from packages built in slurm_deb_build_dir (roles/slurm)
+  slurm_build_dir: nothing, Slurm comes from packages built in system_accounts.slurmbuild.home (roles/system_accounts)
   slurm_configure: nothing, the packages build with the shipped debian/rules plus slurm_deb_build_extra_deps
   slurm_configure_nvml: nothing, NVML is always built in from slurm_nvml_cuda_version
   slurm_build_make_clean: nothing, the package build tree is replaced on each build
@@ -135,3 +135,10 @@ retired_settings:
   nis_export_netgroups: directory_netgroups in roles/directory_defaults (NIS and LDAP publish the same netgroups)
   nis_client_remove_caches: directory_remove_caches in roles/directory_defaults
   nis_client_nsswitch: none; each directory client adds its own source to nsswitch.conf (roles/nsswitch)
+  easybuild_home: system_accounts.easybuild.home (the build account's home) in roles/system_accounts
+  slurm_deb_build_dir: system_accounts.slurmbuild.home (the build account's home) in roles/system_accounts
+  slurm_user_home: system_accounts.slurm.home in roles/system_accounts
+  slurm_user_uid: system_accounts.slurm.uid in roles/system_accounts
+  slurm_user_gid: system_accounts.slurm.gid in roles/system_accounts
+  slurm_groupname: nothing, the slurm account's group is named like it (roles/local_accounts)
+  slurm_manage_user_gid: nothing, roles/local_accounts pins the group's GID and refuses to renumber

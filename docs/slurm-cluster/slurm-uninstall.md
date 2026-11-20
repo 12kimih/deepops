@@ -73,7 +73,7 @@ Files and directories (variable name in parentheses):
 | `/etc/rsyslog.d/99-slurm.conf` | Routes Slurm logs through rsyslog |
 | `/etc/munge/munge.key` | Cluster-wide munge key |
 | `/etc/localusers` | Users allowed to SSH without a job |
-| `/local/slurm` (`slurm_user_home`) | Home of the `slurm` user (uid `slurm_user_uid`, default 22078) |
+| `/local/slurm` (`system_accounts.slurm.home`) | Home of the `slurm` user (uid `system_accounts.slurm.uid`, default 22078) |
 | `/usr/lib/<multiarch>/security/pam_slurm_adopt.so` (`slurm_pam_lib_dir`) | Package `slurm-smd-libpam-slurm-adopt` |
 
 System changes outside those paths:

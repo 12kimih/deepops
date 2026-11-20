@@ -28,7 +28,7 @@
   become_user: "{{ easybuild_user }}"
   ansible.builtin.command:
     argv: [bash, -l, -c, 'module load "EasyBuild/$1" && eb --robot "$2"', build, "{{ easybuild_version }}", "{{ item }}"]
-    chdir: "{{ easybuild_home }}"
+    chdir: "{{ _easybuild_account.home }}"
   loop: "{{ easybuild_packages }}"
   when: not ansible_check_mode  # a first --check has no account to become yet
   register: easybuild_build
