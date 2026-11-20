@@ -116,6 +116,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── lmod
 │   ├── local_accounts
 │   ├── locale
+│   ├── login_shells
 │   ├── maas-controller
 │   ├── maintenance
 │   ├── managed_dir

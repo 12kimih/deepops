@@ -1,0 +1,37 @@
+---
+# The shells Lmod is hooked into where installed, and the system rc file each reads when
+# it starts without a login (none: a login is all it has, or its distribution's rc file
+# already reads /etc/profile.d, as RHEL's /etc/bashrc does).
+lmod_shells:
+  bash:
+    binary: /bin/bash
+    comment: "#"
+    rc: {Debian: /etc/bash.bashrc}
+    hook: |
+      if ! type module >/dev/null 2>&1 && [ -r /etc/profile.d/z00_lmod.sh ]; then
+        . /etc/profile.d/z00_lmod.sh
+      fi
+  # zshenv: every zsh, scripts and ssh commands included (the docs' file for zsh).
+  zsh:
+    binary: /bin/zsh
+    comment: "#"
+    rc: {Debian: /etc/zsh/zshenv, RedHat: /etc/zshenv}
+    hook: |
+      if (( ! $+functions[module] )) && [[ -r /etc/profile.d/z00_lmod.sh ]]; then
+        . /etc/profile.d/z00_lmod.sh
+      fi
+  # csh.cshrc: every tcsh, login or not.
+  tcsh:
+    binary: /bin/tcsh
+    comment: "#"
+    rc: {Debian: /etc/csh.cshrc}
+    hook: |
+      if ( -r /etc/profile.d/z00_lmod.csh ) then
+        source /etc/profile.d/z00_lmod.csh
+      endif
+  # fish reads /etc/fish/conf.d in every start: the link below is its hook.
+  fish:
+    binary: /usr/bin/fish
+    comment: "#"
+    rc: {}
+    hook: ""

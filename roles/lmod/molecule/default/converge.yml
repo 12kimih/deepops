@@ -1,7 +1,10 @@
 ---
+# Every supported shell installed first, as roles/login_shells does in a deploy, so the
+# role hooks and checks each of them.
 - name: Converge
   hosts: all
-  tasks:
-    - name: "Include lmod"
-      ansible.builtin.include_role:
-        name: "lmod"
+  become: true
+  roles:
+    - role: login_shells
+      login_shells: [bash, zsh, tcsh, fish]
+    - role: lmod

@@ -1,0 +1,21 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: login-shells-ubuntu-2404
+    image: geerlingguy/docker-ubuntu2404-ansible
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+provisioner:
+  name: ansible
+  ansible_args:
+    - -vv
+  inventory:
+    group_vars:
+      all:
+        login_shells: [bash, zsh, tcsh, fish]
+verifier:
+  name: ansible

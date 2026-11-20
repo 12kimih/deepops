@@ -1,0 +1,6 @@
+---
+# The shells people log in with. Each is installed on every host, so a login or an
+# interactive job works on any node (an account whose shell a node lacks cannot log in
+# there), and its startup reads /etc/profile.d, the one place roles put the login
+# environment (Lmod, the cluster tools, CUDA). Supported: bash, zsh, tcsh, fish.
+login_shells: [bash]

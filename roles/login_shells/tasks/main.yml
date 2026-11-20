@@ -1,0 +1,60 @@
+---
+- name: Check the login shells are supported
+  ansible.builtin.assert:
+    that: login_shells | difference(login_shells_supported) | length == 0
+    fail_msg: "login_shells may name {{ login_shells_supported | join(', ') }}, not {{ login_shells | difference(login_shells_supported) | join(', ') }}."
+    quiet: true
+
+# A shell is never removed here: an account may still log in with it.
+- name: Install the login shells (Debian family)
+  ansible.builtin.apt:
+    name: "{{ login_shells }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install the login shells (RHEL family)
+  ansible.builtin.dnf:
+    name: "{{ login_shells }}"
+    state: present
+  when: ansible_facts.os_family == "RedHat"
+
+# bash and sh read /etc/profile, which reads /etc/profile.d/*.sh, and RHEL's zsh and tcsh
+# read it too (/etc/zprofile, /etc/csh.login). Debian's zsh reads none of it, so a zsh
+# login had no module command and none of the environment roles publish there. The loop
+# is the Lmod docs' for the system zsh files, in zprofile: login shells only, as for bash.
+- name: Read /etc/profile.d in a zsh login (Debian)
+  ansible.builtin.blockinfile:
+    path: /etc/zsh/zprofile
+    marker: "# {mark} DeepOps: /etc/profile.d (roles/login_shells)"
+    block: |
+      if [[ -o nomatch ]]; then
+        __deepops_nomatch=1; unsetopt nomatch
+      fi
+      for __deepops_f in /etc/profile.d/*.sh; do
+        [[ -r $__deepops_f ]] && . $__deepops_f
+      done
+      [[ -n ${__deepops_nomatch:-} ]] && setopt nomatch
+      unset __deepops_f __deepops_nomatch
+  when:
+    - ansible_facts.os_family == "Debian"
+    - "'zsh' in login_shells"
+
+# Debian's tcsh reads /etc/csh.login at login without looking in /etc/profile.d.
+- name: Read /etc/profile.d in a tcsh login (Debian)
+  ansible.builtin.blockinfile:
+    path: /etc/csh.login
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+    marker: "# {mark} DeepOps: /etc/profile.d (roles/login_shells)"
+    block: |
+      foreach __deepops_f ( `/bin/sh -c 'ls /etc/profile.d/*.csh 2>/dev/null'` )
+        if ( -r $__deepops_f ) source $__deepops_f
+      end
+      unset __deepops_f
+  when:
+    - ansible_facts.os_family == "Debian"
+    - "'tcsh' in login_shells"
