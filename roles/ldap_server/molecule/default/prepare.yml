@@ -8,6 +8,14 @@
         update_cache: true
 
     # What roles/site_secrets makes, vaulted, in a site's config.
+    - name: Make the directory of the password files
+      ansible.builtin.file:
+        path: "{{ ldap_secrets_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
     - name: Write the read-only account's password file
       ansible.builtin.copy:
         content: molecule-only

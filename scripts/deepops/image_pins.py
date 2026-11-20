@@ -89,9 +89,11 @@ def tags(ref):
 
 def pins():
     """[(image:tag, digest, file:line)] for every pin in the roles' defaults, vars and
-    Dockerfiles (a build stage's base image)."""
+    Dockerfiles (a build stage's base image), and the molecule scenarios' platform."""
     found = []
-    for path in tracked("roles/*/defaults/*", "roles/*/vars/*", "roles/**/Dockerfile"):
+    for path in tracked(
+        "roles/*/defaults/*", "roles/*/vars/*", "roles/**/Dockerfile", ".config/molecule/config.yml"
+    ):
         rel = path.relative_to(ROOT).as_posix()
         for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
             if line.lstrip().startswith("#"):

@@ -8,7 +8,8 @@ DeepOps Testing, CI/CD, and Validation
     - [Testing Method](#testing-method)
     - [Tests](#tests)
   - [DeepOps Ansible role testing](#deepops-ansible-role-testing)
-    - [Defining Molecule tests for a new role](#defining-molecule-tests-for-a-new-role)
+    - [Running the scenarios](#running-the-scenarios)
+    - [Defining Molecule tests for a role](#defining-molecule-tests-for-a-role)
   - [DeepOps Deployment Validation](#deepops-deployment-validation)
 
 ## Linting
@@ -84,7 +85,7 @@ checked out. Work in another worktree on a detached HEAD or a branch of its own.
 
 ## DeepOps end-to-end testing
 
-Public DeepOps pull requests are validated with GitHub Actions for setup, linting, CodeQL, and selected Molecule role tests. Those checks catch many packaging and role-regression issues, but they do not replace deployment validation on real GPU systems.
+Public DeepOps pull requests are validated with GitHub Actions for setup, linting, CodeQL, and every role's Molecule scenarios. Those checks catch many packaging and role-regression issues, but they do not replace deployment validation on real GPU systems.
 
 DeepOps also retains a legacy Jenkins/Vagrant test harness in the [jenkins](../../workloads/jenkins) and [virtual](../../virtual) directories. Treat those files as community-supported reference material unless maintainers explicitly say a Jenkins job is still authoritative. New release validation should record the exact environment, operating system, GPU stack, and workload checks used for the pull request or release.
 
@@ -94,7 +95,7 @@ The goal of DeepOps validation is to prevent bugs from being introduced into the
 
 DeepOps currently uses these testing layers:
 
-- GitHub Actions for public pull request checks, including setup, linting, CodeQL, and selected Molecule role tests.
+- GitHub Actions for public pull request checks, including setup, linting, CodeQL, and every role's Molecule scenarios.
 - Focused local validation for changed playbooks, roles, scripts, and documentation before opening or updating a pull request.
 - GPU-backed deployment validation for changes that affect Slurm, Kubernetes, drivers, container runtimes, DGX platform software, or workload examples.
 - Legacy Jenkins/Vagrant jobs as reference material for operators who still run that harness.
@@ -111,8 +112,8 @@ A short description of the historical Jenkins test matrix is outlined below. The
 | --------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------ |
 | Ubuntu 18.04                                        | x                                         | x                                                      | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | Ubuntu 20.04                                        |                                           | x                                                      | x                                                                       | Legacy Jenkins/Vagrant reference only |
-| Ubuntu 22.04                                        |                                           |                                                        |                                                                         | setup.sh and Molecule GitHub Actions |
-| Ubuntu 24.04                                        |                                           |                                                        |                                                                         | setup.sh GitHub Action              |
+| Ubuntu 22.04                                        |                                           |                                                        |                                                                         | setup.sh GitHub Action               |
+| Ubuntu 24.04                                        |                                           |                                                        |                                                                         | setup.sh and Molecule GitHub Actions |
 | CentOS 7                                            |                                           | x                                                      | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | CentOS 8                                            |                                           |                                                        | x                                                                       | Legacy Jenkins/Vagrant reference only |
 | DGX OS                                              |                                           |                                                        |                                                                         | Syntax-checked only; full validation requires DGX hardware |
@@ -150,70 +151,54 @@ A short description of the historical Jenkins test matrix is outlined below. The
 
 ## DeepOps Ansible role testing
 
-A subset of the Ansible roles in DeepOps have tests defined using [Ansible Molecule](https://molecule.readthedocs.io/en/latest/).
-This testing mechanism allows the roles to be tested individually, providing additional test signal to identify issues which do not appear in the end-to-end tests.
-The roles listed in [`.github/workflows/molecule.yml`](../../.github/workflows/molecule.yml) are tested automatically for each pull request.
+Roles can carry [Ansible Molecule](https://molecule.readthedocs.io/en/latest/) scenarios,
+which run the role alone in a container and catch what the end-to-end tests do not.
+Every role with a scenario (`roles/<role>/molecule/<scenario>/molecule.yml`) is tested
+for each pull request: the CI matrix is `scripts/deepops/molecule.py list`, never a hand
+list.
 
-Molecule testing runs the Ansible role in question inside a Docker container.
-As such, not all roles will be easy to test with this mechanism.
-Roles which mostly involve installing software, configuring services, or executing scripts should generally be possible to test.
-Roles which rely on the presence of specific hardware (such as GPUs), which reboot the nodes they act on, or which make changes to kernel configuration are going to be harder to test with Molecule.
+Molecule runs the role in a Docker container with systemd, so services start and
+restart as on a node. The container is never privileged and gets no host devices: it
+is a node without special hardware, so a role there can never configure the Docker
+host's own (a privileged run once set the host BMC's address). Roles that need
+specific hardware (GPUs, a BMC), reboot, or change the kernel test only the parts a
+container allows: a component's absent path, and the refusal where the hardware or a
+site input is missing (see the [bmc](../../roles/bmc/molecule/default/verify.yml)
+scenario). A role that starts containers of its own (the Slurm package build) has no
+scenario: Docker inside the container needs the privilege it never gets, and
+`validate_slurm.py` on a cluster is its test.
 
-### Defining Molecule tests for a new role
+### Running the scenarios
 
-To add Molecule tests to a new role, the following procedure can be used.
-
-1. Ensure you have Docker installed in your development environment
-
-2. Install Ansible Molecule and `community.docker` Ansible Galaxy collection in your development environment
-
-```
-$ python3 -m pip install "molecule[docker,lint]"
-$ ansible-galaxy collection install community.docker
-```
-
-3. Initialize Molecule in your new role
+From the repository root, after `scripts/setup.sh` (Docker, `.venv`, Galaxy content):
 
 ```bash
-cd deepops/roles/<your-role>
-molecule init scenario -r <your-role> --driver-name docker
+uv run scripts/deepops/molecule.py test              # every role
+uv run scripts/deepops/molecule.py test sshd nhc     # some roles
 ```
 
-4. In the file `molecule/default/molecule.yml`, define the list of platforms to be tested.
-   The existing scenarios use Ubuntu 22.04; the setup workflow runs on Ubuntu 22.04 and 24.04.
-   Add Red Hat family images only for roles that explicitly support them, and validate the image choice for that role.
-   Keep Ubuntu 18.04, Ubuntu 20.04, CentOS 7, and CentOS 8 scenarios in separately named legacy test scenarios when maintaining older compatibility paths.
-   To test the current Ubuntu stacks, the following `platforms` stanza can be used.
+Each role's containers are named after the role, so two roles can run at once on one
+Docker host.
 
-```yaml
-platforms:
-  - name: ubuntu-2204
-    image: geerlingguy/docker-ubuntu2204-ansible
-    pre_build_image: true
-  - name: ubuntu-2404
-    image: geerlingguy/docker-ubuntu2404-ansible
-    pre_build_image: true
-```
+### Defining Molecule tests for a role
 
-5. If you haven't already, define your role's metadata in the file `meta/main.yml`.
-   A sample `meta.yml` is shown here:
+Everything scenarios share is in [`.config/molecule/config.yml`](../../.config/molecule/config.yml),
+which Molecule merges under every scenario: the platform (Ubuntu 24.04 with systemd,
+pinned by digest), the driver, and the repository's Ansible paths (Galaxy roles and
+collections, `plugins/module_utils`, `plugins/filter`). A scenario states only what it
+adds:
 
-```yaml
-galaxy_info:
-  role_name: <your-role>
-  namespace: deepops
-  author: DeepOps Team
-  company: NVIDIA
-  description: <your-description>
-  license: 3-Clause BSD
-  min_ansible_version: 2.9
-```
-
-6. Once this is done, verify that your role executes successfully in the Molecule environment by running `molecule test`. If you run into any issues, consult the [Molecule documentation](https://molecule.readthedocs.io/en/latest/index.html) for help resolving them.
-
-7. (optional) In addition to testing successful execution, you can add additional tests which will be run after your role completes in a file `molecule/default/verify.yml`. This is an Ansible playbook that will run in the same environment as your playbook ran. For a simple example of such a verify playbook, see the [default_target role](../../roles/default_target/molecule/default/verify.yml).
-
-8. Once you're confident that your new tests are all passing, add your role to the `deepops-role` section in the `.github/workflows/molecule.yml` file.
+1. Create `roles/<role>/molecule/default/` with `converge.yml` (the play that applies
+   the role) and, ideally, `verify.yml` (checks that it did, see
+   [default_target](../../roles/default_target/molecule/default/verify.yml)) and
+   `prepare.yml` (anything the container lacks that a node has).
+2. Write `molecule.yml` with only the scenario's own settings: inventory vars
+   (`provisioner.inventory.group_vars`), groups (`provisioner.inventory.hosts`), a test
+   sequence. With nothing to add it reads `{}`. Never restate `platforms`: a list in a
+   scenario replaces the shared one.
+3. A component's removal is a scenario of its own (`molecule/absent/`): present, then
+   absent, then a rerun that changes nothing.
+4. Run `uv run scripts/deepops/molecule.py test <role>`; CI picks the role up by itself.
 
 ## DeepOps Deployment Validation
 

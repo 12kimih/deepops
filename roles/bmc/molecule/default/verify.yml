@@ -25,3 +25,21 @@
     - name: Check no netplan file was written
       ansible.builtin.assert:
         that: not bmc_netplan_file.stat.exists
+
+    # A BMC address for a host with no BMC would leave it silently unconfigured.
+    - name: A host without a BMC refuses a BMC address of its own
+      block:
+        - name: Apply the role with a BMC address
+          ansible.builtin.include_role:
+            name: bmc
+          vars:
+            bmc_ipaddr: 192.0.2.10
+            bmc_netmask: 255.255.255.0
+            bmc_gateway: 192.0.2.1
+        - name: Never reached
+          ansible.builtin.fail:
+            msg: the role accepted bmc_ipaddr on a host without /dev/ipmi0
+      rescue:
+        - name: Check it was the missing device that stopped it
+          ansible.builtin.assert:
+            that: "'has no /dev/ipmi0' in ansible_failed_result.msg"

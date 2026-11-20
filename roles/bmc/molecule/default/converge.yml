@@ -1,14 +1,14 @@
 ---
-# Fully configured on purpose: a container has no BMC, so this exercises the
-# guard that keeps the role a no-op on a host without one.
+# A host without a BMC (a container has no /dev/ipmi0) under the site-wide settings
+# every host gets (bmc_password, bmc_snmp_community) and no bmc_ipaddr of its own: the
+# role installs ipmitool and leaves the rest alone, so a mixed inventory is safe.
+# verify.yml checks the other half: such a host given a bmc_ipaddr stops the run.
 - name: Converge
   hosts: all
   become: true
   vars:
-    bmc_ipaddr: 192.0.2.10
-    bmc_netmask: 255.255.255.0
-    bmc_gateway: 192.0.2.1
     bmc_password: molecule-test
+    bmc_snmp_community: molecule
   tasks:
     - name: "Include bmc"
       ansible.builtin.include_role:

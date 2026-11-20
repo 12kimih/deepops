@@ -1,4 +1,7 @@
 ---
+# The SDK itself is a 15 GB download with no published checksum (hpcsdk_checksums is
+# the site's): the scenario takes it off a host, and verify.yml proves present stops
+# before downloading anything unverified.
 - name: Converge
   hosts: all
   become: true
@@ -7,3 +10,5 @@
       ansible.builtin.include_role:
         name: "nvidia_hpc_sdk"
         public: true  # deepops_paths (a dependency) supplies its directories
+      vars:
+        hpcsdk_state: absent

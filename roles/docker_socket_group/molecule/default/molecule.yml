@@ -1,18 +1,5 @@
 ---
-dependency:
-  name: galaxy
-driver:
-  name: docker
-platforms:
-  - name: docker-socket-group-ubuntu-2204
-    image: geerlingguy/docker-ubuntu2204-ansible
-    cgroupns_mode: host
-    pre_build_image: true
-    privileged: true
 provisioner:
-  name: ansible
-  ansible_args:
-    - -vv
   inventory:
     group_vars:
       all:
@@ -23,5 +10,3 @@ provisioner:
         # configuration are written correctly. The live-socket check finds no socket
         # for the same reason, so it does nothing.
         docker_daemon_restart: false
-verifier:
-  name: ansible

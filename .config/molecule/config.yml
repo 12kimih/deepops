@@ -1,0 +1,56 @@
+---
+# What every role's molecule scenarios share. Molecule reads this file from the
+# repository root and merges each roles/<role>/molecule/<scenario>/molecule.yml over it,
+# so a scenario states only what it adds (inventory vars, groups, a test sequence). A
+# list there replaces the list here: a scenario never restates platforms.
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  # Ubuntu 24.04 with systemd as PID 1, as on the nodes, so services start and restart
+  # as in a deploy. Never privileged: a privileged container sees the host's devices
+  # and kernel, and a role then configures the real hardware (the bmc scenario once set
+  # the Docker host's own BMC address through its /dev/ipmi0). systemd needs only
+  # SYS_ADMIN and the cgroup tree. SYS_PTRACE lets root read another user's
+  # /proc/<pid>/exe, as on a node: without it start-stop-daemon --exec finds no daemon
+  # and an init script's stop silently leaves it running (slapd). Both act only inside
+  # the container. With the host's cgroup namespace systemd stays inside
+  # the container's own docker-<id>.scope. /dev holds only the standard nodes, kernel
+  # modules cannot be loaded and /proc/sys is read-only, as a role on a real node expects
+  # of a host without that hardware.
+  # Groups a scenario needs come from provisioner.inventory.hosts, not a platform copy.
+  # The image has only a `latest` tag: image_pins.py check reports when it moves.
+  # The name is the role's (scripts/deepops/molecule.py sets it) and the scenario's, so
+  # scenarios run at once on one Docker host never share a container.
+  - name: "${DEEPOPS_MOLECULE_INSTANCE:-instance}-${MOLECULE_SCENARIO_NAME}"
+    image: "geerlingguy/docker-ubuntu2404-ansible:latest@sha256:fa0889a991fe4f9404efc2f53d5960804f4e409e74bff6ad2443992cc57915c4"
+    pre_build_image: true
+    # The image ships a policy-rc.d that refuses every service start a package asks
+    # for; a node has none (roles/quiet_install writes its own only for an install).
+    command: sh -c 'rm -f /usr/sbin/policy-rc.d; exec /lib/systemd/systemd'
+    capabilities:
+      - SYS_ADMIN
+      - SYS_PTRACE
+    security_opts:
+      - apparmor=unconfined
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+provisioner:
+  name: ansible
+  ansible_args:
+    - -vv
+  # Molecule runs from the role with its own ansible.cfg: the repository's paths
+  # (ansible.cfg) given again, so a scenario finds the Galaxy roles and collections,
+  # the shared module_utils and the filter plugins as a deploy does.
+  env:
+    ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/../galaxy:${MOLECULE_PROJECT_DIRECTORY}/.."
+    ANSIBLE_COLLECTIONS_PATH: "${MOLECULE_PROJECT_DIRECTORY}/../../collections"
+    ANSIBLE_MODULE_UTILS: "${MOLECULE_PROJECT_DIRECTORY}/../../plugins/module_utils"
+    ANSIBLE_FILTER_PLUGINS: "${MOLECULE_PROJECT_DIRECTORY}/../../plugins/filter"
+verifier:
+  name: ansible

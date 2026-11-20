@@ -3,19 +3,24 @@
   hosts: all
   become: true
   tasks:
-    - name: Read the grub defaults
+    - name: Read the grub defaults and the role's drop-in
       ansible.builtin.slurp:
-        src: /etc/default/grub
-      register: grub_defaults
+        src: "{{ item }}"
+      loop:
+        - /etc/default/grub
+        - /etc/default/grub.d/deepops-serial-console.cfg
+      register: grub_files
 
-    - name: The serial console block is present, coherent and removable
+    - name: The settings are in the drop-in and the old block is gone
       ansible.builtin.assert:
         that:
-          - "'console=ttyS1,115200n8' in content"
-          - "'GRUB_TERMINAL=\"console serial\"' in content"
-          - "'--unit=1' in content"
-          - "'GRUB_TIMEOUT_STYLE=menu' in content"
-          - "'# BEGIN ANSIBLE MANAGED -- serial console' in content"
-          - "'# END ANSIBLE MANAGED -- serial console' in content"
+          - "'serial console' not in defaults"
+          - "'GRUB_TIMEOUT_STYLE=hidden' in defaults"
+          - "'console=tty0 console=ttyS1,115200n8' in dropin"
+          - "'GRUB_TERMINAL=\"console serial\"' in dropin"
+          - "'--unit=1 ' in dropin"
+          - "'GRUB_TIMEOUT=\"5\"' in dropin"
+          - "'GRUB_TIMEOUT_STYLE=\"menu\"' in dropin"
       vars:
-        content: "{{ grub_defaults.content | b64decode }}"
+        defaults: "{{ grub_files.results[0].content | b64decode }}"
+        dropin: "{{ grub_files.results[1].content | b64decode }}"
