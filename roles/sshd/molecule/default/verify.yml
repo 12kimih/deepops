@@ -53,3 +53,15 @@
         timeout: 10
         search_regex: SSH-2.0
       loop: [22, 2222]
+
+    - name: Read whether ssh.service and ssh.socket start at boot
+      ansible.builtin.command:
+        argv: [systemctl, is-enabled, ssh.service, ssh.socket]
+      register: sshd_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Check sshd is left to the socket, as Ubuntu ships it
+      ansible.builtin.assert:
+        that: sshd_enabled.stdout_lines == ['disabled', 'enabled']
+        fail_msg: "ssh.service, ssh.socket: {{ sshd_enabled.stdout_lines }}"

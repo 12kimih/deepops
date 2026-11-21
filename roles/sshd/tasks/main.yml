@@ -40,6 +40,20 @@
       failed_when: false
       check_mode: false  # read-only; --check needs the result
 
+    # Ubuntu 22.10 and later start sshd from ssh.socket on the first connection;
+    # ssh.service is then not enabled by itself (the socket starts it). Enabled beside
+    # the socket, a hand change, it starts sshd at boot outside that design: it goes
+    # back to the distribution's way. Disabling does not stop a running sshd, and a host
+    # without the socket (sshd run as a service) is left as it is: switching over there
+    # needs the service stopped first, which belongs in a window, not a deploy.
+    - name: Leave starting sshd to ssh.socket
+      systemd_unit:
+        name: ssh.service
+        enabled: false
+      when:
+        - ansible_facts.os_family == "Debian"
+        - sshd_socket.stdout | default('') == 'enabled'
+
     # sshd -t and -T need its privilege separation directory, which systemd makes only
     # when it starts sshd: a socket-started sshd that has had no login yet lacks it.
     - name: Make sshd's privilege separation directory (Debian family)
