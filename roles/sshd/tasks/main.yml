@@ -207,14 +207,15 @@
         - not ansible_check_mode
         - sshd_dropin is changed or sshd_main is changed or sshd_aside is changed
       vars:
-        _ports_before: "{{ sshd_before.stdout_lines | select('match', '^port ') | sort | list }}"
-        _ports_after: "{{ sshd_after.stdout_lines | select('match', '^port ') | sort | list }}"
+        # The socket's ListenStream comes from both Port and ListenAddress.
+        _ports_before: "{{ sshd_before.stdout_lines | select('match', '^(port|listenaddress) ') | sort | list }}"
+        _ports_after: "{{ sshd_after.stdout_lines | select('match', '^(port|listenaddress) ') | sort | list }}"
         _socket: "{{ sshd_socket.stdout | default('') in ['enabled', 'enabled-runtime', 'static'] }}"
         _service: "{{ 'ssh' if ansible_facts.os_family == 'Debian' else 'sshd' }}"
       block:
-        # New ports reach the socket only through the generator; the sessions in place
-        # are their own processes and stay.
-        - name: Move ssh.socket to the new ports
+        # New ports and addresses reach the socket only through the generator; the
+        # sessions in place are their own processes and stay.
+        - name: Move ssh.socket to the new ports and addresses
           systemd_unit:
             name: ssh.socket
             state: restarted
@@ -239,10 +240,25 @@
             - not (_socket | bool) or _ports_before == _ports_after
             - sshd_service.stdout == 'active' or not (_socket | bool)
 
-    - name: Check sshd answers on every port
-      ansible.builtin.wait_for:
-        host: 127.0.0.1
-        port: "{{ item | int }}"
-        timeout: 30
-      loop: "{{ sshd_ports }}"
+    # A host key back, not an open port: ssh.socket accepts the connection even when the
+    # sshd it starts cannot run. Each address sshd listens on; a wildcard one through
+    # the loopback.
+    - name: Check sshd answers on every address
+      ansible.builtin.command:
+        argv:
+          - ssh-keyscan
+          - -T
+          - "10"
+          - -p
+          - "{{ item.rsplit(':', 1) | last }}"
+          - "{{ {'0.0.0.0': '127.0.0.1', '::': '::1'}.get(_host, _host) }}"
+      vars:
+        _host: "{{ (item.rsplit(':', 1) | first).strip('[]') }}"
+      register: sshd_keyscan
+      until: sshd_keyscan.stdout is search('ssh-|ecdsa-')
+      retries: 3
+      delay: 5
+      changed_when: false
+      check_mode: false  # read-only
+      loop: "{{ sshd_after.stdout_lines | select('match', '^listenaddress ') | map('regex_replace', '^listenaddress ', '') | list }}"
       when: not ansible_check_mode
