@@ -146,6 +146,25 @@ class Check(unittest.TestCase):
         )
         self.assertTrue(self.problems(lambda r: r["people"]["bob"].update(default_account="admin")))
 
+    def test_several_accounts_only_for_the_named_roles(self):
+        # alice (admin) is in two accounts; bob gets a second one.
+        def two_for_bob(r):
+            r["several_accounts"] = ["admin"]
+            r["people"]["bob"].update(accounts={"team-a": {}, "admin": {}}, default_account="team-a")
+
+        got = self.problems(two_for_bob)
+        self.assertIn(
+            "people.bob.accounts: several accounts are for admin (several_accounts): "
+            "each association is its own fair share",
+            got,
+        )
+        self.assertFalse([p for p in got if p.startswith("people.alice")], "an admin may")
+        self.assertIn(
+            "several_accounts: unknown role root",
+            self.problems(lambda r: r.update(several_accounts=["root"])),
+        )
+        self.assertFalse(self.problems(lambda r: None), "absent: no limit")
+
     def test_member_keys_required_for_slurm_users_only(self):
         self.assertIn(
             "people.bob.slack: required for an active Slurm user",

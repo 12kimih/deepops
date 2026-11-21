@@ -29,6 +29,9 @@ roles:
 attributes: [slack]
 member_keys: [slack]
 
+# Only these roles may be in several Slurm accounts: each association has its own fair
+# share, so a second account would double a person's.
+several_accounts: [admin]
 people:
   alice:
     uid: 1001

@@ -7,6 +7,9 @@ A roster file declares the roles a site uses and the people:
       docker: {description: Docker daemon socket, requires: admin}
     attributes: [slack]           # extra per-person keys the site uses
     member_keys: [slack]          # what every active Slurm user must set
+    several_accounts: [admin]     # optional: only these roles may be in several Slurm
+                                  # accounts (each association has its own fair share,
+                                  # so a second one doubles a person's); absent: anyone
     people:
       alice:
         uid: 1001                 # required, unique, >= 1000
@@ -38,7 +41,7 @@ KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status"
 QUOTA_KEYS = ("block_warn", "block_hard", "inode_warn", "inode_hard")
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
-TOP_KEYS = {"roles", "attributes", "member_keys", "people"}
+TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "people"}
 
 
 def _active(people):
@@ -151,6 +154,10 @@ def check(roster, uid_min=UID_MIN):
     for key in member_keys:
         if key not in KEYS | attributes:
             problems.append(f"member_keys: {key} is neither a person key nor in attributes")
+    several = roster.get("several_accounts")
+    for role in several or []:
+        if role not in roles:
+            problems.append(f"several_accounts: unknown role {role}")
     uids = {}
     for name, p in roster["people"].items():
         p = p or {}
@@ -195,6 +202,11 @@ def check(roster, uid_min=UID_MIN):
             problems.append(f"{where}.default_account: {default} is not one of its accounts")
         if default is None and len(accounts) > 1:
             problems.append(f"{where}.default_account: required with several accounts")
+        if several is not None and len(accounts) > 1 and not set(held) & set(several):
+            problems.append(
+                f"{where}.accounts: several accounts are for {', '.join(several) or 'nobody'} "
+                "(several_accounts): each association is its own fair share"
+            )
         if status == "left":
             for key in ("roles", "accounts"):
                 if p.get(key):
