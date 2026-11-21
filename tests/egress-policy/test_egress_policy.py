@@ -1,11 +1,12 @@
-"""roles/egress_policy and roles/dns_resolver: their filters and what they render.
+"""roles/egress_policy, roles/ingress_policy and roles/dns_resolver: their filters and
+what they render.
 
-The ruleset is checked by `nft -c` and the resolver configuration by
-`unbound-checkconf` when the roles write them (template validate); here the rendering
-is checked without a kernel: the internal networks split by address family, users'
-DNS kept to the local resolver, the node-wide SSH bucket by host role, the inbound
-chain only when asked for, SSH multiplexing only where ~/.ssh is writable, and the
-resolver's blocked names. Container publishes in the roles must bind an address, or
+The rulesets are checked by `nft -c` and the resolver configuration by
+`unbound-checkconf` when the roles write them (validate); here the rendering is
+checked without a kernel: the internal networks split by address family, users' DNS
+kept to the local resolver, the node-wide SSH bucket by host role, inbound filtering
+only in the ingress table (one table per direction, each replacing only itself), SSH
+multiplexing only where ~/.ssh is writable, and the resolver's blocked names. Container publishes in the roles must bind an address, or
 Docker forwards them past the input filter.
 """
 
@@ -25,10 +26,14 @@ sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import tracked  # noqa: E402
 
 ROLE = ROOT / "roles" / "egress_policy"
+INGRESS = ROOT / "roles" / "ingress_policy"
 RESOLVER = ROOT / "roles" / "dns_resolver"
 spec = importlib.util.spec_from_file_location("networks", ROOT / "plugins" / "filter" / "networks.py")
 networks = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(networks)
+spec = importlib.util.spec_from_file_location("nft_table", ROOT / "plugins" / "filter" / "nft_table.py")
+nft_table = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(nft_table)
 
 
 def load(role):
@@ -41,12 +46,14 @@ def load(role):
 def render(role, name, host="n1", groups=None, **overrides):
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(role / "templates"), trim_blocks=True)
     env.filters.update(networks.FilterModule().filters())
+    env.filters.update(nft_table.FilterModule().filters())
     env.filters["to_json"] = json.dumps
     env.filters["comment"] = lambda text: "# " + text
     env.filters["regex_replace"] = lambda text, pattern, repl="": re.sub(pattern, repl, text)
     values = {**load(role), "ansible_managed": "managed", "node_exporter_prom_dir": "/run/prometheus"}
     values.update(inventory_hostname=host, groups=groups or {"slurm-login": ["login1"]})
-    values.update(egress_policy_internal_networks=["192.0.2.0/24", "198.51.100.7", "2001:db8::/32"])
+    nets = ["192.0.2.0/24", "198.51.100.7", "2001:db8::/32"]
+    values.update(cluster_networks=nets)
     values.update(overrides)
     # Role defaults that refer to other values, typed as Ansible types them (a list stays
     # a list).
@@ -67,6 +74,31 @@ class Filters(unittest.TestCase):
         self.assertTrue(networks.ip_in_networks("192.0.2.9", nets))
         self.assertFalse(networks.ip_in_networks("203.0.113.1", nets))
         self.assertFalse(networks.ip_in_networks("garbage", nets))
+
+    def test_securenets_and_addresses_in_networks(self):
+        self.assertEqual(
+            networks.networks_netmask(["10.0.0.0/16", "2001:db8::/32"]), ["255.255.0.0 10.0.0.0"]
+        )
+        self.assertEqual(networks.addresses_in_networks(["203.0.113.5", "10.0.1.2", "10.0.1.3"], ["10.0.0.0/16"]),
+                         ["10.0.1.2", "10.0.1.3"])  # fmt: skip
+
+    def test_cluster_addresses(self):
+        nets = ["10.0.0.0/16"]
+        hostvars = {
+            # The default route's address first when it is inside the networks...
+            "a": {"ansible_facts": {"default_ipv4": {"address": "10.0.0.1"}, "all_ipv4_addresses": ["10.0.9.9"]}},
+            # ...else the first inside them; a public default route is passed over.
+            "b": {"ansible_facts": {"default_ipv4": {"address": "203.0.113.2"},
+                                    "all_ipv4_addresses": ["203.0.113.2", "10.0.0.2"]}},
+            # The inventory's cluster_address wins over the facts.
+            "c": {"cluster_address": "10.0.5.5", "ansible_facts": {"all_ipv4_addresses": ["10.0.0.3"]}},
+            "d": {"ansible_facts": {"all_ipv4_addresses": ["203.0.113.4"]}},
+            "e": {},
+        }  # fmt: skip
+        self.assertEqual(
+            networks.cluster_addresses(hostvars, ["a", "b", "c", "d", "e", "gone"], nets),
+            {"a": "10.0.0.1", "b": "10.0.0.2", "c": "10.0.5.5", "d": "", "e": "", "gone": ""},
+        )
 
     def test_ports(self):
         self.assertTrue(networks.port_in_ports("22", [22]))
@@ -105,24 +137,60 @@ class Ruleset(unittest.TestCase):
             "limit rate over 600/minute burst 1200 packets jump ssh_node_reject", self.nft(host="login1")
         )
 
-    def test_inbound_chain_only_when_asked(self):
+    def test_no_inbound_chain(self):
         self.assertNotIn("hook input", self.nft())
+
+
+class Ingress(unittest.TestCase):
+    def nft(self, **overrides):
+        return render(INGRESS, "ingress-policy.nft.j2", **overrides)
+
+    def test_cluster_networks_ports_and_trusted_interfaces_get_in(self):
         text = self.nft(
-            egress_policy_inbound=True,
-            egress_policy_inbound_tcp_ports=[22, "60000-60010"],
-            egress_policy_trusted_interfaces=["wg0"],
+            ingress_policy_tcp_ports=[22, "60000-60010"], ingress_policy_trusted_interfaces=["wg0"]
         )
-        self.assertIn("policy drop;", text)
+        self.assertIn("type filter hook input priority filter; policy drop;", text)
+        self.assertIn("elements = { 192.0.2.0/24, 198.51.100.7/32 };", text)
+        self.assertIn("elements = { 2001:db8::/32 };", text)
         self.assertIn("elements = { 22, 60000-60010 };", text)
         self.assertIn('iifname { "wg0" } accept', text)
+        self.assertNotIn("iifname", self.nft())
+        self.assertNotIn("hook output", text)
 
-    def test_only_this_table_is_replaced(self):
-        text = self.nft()
-        self.assertNotRegex(text, r"(?m)^\s*flush ruleset")
+
+class OneTablePerRole(unittest.TestCase):
+    def test_paths_are_named_after_the_table(self):
         self.assertEqual(
-            re.findall(r"(?m)^(?:delete )?table \S+ \S+", text),
-            ["table inet egress_policy", "delete table inet egress_policy", "table inet egress_policy"],
+            nft_table.nft_table_paths("ingress_policy"),
+            {
+                "ruleset": "/etc/ingress-policy.nft",
+                "unit": "ingress-policy.service",
+                "loaded": "/run/ingress-policy.loaded",
+            },
         )
+        self.assertEqual(
+            nft_table.nft_table_items("egress_policy"),
+            [
+                "unit:egress-policy.service",
+                "file:/etc/systemd/system/egress-policy.service",
+                "file:/etc/egress-policy.nft",
+            ],
+        )
+        with self.assertRaises(ValueError):
+            nft_table.nft_table_paths("../x")
+
+    def test_each_ruleset_replaces_only_its_own_table(self):
+        for role, template, table in (
+            (ROLE, "egress-policy.nft.j2", "egress_policy"),
+            (INGRESS, "ingress-policy.nft.j2", "ingress_policy"),
+        ):
+            with self.subTest(table=table):
+                text = render(role, template)
+                self.assertNotRegex(text, r"(?m)^\s*flush ruleset")
+                self.assertEqual(
+                    re.findall(r"(?m)^(?:delete )?table \S+ \S+", text),
+                    [f"table inet {table}", f"delete table inet {table}", f"table inet {table}"],
+                )
 
 
 class SshClient(unittest.TestCase):

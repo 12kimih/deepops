@@ -11,8 +11,5 @@
 # in all.yml.
 #people_manage_accounts: true  # example
 
-# Which client networks may query this NIS server ("NETMASK NETWORK" lines).
-# Role default = localhost + RFC1918; TIGHTEN to your actual cluster subnet.
-#nis_server_securenets:  # example
-#  - "255.0.0.0       127.0.0.0"   # localhost
-#  - "255.255.255.0   10.0.0.0"   # the cluster's internal subnet
+# Which client networks may query this NIS server ("NETMASK NETWORK" lines). Role
+# default: localhost and cluster_networks (RFC1918 while cluster_networks is empty).

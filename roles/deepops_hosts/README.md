@@ -53,9 +53,10 @@ None of the variables below are required. When not set, the default setting is a
 | `hosts_default_domain`                   | ''                                   | Domain used for the FQDN of the default interface entry (otherwise `ansible_fqdn`)                                |
 | `hosts_interface_domain`                 | ''                                   | Domain per interface, or per host per interface, for the interface entries                                        |
 | `hosts_exclude_interfaces`               | [lo, docker, nodelocaldns, br-, veth]| Interface name prefixes left out of the hosts file                                                                |
-| `hosts_internal_subnet_prefix`           |                                      | Prefer the address with this prefix (e.g. `10.0.`) when an interface has several                                  |
 | `host_file_backup`                       | no                                   | If yes, backup of host file is created with timestamp                                                             |
 |                                          |                                      |                                                                                                                   |
+
+An interface with several addresses is listed by the one inside `cluster_networks` (roles/network_defaults).
 
 (1) When setting `hosts_add_ansible_managed_hosts`, an entry for the current host will also be added.
 

@@ -1,0 +1,18 @@
+---
+# Stopping the unit deletes the table; the record stops it and removes the ruleset and
+# the unit, adopting them where they predate the record. ufw stays off: turning it back
+# on is a site's decision.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ingress_policy
+    component_record_action: absent
+    component_record_items: "{{ ingress_policy_items }}"
+
+- name: Delete the ingress policy table
+  ansible.builtin.include_role:
+    name: nft_table
+    tasks_from: absent
+  vars:
+    nft_table_name: ingress_policy

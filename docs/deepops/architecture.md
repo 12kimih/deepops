@@ -113,6 +113,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── grafana
 │   ├── helm_release
 │   ├── host_baseline
+│   ├── ingress_policy
 │   ├── internal_ca
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
@@ -129,10 +130,12 @@ reader writes `| default(...)` for a defined variable;
 │   ├── move-home-dirs
 │   ├── netapp-trident
 │   ├── netplan
+│   ├── network_defaults
 │   ├── nfs
 │   ├── nfs-client-provisioner
 │   ├── nfs_client
 │   ├── nfs_common
+│   ├── nft_table
 │   ├── nginx-docker-registry-cache
 │   ├── nginx-docker-registry-cache-client
 │   ├── nginx_docker_cache_defaults

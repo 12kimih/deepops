@@ -1,0 +1,4 @@
+---
+# What the component installs, for its record (roles/component_record): the table's
+# ruleset and unit (roles/nft_table). nftables ships with the OS and stays.
+ingress_policy_items: "{{ 'ingress_policy' | nft_table_items }}"

@@ -1,0 +1,15 @@
+---
+# The table itself, also one loaded by hand or left by a unit removed earlier; stopping
+# the unit (the caller's component record) deletes it too.
+- name: Look for table {{ nft_table_name }}
+  ansible.builtin.command:
+    argv: [nft, list, table, inet, "{{ nft_table_name }}"]
+  register: nft_table_present
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Delete table {{ nft_table_name }}
+  change_command:
+    argv: [nft, delete, table, inet, "{{ nft_table_name }}"]
+  when: nft_table_present.rc == 0

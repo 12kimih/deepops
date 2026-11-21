@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: ingress_policy
+  author: DeepOps
+  description: Let only the cluster's networks and the open ports reach a host, with nftables
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
+dependencies:
+  - role: network_defaults  # cluster_networks

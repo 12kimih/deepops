@@ -36,11 +36,9 @@ hosts_default_domain: ""
 # hosts_interface_domain: { eth1: yourdomain.com }
 hosts_interface_domain: ""
 
-# Prefer an address on this internal subnet prefix (e.g. "10.0.") when a host has
-# extra addresses on an interface (such as a secondary IP), so /etc/hosts resolves
-# nodes to the cluster network rather than a management/public NIC. Unset = use the
-# interface's primary address (original behaviour). Set it in config/group_vars.
-hosts_internal_subnet_prefix: ""
+# On an interface with several addresses (a secondary IP), the one inside cluster_networks
+# (roles/network_defaults) is listed, so nodes resolve to the cluster network rather
+# than a management or public address.
 # A hosts file to install verbatim instead of generating one (empty: generate).
 hosts_file_src: ""
 

@@ -1,0 +1,36 @@
+#!/usr/sbin/nft -f
+# roles/ingress_policy (Ansible managed). Only this table is replaced, in one transaction: Docker's,
+# Tailscale's, egress_policy's and any other table stay as they are. It is created first
+# so the delete never fails.
+{% macro elements(items) -%}
+{%- if items | length > 0 %} elements = { {{ items | join(', ') }} };{% endif -%}
+{%- endmacro %}
+table inet ingress_policy {}
+delete table inet ingress_policy
+
+table inet ingress_policy {
+	counter dropped_inbound {}
+
+	set internal4 { type ipv4_addr; flags interval; auto-merge;{{ elements(cluster_networks | networks_of_version(4)) }} }
+	set internal6 { type ipv6_addr; flags interval; auto-merge;{{ elements(cluster_networks | networks_of_version(6)) }} }
+	set inbound_tcp { type inet_service; flags interval; auto-merge;{{ elements(ingress_policy_tcp_ports) }} }
+	set inbound_udp { type inet_service; flags interval; auto-merge;{{ elements(ingress_policy_udp_ports) }} }
+
+	chain input {
+		type filter hook input priority filter; policy drop;
+		iif "lo" accept
+		ct state established,related accept
+		ct state invalid drop
+		meta l4proto { icmp, ipv6-icmp } accept
+		udp sport 67 udp dport 68 accept
+		ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+		ip saddr @internal4 accept
+		ip6 saddr @internal6 accept
+{% if ingress_policy_trusted_interfaces | length > 0 %}
+		iifname { {{ ingress_policy_trusted_interfaces | map('to_json') | join(', ') }} } accept
+{% endif %}
+		tcp dport @inbound_tcp accept
+		udp dport @inbound_udp accept
+		counter name "dropped_inbound"
+	}
+}

@@ -14,15 +14,13 @@
 # sets it from deepops_components. Absent only when named in deepops_component_removals.
 nis_server_state: present
 
-# /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client
-# networks may query this server, as "NETMASK NETWORK" lines. The default allows
-# localhost + the RFC1918 private ranges; TIGHTEN this to your actual cluster
-# subnet (e.g. "255.255.255.0 192.0.2.0") -- a wide-open server is a security risk.
-nis_server_securenets:
-  - "255.0.0.0       127.0.0.0"        # localhost (required)
-  - "255.0.0.0       10.0.0.0"         # 10.0.0.0/8    (RFC1918)
-  - "255.240.0.0     172.16.0.0"       # 172.16.0.0/12 (RFC1918)
-  - "255.255.0.0     192.168.0.0"      # 192.168.0.0/16 (RFC1918)
+# /etc/ypserv.securenets (Debian) or /var/yp/securenets (RHEL): which client networks
+# may query this server, as "NETMASK NETWORK" lines: localhost and the cluster's IPv4
+# networks (roles/network_defaults), or the RFC1918 private ranges while
+# cluster_networks is empty (a wide-open server is a security risk).
+nis_server_securenets: >-
+  {{ ['255.0.0.0 127.0.0.0'] + (cluster_networks | networks_netmask if cluster_networks | length > 0
+     else ['255.0.0.0 10.0.0.0', '255.240.0.0 172.16.0.0', '255.255.0.0 192.168.0.0']) }}
 
 # Also run yppasswdd (lets users change NIS passwords with yppasswd) and ypxfrd
 # (speeds map transfer to NIS SLAVE servers -- only needed if you run slaves).

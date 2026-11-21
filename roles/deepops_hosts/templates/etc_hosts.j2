@@ -46,9 +46,10 @@ ff02::2  ip6-allrouters
     {% set interface_facts = hostvars[host]['ansible_facts'].get(interface, {}) -%}
     {% set primary_addr = interface_facts.get(hosts_ip_protocol, {}).get('address', None) -%}
     {% set secondaries_list = interface_facts.get(hosts_ip_protocol + '_secondaries', []) -%}
-    {% if hosts_internal_subnet_prefix -%}
-        {% set internal_secondary = (secondaries_list | selectattr('address', 'match', '^' + (hosts_internal_subnet_prefix | regex_escape)) | list | first) | default(None) -%}
-        {% set addr = internal_secondary.address if internal_secondary else primary_addr -%}
+    {#- On an interface with several addresses, the one in cluster_networks. -#}
+    {% set internal_secondary = secondaries_list | map(attribute='address') | addresses_in_networks(cluster_networks) | first | default(None) -%}
+    {% if internal_secondary and not (primary_addr and primary_addr | ip_in_networks(cluster_networks)) -%}
+        {% set addr = internal_secondary -%}
     {% else -%}
         {% set addr = primary_addr -%}
     {% endif -%}

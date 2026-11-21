@@ -64,7 +64,7 @@ These are additive -- upstream had no equivalent default:
   `group_vars/ldap-server.yml`), the docker socket group and the sudo netgroup
   (`cluster_docker_group_*`, `cluster_sudoers_*` in `group_vars/all.yml`).
 - **Node operations** (`group_vars/all.yml`) -- `docker_daemon_options` / `docker_sysctls`,
-  `hosts_internal_subnet_prefix`, `ansible_python_interpreter`, and the netplan, serial
+  `cluster_networks`, `ansible_python_interpreter`, and the netplan, serial
   console and BMC settings behind the [utility playbooks](utilities.md).
 
 ## enroot (group_vars/all.yml) -- simplified
@@ -107,7 +107,7 @@ These are additive -- upstream had no equivalent default:
   `group_vars/ldap-server.yml`), the docker socket group and the sudo netgroup
   (`cluster_docker_group_*`, `cluster_sudoers_*` in `group_vars/all.yml`).
 - **Node operations** (`group_vars/all.yml`) -- `docker_daemon_options` / `docker_sysctls`,
-  `hosts_internal_subnet_prefix`, `ansible_python_interpreter`, and the netplan, serial
+  `cluster_networks`, `ansible_python_interpreter`, and the netplan, serial
   console and BMC settings behind the [utility playbooks](utilities.md).
 
 ## enroot (group_vars/all.yml) -- simplified

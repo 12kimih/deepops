@@ -10,16 +10,9 @@
     component_record_action: absent
     component_record_items: "{{ _egress_policy_base_items + _egress_policy_metrics_items }}"
 
-# A table loaded by hand, or left by a unit removed earlier.
-- name: Look for the egress policy table
-  ansible.builtin.command:
-    argv: [nft, list, table, inet, egress_policy]
-  register: egress_policy_table
-  changed_when: false
-  failed_when: false
-  check_mode: false  # read-only; --check needs the result
-
 - name: Delete the egress policy table
-  change_command:
-    argv: [nft, delete, table, inet, egress_policy]
-  when: egress_policy_table.rc == 0
+  ansible.builtin.include_role:
+    name: nft_table
+    tasks_from: absent
+  vars:
+    nft_table_name: egress_policy

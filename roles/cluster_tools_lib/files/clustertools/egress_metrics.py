@@ -14,12 +14,13 @@ reports them, read from /proc and the policy's nftables table:
   egress_policy_metrics_timestamp_seconds       when this was measured
 
 A user is a uid in user_uids (the policy's restricted ranges: system accounts and
-root are not). exposed is "false" when the policy's inbound filter keeps the port
-from outside the cluster (it is not an allowed inbound port, or the socket is bound to
-an internal address), else "true". A UDP socket on an ephemeral port is a client's,
-not a server's, and is left out. CONFIG holds table, user_uids ("A-B" or "N") and
-tunnel_programs (a name, or "program subcommand" such as "code tunnel"). The file is
-written atomically. Python 3.9 or newer, standard library only.
+root are not). exposed is "false" when the inbound filter (roles/ingress_policy's
+table) keeps the port from outside the cluster (it is not an open port, or the socket
+is bound to an internal address), else "true". A UDP socket on an ephemeral port is a
+client's, not a server's, and is left out. CONFIG holds table (the egress policy's),
+inbound_table (the ingress policy's), user_uids ("A-B" or "N") and tunnel_programs (a
+name, or "program subcommand" such as "code tunnel"). The file is written atomically.
+Python 3.9 or newer, standard library only.
 """
 
 import ipaddress
@@ -225,9 +226,10 @@ def user_name(uid):
     return _NAMES[uid]
 
 
-def textfile(cfg, table_json, proc_root="/proc", now=None):
+def textfile(cfg, table_json, inbound_json=None, proc_root="/proc", now=None):
     ranges = uid_ranges(cfg["user_uids"])
     state = policy(table_json)
+    inbound = policy(inbound_json)
     ephemeral = ephemeral_ports(proc_root)
     procs = processes(proc_root, ranges)
     listening = [
@@ -260,7 +262,7 @@ def textfile(cfg, table_json, proc_root="/proc", now=None):
     for proto, addr, port, uid, inode in sorted(listening, key=lambda s: (s[0], str(s[1]), s[2], s[3])):
         labels = {
             "proto": proto, "address": str(addr), "port": port, "user": user_name(uid),
-            "process": owners.get(inode, ""), "exposed": str(exposed(state, proto, addr, port)).lower(),
+            "process": owners.get(inode, ""), "exposed": str(exposed(inbound, proto, addr, port)).lower(),
         }  # fmt: skip
         key = tuple(labels.items())
         if key not in seen:
@@ -295,7 +297,11 @@ def main(argv=None):
         return 2
     cfg = json.loads(Path(argv[0]).read_text())
     return run_main(
-        "egress-policy-metrics", lambda: write_atomic(argv[1], textfile(cfg, load_table(cfg["table"])))
+        "egress-policy-metrics",
+        lambda: write_atomic(
+            argv[1],
+            textfile(cfg, load_table(cfg["table"]), load_table(cfg.get("inbound_table", "ingress_policy"))),
+        ),
     )
 
 

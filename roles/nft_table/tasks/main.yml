@@ -1,0 +1,74 @@
+---
+# Install a role's nftables table and keep the kernel holding exactly the file: written
+# (checked by nft -c), loaded now and at every boot by its unit, and reloaded whenever the
+# kernel's copy is not the file's, also after a run that failed between the two.
+- name: Check the table request
+  ansible.builtin.assert:
+    that:
+      - nft_table_ruleset is search('(?m)^table inet ' ~ nft_table_name ~ ' [{][}]$')
+      - nft_table_ruleset is search('(?m)^delete table inet ' ~ nft_table_name ~ '$')
+      - nft_table_description | length > 0
+      # The calling role by its path: what shows deepops wrote the file (component
+      # adoption, the stale files audit). A template lookup leaves ansible_managed empty.
+      - nft_table_ruleset is search('roles/[a-z0-9_-]+')
+    fail_msg: >-
+      nft_table needs nft_table_name, nft_table_description and a ruleset that names its
+      role (roles/<name>) and creates, deletes and defines `table inet {{ nft_table_name }}`
+      (so loading it replaces only that table).
+    quiet: true
+
+- name: Install nftables
+  ansible.builtin.package:
+    name: nftables
+    state: present
+
+- name: Write the ruleset of table {{ nft_table_name }}
+  ansible.builtin.copy:
+    content: "{{ nft_table_ruleset }}"
+    dest: "{{ (nft_table_name | nft_table_paths).ruleset }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: nft -c -f %s
+
+- name: Install the boot unit of table {{ nft_table_name }}
+  ansible.builtin.template:
+    src: nft-table.service.j2
+    dest: "/etc/systemd/system/{{ (nft_table_name | nft_table_paths).unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+# Under --check the files above are not written, so there is nothing to load.
+- name: Load now and at boot table {{ nft_table_name }}
+  ansible.builtin.systemd_service:
+    name: "{{ (nft_table_name | nft_table_paths).unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+# What the kernel holds against the file, not whether this run wrote it: a run that
+# failed after writing would otherwise leave the old table loaded until a reboot.
+- name: Read the checksum the kernel holds of table {{ nft_table_name }}
+  ansible.builtin.command:
+    argv: [cat, "{{ (nft_table_name | nft_table_paths).loaded }}"]
+  register: nft_table_loaded
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the checksum of the ruleset file of table {{ nft_table_name }}
+  ansible.builtin.stat:
+    path: "{{ (nft_table_name | nft_table_paths).ruleset }}"
+    checksum_algorithm: sha256
+  register: nft_table_file
+
+# Reload replaces the table in one transaction; there is no moment without it.
+- name: Load the ruleset the kernel does not hold yet of table {{ nft_table_name }}
+  ansible.builtin.systemd_service:
+    name: "{{ (nft_table_name | nft_table_paths).unit }}"
+    state: reloaded
+  when:
+    - not ansible_check_mode
+    - (nft_table_loaded.stdout.split() + [''])[0] != nft_table_file.stat.checksum | default('')

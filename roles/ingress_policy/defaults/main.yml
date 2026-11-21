@@ -1,0 +1,29 @@
+---
+# ingress_policy -- what may reach this host, enforced in the kernel with nftables (one
+# table, inet ingress_policy, owned by this role alone; what users may reach outside is
+# roles/egress_policy's table). Loopback, replies, ICMP, DHCP, the cluster's networks
+# (cluster_networks, roles/network_defaults), the trusted interfaces and the open ports
+# below are let in; every other new connection is dropped. It takes over from ufw (the
+# former ufw-enable.yml), which it stops and disables, so one tool owns the host's
+# inbound filtering. Ports published by Docker (-p) are forwarded, not delivered to the
+# host, and are not filtered here (bind them to an address). See
+# docs/slurm-cluster/egress-policy.md.
+
+# present applies the filter; absent removes the table and its unit (everything is let
+# in again; ufw stays off); kept does nothing. A deploy sets it from
+# slurm_enable_ingress_policy (docs/deepops/component-state.md).
+ingress_policy_state: present
+
+# Ports open to everyone: a number or "A-B". The SSH port and the web portal on a login
+# host; set them per host or group.
+ingress_policy_tcp_ports: []
+ingress_policy_udp_ports: []
+
+# Interfaces whose traffic is let in like the cluster's networks (a VPN such as
+# tailscale0).
+ingress_policy_trusted_interfaces: []
+
+# Refuse to turn the filter on when the SSH session Ansible (or its operator) came in on
+# would be cut: neither from the cluster's networks or a trusted interface nor to an
+# open port.
+ingress_policy_lockout_check: true

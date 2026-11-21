@@ -768,7 +768,7 @@ tests:
           - exp_labels: {severity: warning, host: n1, instance: "n1:9100", user: bob, process: python3, proto: tcp, address: "0.0.0.0", port: "8888", exposed: "true"}
             exp_annotations:
               summary: "bob's python3 on n1 listens on 0.0.0.0 port 8888/tcp, open from outside the cluster"
-              description: "No inbound filter keeps this port from the internet. Ask the user to bind to 127.0.0.1 and reach it through an SSH tunnel, or turn on egress_policy_inbound for the host."
+              description: "No inbound filter keeps this port from the internet. Ask the user to bind to 127.0.0.1 and reach it through an SSH tunnel, or turn on the ingress policy (slurm_enable_ingress_policy) for the host."
 
   - name: outbound SSH over a limit warns per host and limit; other rejections do not
     interval: 1m

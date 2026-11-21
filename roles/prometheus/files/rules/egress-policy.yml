@@ -55,8 +55,8 @@ groups:
             {{ $labels.address }} port {{ $labels.port }}/{{ $labels.proto }}, open from outside the cluster
           description: >-
             No inbound filter keeps this port from the internet. Ask the user to bind to
-            127.0.0.1 and reach it through an SSH tunnel, or turn on egress_policy_inbound
-            for the host.
+            127.0.0.1 and reach it through an SSH tunnel, or turn on the ingress policy
+            (slurm_enable_ingress_policy) for the host.
       - alert: EgressSshRejected
         expr: sum by (host, reason) (increase(egress_policy_rejected_packets_total{reason=~"ssh_.*"}[10m])) > 0
         labels: {severity: warning}

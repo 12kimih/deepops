@@ -1,0 +1,34 @@
+{{ ansible_managed | comment }}
+{% set paths = nft_table_name | nft_table_paths %}
+# roles/nft_table: loads the {{ nft_table_name }} nftables table before the network comes
+# up. `systemctl stop` removes the table (it is off until the next start); `systemctl
+# reload` replaces it in one transaction. After each load the file's checksum goes to
+# {{ paths.loaded }}: what the kernel holds. Ordered after nftables.service and
+# restarted with it, because its `flush ruleset` would remove the table too.
+[Unit]
+Description={{ nft_table_description }}
+Documentation=man:nft(8)
+Wants=network-pre.target
+Before=network-pre.target shutdown.target
+After=nftables.service
+PartOf=nftables.service
+Conflicts=shutdown.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Loading a ruleset takes milliseconds; a hang must not hold up the boot.
+TimeoutStartSec=30s
+StandardInput=null
+ProtectSystem=full
+ProtectHome=true
+ExecStart=/usr/sbin/nft -f {{ paths.ruleset }}
+ExecStartPost=/bin/sh -c 'sha256sum {{ paths.ruleset }} > {{ paths.loaded }}'
+ExecReload=/usr/sbin/nft -f {{ paths.ruleset }}
+ExecReload=/bin/sh -c 'sha256sum {{ paths.ruleset }} > {{ paths.loaded }}'
+ExecStop=-/usr/sbin/nft delete table inet {{ nft_table_name }}
+ExecStopPost=-/bin/rm -f {{ paths.loaded }}
+
+[Install]
+WantedBy=sysinit.target

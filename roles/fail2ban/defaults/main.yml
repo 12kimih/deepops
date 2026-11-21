@@ -8,5 +8,8 @@ fail2ban_state: present
 # defaults (Debian: nftables bans, the systemd journal): bantime (-1 bans for good),
 # findtime, maxretry. fail2ban's own: 10m, 10m, 5.
 fail2ban_settings: {}
-# Addresses never banned, besides the host's own.
-fail2ban_ignoreip: []
+# Addresses never banned, besides the host's own: the cluster's networks
+# (roles/network_defaults). A range rather than each host's address, so a host whose
+# facts are stale or missing is still never banned; it must not hold a range the hosts
+# share with others.
+fail2ban_ignoreip: "{{ cluster_networks }}"

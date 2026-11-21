@@ -16,9 +16,11 @@ nfs_shared_dirs: []
 # up only when the site lists nfs in deepops_component_removals.
 nfs_state: present
 
-# Hosts or networks every export is offered to unless an entry sets its own clients.
-# "*" is any host that can reach the server; set the cluster's subnet instead.
-nfs_export_clients: ["*"]
+# Hosts or networks every export is offered to unless an entry sets its own clients: the
+# cluster's networks (roles/network_defaults; a range, so a host is never refused for
+# facts it has not reported yet), or "*" (any host that can reach the server) while
+# cluster_networks is empty.
+nfs_export_clients: "{{ cluster_networks if cluster_networks | length > 0 else ['*'] }}"
 
 # Number of nfsd (kernel NFS server) threads. The Linux default is only 8, far too
 # few for many concurrent clients under heavy random I/O: each nfsd thread serves

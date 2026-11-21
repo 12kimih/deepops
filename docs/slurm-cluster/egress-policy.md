@@ -1,8 +1,8 @@
 # Egress policy
 
 `roles/egress_policy` limits where users' processes may connect outside the cluster,
-sets client SSH defaults for every user, optionally filters inbound traffic, and
-reports what a firewall cannot block. `roles/dns_resolver` gives every host a local
+sets client SSH defaults for every user, and reports what a firewall cannot block.
+`roles/ingress_policy` decides what may reach each host (below). `roles/dns_resolver` gives every host a local
 resolver that blocks tunnel services by name. Both are off until
 `slurm_enable_egress_policy` and `slurm_enable_dns_resolver` are true;
 `playbooks/generic/egress-policy.yml` and `playbooks/generic/dns-resolver.yml` run
@@ -22,7 +22,7 @@ Outbound, for a **user** (a uid in `egress_policy_restricted_uids`, by default
 |---|---|
 | this host (its local resolver included) | everything |
 | DNS (53, and DNS over TLS on 853) to any other address | rejected, internal resolvers included |
-| the `egress_policy_internal_networks` | everything else |
+| the cluster's networks (`cluster_networks`) | everything else |
 | anywhere else | TCP 80 and 443, UDP 123 (NTP), ICMP echo (ping); not UDP 443 (QUIC) |
 | anywhere else, TCP 22 | new connections through a token bucket per user and destination address (30 at once, then 20 a minute), and a node-wide one (on `[slurm-login]` hosts 1200, then 600 a minute; elsewhere 120, then 60) |
 | anywhere else, any other port | rejected at once (ICMP administratively prohibited) and logged with the uid |
@@ -85,15 +85,20 @@ once with "No route to host"; `journalctl -k --grep egress-policy` shows the uid
 Slurm and pyxis do not use ssh, and Ansible passes its own control options on the
 command line, so neither is affected.
 
-### Inbound (replaces ufw-enable.yml)
+### Inbound: roles/ingress_policy (replaces ufw-enable.yml)
 
-With `egress_policy_inbound: true` the table also drops inbound traffic except
-loopback, replies, ICMP, DHCP, the internal networks, `egress_policy_trusted_interfaces`
-(a VPN interface) and `egress_policy_inbound_tcp_ports` / `_udp_ports`. The former
-`ufw-enable.yml` playbook did this with ufw; turning this on disables ufw, so one tool
-owns the host's filtering (on Ubuntu 24.04 ufw is itself iptables over nftables, and a
-packet dropped by either table is dropped). The Docker bridge is no longer allowed:
-the monitoring containers and the registry use host networking.
+A second table, `inet ingress_policy`, owned by `roles/ingress_policy` and switched on
+by `slurm_enable_ingress_policy`, drops new inbound connections except loopback,
+replies, ICMP, DHCP, the cluster's networks (`cluster_networks`),
+`ingress_policy_trusted_interfaces` (a VPN interface) and `ingress_policy_tcp_ports` /
+`_udp_ports` (per host: the SSH port and the portal on a login node). It is its own
+component, so a host can filter inbound without the egress limits and the other way
+round; both tables are loaded the same way (`roles/nft_table`: their own unit,
+replaced in one transaction). The former `ufw-enable.yml` playbook did this with ufw;
+turning it on disables ufw, so one tool owns the host's inbound filtering (on Ubuntu
+24.04 ufw is itself iptables over nftables, and a packet dropped by any table is
+dropped). The Docker bridge is not let in: the monitoring containers and the registry
+use host networking.
 
 Before turning it on, the role checks the SSH session the run came in on (with a local
 connection, the operator's own login) and refuses if the new rules would cut it.
@@ -128,13 +133,13 @@ the mention that critical alerts carry, so they never page
 
 ## Turning it on
 
-1. Set the site's resolvers, the internal networks (every network jobs talk over: the
-   cluster subnet, an IPoIB or storage network) and the exempt administrators in
-   `config/group_vars/all.yml`:
+1. Set the site's resolvers, the cluster's networks (`cluster_networks`, every network
+   jobs talk over: the management network, an IPoIB or storage network) and the exempt
+   administrators in `config/group_vars/all.yml`:
 
    ```yaml
    dns_resolver_upstreams: [192.0.2.53, 198.51.100.53]
-   egress_policy_internal_networks: ["{{ cluster_subnet }}"]
+   cluster_networks: [10.0.0.0/16]
    egress_policy_exempt_uids: "{{ people | people_uids('admin') }}"
    ```
 
@@ -161,7 +166,6 @@ at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts
 | Variable | Default | Description |
 |---|---|---|
 | `egress_policy_state` | `present` | present applies the policy; absent removes the table, its unit, the SSH drop-in and the metrics (the way back); kept does nothing. A deploy sets it from slurm_enable_egress_policy (docs/deepops/component-state.md). |
-| `egress_policy_internal_networks` | `[]` | The cluster's own networks (CIDRs, IPv4 or IPv6): users reach them on every port, and with egress_policy_inbound they reach this host on every port. List every network jobs talk over (an IPoIB or storage network too), or multi-node jobs break. Required. |
 | `egress_policy_restricted_uids` | `[1000-60000, 65536-4294967294]` | Who is a user: the uids whose outside traffic is limited ("A-B" or "N"). Below 1000 are root and system accounts; 60001-65535 are systemd's DynamicUser range and nobody, which containerized services run as. Above 65535 are subordinate uids, which a rootless container's processes run as. |
 | `egress_policy_exempt_uids` | `[]` | Users exempt from the limits: the administrators' uids, from the people roster. |
 | `egress_policy_allowed_tcp_ports` | `[80, 443]` | Destination ports users may reach outside the cluster: web (TCP only: QUIC on UDP 443 is not allowed) and NTP. |
@@ -174,11 +178,6 @@ at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts
 | `egress_policy_ssh_node_rate` | `'{{ ''600/minute'' if inventory_hostname in groups[''slurm-login''] \| default([]) else ''60/minute'' }}'` | The node-wide bucket is generous on login nodes, where many people work at once. |
 | `egress_policy_ssh_node_burst` | `'{{ 1200 if inventory_hostname in groups[''slurm-login''] \| default([]) else 120 }}'` |  |
 | `egress_policy_log_rate` | `10/minute` | Log rejected connections to the kernel log, with the uid (journalctl -k), at most this often. |
-| `egress_policy_inbound` | `false` | Filter inbound traffic too (the former ufw-enable.yml): allow loopback, replies, ICMP, DHCP, the internal networks, the trusted interfaces and the ports below, drop the rest. Turning it on stops and disables ufw, so one tool owns the host's filtering. Ports published by Docker (-p) are forwarded, not delivered to the host, and are not filtered here. |
-| `egress_policy_inbound_tcp_ports` | `[]` | Ports open to everyone: a number or "A-B". The SSH port on a login host. |
-| `egress_policy_inbound_udp_ports` | `[]` |  |
-| `egress_policy_trusted_interfaces` | `[]` | Interfaces whose traffic is trusted like the internal networks (a VPN such as tailscale0). |
-| `egress_policy_inbound_lockout_check` | `true` | Refuse to turn on inbound filtering when the SSH session Ansible (or its operator) came in on would be cut: neither from an internal network or trusted interface nor to an allowed port. |
 | `egress_policy_ssh_client_options` | `{ConnectTimeout: 10, ConnectionAttempts: 1}` | Client SSH settings for every user (/etc/ssh/ssh_config.d; a user's ~/.ssh/config wins). One attempt with a timeout, so a script cannot retry in a tight loop. |
 | `egress_policy_ssh_multiplex_options` | `{ControlMaster: auto, ControlPath: ~/.ssh/cm-%C, ControlPersist: 10m}` | One connection per destination, reused by every later ssh, scp and rsync to it (`ssh -O exit HOST` ends it). Only where ~/.ssh is writable: ssh exits when it cannot make the socket. {} turns it off. |
 | `egress_policy_ssh_client_file` | `/etc/ssh/ssh_config.d/40-egress-policy.conf` |  |
@@ -187,6 +186,16 @@ at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts
 | `egress_policy_metrics_textfile_dir` | `'{{ node_exporter_prom_dir }}'` |  |
 | `egress_policy_tunnel_programs` | `[cloudflared, ngrok, frpc, frps, bore, lt, localtunnel, chisel, zrok, rathole, gost, inlets, pagekite.py, tunnelto, tmole, loophole, playit, wstunnel, devtunnel, code tunnel, code-tunnel, tailscaled, zerotier-one, wireguard-go]` | Tunnel programs, by executable or script name, or "program subcommand". |
 <!-- END GENERATED: role-variables:egress_policy -->
+
+<!-- BEGIN GENERATED: role-variables:ingress_policy -->
+| Variable | Default | Description |
+|---|---|---|
+| `ingress_policy_state` | `present` | present applies the filter; absent removes the table and its unit (everything is let in again; ufw stays off); kept does nothing. A deploy sets it from slurm_enable_ingress_policy (docs/deepops/component-state.md). |
+| `ingress_policy_tcp_ports` | `[]` | Ports open to everyone: a number or "A-B". The SSH port and the web portal on a login host; set them per host or group. |
+| `ingress_policy_udp_ports` | `[]` |  |
+| `ingress_policy_trusted_interfaces` | `[]` | Interfaces whose traffic is let in like the cluster's networks (a VPN such as tailscale0). |
+| `ingress_policy_lockout_check` | `true` | Refuse to turn the filter on when the SSH session Ansible (or its operator) came in on would be cut: neither from the cluster's networks or a trusted interface nor to an open port. |
+<!-- END GENERATED: role-variables:ingress_policy -->
 
 <!-- BEGIN GENERATED: role-variables:dns_resolver -->
 | Variable | Default | Description |

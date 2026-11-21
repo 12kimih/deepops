@@ -1,0 +1,90 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ingress_policy
+    component_record_action: begin
+    component_record_items: "{{ ingress_policy_items }}"
+
+# Without the cluster's networks every node would drop the others' traffic.
+- name: Check the ingress policy settings
+  ansible.builtin.assert:
+    that:
+      - cluster_networks | length > 0
+      - cluster_networks | networks_invalid | length == 0
+      - (ingress_policy_tcp_ports + ingress_policy_udp_ports)
+        | map('string') | reject('match', '^[0-9]+(-[0-9]+)?$') | list | length == 0
+    fail_msg: >-
+      cluster_networks must list the cluster's networks as CIDRs (invalid:
+      {{ cluster_networks | networks_invalid }}); ports are numbers or "A-B".
+    quiet: true
+
+# The operator's session is the one at risk: with a local connection it is the login
+# Ansible runs in, so the variable is read without become (sudo drops it).
+- name: Find the SSH session this run came in on
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      set -- ${SSH_CONNECTION:-}
+      [ $# -eq 4 ] || exit 0
+      dev=$(ip -o route get "$1" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p')
+      echo "$1 $4 ${dev:-}"
+  become: false
+  register: ingress_policy_session
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: ingress_policy_lockout_check
+
+- name: Refuse a filter that would cut this SSH session
+  vars:
+    ingress_policy_session_fields: "{{ ingress_policy_session.stdout.split() }}"
+  ansible.builtin.assert:
+    that: >-
+      ingress_policy_session_fields | length < 2
+      or ingress_policy_session_fields[0] | ip_in_networks(cluster_networks)
+      or ingress_policy_session_fields[1] | port_in_ports(ingress_policy_tcp_ports)
+      or (ingress_policy_session_fields[2:] | first | default('')) in ingress_policy_trusted_interfaces + ['lo']
+    fail_msg: >-
+      This SSH session ({{ ingress_policy_session.stdout }}: client, server port,
+      interface) is not from cluster_networks or a trusted interface, and its port is
+      not in ingress_policy_tcp_ports, so the filter would cut it. Add the port, or set
+      ingress_policy_lockout_check: false if another path in is certain.
+  when: ingress_policy_lockout_check
+
+- name: Render the ruleset
+  ansible.builtin.set_fact:
+    ingress_policy_ruleset: "{{ lookup('ansible.builtin.template', 'ingress-policy.nft.j2') }}"
+
+- name: Install and load the ingress policy table
+  ansible.builtin.include_role:
+    name: nft_table
+  vars:
+    nft_table_name: ingress_policy
+    nft_table_ruleset: "{{ ingress_policy_ruleset }}"
+    nft_table_description: Ingress policy nftables table
+
+# ufw's rules (the former ufw-enable.yml) would still drop what this table lets in.
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Hand inbound filtering over from ufw
+  when: "'ufw.service' in ansible_facts.services"
+  block:
+    - name: Disable ufw
+      community.general.ufw:
+        state: disabled
+
+    - name: Stop the ufw service
+      ansible.builtin.systemd_service:
+        name: ufw
+        state: stopped
+        enabled: false
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: ingress_policy
+    component_record_action: present
+    component_record_items: "{{ ingress_policy_items }}"

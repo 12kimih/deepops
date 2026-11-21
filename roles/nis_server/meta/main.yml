@@ -2,6 +2,7 @@
 dependencies:
   - role: directory_defaults  # directory_groups, directory_netgroups, nis_domain
   - role: retired_settings  # nis_make_server, nis_export_*
+  - role: network_defaults  # cluster_networks, the securenets
 
 galaxy_info:
   namespace: deepops
