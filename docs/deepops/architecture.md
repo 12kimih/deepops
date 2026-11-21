@@ -185,6 +185,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── retired_settings
 │   ├── root_access
 │   ├── rsyslog_client
+│   ├── rsyslog_defaults
 │   ├── rsyslog_server
 │   ├── runai
 │   ├── serial_console

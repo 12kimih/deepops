@@ -1,6 +1,7 @@
 ---
 # slurm_log_files, the files it forwards by default: roles/slurm_paths.
 dependencies:
+  - role: rsyslog_defaults  # rsyslog_validate
   - role: slurm_paths
 
 galaxy_info:

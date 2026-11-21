@@ -1,5 +1,6 @@
 ---
-- name: Reload rsyslog
+# A restart: rsyslogd does not re-read its configuration on SIGHUP.
+- name: Restart rsyslog
   systemd_unit:
     name: rsyslog
     state: restarted
