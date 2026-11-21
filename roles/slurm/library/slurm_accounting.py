@@ -28,8 +28,12 @@ options:
     type: dict
     required: true
   cluster:
-    description: Cluster name; defaults to sacctmgr's (ClusterName in slurm.conf).
+    description:
+      - The cluster whose associations are read and written. Required: without one,
+        sacctmgr reads the associations of every cluster in the database (an old name
+        after a rename among them) but adds to the local one.
     type: str
+    required: true
   prune:
     description: Delete QoS, accounts and associations that I(spec) does not list.
     type: bool
@@ -340,9 +344,9 @@ def ordered_accounts(accounts):
     return order
 
 
-def plan(spec, cur_qos, cur_accounts, cur_users, cluster=None, prune=False):
+def plan(spec, cur_qos, cur_accounts, cur_users, cluster, prune=False):
     """The sacctmgr argument lists that make the database match spec, and what is unmanaged."""
-    where_cluster = [f"cluster={cluster}"] if cluster else []
+    where_cluster = [f"cluster={cluster}"]
     cmds = []
     want_qos = desired_qos(spec)
     want_accounts = desired_accounts(spec)
@@ -475,7 +479,7 @@ def main():
     module = AnsibleModule(
         argument_spec={
             "spec": {"type": "dict", "required": True},
-            "cluster": {"type": "str"},
+            "cluster": {"type": "str", "required": True},
             "prune": {"type": "bool", "default": False},
             "sacctmgr": {"type": "str", "default": "sacctmgr"},
             "priority_weights": {"type": "dict", "default": {}},
@@ -496,7 +500,7 @@ def main():
             module.fail_json(msg=f"sacctmgr {' '.join(args)} failed: {err.strip()}")
         return out
 
-    where = [f"cluster={cluster}"] if cluster else []
+    where = [f"cluster={cluster}"]
     cur_qos = current_qos(read("show", "qos", f"format={QOS_FIELDS}"))
     cur_accounts, cur_users = current_assocs(
         # wopl: limits only where they are set, not propagated from parents; otherwise an
