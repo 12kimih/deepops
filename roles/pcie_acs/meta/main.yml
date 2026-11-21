@@ -1,0 +1,16 @@
+---
+dependencies:
+  - role: deepops_paths  # pcie_acs_program, pcie_acs_service, deepops_containerized
+
+galaxy_info:
+  namespace: deepops
+  role_name: pcie_acs
+  author: DeepOps
+  description: PCIe ACS off at every boot, for GPU peer-to-peer
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

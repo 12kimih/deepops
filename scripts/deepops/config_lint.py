@@ -3,7 +3,7 @@
 
     config_lint.py [--fix]              run every check
     config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
-                                        doc-vars, doc-limits, duplicates, shadow
+                                        doc-vars, doc-limits, doc-gpu, duplicates, shadow
 
 A role's defaults own each setting's default and a config states only what differs
 (scripts/deepops/settings.py models both):
@@ -27,6 +27,9 @@ doc-vars   every setting a document tells a reader to set (`name: value`) or lis
 doc-limits every `ansible-playbook -l X playbooks/...` a document shows limits to hosts the
            play targets: -l only narrows a play's own hosts, so a group outside them
            (or one config.example/inventory does not know) runs nothing there.
+doc-gpu    every GPU command a document runs on a node through ansible or ssh goes
+           through systemd-run: the Slurm login setup hides the GPUs from the ssh
+           service, so nvidia-smi there finds none (the roles' tasks do the same).
 retired    no config sets a setting deepops retired (the deploy would stop on it).
 removals   deepops_component_removals names only components with removal: explicit
            in the registry (any other name fails every deploy).
@@ -436,6 +439,23 @@ def check_doc_limits():
     return problems
 
 
+# A command a document runs on a node over ansible (ad hoc -a) or ssh, and the GPU
+# tools in it that need the devices (dcgmi talks to its daemon and needs none).
+REMOTE_COMMAND = re.compile(r"\bansible\b[^`\n]*?\s-a\s[^`\n]*|\bssh\s[^`\n|]*")
+GPU_TOOL = re.compile(r"\b(nvidia-smi|nvidia-mig-parted)\b")
+
+
+def check_doc_gpu():
+    problems = []
+    for shown, text, site in documents():
+        for number, line in enumerate(text.splitlines(), 1):
+            for cmd in REMOTE_COMMAND.findall(line):
+                if GPU_TOOL.search(cmd) and "systemd-run" not in cmd:
+                    why = "runs a GPU tool over ssh, where the GPUs are hidden: wrap it in systemd-run"
+                    problems.append(found("doc-gpu", shown, number, why, site))
+    return problems
+
+
 def check_retired():
     """A config that still sets a retired setting stops every deploy at the
     retired_settings role: the change that retires a setting fixes the configs too."""
@@ -523,6 +543,7 @@ CHECKS = {
     "doc-paths": check_doc_paths,
     "doc-vars": check_doc_vars,
     "doc-limits": check_doc_limits,
+    "doc-gpu": check_doc_gpu,
     "duplicates": check_duplicates,
     "shadow": check_shadow,
     "retired": check_retired,

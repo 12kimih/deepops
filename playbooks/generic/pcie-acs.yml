@@ -1,0 +1,12 @@
+---
+# PCIe ACS off at every boot for GPU peer-to-peer (roles/pcie_acs). Every host it runs
+# on converges to deepops_components (present on slurm-node while slurm_disable_pcie_acs
+# is on, removed elsewhere); NHC drains a node where ACS is back on.
+#
+#   ansible-playbook -K playbooks/generic/pcie-acs.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: pcie_acs
+      pcie_acs_state: "{{ deepops_components.pcie_acs | component_phase(deepops_phase) }}"

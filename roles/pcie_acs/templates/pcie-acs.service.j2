@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# roles/pcie_acs: PCIe ACS off at every boot, before anything opens the GPUs (the
+# persistence daemon, slurmd), so no job starts with peer-to-peer through the CPU.
+[Unit]
+Description=Disable PCIe ACS for GPU peer-to-peer (deepops)
+Before=nvidia-persistenced.service slurmd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=2min
+ExecStart={{ pcie_acs_program }} disable
+
+[Install]
+WantedBy=multi-user.target

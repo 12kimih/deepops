@@ -1,0 +1,6 @@
+---
+# What this component installs, for its record (roles/component_record).
+pcie_acs_items:
+  - "unit:{{ pcie_acs_service }}"
+  - "file:/etc/systemd/system/{{ pcie_acs_service }}"
+  - "file:{{ pcie_acs_program }}"

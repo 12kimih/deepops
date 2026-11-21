@@ -318,6 +318,11 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #nvidia_power_limit_watts_by_model:  # example
 #  "NVIDIA A30": 150
 
+# PCIe ACS off on the compute nodes at every boot, for GPU peer-to-peer (roles/pcie_acs;
+# NHC drains a node where it is back on). Bare metal only: a host passing devices to
+# virtual machines needs ACS.
+#slurm_disable_pcie_acs: false
+
 # GPU ECC (roles/nvidia_ecc): "enabled" or "disabled" on every GPU of the nodes, ""
 # leaves each GPU as it is. ECC reserves about a sixteenth of a GDDR GPU's memory; a
 # change is applied by the next (drained) reboot, which the role requests.

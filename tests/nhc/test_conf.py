@@ -64,6 +64,19 @@ class NhcConf(unittest.TestCase):
         self.assertNotIn("check_nv_xid", text)
         self.assertNotIn("check_nv_remapped_rows", text)
 
+    def test_acs_is_checked_where_its_component_is_present(self):
+        program = role_defaults("deepops_paths")["pcie_acs_program"]
+        for state, checked in (("present", True), ("absent", False), ("kept", False)):
+            with self.subTest(state=state):
+                text = conf(
+                    "debian.yml",
+                    "Debian",
+                    deepops_components={"pcie_acs": state},
+                    pcie_acs_program=program,
+                )
+                self.assertEqual(f"check_pcie_acs {program}\n" in text, checked)
+        self.assertNotIn("check_pcie_acs", conf("debian.yml", "Debian"))
+
 
 if __name__ == "__main__":
     unittest.main()

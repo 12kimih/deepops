@@ -179,6 +179,9 @@ deepops_component_registry:
   nvidia_power_limit:
     rules:
       - {switch: "{{ slurm_cluster_configure_gpu_power_limit }}", group: slurm-node}
+  pcie_acs:
+    rules:
+      - {switch: "{{ slurm_disable_pcie_acs }}", group: slurm-node}
   # The NVIDIA HPC SDK, installed by the first login node into shared storage; it
   # registers with Lmod.
   hpcsdk:

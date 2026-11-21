@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: pcie_acs_state in ['present', 'absent', 'kept']
+    fail_msg: "pcie_acs_state must be present, absent or kept, not {{ pcie_acs_state }}."
+    quiet: true
+
+- name: "Make PCIe ACS disabling {{ pcie_acs_state }}"
+  ansible.builtin.include_tasks: "{{ pcie_acs_state }}.yml"
+  when: pcie_acs_state != 'kept'

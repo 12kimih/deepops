@@ -119,3 +119,14 @@ check_nv_remapped_rows() {
 	fi
 	return 0
 }
+
+# PCIe ACS on again on a device where roles/pcie_acs turned it off (a firmware or
+# hotplug reset): peer-to-peer traffic goes through the CPU. $1 is its program.
+check_pcie_acs() {
+	local found
+	if ! found="$("$1" check 2>&1)"; then
+		echo "${found:-$1 check failed}"
+		return 1
+	fi
+	return 0
+}

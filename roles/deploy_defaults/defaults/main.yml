@@ -64,6 +64,8 @@ slurm_enable_fail2ban: false
 slurm_login_on_compute: false
 allow_user_set_gpu_clocks: false
 slurm_cluster_configure_gpu_power_limit: true
+# PCIe ACS off on the compute nodes for GPU peer-to-peer (roles/pcie_acs): bare metal only
+slurm_disable_pcie_acs: false
 slurm_install_enroot: true
 slurm_install_pyxis: true
 # Rootless Podman on compute nodes, for Dockerfile builds in CPU jobs (roles/podman)

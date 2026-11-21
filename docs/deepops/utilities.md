@@ -56,8 +56,8 @@ reboots each as it empties and returns it to service. See
 | `nvidia-software/nvidia-power-limit.yml` | slurm-cluster | persistent GPU power cap: the GPU model's (`nvidia_power_limit_watts_by_model`) or the host's (`nvidia_power_limit_watts`); a node with neither has its cap removed |
 | `nvidia-software/nvidia-ecc.yml` | slurm-node | every GPU in the ECC mode `nvidia_ecc_mode` declares (enabled or disabled; empty leaves them); a change is set at once and applied by the next reboot, which it requests |
 | `utilities/gpu-diag.yml` | slurm-node | GPU burn-in: one node at a time, drain it, run the DCGM diagnostics (`dcgmi diag -r 3`, `-e maintenance_verify_dcgm_level=N`) with the other verify checks, resume; a failing node stays drained |
-| `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS and IOMMU state; read-only |
-| `utilities/disable-acs.yml` | slurm-node | disables PCIe ACS for GPU peer-to-peer, persistently |
+| `generic/pcie-acs.yml` | slurm-cluster | PCIe ACS off at every boot for GPU peer-to-peer where `slurm_disable_pcie_acs` puts it (slurm-node), removed elsewhere; NHC drains a node where ACS is back on |
+| `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS (roles/pcie_acs) and IOMMU state; read-only |
 | `utilities/nvidia-driver-switch.yml` | slurm-node | switches the NVIDIA driver branch one node at a time: drain, switch, reboot, verify, resume |
 | `utilities/nvidia-set-gpu-clocks.yml` | slurm-node | locks the GPU clocks to `gpu_clock_lock`, or resets them (`gpu_clock_reset`), on hosts with GPUs; runtime only |
 | `utilities/gpu-clocks.yml` | slurm-node | lets users change application clocks (`nvidia-smi -acp`); `slurm-cluster.yml` runs it when `allow_user_set_gpu_clocks` |

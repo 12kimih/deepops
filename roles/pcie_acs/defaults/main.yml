@@ -1,0 +1,14 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): PCIe Access Control
+# Services (ACS) off on every device that has the capability, so GPUs and NICs below one
+# PCIe switch reach each other peer to peer instead of through the CPU's root complex
+# (NCCL's troubleshooting guide, "PCI Access Control Services"). A deploy sets it from
+# deepops_components (slurm_disable_pcie_acs, on slurm-node). For bare metal: a host
+# that passes devices to virtual machines needs ACS to isolate them, and NCCL's guide
+# also wants the IOMMU off there.
+#
+# A oneshot unit turns ACS off at every boot, before nvidia-persistenced and slurmd,
+# and NHC drains a node where it is back on (roles/nhc, check_pcie_acs). Both run one
+# program, pcie_acs_program (roles/deepops_paths). absent removes them; the devices keep
+# ACS off until the next boot, which gives them back the firmware's setting.
+pcie_acs_state: present

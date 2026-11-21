@@ -201,6 +201,20 @@ class SiteDocs(Configs):
         )
         self.assertEqual(cl.check_doc_limits(), ["doc-limits: config/admin-docs/page.md:2"])
 
+    def test_a_gpu_tool_over_ssh_needs_a_transient_unit(self):
+        # Six such commands in one site guide printed "No devices were found".
+        self.page(
+            'ansible gpu1 -b -m shell -a "nvidia-smi -L"\n'
+            'ansible gpu1 -b -a "systemd-run --wait --pipe --collect --quiet -- nvidia-smi -L"\n'
+            'ansible gpu1 -b -m shell -a "dcgmi diag -r 1"\n'
+            "ssh gpu1 nvidia-smi\n"
+            "test with `srun --gpus=1 nvidia-smi`, never with bare SSH `nvidia-smi`\n"
+        )
+        self.assertEqual(
+            cl.check_doc_gpu(),
+            ["doc-gpu: config/admin-docs/page.md:1", "doc-gpu: config/admin-docs/page.md:4"],
+        )
+
 
 class Shadow(unittest.TestCase):
     """Ansible 2.22 checked: all/ beside all.yml, all.yml beside all.yaml, and
