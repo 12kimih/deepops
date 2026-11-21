@@ -31,4 +31,5 @@ ExecStop=-/usr/sbin/nft delete table inet {{ nft_table_name }}
 ExecStopPost=-/bin/rm -f {{ paths.loaded }}
 
 [Install]
-WantedBy=sysinit.target
+# PartOf= stops it with nftables.service; nftables.service starting loads it again.
+WantedBy=sysinit.target nftables.service

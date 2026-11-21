@@ -26,4 +26,5 @@ ExecStart=/usr/bin/docker run --rm --name %n \
 
 
 [Install]
-WantedBy=multi-user.target
+# PartOf= stops it with docker.service; docker.service starting starts it again.
+WantedBy=multi-user.target docker.service

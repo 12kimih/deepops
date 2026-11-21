@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
 import unrecorded  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
+
 PLAYBOOK = Path(sys.executable).with_name("ansible-playbook")
 MISSING = "deepops-test-not-installed.service"
 PLAY = f"""
@@ -26,9 +29,18 @@ PLAY = f"""
 """
 
 
-def run(*extra):
+def enabled_unit():
+    """A service unit enabled on this host, for a relink preview."""
+    out = subprocess.run(
+        ["systemctl", "list-unit-files", "--type=service", "--state=enabled", "--no-legend", "--plain"],
+        capture_output=True, text=True, timeout=bounds.CHILD,
+    ).stdout  # fmt: skip
+    return next((line.split()[0] for line in out.splitlines() if line.split()), None)
+
+
+def run(*extra, play=PLAY):
     with tempfile.TemporaryDirectory() as tmp:
-        (Path(tmp) / "play.yml").write_text(PLAY)
+        (Path(tmp) / "play.yml").write_text(play)
         env = unrecorded.env(
             ANSIBLE_ACTION_PLUGINS=str(ROOT / "plugins" / "action"),
             ANSIBLE_LOAD_CALLBACK_PLUGINS="1",
@@ -52,6 +64,25 @@ class SystemdUnit(unittest.TestCase):
             f"would reload systemd\nwould enable {MISSING}\nwould start {MISSING}\n",
         )
         self.assertFalse(stop["changed"] or stop.get("failed"), "stopping what is not there is done")
+
+    def test_relink_previews_enabling_a_changed_unit_afresh(self):
+        unit = enabled_unit()
+        if not unit:
+            self.skipTest("no enabled service unit")
+        play = f"""
+- hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: relink
+      systemd_unit: {{name: {unit}, enabled: true, relink: true}}
+    - name: unchanged
+      systemd_unit: {{name: {unit}, enabled: true, relink: false}}
+"""
+        got = run("--check", "--diff", play=play)
+        self.assertTrue(got["relink"]["changed"], got["relink"])
+        self.assertEqual(got["relink"]["diff"]["prepared"], f"would reenable {unit}\n")
+        self.assertFalse(got["unchanged"]["changed"], "an enabled unit with relink off stays as it is")
 
     def test_a_real_run_still_fails_on_a_missing_unit(self):
         got = run()
