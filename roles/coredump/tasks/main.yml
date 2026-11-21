@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: coredump_state in ['present', 'absent', 'kept']
+    fail_msg: "coredump_state must be present, absent or kept, not {{ coredump_state }}."
+    quiet: true
+
+- name: "Make crash handling by systemd-coredump {{ coredump_state }}"
+  ansible.builtin.include_tasks: "{{ coredump_state }}.yml"
+  when: coredump_state != 'kept'

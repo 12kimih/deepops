@@ -1,0 +1,22 @@
+---
+# The handler's package where it is one of its own (RHEL ships it in systemd). On Ubuntu
+# it takes the place of apport-core-dump-handler, which apt removes for it (both provide
+# core-dump-handler and conflict on it): apport itself, and the ubuntu-server
+# metapackage that depends on it, stay, and so does apport's daily /var/crash cleanup.
+coredump_packages_by_family:
+  Debian: [systemd-coredump]
+  RedHat: []
+coredump_packages: "{{ coredump_packages_by_family[ansible_facts.os_family] | default([]) }}"
+coredump_conf_file: /etc/systemd/coredump.conf.d/deepops.conf
+coredump_sysctl_file: /etc/sysctl.d/90-deepops-coredump.conf
+# The kernel's core pattern, the package's (/usr/lib/sysctl.d/50-coredump.conf) but with
+# %c, the crashing process's core size limit, where the package passes the largest
+# number there is: systemd-coredump stores a core only up to that limit, so the user's
+# ulimit -c decides again, as core(5) has it.
+coredump_core_pattern: "|/usr/lib/systemd/systemd-coredump %P %u %g %s %t %c %h %d"
+
+# What this component installs, for its record (roles/component_record).
+coredump_items: >-
+  {{ coredump_packages | map('regex_replace', '^', 'package:') | list
+     + ['file:' ~ coredump_sysctl_file]
+     + (['dir:' ~ coredump_conf_file | dirname, 'file:' ~ coredump_conf_file] if coredump_settings | length > 0 else []) }}

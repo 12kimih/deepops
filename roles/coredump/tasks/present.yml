@@ -1,0 +1,51 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: coredump
+    component_record_action: begin
+    component_record_items: "{{ coredump_items }}"
+
+- name: Install systemd-coredump
+  ansible.builtin.package:
+    name: "{{ coredump_packages }}"
+    state: present
+  when: coredump_packages | length > 0
+
+- name: Hand crashes to systemd-coredump within the core size limit
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: sysctl
+  vars:
+    host_baseline_sysctls:
+      kernel.core_pattern: "{{ coredump_core_pattern }}"
+    host_baseline_sysctl_file: "{{ coredump_sysctl_file }}"
+
+# systemd-coredump reads its settings for every crash: nothing to restart. A file no
+# longer wanted goes with the record below (only an earlier run needed it).
+- name: Create the settings directory
+  ansible.builtin.file:
+    path: "{{ coredump_conf_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: coredump_settings | length > 0
+
+- name: Configure systemd-coredump
+  ansible.builtin.template:
+    src: coredump.conf.j2
+    dest: "{{ coredump_conf_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: coredump_settings | length > 0
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: coredump
+    component_record_action: present
+    component_record_items: "{{ coredump_items }}"

@@ -104,6 +104,8 @@ image_command_tool: "crictl"
 ################################################################################
 #kube_enable_rsyslog_server: true
 #kube_enable_rsyslog_client: true
+# Crashes to systemd-coredump, cores only within ulimit -c (roles/coredump)
+#kube_enable_coredump: true
 # The server is kube_control_plane[0]; the clients are [k8s_cluster].
 rsyslog_client_tcp_host: "{{ groups['kube_control_plane'][0] }}"
 

@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# roles/coredump: coredump_settings over systemd's defaults.
+[Coredump]
+{% for key, value in coredump_settings | dictsort %}
+{{ key }}={{ value }}
+{% endfor %}

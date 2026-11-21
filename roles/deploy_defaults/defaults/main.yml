@@ -81,6 +81,9 @@ slurm_enable_ingress_policy: false
 # A local resolver on every host that blocks tunnel services by name
 # (roles/dns_resolver); the egress policy lets users send DNS to it alone
 slurm_enable_dns_resolver: false
+# Crashes to systemd-coredump on every host, cores only within the crashing process's
+# core size limit (roles/coredump), in place of apport's core handler
+slurm_enable_coredump: true
 
 # Components whose removal is explicit only (removal: explicit in the registry,
 # roles/deploy_defaults/vars/main.yml: the driver, authentication, Slurm, MUNGE, the NFS
@@ -97,6 +100,7 @@ kube_enable_container_registry: false
 kube_enable_rsyslog_server: true
 kube_enable_rsyslog_client: true
 kube_enable_fail2ban: false
+kube_enable_coredump: true
 deepops_gpu_operator_enabled: true
 # Set to true for DGX and other systems with pre-installed drivers
 gpu_operator_preinstalled_nvidia_software: true

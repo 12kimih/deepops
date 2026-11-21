@@ -407,8 +407,20 @@
     hostlist: k8s_cluster
     deepops_phase: install
 
+- name: Hand crashes to systemd-coredump
+  import_playbook: generic/coredump.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: install
+
 # Removal phase (docs/deepops/component-state.md): the components no longer wanted on a
 # host go, in the reverse of the install order, so nothing goes from under what needs it.
+- name: Remove systemd-coredump where it is no longer wanted
+  import_playbook: generic/coredump.yml
+  vars:
+    hostlist: k8s_cluster
+    deepops_phase: remove
+
 - name: Remove the rsyslog client where it is no longer wanted
   import_playbook: generic/rsyslog-client.yml
   vars:

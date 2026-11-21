@@ -1,0 +1,16 @@
+---
+dependencies:
+  - role: deepops_paths  # deepops_containerized
+
+galaxy_info:
+  namespace: deepops
+  role_name: coredump
+  author: DeepOps
+  description: Crashes to systemd-coredump, cores only where the core size limit allows
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

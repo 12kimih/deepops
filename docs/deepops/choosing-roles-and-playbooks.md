@@ -46,6 +46,10 @@ Different layers; the monitoring stack uses the exporter.
 
 - `playbooks/generic/pcie-acs.yml` (`pcie_acs` role, switch `slurm_disable_pcie_acs`) -- turns PCIe Access Control Services off on every device that has it, at every boot before the GPUs are opened, so GPUs below one PCIe switch talk peer to peer (NCCL's guidance for bare metal). NHC drains a node where ACS is back on; `playbooks/utilities/verify-acs.yml` reports it with the IOMMU state.
 
+## Crash dumps
+
+- `playbooks/generic/coredump.yml` (`coredump` role, switches `slurm_enable_coredump`, `kube_enable_coredump`, on by default) -- hands crashing processes to **systemd-coredump** on every host, in place of apport's core handler on Ubuntu (apport itself stays). Every crash is logged to the journal; a core is stored only within the process's core size limit (`ulimit -c`, which a Slurm job takes from where it was submitted), readable by its owner with `coredumpctl`, and kept three days. `coredump_settings` sets coredump.conf over systemd's bounds.
+
 ## Container registries (three different deploy targets)
 
 - `standalone-container-registry` -- a Docker `registry` daemon on a **bare-metal** host. With `standalone_container_registry_cache_enable` it runs as a Docker Hub pull-through cache instead, which cannot be pushed to.

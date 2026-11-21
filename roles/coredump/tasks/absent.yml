@@ -1,0 +1,11 @@
+---
+# The kernel keeps its core pattern until the next boot, which then gives back its own
+# (a core file in the working directory, within the core size limit).
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: coredump
+    component_record_action: absent
+    component_record_items: "{{ coredump_items }}"
+    component_record_exclusive_packages: "{{ coredump_packages }}"

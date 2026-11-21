@@ -90,6 +90,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── container_image
 │   ├── container_service
 │   ├── container_storage_gc
+│   ├── coredump
 │   ├── deepops_chrony
 │   ├── deepops_hosts
 │   ├── deepops_paths
