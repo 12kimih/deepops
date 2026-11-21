@@ -177,8 +177,8 @@ def filesystem_steps(host, mount, cfg):
     if not all(o in live for o in options):
         raise Error(
             f"{mount} is mounted without {','.join(options)}: add them to its entry in"
-            f" host_baseline_mount_options (roles/host_baseline sets /etc/fstab and"
-            f" remounts it), then run this again"
+            f" host_baseline_mount_options and run playbooks/generic/host-baseline.yml"
+            f" (it sets /etc/fstab and remounts), then run this again"
         )
     steps = []
     quota_file = os.path.join(mount, QUOTA_FILE)

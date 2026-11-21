@@ -137,7 +137,8 @@ class Apply(unittest.TestCase):
 
     def test_a_mount_without_its_quota_options_is_refused_naming_them(self):
         with self.assertRaisesRegex(
-            dq.Error, "usrjquota=aquota.user,jqfmt=vfsv1.*host_baseline_mount_options"
+            dq.Error,
+            "usrjquota=aquota.user,jqfmt=vfsv1.*host_baseline_mount_options.*playbooks/generic/host-baseline.yml",
         ):
             plan(FakeHost(live="rw,noatime"), CFG)
         with self.assertRaisesRegex(dq.Error, "without usrquota"):
