@@ -14,9 +14,11 @@
         path: /usr/bin/nvidia-smi
       register: nvidia_ecc_smi
 
+    # In a transient unit: the GPUs are hidden from the ssh session Ansible runs in.
     - name: Read each GPU's ECC mode
       ansible.builtin.command:
-        argv: [nvidia-smi, --query-gpu=index,ecc.mode.current,ecc.mode.pending, --format=csv,noheader]
+        argv: [systemd-run, --wait, --pipe, --collect, --quiet, --,
+               nvidia-smi, --query-gpu=index,ecc.mode.current,ecc.mode.pending, --format=csv,noheader]
       register: nvidia_ecc_report
       changed_when: false
       check_mode: false  # read-only; --check needs the result
@@ -28,7 +30,8 @@
 
     - name: Set the pending ECC mode
       ansible.builtin.command:
-        argv: [nvidia-smi, -i, "{{ item }}", -e, "{{ '1' if nvidia_ecc_mode == 'enabled' else '0' }}"]
+        argv: [systemd-run, --wait, --pipe, --collect, --quiet, --,
+               nvidia-smi, -i, "{{ item }}", -e, "{{ '1' if nvidia_ecc_mode == 'enabled' else '0' }}"]
       loop: "{{ nvidia_ecc_plan.set }}"
       changed_when: true
 
