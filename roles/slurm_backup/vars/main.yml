@@ -5,12 +5,16 @@ slurm_backup_timers:
   - {command: restore-test, schedule: "{{ slurm_backup_restore_test_schedule }}"}
 slurm_backup_unit_files: "{{ ['slurm-backup@.service'] + slurm_backup_timers | map(attribute='command') | map('regex_replace', '^(.*)$', 'slurm-backup-\\1.timer') | list }}"
 # What this component installs, for its record (roles/component_record): the units
-# (the timers, and the publish instance enabled for boot) before their files. The
-# backup sets and the work directory's lock stay.
+# (the timers) before their files, and the kept metrics with their boot restore
+# (roles/textfile_keep). The backup sets and the work directory's lock stay. The
+# publish instance versions before the keep mechanism enabled at boot is no longer an
+# item, so its record removes it.
 slurm_backup_items: >-
   {{ slurm_backup_timers | map(attribute='command') | map('regex_replace', '^', 'unit:slurm-backup-')
      | map('regex_replace', '$', '.timer') | list
-     + ['unit:slurm-backup@publish.service']
      + slurm_backup_unit_files | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ slurm_backup_script, 'file:' ~ slurm_backup_config, 'file:' ~ slurm_backup_metrics_file,
-        'file:' ~ slurm_backup_textfile_dir ~ '/' ~ slurm_backup_textfile, 'dir:' ~ slurm_backup_work_dir] }}
+        'file:' ~ slurm_backup_textfile_dir ~ '/' ~ slurm_backup_textfile, 'dir:' ~ slurm_backup_work_dir,
+        'file:/etc/tmpfiles.d/deepops-textfile-' ~ slurm_backup_keep_name ~ '.conf'] }}
+# The name its kept metrics go by in roles/textfile_keep (the textfile without .prom).
+slurm_backup_keep_name: "{{ slurm_backup_textfile | regex_replace('[.]prom$', '') }}"

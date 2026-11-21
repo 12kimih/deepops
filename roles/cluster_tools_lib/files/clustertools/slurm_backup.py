@@ -3,7 +3,7 @@
     slurm-backup backup CONFIG.json        daily: dump, archive, copy, prune, report
     slurm-backup restore-test CONFIG.json  monthly: load the newest dump into a scratch
                                            database and compare it with the live one
-    slurm-backup publish CONFIG.json       at boot and deploy: republish the kept metrics
+    slurm-backup publish CONFIG.json       at deploy: write the metrics for the configured destinations
     slurm-backup check CONFIG.json         refuse a configuration the others cannot run
 
 What is backed up: the accounting database (mariadb-dump, one consistent snapshot
