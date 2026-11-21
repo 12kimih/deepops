@@ -80,6 +80,9 @@
 - name: Set the target each host boots into
   import_playbook: generic/default-target.yml
 
+- name: Put the console on the BMC's serial line where the site enables it
+  import_playbook: generic/serial-console.yml
+
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
   vars:

@@ -2,6 +2,10 @@
 # Serial console over the BMC's SOL: the only console another machine can reach on a node
 # that stops before the network is up. Which port SOL is wired to is a BIOS setting the OS
 # cannot read -- confirm by attaching during a boot, a blank screen means the other one.
+#
+# Off by default (the wiring is the site's to confirm); on, the console and GRUB's
+# terminal go to the port from the next boot, and off again removes that.
+serial_console_enabled: false
 serial_console_port: ttyS1
 serial_console_speed: 115200
 

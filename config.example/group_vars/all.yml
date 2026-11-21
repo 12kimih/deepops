@@ -588,7 +588,9 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 ################################################################################
 # Puts the console on the BMC's serial-over-LAN so a node that stops before the
 # network is up can still be driven remotely. Which port SOL is wired to is a
-# BIOS setting: confirm by attaching during a boot. Takes effect at the next one.
+# BIOS setting: confirm by attaching during a boot. Takes effect at the next one;
+# false (the default) leaves the console alone, and removes it when it was on.
+#serial_console_enabled: false
 #serial_console_port: ttyS1
 #serial_console_speed: 115200
 #serial_console_grub_timeout: 5

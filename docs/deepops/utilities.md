@@ -15,7 +15,6 @@ line: a play's `hosts:` is resolved before host and group variables exist, so se
 | --- | --- | --- |
 | `utilities/power.yml` | all | chassis power through each host's BMC: `-e bmc_power_action=status\|on\|soft\|off\|cycle\|reset\|diag` |
 | `utilities/bmc.yml` | all | configures each BMC in-band: address, password, SNMP community |
-| `utilities/serial-console.yml` | all | puts the kernel and GRUB console on the BMC's serial-over-LAN, from the next boot |
 
 See [out-of-band management](bmc.md).
 
