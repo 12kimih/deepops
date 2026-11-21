@@ -71,36 +71,18 @@
 - name: Retire the unit files the site names
   when: docker_retired_unit_files | length > 0
   block:
-    - name: Look for the retired unit files
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        get_checksum: false
-      loop: "{{ docker_retired_unit_files }}"
-      register: docker_retired_units
-
-    - name: Keep a copy of each
-      ansible.builtin.copy:
-        src: "{{ item.stat.path }}"
-        dest: "/var/backups/deepops-docker-units/{{ item.stat.path | regex_replace('^/', '') | replace('/', '_') }}"
-        remote_src: true
-        mode: preserve
-      loop: "{{ docker_retired_units.results | selectattr('stat.exists') | list }}"
-      loop_control:
-        label: "{{ item.item }}"
-
-    - name: Remove them
-      ansible.builtin.file:
-        path: "{{ item.stat.path }}"
-        state: absent
-      loop: "{{ docker_retired_units.results | selectattr('stat.exists') | list }}"
-      loop_control:
-        label: "{{ item.item }}"
-      register: docker_retired_removed
+    - name: Set aside the retired unit files
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: set_aside
+      vars:
+        host_baseline_set_aside_paths: "{{ docker_retired_unit_files }}"
+        host_baseline_set_aside_dir: /var/backups/deepops-docker-units
 
     - name: Reload systemd without them
       systemd_unit:
         daemon_reload: true
-      when: docker_retired_removed is changed
+      when: host_baseline_set_aside is changed
 
 # nvidia_container_toolkit and docker_socket_group own other keys in this file; each
 # goes through docker_daemon_json, which also removes a key its owner no longer sets.
@@ -116,7 +98,7 @@
          | combine({'insecure-registries': docker_insecure_registries} if docker_insecure_registries | length > 0 else {})
          | combine({'registry-mirrors': docker_registry_mirrors} if docker_registry_mirrors | length > 0 else {}) }}
     # dockerd picks up a changed unit only when it restarts.
-    docker_daemon_json_unit_changed: "{{ (docker_retired_removed | default({})) is changed }}"
+    docker_daemon_json_unit_changed: "{{ (host_baseline_set_aside | default({})) is changed }}"
     docker_daemon_json_retiring: "{{ docker_retired_unit_files }}"
 
 - name: Raise the kernel limits a container host runs into
