@@ -46,4 +46,4 @@
 - name: Drop the removed library paths from the linker cache
   change_command:
     cmd: ldconfig
-  when: cuda_system_removed.results | selectattr('path', 'search', '^/etc/ld\.so\.conf\.d/') | list | length > 0
+  when: cuda_system_removed.results | selectattr('path', 'search', '^/etc/ld\\.so\\.conf\\.d/') | list | length > 0

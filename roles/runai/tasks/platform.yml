@@ -6,7 +6,7 @@
     that:
       - runai_platform_domain | length > 0
       - runai_platform_domain is match('^[A-Za-z0-9]([-A-Za-z0-9.]*[A-Za-z0-9])?$')
-      - runai_platform_admin_user is match('^[^@\s]+@[^@\s]+$')
+      - runai_platform_admin_user is match('^[^@\\s]+@[^@\\s]+$')
       - runai_platform_admin_password | runai_password_ok
       - (runai_platform_tls_cert_file | length > 0) == (runai_platform_tls_key_file | length > 0)
       - runai_platform_exposure in ['ingress', 'gateway']

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse every role template with Jinja and fail on syntax errors.
+r"""Parse every role template with Jinja and fail on syntax errors.
 
 The template module renders these files through Jinja before installing them,
 so a file that Jinja cannot parse breaks the play at deploy time even when the
@@ -11,12 +11,16 @@ tag".
 Only syntax is checked, with Jinja's parser alone: templates are never compiled
 or rendered, so neither variables nor Ansible's filters and tests are needed and
 every template is checked. Ansible enables no Jinja extensions by default, so
-plain Jinja accepts exactly what a deploy does.
+plain Jinja accepts exactly what a deploy does. A string literal with an escape
+Python does not know (a regex's `\s` written with one backslash) fails too: Jinja
+unescapes literals in templates, and Python deprecates such escapes and will refuse
+them (write `\\s`).
 
     check-template-syntax.py    every tracked roles/*/templates/** file
 """
 
 import sys
+import warnings
 from pathlib import Path
 
 from jinja2 import Environment
@@ -27,16 +31,27 @@ import cli  # noqa: E402
 from repo_files import ROOT, tracked  # noqa: E402
 
 
+def problem(text):
+    """Why Jinja refuses TEXT as a template ("LINE: message"), or None."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            Environment().parse(text)
+    except TemplateSyntaxError as err:
+        return f"{err.lineno}: {err.message}"
+    except DeprecationWarning as err:
+        return f"?: {err}"
+    return None
+
+
 def main(argv):
     cli.parser(__doc__).parse_args(argv)
-    env = Environment()
     templates = tracked("roles/*/templates/*")
     failures = []
     for path in templates:
-        try:
-            env.parse(path.read_text(encoding="utf-8"))
-        except TemplateSyntaxError as err:
-            failures.append(f"{path.relative_to(ROOT)}:{err.lineno}: {err.message}")
+        found = problem(path.read_text(encoding="utf-8"))
+        if found:
+            failures.append(f"{path.relative_to(ROOT)}:{found}")
     for failure in failures:
         print(failure, file=sys.stderr)
     print(f"{len(templates)} templates parsed, {len(failures)} failed")
