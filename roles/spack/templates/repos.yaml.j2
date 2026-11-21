@@ -1,8 +1,0 @@
-# {{ ansible_managed }}
-# The builtin package repository: one shared clone at a fixed tag, instead of a clone in
-# every user's ~/.spack on a moving branch. https://spack.readthedocs.io/en/latest/repositories.html
-repos:
-  builtin:
-    git: {{ spack_packages_repo | to_json }}
-    tag: {{ spack_packages_version | to_json }}
-    destination: {{ spack_packages_dir | to_json }}

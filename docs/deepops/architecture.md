@@ -202,7 +202,6 @@ reader writes `| default(...)` for a defined variable;
 │   ├── slurm_paths
 │   ├── slurm_usage_report
 │   ├── source_build
-│   ├── spack
 │   ├── sshd
 │   ├── sssd_client
 │   ├── stale_files
