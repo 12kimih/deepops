@@ -7,4 +7,4 @@
   vars:
     component_record_name: nginx_docker_cache
     component_record_action: absent
-    component_record_items: "{{ nginx_docker_cache_items }}"
+    component_record_items: "{{ nginx_docker_cache_items + nginx_docker_cache_retired_items }}"

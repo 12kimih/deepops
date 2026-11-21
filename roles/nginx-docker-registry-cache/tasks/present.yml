@@ -31,6 +31,7 @@
     group: "root"
     mode: "0400"
   register: nginx_docker_cache_ca_key
+  notify: [Restart the caching proxy]
   when: nginx_docker_cache_ca | length > 0
 
 - name: Add pre-defined CA certificate
@@ -41,26 +42,41 @@
     group: "root"
     mode: "0444"
   register: nginx_docker_cache_ca_crt
+  notify: [Restart the caching proxy]
   when: nginx_docker_cache_ca | length > 0
 
-- name: Run caching proxy
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ nginx_docker_cache_image }}"
+
+# It ran outside systemd under its own name, with Docker's restart policy: that
+# container holds the proxy port the unit's needs, so it goes first (its cache and CA
+# are binds and stay).
+- name: Retire the proxy container run outside systemd
   community.docker.docker_container:
     name: "{{ nginx_docker_cache_name }}"
-    image: "{{ nginx_docker_cache_image }}"
-    state: started
-    network_mode: host
-    # nginx reads the mounted CA only at start: restart when it changed. restart_policy
-    # keeps the container across boots.
-    restart: "{{ nginx_docker_cache_ca_key is changed or nginx_docker_cache_ca_crt is changed }}"
-    restart_policy: unless-stopped
-    # Binds, never volumes: a bind refuses a missing source (roles/container_service).
-    mounts:
-      - {type: bind, source: "{{ nginx_docker_cache_mirror_path }}", target: /docker_mirror_cache}
-      - {type: bind, source: "{{ nginx_docker_cache_ca_path }}", target: /ca}
-    env:
-      REGISTRIES: "{{ nginx_docker_cache_registry_string }}"
-      ENABLE_MANIFEST_CACHE: "{{ nginx_docker_cache_manifests }}"
-      MANIFEST_CACHE_DEFAULT_TIME: "{{ nginx_docker_cache_manifest_default_time }}"
+    state: absent
+
+- name: Run the caching proxy
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ nginx_docker_cache_svc_name }}"
+      description: Container registry caching proxy
+      image: "{{ nginx_docker_cache_image }}"
+      options: [--network host]
+      mounts:
+        - {src: "{{ nginx_docker_cache_mirror_path }}", dst: /docker_mirror_cache}
+        - {src: "{{ nginx_docker_cache_ca_path }}", dst: /ca}
+      env:
+        REGISTRIES: "{{ nginx_docker_cache_registry_string }}"
+        ENABLE_MANIFEST_CACHE: "{{ nginx_docker_cache_manifests }}"
+        MANIFEST_CACHE_DEFAULT_TIME: "{{ nginx_docker_cache_manifest_default_time }}"
+      # nginx reads the mounted CA only at start.
+      notify: [Restart the caching proxy]
 
 - name: Record the component as present
   ansible.builtin.include_role:

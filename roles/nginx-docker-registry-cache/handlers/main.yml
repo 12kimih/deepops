@@ -1,0 +1,6 @@
+---
+# nginx reads the mounted CA only at start.
+- name: Restart the caching proxy
+  systemd_unit:
+    name: "{{ nginx_docker_cache_svc_name }}"
+    state: restarted

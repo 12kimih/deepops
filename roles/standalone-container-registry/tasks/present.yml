@@ -95,11 +95,9 @@
       unit: "{{ standalone_container_registry_svc_name }}"
       description: Container registry
       image: "{{ standalone_container_registry_image }}"
+      options: [--network host]
       # The registry exports traces to localhost:4318 unless told not to (its docs).
-      options: >-
-        {{ ['--network host']
-           + ((proxy_env | combine({'OTEL_TRACES_EXPORTER': 'none'})).items()
-              | map('join', '=') | map('regex_replace', '^', '--env=') | list) }}
+      env: "{{ proxy_env | combine({'OTEL_TRACES_EXPORTER': 'none'}) }}"
       mounts:
         - {src: "{{ standalone_container_registry_config_dir }}/config.yml", dst: /etc/docker/registry/config.yml, readonly: true}
         - {src: "{{ standalone_container_registry_data_dir }}", dst: /var/lib/registry}
