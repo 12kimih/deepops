@@ -38,6 +38,16 @@ host_baseline_protected_packages:
   - linux-modules-*
   - slurm-smd*
   - munge
+  # The vendor-neutral GL, EGL and Vulkan loaders (glvnd, the Vulkan loader). Jobs load
+  # them directly (EGL rendering, Vulkan), and no NVIDIA package depends on them, so a
+  # removal that takes a desktop with them would autoremove them too (2026-11-22).
+  - libglvnd0
+  - libgl1
+  - libegl1
+  - libgles2
+  - libglx0
+  - libopengl0
+  - libvulkan1
 
 # Units a site keeps off (tasks_from: masked, owner "site"): stopped, disabled and
 # masked, so neither a dependency nor a socket starts them; for a service a metapackage
