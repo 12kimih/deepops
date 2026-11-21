@@ -108,6 +108,9 @@ fi
 command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
 cd "${REPO_DIR}" || exit 1
 uv sync --locked || { echo "ERROR: uv sync failed" >&2; exit 1; }
+# Every Ansible run is recorded with ARA (ansible.cfg callback_plugins): the link
+# follows the installed ARA, wherever its package lives.
+ln -sfn "$(uv run --locked python -m ara.setup.callback_plugins)" .callback_plugins
 # The tools scripts/check.sh runs from outside .venv, the missing ones (CI does the same).
 mapfile -t CHECK_DEB < <(scripts/check.sh --missing-tools)
 if [ "${#CHECK_DEB[@]}" -gt 0 ] ; then
@@ -185,6 +188,8 @@ fi
 if [ -f submodules/kubespray/requirements.txt ] ; then
     uv venv -q --clear --python "${KUBESPRAY_PYTHON}" .venv-kubespray
     uv pip install -q --python .venv-kubespray -r submodules/kubespray/requirements.txt
+    # The same ARA as .venv (uv.lock), so the shared callback loads there too.
+    uv pip install -q --python .venv-kubespray "ara[server]==$(uv run --locked python -c 'import importlib.metadata as m; print(m.version("ara"))')"
 fi
 
 # Earlier versions activated /opt/deepops/env from ~/.bashrc; uv run replaces that. Only

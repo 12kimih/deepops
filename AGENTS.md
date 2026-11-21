@@ -114,7 +114,9 @@ limits, failure reasons and the distinction from training success.
 
 1. **Validate, don't assume.** Run the doctor before deploying and the
    matching validator after. A playbook finishing with `failed=0` is not the
-   success signal; the validator's `"ok": true` is.
+   success signal; the validator's `"ok": true` is. Read what a run did from its
+   ARA record (`uv run ara playbook list`, `docs/deepops/ansible.md`), not from
+   pasted terminal output.
 2. **Never run a cluster playbook against an unreviewed inventory.** These
    playbooks install drivers, change container runtimes, and can reboot
    machines. Confirm the inventory lists exactly the intended hosts

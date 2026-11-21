@@ -9,6 +9,8 @@ Ansible is a tool that automates the configuration of systems.
     - [Password configuration](#password-configuration)
   - [Ansible Playbooks](#ansible-playbooks)
     - [Ansible playbook output](#ansible-playbook-output)
+    - [Previewing a run (`--check --diff`)](#previewing-a-run---check---diff)
+    - [Run history (ARA)](#run-history-ara)
   - [Ansible Usage](#ansible-usage)
     - [Useful commands](#useful-commands)
   - [Ansible Troubleshooting](#ansible-troubleshooting)
@@ -101,6 +103,29 @@ changed: [node1] => (item=defgw ipaddr)
 A command whose outcome only its output tells (`kubectl apply`, `sacctmgr add`) is
 reported as a change under `--check` too: nothing ran, so the preview cannot know.
 `tests/task-rules` enforces the convention (rule 19).
+
+### Run history (ARA)
+
+Every `ansible-playbook` and `ansible` run is recorded by
+[ARA](https://ara.recordsansible.org/) (pinned in `pyproject.toml`): its command line
+options (`--check`, `--diff`, `--limit`), each task's result per host, output, diffs
+and the recap. Nobody has to copy terminal output to show what a run did, and the
+history stays. `scripts/setup.sh` links `.callback_plugins` (`ansible.cfg`) to ARA's
+callback; the records live in `~/.ara/server` (owner-only), one database per operator.
+
+```bash
+uv run ara playbook list                                  # runs, newest first
+uv run ara result list --playbook <id> --status failed    # what failed
+uv run ara result list --playbook <id> --changed          # what changed
+uv run ara result show <id> --with-content                # one result: output, diff
+uv run ara-manage runserver                               # the same in a browser (127.0.0.1:8000)
+uv run ara playbook prune --days 365 --confirm            # drop old runs
+```
+
+Values a task marks `no_log` are recorded as censored and extra vars not at all; host
+facts are kept with the run, as the fact cache keeps them. Test playbooks (`scripts/check.sh`,
+`scripts/deepops/molecule.py`) leave no record: they point `ANSIBLE_CALLBACK_PLUGINS`
+at an empty directory.
 
 ## Ansible Usage
 

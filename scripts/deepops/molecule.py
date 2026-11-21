@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -45,11 +46,18 @@ def test(names):
     # molecule and ansible-* from the same environment as this interpreter.
     path = f"{Path(sys.executable).parent}{os.pathsep}{os.environ.get('PATH', '')}"
     failed = []
-    for role in names or known:
-        env = {**os.environ, "PATH": path, "DEEPOPS_MOLECULE_INSTANCE": instance(role)}
-        print(f"==> {role}", flush=True)
-        if subprocess.run(["molecule", "test", "--all"], cwd=ROOT / "roles" / role, env=env).returncode:
-            failed.append(role)
+    # Test runs are not runs to keep: no callback plugin directory, no ARA record.
+    with tempfile.TemporaryDirectory() as no_callbacks:
+        for role in names or known:
+            env = {
+                **os.environ,
+                "PATH": path,
+                "DEEPOPS_MOLECULE_INSTANCE": instance(role),
+                "ANSIBLE_CALLBACK_PLUGINS": no_callbacks,
+            }
+            print(f"==> {role}", flush=True)
+            if subprocess.run(["molecule", "test", "--all"], cwd=ROOT / "roles" / role, env=env).returncode:
+                failed.append(role)
     if failed:
         print(f"failed: {' '.join(failed)}", file=sys.stderr)
     return 1 if failed else 0
