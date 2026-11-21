@@ -4,6 +4,7 @@
 # this role and a deploy stops on it; scripts/deepops/config_lint.py reports a document
 # or config that still names one. Add a name here when a setting is renamed or removed.
 retired_settings:
+  allow_user_set_gpu_clocks: nothing (nvidia-smi -acp is a no-op on current drivers); clocks are locked per site with playbooks/utilities/nvidia-set-gpu-clocks.yml
   host_file_backup: nothing (the repository is the hosts file's history; rule 14)
   hosts_custom_hosts_marker: nothing (hosts_entries are written once, in roles/deepops_hosts' own part)
   slurm_container_storage_gc: slurm_enable_container_storage_gc in roles/deploy_defaults (off removes the cleanup)

@@ -220,10 +220,6 @@
   vars:
     deepops_phase: install
 
-- name: Set Permissions to adjust GPU Clocks speeds
-  import_playbook: utilities/gpu-clocks.yml
-  when: allow_user_set_gpu_clocks
-
 # Declarative: nodes with nvidia_power_limit_watts get the cap, nodes without have any
 # cap removed; slurm_cluster_configure_gpu_power_limit off removes it everywhere.
 - name: Configure the GPU power limit

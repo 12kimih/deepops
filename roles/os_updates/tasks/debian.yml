@@ -174,20 +174,17 @@
             [Install]
             WantedBy=timers.target
 
-    # Under --check the unit files above are not written, so there is nothing to enable.
     - name: Enable the pending-updates metrics timer and boot republish
       systemd_unit:
         name: "{{ item }}"
         enabled: true
         daemon_reload: true
       loop: [os-updates-metrics.timer, os-updates-metrics.publish.service]
-      when: not ansible_check_mode
 
     - name: Start the pending-updates metrics timer
       systemd_unit:
         name: os-updates-metrics.timer
         state: started
-      when: not ansible_check_mode
 
 - name: Remove the pending-updates metrics when they are off
   when: not os_updates_metrics | bool

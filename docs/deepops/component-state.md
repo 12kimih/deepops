@@ -150,7 +150,7 @@ clients before the server.
 ## Not components
 
 - Migrations and one-shot settings have no absent state: move-home-dirs, hostname and
-  /etc/hosts, swapoff, bootstrap-python, gpu-clocks (runtime only), Kubespray itself.
+  /etc/hosts, swapoff, bootstrap-python, Kubespray itself.
 - **Policies** are enums, not present/absent: os_updates (security, off, unmanaged:
   off disables unattended upgrades, it does not purge the package), node_user_policy,
   ai_agent_rules, and `disable-cloud-init` (off re-enables cloud-init). The test keeps

@@ -39,14 +39,12 @@
     group: root
     mode: "0644"
 
-# Under --check the files above are not written, so there is nothing to load.
 - name: Load now and at boot table {{ nft_table_name }}
   systemd_unit:
     name: "{{ (nft_table_name | nft_table_paths).unit }}"
     enabled: true
     state: started
     daemon_reload: true
-  when: not ansible_check_mode
 
 # What the kernel holds against the file, not whether this run wrote it: a run that
 # failed after writing would otherwise leave the old table loaded until a reboot.
@@ -70,5 +68,4 @@
     name: "{{ (nft_table_name | nft_table_paths).unit }}"
     state: reloaded
   when:
-    - not ansible_check_mode
     - (nft_table_loaded.stdout.split() + [''])[0] != nft_table_file.stat.checksum | default('')

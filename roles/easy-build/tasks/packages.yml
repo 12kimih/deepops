@@ -30,7 +30,6 @@
     argv: [bash, -l, -c, 'module load "EasyBuild/$1" && eb --robot "$2"', build, "{{ easybuild_version }}", "{{ item }}"]
     chdir: "{{ _easybuild_account.home }}"
   loop: "{{ easybuild_packages }}"
-  when: not ansible_check_mode  # a first --check has no account to become yet
   register: easybuild_build
   # eb prints this once per installation it completes, and nothing when all is built.
   changed_when: >-

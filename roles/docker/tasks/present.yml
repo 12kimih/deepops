@@ -255,14 +255,12 @@
           [Install]
           WantedBy=timers.target
 
-    # Under --check the unit files above are not written, so there is nothing to enable.
     - name: Enable the image prune timer
       systemd_unit:
         name: docker-image-prune.timer
         enabled: true
         state: started
         daemon_reload: true
-      when: not ansible_check_mode
 
 # With pruning or kernel tuning off, their files are not in docker_items: the record
 # removes them.

@@ -24,7 +24,7 @@
   systemd_unit:
     name: systemd-resolved
     state: restarted
-  when: dns_resolver_dropin is changed and not ansible_check_mode
+  when: dns_resolver_dropin is changed
 
 - name: Name the systemd-resolved stub in /etc/resolv.conf
   ansible.builtin.file:

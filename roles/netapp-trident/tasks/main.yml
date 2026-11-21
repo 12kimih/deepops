@@ -87,12 +87,15 @@
   when: create_StorageClasses
   run_once: true
 
+# kubectl apply says "unchanged" for what is already so: only the rest is a change.
 - name: Create StorageClasses
-  ansible.builtin.command: "kubectl apply -f {{ deepops_dir }}/trident-installer/sc-{{ item.metadata.name }}.yaml"
+  change_command:
+    argv: [kubectl, apply, -f, "{{ deepops_dir }}/trident-installer/sc-{{ item.metadata.name }}.yaml"]
   with_items: "{{ storageClasses_to_create }}"
   when: create_StorageClasses
   run_once: true
-  changed_when: false
+  register: trident_storage_classes
+  changed_when: ansible_check_mode or (trident_storage_classes.stdout is not search('(?m) unchanged$'))
 
 # One snapshot controller per cluster: Kubespray's, matched to its Kubernetes.
 - name: Look for the volume snapshot CRDs
@@ -125,11 +128,13 @@
   run_once: true
 
 - name: Create volume snapshot classes
-  ansible.builtin.command: "kubectl apply -f {{ deepops_dir }}/trident-installer/snapclass-{{ item.metadata.name }}.yaml"
+  change_command:
+    argv: [kubectl, apply, -f, "{{ deepops_dir }}/trident-installer/snapclass-{{ item.metadata.name }}.yaml"]
   with_items: "{{ volume_snapshot_classes_to_create }}"
   when: enable_volume_snapshots
   run_once: true
-  changed_when: false
+  register: trident_snapshot_classes
+  changed_when: ansible_check_mode or (trident_snapshot_classes.stdout is not search('(?m) unchanged$'))
 
 - name: Fetch tridentctl from control node
   ansible.builtin.fetch:

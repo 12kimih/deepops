@@ -55,12 +55,11 @@
 
     # Triggers first, or the umount re-arms a mount against a dying server.
     - name: Detach the shared filesystems before the reboot
-      ansible.builtin.shell:
+      change_shell:
         cmd: |
           systemctl stop '*.automount' 2>/dev/null || true
           umount -l -f -a -t nfs,nfs4 2>/dev/null || true
           exit 0
-      changed_when: false
       # Only a clean shutdown can hang on a dead mount; a power cycle has none. And once
       # /home is gone, a new SSH session (the persistent one lapses while the other
       # hosts of the batch reboot) cannot read authorized_keys and is refused.

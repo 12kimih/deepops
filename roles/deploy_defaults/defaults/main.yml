@@ -62,7 +62,6 @@ slurm_enable_rsyslog_client: true
 # Off leaves an installed fail2ban alone; deepops_component_removals: [fail2ban] removes it.
 slurm_enable_fail2ban: false
 slurm_login_on_compute: false
-allow_user_set_gpu_clocks: false
 slurm_cluster_configure_gpu_power_limit: true
 # PCIe ACS off on the compute nodes for GPU peer-to-peer (roles/pcie_acs): bare metal only
 slurm_disable_pcie_acs: false

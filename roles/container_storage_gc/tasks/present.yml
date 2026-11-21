@@ -48,7 +48,6 @@
     enabled: true
     state: "{{ 'restarted' if container_storage_gc_units is changed else 'started' }}"
     daemon_reload: true
-  when: not ansible_check_mode
 
 - name: Record the component as present
   ansible.builtin.include_role:
