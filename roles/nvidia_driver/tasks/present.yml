@@ -145,10 +145,13 @@
       Type=forking
       ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
       ExecStopPost=/bin/rm -rf /var/run/nvidia-persistenced
+      # Without it a crashed daemon leaves the GPUs out of persistence mode until a reboot.
+      Restart=on-failure
+      RestartSec=5
 
       [Install]
       WantedBy=multi-user.target
-  notify: Nvidia-persistenced unit changed
+  register: nvidia_driver_persistenced_unit
   when: nvidia_driver_persistenced | bool
 
 # The drop-in earlier versions of this role could write (override.conf, told by its
@@ -169,7 +172,7 @@
     - >-
       "ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode"
       in (nvidia_driver_old_dropin.content | b64decode)
-  notify: Nvidia-persistenced unit changed
+  register: nvidia_driver_persistenced_dropin
 
 - name: Remove the drop-in directory when nothing else is in it
   change_command:
@@ -189,10 +192,14 @@
     daemon_reload: true
   when: nvidia_driver_persistenced | bool
 
+# Restarted here, not by a handler, when its unit changed: the persistence mode is read
+# right below and must come from the new unit.
 - name: Start the NVIDIA persistence daemon
   systemd_unit:
     name: nvidia-persistenced
-    state: started
+    state: >-
+      {{ 'restarted' if nvidia_driver_persistenced_unit is changed or nvidia_driver_persistenced_dropin is changed
+         else 'started' }}
   when:
     - nvidia_driver_persistenced | bool
     - nvidia_driver_module_loaded | bool
