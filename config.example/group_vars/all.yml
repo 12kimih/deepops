@@ -542,12 +542,6 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 ################################################################################
 # Misc.                                                                        #
 ################################################################################
-# Set /etc/rc.local contents
-# Playbook: rc-local
-#rc_local_contents: |  # example
-#  echo foo
-#  echo bar
-#
 # DeepOps specific config
 #deepops_dir: /opt/deepops
 
