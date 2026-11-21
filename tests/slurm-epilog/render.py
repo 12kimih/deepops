@@ -15,9 +15,13 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
-sys.path.insert(0, str(ROOT / "plugins" / "filter"))
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_files import tracked  # noqa: E402
-from slurm_node import FilterModule  # noqa: E402  (the repository's filters the templates use)
+import in_tree  # noqa: E402
+
+# The repository's filters the templates use, loaded from their file: plugins/filter on
+# sys.path would shadow the standard library with its secrets.py.
+FilterModule = in_tree.load("plugins/filter/slurm_node.py").FilterModule
 
 
 def role_defaults(*names):
