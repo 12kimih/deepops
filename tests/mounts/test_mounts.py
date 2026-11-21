@@ -49,5 +49,16 @@ class FstabEntries(unittest.TestCase):
         self.assertEqual([e["path"] for e in fstab_entries(FSTAB) if e["network"]], ["/scratch"])
 
 
+class ProjectFilesystems(unittest.TestCase):
+    def test_each_project_gets_the_mount_it_lives_on(self):
+        from mounts import project_filesystems
+
+        got = project_filesystems({"/var/tmp/x": {"id": 7}, "/srv/d": {"id": 8}}, MOUNTS)
+        self.assertEqual(
+            got, {"/var/tmp/x": {"id": 7, "filesystem": "/var/tmp"}, "/srv/d": {"id": 8, "filesystem": "/"}}
+        )
+        self.assertEqual(project_filesystems({}, MOUNTS), {})
+
+
 if __name__ == "__main__":
     unittest.main()

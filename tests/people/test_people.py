@@ -77,14 +77,14 @@ class Derive(unittest.TestCase):
         self.assertNotIn("carol", people.people_accounting(p))
 
     def test_disk_quotas_are_the_default_under_each_persons_own(self):
-        default = {"block_soft": "10G", "block_hard": "20G"}
+        default = {"block_warn": "10G", "block_hard": "20G"}
         got = people.people_disk_quotas(self.p, default)
-        self.assertEqual(got["alice"], {"block_soft": "50G", "block_hard": "100G"})
+        self.assertEqual(got["alice"], {"block_warn": "50G", "block_hard": "100G"})
         self.assertEqual(got["bob"], default)
         self.assertNotIn("carol", got, "someone who left is limited no longer")
         # No default: only who has their own, so quotas only count for the rest.
         self.assertEqual(
-            people.people_disk_quotas(self.p, {}), {"alice": {"block_soft": "50G", "block_hard": "100G"}}
+            people.people_disk_quotas(self.p, {}), {"alice": {"block_warn": "50G", "block_hard": "100G"}}
         )
 
 
@@ -99,11 +99,11 @@ class Check(unittest.TestCase):
 
     def test_disk_quota_takes_only_its_limits(self):
         self.assertIn(
-            "people.bob.disk_quota: a mapping of block_soft, block_hard, inode_soft, inode_hard",
+            "people.bob.disk_quota: a mapping of block_warn, block_hard, inode_warn, inode_hard",
             self.problems(lambda r: r["people"]["bob"].update(disk_quota={"size": "1G"})),
         )
         self.assertIn(
-            "people.bob.disk_quota: a mapping of block_soft, block_hard, inode_soft, inode_hard",
+            "people.bob.disk_quota: a mapping of block_warn, block_hard, inode_warn, inode_hard",
             self.problems(lambda r: r["people"]["bob"].update(disk_quota="20G")),
         )
 

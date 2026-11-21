@@ -288,25 +288,36 @@ tests:
               summary: "n1 has reported no update status for 3 days"
               description: "`systemctl status os-updates-metrics.timer` and `journalctl -u os-updates-metrics` on the host."
 
-  - name: a user over their soft disk quota for a day is reported, one under it is not
+  - name: a user or a shared directory past its warn level for an hour is reported, one under it is not
     interval: 1h
     input_series:
       - series: 'disk_quota_used_bytes{host="login", instance="login:9100", filesystem="/", user="alice"}'
         values: '15x30'
-      - series: 'disk_quota_limit_bytes{host="login", instance="login:9100", filesystem="/", user="alice", kind="soft"}'
+      - series: 'disk_quota_limit_bytes{host="login", instance="login:9100", filesystem="/", user="alice", kind="warn"}'
         values: '10x30'
       - series: 'disk_quota_used_bytes{host="login", instance="login:9100", filesystem="/", user="bob"}'
         values: '5x30'
-      - series: 'disk_quota_limit_bytes{host="login", instance="login:9100", filesystem="/", user="bob", kind="soft"}'
+      - series: 'disk_quota_limit_bytes{host="login", instance="login:9100", filesystem="/", user="bob", kind="warn"}'
         values: '10x30'
+      - series: 'disk_quota_project_used_bytes{host="nfs", instance="nfs:9100", filesystem="/home", project="/home/shared/datasets", project_id="101"}'
+        values: '20x30'
+      - series: 'disk_quota_project_limit_bytes{host="nfs", instance="nfs:9100", filesystem="/home", project="/home/shared/datasets", project_id="101", kind="warn"}'
+        values: '15x30'
     alert_rule_test:
-      - eval_time: 23h
-        alertname: DiskQuotaOverSoftLimit
+      - eval_time: 30m
+        alertname: DiskQuotaOverWarnLevel
         exp_alerts: []
-      - eval_time: 25h
-        alertname: DiskQuotaOverSoftLimit
+      - eval_time: 2h
+        alertname: DiskQuotaOverWarnLevel
         exp_alerts:
           - exp_labels: {severity: info, host: login, instance: "login:9100", filesystem: /, user: alice}
             exp_annotations:
-              summary: "alice has been over their soft disk quota on login:/ for a day"
-              description: "Once the grace period ends the user can write nothing more there. `quota -s alice` on the host shows it; the person frees space, or gets a larger disk_quota in people.yml."
+              summary: "alice is past their disk warn level on login:/"
+              description: "Nothing is refused yet: only the hard limit stops writes. `quota -s alice` on the host shows it; the person frees space, or gets a larger disk_quota in people.yml."
+      - eval_time: 2h
+        alertname: DiskQuotaProjectOverWarnLevel
+        exp_alerts:
+          - exp_labels: {severity: info, host: nfs, instance: "nfs:9100", filesystem: /home, project: /home/shared/datasets, project_id: "101"}
+            exp_annotations:
+              summary: "/home/shared/datasets on nfs is past its warn level"
+              description: "Nothing is refused yet: only the hard limit stops writes. Free space there, or raise its block_hard and block_warn in disk_quota_projects."

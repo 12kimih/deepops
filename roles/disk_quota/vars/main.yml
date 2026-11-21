@@ -10,7 +10,7 @@ _disk_quota_cfg:
   limits: "{{ _disk_quota_users }}"
   # Everyone else the roster names, left or limited no longer: limits they had go.
   release: "{{ _disk_quota_roster | list | difference(_disk_quota_users | list) | sort }}"
-  grace_days: "{{ disk_quota_grace_days | int }}"
+  projects: "{{ disk_quota_projects | project_filesystems(ansible_facts.mounts) }}"
   textfile: "{{ _disk_quota_textfile }}"
 
 # What this component installs, for its record (roles/component_record): the timer and

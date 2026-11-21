@@ -1,6 +1,5 @@
 ---
 dependencies:
-  - role: deploy_defaults  # cluster_user_grace_days
   - role: deepops_paths  # deepops_containerized
   - role: cluster_tools_lib  # clustertools.disk_quota
   - role: prometheus_paths  # node_exporter_prom_dir

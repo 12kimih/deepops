@@ -1,9 +1,11 @@
 """clustertools.disk_quota against a fake host: what it would run, and nothing twice.
 
 A filesystem mounted with its quota options (host_baseline_mount_options writes them)
-gets quotas on and every user's limits; one mounted without them is refused, naming
-what to add; a rerun on a host that already matches does nothing; removal takes the
-quotas back; the metrics carry each user's usage and limits. No real command runs.
+gets quotas on and every user's hard limits; the warn level never reaches the kernel
+(soft stays 0: no grace period that later refuses writes), it is only exported. One
+mounted without the options is refused, naming what to add. Project quotas (a tree's
+total) work on ext4 and XFS, as deploy-time projects and as a library. A rerun on a host
+that already matches does nothing; removal takes the quotas back. No real command runs.
 """
 
 import sys
@@ -14,39 +16,43 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tool
 from clustertools import disk_quota as dq  # noqa: E402
 from clustertools import prom  # noqa: E402
 
-FSTAB = "# /etc/fstab\nUUID=abc /               ext4    defaults,noatime 0 1\nUUID=def /boot/efi vfat umask=0077 0 1\n"
 CSV_HEAD = "User,BlockStatus,FileStatus,BlockUsed,BlockSoftLimit,BlockHardLimit,BlockGrace,FileUsed,FileSoftLimit,FileHardLimit,FileGrace\n"
+PCSV_HEAD = CSV_HEAD.replace("User,", "Project,", 1)
 GB = 1024 * 1024  # KiB
+TB = 1024 * GB
 
 
 class FakeHost:
-    def __init__(
-        self,
-        fstab=FSTAB,
-        live="rw,noatime,usrjquota=aquota.user,jqfmt=vfsv1",
-        feature=False,
-        quota_file=False,
-        on=False,
-        csv="",
-        grace="7days",
-    ):
-        self.files = {"/etc/fstab": fstab, "/proc/self/mounts": f"/dev/sda4 / ext4 {live} 0 0\n"}
-        self.feature, self.on, self.csv, self.grace = feature, on, csv, grace
+    def __init__(self, live="rw,noatime,usrjquota=aquota.user,jqfmt=vfsv1", feature=False, quota_file=False, on=False,
+                 csv="", home=None, project_ids=None, pcsv="", xfs_report="", pon=True):  # fmt: skip
+        table = f"/dev/sda4 / ext4 {live} 0 0\n"
+        if home:
+            table += f"/dev/sdb1 /home ext4 {home} 0 0\n"
+        self.files = {"/proc/self/mounts": table}
+        self.feature, self.on, self.csv, self.pcsv, self.xfs_report, self.pon = (
+            feature,
+            on,
+            csv,
+            pcsv,
+            xfs_report,
+            pon,
+        )
+        self.project_ids = dict(project_ids or {})
         self.exist = {"/aquota.user"} if quota_file else set()
-        self.ran, self.wrote, self.removed = [], {}, []
+        self.ran, self.removed = [], []
 
     def read(self, path):
         return self.files[path]
-
-    def write(self, path, text):
-        self.wrote[path] = text
-        self.files[path] = text
 
     def exists(self, path):
         return path in self.exist
 
     def remove(self, path):
         self.removed.append(path)
+
+    def xfs_quota(self, mount, cmd):
+        self.ran.append(["xfs_quota", "-x", "-c", cmd, mount])
+        return self.xfs_report if cmd.startswith("quota ") else ""
 
     def run(self, argv, check=True):
         self.ran.append(argv)
@@ -58,10 +64,14 @@ class FakeHost:
             )
         if argv[:2] == ["quotaon", "-pu"]:
             return f"user quota on / (/dev/sda4) is {'on' if self.on else 'off'}\n"
-        if argv[:2] == ["repquota", "-u"] and "csv" in argv:
-            return CSV_HEAD + self.csv
+        if argv[:2] == ["quotaon", "-pP"]:
+            return f"project quota on /home (/dev/sdb1) is {'on' if self.pon else 'off'}\n"
+        if argv[:2] == ["repquota", "-P"]:
+            return PCSV_HEAD + self.pcsv
         if argv[:2] == ["repquota", "-u"]:
-            return f"*** Report for user quotas on device /dev/sda4\nBlock grace time: {self.grace}; Inode grace time: {self.grace}\n"
+            return CSV_HEAD + self.csv
+        if argv[:2] == ["lsattr", "-pd"]:
+            return f"{self.project_ids.get(argv[2], 0)} --------------e------- {argv[2]}\n"
         return ""
 
 
@@ -77,10 +87,12 @@ def run(host, cfg, action="apply"):
 CFG = {
     "filesystems": ["/"],
     "limits": {
-        "alice": {"block_soft": "10G", "block_hard": "20G", "inode_soft": 200000, "inode_hard": "500k"}
+        "alice": {"block_warn": "10G", "block_hard": "20G", "inode_warn": 200000, "inode_hard": "500k"}
     },
     "release": ["bob"],
-    "grace_days": 7,
+}
+PROJECT = {
+    "/home/shared/datasets": {"filesystem": "/home", "id": 101, "block_warn": "15T", "block_hard": "20T"}
 }
 
 
@@ -94,23 +106,24 @@ class Sizes(unittest.TestCase):
             with self.subTest(size=bad), self.assertRaises(dq.Error):
                 dq.kib(bad)
 
-    def test_a_soft_limit_above_its_hard_limit_is_refused(self):
+    def test_a_warn_level_above_its_hard_limit_is_refused(self):
         with self.assertRaises(dq.Error):
-            dq.wanted({"a": {"block_soft": "30G", "block_hard": "20G"}})
+            dq.wanted({"a": {"block_warn": "30G", "block_hard": "20G"}})
+
+    def test_the_kernel_gets_the_hard_limits_only(self):
+        self.assertEqual(dq.kernel(dq.levels("a", CFG["limits"]["alice"])), (0, 20 * GB, 0, 500000))
 
 
 class Parse(unittest.TestCase):
-    def test_report_and_grace(self):
+    def test_report(self):
         csv = (
             CSV_HEAD
-            + "root,ok,ok,1000,0,0,,10,0,0,\nalice,ok,ok,2048,10485760,20971520,,5,200000,500000,\n#1234,ok,ok,1,0,0,,1,0,0,\n"
+            + "root,ok,ok,1000,0,0,,10,0,0,\nalice,ok,ok,2048,0,20971520,,5,0,500000,\n#1234,ok,ok,1,0,0,,1,0,0,\n"
         )
         got = dq.report(csv)
-        self.assertEqual(got["alice"], (2048, 10485760, 20971520, 5, 200000, 500000))
+        self.assertEqual(got["alice"], (2048, 0, 20971520, 5, 0, 500000))
         self.assertIn("1234", got)
-        self.assertEqual(
-            dq.grace_shown("Block grace time: 7days; Inode grace time: 7days\n"), ("7days", "7days")
-        )
+        self.assertEqual(dq.report(PCSV_HEAD + "#101,ok,ok,5,0,9,,1,0,0,\n")["101"][:3], (5, 0, 9))
 
     def test_feature_and_mounts(self):
         self.assertTrue(dq.has_feature("Filesystem features:      has_journal quota extent\n"))
@@ -121,19 +134,13 @@ class Parse(unittest.TestCase):
 
 
 class Apply(unittest.TestCase):
-    def test_a_fresh_host_gets_quotacheck_quotaon_grace_and_limits(self):
+    def test_a_fresh_host_gets_quotacheck_quotaon_and_hard_limits(self):
         host = FakeHost()
-        steps = plan(host, CFG)
         self.assertEqual(
-            steps,
-            [
-                "quotacheck -cum /",
-                "quotaon -u /",
-                "setquota -t -u 604800 604800 /",
-                f"setquota -u alice {10 * GB} {20 * GB} 200000 500000 /",
-            ],
+            plan(host, CFG),
+            ["quotacheck -cum /", "quotaon -u /", f"setquota -u alice 0 {20 * GB} 0 500000 /"],
         )
-        self.assertEqual(host.wrote, {}, "a plan changes nothing")
+        self.assertFalse([a for a in host.ran if a[:2] == ["setquota", "-t"]], "no grace period is ever set")
 
     def test_a_mount_without_its_quota_options_is_refused_naming_them(self):
         with self.assertRaisesRegex(
@@ -142,7 +149,7 @@ class Apply(unittest.TestCase):
         ):
             plan(FakeHost(live="rw,noatime"), CFG)
         with self.assertRaisesRegex(dq.Error, "without usrquota"):
-            plan(FakeHost(live="rw,noatime,usrjquota=aquota.user,jqfmt=vfsv1", feature=True), CFG)
+            plan(FakeHost(feature=True), CFG)
 
     def test_the_quota_feature_needs_no_quota_file(self):
         steps = plan(FakeHost(live="rw,usrquota", feature=True), CFG)
@@ -150,20 +157,17 @@ class Apply(unittest.TestCase):
         self.assertIn("quotaon -u /", steps)
 
     def test_a_host_that_matches_needs_nothing(self):
-        csv = f"alice,ok,ok,10,{10 * GB},{20 * GB},,1,200000,500000,\nbob,ok,ok,10,0,0,,1,0,0,\n"
-        host = FakeHost(quota_file=True, on=True, csv=csv)
-        self.assertEqual(plan(host, CFG), [])
+        csv = f"alice,ok,ok,10,0,{20 * GB},,1,0,500000,\nbob,ok,ok,10,0,0,,1,0,0,\n"
+        self.assertEqual(plan(FakeHost(quota_file=True, on=True, csv=csv), CFG), [])
 
-    def test_changed_and_released_limits(self):
-        csv = f"alice,ok,ok,10,{5 * GB},{20 * GB},,1,200000,500000,\nbob,ok,ok,10,{GB},{2 * GB},,1,0,0,\ncarol,ok,ok,10,{GB},{2 * GB},,1,0,0,\n"
-        host = FakeHost(quota_file=True, on=True, csv=csv, grace="3days")
+    def test_a_soft_limit_left_from_before_goes_and_released_users_lose_theirs(self):
+        csv = (
+            f"alice,ok,ok,10,{10 * GB},{20 * GB},,1,200000,500000,\n"
+            f"bob,ok,ok,10,{GB},{2 * GB},,1,0,0,\ncarol,ok,ok,10,{GB},{2 * GB},,1,0,0,\n"
+        )
         self.assertEqual(
-            plan(host, CFG),
-            [
-                "setquota -t -u 604800 604800 /",
-                f"setquota -u alice {10 * GB} {20 * GB} 200000 500000 /",
-                "setquota -u bob 0 0 0 0 /",
-            ],
+            plan(FakeHost(quota_file=True, on=True, csv=csv), CFG),
+            [f"setquota -u alice 0 {20 * GB} 0 500000 /", "setquota -u bob 0 0 0 0 /"],
             "carol is no one's to release: limits set by hand stay",
         )
 
@@ -180,42 +184,97 @@ class Apply(unittest.TestCase):
         with self.assertRaises(dq.Error):
             plan(FakeHost(), {**CFG, "filesystems": ["/srv"]})
 
-    def test_apply_runs_what_the_plan_said_and_never_writes_fstab(self):
+
+class Projects(unittest.TestCase):
+    def test_an_ext4_project_gets_its_tree_and_hard_limit(self):
+        host = FakeHost(home="rw,prjquota", pon=False)
+        self.assertEqual(
+            plan(host, {"projects": PROJECT}),
+            [
+                "quotaon -P /home",
+                "make /home/shared/datasets project 101",
+                f"limit project 101 (/home/shared/datasets) to {20 * TB} KiB",
+            ],
+        )
+        run(host, {"projects": PROJECT})
+        self.assertIn(["chattr", "-R", "-p", "101", "+P", "/home/shared/datasets"], host.ran)
+        self.assertIn(["setquota", "-P", "101", "0", str(20 * TB), "0", "0", "/home"], host.ran)
+
+    def test_a_project_that_matches_needs_nothing(self):
+        host = FakeHost(
+            home="rw,prjquota",
+            project_ids={"/home/shared/datasets": 101},
+            pcsv=f"#101,ok,ok,5,0,{20 * TB},,1,0,0,\n",
+        )
+        self.assertEqual(plan(host, {"projects": PROJECT}), [])
+
+    def test_a_filesystem_without_project_quotas_is_refused(self):
+        with self.assertRaisesRegex(dq.Error, "without prjquota"):
+            plan(FakeHost(home="rw,usrquota"), {"projects": PROJECT})
+
+    def test_xfs_projects_go_through_xfs_quota(self):
         host = FakeHost()
-        run(host, CFG)
-        self.assertIn(["quotacheck", "-cum", "/"], host.ran)
-        self.assertEqual(host.wrote, {})
+        host.files["/proc/self/mounts"] = "/dev/sda4 / ext4 rw 0 0\n/dev/sdc1 /scratch xfs rw,pquota 0 0\n"
+        dq.project_set(host, "/scratch", "/scratch/alice-1", 1000)
+        dq.project_limit(host, "/scratch", 1000, 5 * 1024**4, warn_bytes=4 * 1024**4)
+        self.assertEqual(
+            [a[3] for a in host.ran if a[0] == "xfs_quota"],
+            ["project -s -p /scratch/alice-1 1000", f"limit -p bsoft=0 bhard={5 * TB}k 1000"],
+            "the warn level never reaches the kernel",
+        )
+        host.xfs_report = f"/dev/sdc1 2048 0 {5 * TB} 00 [--------] /scratch\n"
+        self.assertEqual(dq.project_used(host, "/scratch", 1000), 2048 * 1024)
+
+    def test_removal_lifts_a_project_limit_and_keeps_its_tree(self):
+        host = FakeHost(
+            home="rw,prjquota",
+            project_ids={"/home/shared/datasets": 101},
+            pcsv=f"#101,ok,ok,5,0,{20 * TB},,1,0,0,\n",
+        )
+        self.assertEqual(
+            plan(host, {"projects": PROJECT}, "remove"),
+            ["lift the limit of project 101 (/home/shared/datasets)"],
+        )
+        run(host, {"projects": PROJECT}, "remove")
+        self.assertIn(["setquota", "-P", "101", "0", "0", "0", "0", "/home"], host.ran)
+        self.assertFalse([a for a in host.ran if a[0] == "chattr"])
 
 
 class Remove(unittest.TestCase):
     def test_removal_releases_turns_off_and_removes_the_quota_file(self):
-        csv = f"alice,ok,ok,10,{10 * GB},{20 * GB},,1,0,0,\n"
+        csv = f"alice,ok,ok,10,0,{20 * GB},,1,0,0,\n"
         host = FakeHost(quota_file=True, on=True, csv=csv)
         self.assertEqual(
-            plan(host, CFG, "remove"),
-            ["setquota -u alice 0 0 0 0 /", "quotaoff -u /", "remove /aquota.user"],
+            plan(host, CFG, "remove"), ["setquota -u alice 0 0 0 0 /", "quotaoff -u /", "remove /aquota.user"]
         )
         run(host, CFG, "remove")
         self.assertEqual(host.removed, ["/aquota.user"])
-        self.assertEqual(host.wrote, {})
 
     def test_nothing_to_remove_where_there_were_none(self):
         self.assertEqual(plan(FakeHost(), CFG, "remove"), [])
 
 
 class Metrics(unittest.TestCase):
-    def test_usage_and_limits_per_user(self):
-        csv = f"root,ok,ok,1000,0,0,,10,0,0,\nalice,ok,ok,2048,{10 * GB},{20 * GB},,5,200000,500000,\n"
-        values = prom.parse(dq.metrics(FakeHost(csv=csv), {"filesystems": ["/"]}, 1700000000))
+    def test_usage_hard_from_the_kernel_warn_from_the_configuration(self):
+        csv = f"root,ok,ok,1000,0,0,,10,0,0,\nalice,ok,ok,2048,0,{20 * GB},,5,0,500000,\n"
+        host = FakeHost(csv=csv, home="rw,prjquota", pcsv=f"#101,ok,ok,7,0,{20 * TB},,1,0,0,\n")
+        values = prom.parse(dq.metrics(host, {**CFG, "projects": PROJECT}, 1700000000))
+
+        def get(name, **labels):
+            return values.get(prom.key(name, **labels))
+
+        self.assertEqual(get("disk_quota_used_bytes", filesystem="/", user="alice"), str(2048 * 1024))
         self.assertEqual(
-            values[prom.key("disk_quota_used_bytes", filesystem="/", user="alice")], str(2048 * 1024)
+            get("disk_quota_limit_bytes", filesystem="/", kind="hard", user="alice"), str(20 * GB * 1024)
         )
         self.assertEqual(
-            values[prom.key("disk_quota_limit_bytes", filesystem="/", kind="hard", user="alice")],
-            str(20 * GB * 1024),
+            get("disk_quota_limit_bytes", filesystem="/", kind="warn", user="alice"), str(10 * GB * 1024)
         )
-        self.assertNotIn(prom.key("disk_quota_limit_bytes", filesystem="/", kind="hard", user="root"), values)
-        self.assertEqual(values[prom.key("disk_quota_last_success_timestamp_seconds")], "1700000000")
+        self.assertIsNone(get("disk_quota_limit_bytes", filesystem="/", kind="hard", user="root"))
+        labels = {"filesystem": "/home", "project": "/home/shared/datasets", "project_id": "101"}
+        self.assertEqual(get("disk_quota_project_used_bytes", **labels), str(7 * 1024))
+        self.assertEqual(get("disk_quota_project_limit_bytes", kind="warn", **labels), str(15 * TB * 1024))
+        self.assertEqual(get("disk_quota_last_success_timestamp_seconds"), "1700000000")
 
 
 class Cli(unittest.TestCase):
