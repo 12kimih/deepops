@@ -2,6 +2,7 @@
 
 "/var/spool/slurmd-private" | mount_point(ansible_facts.mounts)  -> "/" (or "/var" ...)
 fstab_text | fstab_entries   -> [{src, path, fstype, opts, dump, passno}, ...]
+projects | project_filesystems(ansible_facts.mounts) -> each with its "filesystem"
 
 The deepest mount at or above the path, by whole path components: /var/tmpfoo is
 not under /var/tmp. The path need not exist yet. Tools that check a filesystem by
@@ -27,6 +28,15 @@ def mount_point(path, mounts):
     if best is None:
         raise ValueError(f"no mount holds {path!r} (is / among the mounts?)")
     return best
+
+
+def project_filesystems(projects, mounts):
+    """PROJECTS ({path: settings}) with each one's "filesystem": the mount point its
+    path lives on, which project quotas are set on (clustertools.disk_quota)."""
+    return {
+        path: {**(settings or {}), "filesystem": mount_point(path, mounts)}
+        for path, settings in (projects or {}).items()
+    }
 
 
 # Filesystems another host serves: their options are the mounting role's (nfs_client).
@@ -60,4 +70,8 @@ def fstab_entries(text):
 
 class FilterModule:
     def filters(self):
-        return {"mount_point": mount_point, "fstab_entries": fstab_entries}
+        return {
+            "mount_point": mount_point,
+            "fstab_entries": fstab_entries,
+            "project_filesystems": project_filesystems,
+        }

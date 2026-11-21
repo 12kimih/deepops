@@ -182,8 +182,8 @@
 # NFS server are kept then; name one here to remove it where nothing wants it.
 #deepops_component_removals: []
 
-# How long users have to clean up before the cluster removes or refuses their data (the
-# grace over a soft disk quota, unused container stores, ...): one value for all of them.
+# How long users have to clean up before the cluster removes their data (unused
+# container stores, ended scratch allocations, ...): one value for all of them.
 #cluster_user_grace_days: 14
 
 ################################################################################

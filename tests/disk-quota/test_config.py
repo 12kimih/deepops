@@ -18,7 +18,13 @@ PEOPLE = yaml.safe_load((ROOT / "config.example/people.yml").read_text())["peopl
 
 
 def config(**overrides):
-    values = {**role_defaults("disk_quota"), **VARS, "people": PEOPLE, **overrides}
+    values = {
+        **role_defaults("disk_quota"),
+        **VARS,
+        "people": PEOPLE,
+        "ansible_facts": {"mounts": [{"mount": "/"}]},
+        **overrides,
+    }
     return json.loads(render("{{ _disk_quota_cfg | to_json }}", values))
 
 
@@ -28,14 +34,26 @@ class Config(unittest.TestCase):
         self.assertEqual(cfg["filesystems"], ["/"])
         self.assertEqual(list(cfg["limits"]), ["alice"])
         self.assertEqual(cfg["release"], ["bob", "carol", "dave"])
-        self.assertEqual(cfg["grace_days"], 14, "the site's one cleanup period, cluster_user_grace_days")
+        self.assertNotIn("grace_days", cfg, "a warn level only notifies: no grace period to set")
+        self.assertEqual(cfg["projects"], {})
         self.assertTrue(cfg["textfile"].endswith("/disk-quota.prom"))
 
     def test_site_limits_reach_every_active_person(self):
-        cfg = config(disk_quota_limits={"block_soft": "10G", "block_hard": "20G"})
+        cfg = config(disk_quota_limits={"block_warn": "10G", "block_hard": "20G"})
         self.assertEqual(sorted(cfg["limits"]), ["alice", "bob", "dave"])
         self.assertEqual(cfg["limits"]["alice"]["block_hard"], "100G")
         self.assertEqual(cfg["release"], ["carol"])
+
+    def test_each_project_carries_the_filesystem_it_lives_on(self):
+        mounts = [{"mount": "/"}, {"mount": "/home"}]
+        cfg = config(
+            disk_quota_projects={"/home/shared/datasets": {"id": 101, "block_hard": "20T"}},
+            ansible_facts={"mounts": mounts},
+        )
+        self.assertEqual(
+            cfg["projects"],
+            {"/home/shared/datasets": {"id": 101, "block_hard": "20T", "filesystem": "/home"}},
+        )
 
     def test_no_roster_names_nobody(self):
         cfg = config(people={}, disk_quota_limits={"block_hard": "20G"})

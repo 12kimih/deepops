@@ -1,8 +1,8 @@
 ---
-# Per-user disk quotas (roles/disk_quota textfile metrics, clustertools.disk_quota). The
-# disk itself is watched by the filesystem rules in host.yml; these say when the usage
-# stopped being reported, and who has been over a soft limit for a day (the hard limit
-# takes over when the grace period ends).
+# Disk quotas (roles/disk_quota textfile metrics, clustertools.disk_quota). The disk
+# itself is watched by the filesystem rules in host.yml; these say when the usage stopped
+# being reported, and who (or which shared directory) is past its warn level: a level
+# that only notifies (the kernel enforces the hard limit alone, at once).
 groups:
   - name: disk-quota
     rules:
@@ -23,15 +23,26 @@ groups:
         annotations:
           summary: "{{ $labels.host }} has reported no disk quota usage for an hour"
           description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
-      - alert: DiskQuotaOverSoftLimit
+      - alert: DiskQuotaOverWarnLevel
         expr: |
           disk_quota_used_bytes
-          > on (instance, filesystem, user) group_left disk_quota_limit_bytes{kind="soft"}
-        for: 1d
+          > on (instance, filesystem, user) group_left disk_quota_limit_bytes{kind="warn"}
+        for: 1h
         labels: {severity: info}
         annotations:
-          summary: "{{ $labels.user }} has been over their soft disk quota on {{ $labels.host }}:{{ $labels.filesystem }} for a day"
+          summary: "{{ $labels.user }} is past their disk warn level on {{ $labels.host }}:{{ $labels.filesystem }}"
           description: >-
-            Once the grace period ends the user can write nothing more there. `quota -s
+            Nothing is refused yet: only the hard limit stops writes. `quota -s
             {{ $labels.user }}` on the host shows it; the person frees space, or gets a
             larger disk_quota in people.yml.
+      - alert: DiskQuotaProjectOverWarnLevel
+        expr: |
+          disk_quota_project_used_bytes
+          > on (instance, filesystem, project) group_left disk_quota_project_limit_bytes{kind="warn"}
+        for: 1h
+        labels: {severity: info}
+        annotations:
+          summary: "{{ $labels.project }} on {{ $labels.host }} is past its warn level"
+          description: >-
+            Nothing is refused yet: only the hard limit stops writes. Free space there,
+            or raise its block_hard and block_warn in disk_quota_projects.

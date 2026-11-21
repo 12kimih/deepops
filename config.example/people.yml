@@ -41,7 +41,7 @@ people:
     default_account: team-a
     roles: [admin, docker]
     # Over the site's per-user disk quota on the login nodes (roles/disk_quota).
-    disk_quota: {block_soft: 50G, block_hard: 100G}
+    disk_quota: {block_warn: 50G, block_hard: 100G}
   bob:
     uid: 1002
     slack: U0BOB0002

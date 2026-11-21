@@ -18,7 +18,7 @@ A roster file declares the roles a site uses and the people:
           admin: {qos: [high, urgent]}
         default_account: admin    # needed with several accounts
         roles: [admin]
-        disk_quota: {block_soft: 50G, block_hard: 100G}  # optional, over the site's
+        disk_quota: {block_warn: 50G, block_hard: 100G}  # optional, over the site's
                                   # default per-user disk quota (roles/disk_quota)
         status: active            # active (default) or left
 
@@ -35,7 +35,7 @@ import re
 
 STATUSES = ("active", "left")
 KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota"}
-QUOTA_KEYS = ("block_soft", "block_hard", "inode_soft", "inode_hard")
+QUOTA_KEYS = ("block_warn", "block_hard", "inode_warn", "inode_hard")
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
 TOP_KEYS = {"roles", "attributes", "member_keys", "people"}

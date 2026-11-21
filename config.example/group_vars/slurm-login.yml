@@ -21,8 +21,10 @@
 #disk_quota_filesystems: [/]
 #disk_quota_limits: {}
 #disk_quota_limits:  # example
-#  block_soft: 10G
+#  block_warn: 10G
 #  block_hard: 20G
-#  inode_soft: 200k
+#  inode_warn: 200k
 #  inode_hard: 500k
-#disk_quota_grace_days: "{{ cluster_user_grace_days }}"
+#disk_quota_projects: {}
+#disk_quota_projects:  # example
+#  /home/shared/datasets: {id: 101, block_warn: 15T, block_hard: 20T}
