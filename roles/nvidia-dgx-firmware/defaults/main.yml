@@ -55,7 +55,8 @@ nv_services:
   - nvidia-persistenced
   - nvidia-fabricmanager
   - nv_peer_mem
-  - dcgm
+  - dcgm  # DCGM 3
+  - nvidia-dcgm  # DCGM 4
   - docker
 nv_modules:
   - nv_peer_mem
