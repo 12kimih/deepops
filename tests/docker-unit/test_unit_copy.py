@@ -31,7 +31,7 @@ def repairs(exists, state="started", containerized=False):
     return condition(
         REPAIR["when"],
         {
-            "docker_api_socket_file": {"stat": {"exists": exists}},
+            "docker_api_probe": {"rc": 0 if exists else 1},
             "docker_service_state": state,
             "deepops_containerized": containerized,
         },
@@ -52,7 +52,7 @@ class ApiSocket(unittest.TestCase):
 
     def test_a_socket_still_missing_after_the_repair_stops_the_run(self):
         last = REPAIR["block"][-1]
-        self.assertEqual(last["assert"]["that"], "docker_api_socket_again.stat.exists")
+        self.assertEqual(last["assert"]["that"], "docker_api_again.rc == 0")
 
     def test_nothing_to_do_with_the_socket_there_or_docker_meant_off(self):
         self.assertFalse(repairs(True))

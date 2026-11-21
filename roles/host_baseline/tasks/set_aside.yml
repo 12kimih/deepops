@@ -1,7 +1,8 @@
 ---
 # Files a role takes out of service but keeps (a foreign unit file, a hand drop-in), the
 # one way: moved, owner and mode as they were, into host_baseline_set_aside_dir (made
-# 0700 when needed), each under its path with / as _, so two names never collide. A
+# 0700 when needed), each under its path with / as _, so two names never collide, and
+# a file set aside before keeps its copy (the new one gets the time appended). A
 # path not on the host is skipped. Under --check the move is previewed (change_command);
 # the directory and the move happen together, so no step waits on a directory a skipped
 # step would have made. Registers host_baseline_set_aside (one result per moved path).
@@ -25,7 +26,7 @@
     argv:
       - sh
       - -c
-      - 'mkdir -p -m 0700 -- "$1" && mv -- "$2" "$1/$3"'
+      - 'mkdir -p -m 0700 -- "$1" && t="$1/$3" && { [ ! -e "$t" ] || t="$t.$(date +%Y%m%dT%H%M%S)"; } && mv -- "$2" "$t"'
       - set-aside
       - "{{ host_baseline_set_aside_dir }}"
       - "{{ item.stat.path }}"

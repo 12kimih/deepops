@@ -50,7 +50,7 @@
     state: present
     update_cache: true
   notify:
-    - Restart docker
+    - Restart dockerd
   when: dgx_os6_install_container_runtime
 
 - name: Install DGX OS 6 NVSM packages

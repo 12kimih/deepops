@@ -38,4 +38,4 @@ docker_socket_group_socket_path: /run/docker.sock
 
 # Whether a run may restart dockerd to apply this (it stops running containers) is
 # docker_daemon_restart, shared by every role that configures dockerd
-# (roles/docker_daemon_json).
+# (roles/docker_restart).

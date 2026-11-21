@@ -33,6 +33,11 @@ class Unit(unittest.TestCase):
         self.assertIn("PartOf=nftables.service", nft)
         self.assertIn("WantedBy=sysinit.target nftables.service", nft)
 
+    def test_a_dead_api_fails_the_unit_visibly(self):
+        self.assertIn("ExecStartPre=/usr/bin/docker info --format ok", TEMPLATE)
+        self.assertIn("StartLimitBurst=5", TEMPLATE.split("[Service]")[0])
+        self.assertIn("StartLimitIntervalSec=300", TEMPLATE.split("[Service]")[0])
+
 
 if __name__ == "__main__":
     unittest.main()

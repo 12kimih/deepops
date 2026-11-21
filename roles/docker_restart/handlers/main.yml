@@ -1,0 +1,64 @@
+---
+# Every role's change to dockerd comes here, so one run restarts (or reloads) it once,
+# in this order (handlers run as written): systemd reads changed unit files, the socket
+# re-binds when its unit changed, dockerd restarts, or reloads when every change is one
+# it re-reads on SIGHUP, and the API is checked. Several restarts in one run used to
+# bounce every container each time and could hit docker.service's start limit.
+#
+# Under socket activation systemd owns the socket and applies SocketGroup= only when the
+# unit re-binds; restarting docker.service does not restart docker.socket. try-restart
+# re-binds only a socket already running, so a node without socket activation is never
+# switched over to it. man systemctl(1), man systemd.socket(5)
+- name: Reload systemd for dockerd
+  systemd_unit:
+    daemon_reload: true
+  listen: [Restart dockerd, Restart the docker socket unit]
+  when: docker_daemon_restart | bool
+
+- name: Restart the docker socket unit
+  change_command:
+    cmd: systemctl try-restart docker.socket
+  when: docker_daemon_restart | bool
+
+# try-: a dockerd stopped on purpose stays stopped and reads the change when it starts.
+- name: Restart dockerd
+  change_command:
+    argv: [systemctl, try-restart, docker.service]
+  when: docker_daemon_restart | bool
+
+- name: Note that dockerd restarted
+  ansible.builtin.set_fact:
+    docker_restart_done: true
+  listen: Restart dockerd
+  when: docker_daemon_restart | bool
+
+# The package's unit reloads with SIGHUP (ExecReload); a restart in the same run already
+# read the new configuration.
+- name: Reload dockerd
+  change_command:
+    argv: [systemctl, try-reload-or-restart, docker.service]
+  when: not docker_restart_done | default(false)
+
+# A daemon that came back without its API (a socket file removed under it, a refused
+# configuration) fails the run here instead of every client failing later.
+- name: Look whether dockerd runs
+  ansible.builtin.command:
+    argv: [systemctl, is-active, docker.service]
+  register: docker_restart_active
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only
+  listen: [Restart dockerd, Reload dockerd]
+
+- name: Check the Docker API answers
+  ansible.builtin.command:
+    argv: [docker, --host, "unix://{{ docker_api_socket }}", info, --format, ok]
+  register: docker_restart_api
+  until: docker_restart_api.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  listen: [Restart dockerd, Reload dockerd]
+  when:
+    - not ansible_check_mode
+    - docker_restart_active.stdout | default('') == 'active'

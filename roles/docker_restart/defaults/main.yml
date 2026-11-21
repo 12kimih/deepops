@@ -1,0 +1,13 @@
+---
+# docker_restart -- the one way any role restarts or reloads dockerd: notify
+# "Restart dockerd" (a change only a restart applies) or "Reload dockerd" (one dockerd
+# re-reads on SIGHUP), and list this role in meta/main.yml dependencies.
+#
+# May a run restart dockerd? A change that needs a restart takes effect only then, and a
+# restart stops every container live-restore does not keep. False stages the change for
+# a maintenance window; a later run with true applies it. A reload stops nothing and is
+# always allowed.
+docker_daemon_restart: true
+# The API socket docker.socket listens on (the package's unit, ListenStream), checked
+# after every restart or reload.
+docker_api_socket: /run/docker.sock

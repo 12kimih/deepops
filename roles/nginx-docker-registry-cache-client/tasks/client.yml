@@ -17,7 +17,7 @@
     mode: "0644"
   when: nginx_docker_cache_dockerd_clients
   notify:
-    - Restart docker
+    - Restart dockerd
 
 # The site's own CA when it gave one, else the one the proxy made (read from the cache
 # host above).

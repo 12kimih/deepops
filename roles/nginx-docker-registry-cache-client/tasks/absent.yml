@@ -21,5 +21,8 @@
   ansible.builtin.include_tasks: trust.yml
 
 - name: Restart Docker without the proxy
-  ansible.builtin.include_tasks: restart_docker.yml
+  ansible.builtin.debug:
+    msg: The proxy drop-in of docker.service is gone; dockerd restarts.
+  changed_when: true
+  notify: Restart dockerd
   when: nginx_docker_cache_docker_config_dest in component_record_removed.file

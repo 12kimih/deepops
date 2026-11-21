@@ -116,7 +116,7 @@
     state: present
     allowerasing: true
   notify:
-    - Restart docker
+    - Restart dockerd
   when: dgx_redhat_install_container_runtime
 
 - name: Install Red Hat DGX optional cachefilesd configuration

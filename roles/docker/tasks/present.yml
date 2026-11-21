@@ -89,15 +89,37 @@
 
 # The unit files the site retires go before daemon.json is written: their flags would
 # make dockerd refuse daemon.json's keys for the same options.
-- name: Retire the unit files the site names
-  when: docker_retired_unit_files | length > 0
+# Besides the site's, DGX OS's drop-in (docker_dgx_override), whose options conflict with
+# a stock install. A retired unit changes how dockerd starts, so it needs the restart
+# that applies it: with restarts off, the old dockerd would run on until something else
+# restarts it unattended (an upgrade), and its socket would go then.
+- name: Look for the unit files to retire
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: false
+  loop: "{{ _docker_retiring }}"
+  register: docker_retiring_found
+
+- name: Refuse to retire a unit file without restarting dockerd
+  ansible.builtin.assert:
+    that: docker_daemon_restart | bool or not _found
+    fail_msg: >-
+      {{ _found | join(', ') }} on {{ inventory_hostname }} would be retired, which takes a
+      dockerd restart, and docker_daemon_restart is false. Run this with it true in a
+      maintenance window.
+    quiet: true
+  vars:
+    _found: "{{ docker_retiring_found.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+
+- name: Retire the unit files
+  when: docker_retiring_found.results | selectattr('stat.exists') | list | length > 0
   block:
     - name: Set aside the retired unit files
       ansible.builtin.include_role:
         name: host_baseline
         tasks_from: set_aside
       vars:
-        host_baseline_set_aside_paths: "{{ docker_retired_unit_files }}"
+        host_baseline_set_aside_paths: "{{ _docker_retiring }}"
         host_baseline_set_aside_dir: /var/backups/deepops-docker-units
 
     - name: Reload systemd without them
@@ -120,29 +142,35 @@
          | combine({'registry-mirrors': docker_registry_mirrors} if docker_registry_mirrors | length > 0 else {}) }}
     # dockerd picks up a changed unit only when it restarts.
     docker_daemon_json_unit_changed: "{{ (host_baseline_set_aside | default({})) is changed }}"
-    docker_daemon_json_retiring: "{{ docker_retired_unit_files }}"
+    docker_daemon_json_retiring: "{{ _docker_retiring }}"
 
 # A dockerd that made its own API socket (a retired unit passing -H unix://...) removes
 # the socket file when it stops, and the package's dockerd that follows serves the
 # socket docker.socket handed it with that file gone: every client then finds no
-# daemon (2026-11-22: retiring a kubespray-era unit). So after any restart the file is
-# checked, and docker.socket recreates it (dockerd stops first, live-restore keeps the
-# containers).
+# daemon (2026-11-22: retiring a kubespray-era unit). So on every run, after any
+# restart, the API is asked, and where it does not answer docker.socket recreates the
+# file (dockerd stops first, live-restore keeps the containers).
 - name: Apply a pending dockerd restart now
   ansible.builtin.meta: flush_handlers
 
-- name: Look for the Docker API socket
-  ansible.builtin.stat:
-    path: "{{ docker_api_socket }}"
-    get_checksum: false
-  register: docker_api_socket_file
-  when: not deepops_containerized | bool
+# The API itself is asked, not the file: a socket file with nothing behind it passes a
+# stat.
+- name: Ask the Docker API
+  ansible.builtin.command:
+    argv: [docker, --host, "unix://{{ docker_api_socket }}", info, --format, ok]
+  register: docker_api_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when:
+    - not deepops_containerized | bool
+    - docker_service_state == 'started'
 
 - name: Recreate the Docker API socket
   when:
     - not deepops_containerized | bool
     - docker_service_state == 'started'
-    - not docker_api_socket_file.stat.exists
+    - docker_api_probe.rc | default(0) != 0
   block:
     - name: Stop dockerd so docker.socket can listen again
       systemd_unit:
@@ -159,20 +187,25 @@
         name: docker.service
         state: started
 
-    - name: Look for the recreated socket
-      ansible.builtin.stat:
-        path: "{{ docker_api_socket }}"
-        get_checksum: false
-      register: docker_api_socket_again
+    - name: Ask the Docker API again
+      ansible.builtin.command:
+        argv: [docker, --host, "unix://{{ docker_api_socket }}", info, --format, ok]
+      register: docker_api_again
+      until: docker_api_again.rc == 0
+      retries: 12
+      delay: 5
+      changed_when: false
+      failed_when: false
       when: not ansible_check_mode
 
-    - name: Stop when the socket is still missing
+    - name: Stop when the API still does not answer
       ansible.builtin.assert:
-        that: docker_api_socket_again.stat.exists
+        that: docker_api_again.rc == 0
         fail_msg: >-
-          {{ docker_api_socket }} is still missing on {{ inventory_hostname }} after
-          restarting docker.socket and dockerd: no Docker client can reach the daemon.
-          See systemctl status docker.socket docker.service.
+          The Docker API ({{ docker_api_socket }}) still does not answer on
+          {{ inventory_hostname }} after restarting docker.socket and dockerd:
+          {{ docker_api_again.stderr | default('') }}. See systemctl status docker.socket
+          docker.service.
         quiet: true
       when: not ansible_check_mode
 
@@ -196,7 +229,8 @@
           # Managed by roles/docker (docker_image_prune_until).
           [Unit]
           Description=Remove Docker images no container uses, older than {{ docker_image_prune_until }}
-          Requires=docker.service
+          # Only while Docker runs: a timer must not start a Docker stopped on purpose.
+          Requisite=docker.service
           After=docker.service
 
           [Service]

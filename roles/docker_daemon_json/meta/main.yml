@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: docker_restart  # the handlers: Restart dockerd, Reload dockerd
   - role: deepops_paths  # deepops_cache_dir, deepops_state_dir
 
 galaxy_info:

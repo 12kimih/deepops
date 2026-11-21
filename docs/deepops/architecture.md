@@ -104,6 +104,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── docker
 │   ├── docker-login
 │   ├── docker_daemon_json
+│   ├── docker_restart
 │   ├── docker_socket_group
 │   ├── download
 │   ├── easy-build
