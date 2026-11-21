@@ -5,7 +5,7 @@ Usage (from the deepops directory):
   uv run scripts/deepops/people.py check                 # config.example and config rosters
   uv run scripts/deepops/people.py check FILE [FILE ...]
   uv run scripts/deepops/people.py add FILE LOGIN --account TEAM [--name NAME] [--slack ID]
-  uv run scripts/deepops/people.py leave FILE LOGIN
+  uv run scripts/deepops/people.py leave FILE LOGIN [--ends YYYY-MM-DD]
 
 The rules live in plugins/filter/people.py (check), which the playbooks apply through
 the people_check filter, so a roster that passes here is one the deploy accepts.
@@ -14,8 +14,9 @@ add and leave are the one way the roster is edited, by a person or by the cluste
 (an account request becomes a pull request of their change): add gives the next free
 UID (after the roster's, never a system account's), an account declared in the
 Slurm accounting file beside the roster (files/slurm/accounting.yml), keeps the people in order and the
-file's comments; leave makes someone `status: left` with no roles or accounts, keeping
-the entry so the UID stays reserved. Either writes nothing unless the result passes
+file's comments; leave --ends sets someone's last day (they keep their account for the
+grace period, people_leave_grace_days), and leave alone makes them `status: left` at
+once with no roles or accounts, keeping the entry so the UID stays reserved. Either writes nothing unless the result passes
 check. The deploy (slurm-cluster.yml --tags people) applies the change.
 """
 
@@ -68,10 +69,10 @@ def add(path, login, account, name=None, slack=None):
     return 0
 
 
-def leave(path, login):
-    if edit(path, lambda t: people.roster_leave(t, login)) is None:
+def leave(path, login, ends=None):
+    if edit(path, lambda t: people.roster_leave(t, login, ends)) is None:
         return 1
-    print(f"{login} has left (the UID stays reserved)")
+    print(f"{login} ends on {ends}" if ends else f"{login} has left (the UID stays reserved)")
     return 0
 
 
@@ -91,8 +92,9 @@ def main(argv):
             parser.add_argument("--slack")
             args = parser.parse_args(argv)
             return add(args.file, args.login, args.account, args.name, args.slack)
+        parser.add_argument("--ends")
         args = parser.parse_args(argv)
-        return leave(args.file, args.login)
+        return leave(args.file, args.login, args.ends)
     parser = cli.parser(__doc__)
     parser.add_argument("command", choices=["check"])
     parser.add_argument("files", nargs="*", type=Path)

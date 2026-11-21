@@ -24,11 +24,18 @@ A roster file declares the roles a site uses and the people:
         disk_quota: {block_warn: 50G, block_hard: 100G}  # optional, over the site's
                                   # default per-user disk quota (roles/disk_quota)
         status: active            # active (default) or left
+        ends: 2027-02-28          # optional: the last day of membership (graduation)
 
 Every list a role consumes (sudo netgroup, group members, Slurm associations,
 chat IDs, subordinate IDs) is computed from `people` with the filters below, so access is granted
 and revoked in one place. Only `active` people get anything; someone who has left
 keeps an entry so the UID stays reserved and the account can be locked.
+
+Leaving has two steps. Past `ends`, a person keeps their account and their files (to
+take them away) but no Slurm association and no role; login stops at
+people_login_expires (ends + people_leave_grace_days), applied by the directory and
+the local accounts from that one date. `status: left` is the final state (the files
+are kept for people_leave_keep_days, then an administrator decides).
 
 check() is the single validation, used at deploy time through people_check and at
 commit time by scripts/deepops/people.py. roster_add() and roster_leave() are the one
@@ -38,11 +45,54 @@ way a roster file is edited (scripts/deepops/people.py, the cluster bot's reques
 import re
 
 STATUSES = ("active", "left")
-KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota"}
+KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota", "ends"}
 QUOTA_KEYS = ("block_warn", "block_hard", "inode_warn", "inode_hard")
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
 TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "people"}
+
+
+def _date(value):
+    """A roster date (YAML reads 2027-02-28 as a date; quoted, a string) or None."""
+    import datetime
+
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value))
+
+
+def _today(today=None):
+    import datetime
+
+    return _date(today) or datetime.date.today()
+
+
+def _ended(person, today=None):
+    """Whether PERSON is past their `ends`: account kept, no Slurm and no role."""
+    ends = _date((person or {}).get("ends"))
+    return ends is not None and _today(today) > ends
+
+
+def _member(people, today=None):
+    """Active people not past their end: those who hold associations and roles."""
+    return {n: p for n, p in _active(people).items() if not _ended(p, today)}
+
+
+def people_login_expires(person, grace_days=30):
+    """The day PERSON's login stops, "YYYY-MM-DD", or "" for no end: ends + GRACE_DAYS
+    for someone leaving; 1970-01-02, long past, for someone who has left. The one
+    derivation the directory (shadowExpire) and local accounts (expires) both use."""
+    import datetime
+
+    person = person or {}
+    if person.get("status", "active") != "active":
+        return "1970-01-02"
+    ends = _date(person.get("ends"))
+    return (ends + datetime.timedelta(days=int(grace_days))).isoformat() if ends else ""
 
 
 def _active(people):
@@ -59,14 +109,14 @@ def people_left(people):
     return sorted(set(people or {}) - set(_active(people)))
 
 
-def people_with_role(people, role):
-    """Sorted login names of active people holding role."""
-    return sorted(n for n, p in _active(people).items() if role in (p.get("roles") or []))
+def people_with_role(people, role, today=None):
+    """Sorted login names of members holding role (none once past their end)."""
+    return sorted(n for n, p in _member(people, today).items() if role in (p.get("roles") or []))
 
 
-def people_uids(people, role):
-    """Sorted UIDs of active people holding role (a kernel matches a uid, not a name)."""
-    return sorted(p["uid"] for n, p in _active(people).items() if role in (p.get("roles") or []))
+def people_uids(people, role, today=None):
+    """Sorted UIDs of members holding role (a kernel matches a uid, not a name)."""
+    return sorted(p["uid"] for n, p in _member(people, today).items() if role in (p.get("roles") or []))
 
 
 def people_attr(people, key):
@@ -95,13 +145,14 @@ def people_shells(people, default="/bin/bash"):
     return sorted({p.get("shell") or default for p in _active(people).values()} | {default})
 
 
-def people_accounting(people):
-    """{login: {accounts, default_account}} for active people with Slurm accounts.
+def people_accounting(people, today=None):
+    """{login: {accounts, default_account}} for members with Slurm accounts (nobody past
+    their end: no new jobs while they take their files away).
 
     This is the `users` part of a slurm_accounting spec.
     """
     out = {}
-    for n, p in sorted(_active(people).items()):
+    for n, p in sorted(_member(people, today).items()):
         if p.get("accounts"):
             u = {"accounts": {a: o or {} for a, o in p["accounts"].items()}}
             if p.get("default_account"):
@@ -177,6 +228,10 @@ def check(roster, uid_min=UID_MIN):
             problems.append(f"{where}.uid: {uid} is also {uids[uid]}'s")
         else:
             uids[uid] = name
+        try:
+            _date(p.get("ends"))
+        except (TypeError, ValueError):
+            problems.append(f"{where}.ends: a date, YYYY-MM-DD")
         status = p.get("status", "active")
         if status not in STATUSES:
             problems.append(f"{where}.status: must be one of {', '.join(STATUSES)}")
@@ -272,12 +327,20 @@ def roster_add(text, login, account, name=None, slack=None, reserved=(), account
     return _dump_checked(rt, doc, uid_min), uid
 
 
-def roster_leave(text, login, uid_min=UID_MIN):
-    """TEXT with LOGIN `status: left`: no roles, accounts or quota; the UID stays reserved."""
+def roster_leave(text, login, ends=None, uid_min=UID_MIN):
+    """TEXT with LOGIN leaving: with ENDS ("YYYY-MM-DD"), their last day (the account stays
+    for the grace period, see the module's doc); without, `status: left` at once: no
+    roles, accounts or quota, the UID stays reserved."""
     rt, doc = _round_trip(text)
     entry = doc["people"].get(login)
     if entry is None:
         raise EditError(f"{login} is not in the roster")
+    if ends is not None:
+        try:
+            entry["ends"] = _date(ends).isoformat()
+        except (TypeError, ValueError):
+            raise EditError(f"ends: {ends} is not a date, YYYY-MM-DD") from None
+        return _dump_checked(rt, doc, uid_min)
     for key in ("roles", "accounts", "default_account", "disk_quota"):
         entry.pop(key, None)
     entry["status"] = "left"
@@ -319,4 +382,5 @@ class FilterModule:
             "people_subids": people_subids,
             "people_disk_quotas": people_disk_quotas,
             "people_check": people_check,
+            "people_login_expires": people_login_expires,
         }
