@@ -76,6 +76,8 @@ def parse_jobs(data, now):
                     "running": "RUNNING" in state,
                     "partition": job.get("partition", ""),
                     "qos": job.get("qos", ""),
+                    # srun and salloc sessions: someone holds the GPUs at a shell
+                    "interactive": job.get("batch_flag") is False,
                     "runtime": max(0, now - (num(job.get("start_time")) or now)),
                     "gpus": gpus,
                     "gpu_type": ",".join(sorted({t for t in types.values() if t})),
@@ -396,7 +398,8 @@ CONFIG_KEYS = {
     "idle_util_threshold": (int, float), "notify": list, "notify_repeat_hours": (int, float),
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
     "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
-    "repeat_idle_share": (int, float), "repeat_weeks": int,
+    "repeat_idle_share": (int, float), "repeat_weeks": int, "cancel_interactive_only": bool,
+    "cancel_warn_hours": (int, float), "cancel_warn_text": str,
 }  # fmt: skip
 
 
@@ -416,7 +419,7 @@ def load_config(path):
     if not isinstance(cfg, dict):
         raise ConfigError(f"{path}: not a JSON object")
     for key, kind in CONFIG_KEYS.items():
-        if not isinstance(cfg.get(key), kind) or isinstance(cfg.get(key), bool):
+        if not isinstance(cfg.get(key), kind) or (kind is not bool and isinstance(cfg.get(key), bool)):
             raise ConfigError(f"{path}: {key} is missing or not a {getattr(kind, '__name__', 'number')}")
     if set(cfg["notify"]) - NOTIFY:
         raise ConfigError(f"{path}: notify takes only {', '.join(sorted(NOTIFY))}")
@@ -433,6 +436,14 @@ def load_config(path):
             raise ConfigError(f"{path}: cancel_after_hours needs notify, so owners are told first")
         if cfg["cancel_after_hours"] <= cfg["idle_hours"]:
             raise ConfigError(f"{path}: cancel_after_hours must exceed idle_hours")
+        if not 0 <= cfg["cancel_warn_hours"] < cfg["cancel_after_hours"] - cfg["idle_hours"]:
+            raise ConfigError(f"{path}: cancel_warn_hours must be under cancel_after_hours minus idle_hours")
+        try:
+            cfg["cancel_warn_text"].format(**DM_FIELDS)
+        except (KeyError, IndexError, ValueError) as e:
+            raise ConfigError(
+                f"{path}: cancel_warn_text: {e!r}; it may use only {{{'}, {'.join(DM_FIELDS)}}}"
+            ) from None
     return cfg
 
 
@@ -628,6 +639,12 @@ def post_report(report, cfg, who, slack, to):
     return channel, ts
 
 
+def cancellable(idle, cfg):
+    """The idle jobs the policy may cancel: interactive sessions only, unless configured
+    otherwise (a batch job ends by itself; a shell holds GPUs until someone exits)."""
+    return [j for j in idle if j.get("interactive") or not cfg["cancel_interactive_only"]]
+
+
 def act(report, cfg, who, slack, cache, now):
     """Post the report, notify the owners of idle jobs and cancel those idle too long.
     One failed notification or cancellation does not stop the rest; the run still
@@ -668,11 +685,25 @@ def act(report, cfg, who, slack, cache, now):
 
     if cfg["cancel_after_hours"] > 0:
         cancelled = []
-        for j in report["idle"]:
-            # Only once the owner was told in an earlier run: a lost state file or a
-            # failed notification never turns into a cancel without warning.
+        limit, warn = cfg["cancel_after_hours"] * 3600, cfg["cancel_warn_hours"] * 3600
+        for j in cancellable(report["idle"], cfg):
+            idle = now - j["state"]["since"]
+            # The last word before a cancel: a DM cancel_warn_hours ahead, once.
+            if warn and idle >= limit - warn and not j["state"].get("warned"):
+                try:
+                    member = slack_id(j["user"], cfg, slack, cache)
+                    if member:
+                        slack.post(slack.channel(member), cfg["cancel_warn_text"].format(
+                            job=j["label"], gpus=len(j["gpus"]), hours=f"{cfg['cancel_warn_hours']:g}",
+                            runtime=duration(j["runtime"])))  # fmt: skip
+                        j["state"]["warned"] = now
+                except (RuntimeError, OSError) as e:
+                    failures.append(f"warning {j['user']} of {j['label']}: {e}")
+            # Only once the owner was told, and warned, in an earlier run: a lost state
+            # file or a failed message never turns into a cancel without warning.
             told = j["state"]["notified"]
-            if told is None or told >= now or now - j["state"]["since"] < cfg["cancel_after_hours"] * 3600:
+            warned = j["state"].get("warned") if warn else told
+            if told is None or told >= now or warned is None or warned >= now or idle < limit:
                 continue
             try:
                 run("scancel", j["id"])
