@@ -9,11 +9,21 @@
     tasks_from: epel
   when: ansible_facts.os_family == "RedHat"
 
-- name: Install the kernel headers, DKMS and compiler (Debian)
+# DKMS builds the modules again for each kernel an upgrade installs, from its headers.
+- name: Install the kernel headers (Debian)
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_packages
+  vars:
+    host_baseline_kernel_packages: [headers]
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install DKMS and the compiler (Debian)
   ansible.builtin.apt:
-    name: ["linux-headers-{{ ansible_facts.kernel }}", dkms, gcc, make]
+    name: [dkms, gcc, make]
     state: present
     update_cache: true
+    cache_valid_time: 3600
   when: ansible_facts.os_family == "Debian"
 
 - name: Install the kernel headers, DKMS and compiler (RHEL family)

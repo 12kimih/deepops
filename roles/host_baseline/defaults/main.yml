@@ -27,3 +27,7 @@ host_baseline_kernel_args_owner: ""
 host_baseline_kernel_args: []
 host_baseline_kernel_args_grub: {}
 host_baseline_kernel_args_reason: ""
+
+# Packages built per kernel (tasks_from: kernel_packages, Debian family): the kinds the
+# including role needs (tools, headers), for the kernel flavour and the running kernel.
+host_baseline_kernel_packages: []
