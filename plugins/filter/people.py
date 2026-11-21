@@ -18,6 +18,8 @@ A roster file declares the roles a site uses and the people:
           admin: {qos: [high, urgent]}
         default_account: admin    # needed with several accounts
         roles: [admin]
+        disk_quota: {block_soft: 50G, block_hard: 100G}  # optional, over the site's
+                                  # default per-user disk quota (roles/disk_quota)
         status: active            # active (default) or left
 
 Every list a role consumes (sudo netgroup, group members, Slurm associations,
@@ -32,7 +34,8 @@ commit time by scripts/deepops/people.py.
 import re
 
 STATUSES = ("active", "left")
-KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status"}
+KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota"}
+QUOTA_KEYS = ("block_soft", "block_hard", "inode_soft", "inode_hard")
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
 TOP_KEYS = {"roles", "attributes", "member_keys", "people"}
@@ -180,6 +183,9 @@ def check(roster, uid_min=UID_MIN):
             req = (roles[role] or {}).get("requires")
             if req and req not in held:
                 problems.append(f"{where}.roles: {role} requires {req}")
+        quota = p.get("disk_quota")
+        if quota is not None and (not isinstance(quota, dict) or set(quota) - set(QUOTA_KEYS)):
+            problems.append(f"{where}.disk_quota: a mapping of {', '.join(QUOTA_KEYS)}")
         accounts = p.get("accounts") or {}
         if not isinstance(accounts, dict):
             problems.append(f"{where}.accounts: must be a mapping of account -> options")
@@ -198,6 +204,17 @@ def check(roster, uid_min=UID_MIN):
                 if p.get(key) in (None, ""):
                     problems.append(f"{where}.{key}: required for an active Slurm user")
     return problems
+
+
+def people_disk_quotas(people, default=None):
+    """{login: limits} for every active person: their own disk_quota over DEFAULT (a
+    mapping of QUOTA_KEYS). Someone with neither is left out: not limited."""
+    out = {}
+    for name, p in sorted(_active(people).items()):
+        limits = {**(default or {}), **(p.get("disk_quota") or {})}
+        if any(limits.get(k) not in (None, "", 0, "0") for k in QUOTA_KEYS):
+            out[name] = limits
+    return out
 
 
 def people_check(roster, uid_min=UID_MIN):
@@ -222,5 +239,6 @@ class FilterModule:
             "people_local_accounts": people_local_accounts,
             "people_shells": people_shells,
             "people_subids": people_subids,
+            "people_disk_quotas": people_disk_quotas,
             "people_check": people_check,
         }

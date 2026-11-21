@@ -304,6 +304,11 @@
   vars:
     deepops_phase: install
 
+- name: Limit each user's space on the login nodes' disks
+  import_playbook: generic/disk-quota.yml
+  vars:
+    deepops_phase: install
+
 - name: Limit what users leave running outside Slurm jobs
   import_playbook: generic/node-user-policy.yml
   tags:
@@ -428,6 +433,11 @@
 
 - name: Remove systemd-coredump where it is no longer wanted
   import_playbook: generic/coredump.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the disk quotas where they are no longer wanted
+  import_playbook: generic/disk-quota.yml
   vars:
     deepops_phase: remove
 

@@ -1,0 +1,35 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): per-user disk quotas on
+# local ext4 filesystems (clustertools.disk_quota). A deploy sets it from
+# deepops_components (slurm_enable_disk_quota, on slurm-login): a login node shares its
+# disk with whatever else runs there (on a small cluster the controller, its database
+# and the logs), and one user's /tmp, /var/tmp or enroot cache could fill it.
+#
+# Everyone in the roster is limited, administrators too (their own accounts; what they
+# do with sudo is root's and never limited), each with disk_quota_limits or their own
+# disk_quota in the roster; root and system accounts are never limited. Each user's
+# usage and limits are exported as metrics (disk_quota_used_bytes, ...) every
+# disk_quota_metrics_interval.
+#
+# The filesystems' quota mount options are host_baseline_mount_options' (the one writer
+# of /etc/fstab, which also remounts): usrjquota=aquota.user,jqfmt=vfsv1, or usrquota on
+# a filesystem with ext4's quota feature. Without them the role stops, naming them.
+# absent takes the limits and quotas away; drop the options there too, or the next boot
+# turns quotas on again.
+# https://www.kernel.org/doc/html/latest/filesystems/ext4/overview.html#quota
+disk_quota_state: present
+
+# Local ext4 mount points whose users' space is limited.
+disk_quota_filesystems: ["/"]
+
+# Every roster person's limits: block_soft and block_hard (setquota sizes: K, M, G, T),
+# inode_soft and inode_hard (numbers, or with k, m, g, t). {} sets none: quotas only
+# count, so the metrics show how the space is used before limits are chosen. A person's
+# own disk_quota in the roster (people.yml) overrides these, key by key.
+disk_quota_limits: {}
+
+# How long a user may stay over a soft limit, in days.
+disk_quota_grace_days: 7
+
+# How often every user's usage is exported (systemd OnUnitActiveSec).
+disk_quota_metrics_interval: 15min

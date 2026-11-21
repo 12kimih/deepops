@@ -1,0 +1,37 @@
+---
+# Per-user disk quotas (roles/disk_quota textfile metrics, clustertools.disk_quota). The
+# disk itself is watched by the filesystem rules in host.yml; these say when the usage
+# stopped being reported, and who has been over a soft limit for a day (the hard limit
+# takes over when the grace period ends).
+groups:
+  - name: disk-quota
+    rules:
+      - alert: DiskQuotaMetricsStale
+        expr: time() - disk_quota_last_success_timestamp_seconds > 3600
+        labels: {severity: warning}
+        annotations:
+          summary: "Disk quota usage on {{ $labels.host }} has not been reported for an hour"
+          description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
+      # No timestamp at all on a host with the unit installed: the alert above has
+      # nothing to compare, so the unit's presence stands in.
+      - alert: DiskQuotaMetricsNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="disk-quota-metrics.service"})
+          unless on (instance) disk_quota_last_success_timestamp_seconds
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} has reported no disk quota usage for an hour"
+          description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
+      - alert: DiskQuotaOverSoftLimit
+        expr: |
+          disk_quota_used_bytes
+          > on (instance, filesystem, user) group_left disk_quota_limit_bytes{kind="soft"}
+        for: 1d
+        labels: {severity: info}
+        annotations:
+          summary: "{{ $labels.user }} has been over their soft disk quota on {{ $labels.host }}:{{ $labels.filesystem }} for a day"
+          description: >-
+            Once the grace period ends the user can write nothing more there. `quota -s
+            {{ $labels.user }}` on the host shows it; the person frees space, or gets a
+            larger disk_quota in people.yml.

@@ -975,3 +975,32 @@ tests:
       - eval_time: 12m
         alertname: TlsCertificateExpired
         exp_alerts: []
+
+  - name: disk quota usage that stops, or never starts, being reported warns
+    interval: 1m
+    input_series:
+      - series: 'disk_quota_last_success_timestamp_seconds{host="login", instance="login:9100"}'
+        values: '0x80'
+      - series: 'node_systemd_unit_state{host="n1", instance="n1:9100", name="disk-quota-metrics.service", state="inactive"}'
+        values: '1x80'
+    alert_rule_test:
+      - eval_time: 59m
+        alertname: DiskQuotaMetricsStale
+        exp_alerts: []
+      - eval_time: 62m
+        alertname: DiskQuotaMetricsStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: login, instance: "login:9100"}
+            exp_annotations:
+              summary: "Disk quota usage on login has not been reported for an hour"
+              description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
+      - eval_time: 58m
+        alertname: DiskQuotaMetricsNeverReported
+        exp_alerts: []
+      - eval_time: 62m
+        alertname: DiskQuotaMetricsNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "n1 has reported no disk quota usage for an hour"
+              description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."

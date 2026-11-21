@@ -1,0 +1,11 @@
+{{ ansible_managed | comment }}
+# roles/disk_quota
+[Unit]
+Description=Export every user's disk usage and quota limits regularly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={{ disk_quota_metrics_interval }}
+
+[Install]
+WantedBy=timers.target
