@@ -20,7 +20,9 @@ facts already live.
 | --- | --- | --- |
 | `netplan_config` | **host** | the `network:` mapping, passed to netplan verbatim |
 | `netplan_file` | site | which file the role owns, `01-netcfg.yaml` by default |
-| `netplan_conflicting_manager` | site | the manager to mask so it cannot compete with the renderer |
+| `netplan_conflicting_manager` | site | the manager to mask so it cannot compete with the renderer; one masked before and no longer named is unmasked |
+| `netplan_wait_online` | site | boot waits for the configured links (default on) |
+| `netplan_rollback_seconds` | site | how long a host waits for Ansible before undoing a change (default 300) |
 
 `netplan_config` is not re-modelled as Ansible variables. Bonds, VLANs, bridges and
 anything else netplan supports work without the role growing a knob for them, and there
@@ -55,24 +57,41 @@ is reversible and needs no package name, which differs by distribution.
 
 ## Applying it
 
+The cluster deploys run `playbooks/generic/netplan.yml` (one host at a time); it also
+runs alone:
+
 ```bash
-ansible-playbook playbooks/utilities/netplan.yml --check --diff   # nothing should change
-ansible-playbook playbooks/utilities/netplan.yml
+ansible-playbook playbooks/generic/netplan.yml --check --diff   # nothing should change
+ansible-playbook playbooks/generic/netplan.yml
 ```
 
-Run the check first. Encoding what a node already has should report no change; anything
-else means the encoding is wrong, and that is worth knowing before it is applied.
+Encode what a node already has first: the managed file is compared with
+`netplan_config` as data, so a node whose file already says the same (in any layout)
+is left untouched, and the check reports no change. Anything else means the encoding is
+wrong, and that is worth knowing before it is applied.
 
-The play runs `serial: 1`, so a configuration that takes a node off the network takes one
-node rather than the fleet. It is deliberately not part of the cluster deploy.
+On a host it manages, the role takes `/etc/netplan` as its own: files no deepops role
+wrote (the installer's `50-cloud-init.yaml`, a NetworkManager profile left behind) are
+moved to `/var/backups/netplan/set-aside`, since netplan merges every file and a later
+one overrides ours. Files other roles write (`60-bmc-mgmt.yaml`, roles/bmc) stay.
+
+Boot waits for the configured links (`netplan_wait_online`, on by default: the NFS
+mounts come after the network). A link that may stay down goes in `netplan_config` with
+`optional: true`; a link netplan does not configure is not waited for.
 
 ## When it goes wrong
 
 netplan reads every file in the directory, so a single file cannot be validated on its
-own. The role writes it, runs `netplan generate`, and puts the previous file back if
-netplan refuses -- a rejected configuration never survives to a boot.
+own. The role writes the change, runs `netplan generate`, and puts the previous files
+back if netplan refuses: a rejected configuration never survives to a boot.
 
-That catches malformed configuration, not wrong configuration. An address that is valid
-but not reachable applies cleanly and takes the node off the network. Out-of-band access
-is the recovery path: see [out-of-band management](bmc.md) for the console and power
-control that make that a five-minute problem instead of a trip to the rack.
+A configuration that is valid but wrong (an address that cannot be reached) is caught
+too: before `netplan apply` the host arms a timer (`deepops-netplan-rollback`,
+`netplan_rollback_seconds`, 300 by default) that puts the previous files back and applies
+them; the change is applied in the background, and only when Ansible reaches the host
+again is the timer stopped. A change that cuts the host off is undone by the host itself
+within five minutes. Other roles change `/etc/netplan` through the same steps
+(`include_role: netplan, tasks_from: apply`).
+
+Out-of-band access remains the last resort: see [out-of-band management](bmc.md) for the
+console and power control.

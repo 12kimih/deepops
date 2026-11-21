@@ -1,0 +1,10 @@
+---
+# netplan's configuration directory (a test points it elsewhere).
+netplan_dir: /etc/netplan
+# The previous /etc/netplan, kept while a change is applied; files no deepops role
+# wrote are set aside here once netplan_config manages the host (roles/host_baseline).
+netplan_rollback_dir: /var/backups/netplan/rollback
+netplan_set_aside_dir: /var/backups/netplan/set-aside
+netplan_rollback_unit: deepops-netplan-rollback
+# The manager this role masked, so a changed netplan_conflicting_manager unmasks it.
+netplan_masked_record: "{{ deepops_state_dir }}/netplan-masked"
