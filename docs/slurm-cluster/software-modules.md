@@ -2,13 +2,9 @@
 
 - [Software Modules](#software-modules)
   - [Introduction](#introduction)
-  - [Installing Spack](#installing-spack)
+  - [Installing EasyBuild](#installing-easybuild)
     - [Configuration](#configuration)
     - [Usage](#usage)
-    - [Architecture-specific builds](#architecture-specific-builds)
-  - [Installing EasyBuild](#installing-easybuild)
-    - [Configuration](#configuration-1)
-    - [Usage](#usage-1)
 
 ## Introduction
 
@@ -40,11 +36,11 @@ them, as the [Lmod docs](https://lmod.readthedocs.io/en/latest/030_installing.ht
 A script must start with `#!/bin/bash` (bash reads `BASH_ENV`; `#!/bin/sh` does not).
 A cron job has no session: begin it with `. /etc/profile.d/z00_lmod.sh`.
 
-DeepOps also provides tooling for managing Environment Modules with two general build
-frameworks -- EasyBuild and Spack -- plus a dedicated `nvidia_cuda_toolkit` role for CUDA.
-The two build frameworks provide a selection of tested build recipes for common
-development tools and scientific software packages, making it easier to install software
-without a tedious manual build process.
+DeepOps also provides tooling for managing Environment Modules with a general build
+framework, EasyBuild, plus a dedicated `nvidia_cuda_toolkit` role for CUDA. EasyBuild
+provides a selection of tested build recipes for common development tools and scientific
+software packages, making it easier to install software without a tedious manual build
+process. (The Spack role was retired in 2026-11: build with EasyBuild, or in a container.)
 
 For **CUDA specifically**, the `nvidia_cuda_toolkit` role
 (`slurm_install_cuda_toolkit: true`; `slurm-cluster.yml` or
@@ -62,75 +58,6 @@ pkg-config and nsight desktop files pointing into the tree), so nothing outside 
 resolves CUDA. This is the per-version, modules-based
 alternative to the system-wide `nvidia_cuda` install -- see
 [Choosing between similar roles and playbooks](../deepops/choosing-roles-and-playbooks.md).
-
-## Installing Spack
-
-[Spack](https://spack.io/) is a package manager for supercomputers, Linux, and MacOS which makes installing scientific software easy.
-
-To install Spack using DeepOps, you can run:
-
-```bash
-ansible-playbook -l slurm-cluster playbooks/slurm-cluster/spack-modules.yml
-```
-
-### Configuration
-
-Spack is cloned at the release tag `spack_version`, and its builtin package repository
-(spack/spack-packages, separate since Spack 1.0) once into `spack_packages_dir` at
-`spack_packages_version`, so no user's Spack clones it into their home. Both live under
-the shared prefix; the settings sit in the instance's site scope
-(`$SPACK_ROOT/etc/spack/site`).
-
-- `spack_install_dir`: where Spack is installed, on a filesystem every node shares.
-  The default is `/sw/spack`.
-- `spack_default_packages`: specs the role installs into the shared instance. None by default.
-- `spack_lmod_core_compilers`: compilers whose packages go in the Core layer of the Lmod
-  hierarchy. The default is `[gcc]`.
-
-### Usage
-
-Spack generates an Lmod module for each package it installs, in a Core/compiler/MPI
-hierarchy under `$SPACK_ROOT/share/spack/lmod`. The playbook registers the Core layer
-with Lmod on every node, so `module avail` lists them and `module load` works anywhere:
-
-```bash
-login01:~$ module avail
----------------------------- /sw/spack/share/spack/lmod/Core ----------------------------
-   cuda/13.0.2    gcc/14.3.0    openmpi/5.0.8 ...
-```
-Use "module keyword key1 key2 ..." to search for all possible modules matching any of the "keys".
-```
-
-You can then load a chosen module using `module load`.
-Loading a module will change your active environment variables (such as `PATH`) to add the software package in question to your environment.
-
-```bash
-login01:~$ module load cuda-10.2.89-gcc-7.5.0-sozilk3
-login01:~$ which nvcc
-/sw/spack/opt/spack/linux-ubuntu18.04-ivybridge/gcc-7.5.0/cuda-10.2.89-sozilk3ahqmsg3nndyifhv7hhw2j6cgt/bin/nvcc
-```
-
-In addition to using Environment Modules directly, Spack also provides a mechanism to load and unload modules directly using the `spack` command.
-
-```bash
-login01:~$ spack find
--- linux-ubuntu24.04-x86_64_v3 / %c,cxx=gcc@13.3.0 --------------------
-cuda@13.0.2  openmpi@5.0.8 ...
-login01:~$ spack load cuda
-login01:~$ which nvcc
-/sw/spack/opt/spack/linux-x86_64_v3/cuda-13.0.2-.../bin/nvcc
-```
-
-For more information on using Spack, see the [Spack documentation](https://spack.readthedocs.io/en/latest/).
-
-### Architecture-specific builds
-
-It's important to note that, by default, Spack will detect and optimize for the specific microarchitecture where packages are being built.
-This will likely improve performance for many packages!
-However, if you run multiple CPU microarchitectures on your cluster, you may wish to build the same packages multiple times, once on each architecture.
-
-If you prefer to avoid optimizing for a specific microarchitecture, you can target the generic `x86_64` architecture by adding `target=x86_64` to the spec.
-This will produce less-optimized but more generic builds.
 
 ## Installing EasyBuild
 
