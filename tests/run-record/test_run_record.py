@@ -10,6 +10,7 @@ point ANSIBLE_CALLBACK_PLUGINS at an empty directory, so test playbooks leave no
 import configparser
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import tracked  # noqa: E402
+
 BIN = Path(sys.executable).parent
 SECRET = "run-record-secret-value"
 PLAY = f"""
@@ -47,12 +51,26 @@ class Wiring(unittest.TestCase):
         self.assertIn("/.callback_plugins", (ROOT / ".gitignore").read_text().splitlines())
 
     def test_tests_record_nothing(self):
-        self.assertIn(
-            'export ANSIBLE_CALLBACK_PLUGINS="${logs}/no-callbacks"', (ROOT / "scripts/check.sh").read_text()
-        )
-        self.assertIn(
-            '"ANSIBLE_CALLBACK_PLUGINS": no_callbacks', (ROOT / "scripts/deepops/molecule.py").read_text()
-        )
+        """Every test and scenario that starts Ansible runs it unrecorded, alone or in check.sh."""
+        check = (ROOT / "scripts/check.sh").read_text()
+        self.assertIn('export ANSIBLE_CALLBACK_PLUGINS="${logs}/no-callbacks"', check)
+        self.assertIn("unrecorded.env(", (ROOT / "scripts/deepops/molecule.py").read_text())
+        # A program name as an argument (Python) or a command (shell), not a mention in text.
+        starts = {
+            ".py": re.compile(
+                r"[\"']ansible(-playbook)?[\"']|with_name\([\"']ansible|/ \"ansible-playbook\""
+            ),
+            ".sh": re.compile(r"(?m)^[^#\n]*\bansible(-playbook)? "),
+        }
+        offenders = []
+        for path in tracked("tests/*.py", "tests/*.sh", "scripts/validation/tests/*.py"):
+            rel = path.relative_to(ROOT).as_posix()
+            text = path.read_text()
+            if rel == "tests/run-record/test_run_record.py" or not starts[Path(rel).suffix].search(text):
+                continue  # this file sets ANSIBLE_CALLBACK_PLUGINS itself, to test recording
+            if "unrecorded." not in text and "export ANSIBLE_CALLBACK_PLUGINS" not in text:
+                offenders.append(rel)
+        self.assertEqual(offenders, [], "run Ansible with unrecorded.env() (scripts/deepops/unrecorded.py)")
 
 
 class Recording(unittest.TestCase):

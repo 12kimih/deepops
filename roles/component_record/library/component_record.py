@@ -72,10 +72,16 @@ import json
 import os
 import tempfile
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.deepops_marks import made_by_deepops, named_deepops
 
 KINDS = ("package", "unit", "container", "file", "dir", "mount")
+
+
+def dump(record):
+    """The record file's text: what is written and what a diff compares."""
+    return json.dumps(record, indent=1, sort_keys=True) + "\n"
 
 
 def load(path):
@@ -193,11 +199,11 @@ def main():
         os.makedirs(os.path.dirname(p["path"]), mode=0o755, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p["path"]))
         with os.fdopen(fd, "w") as f:
-            json.dump(record, f, indent=1, sort_keys=True)
-            f.write("\n")
+            f.write(dump(record))
         os.chmod(tmp, 0o644)
         os.replace(tmp, p["path"])
-    module.exit_json(changed=changed, orphans=orphans, before=before)
+    diff = deepops_diff.text(p["path"], dump(data), dump(record))
+    module.exit_json(changed=changed, orphans=orphans, before=before, diff=diff if changed else {})
 
 
 if __name__ == "__main__":

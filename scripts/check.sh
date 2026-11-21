@@ -114,7 +114,8 @@ fi
 jobs_max="${CHECK_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 logs="$(mktemp -d)"
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "${logs}"' EXIT
-# The test playbooks are not runs to keep: no callback plugin directory, no ARA record.
+# The test playbooks are not runs to keep: no callback plugin directory, no ARA record
+# (scripts/deepops/unrecorded.py, the same for a test run on its own).
 mkdir "${logs}/no-callbacks"
 export ANSIBLE_CALLBACK_PLUGINS="${logs}/no-callbacks"
 run_one() {

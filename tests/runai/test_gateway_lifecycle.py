@@ -1,7 +1,6 @@
 """Execute real Ansible tasks against the bounded offline Kubernetes/Helm doubles."""
 
 import json
-import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -13,6 +12,9 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
+
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import module  # noqa: E402
 
@@ -22,8 +24,7 @@ class Lifecycle(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.state = Path(self.tmp.name)
         self.addCleanup(self.tmp.cleanup)
-        self.env = dict(
-            os.environ,
+        self.env = unrecorded.env(
             FAKE_STATE=str(self.state),
             RUNAI_TEST_BIN=str(HERE / "bin"),
             ANSIBLE_ROLES_PATH=str(ROOT / "roles"),

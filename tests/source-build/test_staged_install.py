@@ -2,20 +2,19 @@
 it put in place, a new version removes only what the old one alone had, and a removal
 takes everything listed and the directories it made, never one that was there."""
 
-import importlib.util
 import json
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location(
-    "staged_install", ROOT / "roles" / "source_build" / "library" / "staged_install.py"
-)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import in_tree  # noqa: E402
+
+mod = in_tree.load("roles/source_build/library/staged_install.py")
 
 
 class StagedInstall(unittest.TestCase):

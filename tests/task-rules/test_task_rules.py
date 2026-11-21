@@ -73,6 +73,10 @@
    escapes Python knows in its string literals: Jinja unescapes them there (rule 13's
    other half), so `match('^\\\\S+\\\\s')` is the regex `^\\S+\\s`, and a single `\\s`
    is an invalid escape that Python deprecates and will refuse.
+21. An in-tree module that supports check mode says what it changes: it returns a
+   `diff` built by plugins/module_utils/deepops_diff.py (a file's text, or the steps it
+   takes). Without one --check --diff showed only "changed" for files a module would
+   remove (stale_files, 2026-11), entries it would write, packages it would install.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -768,6 +772,19 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {key}: {value}")
         self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
         scan.check(self)
+
+    def test_modules_say_what_they_change(self):
+        offenders = []
+        for path in tracked("roles/*/library/*.py", "plugins/modules/*.py"):
+            rel = path.relative_to(ROOT).as_posix()
+            text = path.read_text()
+            if rel.startswith("roles/nvidia-dgx") or "supports_check_mode=True" not in text:
+                continue
+            if "from ansible.module_utils import deepops_diff" not in text or not re.search(
+                r'\bdiff=|\["diff"\]', text
+            ):
+                offenders.append(rel)
+        self.assertEqual(offenders, [], "return diff=deepops_diff.text(...) or .actions(...) when changed")
 
     def test_conditions_spell_only_known_escapes(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []

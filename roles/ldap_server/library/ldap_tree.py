@@ -61,6 +61,7 @@ undeclared:
   type: list
 """
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 
 try:
@@ -188,7 +189,14 @@ def main():
         info = e.args[0] if e.args and isinstance(e.args[0], dict) else {"desc": str(e)}
         module.fail_json(msg=f"LDAP: {info.get('desc', '')} {info.get('info', '')}".strip(), **result)
     changed = bool(result["added"] or result["modified"] or result["deleted"] or result["passwords_set"])
-    module.exit_json(changed=changed, **result)
+    # Entry and attribute names only: values may be secrets.
+    diff = deepops_diff.actions(
+        [f"add {dn}" for dn in result["added"]]
+        + [f"modify {dn}: {', '.join(names)}" for dn, names in result["modified"].items()]
+        + [f"set the password of {dn}" for dn in result["passwords_set"]]
+        + [f"delete {dn}" for dn in result["deleted"]]
+    )
+    module.exit_json(changed=changed, diff=diff if changed else {}, **result)
 
 
 if __name__ == "__main__":

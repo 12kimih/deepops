@@ -20,6 +20,8 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
 
 
 class PlatformPath(unittest.TestCase):
@@ -86,8 +88,7 @@ class PlatformPath(unittest.TestCase):
                 ]
             )
         )
-        self.env = dict(
-            os.environ,
+        self.env = unrecorded.env(
             FAKE_STATE=str(self.state),
             PATH=str(HERE / "bin") + os.pathsep + os.environ["PATH"],
             ANSIBLE_CONFIG=str(ROOT / "ansible.cfg"),

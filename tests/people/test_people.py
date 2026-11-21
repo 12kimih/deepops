@@ -11,6 +11,9 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import in_tree  # noqa: E402
+
 spec = importlib.util.spec_from_file_location("people_filter", ROOT / "plugins" / "filter" / "people.py")
 people = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(people)
@@ -147,11 +150,7 @@ class ExampleConfig(unittest.TestCase):
     """config.example's roster and accounting file make one consistent spec."""
 
     def test_roster_fills_the_accounting_spec(self):
-        aspec = importlib.util.spec_from_file_location(
-            "slurm_accounting", ROOT / "roles" / "slurm" / "library" / "slurm_accounting.py"
-        )
-        acct = importlib.util.module_from_spec(aspec)
-        aspec.loader.exec_module(acct)
+        acct = in_tree.load("roles/slurm/library/slurm_accounting.py")
         spec = yaml.safe_load((ROOT / "config.example" / "files" / "slurm" / "accounting.yml").read_text())
         spec["users"] = {**(spec.get("users") or {}), **people.people_accounting(EXAMPLE["people"])}
         users = acct.desired_users(spec, acct.desired_accounts(spec), {})

@@ -15,6 +15,7 @@ import json
 import os
 import shutil
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = r"""
@@ -122,13 +123,18 @@ def main():
                 os.unlink(manifest)
         else:
             removed = sorted(old_files)
-        module.exit_json(changed=changed, removed=removed)
+        diff = deepops_diff.actions([f"remove {path}" for path in removed] + [f"remove {manifest}"])
+        module.exit_json(changed=changed, removed=removed, diff=diff if changed else {})
 
     stage = module.params["stage"].rstrip("/")
     new_files, new_dirs = staged(stage)
     gone_files = old_files - new_files
+    diff = deepops_diff.actions(
+        [f"install {len(new_files)} files from {stage} into {root}"]
+        + [f"remove {path}" for path in sorted(gone_files)]
+    )
     if module.check_mode:
-        module.exit_json(changed=True, installed=len(new_files), removed=sorted(gone_files))
+        module.exit_json(changed=True, installed=len(new_files), removed=sorted(gone_files), diff=diff)
     try:
         made = copy_into_place(root, stage, new_files, new_dirs)
     except (OSError, RuntimeError) as err:
@@ -141,7 +147,7 @@ def main():
     with open(tmp, "w") as f:
         json.dump({"files": sorted(new_files), "dirs": sorted((old_dirs & new_dirs) | made)}, f, indent=0)
     os.replace(tmp, manifest)
-    module.exit_json(changed=True, installed=len(new_files), removed=removed)
+    module.exit_json(changed=True, installed=len(new_files), removed=removed, diff=diff)
 
 
 if __name__ == "__main__":

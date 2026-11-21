@@ -42,6 +42,7 @@ import os
 import re
 import tempfile
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
 LINE = re.compile(r"^(?P<db>[a-z_]+)(?P<sep>:\s*)(?P<rest>[^#]*?)(?P<tail>\s*(#.*)?)$")
@@ -109,8 +110,7 @@ def main():
             f.write(after)
         os.chmod(tmp, 0o644)
         os.replace(tmp, p["path"])
-    diff = {"before": before, "after": after, "before_header": p["path"], "after_header": p["path"]}
-    module.exit_json(changed=changed, diff=diff if changed else {})
+    module.exit_json(changed=changed, diff=deepops_diff.text(p["path"], before, after) if changed else {})
 
 
 if __name__ == "__main__":

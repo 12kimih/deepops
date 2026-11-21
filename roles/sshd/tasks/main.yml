@@ -72,13 +72,29 @@
         excludes: [10-deepops.conf]
       register: sshd_foreign
 
+    # What each one sets, so a preview shows the settings that leave with it.
+    - name: Read the drop-ins this role did not write
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop: "{{ sshd_foreign.files | map(attribute='path') | sort }}"
+      register: sshd_foreign_text
+
     - name: Report the drop-ins set aside
       ansible.builtin.debug:
         msg: >-
           {{ 'Would move' if ansible_check_mode else 'Moving' }}
           {{ sshd_foreign.files | map(attribute='path') | sort | join(', ') }} to {{ sshd_aside_dir }}:
           sshd_config.d holds only the site's drop-in; set what they set in sshd_settings.
+          {% for file in sshd_foreign_text.results %} {{ file.item }}: {{ file.content | b64decode | trim }}.{% endfor %}
       when: sshd_foreign.matched > 0
+
+    # Read here and written as content below: a copy from a path on the host shows no
+    # diff, and the preview must show the hand edits the package's file replaces.
+    - name: Read the package's own sshd_config (Debian family)
+      ansible.builtin.slurp:
+        src: /usr/share/openssh/sshd_config
+      register: sshd_package_config
+      when: ansible_facts.os_family == "Debian"
 
     # A configuration sshd rejects would leave no way in: the files are written, sshd
     # checks them together, and anything it refuses is put back as it was.
@@ -97,9 +113,8 @@
         # The package's file: its hand edits move to the drop-in (sshd_settings).
         - name: Put back the package's own sshd_config (Debian family)
           ansible.builtin.copy:
-            src: /usr/share/openssh/sshd_config
+            content: "{{ sshd_package_config.content | b64decode }}"
             dest: /etc/ssh/sshd_config
-            remote_src: true
             owner: root
             group: root
             mode: "0644"

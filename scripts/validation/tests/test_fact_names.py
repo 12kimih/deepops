@@ -10,13 +10,15 @@ that reads local facts, so this asks Ansible itself.
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import json
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
+
 spec = spec_from_file_location("normalizer", ROOT / "scripts" / "deepops" / "normalize-ansible-style.py")
 normalizer = module_from_spec(spec)
 spec.loader.exec_module(normalizer)
@@ -31,7 +33,7 @@ def gathered_keys():
             f"    - ansible.builtin.copy: {{content: '{{{{ ansible_facts.keys() | list | to_json }}}}', dest: '{out}'}}\n"
         )
         (Path(tmp) / "ansible.cfg").write_text("[defaults]\n")
-        env = dict(os.environ, ANSIBLE_CONFIG=str(Path(tmp) / "ansible.cfg"))
+        env = unrecorded.env(ANSIBLE_CONFIG=str(Path(tmp) / "ansible.cfg"))
         playbook = Path(sys.executable).with_name("ansible-playbook")
         subprocess.run(
             [str(playbook), "-i", "localhost,", str(play)],

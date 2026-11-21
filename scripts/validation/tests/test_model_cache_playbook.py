@@ -7,6 +7,7 @@ remote hosts, users, packages or services are created by this fixture.
 import getpass
 import grp
 import os
+import sys
 from pathlib import Path
 import shutil
 import subprocess
@@ -17,6 +18,8 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
 
 
 @unittest.skipUnless(shutil.which("ansible-playbook"), "ansible-playbook required")
@@ -46,8 +49,7 @@ class ModelCachePlaybookTests(unittest.TestCase):
         path.write_text(yaml.safe_dump([play]))
         config = Path(self.temp.name) / "ansible.cfg"
         config.write_text("[defaults]\nretry_files_enabled = False\n")
-        env = dict(
-            os.environ,
+        env = unrecorded.env(
             ANSIBLE_CONFIG=str(config),
             ANSIBLE_NOCOLOR="1",
             ANSIBLE_LOCAL_TEMP=str(Path(self.temp.name) / "ansible-local"),

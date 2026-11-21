@@ -4,16 +4,15 @@ The module is tested through its pure functions: parse sacctmgr -nP output,
 compare it with a spec, and plan commands. Data here is synthetic.
 """
 
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
+import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = spec_from_file_location(
-    "slurm_accounting", ROOT / "roles" / "slurm" / "library" / "slurm_accounting.py"
-)
-acct = module_from_spec(spec)
-spec.loader.exec_module(acct)
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import in_tree  # noqa: E402
+
+acct = in_tree.load("roles/slurm/library/slurm_accounting.py")
 
 QOS = "\n".join(
     [

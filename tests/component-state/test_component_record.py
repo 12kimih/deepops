@@ -1,9 +1,7 @@
 """roles/component_record: owner sets, orphans, and a real run on scratch paths."""
 
 import base64
-import importlib.util
 import json
-import os
 import re
 import subprocess
 import sys
@@ -12,18 +10,14 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-# The module imports the shared marks as Ansible ships module_utils to the host.
-marks_spec = importlib.util.spec_from_file_location(
-    "deepops_marks", ROOT / "plugins/module_utils/deepops_marks.py"
-)
-marks = importlib.util.module_from_spec(marks_spec)
-marks_spec.loader.exec_module(marks)
-sys.modules["ansible.module_utils.deepops_marks"] = marks
-spec = importlib.util.spec_from_file_location(
-    "component_record", ROOT / "roles/component_record/library/component_record.py"
-)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import in_tree  # noqa: E402
+
+mod = in_tree.load("roles/component_record/library/component_record.py")
+marks = sys.modules["ansible.module_utils.deepops_marks"]
 
 
 def run(data, name, action, items=(), version=""):
@@ -160,7 +154,7 @@ class Run(unittest.TestCase):
         argv = ["ansible-playbook", "-i", "localhost,", str(self.playbook), "-e", json.dumps(
             {"record": str(self.record), "action": action, "items": items})]  # fmt: skip
         done = subprocess.run(argv + (["--check"] if check else []), cwd=ROOT, capture_output=True, text=True,
-                              env={**os.environ, "ANSIBLE_CALLBACK_RESULT_FORMAT": "json"})  # fmt: skip
+                              env=unrecorded.env(ANSIBLE_CALLBACK_RESULT_FORMAT="json"))  # fmt: skip
         self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
         encoded = re.search(r"REMOVED=([A-Za-z0-9+/=]+)", done.stdout).group(1)
         self.removed = json.loads(base64.b64decode(encoded))
