@@ -16,7 +16,7 @@ def run(paths, check=False):
     argv = ["ansible", "localhost", "-M", "roles/marked_files/library", "-m", "marked_file",
             "-a", json.dumps({"paths": [str(p) for p in paths]})] + (["--check", "--diff"] if check else [])  # fmt: skip
     env = unrecorded.env(ANSIBLE_LOAD_CALLBACK_PLUGINS="1", ANSIBLE_STDOUT_CALLBACK="ansible.builtin.json")
-    done = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, env=env)
+    done = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, env=env, timeout=unrecorded.TIMEOUT)
     return json.loads(done.stdout)["plays"][0]["tasks"][0]["hosts"]["localhost"]
 
 

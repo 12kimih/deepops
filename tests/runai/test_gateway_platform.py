@@ -101,7 +101,7 @@ class PlatformPath(unittest.TestCase):
             env=self.env,
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=unrecorded.TIMEOUT,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

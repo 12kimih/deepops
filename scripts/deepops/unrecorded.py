@@ -15,6 +15,10 @@ import os
 import shutil
 import tempfile
 
+# How long one such run may take: a bound against a hang, not a performance test, so
+# sized for a shared, loaded host (a 180 s bound failed at load 50, 2026-11).
+TIMEOUT = 1800
+
 _EMPTY = []
 
 

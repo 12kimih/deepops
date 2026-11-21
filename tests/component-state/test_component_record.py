@@ -154,7 +154,7 @@ class Run(unittest.TestCase):
         argv = ["ansible-playbook", "-i", "localhost,", str(self.playbook), "-e", json.dumps(
             {"record": str(self.record), "action": action, "items": items})]  # fmt: skip
         done = subprocess.run(argv + (["--check"] if check else []), cwd=ROOT, capture_output=True, text=True,
-                              env=unrecorded.env(ANSIBLE_CALLBACK_RESULT_FORMAT="json"))  # fmt: skip
+                              env=unrecorded.env(ANSIBLE_CALLBACK_RESULT_FORMAT="json"), timeout=unrecorded.TIMEOUT)  # fmt: skip
         self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
         encoded = re.search(r"REMOVED=([A-Za-z0-9+/=]+)", done.stdout).group(1)
         self.removed = json.loads(base64.b64decode(encoded))

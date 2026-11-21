@@ -40,7 +40,7 @@ def gathered_keys():
             env=env,
             check=True,
             capture_output=True,
-            timeout=300,
+            timeout=unrecorded.TIMEOUT,
         )
         return set(json.loads(out.read_text()))
 

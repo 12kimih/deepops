@@ -63,7 +63,7 @@ class ModelCachePlaybookTests(unittest.TestCase):
         cmd = ["ansible-playbook", "-i", str(inventory), str(path)]
         if check:
             cmd.append("--check")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=unrecorded.TIMEOUT)
         self.assertEqual(result.returncode, 0 if success else 2, result.stdout + result.stderr)
         return result.stdout
 

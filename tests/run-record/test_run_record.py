@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import tracked  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
+
 BIN = Path(sys.executable).parent
 SECRET = "run-record-secret-value"
 PLAY = f"""
@@ -70,6 +73,8 @@ class Wiring(unittest.TestCase):
                 continue  # this file sets ANSIBLE_CALLBACK_PLUGINS itself, to test recording
             if "unrecorded." not in text and "export ANSIBLE_CALLBACK_PLUGINS" not in text:
                 offenders.append(rel)
+            elif rel.endswith(".py") and "subprocess" in text and "timeout=unrecorded.TIMEOUT" not in text:
+                offenders.append(f"{rel}: bound the run with timeout=unrecorded.TIMEOUT")
         self.assertEqual(offenders, [], "run Ansible with unrecorded.env() (scripts/deepops/unrecorded.py)")
 
 
@@ -84,7 +89,7 @@ class Recording(unittest.TestCase):
                "ANSIBLE_GATHERING": "implicit", "ANSIBLE_CACHE_PLUGIN": "memory"}  # fmt: skip
         out = subprocess.run(
             [str(BIN / "ansible-playbook"), "-i", "localhost,", str(d / "play.yml")],
-            env=env, capture_output=True, text=True, timeout=300,
+            env=env, capture_output=True, text=True, timeout=unrecorded.TIMEOUT,
         )  # fmt: skip
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
         return env

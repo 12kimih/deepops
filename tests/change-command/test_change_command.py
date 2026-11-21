@@ -63,7 +63,7 @@ def run(tmp, *extra):
     result = subprocess.run(
         [str(PLAYBOOK), "-i", "localhost,", "-c", "local", "-e", f"out={out}", "-e", f"record={record}",
          str(tmp / "play.yml"), *extra],
-        capture_output=True, text=True, env=env, cwd=tmp, timeout=300,
+        capture_output=True, text=True, env=env, cwd=tmp, timeout=unrecorded.TIMEOUT,
     )  # fmt: skip
     if result.returncode:
         raise AssertionError(result.stdout[-3000:] + result.stderr[-2000:])

@@ -44,6 +44,7 @@ class Lifecycle(unittest.TestCase):
             env=self.env,
             capture_output=True,
             text=True,
+            timeout=unrecorded.TIMEOUT,
         )
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
@@ -171,6 +172,7 @@ class Lifecycle(unittest.TestCase):
             env=self.env,
             capture_output=True,
             text=True,
+            timeout=unrecorded.TIMEOUT,
         )
         self.assertNotEqual(p.returncode, 0)
         self.assertEqual(set(self.releases()), {"kgateway-system/kgateway", "kgateway-system/kgateway-crds"})
