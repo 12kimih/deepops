@@ -242,7 +242,7 @@ class TestSlurmGpuJob(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--partition") + 1], "batch")
         self.assertIn("--gpus=1", validate_slurm.gpu_job_command("x", "", ""))
 
-    def main(self, argv, srun_rc, job_out="NVIDIA H100, 580.95\nprivate_tmp=1", config=""):
+    def main(self, argv, srun_rc, job_out="NVIDIA H100, 580.95\nprivate_tmp=1\nvulkan=1\negl=1", config=""):
         calls = []
 
         def fake_run(cmd, timeout=60):
@@ -286,21 +286,41 @@ class TestSlurmGpuJob(unittest.TestCase):
         rc, result, _ = self.main([], 0, config=ns)
         self.assertEqual((rc, result["private_tmp_expected"], result["private_tmp_in_job"]), (0, True, True))
         self.assertEqual(result["gpus_visible_in_job"], 1)
-        rc, result, _ = self.main([], 0, job_out="NVIDIA H100, 580.95\nprivate_tmp=0", config=ns)
+        rc, result, _ = self.main(
+            [], 0, job_out="NVIDIA H100, 580.95\nprivate_tmp=0\nvulkan=1\negl=1", config=ns
+        )
         self.assertEqual(rc, 1)
         self.assertIn("/tmp was not its own", " ".join(result["failures"]))
         rc, result, _ = self.main(
-            [], 0, job_out="NVIDIA H100, 580.95\nprivate_tmp=0", config="NamespaceType = (null)\n"
+            [],
+            0,
+            job_out="NVIDIA H100, 580.95\nprivate_tmp=0\nvulkan=1\negl=1",
+            config="NamespaceType = (null)\n",
         )
         self.assertEqual(
             (rc, result["private_tmp_expected"], result["private_tmp_in_job"]), (0, False, False)
         )
+
+    def test_the_job_must_see_the_gpu_graphics_driver_unless_headless(self):
+        # The R580 switch to the headless driver took GPU Vulkan from every node and
+        # nothing noticed: rendering fell back to the CPU without an error.
+        headless = "NVIDIA H100, 580.95\nprivate_tmp=1\nvulkan=0\negl=0"
+        rc, result, _ = self.main([], 0, job_out=headless)
+        self.assertEqual((rc, result["graphics_expected"], result["graphics_in_job"]), (1, True, False))
+        self.assertIn("no NVIDIA Vulkan driver", " ".join(result["failures"]))
+        rc, result, _ = self.main(["--headless"], 0, job_out=headless)
+        self.assertEqual((rc, result["graphics_expected"]), (0, False))
+        rc, result, _ = self.main([], 0, job_out="NVIDIA H100, 580.95\nprivate_tmp=1\nvulkan=1\negl=0")
+        self.assertEqual((rc, result["graphics_in_job"]), (1, False), "Vulkan without EGL is not enough")
+        self.assertEqual(self.main([], 0)[1]["gpus_visible_in_job"], 1, "probe lines are not GPUs")
 
     def test_the_job_checks_its_tmp_after_its_gpus(self):
         script = validate_slurm.gpu_job_command("x", "", "")[-1]
         self.assertTrue(script.startswith("nvidia-smi "))
         self.assertIn("findmnt -n -o FSROOT --mountpoint /tmp", script)
         self.assertIn('"/$SLURM_JOB_ID/"', script)
+        for key in validate_slurm.PROBES:
+            self.assertIn('printf "%s=%%s' % key, script)
 
 
 if __name__ == "__main__":
