@@ -2,7 +2,8 @@
 
 A user's listener on a non-loopback address is reported, with whether the inbound
 filter keeps it from the outside; system accounts, loopback and UDP client sockets are
-not. Tunnel programs are found by executable, script or subcommand name.
+not. Tunnel programs are found by executable, script or subcommand name. The counters
+come from the egress table, exposure from the ingress table (roles/ingress_policy).
 """
 
 import os
@@ -15,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tool
 from clustertools import egress_metrics as em  # noqa: E402
 from clustertools import prom  # noqa: E402
 
-CFG = {"table": "egress_policy", "user_uids": ["1000-60000", "65536-4294967294"],
+CFG = {"table": "egress_policy", "inbound_table": "ingress_policy", "user_uids": ["1000-60000", "65536-4294967294"],
        "tunnel_programs": ["cloudflared", "lt", "code tunnel", "tailscaled"]}  # fmt: skip
 HEADER = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
 TABLE = {
@@ -24,12 +25,18 @@ TABLE = {
         {"table": {"family": "inet", "name": "egress_policy"}},
         {"counter": {"family": "inet", "name": "rejected_port", "table": "egress_policy", "packets": 4, "bytes": 240}},
         {"counter": {"family": "inet", "name": "rejected_ssh_node", "table": "egress_policy", "packets": 2, "bytes": 1}},
-        {"counter": {"family": "inet", "name": "dropped_inbound", "table": "egress_policy", "packets": 9, "bytes": 1}},
-        {"set": {"family": "inet", "name": "internal4", "table": "egress_policy", "type": "ipv4_addr",
+    ]
+}  # fmt: skip
+INBOUND = {
+    "nftables": [
+        {"metainfo": {"version": "1.0.9"}},
+        {"table": {"family": "inet", "name": "ingress_policy"}},
+        {"counter": {"family": "inet", "name": "dropped_inbound", "table": "ingress_policy", "packets": 9, "bytes": 1}},
+        {"set": {"family": "inet", "name": "internal4", "table": "ingress_policy", "type": "ipv4_addr",
                  "elem": [{"prefix": {"addr": "10.0.0.0", "len": 16}}]}},
-        {"set": {"family": "inet", "name": "inbound_tcp", "table": "egress_policy", "type": "inet_service",
+        {"set": {"family": "inet", "name": "inbound_tcp", "table": "ingress_policy", "type": "inet_service",
                  "elem": [22, {"range": [60000, 60010]}]}},
-        {"chain": {"family": "inet", "table": "egress_policy", "name": "input", "type": "filter", "hook": "input"}},
+        {"chain": {"family": "inet", "table": "ingress_policy", "name": "input", "type": "filter", "hook": "input"}},
     ]
 }  # fmt: skip
 
@@ -93,8 +100,8 @@ class EgressMetricsTests(unittest.TestCase):
         for n, inode in enumerate(inodes, 3):
             os.symlink(f"socket:[{inode}]", d / "fd" / str(n))
 
-    def metrics(self, table):
-        return prom.parse(em.textfile(CFG, table, proc_root=self.proc, now=1700000000))
+    def metrics(self, table, inbound=INBOUND):
+        return prom.parse(em.textfile(CFG, table, inbound, proc_root=self.proc, now=1700000000))
 
     def listeners(self, values):
         return {
@@ -119,17 +126,19 @@ class EgressMetricsTests(unittest.TestCase):
         )
 
     def test_an_allowed_inbound_port_is_exposed(self):
-        TABLE_OPEN = {"nftables": [*TABLE["nftables"][:-2],
-                      {"set": {"name": "inbound_tcp", "elem": [{"range": [8000, 8888]}]}}, TABLE["nftables"][-1]]}  # fmt: skip
+        OPEN = {"nftables": [*INBOUND["nftables"][:-2],
+                {"set": {"name": "inbound_tcp", "elem": [{"range": [8000, 8888]}]}}, INBOUND["nftables"][-1]]}  # fmt: skip
         self.assertIn(
-            ("tcp", "0.0.0.0", "8888", "bob", "python3", "true"), self.listeners(self.metrics(TABLE_OPEN))
+            ("tcp", "0.0.0.0", "8888", "bob", "python3", "true"), self.listeners(self.metrics(TABLE, OPEN))
         )
 
-    def test_without_the_table_every_listener_is_exposed(self):
-        values = self.metrics(None)
+    def test_without_the_tables_every_listener_is_exposed(self):
+        values = self.metrics(None, None)
         self.assertEqual(values[prom.key("egress_policy_loaded")], "0")
         self.assertEqual({entry[5] for entry in self.listeners(values)}, {"true"})
         self.assertFalse([k for k in values if k[0] == "egress_policy_rejected_packets_total"])
+        # The egress table alone filters nothing inbound.
+        self.assertEqual({entry[5] for entry in self.listeners(self.metrics(TABLE, None))}, {"true"})
 
     def test_reject_counters(self):
         values = self.metrics(TABLE)

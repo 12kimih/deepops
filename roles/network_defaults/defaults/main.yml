@@ -1,0 +1,17 @@
+---
+# network_defaults -- the cluster's own networks, named once for every role that needs
+# them (a shared-defaults role: roles list it as a meta dependency).
+#
+# The cluster's networks as CIDRs (IPv4 or IPv6): every network the hosts talk to each
+# other over (the management network, an IPoIB or storage network too). Never a range
+# the hosts share with others (a campus network). Read as a range where one is needed:
+# what may reach a host (roles/ingress_policy), where users may connect freely
+# (roles/egress_policy), who mounts the exports (roles/nfs), who is never banned
+# (roles/fail2ban), whose logs are taken (roles/rsyslog_server), which address
+# /etc/hosts gives each host (roles/deepops_hosts).
+cluster_networks: []
+
+# This host's address inside cluster_networks, from its gathered facts ("" when it has
+# none). Set it in the inventory for a host whose address the facts cannot decide; its
+# peers read it there too (plugins/filter/networks.py, cluster_addresses).
+cluster_address: "{{ (hostvars | cluster_addresses([inventory_hostname], cluster_networks))[inventory_hostname] }}"

@@ -13,4 +13,5 @@ galaxy_info:
       versions: ["8", "9"]
 dependencies:
   - role: retired_settings  # nfs_servers
+  - role: network_defaults  # cluster_networks
   - role: nfs_common  # its settings and items; installed by present.yml

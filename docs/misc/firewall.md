@@ -107,13 +107,14 @@ This is often best for performance as well, as it removes any source of contenti
 
 If you are using a single network for both MPI and management traffic, you should generally allow all TCP and UDP traffic between the nodes in the cluster.
 
-## Host firewall (roles/egress_policy)
+## Host firewall (roles/ingress_policy, roles/egress_policy)
 
-`roles/egress_policy` owns the host's filtering in one nftables table: what users may
-reach outside the cluster, and, with `egress_policy_inbound`, inbound traffic (only
-the internal networks, trusted interfaces and the listed ports). It replaced the
-former `ufw-enable.yml` and disables ufw when it takes inbound over. See
-[Egress policy](../slurm-cluster/egress-policy.md).
+Two nftables tables, one per direction, each its own component: `roles/ingress_policy`
+(`slurm_enable_ingress_policy`) lets only the cluster's networks (`cluster_networks`),
+trusted interfaces and each host's open ports reach it; `roles/egress_policy`
+(`slurm_enable_egress_policy`) limits what users may reach outside the cluster. The
+ingress policy replaced the former `ufw-enable.yml` and disables ufw when it takes
+over. See [Egress policy](../slurm-cluster/egress-policy.md).
 
 `config.example/playbooks/ufw-disable.yml` stops and disables UFW on all nodes, for a
 fresh Ubuntu install whose UFW would block Slurm, munge or NFS.

@@ -152,7 +152,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 # - root_squash: root on a client is nobody on the export, so one compromised node is
 #   not root over everyone's files. These trees are written as root only on the server
 #   itself (accounts, software installs), never through the mount.
-# - Every export is offered to nfs_export_clients (the cluster subnet, group_vars/all.yml).
+# - Every export is offered to nfs_export_clients (cluster_networks, group_vars/all.yml).
 nfs_exports:
   - path: /home    # shared home dirs
     options: "rw,sync,root_squash,no_subtree_check"

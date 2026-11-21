@@ -149,3 +149,11 @@ retired_settings:
   slurm_groupname: nothing, the slurm account's group is named like it (roles/local_accounts)
   slurm_manage_user_gid: nothing, roles/local_accounts pins the group's GID and refuses to renumber
   docker_login_disable_log_password: nothing, roles/docker-login never logs credentials
+  cluster_subnet: cluster_networks (a list of CIDRs) in roles/network_defaults
+  egress_policy_internal_networks: cluster_networks in roles/network_defaults
+  hosts_internal_subnet_prefix: cluster_networks in roles/network_defaults (/etc/hosts lists the address inside them)
+  egress_policy_inbound: slurm_enable_ingress_policy in roles/deploy_defaults (roles/ingress_policy, its own table)
+  egress_policy_inbound_tcp_ports: ingress_policy_tcp_ports in roles/ingress_policy
+  egress_policy_inbound_udp_ports: ingress_policy_udp_ports in roles/ingress_policy
+  egress_policy_trusted_interfaces: ingress_policy_trusted_interfaces in roles/ingress_policy
+  egress_policy_inbound_lockout_check: ingress_policy_lockout_check in roles/ingress_policy

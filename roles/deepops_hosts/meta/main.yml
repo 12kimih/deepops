@@ -34,4 +34,6 @@ galaxy_info:
   galaxy_tags:
     - system
     - networking
-dependencies: []
+dependencies:
+  - role: retired_settings  # hosts_internal_subnet_prefix
+  - role: network_defaults  # cluster_networks: the address each host is listed by

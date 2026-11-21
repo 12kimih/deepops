@@ -1,0 +1,16 @@
+---
+# What may reach each host: the cluster's networks, trusted interfaces and the open ports
+# (roles/ingress_policy). Preview on one host first:
+#
+#   ansible-playbook -K --check --diff -l <host> playbooks/generic/ingress-policy.yml
+#
+# Present where slurm_enable_ingress_policy is on, removed where it is off
+# (deepops_components).
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tags:
+    - ingress-policy
+  roles:
+    - role: deploy_defaults
+    - role: ingress_policy
+      ingress_policy_state: "{{ deepops_components.ingress_policy | component_phase(deepops_phase) }}"

@@ -19,11 +19,8 @@
 ################################################################################
 # /etc/hosts                                                                   #
 ################################################################################
-# When generating /etc/hosts (the hosts role, run by hosts.yml), prefer an address
-# on this internal subnet prefix (e.g. "10.0.") -- useful when nodes have a secondary
-# IP on the cluster network and hostnames should resolve to it, not a management/public
-# NIC. Unset = use the interface's primary address.
-#hosts_internal_subnet_prefix: "10.0."  # example
+# When generating /etc/hosts (the hosts role, run by hosts.yml), an interface with
+# several addresses is listed by the one inside cluster_networks (NETWORK below).
 
 ################################################################################
 # PROXY
@@ -54,14 +51,17 @@
 ################################################################################
 # NETWORK                                                                      #
 ################################################################################
-# The cluster's internal network (CIDR): the one place it is written. NFS exports are
-# offered to it only (nfs_export_clients, STORAGE below).
-#cluster_subnet: "10.0.0.0/16"  # example
+# The cluster's own networks (CIDRs, roles/network_defaults): the one place they are
+# written. Every network the hosts talk over, never one they share with others. NFS
+# exports are offered to them, fail2ban never bans them, rsyslog takes their logs, the
+# ingress and egress policies let them through, and each host's cluster_address (for
+# /etc/hosts and host-based SSH) is its address in them.
+#cluster_networks: []
+#cluster_networks: [10.0.0.0/16]  # example
 
 # Egress policy (roles/egress_policy, docs/slurm-cluster/egress-policy.md): outside
 # the cluster, users reach only web, DNS, NTP and rate-limited SSH; the administrators
 # and system accounts are exempt. Switched on by slurm_enable_egress_policy.
-#egress_policy_internal_networks: ["{{ cluster_subnet }}"]  # example
 #egress_policy_exempt_uids: "{{ people | people_uids('admin') }}"  # example
 #egress_policy_ssh_rate: 20/minute
 #egress_policy_ssh_burst: 30
@@ -69,11 +69,14 @@
 # and 60/minute, burst 120 elsewhere.
 #egress_policy_ssh_node_rate: 600/minute  # example
 #egress_policy_ssh_node_burst: 1200  # example
-# Inbound filtering (replaces ufw): the internal networks, plus the SSH port on the
-# login node.
-#egress_policy_inbound: true  # example
-#egress_policy_inbound_tcp_ports: "{{ [cluster_info.ssh_port] if inventory_hostname in groups['slurm-login'] | default([]) else [] }}"  # example
-#egress_policy_trusted_interfaces: [tailscale0]  # example
+
+# Ingress policy (roles/ingress_policy, slurm_enable_ingress_policy; replaces ufw): only
+# the cluster's networks (cluster_networks), trusted interfaces and the open ports reach
+# a host. Open the SSH port on the login node.
+#ingress_policy_tcp_ports: "{{ [cluster_info.ssh_port] if inventory_hostname in groups['slurm-login'] | default([]) else [] }}"  # example
+#ingress_policy_udp_ports: []
+#ingress_policy_trusted_interfaces: [tailscale0]  # example
+#ingress_policy_lockout_check: true
 
 # Local resolver (roles/dns_resolver, slurm_enable_dns_resolver): unbound on loopback,
 # forwarding to the site's resolvers, answering NXDOMAIN for tunnel services.
@@ -116,7 +119,7 @@
 # fail2ban (roles/fail2ban; switch slurm_enable_fail2ban / kube_enable_fail2ban): the
 # site's [DEFAULT] settings over the distribution's, and addresses never banned.
 #fail2ban_settings: {}  # e.g. {bantime: 1h, findtime: 10m, maxretry: 5}
-#fail2ban_ignoreip: []  # e.g. ["{{ cluster_subnet }}"]
+#fail2ban_ignoreip: "{{ cluster_networks }}"
 
 # The shells people log in with: installed on every host, each reading /etc/profile.d
 # (roles/login_shells). Default: every shell people.yml gives an active person, and bash.
@@ -167,7 +170,7 @@
 #nfs_exports:  # example
 #  - path: /export/shared
 #    options: "rw,sync,root_squash,no_subtree_check"
-#nfs_export_clients: ["{{ cluster_subnet }}"]  # example
+#nfs_export_clients: "{{ cluster_networks if cluster_networks | length > 0 else ['*'] }}"
 
 # NFS Client
 # This config will mount an NFS share on hosts. An entry without `options` is mounted

@@ -12,5 +12,7 @@ galaxy_info:
     - name: EL
       versions: ["8", "9"]
 dependencies:
+  - role: retired_settings  # egress_policy_inbound and its settings went to roles/ingress_policy
+  - role: network_defaults  # cluster_networks
   - role: cluster_tools_lib  # the metrics program
   - role: prometheus_paths  # node_exporter_prom_dir

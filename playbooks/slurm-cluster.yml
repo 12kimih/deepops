@@ -286,6 +286,13 @@
   tags:
     - egress-policy
 
+- name: Let only the cluster's networks and the open ports reach the hosts
+  import_playbook: generic/ingress-policy.yml
+  vars:
+    deepops_phase: install
+  tags:
+    - ingress-policy
+
 - name: Limit what users leave running outside Slurm jobs
   import_playbook: generic/node-user-policy.yml
   tags:
@@ -407,6 +414,13 @@
     deepops_phase: remove
   tags:
     - egress-policy
+
+- name: Remove the ingress policy where it is no longer wanted
+  import_playbook: generic/ingress-policy.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - ingress-policy
 
 - name: Remove the rsyslog client where it is no longer wanted
   import_playbook: generic/rsyslog-client.yml

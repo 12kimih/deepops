@@ -1,6 +1,7 @@
 ---
 # egress_policy -- what users' processes may reach outside the cluster, enforced in the
-# kernel with nftables (one table, inet egress_policy, owned by this role alone), plus
+# kernel with nftables (one table, inet egress_policy, owned by this role alone; what
+# may reach the host is roles/ingress_policy's table), plus
 # the client SSH defaults and the metrics that report what a firewall cannot block.
 # See docs/slurm-cluster/egress-policy.md.
 
@@ -9,11 +10,8 @@
 # slurm_enable_egress_policy (docs/deepops/component-state.md).
 egress_policy_state: present
 
-# The cluster's own networks (CIDRs, IPv4 or IPv6): users reach them on every port, and
-# with egress_policy_inbound they reach this host on every port. List every network
-# jobs talk over (an IPoIB or storage network too), or multi-node jobs break.
-# Required.
-egress_policy_internal_networks: []
+# Users reach the cluster's networks (cluster_networks, roles/network_defaults) on every
+# port: list every network jobs talk over there, or multi-node jobs break.
 
 # Who is a user: the uids whose outside traffic is limited ("A-B" or "N"). Below 1000
 # are root and system accounts; 60001-65535 are systemd's DynamicUser range and
@@ -54,23 +52,6 @@ egress_policy_ssh_node_burst: "{{ 1200 if inventory_hostname in groups['slurm-lo
 # Log rejected connections to the kernel log, with the uid (journalctl -k), at most
 # this often.
 egress_policy_log_rate: 10/minute
-
-# Filter inbound traffic too (the former ufw-enable.yml): allow loopback, replies,
-# ICMP, DHCP, the internal networks, the trusted interfaces and the ports below, drop
-# the rest. Turning it on stops and disables ufw, so one tool owns the host's
-# filtering. Ports published by Docker (-p) are forwarded, not delivered to the host,
-# and are not filtered here.
-egress_policy_inbound: false
-# Ports open to everyone: a number or "A-B". The SSH port on a login host.
-egress_policy_inbound_tcp_ports: []
-egress_policy_inbound_udp_ports: []
-# Interfaces whose traffic is trusted like the internal networks (a VPN such as
-# tailscale0).
-egress_policy_trusted_interfaces: []
-# Refuse to turn on inbound filtering when the SSH session Ansible (or its operator)
-# came in on would be cut: neither from an internal network or trusted interface nor
-# to an allowed port.
-egress_policy_inbound_lockout_check: true
 
 # Client SSH settings for every user (/etc/ssh/ssh_config.d; a user's ~/.ssh/config
 # wins). One attempt with a timeout, so a script cannot retry in a tight loop.

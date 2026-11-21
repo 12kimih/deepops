@@ -244,6 +244,9 @@ deepops_component_registry:
   egress_policy:
     rules:
       - {switch: "{{ slurm_enable_egress_policy }}", group: slurm-cluster}
+  ingress_policy:
+    rules:
+      - {switch: "{{ slurm_enable_ingress_policy }}", group: slurm-cluster}
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-

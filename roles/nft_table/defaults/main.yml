@@ -1,0 +1,21 @@
+---
+# nft_table -- one nftables table of a role's own (inet <name>), loaded before the network
+# comes up by its unit and replaced in one transaction when it changes. Other tables
+# (Docker's, Tailscale's, another role's) are never touched. See tasks/main.yml.
+#   - name: Render the ruleset  # in the calling role: its own template and variables
+#     ansible.builtin.set_fact:
+#       egress_policy_ruleset: "{{ lookup('ansible.builtin.template', 'egress-policy.nft.j2') }}"
+#   - ansible.builtin.include_role:
+#       name: nft_table
+#     vars:
+#       nft_table_name: egress_policy
+#       nft_table_ruleset: "{{ egress_policy_ruleset }}"
+#       nft_table_description: Egress policy nftables table
+# tasks_from: absent deletes the table; the caller's component record removes the unit
+# and files ('<name>' | nft_table_items, plugins/filter/nft_table.py).
+nft_table_name: ""
+# The whole ruleset: it names its role in a comment (roles/<name>), and creates the
+# table, deletes it and defines it again, so that loading it replaces only this table
+# (the role checks all but the last).
+nft_table_ruleset: ""
+nft_table_description: ""
