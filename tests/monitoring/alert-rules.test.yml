@@ -645,6 +645,86 @@ tests:
           - labels: 'job_device:dcgm_fb_used_bytes:max{host="n1", device="nvidia1", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
             value: 1024
 
+  # NVML order swapped as above. Both unheld GPUs are fully busy; NVML 1 (Slurm's nvidia0)
+  # holds no memory (hung), NVML 0 (nvidia1) is held by job 7, and a third (NVML 2,
+  # nvidia2) has memory in use (a process outside Slurm, not a hang).
+  - name: a busy GPU no job holds with no memory in use is hung; one with memory is not
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0x30'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '500x30'
+      - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
+        values: '40000x30'
+      - series: 'DCGM_FI_DEV_FB_FREE_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '48000x30'
+      - series: 'DCGM_FI_DEV_FB_FREE_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '47500x30'
+      - series: 'DCGM_FI_DEV_FB_FREE_BYTES{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
+        values: '8000x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0x30'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
+        values: '2x30'
+      - series: 'slurm_gpu_allocated{host="m", instance="m:9100", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+        values: '1x30'
+      - series: 'slurm_metrics_updated_timestamp_seconds{host="m", instance="m:9100"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: GpuStuck
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: GpuStuck
+        exp_alerts:
+          - exp_labels: {severity: critical, host: n1, gpu: "1", device: nvidia0}
+            exp_annotations:
+              summary: "GPU nvidia0 on n1 is busy with no job and no memory in use: hung"
+              description: >-
+                Drain the node (`scontrol update nodename=n1 state=drain
+                reason="gpu hung"`), then reset the GPU or reboot once its jobs end, and run
+                playbooks/utilities/gpu-diag.yml before resuming it.
+
+  # A job's SM activity and power are those of the GPU its allocation names (NVML 0 is
+  # Slurm's nvidia1, held by job 7).
+  - name: a job's SM activity and power are the GPU its allocation names
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_PROF_SM_UTIL_RATIO{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '0.4x10'
+      - series: 'DCGM_FI_PROF_SM_UTIL_RATIO{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0.9x10'
+      - series: 'DCGM_FI_DEV_BOARD_POWER_WATTS{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '250x10'
+      - series: 'DCGM_FI_DEV_BOARD_POWER_WATTS{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '60x10'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+        values: '1x10'
+      - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '0x10'
+      - series: 'slurm_gpu_allocated{host="m", instance="m:9100", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: job_device:dcgm_sm_util_ratio:max
+        eval_time: 5m
+        exp_samples:
+          - labels: 'job_device:dcgm_sm_util_ratio:max{host="n1", device="nvidia1", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+            value: 0.4
+      - expr: job_device:dcgm_power_watts:max
+        eval_time: 5m
+        exp_samples:
+          - labels: 'job_device:dcgm_power_watts:max{host="n1", device="nvidia1", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
+            value: 250
+
   - name: stale allocation data warns and silences the busy-GPU alert
     interval: 1m
     input_series:

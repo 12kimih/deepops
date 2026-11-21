@@ -114,14 +114,19 @@ Slurm / Scheduler provides the following information about running jobs and the 
 Slurm / GPU allocation comes from `roles/slurm_metrics`: a timer on the controller writes
 `slurm_gpu_allocated{node,gpu,gpu_type,user,account,partition,job_id}` (1 per GPU a job
 holds) and `slurm_gpu_configured{node,gpu_type}` every minute as a node_exporter text file. The
-recording rule `host_device:slurm_gpu_allocated:max` keys them like DCGM series, and the
-alert `GpuBusyWithoutJob` fires when a GPU stays busy for 15 minutes with no job holding it
-(a process outside Slurm, or one a finished job left behind). `SlurmGpuMetricsStale` warns
-when the file stops updating, which also pauses that alert.
+recording rule `host_device:slurm_gpu_allocated:max` keys them like DCGM series, and
+`host_device:slurm_gpu_unheld:info` names the GPUs no job holds on nodes in service. The
+alert `GpuBusyWithoutJob` fires when one of those stays busy for 15 minutes (a process
+outside Slurm, or one a finished job left behind), and `GpuStuck` (critical) when it is
+fully busy with almost no memory in use for 10 minutes: a hung GPU, which needs a reset or
+a reboot. `SlurmGpuMetricsStale` warns when the file stops updating, which also pauses
+both alerts.
 
 Per-job GPU usage comes from the same join: `job_device:dcgm_gpu_util_ratio:max` and
-`job_device:dcgm_fb_used_bytes:max` carry each held GPU's utilisation and memory with the
-job's labels (`job_id`, `user`, `account`, `partition`). The dashboard's "by job" panels
+`job_device:dcgm_fb_used_bytes:max` carry each held GPU's utilisation and memory, and
+`job_device:dcgm_sm_util_ratio:max` and `job_device:dcgm_power_watts:max` its SM activity
+(the share of cycles an SM has work, which utilisation alone does not tell) and board
+power, with the job's labels (`job_id`, `user`, `account`, `partition`). The dashboard's "by job" panels
 show them, with each job's mean and peak over the selected range. They cover jobs that ran
 for at least one allocation interval (a minute), for as long as Prometheus keeps data.
 Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only with

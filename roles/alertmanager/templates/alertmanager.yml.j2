@@ -35,6 +35,10 @@ inhibit_rules:
   - source_matchers: ['severity="critical"']
     target_matchers: ['severity="warning"']
     equal: [alertname, host]
+  # A hung GPU is also one busy without a job: one message for it.
+  - source_matchers: ['alertname="GpuStuck"']
+    target_matchers: ['alertname="GpuBusyWithoutJob"']
+    equal: [host, device]
 
 receivers:
   - name: heartbeat
