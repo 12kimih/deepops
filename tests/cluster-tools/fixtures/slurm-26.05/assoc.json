@@ -2,6 +2,7 @@
  "associations": [
   {
    "account": "root",
+   "cluster": "testcluster",
    "default": {
     "qos": ""
    },
@@ -14,6 +15,7 @@
   },
   {
    "account": "root",
+   "cluster": "testcluster",
    "default": {
     "qos": ""
    },
@@ -26,6 +28,7 @@
   },
   {
    "account": "acct1",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -38,6 +41,7 @@
   },
   {
    "account": "acct1",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -52,6 +56,7 @@
   },
   {
    "account": "acct1",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -66,6 +71,7 @@
   },
   {
    "account": "acct2",
+   "cluster": "testcluster",
    "default": {
     "qos": ""
    },
@@ -78,6 +84,7 @@
   },
   {
    "account": "acct2",
+   "cluster": "testcluster",
    "default": {
     "qos": ""
    },
@@ -90,6 +97,7 @@
   },
   {
    "account": "acct6",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -102,6 +110,7 @@
   },
   {
    "account": "acct3",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -115,6 +124,7 @@
   },
   {
    "account": "acct4",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -128,6 +138,7 @@
   },
   {
    "account": "acct4",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -141,6 +152,7 @@
   },
   {
    "account": "acct4",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -154,6 +166,7 @@
   },
   {
    "account": "acct4",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -167,6 +180,7 @@
   },
   {
    "account": "acct5",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -180,6 +194,7 @@
   },
   {
    "account": "acct5",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -193,6 +208,7 @@
   },
   {
    "account": "acct5",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -206,6 +222,7 @@
   },
   {
    "account": "acct5",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -219,6 +236,7 @@
   },
   {
    "account": "acct5",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -232,6 +250,7 @@
   },
   {
    "account": "acct5",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -245,6 +264,7 @@
   },
   {
    "account": "acct7",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -258,6 +278,7 @@
   },
   {
    "account": "acct8",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -271,6 +292,7 @@
   },
   {
    "account": "acct8",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -284,6 +306,7 @@
   },
   {
    "account": "acct8",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -297,6 +320,7 @@
   },
   {
    "account": "acct8",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -310,6 +334,7 @@
   },
   {
    "account": "acct8",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -323,6 +348,7 @@
   },
   {
    "account": "acct8",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -336,6 +362,7 @@
   },
   {
    "account": "acct9",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -349,6 +376,7 @@
   },
   {
    "account": "acct9",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -362,6 +390,7 @@
   },
   {
    "account": "acct9",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -375,6 +404,7 @@
   },
   {
    "account": "acct9",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -388,6 +418,7 @@
   },
   {
    "account": "acct9",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -401,6 +432,7 @@
   },
   {
    "account": "acct9",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -414,6 +446,7 @@
   },
   {
    "account": "acct10",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -427,6 +460,7 @@
   },
   {
    "account": "acct10",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -440,6 +474,7 @@
   },
   {
    "account": "acct10",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -453,6 +488,7 @@
   },
   {
    "account": "acct10",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -466,6 +502,7 @@
   },
   {
    "account": "acct10",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -479,6 +516,7 @@
   },
   {
    "account": "acct11",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -492,6 +530,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -505,6 +544,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -518,6 +558,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -531,6 +572,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -544,6 +586,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -557,6 +600,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -570,6 +614,7 @@
   },
   {
    "account": "acct12",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -583,6 +628,7 @@
   },
   {
    "account": "acct13",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -596,6 +642,7 @@
   },
   {
    "account": "acct13",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -609,6 +656,7 @@
   },
   {
    "account": "acct13",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -622,6 +670,7 @@
   },
   {
    "account": "acct13",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -635,6 +684,7 @@
   },
   {
    "account": "acct13",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -648,6 +698,7 @@
   },
   {
    "account": "acct14",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -661,6 +712,7 @@
   },
   {
    "account": "acct15",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -674,6 +726,7 @@
   },
   {
    "account": "acct15",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -687,6 +740,7 @@
   },
   {
    "account": "acct15",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -700,6 +754,7 @@
   },
   {
    "account": "acct15",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -713,6 +768,7 @@
   },
   {
    "account": "acct15",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -726,6 +782,7 @@
   },
   {
    "account": "acct16",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -739,6 +796,7 @@
   },
   {
    "account": "acct16",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -752,6 +810,7 @@
   },
   {
    "account": "acct16",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -765,6 +824,7 @@
   },
   {
    "account": "acct16",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -778,6 +838,7 @@
   },
   {
    "account": "acct17",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -791,6 +852,7 @@
   },
   {
    "account": "acct18",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -804,6 +866,7 @@
   },
   {
    "account": "acct18",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -817,6 +880,7 @@
   },
   {
    "account": "acct18",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -830,6 +894,7 @@
   },
   {
    "account": "acct18",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -843,6 +908,7 @@
   },
   {
    "account": "acct18",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -856,6 +922,7 @@
   },
   {
    "account": "acct18",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -869,6 +936,7 @@
   },
   {
    "account": "acct19",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -882,6 +950,7 @@
   },
   {
    "account": "acct19",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -895,6 +964,7 @@
   },
   {
    "account": "acct19",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -908,6 +978,7 @@
   },
   {
    "account": "acct19",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -921,6 +992,7 @@
   },
   {
    "account": "acct19",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },
@@ -934,6 +1006,7 @@
   },
   {
    "account": "acct19",
+   "cluster": "testcluster",
    "default": {
     "qos": "low"
    },

@@ -97,11 +97,15 @@ QUERIES = {
     "jobs_detail": (("scontrol", "-d", "--json", "show", "jobs"), "jobs"),
     "qos": (("sacctmgr", "--json", "show", "qos"), "qos"),
     "associations": (("sacctmgr", "--json", "show", "assoc"), "associations"),
+    # The database keeps every cluster's associations; parse() keeps this cluster's
+    # (LOCAL_CLUSTER), so a renamed cluster's old grants never read as current.
     # Running and finished jobs from the accounting database, of every cluster it holds:
     # a renamed cluster's history stays under its old name (slurm-cluster-rename.yml).
     # The job ids follow -j; each record names its cluster.
     "accounting": (("sacct", "--json", "--clusters=all", "-j"), "jobs"),
 }
+# Kinds whose records name a cluster and mean the one the reply comes from (its meta).
+LOCAL_CLUSTER = {"associations"}
 _JOB_FIELDS = (
     "job_id",
     "name",
@@ -148,7 +152,7 @@ FIELDS = {
     "jobs": _JOB_FIELDS,
     "jobs_detail": (*_JOB_FIELDS, "gres_detail"),
     "qos": ("name", "priority", "preempt", "flags", "limits"),
-    "associations": ("account", "user", "qos", "default", "is_default"),
+    "associations": ("cluster", "account", "user", "qos", "default", "is_default"),
     "accounting": (
         "cluster",
         "job_id",
@@ -204,7 +208,11 @@ def parse(kind, text):
         raise SchemaError(f"{QUERIES[kind][0][0]}: unreadable JSON for {kind}: {e}") from None
     if not isinstance(data, dict):
         raise SchemaError(f"{QUERIES[kind][0][0]}: the reply for {kind} is not a JSON object")
-    return check(kind, printable(data))
+    data = check(kind, printable(data))
+    if kind in LOCAL_CLUSTER:
+        key, here = QUERIES[kind][1], cluster_name(data)
+        data[key] = [r for r in data[key] if r["cluster"] == here]
+    return data
 
 
 def printable(value):
