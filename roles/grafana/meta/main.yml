@@ -2,6 +2,7 @@
 # prometheus_port, alertmanager_port and the other shared paths: roles/prometheus_paths.
 dependencies:
   - role: prometheus_paths
+  - role: system_accounts  # system_accounts.grafana: the image's user
 
 galaxy_info:
   namespace: deepops

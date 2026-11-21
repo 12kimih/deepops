@@ -192,6 +192,9 @@ class Run(unittest.TestCase):
         # Adopted on a host that never had them: orphans, but nothing removed.
         self.assertEqual(self.play("absent", [f"file:{conf}/never"]), 0)
         self.assertEqual(self.removed["file"], [], "an adopted orphan that was never there")
+        # A directory named deepops a host never had is no evidence: a preview of the
+        # removal on such a host (grafana's dashboards on a node without Grafana) is clean.
+        self.assertEqual(self.play("absent", [f"dir:{self.base}/dashboards/deepops"], check=True), 0)
 
 
 if __name__ == "__main__":

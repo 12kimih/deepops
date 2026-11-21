@@ -4,7 +4,7 @@
 grafana_state: present
 grafana_config_template: templates/grafana.ini.j2
 grafana_data_dir: /var/lib/grafana
-grafana_user_id: 472
+grafana_user_id: "{{ system_accounts.grafana.uid }}"  # the image's user (roles/system_accounts)
 grafana_container: "grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf"
 grafana_svc_name: "docker.grafana.service"
 grafana_service_state: started

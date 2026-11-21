@@ -184,6 +184,10 @@ def main():
     data = load(p["path"])
 
     def evidence(kind, ident):
+        # Only what is on the host is evidence: a path named deepops that a host never
+        # had (grafana's dashboards on a node without Grafana) is nothing to remove.
+        if kind in ("file", "dir") and not os.path.lexists(ident):
+            return False
         if kind == "file":
             return made_by_deepops(ident)
         if kind == "dir":
