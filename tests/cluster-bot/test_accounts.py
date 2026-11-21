@@ -83,20 +83,31 @@ class Accounts(unittest.TestCase):
         for kw in ({"user": "Bad Name"}, {"user": "alice"}, {"account": "nosuch"}, {"key": "ssh-rsa AAAA"}):
             self.assertEqual(self.join(**kw).status, "refused", kw)
 
-    def test_leave_opens_a_pull_request_that_keeps_the_uid(self):
-        held = self.engine.submit({"kind": "leave", "user": "alice", "asked_by": "alice"})
+    def test_leave_sets_the_last_day_and_keeps_the_account(self):
+        held = self.engine.submit(
+            {"kind": "leave", "user": "alice", "ends": "2027-02-28", "asked_by": "alice"}
+        )
         self.assertEqual(self.engine.approve(held.key, "<@UADMIN>").status, "done")
         text = self.repo.proposed[0][2]["people.yml"][0]
         alice = accounts.load(text)["people"]["alice"]
-        self.assertEqual((alice["status"], alice["uid"]), ("left", 1001))
-        self.assertEqual(self.engine.submit({"kind": "leave", "user": "nobody"}).status, "refused")
+        self.assertEqual(
+            (alice.get("status", "active"), str(alice["ends"]), alice["uid"]), ("active", "2027-02-28", 1001)
+        )
+        self.assertIn("2027-02-28", self.repo.proposed[0][4])
+        self.assertEqual(
+            self.engine.submit({"kind": "leave", "user": "nobody", "ends": "2027-01-01"}).status, "refused"
+        )
 
     def test_the_form_offers_the_leaf_teams_and_names_what_the_handler_reads(self):
         teams = accounts.JoinFeature(self.repo, people, SETTINGS).teams()
         self.assertEqual(teams, ["team-a", "team-b"])
         form = accounts_blocks.join_form(teams)
         self.assertEqual([b.get("block_id") for b in form["blocks"][1:]], ["login", "name", "team", "key"])
-        self.assertEqual(accounts_blocks.leave_form("alice", False)["private_metadata"], "alice")
+        leave = accounts_blocks.leave_form("alice", False, "2026-11-22")
+        self.assertEqual([b.get("block_id") for b in leave["blocks"]], [None, "ends"])
+        self.assertEqual(
+            accounts_blocks.leave_form("alice", True, "2026-11-22")["blocks"][-1]["block_id"], "login"
+        )
 
 
 if __name__ == "__main__":

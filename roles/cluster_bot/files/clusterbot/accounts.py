@@ -92,7 +92,8 @@ class JoinFeature(_RosterFeature):
 
 
 class LeaveFeature(_RosterFeature):
-    """req: user (the login that leaves), asked_by."""
+    """req: user (the login that leaves), ends (their last day, YYYY-MM-DD), asked_by.
+    The PR sets `ends`: the account stays for the grace period, then login stops."""
 
     def decide(self, req):
         person = self._roster().get(req["user"])
@@ -105,12 +106,13 @@ class LeaveFeature(_RosterFeature):
     def apply(self, req):
         text, sha = self._read(self.s["roster"])
         try:
-            new = self.people.roster_leave(text, req["user"])
+            new = self.people.roster_leave(text, req["user"], req["ends"])
         except self.people.EditError as e:
             raise Refused(str(e)) from None
-        body = f"Leave request from Slack (asked by {req.get('asked_by', req['user'])}).\n\nMerge, then run `slurm-cluster.yml --tags people`."
+        body = (f"Leave request from Slack (asked by {req.get('asked_by', req['user'])}): last day {req['ends']}.\n\n"
+                "Merge, then run `slurm-cluster.yml --tags people`.")  # fmt: skip
         url = self._propose(f"leave/{req['user']}", new, sha, f"people: {req['user']} leaves", body)
         return f"계정 정리 PR을 열었습니다: {url}", {"url": url}
 
     def describe(self, req):
-        return f"계정 정리 {req['user']}"
+        return f"계정 정리 {req['user']} (마지막 날 {req['ends']})"
