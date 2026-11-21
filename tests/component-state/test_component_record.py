@@ -158,14 +158,27 @@ PLAY = """
 """
 
 
+class UnitOrder(unittest.TestCase):
+    def test_what_starts_a_service_stops_before_it(self):
+        _, orphans, _ = run(
+            {"components": {"c": {"state": "present", "version": ""}},
+             "items": {"unit:x.service": ["c"], "unit:x.timer": ["c"], "unit:y.socket": ["c"], "unit:a.service": ["c"]}},
+            "c", "absent",
+        )  # fmt: skip
+        self.assertEqual(orphans["unit"], ["x.timer", "y.socket", "a.service", "x.service"])
+
+
 class Run(unittest.TestCase):
     """The role itself, on files and directories in a scratch directory."""
 
-    def play(self, action, items, check=False, legacy=None):
+    def play(self, action, items, check=False, legacy=None, fails=False):
         argv = ["ansible-playbook", "-i", "localhost,", str(self.playbook), "-e", json.dumps(
             {"record": str(self.record), "action": action, "items": items, "legacy": legacy or {}})]  # fmt: skip
         done = subprocess.run(argv + (["--check"] if check else []), cwd=ROOT, capture_output=True, text=True,
                               env=unrecorded.env(ANSIBLE_CALLBACK_RESULT_FORMAT="json"), timeout=unrecorded.TIMEOUT)  # fmt: skip
+        if fails:
+            self.assertNotEqual(done.returncode, 0, done.stdout[-3000:])
+            return None
         self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
         encoded = re.search(r"REMOVED=([A-Za-z0-9+/=]+)", done.stdout).group(1)
         self.removed = json.loads(base64.b64decode(encoded))
@@ -206,6 +219,23 @@ class Run(unittest.TestCase):
         # A directory named deepops a host never had is no evidence: a preview of the
         # removal on such a host (grafana's dashboards on a node without Grafana) is clean.
         self.assertEqual(self.play("absent", [f"dir:{self.base}/dashboards/deepops"], check=True), 0)
+
+    def test_a_removal_that_fails_keeps_the_record_for_the_next_run(self):
+        """The record is written after the orphans are gone: written first, a failed
+        removal lost them from it, and no later run would remove them."""
+        conf = self.base / "conf"
+        items = [f"file:{conf}/a", f"file:{conf}/b"]
+        self.play("present", items)
+        recorded = json.loads(self.record.read_text())
+        conf.chmod(0o500)  # the files cannot go
+        try:
+            self.play("absent", [], fails=True)
+            self.assertEqual(json.loads(self.record.read_text()), recorded, "the record as it was")
+        finally:
+            conf.chmod(0o755)
+        self.play("absent", [])
+        self.assertEqual(sorted(self.removed["file"]), sorted(i.split(":", 1)[1] for i in items))
+        self.assertEqual(json.loads(self.record.read_text()), EMPTY)
 
     def test_absent_removes_an_earlier_versions_unmarked_file_only_in_its_shape(self):
         conf = self.base / "conf"
