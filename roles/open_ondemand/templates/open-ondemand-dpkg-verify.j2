@@ -9,6 +9,7 @@ conffile lists below from its settings; the validator runs this on the portal ho
 
 import fnmatch
 import glob
+import re
 import subprocess
 import sys
 
@@ -43,12 +44,18 @@ def excluded(path, rules):
     return result
 
 
+# dpkg -V: nine attribute characters (or "missing"), a "c" for a conffile, the path,
+# which may hold spaces. A package that is not installed is said on stderr, exit 1.
+LINE = re.compile(r"^\S+\s+(?:c\s+)?(/.*)$")
+
+
 def main():
     rules = dpkg_filters()
-    out = subprocess.run(["dpkg", "-V", *PACKAGES], capture_output=True, text=True).stdout
-    differences = []
-    for line in out.splitlines():
-        path = line.split()[-1] if line.split() else ""
+    done = subprocess.run(["dpkg", "-V", *PACKAGES], capture_output=True, text=True, timeout=600)
+    differences = [line.strip() for line in done.stderr.splitlines() if "not installed" in line]
+    for line in done.stdout.splitlines():
+        match = LINE.match(line)
+        path = match.group(1) if match else ""
         if path in MANAGED_CONFFILES:
             continue
         if line.startswith("missing") and excluded(path, rules):

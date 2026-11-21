@@ -9,8 +9,8 @@ set -ex
 . '{{ slurm_config_dir }}/shared/lib/localusers.sh'
 localusers_live=/etc/localusers
 
-if localusers_listed "$SLURM_JOB_USER"; then
-    exit 0  # don't revoke access for these users
+if localusers_spared "$SLURM_JOB_USER"; then
+    exit 0  # an operator, or a list that cannot be read: access stays
 fi
 
 # Escape the characters that are special in a sed regular expression (and the
