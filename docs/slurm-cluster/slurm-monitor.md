@@ -131,8 +131,10 @@ Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only wit
 finished: Slurm's per step where the job has them, else Prometheus' per GPU, each row
 naming its source (`--source slurm|prometheus` asks for one, `--json` for scripts). The
 two differ in meaning: Slurm keeps each task's high-water mark, Prometheus the mean and
-max over the run. It reads Prometheus at the site facts' `prometheus_url`, the first host
-of the prometheus component, so every host running it must reach that port.
+max over the run. The job is looked up in every cluster the accounting database holds,
+so a job from before a rename (kept under the old name) is found too; each report names
+its cluster. It reads Prometheus at the site facts' `prometheus_url`, the first host of
+the prometheus component, so every host running it must reach that port.
 
 Grafana allows you to view custom time-slices, set the polling duration, and many other dashboard customizations.
 

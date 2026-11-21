@@ -5,7 +5,7 @@ Capture on a Slurm client (read-only):
     scontrol --json show nodes > nodes.json;  scontrol --json show partitions > partitions.json
     scontrol -d --json show jobs > jobs.json; sacctmgr --json show qos > qos.json
     sacctmgr --json show assoc > assoc.json
-    sacct --json -a -S now-3days -E now > accounting.json
+    sacct --json --clusters=all -a -S now-3days -E now > accounting.json
 then run:  make_fixtures.py CAPTURE_DIR fixtures/slurm-<release>
 Only the files the capture holds are written, so a part can be refreshed alone.
 
@@ -69,6 +69,7 @@ JOB_FIELDS = (
 QOS_FIELDS = ("name", "priority", "preempt", "flags", "limits")
 ASSOC_FIELDS = ("account", "user", "qos", "default", "is_default", "partition")
 ACCOUNTING_FIELDS = (
+    "cluster",
     "job_id",
     "user",
     "account",
@@ -82,6 +83,7 @@ ACCOUNTING_FIELDS = (
 )
 STEP_FIELDS = ("step", "state")
 ACCOUNTING_KEPT = 12  # each record carries its steps' TRES lists
+STEPS_KEPT = 4  # the first of a job's steps: a job of many srun steps would swell the file
 STEP_NAMES = {"batch", "extern", "interactive"}  # Slurm's own; others are commands
 JOBS_KEPT = 40
 FILES = ("nodes", "partitions", "jobs", "qos", "assoc", "accounting")
@@ -99,14 +101,14 @@ def pick(d, fields):
 
 
 def accounting_jobs(jobs):
-    """Finished jobs that used something, one per state and array kind first (an array
-    task among them), each with only the fields the tools read (TRESUsageIn max and
-    average of each step, the allocation, the run's times); command step names become
-    step<N>."""
+    """Finished jobs that used something, one per cluster, state and array kind first
+    (an array task among them), each with only the fields the tools read (TRESUsageIn
+    max and average of each step, the allocation, the run's times); command step names
+    become step<N>."""
     used = [j for j in jobs if any(s["tres"]["requested"]["max"] for s in j["steps"])]
     seen, kept = set(), []
     for j in used:
-        kind = (tuple(j["state"]["current"]), bool(j["array"]["job_id"]))
+        kind = (j["cluster"], tuple(j["state"]["current"]), bool(j["array"]["job_id"]))
         if kind not in seen:
             seen.add(kind)
             kept.append(j)
@@ -115,7 +117,7 @@ def accounting_jobs(jobs):
     for j in kept:
         job = pick(j, ACCOUNTING_FIELDS)
         job["steps"] = []
-        for i, s in enumerate(j["steps"]):
+        for i, s in enumerate(j["steps"][:STEPS_KEPT]):
             step = pick(s, STEP_FIELDS)
             name = s["step"]["name"]
             step["step"] = {"id": s["step"]["id"], "name": name if name in STEP_NAMES else f"step{i}"}
@@ -166,6 +168,8 @@ def main(src, dst):
         names[a] = f"acct{i + 1}"
     qos = raw.get("qos", empty)["qos"]
     suffixes = sorted({q["name"].split("_", 1)[1] for q in qos if "_" in q["name"]})
+    for i, c in enumerate(sorted({j["cluster"] for j in accounting})):
+        names[c] = f"cluster{i + 1}"  # a renamed cluster's history keeps the old name
     for i, s in enumerate(suffixes):
         names[f"_{s}"] = f"_t{i + 1}"  # numbered: a letter could equal a real suffix
     for q in qos:

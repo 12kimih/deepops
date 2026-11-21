@@ -97,8 +97,10 @@ QUERIES = {
     "jobs_detail": (("scontrol", "-d", "--json", "show", "jobs"), "jobs"),
     "qos": (("sacctmgr", "--json", "show", "qos"), "qos"),
     "associations": (("sacctmgr", "--json", "show", "assoc"), "associations"),
-    # Running and finished jobs from the accounting database; the job ids follow -j.
-    "accounting": (("sacct", "--json", "-j"), "jobs"),
+    # Running and finished jobs from the accounting database, of every cluster it holds:
+    # a renamed cluster's history stays under its old name (slurm-cluster-rename.yml).
+    # The job ids follow -j; each record names its cluster.
+    "accounting": (("sacct", "--json", "--clusters=all", "-j"), "jobs"),
 }
 _JOB_FIELDS = (
     "job_id",
@@ -148,6 +150,7 @@ FIELDS = {
     "qos": ("name", "priority", "preempt", "flags", "limits"),
     "associations": ("account", "user", "qos", "default", "is_default"),
     "accounting": (
+        "cluster",
         "job_id",
         "user",
         "account",

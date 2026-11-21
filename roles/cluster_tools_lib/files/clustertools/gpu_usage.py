@@ -8,7 +8,9 @@ Two sources, each row naming its own:
               mean and max over the job's run. Kept for Prometheus' retention; a job
               shorter than the allocation interval (a minute) may have no samples.
 --source auto (the default) shows Slurm's figures where the job has them, else
-Prometheus'. The job comes from sacct, so finished jobs work as well as running ones.
+Prometheus'. The job comes from sacct, so finished jobs work as well as running ones,
+and from every cluster the accounting database holds: a job of the cluster's old name
+(a rename keeps that history apart) is found too, and each report names its cluster.
 Python 3.9 or newer, standard library only.
 """
 
@@ -129,6 +131,7 @@ def report(job, source, api, now):
     label = slurm.accounting_label(job)
     out = {
         "job": label,
+        "cluster": job["cluster"],
         "user": job["user"],
         "account": job["account"],
         "partition": job["partition"],
@@ -196,7 +199,7 @@ def render(reports, theme):
                 "sub",
             ),
         ]
-        title = f"job {r['job']}"
+        title = f"job {r['job']} on {r['cluster']}"
         out.append(grid.render(title, tally) if r["rows"] else theme.section(title, theme.cols, tally))
         out += [f"  {theme.paint('muted', note)}" for note in r["notes"]]
     return "\n".join(out) + "\n"

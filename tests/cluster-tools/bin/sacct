@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
-# Fake sacct: serves $ACCOUNTING (a test writes the reply for `sacct --json -j JOB`).
-[[ "$1" == --json && "$2" == -j && -n "${ACCOUNTING:-}" ]] && exec cat "$ACCOUNTING"
+# Fake sacct: serves $ACCOUNTING (a test writes the reply for
+# `sacct --json --clusters=all -j JOB`).
+[[ "$1 $2 $3" == "--json --clusters=all -j" && -n "${ACCOUNTING:-}" ]] && exec cat "$ACCOUNTING"
 echo "sacct: unsupported fake call: $*" >&2; exit 1
