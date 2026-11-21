@@ -738,6 +738,39 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "install with repo_package (plugins/action/repo_package.py)")
         scan.check(self)
 
+    def test_a_docker_api_task_waits_for_docker_in_a_preview(self):
+        # A preview installs nothing: on a host without Docker every community.docker
+        # task failed the preview of a first deploy. Each is skipped under
+        # docker_preview_installs (roles/docker), or under --check altogether.
+        def walk(items, inherited):
+            for task in items or []:
+                if not isinstance(task, dict):
+                    continue
+                when = task.get("when", [])
+                conds = inherited + [str(c) for c in (when if isinstance(when, list) else [when])]
+                yield task, conds
+                for key in ("block", "rescue", "always"):
+                    yield from walk(task.get(key), conds)
+
+        scan, offenders, seen = Scan(minimum=MINIMUM_FILES), [], 0
+        for path in map(scan.seen, ansible_files()):
+            if not rel(path).startswith("roles/") or "/molecule/" in rel(path):
+                continue
+            data = yaml.safe_load(path.read_text())
+            if not isinstance(data, list) or any(isinstance(i, dict) and "hosts" in i for i in data):
+                continue
+            for task, conds in walk(data, []):
+                if not any(str(k).startswith("community.docker.") for k in task):
+                    continue
+                seen += 1
+                joined = " ".join(conds)
+                if "docker_preview_installs" not in joined and "ansible_check_mode" not in joined:
+                    if rel(path) != "roles/component_record/tasks/main.yml":  # asks the API first
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertGreater(seen, 5, "the scan finds the Docker API tasks")
+        self.assertEqual(offenders, [], "when: not docker_preview_installs | default(false)")
+        scan.check(self)
+
     def test_only_host_baseline_sets_kernel_settings(self):
         # A sysctl written straight to a file was undone at boot by a later file (a hand
         # line in /etc/sysctl.conf) while the running value looked right; the shared

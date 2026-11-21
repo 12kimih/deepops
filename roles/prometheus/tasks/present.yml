@@ -72,6 +72,7 @@
   community.docker.docker_volume:
     name: "{{ prometheus_docker_volume_name }}"
     state: present
+  when: not docker_preview_installs | default(false)  # roles/docker
 
 - name: Run Prometheus
   ansible.builtin.include_role:

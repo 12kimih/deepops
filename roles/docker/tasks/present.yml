@@ -16,6 +16,19 @@
   ansible.builtin.include_tasks: redhat.yml
   when: ansible_facts.os_family == "RedHat"
 
+# A preview installs nothing, so on a host without Docker the Docker API is not there
+# for any later task to ask: every task that talks to it (community.docker) is skipped
+# under docker_preview_installs, and the real run does them.
+- name: Look for the Docker client
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+    get_checksum: false
+  register: docker_client_file
+
+- name: Note a Docker this preview only installs
+  ansible.builtin.set_fact:
+    docker_preview_installs: "{{ ansible_check_mode and not docker_client_file.stat.exists }}"
+
 - name: Ensure the Docker service is enabled and running
   systemd_unit:
     name: docker
@@ -165,11 +178,13 @@
   when:
     - not deepops_containerized | bool
     - docker_service_state == 'started'
+    - not docker_preview_installs | bool
 
 - name: Recreate the Docker API socket
   when:
     - not deepops_containerized | bool
     - docker_service_state == 'started'
+    - not docker_preview_installs | bool
     - docker_api_probe.rc | default(0) != 0
   block:
     - name: Stop dockerd so docker.socket can listen again

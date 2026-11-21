@@ -25,6 +25,7 @@
   loop_control:
     label: "{{ item.registry }}"
   no_log: true
+  when: not docker_preview_installs | default(false)  # roles/docker
 
 # A registry dropped from the list keeps its credential in root's Docker config otherwise.
 - name: Log out of the registries no longer listed
@@ -33,6 +34,7 @@
     state: absent
   loop: "{{ (docker_login_before + (docker_login_registries | map(attribute='registry') | list if docker_login_state == 'absent' else []))
             | unique | difference(docker_login_wanted) }}"
+  when: not docker_preview_installs | default(false)  # roles/docker
 
 - name: Create deepops' state directory
   ansible.builtin.file:

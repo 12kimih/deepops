@@ -60,6 +60,7 @@
   community.docker.docker_container_info:
     name: "{{ standalone_container_registry_name }}"
   register: standalone_container_registry_earlier
+  when: not docker_preview_installs | default(false)  # roles/docker
 
 - name: Keep what the earlier registry stored
   change_command:
@@ -85,7 +86,9 @@
   community.docker.docker_container:
     name: "{{ standalone_container_registry_name }}"
     state: absent
-  when: standalone_container_registry_earlier.exists | default(false)
+  when:
+    - not docker_preview_installs | default(false)  # roles/docker
+    - standalone_container_registry_earlier.exists | default(false)
 
 - name: Run the registry
   ansible.builtin.include_role:
