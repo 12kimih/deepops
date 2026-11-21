@@ -16,8 +16,10 @@ import threading
 import time
 from pathlib import Path
 
+from . import accounts_blocks
 from . import blocks as shared
 from . import scratch_blocks as blocks
+from .accounts import JoinFeature, LeaveFeature
 from .requests import Engine
 from .scratch import ScratchFeature, SshExecutor
 
@@ -36,7 +38,7 @@ def load(path):
     return cfg
 
 
-def build(cfg, engine, scratch):
+def build(cfg, engine, scratch, join=None):
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
@@ -71,6 +73,49 @@ def build(cfg, engine, scratch):
             client.chat_postMessage(channel=slack_id, text=outcome.text)
         else:
             tell(client, slack_id, outcome)
+
+    @app.command("/join")
+    def join_command(ack, body, client):
+        ack()
+        if join is None or user_of(body["user_id"]):
+            text = "이미 계정이 있습니다." if join else "이 클러스터는 Slack 계정 신청을 받지 않습니다."
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            return
+        client.views_open(trigger_id=body["trigger_id"], view=accounts_blocks.join_form(join.teams()))
+
+    @app.view("join.submit")
+    def join_submit(ack, body, client, view):
+        v = view["state"]["values"]
+        req = {"kind": "join", "user": v["login"]["v"]["value"].strip(), "name": v["name"]["v"]["value"].strip(),
+               "account": v["team"]["v"]["selected_option"]["value"], "key": v["key"]["v"]["value"],
+               "slack": body["user"]["id"]}  # fmt: skip
+        ack()
+        submit(client, body["user"]["id"], req)
+
+    @app.command("/leave")
+    def leave_command(ack, body, client):
+        ack()
+        user = user_of(body["user_id"])
+        if join is None or not user:
+            client.chat_postEphemeral(
+                channel=body["channel_id"], user=body["user_id"], text="정리할 계정이 없습니다."
+            )
+            return
+        view = accounts_blocks.leave_form(user, body["user_id"] in admins)
+        client.views_open(trigger_id=body["trigger_id"], view=view)
+
+    @app.view("leave.submit")
+    def leave_submit(ack, body, client, view):
+        ack()
+        slack_id = body["user"]["id"]
+        if slack_id in admins and "login" in view["state"]["values"]:
+            login = view["state"]["values"]["login"]["v"]["value"].strip()
+        else:
+            login = user_of(slack_id)  # anyone else may give back only their own account
+        if login:
+            submit(
+                client, slack_id, {"kind": "leave", "user": login, "asked_by": user_of(slack_id) or slack_id}
+            )
 
     @app.command("/scratch")
     def scratch_command(ack, body, client):
@@ -199,8 +244,17 @@ def main(argv=None):
         scratch = ScratchFeature(
             SshExecutor(sc["host"], sc["key"], sc["user"], sc["known_hosts"]), sc["policy"]
         )
-    engine = Engine({"scratch": scratch} if scratch else {}, cfg["pending"])
-    app = build(cfg, engine, scratch)
+    features, join = {"scratch": scratch} if scratch else {}, None
+    gh = cfg.get("github") or {}
+    if gh.get("repo"):
+        from . import github, people_roster  # the roster module the role installs
+
+        repo = github.Repo(github.App(gh["app_id"], gh["installation_id"], gh["key_file"]), gh["repo"])
+        settings = {**cfg["roster"], "base": gh["base"]}
+        join = JoinFeature(repo, people_roster, settings)
+        features.update(join=join, leave=LeaveFeature(repo, people_roster, settings))
+    engine = Engine(features, cfg["pending"])
+    app = build(cfg, engine, scratch, join)
 
     def reminders():
         path = Path(sc["reminders"])

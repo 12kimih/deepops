@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import in_tree  # noqa: E402
-from clusterbot import accounts, requests  # noqa: E402
+from clusterbot import accounts, accounts_blocks, requests  # noqa: E402
 
 people = in_tree.load("plugins/filter/people.py")
 
@@ -23,6 +23,7 @@ SETTINGS = {
     "base": "main",
     "roster": "people.yml",
     "accounting": "files/slurm/accounting.yml",
+    "exclude": ["root", "admin"],
     "reserved": [22078],
 }
 
@@ -86,6 +87,13 @@ class Accounts(unittest.TestCase):
         alice = accounts.load(text)["people"]["alice"]
         self.assertEqual((alice["status"], alice["uid"]), ("left", 1001))
         self.assertEqual(self.engine.submit({"kind": "leave", "user": "nobody"}).status, "refused")
+
+    def test_the_form_offers_the_leaf_teams_and_names_what_the_handler_reads(self):
+        teams = accounts.JoinFeature(self.repo, people, SETTINGS).teams()
+        self.assertEqual(teams, ["team-a", "team-b"])
+        form = accounts_blocks.join_form(teams)
+        self.assertEqual([b.get("block_id") for b in form["blocks"][1:]], ["login", "name", "team", "key"])
+        self.assertEqual(accounts_blocks.leave_form("alice", False)["private_metadata"], "alice")
 
 
 if __name__ == "__main__":

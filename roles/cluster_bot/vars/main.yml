@@ -7,6 +7,7 @@ _cluster_bot_config: "{{ _cluster_bot_etc }}/config.json"
 _cluster_bot_tokens: {bot: "{{ _cluster_bot_etc }}/bot.token", app: "{{ _cluster_bot_etc }}/app.token"}
 _cluster_bot_home: "{{ system_accounts[cluster_bot_user].home }}"
 _cluster_bot_unit: cluster-bot.service
+_cluster_bot_github_key: "{{ _cluster_bot_etc }}/github-app.pem"
 _cluster_bot_known_hosts: "{{ _cluster_bot_etc }}/known_hosts"
 _cluster_bot_ready: "{{ slack_bot_token | length > 0 and slack_app_token | length > 0 }}"
 _cluster_bot_scratch_host: "{{ (groups['scratch-server'] | default([]))[:1] | join }}"
@@ -17,6 +18,17 @@ _cluster_bot_cfg:
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
   admins: "{{ cluster_bot_admins | map('extract', cluster_bot_members) | select | list }}"
   pending: "{{ _cluster_bot_home }}/requests-pending.json"
+  github:
+    repo: "{{ cluster_bot_github_repo }}"
+    base: "{{ cluster_bot_github_base }}"
+    app_id: "{{ cluster_bot_github_app_id }}"
+    installation_id: "{{ cluster_bot_github_installation_id }}"
+    key_file: "{{ _cluster_bot_github_key }}"
+  roster:
+    roster: people.yml
+    accounting: files/slurm/accounting.yml
+    reserved: "{{ system_accounts.values() | map(attribute='uid') | list }}"
+    exclude: "{{ cluster_bot_join_exclude }}"
   scratch:
     host: "{{ (hostvars | cluster_addresses([_cluster_bot_scratch_host], cluster_networks))[_cluster_bot_scratch_host] if _cluster_bot_scratch_host else '' }}"
     key: "{{ cluster_bot_key }}"
@@ -38,5 +50,6 @@ cluster_bot_items:
   - "file:{{ _cluster_bot_tokens.bot }}"
   - "file:{{ _cluster_bot_tokens.app }}"
   - "file:{{ _cluster_bot_known_hosts }}"
+  - "file:{{ _cluster_bot_github_key }}"
   - "dir:{{ _cluster_bot_etc }}"
   - "dir:{{ _cluster_bot_prefix }}"

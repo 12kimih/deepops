@@ -12,6 +12,7 @@
     that:
       - cluster_bot_sha256.slack_bolt[cluster_bot_slack_bolt_version] is defined
       - cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] is defined
+      - cluster_bot_sha256.ruamel_yaml[cluster_bot_ruamel_yaml_version] is defined
     fail_msg: >-
       cluster_bot_sha256 has no hash for slack_bolt {{ cluster_bot_slack_bolt_version }} or
       slack_sdk {{ cluster_bot_slack_sdk_version }}; add the wheels' sha256 from PyPI.
@@ -59,6 +60,7 @@
     content: |
       slack_bolt=={{ cluster_bot_slack_bolt_version }} --hash=sha256:{{ cluster_bot_sha256.slack_bolt[cluster_bot_slack_bolt_version] }}
       slack_sdk=={{ cluster_bot_slack_sdk_version }} --hash=sha256:{{ cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] }}
+      ruamel.yaml=={{ cluster_bot_ruamel_yaml_version }} --hash=sha256:{{ cluster_bot_sha256.ruamel_yaml[cluster_bot_ruamel_yaml_version] }}
   register: cluster_bot_requirements
 
 - name: Look for the bot's venv
@@ -89,6 +91,27 @@
     owner: root
     group: root
     mode: u=rwX,go=rX
+  notify: Restart the cluster bot
+
+# The roster's checks and editors, the very file the deploy and people.py use: account
+# requests edit the roster as an administrator would.
+- name: Install the roster module
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../plugins/filter/people.py"
+    dest: "{{ _cluster_bot_lib }}/clusterbot/people_roster.py"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the cluster bot
+
+- name: Write the GitHub App's private key
+  ansible.builtin.copy:
+    dest: "{{ _cluster_bot_github_key }}"
+    owner: root
+    group: "{{ cluster_bot_user }}"
+    mode: "0640"
+    content: "{{ cluster_bot_github_app_key | trim }}\n"
+  no_log: true
   notify: Restart the cluster bot
 
 # Each token in its own file the bot alone reads: never on a command line or in the unit.

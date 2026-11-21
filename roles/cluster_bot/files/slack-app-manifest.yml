@@ -8,6 +8,12 @@ features:
     display_name: cluster-bot
     always_online: true
   slash_commands:
+    - command: /join
+      description: "Ask for a cluster account"
+      should_escape: false
+    - command: /leave
+      description: "Give back a cluster account (graduation)"
+      should_escape: false
     - command: /scratch
       description: "Fast scratch space: ask, extend, resize, release"
       should_escape: false

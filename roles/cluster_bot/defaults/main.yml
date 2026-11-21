@@ -16,7 +16,12 @@ cluster_bot_state: present
 cluster_bot_slack_bolt_version: "1.30.0"
 # upstream: pypi slack-sdk 3.9
 cluster_bot_slack_sdk_version: "3.48.0"
+# The roster editors' YAML library (round trip, pure Python), for account requests.
+# upstream: pypi ruamel.yaml 3.9
+cluster_bot_ruamel_yaml_version: "0.19.1"
 cluster_bot_sha256:
+  ruamel_yaml:
+    "0.19.1": 27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93
   slack_bolt:
     "1.30.0": 81f5bc46e79516d23d5e2a31dded6304dd1b8b6b72c0083f2f31d5d801e262c4
   slack_sdk:
@@ -29,3 +34,14 @@ cluster_bot_admins: "{{ people | default({}) | people_with_role('admin') }}"
 
 # Days before an allocation's end its owner is reminded, once each.
 cluster_bot_remind_days: [7, 1]
+
+# Account requests (/join, /leave) become pull requests on the site configuration, made
+# as the bot's GitHub App (docs/slurm-cluster/cluster-bot.md: creating it). Empty repo
+# leaves them off. The App's private key (PEM) is a secret: vault it.
+cluster_bot_github_repo: ""
+cluster_bot_github_base: main
+cluster_bot_github_app_id: ""
+cluster_bot_github_installation_id: ""
+cluster_bot_github_app_key: ""
+# Accounts never offered to a new person (accounts without children are offered).
+cluster_bot_join_exclude: [root, admin]
