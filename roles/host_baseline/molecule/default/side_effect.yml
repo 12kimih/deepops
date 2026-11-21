@@ -1,0 +1,31 @@
+---
+- name: Check the units are off, then drop them from the list
+  hosts: all
+  become: true
+  tasks:
+    - name: Read the units' state
+      ansible.builtin.command:
+        argv: [systemctl, is-enabled, cron.service]
+      register: masked_state
+      changed_when: false
+      failed_when: false
+
+    - name: Read the test owner's record
+      ansible.builtin.slurp:
+        src: /var/lib/deepops/masked-units/test
+      register: masked_first
+
+    - name: Check cron is masked and only it is recorded (nosuch.service is not installed)
+      ansible.builtin.assert:
+        that:
+          - masked_state.stdout_lines == ['masked']
+          - masked_first.content | b64decode == 'cron.service\n'
+        fail_msg: "{{ masked_state.stdout_lines }}"
+
+    - name: Drop them from the test owner's list
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: masked
+      vars:
+        host_baseline_masked_owner: test
+        host_baseline_masked_units: []

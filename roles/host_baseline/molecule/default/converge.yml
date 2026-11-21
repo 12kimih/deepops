@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Mask the test owner's units
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: masked
+      vars:
+        host_baseline_masked_owner: test
+        host_baseline_masked_units: [cron.service, nosuch.service]

@@ -39,6 +39,17 @@ host_baseline_protected_packages:
   - slurm-smd*
   - munge
 
+# Units a site keeps off (tasks_from: masked, owner "site"): stopped, disabled and
+# masked, so neither a dependency nor a socket starts them; for a service a metapackage
+# brings and nothing here uses (multipathd without a SAN). Units not installed are left
+# for the run after their package arrives. A unit dropped from the list is unmasked and
+# set back to the distribution's preset. Empty = nothing masked by the site.
+host_baseline_masked_units: []
+# The one way roles mask units (tasks_from: masked): the including role passes an owner
+# (names its record under deepops_state_dir) and its units; each owner unmasks only what
+# it masked.
+host_baseline_masked_owner: site
+
 # Local filesystems' mount options, mount point: options (fstab(5) field 4), for the
 # entries already in /etc/fstab (the installer's, by UUID): only the options are set,
 # then the filesystem is remounted. A network filesystem is roles/nfs_client's. Usually
