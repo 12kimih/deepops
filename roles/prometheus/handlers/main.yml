@@ -11,11 +11,10 @@
 # --web.enable-lifecycle, which also serves an unauthenticated /-/quit. Retries cover a
 # restart that is still starting up (the container is named after the unit).
 - name: Reload prometheus
-  ansible.builtin.command:
+  change_command:
     argv: [docker, kill, --signal=HUP, "{{ prometheus_svc_name }}"]
   register: prometheus_reload
   until: prometheus_reload is succeeded
   retries: 10
   delay: 3
-  changed_when: true
   when: prometheus_service_state == 'started'

@@ -49,12 +49,11 @@
 # Through the entry's mount unit, so systemd tracks the mount and its start timeout bounds
 # a server that answers but does not serve the export.
 - name: Mount the entries whose server answered
-  ansible.builtin.command:
+  change_command:
     argv: [systemctl, start, "{{ item.item.target }}"]
   loop: "{{ nfs_mount_wait.results | reject('failed') | list }}"
   loop_control:
     label: "{{ item.item.target }}"
-  changed_when: true
   tags:
     - nfs_mount
 

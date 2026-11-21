@@ -7,9 +7,11 @@
   check_mode: false
 
 - name: Remove the Gateway
-  ansible.builtin.command: "{{ runai_kubectl }} --namespace {{ runai_cluster_namespace }} delete gateway {{ runai_gateway_name }} --ignore-not-found"
+  change_command:
+    cmd: "{{ runai_kubectl }} --namespace {{ runai_cluster_namespace }} delete gateway {{ runai_gateway_name }} --ignore-not-found"
   register: runai_rm_gw
-  changed_when: "'deleted' in runai_rm_gw.stdout"
+  changed_when: >-
+    ansible_check_mode or ('deleted' in runai_rm_gw.stdout)
   when: "'gateways.gateway.networking.k8s.io' in runai_gw_types.stdout_lines"
 
 # Check every route/policy as well as Gateways BEFORE removing either controller
@@ -50,17 +52,19 @@
 # KGateway creates this Secret at runtime, outside the Helm release. Remove it
 # only after the owned controller is stopped, before dropping its ownership record.
 - name: Remove the owned controller runtime HMAC Secret
-  ansible.builtin.command: "{{ runai_kubectl }} --namespace {{ runai_gateway_controller_namespace }} delete secret oauth2-hmac-secret --ignore-not-found"
+  change_command:
+    cmd: "{{ runai_kubectl }} --namespace {{ runai_gateway_controller_namespace }} delete secret oauth2-hmac-secret --ignore-not-found"
   register: runai_rm_gw_hmac
-  changed_when: "'deleted' in runai_rm_gw_hmac.stdout"
+  changed_when: >-
+    ansible_check_mode or ('deleted' in runai_rm_gw_hmac.stdout)
   when:
     - runai_gw_unused | bool
     - runai_gw_owners.results | selectattr('item', 'equalto', 'kgateway') | map(attribute='stdout') | select | list | length > 0
 
 - name: Remove ownership records after release cleanup
-  ansible.builtin.command: "{{ runai_kubectl }} --namespace {{ runai_gateway_controller_namespace }} delete configmap deepops-runai-{{ item.item }} --ignore-not-found"
+  change_command:
+    cmd: "{{ runai_kubectl }} --namespace {{ runai_gateway_controller_namespace }} delete configmap deepops-runai-{{ item.item }} --ignore-not-found"
   loop: "{{ runai_gw_owners.results }}"
-  changed_when: true
   when:
     - runai_gw_unused | bool
     - item.stdout | length > 0
@@ -78,9 +82,9 @@
   check_mode: false
 
 - name: Remove unused Gateway API CRDs this role installed
-  ansible.builtin.command: "{{ runai_kubectl }} delete crd {{ item }} --ignore-not-found"
+  change_command:
+    cmd: "{{ runai_kubectl }} delete crd {{ item }} --ignore-not-found"
   loop: "{{ runai_gw_crds_owned.stdout_lines }}"
-  changed_when: true
   when: runai_gw_unused | bool
 
 # Never delete the controller namespace: it can contain unrelated releases,

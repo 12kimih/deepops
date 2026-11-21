@@ -33,6 +33,7 @@ from repo_scan import ansible_files, module, tasks, tracked  # noqa: E402
 os.environ["ANSIBLE_CONFIG"] = str(Path(__file__).with_name("ansible.cfg"))
 os.environ["ANSIBLE_ROLES_PATH"] = str(ROOT / "roles")
 os.environ["ANSIBLE_FILTER_PLUGINS"] = str(ROOT / "plugins" / "filter")
+os.environ["ANSIBLE_ACTION_PLUGINS"] = str(ROOT / "plugins" / "action")
 os.environ["ANSIBLE_COLLECTIONS_PATH"] = str(ROOT / "collections")
 os.environ["ANSIBLE_LOCAL_TEMP"] = str(Path.home() / ".cache" / "deepops" / "ansible-tmp")
 

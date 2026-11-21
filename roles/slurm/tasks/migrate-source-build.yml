@@ -20,14 +20,13 @@
     - "{{ slurm_source_build_dirs[0] }}/contribs/pam_slurm_adopt"
 
 - name: Uninstall the source build
-  ansible.builtin.command:
+  change_command:
     argv: [make, uninstall]
     chdir: "{{ item.item }}"
   loop: "{{ slurm_source_makefiles.results | selectattr('stat.exists') | list }}"
   loop_control:
     label: "{{ item.item }}"
   register: slurm_source_uninstall
-  changed_when: true
   failed_when: false
 
 # Its library path in /etc/ld.so.conf.d goes with the other leftovers (stale-files.yml,

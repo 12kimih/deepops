@@ -108,8 +108,8 @@
     - not enroot_apparmor_global_disable | bool
 
 - name: Ubuntu | load enroot's AppArmor profile
-  ansible.builtin.command: apparmor_parser -r -W /etc/apparmor.d/enroot
-  changed_when: true
+  change_command:
+    cmd: apparmor_parser -r -W /etc/apparmor.d/enroot
   when:
     - enroot_userns_knob.stat.exists
     - not enroot_apparmor_global_disable | bool

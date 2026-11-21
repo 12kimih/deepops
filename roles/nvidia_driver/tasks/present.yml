@@ -160,12 +160,14 @@
   notify: Nvidia-persistenced unit changed
 
 - name: Remove the drop-in directory when nothing else is in it
-  ansible.builtin.command:
+  change_command:
     argv: [rmdir, /etc/systemd/system/nvidia-persistenced.service.d]
     removes: /etc/systemd/system/nvidia-persistenced.service.d
   register: nvidia_driver_dropin_dir
-  failed_when: nvidia_driver_dropin_dir.rc != 0 and 'not empty' not in nvidia_driver_dropin_dir.stderr
-  changed_when: nvidia_driver_dropin_dir.rc == 0
+  failed_when: >-
+    not ansible_check_mode and (nvidia_driver_dropin_dir.rc != 0 and 'not empty' not in nvidia_driver_dropin_dir.stderr)
+  changed_when: >-
+    ansible_check_mode or (nvidia_driver_dropin_dir.rc == 0)
 
 # Enabled now, whatever module runs: after a pending reboot it starts with the new one.
 - name: Enable the NVIDIA persistence daemon at boot

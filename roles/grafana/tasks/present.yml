@@ -116,11 +116,10 @@
 
 # On stdin, not argv: every user on the host can read a process's arguments.
 - name: Reset the admin password
-  ansible.builtin.command:
+  change_command:
     argv: [docker, exec, -i, "{{ grafana_svc_name }}", grafana, cli, admin, reset-admin-password, --password-from-stdin]
     stdin: "{{ grafana_cfg_pass }}"
   no_log: true
-  changed_when: true
   when: grafana_service_state != "stopped" and (grafana_login.status | default(200)) == 401
 
 # Earlier layouts kept the provisioned dashboards in the data directory. Removed only

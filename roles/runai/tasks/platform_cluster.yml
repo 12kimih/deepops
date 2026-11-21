@@ -21,7 +21,7 @@
 # The install key is short-lived (two hours) and is fetched only when the
 # cluster release must be created or changed.
 - name: Register the cluster and fetch its install settings
-  ansible.builtin.command:
+  change_command:
     argv: >-
       {{ ['python3', runai_work_dir ~ '/runai_api.py',
           '--domain', runai_platform_domain,
@@ -33,7 +33,8 @@
     RUNAI_USERNAME: "{{ runai_platform_admin_user }}"
     RUNAI_PASSWORD: "{{ runai_platform_admin_password }}"
   register: runai_api
-  changed_when: (runai_api.stdout | from_json).created
+  changed_when: >-
+    ansible_check_mode or ((runai_api.stdout | from_json).created)
   no_log: true
   become: true
   when: >-
@@ -53,4 +54,4 @@
       version: "{{ runai_chart_version }}"
       helm_values: "{{ runai_cluster_base_values | runai_deep_merge((runai_api.stdout | from_json)['values']) | runai_deep_merge(runai_platform_cluster_extra_values) }}"
       sensitive: true
-  when: runai_api is not skipped
+  when: runai_api.stdout is defined  # --check asks nothing of the API

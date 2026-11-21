@@ -36,12 +36,12 @@ def load(path):
 
 
 def gpu_commands(path):
-    """The (task, normalized command) pairs of PATH's command and shell tasks that drive
-    the GPUs (finding nvidia-smi on PATH does not)."""
+    """The (task, normalized command) pairs of PATH's command and shell tasks (and their
+    change_ forms) that drive the GPUs (finding nvidia-smi on PATH does not)."""
     pairs = []
     for task in repo_scan.tasks(ROOT / path):
         name, args = repo_scan.module(task)
-        if name not in ("command", "shell"):
+        if name not in {"command", "shell"} | repo_scan.CHANGES:
             continue
         # The raw text of a free-form command: its words are shell, not key=value pairs.
         raw = next((v for k, v in task.items() if repo_scan.canonical(k) == name), None)
@@ -149,8 +149,8 @@ class TransientExecutionContract(unittest.TestCase):
         ):
             with self.subTest(name=name):
                 task = task_named(path, name)
-                self.assertIn("command", task)
-                self.assertNotIn("shell", task)
+                self.assertTrue({"command", "change_command"} & set(task))
+                self.assertFalse({"shell", "change_shell"} & set(task))
 
 
 class MigApplyFailureContract(unittest.TestCase):

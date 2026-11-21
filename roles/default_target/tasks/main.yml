@@ -8,8 +8,8 @@
     - default_target
 
 - name: Set the default target
-  ansible.builtin.command: "systemctl set-default {{ default_target }}"
+  change_command:
+    cmd: "systemctl set-default {{ default_target }}"
   when: default_target_now.stdout | trim != default_target
-  changed_when: true
   tags:
     - default_target

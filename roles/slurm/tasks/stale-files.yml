@@ -20,8 +20,8 @@
     stale_files_report: "{{ stale_files_report_paths if _report else [] }}"
 
 - name: Refresh the library cache without them
-  ansible.builtin.command: ldconfig
-  changed_when: true
+  change_command:
+    cmd: ldconfig
   when: stale_files_result is changed
 
 # Its Slurm log import gone, rsyslog stops reading the logs a second time.

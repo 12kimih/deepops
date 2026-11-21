@@ -8,9 +8,8 @@
 # try-restart re-binds only a socket already running, so a node without socket
 # activation is never switched over to it. man systemctl(1), man systemd.socket(5)
 - name: Restart the docker socket unit
-  ansible.builtin.command:
+  change_command:
     cmd: systemctl try-restart docker.socket
-  changed_when: true
   when:
     - docker_daemon_restart | bool
     - ((docker_socket_group_unit | default({})).rc | default(1)) == 0

@@ -91,10 +91,10 @@
 
 - name: Run the installer
   when: hpcsdk_install
-  ansible.builtin.command: "./install"
+  change_command:
+    cmd: "./install"
   args:
     chdir: "{{ hpcsdk_temp_dir }}/{{ hpcsdk_download_name }}"
-  changed_when: true
   environment:
     NVHPC_SILENT: "true"
     NVHPC_INSTALL_DIR: "{{ hpcsdk_install_dir }}"
@@ -141,12 +141,11 @@
     hpcsdk_localrc: "{{ build_record_stale }}"
 
 - name: Run the makelocalrc script
-  ansible.builtin.command:
+  change_command:
     argv:
       - "{{ hpcsdk_tree }}/compilers/bin/makelocalrc"
       - -x
       - "{{ hpcsdk_tree }}/compilers"
-  changed_when: true
   when: hpcsdk_localrc
 
 - name: Record what localrc was generated for

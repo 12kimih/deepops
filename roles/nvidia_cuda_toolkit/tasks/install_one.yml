@@ -38,23 +38,21 @@
     - "{{ cuda_install_root }}/{{ cuda_toolkit.version }}"
 
 - name: Install the toolkit (never the driver) for {{ cuda_toolkit.version }}
-  ansible.builtin.command:
+  change_command:
     cmd: >-
       sh {{ cuda_cache_dir }}/{{ cuda_toolkit.runfile }}
       --silent --toolkit
       --toolkitpath={{ cuda_install_root }}/.{{ cuda_toolkit.version }}.partial
       --override --no-man-page
       --tmpdir={{ cuda_cache_dir }}/tmp
-  changed_when: true
 
 - name: Put the finished toolkit in place for {{ cuda_toolkit.version }}
-  ansible.builtin.command:
+  change_command:
     argv:
       - mv
       - -T
       - "{{ cuda_install_root }}/.{{ cuda_toolkit.version }}.partial"
       - "{{ cuda_install_root }}/{{ cuda_toolkit.version }}"
-  changed_when: true
 
 - name: Remove the runfile of {{ cuda_toolkit.version }}
   ansible.builtin.file:

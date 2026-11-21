@@ -16,6 +16,8 @@
     quiet: true
 
 - name: Pull {{ container_image }}
-  ansible.builtin.command: docker pull {{ container_image | quote }}
+  change_command:
+    cmd: docker pull {{ container_image | quote }}
   register: container_image_pull
-  changed_when: "'Downloaded newer image' in container_image_pull.stdout"
+  changed_when: >-
+    ansible_check_mode or ('Downloaded newer image' in container_image_pull.stdout)

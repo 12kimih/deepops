@@ -1,14 +1,15 @@
 ---
 # Source first: a BMC ignores a static address while the channel is still DHCP.
 - name: Set the BMC address source
-  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} ipsrc {{ bmc_ipsrc }}"
+  change_command:
+    cmd: "ipmitool -I open lan set {{ bmc_channel }} ipsrc {{ bmc_ipsrc }}"
   when: (bmc_ipsrc | lower) not in (bmc_lan_now.ipsrc | lower)
-  changed_when: true
   tags:
     - bmc
 
 - name: Set the BMC LAN address
-  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} {{ item.key }} {{ item.value }}"
+  change_command:
+    cmd: "ipmitool -I open lan set {{ bmc_channel }} {{ item.key }} {{ item.value }}"
   loop:
     - {key: "ipaddr", value: "{{ bmc_ipaddr }}", now: "{{ bmc_lan_now.ipaddr }}"}
     - {key: "netmask", value: "{{ bmc_netmask }}", now: "{{ bmc_lan_now.netmask }}"}
@@ -19,6 +20,5 @@
     - bmc_ipsrc == "static"
     - item.value | length > 0
     - item.value != item.now
-  changed_when: true
   tags:
     - bmc

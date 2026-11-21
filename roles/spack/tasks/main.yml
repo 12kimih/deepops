@@ -63,7 +63,7 @@
   delay: 10
 
 - name: Move an existing clone to its pinned tag
-  ansible.builtin.shell:
+  change_shell:
     cmd: >-
       git -C "$DEST" fetch --depth 1 origin tag "$VERSION" &&
       git -C "$DEST" checkout -q "$VERSION"
@@ -77,7 +77,6 @@
     - not (item.rc == 128 and item.stderr is search('not a git repository'))
     - item.item.version not in item.stdout_lines
   register: spack_move
-  changed_when: true
   retries: 5
   delay: 10
   until: spack_move is succeeded
@@ -130,8 +129,9 @@
 # `spack install` is a no-op for a spec already installed; modules for new installs are
 # generated as they install (modules.yaml enable: lmod).
 - name: Install the default packages
-  ansible.builtin.command:
+  change_command:
     argv: ["{{ spack_bin }}", install, "{{ item }}"]
   loop: "{{ spack_default_packages }}"
   register: spack_build_result
-  changed_when: "'already installed' not in spack_build_result.stdout"
+  changed_when: >-
+    ansible_check_mode or ('already installed' not in spack_build_result.stdout)

@@ -30,7 +30,7 @@
 # maximum), and a routine run would lower them mid-job. Before the removal, so a run
 # that fails in between leaves the configuration for the next run to finish.
 - name: Reset each GPU to its default power limit
-  ansible.builtin.command:
+  change_command:
     cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ item.split(',')[2] | trim | float | round | int }}
   loop: "{{ nvidia_power_limit_readings.stdout_lines | default([]) }}"
   when:

@@ -7,6 +7,5 @@
 
 # Answers cached under the old settings would otherwise live out their timeout.
 - name: Flush the sssd cache
-  ansible.builtin.command:
+  change_command:
     argv: [sss_cache, -E]
-  changed_when: true

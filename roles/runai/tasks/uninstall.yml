@@ -55,13 +55,15 @@
 # Helm keeps these on purpose (resource-policy: keep); an uninstall that leaves
 # them behind is not clean, so remove them here.
 - name: Remove namespaces left behind
-  ansible.builtin.command: "{{ runai_kubectl }} delete namespace {{ item }} --ignore-not-found --wait --timeout=300s"
+  change_command:
+    cmd: "{{ runai_kubectl }} delete namespace {{ item }} --ignore-not-found --wait --timeout=300s"
   loop: >-
     {{ [runai_kai_namespace, 'kai-resource-reservation', 'runai-reservation',
         'runai-scale-adjust', runai_cluster_namespace, runai_cp_namespace]
        + ([runai_platform_ingress_namespace] if runai_haproxy_managed | bool else []) }}
   register: runai_rm_ns
-  changed_when: "'deleted' in runai_rm_ns.stdout"
+  changed_when: >-
+    ansible_check_mode or ('deleted' in runai_rm_ns.stdout)
 
 - name: List CRDs from these charts
   ansible.builtin.shell: >-
@@ -74,7 +76,7 @@
   check_mode: false
 
 - name: Remove CRDs from these charts (runai_uninstall_remove_crds)
-  ansible.builtin.command: "{{ runai_kubectl }} delete {{ item }} --ignore-not-found"
+  change_command:
+    cmd: "{{ runai_kubectl }} delete {{ item }} --ignore-not-found"
   loop: "{{ runai_left_crds.stdout_lines }}"
-  changed_when: true
   when: runai_uninstall_remove_crds | bool

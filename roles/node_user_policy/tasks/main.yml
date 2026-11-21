@@ -18,11 +18,10 @@
 
     # disable-linger stops the user's manager too, so their services end now.
     - name: Disable lingering for users not allowed to
-      ansible.builtin.command:
+      change_command:
         argv: [loginctl, disable-linger, "{{ item }}"]
       loop: "{{ node_user_policy_lingering.files | map(attribute='path') | map('basename')
                 | reject('in', node_user_policy_linger_users) | list }}"
-      changed_when: true
 
 # Only the rule this role wrote goes: a site's own of the same name stays.
 - name: Remove the lingering rule when the policy is off

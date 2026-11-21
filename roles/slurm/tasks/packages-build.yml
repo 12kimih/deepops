@@ -120,7 +120,7 @@
         fail_key: false
 
     - name: Give the build account the registry's numbers
-      ansible.builtin.shell:
+      change_shell:
         cmd: |
           set -e
           groupmod -g {{ _gid }} {{ slurm_deb_build_user | quote }}
@@ -129,7 +129,6 @@
       vars:
         _gid: "{{ _slurm_build_account.gid | default(_slurm_build_account.uid) }}"
         _now: "{{ ansible_facts.getent_passwd[slurm_deb_build_user] | default(none) }}"
-      changed_when: true
       when:
         - _now is not none
         - _now[4] == _slurm_build_account.home
@@ -567,7 +566,7 @@
 # keyring; then the signature is checked against slurm_repo_signing_pubkey_file, the key
 # the nodes trust, so a mismatched pair fails here and not on every node.
 - name: Index and sign the repository
-  ansible.builtin.shell:
+  change_shell:
     cmd: |
       set -eu
       work=$(mktemp -d {{ deepops_cache_dir }}/slurm-repo-sign.XXXXXX)
@@ -587,5 +586,4 @@
     executable: /bin/bash
     stdin: "{{ lookup('ansible.builtin.file', slurm_repo_signing_key_file) }}"  # decrypts the vaulted file
   no_log: true
-  changed_when: true
   when: slurm_repo_index.stdout != 'current'

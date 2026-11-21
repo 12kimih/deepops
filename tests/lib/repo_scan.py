@@ -111,6 +111,12 @@ def tasks(path):
             yield from _walk([item])
 
 
+# The actions that run a command: change_command and change_shell (plugins/action) are
+# command and shell for a change, which --check reports instead of skipping.
+CHANGES = frozenset({"change_command", "change_shell"})
+COMMANDS = frozenset({"command", "shell", "script", "raw", "expect"}) | CHANGES
+
+
 def canonical(name):
     """ansible.builtin.copy, ansible.legacy.copy and copy are one module."""
     return name.rsplit(".", 1)[-1] if isinstance(name, str) else name

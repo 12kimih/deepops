@@ -24,13 +24,12 @@
 # The nodes keep the configuration slurmctld served them until told to fetch it again
 # (configless); slurmctld must answer first, which it may not yet right after a restart.
 - name: Reconfigure slurmd
-  ansible.builtin.command:
+  change_command:
     argv: ["{{ slurm_install_prefix }}/bin/scontrol", reconfigure]
   register: slurm_reconfigure
-  until: slurm_reconfigure.rc == 0
+  until: slurm_reconfigure is succeeded
   retries: 12
   delay: 5
-  changed_when: true
   when: is_controller
 
 - name: Restart slurmd

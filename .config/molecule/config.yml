@@ -46,11 +46,12 @@ provisioner:
     - -vv
   # Molecule runs from the role with its own ansible.cfg: the repository's paths
   # (ansible.cfg) given again, so a scenario finds the Galaxy roles and collections,
-  # the shared module_utils and the filter plugins as a deploy does.
+  # the shared module_utils and the filter and action plugins as a deploy does.
   env:
     ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/../galaxy:${MOLECULE_PROJECT_DIRECTORY}/.."
     ANSIBLE_COLLECTIONS_PATH: "${MOLECULE_PROJECT_DIRECTORY}/../../collections"
     ANSIBLE_MODULE_UTILS: "${MOLECULE_PROJECT_DIRECTORY}/../../plugins/module_utils"
     ANSIBLE_FILTER_PLUGINS: "${MOLECULE_PROJECT_DIRECTORY}/../../plugins/filter"
+    ANSIBLE_ACTION_PLUGINS: "${MOLECULE_PROJECT_DIRECTORY}/../../plugins/action"
 verifier:
   name: ansible

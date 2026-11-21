@@ -14,7 +14,7 @@
 # One call sets every level: ipmitool copies the current enables and replaces the named
 # levels' with the listed types.
 - name: Set the IPMI 1.5 authentication types
-  ansible.builtin.command:
+  change_command:
     argv:
       - ipmitool
       - -I
@@ -29,6 +29,5 @@
     ['callback', 'user', 'operator', 'admin']
     | map('extract', bmc_lan_now.auth) | map('sort') | unique
     != [bmc_auth_types | map('lower') | sort]
-  changed_when: true
   tags:
     - bmc

@@ -95,7 +95,7 @@
 
     # A directory goes only when empty: anything left in it is not ours to remove.
     - name: Remove empty directories
-      ansible.builtin.command:
+      change_command:
         argv:
           - python3
           - -c
@@ -110,7 +110,8 @@
                 print("kept")
           - "{{ item }}"
       register: component_record_rmdir
-      changed_when: component_record_rmdir.stdout == 'removed'
+      changed_when: >-
+        ansible_check_mode or (component_record_rmdir.stdout == 'removed')
       loop: "{{ component_record_orphans.dir | sort | reverse }}"
 
     - name: Remove packages

@@ -42,7 +42,7 @@
 # The secret is applied as a manifest on stdin, so the password is never on a command
 # line (readable by every local user through ps) and needs no shell quoting.
 - name: Create a docker secret for private GPU Operator containers
-  ansible.builtin.command:
+  change_command:
     argv: [kubectl, apply, -f, "-"]
     stdin: "{{ {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'kubernetes.io/dockerconfigjson',
                'metadata': {'name': 'registry-secret', 'namespace': gpu_operator_namespace},
@@ -52,7 +52,8 @@
                  'auth': (gpu_operator_registry_username ~ ':' ~ gpu_operator_registry_password) | b64encode}}}
                  | to_json | b64encode}} | to_json }}"
   register: gpu_operator_registry_secret
-  changed_when: "'unchanged' not in gpu_operator_registry_secret.stdout"
+  changed_when: >-
+    ansible_check_mode or ('unchanged' not in gpu_operator_registry_secret.stdout)
   no_log: true
 
 # Installs into gpu_operator_namespace, from the NGC repository that needs the

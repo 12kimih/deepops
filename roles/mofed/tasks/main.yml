@@ -43,9 +43,8 @@
 # A standalone MLNX_OFED (ofed_info names itself MLNX_OFED_LINUX) goes with its own
 # uninstaller, as the guide says.
 - name: Remove MLNX_OFED
-  ansible.builtin.command:
+  change_command:
     argv: [/usr/sbin/ofed_uninstall.sh, --force]
-  changed_when: true
   when: mofed_ofed_info.stdout is search('^MLNX_OFED_LINUX')
 
 # DOCA before 2.6 cannot be upgraded in place: every DOCA package goes first.
