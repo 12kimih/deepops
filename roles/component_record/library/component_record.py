@@ -60,6 +60,13 @@ options:
         its items (C(<role>_legacy) in its vars/main.yml).
     type: dict
     default: {}
+  write:
+    description:
+      - False computes the record and the orphans without writing it. The role calls it
+        so first, removes the orphans, then writes: a removal that fails midway leaves
+        the record as it was, so the next run finds the same orphans again.
+    type: bool
+    default: true
   version:
     description: The component's version, for C(begin) and C(present).
     type: str
@@ -179,6 +186,9 @@ def apply(data, name, action, items, version, exclusive=(), evidence=lambda kind
     for item in orphans:
         kind, _, ident = item.partition(":")
         grouped[kind].append(ident)
+    # What starts a service stops first (a socket, a timer or a path unit), or it could
+    # start the service again between the two stops.
+    grouped["unit"].sort(key=lambda unit: (not unit.endswith((".socket", ".timer", ".path")), unit))
     return record, grouped, before
 
 
@@ -192,6 +202,7 @@ def main():
             "version": {"type": "str", "default": ""},
             "exclusive_packages": {"type": "list", "elements": "str", "default": []},
             "legacy": {"type": "dict", "default": {}},
+            "write": {"type": "bool", "default": True},
         },
         supports_check_mode=True,
     )
@@ -234,7 +245,7 @@ def main():
         data, p["name"], p["action"], p["items"], p["version"], set(p["exclusive_packages"]), evidence
     )
     changed = record != data
-    if changed and not module.check_mode:
+    if changed and p["write"] and not module.check_mode:
         os.makedirs(os.path.dirname(p["path"]), mode=0o755, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p["path"]))
         with os.fdopen(fd, "w") as f:

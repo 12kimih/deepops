@@ -7,7 +7,10 @@
     fail_msg: component_record needs a name and an action (begin, present or absent).
     quiet: true
 
-- name: "Record the component {{ component_record_name ~ ' (' ~ component_record_action ~ ')' }}"
+# The record and its orphans, worked out without writing: the record is written after
+# the orphans are gone (the last task), so a removal that fails midway leaves it as it
+# was and the next run finds the same orphans again.
+- name: "Work out the record of {{ component_record_name ~ ' (' ~ component_record_action ~ ')' }}"
   component_record:
     path: "{{ component_record_path }}"
     name: "{{ component_record_name }}"
@@ -16,7 +19,9 @@
     version: "{{ component_record_version | string }}"
     exclusive_packages: "{{ component_record_exclusive_packages }}"
     legacy: "{{ component_record_legacy }}"
+    write: false
   register: component_record_result
+  changed_when: false
 
 # The calling role, removed, has nothing to run again after a pending reboot.
 - name: Withdraw the removed component's reboot request
@@ -47,10 +52,26 @@
       loop: "{{ component_record_orphans.mount }}"
       register: component_record_mounts
 
-    - name: Look for the Docker daemon
-      ansible.builtin.stat:
-        path: /var/run/docker.sock
+    # The API is asked, not the socket file (a file with nothing behind it, or none while
+    # dockerd runs on). No Docker on the host: no container to remove. Docker installed
+    # but not answering: stop, the record kept, rather than lose the containers from it.
+    - name: Ask the Docker API
+      ansible.builtin.command:
+        argv: [docker, info, --format, ok]
       register: component_record_docker
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when: component_record_orphans.container | length > 0
+
+    - name: Stop when Docker is installed but does not answer
+      ansible.builtin.assert:
+        that: component_record_docker.rc in [0, 127]
+        fail_msg: >-
+          Containers {{ component_record_orphans.container | join(', ') }} are no longer
+          wanted, but Docker does not answer on {{ inventory_hostname }}:
+          {{ component_record_docker.stderr | default('') }}. Bring Docker back and run again.
+        quiet: true
       when: component_record_orphans.container | length > 0
 
     - name: Remove containers
@@ -59,7 +80,7 @@
         state: absent
       loop: "{{ component_record_orphans.container }}"
       register: component_record_containers
-      when: component_record_docker.stat.exists | default(false)
+      when: component_record_docker.rc | default(1) == 0
 
     - name: Look up units
       systemd_unit:
@@ -135,3 +156,13 @@
           dir: "{{ component_record_rmdir.results | default([]) | select('changed') | map(attribute='item') | list }}"
           package: >-
             {{ (host_baseline_present | default([])) if component_record_orphans.package | length > 0 else [] }}
+
+- name: "Record the component {{ component_record_name ~ ' (' ~ component_record_action ~ ')' }}"
+  component_record:
+    path: "{{ component_record_path }}"
+    name: "{{ component_record_name }}"
+    action: "{{ component_record_action }}"
+    items: "{{ component_record_items }}"
+    version: "{{ component_record_version | string }}"
+    exclusive_packages: "{{ component_record_exclusive_packages }}"
+    legacy: "{{ component_record_legacy }}"
