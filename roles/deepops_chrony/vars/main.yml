@@ -3,3 +3,8 @@
 # own on Debian (its configuration goes with its purge). On the RHEL family it is the
 # OS's time service, not ours to remove.
 chrony_items: "{{ ['package:chrony'] if ansible_facts.os_family == 'Debian' else [] }}"
+
+# This host serves time (it takes it from chrony_upstream) or takes it from the hosts
+# that do, each by its address inside the cluster (its name where facts give none).
+chrony_serves: "{{ not chrony_serve_hosts or inventory_hostname in chrony_serve_hosts }}"
+chrony_serve_addresses: "{{ hostvars | cluster_addresses(chrony_serve_hosts, cluster_networks) }}"

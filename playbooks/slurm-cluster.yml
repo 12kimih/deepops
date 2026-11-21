@@ -18,6 +18,12 @@
   tags:
     - set-hosts
 
+- name: Set the system locale and time zone
+  import_playbook: generic/locale.yml
+
+- name: Set the target each host boots into
+  import_playbook: generic/default-target.yml
+
 - name: Configure Chrony (NTP) sync
   import_playbook: generic/chrony-client.yml
   vars:

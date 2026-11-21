@@ -1,29 +1,16 @@
 ---
 galaxy_info:
-  author: unxnn
-  role_name: chrony
-  description: This role enables users to install and configure chrony on their hosts.
-  license: MIT
-  min_ansible_version: 2.4
+  namespace: deepops
+  author: DeepOps
+  role_name: deepops_chrony
+  description: Time sync with chrony, optionally through the cluster's own time servers
+  license: MIT  # vendored from unxnn/ansible-role-chrony (LICENSE)
+  min_ansible_version: "2.17"
   platforms:
-    - name: EL
-      versions:
-        - 7
-        - 8
-    - name: Debian
-      versions:
-        - jessie
-        - stretch
-        - buster
     - name: Ubuntu
-      versions:
-        - bionic
-        - cosmic
-        - disco
-        - eoan
-  galaxy_tags:
-    - system
-    - chrony
-    - ntp
-    - time
-dependencies: []
+      versions: [noble, jammy]
+    - name: EL
+      versions: ["8", "9"]
+dependencies:
+  - role: network_defaults  # cluster_networks, cluster_addresses for chrony_serve_hosts
+  - role: retired_settings  # chrony_config_server, chrony_timezone

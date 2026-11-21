@@ -1,15 +1,16 @@
 ---
 - name: Read the current default target
-  ansible.builtin.command: systemctl get-default
+  ansible.builtin.command:
+    argv: [systemctl, get-default]
   register: default_target_now
   changed_when: false
-  check_mode: false
+  check_mode: false  # read-only; --check needs the result
   tags:
     - default_target
 
 - name: Set the default target
   change_command:
-    cmd: "systemctl set-default {{ default_target }}"
+    argv: [systemctl, set-default, "{{ default_target }}"]
   when: default_target_now.stdout | trim != default_target
   tags:
     - default_target

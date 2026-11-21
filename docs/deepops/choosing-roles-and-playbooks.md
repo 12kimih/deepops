@@ -61,5 +61,10 @@ Different layers; the monitoring stack uses the exporter.
 ## Time synchronization
 
 - `chrony` (`playbooks/generic/chrony-client.yml`) -- the default and only
-  time-sync path. (The old `ntp-client.yml` / `geerlingguy.ntp` was removed as
-  redundant.)
+  time-sync path. Every host takes time from `chrony_upstream`, or, with
+  `chrony_serve_hosts` set (for example the first slurm-master), only those hosts do
+  and serve the rest over `cluster_networks`, keeping the cluster in step while the
+  outside is unreachable. The time zone is `locale_timezone` (roles/locale), set with
+  the locale by `playbooks/generic/locale.yml`; `playbooks/generic/default-target.yml`
+  sets the boot target (`default_target`, multi-user.target). All three run in both
+  cluster deploys.

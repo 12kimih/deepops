@@ -35,6 +35,8 @@ retired_settings:
   enroot_configure_kernel_options_versions: every installed kernel gets the arguments (roles/host_baseline, kernel_args)
   nvidia_power_limit_persistence_mode: persistence mode is the persistence daemon's (roles/nvidia_driver)
   nvidia_driver_persistenced_dropin: the role owns the nvidia-persistenced unit with persistence mode on (roles/nvidia_driver)
+  chrony_config_server: chrony_upstream (chrony.conf source lines, e.g. "server time.example.org iburst") in roles/deepops_chrony
+  chrony_timezone: locale_timezone in roles/locale (the time zone is set with or without chrony)
   spack_build_packages: spack_default_packages (the specs to install; empty installs none) in roles/spack
   volume_snapshot_CRD_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster
   snapshot_controller_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster

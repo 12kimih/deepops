@@ -1,50 +1,28 @@
-<!-- Vendored into DeepOps from https://github.com/DeepOps/ansible-role-chrony at commit c9022153036dfdde4e2b313aecde4a46cd6f6687. -->
-# Ansible Role: Chrony
+<!-- Vendored into DeepOps from https://github.com/DeepOps/ansible-role-chrony at commit c9022153036dfdde4e2b313aecde4a46cd6f6687, since rewritten. -->
+# deepops_chrony
 
-This role enables users to install and configure chrony on their hosts.
+Time sync with chrony (chrony.conf(5)), as a deepops component: `chrony_install` in
+roles/deploy_defaults switches it, `deepops_component_removals` removes it (the OS's
+own time service takes over; docs/deepops/component-state.md).
 
-## Build Status
+Every host takes time from `chrony_upstream`, or, with `chrony_serve_hosts` set, only
+those hosts do and serve it to `chrony_serve_networks`; every other host then takes
+time from them by their address inside the cluster. A serving host that loses all
+upstream sources keeps serving (orphan mode), so the cluster stays in step.
 
-[![Build Status](https://travis-ci.org/unxnn/ansible-role-chrony.svg?branch=master)](https://travis-ci.org/unxnn/ansible-role-chrony)
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `chrony_state` | `present` | present, absent or kept; a deploy sets it |
+| `chrony_service_state` / `_enabled` | `started` / `true` | the service |
+| `chrony_upstream` | three `pool N.pool.ntp.org` lines | chrony.conf source lines |
+| `chrony_serve_hosts` | `[]` | inventory hosts that serve the rest |
+| `chrony_serve_networks` | `cluster_networks` | whom a serving host answers |
+| `chrony_serve_orphan_stratum` | `10` | stratum served with no upstream left |
+| `chrony_config_logdir` | `/var/log/chrony` | chrony's log directory |
 
-## Requirements
-
-None
-
-## Role Variables
-
-| Variable | Required | Default | Comments |
-|----------|----------|---------|----------|
-| `chrony_state` | No | `present` | present, absent or kept; a deploy sets it from `chrony_install` (docs/deepops/component-state.md). absent hands time sync back to systemd-timesyncd (Debian family only) |
-| `chrony_service_state` | No | `started` | The chrony service's state |
-| `chrony_service_enabled` | No | `true` | Whether the chrony service starts at boot |
-| `chrony_config_server` | No | `["0.pool.ntp.org","1.pool.ntp.org","2.pool.ntp.org", "3.pool.ntp.org"]` | A list of NTP servers to use.  |
-| `chrony_config_logdir` | No | `/var/log/chrony` | Where chrony writes its logs |
-| `chrony_timezone` | No | `Etc/UTC` | Set the timezone for your server. |
-
-## Examples
-
-1) Install chrony and use the default settings.
-
-```
-
-- hosts: all
-  roles:
-    - role: unxnn.chrony
-```
-
-2) Install chrony and use custom servers.
-
-```
-
-- hosts: all
-  roles:
-    - role: unxnn.chrony
-  vars:
-    chrony_config_server:
-      - 0.pool.ntp.org
-      - 2.pool.ntp.org
-```
+The configuration keeps the distribution's drop-in directories (`confdir`,
+`sourcedir` on Ubuntu and Debian) and its leap second handling (`leapsectz`). The time
+zone is roles/locale's (`locale_timezone`).
 
 ## License
 

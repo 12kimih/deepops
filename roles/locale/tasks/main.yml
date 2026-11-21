@@ -30,27 +30,39 @@
   tags:
     - locale
 
-# Write the login-session default LANG. /etc/default/locale is read by PAM on
-# Debian/Ubuntu; /etc/locale.conf is the systemd file used on RHEL/Rocky. Takes
-# effect on the next login (existing sessions keep their locale).
-- name: Set the default LANG (Debian)
-  ansible.builtin.lineinfile:
+# The login default LANG lives in locale.conf(5), /etc/locale.conf, which PAM and
+# systemd read; on Debian and Ubuntu up to 22.04 it is /etc/default/locale instead
+# (since 24.04 that is a link to /etc/locale.conf, written through, never chmodded as
+# a link). Takes effect on the next login.
+- name: Find the locale file
+  ansible.builtin.stat:
     path: /etc/default/locale
-    regexp: "^LANG="
-    line: "LANG={{ locale_lang }}"
-    create: true
-    mode: "0644"
-  when: ansible_facts.os_family == "Debian"
+  register: locale_default_file
   tags:
     - locale
 
-- name: Set the default LANG (RHEL/Rocky)
+- name: Set the default LANG
   ansible.builtin.lineinfile:
-    path: /etc/locale.conf
+    path: >-
+      {{ '/etc/default/locale' if ansible_facts.os_family == 'Debian'
+         and locale_default_file.stat.exists and not locale_default_file.stat.islnk
+         else '/etc/locale.conf' }}
     regexp: "^LANG="
     line: "LANG={{ locale_lang }}"
     create: true
     mode: "0644"
-  when: ansible_facts.os_family == "RedHat"
+  tags:
+    - locale
+
+- name: Install the time zone database
+  ansible.builtin.package:
+    name: tzdata
+    state: present
+  tags:
+    - locale
+
+- name: Set the time zone
+  community.general.timezone:
+    name: "{{ locale_timezone }}"
   tags:
     - locale
