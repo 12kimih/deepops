@@ -318,7 +318,8 @@ class RunTests(unittest.TestCase):
                    "notify": ["dm"], "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
                    "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
                    "dm_text": "{job}", "dashboard_url": "", "admin_channel": "#admin",
-                   "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2}  # fmt: skip
+                   "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
+                   "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}"}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
             slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
@@ -356,7 +357,8 @@ class ConfigTests(unittest.TestCase):
             "idle_util_threshold": 0, "notify": ["mention"], "notify_repeat_hours": 6,
             "dm_text": "{job} {gpus} {hours} {runtime}", "cancel_after_hours": 0, "user_map": {},
             "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin",
-            "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2}  # fmt: skip
+            "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
+                   "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}"}  # fmt: skip
 
     def load(self, **change):
         with tempfile.TemporaryDirectory() as d:
@@ -371,6 +373,8 @@ class ConfigTests(unittest.TestCase):
         for change, word in (({"dm_text": "{user}"}, "dm_text"), ({"dm_text": "{"}, "dm_text"),
                              ({"notify": ["email"]}, "notify"), ({"idle_hours": "2"}, "idle_hours"),
                              ({"cancel_after_hours": 1}, "exceed"),
+                             ({"cancel_after_hours": 12, "cancel_warn_hours": 10}, "cancel_warn_hours"),
+                             ({"cancel_after_hours": 12, "cancel_warn_text": "{user}"}, "cancel_warn_text"),
                              ({"cancel_after_hours": 24, "notify": []}, "notify"),
                              ({"channel": None}, "channel")):  # fmt: skip
             with self.subTest(change=change), self.assertRaisesRegex(report.ConfigError, word):
@@ -388,16 +392,32 @@ class ConfigTests(unittest.TestCase):
 
 
 class CancelTests(unittest.TestCase):
-    def run_act(self, notified):
-        j = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": False,
-             "state": {"since": NOW - 30 * 3600, "notified": notified}}  # fmt: skip
-        cfg = {"notify": ["mention"], "cancel_after_hours": 24, "channel": "#c"}
-        slack = mock.Mock()
-        slack.post.return_value = "ts"
+    """Cancelling: interactive sessions only (unless configured), and only once the owner
+    was told and then warned cancel_warn_hours ahead, each in an earlier run."""
+
+    def run_act(self, notified, warned=None, interactive=True, only=True, warn=1):
+        self.job = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": False, "runtime": 9,
+                    "interactive": interactive, "state": {"since": NOW - 30 * 3600, "notified": notified}}  # fmt: skip
+        if warned is not None:
+            self.job["state"]["warned"] = warned
+        cfg = {"notify": ["mention"], "cancel_after_hours": 24, "channel": "#c", "cancel_interactive_only": only,
+               "cancel_warn_hours": warn, "cancel_warn_text": "{job} in {hours}h"}  # fmt: skip
+        self.slack = mock.Mock()
+        self.slack.post.return_value = "ts"
         with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
-                mock.patch.object(report, "run") as run:  # fmt: skip
-            report.act({"idle": [j]}, cfg, lambda u, m: u, slack, {}, NOW)
+                mock.patch.object(report, "slack_id", lambda *a: "UU"), mock.patch.object(report, "run") as run:  # fmt: skip
+            report.act({"idle": [self.job]}, cfg, lambda u, m: u, self.slack, {}, NOW)
         return run.call_count
+
+    def test_warned_first_then_cancelled_in_a_later_run(self):
+        self.assertEqual(self.run_act(NOW - 3600), 0, "told but not yet warned: warned now, not cancelled")
+        self.assertEqual(self.job["state"]["warned"], NOW)
+        self.assertIn("7 in 1h", str(self.slack.post.call_args))
+        self.assertEqual(self.run_act(NOW - 3600, warned=NOW - 600), 1)
+
+    def test_a_batch_job_is_never_cancelled_unless_configured(self):
+        self.assertEqual(self.run_act(NOW - 3600, warned=NOW - 600, interactive=False), 0)
+        self.assertEqual(self.run_act(NOW - 3600, warned=NOW - 600, interactive=False, only=False), 1)
 
     def test_an_owner_without_a_slack_member_is_not_counted_as_told(self):
         j = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": True, "runtime": 9,
@@ -408,6 +428,9 @@ class CancelTests(unittest.TestCase):
             "channel": "#c",
             "dm_text": "{job}",
             "idle_hours": 2,
+            "cancel_interactive_only": True,
+            "cancel_warn_hours": 1,
+            "cancel_warn_text": "{job}",
         }
         with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
                 mock.patch.object(report, "slack_id", lambda *a: ""), mock.patch("sys.stderr"):  # fmt: skip
@@ -415,8 +438,8 @@ class CancelTests(unittest.TestCase):
         self.assertIsNone(j["state"]["notified"])
 
     def test_cancelled_only_after_the_owner_was_told_in_an_earlier_run(self):
-        self.assertEqual(self.run_act(None), 0)  # never told (lost state, failed DM)
-        self.assertEqual(self.run_act(NOW - 3600), 1)
+        self.assertEqual(self.run_act(None, warned=NOW - 600), 0)  # never told (lost state, failed DM)
+        self.assertEqual(self.run_act(NOW - 3600, warn=0), 1)  # no separate warning configured
 
 
 class WeeklyTests(unittest.TestCase):
@@ -424,7 +447,8 @@ class WeeklyTests(unittest.TestCase):
     idlest mentioned; a person over both thresholds for repeat_weeks weeks running is
     reported to the administrators, with their numbers and what to do."""
 
-    CFG = {"repeat_weeks": 2, "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5}
+    CFG = {"repeat_weeks": 2, "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "cancel_interactive_only": True,
+           "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}"}  # fmt: skip
 
     class Prom:
         def query(self, expr):

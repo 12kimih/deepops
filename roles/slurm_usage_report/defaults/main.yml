@@ -37,9 +37,17 @@ slurm_usage_report_dm_text: >-
   Your job {job} ({gpus} GPU, running {runtime}) has had idle GPUs for {hours}h.
   If you no longer need it, please free the GPUs with `scancel {job}`.
 # Cancel jobs idle this long (0 = never), announced in the report thread, and only once
-# the owner was notified in an earlier run: needs notify and more than idle_hours.
-# Announce the policy before enabling.
+# the owner was notified, and warned cancel_warn_hours ahead, in earlier runs: needs
+# notify and more than idle_hours. Announce the policy before enabling.
 slurm_usage_report_cancel_after_hours: 0
+# Only interactive sessions (srun, salloc: a shell holding GPUs until someone exits) are
+# cancelled; a batch job ends by itself.
+slurm_usage_report_cancel_interactive_only: true
+# The DM before a cancel, this many hours ahead (0: no separate warning).
+slurm_usage_report_cancel_warn_hours: 1
+slurm_usage_report_cancel_warn_text: >-
+  Your interactive job {job} ({gpus} GPU, running {runtime}) has held idle GPUs for long
+  and will be cancelled in {hours}h. Use the GPUs, or free them now with `scancel {job}`.
 
 # Slurm user -> Slack member ID or email (default: the roster's, slack_members). Users
 # not listed are looked up as <user>@<email_domain> when email_domain is set; otherwise
