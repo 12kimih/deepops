@@ -63,6 +63,7 @@
       state: "{{ node_exporter_service_state }}"
       enabled: "{{ node_exporter_service_enabled }}"
       notify: [Restart node-exporter]
+      health_url: "http://localhost:{{ node_exporter_port }}/metrics"
 
 - name: Record the component as present
   ansible.builtin.include_role:

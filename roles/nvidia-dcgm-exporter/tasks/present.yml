@@ -62,6 +62,7 @@
       state: "{{ dcgm_exporter_service_state }}"
       enabled: "{{ dcgm_exporter_service_enabled }}"
       notify: [Restart dcgm]
+      health_url: "http://localhost:{{ dcgm_exporter_port }}/metrics"
   when: has_gpus
 
 - name: Record the component as present

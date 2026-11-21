@@ -100,20 +100,9 @@
       state: "{{ grafana_service_state }}"
       enabled: "{{ grafana_service_enabled }}"
       notify: [Restart grafana]
+      health_url: "http://localhost:{{ grafana_port }}/api/health"
 
-- name: Apply pending restarts
-  ansible.builtin.meta: flush_handlers
-
-- name: Wait for grafana
-  ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
-  register: grafana_health
-  until: grafana_health.status == 200
-  retries: 30
-  delay: 2
-  # Under --check nothing was started or changed, so there is nothing to wait for.
-  when: grafana_service_state != "stopped" and not ansible_check_mode
-
+# roles/container_service ran the pending restarts and waited for /api/health.
 # grafana.ini sets the password only when the database is first created.
 - name: Check the admin password
   ansible.builtin.uri:

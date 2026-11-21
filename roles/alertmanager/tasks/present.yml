@@ -74,6 +74,7 @@
       state: "{{ alertmanager_service_state }}"
       enabled: "{{ alertmanager_service_enabled }}"
       notify: [Restart alertmanager]
+      health_url: "http://localhost:{{ alertmanager_port }}/-/ready"
 
 - name: Record the component as present
   ansible.builtin.include_role:

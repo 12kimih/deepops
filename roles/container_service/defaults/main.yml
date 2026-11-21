@@ -16,6 +16,10 @@
 #   args         the container's arguments
 #   state, enabled   the service's (started, true)
 #   notify       the caller's handlers to notify when the unit changes
+#   health_url   where it answers 200 once serving (/-/ready, /metrics); with it the role
+#                runs the pending handlers and waits for that before going on
+#                (tasks/verify.yml; without it, only that the container runs)
+#   health_timeout   seconds it may take (a large Prometheus TSDB replays its WAL first)
 container_service: {}
 container_service_keys:
   unit: ""
@@ -27,3 +31,5 @@ container_service_keys:
   state: started
   enabled: true
   notify: []
+  health_url: ""
+  health_timeout: 120
