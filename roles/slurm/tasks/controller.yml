@@ -8,8 +8,6 @@
   with_items:
     - mariadb-server
     - python3-pymysql
-    - s-nail
-    - ssmtp
   when: ansible_facts.os_family == "Debian"
 
 - name: Install dependencies (RedHat)
@@ -19,7 +17,6 @@
   with_items:
     - mariadb-server
     - python3-PyMySQL
-    - mailx
     - policycoreutils-python-utils
   when: ansible_facts.os_family == "RedHat"
 

@@ -1,0 +1,12 @@
+---
+# Slurm job notices as Slack DMs (roles/job_notice) on the controllers, which run
+# MailProg; removed elsewhere.
+#
+#   ansible-playbook -K playbooks/slurm-cluster/job-notice.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: job_notice
+      job_notice_state: "{{ deepops_components.job_notice | component_phase(deepops_phase) }}"
+  tags: ['job-notice', 'people']  # the chat IDs come from the roster

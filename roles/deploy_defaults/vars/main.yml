@@ -134,6 +134,10 @@ deepops_component_registry:
   slurm_backup:
     rules:
       - {switch: "{{ slurm_enable_backup }}", group: slurm-master, first: true}
+  # Slurm's MailProg as Slack DMs, on every controller (MailProg must be on each).
+  job_notice:
+    rules:
+      - {switch: "{{ slurm_enable_job_notices }}", group: slurm-master}
   slurm_usage_report:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}

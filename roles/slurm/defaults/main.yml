@@ -189,10 +189,6 @@ slurm_stale_files_rules:
 slurm_sysconf_dir: /etc/sysconfig
 slurm_contain_ssh: true
 
-# The account slurmctld and slurmdbd run as; its IDs and home are in
-# roles/system_accounts (the same numbers on every host: Slurm ships numeric IDs in
-# every job, NFS with AUTH_SYS sends them).
-slurm_username: slurm
 
 # Users who may SSH to a compute node without a job there (pam_slurm_adopt with
 # slurm_restrict_node_access), besides root: /etc/localusers. The list is the whole

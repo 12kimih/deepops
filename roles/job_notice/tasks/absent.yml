@@ -1,0 +1,9 @@
+---
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: job_notice
+    component_record_action: absent
+    component_record_items: "{{ job_notice_items }}"
+    component_record_exclusive_packages: []
