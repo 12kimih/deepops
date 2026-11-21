@@ -35,3 +35,32 @@
 
 - name: Flush handlers to ensure munge gets restarted now
   ansible.builtin.meta: flush_handlers
+
+# A running munged proves nothing about the key: each host encodes and decodes with its
+# own, then decodes a credential the first controller made, which only the same key
+# can. A host with another key fails here, not as "Invalid credential" on every job.
+- name: Check MUNGE on its key
+  when: not ansible_check_mode  # nothing was installed or restarted
+  block:
+    - name: Encode and decode a credential here
+      ansible.builtin.shell:
+        cmd: set -o pipefail && munge -n | unmunge --metadata=/dev/null --output=/dev/null
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Make a credential on the first controller
+      ansible.builtin.command:
+        argv: [munge, -n]
+      register: slurm_munge_credential
+      changed_when: false
+      check_mode: false  # read-only
+      run_once: true
+      delegate_to: "{{ groups['slurm-master'][0] }}"
+      when: groups['slurm-master'] | default([]) | length > 0
+
+    - name: Decode the controller's credential here
+      ansible.builtin.command:
+        argv: [unmunge, --metadata=/dev/null, --output=/dev/null]
+        stdin: "{{ slurm_munge_credential.stdout }}"
+      changed_when: false
+      when: slurm_munge_credential.stdout is defined
