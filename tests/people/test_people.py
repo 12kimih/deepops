@@ -2,6 +2,7 @@
 
 import copy
 import importlib.util
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -197,6 +198,56 @@ class ExampleConfig(unittest.TestCase):
         self.assertEqual(sorted(users), ["alice", "bob", "dave"])
         self.assertEqual(users["alice"]["default_account"], "team-a")
         self.assertEqual(users["alice"]["associations"]["admin"]["qos"], ["high_a", "low", "urgent"])
+
+
+class Edit(unittest.TestCase):
+    """people.py add and leave: the one way the roster is edited, by a person or the bot.
+    The file keeps its comments and order; nothing is written unless check passes."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        self.roster = self.dir / "people.yml"
+        shutil.copy(ROOT / "config.example" / "people.yml", self.roster)
+        (self.dir / "files" / "slurm").mkdir(parents=True)
+        shutil.copy(
+            ROOT / "config.example" / "files" / "slurm" / "accounting.yml", self.dir / "files" / "slurm"
+        )
+        self.before = self.roster.read_text()
+
+    def run_people(self, *args):
+        script = ROOT / "scripts" / "deepops" / "people.py"
+        return subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True)
+
+    def test_add_gives_the_next_uid_in_order_and_only_adds_lines(self):
+        done = self.run_people("add", str(self.roster), "carl", "--account", "team-a", "--slack", "U0CARL001")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        after = yaml.safe_load(self.roster.read_text())["people"]
+        uids = [p["uid"] for n, p in after.items() if n != "carl"]
+        self.assertEqual(
+            after["carl"], {"uid": max(uids) + 1, "slack": "U0CARL001", "accounts": {"team-a": {}}}
+        )
+        names = list(after)
+        i = names.index("carl")
+        self.assertTrue(names[i - 1] < "carl" < names[i + 1], names)  # beside its neighbours
+        removed = [
+            line for line in self.before.splitlines() if line not in self.roster.read_text().splitlines()
+        ]
+        self.assertEqual(removed, [], "comments and every other line stay")
+
+    def test_add_refuses_a_duplicate_an_undeclared_account_and_a_failing_check(self):
+        for args in (["bob", "--account", "team-a", "--slack", "U0X"], ["eve", "--account", "nosuch", "--slack", "U0X"],
+                     ["eve", "--account", "team-a"]):  # fmt: skip
+            self.assertEqual(self.run_people("add", str(self.roster), *args).returncode, 1, args)
+        self.assertEqual(self.roster.read_text(), self.before)
+
+    def test_leave_keeps_the_uid_and_drops_access(self):
+        self.assertEqual(self.run_people("leave", str(self.roster), "alice").returncode, 0)
+        alice = yaml.safe_load(self.roster.read_text())["people"]["alice"]
+        self.assertEqual(alice["status"], "left")
+        self.assertFalse({"roles", "accounts", "default_account", "disk_quota"} & set(alice))
+        self.assertEqual(alice["uid"], 1001)
 
 
 class Cli(unittest.TestCase):
