@@ -4,3 +4,4 @@ node_exporter_items:
   - "unit:{{ node_exporter_svc_name }}"
   - "container:{{ node_exporter_svc_name }}"
   - "file:/etc/systemd/system/{{ node_exporter_svc_name }}"
+  - "file:{{ node_exporter_prom_dir_tmpfiles }}"

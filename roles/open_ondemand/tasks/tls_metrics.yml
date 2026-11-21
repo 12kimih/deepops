@@ -30,6 +30,7 @@
             [Service]
             Type=oneshot
             TimeoutStartSec=1min
+            ExecStartPre=/usr/bin/install -d -m 0755 {{ open_ondemand_tls_metrics_textfile_dir }}
             ExecStart=/usr/local/sbin/open-ondemand-tls-metrics {{ open_ondemand_tls_dir }}/fullchain.pem {{ open_ondemand_tls_metrics_textfile_dir }}
           timer: |
             # Managed by roles/open_ondemand.
