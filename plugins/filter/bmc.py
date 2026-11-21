@@ -6,7 +6,8 @@ stdout | bmc_lan                                 -> {ipsrc, ipaddr, netmask, gat
                                                     auth_enables: ["0x04", ...] (5 bytes),
                                                     cipher_suites: [id, ...], cipher_privs}
 lan | bmc_auth_enables(['md5'])                  -> the 5 bytes of LAN parameter 2 that leave
-                                                    only those types at every level
+                                                    only those types at every level ([]: none,
+                                                    IPMI 1.5 sessions off)
 lan | bmc_cipher_privs([3, 17])                  -> the 15-character privilege list that
                                                     leaves exactly those suites open (ADMIN)
 
@@ -15,9 +16,10 @@ makes is computed from it here, in one place.
 
 Authentication Type Enables (LAN parameter 2, IPMI 2.0 table 23-4) are one byte per
 level (callback, user, operator, admin, OEM), one bit per type. They are written whole
-(Set LAN Configuration Parameters): `ipmitool lan set <ch> auth` compares each level and
-type with strcasecmp against the rest of its comma list, so of "callback,user,operator,
-admin" it sets admin alone and only warns about the others (ipmitool 1.8.19 to master).
+(Set LAN Configuration Parameters), the OEM level with the others: `ipmitool lan set <ch>
+auth` cannot name it, and compares each level and type with strcasecmp against the rest
+of its comma list, so of "callback,user,operator,admin" it sets admin alone and only warns
+about the others (ipmitool 1.8.19 to master).
 
 Cipher suite privileges (LAN parameter 24) are one nibble per *entry* of the BMC's
 cipher suite list (parameter 23, "RMCP+ Cipher Suites"), in that order, not per suite
@@ -69,7 +71,7 @@ def bmc_lan(stdout):
 
 
 def bmc_auth_enables(lan, types):
-    """TYPES at every level ipmitool names; the OEM level's byte is kept as it is."""
+    """TYPES at every privilege level, the OEM one included; [] enables none."""
     types = [str(t).lower() for t in types or []]
     unknown = sorted(set(types) - set(AUTH_BITS))
     if unknown:
@@ -80,7 +82,7 @@ def bmc_auth_enables(lan, types):
             f"the BMC does not support IPMI 1.5 authentication types {missing} (it supports"
             f" {lan['auth_support']}): set this host's bmc_auth_types to types it supports"
         )
-    return [_auth_byte(types)] * len(AUTH_LEVELS) + [lan["auth_enables"][-1]]
+    return [_auth_byte(types)] * (len(AUTH_LEVELS) + 1)
 
 
 def bmc_cipher_privs(lan, allowed):

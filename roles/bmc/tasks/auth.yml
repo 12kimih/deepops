@@ -17,7 +17,8 @@
     - bmc
 
 # Set LAN Configuration Parameters (netfn 0x0c, command 0x01), parameter 2: the five
-# level bytes in one write (plugins/filter/bmc.py says why not `lan set auth`).
+# level bytes in one write (plugins/filter/bmc.py says why not `lan set auth`). A BMC
+# that supports no type (Auth Type Support empty) already enables none: [] is converged.
 - name: Set the IPMI 1.5 authentication types
   change_command:
     argv: "{{ ['ipmitool', '-I', 'open', 'raw', '0x0c', '0x01', bmc_channel | string, '0x02'] + bmc_auth_enables_want }}"

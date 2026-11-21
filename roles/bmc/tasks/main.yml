@@ -79,7 +79,7 @@
       ansible.builtin.include_tasks: lan_facts.yml
       when: >-
         (bmc_ipaddr | length > 0) or (bmc_snmp_community | length > 0)
-        or (bmc_auth_types | length > 0) or (bmc_cipher_suites | length > 0)
+        or (bmc_auth_types is not none) or (bmc_cipher_suites is not none)
 
     - name: Configure the BMC LAN channel
       ansible.builtin.include_tasks: lan.yml
@@ -91,11 +91,11 @@
 
     - name: Set the IPMI 1.5 authentication types
       ansible.builtin.include_tasks: auth.yml
-      when: bmc_auth_types | length > 0
+      when: bmc_auth_types is not none
 
     - name: Close the cipher suites not listed
       ansible.builtin.include_tasks: ciphers.yml
-      when: bmc_cipher_suites | length > 0
+      when: bmc_cipher_suites is not none
 
     - name: Set the BMC password
       ansible.builtin.include_tasks: password.yml

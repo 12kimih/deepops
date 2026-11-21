@@ -6,6 +6,7 @@ their IDs as positions would have opened suite 0 (no authentication) and left 17
 """
 
 import importlib.util
+import re
 import unittest
 from pathlib import Path
 
@@ -74,13 +75,25 @@ class AuthEnables(unittest.TestCase):
         # MD2, MD5 and PASSWORD: bits 1, 2 and 4
         self.assertEqual(lan["auth_enables"], ["0x16"] * 5)
 
-    def test_md5_at_every_level_and_oem_kept(self):
+    def test_md5_at_every_level_oem_included(self):
         lan = bmc.bmc_lan(LAN_PRINT)
-        self.assertEqual(bmc.bmc_auth_enables(lan, ["MD5"]), ["0x04"] * 4 + ["0x16"])
+        self.assertEqual(bmc.bmc_auth_enables(lan, ["MD5"]), ["0x04"] * 5)
+
+    def test_empty_turns_ipmi15_off(self):
+        self.assertEqual(bmc.bmc_auth_enables(bmc.bmc_lan(LAN_PRINT), []), ["0x00"] * 5)
+
+    def test_a_bmc_without_ipmi15_is_converged_on_empty(self):
+        """X14 boards ship with Auth Type Support empty and every level enabling none."""
+        text = re.sub(r"(?m)^(Auth Type Support\s*:|(?:Auth Type Enable)?\s*: \w+ *:).*$", r"\1", LAN_PRINT)
+        lan = bmc.bmc_lan(text)
+        self.assertEqual(lan["auth_support"], [])
+        self.assertEqual(bmc.bmc_auth_enables(lan, []), lan["auth_enables"])
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            bmc.bmc_auth_enables(lan, ["md5"])
 
     def test_converged_reads_back_equal(self):
         text = LAN_PRINT
-        for level in ("Callback", "User    ", "Operator", "Admin   "):
+        for level in ("Callback", "User    ", "Operator", "Admin   ", "OEM     "):
             text = text.replace(f": {level} : MD2 MD5 PASSWORD", f": {level} : MD5")
         lan = bmc.bmc_lan(text)
         self.assertEqual(bmc.bmc_auth_enables(lan, ["md5"]), lan["auth_enables"])

@@ -41,8 +41,8 @@ when they are not.
 | `bmc_password_format` | site | `20` on newer BMCs, `16` on older ones |
 | `bmc_snmp_community_file` | site | a site secret file holding the SNMP community, made when missing (random, vaulted, 18 characters) |
 | `bmc_snmp_community` | site | an explicit community instead (vault it); both empty leave it alone |
-| `bmc_auth_types` | site | IPMI 1.5 authentication types left enabled at every level, e.g. `[md5]` |
-| `bmc_cipher_suites` | site | RMCP+ suites left open (up to ADMIN), e.g. `[3, 17]`; every other one is closed |
+| `bmc_auth_types` | site | IPMI 1.5 authentication types left enabled at every level: `[]` turns IPMI 1.5 sessions off, `[md5]` keeps MD5 only; `null` (default) leaves them alone |
+| `bmc_cipher_suites` | site | RMCP+ suites left open (up to ADMIN), e.g. `[3, 17]`; every other one is closed; `null` (default) leaves them alone |
 | `bmc_mgmt_interface`, `bmc_mgmt_address` | **host** | this host's leg on the management network |
 
 Every value is empty by default, and an empty value means the role leaves that setting
@@ -236,7 +236,7 @@ over KCS, which uses no suite, so a mistake stays repairable in-band.
 Factory BMCs leave weak paths open next to the strong ones. On a fleet that offers them:
 
 ```yaml
-bmc_auth_types: [md5]          # IPMI 1.5: drops none, password (clear text) and md2
+bmc_auth_types: []             # IPMI 1.5 sessions off: out-of-band calls use RMCP+
 bmc_cipher_suites: [3, 17]     # RMCP+: AES with SHA1 or SHA256 integrity only
 bmc_snmp_community_file: "{{ inventory_dir }}/files/bmc/snmp-community"   # not "public"
 ```

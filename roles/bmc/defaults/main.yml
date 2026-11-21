@@ -28,18 +28,18 @@ bmc_snmp_community: "{{ query('ansible.builtin.file', bmc_snmp_community_file, e
 # The secret files roles/site_secrets makes for this role (playbooks/utilities/bmc.yml).
 bmc_site_secrets: "{{ [{'path': bmc_snmp_community_file, 'kind': 'password', 'chars': 18}] if bmc_snmp_community_file | length > 0 else [] }}"
 
-# IPMI 1.5 session authentication types left enabled at the callback, user, operator and
-# admin levels (the OEM level's are kept), from md2, md5, password and oem, each one the
-# BMC supports (`ipmitool lan print`: Auth Type Support): [md5] drops none (no
-# authentication), password (clear text) and md2. IPMI 2.0 (RMCP+, the cipher suites
-# below) does not use them. Empty leaves them alone.
-bmc_auth_types: []
+# IPMI 1.5 session authentication types left enabled at every privilege level, from md2,
+# md5, password and oem, each one the BMC supports (`ipmitool lan print`: Auth Type
+# Support). [] turns IPMI 1.5 sessions off (newer BMCs ship so); [md5] drops none (no
+# authentication), password (clear text) and md2. Out-of-band calls here use IPMI 2.0
+# (RMCP+, the cipher suites below), which does not read them. null leaves them alone.
+bmc_auth_types: null
 
 # The RMCP+ cipher suites left open, each up to ADMIN; every other suite the BMC lists
 # is closed. Must hold bmc_cipher_suite, which out-of-band calls use, and only suites
 # the BMC lists (`ipmitool lan print`: RMCP+ Cipher Suites): [3, 17] keeps the AES ones
-# with SHA1 and SHA256 integrity. Empty leaves them alone.
-bmc_cipher_suites: []
+# with SHA1 and SHA256 integrity. null leaves them alone.
+bmc_cipher_suites: null
 
 # Chassis power action driven out-of-band by playbooks/utilities/power.yml.
 bmc_power_action: status
