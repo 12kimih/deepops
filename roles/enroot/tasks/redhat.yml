@@ -5,7 +5,8 @@
     tasks_from: epel
 
 - name: RHEL | install enroot dependencies
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name:
       - curl
       - gawk

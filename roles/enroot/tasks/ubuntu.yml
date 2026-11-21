@@ -14,7 +14,8 @@
 #   https://github.com/NVIDIA/enroot/blob/main/doc/requirements.md
 #   https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
 - name: Ubuntu | install enroot dependencies
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name:
       - curl
       - gawk

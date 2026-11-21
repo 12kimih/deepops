@@ -10,6 +10,6 @@
     tasks_from: cuda
 
 - name: RedHat | install cuda
-  ansible.builtin.package:
+  repo_package:
     name: "{{ cuda_version }}"
     state: present

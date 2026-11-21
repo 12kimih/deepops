@@ -8,7 +8,8 @@
   when: ansible_facts.os_family == "Debian"
 
 - name: Install dependencies (RedHat)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ item }}"
   with_items:
     - kernel-tools # for cpupower, used in prolog+epilog

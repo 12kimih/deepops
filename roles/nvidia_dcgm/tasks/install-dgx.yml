@@ -33,7 +33,7 @@
   when: dcgm_dgx_conflicting_pkgs | length > 0
 
 - name: Install the DCGM package shipped by DGX OS
-  ansible.builtin.package:
+  repo_package:
     name: "{{ dcgm_dgx_pkg_name }}"
     state: present
   when: dcgm_dgx_pkg_name not in ansible_facts.packages

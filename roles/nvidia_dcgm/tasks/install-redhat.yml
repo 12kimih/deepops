@@ -17,7 +17,8 @@
     host_baseline_absent_packages: "{{ _dcgm_other_packages }}"
 
 - name: RedHat | install package
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ dcgm_pkg_name }}"
     state: "present"
     install_weak_deps: true  # the diagnostics (NVIDIA's install guide)

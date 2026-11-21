@@ -41,7 +41,8 @@
 # ansible_facts.kernel can fail to resolve when no matching version is published.
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/red-hat-enterprise-linux.html
 - name: Install matching kernel headers and development packages (RHEL/Rocky)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name:
       - "kernel-devel-{{ ansible_facts.kernel }}"
       - "kernel-headers"
@@ -104,7 +105,8 @@
     ~ (nvidia_driver_rhel_stream_resolved.split(':') | last | regex_escape) ~ '\\s.*\\[e\\]')
 
 - name: Install the NVIDIA driver (RHEL/Rocky)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ nvidia_driver_rhel_package_resolved }}"
     state: present
   register: nvidia_driver_install
@@ -115,7 +117,8 @@
 # profile and name them directly.
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/optional-components.html
 - name: Install NVIDIA Fabric Manager and NSCQ (RHEL/Rocky)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: >-
       {{ ['@' ~ (nvidia_driver_rhel_stream_resolved | trim) ~ '/fm']
          if nvidia_driver_branch | int <= 615

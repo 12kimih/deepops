@@ -51,7 +51,8 @@
 # same transaction: it depends on exactly this slurm-smd, so the plugin and the Slurm
 # that loads it always change together.
 - name: Install the Slurm packages
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: >-
       {{ _packages | map('regex_replace', '$', '=' ~ slurm_deb_version) | list + [slurm_pmix_runtime_package]
          + ([slurm_pyxis_package ~ '=' ~ slurm_pyxis_deb_version] if slurm_pyxis_wanted | bool else []) }}

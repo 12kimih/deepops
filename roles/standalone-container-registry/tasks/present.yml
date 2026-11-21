@@ -47,7 +47,7 @@
     tasks_from: epel
 
 - name: Install python3 docker module
-  ansible.builtin.package:
+  repo_package:
     name: python3-docker
     state: present
 

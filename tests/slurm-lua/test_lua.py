@@ -321,7 +321,7 @@ class PyxisPackage(unittest.TestCase):
 
     def test_it_is_installed_with_slurm(self):
         install = find(load("roles/slurm/tasks/packages.yml"), "Install the Slurm packages")
-        self.assertIn("slurm_pyxis_package", install["apt"]["name"])
+        self.assertIn("slurm_pyxis_package", install["repo_package"]["name"])
 
     def test_no_host_builds_pyxis(self):
         for path in tracked("roles/pyxis/tasks/*.yml", root=ROOT):

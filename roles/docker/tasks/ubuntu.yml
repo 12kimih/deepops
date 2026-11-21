@@ -12,7 +12,8 @@
 
 # "sudo apt-get install ca-certificates curl"
 - name: Install repository prerequisites
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name:
       - ca-certificates
       - curl
@@ -44,7 +45,8 @@
 # docker_engine_version ("Install a specific version"); never downgraded here.
 # lock_timeout rides out unattended-upgrades.
 - name: Install Docker Engine + plugins
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ docker_packages | map('regex_replace', '^(docker-ce|docker-ce-cli)$', '\\1=5:' ~ docker_engine_version ~ '-1~*') | list }}"
     state: present
     update_cache: true

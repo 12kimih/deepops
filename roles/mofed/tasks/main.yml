@@ -19,7 +19,8 @@
   when: ansible_facts.os_family == "Debian"
 
 - name: Install DKMS and the compiler (Debian)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: [dkms, gcc, make]
     state: present
     update_cache: true
@@ -27,7 +28,8 @@
   when: ansible_facts.os_family == "Debian"
 
 - name: Install the kernel headers, DKMS and compiler (RHEL family)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: ["kernel-devel-{{ ansible_facts.kernel }}", "kernel-headers", dkms, gcc, make]
     state: present
   when: ansible_facts.os_family == "RedHat"
@@ -91,7 +93,8 @@
 
 # --- The profile, then the firmware updater if asked for ---
 - name: Install DOCA-OFED (Debian)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ [mofed_package] + (['mlnx-fw-updater'] if mofed_install_fw_updater else []) }}"
     state: present
     update_cache: true
@@ -100,7 +103,8 @@
   environment: "{{ proxy_env }}"
 
 - name: Install DOCA-OFED (RHEL family)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ [mofed_package] + (['mlnx-fw-updater'] if mofed_install_fw_updater else []) }}"
     state: present
   register: mofed_install_redhat

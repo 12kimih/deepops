@@ -121,6 +121,11 @@ shows what it would remove, write or install, never only that it would. Files ar
 found through `find_present` (rule 25): a path not on the host (a directory this run
 would make, a component a host never had) is an empty directory, not a warning.
 
+A role that adds a package repository (`roles/package_repos`) installs through
+`repo_package` (apt or dnf with their own arguments). Under `--check` the repository is
+neither written nor indexed, so its packages are still unknown; the install then shows
+as the change it will be ("would install X from Y") instead of failing the preview.
+
 ### Run history (ARA)
 
 Every `ansible-playbook` and `ansible` run is recorded by
