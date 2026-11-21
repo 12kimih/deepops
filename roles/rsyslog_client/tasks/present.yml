@@ -28,10 +28,11 @@
   ansible.builtin.meta: flush_handlers
 
 - name: Check rsyslog runs
-  ansible.builtin.command:
-    argv: [systemctl, is-active, rsyslog]
-  changed_when: false
-  check_mode: false  # read-only
+  ansible.builtin.include_role:
+    name: maintenance
+    tasks_from: unit_healthy
+  vars:
+    maintenance_healthy_units: [rsyslog.service]
 
 - name: Record the component as present
   ansible.builtin.include_role:
