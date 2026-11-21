@@ -1,0 +1,7 @@
+---
+# Derived, not settings: the day each person's login stops (plugins/filter/people.py,
+# people_login_expires), login: shadow day (days since 1970-01-01), "" for no end. The
+# directory's shadowExpire and the local accounts' expiry both read it.
+people_login_ends: >-
+  {{ dict(people | list | zip(people | dict2items | map(attribute='value')
+     | map('people_login_expires', people_leave_grace_days) | map('people_shadow_day'))) }}

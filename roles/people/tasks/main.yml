@@ -94,38 +94,46 @@
     - people
 
 # Expiry blocks every login PAM checks, SSH keys included; a locked password alone
-# would not. Only accounts that exist are locked; a left person is never created.
+# would not. Only accounts that exist are locked; a left person is never created. Their
+# day (people_login_ends) is 1, 1970-01-02, which no one sets by hand: the lock's marker.
+# The user module's expires counts seconds, shadow(5) days.
 - name: Lock the accounts of people who have left
   ansible.builtin.user:
     name: "{{ item }}"
     password_lock: true
-    expires: 1
+    expires: "{{ people_login_ends[item] * 86400 }}"
     shell: /usr/sbin/nologin
   loop: "{{ people | people_left | select('in', ansible_facts.getent_passwd) | list }}"
   tags:
     - people
 
-# A person back from left (status active again) gets the account back: the lock above
-# set expiry day 1 (1970-01-02), which no one sets by hand, and is undone only where it
-# is found; the password regains its hash where the lock put a "!" before one. The shell
-# comes back with the account update at the top (local_accounts). Only the name, whether
-# a hash sits behind a "!" and the expiry day leave the host: never a hash, nor a fact.
-- name: Read which local accounts the lock marked
+# Each local account's expiry day ("-" for none) and whether a "!" sits before a hash:
+# only those leave the host, never a hash, nor a fact.
+- name: Read the local accounts' expiry
   ansible.builtin.command:
-    argv: [awk, -F, ":", '$8 == "1" { print $1, ($2 ~ /^![^!*]/) }', /etc/shadow]
-  register: people_marked
+    argv: [awk, -F, ":", '{ print $1, ($8 == "" ? "-" : $8), ($2 ~ /^![^!*]/) }', /etc/shadow]
+  register: people_expiry
   changed_when: false
   check_mode: false
   tags:
     - people
 
-- name: Give back the accounts of people active again
+# Every active person's account ends on the day people_login_ends gives (a last day plus
+# the grace period), or never: set where it differs, so a new last day, a cancelled one
+# and a return from left are one step. Someone back from left (the lock's day 1) gets
+# the password's hash back where the lock put a "!" before it; the shell comes back
+# with the account update at the top (local_accounts).
+- name: Set when each active person's login ends
   vars:
-    _marked: "{{ dict(people_marked.stdout_lines | map('split') | map('first') | zip(people_marked.stdout_lines | map('split') | map('last'))) }}"
+    _rows: "{{ people_expiry.stdout_lines | map('split') | list }}"
+    _day: "{{ dict(_rows | map('first') | zip(_rows | map(attribute=1))) }}"
+    _locked: "{{ dict(_rows | map('first') | zip(_rows | map('last'))) }}"
+    _want: "{{ people_login_ends[item] | string if people_login_ends[item] != '' else '-' }}"
   ansible.builtin.user:
     name: "{{ item }}"
-    expires: -1
-    password_lock: "{{ false if _marked[item] == '1' else omit }}"
-  loop: "{{ _marked | list | select('in', people | people_active) | list }}"
+    expires: "{{ people_login_ends[item] * 86400 if people_login_ends[item] != '' else -1 }}"
+    password_lock: "{{ false if (_day[item] == '1' and _locked[item] == '1') else omit }}"
+  loop: "{{ people | people_active | list | select('in', ansible_facts.getent_passwd) | list }}"
+  when: _want != _day[item] | default('-')
   tags:
     - people

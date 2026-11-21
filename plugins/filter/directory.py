@@ -2,15 +2,17 @@
 
     {{ people | directory_entries(suffix, groups=directory_groups,
                                   netgroups=directory_netgroups, readers=ldap_reader_passwords,
-                                  shadow=getent_shadow) }}
+                                  shadow=getent_shadow, ends=people_login_ends) }}
 
 gives {entries, secrets, passwords, prune, report} for library/ldap_tree.py (secrets
 and passwords are the values never to log). The tree is RFC 2307,
 what NIS served, one to one:
 
     ou=people     uid=<login>: inetOrgPerson, posixAccount, shadowAccount; the roster
-                  UID, GID = UID, home, shell. Someone who has left keeps the entry (the
-                  UID stays reserved), expired (shadowExpire 1), nologin, no password.
+                  UID, GID = UID, home, shell. Someone leaving expires on the day ENDS
+                  gives (login: shadow day, people_login_ends: their last day plus the
+                  grace period). Someone who has left keeps the entry (the UID stays
+                  reserved), expired (shadowExpire 1), nologin, no password.
     ou=groups     cn=<login>: the per-user group (GID = UID); cn=<name>: each cluster
                   group with its pinned GID and memberUid.
     ou=netgroups  cn=<name>: nisNetgroup with (,user,) triples.
@@ -49,6 +51,7 @@ def directory_entries(
     nologin="/usr/sbin/nologin",
     shadow=None,
     exclusive=True,
+    ends=None,
 ):
     from ansible.errors import AnsibleFilterError
 
@@ -75,7 +78,11 @@ def directory_entries(
         }
         dn = _dn(f"uid={login}", "ou=people", suffix)
         if login in active:
-            attrs |= {"loginShell": [p.get("shell") or shell], "shadowExpire": []}
+            day = (ends or {}).get(login, "")
+            attrs |= {
+                "loginShell": [p.get("shell") or shell],
+                "shadowExpire": [str(day)] if day != "" else [],
+            }
             # Mirrored only where the source has the account: one it no longer holds (its
             # local copy retired, playbooks/utilities/retire-local-accounts.yml) keeps
             # the password the directory has; a locked one is locked here too.

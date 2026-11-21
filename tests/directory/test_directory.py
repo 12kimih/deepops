@@ -57,6 +57,13 @@ class Tree(unittest.TestCase):
         self.assertIn(f"ou=people,{SUFFIX}", build()["report"])
         self.assertNotIn(f"ou=people,{SUFFIX}", build()["prune"], "people are never pruned")
 
+    def test_someone_leaving_expires_on_their_day(self):
+        got = build(ends={"alice": 20849, "bob": "", "carol": 1})
+        alice = entry(got, f"uid=alice,ou=people,{SUFFIX}")["attributes"]
+        bob = entry(got, f"uid=bob,ou=people,{SUFFIX}")["attributes"]
+        self.assertEqual((alice["shadowExpire"], alice["loginShell"]), (["20849"], ["/bin/bash"]))
+        self.assertEqual(bob["shadowExpire"], [], "no end clears an earlier expiry")
+
     def test_shadow_hashes_are_secrets_and_locked_ones_none(self):
         got = build(shadow=SHADOW)
         self.assertEqual(

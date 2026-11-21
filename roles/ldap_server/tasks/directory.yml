@@ -21,7 +21,7 @@
            groups=directory_groups, netgroups=directory_netgroups, readers=ldap_reader_passwords,
            home_root=people_home_root, shell=people_default_shell,
            shadow=(ansible_facts.getent_shadow if ldap_server_password_source == 'shadow' else none),
-           exclusive=directory_groups_exclusive) }}
+           exclusive=directory_groups_exclusive, ends=people_login_ends) }}
   register: ldap_server_sync
 
 # A person is never deleted from the directory: one the roster does not know stays until
