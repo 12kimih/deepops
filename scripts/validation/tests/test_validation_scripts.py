@@ -242,13 +242,15 @@ class TestSlurmGpuJob(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--partition") + 1], "batch")
         self.assertIn("--gpus=1", validate_slurm.gpu_job_command("x", "", ""))
 
-    def main(self, argv, srun_rc):
+    def main(self, argv, srun_rc, job_out="NVIDIA H100, 580.95\nprivate_tmp=1", config=""):
         calls = []
 
         def fake_run(cmd, timeout=60):
             calls.append(cmd)
             if cmd[0] == "srun":
-                return (srun_rc, "NVIDIA H100, 580.95", "") if srun_rc == 0 else (124, "", "timeout after 1s")
+                return (srun_rc, job_out, "") if srun_rc == 0 else (124, "", "timeout after 1s")
+            if cmd[:3] == ["scontrol", "show", "config"]:
+                return 0, config, ""
             return 0, "", ""
 
         out = io.StringIO()
@@ -278,6 +280,27 @@ class TestSlurmGpuJob(unittest.TestCase):
         self.assertTrue(result["gpu_job_ok"])
         self.assertIn("--gpus=h100:1", next(c for c in calls if c[0] == "srun"))
         self.assertFalse([c for c in calls if c[0] == "scancel"])
+
+    def test_the_job_reports_whether_its_tmp_was_its_own(self):
+        ns = "NamespaceType           = namespace/linux\n"
+        rc, result, _ = self.main([], 0, config=ns)
+        self.assertEqual((rc, result["private_tmp_expected"], result["private_tmp_in_job"]), (0, True, True))
+        self.assertEqual(result["gpus_visible_in_job"], 1)
+        rc, result, _ = self.main([], 0, job_out="NVIDIA H100, 580.95\nprivate_tmp=0", config=ns)
+        self.assertEqual(rc, 1)
+        self.assertIn("/tmp was not its own", " ".join(result["failures"]))
+        rc, result, _ = self.main(
+            [], 0, job_out="NVIDIA H100, 580.95\nprivate_tmp=0", config="NamespaceType = (null)\n"
+        )
+        self.assertEqual(
+            (rc, result["private_tmp_expected"], result["private_tmp_in_job"]), (0, False, False)
+        )
+
+    def test_the_job_checks_its_tmp_after_its_gpus(self):
+        script = validate_slurm.gpu_job_command("x", "", "")[-1]
+        self.assertTrue(script.startswith("nvidia-smi "))
+        self.assertIn("findmnt -n -o FSROOT --mountpoint /tmp", script)
+        self.assertIn('"/$SLURM_JOB_ID/"', script)
 
 
 if __name__ == "__main__":
