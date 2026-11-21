@@ -56,7 +56,9 @@ STUB
 
 render() {
     # $1 = template path relative to $templates, $2 = output path
-    python3 "$here/render.py" "$templates/$1" "$2" "${RENDER_SCOPE:-job}" || return 1
+    # Per-job private directories are off unless a case names them (RENDER_PRIVATE_DIRS,
+    # comma-separated): with them on, the job-scope file cleanup never runs at all.
+    python3 "$here/render.py" "$templates/$1" "$2" "${RENDER_SCOPE:-job}" "${RENDER_PRIVATE_DIRS-}" || return 1
     chmod +x "$2"
     # A rendered script that does not parse would fail every behavioural case
     # below with the same opaque message; check the syntax separately so the
@@ -295,11 +297,6 @@ setup_cleanup() {
     # case gets the fixture roots, including the ones that are supposed to stop
     # before any deletion -- test safety cannot rest on the code under test.
     sed -i "s#^    for dir in /tmp /dev/shm ; do#    for dir in $dir/roots/tmp $dir/roots/shm ; do#" "$dir/42-cleanup"
-
-    # Job scope also reads slurm.conf (job_container/tmpfs). Keep that off the
-    # host's real file too; the fixture has none unless a case writes one. The
-    # user-scope rendering has no such line, so a miss here is not an error.
-    sed -i "s#^slurm_conf=.*#slurm_conf='$dir/etc/slurm/slurm.conf'#" "$dir/42-cleanup"
 
     # And the redirect is verified rather than assumed: a template edit that
     # changes that line would silently hand the real roots back.
@@ -904,22 +901,18 @@ else
     no "user scope renders the original killall script" "see $user40"
 fi
 
-# --- 42-lastuserjob-cleanup: job_container/tmpfs ---------------------------------
+# --- 42-lastuserjob-cleanup: per-job private directories ---------------------------
 echo
-echo "42-lastuserjob-cleanup -- job_container/tmpfs (scope=job)"
+echo "42-lastuserjob-cleanup -- per-job private directories (scope=job)"
 jc_identity="$(cleanup_identity)" || jc_identity=""
 if [ -z "$jc_identity" ]; then
-    printf '  skip job_container cases (no resolvable unprivileged account)\n'
+    printf '  skip private-directory cases (no resolvable unprivileged account)\n'
 else
     jc_case() {
-        # $1 = label, $2 = slurm.conf contents ("" = none), $3 = expect gone|kept
-        local label="$1" conf="$2" expect="$3" dir
-        dir="$(setup_cleanup)" || { no "$label" "harness setup failed"; return; }
+        # $1 = label, $2 = slurm_job_private_dirs, $3 = expect gone|kept
+        local label="$1" expect="$3" dir
+        dir="$(RENDER_PRIVATE_DIRS="$2" setup_cleanup)" || { no "$label" "harness setup failed"; return; }
         : > "$dir/etc/slurm/localusers.backup"
-        sed -i "s#^slurm_conf=.*#slurm_conf='$dir/etc/slurm/slurm.conf'#" "$dir/42-cleanup"
-        grep -qF "slurm_conf='$dir/etc/slurm/slurm.conf'" "$dir/42-cleanup" \
-            || { no "$label" "harness could not redirect slurm.conf"; return; }
-        [ -z "$conf" ] || printf '%s\n' "$conf" > "$dir/etc/slurm/slurm.conf"
         own_file "$jc_identity" "$dir/roots/tmp/scratch" || { no "$label" "could not create the fixture file"; return; }
         local out rc state=kept
         out=$(PATH="$dir/bin:$PATH" SLURM_JOB_USER="$jc_identity" "$dir/42-cleanup" 2>&1); rc=$?
@@ -928,22 +921,15 @@ else
             no "$label" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
         elif [ "$state" != "$expect" ]; then
             no "$label" "file is $state, wanted $expect"
-        elif [ "$expect" = kept ] && ! grep -q 'job_container/tmpfs is configured' <<<"$out"; then
+        elif [ "$expect" = kept ] && ! grep -q 'removed with the job' <<<"$out"; then
             no "$label" "skipped without logging why: $(printf '%s' "$out" | tail -1)"
         else
             ok "$label"
         fi
     }
-    jc_case "job_container/tmpfs configured: file cleanup is skipped and logged" \
-        "JobContainerType=job_container/tmpfs" kept
-    jc_case "job_container/tmpfs with spacing is still detected" \
-        "  JobContainerType = job_container/tmpfs" kept
-    jc_case "a commented-out JobContainerType does not skip the cleanup" \
-        "#JobContainerType=job_container/tmpfs" gone
-    jc_case "no JobContainerType: cleanup runs" "ProctrackType=proctrack/cgroup" gone
-    jc_case "Slurm 26.05's NamespaceType=namespace/tmpfs is detected too" \
-        "NamespaceType=namespace/tmpfs" kept
-    jc_case "no slurm.conf readable: cleanup runs as before" "" gone
+    jc_case "private /tmp and /dev/shm: file cleanup is skipped and logged" "/tmp,/var/tmp,/dev/shm" kept
+    jc_case "only /tmp private: the host's /dev/shm still needs the cleanup" "/tmp" gone
+    jc_case "no private directories: cleanup runs" "" gone
 fi
 
 # --- 50-lastuserjob-all-enroot-dirs -----------------------------------------------
@@ -1090,6 +1076,20 @@ if render "shared/lib/enroot-paths.sh" "$ep/lib.sh" && render "prolog.d/50-all-e
     fi
 else
     no "enroot prolog renders" "render failed"
+fi
+# Under a per-job private directory the job never sees what the prolog would make on
+# the host, so the prolog leaves the path to enroot inside the job.
+if RENDER_PRIVATE_DIRS="$ep/run" render "prolog.d/50-all-enroot-dirs" "$ep/50p"; then
+    sed -i "s#/etc/slurm/shared/lib/enroot-paths.sh#$ep/lib.sh#" "$ep/50p"
+    rm -rf "$ep/run/user-x" "$ep/log"
+    run50 "$(id -u)" 50p; rc=$?
+    if [ "$rc" = 0 ] && [ ! -e "$ep/run/user-x" ] && [ ! -e "$ep/log" ]; then
+        ok "a path under a per-job private directory is left to enroot in the job"
+    else
+        no "a path under a per-job private directory is left to enroot in the job" "rc=$rc"
+    fi
+else
+    no "enroot prolog renders with private directories" "render failed"
 fi
 for t in prolog.d/50-all-enroot-dirs epilog.d/50-lastuserjob-all-enroot-dirs; do
     if render "$t" "$ed/script" && grep -q 'shared/lib/enroot-paths.sh' "$ed/script" \

@@ -1,0 +1,11 @@
+# Per-job private directories (slurm_job_private_dirs). slurmctld serves this file to
+# every slurmd with slurm.conf. https://slurm.schedmd.com/namespace.yaml.html
+---
+defaults:
+  auto_base_path: true
+  base_path: {{ slurm_job_private_base | to_json }}
+  dir_confs:
+{% for dir in slurm_job_private_dirs %}
+    - path: {{ dir | to_json }}
+      options: "nodev,nosuid"
+{% endfor %}

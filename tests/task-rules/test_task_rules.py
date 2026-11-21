@@ -229,6 +229,7 @@ WORLD_WRITABLE_OK = {
     "roles/nvidia-dgx-firmware/tasks/clean.yml": "upstream DGX: removes that same nvsm dump",
     "roles/ai_agent_rules/tasks/main.yml": "fetched on the controller, as the operator (become: false)",
     "roles/download/tasks/main.yml": "the assert that refuses these paths names them",
+    "roles/slurm/defaults/main.yml": "slurm_job_private_dirs names the directories Slurm makes private per job",
 }
 # file -> why it keeps Ansible's backup copy
 BACKUP_OK = {

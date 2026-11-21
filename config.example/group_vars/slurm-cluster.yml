@@ -124,6 +124,12 @@ slurm_ha_state_save_location: "/sw/slurm"
 # See docs/slurm-cluster/slurm-single-node.md
 #slurm_login_on_compute: false
 
+# Directories each job sees as its own, removed with the job (Slurm namespace/linux);
+# [] turns it off. The base must be node-local disk.
+# See docs/slurm-cluster/epilog-job-scoped-cleanup.md
+#slurm_job_private_dirs: [/tmp, /var/tmp, /dev/shm]
+#slurm_job_private_base: /var/spool/slurmd-private
+
 ################################################################################
 # Optional installs                                                            #
 ################################################################################

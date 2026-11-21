@@ -28,6 +28,16 @@
     path: /sys/fs/cgroup/cgroup.controllers
   register: slurm_cgroup_v2
 
+- name: Refuse per-job private directories on cgroup v1
+  ansible.builtin.assert:
+    that: slurm_cgroup_v2.stat.exists
+    fail_msg: >-
+      {{ inventory_hostname }} runs the legacy cgroup v1 hierarchy, and Slurm's
+      namespace/linux plugin (slurm_job_private_dirs) needs cgroup v2. Boot the node
+      with the unified hierarchy, or set slurm_job_private_dirs: [].
+    quiet: true
+  when: slurm_job_private_dirs | length > 0
+
 # The line earlier versions appended to /etc/default/grub; the arguments now live in
 # their own file (roles/host_baseline, kernel_args).
 - name: Remove the cgroup line from the grub defaults
@@ -196,9 +206,10 @@
     enabled: true
     daemon_reload: true
 
-# slurmd fetches slurm.conf, gres.conf, cgroup.conf and plugstack.conf from slurmctld
-# (--conf-server, above) and caches them in /run/slurm/conf, where the commands on the
-# node find them too. A local copy would be read by the commands instead, and go stale.
+# slurmd fetches slurm.conf, gres.conf, cgroup.conf, namespace.yaml and plugstack.conf
+# from slurmctld (--conf-server, above) and caches them in /run/slurm/conf, where the
+# commands on the node find them too. A local copy would be read by the commands
+# instead, and go stale.
 # Removed only once the running slurmd has that cache: every Slurm client on the node,
 # pam_slurm_adopt in sshd among them, dies with "Could not establish a configuration
 # source" when it finds neither (2026-11-20: a slurmd that failed to start, with the
@@ -215,7 +226,7 @@
   ansible.builtin.file:
     path: "{{ slurm_config_dir }}/{{ item }}"
     state: absent
-  loop: [slurm.conf, cgroup.conf, gres.conf]
+  loop: [slurm.conf, cgroup.conf, gres.conf, namespace.yaml]
   when: not is_controller
   tags:
     - config
