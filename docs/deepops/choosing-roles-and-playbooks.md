@@ -42,6 +42,10 @@ Different layers; the monitoring stack uses the exporter.
 
 - `playbooks/nvidia-software/nvidia-power-limit.yml` (`nvidia_power_limit` role) -- caps the GPU **power draw** (`nvidia-smi -pl`) and installs a `nvidia-power-limit.service` systemd unit so the cap is re-applied on every boot (nvidia-smi otherwise resets it to the card default). Set the cap per GPU model with `nvidia_power_limit_watts_by_model` (every node with that model gets it, new ones included), a host's own with `nvidia_power_limit_watts`, or `-e` for a one-off that the next run without it undoes, and target specific nodes with `-l`/`-e hostlist=`. Unlike the clock playbooks above, this is a persistent, GPU-gated systemd setting, not a one-shot runtime command. The wattage lands in `/etc/nvidia-power-limit.conf`, which the systemd unit reads and the Slurm prolog/epilog helper (`set_gpu_power_levels.sh`) clamps against, so an exclusive job cannot raise a capped node to the card maximum.
 
+## PCIe ACS (GPU peer-to-peer)
+
+- `playbooks/generic/pcie-acs.yml` (`pcie_acs` role, switch `slurm_disable_pcie_acs`) -- turns PCIe Access Control Services off on every device that has it, at every boot before the GPUs are opened, so GPUs below one PCIe switch talk peer to peer (NCCL's guidance for bare metal). NHC drains a node where ACS is back on; `playbooks/utilities/verify-acs.yml` reports it with the IOMMU state.
+
 ## Container registries (three different deploy targets)
 
 - `standalone-container-registry` -- a Docker `registry` daemon on a **bare-metal** host. With `standalone_container_registry_cache_enable` it runs as a Docker Hub pull-through cache instead, which cannot be pushed to.

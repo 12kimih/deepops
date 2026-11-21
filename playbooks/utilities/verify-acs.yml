@@ -1,12 +1,11 @@
 ---
-# Verify NCCL GPU peer-to-peer (P2P) enablement on every compute node:
-#   1. PCIe ACS is disabled on all PCI devices (ground truth: ACS Control register
-#      readback) and the persistent disable-acs unit is enabled/active.
-#   2. IOMMU/VT-d posture (read-only audit): BIOS VT-d state via the DMAR ACPI
-#      table, and the kernel intel_iommu/iommu setting actually in effect.
-# The play FAILS only if ACS is still enabled somewhere; the IOMMU section is
-# informational so you can audit BIOS VT-d state across the fleet without
-# rebooting into firmware setup.
+# Report GPU peer-to-peer readiness on the compute nodes, read-only:
+#   1. PCIe ACS is off on every device (roles/pcie_acs's program, as NHC runs it) and
+#      its boot unit is enabled.
+#   2. The IOMMU: BIOS VT-d (the DMAR ACPI table) and the kernel setting in effect.
+# The play fails only where ACS is on; the IOMMU section is for reading.
+#
+#   ansible-playbook -K playbooks/utilities/verify-acs.yml [-e hostlist=...]
 - hosts: "{{ hostlist | default('slurm-node') }}"
   become: true
   gather_facts: false
@@ -14,39 +13,38 @@
     - nvidia
     - verify-acs
   roles:
-    - role: proxy_defaults
+    - role: deepops_paths  # pcie_acs_program, pcie_acs_service
   tasks:
-    - name: Read the ACS Control register from every PCI device
-      ansible.builtin.shell: |
-        set -o pipefail
-        offenders=""
-        for dev in $(lspci -d '*:*:*' | awk '{print $1}'); do
-          val=$(setpci -s "$dev" ECAP_ACS+0x6.w 2>/dev/null) || continue
-          if [ -n "$val" ] && [ "$val" != "0000" ]; then
-            offenders="${offenders}${dev} ACSCtl=0x${val} $(lspci -s "$dev" | cut -d' ' -f2-)\n"
-          fi
-        done
-        printf '%b' "$offenders"
-      args:
-        executable: /bin/bash
+    - name: Look for the ACS program
+      ansible.builtin.stat:
+        path: "{{ pcie_acs_program }}"
+      register: acs_program
+
+    - name: Require roles/pcie_acs
+      ansible.builtin.assert:
+        that: acs_program.stat.exists
+        fail_msg: >-
+          {{ pcie_acs_program }} is missing: PCIe ACS is not managed on this host
+          (slurm_disable_pcie_acs, playbooks/generic/pcie-acs.yml).
+        quiet: true
+
+    - name: Read the devices with ACS on
+      ansible.builtin.command:
+        argv: ["{{ pcie_acs_program }}", check]
       register: acs_state
       changed_when: false
-      check_mode: false  # read-only; --check needs the result
       failed_when: false
+      check_mode: false  # read-only; --check needs the result
 
-    - name: Check the disable-acs systemd unit is enabled and active
-      ansible.builtin.shell: |
-        printf 'enabled=%s active=%s' \
-          "$(systemctl is-enabled disable-acs.service 2>/dev/null || echo missing)" \
-          "$(systemctl is-active  disable-acs.service 2>/dev/null || echo inactive)"
-      args:
-        executable: /bin/bash
+    - name: Read the boot unit's state
+      ansible.builtin.command:
+        argv: [systemctl, is-enabled, "{{ pcie_acs_service }}"]
       register: acs_unit
       changed_when: false
-      check_mode: false  # read-only; --check needs the result
       failed_when: false
+      check_mode: false  # read-only; --check needs the result
 
-    - name: Detect BIOS VT-d / IOMMU via the DMAR ACPI table
+    - name: Look for BIOS VT-d (the DMAR ACPI table)
       ansible.builtin.stat:
         path: /sys/firmware/acpi/tables/DMAR
         get_checksum: false
@@ -58,52 +56,31 @@
       ansible.builtin.shell: |
         set -o pipefail
         cmd=$(cat /proc/cmdline)
-        intel=$(printf '%s' "$cmd"  | grep -o 'intel_iommu=[^ ]*' || true)
-        amd=$(printf '%s'   "$cmd"  | grep -o 'amd_iommu=[^ ]*'   || true)
-        mode=$(printf '%s' " $cmd"  | grep -oE ' iommu=[^ ]*' | tr -d ' ' || true)
+        intel=$(printf '%s' "$cmd" | grep -o 'intel_iommu=[^ ]*' || true)
+        amd=$(printf '%s' "$cmd" | grep -o 'amd_iommu=[^ ]*' || true)
+        mode=$(printf '%s' " $cmd" | grep -oE ' iommu=[^ ]*' | tr -d ' ' || true)
         groups=$(ls /sys/kernel/iommu_groups/ 2>/dev/null | wc -l)
-        printf '%s %s %s groups=%s' \
-          "${intel:-intel_iommu=unset}" "${amd:-}" "${mode:-}" "$groups"
+        printf '%s %s %s groups=%s' "${intel:-intel_iommu=unset}" "${amd:-}" "${mode:-}" "$groups"
       args:
         executable: /bin/bash
       register: iommu_kernel
       changed_when: false
       check_mode: false  # read-only; --check needs the result
-      failed_when: false
 
-    # ---- Report ----
-    - name: Report PCI devices where ACS is still enabled
-      ansible.builtin.debug:
-        msg: "{{ acs_state.stdout_lines }}"
-      when: (acs_state.stdout | trim) != ''
-
-    - name: Report ACS all-clear
-      ansible.builtin.debug:
-        msg: "OK - ACS disabled on all PCI devices on {{ inventory_hostname }}"
-      when: (acs_state.stdout | trim) == ''
-
-    - name: Report IOMMU / VT-d posture (read-only audit)
+    - name: Report
       ansible.builtin.debug:
         msg:
-          - "VT-d in BIOS (DMAR ACPI table): {{ 'ON' if dmar_table.stat.exists else 'OFF (firmware default / disabled)' }}"
+          - "PCIe ACS: {{ acs_state.stdout | default('', true) or 'off on every device' }}"
+          - "{{ pcie_acs_service }}: {{ acs_unit.stdout }}"
+          - "VT-d in BIOS (DMAR table): {{ 'on' if dmar_table.stat.exists else 'off' }}"
           - "kernel IOMMU: {{ iommu_kernel.stdout | trim }}"
-          - "disable-acs.service: {{ acs_unit.stdout | trim }}"
-          - "ACS effective state: {{ 'DISABLED (P2P ready)' if (acs_state.stdout | trim) == '' else 'ENABLED on some devices' }}"
 
-    - name: Warn if the disable-acs unit will not persist across reboots
-      ansible.builtin.debug:
-        msg: >-
-          WARNING - disable-acs.service is not enabled+active on
-          {{ inventory_hostname }}; ACS may be re-enabled on next reboot. Run
-          playbooks/utilities/disable-acs.yml to install the persistent unit.
-      when: acs_unit.stdout is not search('enabled=enabled active=active')
-
-    - name: Fail if ACS is still enabled on any PCI device
+    - name: Fail where ACS is on or will not be turned off at boot
       ansible.builtin.assert:
         that:
-          - (acs_state.stdout | trim) == ''
+          - acs_state.rc == 0
+          - acs_unit.stdout == 'enabled'
         fail_msg: >-
-          PCIe ACS is still enabled on one or more devices - NCCL GPU P2P will be
-          degraded. See the per-device report above.
-        success_msg: "PCIe ACS is disabled on every PCI device."
-  environment: "{{ proxy_env }}"
+          GPU peer-to-peer is degraded or will be after a reboot (see the report);
+          rerun playbooks/generic/pcie-acs.yml.
+        quiet: true

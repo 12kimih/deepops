@@ -103,6 +103,12 @@
   tags:
     - people
 
+# Before NHC, which checks ACS stays off where this is present.
+- name: Turn PCIe ACS off for GPU peer-to-peer
+  import_playbook: generic/pcie-acs.yml
+  vars:
+    deepops_phase: install
+
 - name: Install DCGM
   import_playbook: nvidia-software/nvidia-dcgm.yml
   vars:
@@ -387,6 +393,11 @@
 
 - name: Remove the GPU power limit where it is no longer wanted
   import_playbook: nvidia-software/nvidia-power-limit.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the PCIe ACS unit where it is no longer wanted
+  import_playbook: generic/pcie-acs.yml
   vars:
     deepops_phase: remove
 

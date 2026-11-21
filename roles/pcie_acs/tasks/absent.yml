@@ -1,0 +1,10 @@
+---
+# The devices keep ACS off until the next boot, which gives them back the firmware's
+# setting: removal changes no device.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: pcie_acs
+    component_record_action: absent
+    component_record_items: "{{ pcie_acs_items }}"

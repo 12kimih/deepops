@@ -50,3 +50,5 @@ nhc_gpu_drain_xids: [46, 48, 62, 64, 74, 79, 95, 109, 110, 119, 120, 136, 140, 1
 # Drain a GPU node whose row remapping is pending (needs a GPU reset) or has failed
 # (out of spare rows, NVIDIA's RMA criterion).
 nhc_gpu_check_remapped_rows: true
+# Drain a node where PCIe ACS is back on: on wherever roles/pcie_acs is present.
+nhc_check_pcie_acs: "{{ (deepops_components | default({})).pcie_acs | default('absent') == 'present' }}"

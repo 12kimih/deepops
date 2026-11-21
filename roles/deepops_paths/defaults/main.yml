@@ -19,6 +19,11 @@ maintenance_reboot_requests_dir: "{{ deepops_state_dir }}/reboot-requested-by"
 # changes a GPU's power limit reads the cap back instead of guessing: the Slurm
 # prolog/epilog does, so an exclusive job never gets the card maximum on a capped node.
 nvidia_power_limit_conf_file: /etc/nvidia-power-limit.conf
+# Turns PCIe ACS off, or lists the devices where it is on (roles/pcie_acs); NHC runs
+# it to drain a node where ACS came back (roles/nhc). Its boot unit keeps the name the
+# hand-installed one had (the old utilities/disable-acs.yml), so it is taken over in place.
+pcie_acs_program: /usr/local/sbin/pcie-acs
+pcie_acs_service: disable-acs.service
 # Software modules (Lmod): the prefix must be on storage every node shares.
 sm_prefix: /sw
 sm_module_root: "{{ sm_prefix }}/modules"

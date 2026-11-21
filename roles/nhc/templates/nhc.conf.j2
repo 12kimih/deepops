@@ -26,6 +26,11 @@
 # {{ ansible_facts.hostname }} || check_hw_eth {{ interface }}
 {% endfor %}
 
+{% if nhc_check_pcie_acs | bool %}
+# PCIe ACS back on (roles/pcie_acs): GPUs below one PCIe switch lose peer-to-peer
+ {{ ansible_facts.hostname }} || check_pcie_acs {{ pcie_acs_program }}
+
+{% endif %}
 # Check that the expected services are up. systemd is asked rather than ps: a
 # socket-activated sshd has no process until the first login, and a hung systemd
 # fails the check instead of leaving a node that can no longer manage services.

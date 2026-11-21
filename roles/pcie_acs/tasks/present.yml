@@ -1,0 +1,63 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: pcie_acs
+    component_record_action: begin
+    component_record_items: "{{ pcie_acs_items }}"
+
+# setpci; part of every server install, so not this component's to remove.
+- name: Install pciutils
+  ansible.builtin.package:
+    name: pciutils
+    state: present
+
+- name: Install the program
+  ansible.builtin.template:
+    src: pcie-acs.sh.j2
+    dest: "{{ pcie_acs_program }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart pcie-acs
+
+- name: Install the boot unit
+  ansible.builtin.template:
+    src: pcie-acs.service.j2
+    dest: "/etc/systemd/system/{{ pcie_acs_service }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart pcie-acs
+
+# A container shares the host's PCI devices: their configuration is the host's to set.
+- name: Turn ACS off now and at every boot
+  ansible.builtin.systemd_service:
+    name: "{{ pcie_acs_service }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not deepops_containerized
+
+- name: Apply a changed program or unit now
+  ansible.builtin.meta: flush_handlers
+
+# The unit fails when a device keeps ACS on; this says which, also on a rerun where the
+# unit had already run.
+- name: Check ACS is off on every device
+  ansible.builtin.command:
+    argv: ["{{ pcie_acs_program }}", check]
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when:
+    - not deepops_containerized
+    - not ansible_check_mode
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: pcie_acs
+    component_record_action: present
+    component_record_items: "{{ pcie_acs_items }}"

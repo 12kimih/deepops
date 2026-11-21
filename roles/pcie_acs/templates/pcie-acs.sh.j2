@@ -1,0 +1,45 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# roles/pcie_acs: PCIe Access Control Services off on every device that has the
+# capability, as NCCL's troubleshooting guide does it: the ACS Control register
+# (ECAP_ACS+0x6) written 0.
+#
+#   pcie-acs disable   turn it off, then fail if a device still has it on
+#   pcie-acs check     list the devices with ACS on and fail if there are any (NHC)
+set -u
+mode=${1:-}
+case "$mode" in
+disable | check) ;;
+*)
+	echo "usage: ${0##*/} disable|check" >&2
+	exit 2
+	;;
+esac
+
+# The ACS Control register of a device, or nothing when it has no ACS capability
+# (setpci then fails or prints no value).
+control() {
+	local value
+	value=$(setpci -s "$1" ECAP_ACS+0x6.w 2>/dev/null) || return 0
+	[[ $value =~ ^[0-9a-fA-F]{4}$ ]] && echo "$value"
+}
+
+on=()
+for path in "${PCIE_ACS_DEVICES:-/sys/bus/pci/devices}"/*; do
+	dev=${path##*/}
+	ctl=$(control "$dev")
+	[ -n "$ctl" ] && [ "$ctl" != 0000 ] || continue
+	if [ "$mode" = disable ]; then
+		setpci -s "$dev" ECAP_ACS+0x6.w=0000
+		now=$(control "$dev")
+		echo "$dev: ACS control $ctl -> ${now:-unreadable}"
+		[ "$now" = 0000 ] && continue
+		ctl=${now:-unreadable}
+	fi
+	on+=("$dev ($ctl)")
+done
+
+if [ -n "${on[*]-}" ]; then
+	echo "PCIe ACS on: ${on[*]}"
+	exit 1
+fi
