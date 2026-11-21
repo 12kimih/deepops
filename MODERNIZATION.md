@@ -582,7 +582,8 @@ Values verified against ESnet, NetApp ONTAP, RHEL, and NVIDIA DGX BasePOD docs.
 ## 29. Slurm: bring-your-own job_submit + GPU billing + generalized examples  (`0cfa77f6`, `08272e81`, `2fc74b55`)
 
 `job_submit.lua` is no longer generated from routing vars -- users supply their own
-(`config.example/files/slurm/job_submit.lua` is a starting point) and the role
+(the starting point it named then is now the role's template, rendered from
+`slurm_job_submit_policy`) and the role
 copies it **verbatim** (`copy`, not `template` -- lua `{{` table literals would break
 Jinja) with an assert when the lua plugin is enabled. config.example
 node/partition/gres + tunables examples generalized to modern 8-GPU nodes (B200

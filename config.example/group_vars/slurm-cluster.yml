@@ -89,11 +89,21 @@ slurm_ha_state_save_location: "/sw/slurm"
 #ai_agent_rules_sha256: ""
 
 # --- job_submit.lua (optional Lua submit filter) -----------------------------
-# DeepOps ships no routing template -- write your OWN job_submit.lua, drop it in
-# config/files/slurm/, and point Slurm at it (used verbatim). Docs:
-# https://slurm.schedmd.com/job_submit_plugins.html
+# Routes GPU jobs by type, stamps the type on every GPU request (typed QoS limits see
+# it), sizes GPU jobs from the partition defaults and keeps interactive GPU sessions on a
+# team QoS: roles/slurm's template, rendered from slurm_job_submit_policy (its [1] block
+# explains each key). https://slurm.schedmd.com/job_submit_plugins.html
 #slurm_job_submit_plugins: "lua"  # example
-#slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"  # example
+#slurm_job_submit_policy:  # example
+#  cpu_partitions: cpu
+#  gpu_partitions: {b200: [b200], h100: [h100, h100-short], h200: [h200]}
+#  default_gpu_type: b200
+#  strict_gpu_type: true
+#  force_gpu_partition: true
+#  gpu_jobs_use_defaults: true
+#  gpus_per_node: [1, 2, 4, 8]
+#  gpu_nodes_shared: true
+#  interactive_gpu_qos: "^high_"
 
 # --- Backups of the controller (roles/slurm_backup) --------------------------
 # Daily: accounting database dump, StateSaveLocation and (where munge_key) the MUNGE

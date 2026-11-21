@@ -1,8 +1,9 @@
 -- Regression tests for the job_submit.lua site policy.
 --
---   lua5.4 roles/slurm/tests/job_submit_test.lua config.example/files/slurm/job_submit.lua
---   lua5.4 roles/slurm/tests/job_submit_test.lua config/files/slurm/job_submit.lua
+--   python3 roles/slurm/tests/render_job_submit.py roles/slurm/tests/job_submit_policy.yml > /tmp/js.lua
+--   lua5.4 roles/slurm/tests/job_submit_test.lua /tmp/js.lua
 --
+-- (scripts/check.sh does both: the tests run on the template rendered as the role renders it.)
 -- The plugin under test is loaded as a string with its [1] site block swapped for the
 -- one each scenario declares, so these tests exercise the plugin BODY and stay valid
 -- for any cluster's copy of the file. Nothing here talks to Slurm: the slurm.* table
@@ -14,7 +15,7 @@
 -- request must therefore leave this plugin carrying its GPU type. If section A ever
 -- fails, per-type GPU quotas are silently unenforced.
 
-local plugin_path = arg[1] or "config.example/files/slurm/job_submit.lua"
+local plugin_path = assert(arg[1], "usage: job_submit_test.lua RENDERED_JOB_SUBMIT.lua")
 local fh = assert(io.open(plugin_path, "r"), "cannot open " .. plugin_path)
 local PLUGIN = fh:read("*a")
 fh:close()
@@ -502,6 +503,28 @@ local broken = setmetatable({}, {__index = function() error("boom") end})
 check("P1 submit", submit(broken), slurm.ERROR)
 check("P1 user is told", logged("failed internally"), true)
 check("P2 modify", modify(broken, GPU_REC), slurm.ERROR)
+
+print("== R. interactive GPU sessions only on a matching QoS ==")
+-- The rendered file's own [1] block, with the rule switched on.
+do
+    local saved = PLUGIN
+    local n
+    PLUGIN, n = PLUGIN:gsub('local INTERACTIVE_GPU_QOS%s*=%s*"[^"]*"', 'local INTERACTIVE_GPU_QOS = "^high_"', 1)
+    assert(n == 1, "no INTERACTIVE_GPU_QOS line in " .. plugin_path)
+    with_site(TWO_TYPES)
+    t = {gres = "gpu:a100:1"}
+    check("R1 srun/salloc without --qos refused", submit(t), slurm.ERROR)
+    check("R1 told to name the team QoS", logged("add %-%-qos=<team QoS>"), true)
+    t = {gres = "gpu:a100:1", qos = "low"}
+    check("R2 on the default QoS refused", submit(t), slurm.ERROR)
+    t = {gres = "gpu:a100:1", qos = "high_d"}
+    check("R3 on a team QoS accepted", submit(t), slurm.SUCCESS)
+    t = {gres = "gpu:a100:1", script = "#!/bin/bash\ntrain"}
+    check("R4 a batch job needs no team QoS", submit(t), slurm.SUCCESS)
+    t = {partition = "cpu"}
+    check("R5 an interactive CPU session is not concerned", submit(t), slurm.SUCCESS)
+    PLUGIN = saved
+end
 
 print(string.format("\n%s: %d passed, %d failed", plugin_path, pass, fail))
 os.exit(fail == 0 and 0 or 1)

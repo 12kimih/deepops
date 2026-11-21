@@ -1,0 +1,17 @@
+---
+# The policy the Lua tests render the template with (scripts/check.sh): several GPU
+# types, one split across two partitions, every rule on but the interactive one, which
+# the tests switch on themselves.
+slurm_job_submit_policy:
+  cpu_partitions: cpu
+  gpu_partitions:
+    b200: [b200]
+    h100: [h100, h100-short]
+    h200: [h200]
+  default_gpu_type: b200
+  strict_gpu_type: true
+  force_gpu_partition: true
+  gpu_jobs_use_defaults: true
+  gpus_per_node: [1, 2, 4, 8]
+  gpu_nodes_shared: true
+  interactive_gpu_qos: ""

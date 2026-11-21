@@ -104,7 +104,9 @@ if ! "${fast}"; then
     # Fake helm and kubectl; about eight minutes, so the full check only.
     step "runai role tests" bash tests/runai/run-tests.sh
     step "job_submit.lua tests (Lua 5.4, as slurmctld runs it)" \
-        lua5.4 roles/slurm/tests/job_submit_test.lua config.example/files/slurm/job_submit.lua
+        bash -c 'set -euo pipefail; out=$(mktemp); trap "rm -f $out" EXIT
+            "$1" roles/slurm/tests/render_job_submit.py roles/slurm/tests/job_submit_policy.yml > "$out"
+            lua5.4 roles/slurm/tests/job_submit_test.lua "$out"' _ "${python}"
     # The Slurm exporter is Go; nothing else would run its tests.
     step "Slurm exporter: gofmt, vet, tests" bash -c \
         'cd roles/prometheus-slurm-exporter/files/exporter && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
