@@ -11,6 +11,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "lib"))
+import bounds  # noqa: E402
+
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 SCRIPT = SCRIPTS / "validate_finetune.py"
@@ -307,7 +310,7 @@ class ReadinessTests(unittest.TestCase):
             command += ["--require-file", name]
         for expected in (0, 1):
             proc = subprocess.run(
-                command, env={"PATH": str(tools)}, capture_output=True, text=True, timeout=10
+                command, env={"PATH": str(tools)}, capture_output=True, text=True, timeout=bounds.CHILD
             )
             self.assertEqual(proc.returncode, expected, proc.stderr)
             result = json.loads(proc.stdout)
@@ -336,7 +339,7 @@ class ReadinessTests(unittest.TestCase):
             [sys.executable, str(SCRIPT), "--json", "--nodes", "2"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=bounds.CHILD,
         )
         self.assertEqual(proc.returncode, 2)
         self.assertEqual(json.loads(proc.stdout)["status"], "bad_input")

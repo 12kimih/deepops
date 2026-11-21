@@ -5,12 +5,16 @@ Only kubectl is replaced; the real script and common.sh run in a disposable
 checkout fragment, so neither the cluster nor the source manifest is modified.
 """
 
+import sys
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests" / "lib"))
+import bounds  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 
@@ -68,7 +72,7 @@ esac
                 env=env,
                 text=True,
                 capture_output=True,
-                timeout=10,
+                timeout=bounds.CHILD,
             )
             return result, (root / "calls").read_text().splitlines(), original, manifest.read_text()
 

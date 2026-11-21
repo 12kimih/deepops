@@ -3,12 +3,17 @@
 Run with: python3 -m unittest discover scripts/validation/tests
 """
 
+from pathlib import Path
+import sys
 import os
 import shutil
 import stat
 import subprocess
 import tempfile
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "lib"))
+import bounds  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 SCRIPT = os.path.join(REPO, "scripts", "k8s", "deploy_monitoring.sh")
@@ -81,7 +86,7 @@ class TestDeployMonitoringExit(unittest.TestCase):
             env=e,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=bounds.CHILD,
         )
         calls = ""
         if os.path.exists(self.log):

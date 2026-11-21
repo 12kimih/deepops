@@ -12,6 +12,9 @@ import threading
 import time
 import unittest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "lib"))
+import bounds  # noqa: E402
+
 SCRIPT = Path(__file__).resolve().parents[1] / "validate_vllm.py"
 REVISION = "a" * 40
 
@@ -106,7 +109,9 @@ class VllmTests(unittest.TestCase):
         ]
         for name in ("config.json", "tokenizer.json", "model.safetensors"):
             args += ["--require-file", name]
-        run = subprocess.run(args + list(extra), capture_output=True, text=True, timeout=5, env=env)
+        run = subprocess.run(
+            args + list(extra), capture_output=True, text=True, timeout=bounds.CHILD, env=env
+        )
         self.assertEqual(run.stderr, "", run.stderr)
         self.assertIn(run.returncode, (0, 1), run.stderr)
         result = json.loads(run.stdout)

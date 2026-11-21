@@ -1,12 +1,17 @@
 """roles/nfs/files/nfs-server-start-failed: the restart helper acts only on a failed
 start with no nfsd running or stuck, never on a stop that hung (2026-11-18)."""
 
+import sys
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
+
 CHECK = ROOT / "roles/nfs/files/nfs-server-start-failed"
 
 
@@ -16,7 +21,7 @@ def decide(result, threads=None, ps=""):
             f.write(threads)
             f.flush()
         path = f.name if threads is not None else "/nonexistent/threads"
-        return subprocess.run(["sh", str(CHECK), result, path, ps], timeout=30).returncode
+        return subprocess.run(["sh", str(CHECK), result, path, ps], timeout=bounds.CHILD).returncode
 
 
 class StartFailed(unittest.TestCase):
