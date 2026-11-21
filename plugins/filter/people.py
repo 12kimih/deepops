@@ -95,6 +95,15 @@ def people_login_expires(person, grace_days=30):
     return (ends + datetime.timedelta(days=int(grace_days))).isoformat() if ends else ""
 
 
+def people_shadow_day(day):
+    """A "YYYY-MM-DD" from people_login_expires as shadow(5) counts it, days since
+    1970-01-01 in UTC (shadowExpire; the user module's expires is this times 86400), or
+    "" for no end. The one conversion: through a local-time timestamp a day would slip."""
+    import datetime
+
+    return (_date(day) - datetime.date(1970, 1, 1)).days if _date(day) else ""
+
+
 def _active(people):
     return {n: p or {} for n, p in (people or {}).items() if (p or {}).get("status", "active") == "active"}
 
@@ -383,4 +392,5 @@ class FilterModule:
             "people_disk_quotas": people_disk_quotas,
             "people_check": people_check,
             "people_login_expires": people_login_expires,
+            "people_shadow_day": people_shadow_day,
         }

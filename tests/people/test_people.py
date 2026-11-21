@@ -325,3 +325,16 @@ class Cli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShadowDay(unittest.TestCase):
+    """people_shadow_day counts days in UTC: day 1 is the lock marker the people role
+    reads back, and the user module's expires is the day times 86400 seconds."""
+
+    def test_days_since_the_epoch(self):
+        self.assertEqual(people.people_shadow_day("1970-01-02"), 1)
+        self.assertEqual(people.people_shadow_day("2027-01-31"), 20849)
+        self.assertEqual(people.people_shadow_day(""), "")
+
+    def test_left_is_day_one(self):
+        self.assertEqual(people.people_shadow_day(people.people_login_expires({"status": "left"}, 30)), 1)
