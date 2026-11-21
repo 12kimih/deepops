@@ -1,9 +1,7 @@
 ---
-- name: Require known IPMI 1.5 authentication types
+- name: Refuse authentication without a password
   ansible.builtin.assert:
-    that:
-      - bmc_auth_types | map('lower') | difference(['none', 'md2', 'md5', 'password', 'oem']) | length == 0
-      - "'none' not in (bmc_auth_types | map('lower'))"
+    that: "'none' not in (bmc_auth_types | map('lower'))"
     fail_msg: >-
       bmc_auth_types takes md2, md5, password and oem ({{ bmc_auth_types }}); none would
       let a session in without authentication.
@@ -11,23 +9,18 @@
   tags:
     - bmc
 
-# One call sets every level: ipmitool copies the current enables and replaces the named
-# levels' with the listed types.
+# bmc_auth_enables refuses a type that is unknown or that the BMC does not support.
+- name: Work out the authentication type enables
+  ansible.builtin.set_fact:
+    bmc_auth_enables_want: "{{ bmc_lan_now | bmc_auth_enables(bmc_auth_types) }}"
+  tags:
+    - bmc
+
+# Set LAN Configuration Parameters (netfn 0x0c, command 0x01), parameter 2: the five
+# level bytes in one write (plugins/filter/bmc.py says why not `lan set auth`).
 - name: Set the IPMI 1.5 authentication types
   change_command:
-    argv:
-      - ipmitool
-      - -I
-      - open
-      - lan
-      - set
-      - "{{ bmc_channel }}"
-      - auth
-      - callback,user,operator,admin
-      - "{{ bmc_auth_types | map('lower') | join(',') }}"
-  when: >-
-    ['callback', 'user', 'operator', 'admin']
-    | map('extract', bmc_lan_now.auth) | map('sort') | unique
-    != [bmc_auth_types | map('lower') | sort]
+    argv: "{{ ['ipmitool', '-I', 'open', 'raw', '0x0c', '0x01', bmc_channel | string, '0x02'] + bmc_auth_enables_want }}"
+  when: bmc_auth_enables_want != bmc_lan_now.auth_enables
   tags:
     - bmc
