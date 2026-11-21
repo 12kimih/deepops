@@ -34,3 +34,27 @@ class CudaDriver(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KernelModule(unittest.TestCase):
+    OPEN = "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  580.95.05  Release Build  (dvs-builder@U22)  Tue Sep 23 2025\nGCC version:  gcc version 13.3.0"
+    PROPRIETARY = "NVRM version: NVIDIA UNIX x86_64 Kernel Module  580.95.05  Tue Sep 23 09:00:00 UTC 2025\nGCC version:  gcc 13"
+
+    def test_the_running_module_and_its_flavor(self):
+        self.assertEqual(nv.nvidia_module_loaded(self.OPEN), "580.95.05 open")
+        self.assertEqual(nv.nvidia_module_loaded(self.PROPRIETARY), "580.95.05 proprietary")
+        self.assertEqual(nv.nvidia_module_loaded(""), "")
+        self.assertEqual(nv.nvidia_module_loaded(None), "")
+
+    def test_the_module_on_disk_and_its_flavor(self):
+        self.assertEqual(nv.nvidia_module_on_disk("580.95.05\n", "Dual MIT/GPL"), "580.95.05 open")
+        self.assertEqual(nv.nvidia_module_on_disk("580.95.05", "NVIDIA"), "580.95.05 proprietary")
+        self.assertEqual(nv.nvidia_module_on_disk("", "NVIDIA"), "")
+
+    def test_a_flavor_switch_at_one_version_is_not_current(self):
+        self.assertNotEqual(
+            nv.nvidia_module_loaded(self.PROPRIETARY), nv.nvidia_module_on_disk("580.95.05", "Dual MIT/GPL")
+        )
+        self.assertEqual(
+            nv.nvidia_module_loaded(self.OPEN), nv.nvidia_module_on_disk("580.95.05", "Dual MIT/GPL")
+        )

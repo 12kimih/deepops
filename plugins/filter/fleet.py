@@ -17,8 +17,9 @@ counts only where it is installed on two or more hosts: a package only one host 
 
 Equal package versions do not mean equal running code: a host also drifts when it
 runs other than what it has installed, a pending reboot (reboot_pending: the
-packages that asked for it, or "yes") or an NVIDIA module loaded at another version
-than the one on disk (nvidia_loaded vs nvidia_on_disk, "" where none). The loaded
+packages that asked for it, or "yes") or an NVIDIA module loaded at another version or
+flavor than the one on disk (nvidia_loaded vs nvidia_on_disk, "<version> <open|
+proprietary>" from plugins/filter/nvidia.py, "" where none). The loaded
 module is compared like a package: between the hosts that have one.
 
 One value must differ instead: /etc/machine-id. Hosts cloned from one image share it
