@@ -28,7 +28,7 @@ class Config(unittest.TestCase):
         self.assertEqual(cfg["filesystems"], ["/"])
         self.assertEqual(list(cfg["limits"]), ["alice"])
         self.assertEqual(cfg["release"], ["bob", "carol", "dave"])
-        self.assertEqual(cfg["grace_days"], 7)
+        self.assertEqual(cfg["grace_days"], 14, "the site's one cleanup period, cluster_user_grace_days")
         self.assertTrue(cfg["textfile"].endswith("/disk-quota.prom"))
 
     def test_site_limits_reach_every_active_person(self):

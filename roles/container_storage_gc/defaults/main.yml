@@ -13,7 +13,8 @@
 # deepops_components.
 container_storage_gc_state: present
 
-container_storage_gc_unused_days: 14
+# Days a store may go unused before it is removed: the site's one cleanup period.
+container_storage_gc_unused_days: "{{ cluster_user_grace_days }}"
 container_storage_gc_max_used_percent: 80
 
 # Roster-shaped mapping (login -> {uid, status}) whose active people keep their stores;

@@ -1,9 +1,10 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): per-user disk quotas on
 # local ext4 filesystems (clustertools.disk_quota). A deploy sets it from
-# deepops_components (slurm_enable_disk_quota, on slurm-login): a login node shares its
-# disk with whatever else runs there (on a small cluster the controller, its database
-# and the logs), and one user's /tmp, /var/tmp or enroot cache could fill it.
+# deepops_components (slurm_enable_disk_quota, on slurm-login and slurm-nfs): a login
+# node shares its disk with whatever else runs there (on a small cluster the controller,
+# its database and the logs), and one user's /tmp, /var/tmp or enroot cache could fill
+# it; the home server's /home is everyone's. docs/deepops/disk-quota.md.
 #
 # Everyone in the roster is limited, administrators too (their own accounts; what they
 # do with sudo is root's and never limited), each with disk_quota_limits or their own
@@ -19,7 +20,8 @@
 # https://www.kernel.org/doc/html/latest/filesystems/ext4/overview.html#quota
 disk_quota_state: present
 
-# Local ext4 mount points whose users' space is limited.
+# Local ext4 mount points whose users' space is limited, per host (["/", "/home"] on a
+# login node that is also the home server).
 disk_quota_filesystems: ["/"]
 
 # Every roster person's limits: block_soft and block_hard (setquota sizes: K, M, G, T),
@@ -28,8 +30,8 @@ disk_quota_filesystems: ["/"]
 # own disk_quota in the roster (people.yml) overrides these, key by key.
 disk_quota_limits: {}
 
-# How long a user may stay over a soft limit, in days.
-disk_quota_grace_days: 7
+# How long a user may stay over a soft limit, in days: the site's one cleanup period.
+disk_quota_grace_days: "{{ cluster_user_grace_days }}"
 
 # How often every user's usage is exported (systemd OnUnitActiveSec).
 disk_quota_metrics_interval: 15min
