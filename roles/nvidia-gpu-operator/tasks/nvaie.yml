@@ -4,9 +4,12 @@
   ansible.builtin.set_fact:
     gpu_operator_enable_migmanager: false
 
+# kubectl apply says "unchanged" for what is already so: only the rest is a change.
 - name: Create namespace for GPU Operator resources
-  ansible.builtin.shell: set -o pipefail && kubectl create namespace {{ gpu_operator_namespace }} -o yaml --dry-run=client | kubectl apply -f -
-  changed_when: false
+  change_shell:
+    cmd: set -o pipefail && kubectl create namespace {{ gpu_operator_namespace }} -o yaml --dry-run=client | kubectl apply -f -
+  register: gpu_operator_namespace_apply
+  changed_when: ansible_check_mode or (gpu_operator_namespace_apply.stdout is not search('(?m) unchanged$'))
 
 - name: Create local directory for gpu operator configuration
   ansible.builtin.file:
@@ -34,10 +37,14 @@
     mode: "0600"
 
 - name: Create the licensing configmap (gridd.conf and NLS token)
-  ansible.builtin.shell: set -o pipefail && kubectl create configmap licensing-config -n "{{ gpu_operator_namespace }}" --from-file="{{
-    gpu_operator_grid_config_dir }}/gridd.conf" --from-file="{{ gpu_operator_grid_config_dir }}/client_configuration_token.tok" -o yaml --dry-run=client |
-    kubectl apply -f -
-  changed_when: false
+  change_shell:
+    cmd: >-
+      set -o pipefail && kubectl create configmap licensing-config -n "{{ gpu_operator_namespace }}"
+      --from-file="{{ gpu_operator_grid_config_dir }}/gridd.conf"
+      --from-file="{{ gpu_operator_grid_config_dir }}/client_configuration_token.tok" -o yaml --dry-run=client
+      | kubectl apply -f -
+  register: gpu_operator_licensing_apply
+  changed_when: ansible_check_mode or (gpu_operator_licensing_apply.stdout is not search('(?m) unchanged$'))
 
 # The secret is applied as a manifest on stdin, so the password is never on a command
 # line (readable by every local user through ps) and needs no shell quoting.

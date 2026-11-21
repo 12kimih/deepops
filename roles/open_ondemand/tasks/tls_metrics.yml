@@ -52,7 +52,6 @@
         enabled: true
         state: started
         daemon_reload: "{{ open_ondemand_tls_units is changed }}"
-      when: not ansible_check_mode
 
     # Right away, so a new certificate shows up without waiting a day.
     - name: Publish the certificate expiry now
@@ -60,4 +59,3 @@
         name: open-ondemand-tls-metrics.service
         state: started
       changed_when: false
-      when: not ansible_check_mode

@@ -322,10 +322,6 @@ hpcsdk_install_in_path: false
 openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-dependency-tracking --disable-getpwuid --with-pmix=external --with-hwloc=external --with-libevent=external"
 
 ################################################################################
-# Allow the User Permission to Set GPU Clocks                                  #
-################################################################################
-#allow_user_set_gpu_clocks: false
-################################################################################
 # GPU Power Limit                                                              #
 ################################################################################
 # slurm-cluster.yml runs roles/nvidia_power_limit over [slurm-node]. It is declarative:

@@ -35,7 +35,6 @@ Different layers; the monitoring stack uses the exporter.
 
 ## GPU clock control (confusingly named)
 
-- `playbooks/utilities/gpu-clocks.yml` -- sets clock **permission** (`nvidia-smi -acp`) so users may change clocks.
 - `playbooks/utilities/nvidia-set-gpu-clocks.yml` -- **locks/resets** the clock **frequency** (`nvidia-smi -lgc`/`-rgc`) on the hosts with GPUs (`slurm-node`, or `-e hostlist=`).
 
 ## GPU power limit (persists across reboots)

@@ -17,4 +17,3 @@
   systemd_unit:
     name: slurm-backup@backup.service
     state: started
-  when: not ansible_check_mode

@@ -43,10 +43,9 @@
 # systemd refuses to lay an automount over a live mount point -- leaves the target
 # succeeding and converts on the next boot rather than failing the run.
 - name: Activate the generated mount units
-  ansible.builtin.command:
-    cmd: systemctl start remote-fs.target
-  when: nfs_mounts | length > 0
-  changed_when: false
+  change_command:
+    argv: [systemctl, start, remote-fs.target]
+  when: nfs_mounts | length > 0 and nfs_client_fstab is changed
   tags:
     - nfs
 

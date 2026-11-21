@@ -89,7 +89,6 @@
         state: stopped
       loop: [slurmctld, slurmdbd]
       failed_when: false
-      when: not ansible_check_mode
 
     - name: Upgrade the controller
       ansible.builtin.include_role:

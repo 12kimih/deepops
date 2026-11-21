@@ -78,7 +78,6 @@ class Explicit(unittest.TestCase):
 GATES = {
     # Policies: an enum or a runtime setting, not something installed.
     "deepops_disable_cloud_init": "policy (off re-enables cloud-init)",
-    "allow_user_set_gpu_clocks": "policy (a runtime setting, gone at reboot)",
     # One-shot: nothing to remove.
     "slurm_configure_etc_hosts": "one-shot (hostname and /etc/hosts)",
     # Gates on a role or an include inside a component playbook (Gates.ROLE_GATES).

@@ -1,7 +1,7 @@
 # Utility playbooks
 
 Playbooks for running a cluster once it is deployed. None of them is imported by
-`playbooks/slurm-cluster.yml` (except `gpu-clocks.yml`, behind a switch), so each runs
+`playbooks/slurm-cluster.yml`, so each runs
 only when you mean it to. The configuration
 playbooks converge and can be re-run; the action playbooks (power, reboot) act every time.
 
@@ -58,7 +58,6 @@ reboots each as it empties and returns it to service. See
 | `utilities/verify-acs.yml` | slurm-node | reports PCIe ACS (roles/pcie_acs) and IOMMU state; read-only |
 | `utilities/nvidia-driver-switch.yml` | slurm-node | switches the NVIDIA driver branch one node at a time: drain, switch, reboot, verify, resume |
 | `utilities/nvidia-set-gpu-clocks.yml` | slurm-node | locks the GPU clocks to `gpu_clock_lock`, or resets them (`gpu_clock_reset`), on hosts with GPUs; runtime only |
-| `utilities/gpu-clocks.yml` | slurm-node | lets users change application clocks (`nvidia-smi -acp`); `slurm-cluster.yml` runs it when `allow_user_set_gpu_clocks` |
 | `slurm-cluster/nvidia-cuda-toolkit.yml` | slurm-cluster | CUDA toolkits as Lmod modules, installed by the first slurm-master into the shared tree while `slurm_install_cuda_toolkit` is on, removed from it when off |
 
 ## Site tooling

@@ -21,10 +21,19 @@
 # CodeReady Builder / CRB provides build deps (e.g. dkms). On Rocky/Alma this is
 # enabled with dnf config-manager; on RHEL proper it is the codeready-builder
 # repo enabled via subscription-manager (override nvidia_driver_rhel_crb_repo).
-- name: Enable the CodeReady Builder (CRB) repository (RHEL/Rocky)
+- name: Read the enabled repositories (RHEL/Rocky)
   ansible.builtin.command:
-    cmd: "dnf config-manager --set-enabled {{ nvidia_driver_rhel_crb_repo }}"
+    argv: [dnf, -q, repolist, --enabled]
+  register: nvidia_driver_rhel_repos
   changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Enable the CodeReady Builder (CRB) repository (RHEL/Rocky)
+  change_command:
+    argv: [dnf, config-manager, --set-enabled, "{{ nvidia_driver_rhel_crb_repo }}"]
+  when: >-
+    nvidia_driver_rhel_crb_repo not in
+    (nvidia_driver_rhel_repos.stdout_lines | map('split') | map('first') | list)
 
 # Per the official guide, kernel-devel is pinned to the running kernel while
 # kernel-headers is the unversioned arch package (a single version that tracks
@@ -73,17 +82,26 @@
     nvidia_driver_purge_target: "{{ nvidia_driver_rhel_package_resolved }}"
 
 - name: Reset the NVIDIA driver dnf module (RHEL/Rocky)
-  ansible.builtin.command:
-    cmd: "dnf -y module reset nvidia-driver"
-  changed_when: false
+  change_command:
+    argv: [dnf, -y, module, reset, nvidia-driver]
   when:
     - nvidia_driver_purge_existing | bool
     - nvidia_driver_switch | bool
 
-- name: Enable the NVIDIA driver dnf module stream (RHEL/Rocky)
+- name: Read the enabled NVIDIA driver module stream (RHEL/Rocky)
   ansible.builtin.command:
-    cmd: "dnf -y module enable {{ nvidia_driver_rhel_stream_resolved }}"
+    argv: [dnf, -q, module, list, --enabled, nvidia-driver]
+  register: nvidia_driver_rhel_module
   changed_when: false
+  failed_when: false  # none enabled yet: dnf says so and exits non-zero
+  check_mode: false  # read-only; --check needs the result
+
+- name: Enable the NVIDIA driver dnf module stream (RHEL/Rocky)
+  change_command:
+    argv: [dnf, -y, module, enable, "{{ nvidia_driver_rhel_stream_resolved }}"]
+  when: >-
+    nvidia_driver_rhel_module.stdout is not search('(?m)^nvidia-driver\\s+'
+    ~ (nvidia_driver_rhel_stream_resolved.split(':') | last | regex_escape) ~ '\\s.*\\[e\\]')
 
 - name: Install the NVIDIA driver (RHEL/Rocky)
   ansible.builtin.dnf:

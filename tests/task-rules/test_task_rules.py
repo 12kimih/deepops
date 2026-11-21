@@ -70,7 +70,13 @@
    task that runs under --check on purpose (check_mode: false). A change task's
    changed_when, failed_when and until that read its own result are guarded, since
    under --check nothing ran: `ansible_check_mode or (...)` for changed_when and until,
-   `not ansible_check_mode and (...)` for failed_when.
+   `not ansible_check_mode and (...)` for failed_when. A command whose line plainly
+   changes the host (kubectl apply, systemctl start, mount, dnf enable, ...) cannot
+   claim to only read (changed_when: false): that hid `kubectl apply` and
+   `dnf module enable` from previews and reports.
+   systemd_unit, change_command and change_shell preview themselves under --check (a
+   unit not installed yet included), so they never skip it with `when: not
+   ansible_check_mode`: that hid 18 restarts and enables from every preview.
 20. A condition (when, changed_when, failed_when, until, an assert's that) spells only
    escapes Python knows in its string literals: Jinja unescapes them there (rule 13's
    other half), so `match('^\\\\S+\\\\s')` is the regex `^\\S+\\s`, and a single `\\s`
@@ -227,6 +233,19 @@ def not_boolean(cond):
 
 def rel(path):
     return path.relative_to(ROOT).as_posix()
+
+
+# A command line that plainly changes the host. A task running one cannot claim to only
+# read (changed_when: false): it would be skipped by --check and report "ok" when it ran.
+MUTATES = re.compile(
+    r"\bkubectl\s+(apply|create(?![^|]*--dry-run)|delete|patch|replace|label|annotate|taint)\b"
+    r"|\bsystemctl\s+(start|stop|restart|reload|enable|disable|mask|unmask)\b"
+    r"|\bu?mount\s+-"
+    r"|\bdnf\b[^|;]*\b(install|remove|erase|enable|disable|reset|config-manager)\b"
+    r"|\bapt(-get)?\s+(-\S+\s+)*(install|remove|purge)\b"
+    r"|\bnvidia-smi\b[^|;]*\s-(acp|pm|e|mig|lgc|rgc|pl|rac)\b"
+    r"|\b(useradd|usermod|userdel|groupadd|chown|chmod|ln\s+-s)\b"
+)
 
 
 def command_line(args):
@@ -428,6 +447,42 @@ class TaskRules(unittest.TestCase):
             offenders, [], "a change runs as change_command or change_shell; a read sets changed_when: false"
         )
         scan.check(self)
+
+    def test_a_previewing_task_runs_under_check(self):
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, _ = module(task)
+                when = task.get("when")
+                text = " and ".join(map(str, when)) if isinstance(when, list) else str(when or "")
+                # Ansible refuses async under --check, so an async change has a twin
+                # that previews it (roles/netplan apply.yml).
+                if (
+                    name in ("systemd_unit", "change_command", "change_shell")
+                    and "async" not in task
+                    and re.search(r"(?<!or )\bnot ansible_check_mode\b(?! or)", text)
+                ):
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(
+            offenders,
+            [],
+            "systemd_unit and change_command preview themselves: no `when: not ansible_check_mode`",
+        )
+        scan.check(self)
+
+    def test_a_read_never_runs_a_changing_command(self):
+        scan, offenders = Scan(PLAIN_CHANGE_OK, MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if (
+                    name in ("command", "shell")
+                    and str(task.get("changed_when", "")).lower() == "false"
+                    and MUTATES.search(command_line(args))
+                    and not scan.excuse(rel(path))
+                ):
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "a command that changes the host is a change_command, not a read")
 
     def test_a_change_reads_its_result_only_when_it_ran(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []

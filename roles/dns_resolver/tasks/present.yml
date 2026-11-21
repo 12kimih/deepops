@@ -31,13 +31,11 @@
     validate: unbound-checkconf %s
   register: dns_resolver_conf
 
-# Under --check the package and file above may not exist yet.
 - name: Run unbound
   systemd_unit:
     name: unbound
     enabled: true
     state: "{{ 'restarted' if dns_resolver_conf is changed else 'started' }}"
-  when: not ansible_check_mode
 
 # Before the host depends on it: unbound must resolve, and answer NXDOMAIN for a
 # blocked name. Only a listed one proves the block: any .invalid name is NXDOMAIN anyway.
@@ -86,7 +84,7 @@
   systemd_unit:
     name: systemd-resolved
     state: restarted
-  when: dns_resolver_dropin is changed and not ansible_check_mode
+  when: dns_resolver_dropin is changed
 
 - name: Name unbound in /etc/resolv.conf
   ansible.builtin.file:

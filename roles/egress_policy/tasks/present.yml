@@ -105,7 +105,6 @@
         enabled: true
         state: "{{ 'restarted' if egress_policy_metrics_units is changed else 'started' }}"
         daemon_reload: true
-      when: not ansible_check_mode
 
 # With the metrics off they are not in egress_policy_items, so the record removes them.
 - name: Record the component as present
