@@ -293,10 +293,9 @@ The DeepOps Singularity wrapper role has been retired. Singularity lives on upst
 
 ## GPU graphics and video
 
-Jobs that render on the GPUs (OpenGL, EGL or Vulkan, with no display) or encode and
-decode video on them (NVENC, NVDEC) need driver libraries the default headless driver
-leaves out: add `graphics` and `video` to `nvidia_driver_capabilities`. See
-[GPU graphics and video in jobs](./gpu-capabilities.md).
+The full NVIDIA driver is installed, so jobs can render on the GPUs (OpenGL, EGL or
+Vulkan, with no display) and encode and decode video on them (NVENC, NVDEC);
+`nvidia_driver_headless` keeps only CUDA. See [GPU graphics and video in jobs](./gpu-graphics.md).
 
 ## Large deployments
 

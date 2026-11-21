@@ -1,11 +1,12 @@
 ---
 # Two install methods, selected by nvidia_driver_install_method:
-#  - ubuntu_repo (default): the Canonical archive's server set, as Ubuntu's docs give it
-#    for compute nodes: the signed precompiled kernel modules for the running kernel
-#    flavour (linux-modules-nvidia-{branch}-server-open-{flavour}, which follow kernel
-#    upgrades), the userspace without DKMS (nvidia-headless-no-dkms-...) and the tools
-#    (nvidia-utils-...). The nvidia-driver-{branch}-server-open meta is NOT used: it
-#    depends on nvidia-dkms and builds the modules on every node.
+#  - ubuntu_repo (default): the Canonical archive, as ubuntu-drivers installs it: the
+#    signed precompiled kernel modules for the running kernel flavour
+#    (linux-modules-nvidia-{branch}-server-open-{flavour}, which follow kernel upgrades)
+#    with the full driver (nvidia-driver-{branch}-server-open: CUDA, OpenGL/EGL/Vulkan,
+#    NVENC/NVDEC, the tools). The modules package provides nvidia-dkms-{branch}-..., so
+#    installed together nothing is compiled on the node. nvidia_driver_headless takes
+#    the compute-only userspace instead (nvidia-headless-no-dkms-..., nvidia-utils-...).
 #    https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/
 #  - nvidia_repo: NVIDIA's CUDA apt repo (cuda-keyring + nvidia-open / cuda-drivers),
 #    branch-pinned with nvidia-driver-pinning-{branch} (installed FIRST).
@@ -22,9 +23,9 @@
   ansible.builtin.set_fact:
     nvidia_driver_packages_resolved: >-
       {{ [nvidia_driver_package] if nvidia_driver_package | length > 0 else
-         ['linux-modules-nvidia-' ~ _flavoured ~ '-' ~ _kernel_flavour,
-          'nvidia-headless-no-dkms-' ~ _flavoured,
-          'nvidia-utils-' ~ _branch] }}
+         ['linux-modules-nvidia-' ~ _flavoured ~ '-' ~ _kernel_flavour]
+         + (['nvidia-headless-no-dkms-' ~ _flavoured, 'nvidia-utils-' ~ _branch]
+            if nvidia_driver_headless | bool else ['nvidia-driver-' ~ _flavoured]) }}
   vars:
     _branch: "{{ nvidia_driver_ubuntu_branch }}"
     _flavoured: "{{ _branch ~ ('-open' if nvidia_driver_kernel_modules == 'open' else '') }}"

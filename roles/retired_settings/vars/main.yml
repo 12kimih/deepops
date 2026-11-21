@@ -39,6 +39,7 @@ retired_settings:
   nvidia_driver_persistenced_dropin: the role owns the nvidia-persistenced unit with persistence mode on (roles/nvidia_driver)
   chrony_config_server: chrony_upstream (chrony.conf source lines, e.g. "server time.example.org iburst") in roles/deepops_chrony
   chrony_timezone: locale_timezone in roles/locale (the time zone is set with or without chrony)
+  nvidia_driver_capabilities: nvidia_driver_headless in roles/nvidia_driver (the full driver carries every capability; true keeps only compute)
   spack_build_packages: spack_default_packages (the specs to install; empty installs none) in roles/spack
   volume_snapshot_CRD_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster
   snapshot_controller_manifest_URLs: csi_snapshot_controller_enabled (Kubespray deploys the snapshot CRDs and controller) in group_vars/k8s_cluster

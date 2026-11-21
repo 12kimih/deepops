@@ -40,7 +40,8 @@ nvidia_driver_server_branch: true
 
 # Full override of the exact package name. Leave empty ("") to construct it from
 # the toggles above. Examples:
-#   "nvidia-driver-580-server-open"  (default: data-center, open kernel modules)
+#   "nvidia-driver-580-server-open"  (data-center, open kernel modules; alone it builds
+#                                     DKMS modules: leave empty for the precompiled ones)
 #   "nvidia-driver-580"              (desktop, proprietary)
 #   "nvidia-driver-570-open"         (desktop, open)
 #   "nvidia-driver-535-server"       (data-center, proprietary)
@@ -80,15 +81,13 @@ nvidia_driver_install_method: "ubuntu_repo"
 # --- NVIDIA CUDA repository (Ubuntu nvidia_repo method, and RHEL) --------------
 # roles/package_repos (tasks_from: cuda), shared with nvidia_cuda and nvidia_dcgm.
 
-# --- Driver capabilities -------------------------------------------------------
-# What the driver offers besides CUDA, in NVIDIA's own names (the ones containers ask
-# for in NVIDIA_DRIVER_CAPABILITIES): compute and utility (CUDA, nvidia-smi) always;
-# graphics adds OpenGL, EGL and Vulkan without a display (3D, simulation, rendering
-# jobs), video adds NVENC and NVDEC (encoding and decoding video on the GPU). On the
-# Ubuntu archive's headless driver each is its own package at the driver's branch,
-# kept through every branch switch; one taken out of the list is removed again.
-# docs/slurm-cluster/gpu-capabilities.md.
-nvidia_driver_capabilities: [compute, utility]
+# --- Userspace -------------------------------------------------------------------
+# Ubuntu archive only: false (default) installs the full driver, as every other install
+# method does: CUDA, OpenGL/EGL/Vulkan without a display, NVENC/NVDEC, the tools, so a
+# job needing any of them finds it, at the driver's own version. true installs the
+# compute-only (headless) userspace: CUDA and the tools alone, for nodes that only ever
+# compute. docs/slurm-cluster/gpu-graphics.md.
+nvidia_driver_headless: false
 
 # --- Post-installation actions -------------------------------------------------
 # Run the NVIDIA persistence daemon with persistence mode on (the role owns its unit:
