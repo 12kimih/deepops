@@ -26,7 +26,7 @@
         mode: "0755"
         create: true
     - name: Manage rc-local service
-      ansible.builtin.systemd:
+      systemd_unit:
         name: rc-local
         state: started
         enabled: true

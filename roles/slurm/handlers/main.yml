@@ -1,6 +1,6 @@
 ---
 - name: Restart munge
-  ansible.builtin.service:
+  systemd_unit:
     name: munge
     state: restarted
 
@@ -8,14 +8,14 @@
 # slurmd, the order Slurm requires on an upgrade (a daemon may talk only to one of the
 # same or a newer release).
 - name: Restart slurmdbd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurmdbd
     state: restarted
     daemon_reload: true
   when: is_controller
 
 - name: Restart slurmctld
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurmctld
     state: restarted
     daemon_reload: true
@@ -33,21 +33,21 @@
   when: is_controller
 
 - name: Restart slurmd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurmd
     state: restarted
     daemon_reload: true
   when: is_compute
 
 - name: Restart sackd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: sackd
     state: restarted
     daemon_reload: true
   when: not (is_compute or is_controller)
 
 - name: Restart logind
-  ansible.builtin.service:
+  systemd_unit:
     name: systemd-logind.service
     state: restarted
     enabled: true

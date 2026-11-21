@@ -153,7 +153,7 @@
             - Restart nvidia-power-limit
 
         - name: Enable and start the GPU power-limit service
-          ansible.builtin.systemd:
+          systemd_unit:
             name: "{{ nvidia_power_limit_service_name }}"
             enabled: true
             state: started

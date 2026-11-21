@@ -21,7 +21,7 @@
     - Restart chrony
 
 - name: Start and enable chrony service
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ chrony_service_name }}"
     state: "{{ chrony_service_state }}"
     enabled: "{{ chrony_service_enabled }}"

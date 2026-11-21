@@ -20,7 +20,7 @@
 # install, driver changes and boot; they are kept on, and a missing spec is made now.
 # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html
 - name: Keep the CDI specification refreshed
-  ansible.builtin.systemd:
+  systemd_unit:
     name: nvidia-cdi-refresh.path
     enabled: true
     state: started
@@ -33,7 +33,7 @@
   when: nvidia_container_toolkit_cdi | bool
 
 - name: Generate the CDI specification
-  ansible.builtin.systemd:
+  systemd_unit:
     name: nvidia-cdi-refresh.service
     state: started
   when:

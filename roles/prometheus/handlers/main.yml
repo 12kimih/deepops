@@ -2,7 +2,7 @@
 # Both only while Prometheus is meant to run: a restart would start one set to stopped,
 # and a reload would fail against it after its retries.
 - name: Restart prometheus
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ prometheus_svc_name }}"
     state: restarted
   when: prometheus_service_state == 'started'

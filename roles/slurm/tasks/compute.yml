@@ -200,7 +200,7 @@
   ansible.builtin.meta: flush_handlers
 
 - name: Start slurmd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurmd
     state: started
     enabled: true

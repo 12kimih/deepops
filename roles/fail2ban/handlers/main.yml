@@ -1,5 +1,5 @@
 ---
 - name: Restart fail2ban
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: fail2ban
     state: restarted

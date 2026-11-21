@@ -1,6 +1,6 @@
 ---
 - name: Reload systemd
-  ansible.builtin.systemd:
+  systemd_unit:
     daemon_reload: true
 
 # The socket unit and dockerd restart through roles/docker_daemon_json's handlers,

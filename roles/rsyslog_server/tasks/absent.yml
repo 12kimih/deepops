@@ -8,7 +8,7 @@
     component_record_items: "{{ rsyslog_server_items }}"
 
 - name: Look for rsyslog
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: rsyslog
   register: rsyslog_server_rsyslog
   check_mode: true  # read-only: no state requested
@@ -16,7 +16,7 @@
 
 # rsyslog keeps running for the OS; it restarts so the removed file stops applying.
 - name: Restart rsyslog without this component's settings
-  ansible.builtin.service:
+  systemd_unit:
     name: rsyslog
     state: restarted
   when:

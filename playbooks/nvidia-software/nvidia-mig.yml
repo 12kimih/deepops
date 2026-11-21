@@ -111,7 +111,7 @@
       when: has_mig.rc == 0
 
     - name: Regenerate the CDI specification for the MIG layout
-      ansible.builtin.systemd:
+      systemd_unit:
         name: nvidia-cdi-refresh.service
         state: restarted
       when:

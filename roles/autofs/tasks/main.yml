@@ -31,7 +31,7 @@
     mode: "0755"
 
 - name: Make sure autofs is running
-  ansible.builtin.service:
+  systemd_unit:
     name: autofs
     state: started
     enabled: true

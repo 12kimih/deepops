@@ -52,7 +52,7 @@
 # Starting statd needs nothing else restarted, and a restart of nfs-server on a live
 # server can hang nfsd and every client with it.
 - name: Ensure statd is enabled
-  ansible.builtin.service:
+  systemd_unit:
     name: rpc-statd
     enabled: true
     state: started
@@ -157,7 +157,7 @@
     - nfs
 
 - name: Ensure nfs server is running
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ nfs_server_daemon }}"
     state: started
     enabled: true

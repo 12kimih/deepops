@@ -5,7 +5,7 @@
 # What make uninstall misses (contrib, the Perl API, other releases' files) is
 # stale-files.yml's, on every run.
 - name: Stop the source-built daemons
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "{{ item }}"
     state: stopped
   loop: [slurmctld, slurmd, slurmdbd]
@@ -44,5 +44,5 @@
     - slurmd.service.d/10-slurm-path.conf
 
 - name: Reload systemd for the packaged units
-  ansible.builtin.systemd:
+  systemd_unit:
     daemon_reload: true

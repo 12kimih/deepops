@@ -1,6 +1,6 @@
 ---
 # roles/deepops_hosts/handlers/main.yml
 - name: Restart hosts
-  ansible.builtin.service:
+  systemd_unit:
     name: hostsd
     state: restarted

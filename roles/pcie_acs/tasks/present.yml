@@ -33,7 +33,7 @@
 
 # A container shares the host's PCI devices: their configuration is the host's to set.
 - name: Turn ACS off now and at every boot
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: "{{ pcie_acs_service }}"
     enabled: true
     state: started

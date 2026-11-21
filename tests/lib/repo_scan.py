@@ -115,6 +115,9 @@ def tasks(path):
 # command and shell for a change, which --check reports instead of skipping.
 CHANGES = frozenset({"change_command", "change_shell"})
 COMMANDS = frozenset({"command", "shell", "script", "raw", "expect"}) | CHANGES
+# Ansible's own service modules, which every task replaces with systemd_unit (rule 22).
+SERVICES = frozenset({"systemd", "systemd_service", "service"})
+UNITS = SERVICES | {"systemd_unit"}
 
 
 def canonical(name):

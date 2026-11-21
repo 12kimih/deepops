@@ -30,7 +30,7 @@
 
     # Only systemd reads it; slurmdbd needs no restart for this.
     - name: Reload systemd for the slurmdbd override
-      ansible.builtin.systemd:
+      systemd_unit:
         daemon_reload: true
       when: slurmdbd_timeout is changed
 

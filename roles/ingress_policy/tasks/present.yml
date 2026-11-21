@@ -76,7 +76,7 @@
         state: disabled
 
     - name: Stop the ufw service
-      ansible.builtin.systemd_service:
+      systemd_unit:
         name: ufw
         state: stopped
         enabled: false

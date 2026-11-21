@@ -77,6 +77,12 @@
    `diff` built by plugins/module_utils/deepops_diff.py (a file's text, or the steps it
    takes). Without one --check --diff showed only "changed" for files a module would
    remove (stale_files, 2026-11), entries it would write, packages it would install.
+22. A unit is started, stopped, enabled or reloaded through systemd_unit
+   (plugins/action), never ansible.builtin.systemd, systemd_service or service: under
+   --check a unit this run installs (a package's, a template's) does not exist yet, and
+   those fail on it (fail2ban's preview failed on every node without it, 2026-11), in a
+   task or a handler alike. systemd_unit runs as systemd_service and previews such a
+   unit as what it would do once installed.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -93,7 +99,7 @@ from jinja2 import nodes
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import CHANGES, COMMANDS, Scan, ansible_files, module, role_var_files, tasks, tracked  # noqa: E402
+from repo_scan import CHANGES, COMMANDS, SERVICES, Scan, ansible_files, module, role_var_files, tasks, tracked  # noqa: E402
 
 # How a change task's conditions on its own result start (rule 19).
 CHECK_GUARDS = {
@@ -772,6 +778,14 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {key}: {value}")
         self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
         scan.check(self)
+
+    def test_units_go_through_systemd_unit(self):
+        offenders = []
+        for path in ansible_files():
+            if rel(path).startswith("roles/nvidia-dgx"):
+                continue  # NVIDIA's DGX roles are kept as shipped
+            offenders += [f"{rel(path)}: {t.get('name')}" for t in tasks(path) if module(t)[0] in SERVICES]
+        self.assertEqual(offenders, [], "use systemd_unit (plugins/action/systemd_unit.py)")
 
     def test_modules_say_what_they_change(self):
         offenders = []

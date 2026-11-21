@@ -41,7 +41,7 @@
 
 # Under --check the files above are not written, so there is nothing to load.
 - name: Load now and at boot table {{ nft_table_name }}
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: "{{ (nft_table_name | nft_table_paths).unit }}"
     enabled: true
     state: started
@@ -66,7 +66,7 @@
 
 # Reload replaces the table in one transaction; there is no moment without it.
 - name: Load the ruleset the kernel does not hold yet of table {{ nft_table_name }}
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: "{{ (nft_table_name | nft_table_paths).unit }}"
     state: reloaded
   when:

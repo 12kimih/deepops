@@ -104,6 +104,21 @@ A command whose outcome only its output tells (`kubectl apply`, `sacctmgr add`) 
 reported as a change under `--check` too: nothing ran, so the preview cannot know.
 `tests/task-rules` enforces the convention (rule 19).
 
+A unit is started, stopped, enabled or reloaded through `systemd_unit`
+(`plugins/action`, rule 22), which runs as `ansible.builtin.systemd_service`. Under
+`--check` a unit this run installs (a package's, a template's) does not exist yet;
+`systemd_unit` previews what it would do to it instead of failing:
+
+```console
+TASK [fail2ban : Run fail2ban] ************************************************
+would enable fail2ban
+would start fail2ban
+changed: [node1]
+```
+
+Every in-tree module returns a diff when it changes something (rule 21), so `--diff`
+shows what it would remove, write or install, never only that it would.
+
 ### Run history (ARA)
 
 Every `ansible-playbook` and `ansible` run is recorded by

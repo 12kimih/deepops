@@ -23,7 +23,7 @@
   when: os_updates_policy == "security"
 
 - name: Run dnf-automatic on its timer
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: dnf-automatic.timer
     enabled: true
     state: started

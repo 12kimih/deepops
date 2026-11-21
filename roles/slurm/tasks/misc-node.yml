@@ -35,7 +35,7 @@
     - config
 
 - name: Ensure all slurm services are stopped
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ item }}"
     state: stopped
     enabled: false
@@ -49,7 +49,7 @@
   ansible.builtin.meta: flush_handlers
 
 - name: Start sackd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: sackd
     state: started
     enabled: true

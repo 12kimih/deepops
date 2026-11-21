@@ -14,7 +14,7 @@
   ansible.builtin.include_tasks: present.yml
 
 - name: Back up the accounting database, the controller state and the MUNGE key now
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurm-backup@backup.service
     state: started
   when: not ansible_check_mode

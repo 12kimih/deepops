@@ -58,7 +58,7 @@
   notify: Restart usage report timer
 
 - name: Enable the report timer
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "{{ slurm_usage_report_svc_name }}.timer"
     state: started
     enabled: true

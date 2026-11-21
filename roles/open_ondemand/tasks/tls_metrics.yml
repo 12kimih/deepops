@@ -46,7 +46,7 @@
       register: open_ondemand_tls_units
 
     - name: Enable the certificate metrics timer
-      ansible.builtin.systemd_service:
+      systemd_unit:
         name: open-ondemand-tls-metrics.timer
         enabled: true
         state: started
@@ -55,7 +55,7 @@
 
     # Right away, so a new certificate shows up without waiting a day.
     - name: Publish the certificate expiry now
-      ansible.builtin.systemd_service:
+      systemd_unit:
         name: open-ondemand-tls-metrics.service
         state: started
       changed_when: false
