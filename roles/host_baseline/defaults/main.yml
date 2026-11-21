@@ -49,6 +49,9 @@ host_baseline_mount_options: {}
 # Kernel settings (tasks_from: sysctl): the including role passes both.
 host_baseline_sysctls: {}
 host_baseline_sysctl_file: ""
+# Kernel settings a role no longer sets, put back to the kernel's own values now
+# (tasks_from: sysctl_reset), key: value.
+host_baseline_sysctls_reset: {}
 
 # Kernel command line and boot loader settings (tasks_from: kernel_args), the one way
 # roles set them: a role's own file, never an edit of /etc/default/grub. The including

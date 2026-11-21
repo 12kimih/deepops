@@ -1,0 +1,23 @@
+---
+# Kernel settings a role no longer sets (host_baseline_sysctls_reset, key: the kernel's
+# own value), put back now. Their file went with the role (its record removes it) and a
+# boot gives the kernel's value back anyway, but until then the running value stays, and
+# may name what is gone (a core pattern piping to a removed program loses every core).
+# Skipped in a container: its kernel is the host's.
+- name: Read the kernel settings to put back
+  ansible.builtin.command:
+    argv: [sysctl, -n, "{{ item.key }}"]
+  loop: "{{ host_baseline_sysctls_reset | dict2items }}"
+  register: host_baseline_sysctl_now
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: not deepops_containerized | bool
+
+- name: Put the kernel settings back to the kernel's own values
+  change_command:
+    argv: [sysctl, -w, "{{ item.item.key }}={{ item.item.value }}"]
+  loop: "{{ host_baseline_sysctl_now.results | default([]) | rejectattr('skipped', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: item.stdout | trim != item.item.value | string
