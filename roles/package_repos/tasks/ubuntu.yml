@@ -1,0 +1,60 @@
+---
+# Ubuntu's own archive from the site's mirror (package_repos_ubuntu_mirror), as the
+# release ships it (/etc/apt/sources.list.d/ubuntu.sources, deb822), trusting the
+# archive key the ubuntu-keyring package keeps up to date, never a copy of it. Empty
+# leaves the OS's file alone. A different package_repos_ubuntu_security_mirror puts the
+# -security suite in its own source (ubuntu-security.sources), as Ubuntu's default file
+# keeps it on security.ubuntu.com.
+- name: Point apt at the site's Ubuntu mirror
+  when:
+    - package_repos_ubuntu_mirror | length > 0
+    - ansible_facts.distribution == 'Ubuntu'
+  vars:
+    _codename: "{{ ansible_facts.distribution_release }}"
+    _separate: "{{ package_repos_ubuntu_security_mirror | regex_replace('/*$', '') != package_repos_ubuntu_mirror | regex_replace('/*$', '') }}"
+  block:
+    - name: Read the one-line sources list
+      ansible.builtin.slurp:
+        src: /etc/apt/sources.list
+      register: package_repos_sources_list
+      failed_when: false
+
+    # Entries there would be a second, unmanaged source of the same archive.
+    - name: Refuse entries in /etc/apt/sources.list
+      ansible.builtin.assert:
+        that: _entries | length == 0
+        fail_msg: >-
+          /etc/apt/sources.list has entries ({{ _entries | join('; ') }}): since Ubuntu 24.04
+          the archive is /etc/apt/sources.list.d/ubuntu.sources, which this manages. Remove
+          them (comment them out) first.
+        quiet: true
+      vars:
+        _entries: >-
+          {{ (package_repos_sources_list.content | default('') | b64decode).splitlines()
+             | map('trim') | select('match', '^deb(-src)?\s') | list }}
+
+    - name: Write the Ubuntu archive source
+      ansible.builtin.deb822_repository:
+        name: ubuntu
+        types: [deb]
+        uris: ["{{ package_repos_ubuntu_mirror }}"]
+        suites: "{{ [_codename, _codename ~ '-updates', _codename ~ '-backports'] + ([] if _separate else [_codename ~ '-security']) }}"
+        components: "{{ package_repos_ubuntu_components }}"
+        signed_by: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+      register: package_repos_ubuntu_archive
+
+    - name: Write the security source
+      ansible.builtin.deb822_repository:
+        name: ubuntu-security
+        types: [deb]
+        uris: ["{{ package_repos_ubuntu_security_mirror }}"]
+        suites: ["{{ _codename }}-security"]
+        components: "{{ package_repos_ubuntu_components }}"
+        signed_by: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+        state: "{{ 'present' if _separate else 'absent' }}"
+      register: package_repos_ubuntu_security
+
+    - name: Refresh the package index
+      ansible.builtin.apt:
+        update_cache: true
+      when: package_repos_ubuntu_archive is changed or package_repos_ubuntu_security is changed

@@ -5,6 +5,11 @@
 - hosts: all
   become: true
   tasks:
+    - name: Point apt at the site's Ubuntu mirror
+      ansible.builtin.include_role:
+        name: package_repos
+        tasks_from: ubuntu
+
     - name: Apply the OS update policy
       ansible.builtin.include_role:
         name: os_updates
