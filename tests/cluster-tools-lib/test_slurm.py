@@ -186,6 +186,19 @@ class SchemaTests(unittest.TestCase):
             with self.subTest(kind=kind):
                 self.assertTrue(any((r / f"{name}.json").exists() for r in self.releases()), "no fixture")
 
+    def test_associations_are_the_replying_clusters(self):
+        # The database keeps a renamed cluster's grants under its old name: they are not
+        # this cluster's, and reading them as such shows QoS a user no longer has.
+        data = json.loads((self.releases()[-1] / "assoc.json").read_text())
+        here = slurm.cluster_name(data)
+        mine = len(data["associations"])
+        old = [dict(a, cluster="oldname", qos=["retired"]) for a in data["associations"]]
+        data["associations"] += old
+        parsed = slurm.parse("associations", json.dumps(data))
+        self.assertEqual(len(parsed["associations"]), mine)
+        self.assertEqual({a["cluster"] for a in parsed["associations"]}, {here})
+        self.assertNotIn("retired", {q for a in parsed["associations"] for q in a["qos"]})
+
     def test_a_renamed_field_is_named(self):
         data = json.loads((self.releases()[0] / "jobs.json").read_text())
         data["meta"]["slurm"]["release"] = "26.05.0"

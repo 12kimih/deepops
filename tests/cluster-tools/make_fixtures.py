@@ -67,7 +67,7 @@ JOB_FIELDS = (
     "priority",
 )
 QOS_FIELDS = ("name", "priority", "preempt", "flags", "limits")
-ASSOC_FIELDS = ("account", "user", "qos", "default", "is_default", "partition")
+ASSOC_FIELDS = ("cluster", "account", "user", "qos", "default", "is_default", "partition")
 ACCOUNTING_FIELDS = (
     "cluster",
     "job_id",
@@ -168,8 +168,13 @@ def main(src, dst):
         names[a] = f"acct{i + 1}"
     qos = raw.get("qos", empty)["qos"]
     suffixes = sorted({q["name"].split("_", 1)[1] for q in qos if "_" in q["name"]})
-    for i, c in enumerate(sorted({j["cluster"] for j in accounting})):
-        names[c] = f"cluster{i + 1}"  # a renamed cluster's history keeps the old name
+    # The reply's own cluster (its meta) is testcluster; any other the database holds
+    # (a renamed cluster's history keeps the old name) is cluster<N>.
+    here = {d["meta"]["slurm"]["cluster"] for d in raw.values()}
+    others = {j["cluster"] for j in accounting} | {a["cluster"] for a in assoc}
+    for i, c in enumerate(sorted(others - here)):
+        names[c] = f"cluster{i + 1}"
+    names.update({c: "testcluster" for c in here})
     for i, s in enumerate(suffixes):
         names[f"_{s}"] = f"_t{i + 1}"  # numbered: a letter could equal a real suffix
     for q in qos:
