@@ -55,7 +55,10 @@ def bmc_cipher_privs(lan, allowed):
     suites = lan["cipher_suites"][:PRIVS_LENGTH]
     missing = sorted(allowed - set(suites))
     if missing:
-        raise ValueError(f"the BMC does not offer cipher suites {missing} (it lists {suites})")
+        raise ValueError(
+            f"the BMC does not offer cipher suites {missing} (it lists {suites}): its firmware"
+            " predates them; update it, or set this host's bmc_cipher_suites to suites it lists"
+        )
     return "".join("a" if s in allowed else "X" for s in suites).ljust(PRIVS_LENGTH, "X")
 
 
