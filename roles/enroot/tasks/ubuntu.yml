@@ -94,6 +94,8 @@
     - enroot_userns_knob.stat.exists
     - not enroot_apparmor_global_disable | bool
     - not enroot_apparmor_profile.stat.exists
+    # A preview of a first install: the package that ships it is not installed yet.
+    - not (ansible_check_mode and enroot_install is changed)
 
 # The kernel's profile list decides, so a profile that failed to load earlier or was
 # unloaded by hand is repaired on the next run, not only after a package change.
