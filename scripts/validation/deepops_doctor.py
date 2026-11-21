@@ -37,19 +37,33 @@ def check(checks, name, ok, detail):
     return ok
 
 
-def count_positive_stdout_hosts(output):
-    """Count hosts whose ansible one-line ``(stdout) N`` value is a positive int."""
+# Ansible's JSON callback: the oneline callback (-o) is deprecated in ansible-core 2.20
+# and removed in 2.23, and its text was never meant to be parsed.
+JSON_OUTPUT = {"ANSIBLE_LOAD_CALLBACK_PLUGINS": "1", "ANSIBLE_STDOUT_CALLBACK": "ansible.builtin.json"}
+
+
+def ad_hoc(inventory, module, args=None):
+    """(rc, {host: result}) of one ad-hoc MODULE task on every host of INVENTORY."""
+    argv = ["ansible", "all", "-i", inventory, "-m", module] + (["-a", args] if args else [])
+    rc, out, _ = run(argv, timeout=300, env={**os.environ, **JSON_OUTPUT})
+    try:
+        return rc, json.loads(out)["plays"][0]["tasks"][0]["hosts"]
+    except (ValueError, KeyError, IndexError):
+        return rc, {}
+
+
+def reached(results):
+    """The hosts that answered: neither unreachable nor failed."""
+    return [h for h, r in results.items() if not r.get("unreachable") and not r.get("failed")]
+
+
+def count_positive_stdout_hosts(results):
+    """Count hosts whose command printed a positive integer first."""
     hosts = 0
-    for line in output.splitlines():
-        if "(stdout)" not in line:
-            continue
-        tail = line.rsplit("(stdout)", 1)[1].strip()
-        first = tail.split("\\n")[0].strip()
-        try:
-            if int(first) > 0:
-                hosts += 1
-        except ValueError:
-            continue
+    for result in results.values():
+        first = (result.get("stdout") or "").split("\n")[0].strip()
+        if first.isdigit() and int(first) > 0:
+            hosts += 1
     return hosts
 
 
@@ -177,8 +191,8 @@ def main():
         )
 
     if args.remote and hosts_total > 0:
-        rc, out, err = run(["ansible", "all", "-i", inventory, "-m", "ping", "-o"], timeout=300)
-        reachable = out.count("SUCCESS")
+        rc, results = ad_hoc(inventory, "ping")
+        reachable = len(reached(results))
         check(
             checks,
             "hosts_reachable",
@@ -192,42 +206,20 @@ def main():
             ),
         )
 
-        rc, out, _ = run(
-            [
-                "ansible",
-                "all",
-                "-i",
-                inventory,
-                "-m",
-                "shell",
-                "-o",
-                "-a",
-                "lspci 2>/dev/null | grep -ci nvidia || true",
-            ],
-            timeout=300,
-        )
+        rc, results = ad_hoc(inventory, "shell", "lspci 2>/dev/null | grep -ci nvidia || true")
         # Facts for the operator, not checks: they cannot fail, so they are not in
         # "checks" (where a pass that cannot fail would mean nothing); a count that
         # could not be read is null, not 0.
-        info["gpu_hosts"] = count_positive_stdout_hosts(out) if rc == 0 else None
+        info["gpu_hosts"] = count_positive_stdout_hosts(results) if rc == 0 else None
 
-        rc, out, _ = run(
-            [
-                "ansible",
-                "all",
-                "-i",
-                inventory,
-                "-m",
-                "shell",
-                "-o",
-                "-a",
-                "systemctl show ssh.service sshd.service -p DeviceAllow 2>/dev/null | grep -ci nvidiactl || true",
-            ],
-            timeout=300,
+        rc, results = ad_hoc(
+            inventory,
+            "shell",
+            "systemctl show ssh.service sshd.service -p DeviceAllow 2>/dev/null | grep -ci nvidiactl || true",
         )
         # Hosts that hide GPUs from SSH sessions (Slurm login GPU hiding): there a
         # direct nvidia-smi over SSH is expected to fail and srun is the GPU test.
-        info["ssh_gpu_hiding_hosts"] = count_positive_stdout_hosts(out) if rc == 0 else None
+        info["ssh_gpu_hiding_hosts"] = count_positive_stdout_hosts(results) if rc == 0 else None
 
     ok = all(c["ok"] for c in checks)
     result = {"ok": ok, "checks": checks, "info": info}

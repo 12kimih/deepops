@@ -22,6 +22,7 @@ Skips when docker is not available.
 
 import json
 import os
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -34,6 +35,9 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
+
 ANSIBLE = ROOT / ".venv" / "bin" / "ansible-playbook"
 TEST_PASSWORD = "smoke-test-only"
 # What a site sets for the optional parts, so those parts render (and are checked) too.
@@ -160,7 +164,7 @@ class MonitoringImages(unittest.TestCase):
         # Extra vars: above the role defaults loaded as vars_files.
         (cls.tmp / "site.json").write_text(json.dumps(SITE))
         # Run from the scratch directory: Ansible's defaults, plus the repository's filters.
-        env = {**os.environ, "ANSIBLE_FILTER_PLUGINS": str(ROOT / "plugins/filter")}
+        env = unrecorded.env(ANSIBLE_FILTER_PLUGINS=str(ROOT / "plugins/filter"))
         env.pop("ANSIBLE_CONFIG", None)
         result = subprocess.run(
             [str(ANSIBLE), "-i", "localhost,", "-c", "local", "-e", "@site.json", str(playbook)],

@@ -1,13 +1,14 @@
 """roles/nsswitch: one client's source token, added and taken away, nothing else touched."""
 
-import importlib.util
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("nss", ROOT / "roles/nsswitch/library/nsswitch_source.py")
-nss = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(nss)
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import in_tree  # noqa: E402
+
+nss = in_tree.load("roles/nsswitch/library/nsswitch_source.py")
 
 # Ubuntu 24.04's shipped file (/usr/share/libc-bin/nsswitch.conf), as installed.
 UBUNTU = """\

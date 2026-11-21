@@ -9,12 +9,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "roles/site_secrets/library/site_secret.py"
+RUNNER = ROOT / "tests/lib/in_tree.py"  # runs it with plugins/module_utils, as Ansible ships it
 
 
 def run(**args):
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump({"ANSIBLE_MODULE_ARGS": args}, f)
-    done = subprocess.run([sys.executable, str(MODULE), f.name], capture_output=True, text=True)
+    done = subprocess.run([sys.executable, str(RUNNER), str(MODULE), f.name], capture_output=True, text=True)
     Path(f.name).unlink()
     return json.loads(done.stdout)
 
@@ -31,6 +32,13 @@ class Password(unittest.TestCase):
             again = run(path=str(path), kind="password", length=32, vault=False)
             self.assertFalse(again["changed"])
             self.assertEqual(path.read_text(), text, "never replaced")
+
+    def test_the_diff_names_the_file_never_the_secret(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "p"
+            got = run(path=str(path), kind="password", length=32, vault=False)
+            self.assertEqual(got["diff"], {"prepared": f"create {path} (password)\n"})
+            self.assertNotIn(path.read_text(), json.dumps(got))
 
     def test_too_short(self):
         with tempfile.TemporaryDirectory() as tmp:

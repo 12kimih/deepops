@@ -5,7 +5,6 @@ without it they run exactly as command and shell; creates/removes stay command's
 """
 
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +12,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+import unrecorded  # noqa: E402
+
 PLAYBOOK = Path(sys.executable).with_name("ansible-playbook")
 
 PLAY = """
@@ -56,7 +58,7 @@ def run(tmp, *extra):
     out, record = tmp / "out", tmp / "record.json"
     out.mkdir(exist_ok=True)
     (tmp / "play.yml").write_text(PLAY)
-    env = {**os.environ, "ANSIBLE_ACTION_PLUGINS": str(ROOT / "plugins" / "action")}
+    env = unrecorded.env(ANSIBLE_ACTION_PLUGINS=str(ROOT / "plugins" / "action"))
     env.pop("ANSIBLE_CONFIG", None)
     result = subprocess.run(
         [str(PLAYBOOK), "-i", "localhost,", "-c", "local", "-e", f"out={out}", "-e", f"record={record}",

@@ -75,6 +75,7 @@ import string
 import subprocess
 import tempfile
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
 # The alphabet of secrets.token_urlsafe: a password made by chars matches one made by length.
@@ -177,15 +178,21 @@ def main():
             msg=f"{p['path']} must be vaulted, and no vault password file is set (ansible.cfg vault_password_file)"
         )
     adopted = [f"{p['path']} from {p['adopt_from']}"] if p["adopt_from"] else []
+    # The files only: a secret's content never goes into a diff.
+    vaulted = " (vaulted)" if p["vault"] else ""
+    diff = deepops_diff.actions(
+        [f"adopt {a}{vaulted}" for a in adopted]
+        or [f"create {path} ({p['kind']}){vaulted}" for path in paths]
+    )
     if module.check_mode:
-        module.exit_json(changed=True, created=[] if adopted else paths, adopted=adopted)
+        module.exit_json(changed=True, created=[] if adopted else paths, adopted=adopted, diff=diff)
 
     if adopted:
         data = base64.b64decode(p["content"] or "")
         if hashlib.sha256(data).hexdigest() != p["sha256"]:
             module.fail_json(msg=f"the copy read from {p['adopt_from']} does not match the agreed checksum")
         write_new(module, p["path"], data, mode, p["vault"])
-        module.exit_json(changed=True, created=[], adopted=adopted)
+        module.exit_json(changed=True, created=[], adopted=adopted, diff=diff)
     if p["chars"] is not None and p["kind"] != "password":
         module.fail_json(msg="chars is for a password only")
     if p["kind"] in ("random", "password"):
@@ -206,7 +213,7 @@ def main():
         secret, public = gpg_pair(module, p["uid"])
         write_new(module, p["path"], secret.encode(), mode, p["vault"])
         write_new(module, p["public_path"], public.encode(), mode, False)
-    module.exit_json(changed=True, created=paths, adopted=[])
+    module.exit_json(changed=True, created=paths, adopted=[], diff=diff)
 
 
 if __name__ == "__main__":

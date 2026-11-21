@@ -56,6 +56,7 @@ options:
 
 import shlex
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
 QOS_FIELDS = "name,priority,preempt,preemptmode,flags,grptres,maxtrespu,maxwall,usagefactor,description"
@@ -530,8 +531,7 @@ def main():
 
     lines = [shlex.join(["sacctmgr", "-i", *c]) for c in cmds]
     result = {"changed": bool(cmds), "commands": lines, "unmanaged": unmanaged}
-    if module._diff:
-        result["diff"] = {"before": "", "after": "\n".join(lines) + ("\n" if lines else "")}
+    result["diff"] = deepops_diff.actions(lines) if cmds else {}
     if not module.check_mode:
         for cmd in cmds:
             rc, out, err = module.run_command([sacctmgr, "-i", *cmd])

@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import in_tree  # noqa: E402
 
 
 def load(name, path):
@@ -19,7 +21,7 @@ def load(name, path):
 directory = load("directory", "plugins/filter/directory.py")
 # ldap_tree imports python-ldap only to talk to a server; changes() needs none of it.
 sys.modules.setdefault("ldap", types.ModuleType("ldap"))
-tree = load("ldap_tree", "roles/ldap_server/library/ldap_tree.py")
+tree = in_tree.load("roles/ldap_server/library/ldap_tree.py")
 
 SUFFIX = "dc=example,dc=internal"
 PEOPLE = {

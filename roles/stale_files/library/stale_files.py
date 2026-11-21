@@ -64,6 +64,7 @@ import struct
 import subprocess
 import sys
 
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.deepops_marks import named_deepops, text_marked
 
@@ -498,6 +499,7 @@ def main():
     found = audit(module.params["config_dirs"], owned | ignored, claimed) if module.params["audit"] else {}
     module.exit_json(
         changed=bool(removing),
+        diff=deepops_diff.actions(f"remove {p}" for p in every) if removing else {},
         stale=stale,
         owned_kept=sorted(kept),
         unowned=dict(sorted(unowned.items())),

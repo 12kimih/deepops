@@ -19,6 +19,7 @@ options:
 import os
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils import deepops_diff
 from ansible.module_utils.deepops_marks import made_by_deepops
 
 
@@ -35,7 +36,8 @@ def main():
         removed.append(path)
         if not module.check_mode:
             os.unlink(path)
-    module.exit_json(changed=bool(removed), removed=removed, kept=kept)
+    diff = deepops_diff.actions(f"remove {path}" for path in removed)
+    module.exit_json(changed=bool(removed), removed=removed, kept=kept, diff=diff if removed else {})
 
 
 if __name__ == "__main__":

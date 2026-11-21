@@ -198,12 +198,12 @@ class TestDoctorParsers(unittest.TestCase):
         self.assertIn("slurm-node", groups)
 
     def test_count_positive_stdout_hosts(self):
-        out = (
-            "n1 | CHANGED | rc=0 | (stdout) 2\n"
-            "n2 | CHANGED | rc=0 | (stdout) 0\n"
-            "n3 | CHANGED | rc=0 | (stdout) not-a-number\n"
-        )
-        self.assertEqual(deepops_doctor.count_positive_stdout_hosts(out), 1)
+        results = {"n1": {"stdout": "2"}, "n2": {"stdout": "0"}, "n3": {"stdout": "not-a-number"}, "n4": {}}
+        self.assertEqual(deepops_doctor.count_positive_stdout_hosts(results), 1)
+
+    def test_reached_hosts(self):
+        results = {"n1": {"ping": "pong"}, "n2": {"unreachable": True}, "n3": {"failed": True}}
+        self.assertEqual(deepops_doctor.reached(results), ["n1"])
 
 
 class TestRunDecodes(unittest.TestCase):
