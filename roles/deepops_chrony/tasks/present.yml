@@ -26,6 +26,25 @@
     state: "{{ chrony_service_state }}"
     enabled: "{{ chrony_service_enabled }}"
 
+- name: Apply a changed configuration now
+  ansible.builtin.meta: flush_handlers
+
+# munge credentials and Slurm both need the clocks in step: a configuration that reaches
+# no source (a mistyped server, a blocked port) must fail here, not as authentication
+# errors later. A source whose reach register is non-zero has answered.
+- name: Check chrony reaches a time source
+  ansible.builtin.command:
+    argv: [chronyc, -n, -c, sources]
+  register: chrony_sources
+  changed_when: false
+  check_mode: false  # read-only
+  until: chrony_sources.rc == 0 and chrony_sources.stdout_lines | map('split', ',') | selectattr(5, 'defined') | rejectattr(5, 'eq', '0') | list | length > 0
+  retries: 12
+  delay: 10
+  when:
+    - chrony_service_state == 'started'
+    - not ansible_check_mode
+
 - name: Record the component as present
   ansible.builtin.include_role:
     name: component_record
