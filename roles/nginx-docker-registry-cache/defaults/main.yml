@@ -5,6 +5,9 @@
 # mirror cache and the generated CA stay.
 nginx_docker_cache_state: present
 
+# Run as a systemd unit (roles/container_service), its container named after it.
+nginx_docker_cache_svc_name: docker.nginx-docker-cache.service
+# The container's name when it ran outside systemd (docker restart policy): retired.
 nginx_docker_cache_name: "deepops-nginx-docker-cache"
 nginx_docker_cache_image: "rpardini/docker-registry-proxy:0.8.0@sha256:fe958e7a4b7ef01a646d903347a0522b6a9065b44b451c5ef87eb4b6b0f3d770"
 
