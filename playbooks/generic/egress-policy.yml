@@ -10,6 +10,7 @@
   become: true
   tags:
     - egress-policy
+    - people  # the exempt UIDs may come from the roster
   roles:
     - role: deploy_defaults  # slurm_enable_egress_policy, proxy_env
     - role: egress_policy

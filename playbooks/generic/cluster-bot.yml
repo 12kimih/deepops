@@ -12,3 +12,4 @@
       cluster_bot_state: "{{ deepops_components.cluster_bot | component_phase(deepops_phase) }}"
   tags:
     - cluster-bot
+    - people  # members and admins come from the roster

@@ -20,10 +20,10 @@ podman_packages:
   Debian: [podman, uidmap, slirp4netns, apparmor]
   RedHat: [podman, shadow-utils, slirp4netns]
 
-# Roster-shaped mapping (login -> {uid, status}) of the people who get a range, and
-# the ranges' layout: start = base + (uid - 1000) * count. The base must exceed every
+# Roster-shaped mapping (login -> {uid, status}) of the people who get a range (default:
+# the roster), and the ranges' layout: start = base + (uid - 1000) * count. The base must exceed every
 # roster UID; count 65536 covers the IDs any image uses.
-podman_people: {}
+podman_people: "{{ people }}"
 podman_subid_base: 100000
 podman_subid_count: 65536
 

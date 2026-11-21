@@ -6,6 +6,10 @@
 # feature that posts or listens uses it. Empty turns the Slack features off.
 slack_bot_token: ""
 
+# Cluster user -> Slack member ID (or an email to look up), for every tool that mentions
+# or messages a person: the roster's `slack` attribute.
+slack_members: "{{ people | people_attr('slack') }}"
+
 # The channels by what they are for:
 #   status    what everyone may look at: the hourly and weekly GPU usage, storage
 #   admin     what an administrator has to act on

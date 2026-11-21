@@ -24,7 +24,7 @@ cluster_bot_sha256:
 
 # Who the bot knows: cluster user -> Slack member ID, and the administrators (cluster
 # users) who approve what goes beyond the automatic limits.
-cluster_bot_members: "{{ people | default({}) | people_attr('slack') }}"
+cluster_bot_members: "{{ slack_members }}"
 cluster_bot_admins: "{{ people | default({}) | people_with_role('admin') }}"
 
 # Days before an allocation's end its owner is reminded, once each.

@@ -13,3 +13,4 @@ galaxy_info:
       versions: ["8", "9"]
 dependencies:
   - role: deploy_defaults  # deepops_component_registry (cluster_bot_host)
+  - role: people_defaults  # people (slack_members)

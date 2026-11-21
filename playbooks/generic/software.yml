@@ -7,6 +7,7 @@
     - role: deploy_defaults
     # The shells people log in with, on every host, each reading /etc/profile.d.
     - role: login_shells
+      tags: [people]  # the shells people chose
   tasks:
     - name: Install extra packages
       ansible.builtin.package:
