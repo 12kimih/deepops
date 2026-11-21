@@ -31,7 +31,8 @@ and revoked in one place. Only `active` people get anything; someone who has lef
 keeps an entry so the UID stays reserved and the account can be locked.
 
 check() is the single validation, used at deploy time through people_check and at
-commit time by scripts/deepops/people.py.
+commit time by scripts/deepops/people.py. roster_add() and roster_leave() are the one
+way a roster file is edited (scripts/deepops/people.py, the cluster bot's requests).
 """
 
 import re
@@ -216,6 +217,71 @@ def check(roster, uid_min=UID_MIN):
                 if p.get(key) in (None, ""):
                     problems.append(f"{where}.{key}: required for an active Slurm user")
     return problems
+
+
+class EditError(ValueError):
+    """A roster edit refused: the reason, or the check's problems, one per line."""
+
+
+def _round_trip(text):
+    from ruamel.yaml import YAML  # only the editors need it, not the deploy's filters
+
+    rt = YAML()
+    rt.preserve_quotes = True
+    rt.indent(mapping=2, sequence=4, offset=2)
+    rt.explicit_start = text.lstrip().startswith("---")
+    return rt, rt.load(text)
+
+
+def _dump_checked(rt, doc, uid_min):
+    import io
+
+    out = io.StringIO()
+    rt.dump(doc, out)
+    problems = check(rt.load(out.getvalue()), uid_min)
+    if problems:
+        raise EditError("\n".join(problems))
+    return out.getvalue()
+
+
+def roster_add(text, login, account, name=None, slack=None, reserved=(), accounts=None, uid_min=UID_MIN):
+    """TEXT (a roster file) with LOGIN added in ACCOUNT, and the UID given: the next after
+    the roster's, never one in RESERVED (system account IDs); ACCOUNTS, when given, the
+    declared Slurm accounts. The person goes beside their neighbours and every other
+    line and comment stays. EditError unless the result passes check()."""
+    from ruamel.yaml.comments import CommentedMap
+
+    if accounts is not None and account not in accounts:
+        raise EditError(f"account {account} is not declared in the Slurm accounting file")
+    rt, doc = _round_trip(text)
+    roster = doc["people"]
+    if login in roster:
+        raise EditError(f"{login} is already in the roster")
+    uids = {p["uid"] for p in roster.values() if p and "uid" in p}
+    uid = max(uids | {uid_min - 1}) + 1
+    while uid in uids or uid in set(reserved):
+        uid += 1
+    entry = CommentedMap(uid=uid)
+    if name:
+        entry["name"] = name
+    if slack:
+        entry["slack"] = slack
+    entry["accounts"] = CommentedMap({account: CommentedMap()})
+    entry["accounts"][account].fa.set_flow_style()
+    roster.insert(sum(1 for other in roster if str(other) < login), login, entry)
+    return _dump_checked(rt, doc, uid_min), uid
+
+
+def roster_leave(text, login, uid_min=UID_MIN):
+    """TEXT with LOGIN `status: left`: no roles, accounts or quota; the UID stays reserved."""
+    rt, doc = _round_trip(text)
+    entry = doc["people"].get(login)
+    if entry is None:
+        raise EditError(f"{login} is not in the roster")
+    for key in ("roles", "accounts", "default_account", "disk_quota"):
+        entry.pop(key, None)
+    entry["status"] = "left"
+    return _dump_checked(rt, doc, uid_min)
 
 
 def people_disk_quotas(people, default=None):
