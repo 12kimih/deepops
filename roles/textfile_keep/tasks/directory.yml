@@ -1,0 +1,24 @@
+---
+# node_exporter's textfile directory, made at every boot (it is a tmpfs under /run): the
+# one place that says so, for the reader (roles/prometheus-node-exporter binds it into
+# its container, and a missing bind source stops the container) and every writer.
+- name: Create the kept and the live textfile directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ node_exporter_prom_keep_dir }}"
+    - "{{ node_exporter_prom_dir }}"
+
+- name: Make the textfile directory at every boot
+  ansible.builtin.copy:
+    dest: "{{ node_exporter_prom_dir_tmpfiles }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # roles/textfile_keep: node_exporter's textfile directory, a tmpfs, at every boot.
+      d {{ node_exporter_prom_dir }} 0755 root root -

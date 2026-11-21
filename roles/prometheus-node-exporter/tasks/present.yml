@@ -17,6 +17,13 @@
     state: absent
   when: inventory_hostname not in deepops_component_registry | component_hosts(groups, 'prometheus', deepops_component_removals)
 
+# The textfile directory it binds is a tmpfs: made at every boot, before the container
+# starts (a missing bind source stops it; nothing else made it on every host).
+- name: Make the textfile directory at every boot
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: directory
+
 - name: Pull the image
   ansible.builtin.include_role:
     name: container_image
