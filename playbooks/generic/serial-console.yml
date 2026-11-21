@@ -1,0 +1,11 @@
+---
+# The console on the BMC's serial-over-LAN (roles/serial_console), so a node that stops
+# before the network is up can still be seen and driven from another machine; on with
+# serial_console_enabled, off again removes it. A boot loader setting through the one
+# kernel_args mechanism: takes effect at the next boot. See docs/deepops/bmc.md.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - serial_console
+  tags:
+    - serial_console

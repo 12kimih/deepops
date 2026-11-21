@@ -182,7 +182,8 @@ reports as already active. `sol deactivate` clears it.
 
 Serial-over-LAN only shows something if the node's kernel writes to the serial console,
 and the GRUB menu only appears there if GRUB is told to use it too. `roles/serial_console`
-does both -- run `playbooks/utilities/serial-console.yml` and reboot, or SOL will be blank
+does both: set `serial_console_enabled: true` (both cluster deploys run
+`playbooks/generic/serial-console.yml`) and reboot, or SOL will be blank
 at exactly the wrong moment. Which port SOL is wired to is a BIOS setting the OS cannot
 read, so confirm it by attaching during a boot.
 

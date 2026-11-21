@@ -9,8 +9,9 @@
   tags:
     - serial_console
 
-# The kernel's console on the serial line too, and GRUB's terminal; they take effect at
-# the next boot (no reboot is asked for).
+# The kernel's console on the serial line too, and GRUB's terminal, while it is enabled;
+# none of it when not (kernel_args removes the file). From the next boot either way (no
+# reboot is asked for).
 - name: Configure the serial console
   ansible.builtin.include_role:
     name: host_baseline
@@ -19,11 +20,11 @@
       tags: [serial_console]
   vars:
     host_baseline_kernel_args_owner: serial-console
-    host_baseline_kernel_args:
-      - console=tty0
-      - "console={{ serial_console_port }},{{ serial_console_speed }}n8"
+    host_baseline_kernel_args: >-
+      {{ ['console=tty0', 'console=' ~ serial_console_port ~ ',' ~ serial_console_speed ~ 'n8']
+         if serial_console_enabled | bool else [] }}
     host_baseline_kernel_args_grub: >-
-      {{ {'GRUB_TERMINAL': 'console serial',
+      {{ {} if not serial_console_enabled | bool else {'GRUB_TERMINAL': 'console serial',
           'GRUB_SERIAL_COMMAND': 'serial --speed=' ~ serial_console_speed ~ ' --unit='
             ~ (serial_console_port | regex_replace('^ttyS', '')) ~ ' --word=8 --parity=no --stop=1'}
          | combine({'GRUB_TIMEOUT': serial_console_grub_timeout | string, 'GRUB_TIMEOUT_STYLE': 'menu'}
