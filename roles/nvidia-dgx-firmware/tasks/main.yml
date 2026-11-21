@@ -30,13 +30,35 @@
   - ansible.builtin.include_tasks: load-image.yml
     when: load_firmware
 
-  # Shut down services and unload drivers
-  - name: Stop system services
-    ansible.builtin.systemd:
+  # Shut down the services that hold the GPUs, and unload the drivers. Only the ones
+  # running are stopped, never disabled, and they are started again below whatever the
+  # update did: they used to be stopped and disabled for good. docker.socket goes first,
+  # or a client's call would start dockerd again in the middle of the flash.
+  - name: Read which services run
+    ansible.builtin.service_facts:
+    when: update_firmware
+
+  - name: Note the services to stop and start again
+    ansible.builtin.set_fact:
+      nv_services_stopped: >-
+        {{ nv_services | select('in', ansible_facts.services | dict2items
+             | selectattr('value.state', 'eq', 'running') | map(attribute='key')
+             | map('regex_replace', '[.]service$', '') | list) | list }}
+    when: update_firmware
+
+  - name: Stop docker.socket with dockerd
+    systemd_unit:
+      name: docker.socket
       state: stopped
-      enabled: false
+    when:
+      - update_firmware
+      - "'docker' in nv_services_stopped"
+
+  - name: Stop system services
+    systemd_unit:
       name: "{{ item }}"
-    with_items: "{{ nv_services }}"
+      state: stopped
+    loop: "{{ nv_services_stopped }}"
     when: update_firmware
 
   - name: Unload drivers
@@ -58,6 +80,13 @@
 
   always:
     - ansible.builtin.include_tasks: transfer-logs.yml # In case of failure, this will pull whatever logs were captured; in case of success it will pull the later logs and some pre-flight checks may be overwritten
+
+    - name: Start again the services stopped for the update
+      systemd_unit:
+        name: "{{ item }}"
+        state: started
+      loop: "{{ (nv_services_stopped | default([]) + (['docker.socket'] if 'docker' in nv_services_stopped | default([]) else [])) | reverse | list }}"
+      when: update_firmware
 
 - name: Clean up the loaded images and copied files
   ansible.builtin.include_tasks: clean.yml
