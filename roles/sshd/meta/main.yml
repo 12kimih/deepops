@@ -12,4 +12,5 @@ galaxy_info:
     - name: EL
       versions: ["8", "9"]
 dependencies:
+  - role: system_accounts  # sshd_hostbased_exclude_users
   - role: network_defaults  # cluster_networks, for sshd_hostbased_group

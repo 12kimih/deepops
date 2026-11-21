@@ -32,6 +32,14 @@
           - hostbased_gone.results | selectattr('stat.exists') | list | length == 0
         fail_msg: "{{ hostbased_login.stdout }} / {{ hostbased_gone.results | selectattr('stat.exists') | map(attribute='item') | list }}"
 
+    - name: Try an excluded service account
+      ansible.builtin.command:
+        argv: [ssh, -o, BatchMode=yes, -o, PreferredAuthentications=hostbased, "{{ cluster_address }}", "true"]
+      become_user: svc
+      register: hostbased_svc
+      changed_when: false
+      failed_when: hostbased_svc.rc == 0
+
     - name: Try root, which shosts.equiv never admits
       ansible.builtin.command:
         argv: [ssh, -o, BatchMode=yes, -o, PreferredAuthentications=hostbased, "{{ cluster_address }}", "true"]
