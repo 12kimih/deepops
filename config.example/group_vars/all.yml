@@ -546,9 +546,9 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 # thing a scanner tries. A site secret file made when missing (random, vaulted); an
 # explicit vaulted bmc_snmp_community wins over it; neither leaves it alone.
 #bmc_snmp_community_file: "{{ inventory_dir }}/files/bmc/snmp-community"  # example
-# Hardening (docs/deepops/bmc.md): IPMI 1.5 authentication types and RMCP+ cipher
-# suites left open; empty leaves them alone.
-#bmc_auth_types: [md5]  # example
+# Hardening (docs/deepops/bmc.md): IPMI 1.5 authentication types ([] turns IPMI 1.5
+# sessions off) and RMCP+ cipher suites left open; null leaves them alone.
+#bmc_auth_types: []  # example
 #bmc_cipher_suites: [3, 17]  # example
 
 ################################################################################
