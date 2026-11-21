@@ -20,6 +20,11 @@ options:
         C(parent). C(members) lists user names, or {user, fairshare, priority, qos,
         default_qos} for a member that differs from the account; a member without
         C(qos) or C(default_qos) inherits the account's, as Slurm does."
+      - "C(defaults): {account: {...}, member: {...}}, a policy stated once: each account
+        but root (whose shares Slurm never uses) takes C(account)'s options (fairshare,
+        priority, max_submit_jobs, organization) unless it sets its own, and each
+        association C(member)'s (fairshare, priority, max_submit_jobs). QoS stay
+        per account: members inherit them as Slurm does."
       - "C(users): name -> {accounts, default_account}. C(accounts) maps account ->
         member options (as in an account's C(members)), so membership can be given per
         user instead of per account, for example derived from a people roster. Both
@@ -181,10 +186,29 @@ def desired_qos(spec):
     return out
 
 
+# The options C(defaults) may state for every account and for every association.
+DEFAULTABLE = {
+    "account": {"fairshare", "priority", "max_submit_jobs", "organization"},
+    "member": {"fairshare", "priority", "max_submit_jobs"},
+}
+
+
+def defaults(spec, kind):
+    """spec.defaults.<kind>, checked against what may be defaulted."""
+    given = dict(((spec.get("defaults") or {}).get(kind)) or {})
+    unknown = sorted(set(given) - DEFAULTABLE[kind])
+    if unknown:
+        raise ValueError(
+            f"defaults.{kind}: {', '.join(unknown)} cannot be defaulted ({', '.join(sorted(DEFAULTABLE[kind]))} can)"
+        )
+    return given
+
+
 def desired_accounts(spec):
     out = {}
+    base = defaults(spec, "account")
     for name, a in (spec.get("accounts") or {}).items():
-        a = a or {}
+        a = (a or {}) if name == ROOT else {**base, **(a or {})}
         out[name] = {
             "parent": None if name == ROOT else a.get("parent", ROOT),
             "fairshare": fairshare(a.get("fairshare", 1)),
@@ -217,16 +241,17 @@ def members(spec):
 
     From an account's members (a name or a dict) and from users.<name>.accounts.
     """
+    base = defaults(spec, "member")
     for account, a in (spec.get("accounts") or {}).items():
         for m in (a or {}).get("members") or []:
             opts = {"user": m} if isinstance(m, str) else dict(m)
-            yield opts.pop("user"), account, opts
+            yield opts.pop("user"), account, {**base, **opts}
     declared = spec.get("accounts") or {}
     for user, u in (spec.get("users") or {}).items():
         for account, opts in ((u or {}).get("accounts") or {}).items():
             if account not in declared:
                 raise ValueError(f"users.{user}.accounts: account {account} is not declared")
-            yield user, account, dict(opts or {})
+            yield user, account, {**base, **(opts or {})}
 
 
 def desired_users(spec, accounts, current_accounts):

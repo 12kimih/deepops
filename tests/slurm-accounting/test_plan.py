@@ -89,6 +89,40 @@ class Plan(unittest.TestCase):
         self.assertEqual(cmds, [])
         self.assertEqual(unmanaged, {"qos": [], "accounts": [], "associations": []})
 
+    def test_defaults_state_a_policy_once_and_plan_the_same(self):
+        # The same accounts with fairshare: parent stated once instead of per account,
+        # and every member's share stated as the policy: nothing to change.
+        spec = copy(SPEC)
+        for a in spec["accounts"].values():
+            del a["fairshare"]
+        spec["defaults"] = {"account": {"fairshare": "parent"}, "member": {"fairshare": 1}}
+        self.assertEqual(plan(spec), plan(SPEC))
+        self.assertEqual(acct.desired_accounts(spec), acct.desired_accounts(SPEC))
+
+    def test_an_account_or_member_of_its_own_overrides_the_default(self):
+        spec = copy(SPEC)
+        spec["defaults"] = {"account": {"fairshare": "parent"}, "member": {"fairshare": 1}}
+        spec["accounts"]["a"]["fairshare"] = 5
+        spec["accounts"]["a"]["members"] = ["alice", {"user": "bob", "fairshare": 2}]
+        cmds, _ = plan(spec)
+        self.assertIn(["modify", "account", "where", "name=a", "cluster=c1", "set", "fairshare=5"], cmds)
+        self.assertIn(
+            ["modify", "user", "where", "name=bob", "account=a", "cluster=c1", "set", "fairshare=2"], cmds
+        )
+        self.assertEqual(len(cmds), 2, "alice keeps the default share she has")
+
+    def test_root_never_takes_the_account_defaults(self):
+        spec = copy(SPEC)
+        spec["accounts"]["root"] = {"qos": ["normal"]}
+        spec["defaults"] = {"account": {"fairshare": "parent"}}
+        self.assertEqual(acct.desired_accounts(spec)["root"]["fairshare"], 1)
+
+    def test_only_what_can_be_defaulted_is_accepted(self):
+        spec = copy(SPEC)
+        spec["defaults"] = {"member": {"qos": ["low"]}}
+        with self.assertRaisesRegex(ValueError, "defaults.member: qos cannot be defaulted"):
+            plan(spec)
+
     def test_new_qos_are_created_before_preempt_names_them(self):
         s = copy(SPEC)
         s["qos"]["urgent"] = {"priority": 20000, "preempt": ["high_a", "low"]}

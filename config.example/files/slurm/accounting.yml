@@ -37,23 +37,25 @@ qos:
     preempt: [high_a, high_b, low]
     description: Emergency tier for administrators
 
+# The share policy, stated once: no account level competes (each passes its share up), so
+# users compete with each other with the same share, not team by team. An account or a
+# member sets its own only to differ.
+defaults:
+  account: {fairshare: parent}
+  member: {fairshare: 1}
 accounts:
   lab:
-    fairshare: parent              # users compete with each other, not team by team
     max_submit_jobs: 500           # per user, queued plus running; inherited downwards
     qos: [low]
     default_qos: low
     description: All research teams
   team-a:
     parent: lab
-    fairshare: parent
     qos: [high_a, low]
   team-b:
     parent: lab
-    fairshare: parent
     qos: [high_b, low]
   admin:
-    fairshare: parent
     priority: 5000                 # first within any tier; team quotas still apply
     max_submit_jobs: 500
     qos: [low]
