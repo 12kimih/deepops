@@ -41,20 +41,30 @@ def role_defaults(*names):
 # Values a deployment supplies, from the roles' defaults. A template referencing a
 # variable not listed here fails loudly (StrictUndefined) instead of rendering an empty
 # string and changing what is under test.
-VARS = role_defaults("slurm_config_dir", "slurm_install_prefix", "slurm_user_runtime_root", "slurm_log_files")
+VARS = role_defaults(
+    "slurm_config_dir",
+    "slurm_install_prefix",
+    "slurm_user_runtime_root",
+    "slurm_log_files",
+    "slurm_job_private_dirs",
+)
 
 SCOPES = ("job", "user")
 
 
 def main():
-    if len(sys.argv) not in (3, 4):
-        sys.exit("usage: render.py <template-path> <output-path> [job|user]")
+    if len(sys.argv) not in (3, 4, 5):
+        sys.exit("usage: render.py <template-path> <output-path> [job|user] [PRIVATE-DIRS]")
 
     template_path, output_path = sys.argv[1], sys.argv[2]
     # slurm_epilog_cleanup_scope. "job" is the role default.
-    scope = sys.argv[3] if len(sys.argv) == 4 else "job"
+    scope = sys.argv[3] if len(sys.argv) >= 4 else "job"
     if scope not in SCOPES:
         sys.exit("scope must be one of: " + ", ".join(SCOPES))
+    # slurm_job_private_dirs, comma-separated ("" for none); the role default otherwise.
+    values = dict(VARS)
+    if len(sys.argv) == 5:
+        values["slurm_job_private_dirs"] = [d for d in sys.argv[4].split(",") if d]
 
     # keep_trailing_newline so the rendered script ends the way the original
     # does; a missing final newline changes nothing functionally but makes
@@ -70,8 +80,8 @@ def main():
     # and the rendered script stops being the one a deployment runs, which is
     # the whole point of rendering instead of testing a trimmed copy.
     #
-    # The values substituted are the fixed fixture constants in VARS above, not
-    # anything read from the environment or from a caller.
+    # The values substituted are the role defaults in VARS above, and the harness's own
+    # choice of private directories, never anything read from the environment.
     env = Environment(
         loader=FileSystemLoader("/"),
         undefined=StrictUndefined,
@@ -83,7 +93,7 @@ def main():
         autoescape=False,
     )
     env.filters.update(FilterModule().filters())
-    rendered = env.get_template(template_path.lstrip("/")).render(slurm_epilog_cleanup_scope=scope, **VARS)
+    rendered = env.get_template(template_path.lstrip("/")).render(slurm_epilog_cleanup_scope=scope, **values)
 
     with open(output_path, "w") as handle:
         handle.write(rendered)

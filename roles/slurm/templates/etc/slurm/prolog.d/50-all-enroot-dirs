@@ -12,6 +12,13 @@ command -v enroot >/dev/null || exit 0  # enroot not installed
 
 for key in ENROOT_RUNTIME_PATH ENROOT_CACHE_PATH ENROOT_DATA_PATH; do
     path=$(enroot_user_path "$key") || continue
+{% if slurm_job_private_dirs | length > 0 %}
+    # The job sees its own empty copy of a per-job private directory (the prolog runs
+    # outside it), and enroot makes its paths there itself (umask 077).
+    case "$path" in
+        {{ slurm_job_private_dirs | join('/* | ') }}/*) continue ;;
+    esac
+{% endif %}
     if [ -e "$path" ] || [ -L "$path" ]; then
         enroot_owned_dir "$path" || enroot_clear "$path" || enroot_log "cannot clear $path"
     fi

@@ -119,16 +119,24 @@
   vars:
     _conf: "{{ lookup('ansible.builtin.template', slurm_conf_template) }}"
     _params: "{{ (_conf | regex_findall('(?m)^ *SlurmctldParameters *= *(.+)') | last | default('') | trim).split(',') }}"
+    _prolog_flags: "{{ (_conf | regex_findall('(?m)^ *PrologFlags *= *(.+)') | last | default('') | trim).split(',') }}"
+    _namespace: "{{ ['namespace/linux'] if slurm_job_private_dirs | length > 0 else [] }}"
   ansible.builtin.assert:
     that:
       - _conf | regex_findall('(?m)^ *ClusterName *= *(.+)') | map('trim') | list == [slurm_cluster_name]
       - "'enable_configless' in _params"
       - _conf | regex_findall('(?m)^ *PluginDir *= *(.+)') | map('trim') | reject('eq', slurm_plugin_dir) | list | length == 0
+      - _conf | regex_findall('(?m)^ *NamespaceType *= *(.+)') | map('trim') | list == _namespace
+      - _conf | regex_findall('(?m)^ *JobContainerType *=') | length == 0
+      - _namespace | length == 0 or 'Contain' in _prolog_flags
     fail_msg: >-
       {{ slurm_conf_template }} must set ClusterName={{ '{{' }} slurm_cluster_name {{ '}}' }}
       and include enable_configless in SlurmctldParameters (the nodes fetch their
       configuration from slurmctld, slurmd --conf-server, and have no copy of their own),
       and set no PluginDir other than the packages' {{ slurm_plugin_dir }} (best: none).
+      Per-job private directories follow slurm_job_private_dirs alone: NamespaceType=namespace/linux
+      with Contain in PrologFlags when it lists any, else no NamespaceType, and never
+      JobContainerType (deprecated: Slurm warns it was replaced with NamespaceType).
     quiet: true
   tags:
     - config
@@ -217,6 +225,50 @@
     src: "{{ slurm_gres_conf_template }}"
     dest: "{{ slurm_config_dir }}/gres.conf"
     mode: "0644"
+  notify:
+    - Restart slurmctld
+    - Reconfigure slurmd
+  tags:
+    - config
+
+# Per-job private directories (slurm_job_private_dirs); slurm.conf names the plugin.
+# slurmd exits on a namespace.yaml it refuses (a duplicate path, a base among the
+# directories), and pam_slurm_adopt then closes SSH to the node: refuse it here.
+- name: Check the per-job private directories
+  vars:
+    _paths: "{{ slurm_job_private_dirs + [slurm_job_private_base] }}"
+  ansible.builtin.assert:
+    that:
+      - _paths | select('match', '^/[^ ,]*[^/ ,]$') | list | length == _paths | length
+      - slurm_job_private_dirs | unique | length == slurm_job_private_dirs | length
+      - slurm_job_private_base is not match('^(' ~ slurm_job_private_dirs | map('regex_escape') | join('|') ~ ')(/|$)')
+    fail_msg: >-
+      slurm_job_private_dirs must list distinct absolute directories (no trailing slash,
+      no commas or spaces), and slurm_job_private_base, an absolute directory on
+      node-local disk, must be none of them and lie under none of them
+      (got {{ slurm_job_private_dirs }} and {{ slurm_job_private_base }}).
+    quiet: true
+  when: slurm_job_private_dirs | length > 0
+  tags:
+    - config
+
+- name: Configure namespace.yaml
+  ansible.builtin.template:
+    src: etc/slurm/namespace.yaml
+    dest: "{{ slurm_config_dir }}/namespace.yaml"
+    mode: "0644"
+  when: slurm_job_private_dirs | length > 0
+  notify:
+    - Restart slurmctld
+    - Reconfigure slurmd
+  tags:
+    - config
+
+- name: Remove namespace.yaml
+  ansible.builtin.file:
+    path: "{{ slurm_config_dir }}/namespace.yaml"
+    state: absent
+  when: slurm_job_private_dirs | length == 0
   notify:
     - Restart slurmctld
     - Reconfigure slurmd

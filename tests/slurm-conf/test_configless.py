@@ -158,6 +158,85 @@ class ControllerCheck(unittest.TestCase):
         self.assertTrue(self.passes(conf))
 
 
+class JobPrivateDirs(unittest.TestCase):
+    """slurm_job_private_dirs alone decides the namespace plugin, its file and Contain."""
+
+    CHECK = ControllerCheck.CHECK
+
+    def test_on_by_default_with_its_file(self):
+        conf = settings(rendered("slurm_conf_template"))
+        self.assertEqual(conf["NamespaceType"], "namespace/linux")
+        self.assertIn("Contain", conf["PrologFlags"].split(","))
+        values = variables()
+        ns = yaml.safe_load(render((ROLE / "templates/etc/slurm/namespace.yaml").read_text(), values))
+        self.assertEqual(
+            ns,
+            {
+                "defaults": {
+                    "auto_base_path": True,
+                    "base_path": DEFAULTS["slurm_job_private_base"],
+                    "dir_confs": [
+                        {"path": d, "options": "nodev,nosuid"} for d in DEFAULTS["slurm_job_private_dirs"]
+                    ],
+                }
+            },
+        )
+        self.assertNotIn(DEFAULTS["slurm_job_private_base"], DEFAULTS["slurm_job_private_dirs"])
+
+    def test_off_leaves_no_plugin_and_contain_to_ssh(self):
+        conf = settings(rendered("slurm_conf_template", slurm_job_private_dirs=[], slurm_contain_ssh=False))
+        self.assertNotIn("NamespaceType", conf)
+        self.assertNotIn("Contain", conf["PrologFlags"].split(","))
+
+    def test_private_dirs_need_contain_even_without_ssh_containment(self):
+        conf = settings(rendered("slurm_conf_template", slurm_contain_ssh=False))
+        self.assertIn("Contain", conf["PrologFlags"].split(","))
+
+    def test_the_controller_check_follows_the_setting(self):
+        check = ControllerCheck()
+        on = rendered("slurm_conf_template")
+        off = rendered("slurm_conf_template", slurm_job_private_dirs=[])
+        self.assertTrue(check.passes(on))
+        self.assertTrue(check.passes(off, slurm_job_private_dirs=[]))
+        self.assertFalse(check.passes(off), "the setting lists directories, the template names no plugin")
+        self.assertFalse(check.passes(on, slurm_job_private_dirs=[]), "a plugin the setting does not ask for")
+        self.assertFalse(check.passes(on.replace("namespace/linux", "namespace/tmpfs")))
+        self.assertFalse(check.passes(on + "\nJobContainerType=job_container/tmpfs\n"))
+        self.assertFalse(check.passes(on.replace("PrologFlags=Alloc,Serial,Contain", "PrologFlags=Alloc")))
+
+    def test_settings_slurmd_would_refuse_are_refused(self):
+        check = task("roles/slurm/tasks/controller.yml", "Check the per-job private directories")
+
+        def passes(dirs, base="/var/spool/slurmd-private"):
+            values = variables(slurm_job_private_dirs=dirs, slurm_job_private_base=base)
+            values.update(
+                {k: render(v, values) if isinstance(v, str) else v for k, v in check["vars"].items()}
+            )
+            return condition(check["assert"]["that"], values)
+
+        self.assertTrue(passes(DEFAULTS["slurm_job_private_dirs"], DEFAULTS["slurm_job_private_base"]))
+        self.assertTrue(passes(["/tmp"], "/tmpdata"), "a sibling sharing a prefix is not under it")
+        for dirs, base in (
+            (["/tmp", "/tmp"], "/var/spool/x"),
+            (["tmp"], "/var/spool/x"),
+            (["/tmp/"], "/var/spool/x"),
+            (["/tmp,/dev/shm"], "/var/spool/x"),
+            (["/tmp"], "/tmp"),
+            (["/tmp"], "/tmp/base"),
+            (["/var/tmp"], "relative"),
+        ):
+            with self.subTest(dirs=dirs, base=base):
+                self.assertFalse(passes(dirs, base))
+
+    def test_the_controller_serves_or_removes_the_file(self):
+        put = task("roles/slurm/tasks/controller.yml", "Configure namespace.yaml")
+        gone = task("roles/slurm/tasks/controller.yml", "Remove namespace.yaml")
+        self.assertTrue(condition(put["when"], variables()))
+        self.assertFalse(condition(gone["when"], variables()))
+        self.assertTrue(condition(gone["when"], variables(slurm_job_private_dirs=[])))
+        self.assertEqual(put["notify"], gone["notify"])
+
+
 class ClusterNameGuard(unittest.TestCase):
     """The controller refuses a ClusterName its saved state does not belong to."""
 
@@ -194,7 +273,7 @@ class ConfServer(unittest.TestCase):
         removed = task(
             "roles/slurm/tasks/compute.yml", "Remove local copies of the configuration slurmctld serves"
         )
-        self.assertEqual(removed["loop"], ["slurm.conf", "cgroup.conf", "gres.conf"])
+        self.assertEqual(removed["loop"], ["slurm.conf", "cgroup.conf", "gres.conf", "namespace.yaml"])
         self.assertEqual(removed["file"]["state"], "absent")
 
 

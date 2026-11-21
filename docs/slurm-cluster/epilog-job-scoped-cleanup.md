@@ -91,29 +91,44 @@ tracker other than cgroup, or user daemons that live outside any job cgroup, can
 keep the old behaviour while it reports the gap. If you need `user`, please open
 an issue at https://github.com/NVIDIA/deepops/issues saying why.
 
-## Per-job `/tmp` and `/dev/shm`: `job_container/tmpfs`
+## Per-job `/tmp`, `/var/tmp` and `/dev/shm`
 
-The complete answer for per-job temporary files is Slurm's own
-`job_container/tmpfs` plugin, which gives each job a private `/tmp` and
-`/dev/shm` that disappear when the job ends. DeepOps does not configure it for
-you, but if you enable it in `slurm.conf` the epilog notices
-(`JobContainerType=job_container/tmpfs`) and skips its own `/tmp` and `/dev/shm`
-file cleanup, since the plugin already handles it:
+Each job gets its own empty `/tmp`, `/var/tmp` and `/dev/shm`, removed with
+everything in them when the job ends, through Slurm's `namespace/linux` plugin.
+The role writes `namespace.yaml` next to `slurm.conf` on the controller
+(slurmctld serves it to every slurmd), names the plugin in `slurm.conf`
+(`NamespaceType=namespace/linux`, with `Contain` in `PrologFlags`), and takes
+both from one setting:
 
+```yaml
+slurm_job_private_dirs: [/tmp, /var/tmp, /dev/shm]   # [] turns it off
+slurm_job_private_base: /var/spool/slurmd-private    # node-local disk
 ```
-JobContainerType=job_container/tmpfs
-```
 
-and add a `job_container.conf` next to `slurm.conf`. See the Slurm documentation
-for `job_container.conf` (the `BasePath` must exist and be writable by slurmd on
-each compute node). Wiring this into the role is tracked separately.
+`/dev/shm` is always a fresh tmpfs; the other directories are bind mounts backed
+by `slurm_job_private_base`, mounted `nodev,nosuid`. SSH sessions that
+`pam_slurm_adopt` adopts into the job see the job's copies. The plugin needs
+cgroup v2, which the role checks on every compute node. A site's own
+`slurm_conf_template` must follow the setting too: the controller refuses a
+template whose `NamespaceType` disagrees with it, or one that still uses the
+deprecated `JobContainerType`.
+
+When `/tmp` and `/dev/shm` are both per job, the epilog skips its own file
+cleanup under them, which would reach only the host's copies. The enroot
+prolog likewise leaves a path under a per-job directory (by default enroot's
+data path, `/tmp/enroot-data/user-<uid>`) to enroot, which creates it inside
+the job.
+
+Changing either setting restarts slurmd on every node (`scontrol reconfigure`).
+Deploy it while the nodes run no jobs: a running job's directories stay where
+the old settings put them. See `namespace.yaml(5)` and
+https://slurm.schedmd.com/namespace.yaml.html.
 
 ## Enroot and Pyxis
 
-The enroot cleanup removes the user's runtime and data directories, which are
-shared by all of that user's jobs on the node. Per-job enroot directories were
-considered and not adopted, because people rely on containers persisting between
-jobs. If you want containers that disappear with the job, Pyxis has a
+The enroot cleanup removes the user's runtime and data directories when their
+last job on the node ends. With a per-job `/tmp` (above), the default data path
+is per job already, so a job's unpacked containers go with it. If you want containers that disappear with the job, Pyxis has a
 container scope setting for job-lifetime containers; see the Pyxis documentation
 for your version.
 
