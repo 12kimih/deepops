@@ -39,6 +39,7 @@
     - {path: "{{ _cluster_bot_prefix }}", owner: root, mode: "0755"}
     - {path: "{{ _cluster_bot_etc }}", owner: root, mode: "0755"}
     - {path: "{{ _cluster_bot_home }}/.ssh", owner: "{{ cluster_bot_user }}", mode: "0700"}
+    - {path: "{{ cluster_bot_prefs_file | dirname }}", owner: "{{ cluster_bot_user }}", mode: "0755"}
   loop_control:
     label: "{{ item.path }}"
 

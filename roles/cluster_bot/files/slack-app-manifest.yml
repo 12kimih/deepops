@@ -4,6 +4,9 @@
 display_information:
   name: Cluster bot
 features:
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
   bot_user:
     display_name: cluster-bot
     always_online: true
@@ -27,6 +30,9 @@ oauth_config:
       - users:read
       - users:read.email
 settings:
+  event_subscriptions:
+    bot_events:
+      - app_home_opened
   interactivity:
     is_enabled: true
   socket_mode_enabled: true

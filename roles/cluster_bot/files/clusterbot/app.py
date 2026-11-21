@@ -16,10 +16,11 @@ import threading
 import time
 from pathlib import Path
 
-from . import accounts_blocks
+from . import accounts_blocks, home_blocks
 from . import blocks as shared
 from . import scratch_blocks as blocks
 from .accounts import JoinFeature, LeaveFeature
+from .prefs import Prefs
 from .requests import Engine
 from .scratch import ScratchFeature, SshExecutor
 
@@ -73,6 +74,30 @@ def build(cfg, engine, scratch, join=None):
             client.chat_postMessage(channel=slack_id, text=outcome.text)
         else:
             tell(client, slack_id, outcome)
+
+    prefs = Prefs(cfg["prefs_file"])
+
+    def publish_home(client, slack_id):
+        login = user_of(slack_id)
+        if not login:
+            return
+        allocations = scratch.mine(login) if scratch else []
+        client.views_publish(
+            user_id=slack_id, view=home_blocks.home(login, allocations, prefs.muted(login), engine.features)
+        )
+
+    @app.event("app_home_opened")
+    def home_opened(event, client):
+        if event.get("tab") == "home":
+            publish_home(client, event["user"])
+
+    @app.action("home.notices")
+    def notices(ack, body, client, action):
+        ack()
+        login = user_of(body["user"]["id"])
+        if login:
+            prefs.set_muted(login, action["value"] == "off")
+            publish_home(client, body["user"]["id"])
 
     @app.command("/join")
     def join_command(ack, body, client):

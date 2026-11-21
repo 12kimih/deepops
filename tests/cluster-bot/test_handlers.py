@@ -2,13 +2,19 @@
 for slack_bolt: each command opens its form, each form submission becomes the request the
 engine receives, and only administrators may decide or act for others."""
 
+import inspect
+import json
+import os
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 
 
 class FakeApp:
@@ -31,9 +37,13 @@ class FakeApp:
     def view(self, name):
         return self._register("view", name)
 
+    def event(self, name):
+        return self._register("event", name)
+
 
 sys.modules["slack_bolt"] = types.SimpleNamespace(App=FakeApp)
 from clusterbot import app  # noqa: E402
+from clustertools import job_notice  # noqa: E402
 
 CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
        "channels": {"help": "#help", "admin": "#admin"}, "scratch": {"policy": {"auto_bytes": 1, "auto_days": 30}}}  # fmt: skip
@@ -49,14 +59,21 @@ def submitted(state, user, callback, metadata=""):
 
 class Handlers(unittest.TestCase):
     def setUp(self):
-        self.engine = mock.Mock()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.prefs = os.path.join(tmp.name, "prefs.json")
+        CFG["prefs_file"] = self.prefs
+        self.engine = mock.Mock(features={"join": object()})
         self.engine.submit.return_value = mock.Mock(status="done", text="ok", request={})
         self.join = mock.Mock(teams=mock.Mock(return_value=["team-a"]))
         self.client = mock.MagicMock()
         self.app = app.build(CFG, self.engine, None, self.join)
 
     def call(self, kind, name, **kw):
-        self.app.handlers[(kind, name)](ack=mock.Mock(), client=self.client, **kw)
+        """As Bolt calls a listener: only the arguments it declares."""
+        fn = self.app.handlers[(kind, name)]
+        offered = {"ack": mock.Mock(), "client": self.client, **kw}
+        fn(**{k: v for k, v in offered.items() if k in inspect.signature(fn).parameters})
 
     def test_join_opens_its_form_and_a_submission_becomes_a_join_request(self):
         self.call("command", "/join", body={"user_id": "UNEW", "channel_id": "C", "trigger_id": "T"})
@@ -96,6 +113,19 @@ class Handlers(unittest.TestCase):
             "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
         )
         self.engine.approve.assert_called_once_with("k", "<@UBOSS>")
+
+    def test_the_home_tab_turns_job_notices_off_and_job_notice_obeys(self):
+        self.call("event", "app_home_opened", event={"tab": "home", "user": "UALICE"})
+        view = self.client.views_publish.call_args.kwargs["view"]
+        toggle = next(b for b in view["blocks"] if b.get("accessory"))["accessory"]
+        self.assertEqual((toggle["action_id"], toggle["value"]), ("home.notices", "off"))
+        self.call("action", "home.notices", body={"user": {"id": "UALICE"}}, action={"value": "off"})
+        self.assertEqual(json.loads(Path(self.prefs).read_text()), {"muted": ["alice"]})
+        self.assertTrue(
+            job_notice.muted({"prefs_file": self.prefs}, "alice"), "the notifier reads the same file"
+        )
+        self.call("action", "home.notices", body={"user": {"id": "UALICE"}}, action={"value": "on"})
+        self.assertFalse(job_notice.muted({"prefs_file": self.prefs}, "alice"))
 
 
 if __name__ == "__main__":
