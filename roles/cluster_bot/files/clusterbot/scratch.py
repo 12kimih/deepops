@@ -1,31 +1,23 @@
-"""Scratch allocations through the bot: a request is decided (scratch_policy), applied at
-once on the scratch server or held for an administrator, and every outcome is a message.
+"""Scratch allocations as a feature of the request engine (clusterbot.requests): the
+policy (scratch_policy) decides, the scratch server applies, and every result is a line
+the person reads.
 
-    service = Scratch(executor, policy, pending_path)
-    service.request(req)        -> Outcome(done | held | refused, text, allocation, req)
-    service.approve(key, admin) -> Outcome      service.deny(key, admin, why) -> Outcome
-    service.mine(user)          -> the user's allocations
+    feature = ScratchFeature(executor, policy)
+    feature.mine(user) -> the user's allocations
 
 The executor runs clustertools.scratch_alloc on the scratch server (over the bot's SSH
-key, whose forced command accepts nothing else) and returns its JSON. Held requests are
-kept in a small JSON file, so an approval survives a restart of the bot.
+key, whose forced command accepts nothing else) and returns its JSON.
 """
 
 import json
-import os
-import secrets
 import shlex
 import subprocess
 import time
-from dataclasses import dataclass, field
 
 from . import scratch_policy
+from .requests import Failed, Feature
 
 TIMEOUT = 120
-
-
-class Failed(Exception):
-    """The scratch server refused or could not be reached; str() says why."""
 
 
 class SshExecutor:
@@ -60,15 +52,6 @@ def day(ts):
     return time.strftime("%Y-%m-%d", time.localtime(ts))
 
 
-@dataclass
-class Outcome:
-    status: str  # done, held, refused
-    text: str
-    allocation: dict = field(default_factory=dict)
-    request: dict = field(default_factory=dict)
-    key: str = ""
-
-
 def describe(req):
     """One line saying what a request asks for."""
     op = req["op"]
@@ -101,77 +84,21 @@ def summary(a):
     return f"`{a['path']}` {human(a['bytes'])}, {day(a['expires'])}까지, {state} (번호 {a['id']})"
 
 
-class Scratch:
-    def __init__(self, executor, policy, pending_path):
-        self.run, self.policy, self.pending_path = executor, policy, pending_path
-
-    def _pending(self):
-        try:
-            with open(self.pending_path) as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            return {}
-
-    def _save(self, pending):
-        os.makedirs(os.path.dirname(self.pending_path), mode=0o700, exist_ok=True)
-        tmp = self.pending_path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(pending, f)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, self.pending_path)
+class ScratchFeature(Feature):
+    def __init__(self, executor, policy):
+        self.run, self.policy = executor, policy
 
     def mine(self, user):
         return self.run("list", user)
 
-    def _apply(self, req):
-        try:
-            a = self.run(*words(req))
-        except Failed as e:
-            return Outcome("refused", f"처리하지 못했습니다: {e}", request=req)
+    def decide(self, req):
+        return scratch_policy.decide(req, self.run("list"), self.policy)
+
+    def apply(self, req):
+        a = self.run(*words(req))
         if req["op"] == "release":
-            return Outcome("done", f"{a['id']}번을 반납했습니다. 곧 지워집니다.", a, req)
-        return Outcome("done", f"완료: {summary(a)}", a, req)
+            return f"{a['id']}번을 반납했습니다. 곧 지워집니다.", a
+        return f"완료: {summary(a)}", a
 
-    def request(self, req):
-        try:
-            verdict, why = scratch_policy.decide(req, self.run("list"), self.policy)
-        except scratch_policy.Refused as e:
-            return Outcome("refused", f"요청할 수 없습니다: {e}", request=req)
-        except Failed as e:
-            return Outcome("refused", f"스크래치 서버에 닿지 못했습니다: {e}", request=req)
-        if verdict == "auto":
-            return self._apply(req)
-        pending = self._pending()
-        key = secrets.token_hex(4)
-        pending[key] = {**req, "why": why, "asked": int(time.time())}
-        self._save(pending)
-        return Outcome("held", f"관리자 승인을 기다립니다 ({why}): {describe(req)}", request=req, key=key)
-
-    def note(self, key, **info):
-        """Keep INFO (where the request's messages are) with a held request."""
-        pending = self._pending()
-        if key in pending:
-            pending[key].update(info)
-            self._save(pending)
-
-    def approve(self, key, admin):
-        pending = self._pending()
-        req = pending.pop(key, None)
-        if req is None:
-            return Outcome("refused", "이미 처리된 요청입니다.")
-        self._save(pending)
-        out = self._apply(req)
-        out.text += f" (승인: {admin})"
-        return out
-
-    def deny(self, key, admin, why=""):
-        pending = self._pending()
-        req = pending.pop(key, None)
-        if req is None:
-            return Outcome("refused", "이미 처리된 요청입니다.")
-        self._save(pending)
-        return Outcome(
-            "refused",
-            f"관리자가 거절했습니다: {describe(req)} ({admin}{', ' + why if why else ''})",
-            request=req,
-        )
+    def describe(self, req):
+        return describe(req)

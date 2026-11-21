@@ -1,29 +1,13 @@
 """The Slack messages and forms of scratch allocations, as plain Block Kit data.
 
-Every action id starts with "scratch." so the app routes them with one pattern; a
-button's value carries what it acts on (an allocation id, a held request's key).
+Every action id starts with "scratch."; a button's value carries what it acts on (an
+allocation id). Approving a held request is the engine's (clusterbot.blocks).
 """
 
-from .scratch import describe as describe_request
+from .blocks import button as _button
 from .scratch import human, summary
 
-__all__ = ["describe_request", "home", "new_form", "number_form", "held", "reminder"]
-
 SIZES = ["100G", "500G", "1T", "2T", "5T", "10T"]
-
-
-def _button(text, action, value, style=None, confirm=None):
-    b = {
-        "type": "button",
-        "text": {"type": "plain_text", "text": text},
-        "action_id": action,
-        "value": str(value),
-    }
-    if style:
-        b["style"] = style
-    if confirm:
-        b["confirm"] = confirm
-    return b
 
 
 def home(allocations):
@@ -92,17 +76,6 @@ def number_form(kind, alloc_id):
         "submit": {"type": "plain_text", "text": "요청"},
         "blocks": [{"type": "input", "block_id": "v", "label": {"type": "plain_text", "text": label}, "element": element}],
     }  # fmt: skip
-
-
-def held(user_mention, text, key):
-    """The administrators' message for a request beyond the automatic limits."""
-    return [
-        {"type": "section", "text": {"type": "mrkdwn", "text": f"{user_mention}: {text}"}},
-        {"type": "actions", "elements": [
-            _button("승인", "scratch.approve", key, style="primary"),
-            _button("거절", "scratch.deny", key, style="danger"),
-        ]},
-    ]  # fmt: skip
 
 
 def reminder(a, days_left):
