@@ -15,15 +15,40 @@
 # Written to the file rather than through ansible.builtin.group: that module resolves
 # the group through NSS, so on a directory client it sees the published entry and
 # creates nothing -- exactly the case this is here to cover. The GID is pinned to the
-# published one, so the local entry shadows the directory entry harmlessly.
+# published one, so the local entry shadows the directory entry harmlessly. Only the
+# local files are read (service files), and an entry already there is kept with its
+# members: rewriting the whole line emptied the members the directory server's own
+# entry carries (directory_groups), and the two roles undid each other every run.
+- name: Read the Docker socket group from the local files
+  ansible.builtin.getent:
+    database: group
+    key: "{{ docker_socket_group }}"
+    service: files
+    fail_key: false
+  when: docker_socket_group_create_local | bool
+
+- name: Refuse a local group of that name with another GID
+  ansible.builtin.assert:
+    that: _local is none or _local[1] | string == docker_socket_group_gid | string
+    fail_msg: >-
+      {{ docker_socket_group }} in /etc/group on {{ inventory_hostname }} has GID
+      {{ _local[1] | default('') }}, not docker_socket_group_gid
+      {{ docker_socket_group_gid }}. Changing a GID changes who owns its files: change it
+      by hand (groupmod -g, then chgrp what the old GID owns), then run again.
+    quiet: true
+  vars:
+    _local: "{{ ansible_facts.getent_group[docker_socket_group] }}"
+  when: docker_socket_group_create_local | bool
+
 - name: Publish the Docker socket group in the local files
   ansible.builtin.lineinfile:
     path: /etc/group
-    regexp: "^{{ docker_socket_group }}:"
     line: "{{ docker_socket_group }}:x:{{ docker_socket_group_gid }}:"
-    state: present
+    insertafter: EOF
     mode: "0644"
-  when: docker_socket_group_create_local | bool
+  when:
+    - docker_socket_group_create_local | bool
+    - ansible_facts.getent_group[docker_socket_group] is none
 
 # Which knob owns the socket depends on how dockerd was started: under socket activation
 # (`-H fd://`) the unit's SocketGroup= wins, otherwise dockerd chowns the socket from the
