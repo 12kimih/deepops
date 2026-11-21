@@ -3,4 +3,7 @@ chrony_service_name: chronyd
 chrony_config_location: /etc/chrony.conf
 chrony_config_driftfile: /var/lib/chrony/drift
 chrony_config_keyfile: /etc/chrony.keys
-chrony_tzdata_package: tzdata
+# RHEL's chrony.conf names no drop-in directories.
+chrony_config_confdir: ""
+chrony_config_sourcedir: ""
+chrony_config_ntsdumpdir: /var/lib/chrony

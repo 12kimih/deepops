@@ -1,8 +1,0 @@
----
-# Set the target each host boots into. Takes effect at the next boot.
-- hosts: "{{ hostlist | default('all') }}"
-  become: true
-  roles:
-    - default_target
-  tags:
-    - default_target

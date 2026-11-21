@@ -88,23 +88,31 @@
 #dns_config_servers: [8.8.8.8]  # example
 #dns_config_search: [example.com]  # example
 
-# NTP configuration
-# Playbook: chrony-client
+# Time sync (roles/deepops_chrony, playbooks/generic/chrony-client.yml). chrony_upstream
+# are chrony.conf source lines. With chrony_serve_hosts set, only those hosts take time
+# from upstream and serve it to chrony_serve_networks; every other host takes time from
+# them, so the cluster keeps one time even while the outside is unreachable.
 #chrony_install: true
 #chrony_service_state: "started"
 #chrony_service_enabled: true
-#chrony_timezone: "Etc/UTC"
-#chrony_config_server:
-#  - 0.pool.ntp.org
-#  - 1.pool.ntp.org
-#  - 2.pool.ntp.org
-#  - 3.pool.ntp.org
+#chrony_upstream:
+#  - pool 0.pool.ntp.org iburst maxsources 2
+#  - pool 1.pool.ntp.org iburst maxsources 2
+#  - pool 2.pool.ntp.org iburst maxsources 2
+#chrony_serve_hosts: []
+#chrony_serve_hosts: "{{ groups['slurm-master'][:1] }}"  # example
+#chrony_serve_networks: "{{ cluster_networks }}"
 
 # Set hostname based on inventory file
 #deepops_set_hostname: true
 
-# Default system locale applied to every node by the locale role (sets LANG=).
+# Every host's locale (LANG) and time zone (roles/locale, playbooks/generic/locale.yml).
 #locale_lang: "en_US.UTF-8"
+#locale_timezone: "Etc/UTC"
+
+# The systemd target each host boots into (roles/default_target); a host that needs a
+# desktop sets graphical.target in its host_vars.
+#default_target: multi-user.target
 
 ################################################################################
 # SOFTWARE                                                                     #

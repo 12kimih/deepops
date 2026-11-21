@@ -1,0 +1,9 @@
+---
+# The systemd target each host boots into (roles/default_target): multi-user.target
+# unless default_target says otherwise for a host. Takes effect at the next boot.
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  roles:
+    - default_target
+  tags:
+    - default_target

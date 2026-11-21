@@ -8,10 +8,23 @@
 chrony_state: present
 chrony_service_state: started
 chrony_service_enabled: true
-chrony_config_server:
-  - 0.pool.ntp.org
-  - 1.pool.ntp.org
-  - 2.pool.ntp.org
-  - 3.pool.ntp.org
+
+# Where time comes from, as chrony.conf(5) source lines (pool, server or peer, with
+# their options). A pool name resolves to several servers, each used as a source.
+chrony_upstream:
+  - pool 0.pool.ntp.org iburst maxsources 2
+  - pool 1.pool.ntp.org iburst maxsources 2
+  - pool 2.pool.ntp.org iburst maxsources 2
+
+# Inventory hosts that take time from chrony_upstream and serve it to the rest: every
+# other host then takes its time from them only (their cluster_address), so the
+# cluster keeps one time even while the outside is unreachable. Empty: every host
+# takes time from chrony_upstream itself.
+chrony_serve_hosts: []
+# The networks a serving host answers (chrony.conf allow).
+chrony_serve_networks: "{{ cluster_networks }}"
+# A serving host that lost every upstream source keeps serving at this stratum (orphan
+# mode, chrony.conf local), so its clients stay in step with one another.
+chrony_serve_orphan_stratum: 10
+
 chrony_config_logdir: /var/log/chrony
-chrony_timezone: Etc/UTC

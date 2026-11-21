@@ -26,14 +26,6 @@
     state: "{{ chrony_service_state }}"
     enabled: "{{ chrony_service_enabled }}"
 
-- name: Ensure tzdata package is installed
-  ansible.builtin.package:
-    name: "{{ chrony_tzdata_package }}"
-    state: present
-
-- name: Set timezone
-  community.general.timezone: name="{{ chrony_timezone }}"
-
 - name: Record the component as present
   ansible.builtin.include_role:
     name: component_record

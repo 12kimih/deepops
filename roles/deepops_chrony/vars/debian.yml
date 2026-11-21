@@ -3,4 +3,8 @@ chrony_service_name: chrony
 chrony_config_location: /etc/chrony/chrony.conf
 chrony_config_driftfile: /var/lib/chrony/chrony.drift
 chrony_config_keyfile: /etc/chrony/chrony.keys
-chrony_tzdata_package: tzdata
+# The package's drop-in directories (chrony.conf of Ubuntu 24.04 and Debian 12): kept,
+# so a file a site or another package puts there still takes effect.
+chrony_config_confdir: /etc/chrony/conf.d
+chrony_config_sourcedir: /etc/chrony/sources.d
+chrony_config_ntsdumpdir: /var/lib/chrony
