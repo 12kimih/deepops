@@ -80,6 +80,16 @@ nvidia_driver_install_method: "ubuntu_repo"
 # --- NVIDIA CUDA repository (Ubuntu nvidia_repo method, and RHEL) --------------
 # roles/package_repos (tasks_from: cuda), shared with nvidia_cuda and nvidia_dcgm.
 
+# --- Driver capabilities -------------------------------------------------------
+# What the driver offers besides CUDA, in NVIDIA's own names (the ones containers ask
+# for in NVIDIA_DRIVER_CAPABILITIES): compute and utility (CUDA, nvidia-smi) always;
+# graphics adds OpenGL, EGL and Vulkan without a display (3D, simulation, rendering
+# jobs), video adds NVENC and NVDEC (encoding and decoding video on the GPU). On the
+# Ubuntu archive's headless driver each is its own package at the driver's branch,
+# kept through every branch switch; one taken out of the list is removed again.
+# docs/slurm-cluster/gpu-capabilities.md.
+nvidia_driver_capabilities: [compute, utility]
+
 # --- Post-installation actions -------------------------------------------------
 # Run the NVIDIA persistence daemon with persistence mode on (the role owns its unit:
 # the distribution units leave persistence mode off), and check every GPU reports it.
