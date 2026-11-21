@@ -1,0 +1,10 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): Slurm's MailProg as Slack
+# DMs (clustertools.job_notice) on the controllers, which run it. A deploy sets it from
+# deepops_components (slurm_enable_job_notices, on slurm-master). Only jobs that ask
+# (--mail-type, or SBATCH_MAIL_TYPE in a person's shell) get a notice; without
+# slack_bot_token it is installed and sends nothing.
+job_notice_state: present
+
+# A person's notices within this many seconds of the first become one message.
+job_notice_coalesce_seconds: 600

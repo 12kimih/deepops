@@ -9,6 +9,9 @@ slack_bot_token: ""
 # Cluster user -> Slack member ID (or an email to look up), for every tool that mentions
 # or messages a person: the roster's `slack` attribute.
 slack_members: "{{ people | people_attr('slack') }}"
+# A person not in slack_members is looked up as <login>@<slack_email_domain> (empty: not
+# looked up); a notice sent to an address in it names that login.
+slack_email_domain: ""
 
 # The channels by what they are for:
 #   status    what everyone may look at: the hourly and weekly GPU usage, storage

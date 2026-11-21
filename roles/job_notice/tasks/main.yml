@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: job_notice_state in ['present', 'absent', 'kept']
+    fail_msg: "job_notice_state must be present, absent or kept, not {{ job_notice_state }}."
+    quiet: true
+
+- name: "Make job notices {{ job_notice_state }}"
+  ansible.builtin.include_tasks: "{{ job_notice_state }}.yml"
+  when: job_notice_state != 'kept'

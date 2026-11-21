@@ -93,6 +93,9 @@ slurm_enable_scratch_alloc: false
 # The cluster's Slack app for requests users make themselves (roles/cluster_bot), on the
 # first slurm-master; needs slack_bot_token and slack_app_token
 slurm_enable_cluster_bot: false
+# Slurm job notices (--mail-type) as Slack DMs (roles/job_notice), on slurm-master; sends
+# nothing without slack_bot_token
+slurm_enable_job_notices: true
 
 # How long users have to clean up what the cluster will otherwise remove: unused
 # container stores (roles/container_storage_gc), ended scratch allocations, and every

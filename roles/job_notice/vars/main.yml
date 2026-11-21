@@ -1,0 +1,18 @@
+---
+_job_notice_config: /etc/cluster-tools/job-notice.json
+_job_notice_token: /etc/cluster-tools/job-notice.token
+_job_notice_state_dir: "{{ deepops_state_dir }}/job-notice"
+_job_notice_cfg:
+  token_file: "{{ _job_notice_token }}"
+  members: "{{ slack_members }}"
+  email_domain: "{{ slack_email_domain }}"
+  state_file: "{{ _job_notice_state_dir }}/state.json"
+  coalesce_seconds: "{{ job_notice_coalesce_seconds | int }}"
+
+# What this component installs, for its record (roles/component_record). The state (open
+# messages, looked-up member IDs) is a cache and goes with it.
+job_notice_items:
+  - "file:{{ job_notice_command }}"
+  - "file:{{ _job_notice_config }}"
+  - "file:{{ _job_notice_token }}"
+  - "dir:{{ _job_notice_state_dir }}"

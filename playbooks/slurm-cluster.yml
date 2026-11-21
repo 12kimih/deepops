@@ -212,6 +212,11 @@
   vars:
     deepops_phase: install
 
+- name: Send Slurm job notices as Slack DMs
+  import_playbook: slurm-cluster/job-notice.yml
+  vars:
+    deepops_phase: install
+
 # Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
@@ -482,6 +487,11 @@
 
 - name: Remove the Slack usage report where it is no longer wanted
   import_playbook: slurm-cluster/slurm-usage-report.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the job notice sender where it is no longer wanted
+  import_playbook: slurm-cluster/job-notice.yml
   vars:
     deepops_phase: remove
 

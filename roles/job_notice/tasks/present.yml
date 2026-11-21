@@ -1,0 +1,61 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: job_notice
+    component_record_action: begin
+    component_record_items: "{{ job_notice_items }}"
+
+# slurmctld runs MailProg as SlurmUser: the command, its configuration and the token
+# are readable by that group, writable by root alone (slurm.conf(5): MailProg).
+- name: Install the notice command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ job_notice_command }}"
+      module: clustertools.job_notice
+
+- name: Create the cluster tools configuration directory
+  ansible.builtin.file:
+    path: "{{ _job_notice_config | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the notice configuration
+  ansible.builtin.copy:
+    dest: "{{ _job_notice_config }}"
+    owner: root
+    group: "{{ slurm_username }}"
+    mode: "0640"
+    content: "{{ _job_notice_cfg | to_nice_json }}\n"
+
+# Never on a command line or in the configuration; empty sends nothing.
+- name: Write the Slack token
+  ansible.builtin.copy:
+    dest: "{{ _job_notice_token }}"
+    owner: root
+    group: "{{ slurm_username }}"
+    mode: "0640"
+    content: "{{ slack_bot_token }}\n"
+  no_log: true
+
+- name: Create the notice state directory
+  ansible.builtin.file:
+    path: "{{ _job_notice_state_dir }}"
+    state: directory
+    owner: "{{ slurm_username }}"
+    group: "{{ slurm_username }}"
+    mode: "0700"
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: job_notice
+    component_record_action: present
+    component_record_items: "{{ job_notice_items }}"

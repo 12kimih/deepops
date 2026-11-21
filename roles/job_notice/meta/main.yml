@@ -1,0 +1,19 @@
+---
+dependencies:
+  - role: slurm_paths  # job_notice_command, slurm_username
+  - role: deepops_paths  # deepops_state_dir
+  - role: slack_defaults  # slack_bot_token, slack_members, slack_email_domain
+  - role: cluster_tools_lib  # clustertools.job_notice
+
+galaxy_info:
+  namespace: deepops
+  role_name: job_notice
+  author: DeepOps
+  description: Slurm job notices (--mail-type) as Slack DMs, close ones coalesced
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
