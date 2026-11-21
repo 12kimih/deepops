@@ -29,10 +29,9 @@
     owner: root
     group: root
     mode: "0644"
-  register: container_service_unit_file
   notify: "{{ _container_service.notify }}"
 
-# A changed unit is enabled afresh (relink), so a link its [Install] gained
+# systemd_unit enables an enabled unit again, so a link its [Install] gained
 # (docker.service.wants: started when Docker starts) is made.
 - name: Configure the service {{ _container_service.unit }}
   systemd_unit:
@@ -40,7 +39,6 @@
     state: "{{ _container_service.state }}"
     enabled: "{{ _container_service.enabled }}"
     daemon_reload: true
-    relink: "{{ container_service_unit_file is changed }}"
 
 # A restart the unit's change (or the caller's) notified runs first, so the check below
 # sees the container that serves from now on.

@@ -9,10 +9,11 @@ systemd_unit takes systemd_service's arguments and runs exactly as it does; unde
 --check, for a unit that is not there yet, it reports what it would do once the run has
 installed it as a change, and with --diff shows it as the diff.
 
-relink: true (with enabled: true) enables the unit afresh (systemctl reenable), for a
-unit whose file changed: enabling an enabled unit adds no link its [Install] gained
-since, so a container unit that gained WantedBy=docker.service stayed down after Docker
-restarted (2026-11-22). Pass it as `relink: "{{ <the unit file's task> is changed }}"`.
+A unit enabled already is enabled again, so the links its [Install] gained since are
+made: ansible's systemd_service skips an enabled unit, so a container unit that gained
+WantedBy=docker.service stayed down after Docker restarted (2026-11-22). systemctl
+enable creates only the links that are missing and says so ("Created symlink"), which is
+what reports the change; a name it refuses (an alias) is left as systemd_service set it.
 """
 
 from __future__ import annotations
@@ -36,33 +37,38 @@ def describe(args):
     return steps
 
 
+def links_created(command_result):
+    """The symlinks systemctl enable reported creating (none when it failed)."""
+    if command_result.get("rc"):
+        return []
+    text = f"{command_result.get('stdout', '')}\n{command_result.get('stderr', '')}"
+    return [line.strip() for line in text.splitlines() if line.strip().startswith("Created symlink")]
+
+
 class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
         del tmp
         result = super().run(task_vars=task_vars)
         args = dict(self._task.args)
-        relink = bool(args.pop("relink", False)) and args.get("enabled") is True
         result.update(
             self._execute_module(
                 module_name="ansible.legacy.systemd_service", module_args=args, task_vars=task_vars
             )
         )
-        if relink and not result.get("failed"):
-            if self._task.check_mode:
-                result.update(changed=True, diff={"prepared": f"would reenable {args['name']}\n"})
-            else:
-                linked = self._execute_module(
-                    module_name="ansible.legacy.command",
-                    module_args={"argv": ["systemctl", "reenable", args["name"]]},
-                    task_vars=task_vars,
-                )
-                if linked.get("rc"):
-                    return {
-                        **result,
-                        "failed": True,
-                        "msg": f"systemctl reenable {args['name']}: {linked.get('stderr')}",
-                    }
+        if (
+            args.get("enabled") is True
+            and args.get("name")
+            and not result.get("failed")
+            and not self._task.check_mode
+        ):
+            linked = self._execute_module(
+                module_name="ansible.legacy.command",
+                module_args={"argv": ["systemctl", "enable", args["name"]]},
+                task_vars=task_vars,
+            )
+            if links_created(linked):
                 result["changed"] = True
+                result["links"] = links_created(linked)
         if self._task.check_mode and result.get("failed") and MISSING in str(result.get("msg", "")):
             # Stopping or disabling what is not there is already done.
             steps = [s for s in describe(args) if not s.startswith(("stop ", "disable "))]

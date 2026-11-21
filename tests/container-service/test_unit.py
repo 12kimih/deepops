@@ -3,19 +3,15 @@
 PartOf=docker.service stops it when docker.service stops, and Restart=always does not
 undo a stop; starting docker.service started nothing back, so a Docker stop and start
 (by hand, or the docker role's socket repair) left every container down (2026-11-22).
-WantedBy=docker.service starts it with Docker, and a unit that gains it is re-enabled,
-since enabling an enabled unit adds no new link."""
+WantedBy=docker.service starts it with Docker; systemd_unit enables an enabled unit
+again, so a unit that gains it gets the link."""
 
-import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from ansible_yaml import load, same_name  # noqa: E402
 
 TEMPLATE = (ROOT / "roles/container_service/templates/container.service.j2").read_text()
-TASKS = load("roles/container_service/tasks/main.yml")
 
 
 def install_section():
@@ -31,18 +27,6 @@ class Unit(unittest.TestCase):
             if line.startswith("WantedBy=")
         ]
         self.assertEqual(wanted_by, [["multi-user.target", "docker.service"]])
-
-    def test_a_changed_unit_is_enabled_afresh(self):
-        task = next(
-            t
-            for t in TASKS
-            if same_name(t.get("name"), "Configure the service {{ _container_service.unit }}")
-        )
-        self.assertEqual(task["systemd_unit"]["relink"], "{{ container_service_unit_file is changed }}")
-        install = next(
-            t for t in TASKS if same_name(t.get("name"), "Install the unit {{ _container_service.unit }}")
-        )
-        self.assertEqual(install["register"], "container_service_unit_file")
 
     def test_nft_tables_come_back_with_nftables_too(self):
         nft = (ROOT / "roles/nft_table/templates/nft-table.service.j2").read_text()

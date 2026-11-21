@@ -30,7 +30,7 @@ PLAY = f"""
 
 
 def enabled_unit():
-    """A service unit enabled on this host, for a relink preview."""
+    """A service unit enabled on this host."""
     out = subprocess.run(
         ["systemctl", "list-unit-files", "--type=service", "--state=enabled", "--no-legend", "--plain"],
         capture_output=True, text=True, timeout=bounds.CHILD,
@@ -53,6 +53,22 @@ def run(*extra, play=PLAY):
     return {t["task"]["name"]: t["hosts"]["localhost"] for t in tasks}
 
 
+class LinksCreated(unittest.TestCase):
+    """An enabled unit is enabled again: only systemctl's report of links it created is a
+    change (a unit whose [Install] gained a target gets that link)."""
+
+    def test_only_created_links_are_a_change(self):
+        sys.path.insert(0, str(ROOT / "plugins" / "action"))
+        from systemd_unit import links_created
+
+        created = "Created symlink /etc/systemd/system/docker.service.wants/x.service -> /etc/systemd/system/x.service."
+        self.assertEqual(links_created({"rc": 0, "stdout": "", "stderr": created}), [created])
+        self.assertEqual(links_created({"rc": 0, "stdout": "", "stderr": ""}), [])
+        self.assertEqual(
+            links_created({"rc": 1, "stdout": "", "stderr": "Refusing to operate on alias name"}), []
+        )
+
+
 @unittest.skipUnless(Path("/run/systemd/system").is_dir(), "needs systemd")
 class SystemdUnit(unittest.TestCase):
     def test_a_unit_not_installed_yet_is_previewed(self):
@@ -65,7 +81,7 @@ class SystemdUnit(unittest.TestCase):
         )
         self.assertFalse(stop["changed"] or stop.get("failed"), "stopping what is not there is done")
 
-    def test_relink_previews_enabling_a_changed_unit_afresh(self):
+    def test_an_enabled_unit_under_check_stays_unchanged(self):
         unit = enabled_unit()
         if not unit:
             self.skipTest("no enabled service unit")
@@ -74,15 +90,11 @@ class SystemdUnit(unittest.TestCase):
   gather_facts: false
   connection: local
   tasks:
-    - name: relink
-      systemd_unit: {{name: {unit}, enabled: true, relink: true}}
-    - name: unchanged
-      systemd_unit: {{name: {unit}, enabled: true, relink: false}}
+    - name: enabled
+      systemd_unit: {{name: {unit}, enabled: true}}
 """
         got = run("--check", "--diff", play=play)
-        self.assertTrue(got["relink"]["changed"], got["relink"])
-        self.assertEqual(got["relink"]["diff"]["prepared"], f"would reenable {unit}\n")
-        self.assertFalse(got["unchanged"]["changed"], "an enabled unit with relink off stays as it is")
+        self.assertFalse(got["enabled"].get("changed") or got["enabled"].get("failed"), got["enabled"])
 
     def test_a_real_run_still_fails_on_a_missing_unit(self):
         got = run()
