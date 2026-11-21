@@ -54,7 +54,11 @@ when it does not finish within `--gpu-job-timeout` seconds it is cancelled, so
 it does not wait in the queue to take a GPU later. The job also reports
 whether its `/tmp` was its own (`private_tmp_in_job`): with a `NamespaceType`
 set (`slurm_job_private_dirs`, docs/slurm-cluster/epilog-job-scoped-cleanup.md)
-one that was not is a failure. Example JSON:
+one that was not is a failure. It also reports whether it sees NVIDIA's Vulkan driver
+and EGL vendor (`graphics_in_job`): without them a job renders on the CPU without an
+error, so their absence is a failure unless `--headless` says the site installs the
+compute-only driver (`nvidia_driver_headless`, docs/slurm-cluster/gpu-graphics.md).
+Example JSON:
 
 ```json
 {
@@ -71,6 +75,8 @@ one that was not is a failure. Example JSON:
   "gpus_visible_in_job": 1,
   "private_tmp_expected": true,
   "private_tmp_in_job": true,
+  "graphics_expected": true,
+  "graphics_in_job": true,
   "failures": []
 }
 ```

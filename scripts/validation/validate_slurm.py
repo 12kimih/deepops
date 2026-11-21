@@ -74,12 +74,18 @@ def pick_gpu_type(nodes):
     return min(types, key=lambda t: (-types[t], t)) if types else ""
 
 
-# What the test job prints after its GPUs: whether its /tmp is its own. Slurm's
-# namespace plugin (slurm_job_private_dirs) mounts it from <base>/<job id>/, so the
-# mount's root names the job.
-PRIVATE_TMP = (
-    'printf "private_tmp=%s\\n" "$(findmnt -n -o FSROOT --mountpoint /tmp | grep -c "/$SLURM_JOB_ID/")"'
-)
+# What the test job reports after its GPUs, one KEY=VALUE line each (job_output):
+#   private_tmp  1 when /tmp is the job's own: Slurm's namespace plugin
+#                (slurm_job_private_dirs) mounts it from <base>/<job id>/, so the
+#                mount's root names the job
+#   vulkan, egl  1 when the job sees NVIDIA's Vulkan driver and EGL vendor: rendering on
+#                the GPU (roles/nvidia_driver's full driver); the headless set has
+#                neither, and a job then renders on the CPU without an error
+PROBES = {
+    "private_tmp": 'findmnt -n -o FSROOT --mountpoint /tmp | grep -c "/$SLURM_JOB_ID/"',
+    "vulkan": "ls /usr/share/vulkan/icd.d/nvidia_icd.json /etc/vulkan/icd.d/nvidia_icd.json 2>/dev/null | grep -c .",
+    "egl": "ls /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null | grep -c .",
+}
 
 
 def gpu_job_command(job_name, gpu_type, partition):
@@ -87,19 +93,20 @@ def gpu_job_command(job_name, gpu_type, partition):
     cmd = ["srun", "--job-name=" + job_name, "--gpus=%s1" % (gpu_type + ":" if gpu_type else ""), "--time=5"]
     if partition:
         cmd += ["--partition", partition]
+    reports = "; ".join('printf "%s=%%s\\n" "$(%s)"' % (key, probe) for key, probe in PROBES.items())
     return cmd + [
         "bash",
         "-c",
-        "nvidia-smi --query-gpu=name,driver_version --format=csv,noheader && " + PRIVATE_TMP,
+        "nvidia-smi --query-gpu=name,driver_version --format=csv,noheader && " + reports,
     ]
 
 
 def job_output(out):
-    """(the GPU lines, whether /tmp was the job's own: True, False, or None unreported)."""
+    """(the GPU lines, {probe: True, False, or None when unreported})."""
     lines = out.splitlines()
-    private = [line.split("=", 1)[1].strip() for line in lines if line.startswith("private_tmp=")]
-    gpus = [line for line in lines if line.strip() and not line.startswith("private_tmp=")]
-    return gpus, (private[-1] not in ("", "0")) if private else None
+    said = dict(line.split("=", 1) for line in lines if line.split("=", 1)[0] in PROBES and "=" in line)
+    gpus = [line for line in lines if line.strip() and line.split("=", 1)[0] not in PROBES]
+    return gpus, {key: (said[key].strip() not in ("", "0")) if key in said else None for key in PROBES}
 
 
 def namespace_type():
@@ -133,6 +140,11 @@ def main():
         help="GPU type for the GPU test job (default: the type with the most configured GPUs)",
     )
     parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="the driver is the compute-only set (nvidia_driver_headless): do not require GPU graphics",
+    )
+    parser.add_argument(
         "--gpu-job-timeout",
         type=int,
         default=300,
@@ -159,6 +171,8 @@ def main():
         "gpus_visible_in_job": 0,
         "private_tmp_expected": False,
         "private_tmp_in_job": None,
+        "graphics_expected": False,
+        "graphics_in_job": None,
         "failures": [],
     }
 
@@ -195,11 +209,19 @@ def main():
             # Killing srun leaves its job queued, to take a GPU later with nobody
             # waiting for it: cancel it by its name.
             run(["scancel", "--name", job_name, "--user", getpass.getuser()])
-        gpus, private = job_output(out)
+        gpus, seen = job_output(out)
         if rc == 0 and gpus:
             result["gpu_job_ok"] = True
             result["gpus_visible_in_job"] = len(gpus)
-            result["private_tmp_in_job"] = private
+            private = result["private_tmp_in_job"] = seen["private_tmp"]
+            graphics = seen["vulkan"] and seen["egl"]
+            result["graphics_in_job"] = None if seen["vulkan"] is None else bool(graphics)
+            result["graphics_expected"] = not args.headless
+            if result["graphics_expected"] and not graphics:
+                result["failures"].append(
+                    "the test job sees no NVIDIA Vulkan driver or EGL vendor: GPU rendering falls back"
+                    " to the CPU (the headless driver; --headless if the site wants it)"
+                )
             result["private_tmp_expected"] = bool(namespace_type())
             if result["private_tmp_expected"] and not private:
                 result["failures"].append(
@@ -224,6 +246,7 @@ def main():
             "gpu_job_ran",
             "gpu_job_ok",
             "private_tmp_in_job",
+            "graphics_in_job",
         ):
             print("%s=%s" % (key, result[key]))
         for failure in result["failures"]:
