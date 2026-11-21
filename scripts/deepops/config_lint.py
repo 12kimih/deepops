@@ -561,6 +561,54 @@ def check_proxy_credentials():
     return problems
 
 
+# A config value naming a key of a mapping setting (`{{ cluster_info.dashboard_url }}`)
+# the setting does not have: Ansible fails the task that renders it, on the hosts, at
+# deploy time (a login banner that named a key moved elsewhere failed every node).
+REFERENCE = re.compile(r"\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b(?!\s*\()")
+JINJA = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)
+QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")  # a path or a word in a template, not a reference
+
+
+def mapping_keys(trees):
+    """{setting: its keys} for each setting a role default or a config sets to a mapping."""
+    keys = {}
+    for path in tracked("roles/*/defaults/main.yml"):
+        for name, value in (settings.load(path.read_text()) or {}).items():
+            if isinstance(value, dict):
+                keys.setdefault(name, set()).update(value)
+    for tree in trees:
+        for rel in tree.files():
+            if rel.split("/", 1)[0] in ("group_vars", "host_vars"):
+                for name, value in (settings.load(tree.text(rel) or "") or {}).items():
+                    if isinstance(value, dict) and name in keys:
+                        keys[name].update(value)
+    return keys
+
+
+def check_mapping_keys():
+    trees = configs()
+    keys = mapping_keys([tree for _, tree, _ in trees])
+    problems = []
+    for label, tree, private in trees:
+        for rel in tree.files():
+            if rel.split("/", 1)[0] not in ("group_vars", "host_vars"):
+                continue
+            for number, line in enumerate((tree.text(rel) or "").splitlines(), 1):
+                for template in JINJA.findall(line):
+                    for name, key in REFERENCE.findall(QUOTED.sub("''", template)):
+                        if name in keys and key not in keys[name]:
+                            problems.append(
+                                found(
+                                    "mapping-keys",
+                                    f"{label}/{rel}",
+                                    number,
+                                    f"{name} has no key {key} (it has {', '.join(sorted(keys[name]))})",
+                                    private,
+                                )
+                            )
+    return problems
+
+
 # A check that can fix takes a Fixes to collect its edits in.
 FIXABLE = {"commented", "redundant"}
 CHECKS = {
@@ -573,6 +621,7 @@ CHECKS = {
     "doc-gpu": check_doc_gpu,
     "duplicates": check_duplicates,
     "proxy-credentials": check_proxy_credentials,
+    "mapping-keys": check_mapping_keys,
     "shadow": check_shadow,
     "retired": check_retired,
     "removals": check_removals,

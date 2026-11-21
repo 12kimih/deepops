@@ -77,6 +77,22 @@ class Retired(Configs):
         self.assertEqual(found, ["retired: config/group_vars/all.yml:2: old_site is retired: set x instead"])
 
 
+class MappingKeys(Configs):
+    def test_a_key_the_mapping_lacks_is_reported(self):
+        self.write(
+            "#x: 1\n",
+            "info: {name: c}\n"
+            'links: ["{{ info.name }}", "{{ info.dashboard_url }}", "{{ inventory_dir ~ \'/people.yml\' }}"]\n',
+        )
+        with mock.patch.object(cl, "tracked", return_value=[]):  # no role defaults: the site's mapping
+            keys = cl.mapping_keys([tree for _, tree, _ in cl.configs()])
+        self.assertEqual(keys, {})  # only a mapping some role defaults counts
+        with mock.patch.object(cl, "mapping_keys", return_value={"info": {"name"}}):
+            found = cl.check_mapping_keys()
+        # A private config is named by place only (found(): its values stay private).
+        self.assertEqual(found, ["mapping-keys: config/group_vars/all.yml:2"])
+
+
 class Removals(Configs):
     def test_only_explicit_removal_components_may_be_named(self):
         self.write(
