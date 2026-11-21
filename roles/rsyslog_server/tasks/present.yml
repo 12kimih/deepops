@@ -23,10 +23,9 @@
     owner: "root"
     group: "root"
     mode: "0644"
-    validate: >-
-      sh -c 'f=/etc/rsyslog.d/.deepops-validate; cp "$1" "$f" && rsyslogd -N1 -f "$f"; rc=$?; rm -f "$f"; exit $rc' sh %s
+    validate: "{{ rsyslog_validate }}"
   notify:
-    - Reload rsyslog
+    - Restart rsyslog
 
 - name: Create directory for clients logs in ubuntu
   ansible.builtin.file:
@@ -55,6 +54,20 @@
     content: |
       # Managed by roles/rsyslog_server: client logs older than rsyslog_log_retention_days go.
       e {{ rsyslog_log_file_path }} - - - {{ rsyslog_log_retention_days | int }}d
+
+- name: Apply a changed configuration now
+  ansible.builtin.meta: flush_handlers
+
+# The listener the clients forward to: a configuration that loads but binds nothing
+# would drop every node's logs.
+- name: Check the listener accepts connections
+  ansible.builtin.wait_for:
+    port: "{{ rsyslog_server_tcp_port | int }}"
+    host: 127.0.0.1
+    timeout: 30
+  when:
+    - rsyslog_server_tcp_port | int > 0
+    - not ansible_check_mode
 
 - name: Record the component as present
   ansible.builtin.include_role:

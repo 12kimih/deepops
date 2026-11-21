@@ -12,4 +12,5 @@ galaxy_info:
     - name: EL
       versions: ["8", "9"]
 dependencies:
+  - role: rsyslog_defaults  # rsyslog_validate
   - role: network_defaults  # cluster_networks, the senders accepted

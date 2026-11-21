@@ -1,0 +1,9 @@
+---
+# rsyslog_defaults -- what the rsyslog roles (rsyslog_server, rsyslog_client) share,
+# named once.
+#
+# A drop-in checked before it replaces the running one: rsyslogd -N1 reads a file only
+# under rsyslog.d's name rules, so the candidate is copied there under a hidden name
+# (never included) and checked alone. Use as a template task's `validate:`.
+rsyslog_validate: >-
+  sh -c 'f=/etc/rsyslog.d/.deepops-validate; cp "$1" "$f" && rsyslogd -N1 -f "$f"; rc=$?; rm -f "$f"; exit $rc' sh %s
