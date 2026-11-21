@@ -88,6 +88,10 @@
 23. Only roles/deepops_hosts writes /etc/hosts. It assembles the file from fragments;
    another role adds its lines through `tasks_from: fragment`. A line written straight
    into /etc/hosts (the registry's, Run:ai's) was dropped by the next deploy.
+24. A package listing names packages with their architecture (dpkg-query
+   ${binary:Package}), never ${Package}: that drops the qualifier, so a foreign-arch copy
+   (libnvidia-*:i386) is named as the native one and never removed (a driver switch left
+   them, 2026-11).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -786,6 +790,16 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {key}: {value}")
         self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
         scan.check(self)
+
+    def test_package_listings_name_the_architecture(self):
+        offenders = [
+            f"{rel(path)}:{number}"
+            for path in ansible_files()
+            if not rel(path).startswith("roles/nvidia-dgx")
+            for number, line in lines_of(path)
+            if "dpkg-query" in path.read_text() and "${Package}" in line
+        ]
+        self.assertEqual(offenders, [], "use ${binary:Package}, which keeps :i386")
 
     def test_only_deepops_hosts_writes_etc_hosts(self):
         offenders = []

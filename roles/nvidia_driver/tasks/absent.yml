@@ -10,7 +10,7 @@
 - name: Find the driver's packages on the host
   ansible.builtin.command:
     argv: >-
-      {{ (['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${Package}\n']
+      {{ (['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${binary:Package}\n']
           if ansible_facts.os_family == 'Debian' else ['rpm', '-qa', '--qf', '%{NAME}\n'])
          + nvidia_driver_packages_owned }}
   register: nvidia_driver_query

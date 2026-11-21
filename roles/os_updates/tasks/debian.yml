@@ -89,7 +89,6 @@
   vars:
     host_baseline_absent_packages: >-
       {{ os_updates_dpkg_status.stdout_lines | select('match', '^rc ') | map('split') | map('last')
-         | map('regex_replace', ':.*$', '')
          | select('match', '^linux-(image|modules|modules-extra|headers)-[0-9]') | list }}
   when: host_baseline_absent_packages | length > 0
 

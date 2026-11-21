@@ -16,7 +16,7 @@
     # ("rc": its conffiles and init scripts kept) counts as present: it is purged too.
     - name: Find which of them are on the host (Debian)
       ansible.builtin.command:
-        argv: "{{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${Package}\\n'] + host_baseline_absent_packages }}"
+        argv: "{{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${binary:Package}\\n'] + host_baseline_absent_packages }}"
       register: host_baseline_query
       changed_when: false
       failed_when: host_baseline_query.rc > 1
@@ -62,6 +62,33 @@
                  | difference(host_baseline_unneeded_before.stdout | regex_findall('(?m)^Remv (\S+)'))))
              | unique | list
              if ansible_facts.os_family == 'Debian' else host_baseline_present }}
+      when: host_baseline_present | length > 0
+
+    # What apt would take beyond the packages named: none of it may be protected (a
+    # setting's pattern, or a package a component records), checked before anything goes.
+    - name: Refuse a removal that takes a protected package with it
+      ansible.builtin.assert:
+        that: host_baseline_taken | length == 0
+        fail_msg: >-
+          Removing {{ host_baseline_present | join(', ') }} would also remove
+          {{ host_baseline_taken | join(', ') }}, which this host needs (a component
+          records it, or host_baseline_protected_packages names it). Name fewer
+          packages, or remove that component first.
+        quiet: true
+      vars:
+        host_baseline_recorded: >-
+          {{ (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
+             | select('match', 'package:') | map('regex_replace', '^package:', '') | list }}
+        host_baseline_protected_regex: >-
+          ^({{ host_baseline_protected_packages | map('regex_escape') | map('replace', '\*', '.*')
+               | join('|') }})$
+        host_baseline_taken: >-
+          {{ host_baseline_removal | difference(host_baseline_present)
+             | map('regex_replace', ':.*$', '') | unique
+             | select('in', host_baseline_recorded)
+             | union(host_baseline_removal | difference(host_baseline_present)
+                     | map('regex_replace', ':.*$', '') | select('match', host_baseline_protected_regex))
+             | list }}
       when: host_baseline_present | length > 0
 
     # apt may also install a package to satisfy an alternative the removed one met
