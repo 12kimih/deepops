@@ -5,6 +5,8 @@ Description=Run the Slurm GPU usage {{ item.what }} {{ item.schedule }}
 [Timer]
 OnCalendar={{ item.schedule }}
 AccuracySec=1s
+# A run missed while the host was down (or a weekly one across a reboot) happens at boot.
+Persistent=true
 
 [Install]
 WantedBy=timers.target
