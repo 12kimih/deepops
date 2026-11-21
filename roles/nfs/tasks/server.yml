@@ -125,6 +125,19 @@
   tags:
     - nfs
 
+- name: Install the condition of the nfsd auto-restart
+  ansible.builtin.copy:
+    src: nfs-server-start-failed
+    dest: "{{ nfs_server_start_failed_check }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - nfs_exports | length > 0
+    - nfs_server_autorestart | bool
+  tags:
+    - nfs
+
 - name: Install nfsd auto-restart safety-net units
   ansible.builtin.template:
     src: "{{ item.src }}"
@@ -151,6 +164,7 @@
   loop:
     - /etc/systemd/system/nfs-server.service.d/auto-restart.conf
     - /etc/systemd/system/nfs-server-restart.service
+    - "{{ nfs_server_start_failed_check }}"
   when: not (nfs_server_autorestart | bool)
   notify: Reload systemd
   tags:

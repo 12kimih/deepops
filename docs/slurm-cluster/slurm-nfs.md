@@ -208,7 +208,12 @@ DeepOps installs a small safety net (enabled by default) that turns a failed sta
 a brief, self-healing event: an `OnFailure=` drop-in on `nfs-server.service` starts a
 helper unit (`nfs-server-restart.service`) that waits, then retries
 `systemctl restart nfs-server`. It is bounded, so a *persistent* failure still stops
-(rather than flapping forever) for an operator to notice. Tune or disable it in
+(rather than flapping forever) for an operator to notice. `OnFailure=` fires on any
+failure, so the helper first checks (`ExecCondition=`, `nfs_server_start_failed_check`)
+that the failure was a start (`Result=exit-code`) and that no nfsd thread runs or is
+stuck in uninterruptible sleep: a stop that hangs in the kernel, as on a server whose
+nfsd deadlocked while stopping, is left alone, since restarting it only stacks more
+stuck tasks. Tune or disable it in
 `config/group_vars/slurm-cluster.yml`:
 
 | Variable | Default | Meaning |

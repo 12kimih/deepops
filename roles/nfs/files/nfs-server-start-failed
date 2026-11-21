@@ -1,0 +1,16 @@
+#!/bin/sh
+# Installed by roles/nfs. Exit 0 when nfs-server.service failed to START and no nfsd is
+# running or stuck, so restarting it is safe; 1 otherwise (systemd ExecCondition= then
+# skips the restart helper). On 2026-11-18 rpc.nfsd hung in the kernel while stopping:
+# OnFailure= fired for the failed stop, and restarting a hung nfsd only stacks more stuck
+# tasks. Arguments override the sources, for the tests: RESULT THREADS_FILE PS_OUTPUT.
+result=${1:-$(systemctl show -P Result nfs-server.service)}
+threads_file=${2:-/proc/fs/nfsd/threads}
+[ "$result" = exit-code ] || exit 1
+threads=$(cat "$threads_file" 2>/dev/null) || threads=0
+[ "${threads:-0}" = 0 ] || exit 1
+if [ $# -ge 3 ]; then processes=$3; else processes=$(ps -eo stat=,comm=); fi
+if printf '%s\n' "$processes" | grep -qE '^D[^ ]* +nfsd'; then
+    exit 1
+fi
+exit 0
