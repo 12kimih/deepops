@@ -1,0 +1,61 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Read the installed packages
+      ansible.builtin.package_facts:
+
+    - name: Read the settings file
+      ansible.builtin.slurp:
+        src: /etc/systemd/coredump.conf.d/deepops.conf
+      register: coredump_conf
+
+    - name: Read the component record
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: coredump_record
+
+    - name: Check systemd-coredump replaced apport's core handler and apport stayed
+      ansible.builtin.assert:
+        that:
+          - "'systemd-coredump' in ansible_facts.packages"
+          - "'apport-core-dump-handler' not in ansible_facts.packages"
+          - "'apport' in ansible_facts.packages"
+          - "'MaxUse=1G' in coredump_conf.content | b64decode"
+          - "'ansible_managed' not in coredump_conf.content | b64decode"
+          - record.components.coredump.state == 'present'
+          - record['items']['package:systemd-coredump'] == ['coredump']
+          - record['items']['file:/etc/systemd/coredump.conf.d/deepops.conf'] == ['coredump']
+      vars:
+        record: "{{ coredump_record.content | b64decode | from_json }}"
+
+    - name: Remove the component
+      ansible.builtin.include_role:
+        name: coredump
+      vars:
+        coredump_state: absent
+
+    - name: Read the packages and the record again
+      ansible.builtin.package_facts:
+
+    - name: Read the record again
+      ansible.builtin.slurp:
+        src: /etc/ansible/facts.d/deepops_components.fact
+      register: coredump_record
+
+    - name: Look for the settings file
+      ansible.builtin.stat:
+        path: /etc/systemd/coredump.conf.d/deepops.conf
+      register: coredump_conf_after
+
+    - name: Check absent took the handler, its settings and its record entry
+      ansible.builtin.assert:
+        that:
+          - "'systemd-coredump' not in ansible_facts.packages"
+          - "'apport' in ansible_facts.packages"
+          - not coredump_conf_after.stat.exists
+          - "'coredump' not in record.components"
+          - record['items'] | dict2items | selectattr('value', 'contains', 'coredump') | list | length == 0
+      vars:
+        record: "{{ coredump_record.content | b64decode | from_json }}"

@@ -299,6 +299,11 @@
   tags:
     - ingress-policy
 
+- name: Hand crashes to systemd-coredump
+  import_playbook: generic/coredump.yml
+  vars:
+    deepops_phase: install
+
 - name: Limit what users leave running outside Slurm jobs
   import_playbook: generic/node-user-policy.yml
   tags:
@@ -420,6 +425,11 @@
     deepops_phase: remove
   tags:
     - egress-policy
+
+- name: Remove systemd-coredump where it is no longer wanted
+  import_playbook: generic/coredump.yml
+  vars:
+    deepops_phase: remove
 
 - name: Remove the ingress policy where it is no longer wanted
   import_playbook: generic/ingress-policy.yml

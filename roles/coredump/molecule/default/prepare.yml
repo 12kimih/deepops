@@ -1,0 +1,11 @@
+---
+# A server install's crash handling: apport with its core handler, which the component
+# replaces.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install apport and its core handler
+      ansible.builtin.apt:
+        name: [apport, apport-core-dump-handler]
+        update_cache: true

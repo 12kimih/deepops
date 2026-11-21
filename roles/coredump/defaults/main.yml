@@ -1,0 +1,20 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): a crashing process goes to
+# systemd-coredump on every host, the handler systemd and RHEL ship, in place of
+# Ubuntu's apport (which keeps reports in /var/crash and cores in its own directory, with
+# no bound on their size). A deploy sets it from deepops_components (slurm_enable_coredump,
+# kube_enable_coredump). Every crash is logged to the journal (process, user, signal);
+# a core is stored only when the process's core size limit allows one (ulimit -c, which
+# a Slurm job takes from where it was submitted), so by default none is, and a user who
+# wants one raises the limit. Stored cores are readable by their owner (coredumpctl
+# list, coredumpctl debug) and leave after three days (systemd's tmpfiles rule).
+# absent removes the handler and its settings; the kernel keeps sending cores to it
+# until the next boot, so none is written meanwhile.
+# https://www.freedesktop.org/software/systemd/man/latest/systemd-coredump.html
+coredump_state: present
+
+# coredump.conf [Coredump] settings over systemd's defaults, which already bound one
+# core (ProcessSizeMax and ExternalSizeMax, 32G) and all of them together (MaxUse,
+# KeepFree, a share of /var/lib/systemd/coredump's filesystem). {} writes no file.
+# https://www.freedesktop.org/software/systemd/man/latest/coredump.conf.html
+coredump_settings: {}

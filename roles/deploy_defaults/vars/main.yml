@@ -247,6 +247,10 @@ deepops_component_registry:
   ingress_policy:
     rules:
       - {switch: "{{ slurm_enable_ingress_policy }}", group: slurm-cluster}
+  coredump:
+    rules:
+      - {switch: "{{ slurm_enable_coredump }}", group: slurm-cluster}
+      - {switch: "{{ kube_enable_coredump }}", group: k8s_cluster}
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-

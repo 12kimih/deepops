@@ -1,0 +1,14 @@
+---
+# Crashes to systemd-coredump (roles/coredump). Every host it runs on converges to
+# deepops_components (present while slurm_enable_coredump or kube_enable_coredump is on,
+# removed elsewhere).
+#
+#   ansible-playbook -K playbooks/generic/coredump.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: coredump
+      coredump_state: "{{ deepops_components.coredump | component_phase(deepops_phase) }}"
+  tags:
+    - coredump

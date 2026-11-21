@@ -141,6 +141,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_enable_egress_policy: false
 # A local resolver that blocks tunnel services by name (dns_resolver_* in all.yml)
 #slurm_enable_dns_resolver: false
+# Crashes to systemd-coredump, cores only within ulimit -c (coredump_* settings)
+#slurm_enable_coredump: true
 
 ################################################################################
 # NFS                                                                          #
