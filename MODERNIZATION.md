@@ -196,7 +196,7 @@ Ported from the operator's private playbooks, rewritten in DeepOps style
   is still on anywhere. Also a read-only IOMMU/VT-d audit (BIOS VT-d via the DMAR
   ACPI table, kernel intel_iommu state) for fleet-wide consistency checks without
   rebooting into firmware.
-- `playbooks/nvidia-software/nvidia-vulkan.yml` -- Vulkan runtime/tools/Mesa.
+- `playbooks/nvidia-software/nvidia-vulkan.yml` -- Vulkan runtime/tools/Mesa; retired 2026-11: GPU graphics is the `graphics` entry of `nvidia_driver_capabilities` (roles/nvidia_driver).
 - `playbooks/utilities/apt-upgrade.yml` -- hostlist-parameterized dist-upgrade.
 - `playbooks/utilities/reboot.yml` -- rolling reboot (`maintenance_serial`).
 

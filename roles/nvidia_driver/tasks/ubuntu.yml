@@ -26,7 +26,7 @@
           'nvidia-headless-no-dkms-' ~ _flavoured,
           'nvidia-utils-' ~ _branch] }}
   vars:
-    _branch: "{{ nvidia_driver_branch ~ ('-server' if nvidia_driver_server_branch | bool else '') }}"
+    _branch: "{{ nvidia_driver_ubuntu_branch }}"
     _flavoured: "{{ _branch ~ ('-open' if nvidia_driver_kernel_modules == 'open' else '') }}"
     _kernel_flavour: "{{ ansible_facts.packages | kernel_flavour(ansible_facts.kernel) }}"
   when: nvidia_driver_install_method == 'ubuntu_repo'

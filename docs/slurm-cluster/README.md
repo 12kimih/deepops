@@ -291,6 +291,13 @@ To build images from a Dockerfile, users run rootless Podman in a CPU job and im
 
 The DeepOps Singularity wrapper role has been retired. Singularity lives on upstream as [Apptainer](https://apptainer.org/); sites that still want it can install Apptainer/Singularity separately.
 
+## GPU graphics and video
+
+Jobs that render on the GPUs (OpenGL, EGL or Vulkan, with no display) or encode and
+decode video on them (NVENC, NVDEC) need driver libraries the default headless driver
+leaves out: add `graphics` and `video` to `nvidia_driver_capabilities`. See
+[GPU graphics and video in jobs](./gpu-capabilities.md).
+
 ## Large deployments
 
 To minimize the requirements for the cluster management services, DeepOps deploys a single Slurm head node for cluster management, shared filesystems, and user login. However, for larger deployments, it often makes sense to run these functions on multiple separate machines.
