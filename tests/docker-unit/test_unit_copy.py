@@ -27,13 +27,14 @@ def passes(exists, retired):
 REPAIR = next(t for t in TASKS if same_name(t.get("name"), "Recreate the Docker API socket"))
 
 
-def repairs(exists, state="started", containerized=False):
+def repairs(exists, state="started", containerized=False, preview_installs=False):
     return condition(
         REPAIR["when"],
         {
             "docker_api_probe": {"rc": 0 if exists else 1},
             "docker_service_state": state,
             "deepops_containerized": containerized,
+            "docker_preview_installs": preview_installs,
         },
     )
 
@@ -58,6 +59,7 @@ class ApiSocket(unittest.TestCase):
         self.assertFalse(repairs(True))
         self.assertFalse(repairs(False, state="stopped"))
         self.assertFalse(repairs(False, containerized=True))
+        self.assertFalse(repairs(False, preview_installs=True), "a preview that only installs Docker")
 
 
 class UnitCopy(unittest.TestCase):

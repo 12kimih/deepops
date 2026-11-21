@@ -58,6 +58,7 @@
   community.docker.docker_container:
     name: "{{ nginx_docker_cache_name }}"
     state: absent
+  when: not docker_preview_installs | default(false)  # roles/docker
 
 - name: Run the caching proxy
   ansible.builtin.include_role:

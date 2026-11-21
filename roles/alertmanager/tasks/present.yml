@@ -53,6 +53,7 @@
   community.docker.docker_volume:
     name: "{{ alertmanager_docker_volume_name }}"
     state: present
+  when: not docker_preview_installs | default(false)  # roles/docker
 
 - name: Run Alertmanager
   ansible.builtin.include_role:
