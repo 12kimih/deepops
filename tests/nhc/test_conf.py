@@ -20,6 +20,7 @@ FACTS = {
     "hostname": "node1",
     "memtotal_mb": 1000,
     "interfaces": ["lo", "eth0"],
+    "mounts": [{"mount": "/"}, {"mount": "/boot"}, {"mount": "/var/spool"}],
     "ansible_local": {
         "gpus": {"count": 0},
         "topology": {"cpu_topology": {"sockets": 2, "physical_cores": 8, "logical_cpus": 16}},
@@ -76,6 +77,30 @@ class NhcConf(unittest.TestCase):
                 )
                 self.assertEqual(f"check_pcie_acs {program}\n" in text, checked)
         self.assertNotIn("check_pcie_acs", conf("debian.yml", "Debian"))
+
+    def test_a_full_local_filesystem_drains_the_node(self):
+        """Each path is named by the mount it lives on (NHC's check matches mount
+        points only and passes on any other directory), once per filesystem."""
+        on = conf("debian.yml", "Debian")
+        free = [
+            line.split("|| ")[1]
+            for line in on.splitlines()
+            if "check_fs_free" in line or "check_fs_ifree" in line
+        ]
+        self.assertEqual(
+            free,
+            [
+                "check_fs_free / 5%",
+                "check_fs_ifree / 5%",
+                "check_fs_free /var/spool 5%",
+                "check_fs_ifree /var/spool 5%",
+            ],
+        )
+        off = conf("debian.yml", "Debian", slurm_job_private_dirs=[])
+        self.assertIn("check_fs_free / 5%", off)
+        self.assertNotIn("/var/spool", off)
+        same = conf("debian.yml", "Debian", nhc_check_free_paths=["/", "/srv/a", "/srv/b"])
+        self.assertEqual(same.count("check_fs_free"), 1)
 
 
 if __name__ == "__main__":

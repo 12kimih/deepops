@@ -189,18 +189,6 @@ slurm_stale_files_rules:
 slurm_sysconf_dir: /etc/sysconfig
 slurm_contain_ssh: true
 
-# Directories each job sees as its own (Slurm's namespace/linux plugin, namespace.yaml):
-# empty when the job starts on a node, removed with all they hold when it ends, so jobs
-# neither collide in nor leave anything behind in them. SSH sessions adopted into the
-# job see the same. /dev/shm is always a fresh tmpfs; the others are bind mounts backed
-# by slurm_job_private_base, which must be node-local disk. Mounted nodev,nosuid.
-# Needs cgroup v2. [] turns it off. A change restarts slurmd on every node (scontrol
-# reconfigure): deploy it while the nodes run no jobs, since a running job's
-# directories stay where the old settings put them.
-# https://slurm.schedmd.com/namespace.yaml.html
-slurm_job_private_dirs: [/tmp, /var/tmp, /dev/shm]
-slurm_job_private_base: /var/spool/slurmd-private
-
 # The account slurmctld and slurmdbd run as; its IDs and home are in
 # roles/system_accounts (the same numbers on every host: Slurm ships numeric IDs in
 # every job, NFS with AUTH_SYS sends them).

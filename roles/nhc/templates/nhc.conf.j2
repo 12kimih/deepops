@@ -9,6 +9,13 @@
 # Check that the root filesystem is mounted rw
  {{ ansible_facts.hostname }} || check_fs_mount_rw /
 
+# Space and inodes left on the local filesystems jobs write to (nhc_check_free_paths);
+# NHC compares mount points, so each path is named by the one it lives on.
+{% for mount in nhc_check_free_paths | map('mount_point', ansible_facts.mounts) | unique %}
+ {{ ansible_facts.hostname }} || check_fs_free {{ mount }} {{ nhc_min_free }}
+ {{ ansible_facts.hostname }} || check_fs_ifree {{ mount }} {{ nhc_min_free }}
+{% endfor %}
+
 {% if nhc_check_mounts | length > 0 %}
 # Check that the shared filesystems are mounted rw. The file test walks into the
 # directory first, so a mount a site has put behind an automount is triggered rather
