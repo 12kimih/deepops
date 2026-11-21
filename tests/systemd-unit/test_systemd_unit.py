@@ -36,7 +36,7 @@ def run(*extra):
             ANSIBLE_LOCALHOST_WARNING="false",
         )
         done = subprocess.run([str(PLAYBOOK), "-i", "localhost,", "play.yml", *extra], cwd=tmp, env=env,
-                              capture_output=True, text=True, timeout=300)  # fmt: skip
+                              capture_output=True, text=True, timeout=unrecorded.TIMEOUT)  # fmt: skip
     tasks = json.loads(done.stdout)["plays"][0]["tasks"]
     return {t["task"]["name"]: t["hosts"]["localhost"] for t in tasks}
 

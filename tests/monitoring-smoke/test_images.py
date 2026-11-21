@@ -168,7 +168,7 @@ class MonitoringImages(unittest.TestCase):
         env.pop("ANSIBLE_CONFIG", None)
         result = subprocess.run(
             [str(ANSIBLE), "-i", "localhost,", "-c", "local", "-e", "@site.json", str(playbook)],
-            capture_output=True, text=True, env=env, cwd=cls.tmp, timeout=300,
+            capture_output=True, text=True, env=env, cwd=cls.tmp, timeout=unrecorded.TIMEOUT,
         )  # fmt: skip
         if result.returncode:
             raise AssertionError("rendering the role templates failed:\n" + result.stdout[-3000:])
