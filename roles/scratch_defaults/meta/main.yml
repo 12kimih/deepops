@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  namespace: deepops
+  role_name: scratch_defaults
+  author: DeepOps
+  description: Fast scratch space per request, its limits and periods, named once
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]
+dependencies:
+  - role: deploy_defaults  # cluster_user_grace_days

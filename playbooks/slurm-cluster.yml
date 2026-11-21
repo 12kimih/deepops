@@ -312,6 +312,16 @@
   vars:
     deepops_phase: install
 
+- name: Run the cluster's Slack app for the requests users make
+  import_playbook: generic/cluster-bot.yml
+  vars:
+    deepops_phase: install
+
+- name: Hand out fast scratch space per request
+  import_playbook: generic/scratch-alloc.yml
+  vars:
+    deepops_phase: install
+
 - name: Limit what users leave running outside Slurm jobs
   import_playbook: generic/node-user-policy.yml
   tags:
@@ -441,6 +451,16 @@
 
 - name: Remove the disk quotas where they are no longer wanted
   import_playbook: generic/disk-quota.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the scratch allocation tool where it is no longer wanted
+  import_playbook: generic/scratch-alloc.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the cluster's Slack app where it is no longer wanted
+  import_playbook: generic/cluster-bot.yml
   vars:
     deepops_phase: remove
 

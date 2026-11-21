@@ -1,0 +1,28 @@
+---
+# scratch_defaults -- fast scratch space per request, named once for the roles that need
+# it: roles/scratch_alloc on the scratch server and roles/cluster_bot, which takes the
+# requests (a shared-defaults role: roles list it as a meta dependency).
+#
+# The mount point (XFS or ext4, with project quotas) that holds the allocations.
+scratch_alloc_mount: /scratch
+
+# Hard caps the tool enforces whoever asks: one allocation's size and how far its end
+# date may be from today.
+scratch_alloc_max_size: 20T
+scratch_alloc_max_days: 180
+
+# What a request may get without an administrator (the cluster bot reads these): size,
+# period, and how many extensions within those.
+scratch_alloc_auto_size: 2T
+scratch_alloc_auto_days: 30
+scratch_alloc_auto_extensions: 2
+
+# After its end date an allocation is read-only for this many days, then removed: the
+# cluster's period for users to clean up.
+scratch_alloc_grace_days: "{{ cluster_user_grace_days }}"
+
+# How often the end dates are kept and the usage exported (systemd OnUnitActiveSec).
+scratch_alloc_sweep_interval: 15min
+
+# The first project ID handed out (project quota IDs; below are free for others).
+scratch_alloc_first_id: 1000

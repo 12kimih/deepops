@@ -1,0 +1,11 @@
+{{ ansible_managed | comment }}
+# roles/scratch_alloc
+[Unit]
+Description=Keep the scratch allocations' end dates regularly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={{ scratch_alloc_sweep_interval }}
+
+[Install]
+WantedBy=timers.target

@@ -33,3 +33,10 @@ system_accounts:
     uid: 472
     home: /var/lib/grafana
     comment: Grafana
+  # The cluster bot (roles/cluster_bot): runs the Slack app on its host and acts on the
+  # others only through keys with forced commands (a shell, so sshd can run them).
+  clusterbot:
+    uid: 22081
+    home: /var/lib/clusterbot
+    shell: /bin/sh
+    comment: Cluster bot

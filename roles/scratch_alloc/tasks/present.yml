@@ -1,0 +1,148 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: scratch_alloc
+    component_record_action: begin
+    component_record_items: "{{ scratch_alloc_items }}"
+
+# xfs_quota for XFS; setquota and repquota for ext4 (clustertools.disk_quota uses either).
+- name: Install the project quota tools
+  ansible.builtin.package:
+    name: [xfsprogs, quota]
+    state: present
+
+- name: Install the allocation command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ _scratch_alloc_command }}"
+      module: clustertools.scratch_alloc
+
+- name: Create the cluster tools configuration directory
+  ansible.builtin.file:
+    path: "{{ _scratch_alloc_config | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the allocation configuration
+  ansible.builtin.copy:
+    dest: "{{ _scratch_alloc_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _scratch_alloc_cfg | to_nice_json }}\n"
+
+# Project quotas are a mount-time option: without them no allocation can be limited.
+- name: Read the scratch filesystem's type and options
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, "FSTYPE,OPTIONS", --mountpoint, "{{ scratch_alloc_mount }}"]
+  register: scratch_alloc_mounted
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: not deepops_containerized | bool
+
+- name: Require project quotas on the scratch filesystem
+  ansible.builtin.assert:
+    that:
+      - _fields | length == 2
+      - _fields[0] in ['xfs', 'ext4']
+      - _fields[1].split(',') | intersect(['prjquota', 'pquota', 'pqnoenforce']) | length > 0
+    fail_msg: >-
+      {{ scratch_alloc_mount }} must be XFS or ext4 mounted with prjquota (now:
+      {{ scratch_alloc_mounted.stdout | default('') or 'not mounted' }}). Add prjquota to its
+      host_baseline_mount_options; XFS takes it only at mount time, so roles/host_baseline asks
+      for the reboot that applies it (ext4 also needs its project feature, tune2fs -O project).
+    quiet: true
+  vars:
+    _fields: "{{ scratch_alloc_mounted.stdout | default('') | split }}"
+  when: not deepops_containerized | bool and not ansible_check_mode
+
+# The bot (roles/cluster_bot) asks over SSH with its own key, whose forced command runs
+# serve through the one sudo rule below; serve takes only allocation requests. Until the
+# bot's key exists on its host there is no way in to write.
+- name: Note the bot's account
+  ansible.builtin.set_fact:
+    _scratch_alloc_bot_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
+
+- name: Create the bot's account
+  ansible.builtin.include_role:
+    name: local_accounts
+  vars:
+    local_accounts: "{{ _scratch_alloc_bot_account }}"
+
+- name: Let the bot run the allocation command's serve mode as root, only that
+  ansible.builtin.copy:
+    dest: "{{ _scratch_alloc_sudoers }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+    content: |
+      # roles/scratch_alloc: the cluster bot's requests, nothing else.
+      Defaults:{{ cluster_bot_user }} env_keep += "SSH_ORIGINAL_COMMAND"
+      {{ cluster_bot_user }} ALL=(root) NOPASSWD: {{ _scratch_alloc_serve }}
+
+- name: Read the bot's public key on its host
+  ansible.builtin.slurp:
+    src: "{{ cluster_bot_key }}.pub"
+  delegate_to: "{{ cluster_bot_host }}"
+  register: scratch_alloc_bot_key
+  failed_when: false
+  run_once: true
+  when: cluster_bot_host | length > 0
+
+- name: Create the bot's SSH directory
+  ansible.builtin.file:
+    path: "{{ _scratch_alloc_bot_keys | dirname }}"
+    state: directory
+    owner: "{{ cluster_bot_user }}"
+    group: "{{ cluster_bot_user }}"
+    mode: "0700"
+
+# from= the bot host's cluster address: the key is useless anywhere else.
+- name: Allow the bot's key, for its requests only
+  ansible.builtin.copy:
+    dest: "{{ _scratch_alloc_bot_keys }}"
+    owner: "{{ cluster_bot_user }}"
+    group: "{{ cluster_bot_user }}"
+    mode: "0600"
+    content: |
+      # roles/scratch_alloc: the cluster bot on {{ cluster_bot_host }}, allocation requests only.
+      {% if scratch_alloc_bot_key.content is defined %}
+      command="sudo -n {{ _scratch_alloc_serve }}",restrict,from="{{ _from }}" {{ scratch_alloc_bot_key.content | b64decode | trim }}
+      {% endif %}
+  vars:
+    _from: "{{ (hostvars | cluster_addresses([cluster_bot_host], cluster_networks))[cluster_bot_host] }}"
+
+- name: Install the sweep units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _scratch_alloc_units }}"
+  register: scratch_alloc_units
+
+- name: Keep the end dates and export the usage regularly
+  systemd_unit:
+    name: scratch-alloc-sweep.timer
+    enabled: true
+    state: "{{ 'restarted' if scratch_alloc_units is changed else 'started' }}"
+    daemon_reload: true
+  when: not deepops_containerized | bool
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: scratch_alloc
+    component_record_action: present
+    component_record_items: "{{ scratch_alloc_items }}"

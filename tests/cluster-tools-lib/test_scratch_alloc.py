@@ -1,7 +1,7 @@
 """clustertools.scratch_alloc: a request becomes a directory of its own with a project
 quota at once; resize, extend and release act on the registry and the quota; at the end
 date the allocation freezes at what it holds, and after the grace period, or once
-released, it goes. A filesystem without project quotas is refused, naming the option."""
+released, it goes. A filesystem without project quotas (XFS or ext4) is refused, naming the option."""
 
 import json
 import os
@@ -48,7 +48,7 @@ class Host(sa.Host):
 
 
 XFS = "/dev/md0 /scratch xfs rw,noatime,attr2,inode64,prjquota 0 0\n"
-CFG = {"mount": "/scratch", "root": "/scratch/alloc", "max_bytes": "20T", "max_days": 180, "grace_days": 14}
+CFG = {"mount": "/scratch", "max_bytes": "20T", "max_days": 180, "grace_days": 14}
 
 
 def fresh():
@@ -59,11 +59,11 @@ class ScratchAllocTests(unittest.TestCase):
     def test_create_makes_a_directory_with_its_quota(self):
         host, data = Host(XFS), fresh()
         out = sa.create(host, CFG, data, "alice", "2T", 30, "training data", 0)
-        self.assertEqual(out["path"], "/scratch/alloc/alice-1000")
+        self.assertEqual(out["path"], "/scratch/alice-1000")
         self.assertEqual(out["bytes"], 2 * 1024**4)
         self.assertEqual(out["expires"], 30 * DAY)
-        self.assertIn("project -s -p /scratch/alloc/alice-1000 1000", host.commands)
-        self.assertIn(f"limit -p bsoft={2 * 1024**3}k bhard={2 * 1024**3}k 1000", host.commands)
+        self.assertIn("project -s -p /scratch/alice-1000 1000", host.commands)
+        self.assertIn(f"limit -p bsoft=0 bhard={2 * 1024**3}k 1000", host.commands)
         self.assertEqual(data["next_id"], 1001)
 
     def test_requests_past_the_hard_caps_or_for_nobody_are_refused(self):
@@ -88,7 +88,7 @@ class ScratchAllocTests(unittest.TestCase):
             sa.extend(host, CFG, data, 1000, 170, 0)  # past max_days from today
         sa.release(host, CFG, data, 1000, 5)
         self.assertEqual(data["allocations"]["1000"]["state"], "released")
-        self.assertIn("/scratch/alloc/.released/1000", host.dirs)
+        self.assertIn("/scratch/.released/1000", host.dirs)
 
     def test_sweep_freezes_then_removes_after_the_grace_period(self):
         host, data = Host(XFS), fresh()
@@ -97,7 +97,7 @@ class ScratchAllocTests(unittest.TestCase):
         self.assertEqual(sa.sweep(host, CFG, data, DAY - 1), [])
         lines = sa.sweep(host, CFG, data, DAY)
         self.assertEqual(data["allocations"]["1000"]["state"], "frozen")
-        self.assertIn("limit -p bsoft=5000k bhard=5000k 1000", host.commands)
+        self.assertIn("limit -p bsoft=0 bhard=5000k 1000", host.commands)
         self.assertTrue(lines[0].startswith("froze 1000"))
         # Extending a frozen allocation gives its size back.
         sa.extend(host, CFG, data, 1000, 1, DAY)
@@ -108,12 +108,13 @@ class ScratchAllocTests(unittest.TestCase):
         self.assertEqual(host.dirs, set())
         self.assertTrue(lines[-1].startswith("removed 1000"))
 
-    def test_the_filesystem_must_be_xfs_with_project_quotas(self):
+    def test_the_filesystem_must_have_project_quotas(self):
         sa.check_mount(Host(XFS), "/scratch")
+        sa.check_mount(Host(XFS.replace(" xfs ", " ext4 ")), "/scratch")  # ext4 with prjquota too
         with self.assertRaisesRegex(sa.Error, "prjquota"):
             sa.check_mount(Host(XFS.replace("prjquota", "noquota")), "/scratch")
-        with self.assertRaisesRegex(sa.Error, "not XFS"):
-            sa.check_mount(Host(XFS.replace(" xfs ", " ext4 ")), "/scratch")
+        with self.assertRaisesRegex(sa.Error, "ext4 and xfs"):
+            sa.check_mount(Host(XFS.replace(" xfs ", " btrfs ")), "/scratch")
         with self.assertRaisesRegex(sa.Error, "not mounted"):
             sa.check_mount(Host(""), "/scratch")
 
@@ -124,6 +125,28 @@ class ScratchAllocTests(unittest.TestCase):
                 data["next_id"] = 1005
             self.assertEqual(json.loads(Path(reg.path).read_text())["next_id"], 1005)
             self.assertEqual(os.stat(reg.path).st_mode & 0o777, 0o600)
+
+    def test_the_bot_key_may_ask_only_for_requests(self):
+        self.assertEqual(
+            sa.served("c.json", "create alice 2T 30"),
+            ["scratch-alloc", "c.json", "create", "alice", "2T", "30"],
+        )
+        self.assertEqual(
+            sa.served("c.json", "extend 1000 7"), ["scratch-alloc", "c.json", "extend", "1000", "7"]
+        )
+        self.assertEqual(sa.served("c.json", "create alice 2T 30 'two words'")[-1], "two words")
+        # A reason with spaces arrives quoted; unquoted it is too many words.
+        for bad in (
+            "sweep",
+            "metrics",
+            "rm -rf /",
+            "extend 1000",
+            "",
+            "list a b",
+            "create alice 2T 30 my run",
+        ):
+            with self.subTest(request=bad), self.assertRaises(sa.Error):
+                sa.served("c.json", bad)
 
 
 if __name__ == "__main__":

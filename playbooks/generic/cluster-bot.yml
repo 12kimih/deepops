@@ -1,0 +1,14 @@
+---
+# The cluster's Slack app (roles/cluster_bot) on the first slurm-master while
+# slurm_enable_cluster_bot is on; removed elsewhere (its account and state stay). Runs
+# before the hosts it acts on, which read its public key (roles/scratch_alloc).
+#
+#   ansible-playbook -K playbooks/generic/cluster-bot.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: cluster_bot
+      cluster_bot_state: "{{ deepops_components.cluster_bot | component_phase(deepops_phase) }}"
+  tags:
+    - cluster-bot

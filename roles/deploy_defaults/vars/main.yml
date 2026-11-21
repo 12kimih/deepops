@@ -256,6 +256,15 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-login}
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-nfs}
+  # Fast scratch space per request (roles/scratch_alloc), on the host whose XFS
+  # filesystem holds it. The allocations and their registry are data: never removed.
+  scratch_alloc:
+    rules:
+      - {switch: "{{ slurm_enable_scratch_alloc }}", group: scratch-server}
+  # The cluster's Slack app (roles/cluster_bot), on one host: the first slurm-master.
+  cluster_bot:
+    rules:
+      - {switch: "{{ slurm_enable_cluster_bot }}", group: slurm-master, first: true}
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-

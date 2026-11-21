@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: scratch_alloc_state in ['present', 'absent', 'kept']
+    fail_msg: "scratch_alloc_state must be present, absent or kept, not {{ scratch_alloc_state }}."
+    quiet: true
+
+- name: "Make scratch allocations {{ scratch_alloc_state }}"
+  ansible.builtin.include_tasks: "{{ scratch_alloc_state }}.yml"
+  when: scratch_alloc_state != 'kept'

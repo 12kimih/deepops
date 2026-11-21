@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: cluster_bot_state in ['present', 'absent', 'kept']
+    fail_msg: "cluster_bot_state must be present, absent or kept, not {{ cluster_bot_state }}."
+    quiet: true
+
+- name: "Make the cluster bot {{ cluster_bot_state }}"
+  ansible.builtin.include_tasks: "{{ cluster_bot_state }}.yml"
+  when: cluster_bot_state != 'kept'

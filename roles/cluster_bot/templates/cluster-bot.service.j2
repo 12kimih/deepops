@@ -1,0 +1,28 @@
+{{ ansible_managed | comment }}
+# roles/cluster_bot
+[Unit]
+Description=Cluster Slack bot (Socket Mode)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ cluster_bot_user }}
+Group={{ cluster_bot_user }}
+Environment=PYTHONPATH={{ _cluster_bot_lib }}
+ExecStart={{ _cluster_bot_venv }}/bin/python -m clusterbot.app {{ _cluster_bot_config }}
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ _cluster_bot_home }}
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
