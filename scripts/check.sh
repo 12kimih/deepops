@@ -114,6 +114,9 @@ fi
 jobs_max="${CHECK_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 logs="$(mktemp -d)"
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "${logs}"' EXIT
+# The test playbooks are not runs to keep: no callback plugin directory, no ARA record.
+mkdir "${logs}/no-callbacks"
+export ANSIBLE_CALLBACK_PLUGINS="${logs}/no-callbacks"
 run_one() {
     local i="$1" start=${SECONDS} status=ok
     nice -n 10 bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
