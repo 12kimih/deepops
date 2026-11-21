@@ -19,6 +19,7 @@
   become: true
   tags:
     - podman
+    - people  # each person's ID range
   roles:
     - role: deploy_defaults
     - role: podman

@@ -14,3 +14,4 @@
       disk_quota_state: "{{ deepops_components.disk_quota | component_phase(deepops_phase) }}"
   tags:
     - disk-quota
+    - people  # each person's limits

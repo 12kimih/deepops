@@ -9,4 +9,4 @@
     - role: deploy_defaults
     - role: container_storage_gc
       container_storage_gc_state: "{{ deepops_components.container_storage_gc | component_phase(deepops_phase) }}"
-  tags: ['container-storage-gc']
+  tags: ['container-storage-gc', 'people']  # the active people keep their stores

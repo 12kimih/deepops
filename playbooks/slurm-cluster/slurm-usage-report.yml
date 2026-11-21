@@ -7,4 +7,4 @@
     - role: deploy_defaults
     - role: slurm_usage_report
       slurm_usage_report_state: "{{ deepops_components.slurm_usage_report | component_phase(deepops_phase) }}"
-  tags: ['slurm-usage-report', 'monitoring']
+  tags: ['slurm-usage-report', 'monitoring', 'people']  # the chat IDs

@@ -147,8 +147,11 @@ Setting the group back to `""` removes the files.
 
 ## Running it
 
-- **People join, change or leave in `people.yml`.** After `--tags people`, the change is
-  in the directory. Every node it ran on forgets its cached answers at once. Other nodes
+- **People join, change or leave in `people.yml`.** One `slurm-cluster.yml --tags people`
+  run applies it everywhere the roster reaches: the account, the home, the Slurm
+  association, the disk quota, the podman ID range, the chat IDs (every play whose role
+  reads the roster carries the tag; `tests/people/test_people_tag.py` keeps it so). The
+  change is in the directory then. Every node it ran on forgets its cached answers at once. Other nodes
   follow within `sssd_client_cache_timeout` (ten minutes), or at once after
   `sss_cache -E`.
 - **A new person has no password until an administrator sets one** on the server:

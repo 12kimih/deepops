@@ -17,9 +17,9 @@ container_storage_gc_state: present
 container_storage_gc_unused_days: "{{ cluster_user_grace_days }}"
 container_storage_gc_max_used_percent: 80
 
-# Roster-shaped mapping (login -> {uid, status}) whose active people keep their stores;
-# empty: no store is removed for its user having left.
-container_storage_gc_people: {}
+# Roster-shaped mapping (login -> {uid, status}) whose active people keep their stores
+# (default: the roster); empty: no store is removed for its user having left.
+container_storage_gc_people: "{{ people }}"
 
 # When the timer runs (systemd OnCalendar), spread over the hour that follows.
 container_storage_gc_on_calendar: "*-*-* 04:00:00"
