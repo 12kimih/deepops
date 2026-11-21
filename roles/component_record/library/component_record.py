@@ -36,7 +36,8 @@ options:
         a unit whose unit file does; a container named deepops, or named as such a unit;
         a directory named deepops or holding an adopted file; a package named in
         I(exclusive_packages) (another role may install it unrecorded); an fstab entry as
-        named (only explicit removals have them).
+        named (only explicit removals have them); a file whose whole content an earlier
+        deepops version wrote unmarked, by I(legacy).
     type: str
     choices: [begin, present, absent]
     required: true
@@ -50,6 +51,15 @@ options:
     type: list
     elements: str
     default: []
+  legacy:
+    description:
+      - For a C(file:) item an earlier deepops version wrote without a mark, regular
+        expressions of which one must match the file's WHOLE content (fullmatch) for
+        C(absent) to adopt it. Shaped on deepops' own text, so a site's file of the same
+        name, or one edited by hand, never matches. The component declares them beside
+        its items (C(<role>_legacy) in its vars/main.yml).
+    type: dict
+    default: {}
   version:
     description: The component's version, for C(begin) and C(present).
     type: str
@@ -70,6 +80,7 @@ before:
 
 import json
 import os
+import re
 import tempfile
 
 from ansible.module_utils import deepops_diff
@@ -93,6 +104,12 @@ def load(path):
     data.setdefault("components", {})
     data.setdefault("items", {})
     return data
+
+
+def legacy_match(text, patterns):
+    """Whether TEXT, a file's whole content, is what an earlier deepops version wrote:
+    one of PATTERNS matches all of it (a pure function, for the tests)."""
+    return any(re.fullmatch(pattern, text) for pattern in patterns or [])
 
 
 def adoptable(items, owned, exclusive=(), evidence=lambda kind, ident: False):
@@ -174,6 +191,7 @@ def main():
             "items": {"type": "list", "elements": "str", "default": []},
             "version": {"type": "str", "default": ""},
             "exclusive_packages": {"type": "list", "elements": "str", "default": []},
+            "legacy": {"type": "dict", "default": {}},
         },
         supports_check_mode=True,
     )
@@ -181,7 +199,24 @@ def main():
     bad = [i for i in p["items"] if i.partition(":")[0] not in KINDS or not i.partition(":")[2]]
     if bad:
         module.fail_json(msg=f"items must be KIND:ID with KIND one of {', '.join(KINDS)}: {bad}")
+    files = {i.partition(":")[2] for i in p["items"] if i.startswith("file:")}
+    stray = sorted(set(p["legacy"]) - files)
+    if stray:
+        module.fail_json(msg=f"legacy names files that are not file items: {stray}")
+    for path, patterns in p["legacy"].items():
+        for pattern in patterns:
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                module.fail_json(msg=f"legacy pattern for {path} does not compile: {e}")
     data = load(p["path"])
+
+    def legacy(path):
+        try:
+            with open(path, errors="replace") as f:
+                return legacy_match(f.read(1 << 20), p["legacy"].get(path))
+        except OSError:
+            return False
 
     def evidence(kind, ident):
         # Only what is on the host is evidence: a path named deepops that a host never
@@ -189,7 +224,7 @@ def main():
         if kind in ("file", "dir") and not os.path.lexists(ident):
             return False
         if kind == "file":
-            return made_by_deepops(ident)
+            return made_by_deepops(ident) or (ident in p["legacy"] and legacy(ident))
         if kind == "dir":
             return named_deepops(ident)
         rc, out, _ = module.run_command(["systemctl", "show", "-P", "FragmentPath", ident])

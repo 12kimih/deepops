@@ -63,7 +63,12 @@ or a run from another operator's machine.
   units and paths). On its first run with the framework, present or absent, what it
   finds is adopted into the record, as `build_record` adopts existing builds. Hosts
   deployed before the record existed, and leftovers installed by hand, are cleaned up
-  like anything recorded.
+  like anything recorded. Without a record, absent takes only what shows deepops made
+  it: a mark in a file (`plugins/module_utils/deepops_marks.py`), or, for a file an
+  earlier version wrote unmarked, its whole content matching that version's shape
+  (`<role>_legacy` in the role's vars/main.yml, passed as `component_record_legacy`:
+  regexes anchored on deepops' own text, so a site's file of the same name or one
+  edited by hand never matches).
 - **Versions.** A changed version removes the items only the old version owned.
 - **absent** starts from the record and the detect step: nothing found, nothing to do
   (`end_role`). After removal the component's entry goes.
