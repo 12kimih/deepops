@@ -94,6 +94,22 @@ class Evidence(unittest.TestCase):
         rule["interpreter"] = shutil.which("sh") + "{0}"[:0]  # an interpreter that exists
         self.assertEqual(mod.match_rule(rule), [])
 
+    def test_a_script_reinstalled_under_the_new_python_stays(self):
+        live = self.tmp / "py3.12"
+        live.write_text("")  # the new interpreter exists
+        for version in ("3.10", "3.12"):
+            record = f"lib/python{version}/dist-packages/tool-1.dist-info/RECORD"
+            self.put(record, "../../../bin/tool,sha256=x,1\n")
+        tool = self.put("bin/tool", "#!/usr/bin/python3\n", 0o755)
+        rule = {
+            "type": "runtime",
+            "glob": str(self.tmp / "lib/python3.*"),
+            "version": r"python(\d+\.\d+)$",
+            "interpreter": str(self.tmp / "py{0}"),
+        }
+        self.assertEqual(mod.match_rule(rule), [str(self.tmp / "lib/python3.10")])
+        self.assertTrue(Path(tool).exists())
+
     def test_nothing_a_package_owns_is_counted(self):
         owned = {"/usr/lib/x/libfoo.so"}
         self.assertTrue(mod.owned_below("/usr/lib/x", owned))
@@ -256,8 +272,18 @@ class Evidence(unittest.TestCase):
         running = mod.os.uname().release
         for version in ("5.15.0-1-generic", "6.8.0-2-generic", running):
             self.put(f"modules/{version}/modules.dep")
-        owned = {"/lib/modules/6.8.0-2-generic/kernel/x.ko"}
-        self.assertEqual(mod.orphan_modules(owned, str(root)), [str(root / "5.15.0-1-generic")])
+        for listed in ("/lib/modules", "/usr/lib/modules"):  # either name dpkg may use
+            owned = {mod.canonical(f"{listed}/6.8.0-2-generic/kernel/x.ko")}
+            self.assertEqual(mod.orphan_modules(owned, str(root)), [str(root / "5.15.0-1-generic")])
+
+    def test_merged_usr_names_one_path(self):
+        """dpkg lists a newer kernel under /usr/lib/modules; its tree under /lib is owned."""
+        with mock.patch.object(mod, "MERGED", ("/lib", "/bin")):
+            owned = {mod.canonical("/usr/lib/modules/6.14.0-1-generic/kernel/x.ko")}
+            self.assertTrue(mod.owned_below("/lib/modules/6.14.0-1-generic", owned))
+            self.assertTrue(mod.owned_below("/usr/lib/modules/6.14.0-1-generic", owned))
+            self.assertEqual(mod.canonical("/libexec/x"), "/libexec/x")
+            self.assertFalse(mod.owned_below("/lib/modules/5.15.0-1-generic", owned))
 
 
 if __name__ == "__main__":

@@ -17,12 +17,9 @@ case "${SLURM_JOB_UID:-}" in
     ''|0|*[!0-9]*) exit 0 ;;  # root, or no usable uid
 esac
 . '{{ slurm_config_dir }}/shared/lib/localusers.sh' || exit 0
-localusers_listed "$SLURM_JOB_USER"
-case $? in
-    0) exit 0 ;;
-    1) ;;
-    *) log "localusers lookup failed; leaving the IPC objects of $SLURM_JOB_USER"; exit 0 ;;
-esac
+if localusers_spared "$SLURM_JOB_USER"; then
+    exit 0  # an operator: their IPC objects stay
+fi
 
 removed=0 failed=0
 # /proc/sysvipc/<kind>: the id is field 2, the owner's uid field 8 (shm, msg) or 5 (sem).

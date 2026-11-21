@@ -267,6 +267,18 @@ cleanup_identity() {
     return 1
 }
 
+# Every part that spares operators sources shared/lib/localusers.sh: render it beside the
+# part, point it at the fixture's list, and the part at it (verified, not assumed).
+use_localusers() {
+    # $1 = rendered part, $2 = the fixture's localusers.backup
+    local lib
+    lib="$(dirname "$1")/localusers.sh"
+    render "shared/lib/localusers.sh" "$lib" || return 1
+    sed -i "s#^localusers_backup=.*#localusers_backup='$2'#" "$lib"
+    sed -i "s#/etc/slurm/shared/lib/localusers.sh#$lib#" "$1"
+    grep -qF ". '$lib'" "$1"
+}
+
 own_file() {
     # $1 = owner, $2 = path
     : > "$2" || return 1
@@ -288,8 +300,7 @@ setup_cleanup() {
     write_logger_stub "$dir"
 
     render "epilog.d/42-lastuserjob-cleanup" "$dir/42-cleanup" || return 1
-    # Point the rendered script at the fixture's localusers.backup.
-    sed -i "s#^localusers_backup=.*#localusers_backup='$dir/etc/slurm/localusers.backup'#" "$dir/42-cleanup"
+    use_localusers "$dir/42-cleanup" "$dir/etc/slurm/localusers.backup" || return 1
 
     # The script deletes under /tmp and /dev/shm. Leaving those pointed at the
     # real directories means that the moment a guard regresses, the suite
@@ -741,7 +752,7 @@ setup_procs() {
     write_logger_stub "$dir"
     render "epilog.d/40-lastuserjob-processes" "$dir/40-processes" || return 1
     render "shared/lib/epilog-job-scope.sh" "$dir/lib/epilog-job-scope.sh" || return 1
-    sed -i "s#^localusers_backup=.*#localusers_backup='$dir/etc/localusers.backup'#" "$dir/40-processes"
+    use_localusers "$dir/40-processes" "$dir/etc/localusers.backup" || return 1
     sed -i "s#^epilog_proc_root=.*#epilog_proc_root='$dir/proc'#" "$dir/40-processes"
     sed -i "s#^job_scope_lib=.*#job_scope_lib='$dir/lib/epilog-job-scope.sh'#" "$dir/40-processes"
     # A recording kill: the harness must never signal a real process.
@@ -751,7 +762,7 @@ printf '%s\n' "\$*" >> "$dir/kill.log"
 STUB
     chmod +x "$dir/bin/kill"
     sed -i "s#^kill_bin=.*#kill_bin='$dir/bin/kill'#" "$dir/40-processes"
-    for want in "localusers_backup='$dir/etc/localusers.backup'" "epilog_proc_root='$dir/proc'" \
+    for want in "epilog_proc_root='$dir/proc'" \
                 "job_scope_lib='$dir/lib/epilog-job-scope.sh'" "kill_bin='$dir/bin/kill'"; do
         if ! grep -qF "$want" "$dir/40-processes"; then
             printf '  FAIL harness: 40 was not redirected into the fixture (%s)\n' "$want" >&2
@@ -950,12 +961,10 @@ ipc_setup() {
     printf '%s\n' "key semid perms nsems uid gid" "0 21 600 1 1001 1001" > "$dir/sysvipc/sem"
     printf '%s\n' "key msqid perms cbytes qnum lspid lrpid uid gid" "0 31 600 0 0 0 0 1002 1002" > "$dir/sysvipc/msg"
     : > "$dir/mqueue/q-mine"
-    render "shared/lib/localusers.sh" "$dir/localusers.sh" && render "epilog.d/43-lastuserjob-ipc" "$dir/43" || return 1
-    sed -i "s#^localusers_backup=.*#localusers_backup='$dir/localusers.backup'#" "$dir/localusers.sh"
-    sed -i -e "s#^sysvipc=.*#sysvipc='$dir/sysvipc'#" -e "s#^mqueue=.*#mqueue='$dir/mqueue'#" \
-        -e "s#/etc/slurm/shared/lib/localusers.sh#$dir/localusers.sh#" "$dir/43"
-    grep -qF "sysvipc='$dir/sysvipc'" "$dir/43" && grep -qF "mqueue='$dir/mqueue'" "$dir/43" \
-        && grep -qF ". '$dir/localusers.sh'" "$dir/43"
+    render "epilog.d/43-lastuserjob-ipc" "$dir/43" || return 1
+    use_localusers "$dir/43" "$dir/localusers.backup" || return 1
+    sed -i -e "s#^sysvipc=.*#sysvipc='$dir/sysvipc'#" -e "s#^mqueue=.*#mqueue='$dir/mqueue'#" "$dir/43"
+    grep -qF "sysvipc='$dir/sysvipc'" "$dir/43" && grep -qF "mqueue='$dir/mqueue'" "$dir/43"
 }
 ipc="$work/ipc"
 if ipc_setup "$ipc"; then
@@ -1169,7 +1178,8 @@ done
 
 # --- 26.09 snapshot -----------------------------------------------------------------
 # scope=user must render byte-for-byte what 26.09 deployed. The snapshots are the
-# 26.09 templates rendered with the same fixture values; script 41 is excluded
+# 26.09 templates rendered with the same fixture values, then with the operator exemption
+# read through shared/lib/localusers.sh (same decisions, both scopes); script 41 is excluded
 # because its match fix applies in both scopes and is covered above, and script 50
 # because it now reads enroot.conf in both scopes (covered below), and run-parts.sh and
 # epilog.sh because their exclusive detection, bounded squeue and never-failing logging

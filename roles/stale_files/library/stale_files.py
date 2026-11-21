@@ -125,8 +125,25 @@ def staged_paths(manifests):
     return paths
 
 
+# Merged /usr: /lib, /bin and /sbin are links into /usr, and dpkg lists a file under
+# whichever name its package was built with (a kernel's modules under /lib/modules, a
+# newer one's under /usr/lib/modules). Every path is compared spelled one way, or an
+# installed kernel's module tree reads as nobody's.
+MERGED = tuple(f"/{d}" for d in ("bin", "sbin", "lib", "lib32", "lib64", "libx32") if os.path.islink(f"/{d}"))
+
+
+def canonical(path):
+    """PATH with a merged-/usr alias spelled through /usr (/lib/x -> /usr/lib/x)."""
+    for alias in MERGED:
+        if path == alias or path.startswith(alias + "/"):
+            return "/usr" + path
+    return path
+
+
 def owned_below(path, owned):
-    prefix = path.rstrip("/") + "/"
+    """Whether OWNED (canonical paths) holds PATH or anything under it."""
+    path = canonical(path).rstrip("/")
+    prefix = path + "/"
     return path in owned or any(p.startswith(prefix) for p in owned)
 
 
@@ -182,6 +199,19 @@ def elf_needed(path):
             return names
     except (OSError, struct.error, IndexError, ValueError):
         return None
+
+
+def record_outside(tree):
+    """What TREE's packages installed outside it, by their RECORD files (entry scripts)."""
+    out = set()
+    for record in glob.glob(os.path.join(tree, "**", "*.dist-info", "RECORD"), recursive=True):
+        site = os.path.dirname(os.path.dirname(record))
+        with open(record, **FS) as f:
+            for line in f:
+                listed = os.path.normpath(os.path.join(site, line.split(",")[0]))
+                if not listed.startswith(tree.rstrip("/") + "/"):
+                    out.add(listed)
+    return out
 
 
 def shebang(path):
@@ -282,21 +312,22 @@ def match_rule(rule):
                 found.append(path)
     elif kind == "runtime":
         version = re.compile(rule["version"])
+        trees = {}  # tree -> its interpreter
         for tree in glob.glob(rule["glob"]):
             m = version.search(tree)
-            if not m:
-                continue
-            interpreter = rule["interpreter"].format(m.group(1))
+            if m:
+                trees[tree] = rule["interpreter"].format(m.group(1))
+        # What a living interpreter's packages installed (pip under the new Python put a
+        # working script under the old name) is never a dead tree's leftover.
+        living = set()
+        for tree, interpreter in trees.items():
+            if os.path.exists(interpreter):
+                living.update(record_outside(tree))
+        for tree, interpreter in trees.items():
             if os.path.exists(interpreter):
                 continue
             found.append(tree)
-            for record in glob.glob(os.path.join(tree, "**", "*.dist-info", "RECORD"), recursive=True):
-                site = os.path.dirname(os.path.dirname(record))
-                with open(record, **FS) as f:
-                    for line in f:
-                        listed = os.path.normpath(os.path.join(site, line.split(",")[0]))
-                        if not listed.startswith(tree.rstrip("/") + "/") and os.path.lexists(listed):
-                            found.append(listed)
+            found += [p for p in record_outside(tree) if p not in living and os.path.lexists(p)]
             for path in files_in(rule.get("dirs", [])):
                 if shebang(path) in (interpreter, os.path.basename(interpreter)):
                     found.append(path)
@@ -386,7 +417,7 @@ def unowned_config(config_dirs, owned, claimed):
             continue
         for name in sorted(os.listdir(top)):
             path = os.path.join(top, name)
-            if path in owned or path.startswith(claimed):
+            if canonical(path) in owned or path.startswith(claimed):
                 continue
             if os.path.isdir(path) and not os.path.islink(path):
                 continue
@@ -401,7 +432,7 @@ def unit_overrides(owned, root="/etc/systemd/system"):
             continue  # .wants/.requires hold enable links
         for name in sorted(names):
             path = os.path.join(top, name)
-            if path in owned or os.path.islink(path) or text_matches(path, r"X-Snappy=yes"):
+            if canonical(path) in owned or os.path.islink(path) or text_matches(path, r"X-Snappy=yes"):
                 continue
             found.append(path)
     return [labelled(p) for p in sorted(found)]
@@ -434,10 +465,10 @@ def orphan_modules(owned, root="/lib/modules"):
     if not os.path.isdir(root):
         return []
     keep = {os.uname().release}
+    prefix = canonical("/lib/modules") + "/"  # where packages put kernel modules, ROOT or not
     for path in owned:
-        for prefix in ("/lib/modules/", "/usr/lib/modules/"):
-            if path.startswith(prefix) and path.count("/") > prefix.count("/"):
-                keep.add(path[len(prefix) :].split("/")[0])
+        if path.startswith(prefix) and path.count("/") > prefix.count("/"):
+            keep.add(path[len(prefix) :].split("/")[0])
     return [os.path.join(root, v) for v in sorted(os.listdir(root)) if v not in keep]
 
 
@@ -465,7 +496,7 @@ def main():
         },
         supports_check_mode=True,
     )
-    owned = owned_paths() | staged_paths(module.params["manifests"])
+    owned = {canonical(p) for p in owned_paths() | staged_paths(module.params["manifests"])}
     stale, kept, within = {}, [], {}
     for rule in module.params["rules"]:
         try:
@@ -492,7 +523,7 @@ def main():
     unowned = {}
     if module.params["report"]:
         for path in files_in(module.params["report"]):
-            if path in owned or path in ignored or path.startswith(claimed):
+            if canonical(path) in owned or path in ignored or path.startswith(claimed):
                 continue
             top = "/".join(path.split("/")[:5])
             unowned[top] = unowned.get(top, 0) + 1
