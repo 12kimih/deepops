@@ -1,6 +1,8 @@
 # dcgm-exporter's own default-counters.csv of the pinned release (4.9.0), unchanged but
 # for the rows deepops enables: uncommented in place (GPU slowdown and memory maximum
-# operating temperatures, the windowed clock-event and XID counts), and the device minor
+# operating temperatures, the windowed clock-event and XID counts, SM activity and
+# occupancy: how much of the GPU a job really uses, which utilisation alone does not
+# tell), and the device minor
 # number below. Updating the exporter: start from the new release's file and enable the
 # same rows (tests/monitoring/test_dcgm_counters.py lists what the rules and dashboards
 # read, so a row they need cannot be lost).
@@ -159,8 +161,8 @@ DCGM_FI_SYSTEM_DRIVER_VERSION, label, Driver Version
 # Datacenter Profiling (DCP) metrics
 # NOTE: supported on Nvidia datacenter Volta GPUs and newer
 DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO, gauge, Ratio of time the graphics engine is active.
-# DCGM_FI_PROF_SM_UTIL_RATIO,      gauge, The ratio of cycles an SM has at least 1 warp assigned.
-# DCGM_FI_PROF_SM_OCCUPANCY_RATIO, gauge, The ratio of number of warps resident on an SM.
+DCGM_FI_PROF_SM_UTIL_RATIO,      gauge, The ratio of cycles an SM has at least 1 warp assigned.
+DCGM_FI_PROF_SM_OCCUPANCY_RATIO, gauge, The ratio of number of warps resident on an SM.
 DCGM_FI_PROF_TENSOR_UTIL_RATIO, gauge, Ratio of cycles the tensor (HMMA) pipe is active.
 DCGM_FI_PROF_DRAM_UTIL_RATIO, gauge, Ratio of cycles the device memory interface is active sending or receiving data.
 # DCGM_FI_PROF_FP64_UTIL_RATIO,    gauge, Ratio of cycles the fp64 pipes are active.

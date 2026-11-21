@@ -37,6 +37,22 @@ groups:
         expr: |
           max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES)
           * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
+      # The share of its memory a GPU holds: one threshold for every model (a context-free
+      # GPU holds only the driver's reservation, a small share of any size).
+      - record: host_device:dcgm_fb_used_fraction:max
+        expr: |
+          max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES / (DCGM_FI_DEV_FB_USED_BYTES + DCGM_FI_DEV_FB_FREE_BYTES))
+          * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
+      # SM activity (the share of cycles an SM has work) and board power: how much of the
+      # GPU is really used, which utilisation (any kernel running) does not tell.
+      - record: host_device:dcgm_sm_util_ratio:max
+        expr: |
+          max by (host, gpu) (DCGM_FI_PROF_SM_UTIL_RATIO)
+          * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
+      - record: host_device:dcgm_power_watts:max
+        expr: |
+          max by (host, gpu) (DCGM_FI_DEV_BOARD_POWER_WATTS)
+          * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
       # Allocation keyed the same way: host is the Slurm node name, device nvidia<IDX>.
       # One definition for the alerts and the Slurm / GPU allocation dashboard.
       - record: host_device:slurm_gpu_allocated:max
@@ -56,15 +72,28 @@ groups:
         expr: |
           host_device:slurm_gpu_allocated:max
           * on (host, device) group_left () host_device:dcgm_fb_used_bytes:max
-      # Only while the allocation data is fresh, so a stale file never pages, and never
-      # on a drained node: maintenance (a DCGM diagnostic, a burn-in) uses its GPUs
-      # outside Slurm on purpose.
-      - alert: GpuBusyWithoutJob
+      - record: job_device:dcgm_sm_util_ratio:max
         expr: |
-          host_device:dcgm_gpu_util_ratio:max > 0
+          host_device:slurm_gpu_allocated:max
+          * on (host, device) group_left () host_device:dcgm_sm_util_ratio:max
+      - record: job_device:dcgm_power_watts:max
+        expr: |
+          host_device:slurm_gpu_allocated:max
+          * on (host, device) group_left () host_device:dcgm_power_watts:max
+      # The GPUs no Slurm job holds, on nodes in service, while the allocation data is
+      # fresh: the one definition the alerts on GPUs outside Slurm read. Never a drained
+      # node: maintenance (a DCGM diagnostic, a burn-in) uses its GPUs outside Slurm on
+      # purpose; and a stale allocation file must never page.
+      - record: host_device:slurm_gpu_unheld:info
+        expr: |
+          max by (host, device) (host_gpu:dcgm_slurm_device:info)
           unless on (host, device) host_device:slurm_gpu_allocated:max
           unless on (host) label_replace(max by (node) (slurm_node_drain) == 1, "host", "$1", "node", "(.*)")
           and on () (time() - max(slurm_metrics_updated_timestamp_seconds) < 300)
+      - alert: GpuBusyWithoutJob
+        expr: |
+          host_device:dcgm_gpu_util_ratio:max > 0
+          and on (host, device) host_device:slurm_gpu_unheld:info
         for: 15m
         labels: {severity: warning}
         annotations:
@@ -72,6 +101,22 @@ groups:
           description: >-
             A process outside Slurm, or one left behind by a finished job. As root on the
             host, `fuser -v /dev/nvidia*` finds it; a GPU reset or reboot clears a hung one.
+      # A hung GPU: fully busy with no job holding it and no memory in use (no process
+      # has a context on it), as after a crashed job; it needs a reset or a reboot. NHC
+      # drains a node on the XIDs NVIDIA lists, but this one may log none.
+      - alert: GpuStuck
+        expr: |
+          host_device:dcgm_gpu_util_ratio:max >= 0.95
+          and on (host, device) host_device:dcgm_fb_used_fraction:max < 0.03
+          and on (host, device) host_device:slurm_gpu_unheld:info
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "GPU {{ $labels.device }} on {{ $labels.host }} is busy with no job and no memory in use: hung"
+          description: >-
+            Drain the node (`scontrol update nodename={{ $labels.host }} state=drain
+            reason="gpu hung"`), then reset the GPU or reboot once its jobs end, and run
+            playbooks/utilities/gpu-diag.yml before resuming it.
       # The textfile error counts only on the host that writes the allocation data.
       - alert: SlurmGpuMetricsStale
         expr: |
