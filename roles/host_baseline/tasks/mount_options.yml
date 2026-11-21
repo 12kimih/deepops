@@ -1,0 +1,68 @@
+---
+# Local filesystems' mount options (host_baseline_mount_options, mount point: options):
+# the entries the installer wrote keep their device (UUID) and order; only the options
+# field is the site's. A filesystem another host serves is the mounting role's
+# (nfs_mount_options in roles/nfs_client), never set here. A changed entry is remounted
+# so the running system takes it now; an option the kernel takes only at mount time
+# (an XFS quota, a data= mode) asks for a reboot instead.
+- name: Apply the declared mount options
+  when: host_baseline_mount_options | length > 0
+  block:
+    - name: Read /etc/fstab
+      ansible.builtin.slurp:
+        src: /etc/fstab
+      register: host_baseline_fstab
+
+    - name: Note the entries the options name
+      ansible.builtin.set_fact:
+        host_baseline_mount_entries: >-
+          {{ host_baseline_fstab.content | b64decode | fstab_entries
+             | selectattr('path', 'in', host_baseline_mount_options) | list }}
+
+    - name: Refuse a mount point that is not a local filesystem in /etc/fstab
+      ansible.builtin.assert:
+        that:
+          - _missing | length == 0
+          - _network | length == 0
+        fail_msg: >-
+          host_baseline_mount_options names {{ (_missing + _network) | join(', ') }}:
+          {{ ('not in /etc/fstab: ' ~ (_missing | join(', ')) ~ '. ') if _missing else '' }}
+          {{- ('served by another host (set nfs_mount_options): ' ~ (_network | join(', '))) if _network else '' }}
+        quiet: true
+      vars:
+        _missing: "{{ host_baseline_mount_options.keys() | difference(host_baseline_mount_entries | map(attribute='path')) }}"
+        _network: "{{ host_baseline_mount_entries | selectattr('network') | map(attribute='path') | list }}"
+
+    - name: Set the mount options in /etc/fstab
+      ansible.posix.mount:
+        path: "{{ item.path }}"
+        src: "{{ item.src }}"
+        fstype: "{{ item.fstype }}"
+        opts: "{{ host_baseline_mount_options[item.path] }}"
+        dump: "{{ item.dump }}"
+        passno: "{{ item.passno }}"
+        state: present
+      loop: "{{ host_baseline_mount_entries }}"
+      loop_control:
+        label: "{{ item.path }}"
+      register: host_baseline_mount_set
+
+    - name: Remount the changed filesystems
+      ansible.posix.mount:
+        path: "{{ item.item.path }}"
+        state: remounted
+      loop: "{{ host_baseline_mount_set.results | selectattr('changed') | list }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+      register: host_baseline_mount_remount
+      failed_when: false
+
+    - name: Ask for a reboot for the options a remount could not take
+      ansible.builtin.include_role:
+        name: maintenance
+        tasks_from: reboot_request
+      vars:
+        maintenance_reason: >-
+          mount {{ host_baseline_mount_remount.results | selectattr('failed', 'defined') | selectattr('failed')
+          | map(attribute='item.item.path') | join(', ') }} with its new options
+      when: host_baseline_mount_remount.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0

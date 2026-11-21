@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "plugins" / "filter"))
-from mounts import mount_point  # noqa: E402
+from mounts import fstab_entries, mount_point  # noqa: E402
 
 MOUNTS = [{"mount": m} for m in ("/", "/var", "/var/tmp", "/boot/efi", "/raid")]
 
@@ -26,6 +26,27 @@ class MountPoint(unittest.TestCase):
             mount_point("var/tmp", MOUNTS)
         with self.assertRaises(ValueError):
             mount_point("/srv", [{"mount": "/var"}])
+
+
+FSTAB = """# /etc/fstab: static file system information.
+UUID=7fd8 / ext4 defaults,noatime,errors=remount-ro 0 1
+UUID=731f none swap sw 0 0
+/dev/sdb1 /home ext4 defaults
+server:/scratch /scratch nfs rw,hard,_netdev  # a comment
+/dev/sdc1 /data\\040set xfs noatime 0 2
+"""
+
+
+class FstabEntries(unittest.TestCase):
+    def test_each_entry_in_order_with_mounts_defaults(self):
+        entries = fstab_entries(FSTAB)
+        self.assertEqual([e["path"] for e in entries], ["/", "none", "/home", "/scratch", "/data\\040set"])
+        self.assertEqual(entries[0]["opts"], "defaults,noatime,errors=remount-ro")
+        self.assertEqual((entries[2]["dump"], entries[2]["passno"]), ("0", "0"), "mount(8) reads 0")
+        self.assertEqual(entries[3]["opts"], "rw,hard,_netdev", "the comment is not an option")
+
+    def test_a_filesystem_another_host_serves_is_marked(self):
+        self.assertEqual([e["path"] for e in fstab_entries(FSTAB) if e["network"]], ["/scratch"])
 
 
 if __name__ == "__main__":

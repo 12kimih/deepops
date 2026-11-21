@@ -1,6 +1,7 @@
-"""The mount point a path lives on, from a host's mounts.
+"""Mounts: the mount point a path lives on, and the entries of an fstab.
 
 "/var/spool/slurmd-private" | mount_point(ansible_facts.mounts)  -> "/" (or "/var" ...)
+fstab_text | fstab_entries   -> [{src, path, fstype, opts, dump, passno}, ...]
 
 The deepest mount at or above the path, by whole path components: /var/tmpfoo is
 not under /var/tmp. The path need not exist yet. Tools that check a filesystem by
@@ -28,6 +29,35 @@ def mount_point(path, mounts):
     return best
 
 
+# Filesystems another host serves: their options are the mounting role's (nfs_client).
+NETWORK_FSTYPES = ("nfs", "nfs4", "cifs", "smb3", "fuse.sshfs", "glusterfs", "ceph", "lustre")
+
+
+def fstab_entries(text):
+    """The entries of fstab(5) TEXT in order, comments and blank lines skipped; dump and
+    passno default to 0 as mount(8) reads them. Octal escapes (\\040 for a space) are
+    kept as written, so an entry is written back exactly."""
+    entries = []
+    for line in str(text).splitlines():
+        fields = line.split("#", 1)[0].split()
+        if len(fields) < 3:
+            continue
+        fields += ["defaults", "0", "0"][len(fields) - 3 :]
+        src, path, fstype, opts, dump, passno = fields[:6]
+        entries.append(
+            {
+                "src": src,
+                "path": path,
+                "fstype": fstype,
+                "opts": opts,
+                "dump": dump,
+                "passno": passno,
+                "network": fstype in NETWORK_FSTYPES,
+            }  # fmt: skip
+        )
+    return entries
+
+
 class FilterModule:
     def filters(self):
-        return {"mount_point": mount_point}
+        return {"mount_point": mount_point, "fstab_entries": fstab_entries}

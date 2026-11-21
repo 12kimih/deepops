@@ -106,6 +106,13 @@
 # Set hostname based on inventory file
 #deepops_set_hostname: true
 
+# Local filesystems' mount options (roles/host_baseline, playbooks/generic/host-baseline.yml):
+# mount point: options, for the entries already in /etc/fstab; the device stays as the
+# installer wrote it, changed filesystems are remounted. Network filesystems take
+# nfs_mount_options. Set per host group: a mount point named must be local on each host.
+#host_baseline_mount_options: {}
+#host_baseline_mount_options: {"/": "defaults,noatime,errors=remount-ro"}  # example
+
 # Every host's locale (LANG) and time zone (roles/locale, playbooks/generic/locale.yml).
 #locale_lang: "en_US.UTF-8"
 #locale_timezone: "Etc/UTC"

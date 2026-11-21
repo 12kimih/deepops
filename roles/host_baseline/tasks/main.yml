@@ -2,6 +2,9 @@
 - name: Remove the packages declared absent
   ansible.builtin.include_tasks: absent.yml
 
+- name: Set the local filesystems' mount options
+  ansible.builtin.include_tasks: mount_options.yml
+
 # What a host keeps after its interpreters change (roles/stale_files): an OS release
 # upgrade left python3.10's, ruby 3.0's and perl 5.34's trees and scripts behind.
 - name: Remove what retired runtimes left
