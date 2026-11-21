@@ -6,7 +6,8 @@ Two sources, each row naming its own:
               step: each task's high-water mark, averaged (mean) and maxed (max) over the
               step's tasks. Slurm records them only with AutoDetect=nvml in gres.conf.
   prometheus  DCGM through the monitoring stack (rules/slurm.yml job_device:*), per GPU:
-              mean and max over the job's run. Kept for Prometheus' retention; a job
+              mean and max over the job's run of utilisation, SM activity (how much of
+              the GPU the kernels kept busy), memory and board power. Kept for Prometheus' retention; a job
               shorter than the allocation interval (a minute) may have no samples.
 CPU: Slurm's own accounting for every job, its CPU time (TotalCPU, user plus system,
 summed over the steps) against its allocated CPUs over its elapsed time, as seff
@@ -32,16 +33,27 @@ from .site import info as site_info
 
 SOURCES = ("auto", "slurm", "prometheus")
 # Prometheus' series (rules/slurm.yml), labelled with the job as Slurm names it.
-UTIL, MEMORY = "job_device:dcgm_gpu_util_ratio:max", "job_device:dcgm_fb_used_bytes:max"
+# Prometheus' per-job series (rules/slurm.yml), labelled with the job as Slurm names it:
+# (figure, series, unit suffix of its keys). Utilisation says a kernel ran; SM activity
+# how much of the GPU it kept busy; memory and board power what it held and drew.
+SERIES = (
+    ("util", "job_device:dcgm_gpu_util_ratio:max", ""),
+    ("sm", "job_device:dcgm_sm_util_ratio:max", ""),
+    ("memory", "job_device:dcgm_fb_used_bytes:max", "_bytes"),
+    ("power", "job_device:dcgm_power_watts:max", "_watts"),
+)
+STATS = (("mean", "avg_over_time"), ("max", "max_over_time"))
+FIGURES = tuple(f"{name}_{stat}{unit}" for name, _, unit in SERIES for stat, _ in STATS)
 STEP = 60  # the allocation interval (roles/slurm_metrics): the shortest window with a sample
-FIGURES = ("util_mean", "util_max", "memory_mean_bytes", "memory_max_bytes")  # ratios, bytes
 
 NOTES = [
     "Sources (each row names its own):\n"
     "  slurm       sacct's TRESUsageInAve and TRESUsageInMax for gres/gpuutil and gres/gpumem, per\n"
     "              job step: each task's high-water mark, averaged and maxed over the tasks.\n"
     "              Present only where Slurm gathers GPU usage (AutoDetect=nvml in gres.conf).\n"
-    "  prometheus  DCGM, per GPU in Slurm's numbering: the mean and the max over the job's run.\n"
+    "  prometheus  DCGM, per GPU in Slurm's numbering: the mean and the max over the job's run,\n"
+    "              with SM activity (how much of the GPU the kernels kept busy: utilisation only\n"
+    "              says a kernel ran) and board power, which Slurm does not record.\n"
     "              Kept as long as Prometheus keeps data; a job under a minute may have none.\n"
     "--source auto (the default) prefers Slurm's figures and falls back to Prometheus'.",
     "CPU: the job's CPU time (sacct TotalCPU) over its allocated CPUs times its elapsed\n"
@@ -51,7 +63,7 @@ NOTES = [
 
 COMMAND = Command(
     "gpu-usage",
-    "what a job's GPUs did: utilisation and memory, running or finished",
+    "what a job's GPUs did: utilisation, SM activity, memory and power, running or finished",
     [
         Opt("job", metavar="JOB", brief=True, help="the job: an id, or ARRAY_TASK for an array task"),
         Opt(
@@ -109,6 +121,7 @@ def slurm_rows(job):
             {
                 "source": "slurm",
                 "where": (step.get("step") or {}).get("id", ""),
+                **dict.fromkeys(FIGURES),  # Slurm records no SM activity or power
                 "util_mean": _ratio(mean.get("gres/gpuutil")),
                 "util_max": _ratio(peak.get("gres/gpuutil")),
                 "memory_mean_bytes": mean.get("gres/gpumem"),
@@ -127,15 +140,12 @@ def prometheus_rows(api, label, start, end):
     span = max(int(end - start), STEP)
     selector = f'{{job_id="{label}"}}'
     figures = {}
-    for key, expr in (
-        ("util_mean", f"avg_over_time({UTIL}{selector}[{span}s])"),
-        ("util_max", f"max_over_time({UTIL}{selector}[{span}s])"),
-        ("memory_mean_bytes", f"avg_over_time({MEMORY}{selector}[{span}s])"),
-        ("memory_max_bytes", f"max_over_time({MEMORY}{selector}[{span}s])"),
-    ):
-        for r in api.query(f"max by (host, device) ({expr})", at=end):
-            where = f"{r['metric'].get('host', '?')}/{r['metric'].get('device', '?')}"
-            figures.setdefault(where, {})[key] = float(r["value"][1])
+    for name, series, unit in SERIES:
+        for stat, function in STATS:
+            key = f"{name}_{stat}{unit}"
+            for r in api.query(f"max by (host, device) ({function}({series}{selector}[{span}s]))", at=end):
+                where = f"{r['metric'].get('host', '?')}/{r['metric'].get('device', '?')}"
+                figures.setdefault(where, {})[key] = float(r["value"][1])
     return [
         {"source": "prometheus", "where": w, **{k: f.get(k) for k in FIGURES}}
         for w, f in sorted(figures.items())
@@ -195,6 +205,23 @@ def _gib(count):
     return "-" if count is None else f"{count / 2**30:.1f}G"
 
 
+def _watts(power):
+    return "-" if power is None else f"{power:.0f}W"
+
+
+# The table's columns after GPU / STEP: (heading, figure, format).
+COLUMNS = (
+    ("UTIL MEAN", "util_mean", _percent),
+    ("UTIL MAX", "util_max", _percent),
+    ("SM MEAN", "sm_mean", _percent),
+    ("SM MAX", "sm_max", _percent),
+    ("MEM MEAN", "memory_mean_bytes", _gib),
+    ("MEM MAX", "memory_max_bytes", _gib),
+    ("POWER MEAN", "power_mean_watts", _watts),
+    ("POWER MAX", "power_max_watts", _watts),
+)
+
+
 def cpu_line(r):
     if r["cpu_efficiency"] is None:
         return f"CPU: {r['cpus']} allocated, no run time to measure against"
@@ -207,16 +234,13 @@ def cpu_line(r):
 def render(reports, theme):
     out = []
     for r in reports:
-        grid = Grid(theme, ["GPU / STEP", "UTIL MEAN", "UTIL MAX", "MEM MEAN", "MEM MAX", "SOURCE"],
-                    align=["l", "r", "r", "r", "r", "l"])  # fmt: skip
+        grid = Grid(theme, ["GPU / STEP", *(c[0] for c in COLUMNS), "SOURCE"],
+                    align=["l", *("r" for _ in COLUMNS), "l"])  # fmt: skip
         for row in r["rows"]:
             grid.row(
                 [
                     (row["where"], "text"),
-                    (_percent(row["util_mean"]), "text"),
-                    (_percent(row["util_max"]), "text"),
-                    (_gib(row["memory_mean_bytes"]), "text"),
-                    (_gib(row["memory_max_bytes"]), "text"),
+                    *((fmt(row[key]), "text") for _, key, fmt in COLUMNS),
                     (row["source"], "muted"),
                 ]
             )

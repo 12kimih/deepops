@@ -136,7 +136,8 @@ Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only wit
 finished: Slurm's per step where the job has them, else Prometheus' per GPU, each row
 naming its source (`--source slurm|prometheus` asks for one, `--json` for scripts). The
 two differ in meaning: Slurm keeps each task's high-water mark, Prometheus the mean and
-max over the run. A line under each job gives the share of its allocated CPUs it kept
+max over the run. Prometheus' rows add SM activity (how much of the GPU the kernels kept
+busy: utilisation only says a kernel ran) and board power, which Slurm does not record. A line under each job gives the share of its allocated CPUs it kept
 busy (its CPU time over CPUs times elapsed time, as `seff` computes it; Slurm adds a
 step's CPU time when the step ends): a GPU job near 100% there while its GPUs idle is
 held back by its CPUs. The job is looked up in every cluster the accounting database holds,

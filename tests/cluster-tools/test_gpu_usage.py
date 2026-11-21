@@ -45,16 +45,20 @@ class FakePrometheus:
         if self.error:
             raise PrometheusError(self.error)
         fn, metric = re.search(r"(\w+)_over_time\((job_device:\w+:max)", expr).groups()
-        key = ("util" if "util" in metric else "memory") + ("_mean" if fn == "avg" else "_max")
+        name, unit = next((n, u) for n, s, u in gpu_usage.SERIES if s == metric)
+        key = f"{name}_{'mean' if fn == 'avg' else 'max'}{unit}"
         return [
             {"metric": {"host": host, "device": device}, "value": [at, str(figures[key])]}
             for (host, device), figures in self.gpus.items()
+            if key in figures
         ]
 
 
 GPU = {
-    ("gpu1", "nvidia3"): {"util_mean": 0.5, "util_max": 1.0, "memory_mean": 2**30, "memory_max": 2 * 2**30}
-}
+    ("gpu1", "nvidia3"): {"util_mean": 0.5, "util_max": 1.0, "sm_mean": 0.2, "sm_max": 0.4,
+                          "memory_mean_bytes": 2**30, "memory_max_bytes": 2 * 2**30,
+                          "power_mean_watts": 150.0, "power_max_watts": 300.0}
+}  # fmt: skip
 
 
 class ReportTests(unittest.TestCase):
@@ -148,7 +152,7 @@ class RenderTests(unittest.TestCase):
         r = gpu_usage.report(gpu_job(), "auto", FakePrometheus(GPU), 0)
         text = gpu_usage.render([r], theme)
         self.assertIn("gpu1/nvidia3", text)
-        self.assertRegex(text, r"50%\s+100%\s+1\.0G\s+2\.0G\s+prometheus")
+        self.assertRegex(text, r"50%\s+100%\s+20%\s+40%\s+1\.0G\s+2\.0G\s+150W\s+300W\s+prometheus")
         self.assertIn("AutoDetect=nvml", text)
         self.assertIn(f"  {gpu_usage.cpu_line(r)}\n", text)
 
