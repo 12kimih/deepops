@@ -1,0 +1,30 @@
+---
+- name: Check the textfile name
+  ansible.builtin.assert:
+    that: textfile_keep_name is match('^[a-z0-9][a-z0-9-]*$')
+    fail_msg: textfile_keep needs a name (lowercase, digits, dashes).
+    quiet: true
+
+- name: Create the kept and the live textfile directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ node_exporter_prom_keep_dir }}"
+    - "{{ node_exporter_prom_dir }}"
+
+# C copies only when the live file is missing: after a boot, never over a newer one.
+- name: Restore at every boot textfile {{ textfile_keep_name }}
+  ansible.builtin.copy:
+    dest: "/etc/tmpfiles.d/deepops-textfile-{{ textfile_keep_name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # roles/textfile_keep: {{ textfile_keep_name }}.prom back into node_exporter's tmpfs
+      # textfile directory at boot.
+      d {{ node_exporter_prom_dir }} 0755 root root -
+      C {{ node_exporter_prom_dir }}/{{ textfile_keep_name }}.prom - - - - {{ node_exporter_prom_keep_dir }}/{{ textfile_keep_name }}.prom

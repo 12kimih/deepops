@@ -1,0 +1,20 @@
+---
+- name: Check the textfile content
+  ansible.builtin.assert:
+    that: textfile_keep_content | length > 0
+    fail_msg: textfile_keep needs the file's content (a timer that writes it uses tasks_from restore).
+    quiet: true
+
+- name: Set up the restore at boot
+  ansible.builtin.include_tasks: restore.yml
+
+- name: Write the kept copy and the live file of textfile {{ textfile_keep_name }}
+  ansible.builtin.copy:
+    content: "{{ textfile_keep_content }}"
+    dest: "{{ item }}/{{ textfile_keep_name }}.prom"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "{{ node_exporter_prom_keep_dir }}"
+    - "{{ node_exporter_prom_dir }}"

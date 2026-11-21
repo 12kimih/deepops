@@ -199,7 +199,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── stale_files
 │   ├── standalone-container-registry
 │   ├── system_accounts
-│   └── textfile_static
+│   └── textfile_keep
 ```
 <!-- END GENERATED: role-tree -->
 
