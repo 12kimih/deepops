@@ -79,6 +79,13 @@ stale_files_host_rules:
     dirs: [/etc/apt/apt.conf.d]
     pattern: zzzz-temp-installer-unattended-upgrade
     contains: "unattended-upgrades run to avoid failing on battery power"
+  # A hand copy of roles/nfs's auto-restart drop-in under another name: it kept the old
+  # OnFailure= after the role's helper learnt to leave a hung nfsd alone.
+  - name: hand copies of the nfs-server auto-restart drop-in
+    type: files
+    dirs: [/etc/systemd/system/nfs-server.service.d]
+    pattern: '(?!auto-restart\.conf$).+\.conf'
+    contains: "OnFailure=nfs-server-restart"
   # What a task with backup: true writes beside a file on each change, never removed
   # (Ansible's own naming: <file>.<pid>.<YYYY-MM-DD@HH:MM:SS>~); tests/task-rules keeps
   # deepops from writing more.

@@ -18,6 +18,11 @@ StartLimitBurst={{ nfs_server_autorestart_retries }}
 
 [Service]
 Type=oneshot
+# OnFailure= fires on any failure, a stop that timed out too: on 2026-11-18 rpc.nfsd hung
+# in the kernel while stopping, and restarting a hung nfsd only stacks more stuck tasks.
+# Act only on a failed START (Result=exit-code) with no nfsd thread running and none
+# stuck in uninterruptible sleep; anything else is left to an operator.
+ExecCondition={{ nfs_server_start_failed_check }}
 # Delay between retries (acts like RestartSec): let memory pressure / package-upgrade
 # churn settle before retrying the start.
 ExecStartPre=/usr/bin/sleep {{ nfs_server_autorestart_delay }}

@@ -46,7 +46,8 @@ nfs_server_threads: 128
 # number of times. This turns a transient FAILED start -- classically rpc.nfsd exiting
 # ENOMEM when a package upgrade bounces the NFS stack -- from an indefinite outage into
 # a brief, self-healing blip, while still giving up after a few tries so a persistent
-# failure is surfaced instead of flapping. Behavior: on a failed start, retry every
+# failure is surfaced instead of flapping. Only a failed start with no nfsd thread
+# running and none stuck is retried: a stop that hangs in the kernel (2026-11-18) is not. Behavior: on a failed start, retry every
 # _delay seconds, up to _retries times (~_retries*_delay s total), then stop. The unit
 # enforces _interval > _retries*_delay (else the StartLimit window resets mid-sequence
 # and the cap never bites).
@@ -54,3 +55,5 @@ nfs_server_autorestart: true
 nfs_server_autorestart_retries: 10     # StartLimitBurst on the helper (max retries)
 nfs_server_autorestart_delay: 30       # seconds between retries (helper ExecStartPre sleep)
 nfs_server_autorestart_interval: 600   # StartLimitIntervalSec window; must exceed retries*delay
+# The helper's condition: a failed start, no nfsd running or stuck (files/).
+nfs_server_start_failed_check: /usr/local/sbin/nfs-server-start-failed
