@@ -1,11 +1,11 @@
 ---
 - name: Restart ondemand-dex
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: ondemand-dex
     state: restarted
 
 - name: Restart apache2
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: apache2
     state: restarted
 

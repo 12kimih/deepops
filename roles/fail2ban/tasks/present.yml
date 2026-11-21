@@ -59,7 +59,7 @@
   when: not ansible_check_mode  # under --check it may not be installed yet
 
 - name: Run fail2ban
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: fail2ban
     enabled: true
     state: started

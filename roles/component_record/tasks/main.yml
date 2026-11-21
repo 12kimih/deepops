@@ -61,7 +61,7 @@
       when: component_record_docker.stat.exists | default(false)
 
     - name: Look up units
-      ansible.builtin.systemd_service:
+      systemd_unit:
         name: "{{ item }}"
       loop: "{{ component_record_orphans.unit }}"
       register: component_record_units
@@ -69,7 +69,7 @@
       failed_when: false
 
     - name: Stop and disable units
-      ansible.builtin.systemd_service:
+      systemd_unit:
         name: "{{ item.item }}"
         state: stopped
         enabled: false
@@ -87,7 +87,7 @@
       register: component_record_files
 
     - name: Reload systemd after unit files went
-      ansible.builtin.systemd_service:
+      systemd_unit:
         daemon_reload: true
       when: >-
         component_record_files.results | select('changed') | map(attribute='item')

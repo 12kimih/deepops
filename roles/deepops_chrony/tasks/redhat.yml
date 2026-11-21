@@ -9,5 +9,8 @@
   register: ntpd_service_status
 
 - name: Stop and mask ntpd service
-  ansible.builtin.systemd: name=ntpd state=stopped masked=yes
+  systemd_unit:
+    name: ntpd
+    state: stopped
+    masked: true
   when: ntpd_service_status.stat.exists

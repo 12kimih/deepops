@@ -100,7 +100,7 @@
       register: egress_policy_metrics_units
 
     - name: Enable the metrics timer
-      ansible.builtin.systemd:
+      systemd_unit:
         name: egress-policy-metrics.timer
         enabled: true
         state: "{{ 'restarted' if egress_policy_metrics_units is changed else 'started' }}"

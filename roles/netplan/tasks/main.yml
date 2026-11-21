@@ -58,7 +58,7 @@
       check_mode: false
 
     - name: Mask it
-      ansible.builtin.systemd:
+      systemd_unit:
         name: "{{ netplan_conflicting_manager }}"
         state: stopped
         enabled: false

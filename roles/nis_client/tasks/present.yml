@@ -26,7 +26,7 @@
     quiet_install_packages: "{{ nis_client_packages + ['rpcbind'] }}"
 
 - name: Ensure rpcbind is running
-  ansible.builtin.service:
+  systemd_unit:
     name: rpcbind
     state: started
     enabled: true
@@ -82,7 +82,7 @@
 # is skipped under molecule (no server in the container).
 # https://wiki.debian.org/BullseyeNis
 - name: Make sure the NIS client (ypbind) is running
-  ansible.builtin.service:
+  systemd_unit:
     name: ypbind
     state: started
     enabled: true

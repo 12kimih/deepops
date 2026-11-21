@@ -66,7 +66,7 @@
 # metrics back at boot so the series never go absent until the next backup. Run
 # now too, so each configured destination is known before its first backup.
 - name: Republish the kept metrics at boot, and now
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurm-backup@publish.service
     enabled: true
     state: started
@@ -75,7 +75,7 @@
 
 # Under --check the unit files above are not written, so there is nothing to enable.
 - name: Enable the timers
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "slurm-backup-{{ item.command }}.timer"
     enabled: true
     state: started

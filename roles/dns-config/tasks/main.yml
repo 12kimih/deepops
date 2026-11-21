@@ -10,7 +10,7 @@
 # Ubuntu 18.04+ (including 22.04/24.04/26.04). Disable it so a static
 # /etc/resolv.conf can be written.
 - name: Disable systemd-resolved (Ubuntu 18.04+)
-  ansible.builtin.service:
+  systemd_unit:
     name: systemd-resolved
     state: stopped
     enabled: false

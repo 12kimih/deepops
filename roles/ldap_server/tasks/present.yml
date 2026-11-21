@@ -47,7 +47,7 @@
     cache_valid_time: 3600
 
 - name: Start slapd
-  ansible.builtin.service:
+  systemd_unit:
     name: slapd
     state: started
     enabled: true
@@ -142,7 +142,7 @@
   register: ldap_server_units
 
 - name: Run the backup daily
-  ansible.builtin.systemd_service:
+  systemd_unit:
     name: slapd-backup.timer
     state: started
     enabled: true

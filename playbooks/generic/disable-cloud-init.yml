@@ -35,7 +35,7 @@
       when: deepops_disable_cloud_init
 
     - name: Disable all systemd services
-      ansible.builtin.service:
+      systemd_unit:
         name: "{{ item }}"
         state: stopped
         enabled: false

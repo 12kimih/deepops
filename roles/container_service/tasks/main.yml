@@ -32,7 +32,7 @@
   notify: "{{ _container_service.notify }}"
 
 - name: Configure the service {{ _container_service.unit }}
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "{{ _container_service.unit }}"
     state: "{{ _container_service.state }}"
     enabled: "{{ _container_service.enabled }}"

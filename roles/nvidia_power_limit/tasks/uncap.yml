@@ -44,7 +44,7 @@
 # daemon_reload so a unit file that was dropped in but never loaded is still
 # known to systemd when it is stopped.
 - name: Stop and disable the GPU power-limit service
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "{{ nvidia_power_limit_service_name }}"
     state: stopped
     enabled: false

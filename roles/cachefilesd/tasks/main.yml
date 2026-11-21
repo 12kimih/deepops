@@ -28,7 +28,7 @@
 # restart fires only when the config above changed, so re-runs don't bounce the
 # daemon.
 - name: Start
-  ansible.builtin.service:
+  systemd_unit:
     name: cachefilesd
     state: started
     enabled: true
@@ -36,7 +36,7 @@
     - molecule-notest
 
 - name: Restart cachefilesd to apply config changes
-  ansible.builtin.service:
+  systemd_unit:
     name: cachefilesd
     state: restarted
   when: cachefilesd_default is changed or cachefilesd_conf is changed

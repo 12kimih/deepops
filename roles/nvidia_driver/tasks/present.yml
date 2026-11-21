@@ -171,14 +171,14 @@
 
 # Enabled now, whatever module runs: after a pending reboot it starts with the new one.
 - name: Enable the NVIDIA persistence daemon at boot
-  ansible.builtin.systemd:
+  systemd_unit:
     name: nvidia-persistenced
     enabled: true
     daemon_reload: true
   when: nvidia_driver_persistenced | bool
 
 - name: Start the NVIDIA persistence daemon
-  ansible.builtin.systemd:
+  systemd_unit:
     name: nvidia-persistenced
     state: started
   when:
@@ -206,13 +206,13 @@
 # NVSwitch HGX baseboards require Fabric Manager, branch-matched to the driver.
 # https://docs.nvidia.com/datacenter/tesla/fabric-manager-user-guide/index.html
 - name: Enable NVIDIA Fabric Manager at boot
-  ansible.builtin.systemd:
+  systemd_unit:
     name: nvidia-fabricmanager
     enabled: true
   when: nvidia_driver_fabricmanager | bool
 
 - name: Start NVIDIA Fabric Manager
-  ansible.builtin.systemd:
+  systemd_unit:
     name: nvidia-fabricmanager
     state: started
   when:

@@ -3,7 +3,7 @@
 # Ubuntu (there is no nis.service since Debian bullseye / Ubuntu 20.04) and ypbind on
 # the RHEL family. https://wiki.debian.org/BullseyeNis
 - name: Restart nis
-  ansible.builtin.service:
+  systemd_unit:
     name: ypbind
     state: restarted
     enabled: true

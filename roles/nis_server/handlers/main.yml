@@ -1,6 +1,6 @@
 ---
 - name: Restart ypserv
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ nis_server_service }}"
     state: restarted
     enabled: true

@@ -15,7 +15,7 @@
     - ((docker_socket_group_unit | default({})).rc | default(1)) == 0
 
 - name: Restart dockerd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: docker
     state: restarted
   when: docker_daemon_restart | bool

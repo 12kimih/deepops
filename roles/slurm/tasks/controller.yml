@@ -43,7 +43,7 @@
 # and it must survive a reboot). On Debian the apt preset starts it but does not
 # guarantee enablement.
 - name: Start mariadb
-  ansible.builtin.systemd:
+  systemd_unit:
     name: mariadb
     state: started
     enabled: true
@@ -281,7 +281,7 @@
   ansible.builtin.meta: flush_handlers
 
 - name: Start slurmdbd
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurmdbd
     state: started
     enabled: true
@@ -346,7 +346,7 @@
   loop: "{{ slurm_acct_users }}"
 
 - name: Start slurmctld
-  ansible.builtin.systemd:
+  systemd_unit:
     name: slurmctld
     state: started
     enabled: true

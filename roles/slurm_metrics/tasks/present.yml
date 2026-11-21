@@ -27,7 +27,7 @@
   notify: Restart slurm metrics timer
 
 - name: Enable the metrics timer
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "{{ slurm_metrics_svc_name }}.timer"
     state: started
     enabled: true

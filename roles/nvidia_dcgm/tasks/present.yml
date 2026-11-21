@@ -72,7 +72,7 @@
 
 # DCGM 4 ships nvidia-dcgm.service (dcgm.service was the 2.x/3.x name).
 - name: Start the nvidia-dcgm service
-  ansible.builtin.systemd:
+  systemd_unit:
     daemon_reload: true
     name: nvidia-dcgm.service
     state: started

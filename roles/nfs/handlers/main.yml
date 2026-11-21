@@ -1,6 +1,6 @@
 ---
 - name: Reload systemd
-  ansible.builtin.systemd:
+  systemd_unit:
     daemon_reload: true
 
 # Live, without a restart: a running nfsd changes its thread count in place.

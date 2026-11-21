@@ -1,6 +1,6 @@
 ---
 - name: Restart sssd
-  ansible.builtin.service:
+  systemd_unit:
     name: sssd
     state: restarted
   notify: Flush the sssd cache

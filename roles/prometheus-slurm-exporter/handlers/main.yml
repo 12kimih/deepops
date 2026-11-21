@@ -1,5 +1,5 @@
 ---
 - name: Restart slurm-exporter
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ slurm_exporter_svc_name }}"
     state: restarted

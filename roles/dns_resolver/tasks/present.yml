@@ -33,7 +33,7 @@
 
 # Under --check the package and file above may not exist yet.
 - name: Run unbound
-  ansible.builtin.systemd:
+  systemd_unit:
     name: unbound
     enabled: true
     state: "{{ 'restarted' if dns_resolver_conf is changed else 'started' }}"
@@ -83,7 +83,7 @@
   register: dns_resolver_dropin
 
 - name: Restart systemd-resolved
-  ansible.builtin.systemd:
+  systemd_unit:
     name: systemd-resolved
     state: restarted
   when: dns_resolver_dropin is changed and not ansible_check_mode

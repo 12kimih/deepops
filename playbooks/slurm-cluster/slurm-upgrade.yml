@@ -84,7 +84,7 @@
       when: inventory_hostname == groups['slurm-master'][0]
 
     - name: Stop slurmctld and slurmdbd for the upgrade
-      ansible.builtin.systemd:
+      systemd_unit:
         name: "{{ item }}"
         state: stopped
       loop: [slurmctld, slurmdbd]

@@ -103,7 +103,7 @@
     host_baseline_absent_packages: "{{ directory_remove_caches }}"
 
 - name: Start SSSD
-  ansible.builtin.service:
+  systemd_unit:
     name: sssd
     state: started
     enabled: true

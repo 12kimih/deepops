@@ -17,7 +17,7 @@
   when: ansible_facts.os_family == "RedHat"
 
 - name: Ensure the Docker service is enabled and running
-  ansible.builtin.systemd:
+  systemd_unit:
     name: docker
     state: "{{ docker_service_state }}"
     enabled: "{{ docker_service_enabled }}"
@@ -98,7 +98,7 @@
       register: docker_retired_removed
 
     - name: Reload systemd without them
-      ansible.builtin.systemd_service:
+      systemd_unit:
         daemon_reload: true
       when: docker_retired_removed is changed
 
@@ -166,7 +166,7 @@
 
     # Under --check the unit files above are not written, so there is nothing to enable.
     - name: Enable the image prune timer
-      ansible.builtin.systemd:
+      systemd_unit:
         name: docker-image-prune.timer
         enabled: true
         state: started

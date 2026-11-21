@@ -28,7 +28,7 @@
     - Restart munge
 
 - name: Start munge
-  ansible.builtin.service:
+  systemd_unit:
     name: munge
     enabled: true
     state: started

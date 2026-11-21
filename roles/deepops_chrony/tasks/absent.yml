@@ -32,7 +32,7 @@
         cache_valid_time: 3600
 
     - name: Start systemd-timesyncd
-      ansible.builtin.systemd_service:
+      systemd_unit:
         name: systemd-timesyncd
         state: started
         enabled: true

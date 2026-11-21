@@ -1,5 +1,5 @@
 ---
 - name: Restart node-exporter
-  ansible.builtin.service:
+  systemd_unit:
     name: "{{ node_exporter_svc_name }}"
     state: restarted

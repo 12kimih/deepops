@@ -122,7 +122,7 @@
         ansible_check_mode or ('already exists' not in slurm_rename_add.stdout)
 
     - name: Stop slurmctld
-      ansible.builtin.systemd:
+      systemd_unit:
         name: slurmctld
         state: stopped
 
@@ -148,13 +148,13 @@
     - role: slurm_paths
   tasks:
     - name: Restart slurmd, which fetches the new configuration
-      ansible.builtin.systemd:
+      systemd_unit:
         name: slurmd
         state: restarted
       when: is_compute
 
     - name: Restart sackd, which fetches the new configuration
-      ansible.builtin.systemd:
+      systemd_unit:
         name: sackd
         state: restarted
       when: not is_compute

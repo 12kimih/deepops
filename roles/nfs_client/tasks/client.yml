@@ -31,7 +31,7 @@
 # systemd-fstab-generator only re-reads /etc/fstab on daemon-reload, so without this the
 # entries written above stay invisible until the node reboots.
 - name: Regenerate the mount units from /etc/fstab
-  ansible.builtin.systemd:
+  systemd_unit:
     daemon_reload: true
   when: nfs_client_fstab is changed
   tags:
@@ -63,7 +63,7 @@
     - nfs
 
 - name: Enable the shutdown-time NFS detach unit
-  ansible.builtin.systemd:
+  systemd_unit:
     name: "{{ nfs_client_detach_unit }}"
     enabled: true
     state: started
