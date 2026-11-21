@@ -6,7 +6,7 @@
       - dns_resolver_upstreams | networks_invalid | length == 0
       - dns_resolver_upstreams | select('search', '/') | list | length == 0
       - (dns_resolver_blocked_domains + dns_resolver_blocked_domains_site)
-        | reject('match', '^([A-Za-z0-9-]+\.)+[A-Za-z0-9-]+$') | list | length == 0
+        | reject('match', '^([A-Za-z0-9-]+\\.)+[A-Za-z0-9-]+$') | list | length == 0
     fail_msg: >-
       dns_resolver_state is present, absent or kept, dns_resolver_upstreams lists IP
       addresses, and the blocked domains are plain names (no wildcard, no trailing dot).

@@ -45,7 +45,7 @@
   ansible.builtin.assert:
     that:
       - egress_policy_nameservers | length > 0
-      - egress_policy_nameservers[0] is match('127\.|::1$')
+      - egress_policy_nameservers[0] is match('127\\.|::1$')
     fail_msg: >-
       /etc/resolv.conf names {{ egress_policy_nameservers | join(', ') or 'no resolver' }}
       first, so users, who may send DNS only to this host's own resolver, would have

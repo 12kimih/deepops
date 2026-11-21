@@ -69,6 +69,10 @@
    changed_when, failed_when and until that read its own result are guarded, since
    under --check nothing ran: `ansible_check_mode or (...)` for changed_when and until,
    `not ansible_check_mode and (...)` for failed_when.
+20. A condition (when, changed_when, failed_when, until, an assert's that) spells only
+   escapes Python knows in its string literals: Jinja unescapes them there (rule 13's
+   other half), so `match('^\\\\S+\\\\s')` is the regex `^\\S+\\s`, and a single `\\s`
+   is an invalid escape that Python deprecates and will refuse.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -107,6 +111,39 @@ SECRET = re.compile(
     r"\{\{[^}]*(password|passwd|_token|\btoken\b|secret|webhook|api_key|_pass\b|heartbeat_url|munge_key)[^}]*\}\}"
 )
 MINIMUM_FILES = 200  # a scan that sees fewer has lost its way
+
+
+# A backslash in a Python string literal that does not start a known escape.
+INVALID_ESCAPE = re.compile(r"\\(?:\\|[\n'\"abfnrtv0-7xuUN]|(.))", re.S)
+CONDITION_KEYS = ("when", "changed_when", "failed_when", "until")
+
+
+def condition_strings(task):
+    """A task's conditions as written: its when/changed_when/failed_when/until and, for
+    an assert, its that."""
+    found = [task.get(key) for key in CONDITION_KEYS]
+    name, args = module(task)
+    if name == "assert":
+        found.append(args.get("that"))
+    for value in found:
+        for cond in value if isinstance(value, list) else [value]:
+            if isinstance(cond, str):
+                yield cond
+
+
+def invalid_escapes(cond):
+    """The invalid escapes in COND's string literals (a condition is an expression)."""
+    try:
+        tokens = list(JINJA.lex("{{ " + cond + " }}"))
+    except jinja2.TemplateSyntaxError:
+        return []
+    return [
+        m.group(0)
+        for _, kind, value in tokens
+        if kind == "string"
+        for m in INVALID_ESCAPE.finditer(value)
+        if m.group(1) is not None
+    ]
 
 
 # Attributes of registered results and facts that hold a number, string or list.
@@ -731,6 +768,18 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {key}: {value}")
         self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
         scan.check(self)
+
+    def test_conditions_spell_only_known_escapes(self):
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                for cond in condition_strings(task):
+                    if invalid_escapes(cond):
+                        offenders.append(f"{rel(path)}: {task.get('name')}: {cond[:80]}")
+        self.assertEqual(offenders, [], "double the backslash: a condition's string literals are unescaped")
+        scan.check(self)
+        self.assertEqual(invalid_escapes(r"x is match('^[^@\s]+$')"), [r"\s"])
+        self.assertEqual(invalid_escapes(r"x is match('^[^@\\s]+\t$')"), [])
 
     def test_templates_in_yaml_hold_single_backslashes(self):
         jinja = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)

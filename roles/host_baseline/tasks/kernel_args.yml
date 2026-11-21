@@ -14,7 +14,7 @@
   ansible.builtin.assert:
     that:
       - host_baseline_kernel_args_owner is match('^[a-z0-9][a-z0-9-]*$')
-      - host_baseline_kernel_args | select('search', '[\s"\']') | list | length == 0
+      - host_baseline_kernel_args | select('search', '[\\s"\']') | list | length == 0
     fail_msg: >-
       kernel_args takes an owner (lowercase, digits, -) and arguments without spaces or
       quotes.
