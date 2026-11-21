@@ -36,39 +36,12 @@
         maintenance_gpus.rc != 0 or
         maintenance_gpus.stdout_lines | select('match', 'GPU [0-9]') | list | length < maintenance_gpus_expected | int
 
-# A service that does not come up fails the node with its journal from this boot,
-# which says why; its systemd properties do not.
+# Every service up, within five minutes of the boot.
 - name: Wait for the node's services
-  ansible.builtin.command:
-    argv: [systemctl, is-active, "{{ item }}"]
-  register: maintenance_unit
-  until: maintenance_unit.stdout == 'active'
-  retries: 30
-  delay: 10
-  changed_when: false
-  failed_when: false
-  loop: "{{ maintenance_verify_units }}"
-  when: not ansible_check_mode
-
-- name: Read the journal of each service that did not start
-  ansible.builtin.command:
-    argv: [journalctl, --boot, --unit, "{{ item.item }}", --lines, "40", --no-pager, --output, short-precise]
-  register: maintenance_unit_journal
-  changed_when: false
-  loop: "{{ maintenance_unit.results | default([]) | selectattr('stdout', 'defined') | rejectattr('stdout', 'eq', 'active') }}"
-  loop_control:
-    label: "{{ item.item }}"
-  when: not ansible_check_mode
-
-- name: Fail on each service that did not start
-  ansible.builtin.fail:
-    msg: |-
-      {{ item.item.item }} is {{ item.item.stdout }} five minutes after the boot. Its journal:
-      {{ item.stdout }}
-  loop: "{{ maintenance_unit_journal.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.item }}"
-  when: not ansible_check_mode
+  ansible.builtin.include_tasks: unit_healthy.yml
+  vars:
+    maintenance_healthy_units: "{{ maintenance_verify_units }}"
+    maintenance_healthy_wait: 300
 
 # Slurm must see the node as declared: when the slurmd started above registers, a GRES
 # it finds unlike slurm.conf (a GPU missing, another type) marks the node INVALID_REG

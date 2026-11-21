@@ -13,13 +13,39 @@
   tags:
     - bmc
 
-# netplan only; a host that manages networking another way is left alone.
-- name: Configure the interface facing the BMC network
-  ansible.builtin.template:
-    src: netplan-bmc-mgmt.yaml.j2
-    dest: /etc/netplan/60-bmc-mgmt.yaml
-    mode: "0600"
+- name: Read the BMC network file
+  ansible.builtin.slurp:
+    src: /etc/netplan/60-bmc-mgmt.yaml
+  register: bmc_netplan_current
+  failed_when: false  # not written yet
   when: bmc_netplan.stat.isdir | default(false)
-  notify: Apply netplan
+  tags:
+    - bmc
+
+# Rendered here: an include argument is evaluated in the included role, which would
+# look for the template among roles/netplan's.
+- name: Render the BMC network file
+  ansible.builtin.set_fact:
+    bmc_mgmt_netplan: "{{ lookup('ansible.builtin.template', 'netplan-bmc-mgmt.yaml.j2') }}"
+  tags:
+    - bmc
+
+# netplan only; a host that manages networking another way is left alone. Compared as
+# data, and applied through roles/netplan, which can always go back: this is the
+# network Ansible reaches the host over.
+- name: Configure the interface facing the BMC network
+  ansible.builtin.include_role:
+    name: netplan
+    tasks_from: apply
+    apply:
+      tags: [bmc]
+  vars:
+    netplan_apply_file: /etc/netplan/60-bmc-mgmt.yaml
+    netplan_apply_content: "{{ bmc_mgmt_netplan }}"
+  when:
+    - bmc_netplan.stat.isdir | default(false)
+    - >-
+      (bmc_netplan_current.content | default('') | b64decode | from_yaml or {}).network | default({})
+      != (bmc_mgmt_netplan | from_yaml).network
   tags:
     - bmc

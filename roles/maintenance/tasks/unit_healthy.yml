@@ -1,0 +1,38 @@
+---
+# The one check that services run after they were (re)started (include_role:
+# maintenance, tasks_from: unit_healthy, after the handlers that restart them ran):
+#   maintenance_healthy_units    the units
+#   maintenance_healthy_wait     seconds each may take to become active (default 60)
+# A unit that does not come up fails the host with its last journal lines, which say
+# why; its systemd properties do not. Under --check nothing was restarted: skipped.
+- name: Wait for the services to run
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ item }}"]
+  register: maintenance_healthy
+  until: maintenance_healthy.stdout == 'active'
+  retries: "{{ ((maintenance_healthy_wait | default(60) | int) / 5) | round(0, 'ceil') | int }}"
+  delay: 5
+  changed_when: false
+  failed_when: false
+  loop: "{{ maintenance_healthy_units }}"
+  when: not ansible_check_mode
+
+- name: Read the journal of each service that does not run
+  ansible.builtin.command:
+    argv: [journalctl, --unit, "{{ item.item }}", --lines, "40", --no-pager, --output, short-precise]
+  register: maintenance_healthy_journal
+  changed_when: false
+  loop: "{{ maintenance_healthy.results | default([]) | selectattr('stdout', 'defined') | rejectattr('stdout', 'eq', 'active') }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not ansible_check_mode
+
+- name: Fail on each service that does not run
+  ansible.builtin.fail:
+    msg: |-
+      {{ item.item.item }} is {{ item.item.stdout }} after {{ maintenance_healthy_wait | default(60) }} s. Its journal:
+      {{ item.stdout }}
+  loop: "{{ maintenance_healthy_journal.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.item }}"
+  when: not ansible_check_mode
