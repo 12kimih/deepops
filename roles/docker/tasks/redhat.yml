@@ -23,6 +23,7 @@
       legacy_files: [/etc/yum.repos.d/docker-ce.repo]  # this role wrote it before
 
 - name: Install Docker Engine + plugins
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ docker_packages | map('regex_replace', '^(docker-ce|docker-ce-cli)$', '\\1-' ~ docker_engine_version) | list }}"
     state: present

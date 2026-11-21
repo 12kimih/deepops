@@ -95,7 +95,8 @@
       when: not item.stat.exists
 
 - name: Install the pinned packages
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ open_ondemand_packages }}"
     state: present
     update_cache: true

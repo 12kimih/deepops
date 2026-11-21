@@ -96,7 +96,8 @@
   when: nvidia_driver_install_method == 'nvidia_repo'
 
 - name: Install the NVIDIA driver from the Ubuntu archive
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ nvidia_driver_packages_resolved }}"
     state: present
     install_recommends: false
@@ -115,14 +116,16 @@
 # Ubuntu drops the branch suffix from the driver package name.
 # https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/version-locking.html
 - name: Pin the NVIDIA driver branch (Ubuntu, nvidia_repo)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "nvidia-driver-pinning-{{ nvidia_driver_branch }}"
     state: present
     update_cache: true
   when: nvidia_driver_install_method == 'nvidia_repo'
 
 - name: Install the NVIDIA driver from the NVIDIA repo (Ubuntu, nvidia_repo)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ 'nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers' }}"
     state: present
     update_cache: true
@@ -140,7 +143,8 @@
 
 # --- Fabric Manager (opt-in, NVSwitch HGX) -----------------------------------
 - name: Install NVIDIA Fabric Manager and NSCQ (Ubuntu)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ ['nvidia-fabricmanager', 'libnvidia-nscq'] | map('regex_replace', '$', _suffix) | list }}"
     state: present
     update_cache: true

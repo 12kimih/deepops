@@ -305,3 +305,14 @@
     - package_repos_changed | bool
     - ansible_facts.os_family == 'Debian'
     - not ansible_check_mode
+
+# Under --check the repository is neither written nor indexed, so its packages are
+# unknown to apt and dnf: repo_package (plugins/action) previews an install that fails
+# for that instead of failing the run.
+- name: Note a repository this preview adds unindexed
+  ansible.builtin.set_fact:
+    package_repos_unrefreshed: "{{ package_repos_unrefreshed | default([]) | union([package_repos_r.name]) }}"
+  when:
+    - ansible_check_mode
+    - package_repos_changed | bool
+    - package_repos_state == 'present'

@@ -12,7 +12,8 @@
     host_baseline_absent_packages: "{{ _dcgm_other_packages }}"
 
 - name: Ubuntu | install package
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ dcgm_pkg_name }}"
     state: "present"
     install_recommends: true  # the diagnostics (NVIDIA's install guide)

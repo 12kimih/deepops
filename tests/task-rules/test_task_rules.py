@@ -706,6 +706,38 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "list files with repo_files.tracked (tests: repo_scan.tracked)")
         self.assertGreater(len(tracked("*.py")), 50)
 
+    def test_a_role_that_adds_a_repository_installs_with_repo_package(self):
+        # package_repos adds a repository under --check without indexing it, so apt and
+        # dnf did not know its packages and every first-deploy preview failed at the
+        # install (Slurm, Docker, the NVIDIA stack). repo_package previews that install
+        # instead; a role adding a repository installs every package through it.
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        files = [scan.seen(p) for p in ansible_files()]
+        adders = set()
+        for path in files:
+            for task in tasks(path):
+                name, args = module(task)
+                if name in ("include_role", "import_role") and args.get("name") == "package_repos":
+                    if args.get("tasks_from") in ("repo", "cuda", "epel") and rel(path).startswith("roles/"):
+                        adders.add(rel(path).split("/")[1])
+        for path in files:
+            parts = rel(path).split("/")
+            if (
+                parts[0] != "roles"
+                or parts[1] not in adders
+                or parts[2] != "tasks"
+                or parts[1] == "package_repos"
+            ):
+                continue
+            for task in tasks(path):
+                name, args = module(task)
+                if name in ("apt", "dnf", "yum", "package") and "name" in args and not args.get("deb"):
+                    if str(args.get("state", "present")) in ("present", "latest", "installed"):
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertGreater(len(adders), 5, "the scan finds the roles that add a repository")
+        self.assertEqual(offenders, [], "install with repo_package (plugins/action/repo_package.py)")
+        scan.check(self)
+
     def test_only_host_baseline_sets_kernel_settings(self):
         # A sysctl written straight to a file was undone at boot by a later file (a hand
         # line in /etc/sysctl.conf) while the running value looked right; the shared

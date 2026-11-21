@@ -25,7 +25,7 @@
 # first in NVIDIA's open kernel module support list is 0x1E02), every older one below.
 # Taking an unanswered query for "no old GPU" put the wrong build on Pascal and Volta.
 - name: Install lspci
-  ansible.builtin.package:
+  repo_package:
     name: pciutils
     state: present
   when: dcgm_compute_caps.rc != 0

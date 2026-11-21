@@ -79,7 +79,7 @@ class GraphicsDispatchers(unittest.TestCase):
                   "ansible_facts": {"os_family": family, "distribution": distribution}}  # fmt: skip
         if not condition(self.TASK["when"], values):
             return []
-        return render(self.TASK["package"]["name"], values)
+        return render(self.TASK["repo_package"]["name"], values)
 
     def test_the_full_driver_keeps_every_dispatcher_by_name(self):
         got = self.installs()

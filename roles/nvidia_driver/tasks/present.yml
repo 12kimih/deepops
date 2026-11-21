@@ -22,7 +22,7 @@
 # name they are the host's own; never in the component's record, other software needs
 # them too. Apart from the driver's install: libraries, no reboot.
 - name: Install the graphics dispatchers the driver plugs into
-  ansible.builtin.package:
+  repo_package:
     name: "{{ nvidia_driver_graphics_dispatchers }}"
     state: present
   when: nvidia_driver_graphics | bool

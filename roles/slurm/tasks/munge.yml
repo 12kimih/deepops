@@ -1,6 +1,6 @@
 ---
 - name: Install munge
-  ansible.builtin.package:
+  repo_package:
     name: munge
     state: present
   notify:

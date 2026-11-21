@@ -19,6 +19,6 @@
     tasks_from: cuda
 
 - name: Ubuntu | install cuda
-  ansible.builtin.package:
+  repo_package:
     name: "{{ cuda_version }}"
     state: present

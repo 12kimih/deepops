@@ -11,7 +11,8 @@
 # Prerequisites named by the official install guide (ca-certificates, gnupg2 -- we
 # use get_url instead of curl). https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 - name: Ubuntu | install repository prerequisites
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name:
       - ca-certificates
       - gnupg2
@@ -40,7 +41,8 @@
         - /usr/share/keyrings/nvidia-container-toolkit-keyring.asc
 
 - name: Ubuntu | install NVIDIA Container Toolkit
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     # apt pins as pkg=version; an empty version installs the latest.
     name: "{{ nvidia_container_toolkit_packages | map('regex_replace', '$', _version_suffix) | list }}"
     state: present

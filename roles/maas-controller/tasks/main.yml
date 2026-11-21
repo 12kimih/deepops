@@ -32,7 +32,8 @@
         - "/etc/apt/trusted.gpg.d/{{ maas_ppa_dir }}.gpg"
 
 - name: Install MAAS
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: maas
     state: present
     update_cache: true

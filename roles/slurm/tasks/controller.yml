@@ -1,6 +1,7 @@
 ---
 - name: Install dependencies (Debian)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     update_cache: true
     cache_valid_time: 3600
     name: "{{ item }}"
@@ -11,7 +12,8 @@
   when: ansible_facts.os_family == "Debian"
 
 - name: Install dependencies (RedHat)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ item }}"
     state: present
   with_items:

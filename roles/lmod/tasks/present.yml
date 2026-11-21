@@ -18,7 +18,8 @@
   when: ansible_facts.os_family == "RedHat"
 
 - name: Install Lmod's prerequisites (Debian)
-  ansible.builtin.apt:
+  repo_package:
+    use: apt
     name: "{{ lmod_build_deps }}"
     state: present
     update_cache: true
@@ -27,7 +28,8 @@
 # EPEL's Lua packages expect CodeReady Builder for their dependencies: "powertools" on
 # EL8, "crb" on EL9+.
 - name: Install Lmod's prerequisites (RHEL family)
-  ansible.builtin.dnf:
+  repo_package:
+    use: dnf
     name: "{{ lmod_build_deps }}"
     state: present
     enablerepo: "{{ 'powertools' if ansible_facts.distribution_major_version == '8' else 'crb' }}"
