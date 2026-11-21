@@ -287,3 +287,26 @@ tests:
             exp_annotations:
               summary: "n1 has reported no update status for 3 days"
               description: "`systemctl status os-updates-metrics.timer` and `journalctl -u os-updates-metrics` on the host."
+
+  - name: a user over their soft disk quota for a day is reported, one under it is not
+    interval: 1h
+    input_series:
+      - series: 'disk_quota_used_bytes{host="login", instance="login:9100", filesystem="/", user="alice"}'
+        values: '15x30'
+      - series: 'disk_quota_limit_bytes{host="login", instance="login:9100", filesystem="/", user="alice", kind="soft"}'
+        values: '10x30'
+      - series: 'disk_quota_used_bytes{host="login", instance="login:9100", filesystem="/", user="bob"}'
+        values: '5x30'
+      - series: 'disk_quota_limit_bytes{host="login", instance="login:9100", filesystem="/", user="bob", kind="soft"}'
+        values: '10x30'
+    alert_rule_test:
+      - eval_time: 23h
+        alertname: DiskQuotaOverSoftLimit
+        exp_alerts: []
+      - eval_time: 25h
+        alertname: DiskQuotaOverSoftLimit
+        exp_alerts:
+          - exp_labels: {severity: info, host: login, instance: "login:9100", filesystem: /, user: alice}
+            exp_annotations:
+              summary: "alice has been over their soft disk quota on login:/ for a day"
+              description: "Once the grace period ends the user can write nothing more there. `quota -s alice` on the host shows it; the person frees space, or gets a larger disk_quota in people.yml."

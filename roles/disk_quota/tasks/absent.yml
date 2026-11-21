@@ -1,0 +1,41 @@
+---
+# The limits and quotas go first, with the command that knows them; the record then
+# removes the command, its units, its configuration and the quota tools. The mount
+# keeps its quota options until the next boot (ext4 does not change them on a remount).
+- name: Take the quotas away
+  when: not deepops_containerized | bool
+  block:
+    - name: Look for the disk quota command and its configuration
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: ["{{ _disk_quota_command }}", "{{ _disk_quota_config }}"]
+      register: disk_quota_found
+
+    - name: Work out the removal steps
+      ansible.builtin.command:
+        argv: ["{{ _disk_quota_command }}", "{{ _disk_quota_config }}", remove, --check]
+      register: disk_quota_plan
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when: disk_quota_found.results | selectattr('stat.exists') | list | length == 2
+
+    - name: Show the removal steps
+      ansible.builtin.debug:
+        var: disk_quota_plan.stdout_lines
+      when: disk_quota_plan.stdout | default('') | length > 0
+
+    - name: Remove the quotas
+      change_command:
+        argv: ["{{ _disk_quota_command }}", "{{ _disk_quota_config }}", remove]
+      register: disk_quota_remove
+      changed_when: ansible_check_mode or (disk_quota_remove.stdout | length > 0)
+      when: disk_quota_plan.stdout | default('') | length > 0
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: disk_quota
+    component_record_action: absent
+    component_record_items: "{{ disk_quota_items }}"
+    component_record_exclusive_packages: [quota]

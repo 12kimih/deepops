@@ -68,6 +68,8 @@ ABSENT_OK = {
     # A backup's results; until then its configured time stands in (rules/backup.yml).
     "after the first run": r"slurm_backup_(restore_test_)?(status|last_\w+)",
     "optional component": r".+_tls_cert_not_after_seconds",  # a service that serves TLS (rules/tls.yml)
+    # Usage is counted from the start; limits exist once the site sets some (roles/disk_quota).
+    "only with limits": r"disk_quota_limit_(bytes|inodes)",
     "Prometheus' own": r"ALERTS|ALERTS_FOR_STATE",
 }
 
@@ -93,6 +95,7 @@ SOURCES = {
     "os_updates": r"os_updates_\w+",
     "container_storage_gc": r"container_storage_gc_\w+",
     "egress_policy": r"egress_policy_\w+",
+    "disk_quota": r"disk_quota_\w+",
     "nfs": r"nfs_export_\w+",  # what roles/nfs exports (roles/textfile_keep)
     "tls": r"\w+_tls_cert_\w+",  # each service's certificate (rules/tls.yml)
     "prometheus": r"prometheus_\w+|up|scrape_\w+|ALERTS|ALERTS_FOR_STATE",

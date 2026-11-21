@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: disk_quota_state in ['present', 'absent', 'kept']
+    fail_msg: "disk_quota_state must be present, absent or kept, not {{ disk_quota_state }}."
+    quiet: true
+
+- name: "Make per-user disk quotas {{ disk_quota_state }}"
+  ansible.builtin.include_tasks: "{{ disk_quota_state }}.yml"
+  when: disk_quota_state != 'kept'

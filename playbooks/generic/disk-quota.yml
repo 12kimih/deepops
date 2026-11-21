@@ -1,0 +1,16 @@
+---
+# Per-user disk quotas (roles/disk_quota). Every host it runs on converges to
+# deepops_components (present on slurm-login while slurm_enable_disk_quota is on,
+# removed elsewhere). The quota mount options come from host_baseline_mount_options
+# (playbooks that run host_baseline set and remount them); the first run then counts
+# every user's files (quotacheck): preview it.
+#
+#   ansible-playbook -K playbooks/generic/disk-quota.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: disk_quota
+      disk_quota_state: "{{ deepops_components.disk_quota | component_phase(deepops_phase) }}"
+  tags:
+    - disk-quota

@@ -1,0 +1,100 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: disk_quota
+    component_record_action: begin
+    component_record_items: "{{ disk_quota_items }}"
+
+- name: Install the quota tools
+  ansible.builtin.package:
+    name: quota
+    state: present
+
+- name: Install the disk quota command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ _disk_quota_command }}"
+      module: clustertools.disk_quota
+
+- name: Create the cluster tools configuration directory
+  ansible.builtin.file:
+    path: "{{ _disk_quota_config | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Names the roster's users and their limits: root's to read.
+- name: Write the disk quota configuration
+  ansible.builtin.copy:
+    dest: "{{ _disk_quota_config }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: "{{ _disk_quota_cfg | to_nice_json }}\n"
+
+# A container's filesystems are the host's: it never remounts or limits them.
+- name: Set up the quotas
+  when: not deepops_containerized | bool
+  block:
+    - name: Look for the disk quota command
+      ansible.builtin.stat:
+        path: "{{ _disk_quota_command }}"
+      register: disk_quota_installed
+
+    # The steps apply would take, from the configuration above (on standard input, so a
+    # preview shows them before the file is written); a command not installed yet, under
+    # --check, has none to show.
+    - name: Work out the quota steps
+      ansible.builtin.command:
+        argv: ["{{ _disk_quota_command }}", "-", apply, --check]
+        stdin: "{{ _disk_quota_cfg | to_json }}"
+      register: disk_quota_plan
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when: disk_quota_installed.stat.exists
+
+    - name: Show the quota steps
+      ansible.builtin.debug:
+        var: disk_quota_plan.stdout_lines
+      when: disk_quota_plan.stdout | default('') | length > 0
+
+    # Remounting the filesystem with its quota options, quotacheck, quotaon, the grace
+    # period and each user's limits, as the steps above say.
+    - name: Apply the quota steps
+      change_command:
+        argv: ["{{ _disk_quota_command }}", "{{ _disk_quota_config }}", apply]
+      register: disk_quota_apply
+      changed_when: ansible_check_mode or (disk_quota_apply.stdout | length > 0)
+      when: disk_quota_plan.stdout | default('') | length > 0
+
+- name: Install the usage metrics units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _disk_quota_units }}"
+  register: disk_quota_units
+
+- name: Export the usage metrics regularly
+  systemd_unit:
+    name: disk-quota-metrics.timer
+    enabled: true
+    state: "{{ 'restarted' if disk_quota_units is changed else 'started' }}"
+    daemon_reload: true
+  when: not deepops_containerized | bool
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: disk_quota
+    component_record_action: present
+    component_record_items: "{{ disk_quota_items }}"

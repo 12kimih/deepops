@@ -10,3 +10,19 @@
 #  CPUQuota: "1200%"   # 12 cores
 #  MemoryMax: 64G
 #  TasksMax: 4096
+
+# Per-user disk quotas on the login nodes' local disks (roles/disk_quota; switch
+# slurm_enable_disk_quota): everyone in the roster, administrators too (their own
+# accounts; sudo is root's), never root or the system accounts. {} only counts, for the
+# disk_quota_* metrics to show how the space is used before you choose limits; a
+# person's disk_quota in people.yml overrides these. The filesystem needs its quota
+# mount options in host_baseline_mount_options (the role stops, naming them, without):
+#host_baseline_mount_options: {"/": "defaults,noatime,errors=remount-ro,usrjquota=aquota.user,jqfmt=vfsv1"}  # example
+#disk_quota_filesystems: [/]
+#disk_quota_limits: {}
+#disk_quota_limits:  # example
+#  block_soft: 10G
+#  block_hard: 20G
+#  inode_soft: 200k
+#  inode_hard: 500k
+#disk_quota_grace_days: 7
