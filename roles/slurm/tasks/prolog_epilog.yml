@@ -1,11 +1,10 @@
 ---
 - name: Install dependencies (Debian)
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    name: "{{ item }}"
-  with_items:
-    - linux-tools-{{ ansible_facts.kernel }} # for cpupower, used in prolog+epilog
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_packages
+  vars:
+    host_baseline_kernel_packages: [tools]  # for cpupower, used in prolog+epilog
   when: ansible_facts.os_family == "Debian"
 
 - name: Install dependencies (RedHat)

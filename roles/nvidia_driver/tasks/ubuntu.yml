@@ -16,8 +16,8 @@
     manager: apt
 
 # Resolved up front so the purge can be skipped when the driver is already installed
-# (re-runs stay idempotent). The modules are built for the running kernel flavour: the
-# HWE kernel's when its meta package is installed, the GA kernel's otherwise.
+# (re-runs stay idempotent). The modules are built for the kernel flavour the host
+# boots (kernel_flavour: the HWE kernel's when its metapackage is installed).
 - name: Determine the NVIDIA driver packages (Ubuntu, Canonical archive)
   ansible.builtin.set_fact:
     nvidia_driver_packages_resolved: >-
@@ -28,8 +28,7 @@
   vars:
     _branch: "{{ nvidia_driver_branch ~ ('-server' if nvidia_driver_server_branch | bool else '') }}"
     _flavoured: "{{ _branch ~ ('-open' if nvidia_driver_kernel_modules == 'open' else '') }}"
-    _hwe: "linux-generic-hwe-{{ ansible_facts.distribution_version }}"
-    _kernel_flavour: "{{ 'generic-hwe-' ~ ansible_facts.distribution_version if _hwe in ansible_facts.packages else 'generic' }}"
+    _kernel_flavour: "{{ ansible_facts.packages | kernel_flavour(ansible_facts.kernel) }}"
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
 # The package whose presence (at the branch) means this driver is installed.

@@ -1,0 +1,44 @@
+---
+# Packages built per kernel (Debian family), the one way roles install them: for each
+# kind in host_baseline_kernel_packages (tools, headers), the flavour's metapackage,
+# which brings the kind for every kernel an upgrade installs, and the running kernel's.
+# The metapackage is held at the version of the installed kernel metapackage: apt
+# upgrades the packages built from one source (linux-meta) together, so a newer one
+# would bring a new kernel with it; os_updates upgrades them all at once.
+# A version-specific package installed by name is marked manual and outlives its
+# kernel: one set per kernel ever booted. Marked automatic, apt removes it with its
+# kernel (it keeps the running and the newest kernels' packages).
+- name: Read the installed packages
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Install each kind for the kernel flavour and the running kernel
+  ansible.builtin.apt:
+    name: >-
+      {{ host_baseline_kernel_packages | map('regex_replace', '^', 'linux-')
+         | product(['-' ~ _flavour ~ _held, '-' ~ ansible_facts.kernel])
+         | map('join') | list }}
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  vars:
+    _flavour: "{{ ansible_facts.packages | kernel_flavour(ansible_facts.kernel) }}"
+    _meta: "{{ ansible_facts.packages['linux-image-' ~ _flavour] | default([]) }}"
+    _held: "{{ ('=' ~ _meta[0].version) if _meta | length > 0 else '' }}"
+
+- name: Read the packages installed by name
+  ansible.builtin.command:
+    argv: [apt-mark, showmanual]
+  register: host_baseline_manual
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Leave each kernel's own packages to apt
+  change_command:
+    argv: "{{ ['apt-mark', 'auto'] + host_baseline_versioned }}"
+  vars:
+    host_baseline_versioned: >-
+      {{ host_baseline_manual.stdout_lines
+         | select('match', '^linux-(' ~ (host_baseline_kernel_packages | map('regex_escape') | join('|')) ~ ')-[0-9]')
+         | list }}
+  when: host_baseline_versioned | length > 0
