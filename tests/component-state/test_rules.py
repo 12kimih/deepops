@@ -287,6 +287,24 @@ def _tasks(path):
                 stack.extend(task.get(key) or [])
 
 
+def _writes(path):
+    """(task, args, module) for each template or copy in PATH; a task looping over a
+    literal list is one write per item, {{ item }} put in its dest and src, so a file
+    written in a loop is checked like any other."""
+    for task in _tasks(path):
+        for module in ("ansible.builtin.template", "ansible.builtin.copy"):
+            args = task.get(module)
+            if not isinstance(args, dict):
+                continue
+            items = task.get("loop")
+            if not isinstance(items, list) or not all(isinstance(i, (str, int)) for i in items):
+                yield task, args, module
+                continue
+            for item in items:
+                yield task, {k: re.sub(r"\{\{\s*item\s*\}\}", str(item), v) if isinstance(v, str) else v
+                             for k, v in args.items()}, module  # fmt: skip
+
+
 class Marks(unittest.TestCase):
     def test_every_file_a_component_writes_shows_deepops_made_it(self):
         # Without a mark, absent on a host deployed before component records leaves the
@@ -307,37 +325,35 @@ class Marks(unittest.TestCase):
             for path in tracked(
                 f"{role.relative_to(ROOT)}/tasks/*.yml", f"{role.relative_to(ROOT)}/tasks/*.yaml"
             ):
-                for task in _tasks(path):
-                    for module in ("ansible.builtin.template", "ansible.builtin.copy"):
-                        args = task.get(module)
-                        if not isinstance(args, dict) or norm(args.get("dest", "")) not in files:
-                            continue
-                        dest = norm(args["dest"])
-                        if marks.named_deepops(dest) or args.get("remote_src"):
-                            continue
-                        if dest in UNMARKABLE:
-                            used.add(dest)
-                            continue
-                        if "content" in args:
-                            text = str(args["content"])
-                            if not re.sub(r"\{\{.*?\}\}", "", text).strip():
-                                continue  # all of it rendered at run time
-                        else:
-                            folder = "templates" if module.endswith("template") else "files"
-                            defaults = yaml.safe_load((role / "defaults/main.yml").read_text()) or {}
-                            # A src named by a setting reads that setting's default.
-                            src = re.sub(
-                                r"\{\{\s*(\w+)\s*\}\}",
-                                lambda m: str(defaults.get(m[1], m[0])),
-                                str(args["src"]),
-                            )
-                            src = src.removeprefix(f"{folder}/")
-                            text = (role / folder / src).read_text(errors="replace")
-                        with self.subTest(component=name, file=dest):
-                            self.assertTrue(
-                                marks.MARK.search(text) or "ansible_managed" in text,
-                                "write ansible_managed (or roles/<name>) into it",
-                            )
+                for task, args, module in _writes(path):
+                    if norm(args.get("dest", "")) not in files:
+                        continue
+                    dest = norm(args["dest"])
+                    if marks.named_deepops(dest) or args.get("remote_src"):
+                        continue
+                    if dest in UNMARKABLE:
+                        used.add(dest)
+                        continue
+                    if "content" in args:
+                        text = str(args["content"])
+                        if not re.sub(r"\{\{.*?\}\}", "", text).strip():
+                            continue  # all of it rendered at run time
+                    else:
+                        folder = "templates" if module.endswith("template") else "files"
+                        defaults = yaml.safe_load((role / "defaults/main.yml").read_text()) or {}
+                        # A src named by a setting reads that setting's default.
+                        src = re.sub(
+                            r"\{\{\s*(\w+)\s*\}\}",
+                            lambda m: str(defaults.get(m[1], m[0])),
+                            str(args["src"]),
+                        )
+                        src = src.removeprefix(f"{folder}/")
+                        text = (role / folder / src).read_text(errors="replace")
+                    with self.subTest(component=name, file=dest):
+                        self.assertTrue(
+                            marks.MARK.search(text) or "ansible_managed" in text,
+                            "write ansible_managed (or roles/<name>) into it",
+                        )
         self.assertEqual(sorted(set(UNMARKABLE) - used), [], "no longer written: drop it from UNMARKABLE")
 
 
