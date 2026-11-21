@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: deploy_defaults  # cluster_user_grace_days
   - role: cluster_tools_lib  # clustertools.container_gc
   - role: prometheus_paths  # node_exporter_prom_dir
   - role: retired_settings  # slurm_container_storage_gc

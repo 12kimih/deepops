@@ -84,9 +84,15 @@ slurm_enable_dns_resolver: false
 # Crashes to systemd-coredump on every host, cores only within the crashing process's
 # core size limit (roles/coredump), in place of apport's core handler
 slurm_enable_coredump: true
-# Per-user disk quotas on the login nodes' local disks (roles/disk_quota): off by
-# default; needs the quota mount options in host_baseline_mount_options
+# Per-user disk quotas on the login nodes' disks and the home server's /home
+# (roles/disk_quota): off by default; needs the quota mount options in
+# host_baseline_mount_options
 slurm_enable_disk_quota: false
+
+# How long users have to clean up what the cluster will otherwise remove or refuse: the
+# grace period over a soft disk quota (roles/disk_quota), unused container stores
+# (roles/container_storage_gc), and every other user-facing cleanup reads this one value.
+cluster_user_grace_days: 14
 
 # Components whose removal is explicit only (removal: explicit in the registry,
 # roles/deploy_defaults/vars/main.yml: the driver, authentication, Slurm, MUNGE, the NFS

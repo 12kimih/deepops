@@ -50,9 +50,9 @@ Different layers; the monitoring stack uses the exporter.
 
 - `playbooks/generic/coredump.yml` (`coredump` role, switches `slurm_enable_coredump`, `kube_enable_coredump`, on by default) -- hands crashing processes to **systemd-coredump** on every host, in place of apport's core handler on Ubuntu (apport itself stays). Every crash is logged to the journal; a core is stored only within the process's core size limit (`ulimit -c`, which a Slurm job takes from where it was submitted), readable by its owner with `coredumpctl`, and kept three days. `coredump_settings` sets coredump.conf over systemd's bounds.
 
-## Disk quotas on the login nodes
+## Disk quotas (login nodes, /home)
 
-- `playbooks/generic/disk-quota.yml` (`disk_quota` role, switch `slurm_enable_disk_quota`, on `slurm-login`) -- per-user quotas on the login nodes' local ext4 disks, which they may share with the controller, its database and the logs. Everyone in the roster is limited, administrators too (their own accounts; sudo is root's); root and the system accounts never are. `disk_quota_limits: {}` only counts: the `disk_quota_used_bytes` metrics show how the space is used before you choose limits, and a person's `disk_quota` in `people.yml` overrides the site's. The quota mount options are set in `host_baseline_mount_options` (`usrjquota=aquota.user,jqfmt=vfsv1`, or `usrquota` with ext4's quota feature), the one writer of /etc/fstab; the role stops, naming them, without. The first run then counts every user's files (quotacheck), and systemd turns quotas on at every boot after that.
+- `playbooks/generic/disk-quota.yml` (`disk_quota` role, switch `slurm_enable_disk_quota`, on `slurm-login` and `slurm-nfs`) -- per-user quotas on local ext4 filesystems: a login node's disk, which it may share with the controller, its database and the logs, and the home server's `/home`. Everyone in the roster is limited, administrators too; root and the system accounts never are. It counts before it limits, exports each user's usage, and takes its mount options from `host_baseline_mount_options`. See [disk-quota.md](disk-quota.md).
 
 ## Container registries (three different deploy targets)
 

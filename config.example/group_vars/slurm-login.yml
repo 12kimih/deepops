@@ -25,4 +25,4 @@
 #  block_hard: 20G
 #  inode_soft: 200k
 #  inode_hard: 500k
-#disk_quota_grace_days: 7
+#disk_quota_grace_days: "{{ cluster_user_grace_days }}"

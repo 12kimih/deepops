@@ -251,9 +251,11 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_coredump }}", group: slurm-cluster}
       - {switch: "{{ kube_enable_coredump }}", group: k8s_cluster}
+  # The login nodes' disks and the home server's /home (disk_quota_filesystems per host).
   disk_quota:
     rules:
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-login}
+      - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-nfs}
 
 # This host's desired state of each component: present or absent.
 deepops_components: >-
