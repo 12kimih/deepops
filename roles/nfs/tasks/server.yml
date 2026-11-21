@@ -15,7 +15,7 @@
     state: "directory"
     mode: "0755"
   with_items: "{{ nfs_exports }}"
-  notify: Reload NFS exports
+  register: nfs_export_dirs
   tags:
     - nfs
 
@@ -59,6 +59,15 @@
   tags:
     - nfs
 
+# Kept to go back to when the new file loses an export (below).
+- name: Read the current exports
+  ansible.builtin.slurp:
+    src: /etc/exports
+  register: nfs_exports_before
+  failed_when: false  # none yet
+  tags:
+    - nfs
+
 - name: Configure exports
   ansible.builtin.template:
     src: exports.j2
@@ -66,10 +75,57 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Reload NFS exports
   register: nfs_exports_copy
   tags:
     - nfs
+
+# exports(5) changes take effect with exportfs -ra, without restarting nfsd: a restart
+# drops every client's state and has hung nfsd before. A line exportfs cannot read is
+# skipped, and the export it named stops at once under its clients; so what is exported
+# afterwards is compared with nfs_exports, and a difference puts the previous file back.
+- name: Load the exports
+  when: nfs_exports_copy is changed or nfs_export_dirs is changed
+  tags:
+    - nfs
+  block:
+    - name: Load the exports
+      change_command:
+        argv: [exportfs, -ra]
+
+    - name: Read what is exported
+      ansible.builtin.command:
+        argv: [exportfs, -s]
+      register: nfs_exported
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Require every export to be exported
+      ansible.builtin.assert:
+        that: nfs_exports_missing | length == 0
+        fail_msg: "exportfs did not export {{ nfs_exports_missing | join(', ') }}; see /etc/exports."
+        quiet: true
+      vars:
+        nfs_exports_missing: >-
+          {{ nfs_exports | map(attribute='path') | map('regex_replace', '/+$', '')
+             | difference(nfs_exported.stdout_lines | map('split') | map('first') | list) }}
+      when: not ansible_check_mode
+  rescue:
+    - name: Put the previous exports back
+      ansible.builtin.copy:
+        content: "{{ nfs_exports_before.content | b64decode }}"
+        dest: /etc/exports
+        mode: "0644"
+      when: nfs_exports_before.content is defined
+
+    - name: Load the previous exports
+      change_command:
+        argv: [exportfs, -ra]
+
+    - name: Report the refused exports
+      ansible.builtin.fail:
+        msg: >-
+          {{ ansible_failed_result.msg | default('exportfs failed') }}
+          {{ 'The previous /etc/exports is back and loaded.' if nfs_exports_before.content is defined else '' }}
 
 # The filesystem each export lives on: an export inside a larger filesystem (a
 # directory under /) is watched as that filesystem.
