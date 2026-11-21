@@ -7,6 +7,33 @@
     component_record_action: begin
     component_record_items: "{{ pcie_acs_items }}"
 
+- name: Check the IOMMU setting
+  ansible.builtin.assert:
+    that: pcie_acs_iommu in ['', 'off', 'pt']
+    fail_msg: "pcie_acs_iommu is off, pt or \"\" (leave the kernel alone), not {{ pcie_acs_iommu }}."
+    quiet: true
+
+# A hand edit of /etc/default/grub set the IOMMU before this role did: back to the
+# package's empty value, so the role's own file is the one place it is set.
+- name: Take the hand-set IOMMU argument out of the grub defaults
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX="(intel|amd)_iommu=(off|on)"$'
+    line: 'GRUB_CMDLINE_LINUX=""'
+  when:
+    - pcie_acs_iommu | length > 0
+    - ansible_facts.os_family == 'Debian'
+    - not deepops_containerized
+
+- name: Set the IOMMU on the kernel command line
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+  vars:
+    host_baseline_kernel_args_owner: pcie-acs
+    host_baseline_kernel_args: "{{ pcie_acs_iommu_args }}"
+    host_baseline_kernel_args_reason: set the IOMMU for GPU peer-to-peer
+
 # setpci; part of every server install, so not this component's to remove.
 - name: Install pciutils
   ansible.builtin.package:

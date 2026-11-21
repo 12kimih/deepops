@@ -12,3 +12,11 @@
 # program, pcie_acs_program (roles/deepops_paths). absent removes them; the devices keep
 # ACS off until the next boot, which gives them back the firmware's setting.
 pcie_acs_state: present
+
+# The IOMMU, which NCCL's guide pairs with ACS: on bare metal its DMA remapping sends GPU
+# peer-to-peer traffic through the CPU too. "off" turns it off (intel_iommu=off or
+# amd_iommu=off, by the CPU's vendor), "pt" keeps it on for devices that need it but
+# passes host DMA through (iommu=pt), "" leaves the kernel command line alone. Written as
+# this role's own boot loader file (roles/host_baseline, kernel_args); a reboot is asked
+# for while the running kernel lacks it.
+pcie_acs_iommu: ""
