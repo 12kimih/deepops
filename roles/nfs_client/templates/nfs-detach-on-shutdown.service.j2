@@ -11,6 +11,9 @@ Documentation=man:umount(8)
 # Shutdown order is startup order reversed, so After= here means this stops before the
 # mounts do. Default dependencies supply Before=shutdown.target.
 After=remote-fs.target
+# Stopping it is the detach: a `systemctl stop` (a removal, by hand) would lazily
+# unmount /home under running jobs. Only shutdown stops it.
+RefuseManualStop=yes
 
 [Service]
 # The work is in ExecStop; RemainAfterExit keeps the unit active until shutdown.

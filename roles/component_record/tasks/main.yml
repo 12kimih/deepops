@@ -90,10 +90,12 @@
       check_mode: true  # read-only: no state requested
       failed_when: false
 
+    # A unit that refuses a manual stop does its work when stopped (it detaches the NFS
+    # mounts): disabled only, it stops at the next shutdown.
     - name: Stop and disable units
       systemd_unit:
         name: "{{ item.item }}"
-        state: stopped
+        state: "{{ omit if item.status.RefuseManualStop | default('no') == 'yes' else 'stopped' }}"
         enabled: false
       loop: "{{ component_record_units.results }}"
       loop_control:

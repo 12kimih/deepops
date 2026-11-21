@@ -124,8 +124,10 @@ Consequences worth knowing:
   and never reaches the reboot -- left powered on, off the network, and out of reach.
   `nfs_detach_on_shutdown` (default true) installs a unit that lazily detaches the mounts
   on the way down; a lazy detach sends no packets, so a server that has already gone
-  cannot stall it. `playbooks/utilities/reboot.yml` does the same before it reboots,
-  covering nodes that do not have the unit yet.
+  cannot stall it. Only shutdown stops it (`RefuseManualStop=yes`): switching it off
+  disables and removes it without detaching anything under running jobs.
+  `playbooks/utilities/reboot.yml` does the same before it reboots, covering nodes that
+  do not have the unit yet.
 - **NHC walks into each mountpoint before reading `/proc/mounts`.** `nhc_check_mounts`
   emits a `check_file_test` ahead of `check_fs_mount_rw`. Harmless for an eager mount,
   and it keeps the check correct if a site does enable an automount elsewhere. See
