@@ -140,6 +140,16 @@ class CommandTests(unittest.TestCase):
         (report,) = json.loads(done.stdout)
         self.assertEqual([r["source"] for r in report["rows"]], ["slurm"])
 
+    def test_a_job_is_found_in_every_cluster_the_accounting_holds(self):
+        # A rename keeps the old cluster's history under its name: the same id may name
+        # a job there and one here, and each report says which cluster it is from.
+        old, new = gpu_job(), gpu_job()
+        old["cluster"], new["cluster"] = "oldname", "newname"
+        done = self.run_on([old, new], "123")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn(f"job {old['job_id']} on oldname", done.stdout)
+        self.assertIn(f"job {new['job_id']} on newname", done.stdout)
+
     def test_a_job_without_gpus_or_unknown_is_one_line(self):
         cpu = gpu_job()
         cpu["tres"]["allocated"] = [t for t in cpu["tres"]["allocated"] if t["type"] != "gres"]

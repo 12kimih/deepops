@@ -1,7 +1,7 @@
 {
  "jobs": [
   {
-   "account": "acct9",
+   "account": "acct4",
    "array": {
     "job_id": 0,
     "task": "",
@@ -11,27 +11,114 @@
      "set": false
     }
    },
-   "job_id": 82657,
+   "cluster": "cluster1",
+   "job_id": 80742,
    "nodes": "gpu2",
    "partition": "a30-1",
    "state": {
     "current": [
-     "CANCELLED"
+     "COMPLETED"
     ]
    },
    "steps": [
     {
      "state": [
-      "CANCELLED"
+      "COMPLETED"
      ],
      "step": {
-      "id": "82657.batch",
+      "id": "80742.batch",
       "name": "batch"
      },
      "tres": {
       "requested": {
-       "average": [],
-       "max": []
+       "average": [
+        {
+         "count": 7,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 1105920,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 7,
+         "id": 1,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 1105920,
+         "id": 2,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu2",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
       }
      }
     },
@@ -40,7 +127,7 @@
       "COMPLETED"
      ],
      "step": {
-      "id": "82657.extern",
+      "id": "80742.extern",
       "name": "extern"
      },
      "tres": {
@@ -68,20 +155,20 @@
     }
    ],
    "time": {
-    "elapsed": 66185,
-    "end": 1794968348,
-    "start": 1794902163
+    "elapsed": 0,
+    "end": 1794790720,
+    "start": 1794790720
    },
    "tres": {
     "allocated": [
      {
-      "count": 20,
+      "count": 40,
       "id": 1,
       "name": "",
       "type": "cpu"
      },
      {
-      "count": 110080,
+      "count": 220160,
       "id": 2,
       "name": "",
       "type": "mem"
@@ -93,7 +180,409 @@
       "type": "node"
      },
      {
-      "count": 3,
+      "count": 6,
+      "id": 5,
+      "name": "",
+      "type": "billing"
+     },
+     {
+      "count": 4,
+      "id": 1001,
+      "name": "gpu",
+      "type": "gres"
+     },
+     {
+      "count": 4,
+      "id": 1005,
+      "name": "gpu:a30",
+      "type": "gres"
+     }
+    ]
+   },
+   "user": "user10"
+  },
+  {
+   "account": "acct7",
+   "array": {
+    "job_id": 81154,
+    "task": "",
+    "task_id": {
+     "infinite": false,
+     "number": 34,
+     "set": true
+    }
+   },
+   "cluster": "cluster1",
+   "job_id": 81489,
+   "nodes": "gpu2",
+   "partition": "a30-1",
+   "state": {
+    "current": [
+     "COMPLETED"
+    ]
+   },
+   "steps": [
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "81489.batch",
+      "name": "batch"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 7897627,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 16031535104,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 10670911651,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 53,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 7897627,
+         "id": 1,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 16031535104,
+         "id": 2,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 10670911651,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu2",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 53,
+         "id": 8,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "81489.extern",
+      "name": "extern"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        }
+       ],
+       "max": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu2",
+         "task": 0,
+         "type": "energy"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "time": {
+    "elapsed": 7846,
+    "end": 1794757789,
+    "start": 1794749943
+   },
+   "tres": {
+    "allocated": [
+     {
+      "count": 10,
+      "id": 1,
+      "name": "",
+      "type": "cpu"
+     },
+     {
+      "count": 55040,
+      "id": 2,
+      "name": "",
+      "type": "mem"
+     },
+     {
+      "count": 1,
+      "id": 4,
+      "name": "",
+      "type": "node"
+     },
+     {
+      "count": 1,
+      "id": 5,
+      "name": "",
+      "type": "billing"
+     },
+     {
+      "count": 1,
+      "id": 1001,
+      "name": "gpu",
+      "type": "gres"
+     },
+     {
+      "count": 1,
+      "id": 1005,
+      "name": "gpu:a30",
+      "type": "gres"
+     }
+    ]
+   },
+   "user": "user7"
+  },
+  {
+   "account": "acct11",
+   "array": {
+    "job_id": 0,
+    "task": "",
+    "task_id": {
+     "infinite": false,
+     "number": 0,
+     "set": false
+    }
+   },
+   "cluster": "cluster1",
+   "job_id": 81230,
+   "nodes": "gpu6",
+   "partition": "a30-2",
+   "state": {
+    "current": [
+     "CANCELLED"
+    ]
+   },
+   "steps": [
+    {
+     "state": [
+      "CANCELLED"
+     ],
+     "step": {
+      "id": "81230.batch",
+      "name": "batch"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 114182514,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 121310412800,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 1028737741609,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 476,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 114182514,
+         "id": 1,
+         "name": "",
+         "node": "gpu6",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 121310412800,
+         "id": 2,
+         "name": "",
+         "node": "gpu6",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu6",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 1028737741609,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu6",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu6",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 476,
+         "id": 8,
+         "name": "",
+         "node": "gpu6",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "81230.extern",
+      "name": "extern"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        }
+       ],
+       "max": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu6",
+         "task": 0,
+         "type": "energy"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "time": {
+    "elapsed": 24468,
+    "end": 1794756704,
+    "start": 1794732236
+   },
+   "tres": {
+    "allocated": [
+     {
+      "count": 32,
+      "id": 1,
+      "name": "",
+      "type": "cpu"
+     },
+     {
+      "count": 115712,
+      "id": 2,
+      "name": "",
+      "type": "mem"
+     },
+     {
+      "count": 1,
+      "id": 4,
+      "name": "",
+      "type": "node"
+     },
+     {
+      "count": 4,
       "id": 5,
       "name": "",
       "type": "billing"
@@ -112,10 +601,10 @@
      }
     ]
    },
-   "user": "user25"
+   "user": "user6"
   },
   {
-   "account": "acct13",
+   "account": "acct8",
    "array": {
     "job_id": 0,
     "task": "",
@@ -125,607 +614,8 @@
      "set": false
     }
    },
-   "job_id": 82734,
-   "nodes": "gpu1",
-   "partition": "a10-2",
-   "state": {
-    "current": [
-     "COMPLETED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "82734.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 208997,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 5830918144,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 11769259153,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 208997,
-         "id": 1,
-         "name": "",
-         "node": "gpu1",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 5830918144,
-         "id": 2,
-         "name": "",
-         "node": "gpu1",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu1",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 11769259153,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu1",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu1",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "node": "gpu1",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "82734.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu1",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 271,
-    "end": 1794950382,
-    "start": 1794950111
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 10,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 55040,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user18"
-  },
-  {
-   "account": "acct13",
-   "array": {
-    "job_id": 82731,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 31,
-     "set": true
-    }
-   },
-   "job_id": 83634,
-   "nodes": "gpu5",
-   "partition": "a10-2",
-   "state": {
-    "current": [
-     "COMPLETED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83634.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 1057312,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 5217595392,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 3030586039,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 1057312,
-         "id": 1,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 5217595392,
-         "id": 2,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 3030586039,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu5",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83634.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 1041,
-    "end": 1794945300,
-    "start": 1794944259
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 10,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 55040,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user18"
-  },
-  {
-   "account": "acct13",
-   "array": {
-    "job_id": 82731,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 38,
-     "set": true
-    }
-   },
-   "job_id": 83684,
-   "nodes": "gpu8",
-   "partition": "a10-1",
-   "state": {
-    "current": [
-     "CANCELLED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "CANCELLED"
-     ],
-     "step": {
-      "id": "83684.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 1170837,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 3238596608,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 1890978833,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 1170837,
-         "id": 1,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 3238596608,
-         "id": 2,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 1890978833,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu8",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83684.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 21074,
-    "end": 1794970316,
-    "start": 1794949242
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 8,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 53248,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user18"
-  },
-  {
-   "account": "acct13",
-   "array": {
-    "job_id": 82733,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 35,
-     "set": true
-    }
-   },
-   "job_id": 83710,
+   "cluster": "cluster1",
+   "job_id": 81573,
    "nodes": "gpu5",
    "partition": "a10-2",
    "state": {
@@ -739,20 +629,20 @@
       "FAILED"
      ],
      "step": {
-      "id": "83710.batch",
+      "id": "81573.batch",
       "name": "batch"
      },
      "tres": {
       "requested": {
        "average": [
         {
-         "count": 4,
+         "count": 442757,
          "id": 1,
          "name": "",
          "type": "cpu"
         },
         {
-         "count": 692224,
+         "count": 9021775872,
          "id": 2,
          "name": "",
          "type": "mem"
@@ -764,7 +654,7 @@
          "type": "energy"
         },
         {
-         "count": 0,
+         "count": 1763097534,
          "id": 6,
          "name": "disk",
          "type": "fs"
@@ -776,7 +666,7 @@
          "type": "vmem"
         },
         {
-         "count": 0,
+         "count": 521,
          "id": 8,
          "name": "",
          "type": "pages"
@@ -784,7 +674,7 @@
        ],
        "max": [
         {
-         "count": 4,
+         "count": 442757,
          "id": 1,
          "name": "",
          "node": "gpu5",
@@ -792,7 +682,7 @@
          "type": "cpu"
         },
         {
-         "count": 692224,
+         "count": 9021775872,
          "id": 2,
          "name": "",
          "node": "gpu5",
@@ -808,7 +698,7 @@
          "type": "energy"
         },
         {
-         "count": 0,
+         "count": 1763097534,
          "id": 6,
          "name": "disk",
          "node": "gpu5",
@@ -824,7 +714,7 @@
          "type": "vmem"
         },
         {
-         "count": 0,
+         "count": 521,
          "id": 8,
          "name": "",
          "node": "gpu5",
@@ -840,7 +730,7 @@
       "COMPLETED"
      ],
      "step": {
-      "id": "83710.extern",
+      "id": "81573.extern",
       "name": "extern"
      },
      "tres": {
@@ -868,9 +758,9 @@
     }
    ],
    "time": {
-    "elapsed": 1,
-    "end": 1794969901,
-    "start": 1794969900
+    "elapsed": 323,
+    "end": 1794757012,
+    "start": 1794756689
    },
    "tres": {
     "allocated": [
@@ -912,10 +802,10 @@
      }
     ]
    },
-   "user": "user18"
+   "user": "user2"
   },
   {
-   "account": "acct16",
+   "account": "acct6",
    "array": {
     "job_id": 0,
     "task": "",
@@ -925,27 +815,114 @@
      "set": false
     }
    },
-   "job_id": 82292,
+   "cluster": "cluster1",
+   "job_id": 81699,
    "nodes": "gpu4",
    "partition": "a30-1",
    "state": {
     "current": [
-     "FAILED"
+     "OUT_OF_MEMORY"
     ]
    },
    "steps": [
     {
      "state": [
-      "CANCELLED"
+      "OUT_OF_MEMORY"
      ],
      "step": {
-      "id": "82292.batch",
+      "id": "81699.batch",
       "name": "batch"
      },
      "tres": {
       "requested": {
-       "average": [],
-       "max": []
+       "average": [
+        {
+         "count": 435447,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 57710186496,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 36954769037,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 234,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 435447,
+         "id": 1,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 57710186496,
+         "id": 2,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 36954769037,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu4",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 234,
+         "id": 8,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
       }
      }
     },
@@ -954,7 +931,7 @@
       "COMPLETED"
      ],
      "step": {
-      "id": "82292.extern",
+      "id": "81699.extern",
       "name": "extern"
      },
      "tres": {
@@ -982,9 +959,9 @@
     }
    ],
    "time": {
-    "elapsed": 0,
-    "end": 1794970000,
-    "start": 1794970000
+    "elapsed": 517,
+    "end": 1794774372,
+    "start": 1794773855
    },
    "tres": {
     "allocated": [
@@ -1026,10 +1003,10 @@
      }
     ]
    },
-   "user": "user20"
+   "user": "user9"
   },
   {
-   "account": "acct15",
+   "account": "acct8",
    "array": {
     "job_id": 0,
     "task": "",
@@ -1039,9 +1016,10 @@
      "set": false
     }
    },
-   "job_id": 83093,
-   "nodes": "gpu7",
-   "partition": "a30-2",
+   "cluster": "cluster1",
+   "job_id": 81822,
+   "nodes": "gpu4",
+   "partition": "a30-1",
    "state": {
     "current": [
      "PREEMPTED"
@@ -1050,16 +1028,102 @@
    "steps": [
     {
      "state": [
-      "CANCELLED"
+      "COMPLETED"
      ],
      "step": {
-      "id": "83093.batch",
+      "id": "81822.batch",
       "name": "batch"
      },
      "tres": {
       "requested": {
-       "average": [],
-       "max": []
+       "average": [
+        {
+         "count": 473247,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 9949294592,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 4394053415,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 431,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 473247,
+         "id": 1,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 9949294592,
+         "id": 2,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 4394053415,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu4",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 431,
+         "id": 8,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
       }
      }
     },
@@ -1068,7 +1132,7 @@
       "COMPLETED"
      ],
      "step": {
-      "id": "83093.extern",
+      "id": "81822.extern",
       "name": "extern"
      },
      "tres": {
@@ -1086,7 +1150,7 @@
          "count": 0,
          "id": 3,
          "name": "",
-         "node": "gpu7",
+         "node": "gpu4",
          "task": 0,
          "type": "energy"
         }
@@ -1096,20 +1160,20 @@
     }
    ],
    "time": {
-    "elapsed": 30753,
-    "end": 1794961139,
-    "start": 1794930386
+    "elapsed": 1149,
+    "end": 1794800050,
+    "start": 1794798901
    },
    "tres": {
     "allocated": [
      {
-      "count": 16,
+      "count": 10,
       "id": 1,
       "name": "",
       "type": "cpu"
      },
      {
-      "count": 57856,
+      "count": 55040,
       "id": 2,
       "name": "",
       "type": "mem"
@@ -1140,10 +1204,1122 @@
      }
     ]
    },
-   "user": "user37"
+   "user": "user14"
+  },
+  {
+   "account": "acct5",
+   "array": {
+    "job_id": 81857,
+    "task": "",
+    "task_id": {
+     "infinite": false,
+     "number": 0,
+     "set": true
+    }
+   },
+   "cluster": "cluster1",
+   "job_id": 81857,
+   "nodes": "gpu4",
+   "partition": "a30-1",
+   "state": {
+    "current": [
+     "CANCELLED"
+    ]
+   },
+   "steps": [
+    {
+     "state": [
+      "CANCELLED"
+     ],
+     "step": {
+      "id": "81857.batch",
+      "name": "batch"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 96254,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 6483980288,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 727199107,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 5363,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 96254,
+         "id": 1,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 6483980288,
+         "id": 2,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 727199107,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu4",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 5363,
+         "id": 8,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "81857.extern",
+      "name": "extern"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        }
+       ],
+       "max": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "energy"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "81857.0",
+      "name": "step2"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 23,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 17690624,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 23,
+         "id": 1,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 17690624,
+         "id": 2,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu4",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "81857.1",
+      "name": "step3"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 28,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 17625088,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 28,
+         "id": 1,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 17625088,
+         "id": 2,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu4",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "node": "gpu4",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "time": {
+    "elapsed": 210,
+    "end": 1794803864,
+    "start": 1794803654
+   },
+   "tres": {
+    "allocated": [
+     {
+      "count": 10,
+      "id": 1,
+      "name": "",
+      "type": "cpu"
+     },
+     {
+      "count": 55040,
+      "id": 2,
+      "name": "",
+      "type": "mem"
+     },
+     {
+      "count": 1,
+      "id": 4,
+      "name": "",
+      "type": "node"
+     },
+     {
+      "count": 1,
+      "id": 5,
+      "name": "",
+      "type": "billing"
+     },
+     {
+      "count": 1,
+      "id": 1001,
+      "name": "gpu",
+      "type": "gres"
+     },
+     {
+      "count": 1,
+      "id": 1005,
+      "name": "gpu:a30",
+      "type": "gres"
+     }
+    ]
+   },
+   "user": "user3"
+  },
+  {
+   "account": "acct5",
+   "array": {
+    "job_id": 82026,
+    "task": "",
+    "task_id": {
+     "infinite": false,
+     "number": 0,
+     "set": true
+    }
+   },
+   "cluster": "cluster1",
+   "job_id": 82051,
+   "nodes": "gpu8",
+   "partition": "a10-1,a10-2",
+   "state": {
+    "current": [
+     "PREEMPTED"
+    ]
+   },
+   "steps": [
+    {
+     "state": [
+      "CANCELLED"
+     ],
+     "step": {
+      "id": "82051.batch",
+      "name": "batch"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 3200176,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 2169372672,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 990297323,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 12,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 3200176,
+         "id": 1,
+         "name": "",
+         "node": "gpu8",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 2169372672,
+         "id": 2,
+         "name": "",
+         "node": "gpu8",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu8",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 990297323,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu8",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu8",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 12,
+         "id": 8,
+         "name": "",
+         "node": "gpu8",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "82051.extern",
+      "name": "extern"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        }
+       ],
+       "max": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu8",
+         "task": 0,
+         "type": "energy"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "time": {
+    "elapsed": 3205,
+    "end": 1794813631,
+    "start": 1794810426
+   },
+   "tres": {
+    "allocated": [
+     {
+      "count": 8,
+      "id": 1,
+      "name": "",
+      "type": "cpu"
+     },
+     {
+      "count": 53248,
+      "id": 2,
+      "name": "",
+      "type": "mem"
+     },
+     {
+      "count": -2,
+      "id": 3,
+      "name": "",
+      "type": "energy"
+     },
+     {
+      "count": 1,
+      "id": 4,
+      "name": "",
+      "type": "node"
+     },
+     {
+      "count": 1,
+      "id": 5,
+      "name": "",
+      "type": "billing"
+     },
+     {
+      "count": 1,
+      "id": 1001,
+      "name": "gpu",
+      "type": "gres"
+     },
+     {
+      "count": 1,
+      "id": 1004,
+      "name": "gpu:a10",
+      "type": "gres"
+     }
+    ]
+   },
+   "user": "user3"
   },
   {
    "account": "acct10",
+   "array": {
+    "job_id": 82395,
+    "task": "",
+    "task_id": {
+     "infinite": false,
+     "number": 0,
+     "set": true
+    }
+   },
+   "cluster": "cluster1",
+   "job_id": 82396,
+   "nodes": "gpu3",
+   "partition": "a10-2",
+   "state": {
+    "current": [
+     "FAILED"
+    ]
+   },
+   "steps": [
+    {
+     "state": [
+      "FAILED"
+     ],
+     "step": {
+      "id": "82396.batch",
+      "name": "batch"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 52973,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 37102608384,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 17980275021,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 6044,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 52973,
+         "id": 1,
+         "name": "",
+         "node": "gpu3",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 37102608384,
+         "id": 2,
+         "name": "",
+         "node": "gpu3",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu3",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 17980275021,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu3",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu3",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 6044,
+         "id": 8,
+         "name": "",
+         "node": "gpu3",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "82396.extern",
+      "name": "extern"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        }
+       ],
+       "max": [
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu3",
+         "task": 0,
+         "type": "energy"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "time": {
+    "elapsed": 63,
+    "end": 1794835499,
+    "start": 1794835436
+   },
+   "tres": {
+    "allocated": [
+     {
+      "count": 10,
+      "id": 1,
+      "name": "",
+      "type": "cpu"
+     },
+     {
+      "count": 55040,
+      "id": 2,
+      "name": "",
+      "type": "mem"
+     },
+     {
+      "count": 1,
+      "id": 4,
+      "name": "",
+      "type": "node"
+     },
+     {
+      "count": 1,
+      "id": 5,
+      "name": "",
+      "type": "billing"
+     },
+     {
+      "count": 1,
+      "id": 1001,
+      "name": "gpu",
+      "type": "gres"
+     },
+     {
+      "count": 1,
+      "id": 1004,
+      "name": "gpu:a10",
+      "type": "gres"
+     }
+    ]
+   },
+   "user": "user4"
+  },
+  {
+   "account": "acct2",
+   "array": {
+    "job_id": 0,
+    "task": "",
+    "task_id": {
+     "infinite": false,
+     "number": 0,
+     "set": false
+    }
+   },
+   "cluster": "cluster1",
+   "job_id": 82500,
+   "nodes": "gpu7",
+   "partition": "a30-2",
+   "state": {
+    "current": [
+     "NODE_FAIL"
+    ]
+   },
+   "steps": [
+    {
+     "state": [
+      "CANCELLED"
+     ],
+     "step": {
+      "id": "82500.batch",
+      "name": "batch"
+     },
+     "tres": {
+      "requested": {
+       "average": [],
+       "max": []
+      }
+     }
+    },
+    {
+     "state": [
+      "CANCELLED"
+     ],
+     "step": {
+      "id": "82500.extern",
+      "name": "extern"
+     },
+     "tres": {
+      "requested": {
+       "average": [],
+       "max": []
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "82500.0",
+      "name": "step2"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 195,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 17444864,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 195,
+         "id": 1,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 17444864,
+         "id": 2,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu7",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 0,
+         "id": 8,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "state": [
+      "COMPLETED"
+     ],
+     "step": {
+      "id": "82500.1",
+      "name": "step3"
+     },
+     "tres": {
+      "requested": {
+       "average": [
+        {
+         "count": 166,
+         "id": 1,
+         "name": "",
+         "type": "cpu"
+        },
+        {
+         "count": 20660224,
+         "id": 2,
+         "name": "",
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "type": "vmem"
+        },
+        {
+         "count": 36,
+         "id": 8,
+         "name": "",
+         "type": "pages"
+        }
+       ],
+       "max": [
+        {
+         "count": 166,
+         "id": 1,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "cpu"
+        },
+        {
+         "count": 20660224,
+         "id": 2,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "mem"
+        },
+        {
+         "count": 0,
+         "id": 3,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "energy"
+        },
+        {
+         "count": 0,
+         "id": 6,
+         "name": "disk",
+         "node": "gpu7",
+         "task": 0,
+         "type": "fs"
+        },
+        {
+         "count": 0,
+         "id": 7,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "vmem"
+        },
+        {
+         "count": 36,
+         "id": 8,
+         "name": "",
+         "node": "gpu7",
+         "task": 0,
+         "type": "pages"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "time": {
+    "elapsed": 123764,
+    "end": 1794974048,
+    "start": 1794850284
+   },
+   "tres": {
+    "allocated": [
+     {
+      "count": 96,
+      "id": 1,
+      "name": "",
+      "type": "cpu"
+     },
+     {
+      "count": 347136,
+      "id": 2,
+      "name": "",
+      "type": "mem"
+     },
+     {
+      "count": 1,
+      "id": 4,
+      "name": "",
+      "type": "node"
+     },
+     {
+      "count": 9,
+      "id": 5,
+      "name": "",
+      "type": "billing"
+     },
+     {
+      "count": 6,
+      "id": 1001,
+      "name": "gpu",
+      "type": "gres"
+     },
+     {
+      "count": 6,
+      "id": 1005,
+      "name": "gpu:a30",
+      "type": "gres"
+     }
+    ]
+   },
+   "user": "user18"
+  },
+  {
+   "account": "acct5",
    "array": {
     "job_id": 83731,
     "task": "",
@@ -1153,6 +2329,7 @@
      "set": true
     }
    },
+   "cluster": "cluster1",
    "job_id": 83732,
    "nodes": "gpu8",
    "partition": "a10-1",
@@ -1255,10 +2432,10 @@
      }
     ]
    },
-   "user": "user8"
+   "user": "user3"
   },
   {
-   "account": "acct13",
+   "account": "acct11",
    "array": {
     "job_id": 0,
     "task": "",
@@ -1268,9 +2445,10 @@
      "set": false
     }
    },
-   "job_id": 82736,
-   "nodes": "gpu1",
-   "partition": "a10-2",
+   "cluster": "cluster1",
+   "job_id": 80797,
+   "nodes": "gpu4",
+   "partition": "a30-1",
    "state": {
     "current": [
      "COMPLETED"
@@ -1282,20 +2460,20 @@
       "COMPLETED"
      ],
      "step": {
-      "id": "82736.batch",
+      "id": "80797.batch",
       "name": "batch"
      },
      "tres": {
       "requested": {
        "average": [
         {
-         "count": 75813,
+         "count": 476147755,
          "id": 1,
          "name": "",
          "type": "cpu"
         },
         {
-         "count": 3649863680,
+         "count": 99997126656,
          "id": 2,
          "name": "",
          "type": "mem"
@@ -1307,7 +2485,7 @@
          "type": "energy"
         },
         {
-         "count": 1779298563,
+         "count": 4720158858563,
          "id": 6,
          "name": "disk",
          "type": "fs"
@@ -1319,7 +2497,7 @@
          "type": "vmem"
         },
         {
-         "count": 0,
+         "count": 604,
          "id": 8,
          "name": "",
          "type": "pages"
@@ -1327,18 +2505,18 @@
        ],
        "max": [
         {
-         "count": 75813,
+         "count": 476147755,
          "id": 1,
          "name": "",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "cpu"
         },
         {
-         "count": 3649863680,
+         "count": 99997126656,
          "id": 2,
          "name": "",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "mem"
         },
@@ -1346,15 +2524,15 @@
          "count": 0,
          "id": 3,
          "name": "",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "energy"
         },
         {
-         "count": 1779298563,
+         "count": 4720158858563,
          "id": 6,
          "name": "disk",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "fs"
         },
@@ -1362,15 +2540,15 @@
          "count": 0,
          "id": 7,
          "name": "",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "vmem"
         },
         {
-         "count": 0,
+         "count": 604,
          "id": 8,
          "name": "",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "pages"
         }
@@ -1383,7 +2561,7 @@
       "COMPLETED"
      ],
      "step": {
-      "id": "82736.extern",
+      "id": "80797.extern",
       "name": "extern"
      },
      "tres": {
@@ -1401,7 +2579,7 @@
          "count": 0,
          "id": 3,
          "name": "",
-         "node": "gpu1",
+         "node": "gpu4",
          "task": 0,
          "type": "energy"
         }
@@ -1411,20 +2589,20 @@
     }
    ],
    "time": {
-    "elapsed": 113,
-    "end": 1794950224,
-    "start": 1794950111
+    "elapsed": 90315,
+    "end": 1794756505,
+    "start": 1794666190
    },
    "tres": {
     "allocated": [
      {
-      "count": 10,
+      "count": 20,
       "id": 1,
       "name": "",
       "type": "cpu"
      },
      {
-      "count": 55040,
+      "count": 110080,
       "id": 2,
       "name": "",
       "type": "mem"
@@ -1436,626 +2614,26 @@
       "type": "node"
      },
      {
-      "count": 1,
+      "count": 4,
       "id": 5,
       "name": "",
       "type": "billing"
      },
      {
-      "count": 1,
+      "count": 2,
       "id": 1001,
       "name": "gpu",
       "type": "gres"
      },
      {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
+      "count": 2,
+      "id": 1005,
+      "name": "gpu:a30",
       "type": "gres"
      }
     ]
    },
-   "user": "user18"
-  },
-  {
-   "account": "acct13",
-   "array": {
-    "job_id": 82731,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 32,
-     "set": true
-    }
-   },
-   "job_id": 83637,
-   "nodes": "gpu5",
-   "partition": "a10-2",
-   "state": {
-    "current": [
-     "COMPLETED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83637.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 1323243,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 3311566848,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 2657204576,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 1323243,
-         "id": 1,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 3311566848,
-         "id": 2,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 2657204576,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu5",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83637.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 1304,
-    "end": 1794946343,
-    "start": 1794945039
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 10,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 55040,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user18"
-  },
-  {
-   "account": "acct13",
-   "array": {
-    "job_id": 82731,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 33,
-     "set": true
-    }
-   },
-   "job_id": 83640,
-   "nodes": "gpu5",
-   "partition": "a10-2",
-   "state": {
-    "current": [
-     "COMPLETED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83640.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 1210604,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 3951448064,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 2920255734,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 1210604,
-         "id": 1,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 3951448064,
-         "id": 2,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 2920255734,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu5",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83640.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 1198,
-    "end": 1794946507,
-    "start": 1794945309
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 10,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 55040,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user18"
-  },
-  {
-   "account": "acct13",
-   "array": {
-    "job_id": 82731,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 36,
-     "set": true
-    }
-   },
-   "job_id": 83681,
-   "nodes": "gpu5",
-   "partition": "a10-2",
-   "state": {
-    "current": [
-     "COMPLETED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83681.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 1589779,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 4497350656,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 1942216200,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 1589779,
-         "id": 1,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 4497350656,
-         "id": 2,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 1942216200,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu5",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 0,
-         "id": 8,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "83681.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu5",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 1589,
-    "end": 1794949539,
-    "start": 1794947950
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 10,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 55040,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user18"
+   "user": "user6"
   }
  ],
  "meta": {
