@@ -27,7 +27,7 @@
   loop: "{{ grafana_dashboard_sets[grafana_dashboard_set] }}"
 
 - name: Find installed dashboards ({{ grafana_dashboard_set }})
-  ansible.builtin.find:
+  find_present:
     paths: "{{ grafana_dashboards_dir }}/{{ grafana_dashboard_set }}"
     patterns: "*.json"
   register: grafana_dashboard_installed

@@ -2,7 +2,7 @@
 # The command and manual page names of the Slurm packages, which slurm_stale_files_rules
 # tell a leftover script or page by (stale-files.yml; playbooks/utilities/stale-files.yml).
 - name: Find the Slurm packages
-  ansible.builtin.find:
+  find_present:
     paths: "{{ slurm_repo_dir }}"
     patterns: "*_{{ slurm_deb_version }}_*.deb"
   register: slurm_stale_debs

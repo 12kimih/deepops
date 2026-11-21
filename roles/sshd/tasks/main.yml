@@ -65,7 +65,7 @@
     # Anything else in sshd_config.d is read beside the drop-in and may set what it leaves
     # to the defaults: the directory holds the drop-in alone.
     - name: Find the drop-ins this role did not write
-      ansible.builtin.find:
+      find_present:
         paths: /etc/ssh/sshd_config.d
         file_type: any
         hidden: true

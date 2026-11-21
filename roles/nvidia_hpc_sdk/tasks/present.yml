@@ -161,7 +161,7 @@
 # its modulefiles. A running job that uses one loses it: change the version in a
 # maintenance window.
 - name: Find the HPC SDK releases the install directory holds
-  ansible.builtin.find:
+  find_present:
     paths: ["{{ hpcsdk_install_dir }}/Linux_{{ hpcsdk_arch }}", "{{ hpcsdk_install_dir }}/modulefiles"]
     file_type: any
     recurse: true

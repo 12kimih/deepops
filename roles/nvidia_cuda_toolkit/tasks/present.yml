@@ -94,7 +94,7 @@
 # A runfile is needed only until its toolkit is installed (a failed install keeps its
 # own for the rerun, which stops before this task).
 - name: Find the cached runfiles
-  ansible.builtin.find:
+  find_present:
     paths: "{{ cuda_cache_dir }}"
     patterns: "*.run"
   register: cuda_cached_runfiles
@@ -130,7 +130,7 @@
 # range in a maintenance window). A toolkit only the driver keeps out loses its
 # modulefile but keeps its tree: a lowered driver branch must not delete software.
 - name: Find what the software tree holds
-  ansible.builtin.find:
+  find_present:
     paths: ["{{ cuda_install_root }}", "{{ cuda_modroot }}/cuda"]
     file_type: any
     patterns: ['^[0-9]+\.[0-9]+(\.[0-9]+)?(\.lua)?$']
@@ -152,7 +152,7 @@
 # An install that failed for a version since dropped from cuda_versions leaves its
 # .partial tree (install_one.yml); hidden, the find above never sees it.
 - name: Find unfinished toolkit installs
-  ansible.builtin.find:
+  find_present:
     paths: "{{ cuda_install_root }}"
     file_type: directory
     hidden: true

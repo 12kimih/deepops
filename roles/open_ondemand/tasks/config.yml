@@ -73,7 +73,7 @@
     mode: "0644"
 
 - name: Find the cluster files
-  ansible.builtin.find:
+  find_present:
     paths: /etc/ood/config/clusters.d
     patterns: ["*.yml", "*.yaml"]
   register: open_ondemand_cluster_files

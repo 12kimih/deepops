@@ -117,7 +117,9 @@ changed: [node1]
 ```
 
 Every in-tree module returns a diff when it changes something (rule 21), so `--diff`
-shows what it would remove, write or install, never only that it would.
+shows what it would remove, write or install, never only that it would. Files are
+found through `find_present` (rule 25): a path not on the host (a directory this run
+would make, a component a host never had) is an empty directory, not a warning.
 
 ### Run history (ARA)
 

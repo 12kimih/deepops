@@ -11,7 +11,7 @@
         mode: "0644"
 
     - name: Find the users who linger
-      ansible.builtin.find:
+      find_present:
         paths: /var/lib/systemd/linger
         file_type: file
       register: node_user_policy_lingering

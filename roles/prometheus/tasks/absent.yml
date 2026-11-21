@@ -2,7 +2,7 @@
 # The alert rule files installed are found, so one dropped from the role since is
 # removed too; the TSDB volume is data and stays.
 - name: Find the installed alert rules
-  ansible.builtin.find:
+  find_present:
     paths: "{{ prometheus_config_dir }}/rules"
     patterns: "*.yml"
   register: prometheus_installed_rules

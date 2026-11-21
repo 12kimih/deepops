@@ -15,7 +15,7 @@
   register: container_service_file_places
 
 - name: List the directories in a file's place
-  ansible.builtin.find:
+  find_present:
     paths: "{{ item.item }}"
     file_type: any
     hidden: true

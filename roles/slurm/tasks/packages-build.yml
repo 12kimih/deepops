@@ -505,7 +505,7 @@
       when: not ansible_check_mode and slurm_deb_build_pyxis
 
 - name: Find the built packages
-  ansible.builtin.find:
+  find_present:
     paths: "{{ _slurm_build_account.home }}"
     patterns: ["*_{{ slurm_deb_version }}_*.deb", "{{ slurm_pyxis_package }}_{{ slurm_pyxis_deb_version }}_*.deb"]
   register: slurm_deb_built

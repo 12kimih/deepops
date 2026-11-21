@@ -69,7 +69,7 @@
   when: managed_dir_template | bool
 
 - name: Find the files present in {{ managed_dir_path }}
-  ansible.builtin.find:
+  find_present:
     paths: "{{ managed_dir_path }}"
     file_type: any
     hidden: true

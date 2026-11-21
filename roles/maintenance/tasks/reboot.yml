@@ -118,7 +118,7 @@
     # goes. A role still running (it asked with maintenance_reboot_now) carries on
     # itself. A failed rerun keeps the request for the next maintenance run.
     - name: Find the roles that waited for this reboot
-      ansible.builtin.find:
+      find_present:
         paths: "{{ maintenance_reboot_requests_dir }}"
         file_type: file
       register: maintenance_reboot_requests
