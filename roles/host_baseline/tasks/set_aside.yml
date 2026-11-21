@@ -1,0 +1,36 @@
+---
+# Files a role takes out of service but keeps (a foreign unit file, a hand drop-in), the
+# one way: moved, owner and mode as they were, into host_baseline_set_aside_dir (made
+# 0700 when needed), each under its path with / as _, so two names never collide. A
+# path not on the host is skipped. Under --check the move is previewed (change_command);
+# the directory and the move happen together, so no step waits on a directory a skipped
+# step would have made. Registers host_baseline_set_aside (one result per moved path).
+- name: Check the request
+  ansible.builtin.assert:
+    that:
+      - host_baseline_set_aside_dir is match('^/var/backups/')
+      - host_baseline_set_aside_paths | reject('match', '^/') | list | length == 0
+    fail_msg: set_aside takes absolute paths and a directory under /var/backups.
+    quiet: true
+
+- name: Look for the files to set aside
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: false
+  loop: "{{ host_baseline_set_aside_paths }}"
+  register: host_baseline_set_aside_found
+
+- name: Set aside {{ host_baseline_set_aside_dir | basename }}
+  change_command:
+    argv:
+      - sh
+      - -c
+      - 'mkdir -p -m 0700 -- "$1" && mv -- "$2" "$1/$3"'
+      - set-aside
+      - "{{ host_baseline_set_aside_dir }}"
+      - "{{ item.stat.path }}"
+      - "{{ item.stat.path | regex_replace('^/', '') | replace('/', '_') }}"
+  loop: "{{ host_baseline_set_aside_found.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: host_baseline_set_aside

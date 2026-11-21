@@ -38,3 +38,8 @@ host_baseline_kernel_args_reason: ""
 # Packages built per kernel (tasks_from: kernel_packages, Debian family): the kinds the
 # including role needs (tools, headers), for the kernel flavour and the running kernel.
 host_baseline_kernel_packages: []
+
+# Files to take out of service and keep (tasks_from: set_aside): absolute paths, and the
+# directory under /var/backups that holds them.
+host_baseline_set_aside_paths: []
+host_baseline_set_aside_dir: ""

@@ -117,7 +117,7 @@ docker_log_opts: {}
 
 # Unit files or drop-ins for docker.service that something else wrote (a kubespray-era
 # full copy of the unit, a docker-options.conf passing DOCKER_OPTS): named here, each is
-# copied under /var/backups/deepops-docker-units and removed, so the package's unit and
+# moved under /var/backups/deepops-docker-units (host_baseline set_aside), so the package's unit and
 # daemon.json decide again, and dockerd restarts once. Only what the site names goes: an
 # unnamed file passing a flag daemon.json also sets stops the run instead (dockerd would
 # refuse to start), naming the file. Move its flags into the settings above first.
