@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import tracked  # noqa: E402
+import bounds  # noqa: E402
 
 STANDALONE = ("scripts/validation/", "scripts/maas_inventory.py")
 
@@ -46,7 +47,7 @@ def run(path, *args):
         capture_output=True,
         text=True,
         errors="replace",
-        timeout=60,
+        timeout=bounds.CHILD,
     )
 
 

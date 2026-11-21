@@ -8,6 +8,9 @@ import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "lib"))
+import bounds  # noqa: E402
+
 
 SCRIPT = Path(__file__).resolve().parents[1] / "validate_model_cache.py"
 REVISION = "a" * 40
@@ -44,7 +47,7 @@ class ModelCacheTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=bounds.CHILD,
         )
         self.assertEqual(result.returncode, 0 if success else 1, result.stderr + result.stdout)
         payload = json.loads(result.stdout)
@@ -200,7 +203,7 @@ class ModelCacheTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=bounds.CHILD,
         )
         self.assertEqual(result.returncode, 2)
 
