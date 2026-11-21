@@ -18,6 +18,9 @@
   tags:
     - set-hosts
 
+- name: Configure each host's network from host_vars, one host at a time
+  import_playbook: generic/netplan.yml
+
 - name: Set the system locale and time zone
   import_playbook: generic/locale.yml
 

@@ -1,61 +1,86 @@
 ---
+# The host's network as netplan_config says: the managed file is written only when its
+# `network:` mapping differs (compared as data, so a file written by hand in another
+# layout is not rewritten), and files no deepops role wrote (an installer's
+# 50-cloud-init.yaml, a NetworkManager leftover) are set aside, since netplan merges
+# every file and theirs override ours. Other roles' files (roles/bmc) stay. Any change
+# goes through apply.yml, which can always go back.
 - name: Configure networking
   when: netplan_config | length > 0
   tags:
     - netplan
   block:
-    # netplan reads every file in the directory, so a bad one cannot be validated in
-    # isolation: write it, ask netplan to build, and put the old file back if it refuses.
-    - name: Configure netplan
-      ansible.builtin.template:
-        src: netplan.yaml.j2
-        dest: "{{ netplan_file }}"
-        backup: true
-        mode: "0600"
-      register: netplan_written
-      notify: Apply netplan
+    - name: List the netplan configuration
+      find_present:
+        paths: "{{ netplan_dir }}"
+        patterns: ["*.yaml", "*.yml"]
+      register: netplan_all
 
-    - name: Check netplan accepts it
-      ansible.builtin.command: netplan generate
-      changed_when: false
-  rescue:
-    - name: Restore the previous configuration
-      ansible.builtin.copy:
-        src: "{{ netplan_written.backup_file }}"
-        dest: "{{ netplan_file }}"
-        remote_src: true
-        mode: "0600"
-      when: netplan_written.backup_file is defined
+    - name: List the files deepops roles wrote
+      find_present:
+        paths: "{{ netplan_dir }}"
+        patterns: ["*.yaml", "*.yml"]
+        contains: ".*(?i:ansible managed|deepops|roles/[a-z0-9_-]+).*"  # find matches whole lines
+      register: netplan_ours
 
-    - name: Remove the configuration this role added
-      ansible.builtin.file:
-        path: "{{ netplan_file }}"
-        state: absent
-      when: netplan_written.backup_file is not defined
+    - name: Read the managed file
+      ansible.builtin.slurp:
+        src: "{{ netplan_file }}"
+      register: netplan_current
+      when: netplan_file in netplan_all.files | map(attribute='path')
 
-    - name: Report that the configuration was rejected
-      ansible.builtin.fail:
-        msg: "netplan rejected {{ netplan_file }}; the previous configuration is back in place"
-  # The copy exists only to put back a rejected file; once the run decided, it goes
-  # (Ansible's timestamped backups otherwise pile up in /etc/netplan).
-  always:
-    - name: Remove the copy kept for the rollback
-      ansible.builtin.file:
-        path: "{{ netplan_written.backup_file }}"
-        state: absent
-      when: netplan_written.backup_file is defined
+    - name: Note what differs
+      ansible.builtin.set_fact:
+        netplan_foreign: >-
+          {{ netplan_all.files | map(attribute='path') | difference(netplan_ours.files | map(attribute='path'))
+             | reject('eq', netplan_file) | list }}
+        netplan_differs: >-
+          {{ netplan_current.content is not defined
+             or ((netplan_current.content | b64decode | from_yaml) or {}).network | default({}) != netplan_config }}
+
+    - name: Apply the change
+      ansible.builtin.include_tasks: apply.yml
+      vars:
+        netplan_apply_file: "{{ netplan_file }}"
+        netplan_apply_content: "{{ lookup('ansible.builtin.template', 'netplan.yaml.j2') if netplan_differs | bool else '' }}"
+        netplan_apply_set_aside: "{{ netplan_foreign }}"
+      when: netplan_differs | bool or netplan_foreign | length > 0
+
+    - name: Let boot wait for the configured links
+      systemd_unit:
+        name: systemd-networkd-wait-online.service
+        enabled: true
+        masked: false
+      when:
+        - netplan_wait_online | bool
+        - netplan_config.renderer | default('networkd') == 'networkd'
 
 - name: Keep the other network manager out of the way
-  when: netplan_conflicting_manager | length > 0
   tags:
     - netplan
   block:
+    - name: Read which manager this role masked
+      ansible.builtin.slurp:
+        src: "{{ netplan_masked_record }}"
+      register: netplan_masked
+      failed_when: false
+
+    - name: Unmask the one no longer named
+      systemd_unit:
+        name: "{{ _before }}"
+        masked: false
+      vars:
+        _before: "{{ (netplan_masked.content | default('') | b64decode).strip() }}"
+      when: _before | length > 0 and _before != netplan_conflicting_manager
+
     - name: Look for it
-      ansible.builtin.command: "systemctl cat {{ netplan_conflicting_manager }}.service"
+      ansible.builtin.command:
+        argv: [systemctl, cat, "{{ netplan_conflicting_manager }}.service"]
       register: netplan_other_manager
       changed_when: false
       failed_when: false
-      check_mode: false
+      check_mode: false  # read-only; --check needs the result
+      when: netplan_conflicting_manager | length > 0
 
     - name: Mask it
       systemd_unit:
@@ -63,4 +88,11 @@
         state: stopped
         enabled: false
         masked: true
-      when: netplan_other_manager.rc == 0
+      when: netplan_conflicting_manager | length > 0 and netplan_other_manager.rc == 0
+
+    - name: Record the manager masked
+      ansible.builtin.copy:
+        content: "{{ netplan_conflicting_manager ~ '\n' if netplan_conflicting_manager else '' }}"
+        dest: "{{ netplan_masked_record }}"
+        mode: "0644"
+      when: netplan_conflicting_manager | length > 0 or netplan_masked.content is defined

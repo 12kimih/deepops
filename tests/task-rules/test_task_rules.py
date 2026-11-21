@@ -293,7 +293,6 @@ WORLD_WRITABLE_OK = {
 }
 # file -> why it keeps Ansible's backup copy
 BACKUP_OK = {
-    "roles/netplan/tasks/main.yml": "puts back a file netplan rejects, then removes the copy (always:)",
     "roles/sshd/tasks/main.yml": "puts back what sshd -t rejects, then removes the copies (always:)",
     "playbooks/k8s-cluster.yml": "the operator's own ~/.kube/config on the controller, not a host file",
 }

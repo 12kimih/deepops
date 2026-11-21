@@ -558,8 +558,12 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 # netplan_config is per-host and belongs in host_vars; an empty one leaves the
 # host's networking alone. netplan_conflicting_manager names the manager to mask
 # so it cannot compete with the renderer. See docs/deepops/netplan.md.
-#netplan_file: /etc/netplan/01-netcfg.yaml
+#netplan_file: "{{ netplan_dir }}/01-netcfg.yaml"  # netplan_dir: /etc/netplan
 #netplan_conflicting_manager: NetworkManager  # example
+# Boot waits for the configured links; a change is undone by the host unless Ansible
+# reaches it again within netplan_rollback_seconds.
+#netplan_wait_online: true
+#netplan_rollback_seconds: 300
 
 ################################################################################
 # Serial console                                                               #

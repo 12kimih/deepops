@@ -1,0 +1,14 @@
+---
+# Each host's netplan configuration from host_vars (roles/netplan). Ansible reaches the
+# host over the network this changes, so the play runs one host at a time, writes only
+# what differs, and applies a change with a timer that undoes it unless Ansible reaches
+# the host again. A host without netplan_config is left alone.
+#
+#   -e hostlist=...   target a subset
+- hosts: "{{ hostlist | default('all') }}"
+  become: true
+  serial: 1
+  roles:
+    - netplan
+  tags:
+    - netplan

@@ -1,11 +1,22 @@
 ---
 # The `network:` mapping, passed to netplan verbatim rather than re-modelled here, so any
 # netplan feature works without the role growing a knob for it. Per-host, in host_vars.
-# Empty leaves the node's networking alone.
+# Empty leaves the node's networking alone (the role never removes a working network).
 netplan_config: {}
-netplan_file: /etc/netplan/01-netcfg.yaml
+netplan_file: "{{ netplan_dir }}/01-netcfg.yaml"
 
 # The manager that must not compete with the renderer -- NetworkManager where netplan
 # renders to networkd, systemd-networkd where it renders to NetworkManager. Masked rather
-# than removed: masking is reversible and needs no package name. Empty disables the check.
+# than removed (reversible, no package name); one masked before and named no longer is
+# unmasked again. Empty masks none.
 netplan_conflicting_manager: ""
+
+# Boot waits for the configured links (systemd-networkd-wait-online), so the NFS mounts
+# (_netdev) come after the network: unmasked and enabled where netplan renders to
+# networkd. A link that may stay down belongs in netplan_config with `optional: true`.
+netplan_wait_online: true
+
+# A change is applied with a way back: before `netplan apply` the host arms a timer that
+# puts the previous files back and applies them, and the run disarms it once Ansible
+# reaches the host again. Seconds the host waits for that.
+netplan_rollback_seconds: 300

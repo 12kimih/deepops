@@ -35,7 +35,6 @@ reboots each as it empties and returns it to service. See
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
 | `utilities/apt-upgrade.yml` | slurm-node | rolling maintenance (roles/maintenance): one node at a time, drain it, upgrade every package (the held-back kernel, systemd, libc, GPU and scheduler stacks included), reboot if needed, check slurmd, GPUs, DCGM (level 1) and NHC, resume. Run it monthly |
-| `utilities/netplan.yml` | all | node networking from `netplan_config`, one host at a time; see [netplan.md](netplan.md) |
 | `utilities/check-id-consistency.yml` | all | asserts that NIS groups resolve to their pinned GID on every node; read-only |
 | `utilities/fleet-consistency.yml` | slurm-cluster | are the hosts level: running kernel, shared packages, loaded NVIDIA driver, kernel policy sysctls, pending reboots, shared machine-ids; read-only |
 | `utilities/mofed.yml` | all | NVIDIA DOCA-OFED for InfiniBand or RoCE adapters |
