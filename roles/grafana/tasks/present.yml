@@ -27,6 +27,18 @@
     - "{{ grafana_config_dir }}/provisioning/dashboards"
     - "{{ grafana_dashboards_dir }}"
 
+# The image's user, named on the host with the IDs roles/system_accounts gives it.
+# Resolved here: local_accounts evaluates its arguments in its own scope.
+- name: Note the Grafana account
+  ansible.builtin.set_fact:
+    _grafana_accounts: "{{ {'grafana': system_accounts.grafana} }}"
+
+- name: Create the Grafana account
+  ansible.builtin.include_role:
+    name: local_accounts
+  vars:
+    local_accounts: "{{ _grafana_accounts }}"
+
 - name: Create data dirs
   ansible.builtin.file:
     path: "{{ item }}"

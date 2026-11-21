@@ -27,3 +27,9 @@ system_accounts:
     uid: 22080
     home: /var/lib/easybuild
     comment: EasyBuild
+  # The user the Grafana image runs as (grafana/grafana: 472): named on the host that
+  # keeps its data, so the data directory has an owner and not a bare number.
+  grafana:
+    uid: 472
+    home: /var/lib/grafana
+    comment: Grafana
