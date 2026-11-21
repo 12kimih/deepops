@@ -46,30 +46,32 @@
       (roles/docker), which backs it up and removes it.
     quiet: true
 
+# The script decides the change itself, so --check runs it too, writing nothing: the
+# preview names the keys that would change, and a converged host previews no change and
+# no dockerd restart.
 - name: Apply the daemon.json keys of {{ docker_daemon_json_owner }}
-  change_command:
+  ansible.builtin.command:
     argv: [python3, -I, -c, "{{ lookup('ansible.builtin.file', 'daemon-json.py') }}"]
     stdin: >-
       {{ {'path': '/etc/docker/daemon.json',
           'record': docker_daemon_json_record_dir ~ '/' ~ docker_daemon_json_owner ~ '.json',
-          'want': docker_daemon_json_keys, 'drop_if': docker_daemon_json_drop_if} | to_json }}
+          'want': docker_daemon_json_keys, 'drop_if': docker_daemon_json_drop_if,
+          'check': ansible_check_mode} | to_json }}
   register: docker_daemon_json_result
-  changed_when: >-
-    ansible_check_mode or (docker_daemon_json_result.rc == 10)
-  failed_when: >-
-    not ansible_check_mode and (docker_daemon_json_result.rc not in [0, 10])
+  changed_when: docker_daemon_json_result.rc == 10
+  failed_when: docker_daemon_json_result.rc not in [0, 10]
+  check_mode: false  # writes nothing under --check (check: true)
 
 # dockerd re-reads some keys on SIGHUP (daemon-json.py: RELOADABLE); a change made only of
-# those reloads it, which stops no container, and anything else restarts it. Under --check
-# nothing ran, so the preview says restart.
+# those reloads it, which stops no container, and anything else restarts it.
 - name: Apply the changed daemon.json keys
   ansible.builtin.debug:
     msg: >-
-      {{ (_changed.changed | join(', ')) if _changed.changed is defined else 'daemon.json' }} changed;
+      {{ _changed.changed | join(', ') }} changed;
       dockerd {{ 'reloads' if _changed.reload | default(false) else 'restarts' }}.
   changed_when: true
   vars:
-    _changed: "{{ docker_daemon_json_result.stdout | default('{}', true) | from_json }}"
+    _changed: "{{ docker_daemon_json_result.stdout | from_json }}"
   notify: "{{ 'Reload dockerd' if _changed.reload | default(false) else 'Restart dockerd' }}"
   when: docker_daemon_json_result is changed
 
