@@ -2,6 +2,11 @@
 # What the component installs, for its record (roles/component_record). The image store
 # (standalone_container_registry_data_dir) is data: never an item, never removed.
 standalone_container_registry_items:
-  - "container:{{ standalone_container_registry_name }}"
+  - "unit:{{ standalone_container_registry_svc_name }}"
+  - "container:{{ standalone_container_registry_svc_name }}"
+  - "file:/etc/systemd/system/{{ standalone_container_registry_svc_name }}"
   - "file:{{ standalone_container_registry_config_dir }}/config.yml"
   - package:python3-docker
+# The container as it ran outside systemd, for a removal on a host never moved over.
+standalone_container_registry_retired_items:
+  - "container:{{ standalone_container_registry_name }}"
