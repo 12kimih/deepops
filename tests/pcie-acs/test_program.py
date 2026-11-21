@@ -15,7 +15,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from ansible_yaml import render  # noqa: E402
+from ansible_yaml import load, render  # noqa: E402
 
 PROGRAM = render((ROOT / "roles/pcie_acs/templates/pcie-acs.sh.j2").read_text(), {"ansible_managed": ""})
 CHECKS = ROOT / "roles/nhc/files/deepops.nhc"
@@ -94,6 +94,25 @@ class Nhc(unittest.TestCase):
         rc, out, _ = run(None, {"0000:00:01.0": "001d"}, nhc=True)
         self.assertEqual((rc, out), (1, "PCIe ACS on: 0000:00:01.0 (001d)"))
         self.assertEqual(run(None, {"0000:00:01.0": "0000"}, nhc=True)[:2], (0, ""))
+
+
+class Iommu(unittest.TestCase):
+    """pcie_acs_iommu picks the argument for the CPU's vendor (the nodes had it typed into
+    /etc/default/grub by hand)."""
+
+    def args(self, setting, vendor):
+        variables = {
+            **load(ROOT / "roles/pcie_acs/vars/main.yml"),
+            "pcie_acs_iommu": setting,
+            "ansible_facts": {"processor": ["0", vendor, "Some CPU"]},
+        }
+        return render("{{ pcie_acs_iommu_args }}", variables)
+
+    def test_off_by_vendor_pt_and_nothing(self):
+        self.assertEqual(self.args("off", "GenuineIntel"), ["intel_iommu=off"])
+        self.assertEqual(self.args("off", "AuthenticAMD"), ["amd_iommu=off"])
+        self.assertEqual(self.args("pt", "GenuineIntel"), ["iommu=pt"])
+        self.assertEqual(self.args("", "GenuineIntel"), [])
 
 
 if __name__ == "__main__":

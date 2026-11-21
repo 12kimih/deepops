@@ -4,3 +4,9 @@ pcie_acs_items:
   - "unit:{{ pcie_acs_service }}"
   - "file:/etc/systemd/system/{{ pcie_acs_service }}"
   - "file:{{ pcie_acs_program }}"
+
+# The kernel argument for pcie_acs_iommu on this host's CPU vendor.
+pcie_acs_iommu_args: >-
+  {{ {'off': [('amd_iommu=off' if ansible_facts.processor | select('search', 'AuthenticAMD') | list | length > 0
+               else 'intel_iommu=off')],
+      'pt': ['iommu=pt'], '': []}[pcie_acs_iommu] }}

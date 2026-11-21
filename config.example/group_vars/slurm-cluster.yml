@@ -328,6 +328,9 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 # NHC drains a node where it is back on). Bare metal only: a host passing devices to
 # virtual machines needs ACS.
 #slurm_disable_pcie_acs: false
+# The IOMMU beside it, as NCCL's guide pairs them: off, pt (pass-through) or "" (leave
+# the kernel command line alone); a reboot applies it.
+#pcie_acs_iommu: ""
 
 # GPU ECC (roles/nvidia_ecc): "enabled" or "disabled" on every GPU of the nodes, ""
 # leaves each GPU as it is. ECC reserves about a sixteenth of a GDDR GPU's memory; a
