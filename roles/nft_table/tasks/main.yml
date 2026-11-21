@@ -38,6 +38,7 @@
     owner: root
     group: root
     mode: "0644"
+  register: nft_table_unit_file
 
 # Under --check the files above are not written, so there is nothing to load.
 - name: Load now and at boot table {{ nft_table_name }}
@@ -46,6 +47,7 @@
     enabled: true
     state: started
     daemon_reload: true
+    relink: "{{ nft_table_unit_file is changed }}"  # its links follow a changed [Install]
   when: not ansible_check_mode
 
 # What the kernel holds against the file, not whether this run wrote it: a run that

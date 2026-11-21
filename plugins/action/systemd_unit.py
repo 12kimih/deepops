@@ -8,6 +8,11 @@ requested service"): fail2ban's preview failed on every node that did not have i
 systemd_unit takes systemd_service's arguments and runs exactly as it does; under
 --check, for a unit that is not there yet, it reports what it would do once the run has
 installed it as a change, and with --diff shows it as the diff.
+
+relink: true (with enabled: true) enables the unit afresh (systemctl reenable), for a
+unit whose file changed: enabling an enabled unit adds no link its [Install] gained
+since, so a container unit that gained WantedBy=docker.service stayed down after Docker
+restarted (2026-11-22). Pass it as `relink: "{{ <the unit file's task> is changed }}"`.
 """
 
 from __future__ import annotations
@@ -35,14 +40,32 @@ class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
         del tmp
         result = super().run(task_vars=task_vars)
+        args = dict(self._task.args)
+        relink = bool(args.pop("relink", False)) and args.get("enabled") is True
         result.update(
             self._execute_module(
-                module_name="ansible.legacy.systemd_service", module_args=self._task.args, task_vars=task_vars
+                module_name="ansible.legacy.systemd_service", module_args=args, task_vars=task_vars
             )
         )
+        if relink and not result.get("failed"):
+            if self._task.check_mode:
+                result.update(changed=True, diff={"prepared": f"would reenable {args['name']}\n"})
+            else:
+                linked = self._execute_module(
+                    module_name="ansible.legacy.command",
+                    module_args={"argv": ["systemctl", "reenable", args["name"]]},
+                    task_vars=task_vars,
+                )
+                if linked.get("rc"):
+                    return {
+                        **result,
+                        "failed": True,
+                        "msg": f"systemctl reenable {args['name']}: {linked.get('stderr')}",
+                    }
+                result["changed"] = True
         if self._task.check_mode and result.get("failed") and MISSING in str(result.get("msg", "")):
             # Stopping or disabling what is not there is already done.
-            steps = [s for s in describe(self._task.args) if not s.startswith(("stop ", "disable "))]
+            steps = [s for s in describe(args) if not s.startswith(("stop ", "disable "))]
             line = (
                 f"{', '.join(steps)} once this run installs it" if steps else "nothing to do: not installed"
             )
