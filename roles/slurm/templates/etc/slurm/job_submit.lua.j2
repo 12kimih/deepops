@@ -1,12 +1,9 @@
--- job_submit.lua -- EXAMPLE Slurm submit-time site policy (partition routing by GPU
--- type, GPU-type stamping on every GPU request, and default-only sizing of GPU jobs).
--- DeepOps does NOT generate this file -- copy it into your config/
--- (config/files/slurm/job_submit.lua), EDIT the [1] block for your cluster, then
--- enable it with:
---     slurm_job_submit_plugins: "lua"
---     slurm_job_submit_template: "{{ inventory_dir }}/files/slurm/job_submit.lua"
--- It is copied verbatim and runs inside slurmctld holding locks -- keep it pure
--- string parsing, no I/O. https://slurm.schedmd.com/job_submit_plugins.html
+{% raw %}-- job_submit.lua -- Slurm submit-time site policy (partition routing by GPU type, GPU-type
+-- stamping on every GPU request, default-only sizing of GPU jobs, interactive GPU
+-- sessions on a team QoS). Rendered by roles/slurm from slurm_job_submit_policy: the
+-- [1] block is the site's settings, the rest is the same for every cluster. Edit the
+-- setting, never this file on a host. It runs inside slurmctld holding locks -- keep it
+-- pure string parsing, no I/O. https://slurm.schedmd.com/job_submit_plugins.html
 --
 -- WHY THE TYPE STAMPING MATTERS -- do not "optimise" it away.
 -- QoS/association GrpTRES limits written against a typed TRES (gres/gpu:a100=4) are
@@ -59,19 +56,29 @@
 --   GPU_NODES_SHARED       true  -- a CPU-only job may not take a GPU node to itself
 --                          (--exclusive in any form, --mem=0): its GPUs would sit idle
 --                          for its whole run. false -- no such rule.
-local CPU_PARTITIONS        = "cpu"
+--   INTERACTIVE_GPU_QOS    a Lua pattern an interactive GPU job's QoS must match: a
+--                          session started with srun or salloc (no batch script)
+--                          holds its GPUs while someone sits at a shell, so it runs
+--                          only on such a QoS (a team's own, e.g. "^high_"), which
+--                          it must name with --qos. "" = no such rule.
+{% endraw %}
+{%- set p = slurm_job_submit_policy -%}
+{%- macro lua_str(s) -%}"{{ s | string | replace('\\', '\\\\') | replace('"', '\\"') }}"{%- endmacro -%}
+{%- macro lua_bool(b) -%}{{ 'true' if b else 'false' }}{%- endmacro %}
+local CPU_PARTITIONS        = {{ lua_str(p.cpu_partitions) }}
 local GPU_TYPE_TO_PARTITION = {
-    ["b200"] = "b200",
-    ["h100"] = { "h100", "h100-short" },
-    ["h200"] = "h200",
+{% for gtype, parts in p.gpu_partitions | dictsort %}
+    [{{ lua_str(gtype) }}] = { {% for part in ([parts] if parts is string else parts) %}{{ lua_str(part) }}{{ ", " if not loop.last }}{% endfor %} },
+{% endfor %}
 }
-local DEFAULT_GPU_TYPE      = "b200"
-local STRICT_GPU_TYPE       = true
-local FORCE_GPU_PARTITION   = true
-local GPU_JOBS_USE_DEFAULTS = true
-local GPUS_PER_NODE         = { 1, 2, 4, 8 }
-local GPU_NODES_SHARED      = true
-
+local DEFAULT_GPU_TYPE      = {{ lua_str(p.default_gpu_type) }}
+local STRICT_GPU_TYPE       = {{ lua_bool(p.strict_gpu_type) }}
+local FORCE_GPU_PARTITION   = {{ lua_bool(p.force_gpu_partition) }}
+local GPU_JOBS_USE_DEFAULTS = {{ lua_bool(p.gpu_jobs_use_defaults) }}
+local GPUS_PER_NODE         = { {{ p.gpus_per_node | map('int') | join(', ') }} }
+local GPU_NODES_SHARED      = {{ lua_bool(p.gpu_nodes_shared) }}
+local INTERACTIVE_GPU_QOS   = {{ lua_str(p.interactive_gpu_qos) }}
+{% raw %}
 -- Derived once at load, from the [1] block above.
 --   GPU_TYPE_PARTITION    type      -> the partition list to route that type to
 --   PARTITION_TO_GPU_TYPE partition -> the single GPU type it holds
@@ -553,6 +560,18 @@ local function job_submit(job_desc, part_list, submit_uid)
         return reject_multi_type()
     end
 
+    -- An interactive session (srun, salloc: no batch script) holds its GPUs while
+    -- someone sits at a shell, so it runs only on a QoS matching INTERACTIVE_GPU_QOS,
+    -- named with --qos (an unset QoS is the preemptible default, which never matches).
+    if INTERACTIVE_GPU_QOS ~= "" and job_desc.script == nil then
+        local qos = job_desc.qos
+        if qos == nil or qos == "" or not string.find(qos, INTERACTIVE_GPU_QOS) then
+            slurm.log_user("Interactive GPU jobs (srun, salloc) run on your team's QoS: " ..
+                           "add --qos=<team QoS> (the qos command lists yours).")
+            return slurm.ERROR
+        end
+    end
+
     -- Untyped request: take the type from the partition it named, else from the site
     -- default. Every path out of this block carries a type or has been rejected -- an
     -- untyped request is invisible to the typed GrpTRES limits (see the header), so
@@ -704,3 +723,4 @@ end
 function slurm_job_modify(job_desc, job_rec, part_list, modify_uid)
     return guarded(job_modify, job_desc, job_rec, part_list, modify_uid)
 end
+{% endraw %}

@@ -167,14 +167,17 @@ with a `PluginDir` other than the packages'; leave `PluginDir` out. Keep
 `MetricsType=metrics/openmetrics` for the Prometheus scrape.
 
 Optional submit-time routing (e.g. GPU jobs to per-GPU-type partitions) is available
-by setting `slurm_job_submit_plugins: "lua"` and pointing `slurm_job_submit_template`
-at your own `job_submit.lua`. DeepOps does not generate one;
-`config.example/files/slurm/job_submit.lua` is a ready-to-edit starting point that
-routes by GPU type and sends CPU-only jobs to a CPU partition. Optionally it also
-pins GPU jobs to every partition of their type (`FORCE_GPU_PARTITION`) and sizes them
-by the partition defaults alone (`GPU_JOBS_USE_DEFAULTS`: CPU options dropped, memory
-options rejected, at most one task per GPU). Test a copy with
-`lua5.4 roles/slurm/tests/job_submit_test.lua <path>` before deploying it.
+by setting `slurm_job_submit_plugins: "lua"` and the site's `slurm_job_submit_policy`
+(see `config.example/group_vars/slurm-cluster.yml`). The role renders
+`roles/slurm/templates/etc/slurm/job_submit.lua.j2` from it: it routes by GPU type and
+sends CPU-only jobs to a CPU partition; optionally it also pins GPU jobs to every
+partition of their type (`force_gpu_partition`), sizes them by the partition defaults
+alone (`gpu_jobs_use_defaults`: CPU options dropped, memory options rejected, at most
+one task per GPU) and keeps interactive GPU sessions on a QoS matching
+`interactive_gpu_qos`. The logic is the same for every cluster; only the policy
+differs. `scripts/check.sh` renders it and runs `roles/slurm/tests/job_submit_test.lua`
+on the result. A site's own Lua file still works: point `slurm_job_submit_template` at
+a path not ending in `.j2` and it is installed as it is.
 
 Because `config/` is git-ignored by DeepOps, keep your server-specific settings
 and secrets there and manage that directory as a separate **private** repo:

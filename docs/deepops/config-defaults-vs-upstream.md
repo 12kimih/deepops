@@ -52,8 +52,8 @@ These are additive -- upstream had no equivalent default:
   and `nfs_detach_on_shutdown`.
 - **Slurm config** -- the `slurm` role tracks upstream; full site control is via complete
   templates under `config/files/slurm/` pointed to by `slurm_conf_template` (and the
-  cgroup/gres/dbd equivalents), rendered verbatim. `config.example/files/slurm/job_submit.lua`
-  is a ready-to-edit Lua submit filter (DeepOps generates none).
+  cgroup/gres/dbd equivalents), rendered verbatim. The Lua submit filter is the role's
+  template, rendered from `slurm_job_submit_policy`.
 - **GPU power cap** -- `slurm_cluster_configure_gpu_power_limit`, the cap per GPU model
   (`nvidia_power_limit_watts_by_model`), and `nvidia_power_limit_watts` for a host that differs.
 - **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner
@@ -95,8 +95,8 @@ These are additive -- upstream had no equivalent default:
   and `nfs_detach_on_shutdown`.
 - **Slurm config** -- the `slurm` role tracks upstream; full site control is via complete
   templates under `config/files/slurm/` pointed to by `slurm_conf_template` (and the
-  cgroup/gres/dbd equivalents), rendered verbatim. `config.example/files/slurm/job_submit.lua`
-  is a ready-to-edit Lua submit filter (DeepOps generates none).
+  cgroup/gres/dbd equivalents), rendered verbatim. The Lua submit filter is the role's
+  template, rendered from `slurm_job_submit_policy`.
 - **GPU power cap** -- `slurm_cluster_configure_gpu_power_limit`, and `nvidia_power_limit_watts`
   per host.
 - **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner

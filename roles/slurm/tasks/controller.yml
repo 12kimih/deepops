@@ -175,25 +175,30 @@
   tags:
     - config
 
-# Deploy a user-provided job_submit.lua only when the lua plugin is enabled. DeepOps
-# does not generate it -- you supply your own (config.example/files/slurm/job_submit.lua
-# is a starting point). Copied VERBATIM, not templated: lua table literals contain
-# "{{" which would break Jinja. Only slurmctld reads it. https://slurm.schedmd.com/job_submit_plugins.html
-- name: Assert a job_submit.lua is provided when the lua plugin is enabled
-  ansible.builtin.assert:
-    that: slurm_job_submit_template | length > 0
-    fail_msg: >-
-      slurm_job_submit_plugins includes 'lua' but slurm_job_submit_template is empty.
-      Write a job_submit.lua, place it under config/files/slurm/, and point
-      slurm_job_submit_template at it (see config.example/files/slurm/job_submit.lua).
-  when: "'lua' in (slurm_job_submit_plugins)"
-
+# job_submit.lua when the lua plugin is enabled: the role's template rendered from
+# slurm_job_submit_policy (only its [1] block is Jinja; the Lua is raw), or a site's own
+# file installed as it is. Only slurmctld reads it. https://slurm.schedmd.com/job_submit_plugins.html
 - name: Configure job_submit.lua
+  ansible.builtin.template:
+    src: "{{ slurm_job_submit_template }}"
+    dest: "{{ slurm_config_dir }}/job_submit.lua"
+    mode: "0644"
+  when:
+    - "'lua' in (slurm_job_submit_plugins)"
+    - slurm_job_submit_template is match('.*[.]j2$')
+  notify:
+    - Restart slurmctld
+  tags:
+    - config
+
+- name: Install the site's own job_submit.lua
   ansible.builtin.copy:
     src: "{{ slurm_job_submit_template }}"
     dest: "{{ slurm_config_dir }}/job_submit.lua"
     mode: "0644"
-  when: "'lua' in (slurm_job_submit_plugins)"
+  when:
+    - "'lua' in (slurm_job_submit_plugins)"
+    - slurm_job_submit_template is not match('.*[.]j2$')
   notify:
     - Restart slurmctld
   tags:
