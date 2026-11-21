@@ -119,6 +119,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── host_baseline
 │   ├── ingress_policy
 │   ├── internal_ca
+│   ├── job_notice
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
 │   ├── ldap_server
