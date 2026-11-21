@@ -43,78 +43,36 @@ def system_ids():
     return {a["uid"] for a in accounts.values()} | {a.get("gid", a["uid"]) for a in accounts.values()}
 
 
-def _load_rt(path):
-    from ruamel.yaml import YAML
-
-    text = path.read_text()
-    rt = YAML()
-    rt.preserve_quotes = True
-    rt.indent(mapping=2, sequence=4, offset=2)
-    rt.explicit_start = text.lstrip().startswith("---")
-    return rt, rt.load(text)
-
-
-def _save_checked(path, rt, doc):
-    import io
-
-    out = io.StringIO()
-    rt.dump(doc, out)
-    problems = people.check(yaml.safe_load(out.getvalue()))
-    if problems:
-        for problem in problems:
-            print(f"{path}: {problem}", file=sys.stderr)
-        return 1
-    path.write_text(out.getvalue())
-    return 0
+def edit(path, change):
+    """Write CHANGE(text) to PATH; a refusal is printed and nothing is written."""
+    try:
+        result = change(path.read_text())
+    except people.EditError as e:
+        for line in str(e).splitlines():
+            print(f"{path}: {line}", file=sys.stderr)
+        return None
+    text = result[0] if isinstance(result, tuple) else result
+    path.write_text(text)
+    return result
 
 
 def add(path, login, account, name=None, slack=None):
-    from ruamel.yaml.comments import CommentedMap
-
     accounting = path.parent / "files" / "slurm" / "accounting.yml"
+    declared = None
     if accounting.is_file():
         declared = (yaml.safe_load(accounting.read_text()) or {}).get("accounts") or {}
-        if account not in declared:
-            print(f"{path}: account {account} is not declared in {accounting}", file=sys.stderr)
-            return 1
-    rt, doc = _load_rt(path)
-    roster = doc["people"]
-    if login in roster:
-        print(f"{path}: {login} is already in the roster", file=sys.stderr)
+    done = edit(path, lambda t: people.roster_add(t, login, account, name, slack, system_ids(), declared))
+    if done is None:
         return 1
-    roster_uids = {p["uid"] for p in roster.values() if p and "uid" in p}
-    taken = roster_uids | system_ids()
-    uid = max(roster_uids | {people.UID_MIN - 1}) + 1
-    while uid in taken:
-        uid += 1
-    entry = CommentedMap(uid=uid)
-    if name:
-        entry["name"] = name
-    if slack:
-        entry["slack"] = slack
-    entry["accounts"] = CommentedMap({account: CommentedMap()})
-    entry["accounts"][account].fa.set_flow_style()
-    position = sum(1 for other in roster if str(other) < login)
-    roster.insert(position, login, entry)
-    status = _save_checked(path, rt, doc)
-    if status == 0:
-        print(f"added {login} (uid {uid}, account {account})")
-    return status
+    print(f"added {login} (uid {done[1]}, account {account})")
+    return 0
 
 
 def leave(path, login):
-    rt, doc = _load_rt(path)
-    entry = doc["people"].get(login)
-    if entry is None:
-        print(f"{path}: {login} is not in the roster", file=sys.stderr)
+    if edit(path, lambda t: people.roster_leave(t, login)) is None:
         return 1
-    for key in ("roles", "accounts", "default_account", "disk_quota"):
-        entry.pop(key, None)
-    entry["status"] = "left"
-    status = _save_checked(path, rt, doc)
-    if status == 0:
-        print(f"{login} has left (uid {entry['uid']} stays reserved)")
-    return status
+    print(f"{login} has left (the UID stays reserved)")
+    return 0
 
 
 def default_files():
