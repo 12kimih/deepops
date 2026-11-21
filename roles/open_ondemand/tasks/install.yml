@@ -5,7 +5,7 @@
 # archived first; the role writes the configuration again from config/.
 - name: Look for an existing Open OnDemand install
   ansible.builtin.command:
-    argv: [dpkg-query, -W, -f, '${db:Status-Abbrev} ${Package} ${Version}\n', ondemand, ondemand-release-web]
+    argv: [dpkg-query, -W, -f, '${db:Status-Abbrev} ${binary:Package} ${Version}\n', ondemand, ondemand-release-web]
   register: open_ondemand_installed
   changed_when: false
   failed_when: open_ondemand_installed.rc > 1

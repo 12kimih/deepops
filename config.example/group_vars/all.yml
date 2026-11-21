@@ -170,6 +170,13 @@
 # The controller keeps its database (slurmdbd) and web server (Open OnDemand).
 #host_baseline_absent_packages: "{{ ['avahi-daemon', 'iperf3', 'samba', 'mysql-server*']  # example
 #  + ([] if inventory_hostname in groups['slurm-master'] | default([]) else ['apache2*']) }}"
+# A removal never takes along a package a component records or one of these (it stops
+# instead, before anything goes): extend the list for the site's own essentials.
+#host_baseline_protected_packages: [apt, dpkg, sudo, systemd, ..., slurm-smd*, munge]  # example
+# The site's own leftovers for roles/stale_files (what a person installed by hand and the
+# site retired); nothing a package owns is taken.
+#stale_files_site_rules:  # example
+#  - {name: a hand-copied code-server, type: files, dirs: [/usr/local/bin], pattern: code-server}
 # A switch turned off, or a host that left a component's group, removes the component
 # (docs/deepops/component-state.md). The driver, authentication, Slurm, MUNGE and the
 # NFS server are kept then; name one here to remove it where nothing wants it.

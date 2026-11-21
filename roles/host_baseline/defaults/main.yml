@@ -14,6 +14,31 @@
 # controller. Empty = nothing removed.
 host_baseline_absent_packages: []
 
+# What a removal may never take along (tasks_from: absent): a package named for removal
+# goes, but one of these that apt would remove with it (a reverse dependency, a freed
+# dependency) stops the run before anything is removed. Every package a component
+# records (ansible_facts.ansible_local.deepops_components) is protected the same way,
+# so removing a desktop never takes the NVIDIA driver that depends on
+# xserver-xorg-core. Shell-style patterns.
+host_baseline_protected_packages:
+  - apt
+  - dpkg
+  - sudo
+  - systemd
+  - systemd-sysv
+  - openssh-server
+  - openssh-client
+  - python3
+  - netplan.io
+  - ubuntu-minimal
+  - ubuntu-server
+  - ubuntu-standard
+  - linux-generic*
+  - linux-image-*
+  - linux-modules-*
+  - slurm-smd*
+  - munge
+
 # Local filesystems' mount options, mount point: options (fstab(5) field 4), for the
 # entries already in /etc/fstab (the installer's, by UUID): only the options are set,
 # then the filesystem is remounted. A network filesystem is roles/nfs_client's. Usually
