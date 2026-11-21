@@ -1,11 +1,17 @@
 ---
-# What this component installs, for its record (roles/component_record). Its state file
-# (when each job turned idle, whom it notified) is data and stays.
-slurm_usage_report_items:
-  - "unit:{{ slurm_usage_report_svc_name }}.timer"
-  - "unit:{{ slurm_usage_report_svc_name }}.service"
-  - "file:/etc/systemd/system/{{ slurm_usage_report_svc_name }}.timer"
-  - "file:/etc/systemd/system/{{ slurm_usage_report_svc_name }}.service"
-  - "file:{{ slurm_usage_report_script }}"
-  - "file:{{ slurm_usage_report_config_dir }}/config.json"
-  - "dir:{{ slurm_usage_report_config_dir }}"
+# The runs: the hourly report and the weekly summary, each its own service and timer
+# (one template pair), sharing the configuration; the weekly run keeps its own state
+# file beside the hourly one's.
+slurm_usage_report_runs:
+  - {unit: "{{ slurm_usage_report_svc_name }}", args: "", schedule: "{{ slurm_usage_report_schedule }}",
+     what: report}
+  - {unit: "{{ slurm_usage_report_svc_name }}-weekly", args: "--weekly",
+     schedule: "{{ slurm_usage_report_weekly_schedule }}", what: weekly summary}
+# What this component installs, for its record (roles/component_record). Its state files
+# (when each job turned idle, whom it notified, each person's weeks) are data and stay.
+_slurm_usage_report_units: "{{ slurm_usage_report_runs | map(attribute='unit') | product(['.timer', '.service']) | map('join') | list }}"
+slurm_usage_report_items: >-
+  {{ _slurm_usage_report_units | map('regex_replace', '^', 'unit:') | list
+     + _slurm_usage_report_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ slurm_usage_report_script, 'file:' ~ slurm_usage_report_config_dir ~ '/config.json',
+        'dir:' ~ slurm_usage_report_config_dir] }}

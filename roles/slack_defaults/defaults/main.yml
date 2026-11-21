@@ -1,0 +1,18 @@
+---
+# slack_defaults -- the cluster's Slack workspace, named once for every role that posts
+# there (a shared-defaults role: roles list it as a meta dependency).
+#
+# The one bot token of the cluster's Slack app (vault it in the site config); every
+# feature that posts or listens uses it. Empty turns the Slack features off.
+slack_bot_token: ""
+
+# The channels by what they are for:
+#   status    what everyone may look at: the hourly and weekly GPU usage, storage
+#   admin     what an administrator has to act on
+#   help      where people ask for help and make requests (scratch space, unbans)
+#   announce  notices and release notes
+slack_channels:
+  status: "#gpu-usage"
+  admin: "#alerts"
+  help: "#help"
+  announce: "#announcements"

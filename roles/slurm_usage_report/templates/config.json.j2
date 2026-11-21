@@ -11,5 +11,9 @@
   "cancel_after_hours": slurm_usage_report_cancel_after_hours | float,
   "user_map": slurm_usage_report_user_map,
   "email_domain": slurm_usage_report_email_domain,
-  "state_file": "/var/lib/" ~ slurm_usage_report_svc_name ~ "/state.json"
+  "state_file": "/var/lib/" ~ slurm_usage_report_svc_name ~ "/state.json",
+  "admin_channel": slurm_usage_report_admin_channel,
+  "repeat_idle_gpu_hours": slurm_usage_report_repeat_idle_gpu_hours | float,
+  "repeat_idle_share": slurm_usage_report_repeat_idle_share | float,
+  "repeat_weeks": slurm_usage_report_repeat_weeks | int
 } | to_nice_json }}

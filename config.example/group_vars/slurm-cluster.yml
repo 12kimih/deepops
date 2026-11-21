@@ -56,14 +56,26 @@ slurm_ha_state_save_location: "/sw/slurm"
 # when the always-firing Watchdog alert stops arriving. Alertmanager pings about every
 # minute; give the check a 2 minute period (headroom for jitter) and 5 minutes of grace.
 #alertmanager_heartbeat_url: ""
-# Slack app bot token (xoxb-) for bot posts and DMs.
+# The cluster's Slack workspace (roles/slack_defaults): the one bot token (xoxb-, vault
+# it) every feature that posts uses, and the channels by purpose.
 #slack_bot_token: ""
+#slack_channels:
+#  status: "#gpu-usage"
+#  admin: "#alerts"
+#  help: "#help"
+#  announce: "#announcements"
 
-# Hourly GPU usage report and idle-GPU nudges (roles/slurm_usage_report); needs
-# slack_bot_token. notify: any of mention, dm ([] = list only). cancel_after_hours 0 = never.
-# user_map: Slurm user -> Slack member ID (profile > Copy member ID) or email; here
-# from the people roster's slack attribute (PEOPLE in all.yml).
-#slurm_usage_report_channel: "#gpu-usage"
+# Hourly GPU usage report and idle-GPU nudges, and a weekly per-person summary of
+# GPU-hours held and left idle (roles/slurm_usage_report), posted to
+# slack_channels.status. notify: any of mention, dm ([] = list only).
+# cancel_after_hours 0 = never. user_map: Slurm user -> Slack member ID (profile > Copy
+# member ID) or email; here from the people roster's slack attribute (PEOPLE in all.yml).
+# Someone over both repeat_idle thresholds for repeat_weeks weeks running is reported to
+# slack_channels.admin with what to do.
+#slurm_usage_report_weekly_schedule: "Mon *-*-* 09:00:00"
+#slurm_usage_report_repeat_idle_gpu_hours: 50
+#slurm_usage_report_repeat_idle_share: 0.5
+#slurm_usage_report_repeat_weeks: 2
 #slurm_usage_report_notify: [mention]
 #slurm_usage_report_cancel_after_hours: 0
 #slurm_usage_report_user_map: "{{ people | people_attr('slack') }}"  # example
