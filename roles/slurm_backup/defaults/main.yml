@@ -45,10 +45,14 @@ slurm_backup_config: /etc/slurm-backup.json
 # node_exporter's textfile collector directory (roles/prometheus-node-exporter).
 slurm_backup_textfile_dir: "{{ node_exporter_prom_dir }}"
 slurm_backup_textfile: slurm-backup.prom
-# Root-only working directory: the set being built, the lock backup and restore-test
-# share, and the metrics kept between runs and reboots (copied into the textfile dir).
+# Root-only working directory: the set being built and the lock backup and restore-test
+# share.
 slurm_backup_work_dir: /var/lib/slurm-backup
-slurm_backup_metrics_file: "{{ slurm_backup_work_dir }}/slurm-backup.prom"
+# The metrics kept between runs and reboots: the kept copy roles/textfile_keep restores
+# into the textfile directory (a tmpfs) at every boot.
+slurm_backup_metrics_file: "{{ node_exporter_prom_keep_dir }}/{{ slurm_backup_textfile }}"
+# Where versions before the shared keep mechanism kept them (moved once).
+slurm_backup_metrics_file_before: "{{ slurm_backup_work_dir }}/slurm-backup.prom"
 
 # Seconds one step (the dump, one copy to a destination, a listing) may take before it
 # is abandoned, and the whole run before systemd stops it. A hung NFS destination then
