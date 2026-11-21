@@ -304,7 +304,9 @@ task_prolog_fileglob:
 # exports it, the epilog of the user's last job on the node removes it.
 slurm_user_runtime_root: /run/slurm-users
 
-# Disable clearing of shared memory when user login shell exits
+# RemoveIPC=no for systemd-logind: a user's IPC objects are not removed at their last
+# logout, which would pull them from a running job. The user's last job on the node
+# removes them instead (epilog.d/43-lastuserjob-ipc).
 slurm_fix_shm: true
 
 # Configure pam_slurm_adopt to adopt processes from user SSH into a job cgroup

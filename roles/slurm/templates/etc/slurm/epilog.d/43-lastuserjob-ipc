@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# System V shared memory, semaphores and message queues, and POSIX message queues,
+# outlive the processes that made them (an MPI or NCCL job that crashes leaves them).
+# systemd-logind removes a user's at their last logout, but not on a Slurm node
+# (RemoveIPC=no, slurm_fix_shm): a job is no login, and a logout must not pull them
+# from a running job. So the user's last job on the node removes them here, as logind
+# would. POSIX shared memory and semaphores are files in /dev/shm, per job or swept by
+# 42. Operators in localusers.backup keep theirs, as they keep their processes (40).
+# Nothing here fails the epilog, which would drain the node.
+set -u
+
+sysvipc=/proc/sysvipc
+mqueue=/dev/mqueue
+log() { logger -s -t slurm-epilog "$*" || :; }
+
+case "${SLURM_JOB_UID:-}" in
+    ''|0|*[!0-9]*) exit 0 ;;  # root, or no usable uid
+esac
+. '{{ slurm_config_dir }}/shared/lib/localusers.sh' || exit 0
+localusers_listed "$SLURM_JOB_USER"
+case $? in
+    0) exit 0 ;;
+    1) ;;
+    *) log "localusers lookup failed; leaving the IPC objects of $SLURM_JOB_USER"; exit 0 ;;
+esac
+
+removed=0 failed=0
+# /proc/sysvipc/<kind>: the id is field 2, the owner's uid field 8 (shm, msg) or 5 (sem).
+for kind in shm:m:8 sem:s:5 msg:q:8; do
+    IFS=: read -r file flag field <<<"$kind"
+    [ -r "$sysvipc/$file" ] || continue
+    for id in $(awk -v uid="$SLURM_JOB_UID" -v f="$field" 'NR > 1 && $f == uid { print $2 }' "$sysvipc/$file"); do
+        if ipcrm "-$flag" "$id" 2>/dev/null; then removed=$((removed + 1)); else failed=$((failed + 1)); fi
+    done
+done
+if [ -d "$mqueue" ]; then
+    while IFS= read -r -d '' queue; do
+        if rm -f -- "$queue"; then removed=$((removed + 1)); else failed=$((failed + 1)); fi
+    done < <(find "$mqueue" -mindepth 1 -maxdepth 1 -type f -uid "$SLURM_JOB_UID" -print0 2>/dev/null)
+fi
+[ "$removed" -eq 0 ] || log "removed $removed IPC objects of $SLURM_JOB_USER"
+[ "$failed" -eq 0 ] || log "could not remove $failed IPC objects of $SLURM_JOB_USER"
+exit 0

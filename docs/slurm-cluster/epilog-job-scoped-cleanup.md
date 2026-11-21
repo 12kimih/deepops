@@ -9,7 +9,8 @@ for one release.
 
 When a job ends, the epilog (`/etc/slurm/epilog.d/*-lastuserjob-*`) removes what
 the user left behind on the node: stray processes, files in `/tmp` and
-`/dev/shm`, enroot containers, and the user's SSH access entry.
+`/dev/shm`, System V IPC objects and POSIX message queues, enroot containers,
+and the user's SSH access entry.
 
 Before 26.11 this was decided from the controller's view alone: the epilog asked
 `squeue` whether the user had another job on the node, and if not it killed
@@ -123,6 +124,19 @@ Changing either setting restarts slurmd on every node (`scontrol reconfigure`).
 Deploy it while the nodes run no jobs: a running job's directories stay where
 the old settings put them. See `namespace.yaml(5)` and
 https://slurm.schedmd.com/namespace.yaml.html.
+
+## IPC objects
+
+System V shared memory segments, semaphores and message queues, and POSIX
+message queues (`/dev/mqueue`), are kernel objects, not files in a directory a
+job could get its own of: they outlive the processes that made them, and an MPI
+or NCCL job that crashes leaves them behind. systemd-logind removes a user's at
+their last logout, but the role turns that off on Slurm nodes
+(`RemoveIPC=no`, `slurm_fix_shm`), since a job is no login and a logout must
+not pull them from a running job. `epilog.d/43-lastuserjob-ipc` removes them
+instead when the user's last job on the node ends, as logind would. Accounts in
+`localusers.backup` keep theirs, as they keep their processes. POSIX shared
+memory and semaphores are files in `/dev/shm`, covered above.
 
 ## Enroot and Pyxis
 
