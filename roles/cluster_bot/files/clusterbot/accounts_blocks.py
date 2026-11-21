@@ -25,21 +25,21 @@ def join_form(teams):
     }  # fmt: skip
 
 
-def leave_form(login, may_choose):
-    """The leave form: whose account (an administrator may name anyone)."""
-    element = {"type": "plain_text_input", "initial_value": login}
-    if not may_choose:
-        return {
-            "type": "modal", "callback_id": "leave.submit", "private_metadata": login,
-            "title": {"type": "plain_text", "text": "계정 정리 신청"},
-            "submit": {"type": "plain_text", "text": "신청"},
-            "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text":
-                f"`{login}` 계정 정리를 신청합니다. 승인되면 종료일 뒤 유예 기간 동안 로그인과 파일 백업만 가능하고, "
-                "그 뒤 로그인이 막힙니다. 파일은 보관 기간 동안 남습니다."}}],
-        }  # fmt: skip
+def leave_form(login, may_choose, today):
+    """The leave form: the last day, and whose account (an administrator may name anyone)."""
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text":
+            "마지막 날이 지나면 새 잡은 낼 수 없고, 유예 기간 동안 로그인해서 파일을 옮길 수 있습니다. "
+            "그 뒤 로그인이 막히고, 파일은 보관 기간 동안 남습니다."}},
+        _input("ends", "마지막 날", {"type": "datepicker", "initial_date": today}),
+    ]  # fmt: skip
+    if may_choose:
+        blocks.append(
+            _input("login", "정리할 계정의 아이디", {"type": "plain_text_input", "initial_value": login})
+        )
     return {
-        "type": "modal", "callback_id": "leave.submit",
+        "type": "modal", "callback_id": "leave.submit", "private_metadata": login,
         "title": {"type": "plain_text", "text": "계정 정리 신청"},
         "submit": {"type": "plain_text", "text": "신청"},
-        "blocks": [_input("login", "정리할 계정의 아이디", element)],
+        "blocks": blocks,
     }  # fmt: skip

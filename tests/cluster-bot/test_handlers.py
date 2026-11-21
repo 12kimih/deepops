@@ -1,0 +1,102 @@
+"""clusterbot.app's Slack handlers, driven with Slack's payload shapes through a stand-in
+for slack_bolt: each command opens its form, each form submission becomes the request the
+engine receives, and only administrators may decide or act for others."""
+
+import sys
+import types
+import unittest
+from pathlib import Path
+from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
+
+
+class FakeApp:
+    def __init__(self, token):
+        self.handlers = {}
+
+    def _register(self, kind, name):
+        def deco(fn):
+            self.handlers[(kind, name)] = fn
+            return fn
+
+        return deco
+
+    def command(self, name):
+        return self._register("command", name)
+
+    def action(self, name):
+        return self._register("action", name)
+
+    def view(self, name):
+        return self._register("view", name)
+
+
+sys.modules["slack_bolt"] = types.SimpleNamespace(App=FakeApp)
+from clusterbot import app  # noqa: E402
+
+CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
+       "channels": {"help": "#help", "admin": "#admin"}, "scratch": {"policy": {"auto_bytes": 1, "auto_days": 30}}}  # fmt: skip
+
+
+def submitted(state, user, callback, metadata=""):
+    return {"user": {"id": user}}, {
+        "state": {"values": state},
+        "callback_id": callback,
+        "private_metadata": metadata,
+    }
+
+
+class Handlers(unittest.TestCase):
+    def setUp(self):
+        self.engine = mock.Mock()
+        self.engine.submit.return_value = mock.Mock(status="done", text="ok", request={})
+        self.join = mock.Mock(teams=mock.Mock(return_value=["team-a"]))
+        self.client = mock.MagicMock()
+        self.app = app.build(CFG, self.engine, None, self.join)
+
+    def call(self, kind, name, **kw):
+        self.app.handlers[(kind, name)](ack=mock.Mock(), client=self.client, **kw)
+
+    def test_join_opens_its_form_and_a_submission_becomes_a_join_request(self):
+        self.call("command", "/join", body={"user_id": "UNEW", "channel_id": "C", "trigger_id": "T"})
+        self.assertEqual(self.client.views_open.call_args.kwargs["view"]["callback_id"], "join.submit")
+        state = {"login": {"v": {"value": " carl "}}, "name": {"v": {"value": "Carl"}},
+                 "team": {"v": {"selected_option": {"value": "team-a"}}}, "key": {"v": {"value": "ssh-ed25519 AAA"}}}  # fmt: skip
+        body, view = submitted(state, "UNEW", "join.submit")
+        self.call("view", "join.submit", body=body, view=view)
+        req = self.engine.submit.call_args.args[0]
+        self.assertEqual(
+            (req["kind"], req["user"], req["account"], req["slack"]), ("join", "carl", "team-a", "UNEW")
+        )
+
+    def test_someone_with_an_account_cannot_join_again(self):
+        self.call("command", "/join", body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T"})
+        self.client.views_open.assert_not_called()
+
+    def test_leave_gives_back_only_ones_own_account_unless_admin(self):
+        state = {"ends": {"v": {"selected_date": "2027-02-28"}}, "login": {"v": {"value": "boss"}}}
+        body, view = submitted(state, "UALICE", "leave.submit", "alice")
+        self.call("view", "leave.submit", body=body, view=view)
+        self.assertEqual(self.engine.submit.call_args.args[0]["user"], "alice", "not the login typed")
+        body, view = submitted(state, "UBOSS", "leave.submit", "boss")
+        self.call("view", "leave.submit", body=body, view=view)
+        req = self.engine.submit.call_args.args[0]
+        self.assertEqual((req["user"], req["ends"]), ("boss", "2027-02-28"))
+
+    def test_only_an_admin_decides_a_held_request(self):
+        body = {"user": {"id": "UALICE"}, "channel": {"id": "C"}, "message": {"ts": "1"}}
+        self.call(
+            "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
+        )
+        self.engine.approve.assert_not_called()
+        self.engine.approve.return_value = mock.Mock(text="done", request={})
+        body["user"]["id"] = "UBOSS"
+        self.call(
+            "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
+        )
+        self.engine.approve.assert_called_once_with("k", "<@UBOSS>")
+
+
+if __name__ == "__main__":
+    unittest.main()

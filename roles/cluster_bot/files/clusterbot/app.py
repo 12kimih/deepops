@@ -101,21 +101,21 @@ def build(cfg, engine, scratch, join=None):
                 channel=body["channel_id"], user=body["user_id"], text="정리할 계정이 없습니다."
             )
             return
-        view = accounts_blocks.leave_form(user, body["user_id"] in admins)
+        view = accounts_blocks.leave_form(user, body["user_id"] in admins, time.strftime("%Y-%m-%d"))
         client.views_open(trigger_id=body["trigger_id"], view=view)
 
     @app.view("leave.submit")
     def leave_submit(ack, body, client, view):
         ack()
-        slack_id = body["user"]["id"]
-        if slack_id in admins and "login" in view["state"]["values"]:
-            login = view["state"]["values"]["login"]["v"]["value"].strip()
+        slack_id, values = body["user"]["id"], view["state"]["values"]
+        if slack_id in admins and "login" in values:
+            login = values["login"]["v"]["value"].strip()
         else:
             login = user_of(slack_id)  # anyone else may give back only their own account
         if login:
-            submit(
-                client, slack_id, {"kind": "leave", "user": login, "asked_by": user_of(slack_id) or slack_id}
-            )
+            req = {"kind": "leave", "user": login, "ends": values["ends"]["v"]["selected_date"],
+                   "asked_by": user_of(slack_id) or slack_id}  # fmt: skip
+            submit(client, slack_id, req)
 
     @app.command("/scratch")
     def scratch_command(ack, body, client):
