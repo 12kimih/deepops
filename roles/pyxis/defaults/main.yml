@@ -2,7 +2,7 @@
 # pyxis's node setup as a component (the plugin and its package are roles/slurm's):
 # present, absent or kept (do nothing). A deploy sets it from deepops_components
 # (slurm_install_enroot and slurm_install_pyxis); absent removes the enroot hooks it
-# links. The /run size it sets in fstab stays: nothing tells it from a site's own.
+# links, and the /run size entry while resize_run_partition put one in fstab.
 pyxis_state: present
 
 # pyxis itself (package, plugstack entry and options) is roles/slurm's: it is packaged,
@@ -16,7 +16,9 @@ pyxis_ubuntu_deps:
 pyxis_el_deps:
   - "util-linux"
 
-# /run is default partition of pyxis runtime_path
+# /run is default partition of pyxis runtime_path: true sizes its tmpfs in fstab (from
+# now on, and at every boot); false again takes that fstab entry out (the running /run
+# keeps its size until the next boot: a live /run is never remounted).
 resize_run_partition: false
 
 # /run tmpfs size. ubuntu default is 10% of physical memory

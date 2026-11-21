@@ -5,7 +5,7 @@
   vars:
     component_record_name: pyxis
     component_record_action: begin
-    component_record_items: "{{ pyxis_items if is_compute else [] }}"
+    component_record_items: "{{ pyxis_items }}"
 
 - name: Install dependencies (Ubuntu)
   ansible.builtin.apt:
@@ -59,4 +59,4 @@
   vars:
     component_record_name: pyxis
     component_record_action: present
-    component_record_items: "{{ pyxis_items if is_compute else [] }}"
+    component_record_items: "{{ pyxis_items }}"
