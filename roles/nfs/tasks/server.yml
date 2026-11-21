@@ -71,6 +71,37 @@
   tags:
     - nfs
 
+# The filesystem each export lives on: an export inside a larger filesystem (a
+# directory under /) is watched as that filesystem.
+- name: Find the filesystem of each export
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, TARGET, --target, "{{ item.path }}"]
+  loop: "{{ nfs_exports }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: nfs_exports_mounts
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+  tags:
+    - nfs
+
+- name: Publish the exports for Prometheus
+  ansible.builtin.include_role:
+    name: textfile_static
+    apply:
+      tags: [nfs]
+  vars:
+    textfile_static_name: "{{ nfs_exports_textfile }}"
+    textfile_static_content: |
+      # HELP nfs_export_info An NFS export of this host and the filesystem it lives on (roles/nfs).
+      # TYPE nfs_export_info gauge
+      {% for result in nfs_exports_mounts.results %}
+      nfs_export_info{path="{{ result.item.path }}",mountpoint="{{ result.stdout | trim }}"} 1
+      {% endfor %}
+  when: nfs_exports | length > 0
+  tags:
+    - nfs
+
 # threads= in the [nfsd] section of /etc/nfs.conf is the modern nfs-utils knob
 # (equivalent to the legacy RPCNFSDCOUNT); boots read it. A running nfsd takes the new
 # count from `rpc.nfsd N`, without a restart; verify with `cat /proc/fs/nfsd/threads`.

@@ -26,6 +26,10 @@ prometheus_exporters:
 prometheus_cfg_scrape_interval: 15s
 # node_exporter's textfile collector directory, which every textfile writer fills.
 node_exporter_prom_dir: /run/prometheus
+# A textfile that changes only when a role runs (a fact the deploy knows, roles/
+# textfile_static): kept here and copied into node_exporter_prom_dir at every boot,
+# since that directory is a tmpfs.
+node_exporter_prom_keep_dir: "{{ deepops_state_dir }}/textfile"
 # Grafana's configuration, mounted into its container at /etc/grafana, and in it the
 # provisioned dashboards: configuration, so never in its data directory. Grafana and
 # every role that ships a dashboard (one subdirectory each, roles/grafana tasks_from

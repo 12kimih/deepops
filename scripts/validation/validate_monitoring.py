@@ -93,6 +93,7 @@ SOURCES = {
     "os_updates": r"os_updates_\w+",
     "container_storage_gc": r"container_storage_gc_\w+",
     "egress_policy": r"egress_policy_\w+",
+    "nfs": r"nfs_export_\w+",  # what roles/nfs exports (roles/textfile_static)
     "tls": r"\w+_tls_cert_\w+",  # each service's certificate (rules/tls.yml)
     "prometheus": r"prometheus_\w+|up|scrape_\w+|ALERTS|ALERTS_FOR_STATE",
     "alertmanager": r"alertmanager_\w+",

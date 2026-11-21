@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: deploy_defaults  # deepops_component_registry, deepops_component_removals
+  - role: deepops_paths  # deepops_state_dir
 
 galaxy_info:
   namespace: deepops

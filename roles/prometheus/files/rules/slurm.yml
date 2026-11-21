@@ -37,11 +37,11 @@ groups:
         expr: |
           max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES)
           * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
-      # The share of its memory a GPU holds: one threshold for every model (a context-free
-      # GPU holds only the driver's reservation, a small share of any size).
+      # The share of the card's memory in use: one threshold for every model (a GPU with
+      # no context holds only a small share of any size).
       - record: host_device:dcgm_fb_used_fraction:max
         expr: |
-          max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES / (DCGM_FI_DEV_FB_USED_BYTES + DCGM_FI_DEV_FB_FREE_BYTES))
+          max by (host, gpu) (DCGM_FI_DEV_FB_USED_BYTES / DCGM_FI_DEV_FB_CAPACITY_BYTES)
           * on (host, gpu) group_left (device) host_gpu:dcgm_slurm_device:info
       # SM activity (the share of cycles an SM has work) and board power: how much of the
       # GPU is really used, which utilisation (any kernel running) does not tell.
