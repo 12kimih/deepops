@@ -64,6 +64,9 @@ SPEC = {
 }
 
 
+CLUSTER = "c1"
+
+
 def current():
     q = acct.current_qos(QOS)
     a, u = acct.current_assocs(ASSOC, ACCOUNTS)
@@ -71,7 +74,7 @@ def current():
 
 
 def plan(spec, prune=False):
-    cmds, unmanaged = acct.plan(spec, *current(), prune=prune)
+    cmds, unmanaged = acct.plan(spec, *current(), CLUSTER, prune=prune)
     return [c for c in cmds if not isinstance(c, tuple)], unmanaged
 
 
@@ -111,7 +114,9 @@ class Plan(unittest.TestCase):
         s["accounts"]["a"]["priority"] = 5000
         s["qos"]["high_a"]["grp_tres"] = {"gres/gpu:x": 6}
         cmds, _ = plan(s)
-        self.assertIn(["modify", "account", "where", "name=a", "set", "priority=5000"], cmds)
+        self.assertIn(
+            ["modify", "account", "where", "name=a", f"cluster={CLUSTER}", "set", "priority=5000"], cmds
+        )
         self.assertIn(
             ["modify", "qos", "where", "name=high_a", "set", "grptres=gres/gpu:x=6,gres/gpu:y=-1"], cmds
         )
@@ -120,21 +125,27 @@ class Plan(unittest.TestCase):
         s = copy(SPEC)
         s["accounts"]["a"]["members"] = ["alice", {"user": "bob", "qos": ["low"]}]
         cmds, _ = plan(s)
-        self.assertEqual(cmds, [["modify", "user", "where", "name=bob", "account=a", "set", "qos=low"]])
+        self.assertEqual(
+            cmds,
+            [["modify", "user", "where", "name=bob", "account=a", f"cluster={CLUSTER}", "set", "qos=low"]],
+        )
 
     def test_values_are_raw_arguments_not_shell_quoted(self):
         s = copy(SPEC)
         s["accounts"]["a"]["description"] = "team a's lab"
         s["qos"]["high_a"]["preempt"] = []
         cmds, _ = plan(s)
-        self.assertIn(["modify", "account", "where", "name=a", "set", "description=team a's lab"], cmds)
+        self.assertIn(
+            ["modify", "account", "where", "name=a", f"cluster={CLUSTER}", "set", "description=team a's lab"],
+            cmds,
+        )
         self.assertIn(["modify", "qos", "where", "name=high_a", "set", "preempt="], cmds)
 
     def test_new_member_gets_an_association(self):
         s = copy(SPEC)
         s["accounts"]["a"]["members"].append("carol")
         cmds, _ = plan(s)
-        self.assertIn(["add", "user", "carol", "account=a"], cmds)
+        self.assertIn(["add", "user", "carol", "account=a", f"cluster={CLUSTER}"], cmds)
 
     def test_default_account_is_explicit_for_several_accounts(self):
         s = copy(SPEC)
@@ -142,7 +153,7 @@ class Plan(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "default_account"):
             plan(s)
         s["users"] = {"alice": {"default_account": "a"}}
-        cmds, _ = acct.plan(s, *current())
+        cmds, _ = acct.plan(s, *current(), CLUSTER)
         self.assertIn(("default", "alice", "a"), cmds)
 
     def test_members_given_per_user_plan_the_same(self):
@@ -152,7 +163,10 @@ class Plan(unittest.TestCase):
         self.assertEqual(plan(s), plan(SPEC))
         s["users"]["bob"]["accounts"]["a"] = {"qos": ["low"]}
         cmds, _ = plan(s)
-        self.assertEqual(cmds, [["modify", "user", "where", "name=bob", "account=a", "set", "qos=low"]])
+        self.assertEqual(
+            cmds,
+            [["modify", "user", "where", "name=bob", "account=a", f"cluster={CLUSTER}", "set", "qos=low"]],
+        )
 
     def test_per_user_member_of_an_undeclared_account_is_refused(self):
         s = copy(SPEC)
@@ -179,7 +193,7 @@ class Plan(unittest.TestCase):
         self.assertEqual(unmanaged["associations"], ["bob@a"])
         self.assertFalse(any(c[0] == "delete" for c in cmds))
         cmds, _ = plan(s, prune=True)
-        self.assertIn(["delete", "user", "where", "name=bob", "account=a"], cmds)
+        self.assertIn(["delete", "user", "where", "name=bob", "account=a", f"cluster={CLUSTER}"], cmds)
 
     def test_parents_are_created_before_children(self):
         s = copy(SPEC)
@@ -193,10 +207,14 @@ class Plan(unittest.TestCase):
         s = copy(SPEC)
         s["accounts"]["lab"]["max_submit_jobs"] = 200
         cmds, _ = plan(s)
-        self.assertIn(["modify", "account", "where", "name=lab", "set", "maxsubmitjobs=200"], cmds)
+        self.assertIn(
+            ["modify", "account", "where", "name=lab", f"cluster={CLUSTER}", "set", "maxsubmitjobs=200"], cmds
+        )
         del s["accounts"]["lab"]["max_submit_jobs"]
         cmds, _ = plan(s)
-        self.assertIn(["modify", "account", "where", "name=lab", "set", "maxsubmitjobs=-1"], cmds)
+        self.assertIn(
+            ["modify", "account", "where", "name=lab", f"cluster={CLUSTER}", "set", "maxsubmitjobs=-1"], cmds
+        )
 
     def test_qos_tiers_must_not_overlap(self):
         s = copy(SPEC)
@@ -230,7 +248,19 @@ class Plan(unittest.TestCase):
         s["accounts"]["root"] = {"qos": ["normal"], "members": [{"user": "root", "fairshare": 1}]}
         cmds, unmanaged = plan(s)
         self.assertFalse(any(c[:2] == ["add", "account"] or "parent=" in " ".join(c) for c in cmds))
-        self.assertIn(["modify", "user", "where", "name=root", "account=root", "set", "fairshare=1"], cmds)
+        self.assertIn(
+            [
+                "modify",
+                "user",
+                "where",
+                "name=root",
+                "account=root",
+                f"cluster={CLUSTER}",
+                "set",
+                "fairshare=1",
+            ],
+            cmds,
+        )
         self.assertEqual(unmanaged["associations"], [])
 
     def test_time_parsing(self):
