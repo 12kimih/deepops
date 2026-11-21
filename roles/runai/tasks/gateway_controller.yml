@@ -12,20 +12,20 @@
   check_mode: false
 
 - name: Install the Gateway API CRDs (standard channel, pinned)
-  ansible.builtin.command: "{{ runai_kubectl }} apply --filename {{ runai_gateway_api_crds_url }}"
+  change_command:
+    cmd: "{{ runai_kubectl }} apply --filename {{ runai_gateway_api_crds_url }}"
   environment: "{{ proxy_env }}"
   register: runai_gw_crds_apply
-  changed_when: true
   when: runai_gw_crds_before.stdout_lines | length == 0
 
 - name: Mark the CRDs this role installed
-  ansible.builtin.shell: >-
-    set -o pipefail;
-    {{ runai_kubectl }} get crd --output name | grep -E '\.gateway\.networking\.k8s\.io$'
-    | xargs -r -I{} {{ runai_kubectl }} annotate --overwrite {} deepops.nvidia.com/runai-installed=true
+  change_shell:
+    cmd: >-
+      set -o pipefail;
+      {{ runai_kubectl }} get crd --output name | grep -E '\.gateway\.networking\.k8s\.io$'
+      | xargs -r -I{} {{ runai_kubectl }} annotate --overwrite {} deepops.nvidia.com/runai-installed=true
   args:
     executable: /bin/bash
-  changed_when: true
   when: runai_gw_crds_apply is not skipped
 
 - name: Look for existing KGateway releases

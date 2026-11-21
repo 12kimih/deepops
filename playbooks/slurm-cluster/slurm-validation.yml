@@ -134,6 +134,8 @@
         tail -n +2  |
         awk '{sum += $4} END {print sum}'
       register: node_out
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
       when: (not num_nodes) or (num_nodes | int <= 0)
 
     - name: Set num_nodes variable
@@ -164,7 +166,7 @@
 
     - block:
         - name: Execute NCCL allreduce test
-          ansible.builtin.shell:
+          change_shell:
             cmd: "{{ ncclcmd }}"
           register: result
           no_log: true
@@ -193,6 +195,7 @@
         mode: "0644"
       delegate_to: localhost
       become: false
+      when: result.stdout is defined  # --check runs no test
 
     - name: Extract "Out of bounds values" and "Avg bus bandwidth".
       ansible.builtin.shell:
@@ -200,7 +203,9 @@
           echo "{{ result.stdout }}" | \
             grep "Out of bounds values\|Avg bus bandwidth"
       register: result_vals
-      when: result.stdout != ""
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when: result.stdout | default('') != ""
 
     - name: Print and analyze results
       ansible.builtin.debug:
@@ -209,6 +214,7 @@
           - Out of bounds values should be 0 otherwise FAIL.
           - Bandwidth will vary based on GPU topology and network interconnect types.
           - Refer to /tmp/nccl_tests.out for detailed NCCL allreduce output.
+      when: result_vals.stdout is defined
 
     - name: Cleanup NCCL container.
       ansible.builtin.file:

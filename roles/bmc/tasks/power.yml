@@ -23,5 +23,6 @@
 - name: Report
   ansible.builtin.debug:
     msg: "{{ bmc_power_result.stdout | trim }}"
+  when: bmc_power_result.stdout is defined  # --check runs nothing, so there is no answer
   tags:
     - power

@@ -47,15 +47,17 @@
     quiet: true
 
 - name: Apply the daemon.json keys of {{ docker_daemon_json_owner }}
-  ansible.builtin.command:
+  change_command:
     argv: [python3, -I, -c, "{{ lookup('ansible.builtin.file', 'daemon-json.py') }}"]
     stdin: >-
       {{ {'path': '/etc/docker/daemon.json',
           'record': docker_daemon_json_record_dir ~ '/' ~ docker_daemon_json_owner ~ '.json',
           'want': docker_daemon_json_keys, 'drop_if': docker_daemon_json_drop_if} | to_json }}
   register: docker_daemon_json_result
-  changed_when: docker_daemon_json_result.rc == 10
-  failed_when: docker_daemon_json_result.rc not in [0, 10]
+  changed_when: >-
+    ansible_check_mode or (docker_daemon_json_result.rc == 10)
+  failed_when: >-
+    not ansible_check_mode and (docker_daemon_json_result.rc not in [0, 10])
   notify: Restart dockerd
 
 - name: Restart dockerd for its changed unit

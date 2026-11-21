@@ -79,7 +79,7 @@
     # needs the same isolation from the ssh cgroup. A failure is left unhandled on
     # purpose: a MIG layout that could not be applied must not pass as applied.
     - name: Apply MIG configuration
-      ansible.builtin.command:
+      change_command:
         argv:
           - systemd-run
           - --wait
@@ -99,6 +99,7 @@
         systemd-run --wait --pipe --collect --quiet --
         nvidia-mig-parted assert -f {{ mig_manager_config }}
         -c {{ mig_manager_profile }}
+      changed_when: false
       when: has_mig.rc == 0
 
     # The CDI specification lists the MIG devices, and nvidia-cdi-refresh does not

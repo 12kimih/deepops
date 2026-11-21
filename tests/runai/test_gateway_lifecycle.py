@@ -7,10 +7,14 @@ import subprocess
 import tempfile
 import unittest
 
+import sys
+
 import yaml
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import module  # noqa: E402
 
 
 class Lifecycle(unittest.TestCase):
@@ -46,7 +50,7 @@ class Lifecycle(unittest.TestCase):
         (self.state / "gwcrds").write_text("\n".join(names))
         tasks = yaml.safe_load((ROOT / "roles/runai/tasks/gateway_controller.yml").read_text())
         task = next(t for t in tasks if t["name"] == "Mark the CRDs this role installed")
-        command = task["ansible.builtin.shell"].replace("{{ runai_kubectl }}", str(HERE / "bin/kubectl"))
+        command = module(task)[1]["cmd"].replace("{{ runai_kubectl }}", str(HERE / "bin/kubectl"))
         return subprocess.run(["/bin/bash", "-c", command], env=self.env, capture_output=True, text=True)
 
     def test_annotation_resources_precede_assignment(self):

@@ -83,6 +83,25 @@ localhost                  : ok=1    changed=0    unreachable=0    failed=0
 node1                      : ok=401  changed=121  unreachable=0    failed=0
 ```
 
+### Previewing a run (`--check --diff`)
+
+`--check --diff` reports what a run would change without changing it. Ansible skips
+`command` and `shell` tasks under `--check`, and this repository hides skipped tasks
+(`display_skipped_hosts = False`), so a change made by a command would not show at
+all. Tasks that change a host through a command therefore use `change_command` or
+`change_shell` (`plugins/action`): they run exactly as `command` and `shell` do, and
+under `--check` they report the command as a change, printed with `--diff`:
+
+```console
+TASK [bmc : Set the BMC LAN address] ****************************************
+would run: ipmitool -I open lan set 1 defgw ipaddr 192.0.2.1
+changed: [node1] => (item=defgw ipaddr)
+```
+
+A command whose outcome only its output tells (`kubectl apply`, `sacctmgr add`) is
+reported as a change under `--check` too: nothing ran, so the preview cannot know.
+`tests/task-rules` enforces the convention (rule 19).
+
 ## Ansible Usage
 
 _Create server inventory_

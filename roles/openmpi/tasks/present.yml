@@ -84,11 +84,10 @@
     source_build: "{{ openmpi_source_build }}"
 
 - name: Uninstall an install from before the manifest, from its own tree
-  ansible.builtin.command:
+  change_command:
     argv: [make, -j, uninstall]
     chdir: "{{ (openmpi_old_trees.results | selectattr('stat.exists') | first).item }}"
   failed_when: false  # a tree whose configure failed has nothing to uninstall
-  changed_when: true
   when:
     - source_build_built | bool
     - openmpi_old_trees.results | default([]) | selectattr('stat', 'defined') | selectattr('stat.exists') | list | length > 0

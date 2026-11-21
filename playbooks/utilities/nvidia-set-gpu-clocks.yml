@@ -26,13 +26,15 @@
         # nvidia-smi runs in a transient unit so it still sees the GPUs where the ssh
         # service has them hidden (DeviceAllow, see login-compute-setup).
         - name: Set the gpu clock to a specified amount
-          ansible.builtin.command: >-
-            systemd-run --wait --pipe --collect --quiet --
-            nvidia-smi -lgc {{ gpu_clock_lock }}
+          change_command:
+            cmd: >-
+              systemd-run --wait --pipe --collect --quiet --
+              nvidia-smi -lgc {{ gpu_clock_lock }}
           when: not gpu_clock_reset
 
         - name: Reset the gpu clock to the default
-          ansible.builtin.command: >-
-            systemd-run --wait --pipe --collect --quiet --
-            nvidia-smi -rgc
+          change_command:
+            cmd: >-
+              systemd-run --wait --pipe --collect --quiet --
+              nvidia-smi -rgc
           when: gpu_clock_reset

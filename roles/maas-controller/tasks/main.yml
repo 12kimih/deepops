@@ -44,11 +44,12 @@
   register: maas_admin_account_check
 
 - name: Create MAAS admin accounts
-  ansible.builtin.command: >-
-    maas createadmin
-    --username {{ item.username }}
-    --email {{ item.email }}
-    --password {{ item.password }}
+  change_command:
+    cmd: >-
+      maas createadmin
+      --username {{ item.username }}
+      --email {{ item.email }}
+      --password {{ item.password }}
   loop: "{{ maas_adminusers }}"
   loop_control:
     label: "{{ item.username }}"

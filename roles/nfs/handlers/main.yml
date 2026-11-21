@@ -5,14 +5,12 @@
 
 # Live, without a restart: a running nfsd changes its thread count in place.
 - name: Apply nfsd thread count
-  ansible.builtin.command:
+  change_command:
     cmd: rpc.nfsd {{ nfs_server_threads | int }}
-  changed_when: true
 
 # exports(5) changes take effect with exportfs -ra, without restarting nfsd: a restart
 # drops every client's state and has hung nfsd before. nfsd's own thread count is
 # applied live too (Apply nfsd thread count); nothing here restarts nfsd.
 - name: Reload NFS exports
-  ansible.builtin.command:
+  change_command:
     cmd: exportfs -ra
-  changed_when: true

@@ -90,9 +90,8 @@
       when: cluster_sudoers_local_have != cluster_sudoers_local_want
 
     - name: Set the local sudo group's members
-      ansible.builtin.command:
+      change_command:
         argv: [gpasswd, -M, "{{ cluster_sudoers_local_want | join(',') }}", "{{ cluster_sudoers_local_group }}"]
-      changed_when: true
       when: cluster_sudoers_local_have != cluster_sudoers_local_want
 
 # A drop-in installed by a package belongs to that component and removing it would

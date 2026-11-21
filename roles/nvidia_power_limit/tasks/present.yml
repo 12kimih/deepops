@@ -181,7 +181,7 @@
         # Covers what the unit alone cannot: the unit file was already correct, so no
         # handler fired, but a card drifted (manual nvidia-smi -pl, driver reload).
         - name: Enforce the cap on any GPU that drifted from it
-          ansible.builtin.command:
+          change_command:
             cmd: systemd-run --wait --pipe --collect --quiet -- nvidia-smi -i {{ item.split(',')[0] | trim }} -pl {{ nvidia_power_limit_target | int }}
           loop: "{{ nvidia_power_limit_recheck.stdout_lines | default([]) }}"
           when:

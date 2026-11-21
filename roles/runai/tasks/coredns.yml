@@ -21,18 +21,18 @@
   no_log: true
 
 - name: Apply the Corefile change
-  ansible.builtin.shell: |
-    set -euo pipefail
-    {{ runai_kubectl }} -n kube-system patch configmap {{ runai_dns_cm }} --type merge \
-      --patch "$(python3 -c 'import json,sys; print(json.dumps({"data": {"Corefile": sys.stdin.read()}}))')"
-    {{ runai_kubectl }} -n kube-system rollout restart {{ runai_dns_workload }}
+  change_shell:
+    cmd: |
+      set -euo pipefail
+      {{ runai_kubectl }} -n kube-system patch configmap {{ runai_dns_cm }} --type merge \
+        --patch "$(python3 -c 'import json,sys; print(json.dumps({"data": {"Corefile": sys.stdin.read()}}))')"
+      {{ runai_kubectl }} -n kube-system rollout restart {{ runai_dns_workload }}
   args:
     executable: /bin/bash
     stdin: >-
       {{ runai_corefile_clean | regex_replace('(\.:53 \{\n)', '\1' ~ runai_corefile_block) if runai_coredns_present | bool else runai_corefile_clean }}
     stdin_add_newline: false
   register: runai_corefile_apply
-  changed_when: true
   when: >-
     (runai_coredns_present | bool and 'deepops-runai' not in runai_corefile_old)
     or (not runai_coredns_present | bool and 'deepops-runai' in runai_corefile_old)

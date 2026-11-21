@@ -102,7 +102,7 @@
   check_mode: false  # read-only; --check needs the result
 
 - name: Release the holds that are not allowed
-  ansible.builtin.command:
+  change_command:
     argv: [apt-mark, unhold, "{{ item }}"]
   loop: >-
     {{ os_updates_holds.stdout_lines
@@ -113,7 +113,6 @@
     os_updates_allowed_holds_regex: >-
       {{ '^(' ~ (os_updates_allowed_holds | map('regex_escape') | map('replace', '\*', '.*')
                  | map('replace', '\?', '.') | join('|')) ~ ')$' }}
-  changed_when: true
 
 - name: Publish pending updates as metrics
   when: os_updates_metrics | bool

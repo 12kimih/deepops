@@ -44,6 +44,6 @@
   register: cuda_system_removed
 
 - name: Drop the removed library paths from the linker cache
-  ansible.builtin.command: ldconfig
+  change_command:
+    cmd: ldconfig
   when: cuda_system_removed.results | selectattr('path', 'search', '^/etc/ld\.so\.conf\.d/') | list | length > 0
-  changed_when: true

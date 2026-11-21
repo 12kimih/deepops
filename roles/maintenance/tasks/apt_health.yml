@@ -40,9 +40,8 @@
 
     # What apt itself asks for: finish the interrupted configuration first.
     - name: Finish what an interrupted dpkg run left
-      ansible.builtin.command:
+      change_command:
         argv: [dpkg, --configure, -a]
       environment:
         DEBIAN_FRONTEND: noninteractive
-      changed_when: true
       when: maintenance_dpkg_audit.stdout | trim | length > 0

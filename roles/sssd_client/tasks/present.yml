@@ -63,9 +63,8 @@
   when: ansible_facts.os_family == 'Debian'
 
 - name: Let PAM ask SSSD (Debian)
-  ansible.builtin.command:
+  change_command:
     argv: [pam-auth-update, --enable, sss]
-  changed_when: true
   when:
     - ansible_facts.os_family == 'Debian'
     - sssd_client_pam.rc == 1
@@ -81,9 +80,8 @@
   when: ansible_facts.os_family == 'RedHat'
 
 - name: Select the sssd profile (RHEL)
-  ansible.builtin.command:
+  change_command:
     argv: [authselect, select, sssd, --force]
-  changed_when: true
   when:
     - ansible_facts.os_family == 'RedHat'
     - sssd_client_authselect.stdout | default('') is not match('^sssd')
@@ -122,17 +120,15 @@
   check_mode: false  # read-only; --check needs the result
 
 - name: Bring SSSD back online
-  ansible.builtin.command:
+  change_command:
     argv: [systemctl, kill, --signal=SIGUSR2, sssd]
-  changed_when: true
   when: sssd_client_online.stdout is search('Offline')
 
 # A roster change this run made in the directory (a revoked admin, a new member) takes
 # effect at once rather than when the cached answers expire.
 - name: Forget cached answers the directory changed this run
-  ansible.builtin.command:
+  change_command:
     argv: [sss_cache, -E]
-  changed_when: true
   when: (hostvars[ldap_server_host].ldap_server_sync | default({})) is changed
 
 - name: Record the component as present

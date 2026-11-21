@@ -46,7 +46,8 @@
         state: present
 
 - name: Autoinstall DKMS modules
-  ansible.builtin.command: dkms autoinstall
+  change_command:
+    cmd: dkms autoinstall
   when:
     - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists

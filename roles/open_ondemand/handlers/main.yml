@@ -12,6 +12,5 @@
 # A package upgrade leaves per-user servers running the old code; the upgrade steps end
 # by stopping them (users get a fresh one on their next request).
 - name: Stop the per-user servers
-  ansible.builtin.command:
+  change_command:
     argv: [/opt/ood/nginx_stage/sbin/nginx_stage, nginx_clean, -f]
-  changed_when: true

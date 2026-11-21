@@ -11,9 +11,8 @@
   register: nginx_docker_cache_client_trust
 
 - name: Rebuild the trust store
-  ansible.builtin.command:
+  change_command:
     argv: "{{ _nginx_docker_cache_trust[ansible_facts.os_family].update }}"
-  changed_when: true
   vars:
     nginx_docker_cache_client_times: >-
       {{ nginx_docker_cache_client_trust.results | map(attribute='stat') | map(attribute='mtime', default=0) | list }}

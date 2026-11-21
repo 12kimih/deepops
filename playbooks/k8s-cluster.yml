@@ -55,7 +55,8 @@
   gather_facts: false
   tasks:
     - name: Make sure kubespray is at the correct version
-      ansible.builtin.command: git submodule update --init
+      change_command:
+        cmd: git submodule update --init
       args:
         chdir: "{{ playbook_dir | dirname }}"
       delegate_to: localhost
@@ -167,7 +168,8 @@
     - name: Remove swap from fstab
       ansible.builtin.lineinfile: path=/etc/fstab regexp='swap' state=absent
     - name: Disable swap
-      ansible.builtin.command: swapoff -a
+      change_command:
+        cmd: swapoff -a
   tags:
     - swap
 
@@ -339,13 +341,16 @@
     # Kubespray installs helm on the control plane (helm_enabled); this puts the same
     # version on the admin machine, for the scripts/k8s/ deploy scripts.
     - name: Install Helm on admin node
-      ansible.builtin.command: "bash {{ playbook_dir }}/../scripts/k8s/install_helm.sh"
+      change_command:
+        cmd: "bash {{ playbook_dir }}/../scripts/k8s/install_helm.sh"
       register: k8s_admin_helm
-      changed_when: "'is installed.' not in k8s_admin_helm.stdout"
+      changed_when: >-
+        ansible_check_mode or ('is installed.' not in k8s_admin_helm.stdout)
       delegate_to: localhost
       run_once: true
     - name: Kubeadm | Remove taint for master with node role
-      ansible.builtin.command: "{{ artifacts_dir }}/kubectl --kubeconfig {{ artifacts_dir }}/admin.conf taint node {{ inventory_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
+      change_command:
+        cmd: "{{ artifacts_dir }}/kubectl --kubeconfig {{ artifacts_dir }}/admin.conf taint node {{ inventory_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
       delegate_to: localhost
       failed_when: false # Taint will not be present if kube_control_plane also under kube_node
 

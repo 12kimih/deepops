@@ -60,6 +60,15 @@
 18. deepops' own directories on a host are named once, deepops_state_dir and
    deepops_cache_dir in roles/deepops_paths: no task, default or template spells out
    /var/lib/deepops or /var/cache/deepops (41 places did, each a copy to keep in step).
+19. A command that changes the host runs as change_command or change_shell
+   (plugins/action), never as command or shell: Ansible skips those under --check and
+   display_skipped_hosts hides the skip, so a preview reported changed=0 for changes
+   the run then made (a BMC's gateway, 2026-11). command and shell are for reading
+   (changed_when: false), for creates/removes, which command predicts itself, and for a
+   task that runs under --check on purpose (check_mode: false). A change task's
+   changed_when, failed_when and until that read its own result are guarded, since
+   under --check nothing ran: `ansible_check_mode or (...)` for changed_when and until,
+   `not ansible_check_mode and (...)` for failed_when.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -76,9 +85,14 @@ from jinja2 import nodes
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import Scan, ansible_files, module, role_var_files, tasks, tracked  # noqa: E402
+from repo_scan import CHANGES, COMMANDS, Scan, ansible_files, module, role_var_files, tasks, tracked  # noqa: E402
 
-COMMANDS = {"command", "shell", "script", "raw", "expect"}
+# How a change task's conditions on its own result start (rule 19).
+CHECK_GUARDS = {
+    "changed_when": "ansible_check_mode or ",
+    "until": "ansible_check_mode or ",
+    "failed_when": "not ansible_check_mode and ",
+}
 TEMPLATES = {"template"}
 # Fetched without a fixed checksum because the file changes in place upstream, and
 # checked against its publisher's signing key right after instead.
@@ -222,6 +236,22 @@ BACKUP_OK = {
     "roles/sshd/tasks/main.yml": "puts back what sshd -t rejects, then removes the copies (always:)",
     "playbooks/k8s-cluster.yml": "the operator's own ~/.kube/config on the controller, not a host file",
 }
+# file -> why it changes the host through command or shell (rule 19)
+UPSTREAM_DGX = "upstream DGX role, kept as NVIDIA ships it (outside ansible-lint too)"
+PLAIN_CHANGE_OK = {
+    "roles/nvidia-dgx-firmware/tasks/check-firmware.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/clean.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/get-data.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/get-health.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/get-ib.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/get-time.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/load-image.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/transfer-logs.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/update-firmware.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx-firmware/tasks/verify-firmware.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx/tasks/configure-raid.yml": UPSTREAM_DGX,
+    "roles/nvidia-dgx/tasks/redhat-el8-plus.yml": UPSTREAM_DGX,
+}
 # file -> why a secret on its command line is acceptable
 SECRET_ARGV_OK = {
     "roles/maas-controller/tasks/main.yml": "maas createadmin takes the password only as an argument; "
@@ -316,6 +346,40 @@ class TaskRules(unittest.TestCase):
                 ):
                     offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "add check_mode: false to these read-only tasks")
+        scan.check(self)
+
+    def test_changes_run_through_change_command(self):
+        scan, offenders = Scan(PLAIN_CHANGE_OK, MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if (
+                    name in ("command", "shell")
+                    and str(task.get("changed_when", "")).lower() != "false"
+                    and task.get("check_mode") is not False
+                    and not {"creates", "removes"} & set(args)
+                    and not scan.excuse(rel(path))
+                ):
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(
+            offenders, [], "a change runs as change_command or change_shell; a read sets changed_when: false"
+        )
+        scan.check(self)
+
+    def test_a_change_reads_its_result_only_when_it_ran(self):
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, _ = module(task)
+                register = task.get("register")
+                if name not in CHANGES or not register:
+                    continue
+                for key, guard in CHECK_GUARDS.items():
+                    value = task.get(key)
+                    text = " and ".join(map(str, value)) if isinstance(value, list) else str(value or "")
+                    if re.search(rf"\b{register}\s*[.\[]", text) and not text.strip().startswith(guard):
+                        offenders.append(f"{rel(path)}: {task.get('name')} ({key})")
+        self.assertEqual(offenders, [], "under --check nothing ran: guard these conditions as rule 19 says")
         scan.check(self)
 
     def test_secret_templates_hide_their_diff(self):

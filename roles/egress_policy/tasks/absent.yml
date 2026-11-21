@@ -20,7 +20,6 @@
   check_mode: false  # read-only; --check needs the result
 
 - name: Delete the egress policy table
-  ansible.builtin.command:
+  change_command:
     argv: [nft, delete, table, inet, egress_policy]
-  changed_when: true
   when: egress_policy_table.rc == 0

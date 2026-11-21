@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from ansible_yaml import canonical, render, same_name  # noqa: E402
+from repo_scan import module  # noqa: E402
 
 ROOT = Path(os.environ.get("DEEPOPS_TEST_ROOT", Path(__file__).resolve().parents[2]))
 PLAY = canonical(yaml.safe_load((ROOT / "playbooks/nvidia-software/nvidia-mig.yml").read_text()))[0]
@@ -29,7 +30,7 @@ class Hooks(unittest.TestCase):
 
     def render(self, values):
         variables = {**DEFAULTS, "inventory_dir": "/cfg", **values}
-        return [render(arg, variables) for arg in APPLY["command"]["argv"]]
+        return [render(arg, variables) for arg in module(APPLY)[1]["argv"]]
 
     def test_the_packaged_hooks_and_the_selected_profile_reach_the_environment(self):
         args = self.render({"mig_manager_profile": "all-1g.10gb"})

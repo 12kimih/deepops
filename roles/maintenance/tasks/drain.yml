@@ -23,11 +23,10 @@
     maintenance_drained_by_run: true
 
 - name: Drain the node
-  ansible.builtin.command:
+  change_command:
     argv: ["{{ maintenance_slurm_bin }}/scontrol", update, "nodename={{ inventory_hostname }}", state=drain,
            "reason={{ maintenance_reason }}"]
   delegate_to: "{{ maintenance_slurm_delegate }}"
-  changed_when: true
   when: maintenance_needs_drain | bool
 
 - name: Wait for the jobs on the node to finish

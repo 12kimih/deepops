@@ -218,12 +218,11 @@
   when: directory_groups_exclusive | bool
 
 - name: Remove members no longer listed for the NIS-exported cluster groups
-  ansible.builtin.command:
+  change_command:
     cmd: "gpasswd -d {{ item.1 }} {{ item.0 }}"
   loop: "{{ nis_group_removals | default([]) }}"
   loop_control:
     label: "{{ item.1 }} -> {{ item.0 }}"
-  changed_when: true
 
 # --- Netgroups published through the netgroup maps -----------------------------
 # Unlike a group, a netgroup is matched by name, so it escapes both the GID_MIN export
@@ -259,11 +258,12 @@
 # changed and prints "Updating <map>" for each.
 # https://tldp.org/HOWTO/NIS-HOWTO/ypserv.html , man ypmake(8)
 - name: Bring the NIS maps up to date with their source files
-  ansible.builtin.command:
+  change_command:
     cmd: make
     chdir: /var/yp
   register: nis_make
-  changed_when: "'Updating' in nis_make.stdout"
+  changed_when: >-
+    ansible_check_mode or ('Updating' in nis_make.stdout)
   # Needs the database ypinit builds, which molecule skips.
   tags:
     - molecule-notest

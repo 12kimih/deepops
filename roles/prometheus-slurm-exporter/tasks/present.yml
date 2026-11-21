@@ -65,7 +65,7 @@
   when: slurm_exporter_build_image
 
 - name: Build exporter image
-  ansible.builtin.command:
+  change_command:
     argv: [docker, build, --label, "deepops.context={{ slurm_exporter_context_hash }}", -t, "{{ slurm_exporter_container }}", "{{ slurm_exporter_build_dir }}"]
   when: slurm_exporter_build_image and slurm_exporter_image_check.stdout | trim != slurm_exporter_context_hash
   notify: Restart slurm-exporter

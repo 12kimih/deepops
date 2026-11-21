@@ -36,17 +36,15 @@
         download_strip: "{{ _source_build_request.strip }}"
 
     - name: "Build: {{ _source_build.name }}"
-      ansible.builtin.command:
+      change_command:
         argv: "{{ item }}"
         chdir: "{{ _source_build_tree }}"
       loop: "{{ _source_build.steps }}"
-      changed_when: true
 
     - name: "Install into the stage: {{ _source_build.name }}"
-      ansible.builtin.command:
+      change_command:
         argv: "{{ _source_build.install + ['DESTDIR=' ~ _source_build_stage] }}"
         chdir: "{{ _source_build_tree }}"
-      changed_when: true
 
     - name: "Put the stage in place under its manifest: {{ _source_build.name }}"
       staged_install:

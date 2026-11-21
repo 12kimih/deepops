@@ -69,11 +69,10 @@
         # A drained partition refuses submissions: a job submitted between the owner's
         # scancel and this run (it happened) cannot arrive under the old name now.
         - name: Drain every partition
-          ansible.builtin.command:
+          change_command:
             argv: ["{{ slurm_install_prefix }}/bin/scontrol", update, "partitionname={{ item.split()[0] }}", state=drain]
           loop: "{{ slurm_rename_partitions.stdout_lines | unique }}"
           when: item.split()[1] != 'drain'
-          changed_when: true
 
         # squeue's default listing: every job not yet finished (pending, running,
         # suspended, completing; vocab.job_active). `-t all` also lists the jobs that
@@ -98,11 +97,10 @@
       rescue:
         # sinfo's %a abbreviates INACTIVE; scontrol takes the full word.
         - name: Put each partition back as it was
-          ansible.builtin.command:
+          change_command:
             argv: ["{{ slurm_install_prefix }}/bin/scontrol", update, "partitionname={{ item.split()[0] }}", "state={{ {'inact': 'inactive'}.get(item.split()[1], item.split()[1]) }}"]
           loop: "{{ slurm_rename_partitions.stdout_lines | unique }}"
           when: item.split()[1] != 'drain'
-          changed_when: true
 
         - name: Stop the rename
           ansible.builtin.fail:
@@ -115,11 +113,13 @@
         tasks_from: now
 
     - name: Add the new cluster to accounting
-      ansible.builtin.command:
+      change_command:
         argv: ["{{ slurm_install_prefix }}/bin/sacctmgr", -i, add, cluster, "{{ slurm_cluster_name }}"]
       register: slurm_rename_add
-      failed_when: slurm_rename_add.rc != 0 and 'already exists' not in slurm_rename_add.stdout
-      changed_when: "'already exists' not in slurm_rename_add.stdout"
+      failed_when: >-
+        not ansible_check_mode and (slurm_rename_add.rc != 0 and 'already exists' not in slurm_rename_add.stdout)
+      changed_when: >-
+        ansible_check_mode or ('already exists' not in slurm_rename_add.stdout)
 
     - name: Stop slurmctld
       ansible.builtin.systemd:
@@ -128,12 +128,11 @@
 
     # Kept, not deleted: it is the record of which name the saved state belonged to.
     - name: Set the old clustername file aside
-      ansible.builtin.command:
+      change_command:
         argv:
           - mv
           - "{{ slurm_state_save_location }}/clustername"
           - "{{ slurm_state_save_location }}/clustername.{{ slurm_rename_from }}.{{ ansible_facts.date_time.epoch }}"
-      changed_when: true
 
 - hosts: slurm-master
   become: true

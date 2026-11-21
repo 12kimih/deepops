@@ -100,11 +100,13 @@
 # refused because ood-portal.conf was edited by hand; anything but 0 or 3 stops the run
 # (systemd's ExecStartPre ignores its failures, so a bad config would go unnoticed).
 - name: Generate the Apache and Dex configuration
-  ansible.builtin.command:
+  change_command:
     argv: ["{{ open_ondemand_portal_generator }}", --detailed-exitcodes]
   register: open_ondemand_generate
-  changed_when: open_ondemand_generate.rc == 3
-  failed_when: open_ondemand_generate.rc not in [0, 3]
+  changed_when: >-
+    ansible_check_mode or (open_ondemand_generate.rc == 3)
+  failed_when: >-
+    not ansible_check_mode and (open_ondemand_generate.rc not in [0, 3])
   when: not ansible_check_mode
   notify:
     - Restart apache2

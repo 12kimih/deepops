@@ -10,11 +10,10 @@
     - bmc
 
 - name: Set the BMC SNMP community
-  ansible.builtin.command:
+  change_command:
     argv: ["ipmitool", "-I", "open", "exec", "/dev/stdin"]
     stdin: 'lan set {{ bmc_channel }} snmp "{{ bmc_snmp_community }}"'
   when: bmc_snmp_community != bmc_lan_now.snmp
-  changed_when: true
   no_log: true
   tags:
     - bmc

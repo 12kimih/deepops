@@ -41,10 +41,9 @@
     - podman_apparmor_fs.stat.exists
 
 - name: Load the AppArmor profiles
-  ansible.builtin.command:
+  change_command:
     argv: [apparmor_parser, -r, -W, "/etc/apparmor.d/{{ item }}"]
   loop: "{{ podman_apparmor_profiles }}"
-  changed_when: true
   when:
     - podman_userns_knob.stat.exists
     - podman_apparmor_fs.stat.exists

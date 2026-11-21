@@ -20,8 +20,8 @@
     - bmc
 
 - name: Close every other cipher suite
-  ansible.builtin.command: "ipmitool -I open lan set {{ bmc_channel }} cipher_privs {{ bmc_cipher_privs_want }}"
+  change_command:
+    cmd: "ipmitool -I open lan set {{ bmc_channel }} cipher_privs {{ bmc_cipher_privs_want }}"
   when: bmc_cipher_privs_want != bmc_lan_now.cipher_privs
-  changed_when: true
   tags:
     - bmc
