@@ -40,11 +40,17 @@
       -e bmc_power_undrained=true to act anyway, losing its jobs.
   when: bmc_power_action not in ["status", "on"]
 
+# ipmitool -E reads IPMI_PASSWORD; the shell sets it from stdin (a last line without a
+# newline counts). Ansible's `environment:` would put it on the module's command line
+# (VAR=value), readable in ps by every user (rule 9).
 - name: "Chassis power {{ bmc_power_action }}"
   change_command:
-    argv: ["ipmitool", "-I", "lanplus", "-C", "{{ bmc_cipher_suite }}", "-H", "{{ bmc_ipaddr }}", "-U", "{{ bmc_user_name }}", "-E", "chassis", "power", "{{ bmc_power_action }}"]
-  environment:
-    IPMI_PASSWORD: "{{ bmc_password }}"
+    argv: >-
+      {{ ['sh', '-c', 'IFS= read -r IPMI_PASSWORD || [ -n "$IPMI_PASSWORD" ] || exit 2; export IPMI_PASSWORD; exec "$@"', 'ipmitool',
+          'ipmitool', '-I', 'lanplus', '-C', bmc_cipher_suite | string, '-H', bmc_ipaddr, '-U', bmc_user_name,
+          '-E', 'chassis', 'power', bmc_power_action] }}
+    stdin: "{{ bmc_password }}"
+  no_log: true
   delegate_to: localhost
   become: false
   register: bmc_power_result

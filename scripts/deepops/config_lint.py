@@ -534,6 +534,33 @@ def check_duplicates():
     return problems
 
 
+# A proxy URL with a user and password (http://user:pass@proxy) in proxy_env reaches every
+# task that uses it through `environment:`, which Ansible puts on the module's command
+# line, readable in ps by every user of the host.
+PROXY_CREDENTIALS = re.compile(r"(?i)proxy[^#\n]*://[^/\s'\"@]+@")
+
+
+def check_proxy_credentials():
+    problems = []
+    for label, tree, private in configs():
+        for rel in tree.files():
+            if rel.split("/", 1)[0] not in ("group_vars", "host_vars"):
+                continue
+            for number, line in enumerate((tree.text(rel) or "").splitlines(), 1):
+                if not line.lstrip().startswith("#") and PROXY_CREDENTIALS.search(line):
+                    problems.append(
+                        found(
+                            "proxy-credentials",
+                            f"{label}/{rel}",
+                            number,
+                            "a proxy URL holds credentials, which `environment:` puts on every "
+                            "task's command line; use a proxy that needs none",
+                            private,
+                        )
+                    )
+    return problems
+
+
 # A check that can fix takes a Fixes to collect its edits in.
 FIXABLE = {"commented", "redundant"}
 CHECKS = {
@@ -545,6 +572,7 @@ CHECKS = {
     "doc-limits": check_doc_limits,
     "doc-gpu": check_doc_gpu,
     "duplicates": check_duplicates,
+    "proxy-credentials": check_proxy_credentials,
     "shadow": check_shadow,
     "retired": check_retired,
     "removals": check_removals,
