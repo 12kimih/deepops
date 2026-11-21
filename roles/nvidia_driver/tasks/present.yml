@@ -27,10 +27,11 @@
     state: present
   when: nvidia_driver_graphics | bool
 
-# A reboot is needed when this run installed the driver, or when the running module does
-# not match the one on disk. The second case matters on re-runs: apt reports no change, so
-# gating on install.changed alone would never re-fire a reboot that was skipped, leaving
-# the node on the old module with nvidia-persistenced failing on a version mismatch.
+# A reboot is needed when the running module is not the one on disk, by version and by
+# flavor (plugins/filter/nvidia.py): a first install, a new version, open <-> proprietary.
+# Not for every install: packages reinstalled at the running version (headless -> full)
+# load nothing new. On re-runs this re-fires a reboot that was skipped. Under --check
+# nothing is installed, so a pending install stands for it.
 - name: Read the running NVIDIA kernel module version
   ansible.builtin.command: cat /proc/driver/nvidia/version
   register: nvidia_driver_loaded_version
@@ -45,13 +46,19 @@
   failed_when: false
   check_mode: false
 
+- name: Read the on-disk NVIDIA kernel module license (open or proprietary)
+  ansible.builtin.command: modinfo -F license nvidia
+  register: nvidia_driver_ondisk_license
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
 - name: Determine whether the NVIDIA driver needs a reboot
   ansible.builtin.set_fact:
     nvidia_driver_reboot_needed: >-
-      {{ (nvidia_driver_install is defined and nvidia_driver_install.changed) or
-         ((nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0 and
-          (nvidia_driver_ondisk_version.stdout | trim)
-            not in (nvidia_driver_loaded_version.stdout | default(''))) }}
+      {{ (ansible_check_mode and nvidia_driver_install is defined and nvidia_driver_install.changed) or
+         (nvidia_driver_module_on_disk | length > 0 and
+          nvidia_driver_module_on_disk != (nvidia_driver_loaded_version.stdout | default('') | nvidia_module_loaded)) }}
 
 - name: Ask for a reboot to load the new NVIDIA kernel module
   ansible.builtin.include_role:
@@ -78,9 +85,8 @@
 - name: Determine whether the NVIDIA kernel module is loaded and current
   ansible.builtin.set_fact:
     nvidia_driver_module_loaded: >-
-      {{ (nvidia_driver_ondisk_version.stdout | default('') | trim) | length > 0 and
-         (nvidia_driver_ondisk_version.stdout | trim)
-           in (nvidia_driver_loaded_version_post.stdout | default('')) }}
+      {{ nvidia_driver_module_on_disk | length > 0 and
+         nvidia_driver_module_on_disk == (nvidia_driver_loaded_version_post.stdout | default('') | nvidia_module_loaded) }}
 
 # Under --check nothing was installed, so an empty modinfo proves nothing there.
 - name: Require an NVIDIA kernel module on disk after the install

@@ -61,3 +61,7 @@ nvidia_driver_items: >-
   {{ nvidia_driver_packages_owned | map('regex_replace', '^', 'package:') | list
      + ['unit:nvidia-persistenced.service', 'file:/etc/systemd/system/nvidia-persistenced.service',
         'file:/etc/apt/preferences.d/deepops-nvidia-driver'] }}
+
+# The module modprobe would load, "<version> <open|proprietary>" ("" when none).
+nvidia_driver_module_on_disk: >-
+  {{ nvidia_driver_ondisk_version.stdout | default('') | nvidia_module_on_disk(nvidia_driver_ondisk_license.stdout | default('')) }}
