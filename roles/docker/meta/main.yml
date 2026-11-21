@@ -1,7 +1,7 @@
 ---
 # A site still setting a name this role read before stops the deploy.
 dependencies:
-  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir
+  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir, deepops_containerized
   - role: retired_settings
 
 galaxy_info:

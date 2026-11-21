@@ -24,3 +24,5 @@ docker_items: >-
      | reject('in', [] if docker_tune_kernel | bool else ['file:/etc/sysctl.d/90-docker.conf'])
      | reject('in', [] if docker_image_prune_until | length > 0 else _docker_prune_items)
      | list }}
+# The API socket docker.socket listens on (the package's unit, ListenStream).
+docker_api_socket: /run/docker.sock

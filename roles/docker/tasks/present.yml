@@ -122,6 +122,60 @@
     docker_daemon_json_unit_changed: "{{ (host_baseline_set_aside | default({})) is changed }}"
     docker_daemon_json_retiring: "{{ docker_retired_unit_files }}"
 
+# A dockerd that made its own API socket (a retired unit passing -H unix://...) removes
+# the socket file when it stops, and the package's dockerd that follows serves the
+# socket docker.socket handed it with that file gone: every client then finds no
+# daemon (2026-11-22: retiring a kubespray-era unit). So after any restart the file is
+# checked, and docker.socket recreates it (dockerd stops first, live-restore keeps the
+# containers).
+- name: Apply a pending dockerd restart now
+  ansible.builtin.meta: flush_handlers
+
+- name: Look for the Docker API socket
+  ansible.builtin.stat:
+    path: "{{ docker_api_socket }}"
+    get_checksum: false
+  register: docker_api_socket_file
+  when: not deepops_containerized | bool
+
+- name: Recreate the Docker API socket
+  when:
+    - not deepops_containerized | bool
+    - docker_service_state == 'started'
+    - not docker_api_socket_file.stat.exists
+  block:
+    - name: Stop dockerd so docker.socket can listen again
+      systemd_unit:
+        name: docker.service
+        state: stopped
+
+    - name: Restart docker.socket, which recreates the socket file
+      systemd_unit:
+        name: docker.socket
+        state: restarted
+
+    - name: Start dockerd on the recreated socket
+      systemd_unit:
+        name: docker.service
+        state: started
+
+    - name: Look for the recreated socket
+      ansible.builtin.stat:
+        path: "{{ docker_api_socket }}"
+        get_checksum: false
+      register: docker_api_socket_again
+      when: not ansible_check_mode
+
+    - name: Stop when the socket is still missing
+      ansible.builtin.assert:
+        that: docker_api_socket_again.stat.exists
+        fail_msg: >-
+          {{ docker_api_socket }} is still missing on {{ inventory_hostname }} after
+          restarting docker.socket and dockerd: no Docker client can reach the daemon.
+          See systemctl status docker.socket docker.service.
+        quiet: true
+      when: not ansible_check_mode
+
 - name: Raise the kernel limits a container host runs into
   ansible.builtin.include_role:
     name: host_baseline
