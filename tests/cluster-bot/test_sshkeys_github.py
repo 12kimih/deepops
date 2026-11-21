@@ -14,6 +14,8 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
+import bounds  # noqa: E402
 from clusterbot import github, sshkeys  # noqa: E402
 
 
@@ -22,7 +24,7 @@ def keygen(tmp, kind, bits=None):
     argv = ["ssh-keygen", "-q", "-t", kind, "-N", "", "-C", "me@lab", "-f", path] + (
         ["-b", str(bits)] if bits else []
     )
-    subprocess.run(argv, check=True, timeout=60)
+    subprocess.run(argv, check=True, timeout=bounds.CHILD)
     return path
 
 
@@ -56,8 +58,10 @@ class GitHub(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             key, pub = os.path.join(tmp, "app.pem"), os.path.join(tmp, "app.pub")
             subprocess.run(["openssl", "genpkey", "-algorithm", "RSA", "-out", key, "-pkeyopt", "rsa_keygen_bits:2048"],
-                           check=True, capture_output=True, timeout=60)  # fmt: skip
-            subprocess.run(["openssl", "pkey", "-in", key, "-pubout", "-out", pub], check=True, timeout=60)
+                           check=True, capture_output=True, timeout=bounds.CHILD)  # fmt: skip
+            subprocess.run(
+                ["openssl", "pkey", "-in", key, "-pubout", "-out", pub], check=True, timeout=bounds.CHILD
+            )
             token = github.App(123, 456, key).jwt(now=1_000_000)
             head, body, sig = token.split(".")
             pad = lambda s: s + "=" * (-len(s) % 4)  # noqa: E731
@@ -65,7 +69,7 @@ class GitHub(unittest.TestCase):
             Path(tmp, "sig").write_bytes(base64.urlsafe_b64decode(pad(sig)))
             Path(tmp, "data").write_text(f"{head}.{body}")
             ok = subprocess.run(["openssl", "dgst", "-sha256", "-verify", pub, "-signature", os.path.join(tmp, "sig"),
-                                 os.path.join(tmp, "data")], capture_output=True, text=True, timeout=60)  # fmt: skip
+                                 os.path.join(tmp, "data")], capture_output=True, text=True, timeout=bounds.CHILD)  # fmt: skip
             self.assertEqual(ok.stdout.strip(), "Verified OK")
 
     def test_a_change_is_a_branch_and_a_pull_request(self):

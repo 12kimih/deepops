@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
+import bounds  # noqa: E402
 import in_tree  # noqa: E402
 from clusterbot import accounts, accounts_blocks, requests  # noqa: E402
 
@@ -45,7 +46,9 @@ class Accounts(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         key = os.path.join(tmp.name, "k")
-        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key], check=True, timeout=60)
+        subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key], check=True, timeout=bounds.CHILD
+        )
         self.key = Path(key + ".pub").read_text()
         self.repo = FakeRepo()
         self.engine = requests.Engine({"join": accounts.JoinFeature(self.repo, people, SETTINGS),
