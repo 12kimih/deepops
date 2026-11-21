@@ -250,6 +250,47 @@ class Edit(unittest.TestCase):
         self.assertEqual(alice["uid"], 1001)
 
 
+class Leaving(unittest.TestCase):
+    """Past `ends` a person keeps the account (login until ends + grace) but no Slurm
+    association and no role; people_login_expires is the one date the directory and the
+    local accounts apply."""
+
+    ROSTER = {
+        "now": {"uid": 1001, "roles": ["admin"], "accounts": {"a": {}}},
+        "soon": {"uid": 1002, "roles": ["admin"], "accounts": {"a": {}}, "ends": "2027-02-28"},
+        "past": {"uid": 1003, "roles": ["admin"], "accounts": {"a": {}}, "ends": "2026-10-31"},
+        "gone": {"uid": 1004, "status": "left"},
+    }
+
+    def test_the_login_expiry_of_each_kind_of_person(self):
+        expires = {n: people.people_login_expires(p, 30) for n, p in self.ROSTER.items()}
+        self.assertEqual(
+            expires, {"now": "", "soon": "2027-03-30", "past": "2026-11-30", "gone": "1970-01-02"}
+        )
+
+    def test_a_person_past_their_end_has_no_association_and_no_role(self):
+        today = "2026-11-22"
+        self.assertEqual(sorted(people.people_accounting(self.ROSTER, today)), ["now", "soon"])
+        self.assertEqual(people.people_with_role(self.ROSTER, "admin", today), ["now", "soon"])
+        self.assertEqual(people.people_uids(self.ROSTER, "admin", today), [1001, 1002])
+        self.assertIn("past", people.people_active(self.ROSTER), "the account itself stays")
+
+    def test_a_date_yaml_reads_or_a_string_and_nothing_else(self):
+        import datetime
+
+        self.assertEqual(people.people_login_expires({"ends": datetime.date(2027, 1, 1)}, 30), "2027-01-31")
+        problems = people.check({"people": {"x": {"uid": 1001, "ends": "next spring"}}})
+        self.assertIn("people.x.ends: a date, YYYY-MM-DD", problems)
+
+    def test_leave_with_an_end_date_keeps_the_person_active(self):
+        text = (ROOT / "config.example" / "people.yml").read_text()
+        out = yaml.safe_load(people.roster_leave(text, "alice", ends="2027-02-28"))["people"]["alice"]
+        self.assertEqual((out.get("status", "active"), str(out["ends"])), ("active", "2027-02-28"))
+        self.assertIn("accounts", out)
+        with self.assertRaises(people.EditError):
+            people.roster_leave(text, "alice", ends="soon")
+
+
 class Cli(unittest.TestCase):
     def test_exit_status(self):
         script = ROOT / "scripts" / "deepops" / "people.py"
