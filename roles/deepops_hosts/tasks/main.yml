@@ -22,40 +22,38 @@
                         | map(attribute='key') | list) | list }}
   when: hosts_add_ansible_managed_hosts | bool and hosts_file_src | length == 0
 
+- name: Make the directory of the hosts file's fragments
+  ansible.builtin.file:
+    path: "{{ hosts_fragments_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: hosts
+
 - name: Install user-defined custom hosts file
   ansible.builtin.copy:
     src: "{{ hosts_file_src }}"
-    dest: "{{ hosts_file }}"
+    dest: "{{ hosts_fragments_dir }}/00-deepops.hosts"
     owner: root
     group: root
     mode: "0644"
-    backup: "{{ host_file_backup }}"
   tags: hosts
   when: hosts_file_src | length > 0
 
-- name: Install custom hosts file
+- name: Write this role's part of the hosts file
   ansible.builtin.template:
     src: etc_hosts.j2
-    dest: "{{ hosts_file }}"
+    dest: "{{ hosts_fragments_dir }}/00-deepops.hosts"
     owner: root
     group: root
     mode: "0644"
-    backup: "{{ host_file_backup }}"
   tags: hosts
   when: hosts_file_src | length == 0
 
-- name: Render custom hosts template
-  ansible.builtin.set_fact:
-    custom_hosts: "{{ lookup('template', 'custom_hosts.j2') }}"
+- name: Assemble the hosts file
+  ansible.builtin.include_tasks:
+    file: assemble.yml
+    apply:
+      tags: hosts
   tags: hosts
-  when: (hosts_file_src | length == 0) and (hosts_entries | length > 0)
-
-- name: Add the managed block to {{ hosts_file }}
-  ansible.builtin.blockinfile:
-    path: "{{ hosts_file }}"
-    owner: root
-    group: root
-    content: "{{ custom_hosts }}"
-    marker: "# {{ hosts_custom_hosts_marker }} {mark}"
-  tags: hosts
-  when: (hosts_file_src | length == 0) and (hosts_entries | length > 0)

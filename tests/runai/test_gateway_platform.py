@@ -47,10 +47,9 @@ class PlatformPath(unittest.TestCase):
                     if meta.is_file()
                     else []
                 )
-        for path in (role / "tasks").glob("*.yml"):
+        for path in (self.state / "roles").glob("*/tasks/*.yml"):
             text = path.read_text().replace("owner: root", 'owner: "%s"' % os.getuid())
             text = text.replace("group: root", 'group: "%s"' % os.getgid())
-            text = text.replace("path: /etc/hosts", 'path: "' + str(self.state / "hosts") + '"')
             path.write_text(text)
         (self.state / "hosts").write_text("127.0.0.1 localhost\n")
         self.prerequisite = {
@@ -82,6 +81,9 @@ class PlatformPath(unittest.TestCase):
                             "runai_platform_manage_hosts_entry": True,
                             "runai_platform_coredns_rewrite": True,
                             "runai_platform_address_timeout": 1,
+                            # /etc/hosts and its fragments in the fixture (roles/deepops_hosts)
+                            "hosts_file": str(self.state / "hosts"),
+                            "hosts_fragments_dir": str(self.state / "hosts.d"),
                         },
                         "roles": ["runai"],
                     }

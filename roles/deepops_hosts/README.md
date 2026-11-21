@@ -53,10 +53,15 @@ None of the variables below are required. When not set, the default setting is a
 | `hosts_default_domain`                   | ''                                   | Domain used for the FQDN of the default interface entry (otherwise `ansible_fqdn`)                                |
 | `hosts_interface_domain`                 | ''                                   | Domain per interface, or per host per interface, for the interface entries                                        |
 | `hosts_exclude_interfaces`               | [lo, docker, nodelocaldns, br-, veth]| Interface name prefixes left out of the hosts file                                                                |
-| `host_file_backup`                       | no                                   | If yes, backup of host file is created with timestamp                                                             |
 |                                          |                                      |                                                                                                                   |
 
 An interface with several addresses is listed by the one inside `cluster_networks` (roles/network_defaults).
+
+`/etc/hosts` is assembled from `/etc/hosts.d/*.hosts` in name order: this role's part
+(`00-deepops.hosts`), then each component's. Another role adds its lines with
+`include_role: deepops_hosts, tasks_from: fragment` (`hosts_fragment_name`,
+`hosts_fragment_lines`, `[]` removes them), never by editing `/etc/hosts`, which the next
+deploy rewrites.
 
 (1) When setting `hosts_add_ansible_managed_hosts`, an entry for the current host will also be added.
 

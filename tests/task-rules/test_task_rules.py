@@ -85,6 +85,9 @@
    those fail on it (fail2ban's preview failed on every node without it, 2026-11), in a
    task or a handler alike. systemd_unit runs as systemd_service and previews such a
    unit as what it would do once installed.
+23. Only roles/deepops_hosts writes /etc/hosts. It assembles the file from fragments;
+   another role adds its lines through `tasks_from: fragment`. A line written straight
+   into /etc/hosts (the registry's, Run:ai's) was dropped by the next deploy.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -783,6 +786,18 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {key}: {value}")
         self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
         scan.check(self)
+
+    def test_only_deepops_hosts_writes_etc_hosts(self):
+        offenders = []
+        for path in ansible_files():
+            if rel(path).startswith(("roles/deepops_hosts/", "roles/nvidia-dgx")):
+                continue
+            for task in tasks(path):
+                _, args = module(task)
+                target = str(args.get("path") or args.get("dest") or "")
+                if target in ("/etc/hosts", "{{ hosts_file }}"):
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "add lines through deepops_hosts tasks_from: fragment")
 
     def test_units_go_through_systemd_unit(self):
         offenders = []
