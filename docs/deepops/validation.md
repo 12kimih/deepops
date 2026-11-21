@@ -51,7 +51,10 @@ maintenance; a powered-down node is available, Slurm powers it up).
 named `deepops-validate-<pid>` and asks for one GPU of the type with the most
 configured GPUs (`--gpu-type` picks another);
 when it does not finish within `--gpu-job-timeout` seconds it is cancelled, so
-it does not wait in the queue to take a GPU later. Example JSON:
+it does not wait in the queue to take a GPU later. The job also reports
+whether its `/tmp` was its own (`private_tmp_in_job`): with a `NamespaceType`
+set (`slurm_job_private_dirs`, docs/slurm-cluster/epilog-job-scoped-cleanup.md)
+one that was not is a failure. Example JSON:
 
 ```json
 {
@@ -66,6 +69,8 @@ it does not wait in the queue to take a GPU later. Example JSON:
   "gpu_job_ran": true,
   "gpu_job_ok": true,
   "gpus_visible_in_job": 1,
+  "private_tmp_expected": true,
+  "private_tmp_in_job": true,
   "failures": []
 }
 ```

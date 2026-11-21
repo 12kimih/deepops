@@ -23,6 +23,7 @@ import functools
 import getpass
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -73,12 +74,39 @@ def pick_gpu_type(nodes):
     return min(types, key=lambda t: (-types[t], t)) if types else ""
 
 
+# What the test job prints after its GPUs: whether its /tmp is its own. Slurm's
+# namespace plugin (slurm_job_private_dirs) mounts it from <base>/<job id>/, so the
+# mount's root names the job.
+PRIVATE_TMP = (
+    'printf "private_tmp=%s\\n" "$(findmnt -n -o FSROOT --mountpoint /tmp | grep -c "/$SLURM_JOB_ID/")"'
+)
+
+
 def gpu_job_command(job_name, gpu_type, partition):
     """The single-GPU test job: named, so a timed-out one can be found and cancelled."""
     cmd = ["srun", "--job-name=" + job_name, "--gpus=%s1" % (gpu_type + ":" if gpu_type else ""), "--time=5"]
     if partition:
         cmd += ["--partition", partition]
-    return cmd + ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
+    return cmd + [
+        "bash",
+        "-c",
+        "nvidia-smi --query-gpu=name,driver_version --format=csv,noheader && " + PRIVATE_TMP,
+    ]
+
+
+def job_output(out):
+    """(the GPU lines, whether /tmp was the job's own: True, False, or None unreported)."""
+    lines = out.splitlines()
+    private = [line.split("=", 1)[1].strip() for line in lines if line.startswith("private_tmp=")]
+    gpus = [line for line in lines if line.strip() and not line.startswith("private_tmp=")]
+    return gpus, (private[-1] not in ("", "0")) if private else None
+
+
+def namespace_type():
+    """The cluster's NamespaceType ("" for none, or when it cannot be read)."""
+    rc, out, _ = run(["scontrol", "show", "config"])
+    found = re.findall(r"(?m)^NamespaceType\s*=\s*(\S+)", out) if rc == 0 else []
+    return "" if not found or found[-1] in ("(null)", "none") else found[-1]
 
 
 def main():
@@ -129,6 +157,8 @@ def main():
         "gpu_job_ran": False,
         "gpu_job_ok": False,
         "gpus_visible_in_job": 0,
+        "private_tmp_expected": False,
+        "private_tmp_in_job": None,
         "failures": [],
     }
 
@@ -165,9 +195,17 @@ def main():
             # Killing srun leaves its job queued, to take a GPU later with nobody
             # waiting for it: cancel it by its name.
             run(["scancel", "--name", job_name, "--user", getpass.getuser()])
-        if rc == 0 and out:
+        gpus, private = job_output(out)
+        if rc == 0 and gpus:
             result["gpu_job_ok"] = True
-            result["gpus_visible_in_job"] = len(out.splitlines())
+            result["gpus_visible_in_job"] = len(gpus)
+            result["private_tmp_in_job"] = private
+            result["private_tmp_expected"] = bool(namespace_type())
+            if result["private_tmp_expected"] and not private:
+                result["failures"].append(
+                    "the test job's /tmp was not its own, though NamespaceType is set"
+                    " (unless slurm_job_private_dirs leaves /tmp out)"
+                )
         else:
             result["failures"].append("srun GPU job failed: %s" % (err or out or "rc=%s" % rc))
 
@@ -185,6 +223,7 @@ def main():
             "gpus_configured",
             "gpu_job_ran",
             "gpu_job_ok",
+            "private_tmp_in_job",
         ):
             print("%s=%s" % (key, result[key]))
         for failure in result["failures"]:
