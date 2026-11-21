@@ -15,6 +15,18 @@
   ansible.builtin.include_tasks: redhat.yml
   when: ansible_facts.os_family == 'RedHat'
 
+# NVIDIA's graphics libraries plug into the distribution's dispatchers (glvnd's libEGL,
+# libGL, libGLX, libOpenGL, libGLESv2; the Vulkan loader), which the driver packages do
+# not depend on: pulled in by something else, they were auto-installed, and removing that
+# (a desktop) autoremoved them, taking EGL, OpenGL and Vulkan from every job. Installed by
+# name they are the host's own; never in the component's record, other software needs
+# them too. Apart from the driver's install: libraries, no reboot.
+- name: Install the graphics dispatchers the driver plugs into
+  ansible.builtin.package:
+    name: "{{ nvidia_driver_graphics_dispatchers }}"
+    state: present
+  when: nvidia_driver_graphics | bool
+
 # A reboot is needed when this run installed the driver, or when the running module does
 # not match the one on disk. The second case matters on re-runs: apt reports no change, so
 # gating on install.changed alone would never re-fire a reboot that was skipped, leaving

@@ -78,13 +78,17 @@ def pick_gpu_type(nodes):
 #   private_tmp  1 when /tmp is the job's own: Slurm's namespace plugin
 #                (slurm_job_private_dirs) mounts it from <base>/<job id>/, so the
 #                mount's root names the job
-#   vulkan, egl  1 when the job sees NVIDIA's Vulkan driver and EGL vendor: rendering on
-#                the GPU (roles/nvidia_driver's full driver); the headless set has
-#                neither, and a job then renders on the CPU without an error
+#   vulkan, egl  1 when the job can render on its GPU: NVIDIA's Vulkan driver and EGL
+#                vendor (roles/nvidia_driver's full driver; the headless set has
+#                neither, and a job then renders on the CPU without an error) and the
+#                dispatchers they plug into (the Vulkan loader, glvnd's libEGL), which a
+#                package removal can take while NVIDIA's files stay
 PROBES = {
     "private_tmp": 'findmnt -n -o FSROOT --mountpoint /tmp | grep -c "/$SLURM_JOB_ID/"',
-    "vulkan": "ls /usr/share/vulkan/icd.d/nvidia_icd.json /etc/vulkan/icd.d/nvidia_icd.json 2>/dev/null | grep -c .",
-    "egl": "ls /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null | grep -c .",
+    "vulkan": "{ ls /usr/share/vulkan/icd.d/nvidia_icd.json /etc/vulkan/icd.d/nvidia_icd.json 2>/dev/null"
+    " | grep -q . && ldconfig -p | grep -q 'libvulkan[.]so[.]1 '; } && echo 1 || echo 0",
+    "egl": "{ ls /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null"
+    " | grep -q . && ldconfig -p | grep -q 'libEGL[.]so[.]1 '; } && echo 1 || echo 0",
 }
 
 

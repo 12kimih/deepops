@@ -48,6 +48,14 @@ _nvidia_driver_packages:
     - libnvsdm*
 # The branch as the Canonical archive names its packages (580-server, or 580).
 nvidia_driver_ubuntu_branch: "{{ nvidia_driver_branch ~ ('-server' if nvidia_driver_server_branch | bool else '') }}"
+# Whether the installed driver renders: every driver but the Ubuntu archive's headless set.
+nvidia_driver_graphics: >-
+  {{ not (nvidia_driver_headless | bool and ansible_facts.distribution == 'Ubuntu'
+          and nvidia_driver_install_method == 'ubuntu_repo') }}
+_nvidia_driver_graphics_dispatchers:
+  Debian: [libglvnd0, libegl1, libgl1, libglx0, libgles2, libopengl0, libvulkan1]
+  RedHat: [libglvnd-egl, libglvnd-gles, libglvnd-glx, libglvnd-opengl, vulkan-loader]
+nvidia_driver_graphics_dispatchers: "{{ _nvidia_driver_graphics_dispatchers[ansible_facts.os_family] | default([]) }}"
 nvidia_driver_packages_owned: "{{ _nvidia_driver_packages[ansible_facts.os_family] | default([]) }}"
 nvidia_driver_items: >-
   {{ nvidia_driver_packages_owned | map('regex_replace', '^', 'package:') | list
