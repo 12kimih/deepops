@@ -1,6 +1,7 @@
 """Merge one owner's keys into /etc/docker/daemon.json (roles/docker_daemon_json).
 
-Reads {"path", "record", "want", "drop_if"} as JSON on stdin. The keys the owner set
+Reads {"path", "record", "want", "drop_if", "check"} as JSON on stdin; with "check"
+true nothing is written, and the exit status and output say what a run would change. The keys the owner set
 last time are in its record; a key there that it no longer wants is removed, so
 turning a setting off removes it instead of leaving it for good. Other owners' keys
 are left alone. Exit 10 when the file changed, 0 when it did not; standard output says
@@ -25,7 +26,7 @@ RELOADABLE = {
 
 args = json.load(sys.stdin)
 path, record = Path(args["path"]), Path(args["record"])
-want, drop_if = args["want"], args["drop_if"]
+want, drop_if, check = args["want"], args["drop_if"], args.get("check", False)
 
 text = path.read_text().strip() if path.exists() else ""
 data = json.loads(text) if text else {}
@@ -42,6 +43,8 @@ old = json.loads(before)
 keys = sorted(k for k in set(old) | set(data) if old.get(k) != data.get(k))
 print(json.dumps({"changed": keys, "reload": bool(keys) and set(keys) <= RELOADABLE}))
 
+if check:
+    sys.exit(10 if changed else 0)
 if changed:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".daemon.json-")
