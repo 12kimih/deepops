@@ -8,6 +8,7 @@ _job_notice_cfg:
   email_domain: "{{ slack_email_domain }}"
   state_file: "{{ _job_notice_state_dir }}/state.json"
   coalesce_seconds: "{{ job_notice_coalesce_seconds | int }}"
+  prefs_file: "{{ cluster_bot_prefs_file }}"
 
 # What this component installs, for its record (roles/component_record). The state (open
 # messages, looked-up member IDs) is a cache and goes with it.

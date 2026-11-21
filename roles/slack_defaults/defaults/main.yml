@@ -35,3 +35,7 @@ cluster_bot_user: clusterbot
 cluster_bot_host: >-
   {{ (deepops_component_registry | component_hosts(groups, 'cluster_bot', deepops_component_removals))[:1] | join }}
 cluster_bot_key: "/var/lib/{{ cluster_bot_user }}/.ssh/id_ed25519"
+# Each person's choices about notices (clusterbot.prefs: who muted job notices), written
+# by the bot and read by the notifiers on the same host (roles/job_notice), so its
+# directory is readable by all.
+cluster_bot_prefs_file: /var/lib/cluster-bot-prefs/prefs.json
