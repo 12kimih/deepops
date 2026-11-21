@@ -64,6 +64,37 @@ class Lan(unittest.TestCase):
         self.assertEqual(lan["auth"], dict.fromkeys(("callback", "user", "operator", "admin", "oem"), []))
 
 
+class AuthEnables(unittest.TestCase):
+    """LAN parameter 2 written whole: `lan set auth callback,user,operator,admin md5` sets
+    admin alone (ipmitool compares each level with strcasecmp against the rest of the list)."""
+
+    def test_support_and_current_bytes(self):
+        lan = bmc.bmc_lan(LAN_PRINT)
+        self.assertEqual(lan["auth_support"], ["none", "md2", "md5", "password"])
+        # MD2, MD5 and PASSWORD: bits 1, 2 and 4
+        self.assertEqual(lan["auth_enables"], ["0x16"] * 5)
+
+    def test_md5_at_every_level_and_oem_kept(self):
+        lan = bmc.bmc_lan(LAN_PRINT)
+        self.assertEqual(bmc.bmc_auth_enables(lan, ["MD5"]), ["0x04"] * 4 + ["0x16"])
+
+    def test_converged_reads_back_equal(self):
+        text = LAN_PRINT
+        for level in ("Callback", "User    ", "Operator", "Admin   "):
+            text = text.replace(f": {level} : MD2 MD5 PASSWORD", f": {level} : MD5")
+        lan = bmc.bmc_lan(text)
+        self.assertEqual(bmc.bmc_auth_enables(lan, ["md5"]), lan["auth_enables"])
+
+    def test_an_unsupported_type_is_refused(self):
+        lan = bmc.bmc_lan(LAN_PRINT.replace("NONE MD2 MD5 PASSWORD\n", "NONE PASSWORD\n", 1))
+        with self.assertRaisesRegex(ValueError, "does not support .*'md5'"):
+            bmc.bmc_auth_enables(lan, ["md5"])
+
+    def test_an_unknown_type_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            bmc.bmc_auth_enables(bmc.bmc_lan(LAN_PRINT), ["sha1"])
+
+
 class CipherPrivs(unittest.TestCase):
     def test_by_entry_not_by_id(self):
         lan = bmc.bmc_lan(LAN_PRINT)
