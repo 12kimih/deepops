@@ -1,16 +1,20 @@
 ---
 # `lan print` is the only readable source of truth for the channel's settings, and every
 # change the role makes to it is gated on what this reports (plugins/filter/bmc.py).
+# It holds the SNMP community, a secret: neither the output nor the parsed settings are
+# shown or recorded (the run history keeps every task's result).
 - name: Read the current BMC LAN configuration
   ansible.builtin.command: "ipmitool -I open lan print {{ bmc_channel }}"
   register: bmc_lan
   changed_when: false
   check_mode: false
+  no_log: true
   tags:
     - bmc
 
 - name: Note the current LAN settings
   ansible.builtin.set_fact:
     bmc_lan_now: "{{ bmc_lan.stdout | bmc_lan }}"
+  no_log: true
   tags:
     - bmc

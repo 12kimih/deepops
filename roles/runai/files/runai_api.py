@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Register a Run:ai cluster with the local control plane and print its Helm values.
 
-Called by the runai role (platform mode). Credentials come from the environment
-(RUNAI_USERNAME, RUNAI_PASSWORD), never from arguments, and are never printed.
+Called by the runai role (platform mode). Credentials come on stdin, the user and the
+password one per line, never from arguments or the environment (which Ansible puts on
+a command line), and are never printed.
 Prints one JSON object: {"values": {...}, "cluster_uid": "...", "created": bool}.
 Exit 0 ok, 1 API/HTTP failure, 2 bad input.
 """
@@ -10,7 +11,6 @@ Exit 0 ok, 1 API/HTTP failure, 2 bad input.
 import argparse
 import http.client
 import json
-import os
 import re
 import socket
 import ssl
@@ -130,9 +130,10 @@ def main(argv=None):
     p.add_argument("--chart-version", required=True)
     p.add_argument("--wait", type=int, default=600, help="seconds to wait for the control plane")
     args = p.parse_args(argv)
-    user, pw = os.environ.get("RUNAI_USERNAME", ""), os.environ.get("RUNAI_PASSWORD", "")
+    user, _, pw = sys.stdin.read().partition("\n")
+    user, pw = user.strip(), pw.rstrip("\n")
     if not user or not pw:
-        print("error: RUNAI_USERNAME and RUNAI_PASSWORD must be set", file=sys.stderr)
+        print("error: the user and the password are read from stdin, one per line", file=sys.stderr)
         return 2
     client = Client(args.domain, args.resolve_ip, args.ca_file)
     try:

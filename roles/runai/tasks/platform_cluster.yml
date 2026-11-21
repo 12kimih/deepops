@@ -29,9 +29,9 @@
           '--chart-version', runai_chart_version]
          + (['--resolve-ip', runai_exposure_address] if runai_exposure_address | length > 0 else [])
          + (['--ca-file', runai_tls_ca] if runai_tls_ca | length > 0 else []) }}
-  environment:
-    RUNAI_USERNAME: "{{ runai_platform_admin_user }}"
-    RUNAI_PASSWORD: "{{ runai_platform_admin_password }}"
+    # The user and password on stdin, one per line: `environment:` would put them on the
+    # module's command line, readable in ps.
+    stdin: "{{ runai_platform_admin_user }}\n{{ runai_platform_admin_password }}"
   register: runai_api
   changed_when: >-
     ansible_check_mode or ((runai_api.stdout | from_json).created)

@@ -22,7 +22,9 @@
 8. Nothing root writes, unpacks, builds or runs lives under a world-writable directory
    (/tmp, /var/tmp, /dev/shm): a user can plant the file or tree first, or swap it
    after. Root's scratch is /var/cache/deepops.
-9. No secret is on a command line: argv is readable by every user on the host (ps).
+9. No secret is on a command line: argv is readable by every user on the host (ps). That
+   includes a task's `environment:`, which Ansible puts on the module's command line
+   (`/bin/sh -c 'VAR=value python3 ...'`) even under no_log.
    A command takes it on stdin, from a root-only file, or from its environment.
 10. Only roles/maintenance reboots, and only a playbook asks it to: a role whose change
    needs a reboot calls its reboot_request (the reboot is left pending, then done with
@@ -324,9 +326,12 @@ class TaskRules(unittest.TestCase):
         for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
                 name, args = module(task)
-                if name in COMMANDS and SECRET.search(
-                    command_line(args) + " " + str(args.get("responses", ""))
-                ):
+                on_argv = (
+                    command_line(args) + " " + str(args.get("responses", "")) if name in COMMANDS else ""
+                )
+                # Ansible puts a task's `environment:` on the module's command line
+                # (`VAR=value python3 ...`), whatever the module, no_log or not.
+                if SECRET.search(on_argv + " " + str(task.get("environment", ""))):
                     if not scan.excuse(rel(path)):
                         offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(offenders, [], "pass the secret on stdin or from a root-only file, never in argv")
