@@ -17,7 +17,11 @@ The full driver is every capability NVIDIA names, at the driver's own version:
 | video | NVENC and NVDEC: encoding and decoding video on the GPU (ffmpeg `h264_nvenc`, DALI, decord, torchvision GPU decoding) |
 
 It also brings an X server driver and Mesa's libraries, which nothing starts on a node
-booted into `multi-user.target`. `nvidia_driver_headless: true` installs only compute
+booted into `multi-user.target`. The dispatchers NVIDIA's libraries plug into (glvnd's
+`libegl1`, `libgl1`, `libglx0`, `libopengl0`, `libgles2`, and the Vulkan loader
+`libvulkan1`) are installed by name: the driver packages do not depend on them, so
+installed only as another package's dependency they went with it (a desktop's removal
+took EGL, OpenGL and Vulkan from every job). `nvidia_driver_headless: true` installs only compute
 and utility (`nvidia-headless-no-dkms-`, `nvidia-utils-`), for nodes that never render
 or code video. Without graphics a job does not fail cleanly: a Vulkan application
 finds only Mesa's CPU renderer (lavapipe, from `mesa-vulkan-drivers`) and runs many
