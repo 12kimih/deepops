@@ -4,8 +4,13 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "plugins" / "filter"))
-from mounts import fstab_entries, mount_point  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests" / "lib"))
+import in_tree  # noqa: E402
+
+# One file loaded as a module: plugins/filter on sys.path would shadow the standard
+# library with its secrets.py (tests/python-rules/test_filter_path).
+_mounts = in_tree.load("plugins/filter/mounts.py")
+fstab_entries, mount_point = _mounts.fstab_entries, _mounts.mount_point
 
 MOUNTS = [{"mount": m} for m in ("/", "/var", "/var/tmp", "/boot/efi", "/raid")]
 
@@ -51,7 +56,7 @@ class FstabEntries(unittest.TestCase):
 
 class ProjectFilesystems(unittest.TestCase):
     def test_each_project_gets_the_mount_it_lives_on(self):
-        from mounts import project_filesystems
+        project_filesystems = _mounts.project_filesystems
 
         got = project_filesystems({"/var/tmp/x": {"id": 7}, "/srv/d": {"id": 8}}, MOUNTS)
         self.assertEqual(
