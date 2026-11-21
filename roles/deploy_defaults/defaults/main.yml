@@ -154,5 +154,3 @@ gpu_clock_lock: ""
 gpu_clock_reset: false
 # Packages playbooks/generic/software.yml adds on every host
 software_extra_packages: []
-# /etc/rc.local's managed block (playbooks/generic/rc-local.yml); empty leaves none
-rc_local_contents: ""
