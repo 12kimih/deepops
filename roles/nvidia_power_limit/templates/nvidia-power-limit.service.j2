@@ -13,6 +13,9 @@
 [Unit]
 Description=Set the NVIDIA GPU power limit (deepops)
 After=nvidia-persistenced.service
+# The cap goes with the GPUs' initialization: a restarted persistence daemon brings them
+# back at their default limit, so this unit restarts with it and sets the cap again.
+PartOf=nvidia-persistenced.service
 Before=slurmd.service
 ConditionPathExists={{ nvidia_power_limit_conf_file }}
 
