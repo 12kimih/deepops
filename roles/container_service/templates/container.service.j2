@@ -5,11 +5,17 @@ After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
 PartOf=docker.service
+# Five failed starts in five minutes (RestartSec=10 below) and the unit is failed, which
+# the failed-units alert shows, instead of retrying unseen for ever.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 TimeoutStartSec=0
 Restart=always
 RestartSec=10
+# No API (dockerd down or its socket gone) fails the start here, plainly.
+ExecStartPre=/usr/bin/docker info --format ok
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
 ExecStart=/usr/bin/docker run --rm --name %n \

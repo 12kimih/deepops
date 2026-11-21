@@ -93,7 +93,7 @@ docker_daemon_options: {}
 # restarts. Those our roles run as units (docker.*.service, PartOf=docker.service)
 # restart with it either way. Turning it on is itself a daemon.json change: the first
 # run with it restarts dockerd once. Not compatible with swarm mode. Whether a run may
-# restart dockerd at all is docker_daemon_restart (roles/docker_daemon_json).
+# restart dockerd at all is docker_daemon_restart (roles/docker_restart).
 docker_live_restore: true
 
 # The default logging driver of containers: Docker rotates no log by default, and the

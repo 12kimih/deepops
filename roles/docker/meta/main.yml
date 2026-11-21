@@ -3,6 +3,7 @@
 dependencies:
   - role: deepops_paths  # deepops_cache_dir, deepops_state_dir, deepops_containerized
   - role: retired_settings
+  - role: docker_restart  # docker_daemon_restart, docker_api_socket, the restart handlers
 
 galaxy_info:
   namespace: deepops

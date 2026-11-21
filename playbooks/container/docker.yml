@@ -11,14 +11,6 @@
   become_method: ansible.builtin.sudo
   tags:
     - docker
-  pre_tasks:
-    # DGX OS ships a docker-override.conf with options that conflict with a stock
-    # install; remove it before installing Docker.
-    - name: Remove the DGX docker systemd override if present
-      ansible.builtin.file:
-        path: /etc/systemd/system/docker.service.d/docker-override.conf
-        state: absent
-      when: deepops_components.docker | component_phase(deepops_phase) == 'present'
   roles:
     - role: deploy_defaults
     - role: docker

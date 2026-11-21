@@ -1,7 +1,0 @@
----
-- name: Reload systemd
-  systemd_unit:
-    daemon_reload: true
-
-# The socket unit and dockerd restart through roles/docker_daemon_json's handlers,
-# gated by its docker_daemon_restart, in that order.

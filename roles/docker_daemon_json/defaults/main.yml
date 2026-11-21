@@ -5,10 +5,7 @@ docker_daemon_json_keys: {}  # the keys this owner wants, with their values
 # Keys another tool wrote that go when they hold this value, e.g. the default-runtime
 # nvidia-ctk set once the NVIDIA runtime is no longer the default.
 docker_daemon_json_drop_if: {}
-# May a run restart dockerd? A changed daemon.json (or socket group) takes effect only
-# then, and a restart stops every container live-restore does not keep. False stages
-# the change for a maintenance window; a later run with true applies it.
-docker_daemon_restart: true
+# Whether a run may restart dockerd: docker_daemon_restart (roles/docker_restart).
 # The caller changed docker.service's unit files: dockerd restarts even when no key did.
 docker_daemon_json_unit_changed: false
 # Unit files the caller removes in this run (gone already, or under --check still there):

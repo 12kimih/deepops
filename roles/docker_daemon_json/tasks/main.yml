@@ -58,7 +58,20 @@
     ansible_check_mode or (docker_daemon_json_result.rc == 10)
   failed_when: >-
     not ansible_check_mode and (docker_daemon_json_result.rc not in [0, 10])
-  notify: Restart dockerd
+
+# dockerd re-reads some keys on SIGHUP (daemon-json.py: RELOADABLE); a change made only of
+# those reloads it, which stops no container, and anything else restarts it. Under --check
+# nothing ran, so the preview says restart.
+- name: Apply the changed daemon.json keys
+  ansible.builtin.debug:
+    msg: >-
+      {{ (_changed.changed | join(', ')) if _changed.changed is defined else 'daemon.json' }} changed;
+      dockerd {{ 'reloads' if _changed.reload | default(false) else 'restarts' }}.
+  changed_when: true
+  vars:
+    _changed: "{{ docker_daemon_json_result.stdout | default('{}', true) | from_json }}"
+  notify: "{{ 'Reload dockerd' if _changed.reload | default(false) else 'Restart dockerd' }}"
+  when: docker_daemon_json_result is changed
 
 - name: Restart dockerd for its changed unit
   ansible.builtin.debug:

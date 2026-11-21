@@ -3,7 +3,9 @@
 Reads {"path", "record", "want", "drop_if"} as JSON on stdin. The keys the owner set
 last time are in its record; a key there that it no longer wants is removed, so
 turning a setting off removes it instead of leaving it for good. Other owners' keys
-are left alone. Exit 10 when the file changed, 0 when it did not.
+are left alone. Exit 10 when the file changed, 0 when it did not; standard output says
+which keys changed and whether dockerd applies them all on SIGHUP (a reload) or only
+when it restarts: {"changed": [...], "reload": true}.
 """
 
 import json
@@ -11,6 +13,15 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+
+# What dockerd reconfigures on SIGHUP without a restart (dockerd reference,
+# "Configuration reload behavior": https://docs.docker.com/reference/cli/dockerd/).
+# Anything else, or a key missing from this list, takes a restart.
+RELOADABLE = {
+    "debug", "labels", "live-restore", "max-concurrent-downloads", "max-concurrent-uploads",
+    "max-download-attempts", "default-runtime", "default-stop-timeout", "runtimes",
+    "authorization-plugins", "insecure-registries", "registry-mirrors", "shutdown-timeout",
+}  # fmt: skip
 
 args = json.load(sys.stdin)
 path, record = Path(args["path"]), Path(args["record"])
@@ -27,6 +38,9 @@ for key, value in drop_if.items():
         data.pop(key)
 data.update(want)
 changed = json.dumps(data, sort_keys=True) != before
+old = json.loads(before)
+keys = sorted(k for k in set(old) | set(data) if old.get(k) != data.get(k))
+print(json.dumps({"changed": keys, "reload": bool(keys) and set(keys) <= RELOADABLE}))
 
 if changed:
     path.parent.mkdir(parents=True, exist_ok=True)

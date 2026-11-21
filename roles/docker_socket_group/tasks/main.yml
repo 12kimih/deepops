@@ -68,7 +68,6 @@
     mode: "0644"
   when: docker_socket_group_unit.rc == 0
   notify:
-    - Reload systemd
     - Restart the docker socket unit
     - Restart dockerd
 
@@ -92,6 +91,5 @@
     - docker_socket_group_socket_stat.stat.exists
     - (docker_socket_group_socket_stat.stat.gr_name | default("")) != docker_socket_group
   notify:
-    - Reload systemd
     - Restart the docker socket unit
     - Restart dockerd

@@ -1,4 +1,5 @@
 ---
 dependencies:
+  - role: docker_restart  # the handler: Restart dockerd
   - role: nginx_docker_cache_defaults  # nginx_docker_cache_ca_path, nginx_docker_cache_ca, nginx_docker_cache_port
   - role: deploy_defaults  # deepops_component_registry, deepops_component_removals

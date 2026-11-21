@@ -24,5 +24,7 @@ docker_items: >-
      | reject('in', [] if docker_tune_kernel | bool else ['file:/etc/sysctl.d/90-docker.conf'])
      | reject('in', [] if docker_image_prune_until | length > 0 else _docker_prune_items)
      | list }}
-# The API socket docker.socket listens on (the package's unit, ListenStream).
-docker_api_socket: /run/docker.sock
+# DGX OS's drop-in, with options that conflict with a stock install: always retired.
+docker_dgx_override: /etc/systemd/system/docker.service.d/docker-override.conf
+# Every unit file the role retires: the site's (docker_retired_unit_files) and DGX OS's.
+_docker_retiring: "{{ docker_retired_unit_files + [docker_dgx_override] }}"
