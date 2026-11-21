@@ -932,6 +932,73 @@ else
     jc_case "no private directories: cleanup runs" "" gone
 fi
 
+# --- 43-lastuserjob-ipc -----------------------------------------------------------
+# The user's System V IPC objects and POSIX message queues go with their last job, an
+# operator's stay, and nothing fails. The kernel's tables, ipcrm and /dev/mqueue are
+# fixtures: the suite never removes a real IPC object of whoever runs it.
+echo
+echo "43-lastuserjob-ipc -- the user's IPC objects go, nobody else's"
+ipc_setup() {
+    # $1 = fixture dir; the job user is uid 1001
+    local dir="$1"
+    rm -rf "$dir"; mkdir -p "$dir/sysvipc" "$dir/mqueue" "$dir/bin"
+    write_logger_stub "$dir"
+    printf '#!/bin/sh\necho "$*" >> "%s/ipcrm.log"\n' "$dir" > "$dir/bin/ipcrm"
+    chmod +x "$dir/bin/ipcrm"
+    printf '%s\n' "key shmid perms size cpid lpid nattch uid gid" \
+        "0 11 600 4096 1 1 0 1001 1001" "0 12 600 4096 1 1 0 1002 1002" > "$dir/sysvipc/shm"
+    printf '%s\n' "key semid perms nsems uid gid" "0 21 600 1 1001 1001" > "$dir/sysvipc/sem"
+    printf '%s\n' "key msqid perms cbytes qnum lspid lrpid uid gid" "0 31 600 0 0 0 0 1002 1002" > "$dir/sysvipc/msg"
+    : > "$dir/mqueue/q-mine"
+    render "shared/lib/localusers.sh" "$dir/localusers.sh" && render "epilog.d/43-lastuserjob-ipc" "$dir/43" || return 1
+    sed -i "s#^localusers_backup=.*#localusers_backup='$dir/localusers.backup'#" "$dir/localusers.sh"
+    sed -i -e "s#^sysvipc=.*#sysvipc='$dir/sysvipc'#" -e "s#^mqueue=.*#mqueue='$dir/mqueue'#" \
+        -e "s#/etc/slurm/shared/lib/localusers.sh#$dir/localusers.sh#" "$dir/43"
+    grep -qF "sysvipc='$dir/sysvipc'" "$dir/43" && grep -qF "mqueue='$dir/mqueue'" "$dir/43" \
+        && grep -qF ". '$dir/localusers.sh'" "$dir/43"
+}
+ipc="$work/ipc"
+if ipc_setup "$ipc"; then
+    : > "$ipc/localusers.backup"
+    me=$(id -u)
+    # The mqueue fixture belongs to whoever runs the suite: run as that uid's job.
+    sed -i "s/ 1001 / $me /" "$ipc/sysvipc/shm" "$ipc/sysvipc/sem"
+    out=$(PATH="$ipc/bin:$PATH" SLURM_JOB_USER=u SLURM_JOB_UID="$me" bash "$ipc/43" 2>&1); rc=$?
+    if [ "$rc" = 0 ] && [ "$(tr '\n' ' ' < "$ipc/ipcrm.log")" = "-m 11 -s 21 " ] \
+       && [ ! -e "$ipc/mqueue/q-mine" ] && grep -q 'removed 3 IPC objects' <<<"$out"; then
+        ok "the user's shared memory, semaphores and message queues go, another user's stay"
+    else
+        no "the user's shared memory, semaphores and message queues go, another user's stay" \
+           "rc=$rc ipcrm=$(tr '\n' ' ' < "$ipc/ipcrm.log" 2>/dev/null) out=$(printf '%s' "$out" | tail -1)"
+    fi
+else
+    no "43-lastuserjob-ipc renders" "harness setup failed"
+fi
+for listed in yes unreadable; do
+    if ipc_setup "$ipc"; then
+        if [ "$listed" = yes ]; then printf 'u\n' > "$ipc/localusers.backup"; fi
+        out=$(PATH="$ipc/bin:$PATH" SLURM_JOB_USER=u SLURM_JOB_UID=1001 bash "$ipc/43" 2>&1); rc=$?
+        if [ "$rc" = 0 ] && [ ! -e "$ipc/ipcrm.log" ] && [ -e "$ipc/mqueue/q-mine" ]; then
+            ok "an operator's IPC objects stay (localusers.backup $listed)"
+        else
+            no "an operator's IPC objects stay (localusers.backup $listed)" "rc=$rc out=$(printf '%s' "$out" | tail -1)"
+        fi
+    else
+        no "43-lastuserjob-ipc renders" "harness setup failed"
+    fi
+done
+for uid in 0 '' x1; do
+    if ipc_setup "$ipc"; then
+        : > "$ipc/localusers.backup"
+        PATH="$ipc/bin:$PATH" SLURM_JOB_USER=u SLURM_JOB_UID="$uid" bash "$ipc/43" >/dev/null 2>&1; rc=$?
+        if [ "$rc" = 0 ] && [ ! -e "$ipc/ipcrm.log" ]; then
+            ok "no usable uid ('$uid'): nothing is removed"
+        else
+            no "no usable uid ('$uid'): nothing is removed" "rc=$rc"
+        fi
+    fi
+done
+
 # --- 50-lastuserjob-all-enroot-dirs -----------------------------------------------
 # The enroot script has no guard of its own; it is protected by the dispatcher.
 # The dispatcher cases above run a -lastuserjob- marker, which is the same gate
@@ -1126,8 +1193,9 @@ snap_ok "epilog.d/42-lastuserjob-cleanup"         42-lastuserjob-cleanup
 for scope in job user; do
     bad=""
     for t in epilog.sh epilog.d/40-lastuserjob-processes epilog.d/41-lastuserjob-ssh \
-             epilog.d/42-lastuserjob-cleanup epilog.d/50-lastuserjob-all-enroot-dirs \
-             shared/bin/run-parts.sh shared/lib/epilog-job-scope.sh shared/lib/enroot-paths.sh; do
+             epilog.d/42-lastuserjob-cleanup epilog.d/43-lastuserjob-ipc epilog.d/50-lastuserjob-all-enroot-dirs \
+             shared/bin/run-parts.sh shared/lib/epilog-job-scope.sh shared/lib/enroot-paths.sh \
+             shared/lib/localusers.sh; do
         RENDER_SCOPE=$scope render "$t" "$work/parse-$scope" 2>/dev/null || bad="$bad $t"
     done
     if [ -z "$bad" ]; then
@@ -1155,9 +1223,12 @@ setup_ssh() {
     mkdir -p "$dir"
     write_logger_stub "$dir"
     render "epilog.d/41-lastuserjob-ssh" "$dir/41-ssh" || return 1
-    sed -i "s#^localusers_backup=.*#localusers_backup='$dir/localusers.backup'#" "$dir/41-ssh"
+    render "shared/lib/localusers.sh" "$dir/localusers.sh" || return 1
+    sed -i "s#^localusers_backup=.*#localusers_backup='$dir/localusers.backup'#" "$dir/localusers.sh"
+    sed -i "s#/etc/slurm/shared/lib/localusers.sh#$dir/localusers.sh#" "$dir/41-ssh"
     sed -i "s#^localusers_live=.*#localusers_live='$dir/localusers'#" "$dir/41-ssh"
-    if ! grep -qF "localusers_backup='$dir/localusers.backup'" "$dir/41-ssh" \
+    if ! grep -qF "localusers_backup='$dir/localusers.backup'" "$dir/localusers.sh" \
+       || ! grep -qF ". '$dir/localusers.sh'" "$dir/41-ssh" \
        || ! grep -qF "localusers_live='$dir/localusers'" "$dir/41-ssh"; then
         printf '  FAIL harness: the 41 paths were not redirected into the fixture\n' >&2
         return 1

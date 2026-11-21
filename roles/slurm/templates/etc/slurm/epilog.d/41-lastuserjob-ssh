@@ -6,10 +6,10 @@ set -ex
 # job user `al`, the sed deleted the SSH allow entry of `alice`, `halley` and
 # every other account containing "al", and a dot in a name (`je.kim`) matched
 # any character. Match the exact line, literally, in both places.
-localusers_backup={{ slurm_config_dir }}/localusers.backup
+. '{{ slurm_config_dir }}/shared/lib/localusers.sh'
 localusers_live=/etc/localusers
 
-if grep -qxF -- "$SLURM_JOB_USER" "$localusers_backup" ; then
+if localusers_listed "$SLURM_JOB_USER"; then
     exit 0  # don't revoke access for these users
 fi
 
