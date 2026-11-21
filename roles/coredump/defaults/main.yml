@@ -8,8 +8,8 @@
 # a Slurm job takes from where it was submitted), so by default none is, and a user who
 # wants one raises the limit. Stored cores are readable by their owner (coredumpctl
 # list, coredumpctl debug) and leave after three days (systemd's tmpfiles rule).
-# absent removes the handler and its settings; the kernel keeps sending cores to it
-# until the next boot, so none is written meanwhile.
+# absent removes the handler and its settings and gives the kernel its own core pattern
+# back at once (a core file in the working directory, within the core size limit).
 # https://www.freedesktop.org/software/systemd/man/latest/systemd-coredump.html
 coredump_state: present
 
