@@ -66,6 +66,27 @@
       uses them today. Choose a base outside every prefix in `ip route`.
   when: docker_daemon_options.get("default-address-pools", []) | length > 0
 
+# A full copy of docker.service in /etc shadows the package's unit, so no package update
+# reaches it again (a kubespray-era copy kept a 2026-06 unit under Docker 29). Settings go
+# in daemon.json or a drop-in; a copy stops the run until the site retires it.
+- name: Look for a copy of the Docker unit in /etc
+  ansible.builtin.stat:
+    path: /etc/systemd/system/docker.service
+    get_checksum: false
+  register: docker_unit_copy
+
+- name: Refuse a copy of the Docker unit the site has not retired
+  ansible.builtin.assert:
+    that: >-
+      not docker_unit_copy.stat.exists
+      or '/etc/systemd/system/docker.service' in docker_retired_unit_files
+    fail_msg: >-
+      /etc/systemd/system/docker.service on {{ inventory_hostname }} is a copy of the
+      Docker unit that shadows the package's, so package updates never reach it. Move
+      any setting it carries into daemon.json (docker_daemon_options) and add it to
+      docker_retired_unit_files, which sets it aside under /var/backups/deepops-docker-units.
+    quiet: true
+
 # The unit files the site retires go before daemon.json is written: their flags would
 # make dockerd refuse daemon.json's keys for the same options.
 - name: Retire the unit files the site names
