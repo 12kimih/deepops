@@ -12,6 +12,30 @@ ask, extend, resize and release from a form; requests within the automatic limit
 applied at once, larger ones wait for an administrator's button in the admin channel;
 owners get a DM `cluster_bot_remind_days` before an allocation ends, with an extend button.
 
+Account requests (`/join`, `/leave`): a newcomer gives a login, a name, a team (the
+accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH
+public key; a person leaving (or an administrator, for anyone) asks to give an account
+back. Both are checked first, wait for an administrator's button, and then become a pull
+request on the site configuration made with the roster's own editors
+(`plugins/filter/people.py`, as `scripts/deepops/people.py add` and `leave`). An
+administrator merges it and runs `slurm-cluster.yml --tags people`; the roster stays the
+only source of accounts.
+
+### The GitHub App for account requests
+
+1. On GitHub, under the organization's settings, create a GitHub App: no webhook;
+   repository permissions Contents (read and write) and Pull requests (read and write),
+   nothing else.
+2. Install it on the site configuration repository only. Note the App ID and the
+   installation ID (the number at the end of the installation's settings URL).
+3. Generate a private key (PEM) and vault it in the site config as
+   `cluster_bot_github_app_key`; set `cluster_bot_github_repo` (owner/name),
+   `cluster_bot_github_app_id` and `cluster_bot_github_installation_id`.
+4. Protect the base branch (`cluster_bot_github_base`) so a pull request needs a review:
+   the App can open pull requests, never merge them.
+
+The bot signs the App's token with the system's `openssl`; tokens last an hour.
+
 ## Turning it on
 
 1. Create the Slack app from the manifest (below; api.slack.com/apps, "From a manifest"),
@@ -41,5 +65,6 @@ the app's settings are updated from it.
 |---|---|
 | `/etc/cluster-bot/config.json` | Channels, members, admins, feature settings (0640, the bot's group) |
 | `/etc/cluster-bot/bot.token`, `app.token` | The tokens, read by the bot alone; never on a command line |
+| `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |
 | `/etc/cluster-bot/known_hosts` | The host keys of the hosts it reaches, read from each host |
 | `/var/lib/clusterbot/` | Its SSH key and state: held requests, reminders sent (kept on removal) |

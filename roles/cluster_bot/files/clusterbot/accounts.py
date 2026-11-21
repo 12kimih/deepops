@@ -48,6 +48,12 @@ class _RosterFeature(Feature):
 class JoinFeature(_RosterFeature):
     """req: user (the requested login), name, account, key (a public key line), slack."""
 
+    def teams(self):
+        """The accounts a new person may pick: those without children, but the excluded."""
+        accounts = (load(self._read(self.s["accounting"])[0]) or {}).get("accounts") or {}
+        parents = {(a or {}).get("parent") for a in accounts.values()}
+        return sorted(n for n in accounts if n not in parents and n not in set(self.s.get("exclude", [])))
+
     def decide(self, req):
         if not re.fullmatch(self.people.LOGIN.pattern, req["user"]):
             raise Refused("아이디는 영문 소문자로 시작하고 영문 소문자, 숫자, -, _ 만 쓸 수 있습니다")
