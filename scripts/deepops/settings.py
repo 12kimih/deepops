@@ -522,8 +522,19 @@ def deployed(config_dir, hosts):
     for host, result in results.items():
         records = result.get("ansible_local.deepops_deploy")
         if isinstance(records, dict) and records:
-            found[host] = max(records.values(), key=lambda r: r.get("time", ""))
+            starts = [start(r) for r in records.values() if isinstance(r, dict)]
+            starts = [r for r in starts if r]
+            if starts:
+                found[host] = max(starts, key=lambda r: r.get("time", ""))
     return found
+
+
+def start(deploy):
+    """Where a deploy's diff starts: its last full run (every tag), else its last partial
+    one (roles/deploy_record keeps both; a flat record is the earlier layout's full run)."""
+    if "deepops" in deploy:
+        return deploy
+    return deploy.get("full") or deploy.get("partial")
 
 
 def cmd_diff(args):
@@ -544,10 +555,8 @@ def cmd_diff(args):
                     for tree in ("deepops", "config")
                     if r.get(f"{tree}_dirty")
                 ]
-                if r.get("limit") or r.get("tags") not in (["all"], None):
-                    notes.append(
-                        f"limited run (limit {r.get('limit') or 'none'}, tags {', '.join(r.get('tags') or [])})"
-                    )
+                if r.get("tags") not in (["all"], None):
+                    notes.append(f"no full run recorded, only one of tags {', '.join(r.get('tags') or [])}")
                 if notes:
                     print(
                         f"{host}: last deployed {r['time']}: "

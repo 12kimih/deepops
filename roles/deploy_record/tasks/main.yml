@@ -3,6 +3,13 @@
 # whether either tree had uncommitted changes), the time, the limit and the tags. The
 # host carries its own record, so it stays right after a deploy limited to some hosts or
 # run from another operator's machine; `scripts/deepops/settings.py diff` starts from it.
+#
+# Each deploy keeps two records: `full`, the last run of every tag (a --limit is still
+# whole for the hosts it ran on), and `partial`, the last run of some tags only. A
+# --tags run never replaces the full one, which is where the next diff starts: a run of
+# one area would otherwise mark every other area deployed. The record is bookkeeping, not
+# a change to the host: never counted as changed (a converged rerun stays changed=0) and
+# not written by --check, which deploys nothing.
 - name: Require the deploy's name
   ansible.builtin.assert:
     that: deploy_record_name | length > 0
@@ -52,9 +59,16 @@
     owner: root
     group: root
     mode: "0644"
-    content: "{{ old | combine({deploy_record_name: record}) | to_nice_json }}\n"
+    content: "{{ old | combine({deploy_record_name: mine | combine({kind: record})}) | to_nice_json }}\n"
+  changed_when: false
+  when: not ansible_check_mode
   vars:
     old: "{{ (deploy_record_old.content | b64decode | from_json) if deploy_record_old.content is defined else {} }}"
+    # ansible_run_tags is a tuple in ansible-core 2.22, never equal to a list: compared as one.
+    # A record of the earlier layout (one flat record per deploy) was a full one.
+    _was: "{{ old.get(deploy_record_name) or {} }}"
+    mine: "{{ {'full': _was} if 'deepops' in _was else _was }}"
+    kind: "{{ 'full' if ansible_run_tags | list == ['all'] and ansible_skip_tags | default([]) | length == 0 else 'partial' }}"
     record:
       deepops: "{{ deploy_record_head.results[0].stdout }}"
       deepops_dirty: "{{ deploy_record_status.results[0].stdout | length > 0 }}"
