@@ -11,8 +11,6 @@ import json
 import re
 import sys
 import time
-import urllib.parse
-import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 
@@ -20,6 +18,8 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
+from .slack import Slack
+from .slack import member as slack_member
 from .slurm import (
     Error,
     Failed,
@@ -34,7 +34,6 @@ from .slurm import (
 )
 from .vocab import job_holds, node_unavailable
 
-SLACK_API = "https://slack.com/api/"
 MAX_BLOCKS = 45  # Slack allows 50 blocks per message
 MAX_SECTION = 2900  # and 3000 characters per section text
 NOTIFY = {"mention", "dm"}
@@ -339,64 +338,9 @@ def render(report, cfg, who):
 # --- Slack ----------------------------------------------------------------------
 
 
-class Slack:
-    def __init__(self, token, dry_run):
-        self.token = token
-        self.dry_run = dry_run
-
-    def call(self, method, **params):
-        if self.dry_run and method != "users.lookupByEmail":
-            print(f"--- {method} {params.get('channel', '')} thread={params.get('thread_ts', '')}")
-            for b in json.loads(params.get("blocks", "[]")):
-                print(
-                    b.get("text", {}).get("text")
-                    or " | ".join(f["text"] for f in b.get("fields", []))
-                    or " ".join(e["text"] for e in b.get("elements", []))
-                    or "-" * 40
-                )
-            if "blocks" not in params:
-                print(params.get("text", ""))
-            print()
-            return {"ok": True, "ts": "dry-run", "channel": {"id": "dry-run"}}
-        data = urllib.parse.urlencode(params).encode()
-        req = urllib.request.Request(
-            SLACK_API + method, data=data, headers={"Authorization": f"Bearer {self.token}"}
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = json.load(resp)
-        if not body.get("ok") and body.get("error") != "users_not_found":
-            raise RuntimeError(
-                f"Slack {method} failed: {body.get('error')} {body.get('response_metadata', '')}"
-            )
-        return body
-
-    def channel(self, target):
-        """A channel name or ID as is; a member ID (U...) becomes their DM channel."""
-        if re.fullmatch(r"[UW][A-Z0-9]+", target):
-            return self.call("conversations.open", users=target)["channel"]["id"]
-        return target
-
-    def post(self, channel, text, blocks=None, thread_ts=None):
-        params = {"channel": channel, "text": text, "unfurl_links": "false", "unfurl_media": "false"}
-        if blocks:
-            params["blocks"] = json.dumps(blocks)
-        if thread_ts:
-            params["thread_ts"] = thread_ts
-        return self.call("chat.postMessage", **params)["ts"]
-
-
 def slack_id(user, cfg, slack, cache):
-    """Slack member ID for a Slurm user, from the map, else by email; cached for a day."""
-    if user in cache and cache[user]["checked"] > time.time() - 86400:
-        return cache[user]["id"]
-    target = cfg["user_map"].get(user) or (f"{user}@{cfg['email_domain']}" if cfg["email_domain"] else "")
-    member = ""
-    if re.fullmatch(r"[UW][A-Z0-9]+", target):
-        member = target
-    elif "@" in target and slack.token:
-        member = slack.call("users.lookupByEmail", email=target).get("user", {}).get("id", "")
-    cache[user] = {"id": member, "checked": time.time()}
-    return member
+    """Slack member ID for a Slurm user (clustertools.slack: the map, else by email)."""
+    return slack_member(slack, user, cfg["user_map"], cfg["email_domain"], cache)
 
 
 # --- Main -----------------------------------------------------------------------
