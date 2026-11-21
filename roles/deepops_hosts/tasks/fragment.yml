@@ -1,0 +1,36 @@
+---
+# One component's lines in /etc/hosts, the one way a role other than this one adds to it
+# (include_role: deepops_hosts, tasks_from: fragment, with hosts_fragment_name and
+# hosts_fragment_lines; [] removes them). A line written straight into /etc/hosts would
+# be dropped by the next deploy, which writes this role's part afresh.
+- name: Check the fragment request
+  ansible.builtin.assert:
+    that: hosts_fragment_name is match('^[a-z0-9][a-z0-9-]*$')
+    fail_msg: hosts_fragment_name names the component (lowercase, digits, -).
+    quiet: true
+
+- name: Make the directory of the hosts file's fragments
+  ansible.builtin.file:
+    path: "{{ hosts_fragments_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the lines of {{ hosts_fragment_name }}
+  ansible.builtin.copy:
+    content: "# {{ hosts_fragment_name }} (roles/deepops_hosts tasks_from: fragment)\n{{ hosts_fragment_lines | join('\n') }}\n"
+    dest: "{{ hosts_fragments_dir }}/50-{{ hosts_fragment_name }}.hosts"
+    owner: root
+    group: root
+    mode: "0644"
+  when: hosts_fragment_lines | length > 0
+
+- name: Remove the lines of {{ hosts_fragment_name }}
+  ansible.builtin.file:
+    path: "{{ hosts_fragments_dir }}/50-{{ hosts_fragment_name }}.hosts"
+    state: absent
+  when: hosts_fragment_lines | length == 0
+
+- name: Assemble the hosts file
+  ansible.builtin.include_tasks: assemble.yml

@@ -4,6 +4,8 @@
 # this role and a deploy stops on it; scripts/deepops/config_lint.py reports a document
 # or config that still names one. Add a name here when a setting is renamed or removed.
 retired_settings:
+  host_file_backup: nothing (the repository is the hosts file's history; rule 14)
+  hosts_custom_hosts_marker: nothing (hosts_entries are written once, in roles/deepops_hosts' own part)
   slurm_container_storage_gc: slurm_enable_container_storage_gc in roles/deploy_defaults (off removes the cleanup)
   docker_rh_repo_url: docker_rh_repo_base_url (and docker_rh_repo_gpgkey) in roles/docker
   nvidia_container_toolkit_enable_docker: roles/docker enables and starts Docker (docker_service_enabled, docker_service_state)

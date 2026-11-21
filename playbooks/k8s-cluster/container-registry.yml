@@ -15,10 +15,14 @@
   roles:
     - role: deploy_defaults  # container_registry_hostname
   tasks:
-    - name: Set registry hostname in /etc/hosts
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        line: "{{ hostvars[groups['kube_control_plane'][0]]['ansible_host'] | default(hostvars[groups['kube_control_plane'][0]]['ansible_facts']['default_ipv4']['address'])
-          }} {{ container_registry_hostname }}"
+    - name: Resolve the registry's hostname
+      ansible.builtin.include_role:
+        name: deepops_hosts
+        tasks_from: fragment
+      vars:
+        hosts_fragment_name: container-registry
+        hosts_fragment_lines:
+          - "{{ hostvars[groups['kube_control_plane'][0]]['ansible_host'] | default(hostvars[groups['kube_control_plane'][0]]['ansible_facts']['default_ipv4']['address'])
+            }} {{ container_registry_hostname }}"
   tags:
     - container-registry

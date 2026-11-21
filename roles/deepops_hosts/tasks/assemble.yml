@@ -1,0 +1,17 @@
+---
+# /etc/hosts from its fragments, in name order. Under --check the first run has made no
+# fragment directory yet; the fragments' own tasks show what changes.
+- name: Look for the hosts file's fragments
+  ansible.builtin.stat:
+    path: "{{ hosts_fragments_dir }}"
+  register: hosts_fragments
+
+- name: Assemble the hosts file from its fragments
+  ansible.builtin.assemble:
+    src: "{{ hosts_fragments_dir }}"
+    dest: "{{ hosts_file }}"
+    regexp: '\.hosts$'
+    owner: root
+    group: root
+    mode: "0644"
+  when: hosts_fragments.stat.exists

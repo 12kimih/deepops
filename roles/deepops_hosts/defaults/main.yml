@@ -45,13 +45,17 @@ hosts_file_src: ""
 
 #Which interfaces should be excluded from the hosts file generation
 hosts_exclude_interfaces:
- - lo
- - docker
- - nodelocaldns
- - br-           # docker / CNI user-defined bridges (br-<hash>)
- - veth          # container veth pairs
+  - lo
+  - docker
+  - nodelocaldns
+  - br-           # docker / CNI user-defined bridges (br-<hash>)
+  - veth          # container veth pairs
 
-# Backup of previous host
-host_file_backup: false
+hosts_file: /etc/hosts
+# The file is assembled from the fragments here, in name order: 00-deepops.hosts (this
+# role's), then each component's (tasks_from: fragment), so no writer undoes another.
+hosts_fragments_dir: /etc/hosts.d
 
-hosts_custom_hosts_marker: "Custom Hosts Managed Block"
+# One component's lines (tasks_from: fragment): its name and the lines, [] removes them.
+hosts_fragment_name: ""
+hosts_fragment_lines: []

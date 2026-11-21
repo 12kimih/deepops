@@ -46,11 +46,17 @@
     - runai_nodelocal.stdout | default('') | length > 0
 
 - name: Remove the hosts-file entry
-  ansible.builtin.lineinfile:
-    path: /etc/hosts
-    regexp: '^\S+\s+{{ runai_platform_domain | regex_escape }}\s*# deepops-runai$'
-    state: absent
-  when: runai_platform_manage_hosts_entry | bool and runai_platform_domain | length > 0
+  ansible.builtin.include_role:
+    name: deepops_hosts
+    tasks_from: fragment
+    apply:
+      become: true
+  vars:
+    hosts_fragment_name: runai
+    hosts_fragment_lines: []
+  # Turning the entry off already removes it (platform_dns.yml), so only a managed one
+  # is left to remove here.
+  when: runai_platform_manage_hosts_entry | bool
 
 # Helm keeps these on purpose (resource-policy: keep); an uninstall that leaves
 # them behind is not clean, so remove them here.
