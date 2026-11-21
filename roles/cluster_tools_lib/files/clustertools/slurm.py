@@ -245,6 +245,13 @@ def num(value):
     return value
 
 
+def seconds(value):
+    """A Slurm JSON CPU time ({"seconds", "microseconds"}) in seconds. The microseconds
+    may exceed a second (sacct sums them per step), so they are added, not appended."""
+    value = value or {}
+    return (value.get("seconds") or 0) + (value.get("microseconds") or 0) / 1e6
+
+
 # --- Host lists -----------------------------------------------------------------
 
 

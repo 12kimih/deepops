@@ -131,7 +131,10 @@ Slurm's own accounting (`sacct` gres/gpuutil, gres/gpumem) records them only wit
 finished: Slurm's per step where the job has them, else Prometheus' per GPU, each row
 naming its source (`--source slurm|prometheus` asks for one, `--json` for scripts). The
 two differ in meaning: Slurm keeps each task's high-water mark, Prometheus the mean and
-max over the run. The job is looked up in every cluster the accounting database holds,
+max over the run. A line under each job gives the share of its allocated CPUs it kept
+busy (its CPU time over CPUs times elapsed time, as `seff` computes it; Slurm adds a
+step's CPU time when the step ends): a GPU job near 100% there while its GPUs idle is
+held back by its CPUs. The job is looked up in every cluster the accounting database holds,
 so a job from before a rename (kept under the old name) is found too; each report names
 its cluster. It reads Prometheus at the site facts' `prometheus_url`, the first host of
 the prometheus component, so every host running it must reach that port.

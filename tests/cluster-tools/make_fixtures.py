@@ -103,8 +103,8 @@ def pick(d, fields):
 def accounting_jobs(jobs):
     """Finished jobs that used something, one per cluster, state and array kind first
     (an array task among them), each with only the fields the tools read (TRESUsageIn
-    max and average of each step, the allocation, the run's times); command step names
-    become step<N>."""
+    max and average of each step, the allocation, the run's times and CPU time);
+    command step names become step<N>."""
     used = [j for j in jobs if any(s["tres"]["requested"]["max"] for s in j["steps"])]
     seen, kept = set(), []
     for j in used:
@@ -124,7 +124,7 @@ def accounting_jobs(jobs):
             step["tres"] = {"requested": pick(s["tres"]["requested"], ("max", "average"))}
             job["steps"].append(step)
         job["array"] = pick(j["array"], ("job_id", "task_id", "task"))
-        job["time"] = pick(j["time"], ("start", "end", "elapsed"))
+        job["time"] = pick(j["time"], ("start", "end", "elapsed", "total"))
         job["state"] = pick(j["state"], ("current",))
         job["tres"] = pick(j["tres"], ("allocated",))
         out.append(job)
