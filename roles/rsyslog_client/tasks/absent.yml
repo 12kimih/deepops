@@ -6,6 +6,7 @@
     component_record_name: rsyslog_client
     component_record_action: absent
     component_record_items: "{{ rsyslog_client_items }}"
+    component_record_legacy: "{{ rsyslog_client_legacy }}"
 
 - name: Look for rsyslog
   systemd_unit:

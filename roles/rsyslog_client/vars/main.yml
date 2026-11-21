@@ -3,3 +3,9 @@
 # ships with the OS and stays when the component goes.
 rsyslog_client_items:
   - file:/etc/rsyslog.d/99-forward-syslog.conf
+# The forward file as deepops versions before marks wrote it (one omfwd action, the
+# whole file): absent adopts it by that shape, so a host the client no longer covers
+# (the log server itself, which forwarded to itself) loses it too.
+rsyslog_client_legacy:
+  /etc/rsyslog.d/99-forward-syslog.conf:
+    - 'action\(type="omfwd" Target="[^"]+" Port="\d+" Protocol="(tcp|udp)"\)\n?'

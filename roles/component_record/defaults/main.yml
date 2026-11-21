@@ -32,4 +32,8 @@ component_record_items: []
 # A package other roles also install (python3-docker, nodejs) is freed by the record
 # alone, when its last recorded owner goes.
 component_record_exclusive_packages: []
+# absent adopts a file an earlier deepops version wrote without a mark when its whole
+# content fullmatches one of these, per file item: {path: [regex, ...]}, shaped on
+# deepops' own text (<role>_legacy in the component's vars/main.yml), never a site value.
+component_record_legacy: {}
 component_record_path: /etc/ansible/facts.d/deepops_components.fact

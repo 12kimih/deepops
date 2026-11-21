@@ -72,6 +72,16 @@ class OwnerSets(unittest.TestCase):
             (before, orphans["package"], orphans["file"], rec), ({}, ["ypserv"], ["/etc/yp.conf"], EMPTY)
         )
 
+    def test_an_earlier_versions_unmarked_file_is_adopted_by_its_whole_shape(self):
+        shape = [r'action\(type="omfwd" Target="[^"]+" Port="\d+" Protocol="(tcp|udp)"\)\n?']
+        self.assertTrue(
+            mod.legacy_match('action(type="omfwd" Target="m" Port="514" Protocol="tcp")\n', shape)
+        )
+        edited = 'action(type="omfwd" Target="m" Port="514" Protocol="tcp")\n*.* @@backup:514\n'
+        self.assertFalse(mod.legacy_match(edited, shape), "one line more is a site's edit")
+        self.assertFalse(mod.legacy_match("# my own forwarding\n", shape))
+        self.assertFalse(mod.legacy_match("anything", []), "no shape, no adoption")
+
     def test_without_evidence_a_sites_own_file_or_service_is_never_adopted(self):
         # Docker's documented proxy drop-in name, a site's own: no mark, so it stays.
         items = ["file:/etc/systemd/system/docker.service.d/http-proxy.conf", "unit:unbound"]
@@ -134,6 +144,7 @@ PLAY = """
         component_record_name: demo
         component_record_action: "{{ 'begin' if action == 'present' else action }}"
         component_record_items: "{{ items }}"
+        component_record_legacy: "{{ legacy | default({}) }}"
     - ansible.builtin.include_role:
         name: component_record
       vars:
@@ -150,9 +161,9 @@ PLAY = """
 class Run(unittest.TestCase):
     """The role itself, on files and directories in a scratch directory."""
 
-    def play(self, action, items, check=False):
+    def play(self, action, items, check=False, legacy=None):
         argv = ["ansible-playbook", "-i", "localhost,", str(self.playbook), "-e", json.dumps(
-            {"record": str(self.record), "action": action, "items": items})]  # fmt: skip
+            {"record": str(self.record), "action": action, "items": items, "legacy": legacy or {}})]  # fmt: skip
         done = subprocess.run(argv + (["--check"] if check else []), cwd=ROOT, capture_output=True, text=True,
                               env=unrecorded.env(ANSIBLE_CALLBACK_RESULT_FORMAT="json"), timeout=unrecorded.TIMEOUT)  # fmt: skip
         self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
@@ -195,6 +206,22 @@ class Run(unittest.TestCase):
         # A directory named deepops a host never had is no evidence: a preview of the
         # removal on such a host (grafana's dashboards on a node without Grafana) is clean.
         self.assertEqual(self.play("absent", [f"dir:{self.base}/dashboards/deepops"], check=True), 0)
+
+    def test_absent_removes_an_earlier_versions_unmarked_file_only_in_its_shape(self):
+        conf = self.base / "conf"
+        old, edited = conf / "old.conf", conf / "edited.conf"
+        old.write_text('action(type="omfwd" Target="m" Port="514" Protocol="tcp")\n')
+        edited.write_text('action(type="omfwd" Target="m" Port="514" Protocol="tcp")\n*.* @@b:514\n')
+        shape = [r'action\(type="omfwd" Target="[^"]+" Port="\d+" Protocol="(tcp|udp)"\)\n?']
+        items = [f"file:{old}", f"file:{edited}"]
+        legacy = {str(old): shape, str(edited): shape}
+        self.play("absent", items, check=True, legacy=legacy)
+        self.assertTrue(old.exists(), "--check removes nothing")
+        self.play("absent", items, legacy=legacy)
+        self.assertEqual(self.removed["file"], [str(old)])
+        self.assertTrue(edited.exists(), "a file edited by hand is the site's")
+        # present writes and records as before; the shape matters only to absent.
+        self.assertGreater(self.play("present", [f"file:{edited}"], legacy={str(edited): shape}), 0)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@
     items: "{{ component_record_items }}"
     version: "{{ component_record_version | string }}"
     exclusive_packages: "{{ component_record_exclusive_packages }}"
+    legacy: "{{ component_record_legacy }}"
   register: component_record_result
 
 # The calling role, removed, has nothing to run again after a pending reboot.
