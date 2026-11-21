@@ -1,0 +1,67 @@
+---
+# slurmctld runs on what this run wrote, proven by scontrol ping, and only then are the
+# nodes told to fetch it (configless). The handlers only note what is due (a handler
+# cannot be undone): a configuration slurmctld refuses would stop the scheduler and,
+# once served, every slurmd. So the files are put back as they were, slurmctld runs on
+# them again, and the run fails with slurmctld's journal.
+- name: Run slurmctld on its configuration
+  block:
+    - name: Start slurmctld, or restart it for a changed configuration or package
+      systemd_unit:
+        name: slurmctld
+        state: "{{ 'restarted' if slurm_ctld_restart_pending | default(false) | bool else 'started' }}"
+        enabled: true
+        daemon_reload: true
+
+    - name: Check slurmctld answers
+      ansible.builtin.include_tasks: controller_healthy.yml
+      when: not ansible_check_mode
+
+    - name: Tell the nodes to fetch the configuration
+      change_command:
+        argv: ["{{ slurm_install_prefix }}/bin/scontrol", reconfigure]
+      when: slurm_reconfigure_pending | default(false) | bool
+  rescue:
+    - name: Read why slurmctld did not come up
+      ansible.builtin.command:
+        argv: [journalctl, --unit, slurmctld, --lines, "40", --no-pager, --output, short-precise]
+      register: slurm_ctld_journal
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Put the previous controller configuration back
+      ansible.builtin.copy:
+        content: "{{ item.content | b64decode }}"
+        dest: "{{ slurm_config_dir }}/{{ item.item }}"
+        mode: "0644"
+      loop: "{{ (slurm_conf_before.results | default([])) | selectattr('content', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+      register: slurm_conf_restored
+
+    - name: Remove the controller configuration files this run added
+      ansible.builtin.file:
+        path: "{{ slurm_config_dir }}/{{ item.item }}"
+        state: absent
+      loop: "{{ (slurm_conf_before.results | default([])) | rejectattr('content', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+      register: slurm_conf_unadded
+
+    - name: Restart slurmctld on the previous configuration
+      systemd_unit:
+        name: slurmctld
+        state: restarted
+      when: slurm_conf_restored is changed or slurm_conf_unadded is changed
+
+    - name: Report the refused configuration
+      ansible.builtin.fail:
+        msg: |-
+          slurmctld did not answer on this run's configuration: {{ ansible_failed_result.msg | default('') }}
+          {{ 'The previous files (' ~ (slurm_conf_restored.results | select('changed') | map(attribute='item.item')
+             | list + slurm_conf_unadded.results | select('changed') | map(attribute='item.item') | list) | join(', ')
+             ~ ') are back and slurmctld was restarted on them; the nodes were not reconfigured.'
+             if slurm_conf_restored is changed or slurm_conf_unadded is changed
+             else 'No file this run wrote was put back.' }}
+          slurmctld's journal:
+          {{ slurm_ctld_journal.stdout }}

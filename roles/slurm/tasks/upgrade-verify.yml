@@ -8,14 +8,7 @@
 # after job_submit.lua passed it, and slurmctld logs nothing. That refusal is accepted
 # only while no node is in service; any other refusal fails the check.
 - name: Ask the controllers whether they are up
-  ansible.builtin.command:
-    argv: ["{{ slurm_install_prefix }}/bin/scontrol", ping]
-  register: slurm_verify_ping
-  until: slurm_verify_ping.rc == 0
-  retries: 12
-  delay: 10
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
+  ansible.builtin.include_tasks: controller_healthy.yml
 
 - name: Read the node states
   ansible.builtin.command:
@@ -66,7 +59,7 @@
   ansible.builtin.assert:
     that:
       - slurm_verify_config.stdout is search('^SLURM_VERSION *= *' ~ slurm_version ~ '$', multiline=True)
-      - slurm_verify_ping.stdout is search('is UP')
+      - slurm_ctld_ping.stdout is search('is UP')
       - slurm_cluster_name in slurm_verify_clusters.stdout_lines
       - "'lua' not in slurm_job_submit_plugins or slurm_verify_config.stdout is search('JobSubmitPlugins *=.*lua')"
       - >-
@@ -74,7 +67,7 @@
         (not _in_service and _submit_out is search('Requested node configuration is not available'))
     fail_msg: >-
       After the upgrade: slurmctld {{ slurm_verify_config.stdout | regex_search('(?m)^SLURM_VERSION *= *(.*)$', '\1') | first | default('version unknown') }}; ping:
-      {{ slurm_verify_ping.stdout | trim }}; clusters: {{ slurm_verify_clusters.stdout_lines | join(', ') }};
+      {{ slurm_ctld_ping.stdout | trim }}; clusters: {{ slurm_verify_clusters.stdout_lines | join(', ') }};
       nodes: {{ slurm_verify_nodes.stdout_lines | join(', ') }}; test-only submission: {{ _submit_out }}
     success_msg: >-
       {{ 'No node is in service (' ~ slurm_verify_nodes.stdout_lines | join(', ') ~ '): the test-only

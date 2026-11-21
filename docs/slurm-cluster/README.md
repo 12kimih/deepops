@@ -220,7 +220,10 @@ The nodes keep no copy of the configuration: `slurmctld` serves `slurm.conf`,
 `gres.conf`, `cgroup.conf` and `plugstack.conf`
 ([configless](https://slurm.schedmd.com/configless_slurm.html)), `slurmd` fetches them
 with `--conf-server`, login nodes through `sackd`. A configuration change on the
-controller reaches them with `scontrol reconfigure`, which the role runs. Prolog and
+controller reaches them with `scontrol reconfigure`, which the role runs only once the
+restarted `slurmctld` answers `scontrol ping`. A configuration it refuses never reaches
+the nodes: the role puts the controller's previous files back, restarts `slurmctld` on
+them and fails with its journal (`roles/slurm/tasks/controller_restart.yml`). Prolog and
 epilog scripts stay on each node (configless ships only single files).
 
 `slurmctld` serves its own metrics for Prometheus (`MetricsType=metrics/openmetrics`,

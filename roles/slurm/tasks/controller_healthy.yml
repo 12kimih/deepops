@@ -1,0 +1,12 @@
+---
+# The one check that slurmctld answers (scontrol ping), after a restart and after an
+# upgrade; its result is slurm_ctld_ping.
+- name: Ask the controllers whether they are up
+  ansible.builtin.command:
+    argv: ["{{ slurm_install_prefix }}/bin/scontrol", ping]
+  register: slurm_ctld_ping
+  until: slurm_ctld_ping.rc == 0
+  retries: 12
+  delay: 10
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result

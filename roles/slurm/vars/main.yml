@@ -2,3 +2,7 @@
 # Derived, not settings: the service accounts as roles/system_accounts declares them.
 _slurm_user_account: "{{ system_accounts[slurm_username] }}"
 _slurm_build_account: "{{ system_accounts[slurm_deb_build_user] }}"
+
+# The controller's files slurmctld reads or serves (configless) that a run may rewrite:
+# kept before it does, put back when slurmctld refuses them (tasks/controller_restart.yml).
+slurm_controller_conf_files: [slurm.conf, job_submit.lua, cgroup.conf, gres.conf, namespace.yaml, plugstack.conf]

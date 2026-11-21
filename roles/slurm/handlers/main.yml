@@ -6,7 +6,9 @@
 
 # Handlers run in the order written here, not notified: slurmdbd, then slurmctld, then
 # slurmd, the order Slurm requires on an upgrade (a daemon may talk only to one of the
-# same or a newer release).
+# same or a newer release). slurmctld's restart and the nodes' reconfigure are only
+# noted here and done by tasks/controller_restart.yml, after slurmdbd answers, where a
+# configuration slurmctld refuses can still be put back: a handler cannot be undone.
 - name: Restart slurmdbd
   systemd_unit:
     name: slurmdbd
@@ -15,21 +17,15 @@
   when: is_controller
 
 - name: Restart slurmctld
-  systemd_unit:
-    name: slurmctld
-    state: restarted
-    daemon_reload: true
+  ansible.builtin.set_fact:
+    slurm_ctld_restart_pending: true
   when: is_controller
 
 # The nodes keep the configuration slurmctld served them until told to fetch it again
-# (configless); slurmctld must answer first, which it may not yet right after a restart.
+# (configless).
 - name: Reconfigure slurmd
-  change_command:
-    argv: ["{{ slurm_install_prefix }}/bin/scontrol", reconfigure]
-  register: slurm_reconfigure
-  until: slurm_reconfigure is succeeded
-  retries: 12
-  delay: 5
+  ansible.builtin.set_fact:
+    slurm_reconfigure_pending: true
   when: is_controller
 
 - name: Restart slurmd
