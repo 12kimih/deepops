@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from common import HERE, run_tool
-from clustertools import gpu_usage, render
+from clustertools import gpu_usage, render, slurm
 from clustertools.prometheus import Error as PrometheusError
 
 ACCOUNTING = json.loads((HERE / "fixtures/slurm-26.05/accounting.json").read_text())
@@ -117,6 +117,31 @@ class ReportTests(unittest.TestCase):
         self.assertIn("not started", gpu_usage.report(job, "prometheus", FakePrometheus(GPU), 0)["notes"][-1])
 
 
+class CpuTests(unittest.TestCase):
+    def test_the_share_of_its_cpus_a_job_kept_busy_is_seffs(self):
+        job = gpu_job()
+        job["time"].update(elapsed=200, total={"seconds": 99, "microseconds": 1_000_000})
+        cpus = slurm.tres_list(job["tres"]["allocated"])["cpu"]
+        r = gpu_usage.report(job, "slurm", None, 0)
+        self.assertEqual((r["cpus"], r["cpu_seconds"]), (cpus, 100.0))
+        self.assertAlmostEqual(r["cpu_efficiency"], 100 / (cpus * 200))
+        self.assertIn(f"CPU: 0.5 of {cpus} busy on average", gpu_usage.cpu_line(r))
+
+    def test_a_running_jobs_share_says_it_counts_finished_steps(self):
+        job = gpu_job()
+        job["time"].update(elapsed=200, total={"seconds": 100})
+        job["state"]["current"] = ["RUNNING"]
+        self.assertTrue(gpu_usage.cpu_line(gpu_usage.report(job, "slurm", None, 0)).endswith(
+            ", finished steps only"))  # fmt: skip
+
+    def test_no_run_time_is_said_not_shown_as_idle(self):
+        job = gpu_job()
+        job["time"]["elapsed"] = 0
+        r = gpu_usage.report(job, "slurm", None, 0)
+        self.assertIsNone(r["cpu_efficiency"])
+        self.assertIn("no run time", gpu_usage.cpu_line(r))
+
+
 class RenderTests(unittest.TestCase):
     def test_rows_and_notes(self):
         theme = render.Theme(color=False, cols=100)
@@ -125,6 +150,7 @@ class RenderTests(unittest.TestCase):
         self.assertIn("gpu1/nvidia3", text)
         self.assertRegex(text, r"50%\s+100%\s+1\.0G\s+2\.0G\s+prometheus")
         self.assertIn("AutoDetect=nvml", text)
+        self.assertIn(f"  {gpu_usage.cpu_line(r)}\n", text)
 
 
 class CommandTests(unittest.TestCase):

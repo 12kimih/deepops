@@ -1,4 +1,5 @@
-"""gpu-usage: what a job's GPUs did, running or finished: utilisation and memory.
+"""gpu-usage: what a job's GPUs did, running or finished: utilisation and memory, and
+how much of its CPUs it kept busy.
 
 Two sources, each row naming its own:
   slurm       Slurm's accounting (sacct TRESUsageIn gres/gpuutil, gres/gpumem), per job
@@ -7,6 +8,9 @@ Two sources, each row naming its own:
   prometheus  DCGM through the monitoring stack (rules/slurm.yml job_device:*), per GPU:
               mean and max over the job's run. Kept for Prometheus' retention; a job
               shorter than the allocation interval (a minute) may have no samples.
+CPU: Slurm's own accounting for every job, its CPU time (TotalCPU, user plus system,
+summed over the steps) against its allocated CPUs over its elapsed time, as seff
+computes it; Slurm adds a step's CPU time when the step ends.
 --source auto (the default) shows Slurm's figures where the job has them, else
 Prometheus'. The job comes from sacct, so finished jobs work as well as running ones,
 and from every cluster the accounting database holds: a job of the cluster's old name
@@ -40,6 +44,9 @@ NOTES = [
     "  prometheus  DCGM, per GPU in Slurm's numbering: the mean and the max over the job's run.\n"
     "              Kept as long as Prometheus keeps data; a job under a minute may have none.\n"
     "--source auto (the default) prefers Slurm's figures and falls back to Prometheus'.",
+    "CPU: the job's CPU time (sacct TotalCPU) over its allocated CPUs times its elapsed\n"
+    "time, as seff computes it: what share of its CPUs it kept busy. Slurm adds a step's\n"
+    "CPU time when the step ends, so a running job's share counts its finished steps.",
 ]
 
 COMMAND = Command(
@@ -71,6 +78,15 @@ def holds_gpus(job):
 
 def gpu_count(job):
     return slurm.tres_list(job["tres"]["allocated"]).get("gres/gpu") or 0
+
+
+def cpu_figures(job):
+    """(CPUs allocated, CPU seconds used, share of the allocation kept busy); the share
+    is None for a job that has not run a second."""
+    cpus = slurm.tres_list(job["tres"]["allocated"]).get("cpu") or 0
+    used = slurm.seconds(job["time"].get("total"))
+    elapsed = job["time"].get("elapsed") or 0
+    return cpus, used, (used / (cpus * elapsed) if cpus and elapsed else None)
 
 
 def window(job, now):
@@ -129,6 +145,7 @@ def prometheus_rows(api, label, start, end):
 def report(job, source, api, now):
     """The figures of one job record: its identity, rows and notes on what is missing."""
     label = slurm.accounting_label(job)
+    cpus, cpu_seconds, cpu_efficiency = cpu_figures(job)
     out = {
         "job": label,
         "cluster": job["cluster"],
@@ -139,6 +156,9 @@ def report(job, source, api, now):
         "nodes": job["nodes"],
         "gpus": gpu_count(job),
         "elapsed": job["time"].get("elapsed") or 0,
+        "cpus": cpus,
+        "cpu_seconds": cpu_seconds,
+        "cpu_efficiency": cpu_efficiency,
         "rows": [],
         "notes": [],
     }
@@ -175,6 +195,15 @@ def _gib(count):
     return "-" if count is None else f"{count / 2**30:.1f}G"
 
 
+def cpu_line(r):
+    if r["cpu_efficiency"] is None:
+        return f"CPU: {r['cpus']} allocated, no run time to measure against"
+    busy = r["cpu_seconds"] / r["elapsed"]
+    line = f"CPU: {busy:.1f} of {r['cpus']} busy on average ({_percent(r['cpu_efficiency'])})"
+    # Slurm adds a step's CPU time when it ends: a running step is not counted yet.
+    return line + (", finished steps only" if "RUNNING" in r["state"].split("/") else "")
+
+
 def render(reports, theme):
     out = []
     for r in reports:
@@ -201,6 +230,7 @@ def render(reports, theme):
         ]
         title = f"job {r['job']} on {r['cluster']}"
         out.append(grid.render(title, tally) if r["rows"] else theme.section(title, theme.cols, tally))
+        out.append(f"  {theme.paint('sub', cpu_line(r))}")
         out += [f"  {theme.paint('muted', note)}" for note in r["notes"]]
     return "\n".join(out) + "\n"
 

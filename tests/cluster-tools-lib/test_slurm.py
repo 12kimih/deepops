@@ -46,6 +46,11 @@ class HostlistTests(unittest.TestCase):
 
 
 class NumberTests(unittest.TestCase):
+    def test_cpu_time_adds_microseconds_past_a_second(self):
+        # sacct sums each step's microseconds without carrying them into seconds.
+        self.assertEqual(slurm.seconds({"seconds": 95, "microseconds": 1182573}), 96.182573)
+        self.assertEqual(slurm.seconds(None), 0)
+
     def test_slurm_number_objects(self):
         self.assertEqual(slurm.num(value(7)), 7)
         self.assertIsNone(slurm.num({"set": False, "infinite": False, "number": 0}))

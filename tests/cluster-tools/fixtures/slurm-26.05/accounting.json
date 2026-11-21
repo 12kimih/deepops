@@ -1,7 +1,7 @@
 {
  "jobs": [
   {
-   "account": "acct4",
+   "account": "acct2",
    "array": {
     "job_id": 0,
     "task": "",
@@ -157,7 +157,11 @@
    "time": {
     "elapsed": 0,
     "end": 1794790720,
-    "start": 1794790720
+    "start": 1794790720,
+    "total": {
+     "microseconds": 8834,
+     "seconds": 0
+    }
    },
    "tres": {
     "allocated": [
@@ -199,10 +203,10 @@
      }
     ]
    },
-   "user": "user10"
+   "user": "user7"
   },
   {
-   "account": "acct7",
+   "account": "acct5",
    "array": {
     "job_id": 81154,
     "task": "",
@@ -358,7 +362,11 @@
    "time": {
     "elapsed": 7846,
     "end": 1794757789,
-    "start": 1794749943
+    "start": 1794749943,
+    "total": {
+     "microseconds": 1590153,
+     "seconds": 7896
+    }
    },
    "tres": {
     "allocated": [
@@ -400,10 +408,10 @@
      }
     ]
    },
-   "user": "user7"
+   "user": "user5"
   },
   {
-   "account": "acct11",
+   "account": "acct8",
    "array": {
     "job_id": 0,
     "task": "",
@@ -559,7 +567,11 @@
    "time": {
     "elapsed": 24468,
     "end": 1794756704,
-    "start": 1794732236
+    "start": 1794732236,
+    "total": {
+     "microseconds": 579184,
+     "seconds": 114182
+    }
    },
    "tres": {
     "allocated": [
@@ -601,10 +613,10 @@
      }
     ]
    },
-   "user": "user6"
+   "user": "user4"
   },
   {
-   "account": "acct8",
+   "account": "acct6",
    "array": {
     "job_id": 0,
     "task": "",
@@ -760,7 +772,11 @@
    "time": {
     "elapsed": 323,
     "end": 1794757012,
-    "start": 1794756689
+    "start": 1794756689,
+    "total": {
+     "microseconds": 749251,
+     "seconds": 442
+    }
    },
    "tres": {
     "allocated": [
@@ -802,10 +818,10 @@
      }
     ]
    },
-   "user": "user2"
+   "user": "user1"
   },
   {
-   "account": "acct6",
+   "account": "acct4",
    "array": {
     "job_id": 0,
     "task": "",
@@ -961,7 +977,11 @@
    "time": {
     "elapsed": 517,
     "end": 1794774372,
-    "start": 1794773855
+    "start": 1794773855,
+    "total": {
+     "microseconds": 957718,
+     "seconds": 434
+    }
    },
    "tres": {
     "allocated": [
@@ -1003,10 +1023,10 @@
      }
     ]
    },
-   "user": "user9"
+   "user": "user6"
   },
   {
-   "account": "acct8",
+   "account": "acct6",
    "array": {
     "job_id": 0,
     "task": "",
@@ -1162,7 +1182,11 @@
    "time": {
     "elapsed": 1149,
     "end": 1794800050,
-    "start": 1794798901
+    "start": 1794798901,
+    "total": {
+     "microseconds": 1232599,
+     "seconds": 473
+    }
    },
    "tres": {
     "allocated": [
@@ -1204,10 +1228,10 @@
      }
     ]
    },
-   "user": "user14"
+   "user": "user8"
   },
   {
-   "account": "acct5",
+   "account": "acct3",
    "array": {
     "job_id": 81857,
     "task": "",
@@ -1565,7 +1589,11 @@
    "time": {
     "elapsed": 210,
     "end": 1794803864,
-    "start": 1794803654
+    "start": 1794803654,
+    "total": {
+     "microseconds": 1182573,
+     "seconds": 95
+    }
    },
    "tres": {
     "allocated": [
@@ -1607,217 +1635,10 @@
      }
     ]
    },
-   "user": "user3"
+   "user": "user2"
   },
   {
-   "account": "acct5",
-   "array": {
-    "job_id": 82026,
-    "task": "",
-    "task_id": {
-     "infinite": false,
-     "number": 0,
-     "set": true
-    }
-   },
-   "cluster": "cluster1",
-   "job_id": 82051,
-   "nodes": "gpu8",
-   "partition": "a10-1,a10-2",
-   "state": {
-    "current": [
-     "PREEMPTED"
-    ]
-   },
-   "steps": [
-    {
-     "state": [
-      "CANCELLED"
-     ],
-     "step": {
-      "id": "82051.batch",
-      "name": "batch"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 3200176,
-         "id": 1,
-         "name": "",
-         "type": "cpu"
-        },
-        {
-         "count": 2169372672,
-         "id": 2,
-         "name": "",
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        },
-        {
-         "count": 990297323,
-         "id": 6,
-         "name": "disk",
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "type": "vmem"
-        },
-        {
-         "count": 12,
-         "id": 8,
-         "name": "",
-         "type": "pages"
-        }
-       ],
-       "max": [
-        {
-         "count": 3200176,
-         "id": 1,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "cpu"
-        },
-        {
-         "count": 2169372672,
-         "id": 2,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "mem"
-        },
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "energy"
-        },
-        {
-         "count": 990297323,
-         "id": 6,
-         "name": "disk",
-         "node": "gpu8",
-         "task": 0,
-         "type": "fs"
-        },
-        {
-         "count": 0,
-         "id": 7,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "vmem"
-        },
-        {
-         "count": 12,
-         "id": 8,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "pages"
-        }
-       ]
-      }
-     }
-    },
-    {
-     "state": [
-      "COMPLETED"
-     ],
-     "step": {
-      "id": "82051.extern",
-      "name": "extern"
-     },
-     "tres": {
-      "requested": {
-       "average": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "type": "energy"
-        }
-       ],
-       "max": [
-        {
-         "count": 0,
-         "id": 3,
-         "name": "",
-         "node": "gpu8",
-         "task": 0,
-         "type": "energy"
-        }
-       ]
-      }
-     }
-    }
-   ],
-   "time": {
-    "elapsed": 3205,
-    "end": 1794813631,
-    "start": 1794810426
-   },
-   "tres": {
-    "allocated": [
-     {
-      "count": 8,
-      "id": 1,
-      "name": "",
-      "type": "cpu"
-     },
-     {
-      "count": 53248,
-      "id": 2,
-      "name": "",
-      "type": "mem"
-     },
-     {
-      "count": -2,
-      "id": 3,
-      "name": "",
-      "type": "energy"
-     },
-     {
-      "count": 1,
-      "id": 4,
-      "name": "",
-      "type": "node"
-     },
-     {
-      "count": 1,
-      "id": 5,
-      "name": "",
-      "type": "billing"
-     },
-     {
-      "count": 1,
-      "id": 1001,
-      "name": "gpu",
-      "type": "gres"
-     },
-     {
-      "count": 1,
-      "id": 1004,
-      "name": "gpu:a10",
-      "type": "gres"
-     }
-    ]
-   },
-   "user": "user3"
-  },
-  {
-   "account": "acct10",
+   "account": "acct7",
    "array": {
     "job_id": 82395,
     "task": "",
@@ -1973,7 +1794,11 @@
    "time": {
     "elapsed": 63,
     "end": 1794835499,
-    "start": 1794835436
+    "start": 1794835436,
+    "total": {
+     "microseconds": 971092,
+     "seconds": 52
+    }
    },
    "tres": {
     "allocated": [
@@ -2015,10 +1840,10 @@
      }
     ]
    },
-   "user": "user4"
+   "user": "user3"
   },
   {
-   "account": "acct2",
+   "account": "acct1",
    "array": {
     "job_id": 0,
     "task": "",
@@ -2274,7 +2099,11 @@
    "time": {
     "elapsed": 123764,
     "end": 1794974048,
-    "start": 1794850284
+    "start": 1794850284,
+    "total": {
+     "microseconds": 866471,
+     "seconds": 0
+    }
    },
    "tres": {
     "allocated": [
@@ -2316,10 +2145,10 @@
      }
     ]
    },
-   "user": "user18"
+   "user": "user9"
   },
   {
-   "account": "acct5",
+   "account": "acct3",
    "array": {
     "job_id": 83731,
     "task": "",
@@ -2390,7 +2219,11 @@
    "time": {
     "elapsed": 0,
     "end": 1794970854,
-    "start": 1794970854
+    "start": 1794970854,
+    "total": {
+     "microseconds": 0,
+     "seconds": 0
+    }
    },
    "tres": {
     "allocated": [
@@ -2432,10 +2265,10 @@
      }
     ]
    },
-   "user": "user3"
+   "user": "user2"
   },
   {
-   "account": "acct11",
+   "account": "acct8",
    "array": {
     "job_id": 0,
     "task": "",
@@ -2591,7 +2424,11 @@
    "time": {
     "elapsed": 90315,
     "end": 1794756505,
-    "start": 1794666190
+    "start": 1794666190,
+    "total": {
+     "microseconds": 1616000,
+     "seconds": 476189
+    }
    },
    "tres": {
     "allocated": [
@@ -2633,7 +2470,7 @@
      }
     ]
    },
-   "user": "user6"
+   "user": "user4"
   }
  ],
  "meta": {
