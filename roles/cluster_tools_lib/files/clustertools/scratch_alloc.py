@@ -1,5 +1,5 @@
 """scratch_alloc: space on the fast scratch filesystem, handed out per request, each with
-its own size limit (an XFS project quota) and an end date.
+its own size limit (a project quota) and an end date.
 
     scratch-alloc CONFIG.json create USER SIZE DAYS [REASON]   a new allocation
     scratch-alloc CONFIG.json resize ID SIZE                   a new size limit
@@ -8,9 +8,14 @@ its own size limit (an XFS project quota) and an end date.
     scratch-alloc CONFIG.json list [USER]                      every allocation, as JSON
     scratch-alloc CONFIG.json sweep                            the end dates kept (a timer)
     scratch-alloc CONFIG.json metrics                          each allocation's size and use
+    scratch-alloc CONFIG.json serve                            one of the above, from SSH
 
-Run as root on the host whose XFS filesystem holds the scratch space. An allocation is
-the directory <root>/<user>-<id>, the user's alone (0700), whose project quota is its
+serve is the forced command of the cluster bot's SSH key: it takes the request from
+SSH_ORIGINAL_COMMAND (one of create, resize, extend, release, list, with their
+arguments, nothing else) and runs it as above, so the key can do nothing else.
+
+Run as root on the host whose filesystem holds the scratch space. An allocation is
+the directory <mount>/<user>-<id>, the user's alone (0700), whose project quota is its
 size; the registry (a JSON file next to it, written atomically under a lock) is the
 record of every allocation, so a request is applied the moment it is accepted.
 
@@ -22,7 +27,7 @@ Who may ask for what (sizes and periods allowed without an administrator) is the
 cluster bot's to decide; this tool refuses only what the configuration's hard caps
 forbid.
 
-CONFIG: {"mount": "/scratch", "root": "/scratch/alloc", "registry": ".../registry.json",
+CONFIG: {"mount": "/scratch", "registry": "/var/lib/deepops/scratch-alloc/registry.json",
          "first_id": 1000, "max_bytes": "20T", "max_days": 180, "grace_days": 14,
          "textfile": "/run/prometheus/scratch-alloc.prom"}
 Python 3.9 or newer, standard library only.
@@ -32,41 +37,29 @@ import fcntl
 import json
 import os
 import pwd
+import shlex
 import shutil
 import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import proc
+from . import disk_quota
 from .cli import run_main
-from .disk_quota import Error as QuotaError
-from .disk_quota import kib
 from .files import write_atomic
 from .prom import key, render
 
-MOUNTS = "/proc/self/mounts"
-# XFS mount options that turn project quota accounting and enforcement on.
-PROJECT_QUOTA = {"prjquota", "pquota", "pqnoenforce"}
 TRASH = ".released"
 DAY = 86400
-TIMEOUT = 120
 
 
 class Error(Exception):
     """A request or a host the tool refuses, said plainly."""
 
 
-class Host:
-    """The commands and files the tool reads and changes: replaced in the tests."""
-
-    def read(self, path):
-        return Path(path).read_text()
-
-    def xfs_quota(self, mount, command):
-        return proc.run(
-            ["xfs_quota", "-x", "-c", command, mount], timeout=TIMEOUT, capture_output=True, text=True
-        ).stdout
+class Host(disk_quota.Host):
+    """The commands and files the tool reads and changes: replaced in the tests. Project
+    quotas go through clustertools.disk_quota (its Host: read, run, xfs_quota)."""
 
     def make_dir(self, path, uid, gid):
         os.mkdir(path, 0o700)
@@ -93,22 +86,17 @@ class Host:
 
 def nbytes(size):
     try:
-        return kib(size) * 1024
-    except QuotaError as e:
+        return disk_quota.kib(size) * 1024
+    except disk_quota.Error as e:
         raise Error(str(e)) from None
 
 
 def check_mount(host, mount):
-    """The scratch filesystem is XFS mounted with project quotas, or nothing can be limited."""
-    for line in host.read(MOUNTS).splitlines():
-        fields = line.split()
-        if len(fields) >= 4 and fields[1] == mount:
-            if fields[2] != "xfs":
-                raise Error(f"{mount} is {fields[2]}, not XFS: per-allocation limits need XFS project quotas")
-            if not PROJECT_QUOTA & set(fields[3].split(",")):
-                raise Error(f"{mount} is mounted without project quotas: add prjquota to its mount options")
-            return
-    raise Error(f"{mount} is not mounted")
+    """The scratch filesystem has project quotas on (XFS or ext4), or nothing can be limited."""
+    try:
+        disk_quota.require_project_quota(host, mount)
+    except disk_quota.Error as e:
+        raise Error(str(e)) from None
 
 
 class Registry:
@@ -131,18 +119,12 @@ class Registry:
 
 
 def used_bytes(host, mount, pid):
-    """What project PID holds now, in bytes (xfs_quota counts 1 KiB blocks)."""
-    out = host.xfs_quota(mount, f"quota -p -N -b {pid}")
-    for line in out.splitlines():
-        fields = line.split()
-        if len(fields) >= 2 and fields[1].isdigit():
-            return int(fields[1]) * 1024
-    return 0
+    return disk_quota.project_used(host, mount, pid)
 
 
 def set_limit(host, mount, pid, limit):
-    kb = max(limit // 1024, 0)
-    host.xfs_quota(mount, f"limit -p bsoft={kb}k bhard={kb}k {pid}")
+    """The project's hard limit; no kernel soft limit or grace period (warnings are Slack's)."""
+    disk_quota.project_limit(host, mount, pid, max(limit, 0))
 
 
 def find(data, alloc_id):
@@ -162,11 +144,11 @@ def create(host, cfg, data, user, size, days, reason, now):
     if not 0 < days <= cfg["max_days"]:
         raise Error(f"{days} days is outside 1 to {cfg['max_days']}")
     pid = data["next_id"]
-    path = os.path.join(cfg["root"], f"{user}-{pid}")
+    path = os.path.join(cfg["mount"], f"{user}-{pid}")
     if host.exists(path):
         raise Error(f"{path} exists already")
     host.make_dir(path, *ids)
-    host.xfs_quota(cfg["mount"], f"project -s -p {path} {pid}")
+    disk_quota.project_set(host, cfg["mount"], path, pid)
     set_limit(host, cfg["mount"], pid, limit)
     data["next_id"] = pid + 1
     data["allocations"][str(pid)] = {
@@ -212,7 +194,7 @@ def release(host, cfg, data, alloc_id, now):
     if entry["state"] == "released":
         return entry | {"id": int(alloc_id)}
     if host.exists(entry["path"]):
-        host.rename(entry["path"], os.path.join(cfg["root"], TRASH, str(alloc_id)))
+        host.rename(entry["path"], os.path.join(cfg["mount"], TRASH, str(alloc_id)))
     entry["state"], entry["released"] = "released", int(now)
     return entry | {"id": int(alloc_id)}
 
@@ -230,7 +212,7 @@ def sweep(host, cfg, data, now):
             out += [f"released {alloc_id} ({entry['user']}): grace period over"]
             release(host, cfg, data, alloc_id, now)
         if entry["state"] == "released":
-            trash = os.path.join(cfg["root"], TRASH, alloc_id)
+            trash = os.path.join(cfg["mount"], TRASH, alloc_id)
             if host.exists(trash):
                 host.remove_tree(trash)
             # Its files are gone with it, so the project ID only needs its limit cleared.
@@ -254,11 +236,30 @@ def metrics(host, cfg, data, now):
 USAGE = __doc__.split("\n\n")[1]
 
 
+ARITY = {"create": (3, 4), "resize": (2,), "extend": (2,), "release": (1,), "list": (0, 1), "sweep": (0,),
+         "metrics": (0,)}  # fmt: skip
+# What the bot's SSH key may ask for: never sweep or metrics (the timer's).
+SERVED = {"create", "resize", "extend", "release", "list"}
+
+
+def served(config, original):
+    """The argv a request over SSH (SSH_ORIGINAL_COMMAND) stands for, or an Error. The
+    request is split as a shell would split words, never run by one."""
+    words = shlex.split(original or "")
+    if not words or words[0] not in SERVED or len(words) - 1 not in ARITY[words[0]]:
+        raise Error(f"not a request this key may make: {original!r}")
+    return ["scratch-alloc", config, *words]
+
+
 def main(argv=None):
     args = (sys.argv if argv is None else argv)[1:]
-    arity = {"create": (3, 4), "resize": (2,), "extend": (2,), "release": (1,), "list": (0, 1), "sweep": (0,),
-             "metrics": (0,)}  # fmt: skip
-    if len(args) < 2 or args[1] not in arity or len(args) - 2 not in arity[args[1]]:
+    if len(args) == 2 and args[1] == "serve":
+        try:
+            return main(served(args[0], os.environ.get("SSH_ORIGINAL_COMMAND")))
+        except Error as e:
+            print(f"scratch-alloc: {e}", file=sys.stderr)
+            return 2
+    if len(args) < 2 or args[1] not in ARITY or len(args) - 2 not in ARITY[args[1]]:
         print(USAGE, file=sys.stderr)
         return 2
 

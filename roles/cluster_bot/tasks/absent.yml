@@ -1,0 +1,11 @@
+---
+# The program, its unit, configuration and tokens go; the bot's account, its key and its
+# state (held requests, reminders sent) stay in its home (data).
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cluster_bot
+    component_record_action: absent
+    component_record_items: "{{ cluster_bot_items }}"
+    component_record_exclusive_packages: []

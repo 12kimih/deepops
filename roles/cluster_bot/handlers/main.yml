@@ -1,0 +1,7 @@
+---
+- name: Restart the cluster bot
+  systemd_unit:
+    name: "{{ _cluster_bot_unit }}"
+    state: restarted
+    daemon_reload: true
+  when: _cluster_bot_ready

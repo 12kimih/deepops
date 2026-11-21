@@ -194,6 +194,16 @@
 #autofs_mount: "/home"  # example
 #autofs_map: "auto.home_linux"  # example
 
+# Fast scratch space per request (roles/scratch_alloc, slurm_enable_scratch_alloc, on
+# [scratch-server]): docs/slurm-cluster/scratch-alloc.md. The filesystem needs prjquota
+# in host_baseline_mount_options.
+#scratch_alloc_mount: /scratch
+#scratch_alloc_max_size: 20T
+#scratch_alloc_max_days: 180
+#scratch_alloc_auto_size: 2T
+#scratch_alloc_auto_days: 30
+#scratch_alloc_auto_extensions: 2
+
 # NFS Server
 # This config will create an NFS server and share the given exports. options are the
 # exports(5) flags alone; every export is offered to nfs_export_clients.
@@ -259,6 +269,11 @@
 #    uid: 472
 #    home: /var/lib/grafana
 #    comment: Grafana
+#  clusterbot:
+#    uid: 22081
+#    home: /var/lib/clusterbot
+#    shell: /bin/sh
+#    comment: Cluster bot
 
 ################################################################################
 # NVIDIA                                                                       #

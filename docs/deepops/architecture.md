@@ -83,6 +83,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── bmc
 │   ├── build_record
 │   ├── cachefilesd
+│   ├── cluster_bot
 │   ├── cluster_sudoers
 │   ├── cluster_tools
 │   ├── cluster_tools_lib
@@ -189,6 +190,8 @@ reader writes `| default(...)` for a defined variable;
 │   ├── rsyslog_defaults
 │   ├── rsyslog_server
 │   ├── runai
+│   ├── scratch_alloc
+│   ├── scratch_defaults
 │   ├── serial_console
 │   ├── site_secrets
 │   ├── slack_defaults

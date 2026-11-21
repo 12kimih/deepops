@@ -1,0 +1,161 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cluster_bot
+    component_record_action: begin
+    component_record_items: "{{ cluster_bot_items }}"
+
+- name: Require the pinned Slack libraries' hashes
+  ansible.builtin.assert:
+    that:
+      - cluster_bot_sha256.slack_bolt[cluster_bot_slack_bolt_version] is defined
+      - cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] is defined
+    fail_msg: >-
+      cluster_bot_sha256 has no hash for slack_bolt {{ cluster_bot_slack_bolt_version }} or
+      slack_sdk {{ cluster_bot_slack_sdk_version }}; add the wheels' sha256 from PyPI.
+    quiet: true
+
+- name: Note the bot's account
+  ansible.builtin.set_fact:
+    _cluster_bot_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
+
+- name: Create the bot's account
+  ansible.builtin.include_role:
+    name: local_accounts
+  vars:
+    local_accounts: "{{ _cluster_bot_account }}"
+
+- name: Create the bot's directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ _cluster_bot_prefix }}", owner: root, mode: "0755"}
+    - {path: "{{ _cluster_bot_etc }}", owner: root, mode: "0755"}
+    - {path: "{{ _cluster_bot_home }}/.ssh", owner: "{{ cluster_bot_user }}", mode: "0700"}
+  loop_control:
+    label: "{{ item.path }}"
+
+# The bot's own key: its way to the hosts it acts on, each of which allows it for one
+# forced command (roles/scratch_alloc). Made on this host, never copied.
+- name: Create the bot's SSH key
+  ansible.builtin.command:
+    argv: [ssh-keygen, -q, -t, ed25519, -N, "", -C, "{{ cluster_bot_user }}@{{ inventory_hostname }}", -f, "{{ cluster_bot_key }}"]
+    creates: "{{ cluster_bot_key }}"
+  become: true
+  become_user: "{{ cluster_bot_user }}"
+
+- name: Write the pinned Slack libraries
+  ansible.builtin.copy:
+    dest: "{{ _cluster_bot_prefix }}/requirements.txt"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      slack_bolt=={{ cluster_bot_slack_bolt_version }} --hash=sha256:{{ cluster_bot_sha256.slack_bolt[cluster_bot_slack_bolt_version] }}
+      slack_sdk=={{ cluster_bot_slack_sdk_version }} --hash=sha256:{{ cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] }}
+  register: cluster_bot_requirements
+
+- name: Look for the bot's venv
+  ansible.builtin.stat:
+    path: "{{ _cluster_bot_venv }}/bin/python"
+  register: cluster_bot_venv_python
+
+# A new pin rebuilds the venv from scratch, so nothing of the old one stays.
+- name: Install the Slack libraries into the bot's venv
+  change_shell:
+    cmd: |
+      set -eu
+      umask 022
+      venv={{ _cluster_bot_venv | quote }}
+      rm -rf "$venv"
+      python3 -m venv "$venv"
+      "$venv/bin/pip" install --no-cache-dir --disable-pip-version-check --require-hashes \
+        --only-binary :all: -r {{ (_cluster_bot_prefix ~ '/requirements.txt') | quote }}
+  args:
+    executable: /bin/bash
+  when: cluster_bot_requirements is changed or not cluster_bot_venv_python.stat.exists
+  notify: Restart the cluster bot
+
+- name: Install the bot's program
+  ansible.builtin.copy:
+    src: clusterbot
+    dest: "{{ _cluster_bot_lib }}/"
+    owner: root
+    group: root
+    mode: u=rwX,go=rX
+  notify: Restart the cluster bot
+
+# Each token in its own file the bot alone reads: never on a command line or in the unit.
+- name: Write the Slack tokens
+  ansible.builtin.copy:
+    dest: "{{ _cluster_bot_tokens[item.key] }}"
+    owner: root
+    group: "{{ cluster_bot_user }}"
+    mode: "0640"
+    content: "{{ item.value }}\n"
+  loop: "{{ {'bot': slack_bot_token, 'app': slack_app_token} | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  no_log: true
+  notify: Restart the cluster bot
+
+- name: Read the scratch server's host key
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  delegate_to: "{{ _cluster_bot_scratch_host }}"
+  register: cluster_bot_scratch_hostkey
+  when: _cluster_bot_scratch_host | length > 0
+
+# The hosts the bot reaches, each with its key read from the host itself: the bot never
+# trusts a key on first use.
+- name: Pin the scratch server's host key
+  ansible.builtin.copy:
+    dest: "{{ _cluster_bot_known_hosts }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # roles/cluster_bot: the hosts the bot reaches.
+      {% if cluster_bot_scratch_hostkey.content is defined %}
+      {{ _cluster_bot_cfg.scratch.host }} {{ (cluster_bot_scratch_hostkey.content | b64decode).split()[:2] | join(' ') }}
+      {% endif %}
+
+- name: Write the bot's configuration
+  ansible.builtin.copy:
+    dest: "{{ _cluster_bot_config }}"
+    owner: root
+    group: "{{ cluster_bot_user }}"
+    mode: "0640"
+    content: "{{ _cluster_bot_cfg | to_nice_json }}\n"
+  notify: Restart the cluster bot
+
+- name: Install the bot's unit
+  ansible.builtin.template:
+    src: cluster-bot.service.j2
+    dest: "/etc/systemd/system/{{ _cluster_bot_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the cluster bot
+
+# Without both tokens there is nothing to connect with: installed, not running.
+- name: Run the cluster bot, or keep it stopped without both tokens
+  systemd_unit:
+    name: "{{ _cluster_bot_unit }}"
+    enabled: "{{ _cluster_bot_ready }}"
+    state: "{{ 'started' if _cluster_bot_ready else 'stopped' }}"
+    daemon_reload: true
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: cluster_bot
+    component_record_action: present
+    component_record_items: "{{ cluster_bot_items }}"
