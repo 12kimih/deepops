@@ -7,7 +7,10 @@
 #   unit         the unit's name (docker.<service>.service); the container's name too
 #   description
 #   image        what runs
-#   options      docker run flags other than the mounts (--network host, --cpus=1)
+#   options      docker run flags other than the mounts and the environment (--network
+#                host, --cpus=1)
+#   env          the container's environment, {NAME: value}: each value reaches it as
+#                given, spaces, %, $, \ and " included (one quoted --env per entry)
 #   mounts       host paths and volumes the container sees, each
 #                {src, dst, type: bind | volume, readonly: false, propagation: ""}:
 #                always --mount, which refuses a bind whose source is missing; -v
@@ -26,6 +29,7 @@ container_service_keys:
   description: ""
   image: ""
   options: []
+  env: {}
   mounts: []
   args: []
   state: started

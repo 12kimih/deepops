@@ -22,6 +22,9 @@ ExecStart=/usr/bin/docker run --rm --name %n \
 {% for option in _container_service.options %}
   {{ option }} \
 {% endfor %}
+{% for name, value in _container_service.env | dictsort %}
+  --env {{ (name ~ '=' ~ value) | systemd_exec_arg }} \
+{% endfor %}
 {% for mount in _container_service.mounts %}
   --mount type={{ mount.type | default('bind') }},src={{ mount.src }},dst={{ mount.dst }}
 {{- ',readonly' if mount.readonly | default(false) else '' }}
