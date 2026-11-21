@@ -1,0 +1,24 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the units' state
+      ansible.builtin.command:
+        argv: [systemctl, is-enabled, cron.service, e2scrub_reap.service]
+      register: unmasked_state
+      changed_when: false
+      failed_when: false
+
+    - name: Read the test owner's record
+      ansible.builtin.slurp:
+        src: /var/lib/deepops/masked-units/test
+      register: masked_record
+
+    - name: Check cron is back at its preset, the hand mask stayed, the record is empty
+      ansible.builtin.assert:
+        that:
+          - unmasked_state.stdout_lines == ['enabled', 'masked']
+          - masked_record.content | b64decode == ''
+        fail_msg: "{{ unmasked_state.stdout_lines }} record={{ masked_record.content | b64decode }}"

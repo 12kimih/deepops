@@ -1,0 +1,73 @@
+---
+# Mask host_baseline_masked_units for host_baseline_masked_owner, and unmask what that
+# owner masked before and no longer lists. The record (one unit per line) is what makes
+# the unmask exact: a unit masked by hand or by another owner is never touched.
+- name: Check the owner of the masked units
+  ansible.builtin.assert:
+    that: host_baseline_masked_owner is match('^[a-z0-9_-]+$')
+    fail_msg: "host_baseline_masked_owner must be a plain name, not {{ host_baseline_masked_owner }}."
+    quiet: true
+
+- name: Read the units this owner masked before
+  ansible.builtin.slurp:
+    src: "{{ _host_baseline_masked_record }}"
+  register: host_baseline_masked_before
+  failed_when: false
+
+# Only installed units can be stopped and masked; one a package brings later is masked
+# by the next run. The record holds what was masked, so the unmask is exact.
+- name: Find which of the listed units are installed
+  ansible.builtin.command:
+    argv: "{{ ['systemctl', 'list-unit-files', '--no-legend', '--plain'] + host_baseline_masked_units }}"
+  register: host_baseline_masked_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only; --check needs the result
+  when: host_baseline_masked_units | length > 0
+
+- name: Note what to mask and what to give back
+  ansible.builtin.set_fact:
+    _host_baseline_mask: >-
+      {{ host_baseline_masked_installed.stdout_lines | default([]) | map('split') | map('first')
+         | select('in', host_baseline_masked_units) | unique | sort }}
+    _host_baseline_unmask: >-
+      {{ ((host_baseline_masked_before.content | default('') | b64decode).split()
+          | difference(host_baseline_masked_units)) | sort }}
+
+- name: Stop and mask the units
+  systemd_unit:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop: "{{ _host_baseline_mask }}"
+
+- name: Unmask the units no longer listed
+  systemd_unit:
+    name: "{{ item }}"
+    masked: false
+  loop: "{{ _host_baseline_unmask }}"
+
+# Back to what the distribution enables by default (systemctl preset), not left disabled.
+- name: Give the unmasked units their preset
+  change_command:
+    argv: [systemctl, preset, "{{ item }}"]
+  loop: "{{ _host_baseline_unmask }}"
+
+- name: Create the masked units' record directory
+  ansible.builtin.file:
+    path: "{{ _host_baseline_masked_record | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: _host_baseline_mask | length > 0 or host_baseline_masked_before.content is defined
+
+- name: Record the units this owner masks
+  ansible.builtin.copy:
+    dest: "{{ _host_baseline_masked_record }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _host_baseline_mask | map('regex_replace', '$', '\n') | join }}"
+  when: _host_baseline_mask | length > 0 or host_baseline_masked_before.content is defined

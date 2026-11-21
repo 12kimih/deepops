@@ -1,0 +1,3 @@
+---
+# The record of the units an owner masked (tasks_from: masked).
+_host_baseline_masked_record: "{{ deepops_state_dir }}/masked-units/{{ host_baseline_masked_owner }}"
