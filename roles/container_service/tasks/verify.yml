@@ -1,0 +1,52 @@
+---
+# The service is up and serving: its container running and, with health_url, answering
+# 200 within health_timeout seconds. Run after the handlers, so a restart a change
+# notified is what gets checked. A failure shows the unit's last journal lines and stops
+# the run: a deploy that finishes green with the service down (a crash loop systemd
+# reports as activating, a Docker API gone) is what this prevents. Skipped under --check
+# and for a service meant to be stopped.
+- name: Check it serves, {{ _container_service.unit }}
+  when:
+    - _container_service.state == 'started'
+    - not ansible_check_mode
+  block:
+    - name: Wait for the container to run, {{ _container_service.unit }}
+      ansible.builtin.command:
+        argv: [docker, inspect, --format, "{{ '{{' }}.State.Running{{ '}}' }}", "{{ _container_service.unit }}"]
+      register: container_service_running
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only
+      until: container_service_running.stdout | trim == 'true'
+      retries: "{{ (_container_service.health_timeout | int / 5) | round(0, 'ceil') | int }}"
+      delay: 5
+
+    - name: Wait for {{ _container_service.health_url }}
+      ansible.builtin.uri:
+        url: "{{ _container_service.health_url }}"
+        status_code: 200
+      register: container_service_health
+      until: container_service_health.status == 200
+      retries: "{{ (_container_service.health_timeout | int / 5) | round(0, 'ceil') | int }}"
+      delay: 5
+      when: _container_service.health_url | length > 0
+
+    - name: Stop if it is not running
+      ansible.builtin.assert:
+        that: container_service_running.stdout | trim == 'true'
+        fail_msg: "{{ _container_service.unit }}: the container is not running"
+        quiet: true
+  rescue:
+    - name: Read the journal of {{ _container_service.unit }}
+      ansible.builtin.command:
+        argv: [journalctl, --unit, "{{ _container_service.unit }}", --lines, "40", --no-pager]
+      register: container_service_journal
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only
+
+    - name: Report it does not serve, {{ _container_service.unit }}
+      ansible.builtin.fail:
+        msg: "{{ [_container_service.unit ~ ' is not serving within ' ~ _container_service.health_timeout ~ ' s ('
+                  ~ (ansible_failed_result.msg | default('not running')) ~ '); its journal:']
+                 + container_service_journal.stdout_lines }}"

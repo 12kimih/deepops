@@ -93,6 +93,25 @@
       state: "{{ prometheus_service_state }}"
       enabled: "{{ prometheus_service_enabled }}"
       notify: [Restart prometheus]
+      # Ready once the TSDB's write-ahead log is replayed: minutes on a large one.
+      health_url: "http://localhost:{{ prometheus_port }}/-/ready"
+      health_timeout: 900
+
+# SIGHUP (the reload handler) succeeds whether or not Prometheus took the new
+# configuration: a file it rejects leaves the old one running. Its own gauge says which.
+- name: Check Prometheus took the configuration
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port }}/api/v1/query?query=prometheus_config_last_reload_successful"
+    return_content: true
+  register: prometheus_reload_state
+  until: >-
+    prometheus_reload_state.json is defined
+    and (prometheus_reload_state.json.data.result | map(attribute='value') | map('last') | list) == ['1']
+  retries: 6
+  delay: 5
+  when:
+    - prometheus_service_state == 'started'
+    - not ansible_check_mode
 
 - name: Record the component as present
   ansible.builtin.include_role:
