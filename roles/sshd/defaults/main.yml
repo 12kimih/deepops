@@ -24,6 +24,10 @@ sshd_ports: [22]
 # address (roles/network_defaults). The members' clients sign with ssh-keysign
 # (/etc/ssh/ssh_config.d/20-hostbased.conf). "" turns it off and removes the files.
 sshd_hostbased_group: ""
+# Accounts never admitted by host-based authentication: the service accounts (a
+# service's login, if any, is a key with a forced command, which host-based login would
+# get around).
+sshd_hostbased_exclude_users: "{{ system_accounts | list }}"
 
 # Further sshd_config(5) settings, written as given: {LoginGraceTime: 20}. true and false
 # are written yes and no; a list value repeats the keyword once per item.

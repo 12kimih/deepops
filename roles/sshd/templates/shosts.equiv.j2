@@ -1,8 +1,13 @@
 # {{ ansible_managed }}
 # roles/sshd: the members of {{ sshd_hostbased_group }} whose users may log in here as
 # themselves by host-based authentication (never root). sshd matches a client by its
-# address (UseDNS is off); the names serve a client that resolves.
+# address (UseDNS is off); the names serve a client that resolves. The first line that
+# matches decides, so each member's excluded accounts (-user) come before it.
 {% for host, address in sshd_hostbased_members | dictsort %}
-{{ address }}
-{{ host }}
+{% for name in [address, host] %}
+{% for user in sshd_hostbased_exclude_users | sort %}
+{{ name }} -{{ user }}
+{% endfor %}
+{{ name }}
+{% endfor %}
 {% endfor %}

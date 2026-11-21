@@ -13,6 +13,7 @@ provisioner:
       all:
         sshd_manage: true
         sshd_hostbased_group: cluster
+        sshd_hostbased_exclude_users: [svc]
         # Docker's networks.
         cluster_networks: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
 scenario:

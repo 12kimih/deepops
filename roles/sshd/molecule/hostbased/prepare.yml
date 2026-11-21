@@ -10,10 +10,11 @@
         state: present
         update_cache: true
 
-    - name: Add a user without a key
+    - name: Add a user without a key, and a service account host-based login must refuse
       ansible.builtin.user:
-        name: tester
+        name: "{{ item }}"
         shell: /bin/bash
+      loop: [tester, svc]
 
     - name: Leave the login script that made every user a key
       ansible.builtin.copy:
