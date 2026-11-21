@@ -212,6 +212,15 @@
 #    server: '{{ groups["slurm-master"][0] }}'
 #    path: /export/shared
 
+# Ubuntu's own archive from a mirror (roles/package_repos, tasks_from: ubuntu, run by
+# playbooks/generic/os-updates.yml): ubuntu.sources points there, trusting the OS's
+# archive key. Empty leaves the OS's sources alone. The -security suite comes from the
+# same mirror unless package_repos_ubuntu_security_mirror names another.
+#package_repos_ubuntu_mirror: ""
+#package_repos_ubuntu_mirror: https://mirror.example.org/ubuntu/  # example
+#package_repos_ubuntu_security_mirror: "{{ package_repos_ubuntu_mirror }}"
+#package_repos_ubuntu_components: [main, restricted, universe, multiverse]
+
 # Extra Packages for Enterprise Linux (roles/package_repos; set for a mirror)
 #package_repos_epel_release: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
 #package_repos_epel_key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}"

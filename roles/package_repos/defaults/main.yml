@@ -4,11 +4,20 @@
 #   tasks_from: epel   EPEL on the RHEL family (a no-op elsewhere)
 #   tasks_from: cuda   NVIDIA's CUDA repository (drivers, CUDA, DCGM): the cuda-keyring
 #                      package on Ubuntu, a dnf repository on the RHEL family
+#   tasks_from: ubuntu Ubuntu's own archive from a mirror (package_repos_ubuntu_mirror)
 #   tasks_from: repo   any other repository, present or absent, from one declaration
 #                      (package_repos_repo; see tasks/repo.yml): a checked signing key
 #                      trusted for that repository only, a deb822 source or yum repo
 #
 # A mirror (an airgap) replaces the base URLs and keeps the layout below them.
+
+# Ubuntu's archive (tasks_from: ubuntu): a mirror's URI (e.g. a national mirror, or an
+# airgap's), and where the -security suite comes from (the same mirror by default;
+# http://security.ubuntu.com/ubuntu/ takes security fixes from Canonical directly, as
+# Ubuntu's own file does). Empty leaves the OS's sources alone.
+package_repos_ubuntu_mirror: ""
+package_repos_ubuntu_security_mirror: "{{ package_repos_ubuntu_mirror }}"
+package_repos_ubuntu_components: [main, restricted, universe, multiverse]
 
 package_repos_epel_release: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
 package_repos_epel_key: "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}"
