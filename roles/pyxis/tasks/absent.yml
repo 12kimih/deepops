@@ -5,4 +5,4 @@
   vars:
     component_record_name: pyxis
     component_record_action: absent
-    component_record_items: "{{ pyxis_items }}"
+    component_record_items: "{{ pyxis_hook_items + pyxis_mount_items }}"

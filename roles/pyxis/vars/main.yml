@@ -1,6 +1,11 @@
 ---
 # What the component installs, for its record (roles/component_record): the Slurm hooks
-# it links into enroot's hooks.d on compute nodes.
-pyxis_items:
+# it links into enroot's hooks.d on compute nodes, and the /run size entry in fstab
+# while resize_run_partition asks for one (an fstab item: dropped from the set, its
+# entry goes, never the live mount).
+pyxis_hook_items:
   - file:/etc/enroot/hooks.d/50-slurm-pmi.sh
   - file:/etc/enroot/hooks.d/50-slurm-pytorch.sh
+pyxis_mount_items: "{{ ['mount:/run'] if resize_run_partition | bool else [] }}"
+# On this host: the hooks where they are linked (compute nodes), the entry where it is set.
+pyxis_items: "{{ (pyxis_hook_items if is_compute | bool else []) + pyxis_mount_items }}"
