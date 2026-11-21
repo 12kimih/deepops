@@ -1,0 +1,40 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  roles:
+    - role: network_defaults  # cluster_address
+  tasks:
+    - name: Log in to the cluster address by host-based authentication alone
+      ansible.builtin.command:
+        argv:
+          - ssh
+          - -o
+          - BatchMode=yes
+          - -o
+          - PreferredAuthentications=hostbased
+          - "{{ cluster_address }}"
+          - id -un
+      become_user: tester
+      register: hostbased_login
+      changed_when: false
+
+    - name: Look for the retired login script and a key made for the user
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/etc/profile.d/ssh-key.sh, /home/tester/.ssh/id_rsa]
+      register: hostbased_gone
+
+    - name: Check the login and that no key was needed or made
+      ansible.builtin.assert:
+        that:
+          - hostbased_login.stdout == 'tester'
+          - hostbased_gone.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: "{{ hostbased_login.stdout }} / {{ hostbased_gone.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+
+    - name: Try root, which shosts.equiv never admits
+      ansible.builtin.command:
+        argv: [ssh, -o, BatchMode=yes, -o, PreferredAuthentications=hostbased, "{{ cluster_address }}", "true"]
+      register: hostbased_root
+      changed_when: false
+      failed_when: hostbased_root.rc == 0

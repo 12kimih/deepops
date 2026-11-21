@@ -1,0 +1,95 @@
+---
+# Host-based authentication among the members of sshd_hostbased_group (defaults): the
+# files sshd and ssh read, written from every member's current host keys and cluster
+# address; removed when the group is "".
+- name: Read every member's host keys and addresses
+  ansible.builtin.setup:
+    gather_subset: ["!all", "!min", network, ssh_host_pub_keys]
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups[sshd_hostbased_group] | default([]) }}"
+  run_once: true
+  when: sshd_hostbased_group | length > 0
+
+- name: Write the members' trust files
+  when: sshd_hostbased_group | length > 0
+  vars:
+    sshd_hostbased_members: "{{ hostvars | cluster_addresses(groups[sshd_hostbased_group], cluster_networks) }}"
+  block:
+    - name: Require every member's cluster address
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in groups[sshd_hostbased_group]
+          - sshd_hostbased_members | dict2items | rejectattr('value') | list | length == 0
+        fail_msg: >-
+          Host-based authentication needs every host it runs on in {{ sshd_hostbased_group }},
+          and an address in cluster_networks for every member (none for:
+          {{ sshd_hostbased_members | dict2items | rejectattr('value') | map(attribute='key') | join(', ') or '-' }}).
+        quiet: true
+
+    - name: Require every member's host key
+      ansible.builtin.assert:
+        that: sshd_hostbased_kinds | map('regex_replace', '^(.+)$', 'ssh_host_key_\\g<1>_public') | select('in', _facts) | list | length > 0
+        fail_msg: "{{ item }} reported no SSH host key ({{ sshd_hostbased_kinds | join(', ') }})."
+        quiet: true
+      vars:
+        _facts: "{{ hostvars[item].ansible_facts | default({}) }}"
+      loop: "{{ groups[sshd_hostbased_group] }}"
+      run_once: true
+
+    - name: Write the members' host keys
+      ansible.builtin.template:
+        src: ssh_known_hosts.j2
+        dest: /etc/ssh/ssh_known_hosts
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Write the members sshd trusts
+      ansible.builtin.template:
+        src: shosts.equiv.j2
+        dest: /etc/ssh/shosts.equiv
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Let the members' clients sign with their host key
+      ansible.builtin.template:
+        src: ssh_config_hostbased.conf.j2
+        dest: "{{ sshd_hostbased_client_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+        validate: ssh -G -F %s hostbased.invalid
+
+    # The login scripts that made every user a key pair and authorized it, so users could
+    # ssh between hosts sharing /home: host-based authentication replaces them. Keys
+    # they already made stay the users'.
+    - name: Retire the login scripts that made users' cluster keys
+      ansible.builtin.include_role:
+        name: stale_files
+      vars:
+        stale_files_state: absent
+        stale_files_rules:
+          - name: the login scripts that generated an SSH key per user
+            type: files
+            dirs: [/etc/profile.d]
+            pattern: ssh-key\.c?sh
+            contains: 'cat \$HOME/\.ssh/id_rsa\.pub >> \$HOME/\.ssh/authorized_keys'
+
+# Off: the files go, where this role wrote them (a site's own known hosts file stays).
+- name: Find the trust files this role wrote
+  ansible.builtin.command:
+    argv: [grep, -l, -F, "roles/sshd", /etc/ssh/ssh_known_hosts, /etc/ssh/shosts.equiv, "{{ sshd_hostbased_client_file }}"]
+  register: sshd_hostbased_ours
+  changed_when: false
+  failed_when: sshd_hostbased_ours.rc > 2
+  check_mode: false  # read-only; --check needs the result
+  when: sshd_hostbased_group | length == 0
+
+- name: Remove the trust files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ sshd_hostbased_ours.stdout_lines | default([]) }}"
+  when: sshd_hostbased_group | length == 0

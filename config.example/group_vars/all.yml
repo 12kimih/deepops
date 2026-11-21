@@ -115,6 +115,11 @@
 #sshd_manage: false
 #sshd_ports: [22]
 #sshd_settings: {}  # e.g. {LoginGraceTime: 20}
+# Host-based authentication among the hosts of one group: users reach the others as
+# themselves without keys of their own (never root); retires the login scripts that made
+# every user a key. Needs cluster_networks.
+#sshd_hostbased_group: ""
+#sshd_hostbased_group: slurm-cluster  # example
 
 # fail2ban (roles/fail2ban; switch slurm_enable_fail2ban / kube_enable_fail2ban): the
 # site's [DEFAULT] settings over the distribution's, and addresses never banned.

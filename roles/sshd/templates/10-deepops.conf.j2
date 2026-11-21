@@ -1,9 +1,14 @@
 # {{ ansible_managed }}
-# roles/sshd: the site's sshd settings (sshd_ports, sshd_settings). sshd reads this
-# before the rest of sshd_config, and the first value of a setting wins.
+# roles/sshd: the site's sshd settings (sshd_ports, sshd_hostbased_group, sshd_settings).
+# sshd reads this before the rest of sshd_config, and the first value of a setting wins.
 {% for port in sshd_ports %}
 Port {{ port }}
 {% endfor %}
+{% if sshd_hostbased_group %}
+# The members of {{ sshd_hostbased_group }} in /etc/ssh/shosts.equiv, their keys in
+# /etc/ssh/ssh_known_hosts.
+HostbasedAuthentication yes
+{% endif %}
 {% for key, value in sshd_settings | dictsort %}
 {% for item in (value if value is sequence and value is not string else [value]) %}
 {{ key }} {{ ('yes' if item else 'no') if item is boolean else item }}

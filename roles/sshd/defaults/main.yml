@@ -14,6 +14,17 @@ sshd_backup_dir: /var/backups/sshd
 # ports a generator takes from these; a change restarts the socket, never a session.
 sshd_ports: [22]
 
+# Host-based authentication inside the cluster: a user logged in on one host of this
+# inventory group reaches the others as themselves, without a key of their own (the
+# Slurm node's PAM still admits only users with a job there). Root never: shosts.equiv
+# does not admit root. Each host proves itself with its host key, checked against
+# /etc/ssh/ssh_known_hosts, which lists every member's current keys (read fresh from
+# each member, so a reinstalled host is not trusted by its old key). sshd knows the
+# client by its address (UseDNS is off), so both files list each member's cluster
+# address (roles/network_defaults). The members' clients sign with ssh-keysign
+# (/etc/ssh/ssh_config.d/20-hostbased.conf). "" turns it off and removes the files.
+sshd_hostbased_group: ""
+
 # Further sshd_config(5) settings, written as given: {LoginGraceTime: 20}. true and false
 # are written yes and no; a list value repeats the keyword once per item.
 sshd_settings: {}
