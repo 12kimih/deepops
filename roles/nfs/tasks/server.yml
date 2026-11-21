@@ -87,12 +87,12 @@
 
 - name: Publish the exports for Prometheus
   ansible.builtin.include_role:
-    name: textfile_static
+    name: textfile_keep
     apply:
       tags: [nfs]
   vars:
-    textfile_static_name: "{{ nfs_exports_textfile }}"
-    textfile_static_content: |
+    textfile_keep_name: "{{ nfs_exports_textfile }}"
+    textfile_keep_content: |
       # HELP nfs_export_info An NFS export of this host and the filesystem it lives on (roles/nfs).
       # TYPE nfs_export_info gauge
       {% for result in nfs_exports_mounts.results %}

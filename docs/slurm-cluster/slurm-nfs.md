@@ -50,7 +50,7 @@ offered to `nfs_export_clients`, which defaults to the cluster's networks (`clus
 roles/network_defaults); an entry's own `clients` replaces it for that export.
 
 The server publishes what it exports, and the filesystem each export lives on, as the
-node_exporter metric `nfs_export_info{path,mountpoint}` (roles/textfile_static, restored at every
+node_exporter metric `nfs_export_info{path,mountpoint}` (roles/textfile_keep, restored at every
 boot). The alert `NfsExportFilling` warns when one of those filesystems is over 80% full for 30
 minutes, once per filesystem: a nearly full filesystem slows every job reading from it.
 

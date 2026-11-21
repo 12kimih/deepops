@@ -12,5 +12,5 @@ nfs_items: >-
         'file:' ~ node_exporter_prom_keep_dir ~ '/' ~ nfs_exports_textfile ~ '.prom',
         'file:/etc/tmpfiles.d/deepops-textfile-' ~ nfs_exports_textfile ~ '.conf'] }}
 # What this server exports and the filesystem each export lives on, for Prometheus
-# (roles/textfile_static): the shared-storage usage alert watches exactly these.
+# (roles/textfile_keep): the shared-storage usage alert watches exactly these.
 nfs_exports_textfile: nfs-exports

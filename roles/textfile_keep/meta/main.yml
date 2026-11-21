@@ -4,9 +4,9 @@ dependencies:
 
 galaxy_info:
   namespace: deepops
-  role_name: textfile_static
+  role_name: textfile_keep
   author: DeepOps
-  description: A node_exporter textfile written at deploy time and restored at every boot
+  description: A node_exporter textfile restored after every boot from a kept copy
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:
