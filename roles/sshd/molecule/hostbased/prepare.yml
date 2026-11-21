@@ -1,0 +1,26 @@
+---
+# A user with no key of their own, and the login script that used to make one.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install the OpenSSH server and client
+      ansible.builtin.apt:
+        name: [openssh-server, openssh-client]
+        state: present
+        update_cache: true
+
+    - name: Add a user without a key
+      ansible.builtin.user:
+        name: tester
+        shell: /bin/bash
+
+    - name: Leave the login script that made every user a key
+      ansible.builtin.copy:
+        dest: /etc/profile.d/ssh-key.sh
+        mode: "0644"
+        content: |
+          #!/bin/sh
+          [ -f $HOME/.ssh/id_rsa ] && return 0
+          ssh-keygen -t rsa -f $HOME/.ssh/id_rsa -v -N ""
+          cat $HOME/.ssh/id_rsa.pub >> $HOME/.ssh/authorized_keys

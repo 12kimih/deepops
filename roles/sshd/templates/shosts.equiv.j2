@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# roles/sshd: the members of {{ sshd_hostbased_group }} whose users may log in here as
+# themselves by host-based authentication (never root). sshd matches a client by its
+# address (UseDNS is off); the names serve a client that resolves.
+{% for host, address in sshd_hostbased_members | dictsort %}
+{{ address }}
+{{ host }}
+{% endfor %}

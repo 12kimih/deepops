@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# roles/sshd: the host keys of the members of {{ sshd_hostbased_group }}, by name and
+# cluster address, read from each member when this was written. sshd checks a host-based
+# login's client key here; ssh checks a member's key here too.
+{% for host, address in sshd_hostbased_members | dictsort %}
+{% set facts = hostvars[host].ansible_facts %}
+{% set names = [host, facts.hostname | default(''), facts.fqdn | default(''), address] | select | unique | join(',') %}
+{% for kind in sshd_hostbased_kinds if ('ssh_host_key_' ~ kind ~ '_public') in facts %}
+{{ names }} {{ facts['ssh_host_key_' ~ kind ~ '_public_keytype'] }} {{ facts['ssh_host_key_' ~ kind ~ '_public'] }}
+{% endfor %}
+{% endfor %}

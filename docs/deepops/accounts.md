@@ -132,6 +132,19 @@ Run each command from `~/deepops`. Preview with `--check` first.
    `nis_server` to `deepops_component_removals`. Then run `playbooks/slurm-cluster.yml`;
    its removal phase takes the clients off first, then the master.
 
+## Logging in between hosts
+
+With `sshd_hostbased_group` (roles/sshd, e.g. `slurm-cluster`) a user logged in on one
+member reaches the others as themselves by host-based authentication, with no key of
+their own; a Slurm node's PAM still admits only users with a job there, and root is
+never admitted this way. Each member proves itself with its host key: the role reads
+every member's current keys and cluster address (`cluster_networks`) and writes
+`/etc/ssh/ssh_known_hosts`, `/etc/ssh/shosts.equiv` and the client setting
+(`/etc/ssh/ssh_config.d/20-hostbased.conf`, signing through `ssh-keysign`). It also
+retires the old login scripts (`/etc/profile.d/ssh-key.sh`, `.csh`) that made every
+user an unprotected key pair and authorized it; keys users already have stay theirs.
+Setting the group back to `""` removes the files.
+
 ## Running it
 
 - **People join, change or leave in `people.yml`.** After `--tags people`, the change is

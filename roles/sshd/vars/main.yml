@@ -1,0 +1,5 @@
+---
+# Host-based authentication (sshd_hostbased_group): the client side, and the host key
+# types the members' known hosts list, strongest first (DSA is gone from OpenSSH).
+sshd_hostbased_client_file: /etc/ssh/ssh_config.d/20-hostbased.conf
+sshd_hostbased_kinds: [ed25519, ecdsa, rsa]

@@ -1,0 +1,31 @@
+---
+# Off: the trust files go and sshd stops accepting host-based logins.
+- name: Turn host-based authentication off
+  hosts: all
+  become: true
+  roles:
+    - role: sshd
+      sshd_hostbased_group: ""
+
+- name: Check it is off
+  hosts: all
+  become: true
+  tasks:
+    - name: Look for the trust files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/etc/ssh/ssh_known_hosts, /etc/ssh/shosts.equiv, /etc/ssh/ssh_config.d/20-hostbased.conf]
+      register: hostbased_files
+
+    - name: Read the effective setting
+      ansible.builtin.command:
+        argv: [sshd, -T]
+      register: hostbased_effective
+      changed_when: false
+
+    - name: Check the files went and the setting is back to the default
+      ansible.builtin.assert:
+        that:
+          - hostbased_files.results | selectattr('stat.exists') | list | length == 0
+          - "'hostbasedauthentication no' in hostbased_effective.stdout_lines"
+        fail_msg: "{{ hostbased_files.results | selectattr('stat.exists') | map(attribute='item') | list }}"

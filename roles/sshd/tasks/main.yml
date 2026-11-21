@@ -10,7 +10,10 @@
           - sshd_ports | length > 0
           - sshd_ports | map('int') | select('gt', 0) | select('lt', 65536) | list | length == sshd_ports | length
           - "'Port' not in sshd_settings and 'Include' not in sshd_settings"
-        fail_msg: sshd_ports needs one or more ports (1-65535); ports go there, not in sshd_settings, and Include is the package's.
+          - "'HostbasedAuthentication' not in sshd_settings"
+        fail_msg: >-
+          sshd_ports needs one or more ports (1-65535); ports go there, not in sshd_settings,
+          Include is the package's and HostbasedAuthentication is sshd_hostbased_group's.
         quiet: true
 
     - name: Install the OpenSSH server (Debian family)
@@ -55,6 +58,9 @@
       changed_when: false
       failed_when: false
       check_mode: false  # read-only; --check needs the result
+
+    - name: Trust the cluster's hosts, or stop trusting them
+      ansible.builtin.include_tasks: hostbased.yml
 
     # Anything else in sshd_config.d is read beside the drop-in and may set what it leaves
     # to the defaults: the directory holds the drop-in alone.

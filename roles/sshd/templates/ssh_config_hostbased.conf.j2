@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# roles/sshd: host-based authentication to the members of {{ sshd_hostbased_group }}
+# (sshd_hostbased_group). ssh-keysign signs with this host's key, which only it can read.
+EnableSSHKeysign yes
+
+Host {{ sshd_hostbased_members | dictsort | map('join', ' ') | join(' ') }}
+    HostbasedAuthentication yes

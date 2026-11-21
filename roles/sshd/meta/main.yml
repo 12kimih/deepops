@@ -11,4 +11,5 @@ galaxy_info:
       versions: [jammy, noble]
     - name: EL
       versions: ["8", "9"]
-dependencies: []
+dependencies:
+  - role: network_defaults  # cluster_networks, for sshd_hostbased_group
