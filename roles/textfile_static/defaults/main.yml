@@ -1,0 +1,15 @@
+---
+# textfile_static -- a node_exporter textfile a role writes when it runs, for facts the
+# deploy knows (what a host exports, which settings it has), kept across reboots:
+# node_exporter_prom_dir is a tmpfs, so the kept copy under node_exporter_prom_keep_dir
+# goes back there at every boot (systemd-tmpfiles, one drop-in per file).
+#   - ansible.builtin.include_role:
+#       name: textfile_static
+#     vars:
+#       textfile_static_name: nfs-exports          # <name>.prom
+#       textfile_static_content: "{{ lookup('ansible.builtin.template', 'nfs-exports.prom.j2') }}"
+# The caller lists the three files in its component record, which removes them with
+# it: {{ node_exporter_prom_dir }}/<name>.prom, {{ node_exporter_prom_keep_dir }}/<name>.prom
+# and /etc/tmpfiles.d/deepops-textfile-<name>.conf.
+textfile_static_name: ""
+textfile_static_content: ""

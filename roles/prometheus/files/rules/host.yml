@@ -31,6 +31,20 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.mountpoint }} on {{ $labels.host }} will fill within 24h"
+      # A filesystem this host exports over NFS (what roles/nfs publishes): slower
+      # well before it is full (fragmented free space, the slow inner tracks of disks),
+      # and every node's jobs read from it, so it warns at 80%. Once per filesystem, however
+      # many exports it holds.
+      - alert: NfsExportFilling
+        expr: |
+          node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.20
+          and node_filesystem_readonly == 0
+          and on (instance, mountpoint) nfs_export_info
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.host }}, exported over NFS, is over 80% full"
+          description: "{{ $value | humanizePercentage }} free. Ask the largest users to clean up before it slows every job."
       - alert: HostInodesAlmostExhausted
         expr: |
           node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}

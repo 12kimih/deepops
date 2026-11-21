@@ -7,4 +7,10 @@ nfs_items: >-
      + ['unit:nfs-server.service', 'unit:nfs-server-restart.service',
         'file:/etc/systemd/system/nfs-server-restart.service',
         'file:/etc/systemd/system/nfs-server.service.d/auto-restart.conf',
-        'dir:/etc/systemd/system/nfs-server.service.d'] }}
+        'dir:/etc/systemd/system/nfs-server.service.d',
+        'file:' ~ node_exporter_prom_dir ~ '/' ~ nfs_exports_textfile ~ '.prom',
+        'file:' ~ node_exporter_prom_keep_dir ~ '/' ~ nfs_exports_textfile ~ '.prom',
+        'file:/etc/tmpfiles.d/deepops-textfile-' ~ nfs_exports_textfile ~ '.conf'] }}
+# What this server exports and the filesystem each export lives on, for Prometheus
+# (roles/textfile_static): the shared-storage usage alert watches exactly these.
+nfs_exports_textfile: nfs-exports

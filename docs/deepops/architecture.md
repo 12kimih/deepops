@@ -198,7 +198,8 @@ reader writes `| default(...)` for a defined variable;
 │   ├── sssd_client
 │   ├── stale_files
 │   ├── standalone-container-registry
-│   └── system_accounts
+│   ├── system_accounts
+│   └── textfile_static
 ```
 <!-- END GENERATED: role-tree -->
 

@@ -37,15 +37,22 @@ If you would like to make changes to that configuration, you can do so be settin
 ```yaml
 nfs_exports:
   - path: "<absolute path of exported directory on control node>"
-    options: "<ips allowed to mount>(<options for the NFS export>)"
+    options: "<options for the NFS export>"        # e.g. rw,sync,root_squash,no_subtree_check
   - path: "<absolute path of another exported directory>"
-    options: "<ips allowed to mount>(<options for the NFS export>)"
+    options: "<options for the NFS export>"
+    clients: ["<host or network>"]                 # optional; default nfs_export_clients
 ```
 
 You can add as many additional exports to the list as you wish, configuring each appropriately.
 
-The `options` field for each export, which specifies the IPs allowed to mount these exports and the options for the export, follows the format of the NFS `/etc/exports` file.
-For documentation on the available NFS export options, see the manpages for your Linux distribution: `man 5 exports`.
+`options` holds the export flags alone, as in `/etc/exports` (`man 5 exports`). Every export is
+offered to `nfs_export_clients`, which defaults to the cluster's networks (`cluster_networks`,
+roles/network_defaults); an entry's own `clients` replaces it for that export.
+
+The server publishes what it exports, and the filesystem each export lives on, as the
+node_exporter metric `nfs_export_info{path,mountpoint}` (roles/textfile_static, restored at every
+boot). The alert `NfsExportFilling` warns when one of those filesystems is over 80% full for 30
+minutes, once per filesystem: a nearly full filesystem slows every job reading from it.
 
 ### NFS mounts on the clients
 

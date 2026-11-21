@@ -663,12 +663,12 @@ tests:
         values: '500x30'
       - series: 'DCGM_FI_DEV_FB_USED_BYTES{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
         values: '40000x30'
-      - series: 'DCGM_FI_DEV_FB_FREE_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
+      - series: 'DCGM_FI_DEV_FB_CAPACITY_BYTES{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
         values: '48000x30'
-      - series: 'DCGM_FI_DEV_FB_FREE_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
-        values: '47500x30'
-      - series: 'DCGM_FI_DEV_FB_FREE_BYTES{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
-        values: '8000x30'
+      - series: 'DCGM_FI_DEV_FB_CAPACITY_BYTES{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
+        values: '48000x30'
+      - series: 'DCGM_FI_DEV_FB_CAPACITY_BYTES{host="n1", instance="n1:9400", gpu="2", device="nvidia2"}'
+        values: '48000x30'
       - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="0", device="nvidia0"}'
         values: '1x30'
       - series: 'DCGM_FI_DEV_GPU_MINOR_NUMBER{host="n1", instance="n1:9400", gpu="1", device="nvidia1"}'
@@ -724,6 +724,38 @@ tests:
         exp_samples:
           - labels: 'job_device:dcgm_power_watts:max{host="n1", device="nvidia1", node="n1", gpu="1", gpu_type="t", user="u", account="a", partition="p", job_id="7"}'
             value: 250
+
+  # Only an exported filesystem warns at 80%; the root filesystem at the same fill does not.
+  - name: an exported filesystem over 80% full warns once, an unexported one not at all
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{host="m", instance="m:9100", mountpoint="/home", fstype="ext4", device="/dev/sdb1"}'
+        values: '15x40'
+      - series: 'node_filesystem_size_bytes{host="m", instance="m:9100", mountpoint="/home", fstype="ext4", device="/dev/sdb1"}'
+        values: '100x40'
+      - series: 'node_filesystem_readonly{host="m", instance="m:9100", mountpoint="/home", fstype="ext4", device="/dev/sdb1"}'
+        values: '0x40'
+      - series: 'node_filesystem_avail_bytes{host="m", instance="m:9100", mountpoint="/", fstype="ext4", device="/dev/sda4"}'
+        values: '15x40'
+      - series: 'node_filesystem_size_bytes{host="m", instance="m:9100", mountpoint="/", fstype="ext4", device="/dev/sda4"}'
+        values: '100x40'
+      - series: 'node_filesystem_readonly{host="m", instance="m:9100", mountpoint="/", fstype="ext4", device="/dev/sda4"}'
+        values: '0x40'
+      - series: 'nfs_export_info{host="m", instance="m:9100", path="/home", mountpoint="/home"}'
+        values: '1x40'
+      - series: 'nfs_export_info{host="m", instance="m:9100", path="/home/data", mountpoint="/home"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: NfsExportFilling
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: NfsExportFilling
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100", mountpoint: /home, fstype: ext4, device: /dev/sdb1}
+            exp_annotations:
+              summary: "/home on m, exported over NFS, is over 80% full"
+              description: "15% free. Ask the largest users to clean up before it slows every job."
 
   - name: stale allocation data warns and silences the busy-GPU alert
     interval: 1m
