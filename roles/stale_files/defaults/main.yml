@@ -84,6 +84,12 @@ stale_files_host_rules:
     dirs: [/etc/apt/apt.conf.d]
     pattern: zzzz-temp-installer-unattended-upgrade
     contains: "unattended-upgrades run to avoid failing on battery power"
+  # DSA host keys: OpenSSH 10 dropped DSA and sshd has not loaded them since 7.0 (no
+  # HostKey names them); older installs generated them anyway and they stayed.
+  - name: DSA host keys sshd no longer loads
+    type: files
+    dirs: [/etc/ssh]
+    pattern: 'ssh_host_dsa_key(\.pub)?'
   # A hand copy of roles/nfs's auto-restart drop-in under another name: it kept the old
   # OnFailure= after the role's helper learnt to leave a hung nfsd alone.
   - name: hand copies of the nfs-server auto-restart drop-in
