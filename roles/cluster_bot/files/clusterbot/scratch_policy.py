@@ -10,9 +10,7 @@ a smaller size) is always automatic. Someone may not act on another person's
 allocation.
 """
 
-
-class Refused(Exception):
-    """A request nobody may make (someone else's allocation, one that does not exist)."""
+from .requests import Refused
 
 
 def _mine(allocations, user, alloc_id):

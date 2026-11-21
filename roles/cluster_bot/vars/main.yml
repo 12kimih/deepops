@@ -16,6 +16,7 @@ _cluster_bot_cfg:
   channels: {help: "{{ slack_channels.help }}", admin: "{{ slack_channels.admin }}"}
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
   admins: "{{ cluster_bot_admins | map('extract', cluster_bot_members) | select | list }}"
+  pending: "{{ _cluster_bot_home }}/requests-pending.json"
   scratch:
     host: "{{ (hostvars | cluster_addresses([_cluster_bot_scratch_host], cluster_networks))[_cluster_bot_scratch_host] if _cluster_bot_scratch_host else '' }}"
     key: "{{ cluster_bot_key }}"
@@ -25,7 +26,6 @@ _cluster_bot_cfg:
       auto_bytes: "{{ scratch_alloc_auto_size | kib * 1024 }}"
       auto_days: "{{ scratch_alloc_auto_days | int }}"
       auto_extensions: "{{ scratch_alloc_auto_extensions | int }}"
-    pending: "{{ _cluster_bot_home }}/scratch-pending.json"
     reminders: "{{ _cluster_bot_home }}/scratch-reminders.json"
     remind_days: "{{ cluster_bot_remind_days }}"
 

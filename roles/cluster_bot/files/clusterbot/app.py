@@ -5,9 +5,9 @@ one handler per action. Each handler reads Slack's input, asks a feature module
     python3 -m clusterbot.app CONFIG.json
 
 CONFIG (written by roles/cluster_bot): bot_token_file, app_token_file, channels {help,
-admin}, members {Slack member ID: cluster user}, admins [member IDs], and scratch {host,
-key, user, known_hosts, policy, pending, reminders, remind_days}; scratch.host empty
-leaves the feature off.
+admin}, members {Slack member ID: cluster user}, admins [member IDs], pending (the held
+requests of every feature, clusterbot.requests), and scratch {host, key, user,
+known_hosts, policy, reminders, remind_days}; scratch.host empty leaves it off.
 """
 
 import json
@@ -16,8 +16,10 @@ import threading
 import time
 from pathlib import Path
 
+from . import blocks as shared
 from . import scratch_blocks as blocks
-from .scratch import Scratch, SshExecutor
+from .requests import Engine
+from .scratch import ScratchFeature, SshExecutor
 
 UNITS = {"G": 1024**3, "T": 1024**4}
 REMIND_EVERY = 3600
@@ -34,7 +36,7 @@ def load(path):
     return cfg
 
 
-def build(cfg, service):
+def build(cfg, engine, scratch):
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
@@ -49,23 +51,23 @@ def build(cfg, service):
         and a DM to the person who asked."""
         req = outcome.request
         thread = req.get("thread_ts")
-        text = f"<@{slack_id}> {blocks.describe_request(req)}: {outcome.text}" if req else outcome.text
+        text = f"<@{slack_id}> {engine.describe(req)}: {outcome.text}" if req else outcome.text
         client.chat_postMessage(channel=channels["help"], text=text, thread_ts=thread)
         client.chat_postMessage(channel=slack_id, text=outcome.text)
 
     def submit(client, slack_id, req):
-        outcome = service.request(req)
+        outcome = engine.submit(req)
         if outcome.status == "held":
             first = client.chat_postMessage(
                 channel=channels["help"],
-                text=f"<@{slack_id}> {blocks.describe_request(req)}: 관리자 승인 대기",
+                text=f"<@{slack_id}> {engine.describe(req)}: 관리자 승인 대기",
             )
             client.chat_postMessage(
                 channel=channels["admin"],
                 text=outcome.text,
-                blocks=blocks.held(f"<@{slack_id}>", outcome.text, outcome.key),
+                blocks=shared.held(f"<@{slack_id}>", outcome.text, outcome.key),
             )
-            service.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
+            engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
             client.chat_postMessage(channel=slack_id, text=outcome.text)
         else:
             tell(client, slack_id, outcome)
@@ -74,7 +76,7 @@ def build(cfg, service):
     def scratch_command(ack, body, client):
         ack()
         user = user_of(body["user_id"])
-        if service is None:
+        if scratch is None:
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"],
                                       text="이 클러스터에는 스크래치 공간 신청이 없습니다.")  # fmt: skip
             return
@@ -83,7 +85,7 @@ def build(cfg, service):
                                       text="사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요.")  # fmt: skip
             return
         client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text="내 스크래치 공간",
-                                  blocks=blocks.home(service.mine(user)))  # fmt: skip
+                                  blocks=blocks.home(scratch.mine(user)))  # fmt: skip
 
     @app.action("scratch.new")
     def new(ack, body, client):
@@ -103,7 +105,11 @@ def build(cfg, service):
         slack_id = body["user"]["id"]
         user = user_of(slack_id)
         if user:
-            submit(client, slack_id, {"op": "release", "user": user, "id": int(action["value"])})
+            submit(
+                client,
+                slack_id,
+                {"kind": "scratch", "op": "release", "user": user, "id": int(action["value"])},
+            )
 
     @app.view("scratch.create")
     def create(ack, body, client, view):
@@ -112,7 +118,7 @@ def build(cfg, service):
         slack_id = body["user"]["id"]
         user = user_of(slack_id)
         if user:
-            req = {"op": "create", "user": user, "size": size_bytes(v["size"]["v"]["selected_option"]["value"]),
+            req = {"kind": "scratch", "op": "create", "user": user, "size": size_bytes(v["size"]["v"]["selected_option"]["value"]),
                    "days": int(v["days"]["v"]["value"]), "reason": v["reason"]["v"]["value"] or ""}  # fmt: skip
             submit(client, slack_id, req)
 
@@ -125,15 +131,16 @@ def build(cfg, service):
         if not user:
             return
         value = view["state"]["values"]["v"]["v"]
-        req = {"op": view["callback_id"].split(".")[1], "user": user, "id": int(view["private_metadata"])}
+        req = {"kind": "scratch", "op": view["callback_id"].split(".")[1], "user": user,
+               "id": int(view["private_metadata"])}  # fmt: skip
         if req["op"] == "extend":
             req["days"] = int(value["value"])
         else:
             req["size"] = size_bytes(value["selected_option"]["value"])
         submit(client, slack_id, req)
 
-    @app.action("scratch.approve")
-    @app.action("scratch.deny")
+    @app.action("request.approve")
+    @app.action("request.deny")
     def decide(ack, body, client, action):
         ack()
         admin = body["user"]["id"]
@@ -142,10 +149,10 @@ def build(cfg, service):
                 channel=body["channel"]["id"], user=admin, text="관리자만 승인할 수 있습니다."
             )
             return
-        if action["action_id"] == "scratch.approve":
-            outcome = service.approve(action["value"], f"<@{admin}>")
+        if action["action_id"] == "request.approve":
+            outcome = engine.approve(action["value"], f"<@{admin}>")
         else:
-            outcome = service.deny(action["value"], f"<@{admin}>")
+            outcome = engine.deny(action["value"], f"<@{admin}>")
         client.chat_update(
             channel=body["channel"]["id"], ts=body["message"]["ts"], text=outcome.text, blocks=[]
         )
@@ -155,11 +162,11 @@ def build(cfg, service):
     return app
 
 
-def remind_once(service, client, cfg, state, now):
+def remind_once(scratch, client, cfg, state, now):
     """DM the owners of allocations that end within one of remind_days, once per stage."""
     by_user = {u: s for s, u in cfg["members"].items()}
     stages = sorted(cfg["scratch"]["remind_days"], reverse=True)
-    live = {str(a["id"]): a for a in service.run("list") if a["state"] == "active"}
+    live = {str(a["id"]): a for a in scratch.run("list") if a["state"] == "active"}
     for key in list(state):
         if key not in live:
             del state[key]
@@ -187,25 +194,26 @@ def main(argv=None):
     argv = sys.argv if argv is None else argv
     cfg = load(argv[1])
     sc = cfg["scratch"]
-    service = None
+    scratch = None
     if sc["host"]:
-        service = Scratch(
-            SshExecutor(sc["host"], sc["key"], sc["user"], sc["known_hosts"]), sc["policy"], sc["pending"]
+        scratch = ScratchFeature(
+            SshExecutor(sc["host"], sc["key"], sc["user"], sc["known_hosts"]), sc["policy"]
         )
-    app = build(cfg, service)
+    engine = Engine({"scratch": scratch} if scratch else {}, cfg["pending"])
+    app = build(cfg, engine, scratch)
 
     def reminders():
         path = Path(sc["reminders"])
         while True:
             try:
                 state = json.loads(path.read_text()) if path.exists() else {}
-                remind_once(service, app.client, cfg, state, time.time())
+                remind_once(scratch, app.client, cfg, state, time.time())
                 path.write_text(json.dumps(state))
             except Exception as e:  # noqa: BLE001 - one failed round must not stop the next
                 print(f"clusterbot: reminders: {e}", file=sys.stderr, flush=True)
             time.sleep(REMIND_EVERY)
 
-    if service is not None:
+    if scratch is not None:
         threading.Thread(target=reminders, daemon=True).start()
     SocketModeHandler(app, cfg["app_token"]).start()
 
