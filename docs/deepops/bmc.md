@@ -252,8 +252,10 @@ the management host (`playbooks/utilities/power.yml -e hostlist=<host>`), then t
 - **Wrong passwords lock the account.** BMCs typically disable an account after three
   bad attempts for several minutes. Test credentials against one BMC, not all of them,
   and never sweep an inventory with a guess.
-- **`netplan apply`** runs on the control node when the management interface changes.
-  It only adds an interface, but it does touch networking.
+- **The management interface is applied through roles/netplan** (`tasks_from: apply`)
+  when its file's content changes: checked by `netplan generate`, applied with a timer
+  that restores the previous configuration if the host cannot be reached again
+  (docs/deepops/netplan.md). It only adds an interface, but it does touch networking.
 - **Secrets never reach `ipmitool`'s arguments.** The password and the SNMP community go
   in on stdin (`ipmitool exec /dev/stdin`), where `ps` cannot show them, and the tasks
   set `no_log`.
