@@ -21,7 +21,6 @@
     registry: "{{ item.registry }}"
     username: "{{ item.username }}"
     password: "{{ item.password }}"
-    reauthorize: "{{ docker_login_reauth }}"
   loop: "{{ docker_login_registries if docker_login_state == 'present' else [] }}"
   loop_control:
     label: "{{ item.registry }}"

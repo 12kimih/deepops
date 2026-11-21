@@ -3,8 +3,8 @@
 # next run (the role records what it logged into); docker_login_state: absent logs out
 # of every one it logged into. Keep the passwords in Ansible Vault.
 # Each {registry, username, password}, e.g. registry nvcr.io, username $oauthtoken.
+# A changed password logs in again by itself (the module compares the stored one).
 docker_login_registries: []
 docker_login_state: present
-docker_login_reauth: true
 # What this role logged into, read back to log out of what was dropped.
 docker_login_record: "{{ deepops_state_dir }}/docker-login.json"
