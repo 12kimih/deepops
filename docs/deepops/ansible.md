@@ -129,6 +129,8 @@ options (`--check`, `--diff`, `--limit`), each task's result per host, output, d
 and the recap. Nobody has to copy terminal output to show what a run did, and the
 history stays. `scripts/setup.sh` links `.callback_plugins` (`ansible.cfg`) to ARA's
 callback; the records live in `~/.ara/server` (owner-only), one database per operator.
+Ad-hoc commands are recorded too (`bin_ansible_callbacks` in `ansible.cfg`), listed as
+`Ad-Hoc: <module>`.
 
 ```bash
 uv run ara playbook list                                  # runs, newest first
