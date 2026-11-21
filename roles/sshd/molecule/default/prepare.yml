@@ -23,3 +23,9 @@
         dest: /etc/ssh/sshd_config.d/50-cloud-init.conf
         content: "PasswordAuthentication no\n"
         mode: "0600"
+
+    # Ubuntu's own state is ssh.socket enabled and ssh.service not; the site had both.
+    - name: Enable ssh.service beside the socket, by hand
+      ansible.builtin.command:
+        argv: [systemctl, enable, ssh.socket, ssh.service]
+      changed_when: true
