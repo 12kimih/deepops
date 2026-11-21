@@ -17,6 +17,7 @@ _nvidia_driver_packages:
     - nvidia-dkms-*
     - nvidia-firmware-*
     - nvidia-driver-*
+    - xserver-xorg-video-nvidia-*
     - nvidia-open*
     - cuda-drivers*
     - nvidia-fabricmanager*
@@ -47,34 +48,6 @@ _nvidia_driver_packages:
     - libnvsdm*
 # The branch as the Canonical archive names its packages (580-server, or 580).
 nvidia_driver_ubuntu_branch: "{{ nvidia_driver_branch ~ ('-server' if nvidia_driver_server_branch | bool else '') }}"
-# The capabilities nvidia_driver_capabilities may name (NVIDIA's, as in
-# NVIDIA_DRIVER_CAPABILITIES; display is left out: it needs an X server).
-nvidia_driver_capability_names: [compute, utility, graphics, video]
-# Where the driver is the archive's headless set, each capability beyond compute and
-# utility is its own package at the driver's branch; NVIDIA's repos carry all of them.
-nvidia_driver_capabilities_separate: >-
-  {{ ansible_facts.distribution == 'Ubuntu' and nvidia_driver_install_method == 'ubuntu_repo'
-     and nvidia_driver_package | length == 0 }}
-_nvidia_driver_capability_archive:
-  graphics: [libnvidia-gl]
-  video: [libnvidia-decode, libnvidia-encode]
-# The distribution's dispatchers graphics plugs into: Vulkan, EGL, GL and GLES (glvnd),
-# and vulkaninfo to see the GPU from a job.
-_nvidia_driver_graphics_loaders:
-  Debian: [libvulkan1, libegl1, libgl1, libgles2, vulkan-tools]
-  RedHat: [vulkan-loader, libglvnd-egl, libglvnd-glx, libglvnd-gles, vulkan-tools]
-nvidia_driver_capability_packages: >-
-  {{ (_nvidia_driver_graphics_loaders[ansible_facts.os_family] | default([])
-      if 'graphics' in nvidia_driver_capabilities else [])
-     + (_nvidia_driver_capability_archive | dict2items
-        | selectattr('key', 'in', nvidia_driver_capabilities) | map(attribute='value') | flatten
-        | map('regex_replace', '$', '-' ~ nvidia_driver_ubuntu_branch) | list
-        if nvidia_driver_capabilities_separate else []) }}
-nvidia_driver_capability_unwanted: >-
-  {{ _nvidia_driver_capability_archive | dict2items
-     | rejectattr('key', 'in', nvidia_driver_capabilities) | map(attribute='value') | flatten
-     | map('regex_replace', '$', '-*') | list
-     if nvidia_driver_capabilities_separate else [] }}
 nvidia_driver_packages_owned: "{{ _nvidia_driver_packages[ansible_facts.os_family] | default([]) }}"
 nvidia_driver_items: >-
   {{ nvidia_driver_packages_owned | map('regex_replace', '^', 'package:') | list

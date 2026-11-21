@@ -280,11 +280,10 @@
 # Purge any pre-existing NVIDIA driver packages before installing (clean
 # reinstall). Container Toolkit packages are excluded from the purge.
 #nvidia_driver_purge_existing: true
-# What the driver offers besides CUDA, in NVIDIA's names: graphics (OpenGL, EGL,
-# Vulkan without a display: 3D, simulation, rendering) and video (NVENC, NVDEC); one
-# taken out is removed again (docs/slurm-cluster/gpu-capabilities.md).
-#nvidia_driver_capabilities: [compute, utility]
-#nvidia_driver_capabilities: [compute, utility, graphics, video]  # example
+# Ubuntu archive: the full driver (CUDA, OpenGL/EGL/Vulkan without a display, NVENC/
+# NVDEC) on precompiled modules; true installs only CUDA and the tools
+# (docs/slurm-cluster/gpu-graphics.md).
+#nvidia_driver_headless: false
 
 
 ################################################################################

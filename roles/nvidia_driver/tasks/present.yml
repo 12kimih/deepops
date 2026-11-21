@@ -15,9 +15,6 @@
   ansible.builtin.include_tasks: redhat.yml
   when: ansible_facts.os_family == 'RedHat'
 
-- name: Install or remove the driver capabilities beyond compute
-  ansible.builtin.include_tasks: capabilities.yml
-
 # A reboot is needed when this run installed the driver, or when the running module does
 # not match the one on disk. The second case matters on re-runs: apt reports no change, so
 # gating on install.changed alone would never re-fire a reboot that was skipped, leaving
