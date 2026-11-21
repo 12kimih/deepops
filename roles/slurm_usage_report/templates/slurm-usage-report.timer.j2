@@ -1,9 +1,9 @@
 {{ ansible_managed | comment }}
 [Unit]
-Description=Run the Slurm GPU usage report {{ slurm_usage_report_schedule }}
+Description=Run the Slurm GPU usage {{ item.what }} {{ item.schedule }}
 
 [Timer]
-OnCalendar={{ slurm_usage_report_schedule }}
+OnCalendar={{ item.schedule }}
 AccuracySec=1s
 
 [Install]

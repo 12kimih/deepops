@@ -1,6 +1,9 @@
 ---
-- name: Restart usage report timer
+- name: Restart usage report timers
   systemd_unit:
-    name: "{{ slurm_usage_report_svc_name }}.timer"
+    name: "{{ item.unit }}.timer"
     state: restarted
     daemon_reload: true
+  loop: "{{ slurm_usage_report_runs }}"
+  loop_control:
+    label: "{{ item.unit }}"

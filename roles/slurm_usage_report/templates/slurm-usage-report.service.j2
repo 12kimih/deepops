@@ -1,6 +1,6 @@
 {{ ansible_managed | comment }}
 [Unit]
-Description=Slurm GPU usage report to Slack
+Description=Slurm GPU usage {{ item.what }} to Slack
 Wants=network-online.target
 After=network-online.target
 
@@ -8,7 +8,7 @@ After=network-online.target
 Type=oneshot
 # A oneshot has no start timeout by default; one hang would stop its timer for good.
 TimeoutStartSec=20min
-ExecStart={{ slurm_usage_report_script }} --config {{ slurm_usage_report_config_dir }}/config.json
+ExecStart={{ slurm_usage_report_script }} --config {{ slurm_usage_report_config_dir }}/config.json {{ item.args }}
 StateDirectory={{ slurm_usage_report_svc_name }}
 ProtectSystem=full
 PrivateTmp=true

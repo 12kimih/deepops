@@ -3,11 +3,19 @@
 Reads jobs and node state from Slurm's JSON output, per-GPU utilisation from
 Prometheus (dcgm-exporter). Posts a summary card with the detail in its thread, and
 mentions (or DMs) the owner of each job whose GPUs all stayed idle for the whole
-window. Can optionally cancel jobs idle for longer. Standard library only.
+window. Can optionally cancel jobs idle for longer.
+
+With --weekly it posts the week instead: for each person, the GPU-hours their jobs held
+and how many of them sat idle, the people who idled most mentioned, from the per-job
+GPU usage Prometheus keeps (job_device:dcgm_gpu_util_ratio:max). Seeing it is the
+point: no job is touched. Someone who idled heavily (repeat_idle_gpu_hours and
+repeat_idle_share) for repeat_weeks weeks in a row is reported to the administrators'
+channel with the weeks' numbers, their jobs now and what to do. Standard library only.
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -39,6 +47,9 @@ MAX_SECTION = 2900  # and 3000 characters per section text
 NOTIFY = {"mention", "dm"}
 DM_FIELDS = {"job": "1234_5", "gpus": 8, "hours": "2", "runtime": "1:00:00"}
 BAR_WIDTH = 10
+WEEK_DAYS = 7
+WEEK_TOP = 5  # the idlest people mentioned in the weekly summary
+WEEKS_KEPT = 8  # weeks of each person's numbers the weekly summary remembers
 
 
 # --- Slurm ----------------------------------------------------------------------
@@ -136,6 +147,41 @@ def collect_gpus(prom, window):
         "util": per_gpu(prom, "100 * avg_over_time(DCGM_FI_DEV_GPU_UTIL_RATIO[10m])"),
         "mem_gib": per_gpu(prom, "DCGM_FI_DEV_FB_USED_BYTES / 2^30"),
     }
+
+
+def collect_week(prom, threshold, days=WEEK_DAYS):
+    """[{user, held, idle}] in GPU-hours over the last DAYS: each minute a job held a GPU,
+    and each such minute its utilisation was at or under THRESHOLD percent."""
+    held_expr = f"job_device:dcgm_gpu_util_ratio:max[{days}d:1m]"
+    idle_expr = f"(job_device:dcgm_gpu_util_ratio:max <= {threshold / 100:g})[{days}d:1m]"
+    rows = defaultdict(lambda: {"held": 0.0, "idle": 0.0})
+    for field, expr in (("held", held_expr), ("idle", idle_expr)):
+        for r in prom.query(f"sum by (user) (count_over_time({expr})) / 60"):
+            rows[r["metric"].get("user", "")][field] = float(r["value"][1])
+    return sorted(
+        ({"user": u, **v} for u, v in rows.items() if u), key=lambda r: (-r["idle"], -r["held"], r["user"])
+    )
+
+
+def render_week(rows, who, days=WEEK_DAYS, top=WEEK_TOP):
+    """(text, blocks): totals, then everyone who held GPUs, idlest first; the TOP idlest
+    with idle hours are mentioned."""
+    held = sum(r["held"] for r in rows)
+    idle = sum(r["idle"] for r in rows)
+    share = idle / held if held else 0
+    head = f"GPU usage, last {days} days: {held:,.0f} GPU-hours held, {idle:,.0f} idle ({share:.0%})"
+    lines = []
+    for n, r in enumerate(rows):
+        name = who(r["user"], n < top and r["idle"] >= 1)
+        part = r["idle"] / r["held"] if r["held"] else 0
+        lines.append(f"{name}: {r['idle']:,.0f} of {r['held']:,.0f} GPU-hours idle ({part:.0%})")
+    body = "\n".join(lines) or "No GPU jobs ran."
+    note = (
+        "Idle: a GPU a job held at 0% utilisation for the minute. Free GPUs you are not using with scancel."
+    )
+    return head, [{"type": "header", "text": {"type": "plain_text", "text": head[:150]}}] + sections(body) + [
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": note}]}
+    ]
 
 
 # --- Analysis -------------------------------------------------------------------
@@ -349,7 +395,8 @@ CONFIG_KEYS = {
     "slack_token": str, "channel": str, "prometheus_url": str, "idle_hours": (int, float),
     "idle_util_threshold": (int, float), "notify": list, "notify_repeat_hours": (int, float),
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
-    "state_file": str,
+    "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
+    "repeat_idle_share": (int, float), "repeat_weeks": int,
 }  # fmt: skip
 
 
@@ -431,9 +478,13 @@ def report_once():
         help="post a preview there instead; notifies, cancels and records nothing",
     )
     ap.add_argument("--check-config", action="store_true", help="check the config and exit")
+    ap.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
     args = ap.parse_args()
     cfg = load_config(args.config)
     if args.check_config:
+        return
+    if args.weekly:
+        weekly(cfg, args)
         return
     preview = args.dry_run or bool(args.to)
     state = load_state(cfg["state_file"])
@@ -459,14 +510,7 @@ def report_once():
     )
     cache = state.setdefault("users", {})
 
-    def who(user, mention):
-        # A failed lookup leaves the name unmentioned rather than the report unposted;
-        # act() looks the member up again and reports the failure with the others.
-        try:
-            member = slack_id(user, cfg, slack, cache) if mention else ""
-        except (RuntimeError, OSError):
-            member = ""
-        return f"<@{member}> ({user})" if member else user
+    who = namer(cfg, slack, cache)
 
     if preview:  # a preview notifies, cancels and records nothing
         post_report(report, cfg, who, slack, args.to)
@@ -477,6 +521,101 @@ def report_once():
         act(report, cfg, who, slack, cache, now)
     finally:
         write_atomic(cfg["state_file"], json.dumps(state), mode=0o600)
+
+
+def namer(cfg, slack, cache):
+    """who(user, mention): the name a report shows, a Slack mention when asked and the
+    member is known. A failed lookup leaves the name unmentioned rather than the report
+    unposted; act() looks the member up again and reports the failure with the others."""
+
+    def who(user, mention):
+        try:
+            member = slack_id(user, cfg, slack, cache) if mention else ""
+        except (RuntimeError, OSError):
+            member = ""
+        return f"<@{member}> ({user})" if member else user
+
+    return who
+
+
+def remember_week(weeks, rows, now):
+    """Add this week's numbers to each person's history (WEEKS_KEPT weeks); people with no
+    GPU jobs this week get a zero week, so a streak needs consecutive weeks. A run within
+    six days of the last (run again by hand) replaces that week instead of adding one."""
+    seen = {r["user"]: r for r in rows}
+    for user in set(weeks) | set(seen):
+        r = seen.get(user, {"held": 0.0, "idle": 0.0})
+        entry = {"end": int(now), "held": r["held"], "idle": r["idle"]}
+        past = weeks.get(user, [])
+        if past and now - past[-1]["end"] < 6 * 86400:
+            entry["end"] = past[-1]["end"]  # the week keeps the time it was first recorded
+            past = past[:-1]
+        weeks[user] = (past + [entry])[-WEEKS_KEPT:]
+        if not any(w["held"] for w in weeks[user]):
+            del weeks[user]
+
+
+def repeaters(weeks, cfg):
+    """The people over both idle thresholds in each of the last repeat_weeks weeks."""
+    n = cfg["repeat_weeks"]
+
+    def heavy(w):
+        share = w["idle"] / w["held"] if w["held"] else 0
+        return w["idle"] >= cfg["repeat_idle_gpu_hours"] and share >= cfg["repeat_idle_share"]
+
+    return sorted(u for u, ws in weeks.items() if n > 0 and len(ws) >= n and all(heavy(w) for w in ws[-n:]))
+
+
+def render_repeaters(users, weeks, jobs, cfg):
+    """(text, blocks) for the administrators: who, each week's numbers, their jobs now,
+    and the steps to take."""
+    head = f"Heavy idle GPU use {cfg['repeat_weeks']} weeks running: {', '.join(users)}"
+    parts = []
+    for u in users:
+        hist = ", ".join(f"{w['idle']:,.0f} of {w['held']:,.0f} h" for w in weeks[u][-cfg["repeat_weeks"] :])
+        running = ", ".join(f"`{j['label']}` ({len(j['gpus'])} GPU)" for j in jobs if j["user"] == u)
+        parts.append(f"*{u}*: idle GPU-hours by week {hist}. Now: {running or 'no jobs'}.")
+    steps = (
+        "What to do: 1) message them with these numbers and ask what the jobs wait on; "
+        "2) check their jobs (`sq`, the Grafana job panels) for GPUs held while the work runs on CPU or "
+        "waits for input, and suggest splitting CPU and GPU stages (--dependency) or fewer GPUs; "
+        "3) if it goes on, agree a limit with them (their QoS) or cancel jobs that hold GPUs idle. "
+        f"Thresholds: {cfg['repeat_idle_gpu_hours']:g} idle GPU-hours and {cfg['repeat_idle_share']:.0%} "
+        "of the hours held, each week."
+    )
+    blocks = sections("\n".join(parts)) + [
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": steps}]}
+    ]
+    return head, blocks
+
+
+def weekly(cfg, args):
+    """The weekly summary, and the administrators' notice of heavy idlers. Touches no
+    job; a preview posts both to --to and records nothing. Its own state file (the weeks
+    and member lookups), so it never races the hourly report's."""
+    slack = Slack(cfg["slack_token"], args.dry_run)
+    now = time.time()
+    rows = collect_week(Prometheus(cfg["prometheus_url"]), cfg["idle_util_threshold"])
+    path = os.path.join(os.path.dirname(cfg["state_file"]), "weekly.json")
+    try:
+        with open(path) as f:
+            state = json.load(f)
+    except (OSError, ValueError):
+        state = {}
+    state = state if isinstance(state, dict) else {}
+    weeks = state["weeks"] if isinstance(state.get("weeks"), dict) else {}
+    cache = state["users"] if isinstance(state.get("users"), dict) else {}
+    who = namer(cfg, slack, cache)
+    preview = args.dry_run or bool(args.to)
+    text, blocks = render_week(rows, who)
+    slack.post(slack.channel(args.to) if args.to else cfg["channel"], text, blocks)
+    remember_week(weeks, rows, now)
+    heavy = repeaters(weeks, cfg)
+    if heavy and (cfg["admin_channel"] or args.to):
+        text, blocks = render_repeaters(heavy, weeks, collect_slurm(now)["jobs"], cfg)
+        slack.post(slack.channel(args.to) if args.to else cfg["admin_channel"], text, blocks)
+    if not preview:
+        write_atomic(path, json.dumps({"weeks": weeks, "users": cache}), mode=0o600)
 
 
 def post_report(report, cfg, who, slack, to):

@@ -1,15 +1,26 @@
 ---
-# Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle.
-# Runs on a host with the Slurm client commands and access to Prometheus.
-# No-op until a Slack bot token (chat:write, im:write, users:read.email) is set.
+# Hourly Slurm GPU usage report to Slack, and nudges for jobs whose GPUs sit idle, and a
+# weekly per-person summary of GPU-hours held and left idle. Runs on a host with the Slurm
+# client commands and access to Prometheus. No-op until the Slack bot token
+# (slack_bot_token in roles/slack_defaults; scopes chat:write, im:write, users:read.email)
+# is set.
 
 # present or absent (docs/deepops/component-state.md); a deploy sets it from
 # deepops_components.
 slurm_usage_report_state: present
-slack_bot_token: ""
 slurm_usage_report_token: "{{ slack_bot_token }}"
-slurm_usage_report_channel: "#gpu-usage"
+slurm_usage_report_channel: "{{ slack_channels.status }}"
 slurm_usage_report_schedule: hourly
+# The weekly summary (systemd OnCalendar): Monday morning, before the week's work.
+slurm_usage_report_weekly_schedule: "Mon *-*-* 09:00:00"
+# Someone over both thresholds (idle GPU-hours, and that share of the GPU-hours their
+# jobs held) in each of repeat_weeks weeks in a row is reported to admin_channel with
+# the weeks' numbers, their jobs now and what to do. Loose to start; tighten from the
+# weekly numbers. "" (admin_channel) turns the notice off.
+slurm_usage_report_admin_channel: "{{ slack_channels.admin }}"
+slurm_usage_report_repeat_idle_gpu_hours: 50
+slurm_usage_report_repeat_idle_share: 0.5
+slurm_usage_report_repeat_weeks: 2
 slurm_usage_report_prometheus_url: "http://localhost:{{ prometheus_port }}"
 # The report links the site facts' dashboard_url (cluster_tools_lib, from
 # grafana_root_url), read on the host through clustertools.site; empty drops the link.

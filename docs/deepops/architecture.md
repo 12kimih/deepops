@@ -189,6 +189,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── runai
 │   ├── serial_console
 │   ├── site_secrets
+│   ├── slack_defaults
 │   ├── slurm
 │   ├── slurm_backup
 │   ├── slurm_metrics

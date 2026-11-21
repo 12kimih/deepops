@@ -317,7 +317,8 @@ class RunTests(unittest.TestCase):
             cfg = {"channel": "#gpu", "state_file": f"{d}/state.json", "idle_hours": 2, "idle_util_threshold": 1,
                    "notify": ["dm"], "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
                    "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
-                   "dm_text": "{job}", "dashboard_url": ""}  # fmt: skip
+                   "dm_text": "{job}", "dashboard_url": "", "admin_channel": "#admin",
+                   "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
             slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
@@ -354,7 +355,8 @@ class ConfigTests(unittest.TestCase):
     BASE = {"slack_token": "t", "channel": "#c", "prometheus_url": "", "idle_hours": 2,
             "idle_util_threshold": 0, "notify": ["mention"], "notify_repeat_hours": 6,
             "dm_text": "{job} {gpus} {hours} {runtime}", "cancel_after_hours": 0, "user_map": {},
-            "email_domain": "", "state_file": "/nonexistent"}  # fmt: skip
+            "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin",
+            "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2}  # fmt: skip
 
     def load(self, **change):
         with tempfile.TemporaryDirectory() as d:
@@ -415,6 +417,47 @@ class CancelTests(unittest.TestCase):
     def test_cancelled_only_after_the_owner_was_told_in_an_earlier_run(self):
         self.assertEqual(self.run_act(None), 0)  # never told (lost state, failed DM)
         self.assertEqual(self.run_act(NOW - 3600), 1)
+
+
+class WeeklyTests(unittest.TestCase):
+    """The weekly summary: GPU-hours held and idle per person, idlest first and the
+    idlest mentioned; a person over both thresholds for repeat_weeks weeks running is
+    reported to the administrators, with their numbers and what to do."""
+
+    CFG = {"repeat_weeks": 2, "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5}
+
+    class Prom:
+        def query(self, expr):
+            idle = "<=" in expr
+            values = {"alice": 40 if idle else 100, "bob": 90 if idle else 120, "carol": 0 if idle else 30}
+            return [{"metric": {"user": u}, "value": [0, str(v)]} for u, v in values.items()]
+
+    def test_collect_and_render_idlest_first(self):
+        rows = report.collect_week(self.Prom(), 0)
+        self.assertEqual([r["user"] for r in rows], ["bob", "alice", "carol"])
+        text, blocks = report.render_week(rows, lambda u, m: f"@{u}" if m else u, top=1)
+        self.assertIn("250 GPU-hours held, 130 idle (52%)", text)
+        body = " ".join(b["text"]["text"] for b in blocks if b["type"] == "section")
+        self.assertIn("@bob: 90 of 120 GPU-hours idle (75%)", body)
+        self.assertIn("alice: 40 of 100", body)
+        self.assertNotIn("@alice", body)
+
+    def test_a_streak_of_heavy_weeks_is_reported_and_a_rerun_replaces_its_week(self):
+        weeks = {}
+        heavy = [{"user": "bob", "held": 120.0, "idle": 90.0}]
+        report.remember_week(weeks, heavy, 0)
+        self.assertEqual(report.repeaters(weeks, self.CFG), [])
+        report.remember_week(weeks, heavy, 3 * 86400)  # run again by hand the same week
+        self.assertEqual(len(weeks["bob"]), 1)
+        report.remember_week(weeks, heavy, 7 * 86400)
+        self.assertEqual(report.repeaters(weeks, self.CFG), ["bob"])
+        report.remember_week(weeks, [], 14 * 86400)  # a week without jobs breaks it
+        self.assertEqual(report.repeaters(weeks, self.CFG), [])
+        text, blocks = report.render_repeaters(["bob"], {"bob": weeks["bob"][:2]}, [], self.CFG)
+        self.assertIn("bob", text)
+        context = blocks[-1]["elements"][0]["text"]
+        self.assertIn("What to do", context)
+        self.assertIn("50 idle GPU-hours and 50%", context)
 
 
 if __name__ == "__main__":

@@ -234,7 +234,17 @@ says so in the report thread. A job is cancelled only after its owner was notifi
 earlier report, so the setting must exceed `slurm_usage_report_idle_hours` and needs
 `slurm_usage_report_notify`; the deploy checks the config and stops on a mistake.
 
-The role needs a Slack app bot token (`slack_bot_token`, scopes `chat:write`, `im:write`,
+Every Monday (`slurm_usage_report_weekly_schedule`) it also posts the week: for each
+person, the GPU-hours their jobs held and how many sat idle (at or under the idle
+threshold for the minute), idlest first, the five idlest mentioned. It touches no job;
+seeing the numbers is the point. Someone over both `slurm_usage_report_repeat_idle_gpu_hours`
+and `slurm_usage_report_repeat_idle_share` in each of `slurm_usage_report_repeat_weeks`
+weeks running is reported to the administrators' channel (`slack_channels.admin`) with each
+week's numbers, their jobs now and the steps to take. The weekly run is its own timer and
+keeps its own state file (`weekly.json` beside the hourly one's); `--weekly` with
+`--dry-run` or `--to` previews it.
+
+The role needs a Slack app bot token (`slack_bot_token` in roles/slack_defaults, scopes `chat:write`, `im:write`,
 `users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack
 members through `slurm_usage_report_user_map`, or by email with
 `slurm_usage_report_email_domain`. Preview a report without notifying anyone, either
