@@ -8,7 +8,7 @@
   register: openmpi_manifest
 
 - name: Find the tree an install from before the manifest was built in
-  ansible.builtin.find:
+  find_present:
     paths: "{{ source_build_root }}"
     patterns: ["openmpi", "openmpi-*"]
     file_type: directory

@@ -4,7 +4,7 @@
 # directory never grows with the versions: the repository, not this directory, says what
 # is built (packages-build.yml).
 - name: Find what a build left in the build directory
-  ansible.builtin.find:
+  find_present:
     paths: "{{ _slurm_build_account.home }}"
     file_type: any
     hidden: true

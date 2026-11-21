@@ -72,7 +72,7 @@
     # Older OOD releases were built against system gems; a tree for a Ruby the host no
     # longer has (left by a release upgrade) can never be loaded again.
     - name: Find system gem trees
-      ansible.builtin.find:
+      find_present:
         paths: /var/lib/gems
         file_type: directory
       register: open_ondemand_gem_trees

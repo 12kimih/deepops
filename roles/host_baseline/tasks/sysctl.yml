@@ -22,7 +22,7 @@
       loop: "{{ host_baseline_sysctls | dict2items }}"
 
     - name: Find the other sysctl files under /etc
-      ansible.builtin.find:
+      find_present:
         paths: /etc/sysctl.d
         patterns: "*.conf"
         file_type: file

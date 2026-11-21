@@ -10,7 +10,7 @@
   when: inventory_hostname in root_access_from_hosts
 
 - name: Find root's public keys on the break-glass hosts
-  ansible.builtin.find:
+  find_present:
     paths: /root/.ssh
     patterns: "*.pub"
   delegate_to: "{{ item }}"

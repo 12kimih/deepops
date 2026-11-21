@@ -92,6 +92,10 @@
    ${binary:Package}), never ${Package}: that drops the qualifier, so a foreign-arch copy
    (libnvidia-*:i386) is named as the native one and never removed (a driver switch left
    them, 2026-11).
+25. Files are found through find_present (plugins/action), never ansible.builtin.find:
+   find warns for every path not on the host, so a component's removal looking on hosts
+   that never had it (prometheus' alert rules) printed a warning per host each deploy.
+   find_present treats a missing path as an empty directory.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -790,6 +794,14 @@ class TaskRules(unittest.TestCase):
                     offenders.append(f"{rel(path)}: {key}: {value}")
         self.assertEqual(offenders, [], "name the group itself (groups['<name>']), see rule 17")
         scan.check(self)
+
+    def test_files_are_found_through_find_present(self):
+        offenders = []
+        for path in ansible_files():
+            if rel(path).startswith("roles/nvidia-dgx"):
+                continue
+            offenders += [f"{rel(path)}: {t.get('name')}" for t in tasks(path) if module(t)[0] == "find"]
+        self.assertEqual(offenders, [], "use find_present (plugins/action/find_present.py)")
 
     def test_package_listings_name_the_architecture(self):
         offenders = [

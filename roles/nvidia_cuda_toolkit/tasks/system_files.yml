@@ -5,7 +5,7 @@
 # role removes trees itself and never runs cuda-uninstaller.
 
 - name: Find the host-wide files that point into the software tree
-  ansible.builtin.find:
+  find_present:
     paths: "{{ item.path }}"
     patterns: "{{ item.pattern }}"
     contains: "{{ item.contains }}"
@@ -20,7 +20,7 @@
   register: cuda_system_files
 
 - name: Find the runfile's CUDA ownership records
-  ansible.builtin.find:
+  find_present:
     paths: /var/log/nvidia/.uninstallManifests
     patterns: ["CUDA_*", "uninstallManifest-CUDA_*"]
     file_type: any

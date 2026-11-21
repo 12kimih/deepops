@@ -103,7 +103,7 @@
 
 # The trees earlier versions kept for `make uninstall`: the manifest replaces them.
 - name: Find the openmpi build trees earlier versions kept
-  ansible.builtin.find:
+  find_present:
     paths: "{{ source_build_root }}"
     patterns: ["openmpi", "openmpi-*"]
     file_type: directory
