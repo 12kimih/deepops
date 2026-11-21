@@ -152,6 +152,16 @@
   tags:
     - config
 
+# Kept to go back to when slurmctld refuses what this run writes (controller_restart.yml).
+- name: Read the controller configuration this run may change
+  ansible.builtin.slurp:
+    src: "{{ slurm_config_dir }}/{{ item }}"
+  loop: "{{ slurm_controller_conf_files }}"
+  register: slurm_conf_before
+  failed_when: false  # a file not written yet
+  tags:
+    - always
+
 - name: Configure slurm.conf
   ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
@@ -274,7 +284,7 @@
 
 # Restart only when its configuration or binaries changed (the handlers), then make
 # sure it runs. An unconditional restart dropped every client connection on each run.
-- name: Apply pending slurmdbd and slurmctld restarts
+- name: Apply a pending slurmdbd restart
   ansible.builtin.meta: flush_handlers
 
 - name: Start slurmdbd
@@ -342,12 +352,14 @@
     and 'Already existing' not in create_user_result.stdout)
   loop: "{{ slurm_acct_users }}"
 
-- name: Start slurmctld
-  systemd_unit:
-    name: slurmctld
-    state: started
-    enabled: true
-    daemon_reload: true
+# Under any --tags: a restart the handlers noted must not be dropped.
+- name: Run slurmctld on its configuration
+  ansible.builtin.include_tasks:
+    file: controller_restart.yml
+    apply:
+      tags: [always]
+  tags:
+    - always
 
 # QoS, accounts and members from the site's declaration (slurm_accounting_file), for
 # this cluster's associations (slurm_cluster_name), so a renamed cluster gets its own.
