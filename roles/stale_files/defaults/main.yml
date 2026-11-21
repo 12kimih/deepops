@@ -76,6 +76,14 @@ stale_files_host_rules:
     glob: /usr/local/share/perl/*
     version: '/perl/(\d+\.\d+\.\d+)$'
     interpreter: /usr/bin/perl{0}
+  # DCGM 3 (the datacenter-gpu-manager package) installed its bindings and samples
+  # under /usr/local/dcgm; DCGM 4 (datacenter-gpu-manager-4-*) uses none of it, and a
+  # removal that was not a purge, or a hand install, left the tree behind (a node with
+  # only DCGM 4 kept one, 2026-11-22). While the old package is installed the tree is
+  # its own and stays.
+  - name: DCGM 3's tree
+    type: glob
+    globs: [/usr/local/dcgm]
   # Subiquity writes this for the unattended-upgrades run during an install and is
   # meant to remove it; left behind, it overrides the site's unattended-upgrades
   # settings (MinimalSteps, the allowed origins) from the end of apt.conf.d.
