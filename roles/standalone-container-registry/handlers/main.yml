@@ -1,0 +1,6 @@
+---
+# The registry reads its configuration only at start.
+- name: Restart the registry
+  systemd_unit:
+    name: "{{ standalone_container_registry_svc_name }}"
+    state: restarted

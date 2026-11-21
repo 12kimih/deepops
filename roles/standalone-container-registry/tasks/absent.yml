@@ -9,4 +9,4 @@
   vars:
     component_record_name: standalone_container_registry
     component_record_action: absent
-    component_record_items: "{{ standalone_container_registry_items }}"
+    component_record_items: "{{ standalone_container_registry_items + standalone_container_registry_retired_items }}"

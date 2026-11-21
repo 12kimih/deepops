@@ -31,6 +31,7 @@
     group: "root"
     mode: "0600"
   register: standalone_container_registry_config
+  notify: [Restart the registry]
 
 - name: Create the registry storage directory
   ansible.builtin.file:
@@ -71,22 +72,40 @@
           + [{}]) | first }}
   when: _volume.Source is defined
 
-- name: Run registry docker container
+- name: Pull the image
+  ansible.builtin.include_role:
+    name: container_image
+  vars:
+    container_image: "{{ standalone_container_registry_image }}"
+
+# It ran outside systemd under its own name, with Docker's restart policy: that
+# container holds the port the unit's needs, so it goes first (its store is a bind,
+# kept above).
+- name: Retire the registry container run outside systemd
   community.docker.docker_container:
     name: "{{ standalone_container_registry_name }}"
-    image: "{{ standalone_container_registry_image }}"
-    state: started
-    network_mode: host
-    # The registry reads its mounted config only at start: restart when it changed
-    # (a new image already recreates the container). restart_policy keeps it across boots.
-    restart: "{{ standalone_container_registry_config is changed }}"
-    restart_policy: unless-stopped
-    # The registry exports traces to localhost:4318 unless told not to (its docs).
-    env: "{{ proxy_env | combine({'OTEL_TRACES_EXPORTER': 'none'}) }}"
-    # Binds, never volumes: a bind refuses a missing source (roles/container_service).
-    mounts:
-      - {type: bind, source: "{{ standalone_container_registry_config_dir }}/config.yml", target: /etc/docker/registry/config.yml, read_only: true}
-      - {type: bind, source: "{{ standalone_container_registry_data_dir }}", target: /var/lib/registry}
+    state: absent
+  when: standalone_container_registry_earlier.exists | default(false)
+
+- name: Run the registry
+  ansible.builtin.include_role:
+    name: container_service
+  vars:
+    container_service:
+      unit: "{{ standalone_container_registry_svc_name }}"
+      description: Container registry
+      image: "{{ standalone_container_registry_image }}"
+      # The registry exports traces to localhost:4318 unless told not to (its docs).
+      options: >-
+        {{ ['--network host']
+           + ((proxy_env | combine({'OTEL_TRACES_EXPORTER': 'none'})).items()
+              | map('join', '=') | map('regex_replace', '^', '--env=') | list) }}
+      mounts:
+        - {src: "{{ standalone_container_registry_config_dir }}/config.yml", dst: /etc/docker/registry/config.yml, readonly: true}
+        - {src: "{{ standalone_container_registry_data_dir }}", dst: /var/lib/registry}
+      # It reads its configuration only at start.
+      notify: [Restart the registry]
+      health_url: "http://localhost:{{ standalone_container_registry_port }}/v2/"
 
 - name: Record the component as present
   ansible.builtin.include_role:
