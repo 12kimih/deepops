@@ -135,6 +135,8 @@ uv run python scripts/deepops/settings.py show <host>   # every setting, and whe
 ```
 
 Each deploy ends by recording on every host what it deployed there (the deepops and config commits, as the custom fact `ansible_local.deepops_deploy`, by `roles/deploy_record`), so `diff` starts each host from its own last deploy, however that deploy was limited and whoever ran it.
+A run with `--tags` is kept apart as the deploy's partial record and never replaces its last full run, the one `diff` starts from (a run of one area would otherwise mark every other area deployed).
+The record is bookkeeping: it never counts as a change (a converged rerun stays `changed=0`) and `--check` does not write it.
 It reads those records from the controller's fact cache; when they are missing or expired it prints the command that refreshes them (`ansible ... -m ansible.builtin.setup -a filter=ansible_local`, which connects).
 `--from <revision>` (with `--config-from <revision>`) starts every host from one revision instead.
 Apart from that refresh, nothing connects to a host or decrypts a vaulted value.

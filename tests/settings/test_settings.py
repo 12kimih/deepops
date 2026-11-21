@@ -168,6 +168,16 @@ class DeployRecords(unittest.TestCase):
         })  # fmt: skip
         self.assertEqual(found, {"h1": new})
 
+    def test_a_full_run_is_the_start_whatever_ran_after_it(self):
+        full = {"deepops": "a", "config": "x", "time": "2026-01-01T00:00:00Z", "tags": ["all"]}
+        partial = {"deepops": "b", "config": "y", "time": "2026-02-01T00:00:00Z", "tags": ["accounting"]}
+        found = self.run_with({
+            "h1": {"ansible_local.deepops_deploy": {"slurm-cluster": {"full": full, "partial": partial}}},
+            "h2": {"ansible_local.deepops_deploy": {"slurm-cluster": {"partial": partial}}},
+            "h3": {"ansible_local.deepops_deploy": {"slurm-cluster": full}},  # the earlier layout
+        })  # fmt: skip
+        self.assertEqual(found, {"h1": full, "h2": partial, "h3": full})
+
     def test_unreadable_output_is_no_record(self):
         done = subprocess.CompletedProcess([], 2, stdout="", stderr="boom")
         with mock.patch.object(S.subprocess, "run", return_value=done):
