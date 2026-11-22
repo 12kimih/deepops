@@ -17,12 +17,29 @@
     managed_dir_sources: "{{ cluster_tools_lib_modules }}"
     managed_dir_keep: [__pycache__]
 
-# The package's earlier name (clustertools, until 2026-11): the commands run the new one,
-# so the old directory is nothing's.
-- name: Remove the package of its earlier name
+# The package's earlier name (clustertools, until 2026-11). A command another role installed
+# imports it until that role runs again, and sq, qos and the timers' tools would break if
+# it went first: it goes only once no installed command names it.
+- name: Find the commands that still import the package's earlier name
+  ansible.builtin.command:
+    argv: [grep, -rlE, "^from clustertools[.]", /usr/local/bin, /usr/local/sbin, /usr/local/libexec]
+  register: cluster_tools_lib_old_users
+  changed_when: false
+  failed_when: cluster_tools_lib_old_users.rc > 1  # 1: none
+  check_mode: false  # read-only; the removal below needs it
+
+- name: Say which commands keep the package's earlier name until their roles run again
+  ansible.builtin.debug:
+    msg: >-
+      These still import clustertools; run the playbook that installs each, and the next
+      run removes {{ cluster_tools_lib_dir }}/clustertools: {{ cluster_tools_lib_old_users.stdout_lines | join(', ') }}
+  when: cluster_tools_lib_old_users.stdout_lines | length > 0
+
+- name: Remove the package of its earlier name, which no command imports any more
   ansible.builtin.file:
     path: "{{ cluster_tools_lib_dir }}/clustertools"
     state: absent
+  when: cluster_tools_lib_old_users.stdout_lines | length == 0
 
 # A changed package may refuse a config another playbook wrote (cluster_tools.config):
 # checked once this play's roles wrote theirs (handlers/main.yml).
