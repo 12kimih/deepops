@@ -10,8 +10,11 @@ RequiresMountsFor={{ slurm_backup_destinations | map(attribute='path') | join(' 
 [Service]
 Type=oneshot
 ExecStart={{ slurm_backup_script }} %i {{ slurm_backup_config }}
+# Behind what people do, yet always moving: the lowest best-effort I/O priority, never
+# the idle class, which a busy disk can starve.
 Nice=10
-IOSchedulingClass=idle
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
 # Each step is bounded by step_timeout; this bounds the whole run, so a hang the
 # program cannot see (a stuck read of a hung mount) still ends and is reported.
 TimeoutStartSec={{ slurm_backup_timeout }}

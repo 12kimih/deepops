@@ -153,12 +153,13 @@ class Apply(unittest.TestCase):
         run(host, CFG)
         self.assertEqual(host.scanned, [["quotacheck", "-cum", "/"]], "the whole-filesystem read")
 
-    def test_a_scan_runs_at_idle_priority_for_up_to_a_day(self):
+    def test_a_scan_runs_at_low_priority_for_up_to_a_day(self):
         with mock.patch.object(dq.proc, "run") as run:
             run.return_value.stdout = ""
             dq.Host().scan(["quotacheck", "-cum", "/home"])
         argv, kwargs = run.call_args
-        self.assertEqual(argv[0], dq.IDLE + ["quotacheck", "-cum", "/home"])
+        self.assertEqual(argv[0], dq.LOW + ["quotacheck", "-cum", "/home"])
+        self.assertNotIn("3", argv[0][argv[0].index("-c") + 1], "never the idle class: it can starve")
         self.assertEqual(kwargs["timeout"], dq.SCAN_TIMEOUT)
 
     def test_a_mount_without_its_quota_options_is_refused_naming_them(self):
