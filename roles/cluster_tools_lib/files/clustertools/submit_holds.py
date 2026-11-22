@@ -3,7 +3,7 @@
     submit-holds CONFIG.json     write the holds file and its metrics (as root, on a
                                  controller, every few minutes)
 
-A person at a disk hard limit (clustertools.storage_report: the disk quota metrics, as
+A person at a disk hard limit (clustertools.disk_report: the disk quota metrics, as
 the daily disk report reads them) is held: their new jobs are refused, with the reason,
 until they free space there. Running jobs go on. Before `disk_from` (Unix time, 0: at
 once) no one is held: the grace a site gives everyone already at a limit when it turns
@@ -23,7 +23,7 @@ import pwd
 import sys
 import time
 
-from . import config, storage_report
+from . import config, disk_report
 from .cli import run_main
 from .files import write_atomic
 from .prom import key, render
@@ -46,11 +46,11 @@ def uid_of(login):
 
 
 def disk_holds(data):
-    """{login: reason} for everyone at a disk hard limit in DATA (storage_report.collect),
+    """{login: reason} for everyone at a disk hard limit in DATA (disk_report.collect),
     the worst of their filesystems."""
     out = {}
-    for row in storage_report.over_warn(data):
-        place, amount, state, hard = storage_report.describe(row)
+    for row in disk_report.over_warn(data):
+        place, amount, state, hard = disk_report.describe(row)
         if hard and row[2] not in out:
             out[row[2]] = (
                 f"Your disk use on {place} is {amount}, {state}. New jobs are held until you"
@@ -100,7 +100,7 @@ def main(argv=None):
         cfg = load_config(args[0])
         now = time.time()
         try:
-            data = storage_report.collect(Prometheus(cfg["prometheus_url"]), now)
+            data = disk_report.collect(Prometheus(cfg["prometheus_url"]), now)
         except PrometheusError as e:  # the last file stays, trusted until it is stale
             print(f"submit-holds: {e}", file=sys.stderr)
             return 1

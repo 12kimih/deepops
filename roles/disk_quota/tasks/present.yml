@@ -93,7 +93,7 @@
 
 - name: Export the usage metrics regularly
   systemd_unit:
-    name: disk-quota-metrics.timer
+    name: disk-quota.timer
     enabled: true
     state: "{{ 'restarted' if disk_quota_units is changed else 'started' }}"
     daemon_reload: true

@@ -1,5 +1,5 @@
-"""The daily disk usage report, clustertools.storage_report, and its run in
-clustertools.usage_report --storage (no cluster needed)."""
+"""The daily disk usage report, clustertools.disk_report, and its run in
+clustertools.usage_report --disk (no cluster needed)."""
 
 import json
 import sys
@@ -10,7 +10,7 @@ from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
-from clustertools import storage_report as storage  # noqa: E402
+from clustertools import disk_report  # noqa: E402
 from clustertools import usage_report as report  # noqa: E402
 
 NOW = 1_800_000_000
@@ -103,7 +103,7 @@ def text_of(blocks):
 
 class CollectTests(unittest.TestCase):
     def test_usage_levels_growth_and_disks(self):
-        data = storage.collect(site(), NOW)
+        data = disk_report.collect(site(), NOW)
         alice = data["users"][("login", "/", "alice")]
         self.assertEqual(
             (alice["used"], alice["before"], alice["warn"], alice["hard"]), (18 * G, 15 * G, 15 * G, 20 * G)
@@ -117,17 +117,17 @@ class CollectTests(unittest.TestCase):
 
     def test_the_disks_are_only_those_counted(self):
         prom = site()
-        storage.collect(prom, NOW)
+        disk_report.collect(prom, NOW)
         disk = [e for e in prom.asked if "node_filesystem_size_bytes" in e][0]
         self.assertIn("and on (instance, mountpoint) label_replace(", disk)
         self.assertIn('"mountpoint", "$1", "filesystem"', disk)
 
     def test_nothing_counted_is_none(self):
-        self.assertIsNone(storage.collect(Prom({}), NOW))
+        self.assertIsNone(disk_report.collect(Prom({}), NOW))
 
     def test_a_host_label_or_the_instance(self):
-        self.assertEqual(storage.host_of({"host": "a", "instance": "b:9100"}), "a")
-        self.assertEqual(storage.host_of({"instance": "b:9100"}), "b")
+        self.assertEqual(disk_report.host_of({"host": "a", "instance": "b:9100"}), "a")
+        self.assertEqual(disk_report.host_of({"instance": "b:9100"}), "b")
 
 
 class LevelTests(unittest.TestCase):
@@ -135,23 +135,25 @@ class LevelTests(unittest.TestCase):
         return dict({"used": 0, "warn": 0, "hard": 0, "inodes": 0, "inode_warn": 0, "inode_hard": 0}, **kw)
 
     def test_hard_first_then_warn_and_files_too(self):
-        self.assertEqual(storage.past(self.entry(used=20, warn=15, hard=20))[0][3], "hard")
-        self.assertEqual(storage.past(self.entry(used=16, warn=15, hard=20)), [("space", 16, 15, "warn")])
+        self.assertEqual(disk_report.past(self.entry(used=20, warn=15, hard=20))[0][3], "hard")
+        self.assertEqual(disk_report.past(self.entry(used=16, warn=15, hard=20)), [("space", 16, 15, "warn")])
         self.assertEqual(
-            storage.past(self.entry(used=15, warn=15, hard=20)), [], "at the warn level is not past it"
+            disk_report.past(self.entry(used=15, warn=15, hard=20)), [], "at the warn level is not past it"
         )
-        self.assertEqual(storage.past(self.entry(inodes=600, inode_warn=500)), [("files", 600, 500, "warn")])
-        self.assertEqual(storage.past(self.entry(used=99)), [], "no levels, nothing past")
+        self.assertEqual(
+            disk_report.past(self.entry(inodes=600, inode_warn=500)), [("files", 600, 500, "warn")]
+        )
+        self.assertEqual(disk_report.past(self.entry(used=99)), [], "no levels, nothing past")
 
     def test_worst_first(self):
-        data = storage.collect(site(), NOW)
-        self.assertEqual([r[2] for r in storage.over_warn(data)], ["bob", "alice"])
+        data = disk_report.collect(site(), NOW)
+        self.assertEqual([r[2] for r in disk_report.over_warn(data)], ["bob", "alice"])
 
 
 class RenderTests(unittest.TestCase):
     def test_card_and_thread(self):
-        data = storage.collect(site(), NOW)
-        (text, card), thread = storage.render(data, who, top=2)
+        data = disk_report.collect(site(), NOW)
+        (text, card), thread = disk_report.render(data, who, top=2)
         self.assertIn("login:/ 75%", text)
         self.assertIn("2 past their level", text)
         body = text_of(card)
@@ -170,10 +172,10 @@ class RenderTests(unittest.TestCase):
             self.assertLessEqual(len(blocks), 50)
 
     def test_people_ranked_everyone_else_on_one_line(self):
-        data = storage.collect(site(), NOW)
+        data = disk_report.collect(site(), NOW)
         data["users"][("login", "/", "root")] = dict(data["users"][("login", "/", "carol")], used=160 * G)
         data["users"][("login", "/", "mysql")] = dict(data["users"][("login", "/", "carol")], used=16 * G)
-        _, thread = storage.render(data, who, top=10, people={"alice", "bob", "carol"})
+        _, thread = disk_report.render(data, who, top=10, people={"alice", "bob", "carol"})
         details = text_of(thread[0][1])
         self.assertIn("the largest of 3 people", details)
         self.assertNotIn("root  ", details, "root is not ranked with the people")
@@ -181,48 +183,48 @@ class RenderTests(unittest.TestCase):
             "Not in the roster (root, services, people who left): root 160G, mysql 16G; 176G together",
             details,
         )
-        _, thread = storage.render(data, who, top=10)
+        _, thread = disk_report.render(data, who, top=10)
         self.assertIn("the largest of 5 users", text_of(thread[0][1]), "no roster: everyone is ranked")
 
     def test_a_hard_limit_says_what_it_means_for_slurm(self):
-        data = storage.collect(site(), NOW)
-        (_, card), _ = storage.render(data, who, top=10, hold=NOW + 2 * storage.DAY)
+        data = disk_report.collect(site(), NOW)
+        (_, card), _ = disk_report.render(data, who, top=10, hold=NOW + 2 * disk_report.DAY)
         self.assertIn("writes there fail now; from ", text_of(card))
         self.assertIn(", new Slurm jobs are refused while at it", text_of(card))
-        (_, card), _ = storage.render(data, who, top=10, hold=0)
+        (_, card), _ = disk_report.render(data, who, top=10, hold=0)
         self.assertIn("; new Slurm jobs are refused until you free space", text_of(card))
-        (_, card), _ = storage.render(data, who, top=10)
+        (_, card), _ = disk_report.render(data, who, top=10)
         self.assertNotIn("Slurm", text_of(card), "no holds: nothing said")
-        bob = storage.over_warn(data)[0]
+        bob = disk_report.over_warn(data)[0]
         self.assertIn("Writes there fail and new Slurm jobs are refused until you free space.",
-                      storage.dm_text(bob, storage.hold_note(0, NOW)))  # fmt: skip
+                      disk_report.dm_text(bob, disk_report.hold_note(0, NOW)))  # fmt: skip
 
     def test_change(self):
-        self.assertEqual(storage.change(5 * G, None), "new")
-        self.assertEqual(storage.change(5 * G, 5 * G + 1000), "0")
-        self.assertEqual(storage.change(4 * G, 5 * G), "-1G")
+        self.assertEqual(disk_report.change(5 * G, None), "new")
+        self.assertEqual(disk_report.change(5 * G, 5 * G + 1000), "0")
+        self.assertEqual(disk_report.change(4 * G, 5 * G), "-1G")
 
     def test_dm(self):
-        data = storage.collect(site(), NOW)
-        rows = storage.over_warn(data)
+        data = disk_report.collect(site(), NOW)
+        rows = disk_report.over_warn(data)
         self.assertEqual(
-            storage.dm_text(rows[1]),
+            disk_report.dm_text(rows[1]),
             "Your disk use on login:/ is 18G, past the warn level 15G, hard limit 20G. Nothing is refused yet:"
             " free space before the hard limit. `quota -s` on the host shows your own usage there.",
         )
-        self.assertIn("Writes there fail until you free space.", storage.dm_text(rows[0]))
+        self.assertIn("Writes there fail until you free space.", disk_report.dm_text(rows[0]))
 
 
 class RunTests(unittest.TestCase):
-    """usage_report --storage: posts the report, notes everyone past a level when asked,
+    """usage_report --disk: posts the report, notes everyone past a level when asked,
     and posts nothing when no disk usage is counted."""
 
     CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
-               user_map={"alice": "UALICE", "bob": "UBOB"}, storage_top=10, storage_notify=["mention", "dm"],
-               storage_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0)  # fmt: skip
+               user_map={"alice": "UALICE", "bob": "UBOB"}, disk_top=10, disk_notify=["mention", "dm"],
+               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0)  # fmt: skip
 
-    def run_storage(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
-        """(posts [(channel, text, blocks as text)], the failure, storage.json): one run at
+    def run_disk(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
+        """(posts [(channel, text, blocks as text)], the failure, disk.json): one run at
         NOW, keeping its state in the directory STATE (a fresh one when None)."""
         posted = []
 
@@ -243,7 +245,7 @@ class RunTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as fresh:
             d = state or fresh
-            cfg = dict(self.CFG, state_file=f"{d}/state.json", storage_notify=list(notify))
+            cfg = dict(self.CFG, state_file=f"{d}/state.json", disk_notify=list(notify))
             args = mock.Mock(dry_run=False, to=None)
             for flag in extra:
                 setattr(args, *flag)
@@ -253,15 +255,15 @@ class RunTests(unittest.TestCase):
                 mock.patch.object(report.time, "time", lambda: now),
             ):
                 try:
-                    report.storage(cfg, args)
+                    report.disk(cfg, args)
                     error = None
                 except RuntimeError as e:
                     error = str(e)
-            saved = Path(f"{d}/storage.json")
+            saved = Path(f"{d}/disk.json")
             return posted, error, json.loads(saved.read_text()) if saved.exists() else None
 
     def test_report_and_notes_one_failure_named_at_the_end(self):
-        posted, error, saved = self.run_storage(site())
+        posted, error, saved = self.run_disk(site())
         self.assertEqual(posted[0][0], "#status")
         self.assertEqual([p[0] for p in posted if p[0].startswith("U")], ["UALICE"])
         self.assertIn("notifying bob", error)
@@ -269,29 +271,29 @@ class RunTests(unittest.TestCase):
 
     def test_told_once_then_again_when_due_and_the_card_mentions_only_them(self):
         with tempfile.TemporaryDirectory() as d:
-            posted, _, saved = self.run_storage(site(), notify=["mention"], state=d)
+            posted, _, saved = self.run_disk(site(), notify=["mention"], state=d)
             self.assertEqual(set(saved["told"]), {"login / alice", "login / bob"})
             self.assertEqual(saved["told"]["login / bob"], NOW)
             self.assertIn("<@UALICE> (alice)", posted[0][2])
             # The next day: bob is still at his hard limit, alice past the same warn level.
-            posted, _, _ = self.run_storage(site(), notify=["mention"], state=d, now=NOW + storage.DAY)
+            posted, _, _ = self.run_disk(site(), notify=["mention"], state=d, now=NOW + disk_report.DAY)
             self.assertIn("<@UBOB> (bob)", posted[0][2])
             self.assertNotIn("<@UALICE>", posted[0][2])
             self.assertIn("alice on login:/", posted[0][2], "still listed, not mentioned")
 
     def test_a_preview_sends_and_records_nothing(self):
-        posted, error, saved = self.run_storage(site(), ("to", "UME"))
+        posted, error, saved = self.run_disk(site(), ("to", "UME"))
         self.assertEqual({p[0] for p in posted}, {"UME"})
         self.assertIsNone(error)
         self.assertIsNone(saved)
 
     def test_no_notes_without_dm(self):
-        posted, error, _ = self.run_storage(site(), notify=["mention"])
+        posted, error, _ = self.run_disk(site(), notify=["mention"])
         self.assertEqual({p[0] for p in posted}, {"#status"})
         self.assertIsNone(error)
 
     def test_nothing_counted_posts_nothing(self):
-        posted, error, _ = self.run_storage(Prom({}))
+        posted, error, _ = self.run_disk(Prom({}))
         self.assertEqual(posted, [])
         self.assertIsNone(error)
 

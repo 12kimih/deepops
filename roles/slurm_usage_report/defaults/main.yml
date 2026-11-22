@@ -23,15 +23,15 @@ slurm_usage_report_repeat_idle_share: 0.5
 slurm_usage_report_repeat_weeks: 2
 # The daily disk usage report (systemd OnCalendar), from the disk quota metrics
 # (roles/disk_quota; without them it posts nothing): each counted filesystem's disk, its
-# storage_top largest people with their day's growth and levels, the projects, and
-# everyone past a warn level, told as storage_notify says (mention, dm, both or []).
-slurm_usage_report_storage_schedule: "*-*-* 09:00:00"
-slurm_usage_report_storage_top: 10
-slurm_usage_report_storage_notify: [mention]
+# disk_top largest people with their day's growth and levels, the projects, and
+# everyone past a warn level, told as disk_notify says (mention, dm, both or []).
+slurm_usage_report_disk_schedule: "*-*-* 09:00:00"
+slurm_usage_report_disk_top: 10
+slurm_usage_report_disk_notify: [mention]
 # A person is told when they first pass a level, every day at a hard limit (their writes
 # fail), and again every repeat_days while past the same warn level (0: every day). The
 # card lists everyone past a level every day, mentioning only those told.
-slurm_usage_report_storage_repeat_days: 7
+slurm_usage_report_disk_repeat_days: 7
 # The people the disk report ranks (the roster's active logins); everyone else on a disk
 # (root, the services, people who left) is one line. [] ranks every user.
 slurm_usage_report_people: "{{ people | people_active | list | sort }}"
@@ -72,7 +72,3 @@ slurm_usage_report_cancel_warn_text: |-
 # shown without a mention.
 slurm_usage_report_user_map: "{{ slack_members }}"
 slurm_usage_report_email_domain: "{{ slack_email_domain }}"
-
-slurm_usage_report_script: /usr/local/libexec/slurm-usage-report
-slurm_usage_report_config_dir: /etc/slurm-usage-report
-slurm_usage_report_svc_name: slurm-usage-report

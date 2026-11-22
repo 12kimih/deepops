@@ -12,16 +12,16 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests/slurm-usage-report"))
-from clustertools import storage_report, submit_holds  # noqa: E402
+from clustertools import disk_report, submit_holds  # noqa: E402
 from clustertools.prometheus import Error as PrometheusError  # noqa: E402
-from test_storage import NOW, site  # noqa: E402
+from test_disk import NOW, site  # noqa: E402
 
 UIDS = {"alice": 1001, "bob": 1002, "carol": 1003}
 
 
 class HoldTests(unittest.TestCase):
     def data(self):
-        return storage_report.collect(site(), NOW)
+        return disk_report.collect(site(), NOW)
 
     def test_only_a_hard_limit_holds_with_the_reason(self):
         held = submit_holds.holds(self.data(), {"disk_from": 0}, NOW, UIDS.get)
@@ -52,13 +52,11 @@ class HoldTests(unittest.TestCase):
                 )
             )
             holds.write_text("generated 1\n")
-            away = mock.patch.object(
-                submit_holds.storage_report, "collect", side_effect=PrometheusError("away")
-            )
+            away = mock.patch.object(submit_holds.disk_report, "collect", side_effect=PrometheusError("away"))
             with away, mock.patch("sys.stderr"):
                 self.assertEqual(submit_holds.main(["submit-holds", str(cfg)]), 1)
             self.assertEqual(holds.read_text(), "generated 1\n")
-            with mock.patch.object(submit_holds.storage_report, "collect", return_value=None):
+            with mock.patch.object(submit_holds.disk_report, "collect", return_value=None):
                 self.assertEqual(submit_holds.main(["submit-holds", str(cfg)]), 0)
             self.assertTrue(holds.read_text().startswith("generated "))
             self.assertIn("submit_holds_people{} 0", prom.read_text())

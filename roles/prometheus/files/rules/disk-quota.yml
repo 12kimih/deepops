@@ -11,18 +11,18 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "Disk quota usage on {{ $labels.host }} has not been reported for an hour"
-          description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
+          description: "`journalctl -u disk-quota` and `systemctl list-timers disk-quota.timer` on the host."
       # No timestamp at all on a host with the unit installed: the alert above has
       # nothing to compare, so the unit's presence stands in.
       - alert: DiskQuotaMetricsNeverReported
         expr: |
-          count by (instance, host) (node_systemd_unit_state{name="disk-quota-metrics.service"})
+          count by (instance, host) (node_systemd_unit_state{name="disk-quota.service"})
           unless on (instance) disk_quota_last_success_timestamp_seconds
         for: 1h
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.host }} has reported no disk quota usage for an hour"
-          description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
+          description: "`journalctl -u disk-quota` and `systemctl list-timers disk-quota.timer` on the host."
       - alert: DiskQuotaOverWarnLevel
         expr: |
           disk_quota_used_bytes
@@ -46,13 +46,3 @@ groups:
           description: >-
             Nothing is refused yet: only the hard limit stops writes. Free space there,
             or raise its block_hard and block_warn in disk_quota_projects.
-      # The submission holds (roles/submit_holds): job_submit.lua trusts their file for
-      # half an hour, then holds no one, so a writer that stopped is said well before.
-      - alert: SubmitHoldsStale
-        expr: time() - submit_holds_last_success_timestamp_seconds > 900
-        labels: {severity: warning}
-        annotations:
-          summary: "The submission holds on {{ $labels.host }} have not been worked out for 15 minutes"
-          description: >-
-            After 30 minutes job_submit.lua holds no one. `journalctl -u submit-holds` and
-            `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?).
