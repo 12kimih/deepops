@@ -48,6 +48,13 @@ PLAY = """
       repo_package: {use: apt, name: deepops-no-such-package, state: present}
       register: after_removal
       ignore_errors: true
+    - name: Known, refusing what it would not bring
+      repo_package: {use: apt, name: dpkg, state: present, refuse: ["linux-image-"], refuse_reason: kernels}
+      register: refusing
+    - name: A refusal needs its reason
+      repo_package: {use: apt, name: dpkg, state: present, refuse: ["linux-image-"]}
+      register: no_reason
+      ignore_errors: true
     - ansible.builtin.assert:
         that:
           - unknown is failed
@@ -56,6 +63,8 @@ PLAY = """
           - known is not changed and known is not failed
           - after_removal is failed
           - "'apt still refuses' in after_removal.msg"
+          - refusing is not failed and refusing is not changed
+          - no_reason is failed and 'refuse_reason' in no_reason.msg
 """
 
 
@@ -92,6 +101,26 @@ Package: other-arch
 Status: install ok installed
 Architecture: i386
 """
+
+
+class Refuse(unittest.TestCase):
+    def test_a_refused_package_is_named_with_the_reason(self):
+        installs = [
+            "libnvidia-gl-580-server",
+            "linux-image-6.8.0-151-generic",
+            "linux-modules-6.8.0-151-generic",
+        ]
+        self.assertEqual(rp.refused_in(installs, ["linux-image-"]), ["linux-image-6.8.0-151-generic"])
+        self.assertEqual(rp.refused_in(["linux-image-x:amd64"], ["linux-image-x$"]), ["linux-image-x:amd64"])
+        self.assertEqual(rp.refused_in(installs, []), [])
+        failed = rp.refusal(["linux-image-6.8.0-151-generic"], "kernels change everywhere at once")
+        self.assertTrue(failed["failed"])
+        self.assertIn("linux-image-6.8.0-151-generic", failed["msg"])
+        self.assertIn("kernels change everywhere at once", failed["msg"])
+
+    def test_without_removals_the_simulation_reads_the_hosts_own_status(self):
+        command = rp.simulation_command({"name": ["a"], "install_recommends": False}, [])
+        self.assertEqual(command, "env LC_ALL=C apt-get -s -q install --no-install-recommends a")
 
 
 class Simulation(unittest.TestCase):

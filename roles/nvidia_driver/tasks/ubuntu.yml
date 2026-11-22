@@ -111,6 +111,9 @@
     state: absent
   when: nvidia_driver_install_method == 'nvidia_repo'
 
+# The archive builds a driver's prebuilt modules for the newest kernel only: a driver
+# newer than the modules of the running kernel would pull that kernel in with it, on
+# the nodes that need it and not the others. Kernels change on every node at once.
 - name: Install the NVIDIA driver from the Ubuntu archive
   repo_package:
     use: apt
@@ -118,6 +121,11 @@
     state: present
     install_recommends: false
     update_cache: true
+    refuse: ["linux-image-"]
+    refuse_reason: >-
+      a new kernel comes on every node at once, in the maintenance upgrade
+      (playbooks/utilities/apt-upgrade.yml), which brings the driver's modules for it;
+      run that, then this playbook
   register: nvidia_driver_install_archive
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
