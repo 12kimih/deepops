@@ -7,6 +7,24 @@
 - name: Take phased updates on every node at once
   ansible.builtin.include_tasks: phased.yml
 
+# apt keeps every package it downloads (/var/cache/apt/archives) unless told not to:
+# Ubuntu's `apt` command deletes them after installing, apt-get and python-apt (Ansible's
+# apt module, unattended-upgrades) do not, and the daily apt job cleans nothing while
+# every interval is 0 (Ubuntu's 10periodic). Every kernel, driver and CUDA upgrade
+# stayed on the root filesystem (3.5G on a GPU node, 2026-11). A package is fetched
+# again when wanted. https://manpages.ubuntu.com/manpages/noble/man5/apt.conf.5.html
+- name: Keep no downloaded packages
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/53deepops-package-cache
+    content: |
+      // Managed by DeepOps (roles/os_updates).
+      APT::Keep-Downloaded-Packages "false";
+      APT::Periodic::CleanInterval "1";
+    owner: root
+    group: root
+    mode: "0644"
+    validate: apt-config -c %s dump
+
 - name: Install unattended-upgrades
   ansible.builtin.apt:
     name: unattended-upgrades
