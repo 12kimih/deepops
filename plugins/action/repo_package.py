@@ -26,9 +26,11 @@ lists them), so a task after it can tell what the install brings (a kernel modul
 rather than only that it changes something.
 
 `refuse` (apt only: regular expressions on package names, with `refuse_reason`) keeps an
-install from bringing what it must not, as apt would resolve it: before a run installs
-anything, and in its preview, apt's simulation is read, and an install that would bring
-a refused package fails naming it and the reason. A driver install that pulled a new
+install from bringing what it must not, as the apt module resolves it: a run first asks
+the module itself under check mode (its own semantics: a package already present stays
+as it is), a preview reads its own answer, and an install that would bring a refused
+package fails naming it and the reason. A separate apt-get simulation named every
+package, upgrading the ones present, and refused installs the module never makes. A driver install that pulled a new
 kernel onto some nodes only (the archive's prebuilt NVIDIA modules for the newer
 kernel, 2026-11) is refused that way: kernels change on every node at once, in a
 maintenance upgrade.
@@ -97,8 +99,6 @@ BEGIN { RS = ""; ORS = "\n\n"; "dpkg --print-architecture" | getline native
 def simulation_command(args, removals, status="/var/lib/dpkg/status"):
     """A shell command: apt-get's simulation of the install on a host without REMOVALS."""
     simulate = shlex.join(["env", "LC_ALL=C", "apt-get", "-s", "-q"])
-    if not removals:
-        return f"{simulate} {shlex.join(simulation_argv(args))}"
     without = shlex.join(["awk", "-v", f"drop={' '.join(removals)}", _WITHOUT, status])
     return (
         "tmp=$(mktemp) && trap 'rm -f \"$tmp\"' EXIT && "
@@ -163,6 +163,13 @@ def with_removals(result, removals, simulated):
 
 
 class ActionModule(ActionBase):
+    _previewing = False
+
+    def _update_module_args(self, module_name, module_args, task_vars, *args, **kwargs):
+        super()._update_module_args(module_name, module_args, task_vars, *args, **kwargs)
+        if self._previewing:  # the module's own answer, asked before a run acts
+            module_args["_ansible_check_mode"] = True
+
     def run(self, tmp=None, task_vars=None):
         del tmp
         result = super().run(task_vars=task_vars)
@@ -194,9 +201,15 @@ class ActionModule(ActionBase):
                 if refreshed.get("failed"):
                     result.update(refreshed)
                     return result
-            simulated = self._simulate(args, [])
+            self._previewing = True
+            try:
+                previewed = self._execute_module(
+                    module_name=MODULES[use], module_args=args, task_vars=task_vars
+                )
+            finally:
+                self._previewing = False
             refused = (
-                refused_in(installs_of(simulated.get("stdout")), refuse) if simulated.get("rc") == 0 else []
+                [] if previewed.get("failed") else refused_in(installs_of(previewed.get("stdout")), refuse)
             )
             if refused:
                 result.update(refusal(refused, reason))

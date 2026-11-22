@@ -118,10 +118,6 @@ class Refuse(unittest.TestCase):
         self.assertIn("linux-image-6.8.0-151-generic", failed["msg"])
         self.assertIn("kernels change everywhere at once", failed["msg"])
 
-    def test_without_removals_the_simulation_reads_the_hosts_own_status(self):
-        command = rp.simulation_command({"name": ["a"], "install_recommends": False}, [])
-        self.assertEqual(command, "env LC_ALL=C apt-get -s -q install --no-install-recommends a")
-
 
 class Simulation(unittest.TestCase):
     def test_the_install_takes_the_tasks_arguments(self):
