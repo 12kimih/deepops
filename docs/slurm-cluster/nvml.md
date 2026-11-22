@@ -82,7 +82,7 @@ For more information on configuring MIG, see the documentation for [NVIDIA mig-p
 
 #### Deploy the cluster
 
-Performed a test on a small cluster consisting of the following two nodes:
+This walkthrough was first performed (on releases DeepOps no longer supports; DGX OS 6 or 7 today) on a small cluster consisting of the following two nodes:
 
 - Generic white-box server running Ubuntu 20.04 for Slurm controller
 - DGX A100 running DGX OS 5.2.0 for Slurm compute node
@@ -164,10 +164,10 @@ ansible-playbook -b -l slurm-cluster playbooks/slurm-cluster.yml
 
 #### Custom slurm.conf and nhc.conf
 
-Because we are using MIG, we will need to use a custom Slurm config to specify the number and type of MIG instances. To do this, we first copy the `slurm.conf` from the DGX node to our DeepOps repo:
+Because we are using MIG, we will need to use a custom Slurm config to specify the number and type of MIG instances. To do this, we first copy the `slurm.conf` from the Slurm controller (the nodes are configless and keep no `/etc/slurm/slurm.conf`) and the node's `nhc.conf` to our DeepOps repo:
 
 ```
-$ scp user@dgx01:/etc/slurm/slurm.conf config/files/slurm/slurm.conf
+$ scp user@<slurm-master>:/etc/slurm/slurm.conf config/files/slurm/slurm.conf
 $ scp user@dgx01:/etc/nhc/nhc.conf config/files/slurm/nhc.conf
 ```
 

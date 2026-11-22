@@ -78,7 +78,7 @@ ansible-playbook playbooks/container/nginx-docker-registry-cache-server.yml
 
 ### Configuring Docker clients
 
-To configure client nodes using Docker for container pulls, ensure `nginx_docker_cache_dockerd_clients` is set to `true`, then run:
+Docker on the client nodes pulls through the proxy when the component is on: set `slurm_enable_nginx_docker_cache: true` (the clients are the `slurm-node` hosts, the proxy the `slurm-cache` group; `nginx_docker_cache_dockerd_clients: false` leaves dockerd out), then run:
 
 ```bash
 ansible-playbook -l <nodes> playbooks/container/nginx-docker-registry-cache-client.yml
@@ -86,17 +86,17 @@ ansible-playbook -l <nodes> playbooks/container/nginx-docker-registry-cache-clie
 
 ### Configuring Enroot clients
 
-To configure client nodes using Enroot for container pulls, add the following line to the `enroot_config` variable:
+To configure client nodes using Enroot for container pulls, add the following line to the `enroot_config` variable (enroot.conf's `NAME value` form, as the role's own lines):
 
 ```bash
-https_proxy=http://<proxy-hostname>:3128/
+https_proxy http://<proxy-hostname>:3128/
 ```
 
-Where `<proxy_hostname>` is the name of the host where you're running the proxy.
+Where `<proxy-hostname>` is the name of the host where you're running the proxy.
 
 Then run:
 
 ```bash
 ansible-playbook -l <nodes> playbooks/container/nginx-docker-registry-cache-client.yml
-ansible-playbook -l <nodes> playbooks/container/pyxis.yml
+ansible-playbook -l <nodes> playbooks/container/enroot.yml
 ```

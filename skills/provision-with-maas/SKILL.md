@@ -24,8 +24,8 @@ deployed machine tags into Ansible inventory.
 - Configure target power control in MAAS, or arrange manual power cycles.
   Commission each target to `Ready`, sync the requested Ubuntu image, and add
   an SSH public key that the operator can use after deployment.
-- Use Ubuntu 24.04 with the MAAS 3.7 repository for a new controller, or the
-  MAAS 3.5 repository while the controller remains on Ubuntu 22.04.
+- The MAAS series follows the controller's Ubuntu release (`maas_series`: 3.8 on
+  26.04, 3.7 on 24.04, 3.5 on 22.04).
 
 ## Procedure
 
@@ -51,8 +51,8 @@ deployed machine tags into Ansible inventory.
 
    Skip this step when using an existing MAAS controller.
 
-3. Edit `config/maas-inventory.yml`, which `scripts/setup.sh` creates from
-   `config.example/maas-inventory.yml`:
+3. Copy `config.example/maas-inventory.yml` to `config/maas-inventory.yml`
+   (`scripts/setup.sh` does not create it) and edit the copy:
 
    ```yaml
    api_url: "http://maas-server:5240/MAAS/api/2.0"

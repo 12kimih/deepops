@@ -1,12 +1,6 @@
 # Creating a new DeepOps release
 
 - [Update software versions and dependencies for new release](#update-software-versions-and-dependencies-for-new-release)
-  - [Kubespray](#kubespray)
-  - [Slurm](#slurm)
-  - [Ansible Galaxy dependencies](#ansible-galaxy-dependencies)
-  - [Slurm container dependencies](#slurm-container-dependencies)
-  - [Helm charts](#helm-charts)
-  - [Misc. roles](#misc-roles)
 - [Create PR with release notes](#create-pr-with-release-notes)
 - [Create release](#create-release)
 

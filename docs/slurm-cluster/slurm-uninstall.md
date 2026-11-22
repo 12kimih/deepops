@@ -19,7 +19,7 @@ How to remove a DeepOps Slurm deployment from a node, including the single-node
 
 ## Before you start
 
-DeepOps installs Slurm from source and makes a number of system-level changes
+DeepOps installs Slurm from packages it builds (`slurm-smd*`) and makes a number of system-level changes
 on each node. There is no "undo" playbook: unlike the Kubernetes deployment,
 which has the Kubespray reset playbook (see
 [Reset the Cluster](../k8s-cluster/README.md#reset-the-cluster)), removing
@@ -54,7 +54,7 @@ only on `slurm-node` hosts):
 | `sackd.service` | Package `slurm-smd-sackd`, on hosts with neither `slurmd` nor `slurmctld` |
 | `munge.service` | Distribution package `munge` |
 | `mariadb.service` | Distribution package `mariadb-server` (controller only) |
-| `docker.slurm-exporter.service`, `docker.node-exporter.service`, `docker.dcgm-exporter.service`, `docker.prometheus.service`, `docker.grafana.service`, `docker.alertmanager.service` | Only when `slurm_enable_monitoring` is set |
+| `docker.node-exporter.service`, `docker.dcgm-exporter.service`, `docker.ipmi-exporter.service`, `docker.prometheus.service`, `docker.grafana.service`, `docker.alertmanager.service` | Only when `slurm_enable_monitoring` is set |
 
 Files and directories (variable name in parentheses):
 
@@ -63,14 +63,13 @@ Files and directories (variable name in parentheses):
 | The `slurm-smd*` packages | Commands in `/usr/bin` and `/usr/sbin`, plugins in `slurm_plugin_dir` (`/usr/lib/<multiarch>/slurm`), headers in `/usr/include/slurm` |
 | `/etc/apt/sources.list.d/deepops-slurm.sources`, `/etc/apt/keyrings/deepops-slurm.asc`, `/etc/apt/preferences.d/deepops-slurm.pref` | The Slurm repository, its key and the version hold |
 | `/sw/.slurm-repo` (`slurm_repo_dir`) | The signed package repository every node installs from (shared) |
-| `/var/cache/deepops/build/slurm-deb` (`slurm_deb_build_dir`), user `slurmbuild` | The package build, on `slurm-master[0]` only |
+| `/var/cache/deepops/build/slurm-deb` (`system_accounts.slurmbuild.home`), user `slurmbuild` | The package build, on `slurm-master[0]` only |
 | `/etc/slurm` (`slurm_config_dir`) | Controller: `slurm.conf`, `cgroup.conf`, `gres.conf`, `slurmdbd.conf`, `plugstack.conf`, `job_submit.lua`. Every node: `prolog.d/`, `epilog.d/`, `shared/bin/`, `localusers.backup`, Pyxis `plugstack.conf.d/` |
 | `/run/slurm/conf` | The configuration `slurmd` or `sackd` fetched from `slurmctld` (configless) |
-| `/sw/slurm` (`slurm_ha_state_save_location`) | State directory when `slurm_enable_ha` is set |
-| `/var/spool/slurm/ctld`, `/var/spool/slurm/d` | Controller and compute state |
+| `/opt/deepops/slurm/state` (`slurm_ha_state_save_location`) | State directory when `slurm_enable_ha` is set (set it to shared storage) |
+| `/var/spool/slurmctld` (`slurm_state_save_location`), `/var/spool/slurmd` | Controller and compute state |
 | `/var/log/slurm` | Daemon logs |
 | `/etc/sysconfig/slurmd`, `/etc/sysconfig/sackd` (`slurm_sysconf_dir`) | `--conf-server` and the PMIx environment for `slurmd`; `--conf-server` for `sackd` |
-| `/etc/rsyslog.d/99-slurm.conf` | Routes Slurm logs through rsyslog |
 | `/etc/munge/munge.key` | Cluster-wide munge key |
 | `/etc/localusers` | Users allowed to SSH without a job |
 | `/local/slurm` (`system_accounts.slurm.home`) | Home of the `slurm` user (uid `system_accounts.slurm.uid`, default 22078) |
@@ -84,8 +83,9 @@ System changes outside those paths:
   listed in `/etc/localusers`.
 - `pam_systemd.so` is commented out in `/etc/pam.d/common-session` (Ubuntu)
   or `/etc/pam.d/password-auth` (RHEL).
-- `/etc/default/grub` gets `cgroup_enable=memory swapaccount=1` appended to
-  `GRUB_CMDLINE_LINUX` on compute nodes.
+- On cgroup v1 compute nodes only, `cgroup_enable=memory swapaccount=1` go on the
+  kernel command line through `/etc/default/grub.d/deepops-slurm-cgroup.cfg`
+  (roles/host_baseline, kernel_args); cgroup v2 nodes get none.
 - `/etc/systemd/logind.conf` gets `RemoveIPC=no` on compute nodes.
 - With `slurm_login_on_compute` (single-node layout) the SSH service unit gets
   a persistent `DeviceAllow=/dev/nvidiactl` property, stored under
@@ -104,8 +104,8 @@ not try to keep them registered.
 
 ```bash
 systemctl disable --now slurmd slurmctld slurmdbd 2>/dev/null
-systemctl disable --now docker.slurm-exporter docker.node-exporter \
-  docker.dcgm-exporter docker.prometheus docker.grafana docker.alertmanager 2>/dev/null
+systemctl disable --now docker.node-exporter docker.dcgm-exporter docker.ipmi-exporter \
+  docker.prometheus docker.grafana docker.alertmanager 2>/dev/null
 # Only if no other workload uses this authentication service:
 # systemctl disable --now munge
 ```
@@ -142,12 +142,11 @@ systemctl daemon-reload
 
 # Local paths only; inspect mounts/symlinks and save backups first.
 rm -rf /etc/slurm
-rm -rf /var/spool/slurm /var/log/slurm
+rm -rf /var/spool/slurmctld /var/spool/slurmd /var/log/slurm
 rm -f /etc/sysconfig/slurmd /etc/sysconfig/sackd
-rm -f /etc/rsyslog.d/99-slurm.conf && systemctl restart rsyslog
 ```
 
-`/sw/.slurm-repo` (`slurm_repo_dir`) and `/sw/slurm`
+`/sw/.slurm-repo` (`slurm_repo_dir`) and the HA state directory
 (`slurm_ha_state_save_location`) may be shared by the entire cluster. Preserve
 them when removing one node. Remove them only once, after all controllers and
 compute nodes are retired and a restorable backup has been made.
@@ -205,8 +204,8 @@ existing IPC or kernel policy. On RHEL-family hosts, use the bootloader update
 command appropriate for that OS and boot mode.
 
 ```bash
-# Kernel command line (requires a reboot to take effect)
-sed -i '/^GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} cgroup_enable=memory swapaccount=1"$/d' /etc/default/grub
+# Kernel command line, cgroup v1 nodes only (requires a reboot to take effect)
+rm -f /etc/default/grub.d/deepops-slurm-cgroup.cfg
 update-grub                                   # Ubuntu
 # grub2-mkconfig -o /boot/grub2/grub.cfg      # RHEL family
 

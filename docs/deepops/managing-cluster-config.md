@@ -10,8 +10,10 @@ How it works (already in the repo):
 - `.gitignore` ignores `/config*/` but keeps `!/config.example/` -- so `config/` is
   invisible to git while the `config.example/` **template** is tracked.
 - `ansible.cfg` points `inventory = ./config/inventory,...` and sets
-  `vault_password_file = ./config/.vault-pass`, read only when a vaulted value is used.
-- `scripts/setup.sh` copies `config.example` -> `config` only if `config/` is absent.
+  `vault_password_file = ./config/.vault-pass`; Ansible does not start without that file
+  (the tests and checks give it a throwaway one, `scripts/deepops/unrecorded.py`).
+- `scripts/setup.sh` starts `config/` from config.example's inventory, `group_vars/` and
+  `host_vars/`, only if `config/` is absent.
 
 > **Golden rule:** edit real values only under `config/`. Keep `config.example/`
 > generic (placeholders + commented examples). Anything you put in `config.example/`

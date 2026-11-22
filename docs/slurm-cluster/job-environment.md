@@ -32,18 +32,18 @@ environment from the job's submitted environment, not from these exports.
 
 ## Per tool
 
-- **Enroot** (`roles/enroot`, 4.2.1, standard build): configured in
+- **Enroot** (`roles/enroot`, `enroot_version`, standard build): configured in
   `enroot.conf.d/90-deepops.conf` as the
   [pyxis setup guide](https://github.com/NVIDIA/pyxis/wiki/Setup) recommends, except
   `ENROOT_MOUNT_HOME y` (the NFS homes are expected inside containers). The layer
   cache had no cleanup before `container-storage-gc`.
-- **Pyxis** (packaged and configured by `roles/slurm`, 0.24.0): `container_scope=job` removes a job's named
+- **Pyxis** (packaged and configured by `roles/slurm`, `slurm_pyxis_version`): `container_scope=job` removes a job's named
   containers in pyxis' own job epilog, which runs enroot as the job user, so the
   `$(id -u)` paths expand correctly. `use_enroot_load=1` takes only registry images
   and squashfs files: a `podman://` image is imported to a squashfs file first
   (`enroot import`, see [rootless Podman](../container/podman.md)). The PMIx settings
   for slurmd (`roles/slurm/tasks/compute.yml`) are the guide's, by owner decision.
-- **NVIDIA Container Toolkit** (`roles/nvidia_container_toolkit`, 1.20): enroot's
+- **NVIDIA Container Toolkit** (`roles/nvidia_container_toolkit`, `nvidia_container_toolkit_version`): enroot's
   `98-nvidia.sh` hook uses `nvidia-container-cli`; podman uses the CDI specification
   the package's `nvidia-cdi-refresh` units keep, which the role keeps enabled and
   `nvidia-mig.yml` refreshes after a MIG change.

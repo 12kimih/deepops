@@ -24,8 +24,9 @@ Before running either the diagnostic or the firmware upgrade playbooks, please e
 - DGX OS is installed to the minimum revision listed in the release notes of the firmware update container to be used
 
 **In addition, please ensure that any system services that access the GPU have been stopped.**
-The firmware update process should attempt to stop a standard list of services which are provided in DGX OS, including
-`dcgm-exporter`, `nvidia-dcgm`, `nvidia-fabricmanager`, `nvidia-persistenced`, `xorg-setup`, `lightdm`, `nvsm-core`, and `kubelet`.
+The firmware update process stops the services listed in `nv_services` (roles/nvidia-dgx-firmware/defaults/main.yml:
+`nvsm`, `nvidia-persistenced`, `nvidia-fabricmanager`, `nv_peer_mem`, `dcgm`, `nvidia-dcgm` and `docker`, which also stops
+every container, the DCGM exporter's included); set `nv_services` to change the list.
 However, if any of these services were launched via Docker, or if you have installed additional services which access the GPU,
 those services will need to be stopped manually in advance of running this playbook.
 

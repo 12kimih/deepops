@@ -90,9 +90,9 @@ login02
 ### Separate monitoring node
 
 The Slurm monitoring services are deployed to the hosts in the `slurm-metric` inventory group, which by default is the Slurm controller node.
-To move them, put the monitoring host in `slurm-metric`; Prometheus scrapes the slurm exporter on the same group.
+To move them, put the monitoring host in `slurm-metric`: Prometheus, Alertmanager and Grafana run there, Prometheus scrapes slurmctld's own metrics endpoint, and the GPU job metrics and the usage report run there too.
 
-Note that in order to correctly monitor Slurm, the monitoring node must have Slurm installed and have access to the cluster.
+Those last two ask Slurm (`scontrol`, `sacct`), so the monitoring node must have the Slurm client installed and reach the controller.
 As with the login nodes, the easiest way to do this is to add the monitoring node to the `slurm-cluster` group, but not to `slurm-master` or `slurm-node`.
 
 Separate monitoring nodes may be configured in the inventory file using the `slurm-metric` group.

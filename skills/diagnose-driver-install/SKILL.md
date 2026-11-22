@@ -52,10 +52,17 @@ dmesg | grep -iE 'nvidia|nvrm' | tail -20
 lsmod | grep nvidia
 ```
 
-- DKMS shows an error for the running kernel → usually missing headers
-  (`linux-headers-$(uname -r)`) or a kernel updated after the driver
-  install. Install headers or reboot into the matching kernel, then rerun
-  the driver play.
+- On Ubuntu with the default `nvidia_driver_install_method: ubuntu_repo`
+  nothing is compiled: Canonical's signed, precompiled
+  `linux-modules-nvidia-<branch>-server-open-<flavour>` package carries the
+  module. Check it matches the running kernel
+  (`dpkg -l 'linux-modules-nvidia-*' | grep "$(uname -r)"`); a missing one
+  means a kernel the driver's modules do not cover yet: kernels change only
+  in `playbooks/utilities/apt-upgrade.yml`, which brings their modules.
+- With `nvidia_repo` (and on RHEL), DKMS builds the module: an error for the
+  running kernel → usually missing headers (`linux-headers-$(uname -r)`) or
+  a kernel updated after the driver install. Install headers or reboot into
+  the matching kernel, then rerun the driver play.
 - Module loaded but `nvidia-smi` fails → check `dmesg` for RmInitAdapter or
   fallen-off-the-bus errors; these are hardware/firmware territory.
 

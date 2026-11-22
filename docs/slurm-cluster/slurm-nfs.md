@@ -193,7 +193,8 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    `async,no_wdelay` -- `async` is the single biggest throughput lever (a crash loses
    unflushed data, acceptable for scratch) and `no_wdelay` suits the small random writes
    of an NVMe backend. `no_subtree_check` is already the default. Example:
-   `nfs_exports: [{path: /scratch, options: "*(rw,async,no_wdelay,no_root_squash)"}]`.
+   `nfs_exports: [{path: /scratch, options: "rw,async,no_wdelay,no_root_squash"}]` (the
+   flags alone: the clients come from `nfs_export_clients`).
 
 7. **Storage and network topology (your hardware, configured outside DeepOps).**
    General principles to apply to whatever you run:

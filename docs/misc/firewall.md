@@ -11,7 +11,7 @@
   - [Slurm](#slurm)
     - [Slurm services](#slurm-services)
     - [MPI traffic](#mpi-traffic)
-  - [Host firewall (roles/egress_policy)](#host-firewall-rolesegress_policy)
+  - [Host firewall (roles/ingress_policy, roles/egress_policy)](#host-firewall-rolesingress_policy-rolesegress_policy)
 
 ## Introduction
 
@@ -47,12 +47,11 @@ These ports will need to be open to any hosts that will need to open the service
 This port range can also be configured using the `--service-node-port-range` flag.
 If you want to specify a particular port for a given service, in order to control specific access, you can do that using the `nodePort` field in your service configuration.
 
-Pre-configured NodePorts for [DeepOps default service specs](/workloads/services) include:
+Pre-configured NodePorts of the monitoring stack (its Helm values, `config.example/helm/monitoring.yml`, or the site's copy in `config/helm/`):
 
 - `tcp/30500`: Prometheus
 - `tcp/30400`: AlertManager
 - `tcp/30200`: Grafana
-- `tcp/30000`: Apt mirror
 
 If a service is not listed here, it will use a random port from the range.
 

@@ -124,7 +124,7 @@ https://nvidia.github.io/libnvidia-container/gpgkey
 
 The following DEB files are not installed from an APT repository, but installed ad-hoc from direct URLs or file paths.
 
-- _CUDA keyring_: `cuda-keyring_1.1-1_all.deb` from the CUDA repository, installed by the DCGM role (and by the driver role with `nvidia_driver_install_method: nvidia_repo`); DCGM itself comes from the CUDA repository
+- _CUDA keyring_: `cuda-keyring_1.1-1_all.deb` comes from the mirrored CUDA repository itself (`package_repos_cuda_base`), installed by `roles/package_repos` wherever a role needs the CUDA repository (DCGM, the CUDA toolkit, the driver with `nvidia_driver_install_method: nvidia_repo`) and checked against `package_repos_cuda_keyring_checksums`: no separate download. On Ubuntu that keyring is what apt trusts; the `3bf863cc.pub` keys above are only for checking the mirror by hand
 - _NVIDIA Enroot_: Download from [Enroot releases](https://github.com/NVIDIA/enroot/releases/)
 
 ## Downloading package repositories on a machine with Internet access
@@ -260,32 +260,24 @@ sudo cp -r /var/repos/mirror/nvidia.github.io/libnvidia-container/ /var/www/html
 ```
 
 At this point, the downloaded package repositories should be available on your offline network via the package server.
-You can then add these downloaded repos to the `/etc/apt/sources.list` configuration on the servers that need to install the packages, e.g.:
+Point DeepOps at them in your configuration; do not add sources by hand. DeepOps writes
+each repository it uses itself, signed by its key (`roles/package_repos`, the Docker and
+Container Toolkit roles), refuses entries in `/etc/apt/sources.list` (the Ubuntu archive
+goes through `package_repos_ubuntu_mirror`), and a second, hand-written source for the
+same repository with other `trusted`/`signed-by` options breaks apt:
 
- Line added to `/etc/apt/sources.list`:
-
+```yaml
+package_repos_ubuntu_mirror: http://repo-server/ubuntu                # the Ubuntu archive
+docker_ubuntu_repo_base_url: http://repo-server/docker/linux/ubuntu  # its gpg key at <base>/gpg
+nvidia_container_toolkit_repo_base_url: http://repo-server/libnvidia-container
+package_repos_cuda_base: http://repo-server/cuda/repos               # <base>/ubuntu2404/x86_64/
 ```
-deb http://repo-server/ubuntu noble main restricted universe multiverse
-deb http://repo-server/ubuntu noble-updates main restricted universe multiverse
-deb http://repo-server/ubuntu noble-backports main restricted universe multiverse
-deb http://repo-server/ubuntu noble-security main restricted universe multiverse
-```
 
-Lines added to `/etc/apt/sources.list.d/dgx.list`:
+The mirrors keep the upstream layout under each base (the roles append the same paths
+they append upstream). The DGX repository is the one DeepOps does not manage; add it on
+DGX systems as NVIDIA's DGX documentation describes:
 
 ```
 deb http://repo-server/baseos/ubuntu/noble/x86_64/ noble common dgx
 deb http://repo-server/baseos/ubuntu/noble/x86_64/ noble-updates common dgx
-```
-
-Lines added to `/etc/apt/sources.list.d/cuda-compute-repo.list`:
-
-```
-deb http://repo-server/cuda/repos/ubuntu2404/x86_64/ /
-```
-
-Lines added to `/etc/apt/sources.list.d/nvidia-container-toolkit.list`:
-
-```
-deb  [trusted=yes] http://repo-server/libnvidia-container/stable/deb/amd64 /
 ```

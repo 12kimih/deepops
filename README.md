@@ -32,8 +32,8 @@ parts that had drifted -- aimed at keeping a GPU + Slurm cluster current and
 reproducible. At a glance:
 
 - **Current OS matrix** (Ubuntu 22.04 / 24.04 / 26.04, RHEL 8 / 9 / 10) and
-  up-to-date component versions (Slurm 25.11.x, enroot, pyxis, PMIx / OpenMPI,
-  DOCA-OFED, monitoring stack).
+  current component versions (Slurm, enroot, pyxis, PMIx / OpenMPI, DOCA-OFED, the
+  monitoring stack; every pin in [docs/deepops/versions.md](docs/deepops/versions.md)).
 - **In-tree NVIDIA roles** (driver / CUDA / container-toolkit / DCGM) replacing the
   EOL Galaxy roles.
 - **CUDA as per-version Lmod modules**, plus performance tuning and broad
@@ -89,7 +89,7 @@ The provisioning system is used to orchestrate the running of all playbooks and 
 - Ubuntu 22.04 LTS and 24.04 LTS
 - NVIDIA DGX OS 6 and 7
 
-DeepOps still retains legacy/community-maintained paths for older environments such as DGX OS 4/5, Ubuntu 18.04/20.04, and CentOS 7/8. Treat those paths as compatibility references unless your site validates them for the release you deploy.
+The legacy paths for DGX OS 4/5 (Ubuntu 18.04/20.04) and the DGX EL7 stack have been removed: the `nvidia-dgx` role refuses them ([DGX software stack](docs/deepops/dgx-software-stack.md)). Other older releases are not validated.
 
 ### Cluster System
 
@@ -97,9 +97,9 @@ The cluster nodes will follow the requirements described by Slurm or Kubernetes.
 
 - Ubuntu 22.04 LTS and 24.04 LTS for generic Kubernetes and Slurm deployments
 - NVIDIA DGX OS 6 and 7 for DGX systems
-- Red Hat Enterprise Linux / Rocky Linux 8 and 9 for DGX platform software installation through the `nvidia-dgx` role
+- Ubuntu 26.04 and Red Hat Enterprise Linux / Rocky Linux 8, 9 and 10 for DGX platform software installation through the `nvidia-dgx` role
 
-DeepOps still retains legacy/community-maintained paths for older environments such as DGX OS 4/5, Ubuntu 18.04/20.04, CentOS 7/8, and the historical DGX EL7 stack. Treat those paths as compatibility references unless your site validates them for the release you deploy.
+The legacy DGX OS 4/5 and DGX EL7 paths have been removed (see above); other older releases are not validated.
 
 You may also install a supported operating system on all servers via a 3rd-party solution such as [MAAS](https://maas.io/) or [Foreman](https://www.theforeman.org/), or via an existing site-standard automated installer.
 For new Ubuntu 24.04 or DGX OS 7 deployments, prefer Ubuntu autoinstall/cloud-init or MAAS and then apply DeepOps roles after the OS is present.

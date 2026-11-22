@@ -3,7 +3,7 @@
 High-Performance RoCE Implementation in Multi-Node Kubernetes Cluster
 
 - [ROCE Perf K8s](#roce-perf-k8s)
-  - [Summary](#summary)
+  - [Introduction](#introduction)
   - [Solution Overview and Scope](#solution-overview-and-scope)
   - [RoCE Design Considerations](#roce-design-considerations)
   - [Key Hardware & Software Requirements](#key-hardware--software-requirements)
@@ -131,7 +131,7 @@ add switch PFC, ECN configuration
 
    ```bash
    # Install software prerequisites and copy default configuration
-   # Copies ./config.example to ./config, if none exists
+   # Starts ./config from config.example (inventory, group_vars, host_vars), if none exists
    ./scripts/setup.sh
    ```
 
@@ -208,7 +208,7 @@ add switch PFC, ECN configuration
    ansible-playbook -l k8s_cluster playbooks/k8s-cluster.yml
    ```
 
-   Please refer to [DeepOps Kubernetes Deployment Guidehere](https://github.com/NVIDIA/deepops/blob/master/docs/kubernetes-cluster.md) for more information.
+   Please refer to the [DeepOps Kubernetes Deployment Guide](README.md) for more information.
 
    Verify that Kubernetes clustering is working with "kubectl get nodes" command:
 
@@ -240,6 +240,9 @@ Worker:
   template:
     metadata:
       annotations:
+        # Historical (the retired SR-IOV device plugin layout): with the Network
+        # Operator the networks are the if_name of nvidia_network_operator_interfaces
+        # and the resources nvidia.com/<res_name>.
         k8s.v1.cni.cncf.io/networks: sriov111,sriov112
     spec:
       containers:
@@ -371,7 +374,7 @@ NCCL tests usually runs pretty fast and can finish in a few minutes once the job
 
 ```bash
 # Describe the pod
-kubernetes describe pods nccl-benchmarks-launcher-your_number
+kubectl describe pods nccl-benchmarks-launcher-your_number
 
 # Checking the running log of the pod
 kubectl logs -f nccl-benchmarks-launcher-your_number

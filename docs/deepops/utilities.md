@@ -1,8 +1,9 @@
 # Utility playbooks
 
-Playbooks for running a cluster once it is deployed. None of them is imported by
-`playbooks/slurm-cluster.yml`, so each runs
-only when you mean it to. The configuration
+Playbooks for running a cluster once it is deployed. None of the `playbooks/utilities/`
+ones is imported by `playbooks/slurm-cluster.yml`, so each runs only when you mean it to;
+the component playbooks listed beside them (power limit, ECC, PCIe ACS, CUDA toolkit,
+cluster tools) also run in the deploy, and run alone to apply just that component. The configuration
 playbooks converge and can be re-run; the action playbooks (power, reboot) act every time.
 
 Most take their targets from `-e hostlist=<pattern>`, and it has to come from the command
@@ -34,7 +35,7 @@ reboots each as it empties and returns it to service. See
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
 | `utilities/apt-upgrade.yml` | slurm-node | rolling maintenance (roles/maintenance): one node at a time, drain it, upgrade every package (the held-back kernel, systemd, libc, GPU and scheduler stacks included), reboot if needed, check slurmd, GPUs, DCGM (level 1) and NHC, resume. Run it monthly |
-| `utilities/check-id-consistency.yml` | all | asserts that NIS groups resolve to their pinned GID on every node; read-only |
+| `utilities/check-id-consistency.yml` | all | asserts that the groups the directory (NIS or LDAP) publishes resolve to their pinned GID on every node; read-only |
 | `utilities/fleet-consistency.yml` | slurm-cluster | are the hosts level: running kernel, shared packages, loaded NVIDIA driver, kernel policy sysctls, pending reboots, shared machine-ids; read-only |
 | `utilities/mofed.yml` | all | NVIDIA DOCA-OFED for InfiniBand or RoCE adapters |
 | `utilities/retire-local-accounts.yml` | all | the last step of a move to LDAP: removes the local copies of directory accounts; see [accounts.md](accounts.md) |

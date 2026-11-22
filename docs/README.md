@@ -26,7 +26,7 @@ git clone https://github.com/NVIDIA/deepops.git
 
 ```bash
 cd deepops
-git checkout <release-tag>   # e.g. 26.05
+git checkout <release-tag>   # the newest: git tag --sort=-v:refname | head -1
 ```
 
 3. Pick one of the [Deployment Options](/README.md#deployment-requirements) mentioned in the main [README](/README.md), following the installation instructions.

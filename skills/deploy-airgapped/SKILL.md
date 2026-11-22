@@ -41,7 +41,9 @@ mirrors explicitly as described below.
    ./scripts/setup.sh
    ```
 
-2. Copy `config.example/` to `config/`. Define the real hosts in
+2. Edit the `config/` that `setup.sh` created (config.example's inventory,
+   `group_vars` and `host_vars`; copy another config.example file into `config/`
+   only to change it). Define the real hosts in
    `config/inventory` before collecting artifacts so the selected cluster path
    and optional components are known:
 
@@ -102,7 +104,7 @@ bootstrap files when building an Enterprise Linux mirror. Keep these outside
 sudo mkdir -p /var/repos/keys /var/repos/bootstrap
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   -o /var/repos/keys/docker-ubuntu.asc
-sudo curl -fsSL https://download.docker.com/linux/centos/gpg \
+sudo curl -fsSL https://download.docker.com/linux/rhel/gpg \
   -o /var/repos/keys/docker-rpm.asc
 sudo curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
   -o /var/repos/keys/libnvidia-container.asc
@@ -135,9 +137,8 @@ top-level repo-ID directories created by `reposync`:
 ```bash
 for repo_id in epel docker-ce-stable cuda-rhel9-x86_64 \
   libnvidia-container nvidia-container-toolkit; do
-  sudo reposync -l --repoid="${repo_id}" --downloadcomps \
-    --download-metadata --download_path=/var/repos
-  sudo createrepo "/var/repos/${repo_id}"
+  sudo dnf reposync --repoid="${repo_id}" --download-metadata \
+    --download-path=/var/repos
 done
 ```
 
@@ -147,27 +148,33 @@ reference host; distribution repositories remain a separate prerequisite.
 
 ## 3. Mirror direct files, charts, and images
 
-1. Download the direct files selected by the current default Slurm profile.
-   These names and versions come from the checked-in role defaults:
+1. Download the direct files the default Slurm profile builds from. Their URLs are
+   role defaults; print them from the checkout, so the list always matches the
+   versions it deploys (`hpcsdk_download_url` only if you set
+   `slurm_install_hpcsdk: true`, which is off by default):
 
    ```bash
    sudo install -d -m 0755 /var/repos/downloads
-   while read -r url name; do
-     sudo curl -fL "${url}" -o "/var/repos/downloads/${name}"
-   done <<'EOF'
-   https://download.schedmd.com/slurm/slurm-26.05.6.tar.bz2 slurm-26.05.6.tar.bz2
-   https://github.com/mej/nhc/releases/download/1.4.3/lbnl-nhc-1.4.3.tar.xz lbnl-nhc-1.4.3.tar.xz
-   https://github.com/NVIDIA/pyxis/archive/v0.11.1.tar.gz pyxis-0.11.1.tar.gz
-   https://developer.download.nvidia.com/hpc-sdk/23.7/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz
-   https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz helm-v3.22.0-linux-amd64.tar.gz
-   EOF
-   for name in slurm-26.05.6.tar.bz2 \
-     lbnl-nhc-1.4.3.tar.xz pyxis-0.11.1.tar.gz \
-     nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz \
-     helm-v3.22.0-linux-amd64.tar.gz; do
-     test -s "/var/repos/downloads/${name}"
+   for rv in slurm:slurm_src_url slurm:slurm_pyxis_tarball_url nhc:nhc_src_url \
+             lmod:lmod_src_url; do   # add nvidia_hpc_sdk:hpcsdk_download_url for the HPC SDK
+     url=$(ANSIBLE_LOAD_CALLBACK_PLUGINS=1 ANSIBLE_STDOUT_CALLBACK=ansible.builtin.json \
+       uv run ansible localhost -c local -i localhost, -m ansible.builtin.debug \
+       -a "msg={{ ${rv#*:} }}" -e "@roles/${rv%%:*}/defaults/main.yml" |
+       python3 -c 'import json,sys; print(json.load(sys.stdin)["plays"][0]["tasks"][0]["hosts"]["localhost"]["msg"])')
+     echo "${rv#*:} ${url}"
+     sudo curl -fL "${url}" -o "/var/repos/downloads/$(basename "${url}")"
+     test -s "/var/repos/downloads/$(basename "${url}")"
    done
    ```
+
+   Then set each variable printed above to the same file name on the mirror,
+   e.g. `slurm_src_url: "http://package-server/downloads/<file name>"` (likewise
+   `slurm_pyxis_tarball_url`, `nhc_src_url`, `lmod_src_url`, and
+   `hpcsdk_download_url` if used). Their checksums stay the role's: the download
+   role refuses a file that does not match.
+
+   Helm is a provisioning-host tool, not a Slurm one: `scripts/k8s/install_helm.sh`
+   installs the version the bundled Kubespray pins, from `HELM_DOWNLOAD_BASE`.
 
    Enroot is also enabled by default. The in-tree `roles/enroot` downloads its
    packages from `enroot_release_base_url` (NVIDIA's GitHub release by default),
@@ -187,15 +194,7 @@ reference host; distribution repositories remain a separate prerequisite.
    and set `enroot_release_base_url: "http://package-server/downloads/enroot"`.
    Enterprise Linux uses `enroot-${v}-${r}.el8.<arch>.rpm` from the same release.
 
-   Replace `package-server` with the mirror host. Verify every file is
-   nonempty. Use these exact overrides with the published paths:
-
-   ```yaml
-   slurm_src_url: "http://package-server/downloads/slurm-26.05.6.tar.bz2"
-   nhc_src_url: "http://package-server/downloads/lbnl-nhc-1.4.3.tar.xz"
-   slurm_pyxis_tarball_url: "http://package-server/downloads/pyxis-0.11.1.tar.gz"
-   hpcsdk_download_url: "http://package-server/downloads/nvhpc_2023_237_Linux_x86_64_cuda_12.2.tar.gz"
-   ```
+   Replace `package-server` with the mirror host.
 
    Add `enroot_release_base_url` to `config/group_vars/all.yml`. The
    third-party package repositories come from `roles/package_repos`: on
@@ -207,8 +206,9 @@ reference host; distribution repositories remain a separate prerequisite.
    repository, so it is covered by the CUDA repository mirror below — verify
    the DCGM package is present in the mirrored CUDA repo content.
 
-   The default Slurm configuration also enables CUDA installation from
-   NVIDIA's CUDA repository. Set `package_repos_cuda_base` to the mirror of
+   The default Slurm path still needs NVIDIA's CUDA repository (DCGM comes from it,
+   and the Slurm build's NVML headers, `slurm_nvml_cuda_version`); CUDA itself is
+   off by default (`slurm_install_cuda`). Set `package_repos_cuda_base` to the mirror of
    `https://developer.download.nvidia.com/compute/cuda/repos` (same layout
    below it): the role installs the cuda-keyring from there, checks it
    against `package_repos_cuda_keyring_checksums`, and points the APT source
@@ -219,9 +219,9 @@ reference host; distribution repositories remain a separate prerequisite.
    the optional component. Do not silently fall back to its public URL.
 
 2. Mirror the Helm repositories/charts required by the selected Kubernetes
-   profile. The default tree references the stable Helm repository, GPU
-   Operator `v26.7.3`, and, when enabled, NFS subdir external provisioner
-   `4.0.18`. Set `gpu_operator_helm_repo` and
+   profile: the GPU Operator chart (`gpu_operator_chart_version`) and, when
+   enabled, the NFS subdir external provisioner (`k8s_nfs_client_chart_version`);
+   the current versions are in docs/deepops/versions.md. Set `gpu_operator_helm_repo` and
    `k8s_nfs_client_helm_repo` to internal chart repositories.
 
    Archive the chart versions selected by current DeepOps defaults on the
@@ -473,38 +473,26 @@ sha256sum -c SHA256SUMS
    test -z "$(find /var/www/html/downloads -maxdepth 1 -type f -size 0 -print -quit)"
    ```
 
-   For RPM, publish the exact top-level repo-ID directories, EPEL bootstrap
-   RPM, and a rewritten Container Toolkit repo file whose base URLs are
-   internal:
+   For RPM, publish the EPEL bootstrap RPM, and each repository in its upstream path layout under its base
+   URL, which the roles append to (docs/airgap/mirror-rpm-repos.md has the table:
+   Docker CE under `<base>/9/x86_64/stable`, the Container Toolkit under
+   `<base>/stable/rpm/x86_64`, CUDA under `<base>/rhel9/x86_64` with its key
+   files); DeepOps writes the repo files on the hosts itself:
 
    ```bash
-   for repo_id in epel docker-ce-stable cuda-rhel9-x86_64 \
-     libnvidia-container nvidia-container-toolkit; do
-     test -d "/var/repos/${repo_id}/repodata"
-     sudo cp -a "/var/repos/${repo_id}" /var/www/html/repos/
-   done
+   R=/var/www/html/repos
+   pub() { test -d "/var/repos/$1/repodata" && sudo install -d "$2" && sudo cp -a "/var/repos/$1/." "$2/"; }
+   pub epel                     "$R/epel"
+   pub docker-ce-stable         "$R/download.docker.com/linux/rhel/9/x86_64/stable"
+   pub nvidia-container-toolkit "$R/nvidia.github.io/libnvidia-container/stable/rpm/x86_64"
+   pub cuda-rhel9-x86_64        "$R/developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64"
+   # and the CUDA repository's key files (*.pub) into that last directory
    test -s /var/repos/bootstrap/epel-release-latest-9.noarch.rpm
    sudo install -m 0644 /var/repos/bootstrap/epel-release-latest-9.noarch.rpm \
      /var/www/html/repos/epel-release-latest-9.noarch.rpm
-   sudo tee /var/www/html/repos/nvidia-container-toolkit.repo >/dev/null <<'EOF'
-   [libnvidia-container]
-   name=libnvidia-container
-   baseurl=http://package-server/repos/libnvidia-container
-   enabled=1
-   gpgcheck=1
-   gpgkey=http://package-server/keys/libnvidia-container.asc
-
-   [nvidia-container-toolkit]
-   name=nvidia-container-toolkit
-   baseurl=http://package-server/repos/nvidia-container-toolkit
-   enabled=1
-   gpgcheck=1
-   gpgkey=http://package-server/keys/libnvidia-container.asc
-   EOF
    ```
 
-   Replace `package-server` with the real internal DNS name in both the repo
-   file and step 5. Verify every configured file URL with `curl -fsS` and every
+   Replace `package-server` with the real internal DNS name in step 5. Verify every configured file URL with `curl -fsS` and every
    APT/RPM metadata path with the target package manager before deployment.
    Preserve GPG verification.
 
@@ -551,13 +539,14 @@ sha256sum -c SHA256SUMS
    ```
 
    Activate the provisioning environment prepared before isolation (or install
-   it from approved internal indexes), then copy and edit `config.example/` if
-   site configuration was not transferred separately. Point
+   it from approved internal indexes), then run `scripts/setup.sh` (it starts `config/`
+   from config.example's inventory, `group_vars` and `host_vars`) if site
+   configuration was not transferred separately. Point
    `scripts/k8s/install_helm.sh` at the mirrored Helm release tarballs; it installs
    the version the bundled Kubespray pins and checks Kubespray's checksum:
 
    ```bash
-   HELM_DOWNLOAD_BASE=http://repo-server/downloads scripts/k8s/install_helm.sh
+   HELM_DOWNLOAD_BASE=http://package-server/downloads scripts/k8s/install_helm.sh
    ```
 
    Mirror the matching archive for another provisioning platform; do not use
@@ -617,7 +606,7 @@ docker_ubuntu_repo_gpgkey: "http://package-server/keys/docker-ubuntu.asc"
 nvidia_container_toolkit_repo_base_url: "http://package-server/repos/nvidia.github.io/libnvidia-container"
 nvidia_container_toolkit_repo_gpg_url: "http://package-server/keys/libnvidia-container.asc"
 
-docker_rh_repo_base_url: "http://package-server/repos/docker-ce-stable"
+docker_rh_repo_base_url: "http://package-server/repos/download.docker.com/linux/rhel"   # <base>/9/x86_64/stable
 docker_rh_repo_gpgkey: "http://package-server/keys/docker-rpm.asc"
 
 docker_insecure_registries:
@@ -675,39 +664,39 @@ gpu_operator_helm_repo: "http://package-server/charts"
 k8s_nfs_client_helm_repo: "http://package-server/charts"
 
 containerd_registries_mirrors:
-  - prefix: "{{ registry_addr }}"
+  - prefix: "{{ registry_host }}"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
   - prefix: "nvcr.io"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
   - prefix: "registry.k8s.io"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
   - prefix: "docker.io"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
   - prefix: "quay.io"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
   - prefix: "gcr.io"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
   - prefix: "ghcr.io"
     mirrors:
-      - host: "http://{{ registry_addr }}"
+      - host: "http://{{ registry_host }}"
         capabilities: ["pull", "resolve"]
         skip_verify: true
 ```
@@ -716,16 +705,11 @@ Use trusted TLS and `skip_verify: false` when the internal registry provides
 it. Set `k8s_nfs_client_provisioner: false` only if the cluster uses a
 site-owned storage path or intentionally has no dynamic NFS provisioner.
 
-The current top-level Kubernetes playbook invokes a Helm installer URL and
-adds `https://charts.helm.sh/stable`; when the Ansible host platform differs
-from the cluster nodes (for example a macOS or arm64 control machine), its
+When the Ansible host platform differs from the cluster nodes (for example a macOS or arm64 control machine), its
 artifact step also downloads `kubectl` and its checksum directly from
 `https://dl.k8s.io`. Run the deployment from a control host matching the
 cluster platform so the playbook fetches `kubectl` from a cluster node
-instead, or pre-approve an internal mirror for that URL. Its containerd
-local-registry settings
-also carry an explicit TODO in `config.example/group_vars/k8s_cluster.yml`.
-Therefore, before declaring a fully disconnected Kubernetes run ready, prove
+instead, or pre-approve an internal mirror for that URL. Before declaring a fully disconnected Kubernetes run ready, prove
 that these references are satisfied by approved internal endpoints or obtain a
 DeepOps code change. Do not claim that the current playbook is turnkey offline.
 
@@ -843,8 +827,8 @@ not claims that this complete procedure was live-tested in an air gap.
 - **Slurm validator reports `gpu_job_ok: false`:** inspect its `failures` list.
   If it reports driver errors, follow `skills/diagnose-driver-install/`; if the
   node is down/drained, inspect its Slurm reason before resuming it.
-- **Kubernetes play tries `raw.githubusercontent.com`,
-  `charts.helm.sh/stable`, a public chart repo, or a public image registry:**
+- **Kubernetes play tries `dl.k8s.io`, a public chart repo, or a public image
+  registry:**
   stop. The pinned Helm/chart/image dependency is not yet served internally;
   complete that mirror or gate the required DeepOps change before rerunning.
 - **Kubernetes CUDA smoke is `Pending` or shows an image pull error:** confirm

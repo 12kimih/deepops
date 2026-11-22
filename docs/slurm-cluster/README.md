@@ -14,7 +14,7 @@ Instructions for deploying a GPU cluster with Slurm
   - [Centralized syslog](#centralized-syslog)
   - [Configuring shared filesystems](#configuring-shared-filesystems)
   - [Installing tools and applications](#installing-tools-and-applications)
-  - [Installing Open on Demand](#installing-open-on-demand)
+  - [Open OnDemand](#open-ondemand)
   - [Pyxis and Enroot](#pyxis-and-enroot)
   - [Large deployments](#large-deployments)
   - [Identity across the cluster](#identity-across-the-cluster)
@@ -252,7 +252,7 @@ Faults of the application itself (XID 13, 31, 43, 45, 94) leave the node in serv
 It also drains a node whose row remapping is pending (applied at the next GPU reset) or has failed (no spare rows left, NVIDIA's RMA criterion; `nhc_gpu_check_remapped_rows`).
 The drain reason names the XID and the GPU's PCI address. Reboot the node once its jobs end: NHC returns it to service by itself when the new boot is clean. A failed row remapping stays drained until the GPU is replaced.
 
-If you want to disable NHC completely, you can do so by setting `slurm_install_nhc: no` and un-defining the `slurm_health_check_program` variable.
+To turn NHC off, set `slurm_install_nhc: false`: `slurm_health_check_program` follows it.
 
 ## Monitoring Slurm
 
@@ -260,16 +260,16 @@ As part of the Slurm installation, Grafana and Prometheus are both deployed.
 
 The services can be reached from the following addresses:
 
-- Grafana: http://\<slurm-master\>:3000
-- Prometheus: http://\<slurm-master\>:9090
+- Grafana: http://\<slurm-metric\>:3000 (`grafana_port`)
+- Prometheus: http://\<slurm-metric\>:9090 (`prometheus_port`)
 
 ## Centralized syslog
 
-To enable syslog forwarding from the cluster nodes to the first Slurm controller node, you can set the following variables in your DeepOps configuration:
+The cluster nodes forward their syslog to the first Slurm controller by default; set these to false in your DeepOps configuration to turn it off:
 
 ```
-slurm_enable_rsyslog_server: true
-slurm_enable_rsyslog_client: true
+slurm_enable_rsyslog_server: false
+slurm_enable_rsyslog_client: false
 ```
 
 For more information about our syslog forwarding functionality, please see the [centralized syslog guide](../misc/syslog.md).
@@ -285,7 +285,7 @@ See the documentation on [software modules](./software-modules.md) for informati
 
 ## Open OnDemand
 
-DeepOps no longer bundles an Open OnDemand installer. Sites that want the [Open OnDemand](https://openondemand.org/) HPC portal on their Slurm cluster should deploy it directly from the upstream project, following its own [installation documentation](https://osc.github.io/ood-documentation/latest/installation.html).
+The [Open OnDemand](https://openondemand.org/) web portal is a component, off by default: set `slurm_install_open_ondemand: true` and the deploy (or `playbooks/slurm-cluster/open-ondemand.yml` alone) installs it on the Slurm controller and removes it from every other host. Its settings, the Dex login and the TLS certificate are in [roles/open_ondemand/README.md](../../roles/open_ondemand/README.md).
 
 ## Pyxis and Enroot
 
@@ -318,12 +318,12 @@ deliberately, or it will behave differently depending on how the user arrived:
 - [Docker access from inside Slurm jobs](./docker-in-slurm-jobs.md) -- why adding a user
   to the `docker` group on a compute node has no effect inside a job, and how to
   publish a socket group that does work.
-- [Administrator sudo on a Slurm + NIS cluster](./cluster-sudo-netgroup.md) -- why `sudo`
-  group membership gives two different answers on the same node, and how a NIS netgroup
-  avoids it.
+- [Administrator sudo on a Slurm cluster with a directory](./cluster-sudo-netgroup.md) -- why
+  `sudo` group membership gives two different answers on the same node, and how a
+  directory (NIS or LDAP) netgroup avoids it.
 
-`playbooks/utilities/check-id-consistency.yml` asserts that every group published
-through NIS resolves to its pinned GID on every node.
+`playbooks/utilities/check-id-consistency.yml` asserts that every group the
+directory (NIS or LDAP) publishes resolves to its pinned GID on every node.
 
 ## Egress policy
 
