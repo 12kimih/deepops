@@ -19,7 +19,7 @@ spec.loader.exec_module(api)
 state = Path(os.environ['FAKE_STATE'])
 
 
-def request(self, method, path, body=None, form=None):
+def request(self, method, path, body=None, form=None, expect=dict):
     with (state / 'api-calls.jsonl').open('a') as log:
         log.write(json.dumps([method, path]) + '\n')
     if (method, path) == ('POST', '/api/v2/token'):

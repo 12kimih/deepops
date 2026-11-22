@@ -23,7 +23,16 @@ KEY_RE = re.compile(r"^([A-Za-z0-9_-]+)(?:\[(\d+)\])?$")
 
 
 class ApiError(Exception):
-    pass
+    """A call failed; STATUS is the HTTP status when the server answered one."""
+
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
+
+# A login the server refuses with these is refused for good (wrong credentials): waiting
+# for the control plane does not change it.
+REFUSED = (400, 401, 403)
 
 
 def parse_set_args(text):
@@ -53,13 +62,33 @@ def nest(pairs):
                     node = node.setdefault(key, {})
             else:
                 lst = node.setdefault(key, [])
+                if not isinstance(lst, list):
+                    raise ApiError("conflicting Helm keys in installation string: %s" % dotted)
                 while len(lst) <= int(index):
                     lst.append({})
                 if last:
                     lst[int(index)] = value
                 else:
                     node = lst[int(index)]
+            if not last and not isinstance(node, dict):
+                raise ApiError("conflicting Helm keys in installation string: %s" % dotted)
     return out
+
+
+class _Connection(http.client.HTTPSConnection):
+    """HTTPS to DOMAIN (its certificate and Host) at the address IP."""
+
+    def __init__(self, domain, ip, context, timeout):
+        super().__init__(domain, 443, context=context, timeout=timeout)
+        self.ip, self.tls = ip, context
+
+    def connect(self):
+        sock = socket.create_connection((self.ip, self.port), self.timeout)
+        try:
+            self.sock = self.tls.wrap_socket(sock, server_hostname=self.host)
+        except BaseException:
+            sock.close()
+            raise
 
 
 class Client:
@@ -70,7 +99,10 @@ class Client:
         self.context = ctx
         self.bearer = ""
 
-    def request(self, method, path, body=None, form=None):
+    def request(self, method, path, body=None, form=None, expect=dict):
+        """The JSON answer of METHOD PATH, which must be an EXPECT (dict, list, or a
+        tuple of them); every failure is an ApiError."""
+        what = "%s %s" % (method, path.split("?")[0])
         headers = {"Accept": "application/json"}
         data = None
         if form is not None:
@@ -81,22 +113,24 @@ class Client:
             headers["Content-Type"] = "application/json"
         if self.bearer:
             headers["Authorization"] = "Bearer " + self.bearer
+        conn = _Connection(self.domain, self.ip, self.context, self.timeout)
         try:
-            sock = socket.create_connection((self.ip, 443), self.timeout)
-            conn = http.client.HTTPSConnection(self.domain, 443, context=self.context, timeout=self.timeout)
-            conn.sock = self.context.wrap_socket(sock, server_hostname=self.domain)
             conn.request(method, path, body=data, headers=headers)
             resp = conn.getresponse()
             raw = resp.read(4 * 1024 * 1024)
+        except (OSError, http.client.HTTPException) as exc:
+            raise ApiError("%s failed: %s" % (what, type(exc).__name__)) from None
+        finally:
             conn.close()
-        except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
-            raise ApiError("%s %s failed: %s" % (method, path.split("?")[0], type(exc).__name__))
         if resp.status >= 300:
-            raise ApiError("%s %s returned HTTP %d" % (method, path.split("?")[0], resp.status))
+            raise ApiError("%s returned HTTP %d" % (what, resp.status), resp.status)
         try:
-            return json.loads(raw) if raw else {}
+            doc = json.loads(raw) if raw else {}
         except ValueError:
-            raise ApiError("%s %s returned invalid JSON" % (method, path.split("?")[0]))
+            raise ApiError("%s returned invalid JSON" % what) from None
+        if not isinstance(doc, expect):
+            raise ApiError("%s returned an unexpected answer" % what)
+        return doc
 
     def login(self, user, pw):
         doc = self.request(
@@ -115,6 +149,8 @@ def wait_for_api(client, user, pw, wait):
             client.login(user, pw)
             return
         except ApiError as exc:
+            if exc.status in REFUSED:
+                raise ApiError("the control plane refused the login (%s)" % exc) from None
             last = str(exc)
         if time.time() >= deadline:
             raise ApiError("control plane did not accept the login in time (%s)" % last)
@@ -138,9 +174,9 @@ def main(argv=None):
     client = Client(args.domain, args.resolve_ip, args.ca_file)
     try:
         wait_for_api(client, user, pw, args.wait)
-        listing = client.request("GET", "/api/v1/clusters")
+        listing = client.request("GET", "/api/v1/clusters", expect=(dict, list))
         items = listing if isinstance(listing, list) else listing.get("clusters", [])
-        found = [c for c in items if c.get("name") == args.cluster_name]
+        found = [c for c in items if isinstance(c, dict) and c.get("name") == args.cluster_name]
         created = not found
         if found:
             uid = found[0]["uuid"]

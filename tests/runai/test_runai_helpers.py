@@ -1,6 +1,9 @@
+import http.client
 import importlib.util
 import os
+import ssl
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -104,6 +107,82 @@ class TestInstallString(unittest.TestCase):
     def test_bad_key_rejected(self):
         with self.assertRaises(api.ApiError):
             api.nest({"a b": "x"})
+
+    def test_conflicting_keys_rejected(self):
+        for pairs in ({"a": "1", "a.b": "2"}, {"a.b": "1", "a[0]": "2"}, {"a[0]": "1", "a[0].b": "2"}):
+            with self.subTest(pairs=pairs), self.assertRaisesRegex(api.ApiError, "conflicting"):
+                api.nest(pairs)
+
+
+class FakeConnection:
+    """_Connection that answers STATUS with BODY, or raises ERROR; records close()."""
+
+    def __init__(self, status=200, body=b"{}", error=None):
+        self.status, self.body, self.error, self.closed = status, body, error, False
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+    def request(self, *args, **kwargs):
+        if self.error:
+            raise self.error
+
+    def getresponse(self):
+        return self
+
+    def read(self, limit):
+        return self.body
+
+    def close(self):
+        self.closed = True
+
+
+class TestClient(unittest.TestCase):
+    def call(self, conn, **kwargs):
+        client = api.Client("runai.example.test", "", "")
+        with mock.patch.object(api, "_Connection", conn):
+            return client.request("GET", "/api/v1/clusters", **kwargs)
+
+    def test_every_connection_is_closed(self):
+        for conn, error in (
+            (FakeConnection(error=ConnectionRefusedError()), "failed: ConnectionRefusedError"),
+            (FakeConnection(error=http.client.RemoteDisconnected()), "failed: RemoteDisconnected"),
+            (FakeConnection(status=503), "returned HTTP 503"),
+            (FakeConnection(body=b"<html>"), "invalid JSON"),
+            (FakeConnection(body=b"[]"), "unexpected answer"),
+        ):
+            with self.subTest(error=error):
+                with self.assertRaisesRegex(api.ApiError, error):
+                    self.call(conn)
+                self.assertTrue(conn.closed)
+        conn = FakeConnection(body=b"[]")
+        self.assertEqual(self.call(conn, expect=(dict, list)), [])
+        self.assertTrue(conn.closed)
+
+    def test_a_failed_handshake_closes_its_socket(self):
+        sock, tls = mock.Mock(), mock.Mock()
+        tls.wrap_socket.side_effect = ssl.SSLError("handshake")
+        conn = api._Connection("runai.example.test", "192.0.2.1", tls, 5)
+        with mock.patch("socket.create_connection", return_value=sock) as connect:
+            with self.assertRaises(ssl.SSLError):
+                conn.connect()
+        connect.assert_called_once_with(("192.0.2.1", 443), 5)
+        tls.wrap_socket.assert_called_once_with(sock, server_hostname="runai.example.test")
+        sock.close.assert_called_once_with()
+
+    def test_a_refused_login_is_not_waited_on(self):
+        client = mock.Mock()
+        client.login.side_effect = api.ApiError("POST /api/v2/token returned HTTP 401", 401)
+        with mock.patch("time.sleep") as sleep, self.assertRaisesRegex(api.ApiError, "refused the login"):
+            api.wait_for_api(client, "u", "p", 600)
+        sleep.assert_not_called()
+
+    def test_an_unready_control_plane_is_waited_on(self):
+        client = mock.Mock()
+        client.login.side_effect = [api.ApiError("POST /api/v2/token returned HTTP 503", 503), None]
+        with mock.patch("time.sleep") as sleep:
+            api.wait_for_api(client, "u", "p", 600)
+        sleep.assert_called_once_with(10)
 
 
 if __name__ == "__main__":
