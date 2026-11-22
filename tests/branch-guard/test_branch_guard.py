@@ -29,8 +29,9 @@ class BranchGuard(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.main = Path(tmp.name) / "shared"
-        self.other = Path(tmp.name) / "private"
+        # Paths with spaces: the guard names worktrees one per line, never split by word.
+        self.main = Path(tmp.name) / "shared tree"
+        self.other = Path(tmp.name) / "private tree"
         self.main.mkdir()
         git(self.main, "init", "-q", "-b", "main")
         git(self.main, "commit", "-q", "--allow-empty", "-m", "one")
@@ -81,7 +82,7 @@ class BranchGuard(unittest.TestCase):
         git(self.other, "checkout", "-q", "-B", "main", "main")
         result = git(self.main, "commit", "-q", "--allow-empty", "-m", "two")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn(str(self.other.resolve()), result.stderr)
+        self.assertIn(f"checked out in {self.other.resolve()}\n", result.stderr)
         self.assertFalse(self.moved())
 
     def test_a_branch_being_rebased_elsewhere_is_held(self):

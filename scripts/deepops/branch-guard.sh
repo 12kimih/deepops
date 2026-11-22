@@ -49,7 +49,8 @@ while read -r _old new ref ; do
     held="$(owners "${ref}")"
     [ -n "${held}" ] || continue
     [ "${held}" = "${here}" ] && continue
-    for dir in ${held} ; do
+    # One git directory per line: a path may hold spaces.
+    printf '%s\n' "${held}" | while IFS= read -r dir ; do
         echo "branch-guard: ${ref#refs/heads/} is checked out in $(worktree "${dir}")" >&2
     done
     refused=1

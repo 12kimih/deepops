@@ -41,20 +41,22 @@ SUFFIXES = ("", ".yml", ".yaml", ".json")
 
 
 def var_files(kind, name=None):
-    """The files Ansible reads for KIND (group_vars, host_vars): NAME, NAME.yml,
-    NAME.yaml, NAME.json, or every file in the directory NAME/; every name when None."""
+    """The files Ansible reads for KIND (group_vars, host_vars) and NAME: the file NAME
+    itself, whatever its name holds after a dot (a host gpu1.example.org), NAME.yml,
+    NAME.yaml, NAME.json, or the files of the directory NAME/; every name when None."""
     base = CONFIG / kind
     if not base.is_dir():
         return []
-    entries = [base / name] if name else sorted(base.iterdir())
+    if name:
+        candidates = [base / name, *(base / (name + suffix) for suffix in SUFFIXES if suffix)]
+    else:
+        candidates = [p for p in sorted(base.iterdir()) if p.is_dir() or p.suffix in SUFFIXES]
     files = []
-    for entry in entries:
-        if entry.is_dir():
-            files += sorted(p for p in entry.rglob("*") if p.is_file() and p.suffix in SUFFIXES)
-        for suffix in SUFFIXES if name else ("",):
-            path = entry.with_name(entry.name + suffix)
-            if path.is_file() and path.suffix in SUFFIXES:
-                files.append(path)
+    for path in candidates:
+        if path.is_dir():
+            files += sorted(p for p in path.rglob("*") if p.is_file() and p.suffix in SUFFIXES)
+        elif path.is_file():
+            files.append(path)
     return files
 
 
