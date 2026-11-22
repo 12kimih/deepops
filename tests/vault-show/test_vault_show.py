@@ -67,6 +67,13 @@ class VaultShow(unittest.TestCase):
         self.assertEqual(self.run_script("a").stdout, "dir\n")
         self.assertEqual(self.run_script("b", "--host", "node1").stdout, "host\n")
 
+    def test_a_dotted_host_name_is_found(self):
+        # host_vars/<name> is read whatever follows a dot in the name.
+        (self.base / "config/host_vars/node1.example.test").write_text(self.vaulted("c", "bare"))
+        (self.base / "config/host_vars/node2.example.test.yml").write_text(self.vaulted("c", "yml"))
+        self.assertEqual(self.run_script("c", "--host", "node1.example.test").stdout, "bare\n")
+        self.assertEqual(self.run_script("c", "--host", "node2.example.test").stdout, "yml\n")
+
     def test_a_host_without_its_own_value_never_picks_a_group_silently(self):
         (self.base / "config/group_vars/all.yml").write_text(self.vaulted("secret", "group"))
         (self.base / "config/group_vars/other.yml").write_text(self.vaulted("secret", "other"))
