@@ -801,6 +801,29 @@ class TaskRules(unittest.TestCase):
         ]
         self.assertEqual(spelled, [], "name it as {{ deepops_system_path }}")
 
+    def test_a_service_its_timer_runs_every_few_minutes_logs_only_what_it_did(self):
+        # The NFS retry, every minute, wrote systemd's start and finish lines: about four
+        # thousand a day per node, burying the journal. A periodic timer's service keeps
+        # them out (LogLevelMax=notice) and its own output in (SyslogLevel=notice).
+        seen, offenders = 0, []
+        for timer in tracked("roles/*/templates/*.timer.j2", "roles/*/files/*.timer"):
+            if not re.search(r"(?m)^OnUnit(Active|Inactive)Sec=", timer.read_text()):
+                continue
+            unit = re.search(r"(?m)^Unit=(\S+)\.service", timer.read_text())
+            name = unit.group(1) if unit else timer.name.split(".timer")[0]
+            services = [
+                p for p in tracked(f"roles/*/templates/{name}.service.j2", f"roles/*/files/{name}.service")
+            ]
+            self.assertTrue(services, f"{rel(timer)}: no service template named {name}")
+            seen += 1
+            text = services[0].read_text()
+            if not re.search(r"(?m)^SyslogLevel=notice$", text) or not re.search(
+                r"(?m)^LogLevelMax=notice$", text
+            ):
+                offenders.append(rel(services[0]))
+        self.assertGreaterEqual(seen, 5, "the scan finds the periodic timers")
+        self.assertEqual(offenders, [], "set SyslogLevel=notice and LogLevelMax=notice in these")
+
     def test_only_the_maintenance_role_reboots(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):

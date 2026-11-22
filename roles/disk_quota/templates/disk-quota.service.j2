@@ -11,3 +11,8 @@ ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
 ExecStart={{ _disk_quota_command }} {{ _disk_quota_config }} metrics
 Nice=10
 IOSchedulingClass=idle
+# Run every few minutes by its timer: systemd's own start and finish lines (info) stay
+# out of the journal, and whatever the program prints is kept (notice, unless it gives
+# a level), so the journal holds what it did, not that it ran.
+SyslogLevel=notice
+LogLevelMax=notice

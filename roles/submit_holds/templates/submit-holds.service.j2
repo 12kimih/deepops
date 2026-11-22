@@ -11,3 +11,8 @@ TimeoutStartSec=5min
 # The directory may sit on /run, which is empty after a boot.
 ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
 ExecStart={{ _submit_holds_command }} {{ _submit_holds_config }}
+# Run every few minutes by its timer: systemd's own start and finish lines (info) stay
+# out of the journal, and whatever the program prints is kept (notice, unless it gives
+# a level), so the journal holds what it did, not that it ran.
+SyslogLevel=notice
+LogLevelMax=notice

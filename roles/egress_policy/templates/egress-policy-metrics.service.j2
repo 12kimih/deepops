@@ -13,3 +13,8 @@ Nice=10
 ProtectSystem=full
 PrivateTmp=true
 NoNewPrivileges=true
+# Run every few minutes by its timer: systemd's own start and finish lines (info) stay
+# out of the journal, and whatever the program prints is kept (notice, unless it gives
+# a level), so the journal holds what it did, not that it ran.
+SyslogLevel=notice
+LogLevelMax=notice
