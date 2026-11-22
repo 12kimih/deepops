@@ -16,9 +16,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from ansible_yaml import load, render  # noqa: E402
+from nhc_checks import argv as nhc_argv  # noqa: E402
 
 PROGRAM = render((ROOT / "roles/pcie_acs/templates/pcie-acs.sh.j2").read_text(), {"ansible_managed": ""})
-CHECKS = ROOT / "roles/nhc/files/deepops.nhc"
 
 # setpci over a directory of register files: a device without a file has no ACS
 # capability (setpci fails), one named *.stuck ignores writes.
@@ -60,7 +60,7 @@ def run(mode, devices, nhc=False):
             "STATE": str(tmp / "state"),
             "PCIE_ACS_DEVICES": str(tmp / "sys"),
         }
-        argv = ["bash", "-c", f". {CHECKS}; check_pcie_acs {program}"] if nhc else [str(program), mode]
+        argv = nhc_argv(f"check_pcie_acs {program}") if nhc else [str(program), mode]
         proc = subprocess.run(argv, env=env, capture_output=True, text=True, check=False)
         regs = {p.name: p.read_text().strip() for p in (tmp / "state").iterdir()}
     return proc.returncode, proc.stdout.strip(), regs
