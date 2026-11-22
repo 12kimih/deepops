@@ -170,7 +170,7 @@
   failed_when: false
 
 - name: Remove the retired persistence drop-in
-  ansible.builtin.file:
+  systemd_dropin:
     path: /etc/systemd/system/nvidia-persistenced.service.d/override.conf
     state: absent
   when:
@@ -178,17 +178,7 @@
     - >-
       "ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode"
       in (nvidia_driver_old_dropin.content | b64decode)
-  register: nvidia_driver_persistenced_dropin
-
-- name: Remove the drop-in directory when nothing else is in it
-  change_command:
-    argv: [rmdir, /etc/systemd/system/nvidia-persistenced.service.d]
-    removes: /etc/systemd/system/nvidia-persistenced.service.d
-  register: nvidia_driver_dropin_dir
-  failed_when: >-
-    not ansible_check_mode and (nvidia_driver_dropin_dir.rc != 0 and 'not empty' not in nvidia_driver_dropin_dir.stderr)
-  changed_when: >-
-    ansible_check_mode or (nvidia_driver_dropin_dir.rc == 0)
+  register: nvidia_driver_old_dropin_removed
 
 # Enabled now, whatever module runs: after a pending reboot it starts with the new one.
 - name: Enable the NVIDIA persistence daemon at boot
@@ -204,7 +194,7 @@
   systemd_unit:
     name: nvidia-persistenced
     state: >-
-      {{ 'restarted' if nvidia_driver_persistenced_unit is changed or nvidia_driver_persistenced_dropin is changed
+      {{ 'restarted' if nvidia_driver_persistenced_unit is changed or nvidia_driver_old_dropin_removed is changed
          else 'started' }}
   when:
     - nvidia_driver_persistenced | bool

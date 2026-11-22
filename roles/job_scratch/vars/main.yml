@@ -12,5 +12,6 @@ _job_scratch_fact: /etc/ansible/facts.d/job_scratch.fact
 job_scratch_items:
   - "mount:{{ slurm_job_private_base }}"
   - "file:{{ _job_scratch_dropin }}"
+  - "dir:{{ _job_scratch_dropin | dirname }}"
   - "file:{{ _job_scratch_fact }}"
   - "file:{{ job_scratch_file }}"

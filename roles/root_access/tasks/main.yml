@@ -51,7 +51,16 @@
     quiet: true
   loop: "{{ root_access_from_hosts }}"
 
-# Mode 0600 root:root, as sshd's StrictModes requires.
+# Not every install has one (cloud-init makes it; a plain install does not). 0700 and
+# 0600 below, as sshd's StrictModes requires.
+- name: Create root's SSH directory
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Allow exactly the break-glass hosts' root keys
   ansible.builtin.copy:
     dest: /root/.ssh/authorized_keys

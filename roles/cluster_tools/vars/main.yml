@@ -6,5 +6,6 @@ cluster_tools_items:
   - "file:/etc/profile.d/{{ cluster_tools_profile_file }}"
   - "file:{{ cluster_tools_motd_dir }}/{{ cluster_tools_motd_file }}"
   - "file:{{ cluster_tools_user_slice_dir }}/{{ cluster_tools_user_slice_file }}"
+  - "dir:{{ cluster_tools_user_slice_dir }}"
   - "file:{{ cluster_tools_manifest }}"
   - "file:{{ cluster_tools_lib_manifest }}"

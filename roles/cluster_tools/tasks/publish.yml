@@ -245,31 +245,17 @@
 
 # systemd re-applies a slice's resource-control properties on daemon-reload, so a
 # changed limit reaches sessions that are already open.
-- name: Create the user slice drop-in directory
-  ansible.builtin.file:
-    path: "{{ cluster_tools_user_slice_dir }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  when: cluster_tools_user_slice_limits | length > 0
-
 - name: Publish the per-user resource limits
-  ansible.builtin.template:
-    src: user-slice-limits.conf.j2
-    dest: "{{ cluster_tools_user_slice_dir }}/{{ cluster_tools_user_slice_file }}"
-    owner: root
-    group: root
-    mode: "0644"
+  systemd_dropin:
+    path: "{{ cluster_tools_user_slice_dir }}/{{ cluster_tools_user_slice_file }}"
+    content: "{{ lookup('ansible.builtin.template', 'user-slice-limits.conf.j2') }}"
   when: cluster_tools_user_slice_limits | length > 0
-  notify: Reload systemd
 
 - name: Remove the per-user resource limits
-  ansible.builtin.file:
+  systemd_dropin:
     path: "{{ cluster_tools_user_slice_dir }}/{{ cluster_tools_user_slice_file }}"
     state: absent
   when: cluster_tools_user_slice_limits | length == 0
-  notify: Reload systemd
 
 # cron's PAM stack has no pam_systemd, so a cron job runs in cron.service, outside
 # every user's slice and its limits: a server started from @reboot ran unlimited
