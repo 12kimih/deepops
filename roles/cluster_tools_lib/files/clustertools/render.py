@@ -241,6 +241,22 @@ def duration(seconds, short=True):
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
+def size(nbytes):
+    """NBYTES in the binary units quotas and df -h use (K, M, G, T, P: powers of 1024),
+    to three significant figures: 0, 512B, 1.5K, 20G, 120G, 1.25T."""
+    n = float(nbytes)
+    for unit in ("B", "K", "M", "G", "T"):
+        if abs(n) < 1024:
+            break
+        n /= 1024
+    else:
+        unit = "P"
+    if unit == "B":
+        return f"{n:.0f}B" if n else "0"
+    text = f"{n:.3g}"
+    return f"{text if 'e' not in text else f'{n:.0f}'}{unit}"  # 999.6 is 1000, never 1e+03
+
+
 def pad(text, cols, align="l"):
     gap = " " * max(0, cols - width(text))
     return gap + text if align == "r" else text + gap

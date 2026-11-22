@@ -47,7 +47,7 @@
   tags:
     - people
 
-- name: Install the report and weekly summary services
+- name: Install the report, weekly summary and disk report services
   ansible.builtin.template:
     src: slurm-usage-report.service.j2
     dest: "/etc/systemd/system/{{ item.unit }}.service"

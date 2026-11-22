@@ -245,6 +245,17 @@ week's numbers, their jobs now and the steps to take. The weekly run is its own 
 keeps its own state file (`weekly.json` beside the hourly one's); `--weekly` with
 `--dry-run` or `--to` previews it.
 
+Every morning (`slurm_usage_report_storage_schedule`) it posts the day's disk usage, from
+the disk quota metrics ([disk-quota.md](../deepops/disk-quota.md); without them it posts
+nothing). The card has each counted filesystem's disk (how full, what is free, how the
+use changed in a day) and everyone past a warn level or at a hard limit, worst first.
+The thread lists each filesystem's `slurm_usage_report_storage_top` largest people (the
+roster's active logins, `slurm_usage_report_people`), with their day's growth and levels;
+everyone else there (root, the services, people who left) on one line; and the projects. `slurm_usage_report_storage_notify` says
+how the people past a level hear about it: `mention` on the card, `dm`, both, or `[]`.
+A host whose usage was not reported in the last hour is named, since its figures are
+older. `--storage` with `--dry-run` or `--to` previews it.
+
 The role needs a Slack app bot token (`slack_bot_token` in roles/slack_defaults, scopes `chat:write`, `im:write`,
 `users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack
 members through `slurm_usage_report_user_map`, or by email with

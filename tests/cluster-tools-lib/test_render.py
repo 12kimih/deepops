@@ -47,6 +47,15 @@ class DurationTests(unittest.TestCase):
         self.assertEqual([render.duration(x, short=False) for x in (59, 86400)], ["00:00:59", "1-00:00:00"])
 
 
+class SizeTests(unittest.TestCase):
+    def test_binary_units_three_figures(self):
+        sizes = (0, 512, 1536, 20 * 2**30, 120 * 2**30, 1.25 * 2**40, 1023 * 2**30, 3 * 2**50)
+        self.assertEqual([render.size(n) for n in sizes],
+                         ["0", "512B", "1.5K", "20G", "120G", "1.25T", "1023G", "3P"])  # fmt: skip
+        self.assertEqual(render.size(-5 * 2**30), "-5G")
+        self.assertEqual(render.size(999.6 * 2**30), "1000G")
+
+
 class WidthTests(unittest.TestCase):
     def test_wide_and_combining(self):
         self.assertEqual(render.width("ab"), 2)

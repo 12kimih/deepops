@@ -65,8 +65,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  help: "#help"
 #  announce: "#announcements"
 
-# Hourly GPU usage report and idle-GPU nudges, and a weekly per-person summary of
-# GPU-hours held and left idle (roles/slurm_usage_report), posted to
+# Hourly GPU usage report and idle-GPU nudges, a weekly per-person summary of GPU-hours
+# held and left idle, and a daily disk usage report (roles/slurm_usage_report), posted to
 # slack_channels.status. notify: any of mention, dm ([] = list only).
 # cancel_after_hours 0 = never. user_map: Slurm user -> Slack member ID (profile > Copy
 # member ID) or email; here from the people roster's slack attribute (PEOPLE in all.yml).
@@ -79,6 +79,12 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_notify: [mention]
 #slurm_usage_report_cancel_after_hours: 0
 #slurm_usage_report_user_map: "{{ slack_members }}"
+# The daily disk usage report, from the disk quota metrics (slurm_enable_disk_quota):
+# each counted filesystem, its storage_top largest people, the projects, and everyone past
+# a warn level (storage_notify: mention, dm, both or []).
+#slurm_usage_report_storage_schedule: "*-*-* 09:00:00"
+#slurm_usage_report_storage_top: 10
+#slurm_usage_report_storage_notify: [mention]
 
 # AI coding agents (roles/ai_agent_rules): the site's agent rules file (Markdown
 # starting with <!-- cluster-agent-rules -->), installed for Claude Code

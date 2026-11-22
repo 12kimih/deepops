@@ -1,6 +1,6 @@
 {{ ansible_managed | comment }}
 [Unit]
-Description=Run the Slurm GPU usage {{ item.what }} {{ item.schedule }}
+Description=Post the cluster {{ item.what }} {{ item.schedule }}
 
 [Timer]
 OnCalendar={{ item.schedule }}
