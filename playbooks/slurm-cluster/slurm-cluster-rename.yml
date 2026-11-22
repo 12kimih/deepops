@@ -116,11 +116,8 @@
     - name: Add the new cluster to accounting
       change_command:
         argv: ["{{ slurm_install_prefix }}/bin/sacctmgr", -i, add, cluster, "{{ slurm_cluster_name }}"]
-      register: slurm_rename_add
-      failed_when: >-
-        not ansible_check_mode and (slurm_rename_add.rc != 0 and 'already exists' not in slurm_rename_add.stdout)
-      changed_when: >-
-        ansible_check_mode or ('already exists' not in slurm_rename_add.stdout)
+        unless: [sh, -c, '"$1" -nP show cluster format=cluster | grep -qxF -- "$2"', sh,
+                 "{{ slurm_install_prefix }}/bin/sacctmgr", "{{ slurm_cluster_name }}"]
 
     - name: Stop slurmctld
       systemd_unit:

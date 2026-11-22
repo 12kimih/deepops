@@ -319,14 +319,12 @@
     delay: 5
     timeout: "{{ slurm_dbd_wait_timeout }}"
 
+# Each add runs only when sacctmgr does not list it yet (unless: a read that runs under
+# --check too), so a preview shows only what a run adds.
 - name: Create cluster
   change_command:
-    cmd: sacctmgr -i add cluster {{ slurm_cluster_name }}
-  register: create_cluster_result
-  failed_when: >-
-    not ansible_check_mode and (create_cluster_result.rc != 0 and 'already exists' not in create_cluster_result.stdout)
-  changed_when: >-
-    ansible_check_mode or ('already exists' not in create_cluster_result.stdout)
+    argv: [sacctmgr, -i, add, cluster, "{{ slurm_cluster_name }}"]
+    unless: [sh, -c, 'sacctmgr -nP show cluster format=cluster | grep -qxF -- "$1"', sh, "{{ slurm_cluster_name }}"]
   run_once: true
 
 # Without an accounting file (slurm_accounting_file), one flat account holds the users
@@ -337,36 +335,18 @@
 - name: Create account
   when: slurm_accounting_file | length == 0
   change_command:
-    cmd: >-
-      sacctmgr -i add account {{ slurm_acct_account }} cluster={{ slurm_cluster_name }}
-      Description="Compute Accounts" Organization="{{ slurm_acct_organization }}"
-  register: create_account_result
-  failed_when: >-
-    not ansible_check_mode and create_account_result.rc != 0
-    and 'Nothing new added' not in create_account_result.stdout
-    and 'Nothing added' not in create_account_result.stdout
-    and 'Already existing' not in create_account_result.stdout
-  changed_when: >-
-    ansible_check_mode or (
-    'Nothing new added' not in create_account_result.stdout
-    and 'Nothing added' not in create_account_result.stdout
-    and 'Already existing' not in create_account_result.stdout)
+    argv: [sacctmgr, -i, add, account, "{{ slurm_acct_account }}", "cluster={{ slurm_cluster_name }}",
+           Description=Compute Accounts, "Organization={{ slurm_acct_organization }}"]
+    unless: [sh, -c, 'sacctmgr -nP show account where name="$1" format=account | grep -qxF -- "$1"', sh,
+             "{{ slurm_acct_account }}"]
 
 - name: Create users
   when: slurm_accounting_file | length == 0
   change_command:
-    cmd: sacctmgr -i create user {{ item }} account={{ slurm_acct_account }} cluster={{ slurm_cluster_name }} adminlevel=None
-  register: create_user_result
-  failed_when: >-
-    not ansible_check_mode and create_user_result.rc != 0
-    and 'Nothing new added' not in create_user_result.stdout
-    and 'Nothing added' not in create_user_result.stdout
-    and 'Already existing' not in create_user_result.stdout
-  changed_when: >-
-    ansible_check_mode or (
-    'Nothing new added' not in create_user_result.stdout
-    and 'Nothing added' not in create_user_result.stdout
-    and 'Already existing' not in create_user_result.stdout)
+    argv: [sacctmgr, -i, create, user, "{{ item }}", "account={{ slurm_acct_account }}",
+           "cluster={{ slurm_cluster_name }}", adminlevel=None]
+    unless: [sh, -c, 'sacctmgr -nP show assoc where user="$1" account="$2" cluster="$3" format=user | grep -qxF -- "$1"',
+             sh, "{{ item }}", "{{ slurm_acct_account }}", "{{ slurm_cluster_name }}"]
   loop: "{{ slurm_acct_users }}"
 
 # Under any --tags: a restart the handlers noted must not be dropped.
