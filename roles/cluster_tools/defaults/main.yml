@@ -21,13 +21,14 @@ cluster_tools_libs: []  # cluster_tools_lib_dir comes from cluster_tools_lib (a 
 
 # Built-in commands to publish, by name: any of sq (the queue, who holds what, why jobs
 # wait, and what each partition pool has left), qos (the QoS a user may submit against
-# and how full each quota is) and gpu-usage (what a job's GPUs did, from Slurm's
-# accounting or Prometheus). Each is cluster_tools.<name, - as _>, installed by
+# and how full each quota is), gpu-usage (what a job's GPUs did, from Slurm's
+# accounting or Prometheus) and scratch-space (which of one's files on the scratch space
+# are due to be cleaned up, and when: roles/scratch_space). Each is cluster_tools.<name, - as _>, installed by
 # cluster_tools_lib with the rest of the cluster's Python; this role adds the command
 # wrapper and bash completion asked of the command itself, so both always match the
 # installed version. Empty publishes none and removes what was published.
 cluster_tools_commands: []
-cluster_tools_builtin: [sq, qos, gpu-usage]
+cluster_tools_builtin: [sq, qos, gpu-usage, scratch-space]
 cluster_tools_completion_dir: /usr/share/bash-completion/completions
 
 # Commands this role published are listed in cluster_tools_manifest, and one dropped from

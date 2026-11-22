@@ -251,6 +251,44 @@ tests:
               summary: "Container image stores on n1 have not been cleaned up for 3 days"
               description: "The daily cleanup failed or did not run, so podman storage and the enroot cache can fill the local disk: `journalctl -u container-storage-gc` and `systemctl list-timers container-storage-gc.timer` on the host."
 
+  - name: a scratch space cleanup that stopped warns after 3 days; one that never reported too
+    interval: 1h
+    input_series:
+      - series: 'scratch_space_last_success_timestamp_seconds{host="s", instance="s:9100"}'
+        values: '0x80'
+      - series: 'node_systemd_unit_state{host="t", instance="t:9100", name="scratch-space-purge.service", state="inactive"}'
+        values: '1x80'
+      - series: 'scratch_space_purge_truncated{host="s", instance="s:9100"}'
+        values: '1x80'
+    alert_rule_test:
+      - eval_time: 70h
+        alertname: ScratchSpaceCleanupStale
+        exp_alerts: []
+      - eval_time: 74h
+        alertname: ScratchSpaceCleanupStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: s, instance: "s:9100"}
+            exp_annotations:
+              summary: "The scratch space on s has not been cleaned up for 3 days"
+              description: "The daily cleanup failed or did not run, so files unused past their date stay and people's purge lists go stale: `journalctl -u scratch-space-purge` and `systemctl list-timers scratch-space-purge.timer` on the host."
+      - eval_time: 74h
+        alertname: ScratchSpaceCleanupNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: t, instance: "t:9100"}
+            exp_annotations:
+              summary: "The scratch space cleanup on t has reported no success for 3 days"
+              description: "`journalctl -u scratch-space-purge` and `systemctl list-timers scratch-space-purge.timer` on the host."
+      - eval_time: 47h
+        alertname: ScratchSpaceCleanupTruncated
+        exp_alerts: []
+      - eval_time: 49h
+        alertname: ScratchSpaceCleanupTruncated
+        exp_alerts:
+          - exp_labels: {severity: warning, host: s, instance: "s:9100"}
+            exp_annotations:
+              summary: "The scratch space cleanup on s stops at its entry bound"
+              description: "Each run looked at scratch_space_purge_max_entries entries and stopped: raise it (roles/scratch_space) or find who holds the files (`quota -s`, disk report)."
+
   - name: a periodic job installed on a host that never reports warns after its window
     interval: 1h
     input_series:

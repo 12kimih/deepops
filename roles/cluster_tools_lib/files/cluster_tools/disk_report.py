@@ -4,6 +4,8 @@
     (text, blocks), thread = render(data, who, top, people, mention)
     over_warn(data)                        -> the people past a warn level, with figures
     row_key(row)                           -> the key of a person's notices (cluster_tools.notices)
+    purge = collect_purge(prometheus)      -> each person's files the scratch cleanup lists
+    purge_key(user, entry), purge_dm_text(user, entry), burst_text(host, user, files)
 
 For each filesystem whose users' space is counted (roles/disk_quota, its textfile
 metrics), the disk: how full, how much is free and how that changed in a day; its
@@ -277,3 +279,53 @@ def dm_text(row, note=""):
     else:
         act = "Nothing is refused yet: free space before the hard limit."
     return f"Your disk use on {place} is {amount}, {state}. {act} {HOW}"
+
+
+# The scratch space's cleanup (cluster_tools.scratch_space): each person's files listed for
+# removal, told once per removal date, and the mass access-time refreshes an
+# administrator sees.
+PURGE_HOW = "`scratch-space` lists them, with any you used since."
+
+
+def collect_purge(prom):
+    """{"due": {(host, user): {files, bytes, next, stale_days}}, "bursts": {(host, user): files}}."""
+    files = series(prom, "scratch_space_purge_due_files", ("user",))
+    nbytes = series(prom, "scratch_space_purge_due_bytes", ("user",))
+    nxt = series(prom, "scratch_space_purge_next_timestamp_seconds", ("user",))
+    stale = {k[0]: v for k, v in series(prom, "scratch_space_purge_stale_days", ()).items()}
+    due = {
+        k: {
+            "files": int(v),
+            "bytes": nbytes.get(k, 0),
+            "next": nxt.get(k),
+            "stale_days": int(stale.get(k[0], 0)),
+        }
+        for k, v in files.items()
+        if v > 0 and nxt.get(k)
+    }
+    bursts = {
+        k: int(v) for k, v in series(prom, "scratch_space_purge_burst_files", ("user",)).items() if v > 0
+    }
+    return {"due": due, "bursts": bursts}
+
+
+def purge_key(k, entry):
+    """A person is told once per removal date: a new date is a new notice."""
+    return f"purge {k[0]} {k[1]} {datetime.fromtimestamp(entry['next']).strftime('%Y-%m-%d')}"
+
+
+def purge_dm_text(k, entry):
+    when = datetime.fromtimestamp(entry["next"]).strftime("%Y-%m-%d")
+    return (
+        f"{entry['files']} of your files on the scratch space ({size(entry['bytes'])}) have not been used"
+        f" for {entry['stale_days']} days: the first go on {when} unless you use them before (read or write)."
+        f" {PURGE_HOW} /scratch is for data in use; keep what must last in your home."
+    )
+
+
+def burst_text(k, files):
+    return (
+        f"Scratch space on {k[0]}: {files} old files of {k[1]} were all used within minutes,"
+        " as a mass access-time refresh would (to escape the cleanup, against the rules). Nothing"
+        " is done automatically; a look is up to you."
+    )

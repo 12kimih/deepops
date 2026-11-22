@@ -8,6 +8,14 @@
 # disk_quota_filesystems on this host), not a size of the directory: what they write
 # anywhere there counts. The directories hold people's data: absent removes nothing, and
 # a former member's goes with people-purge.yml (people_purge_paths).
+#
+# The space is for data in use: a daily timer (cluster_tools.scratch_space purge) lists
+# each file nobody used (read or written) for scratch_space_stale_days in its owner's
+# list file, <root>/<login>/.purge-list, and removes it scratch_space_grace_days after it
+# was first listed unless it is used before. `scratch-space` (a command people run,
+# cluster_tools_builtin) shows the list, with what was used since; the daily disk report
+# tells each person once per removal date. Access times need relatime (or strictatime)
+# on the filesystem: under noatime a file only read looks unused.
 scratch_space_state: present
 
 # The scratch filesystem's mount point on this host.
@@ -18,3 +26,22 @@ scratch_space_root_mode: "0755"
 # A personal directory's mode, a ceiling as for homes: one with permissions beyond it is
 # set to it, a stricter one (0700) is left as its owner chose.
 scratch_space_mode: "{{ people_home_mode }}"
+
+# The cleanup: off removes the timer and stops removing (the list files stay as last
+# written); the periods are the cluster's one stale period and one grace period.
+scratch_space_purge: true
+scratch_space_stale_days: "{{ cluster_user_stale_days }}"
+scratch_space_grace_days: "{{ cluster_user_grace_days }}"
+# The collaboration folders' directory: each folder's files count to their owners.
+scratch_space_projects: "{{ scratch_space_root }}/projects"
+# When the timer runs (systemd OnCalendar), spread over the hour that follows.
+scratch_space_purge_on_calendar: "*-*-* 03:30:00"
+# The most entries one run looks at (a bound on time and memory); files past it keep
+# their dates and are reached the next day.
+scratch_space_purge_max_entries: 50000000
+# Old files (unchanged for the stale period) all used within one burst_window seconds,
+# at least burst_files of them and burst_share of the person's files: counted for an
+# administrator (a mass access-time refresh), never acted on.
+scratch_space_purge_burst_files: 1000
+scratch_space_purge_burst_share: 0.5
+scratch_space_purge_burst_window: 600

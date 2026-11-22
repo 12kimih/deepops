@@ -683,10 +683,46 @@ def disk(cfg, args):
                 failures.append(f"notifying {row[2]}: {e}")
         if delivered:
             told[disk_report.row_key(row)] = int(now)
+    failures += purge_notices(cfg, slack, cache, state, now, preview)
     if not preview:
-        write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
+        write_atomic(
+            path,
+            json.dumps({"users": cache, "told": told, "purge_told": state.get("purge_told", {})}),
+            mode=0o600,
+        )
     if failures:
         raise RuntimeError("; ".join(failures))
+
+
+def purge_notices(cfg, slack, cache, state, now, preview):
+    """Tell each person once per removal date of the scratch cleanup (cluster_tools.
+    scratch_space) in a DM, whatever disk_notify says (it is their files going, not a
+    disk card), and the administrators of a mass access-time refresh once a day; the
+    failures, as text."""
+    purge = disk_report.collect_purge(Prometheus(cfg["prometheus_url"]))
+    told = state.setdefault("purge_told", {})
+    entries = {disk_report.purge_key(k, e): (k, e) for k, e in purge["due"].items()}
+    day = time.strftime("%Y-%m-%d", time.localtime(now))
+    bursts = {f"burst {k[0]} {k[1]} {day}": (k, n) for k, n in purge["bursts"].items()}
+    keys = notices.due(list(entries) + list(bursts), told, now, 10**9)
+    failures = []
+    for key in keys:
+        if preview:
+            continue
+        try:
+            if key in entries:
+                k, entry = entries[key]
+                member = slack_id(k[1], cfg, slack, cache)
+                if member:
+                    slack.post(slack.channel(member), disk_report.purge_dm_text(k, entry))
+                    told[key] = int(now)
+            elif key in bursts and cfg["admin_channel"]:
+                k, n = bursts[key]
+                slack.post(cfg["admin_channel"], disk_report.burst_text(k, n))
+                told[key] = int(now)
+        except (RuntimeError, OSError) as e:
+            failures.append(f"scratch cleanup notice {key}: {e}")
+    return failures
 
 
 def post_report(report, cfg, who, slack, to):

@@ -221,7 +221,8 @@ class RunTests(unittest.TestCase):
 
     CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, disk_top=10, disk_notify=["mention", "dm"],
-               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0)  # fmt: skip
+               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0,
+               admin_channel="#admins")  # fmt: skip
 
     def run_disk(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
         """(posts [(channel, text, blocks as text)], the failure, disk.json): one run at
@@ -291,6 +292,31 @@ class RunTests(unittest.TestCase):
         posted, error, _ = self.run_disk(site(), notify=["mention"])
         self.assertEqual({p[0] for p in posted}, {"#status"})
         self.assertIsNone(error)
+
+    def test_scratch_cleanup_tells_each_person_once_per_date_and_admins_of_a_burst(self):
+        prom = site()
+        prom.now.update({
+            "scratch_space_purge_due_files": [row(3, host="gpu8", user="alice")],
+            "scratch_space_purge_due_bytes": [row(2 * G, host="gpu8", user="alice")],
+            "scratch_space_purge_next_timestamp_seconds": [row(NOW + 14 * disk_report.DAY, host="gpu8", user="alice")],
+            "scratch_space_purge_stale_days": [row(60, host="gpu8")],
+            "scratch_space_purge_burst_files": [row(5000, host="gpu8", user="carol")],
+        })  # fmt: skip
+        with tempfile.TemporaryDirectory() as d:
+            posted, _, saved = self.run_disk(prom, state=d)
+            dm = [p for p in posted if p[0] == "UALICE" and "scratch space" in p[1]]
+            self.assertEqual(len(dm), 1)
+            self.assertIn("3 of your files on the scratch space (2G)", dm[0][1])
+            self.assertIn("`scratch-space`", dm[0][1])
+            admin = [p for p in posted if p[0] == self.CFG["admin_channel"] and "carol" in p[1]]
+            self.assertEqual(len(admin), 1)
+            self.assertEqual(len(saved["purge_told"]), 2)
+            # The next day, the same date: told already.
+            posted, _, _ = self.run_disk(prom, state=d, now=NOW + disk_report.DAY)
+            self.assertFalse([p for p in posted if "scratch space" in p[1] and p[0] == "UALICE"])
+        # A DM whatever disk_notify says: it is a person's files going, not the disk card.
+        posted, _, _ = self.run_disk(prom, notify=["mention"])
+        self.assertEqual(len([p for p in posted if p[0] == "UALICE" and "scratch space" in p[1]]), 1)
 
     def test_nothing_counted_posts_nothing(self):
         posted, error, _ = self.run_disk(Prom({}))

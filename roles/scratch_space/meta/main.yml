@@ -1,6 +1,9 @@
 ---
 dependencies:
   - role: people_defaults  # people, people_home_mode
+  - role: deploy_defaults  # cluster_user_stale_days, cluster_user_grace_days
+  - role: cluster_tools_lib  # cluster_tools.scratch_space
+  - role: prometheus_paths  # node_exporter_prom_dir
 
 galaxy_info:
   namespace: deepops
