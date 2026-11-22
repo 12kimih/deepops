@@ -31,7 +31,7 @@ and any DeepOps-owned UI. The web UI in `platform` mode is the upstream one.
     ingress and the Gateway API paths; reaching that address from another
     machine was not part of the test)
   - `kube-prometheus-stack` 88.6.5 or newer (`scripts/k8s/deploy_monitoring.sh`
-    with `HELM_PROMETHEUS_CHART_VERSION` set)
+    installs a newer one by default)
   - a DNS name for the control plane, and a TLS certificate for it
   - room: the control plane alone wants about 10 CPU cores, 12 GB of memory and
     110 GB of disk; the cluster services about 10 cores, 20 GB, 50 GB. See the
@@ -168,7 +168,8 @@ HAProxy path above and is unchanged.
 default) the role waits up to `runai_platform_address_timeout` seconds (300) for the
 service to get an external address and uses it, instead of the node address, for the
 hosts entry, the CoreDNS entry and the API helper. Install a load balancer first:
-`./scripts/k8s/deploy_loadbalancer.sh` with an address pool in `config/helm/metallb.yml`
+`./scripts/k8s/deploy_loadbalancer.sh` with an address pool in `config/helm/metallb-resources.yml` (copied from config.example
+to change it)
 ([Load Balancer and Ingress](ingress.md)). If no address appears the role stops and says
 so; set `runai_platform_ingress_ip` to use a fixed address instead.
 
@@ -197,7 +198,7 @@ upstream MetalLB requirement, not a separately live-tested path for this release
 The role then, instead of installing HAProxy:
 
 1. installs the Gateway API CRDs (v1.4.0, standard channel) if none are present, and
-   missing KGateway releases (v2.2.1) in `kgateway-system`, recording ownership
+   missing KGateway releases (`runai_gateway_controller_version`) in `kgateway-system`, recording ownership
    in per-release `deepops-runai-kgateway*` ConfigMaps. Existing unowned releases
    are not upgraded or adopted;
 2. creates one `Gateway` (`runai-gateway`) in the Run:ai cluster namespace with a TLS

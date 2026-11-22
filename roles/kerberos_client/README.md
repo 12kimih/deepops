@@ -16,7 +16,8 @@ Role Variables
 The variables that can be passed to this role and a brief description about
 them are as follows:
 
-    kerberos_client_realm_name: EXAMPLE.COM           # The name of the Kerberos Realm (required)
+    kerberos_client_realm_name: ""                    # The Kerberos realm (e.g. EXAMPLE.COM); the role
+                                                      # is a no-op while it is empty (the default)
     kerberos_client_kdc_hostname: kerberos            # The hostname of the server
     kerberos_client_admin_hostname: kerberos          # The hostname of the Kerberos
                                                       # admin server

@@ -33,13 +33,10 @@ Updating a cluster deployed with DeepOps
       - [Updating Slurm](#updating-slurm)
       - [Updating the NVIDIA driver](#updating-the-nvidia-driver-1)
       - [Updating the CUDA toolkit](#updating-the-cuda-toolkit)
-      - [Updating the monitoring stack (excluding dcgm-exporter)](#updating-the-monitoring-stack-excluding-dcgm-exporter)
-      - [Updating dcgm-exporter](#updating-dcgm-exporter)
+      - [Updating the monitoring stack](#updating-the-monitoring-stack-1)
       - [Updating Enroot and Pyxis](#updating-enroot-and-pyxis)
     - [Installing a new HPC SDK](#installing-a-new-hpc-sdk)
     - [Updating OS packages](#updating-os-packages-1)
-      - [On Ubuntu](#on-ubuntu-1)
-      - [On RHEL](#on-rhel-1)
 
 ## Updating the DeepOps repository
 
@@ -352,7 +349,7 @@ For other major version upgrades, see the instructions documented in the [README
 
 #### On Ubuntu
 
-To update the underlying OS packages on the nodes, run the upgrade playbook against them, then reboot any node that asks for it (`/var/run/reboot-required`):
+To update the underlying OS packages, run the maintenance upgrade: one node at a time it drains the node, upgrades every package, reboots it when the upgrade needs it, checks it and returns it to Slurm (a failed node stops the run, still drained):
 
 ```bash
 ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
@@ -360,10 +357,10 @@ ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 
 #### On RHEL
 
-To update the underlying OS packages on the nodes, run the following on each node:
+The same playbook runs dnf on Red Hat family nodes (`maintenance_dnf_nobest`); dnf writes no `/var/run/reboot-required`, so the maintenance role decides the reboot from what was upgraded:
 
 ```bash
-sudo dnf upgrade
+ansible-playbook -K playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
 ```
 
 ## Updating Slurm clusters
@@ -380,23 +377,13 @@ Performing these component-based upgrades does not require updating the DeepOps 
 
 #### Updating Slurm
 
-**Important:** Slurm generally supports upgrading within two major releases without loss of state information or accounting data. E.g., you can upgrade to 25.11 from 25.05 or 24.11, but not from earlier releases. We recommend consulting the release notes for your desired version of Slurm before running an upgrade.
-
-To upgrade to a new version of Slurm, modify your DeepOps configuration to specify your desired Slurm version, with the checksum of its source tarball (the download stops without one; take it from a source independent of the download site, such as a distribution's package sources):
-
-```yaml
-slurm_version: "<version>"
-slurm_checksums:
-  "<version>": "sha512:<checksum of slurm-<version>.tar.bz2>"
-```
-
-Then re-run the Slurm playbook:
+Slurm is built once into `slurm-smd` packages on the controller and installed from that repository; a version change goes through the upgrade playbook, which orders it as Slurm requires (slurmdbd, slurmctld, then the nodes, each drained), and a plain deploy refuses one. Set `slurm_version` and its `slurm_checksums` entry (the SHA256 of the release tarball), then follow [Upgrading Slurm](../slurm-cluster/slurm-upgrade.md#upgrading-slurm):
 
 ```bash
-ansible-playbook playbooks/slurm-cluster/slurm.yml [-l <list-of-nodes>]
+ansible-playbook -K playbooks/slurm-cluster/slurm-upgrade.yml
 ```
 
-Note that this can take a long time, as we download and build Slurm from source in this process.
+How many major releases one upgrade may cross is `slurm_upgrade_max_majors`; read the release notes of the target version first.
 
 #### Updating the NVIDIA driver
 
@@ -439,7 +426,7 @@ For the single system-wide toolkit instead (`slurm_install_cuda: true`), set the
 
 #### Updating the monitoring stack
 
-The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by tag and digest (`repo:tag@sha256:...`) in one variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `node_exporter_container`, `ipmi_exporter_container` and `dcgm_exporter_container`. The playbooks pull the pinned image at deploy time (`roles/container_image`, which refuses an unpinned reference); the units only run the local image and never pull when they start, so a moved tag or a registry outage cannot change or break a restart. `slurm_exporter_container` is built locally from a Dockerfile whose base images are pinned the same way.
+The monitoring stack on a Slurm cluster deployed with DeepOps is container-based, and each image is pinned by tag and digest (`repo:tag@sha256:...`) in one variable: `prometheus_container`, `grafana_container`, `alertmanager_container`, `node_exporter_container`, `ipmi_exporter_container` and `dcgm_exporter_container`. The playbooks pull the pinned image at deploy time (`roles/container_image`, which refuses an unpinned reference); the units only run the local image and never pull when they start, so a moved tag or a registry outage cannot change or break a restart.
 
 To upgrade, print the new pin and set it in your DeepOps configuration (or, for a new default, in the role's defaults), then re-run the playbook. The image reference is part of the unit file, so a new pin changes the unit and the playbook restarts the service.
 
@@ -462,24 +449,16 @@ ansible-playbook -l slurm-node playbooks/slurm-cluster/nvidia-dcgm-exporter.yml
 
 #### Updating Enroot and Pyxis
 
-To update Pyxis and/or Enroot, edit your DeepOps configuration and specify the new versions you wish to use, with the checksum of every file they download (the download stops without one). GitHub publishes them with each release's assets:
-
-```yaml
-slurm_pyxis_version: "<version>"
-slurm_pyxis_checksums:
-  "<version>": "sha256:<checksum of the v<version> source archive>"
-enroot_version: "<version>"
-enroot_checksums:
-  "enroot_<version>-1_amd64.deb": "sha256:<checksum>"
-  "enroot+caps_<version>-1_amd64.deb": "sha256:<checksum>"
-```
-
-`enroot_checksums` names each release file of the packages and architectures your hosts install (`roles/enroot/defaults/main.yml` lists the current ones); a setting in your config replaces the role's whole list.
-
-Then re-run the Pyxis playbook:
+Enroot is installed from NVIDIA's release packages: set `enroot_version` and the checksum of every release file your hosts install (`enroot_checksums`, keyed by file name; `roles/enroot/defaults/main.yml` lists the current ones, and a setting in your config replaces the role's whole list), then run:
 
 ```bash
-ansible-playbook playbooks/container/pyxis.yml [-l <list-of-nodes>]
+ansible-playbook -K playbooks/container/enroot.yml [-l <list-of-nodes>]
+```
+
+Pyxis is a Slurm plugin built with the Slurm packages, against exactly that Slurm: set `slurm_pyxis_version` and its `slurm_pyxis_checksums` entry, then run the Slurm playbook, which builds and installs it with Slurm ([slurm-upgrade.md](../slurm-cluster/slurm-upgrade.md)):
+
+```bash
+ansible-playbook -K playbooks/slurm-cluster/slurm.yml
 ```
 
 ### Installing a new HPC SDK
@@ -505,18 +484,4 @@ Note that we typically install the HPC SDK in an NFS-shared directory, so this p
 
 ### Updating OS packages
 
-#### On Ubuntu
-
-To update the underlying OS packages on the nodes, run the upgrade playbook against them, then reboot any node that asks for it (`/var/run/reboot-required`):
-
-```bash
-ansible-playbook playbooks/utilities/apt-upgrade.yml -e hostlist=<list-of-nodes>
-```
-
-#### On RHEL
-
-To update the underlying OS packages on the nodes, run the following on each node:
-
-```bash
-sudo dnf upgrade
-```
+The maintenance upgrade is the same for both kinds of cluster: see [Updating OS packages](#updating-os-packages) above.

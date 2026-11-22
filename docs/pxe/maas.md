@@ -55,8 +55,8 @@ If a site already uses BCM or another fleet manager, keep that system authoritat
 
 In order to set up and use MAAS, you should at minimum have the following components:
 
-- An Ubuntu 22.04 or 24.04 server which you can use to run MAAS.
-  MAAS 3.7 is the current Ubuntu 24.04 line; use MAAS 3.5 if the controller itself remains on Ubuntu 22.04.
+- An Ubuntu 22.04, 24.04 or 26.04 server which you can use to run MAAS; `maas_series`
+  follows the controller's release (MAAS 3.5 on 22.04, 3.7 on 24.04, 3.8 on 26.04).
 - One or more servers which you will manage using MAAS
 - A network connection between all the servers on which you can safely run DHCP. This is needed so that MAAS can provision IP addresses to the nodes it manages.
 - A network connection which you can use to log into the MAAS server. This may be the same network as the inter-node network, or it may be a separate network.

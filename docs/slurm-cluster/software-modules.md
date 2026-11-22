@@ -100,7 +100,7 @@ EasyBuild` works on nodes with the same Python at the same path.
 
 ### Configuration
 
-- `easybuild_version`: The EasyBuild release (default `5.4.2`). A new version needs its
+- `easybuild_version`: The EasyBuild release (the current default is in the [version table](../deepops/versions.md)). A new version needs its
   sdist checksums in `easybuild_sha256` (see `roles/easy-build/defaults/main.yml`).
 - `easybuild_user`: The build account (default `easybuild`).
 - `easybuild_prefix`: EasyBuild's own tree, the only part of `/sw` the build account owns

@@ -59,8 +59,9 @@ description: Deploy a Kubernetes GPU cluster with DeepOps (Kubespray + GPU Opera
 - **Syntax/import error mentioning `kubespray_defaults`**: the submodule is
   not initialized; run `git submodule update --init --recursive`.
 - **`gpus_allocatable: 0`**: the GPU Operator stack is not ready. Check
-  `kubectl get pods -A | grep -i nvidia` — the driver DaemonSet can take
-  10+ minutes on first deploy; if pods are crash-looping, follow
+  `kubectl get pods -A | grep -i nvidia` — with Operator-managed drivers
+  (`gpu_operator_preinstalled_nvidia_software: false`) the driver DaemonSet
+  can take 10+ minutes on first deploy; if pods are crash-looping, follow
   `skills/diagnose-driver-install/`.
 - **CUDA smoke pod stuck `Pending`**: `kubectl -n deepops-validate
   describe pod deepops-validate-cuda` — usually no allocatable GPU

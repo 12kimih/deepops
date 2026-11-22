@@ -41,7 +41,7 @@ exporter deepops used before is retired: a deploy removes it from every host.
 falls back to it when a node has no ACPI power meter (`node_hwmon_power_average_watt`).
 Install it on its own with `playbooks/slurm-cluster/prometheus-ipmi-exporter.yml`.
 
-The node and GPU exporter containers look like this:
+The node and GPU exporter containers look like this (host networking, so PORTS is empty; they listen on `node_exporter_port` and `dcgm_exporter_port`):
 
 ```bash
 # View the DCGM Exporter container on a GPU node
@@ -49,7 +49,7 @@ $ sudo docker ps
 CONTAINER ID        IMAGE                              COMMAND                  CREATED             STATUS
 PORTS                    NAMES
 139fe402640f        quay.io/prometheus/node-exporter   "/bin/node_exporter ..." 56 minutes ago      Up 56 minutes                                docker.node-exporter.service
-0da9e3f1a7c8        nvcr.io/nvidia/k8s/dcgm-exporter   "/usr/bin/dcgm-expor..." 56 minutes ago      Up 56 minutes       0.0.0.0:9400->9400/tcp   docker.dcgm-exporter.service
+0da9e3f1a7c8        nvcr.io/nvidia/k8s/dcgm-exporter   "/usr/bin/dcgm-expor..." 56 minutes ago      Up 56 minutes                                docker.dcgm-exporter.service
 ```
 
 ## Grafana

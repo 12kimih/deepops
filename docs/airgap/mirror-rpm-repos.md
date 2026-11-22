@@ -31,7 +31,7 @@ The following additional RPM repositories are commonly used for GPU-enabled syst
 - [Fedora Extra Packages for Enterprise Linux (EPEL)](https://fedoraproject.org/wiki/EPEL)
 - NVIDIA CUDA repository: [repo file for EL8](https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo), [repo file for EL9](https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo)
 - NVIDIA Container Toolkit repository: [repo file for RPM-based distributions](https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo)
-- Docker CE repository: [repo file](https://download.docker.com/linux/centos/docker-ce.repo)
+- Docker CE repository: [repo file](https://download.docker.com/linux/rhel/docker-ce.repo)
 
 These repo files provide the following repository IDs, which will be needed by `reposync` below:
 
@@ -63,7 +63,7 @@ For example, if using the list of repositories from the previous section:
 
 ```bash
 cd /etc/yum.repos.d
-sudo wget https://download.docker.com/linux/centos/docker-ce.repo
+sudo wget https://download.docker.com/linux/rhel/docker-ce.repo
 sudo wget https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
 sudo wget https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
 ```
@@ -125,16 +125,20 @@ sudo mkdir /var/www/html/repos
 Then extract and copy your downloaded package files to `/var/www/html/repos`.
 
 At this point, the downloaded package repositories should be available on your offline network via the package server.
-You can then create repo files on the offline network to allow other hosts to use the package repositories.
-For example, a new repo file for the docker-ce-stable repository might look like this:
+Do not write repo files on the cluster hosts by hand: DeepOps writes each repository it
+uses itself (and removes `/etc/yum.repos.d/docker-ce.repo` and `cuda-rhel<N>.repo`), so
+point its variables at the mirror instead. The roles append the upstream paths to each
+base, so keep each mirror in its upstream layout (copy the reposync output into it, or
+link it there):
 
-```bash
-[docker-ce-stable]
-name=Docker CE
-baseurl=http://<my-package-server>/repos/docker-ce-stable
-enabled=1
-gpgcheck=1
-gpgkey=http://<my-package-server>/repos/keys/docker-ce.gpg
+| Variable | The role reads | So the mirror holds |
+|---|---|---|
+| `docker_rh_repo_base_url` (key: `<base>/gpg`) | `<base>/$releasever/$basearch/stable` | `<base>/9/x86_64/stable/` with `repodata/` |
+| `nvidia_container_toolkit_repo_base_url` | `<base>/stable/rpm/$basearch` | `<base>/stable/rpm/x86_64/` |
+| `package_repos_cuda_base` | `<base>/rhel<N>/x86_64/` and its keys there | `<base>/rhel9/x86_64/` with the `.pub` key files |
+
+```yaml
+docker_rh_repo_base_url: http://<my-package-server>/repos/docker/linux/rhel
+nvidia_container_toolkit_repo_base_url: http://<my-package-server>/repos/libnvidia-container
+package_repos_cuda_base: http://<my-package-server>/repos/cuda/repos
 ```
-
-You can then add these repo files to `/etc/yum.repos.d` on any machine where you want to install these packages.

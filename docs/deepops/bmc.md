@@ -43,10 +43,13 @@ when they are not.
 | `bmc_snmp_community` | site | an explicit community instead (vault it); both empty leave it alone |
 | `bmc_auth_types` | site | IPMI 1.5 authentication types left enabled at every level: `[]` turns IPMI 1.5 sessions off, `[md5]` keeps MD5 only; `null` (default) leaves them alone |
 | `bmc_cipher_suites` | site | RMCP+ suites left open (up to ADMIN), e.g. `[3, 17]`; every other one is closed; `null` (default) leaves them alone |
+| `bmc_cipher_suite` | site | the one suite out-of-band calls (power, SOL) use, `3` by default; `bmc_cipher_suites` must keep it open |
 | `bmc_mgmt_interface`, `bmc_mgmt_address` | **host** | this host's leg on the management network |
 
-Every value is empty by default, and an empty value means the role leaves that setting
-alone. Running it against a host with no BMC, or a VM, is a no-op, unless that host has a
+Every address, credential and hardening value is empty by default (`bmc_channel`,
+`bmc_user_name`, `bmc_ipsrc`, `bmc_password_format` and `bmc_cipher_suite` have the
+defaults shown in `roles/bmc/defaults/main.yml`), and an empty value means the role
+leaves that setting alone. Running it against a host with no BMC, or a VM, is a no-op, unless that host has a
 `bmc_ipaddr`: then the missing `/dev/ipmi0` fails the host rather than leaving its BMC
 unconfigured.
 

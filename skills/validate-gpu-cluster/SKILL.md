@@ -49,6 +49,6 @@ contract: `docs/deepops/validation.md`.
 |--------|---------|
 | Slurm `nodes_unavailable > 0` | Node down/drained — `scontrol show node <name>` for the reason. |
 | Slurm `gpus_configured: 0` | GRES not configured — check `config/group_vars/slurm-cluster.yml` GPU settings and rerun the Slurm playbook. |
-| K8s `gpus_allocatable: 0` | GPU Operator stack not ready — `kubectl get pods -A \| grep -i nvidia`; first-deploy driver builds can take 10+ minutes. |
+| K8s `gpus_allocatable: 0` | GPU Operator stack not ready — `kubectl get pods -A \| grep -i nvidia`; with Operator-managed drivers, first-deploy driver builds can take 10+ minutes. |
 | K8s smoke pod `Pending` | No schedulable GPU or image pull failure — `kubectl -n deepops-validate describe pod`. |
 | Direct `nvidia-smi` over SSH says "No devices were found" on a Slurm node | Expected GPU-hide behavior, not a failure. |

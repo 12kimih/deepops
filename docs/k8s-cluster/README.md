@@ -62,16 +62,12 @@ Instructions for deploying a GPU cluster with Kubernetes
    # (optional) Modify `config/group_vars/*.yml` to set configuration parameters
    ```
 
-   Note that as part of the kubernetes deployment process, the default behavior is to also deploy the [NVIDIA k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) for GPU support. The [GPU Operator](https://github.com/NVIDIA/gpu-operator) is an alternative all-in-one deployment method, which will deploy the [device plugin](https://github.com/NVIDIA/k8s-device-plugin) and optionally includes GPU tooling such as driver containers, [GPU Feature Discovery](https://github.com/NVIDIA/k8s-device-plugin) (now part of the device plugin repository), [DCGM-Exporter](https://github.com/NVIDIA/dcgm-exporter) and [MIG Manager](https://github.com/NVIDIA/mig-parted). The default behavior of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) in DeepOps is to deploy host-level drivers and NVIDIA software. To leverage driver containers as part of the GPU Operator, disable the `gpu_operator_preinstalled_nvidia_software` flag. To enable the GPU Operator in DeepOps...
+   Note that by default the Kubernetes deployment deploys the [GPU Operator](https://github.com/NVIDIA/gpu-operator) (`deepops_gpu_operator_enabled: true`), an all-in-one method that deploys the [device plugin](https://github.com/NVIDIA/k8s-device-plugin), [GPU Feature Discovery](https://github.com/NVIDIA/k8s-device-plugin) (now part of the device plugin repository), [DCGM-Exporter](https://github.com/NVIDIA/dcgm-exporter) and [MIG Manager](https://github.com/NVIDIA/mig-parted). DeepOps installs the driver and the NVIDIA software on the hosts and the Operator uses them (`gpu_operator_preinstalled_nvidia_software: true`, which pre-installed drivers and DGX systems need); set it to false to have the Operator run driver containers instead. To deploy only the standalone device plugin and GPU Feature Discovery, without the Operator:
 
    ```bash
    vi config/group_vars/k8s_cluster.yml
 
-   # Enable GPU Operator
-   # set: deepops_gpu_operator_enabled: true
-
-   # Enable host-level drivers (must be 'true' for clusters with pre-installed NVIDIA drivers or DGX systems)
-   # set: gpu_operator_preinstalled_nvidia_software: true
+   # set: deepops_gpu_operator_enabled: false
    ```
 
 4. Verify the configuration
@@ -116,7 +112,7 @@ The following components are completely optional and can be installed on an exis
 ### Kubernetes Dashboard
 
 DeepOps does not install Kubernetes Dashboard. The pinned Kubespray release
-(v2.32.0) no longer ships the dashboard add-on; the former `dashboard_enabled`
+(the `submodules/kubespray` submodule: `git -C submodules/kubespray describe --tags`) no longer ships the dashboard add-on; the former `dashboard_enabled`
 and dashboard image settings have no effect.
 
 If you need a dashboard, install and configure it separately using the
@@ -241,11 +237,11 @@ The source for our built-in Grafana dashboards can be found in [src/dashboards](
 
 #### Centralized syslog
 
-To enable syslog forwarding from the cluster nodes to the first Kubernetes controller node, you can set the following variables in your DeepOps configuration:
+The cluster nodes forward their syslog to the first Kubernetes controller by default; set these to false in your DeepOps configuration to turn it off:
 
 ```yaml
-kube_enable_rsyslog_server: true
-kube_enable_rsyslog_client: true
+kube_enable_rsyslog_server: false
+kube_enable_rsyslog_client: false
 ```
 
 For more information about our syslog forwarding functionality, please see the [centralized syslog guide](../misc/syslog.md).

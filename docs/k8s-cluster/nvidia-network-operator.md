@@ -24,19 +24,19 @@ Here are the key components that NVIDIA network operator try to deploy together:
 
 This playbook also installs the Kubeflow MPI Operator (`nvidia_network_operator_mpi_operator_version`, from its checksummed release manifest; it serves the `kubeflow.org/v2beta1` MPIJob API) for multi-node MPI jobs.
 
-Currently only InfiniBand networking is supported in this implementation, RoCE networking support will be added shortly.
+Both InfiniBand (`nvidia_network_operator_link_type: ib`) and RoCE (`eth`, through an SR-IOV network) interfaces are supported.
 
 ## Requirements and Tested Environment:
 
-This playbook is developed and tested in following environments:
+This playbook was first developed and tested (2021; the versions DeepOps deploys today are in the [version table](../deepops/versions.md)) in the following environment:
 
 - NVIDIA DGX servers with DGX OS 5.1
 - Mellanox ConnectX-6 VPI HCA
 - Ansible 2.9.27 (deployed by DeepOps)
 - Kubernetes v1.21.6 (deployed by DeepOps)
 - Helm version v3.6.3 (deployed by DeepOps)
-- NVIDIA network operator v1.1.0 (the role now deploys `nvidia_network_operator_version`, currently 26.1.1)
-- InfiniBand networking. (Ethernet networking support will be added in the future.)
+- NVIDIA network operator v1.1.0 (the role now deploys `nvidia_network_operator_version`, [version table](../deepops/versions.md))
+- InfiniBand networking
 
 ## Deployment Steps
 
@@ -128,7 +128,7 @@ This playbook is developed and tested in following environments:
 
   Please refer to the [DeepOps Kubernetes Deployment Guide](README.md) for more information.
 
-  Verify that Kubernetes clustering is working with "kubectl get nodes" command:
+  Verify that Kubernetes clustering is working with "kubectl get nodes" command (sample output from the 2021 test environment; current clusters show `control-plane` and a current version):
 
   ```bash
   nvidia@mgmt01:~$ kubectl get nodes
@@ -179,7 +179,7 @@ The cluster is ready to run multi-node workload in the cluster, One last thing i
 
 ### Using SR-IOV interfaces
 
-Below is what is the section of the job file looks like after adding relevant SR-IOV interface configuration. Dockerfiles for similar NCCL test images are in [src/containers/nccl-tests](../../src/containers/nccl-tests).
+Below is the job file before the SR-IOV interface configuration: add the pod annotation `k8s.v1.cni.cncf.io/networks: <if_name>` (an `if_name` of `nvidia_network_operator_interfaces`) and the limit `nvidia.com/<res_name>: 1` to the worker's template, as the [RoCE example](roce-perf-k8s.md) shows. Dockerfiles for similar NCCL test images are in [src/containers/nccl-tests](../../src/containers/nccl-tests).
 
 ```yaml
 apiVersion: kubeflow.org/v2beta1

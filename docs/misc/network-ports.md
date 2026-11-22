@@ -27,7 +27,7 @@ or listing known ports that we configure within DeepOps itself.
   - All hosts: 111/tcp, 111/udp
   - NFS server: 2049/tcp, 2049/udp
   - [NFS firewall guide](https://tldp.org/HOWTO/NFS-HOWTO/security.html#FIREWALLS)
-- rsyslog server: 514/tcp
+- rsyslog server: 514/tcp and 514/udp (`rsyslog_server_tcp_port`, `rsyslog_server_udp_port`)
 - Caching container registry: 5000/tcp
 - Internal cluster container registry: 31500/tcp
 - Monitoring
@@ -45,10 +45,13 @@ or listing known ports that we configure within DeepOps itself.
   - All hosts: 111/tcp, 111/udp
   - NFS server: 2049/tcp, 2049/udp
   - [NFS firewall guide](https://tldp.org/HOWTO/NFS-HOWTO/security.html#FIREWALLS)
-- rsyslog server: 514/tcp
-- Caching container registry: 5000/tcp
+- rsyslog server: 514/tcp and 514/udp (`rsyslog_server_tcp_port`, `rsyslog_server_udp_port`)
+- Container registry: 5000/tcp (`standalone_container_registry_port`)
+- Registry cache proxy: 3128/tcp (`nginx_docker_cache_port`)
 - Monitoring stack:
-  - Prometheus web interface: 9090/tcp
-  - Grafana web interface: 3000/tcp
-  - Prometheus node exporter: 9100/tcp
-  - DCGM node exporter: 9400/tcp
+  - Prometheus web interface: 9090/tcp (`prometheus_port`)
+  - Grafana web interface: 3000/tcp (`grafana_port`)
+  - Alertmanager: 9093/tcp (`alertmanager_port`)
+  - Prometheus node exporter: 9100/tcp (`node_exporter_port`)
+  - IPMI exporter: 9290/tcp (`ipmi_exporter_port`)
+  - DCGM exporter: 9400/tcp (`dcgm_exporter_port`)

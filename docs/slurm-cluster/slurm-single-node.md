@@ -38,7 +38,7 @@ The general requirements and procedure for Slurm setup via deepops is documented
 
 3. Edit config and options.
 
-   After running the setup script in step 2, a copy of "config.example" directory will be made to "config" directory. When one of the compute nodes also functions as a login node a few special configurations have to be set.
+   After running the setup script in step 2, a "config" directory starts from config.example's inventory, group_vars and host_vars. When one of the compute nodes also functions as a login node a few special configurations have to be set.
 
    a. Configuring inventory `"config/inventory"`.
 
@@ -113,7 +113,7 @@ The general requirements and procedure for Slurm setup via deepops is documented
 
    The `slurm_login_on_compute` setting is to enable special settings on a compute node in order that it can function as a login node as well.
 
-   Note: After deployment new users have to be manually added to "/etc/localusers" and "/etc/slurm/localusers.backup" on the node that functions as a login node.
+   Note: who may log in to the node outside a job is `slurm_allow_ssh_user`; every run writes "/etc/localusers" and "/etc/slurm/localusers.backup" from it, so add a user there (not to the files, which the next run rewrites) and apply it with `--tags localusers`.
 
 4. Verify the configuration.
 
@@ -152,24 +152,17 @@ The general requirements and procedure for Slurm setup via deepops is documented
    ansible-playbook -K --forks=1 -l slurm-cluster playbooks/slurm-cluster.yml
    ```
 
-   During Slurm playbook reboot is usually done twice:
-
-   - Once after installing the NVIDIA driver, because the driver sometimes
-     requires a reboot to load correctly.
-   - Once after setting some grub options used for Slurm compute nodes to
-     configure cgroups correctly, because of modification to the kernel
-     command line.
-
-   The above reboot sequence cannot be automated when the compute and login
-   node are on the same system. The recommended approach is to reboot manually
-   when prompted and then run Ansible again.
+   The roles never reboot a host themselves: a change that needs one (a new NVIDIA
+   driver, a kernel argument) leaves `/var/run/reboot-required`. On a system that is
+   both the login and the compute node, reboot it by hand when that file appears,
+   then run the playbook again.
 
    Setting `slurm_login_on_compute` to true, the slurm-cluster playbook will
    restrict GPUs in ssh sessions on the slurm-master by running the following
    command:
 
    ```bash
-   sudo systemctl set-property sshd.service DeviceAllow="/dev/nvidiactl"
+   sudo systemctl set-property ssh.service DeviceAllow="/dev/nvidiactl"   # sshd.service on RHEL
    ```
 
    Refer to `login-compute-setup.yml` role under `"roles/slurm/tasks"`. The

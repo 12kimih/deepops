@@ -33,7 +33,7 @@ cd deepops
 
 ## Installation
 
-This process will install the latest NVIDIA GPU Drivers, and Docker with the NVIDIA container runtime.
+This process installs the pinned NVIDIA driver branch (`nvidia_driver_branch`), Docker, the NVIDIA Container Toolkit and DCGM.
 
 ```bash
 # Install NGC-Ready software stack

@@ -47,7 +47,7 @@ Kubeflow is exposed through the NodePort of the `istio-ingressgateway` service; 
 
 The default username is `deepops@example.com` and the default password is `deepops`.
 
-This can be modified before deploying Kubeflow by editing `./config/files/kubeflow/dex-config-map.yaml`.
+To change it before deploying Kubeflow, copy `config.example/files/kubeflow/dex-config-map.yaml` to `config/files/kubeflow/` and edit the copy.
 
 ## Other usage
 

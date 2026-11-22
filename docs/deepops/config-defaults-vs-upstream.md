@@ -32,20 +32,20 @@ code). Values you set in your own gitignored `config/` always win over these.
 | `openmpi_configure` | v4 form: `--with-pmi=... --with-slurm=... --with-libevent=/usr` | v5 form: `--with-libevent=external` (no `--with-pmi`/`--with-slurm`) | OpenMPI 5.0.x removed those flags; PMIx is the integration path |
 | `slurm_max_job_timelimit` (example) | `INFINITE` | `UNLIMITED` | the documented keyword + default for partition `MaxTime` (synonyms; UNLIMITED matches `sinfo` output) |
 
-## NGC ready-container examples (group_vars/all.yml)
+## NGC ready-container examples (role defaults: roles/deploy_defaults)
 
 | Image | Upstream | This fork |
 |---|---|---|
-| cuda base | `cuda:12.4.1-base-ubuntu22.04` | `cuda:13.2.1-base-ubuntu24.04` |
-| pytorch | `pytorch:24.04-py3` | `pytorch:26.05-py3` |
-| tensorflow | `tensorflow:24.04-tf2-py3` | `tensorflow:25.02-tf2-py3` (the FINAL NGC TF release) |
+| cuda base | `cuda:12.4.1-base-ubuntu22.04` | `ngc_ready_cuda_container`, the current CUDA base on Ubuntu 24.04 ([version table](versions.md)) |
+| pytorch | `pytorch:24.04-py3` | `ngc_ready_pytorch_container`, the current monthly release ([version table](versions.md)) |
+| tensorflow | `tensorflow:24.04-tf2-py3` | `ngc_ready_tensorflow_container`, NGC's final TensorFlow release (held, [version table](versions.md)) |
 
 ## New configuration that did not exist upstream
 
 These are additive -- upstream had no equivalent default:
 
 - **NFS** (`group_vars/slurm-cluster.yml`) -- `nfs_exports` (server,
-  `sync,no_root_squash,no_subtree_check`), `nfs_mounts` (client) and the one
+  `rw,sync,root_squash,no_subtree_check`), `nfs_mounts` (client) and the one
   `nfs_mount_options` they inherit, tuned for a 100GbE+ fabric (`nconnect=16`, 1 MiB
   rsize/wsize, vers 4.2; lower `nconnect` to ~4 on 10/25GbE). The role also ships 100G
   socket-buffer sysctls (ESnet values), `nfs_server_threads`, a self-healing `nfs-server`
@@ -82,46 +82,3 @@ works), so `config.example` keeps only the NFS warning + an NVMe override exampl
 
 The component pins (in `roles/*/defaults/`) advanced too; [versions.md](versions.md)
 lists every one, generated from the roles, so it never lags them.
-
-## New configuration that did not exist upstream
-
-These are additive -- upstream had no equivalent default:
-
-- **NFS** (`group_vars/slurm-cluster.yml`) -- `nfs_exports` (server,
-  `sync,no_root_squash,no_subtree_check`), `nfs_mounts` (client) and the one
-  `nfs_mount_options` they inherit, tuned for a 100GbE+ fabric (`nconnect=16`, 1 MiB
-  rsize/wsize, vers 4.2; lower `nconnect` to ~4 on 10/25GbE). The role also ships 100G
-  socket-buffer sysctls (ESnet values), `nfs_server_threads`, a self-healing `nfs-server`
-  and `nfs_detach_on_shutdown`.
-- **Slurm config** -- the `slurm` role tracks upstream; full site control is via complete
-  templates under `config/files/slurm/` pointed to by `slurm_conf_template` (and the
-  cgroup/gres/dbd equivalents), rendered verbatim. The Lua submit filter is the role's
-  template, rendered from `slurm_job_submit_policy`.
-- **GPU power cap** -- `slurm_cluster_configure_gpu_power_limit`, and `nvidia_power_limit_watts`
-  per host.
-- **Site tooling** -- the `cluster_tools_*` commands, libraries, environment, login banner
-  and shared directories (`group_vars/slurm-cluster.yml`), and the login-node limits
-  (`group_vars/slurm-login.yml`).
-- **Identity** -- the directory (NIS or LDAP: `directory_service`, `directory_groups`,
-  `directory_netgroups` in `group_vars/all.yml`; `group_vars/nis-master.yml`,
-  `group_vars/ldap-server.yml`), the docker socket group and the sudo netgroup
-  (`cluster_docker_group_*`, `cluster_sudoers_*` in `group_vars/all.yml`).
-- **Node operations** (`group_vars/all.yml`) -- `docker_daemon_options` / `docker_sysctls`,
-  `cluster_networks`, `ansible_python_interpreter`, and the netplan, serial
-  console and BMC settings behind the [utility playbooks](utilities.md).
-
-## enroot (group_vars/all.yml) -- simplified
-
-Upstream defined `enroot_runtime_path` / `enroot_cache_path` / `enroot_data_path` and a
-full `enroot_config` block in `config.example`. Those are now **role defaults** (the
-`enroot` role also provisions the sticky-1777 parent dirs via tmpfiles.d so CLI `enroot`
-works), so `config.example` keeps only the NFS warning + an NVMe override example.
-
-## Housekeeping
-
-- Booleans normalized to YAML `true`/`false` (was `yes`/`no`).
-
-## Component versions (role defaults, not config.example)
-
-The component pins themselves (in `roles/*/defaults/`) are listed in the generated
-[version table](versions.md), never restated here.

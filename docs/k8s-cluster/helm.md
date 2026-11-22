@@ -10,7 +10,7 @@ Some services are installed using [Helm](https://helm.sh/), a package manager fo
 
 Install the Helm client by following the instructions for the OS on your provisioning system: https://helm.sh/docs/intro/install/
 
-If you're using Linux, the script `scripts/k8s/install_helm.sh` will set up Helm for the current user.
+If you're using Linux, `scripts/k8s/install_helm.sh` installs the Helm version the bundled Kubespray pins, checksum-verified, into `/usr/local/bin` (`HELM_INSTALL_DIR`; `HELM_DOWNLOAD_BASE` for a mirror).
 
 Helm 3 (the current major version) is **client-only** -- the old server-side
 component (Tiller) was removed, so there is nothing to deploy or initialize in

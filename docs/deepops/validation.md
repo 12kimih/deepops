@@ -5,7 +5,7 @@ machine-readable contract: **did the deployment work?** They are safe to run
 repeatedly, designed for both humans and automation (including AI agents),
 and complement the heavier workload tests under `workloads/`.
 
-All three tools:
+All of these tools:
 
 - print one human-readable line per check by default, or a single flat JSON
   object with `--json`

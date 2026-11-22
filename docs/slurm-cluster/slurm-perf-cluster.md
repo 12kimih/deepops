@@ -25,7 +25,7 @@ It leverages open source tools such as Pyxis and Enroot to optimize Slurm for mu
 
 These packages have been installed and tested with the following Linux distributions and hardware platforms:
 
-- [NVIDIA DGX OS 4.4 or greater](https://docs.nvidia.com/dgx/dgx-os-server-release-notes/index.html#dgx-os-server-sw-versions)
+- [NVIDIA DGX OS 6 or 7](https://docs.nvidia.com/dgx/dgx-os-server-release-notes/index.html#dgx-os-server-sw-versions)
 - DGX A100
 - Non-blocking InfiniBand switches with the DGX A100s [configured in InfiniBand mode](https://docs.nvidia.com/dgx/dgx1-user-guide/configuring-managing-dgx1.html#switching-from-ethernet-to-infiniband).
 - Persistent network storage with [RAID cache](https://docs.nvidia.com/dgx/bp-dgx/storage.html#storage-nfs-cache-deep-learning) configured on DGX A100s
@@ -57,7 +57,7 @@ These packages have been installed and tested with the following Linux distribut
 
    ```bash
    # Install software prerequisites and copy default configuration
-   # Copies ./config.example to ./config, if none exists
+   # Starts ./config from config.example (inventory, group_vars, host_vars), if none exists
    ./scripts/setup.sh
    ```
 
@@ -131,9 +131,9 @@ These packages have been installed and tested with the following Linux distribut
    DeepOps configures NFS for sharing data and models across the cluster of nodes. NFS, or some sort of shared storage is important for multi-node deployments so that training data is accessible from all nodes.
 
    ```bash
-   # Comment in the `nfs_exports` and `nfs_mounts` sections of `config/group_vars/all.yml`
+   # The `nfs_exports` and `nfs_mounts` sections of `config/group_vars/slurm-cluster.yml`
    # Modify configuration as necessary to fit the environment, or just use the defaults
-   vi config/group_vars/all.yml
+   vi config/group_vars/slurm-cluster.yml
    ```
 
 7. Configure NFS across your cluster
@@ -156,11 +156,11 @@ These packages have been installed and tested with the following Linux distribut
 
    Run the cluster playbook.
 
-   The `slurm-cluster.yml` playbook bootstraps the cluster, configures NFS, builds slurm & dependencies, and installs it. With the additional variables `slurm_install_enroot` and `slurm_install_pyxis`, it also installs enroot and pyxis.
+   The `slurm-cluster.yml` playbook bootstraps the cluster, configures NFS, builds slurm & dependencies, and installs it, with enroot and pyxis (on by default: `slurm_install_enroot`, `slurm_install_pyxis`).
 
    ```bash
    # NOTE: If SSH user is different than current user, add: `-u <user>`
-   ansible-playbook playbooks/slurm-cluster.yml -e "slurm_install_enroot=true slurm_install_pyxis=true"
+   ansible-playbook playbooks/slurm-cluster.yml
    ```
 
 ## Performance Validation
@@ -227,11 +227,10 @@ uv sync --locked
 
 ### Connection to hosts via ansible refused/blocked
 
-By default, fail2ban is running on NVIDIA DGX-1 and DGX-2 servers. Stopping fail2ban during deployment can facilitate setup...
+DGX OS runs fail2ban, which bans an address after repeated failed logins. The deploy leaves an installed fail2ban alone unless `slurm_enable_fail2ban` puts it under DeepOps, which never bans `cluster_networks` (`fail2ban_ignoreip`). If the provisioning host was banned, unban it on that node:
 
 ```bash
-# on each dgx node
-sudo systemctl stop fail2ban
+sudo fail2ban-client set sshd unbanip <provisioning-host-address>
 ```
 
 ### Performance validation test hangs / timeouts
@@ -278,12 +277,12 @@ srun -N <num_nodes> --mpi=pmix --exclusive --container-image=registry.example.co
 If the validation test runs, but results are suboptimal, there are many factors that could affect this. Besides hardware and cabling issues, ensure the following...
 
 ```bash
-# nv_peer_mem should be running
-$ lsmod | grep nv
-nv_peer_mem            16384  0
+# nvidia_peermem (the driver's in-tree GPUDirect RDMA module) should be loaded
+$ lsmod | grep nvidia_peermem
 
-# if it isn't, run the following command on each node
-$ sudo modprobe nv_peer_mem
+# if it isn't, load it on each node (playbooks/nvidia-software/nvidia-peer-memory.yml
+# loads it at every boot)
+$ sudo modprobe nvidia_peermem
 ```
 
 Try running the test from the slurm login node, but with debug output enabled...

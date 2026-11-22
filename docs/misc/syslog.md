@@ -12,7 +12,7 @@ Both the Slurm and Kubernetes cluster playbooks include a minimal implementation
 
 Rsyslog was selected for the minimal cluster logging implementation in order to provide a light-weight solution using software already installed on the nodes. This ensures that logs are recorded in one place, making it easier to debug node-specific issues even in the case where the nodes are down or non-responsive. However, for a more full-featured logging solution with search and visualization capabilities, consider a site-managed log stack; for Kubernetes clusters, see the Helm-based procedure in [logging](../k8s-cluster/logging.md).
 
-In the syslog-based implementation, the first cluster management node is selected as a syslog server and listens on `rsyslog_client_tcp_port` for connections. The remaining nodes in the cluster then forward their logs to the selected syslog server. Log files for remote nodes are stored on the syslog server in node-specific files under `/var/log/deepops-hosts`.
+In the syslog-based implementation, the first cluster management node is selected as a syslog server and listens on `rsyslog_server_tcp_port` (TCP) and `rsyslog_server_udp_port` (UDP) for connections. The remaining nodes in the cluster then forward their logs to the selected syslog server. Log files for remote nodes are stored on the syslog server in node-specific files under `/var/log/deepops-hosts`.
 
 On Slurm clusters, the Slurm daemon logs are additionally ingested by rsyslog and forwarded to the syslog server. On Kubernetes clusters, the Kubelet logs are already included in the syslog feed.
 

@@ -29,11 +29,7 @@ The following Apt repositories will need to be mirrored in the offline environme
 
 For instructions on mirroring these repositories, see the [doc on Apt mirrors](./mirror-apt-repos.md).
 
-The following files may need to be downloaded and made available in an HTTP mirror:
-
-- The `cuda-keyring` package (only when using the CUDA repository)
-
-For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./mirror-http-files.md).
+The `cuda-keyring` package comes from the mirrored CUDA repository itself (`package_repos_cuda_base`); it needs no separate HTTP mirror.
 
 Container images are only needed if you want to run the tests built into the playbook:
 
@@ -56,7 +52,7 @@ For instructions on mirroring these repositories, see the [doc on RPM mirrors](.
 
 The following files may need to be downloaded and made available in an HTTP mirror:
 
-- EPEL package (found [here](https://fedoraproject.org/wiki/EPEL))
+- EPEL package (found [here](https://fedoraproject.org/wiki/EPEL)), on Red Hat Enterprise Linux only: Rocky and Alma Linux install `epel-release` from their own extras repository
 
 For instructions on setting up an HTTP mirror, see the [doc on HTTP mirrors](./mirror-http-files.md).
 
@@ -74,8 +70,7 @@ To deploy the NGC-Ready playbook offline, you will need to configure your server
 
 ### Configure servers to use your mirrors for the Linux distribution package repositories
 
-DeepOps does not configure the location of your Linux distribution's package repositories (e.g., Ubuntu or CentOS repositories).
-Instead, you will need to configure your servers to use your offline package mirrors directly.
+On Ubuntu, the cluster deploys point the distribution archive at your mirror (`package_repos_ubuntu_mirror`, applied by `playbooks/generic/os-updates.yml`); this NGC-ready playbook does not import it, so run that playbook first or configure the archive yourself. On Red Hat family systems, configure your servers to use your offline distribution mirrors directly.
 
 On Ubuntu 24.04 servers, you should edit `/etc/apt/sources.list.d/ubuntu.sources` (`/etc/apt/sources.list` on older releases) to replace references to the Ubuntu distribution servers with your own mirror.
 For example,
@@ -144,7 +139,7 @@ docker_ubuntu_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-docker-ce
 **Enterprise Linux**
 
 ```yaml
-# Mirrors of https://download.docker.com/linux/centos and https://nvidia.github.io/libnvidia-container
+# Mirrors of https://download.docker.com/linux/rhel and https://nvidia.github.io/libnvidia-container
 docker_rh_repo_base_url: "http://<your-package-mirror>/<your-path-to-docker-ce>"
 docker_rh_repo_gpgkey: "http://<your-package-mirror>/<your-path-to-docker-ce>/gpg"
 nvidia_container_toolkit_repo_base_url: "http://<your-package-mirror>/<your-path-to-libnvidia-container>"

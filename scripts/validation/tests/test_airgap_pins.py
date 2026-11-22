@@ -15,20 +15,25 @@ class AirgapPinTests(unittest.TestCase):
         self.skill = (ROOT / "skills/deploy-airgapped/SKILL.md").read_text()
         self.gpu = yaml.safe_load((ROOT / "roles/nvidia-gpu-operator/defaults/main.yml").read_text())
 
-    def assert_references_match(self, text, pattern, expected):
+    def assert_references_match(self, text, pattern, expected, required=True):
         versions = re.findall(pattern, text)
-        self.assertTrue(versions, f"No references matched {pattern!r}")
+        if required:
+            self.assertTrue(versions, f"No references matched {pattern!r}")
         for version in versions:
             with self.subTest(pattern=pattern, version=version):
                 self.assertEqual(version, expected)
 
     def test_gpu_operator_chart_preparation_matches_role(self):
-        for pattern in (
-            r"Operator `(v[\d.]+)`",
-            r"nvidia/gpu-operator --version (\S+)",
-            r"gpu-operator-(v[\d.]+)\.tgz",
+        # The commands must pin the role's chart; prose may name the variable instead
+        # (a number there is one more copy to keep current), but any number it names is it.
+        for pattern, required in (
+            (r"Operator `(v[\d.]+)`", False),
+            (r"nvidia/gpu-operator --version (\S+)", True),
+            (r"gpu-operator-(v[\d.]+)\.tgz", True),
         ):
-            self.assert_references_match(self.skill, pattern, self.gpu["gpu_operator_chart_version"])
+            self.assert_references_match(
+                self.skill, pattern, self.gpu["gpu_operator_chart_version"], required
+            )
 
     def test_registry_images_and_archives_match_role(self):
         registry = yaml.safe_load(
