@@ -389,13 +389,21 @@ class NodeAccess(unittest.TestCase):
             self.assertTrue(all("pam_slurm_adopt" not in line for line in lines[:1]))
             self.assertTrue(any("pam_slurm_adopt" in line for line in lines[1:]))
 
-    def test_local_configuration_goes_only_after_slurmd_has_its_copy(self):
-        names = [t.get("name") for t in self.COMPUTE]
-        remove = names.index("Remove local copies of the configuration slurmctld serves")
-        self.assertLess(names.index("Start slurmd"), remove)
-        wait = names.index("Wait for slurmd's copy of the configuration")
-        self.assertLess(wait, remove)
-        self.assertEqual(self.COMPUTE[wait]["wait_for"]["path"], "/run/slurm/conf/slurm.conf")
+    def test_local_configuration_goes_only_after_the_daemon_has_its_copy(self):
+        for path, daemon in (("compute.yml", "slurmd"), ("misc-node.yml", "sackd")):
+            with self.subTest(path):
+                tasks = load(f"roles/slurm/tasks/{path}")
+                names = [t.get("name") for t in tasks]
+                remove = names.index("Remove local copies of the configuration slurmctld serves")
+                self.assertLess(names.index(f"Start {daemon}"), remove)
+                check = names.index(f"Check that {daemon} runs on the controller's configuration")
+                self.assertLess(check, remove)
+                self.assertEqual(tasks[check]["include_tasks"]["file"], "node_registered.yml")
+
+    def test_the_check_waits_for_the_daemons_copy(self):
+        block = load("roles/slurm/tasks/node_registered.yml")[0]["block"]
+        wait = next(t for t in block if "wait_for" in t)
+        self.assertEqual(wait["wait_for"]["path"], "/run/slurm/conf/slurm.conf")
 
 
 if __name__ == "__main__":

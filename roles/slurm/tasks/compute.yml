@@ -212,17 +212,16 @@
 # from slurmctld (--conf-server, above) and caches them in /run/slurm/conf, where the
 # commands on the node find them too. A local copy would be read by the commands
 # instead, and go stale.
-# Removed only once the running slurmd has that cache: every Slurm client on the node,
+# Removed only once the running slurmd has that cache (node_registered.yml): every Slurm client on the node,
 # pam_slurm_adopt in sshd among them, dies with "Could not establish a configuration
 # source" when it finds neither (2026-11-20: a slurmd that failed to start, with the
 # copies already gone, closed every SSH login to the nodes).
-- name: Wait for slurmd's copy of the configuration
-  ansible.builtin.wait_for:
-    path: /run/slurm/conf/slurm.conf
-    timeout: 120
-  when: not is_controller and not ansible_check_mode
-  tags:
-    - config
+- name: Check that slurmd runs on the controller's configuration
+  ansible.builtin.include_tasks:
+    file: node_registered.yml
+    apply:
+      tags: [config]
+  tags: config
 
 - name: Remove local copies of the configuration slurmctld serves
   ansible.builtin.file:
