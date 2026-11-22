@@ -55,7 +55,7 @@ roles as `shared_projects: "{{ people_roster.projects | default({}) }}"`.
 | an owner | close the project | the project's menu | an administrator |
 | anyone in it | leave | the project's menu | at once |
 
-Each request becomes a pull request on the roster (`clusterbot.projects`); "at once" means
+Each request becomes a pull request on the roster (`cluster_bot.projects`); "at once" means
 the pull request opens without waiting for anyone, and an administrator reviews it as they
 merge. Once it is merged and deployed (`slurm-cluster.yml --tags people`: the groups, then
 the folder), everyone whose role changed gets a DM saying so and that a new login applies

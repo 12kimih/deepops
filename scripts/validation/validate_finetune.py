@@ -20,7 +20,7 @@ from validate_model_cache import validate as validate_cache
 # Slurm's replies are read by the cluster tools' one Slurm module (its JSON queries, its
 # per-release field check), from this checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import proc, slurm  # noqa: E402
+from cluster_tools import proc, slurm  # noqa: E402
 
 
 class BadInput(ValueError):

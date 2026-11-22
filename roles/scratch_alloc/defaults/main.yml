@@ -1,6 +1,6 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): fast scratch space handed out
-# per request (clustertools.scratch_alloc), each allocation a directory of its own,
+# per request (cluster_tools.scratch_alloc), each allocation a directory of its own,
 # <mount>/<user>-<id>, with a size limit (a project quota, XFS or ext4) and an end date. A deploy
 # sets it from deepops_components (slurm_enable_scratch_alloc, on scratch-server: the
 # host whose filesystem holds the scratch space).

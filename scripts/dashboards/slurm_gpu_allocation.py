@@ -1,6 +1,6 @@
 """Slurm / GPU allocation: who holds which GPU, against what the cluster can offer.
 
-From roles/slurm_metrics (clustertools.metrics: slurm_gpu_allocated, slurm_gpu_configured,
+From roles/slurm_metrics (cluster_tools.metrics: slurm_gpu_allocated, slurm_gpu_configured,
 slurm_node_state, slurm_node_drain, slurm_node_schedulable) and the recording rule
 host_device:slurm_gpu_allocated:max (rules/slurm.yml), joined with DCGM utilisation
 through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering, and

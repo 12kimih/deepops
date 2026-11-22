@@ -61,7 +61,7 @@ fi
 # /tmp and /dev/shm, and its enroot directories; a job that is CONFIGURING or
 # RESIZING has an allocation on this node and is about to. None of those appear
 # under "-t running", so the *-lastuserjob-* scripts would run and reap them.
-# The states are the ones that hold a node (clustertools vocab.JOB_HOLDS, the
+# The states are the ones that hold a node (cluster_tools vocab.JOB_HOLDS, the
 # list the maintenance drain waits on), less one:
 #
 # COMPLETING is deliberately absent. The epilog runs while its own job is in

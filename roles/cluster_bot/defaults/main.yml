@@ -1,6 +1,6 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): the cluster's Slack app
-# (clusterbot): slash commands, forms and buttons through Socket Mode, an outbound
+# (cluster_bot): slash commands, forms and buttons through Socket Mode, an outbound
 # connection, so no port is opened. A deploy sets it from deepops_components
 # (slurm_enable_cluster_bot, on the first slurm-master). It runs as cluster_bot_user
 # (roles/system_accounts) and needs slack_bot_token and slack_app_token (roles/

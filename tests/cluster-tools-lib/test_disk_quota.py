@@ -1,4 +1,4 @@
-"""clustertools.disk_quota against a fake host: what it would run, and nothing twice.
+"""cluster_tools.disk_quota against a fake host: what it would run, and nothing twice.
 
 A filesystem mounted with its quota options (host_baseline_mount_options writes them)
 gets quotas on and every user's hard limits; the warn level never reaches the kernel
@@ -13,8 +13,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import disk_quota as dq  # noqa: E402
-from clustertools import prom  # noqa: E402
+from cluster_tools import disk_quota as dq  # noqa: E402
+from cluster_tools import prom  # noqa: E402
 
 CSV_HEAD = "User,BlockStatus,FileStatus,BlockUsed,BlockSoftLimit,BlockHardLimit,BlockGrace,FileUsed,FileSoftLimit,FileHardLimit,FileGrace\n"
 PCSV_HEAD = CSV_HEAD.replace("User,", "Project,", 1)

@@ -1,4 +1,4 @@
-"""Tests for clustertools.metrics: GPU allocation as node_exporter textfile metrics."""
+"""Tests for cluster_tools.metrics: GPU allocation as node_exporter textfile metrics."""
 
 import json
 import re
@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from common import HERE, load, run_tool
-from clustertools import metrics, slurm_backup
+from cluster_tools import metrics, slurm_backup
 
 
 def value(n):

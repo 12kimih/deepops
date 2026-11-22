@@ -31,7 +31,7 @@ is refused, saying which to add. Accounts with no entry in limits (root, system
 accounts) are never limited.
 
 The project functions (require_project_quota, project_set, project_limit, project_used)
-are also a library for tools that make projects at run time (clustertools.scratch_alloc).
+are also a library for tools that make projects at run time (cluster_tools.scratch_alloc).
 Python 3.9 or newer, standard library only.
 """
 
@@ -406,7 +406,7 @@ CONFIG_KEYS = {"filesystems": list, "limits": dict, "release": list, "projects":
 
 
 def load_config(path):
-    """The config roles/disk_quota writes (clustertools.config); "-" reads it from stdin."""
+    """The config roles/disk_quota writes (cluster_tools.config); "-" reads it from stdin."""
     return config.require(path, CONFIG_KEYS)
 
 

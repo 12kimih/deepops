@@ -39,7 +39,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ cluster_tools_bin_dir }}/{{ item }}"
-      module: "clustertools.{{ item | replace('-', '_') }}"
+      module: "cluster_tools.{{ item | replace('-', '_') }}"
   loop: "{{ cluster_tools_commands }}"
 
 # bash-completion loads this on the first <TAB> after the command, and the command
@@ -160,7 +160,7 @@
           - "{{ ansible_playbook_python }}"
           - -I
           - -c
-          - "import sys; sys.path.insert(0, sys.argv[1]); from clustertools.banner import main; sys.exit(main())"
+          - "import sys; sys.path.insert(0, sys.argv[1]); from cluster_tools.banner import main; sys.exit(main())"
           - "{{ cluster_tools_lib_source }}"
         stdin: >-
           {{ {'title': cluster_tools_motd_title, 'commands': cluster_tools_motd_commands,

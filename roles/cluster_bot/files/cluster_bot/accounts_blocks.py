@@ -1,4 +1,4 @@
-"""The Slack forms of account requests (clusterbot.accounts)."""
+"""The Slack forms of account requests (cluster_bot.accounts)."""
 
 from .blocks import field
 

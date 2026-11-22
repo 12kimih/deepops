@@ -6,7 +6,7 @@ fail2ban_items: >-
      + ((cluster_bot_access_items + ['file:' ~ _fail2ban_bans_command,
                                      'file:' ~ cluster_bot_serve_dir ~ '/' ~ _fail2ban_bot_service.name ~ '.json'])
         if cluster_bot_host | length > 0 else []) }}
-# The cluster bot's view of the bans (clustertools.bans): the list, and an unban.
+# The cluster bot's view of the bans (cluster_tools.bans): the list, and an unban.
 _fail2ban_bans_command: /usr/local/sbin/cluster-bans
 _fail2ban_bot_service:
   name: bans

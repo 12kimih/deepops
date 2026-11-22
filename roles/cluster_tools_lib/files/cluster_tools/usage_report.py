@@ -4,7 +4,7 @@ Reads jobs and node state from Slurm's JSON output, per-GPU utilisation from
 Prometheus (dcgm-exporter). Posts a summary card with the detail in its thread, and
 tells each person whose jobs' GPUs all stayed idle for the whole window, once for all
 their idle jobs (mentioned, or sent a DM), again every notify_repeat_hours while any
-stays idle (clustertools.notices). Can optionally cancel jobs idle for longer, any job,
+stays idle (cluster_tools.notices). Can optionally cancel jobs idle for longer, any job,
 each only after its owner was told and warned in earlier runs.
 
 With --weekly it posts the week instead: for each person, the GPU-hours their jobs held
@@ -14,7 +14,7 @@ point: no job is touched. Someone who idled heavily (repeat_idle_gpu_hours and
 repeat_idle_share) for repeat_weeks weeks in a row is reported to the administrators'
 channel with the weeks' numbers, their jobs now and what to do.
 
-With --disk it posts the day's disk usage instead (clustertools.disk_report, from
+With --disk it posts the day's disk usage instead (cluster_tools.disk_report, from
 the disk quota metrics): every counted filesystem, its largest people (config people,
 the roster's) and projects, and everyone past a warn level, mentioned or sent a DM
 (disk_notify). Standard library only.
@@ -63,7 +63,7 @@ WEEKS_KEPT = 8  # weeks of each person's numbers the weekly summary remembers
 
 
 # --- Slurm ----------------------------------------------------------------------
-# Reading Slurm is clustertools.slurm's job (the cluster_tools_lib role): one reader for
+# Reading Slurm is cluster_tools.slurm's job (the cluster_tools_lib role): one reader for
 # every tool. What is left here is what this report makes of it.
 
 
@@ -377,7 +377,7 @@ def render(report, cfg, who):
 
 
 def slack_id(user, cfg, slack, cache):
-    """Slack member ID for a Slurm user (clustertools.slack: the map, else by email)."""
+    """Slack member ID for a Slurm user (cluster_tools.slack: the map, else by email)."""
     return slack_member(slack, user, cfg["user_map"], cfg["email_domain"], cache)
 
 
@@ -397,7 +397,7 @@ CONFIG_KEYS = {
 
 def load_config(path):
     """The config, checked whole before anything runs: a mistake in it is one line naming
-    it, at deploy time (the role validates the file, clustertools.config) and never a
+    it, at deploy time (the role validates the file, cluster_tools.config) and never a
     traceback part-way through notifying owners."""
     cfg = config.require(path, CONFIG_KEYS)
     for key in ("notify", "disk_notify"):
@@ -638,7 +638,7 @@ def post_thread(slack, channel, card, thread):
 
 def disk(cfg, args):
     """The daily disk usage report. The people past a level who are due a notice
-    (clustertools.notices: a first crossing, a hard limit every day, the same warn level
+    (cluster_tools.notices: a first crossing, a hard limit every day, the same warn level
     every disk_repeat_days) are mentioned on the card or sent a DM, as disk_notify says,
     and recorded once it reached them. A preview posts to --to and sends and records
     nothing; one failed DM does not stop the others, and the run fails at the end naming

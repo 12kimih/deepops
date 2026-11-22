@@ -1,5 +1,5 @@
 """Each person's choices about what the cluster tells them, kept in one small JSON file
-the bot writes and the tools that notify read (clustertools.job_notice: `muted`).
+the bot writes and the tools that notify read (cluster_tools.job_notice: `muted`).
 
     prefs = Prefs(path)
     prefs.muted("alice") -> bool      prefs.set_muted("alice", True)

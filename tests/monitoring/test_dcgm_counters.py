@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COUNTERS = ROOT / "roles/nvidia-dcgm-exporter/files/dcgm-custom-metrics.csv"
 TYPES = {"gauge", "counter", "label"}
 # Code that names DCGM metrics outside PromQL the validator can parse.
-READERS = [ROOT / "roles/cluster_tools_lib/files/clustertools/usage_report.py"]
+READERS = [ROOT / "roles/cluster_tools_lib/files/cluster_tools/usage_report.py"]
 
 
 def exported():

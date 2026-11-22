@@ -3,7 +3,7 @@
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
     (text, blocks), thread = render(data, who, top, people, mention)
     over_warn(data)                        -> the people past a warn level, with figures
-    row_key(row)                           -> the key of a person's notices (clustertools.notices)
+    row_key(row)                           -> the key of a person's notices (cluster_tools.notices)
 
 For each filesystem whose users' space is counted (roles/disk_quota, its textfile
 metrics), the disk: how full, how much is free and how that changed in a day; its
@@ -14,7 +14,7 @@ warn level only notifies, and the hard limit is the one the kernel enforces, at 
 A person is told (mentioned, or sent a DM) when they first pass a level, every day at
 a hard limit, and again every repeat_days while past the same warn level; the card
 lists everyone past a level every day. It reads Prometheus and changes nothing;
-clustertools.usage_report --disk posts it.
+cluster_tools.usage_report --disk posts it.
 Python 3.9 or newer, standard library only.
 """
 
@@ -27,7 +27,7 @@ DAY = 86400
 # When a host's usage is older than this, the report says so (the alert fires at an hour).
 STALE = 3600
 # A daily timer runs a little earlier or later each day: a notice due every N days may
-# go this much early (clustertools.notices), so a weekly one never slips to the eighth day.
+# go this much early (cluster_tools.notices), so a weekly one never slips to the eighth day.
 LEEWAY = 3600
 HOW = "`quota -s` on the host shows your own usage there."
 
@@ -169,7 +169,7 @@ def describe(row):
 
 
 def hold_note(hold, now):
-    """What a hard limit means for Slurm (clustertools.submit_holds): HOLD is None (no
+    """What a hard limit means for Slurm (cluster_tools.submit_holds): HOLD is None (no
     holds) or the Unix time they start."""
     if hold is None:
         return ""

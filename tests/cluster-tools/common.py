@@ -54,5 +54,5 @@ def run_tool(module, *args, env=None, path=True):
         "USER": "user1",
         **(env or {}),
     }
-    code = f"import sys; sys.path.insert(0, {LIB!r}); from clustertools import {module}; sys.exit({module}.main())"
+    code = f"import sys; sys.path.insert(0, {LIB!r}); from cluster_tools import {module}; sys.exit({module}.main())"
     return subprocess.run([sys.executable, "-I", "-c", code, *args], env=e, capture_output=True, text=True)

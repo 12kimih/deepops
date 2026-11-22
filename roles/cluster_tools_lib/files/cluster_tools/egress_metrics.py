@@ -306,7 +306,7 @@ CONFIG_KEYS = {"table": str, "inbound_table": str, "user_uids": list, "tunnel_pr
 
 
 def load_config(path):
-    """The config roles/egress_policy writes (clustertools.config)."""
+    """The config roles/egress_policy writes (cluster_tools.config)."""
     return config.require(path, CONFIG_KEYS)
 
 

@@ -1,11 +1,11 @@
-"""clustertools.prom: the textfile format, escaping and the round trip."""
+"""cluster_tools.prom: the textfile format, escaping and the round trip."""
 
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import prom  # noqa: E402
+from cluster_tools import prom  # noqa: E402
 
 
 class Prom(unittest.TestCase):

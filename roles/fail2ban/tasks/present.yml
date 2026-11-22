@@ -80,7 +80,7 @@
         name: cluster_tools_lib
         tasks_from: command
       vars:
-        cluster_tools_lib_command: {dest: "{{ _fail2ban_bans_command }}", module: clustertools.bans}
+        cluster_tools_lib_command: {dest: "{{ _fail2ban_bans_command }}", module: cluster_tools.bans}
 
 - name: Record the component as present
   ansible.builtin.include_role:

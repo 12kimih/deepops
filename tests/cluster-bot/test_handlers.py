@@ -1,4 +1,4 @@
-"""clusterbot.app's Slack handlers, driven with Slack's payload shapes through a stand-in
+"""cluster_bot.app's Slack handlers, driven with Slack's payload shapes through a stand-in
 for slack_bolt: each command opens its form, each form submission becomes the request the
 engine receives, and only administrators may decide or act for others."""
 
@@ -42,8 +42,8 @@ class FakeApp:
 
 
 sys.modules["slack_bolt"] = types.SimpleNamespace(App=FakeApp)
-from clusterbot import app  # noqa: E402
-from clustertools import job_notice  # noqa: E402
+from cluster_bot import app  # noqa: E402
+from cluster_tools import job_notice  # noqa: E402
 
 CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
        "channels": {"help": "#help", "admin": "#admin"}, "scratch": {"policy": {"auto_bytes": 1, "auto_days": 30}}}  # fmt: skip

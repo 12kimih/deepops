@@ -1,5 +1,5 @@
 """The bot's requests to the hosts it acts on: over its SSH key, whose one forced command
-there (clustertools.bot_serve) runs only the services roles offer on that host.
+there (cluster_tools.bot_serve) runs only the services roles offer on that host.
 
     run = Remote(host, key, user, known_hosts, "scratch")
     run("list", "alice") -> the service's JSON answer, or Failed with its reason

@@ -16,7 +16,7 @@
 - name: Note the bot's account and dispatcher
   ansible.builtin.set_fact:
     _cluster_bot_access_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
-    _cluster_bot_access_command: {dest: "{{ cluster_bot_serve_command }}", module: clustertools.bot_serve}
+    _cluster_bot_access_command: {dest: "{{ cluster_bot_serve_command }}", module: cluster_tools.bot_serve}
 
 - name: Create the bot's account
   ansible.builtin.include_role:

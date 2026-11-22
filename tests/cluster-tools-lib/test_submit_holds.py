@@ -1,4 +1,4 @@
-"""clustertools.submit_holds: who may not submit for now. Someone at a disk hard limit,
+"""cluster_tools.submit_holds: who may not submit for now. Someone at a disk hard limit,
 with the reason they are shown, from disk_from on; the file job_submit.lua reads, and a
 failed Prometheus read that leaves the last file in place."""
 
@@ -12,8 +12,8 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests/slurm-usage-report"))
-from clustertools import disk_report, submit_holds  # noqa: E402
-from clustertools.prometheus import Error as PrometheusError  # noqa: E402
+from cluster_tools import disk_report, submit_holds  # noqa: E402
+from cluster_tools.prometheus import Error as PrometheusError  # noqa: E402
 from test_disk import NOW, site  # noqa: E402
 
 UIDS = {"alice": 1001, "bob": 1002, "carol": 1003}

@@ -9,7 +9,7 @@ After=network-online.target
 User={{ cluster_bot_user }}
 Group={{ cluster_bot_user }}
 Environment=PYTHONPATH={{ _cluster_bot_lib }}
-ExecStart={{ _cluster_bot_venv }}/bin/python -m clusterbot.app {{ _cluster_bot_config }}
+ExecStart={{ _cluster_bot_venv }}/bin/python -m cluster_bot.app {{ _cluster_bot_config }}
 Restart=on-failure
 RestartSec=30
 NoNewPrivileges=yes

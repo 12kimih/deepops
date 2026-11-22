@@ -14,7 +14,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ _submit_holds_command }}"
-      module: clustertools.submit_holds
+      module: cluster_tools.submit_holds
 
 - name: Create the cluster tools configuration directory
   ansible.builtin.file:
@@ -31,7 +31,7 @@
     group: root
     mode: "0644"
     content: "{{ _submit_holds_cfg | to_nice_json }}\n"
-    validate: "{{ cluster_tools_lib_config_validate }} clustertools.submit_holds %s"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.submit_holds %s"
 
 - name: Record the submission holds configuration
   ansible.builtin.include_role:
@@ -40,7 +40,7 @@
   vars:
     cluster_tools_lib_config:
       role: submit_holds
-      module: clustertools.submit_holds
+      module: cluster_tools.submit_holds
       file: "{{ _submit_holds_config }}"
       playbook: playbooks/slurm-cluster/submit-holds.yml
 

@@ -2,7 +2,7 @@
 # container_storage_gc -- a daily timer that removes users' container image stores from
 # a node's local disk: rootless podman storage (rootless_storage_path in storage.conf)
 # and the enroot layer cache (ENROOT_CACHE_PATH in enroot.conf), each read from the
-# tool's own configuration (clustertools.container_gc). A user's whole store goes when
+# tool's own configuration (cluster_tools.container_gc). A user's whole store goes when
 # the user left the roster, when it went unused for container_storage_gc_unused_days,
 # or, least recently used first, while its filesystem is above
 # container_storage_gc_max_used_percent; never while the user runs that tool. The

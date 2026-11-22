@@ -1,5 +1,5 @@
 ---
-# Egress policy (roles/egress_policy textfile metrics, clustertools.egress_metrics).
+# Egress policy (roles/egress_policy textfile metrics, cluster_tools.egress_metrics).
 # The nftables policy limits where users connect outside the cluster; these report what
 # it cannot block: a tunnel over an allowed port, a service open to the outside, and
 # the policy itself gone missing.

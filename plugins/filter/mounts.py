@@ -32,7 +32,7 @@ def mount_point(path, mounts):
 
 def project_filesystems(projects, mounts):
     """PROJECTS ({path: settings}) with each one's "filesystem": the mount point its
-    path lives on, which project quotas are set on (clustertools.disk_quota)."""
+    path lives on, which project quotas are set on (cluster_tools.disk_quota)."""
     return {
         path: {**(settings or {}), "filesystem": mount_point(path, mounts)}
         for path, settings in (projects or {}).items()

@@ -2,7 +2,7 @@
 dependencies:
   - role: deepops_paths  # deepops_state_dir, deepops_containerized
   - role: scratch_defaults  # scratch_alloc_mount, limits, periods
-  - role: cluster_tools_lib  # clustertools.scratch_alloc
+  - role: cluster_tools_lib  # cluster_tools.scratch_alloc
   - role: prometheus_paths  # node_exporter_prom_dir
   - role: slack_defaults  # cluster_bot_host, the bot's way in (cluster_bot_access_items)
 

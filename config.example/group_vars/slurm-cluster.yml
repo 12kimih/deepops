@@ -388,7 +388,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 # installed under that name makes the command behave differently from a script.
 #cluster_tools_scripts: []
 
-# The cluster commands the role ships (Python, on the shared clustertools library):
+# The cluster commands the role ships (Python, on the shared cluster_tools library):
 # sq (queue, users, why jobs wait, pools), qos (the QoS you may use, quotas) and
 # gpu-usage (what a job's GPUs did, from Slurm's accounting or Prometheus).
 #cluster_tools_commands: [sq, qos, gpu-usage]  # example

@@ -1,7 +1,7 @@
 """The Slack messages and forms of scratch allocations, as plain Block Kit data.
 
 Every action id starts with "scratch."; a button's value carries what it acts on (an
-allocation id). Approving a held request is the engine's (clusterbot.blocks).
+allocation id). Approving a held request is the engine's (cluster_bot.blocks).
 """
 
 from .blocks import button as _button

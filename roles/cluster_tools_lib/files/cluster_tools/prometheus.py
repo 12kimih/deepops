@@ -8,7 +8,7 @@
 Every failure (unreachable, timeout, an answer that is not a successful JSON reply) is
 an Error with one line on why; Error is a RuntimeError, so callers that already catch
 RuntimeError or OSError keep working. Each call is bounded by TIMEOUT seconds. The
-text format node_exporter's textfile collector reads is clustertools.prom. Python 3.9
+text format node_exporter's textfile collector reads is cluster_tools.prom. Python 3.9
 or newer, standard library only.
 """
 

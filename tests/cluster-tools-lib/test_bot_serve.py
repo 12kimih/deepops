@@ -1,4 +1,4 @@
-"""clustertools.bot_serve: the bot's one forced command runs a service only from a file
+"""cluster_tools.bot_serve: the bot's one forced command runs a service only from a file
 of root's that nobody else may write, with the rest of the request as that service's
 own, and every service splits its request the same way."""
 
@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import bot_serve  # noqa: E402
+from cluster_tools import bot_serve  # noqa: E402
 
 ME = os.getuid()  # root's part in the tests: the files are the test's own
 
@@ -67,7 +67,7 @@ class Dispatch(unittest.TestCase):
     def test_the_service_runs_in_a_clean_environment_with_only_its_request(self):
         real = bot_serve.resolve
         env = {"SSH_ORIGINAL_COMMAND": "scratch list alice", "LD_PRELOAD": "/tmp/x.so", "PATH": "/tmp"}
-        with mock.patch.dict(os.environ, env), mock.patch("clustertools.proc.become") as become, \
+        with mock.patch.dict(os.environ, env), mock.patch("cluster_tools.proc.become") as become, \
                 mock.patch.object(bot_serve, "resolve", lambda d, o: real(d, o, owner=ME)):  # fmt: skip
             bot_serve.main(["cluster-bot-serve", self.dir])
         argv, environment = become.call_args.args
@@ -78,7 +78,7 @@ class Dispatch(unittest.TestCase):
 
     def test_a_bad_request_is_refused_with_its_reason_and_nothing_runs(self):
         with mock.patch.dict(os.environ, {"SSH_ORIGINAL_COMMAND": "bans list"}), \
-                mock.patch("clustertools.proc.become") as become:  # fmt: skip
+                mock.patch("cluster_tools.proc.become") as become:  # fmt: skip
             self.assertEqual(bot_serve.main(["cluster-bot-serve", self.dir]), 2)
         become.assert_not_called()
 

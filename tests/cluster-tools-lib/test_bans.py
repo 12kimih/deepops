@@ -1,4 +1,4 @@
-"""clustertools.bans: the jails and their bans read from fail2ban-client as it prints
+"""cluster_tools.bans: the jails and their bans read from fail2ban-client as it prints
 them, an unban only for a well-formed address, and the bot's key asks for nothing else."""
 
 import sys
@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import bans  # noqa: E402
+from cluster_tools import bans  # noqa: E402
 
 # As fail2ban 1.0 prints them (client/beautifier.py, server/banmanager.py getBanList).
 STATUS = "Status\n|- Number of jail:\t2\n`- Jail list:\tsshd, recidive\n"

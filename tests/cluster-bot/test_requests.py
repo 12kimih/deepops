@@ -1,4 +1,4 @@
-"""clusterbot.requests: one flow for every feature. A feature gives only its decision,
+"""cluster_bot.requests: one flow for every feature. A feature gives only its decision,
 its action and a description; the engine applies at once or holds (surviving a restart),
 approves and denies once, refuses an unknown kind, and turns a feature's failure into a
 message."""
@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
-from clusterbot import requests  # noqa: E402
+from cluster_bot import requests  # noqa: E402
 
 
 class Echo(requests.Feature):

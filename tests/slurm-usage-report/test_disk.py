@@ -1,5 +1,5 @@
-"""The daily disk usage report, clustertools.disk_report, and its run in
-clustertools.usage_report --disk (no cluster needed)."""
+"""The daily disk usage report, cluster_tools.disk_report, and its run in
+cluster_tools.usage_report --disk (no cluster needed)."""
 
 import json
 import sys
@@ -10,8 +10,8 @@ from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
-from clustertools import disk_report  # noqa: E402
-from clustertools import usage_report as report  # noqa: E402
+from cluster_tools import disk_report  # noqa: E402
+from cluster_tools import usage_report as report  # noqa: E402
 
 NOW = 1_800_000_000
 G = 2**30

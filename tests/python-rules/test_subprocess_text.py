@@ -8,7 +8,7 @@ stopped a validator, a git hook or a removal module with a traceback instead of 
                              keeps them (roles/stale_files: FS): a replaced character
                              makes a path differ from itself
 
-clustertools' proc.run applies errors="replace" itself. Tests are left out: they run
+cluster_tools' proc.run applies errors="replace" itself. Tests are left out: they run
 the tools on fixtures of their own, where a strict decode fails loudly in the test.
 """
 

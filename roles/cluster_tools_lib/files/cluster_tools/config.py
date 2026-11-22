@@ -13,8 +13,8 @@ therefore records its tool's config (roles/cluster_tools_lib, tasks_from config:
 /etc/cluster-tools/configs.d/<role>.json names the module, the file and the playbook
 that writes it), and
 
-    python3 -m clustertools.config check MODULE FILE     one file: the role's validate
-    python3 -m clustertools.config installed [--skip ROLE ...] [--dir DIR]
+    python3 -m cluster_tools.config check MODULE FILE     one file: the role's validate
+    python3 -m cluster_tools.config installed [--skip ROLE ...] [--dir DIR]
         every recorded config against this package; each misfit is a line naming the
         playbook that rewrites it, and the exit status is 1
 """

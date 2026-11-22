@@ -1,4 +1,4 @@
-"""Tests for clustertools.site and its agreement with the role that writes the file."""
+"""Tests for cluster_tools.site and its agreement with the role that writes the file."""
 
 import json
 import re
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
 from ansible_yaml import load  # noqa: E402
-from clustertools import site  # noqa: E402
+from cluster_tools import site  # noqa: E402
 
 
 class SiteTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class SiteTests(unittest.TestCase):
         # A key read but published by neither dict is always missing on a host.
         defaults = load(ROOT / "roles/cluster_tools_lib/defaults/main.yml")
         published = set(defaults["cluster_info"]) | set(defaults["cluster_tools_lib_derived_info"])
-        package = ROOT / "roles/cluster_tools_lib/files/clustertools"
+        package = ROOT / "roles/cluster_tools_lib/files/cluster_tools"
         read = {
             key
             for path in package.glob("*.py")

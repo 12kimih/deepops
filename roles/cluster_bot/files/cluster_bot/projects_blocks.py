@@ -1,4 +1,4 @@
-"""Block Kit for the collaboration folders (clusterbot.projects): the Home tab's section,
+"""Block Kit for the collaboration folders (cluster_bot.projects): the Home tab's section,
 the forms, and the notice a person gets once a change is deployed."""
 
 from .blocks import button, field

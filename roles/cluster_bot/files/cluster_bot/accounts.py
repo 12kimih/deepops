@@ -28,7 +28,7 @@ def load(text):
 
 def leaving_deadlines(leaving):
     """People leaving ({login: {ends, login_expires}}, people_leaving of the roster as
-    deployed) as clusterbot.reminders deadlines: the end of each last day, local time."""
+    deployed) as cluster_bot.reminders deadlines: the end of each last day, local time."""
     out = {}
     for login, dates in leaving.items():
         after = datetime.date.fromisoformat(dates["ends"]) + datetime.timedelta(days=1)

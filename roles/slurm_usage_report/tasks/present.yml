@@ -17,7 +17,7 @@
     group: root
     mode: "0755"
 
-# The report is clustertools.usage_report, installed with the rest of the cluster's
+# The report is cluster_tools.usage_report, installed with the rest of the cluster's
 # Python by cluster_tools_lib, so it always matches the library it imports. This role
 # only wires it up.
 - name: Remove the report module of earlier layouts
@@ -32,7 +32,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ _slurm_usage_report_command }}"
-      module: clustertools.usage_report
+      module: cluster_tools.usage_report
 
 # Holds the bot token.
 - name: Install the report config
@@ -44,7 +44,7 @@
     group: root
     mode: "0600"
     # The report checks its own config, so a mistake fails the deploy, not the run.
-    validate: "{{ cluster_tools_lib_config_validate }} clustertools.usage_report %s"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.usage_report %s"
   # The user map comes from the people roster.
   tags:
     - people
@@ -58,7 +58,7 @@
   vars:
     cluster_tools_lib_config:
       role: slurm_usage_report
-      module: clustertools.usage_report
+      module: cluster_tools.usage_report
       file: "{{ _slurm_usage_report_config }}"
       playbook: playbooks/slurm-cluster/slurm-usage-report.yml
   tags:

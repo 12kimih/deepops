@@ -1,4 +1,4 @@
-"""clusterbot.scratch_policy: within the automatic size, period and extensions a scratch
+"""cluster_bot.scratch_policy: within the automatic size, period and extensions a scratch
 request is applied at once; beyond them an administrator approves; giving space back is
 always automatic; nobody acts on someone else's allocation."""
 
@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
-from clusterbot import scratch_policy as sp  # noqa: E402
+from cluster_bot import scratch_policy as sp  # noqa: E402
 
 T = 1024**4
 POLICY = {"auto_bytes": 2 * T, "auto_days": 30, "auto_extensions": 2}

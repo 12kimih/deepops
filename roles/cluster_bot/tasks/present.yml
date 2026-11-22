@@ -87,7 +87,7 @@
 
 - name: Install the bot's program
   ansible.builtin.copy:
-    src: clusterbot
+    src: cluster_bot
     dest: "{{ _cluster_bot_lib }}/"
     owner: root
     group: root
@@ -99,7 +99,7 @@
 - name: Install the roster module
   ansible.builtin.copy:
     src: "{{ role_path }}/../../plugins/filter/people.py"
-    dest: "{{ _cluster_bot_lib }}/clusterbot/people_roster.py"
+    dest: "{{ _cluster_bot_lib }}/cluster_bot/people_roster.py"
     owner: root
     group: root
     mode: "0644"

@@ -1,4 +1,4 @@
-"""The Slack form of unban requests (clusterbot.bans)."""
+"""The Slack form of unban requests (cluster_bot.bans)."""
 
 from .blocks import field
 

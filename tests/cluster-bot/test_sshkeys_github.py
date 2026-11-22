@@ -1,6 +1,6 @@
-"""clusterbot.sshkeys accepts ed25519 and strong RSA keys made by ssh-keygen, with
+"""cluster_bot.sshkeys accepts ed25519 and strong RSA keys made by ssh-keygen, with
 OpenSSH's own fingerprint, and refuses weak RSA and a pasted private key.
-clusterbot.github signs the App's JWT with openssl (verified with the public key) and
+cluster_bot.github signs the App's JWT with openssl (verified with the public key) and
 proposes a change as branch, commit and pull request, never on the base branch."""
 
 import base64
@@ -16,7 +16,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
 import bounds  # noqa: E402
-from clusterbot import github, sshkeys  # noqa: E402
+from cluster_bot import github, sshkeys  # noqa: E402
 
 
 def keygen(tmp, kind, bits=None):

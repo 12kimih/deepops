@@ -24,12 +24,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-# The validators start processes the cluster tools' one way (clustertools.proc).
+# The validators start processes the cluster tools' one way (cluster_tools.proc).
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
-from clustertools import proc  # noqa: E402
+from cluster_tools import proc  # noqa: E402
 
 
-# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+# (rc, stdout, stderr), never raising; bounded (cluster_tools.proc).
 run = functools.partial(proc.outcome, timeout=120)
 
 

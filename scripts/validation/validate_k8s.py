@@ -22,9 +22,9 @@ import sys
 import time
 from pathlib import Path
 
-# The validators start processes the cluster tools' one way (clustertools.proc).
+# The validators start processes the cluster tools' one way (cluster_tools.proc).
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import proc  # noqa: E402
+from cluster_tools import proc  # noqa: E402
 
 from role_defaults import role_default
 
@@ -32,7 +32,7 @@ SMOKE_NAMESPACE = "deepops-validate"
 SMOKE_POD = "deepops-validate-cuda"
 
 
-# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+# (rc, stdout, stderr), never raising; bounded (cluster_tools.proc).
 run = functools.partial(proc.outcome, timeout=60)
 
 

@@ -16,7 +16,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ job_notice_command }}"
-      module: clustertools.job_notice
+      module: cluster_tools.job_notice
 
 - name: Create the cluster tools configuration directory
   ansible.builtin.file:
@@ -33,14 +33,14 @@
     group: "{{ slurm_username }}"
     mode: "0640"
     content: "{{ _job_notice_cfg | to_nice_json }}\n"
-    validate: "{{ cluster_tools_lib_config_validate }} clustertools.job_notice %s"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.job_notice %s"
 
 - name: Record the job notice configuration
   ansible.builtin.include_role:
     name: cluster_tools_lib
     tasks_from: config
   vars:
-    cluster_tools_lib_config: {role: job_notice, module: clustertools.job_notice, file: "{{ _job_notice_config }}", playbook: playbooks/slurm-cluster/job-notice.yml}
+    cluster_tools_lib_config: {role: job_notice, module: cluster_tools.job_notice, file: "{{ _job_notice_config }}", playbook: playbooks/slurm-cluster/job-notice.yml}
 
 # Never on a command line or in the configuration; empty sends nothing.
 - name: Write the Slack token

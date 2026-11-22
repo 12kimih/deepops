@@ -22,7 +22,7 @@ cluster_tools_libs: []  # cluster_tools_lib_dir comes from cluster_tools_lib (a 
 # Built-in commands to publish, by name: any of sq (the queue, who holds what, why jobs
 # wait, and what each partition pool has left), qos (the QoS a user may submit against
 # and how full each quota is) and gpu-usage (what a job's GPUs did, from Slurm's
-# accounting or Prometheus). Each is clustertools.<name, - as _>, installed by
+# accounting or Prometheus). Each is cluster_tools.<name, - as _>, installed by
 # cluster_tools_lib with the rest of the cluster's Python; this role adds the command
 # wrapper and bash completion asked of the command itself, so both always match the
 # installed version. Empty publishes none and removes what was published.
@@ -70,7 +70,7 @@ cluster_tools_motd_commands: []
 cluster_tools_motd_links: []
 
 # Catppuccin flavour for the banner -- mocha, macchiato, frappe or latte -- from the
-# palette every cluster command shares (clustertools.render). Emitted as 24-bit colour;
+# palette every cluster command shares (cluster_tools.render). Emitted as 24-bit colour;
 # turn the colour off for a terminal that cannot render it.
 cluster_tools_motd_flavour: mocha
 cluster_tools_motd_color: true

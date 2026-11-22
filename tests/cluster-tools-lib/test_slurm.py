@@ -1,4 +1,4 @@
-"""Unit tests for clustertools.slurm (roles/cluster_tools_lib), no cluster needed."""
+"""Unit tests for cluster_tools.slurm (roles/cluster_tools_lib), no cluster needed."""
 
 import json
 import sys
@@ -7,7 +7,7 @@ from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import slurm  # noqa: E402
+from cluster_tools import slurm  # noqa: E402
 
 
 def value(n):

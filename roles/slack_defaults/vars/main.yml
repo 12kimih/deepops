@@ -1,7 +1,7 @@
 ---
 # The bot's way in on a host it acts on (roles/cluster_bot_access): its key's one forced
 # command runs the dispatcher as root through one sudo rule, and the dispatcher runs
-# only the services roles list in the directory, a file each (clustertools.bot_serve).
+# only the services roles list in the directory, a file each (cluster_tools.bot_serve).
 cluster_bot_serve_command: /usr/local/sbin/cluster-bot-serve
 cluster_bot_serve_dir: /etc/cluster-bot-access
 # What the bot's key runs, and the one command its sudo rule allows.

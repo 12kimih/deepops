@@ -116,7 +116,7 @@ its containers' traffic is forwarded, so the per-uid limits do not apply to it.
 
 ## Alerts
 
-`clustertools.egress_metrics` writes node_exporter textfile metrics every minute;
+`cluster_tools.egress_metrics` writes node_exporter textfile metrics every minute;
 `roles/prometheus/files/rules/egress-policy.yml` alerts on them:
 
 | Alert | When |

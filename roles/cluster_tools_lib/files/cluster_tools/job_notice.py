@@ -6,7 +6,7 @@ Slurm calls it only for jobs that asked (--mail-type, or SBATCH_MAIL_TYPE in the
 user's shell), once per event, with the job in its environment (SLURM_JOB_ID,
 SLURM_JOB_NAME, SLURM_JOB_MAIL_TYPE, SLURM_JOB_STATE, SLURM_JOB_RUN_TIME,
 SLURM_JOB_EXIT_CODE_MAX, ...). The recipient (--mail-user, by default the job's user)
-becomes a Slack member through the roster's chat IDs (clustertools.slack.member).
+becomes a Slack member through the roster's chat IDs (cluster_tools.slack.member).
 
 A person's notices close together become one message: within `coalesce_seconds` of
 the first, each later one is added to it (chat.update), so a burst of jobs ending
@@ -104,7 +104,7 @@ CONFIG_OPTIONAL = {"dry_run": bool}
 
 
 def load_config(path):
-    """The config roles/job_notice writes (clustertools.config)."""
+    """The config roles/job_notice writes (cluster_tools.config)."""
     return config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
 
 
