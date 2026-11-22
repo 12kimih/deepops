@@ -37,14 +37,13 @@ Python 3.9 or newer, standard library only.
 
 import csv
 import io
-import json
 import os
 import re
 import sys
 import time
 from pathlib import Path
 
-from . import proc
+from . import config, proc
 from .cli import run_main
 from .files import write_atomic
 from .prom import key, render
@@ -403,6 +402,13 @@ def steps_for(host, cfg, action):
 
 USAGE = "usage: disk-quota CONFIG.json apply|remove [--check] | metrics"
 
+CONFIG_KEYS = {"filesystems": list, "limits": dict, "release": list, "projects": dict, "textfile": str}
+
+
+def load_config(path):
+    """The config roles/disk_quota writes (clustertools.config); "-" reads it from stdin."""
+    return config.require(path, CONFIG_KEYS)
+
 
 def main(argv=None):
     argv = sys.argv if argv is None else argv
@@ -416,7 +422,7 @@ def main(argv=None):
         return 2
 
     def body():
-        cfg = json.loads(sys.stdin.read() if args[0] == "-" else Path(args[0]).read_text())
+        cfg = load_config(args[0])
         host = Host()
         try:
             if args[1] == "metrics":

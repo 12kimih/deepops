@@ -17,7 +17,8 @@ _scratch_alloc_cfg:
 scratch_alloc_items: >-
   {{ ['package:xfsprogs', 'package:quota', 'unit:scratch-alloc-sweep.timer', 'unit:scratch-alloc-sweep.service']
      + _scratch_alloc_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
-     + ['file:' ~ _scratch_alloc_command, 'file:' ~ _scratch_alloc_config, 'file:' ~ _scratch_alloc_textfile]
+     + ['file:' ~ _scratch_alloc_command, 'file:' ~ _scratch_alloc_config, 'file:' ~ _scratch_alloc_textfile,
+        'file:' ~ cluster_tools_lib_config_records ~ '/scratch_alloc.json']
      + ((cluster_bot_access_items + ['file:' ~ cluster_bot_serve_dir ~ '/' ~ _scratch_alloc_bot_service.name ~ '.json'])
         if cluster_bot_host | length > 0 else []) }}
 # The cluster bot's requests (roles/cluster_bot_access): the allocation command's serve

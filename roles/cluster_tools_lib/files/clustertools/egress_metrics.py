@@ -32,7 +32,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from . import proc
+from . import config, proc
 from .cli import run_main
 from .files import write_atomic
 from .prom import series
@@ -302,19 +302,25 @@ def load_table(name):
     return json.loads(result.stdout) if result.returncode == 0 else None
 
 
+CONFIG_KEYS = {"table": str, "inbound_table": str, "user_uids": list, "tunnel_programs": list}
+
+
+def load_config(path):
+    """The config roles/egress_policy writes (clustertools.config)."""
+    return config.require(path, CONFIG_KEYS)
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 2 or argv[0].startswith("-"):
         print("usage: egress-policy-metrics CONFIG.json PATH  (a node_exporter textfile)", file=sys.stderr)
         return 2
-    cfg = json.loads(Path(argv[0]).read_text())
-    return run_main(
-        "egress-policy-metrics",
-        lambda: write_atomic(
-            argv[1],
-            textfile(cfg, load_table(cfg["table"]), load_table(cfg.get("inbound_table", "ingress_policy"))),
-        ),
-    )
+
+    def body():
+        cfg = load_config(argv[0])
+        write_atomic(argv[1], textfile(cfg, load_table(cfg["table"]), load_table(cfg["inbound_table"])))
+
+    return run_main("egress-policy-metrics", body)
 
 
 if __name__ == "__main__":

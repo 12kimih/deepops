@@ -31,6 +31,14 @@
     group: root
     mode: "0644"
     content: "{{ _container_storage_gc_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} clustertools.container_gc %s"
+
+- name: Record the container storage gc configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: container_storage_gc, module: clustertools.container_gc, file: "{{ _container_storage_gc_config }}", playbook: playbooks/container/container-storage-gc.yml}
 
 - name: Install the container storage cleanup units
   ansible.builtin.template:

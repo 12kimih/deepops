@@ -43,7 +43,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import bot_serve, disk_quota
+from . import bot_serve, config, disk_quota
 from .cli import run_main
 from .files import write_atomic
 from .prom import key, render
@@ -250,6 +250,15 @@ def served(config, original):
     return ["scratch-alloc", config, *words]
 
 
+CONFIG_KEYS = {"mount": str, "registry": str, "first_id": int, "max_bytes": (int, str), "max_days": int,
+               "grace_days": int, "textfile": str}  # fmt: skip
+
+
+def load_config(path):
+    """The config roles/scratch_alloc writes (clustertools.config)."""
+    return config.require(path, CONFIG_KEYS)
+
+
 def main(argv=None):
     args = (sys.argv if argv is None else argv)[1:]
     if len(args) == 2 and args[1] == "serve":
@@ -263,11 +272,11 @@ def main(argv=None):
         return 2
 
     def body():
-        cfg = json.loads(Path(args[0]).read_text())
+        cfg = load_config(args[0])
         host, now, op, rest = Host(), time.time(), args[1], args[2:]
         try:
             check_mount(host, cfg["mount"])
-            with Registry(cfg["registry"], cfg.get("first_id", 1000)).open() as data:
+            with Registry(cfg["registry"], cfg["first_id"]).open() as data:
                 if op == "create":
                     result = create(host, cfg, data, rest[0], rest[1], rest[2], " ".join(rest[3:]), now)
                 elif op == "resize":

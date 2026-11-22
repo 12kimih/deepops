@@ -1,7 +1,6 @@
 """Unit tests for the Slurm usage report, clustertools.usage_report (no cluster needed)."""
 
 import json
-import re
 import sys
 import tempfile
 import unittest
@@ -297,7 +296,7 @@ class RunTests(unittest.TestCase):
             cfg = {"channel": "#gpu", "state_file": f"{d}/state.json", "idle_hours": 2, "idle_util_threshold": 1,
                    "notify": ["dm"], "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
                    "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
-                   "dm_text": "{job}", "dashboard_url": "", "admin_channel": "#admin",
+                   "dm_text": "{job}", "admin_channel": "#admin",
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
                    "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
                    "storage_top": 10, "storage_notify": ["mention"], "storage_repeat_days": 7,
@@ -365,14 +364,6 @@ class ConfigTests(unittest.TestCase):
                              ({"storage_repeat_days": -1}, "storage_repeat_days"), ({"people": "alice"}, "people")):  # fmt: skip
             with self.subTest(change=change), self.assertRaisesRegex(report.ConfigError, word):
                 self.load(**change)
-
-    def test_the_role_writes_every_key_the_report_requires(self):
-        # The deploy validates the file with --check-config: a key the report requires
-        # and the template lacks would fail every deploy, one it writes and the report
-        # ignores would be a setting that does nothing.
-        template = (ROLES / "slurm_usage_report/templates/config.json.j2").read_text()
-        written = set(re.findall(r'^\s*"(\w+)":', template, re.M)) - {"_comment"}
-        self.assertEqual(written, set(report.CONFIG_KEYS))
 
     def test_a_damaged_state_file_is_a_fresh_start(self):
         with tempfile.TemporaryDirectory() as d:

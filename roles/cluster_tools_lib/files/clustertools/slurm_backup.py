@@ -4,7 +4,6 @@
     slurm-backup restore-test CONFIG.json  monthly: load the newest dump into a scratch
                                            database and compare it with the live one
     slurm-backup publish CONFIG.json       at deploy: write the metrics for the configured destinations
-    slurm-backup check CONFIG.json         refuse a configuration the others cannot run
 
 What is backed up: the accounting database (mariadb-dump, one consistent snapshot
 with --single-transaction, compressed as it streams), the StateSaveLocation tree
@@ -32,7 +31,6 @@ import contextlib
 import datetime as dt
 import fcntl
 import hashlib
-import json
 import os
 import re
 import sys
@@ -40,7 +38,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-from . import proc
+from . import config, proc
 from .files import write_atomic
 from .prom import key, parse, render
 
@@ -61,6 +59,21 @@ FAILURES = (proc.CalledProcessError, proc.TimeoutExpired, OSError, tarfile.TarEr
 
 
 # --- pure helpers (unit tested) ----------------------------------------------------
+
+
+CONFIG_KEYS = {"database": str, "state_dir": str, "munge_key": str, "weekly_day": int, "textfile_dir": str,
+               "textfile": str, "work_dir": str, "metrics_file": str, "step_timeout": int, "destinations": list}  # fmt: skip
+CONFIG_OPTIONAL = {"restore_database": str}
+
+
+def load_config(path):
+    """The config roles/slurm_backup writes (clustertools.config), and one the commands can
+    run: every problem is named."""
+    cfg = config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
+    problems = problems_in(cfg)
+    if problems:
+        raise config.ConfigError(f"{path}: {'; '.join(problems)}")
+    return cfg
 
 
 def problems_in(cfg):
@@ -366,20 +379,16 @@ def restore_test(cfg):
     return 1 if problems else 0
 
 
-def check(cfg):
-    for p in problems_in(cfg):
-        print(f"slurm-backup: {p}", file=sys.stderr)
-    return 2 if problems_in(cfg) else 0
-
-
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    commands = {"backup": backup, "restore-test": restore_test, "publish": publish, "check": check}
+    commands = {"backup": backup, "restore-test": restore_test, "publish": publish}
     if len(argv) != 2 or argv[0] not in commands:
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
-    cfg = json.loads(Path(argv[1]).read_text())
-    if argv[0] in ("backup", "restore-test") and check(cfg):
+    try:
+        cfg = load_config(argv[1])
+    except config.ConfigError as e:
+        print(f"slurm-backup: {e}", file=sys.stderr)
         return 2
     return commands[argv[0]](cfg)
 

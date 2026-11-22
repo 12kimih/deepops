@@ -88,6 +88,14 @@
         mode: "0644"
         content: "{{ {'table': 'egress_policy', 'inbound_table': 'ingress_policy', 'user_uids': egress_policy_restricted_uids,
                       'tunnel_programs': egress_policy_tunnel_programs} | to_nice_json }}\n"
+        validate: "{{ cluster_tools_lib_config_validate }} clustertools.egress_metrics %s"
+
+    - name: Record the egress policy configuration
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: config
+      vars:
+        cluster_tools_lib_config: {role: egress_policy, module: clustertools.egress_metrics, file: "{{ _egress_policy_metrics_config }}", playbook: playbooks/generic/egress-policy.yml}
 
     - name: Install the metrics units
       ansible.builtin.template:

@@ -27,7 +27,8 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import storage_report
+from . import config, storage_report
+from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
@@ -371,24 +372,11 @@ CONFIG_KEYS = {
 }  # fmt: skip
 
 
-class ConfigError(ValueError):
-    pass
-
-
 def load_config(path):
     """The config, checked whole before anything runs: a mistake in it is one line naming
-    it, at deploy time (the role validates the file with --check-config) and never a
+    it, at deploy time (the role validates the file, clustertools.config) and never a
     traceback part-way through notifying owners."""
-    with open(path) as f:
-        try:
-            cfg = json.load(f)
-        except ValueError as e:
-            raise ConfigError(f"{path}: not JSON: {e}") from None
-    if not isinstance(cfg, dict):
-        raise ConfigError(f"{path}: not a JSON object")
-    for key, kind in CONFIG_KEYS.items():
-        if not isinstance(cfg.get(key), kind) or (kind is not bool and isinstance(cfg.get(key), bool)):
-            raise ConfigError(f"{path}: {key} is missing or not a {getattr(kind, '__name__', 'number')}")
+    cfg = config.require(path, CONFIG_KEYS)
     for key in ("notify", "storage_notify"):
         if set(cfg[key]) - NOTIFY:
             raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
@@ -461,14 +449,11 @@ def report_once():
         metavar="CHANNEL_OR_MEMBER",
         help="post a preview there instead; notifies, cancels and records nothing",
     )
-    ap.add_argument("--check-config", action="store_true", help="check the config and exit")
     other = ap.add_mutually_exclusive_group()
     other.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
     other.add_argument("--storage", action="store_true", help="post the daily disk usage report instead")
     args = ap.parse_args()
     cfg = load_config(args.config)
-    if args.check_config:
-        return
     if args.weekly:
         weekly(cfg, args)
         return
