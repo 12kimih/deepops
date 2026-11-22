@@ -72,10 +72,9 @@ import os
 import secrets
 import shutil
 import string
-import subprocess
 import tempfile
 
-from ansible.module_utils import deepops_diff
+from ansible.module_utils import deepops_command, deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
 # The alphabet of secrets.token_urlsafe: a password made by chars matches one made by length.
@@ -86,10 +85,10 @@ def gpg_pair(module, uid):
     """(armored secret key, armored public key) of a new passphrase-less ed25519
     signing key, made in a throwaway GNUPGHOME."""
     home = tempfile.mkdtemp(prefix="site-secret-gpg-")
-    env = dict(os.environ, GNUPGHOME=home, LC_ALL="C")
+    env = {"GNUPGHOME": home, "LC_ALL": "C"}
 
     def run(*args):
-        rc, out, err = module.run_command(["gpg", "--batch", "--quiet", *args], environ_update=env)
+        rc, out, err = deepops_command.run(module, ["gpg", "--batch", "--quiet", *args], environ_update=env)
         if rc != 0:  # stderr only: stdout may hold the key
             module.fail_json(msg=f"gpg {' '.join(args)} failed: {err.strip()}")
         return out
@@ -102,7 +101,7 @@ def gpg_pair(module, uid):
             module.fail_json(msg="gpg exported no key")
         return secret, public
     finally:
-        module.run_command(["gpgconf", "--kill", "all"], environ_update=env)
+        deepops_command.run(module, ["gpgconf", "--kill", "all"], environ_update=env)
         shutil.rmtree(home, ignore_errors=True)
 
 
@@ -116,19 +115,16 @@ def write_new(module, path, data, mode, vault):
         os.close(fd)
         if vault:
             p = module.params
-            env = dict(os.environ, ANSIBLE_VAULT_PASSWORD_FILE=p["vault_password_file"])
-            env.pop("ANSIBLE_VAULT_IDENTITY_LIST", None)
-            proc = subprocess.run(
-                [p["ansible_vault"], "encrypt", "--output", tmp, "-"],
-                input=data,
-                env=env,
-                capture_output=True,
-                check=False,
+            # The site's vault password file, never an identity list the caller's shell set.
+            env = {
+                "ANSIBLE_VAULT_PASSWORD_FILE": p["vault_password_file"],
+                "ANSIBLE_VAULT_IDENTITY_LIST": None,
+            }
+            rc, _, err = deepops_command.run(
+                module, [p["ansible_vault"], "encrypt", "--output", tmp, "-"], data=data, environ_update=env
             )
-            if proc.returncode != 0:
-                module.fail_json(
-                    msg=f"ansible-vault encrypt failed: {proc.stderr.decode(errors='replace').strip()}"
-                )
+            if rc != 0:
+                module.fail_json(msg=f"ansible-vault encrypt failed: {err.strip()}")
         else:
             with open(tmp, "wb") as f:
                 f.write(data)

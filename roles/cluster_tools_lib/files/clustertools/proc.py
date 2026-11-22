@@ -32,6 +32,8 @@ import subprocess
 
 CalledProcessError = subprocess.CalledProcessError
 TimeoutExpired = subprocess.TimeoutExpired
+# How long the pipes of a killed session are drained before giving up on them.
+REAP_TIMEOUT = 5
 
 
 def run(argv, *, timeout, check=True, input=None, capture_output=False, **kwargs):
@@ -53,7 +55,10 @@ def run(argv, *, timeout, check=True, input=None, capture_output=False, **kwargs
                 os.killpg(child.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            child.communicate()
+            try:  # bounded too: a process that left the session may still hold the pipes
+                child.communicate(timeout=REAP_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                pass
             raise
     if check and child.returncode:
         raise CalledProcessError(child.returncode, argv, out, err)

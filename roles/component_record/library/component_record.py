@@ -95,7 +95,7 @@ import os
 import re
 import tempfile
 
-from ansible.module_utils import deepops_diff
+from ansible.module_utils import deepops_command, deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.deepops_marks import made_by, named_deepops
 
@@ -244,7 +244,7 @@ def main():
             return made_by(ident, p["role"]) or (ident in p["legacy"] and legacy(ident))
         if kind == "dir":
             return named_deepops(ident)
-        rc, out, _ = module.run_command(["systemctl", "show", "-P", "FragmentPath", ident])
+        rc, out, _ = deepops_command.run(module, ["systemctl", "show", "-P", "FragmentPath", ident])
         return rc == 0 and bool(out.strip()) and made_by(out.strip(), p["role"])
 
     record, orphans, before = apply(

@@ -102,11 +102,15 @@
    find warns for every path not on the host, so a component's removal looking on hosts
    that never had it (prometheus' alert rules) printed a warning per host each deploy.
    find_present treats a missing path as an empty directory.
+26. An in-tree module runs a command through plugins/module_utils/deepops_command.py,
+   never module.run_command or subprocess: run_command takes no timeout, so a sacctmgr
+   with slurmdbd gone or a stuck systemctl held the whole play (2026-11 audit).
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
 """
 
+import ast
 import re
 import sys
 import unittest
@@ -952,6 +956,27 @@ class TaskRules(unittest.TestCase):
             offenders += [f"{rel(path)}: {t.get('name')}" for t in tasks(path) if module(t)[0] in SERVICES]
         self.assertEqual(offenders, [], "use systemd_unit (plugins/action/systemd_unit.py)")
 
+    def test_modules_run_commands_bounded(self):
+        spawn = {"run", "Popen", "call", "check_call", "check_output"}
+        offenders = []
+        for path in tracked("roles/*/library/*.py", "plugins/modules/*.py", "plugins/module_utils/*.py"):
+            rel = path.relative_to(ROOT).as_posix()
+            if rel.startswith(("roles/nvidia-dgx", "roles/galaxy/")) or rel.endswith("/deepops_command.py"):
+                continue
+            for node in ast.walk(ast.parse(path.read_text())):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                    continue
+                f = node.func
+                unbounded = f.attr == "run_command" or (
+                    f.attr in spawn
+                    and isinstance(f.value, ast.Name)
+                    and f.value.id == "subprocess"
+                    and not any(k.arg == "timeout" for k in node.keywords)
+                )
+                if unbounded:
+                    offenders.append(f"{rel}:{node.lineno}")
+        self.assertEqual(offenders, [], "run commands with deepops_command.run (rule 26)")
+
     def test_modules_say_what_they_change(self):
         offenders = []
         for path in tracked("roles/*/library/*.py", "plugins/modules/*.py"):
@@ -959,9 +984,9 @@ class TaskRules(unittest.TestCase):
             text = path.read_text()
             if rel.startswith("roles/nvidia-dgx") or "supports_check_mode=True" not in text:
                 continue
-            if "from ansible.module_utils import deepops_diff" not in text or not re.search(
-                r'\bdiff=|\["diff"\]', text
-            ):
+            if not re.search(
+                r"^from ansible\.module_utils import .*\bdeepops_diff\b", text, re.M
+            ) or not re.search(r'\bdiff=|\["diff"\]', text):
                 offenders.append(rel)
         self.assertEqual(offenders, [], "return diff=deepops_diff.text(...) or .actions(...) when changed")
 
