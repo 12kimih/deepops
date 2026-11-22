@@ -5,7 +5,8 @@ _nginx_docker_cache_client_crt: >-
      else nginx_docker_cache_ca_client_crt_ubuntu }}
 nginx_docker_cache_client_items: >-
   {{ ['file:' ~ _nginx_docker_cache_client_crt]
-     + (['file:' ~ nginx_docker_cache_docker_config_dest] if nginx_docker_cache_dockerd_clients | bool else []) }}
+     + (['file:' ~ nginx_docker_cache_docker_config_dest, 'dir:' ~ nginx_docker_cache_docker_config_dest | dirname]
+        if nginx_docker_cache_dockerd_clients | bool else []) }}
 
 # The system trust store of each family: the bundle its update command builds from the
 # certificate sources, and those sources (the certificate's directory, and Debian's

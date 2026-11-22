@@ -70,27 +70,15 @@
   check_mode: false  # read-only; --check needs the result
   failed_when: false
 
-- name: Ensure the docker.socket drop-in directory exists
-  ansible.builtin.file:
-    path: /etc/systemd/system/docker.socket.d
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  when: docker_socket_group_unit.rc == 0
-
 - name: Align the docker.socket unit group with the daemon configuration
-  ansible.builtin.copy:
+  systemd_dropin:
+    path: /etc/systemd/system/docker.socket.d/10-socket-group.conf
     content: |
       # Ansible managed -- edits will be overwritten (roles/docker_socket_group).
       # Kept in sync with the `group` key in /etc/docker/daemon.json so socket
       # ownership is the same whether or not dockerd is socket-activated.
       [Socket]
       SocketGroup={{ docker_socket_group }}
-    dest: /etc/systemd/system/docker.socket.d/10-socket-group.conf
-    owner: root
-    group: root
-    mode: "0644"
   when: docker_socket_group_unit.rc == 0
   notify:
     - Restart the docker socket unit

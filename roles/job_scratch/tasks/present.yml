@@ -128,18 +128,9 @@
   when: not deepops_containerized | bool
 
 - name: Make slurmd wait for it
-  ansible.builtin.template:
-    src: job-scratch.conf.j2
-    dest: "{{ _job_scratch_dropin }}"
-    owner: root
-    group: root
-    mode: "0644"
-  register: job_scratch_dropin
-
-- name: Load slurmd's new ordering
-  systemd_unit:
-    daemon_reload: true
-  when: job_scratch_dropin is changed
+  systemd_dropin:
+    path: "{{ _job_scratch_dropin }}"
+    content: "{{ lookup('ansible.builtin.template', 'job-scratch.conf.j2') }}"
 
 - name: Create the local facts directory
   ansible.builtin.file:

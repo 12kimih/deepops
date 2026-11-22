@@ -6,38 +6,19 @@
 # which can take far longer than systemd's start timeout; killed part-way, the
 # conversion is left half done. Its start is therefore never timed out (Slurm's upgrade
 # guide), should the unit wait for readiness (the 26.05 one is Type=simple and does not).
+# Only systemd reads it; slurmdbd needs no restart for this.
 - name: Let slurmdbd finish a database conversion
+  systemd_dropin:
+    path: /etc/systemd/system/slurmdbd.service.d/10-start-timeout.conf
+    content: |
+      [Service]
+      TimeoutStartSec=infinity
   when: is_controller
-  block:
-    - name: Create slurmdbd systemd override directory
-      ansible.builtin.file:
-        path: /etc/systemd/system/slurmdbd.service.d
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-
-    - name: Do not time out the slurmdbd start
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/slurmdbd.service.d/10-start-timeout.conf
-        owner: root
-        group: root
-        mode: "0644"
-        content: |
-          [Service]
-          TimeoutStartSec=infinity
-      register: slurmdbd_timeout
-
-    # Only systemd reads it; slurmdbd needs no restart for this.
-    - name: Reload systemd for the slurmdbd override
-      systemd_unit:
-        daemon_reload: true
-      when: slurmdbd_timeout is changed
 
 # The packaged commands are in /usr/bin, on systemd's own PATH: the drop-in that put a
 # custom prefix on slurmd's PATH is no longer needed.
 - name: Remove the slurmd PATH drop-in
-  ansible.builtin.file:
+  systemd_dropin:
     path: /etc/systemd/system/slurmd.service.d/10-slurm-path.conf
     state: absent
   notify: Restart slurmd

@@ -6,7 +6,8 @@
     component_record_name: nginx_docker_cache_client
     component_record_action: absent
     component_record_items: >-
-      {{ ['file:' ~ _nginx_docker_cache_client_crt, 'file:' ~ nginx_docker_cache_docker_config_dest] }}
+      {{ ['file:' ~ _nginx_docker_cache_client_crt, 'file:' ~ nginx_docker_cache_docker_config_dest,
+          'dir:' ~ nginx_docker_cache_docker_config_dest | dirname] }}
 
 # The proxy's CA leaves the trust store: off the list (Debian), and the store rebuilt
 # whenever it is older than its sources, also after a run that failed before rebuilding.

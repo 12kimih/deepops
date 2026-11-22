@@ -117,6 +117,12 @@
 29. A kernel module is loaded at boot through roles/kernel_modules, never modprobe's
    persistent: that wrote /etc/modules-load.d with no diff, and the BMC role and the
    IPMI exporter each wrote the same file, so removing the exporter took the BMC's.
+30. A unit's drop-in (/etc/systemd/system/<unit>.d/) is written and removed through
+   systemd_dropin (plugins/action), never copy, template or file: no package ships the
+   directory and copy does not make it, so job_scratch's first host failed
+   ("Destination directory ... does not exist", 2026-11-22); and the restart after a
+   drop-in changed needs systemd reloaded first, which the docker.socket and registry
+   proxy drop-ins never did. component_record's own removal of recorded files stays.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -133,6 +139,9 @@ import yaml
 from jinja2 import nodes
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "plugins" / "action"))
+from systemd_dropin import UNIT_TYPES  # noqa: E402
+
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import (  # noqa: E402
     CHANGES,
@@ -1017,6 +1026,44 @@ class TaskRules(unittest.TestCase):
                 continue  # NVIDIA's DGX roles are kept as shipped
             offenders += [f"{rel(path)}: {t.get('name')}" for t in tasks(path) if module(t)[0] in SERVICES]
         self.assertEqual(offenders, [], "use systemd_unit (plugins/action/systemd_unit.py)")
+
+    def test_drop_ins_go_through_systemd_dropin(self):
+        dropin = re.compile(rf"/[^/]+\.(?:{UNIT_TYPES})\.d(?:/|$)")
+        reference = re.compile(r"\{\{\s*(\w+)\s*(\|\s*dirname\s*)?\}\}")
+
+        def resolved(text, names):
+            for _ in range(5):
+                found = reference.search(text)
+                if not found or found.group(1) not in names:
+                    break
+                value = resolved(str(names[found.group(1)]), names)
+                value = str(Path(value).parent) if found.group(2) else value
+                text = text[: found.start()] + value + text[found.end() :]
+            return text
+
+        offenders, seen = [], 0
+        for path in ansible_files():
+            if rel(path).startswith(("roles/nvidia-dgx", "roles/component_record/")):
+                continue  # NVIDIA's DGX roles are kept as shipped; recorded files go by kind
+            names = {}
+            if rel(path).startswith("roles/"):
+                for part in ("defaults", "vars"):
+                    file = ROOT / "roles" / rel(path).split("/")[1] / part / "main.yml"
+                    names.update((yaml.safe_load(file.read_text()) or {}) if file.exists() else {})
+            for task in tasks(path):
+                name, args = module(task)
+                if name == "systemd_dropin":
+                    seen += 1
+                elif isinstance(args, dict):
+                    # The target, and what a loop gives it (item, item.dest under a prefix)
+                    target = str(args.get("dest") or args.get("path") or "")
+                    items = task.get("loop") if isinstance(task.get("loop"), list) else []
+                    values = [v for i in items for v in (i.values() if isinstance(i, dict) else [i])]
+                    hits = [v for v in [target, *values] if dropin.search(f"{resolved(target, names)}/{v}")]
+                    if hits:
+                        offenders.append(f"{rel(path)}: {task.get('name')} ({resolved(str(hits[0]), names)})")
+        self.assertEqual(offenders, [], "write or remove a drop-in with systemd_dropin (rule 30)")
+        self.assertGreaterEqual(seen, 9, "the scan finds the systemd_dropin tasks")
 
     def test_scratch_exists_in_a_preview(self):
         scan, offenders, seen = Scan(minimum=MINIMUM_FILES), [], 0

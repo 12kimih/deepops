@@ -116,6 +116,12 @@ would start fail2ban
 changed: [node1]
 ```
 
+A unit's drop-in (`/etc/systemd/system/<unit>.d/<name>.conf`) is written or removed
+through `systemd_dropin` (`plugins/action`, rule 30): it makes the directory no package
+ships, writes the file as `copy` does (previewed and diffed under `--check --diff`),
+reloads systemd when the file changed, so a restart the task notifies sees it, and on
+removal takes the directory too once nothing else is in it.
+
 Every in-tree module returns a diff when it changes something (rule 21), so `--diff`
 shows what it would remove, write or install, never only that it would. Files are
 found through `find_present` (rule 25): a path not on the host (a directory this run

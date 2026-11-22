@@ -32,7 +32,7 @@
 # Its library path in /etc/ld.so.conf.d goes with the other leftovers (stale-files.yml,
 # by its text), which refreshes the library cache.
 # The packages ship their units in /lib/systemd/system; copies here would shadow them.
-# The drop-in directories (slurmdbd's start timeout) stay.
+# The drop-ins stay: service-files.yml removes the build's PATH one on every run.
 - name: Remove the source build's systemd units
   ansible.builtin.file:
     path: "/etc/systemd/system/{{ item }}"
@@ -41,7 +41,6 @@
     - slurmctld.service
     - slurmd.service
     - slurmdbd.service
-    - slurmd.service.d/10-slurm-path.conf
 
 - name: Reload systemd for the packaged units
   systemd_unit:
