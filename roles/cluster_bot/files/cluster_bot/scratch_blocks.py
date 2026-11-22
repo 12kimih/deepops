@@ -1,7 +1,7 @@
 """The Slack messages and forms of scratch allocations, as plain Block Kit data.
 
-Every action id starts with "scratch."; a button's value carries what it acts on (an
-allocation id). Approving a held request is the engine's (cluster_bot.blocks).
+Every action id starts with "scratch."; a person has one allocation, so a button acts on
+theirs. Approving a held request is the engine's (cluster_bot.blocks).
 """
 
 from .blocks import button as _button
@@ -16,8 +16,8 @@ def _sizes():
 
 
 def home(allocations):
-    """What /scratch shows its user: their allocations with what they can do to each, and
-    the way to ask for a new one."""
+    """What /scratch shows its user: their allocation with what they can do to it, or the
+    way to ask for one."""
     blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "*내 스크래치 공간*"}}]
     live = [a for a in allocations if a["state"] != "released"]
     for a in live:
@@ -29,23 +29,26 @@ def home(allocations):
             "deny": {"type": "plain_text", "text": "취소"},
         }
         blocks.append({"type": "actions", "elements": [
-            _button("연장", "scratch.extend", a["id"]),
-            _button("크기 변경", "scratch.resize", a["id"]),
-            _button("반납", "scratch.release", a["id"], style="danger", confirm=release),
+            _button("연장", "scratch.extend", a["user"]),
+            _button("크기 변경", "scratch.resize", a["user"]),
+            _button("반납", "scratch.release", a["user"], style="danger", confirm=release),
         ]})  # fmt: skip
     if not live:
         blocks.append(
             {"type": "context", "elements": [{"type": "mrkdwn", "text": "배정받은 공간이 없습니다."}]}
         )
-    blocks.append(
-        {"type": "actions", "elements": [_button("새로 신청", "scratch.new", "new", style="primary")]}
-    )
+        blocks.append(
+            {"type": "actions", "elements": [_button("신청", "scratch.new", "new", style="primary")]}
+        )
     return blocks
 
 
 def new_form(policy):
     """The form for a new allocation: size, period, reason."""
-    auto = f"{human(policy['auto_bytes'])}, {policy['auto_days']}일 안에서는 바로 배정됩니다. 그보다 크거나 길면 관리자가 승인합니다."
+    auto = (
+        f"/scratch/<아이디> 하나를 받습니다. {human(policy['auto_bytes'])}, 만든 날부터 {policy['auto_days']}일 안에서는 "
+        "바로 배정되고, 그보다 크거나 길면 관리자가 승인합니다."
+    )
     return {
         "type": "modal", "callback_id": "scratch.create",
         "title": {"type": "plain_text", "text": "스크래치 신청"},
@@ -60,8 +63,8 @@ def new_form(policy):
     }  # fmt: skip
 
 
-def number_form(kind, alloc_id):
-    """The form for extending (days) or resizing (size) one allocation."""
+def number_form(kind, user):
+    """The form for extending (days) or resizing (size) USER's allocation."""
     if kind == "extend":
         label, element = (
             "연장할 기간 (일)",
@@ -70,7 +73,7 @@ def number_form(kind, alloc_id):
     else:
         label, element = "새 크기", {"type": "static_select", "options": _sizes()}
     return {
-        "type": "modal", "callback_id": f"scratch.{kind}", "private_metadata": str(alloc_id),
+        "type": "modal", "callback_id": f"scratch.{kind}", "private_metadata": user,
         "title": {"type": "plain_text", "text": "스크래치 연장" if kind == "extend" else "크기 변경"},
         "submit": {"type": "plain_text", "text": "요청"},
         "blocks": [field("v", label, element)],
@@ -88,8 +91,8 @@ def reminder(a, days_left):
         {
             "type": "actions",
             "elements": [
-                _button("연장", "scratch.extend", a["id"]),
-                _button("반납", "scratch.release", a["id"]),
+                _button("연장", "scratch.extend", a["user"]),
+                _button("반납", "scratch.release", a["user"]),
             ],
         },
     ]

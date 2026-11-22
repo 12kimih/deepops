@@ -167,6 +167,8 @@ retired_settings:
   slurm_usage_report_storage_top: slurm_usage_report_disk_top in roles/slurm_usage_report
   slurm_usage_report_storage_notify: slurm_usage_report_disk_notify in roles/slurm_usage_report
   slurm_usage_report_storage_repeat_days: slurm_usage_report_disk_repeat_days in roles/slurm_usage_report
+  scratch_alloc_auto_extensions: none; an extension is given at once while the allocation stays within scratch_alloc_auto_days of when it was made
+  scratch_alloc_first_id: none; an allocation's project ID is its owner's UID
   slurm_deb_build_dir: system_accounts.slurmbuild.home (the build account's home) in roles/system_accounts
   slurm_user_home: system_accounts.slurm.home in roles/system_accounts
   slurm_user_uid: system_accounts.slurm.uid in roles/system_accounts

@@ -16,8 +16,8 @@ sys.path.insert(0, str(ROLE / "files"))
 from cluster_bot import accounts, accounts_blocks, app, reminders, scratch, scratch_blocks, state  # noqa: E402
 
 DAY = 86400
-ALLOC = {"id": 1000, "user": "alice", "bytes": 1024**4, "state": "active", "path": "/scratch/alice-1000",
-         "expires": 10 * DAY, "extensions": 0}  # fmt: skip
+ALLOC = {"user": "alice", "bytes": 1024**4, "state": "active", "path": "/scratch/alice", "created": 0,
+         "expires": 10 * DAY}  # fmt: skip
 
 
 class Client:
@@ -31,24 +31,31 @@ class Client:
 
 
 def feature(allocs):
-    return scratch.ScratchFeature(lambda *words: allocs, {})
+    """The scratch feature over a stand-in server whose list is ALLOCS (and a disk)."""
+    return scratch.ScratchFeature(lambda *words: {"allocations": allocs, "disk": {"bytes": 1, "used": 0}}, {})
 
 
 SLACK_OF = {"alice": "UALICE"}.get
 
 
 class LogicTests(unittest.TestCase):
-    def test_home_offers_actions_per_allocation_and_a_new_request(self):
+    def test_home_offers_what_to_do_with_your_one_allocation_or_to_ask_for_it(self):
         blocks = scratch_blocks.home([ALLOC])
         actions = [e["action_id"] for b in blocks if b["type"] == "actions" for e in b["elements"]]
-        self.assertEqual(actions, ["scratch.extend", "scratch.resize", "scratch.release", "scratch.new"])
+        self.assertEqual(
+            actions, ["scratch.extend", "scratch.resize", "scratch.release"], "one each: no second"
+        )
         release = blocks[2]["elements"][2]
         self.assertIn("confirm", release, "giving space back asks first")
+        none = scratch_blocks.home([])
+        self.assertEqual(
+            [e["action_id"] for b in none if b["type"] == "actions" for e in b["elements"]], ["scratch.new"]
+        )
 
     def test_forms_name_the_fields_their_handlers_read(self):
-        form = scratch_blocks.new_form({"auto_bytes": 2 * 1024**4, "auto_days": 30, "auto_extensions": 2})
+        form = scratch_blocks.new_form({"auto_bytes": 5 * 1024**4, "auto_days": 90, "guard": 0.8})
         self.assertEqual([b.get("block_id") for b in form["blocks"][1:]], ["size", "days", "reason"])
-        self.assertEqual(scratch_blocks.number_form("extend", 1000)["private_metadata"], "1000")
+        self.assertEqual(scratch_blocks.number_form("extend", "alice")["private_metadata"], "alice")
         self.assertEqual(app.size_bytes("2T"), 2 * 1024**4)
 
     def test_reminders_once_per_stage_and_again_after_an_extension(self):
@@ -96,7 +103,7 @@ class LogicTests(unittest.TestCase):
         sent = {}
         reminders.remind(sources, Client(), SLACK_OF, sent, 0)  # first seen ten days off
         reminders.remind(sources, Client(fail=True), SLACK_OF, sent, 4 * DAY)
-        self.assertIsNone(sent["scratch"]["1000"][1], "nothing went out, so no stage is recorded")
+        self.assertIsNone(sent["scratch"]["alice"][1], "nothing went out, so no stage is recorded")
         client = Client()
         reminders.remind(sources, client, SLACK_OF, sent, 4.1 * DAY)
         self.assertEqual(len(client.sent), 1)

@@ -1,58 +1,54 @@
 """What a scratch request gets without an administrator.
 
-    decide(request, allocations, policy) -> ("auto", why) or ("admin", why)
+    decide(request, listing, policy, now) -> ("auto", why) or ("admin", why)
 
-A request is {"op": create|resize|extend|release, "user", and "size" (bytes) or "days"
-or "id"}; allocations are the registry's entries (cluster_tools.scratch_alloc list);
-policy is {"auto_bytes", "auto_days", "auto_extensions"}. Within those a request is
-applied at once; beyond them an administrator approves it. Giving space back (release,
-a smaller size) is always automatic. Someone may not act on another person's
-allocation.
+A person has one allocation, /scratch/<login>. A request is {"op": create | resize |
+extend | release, "user", and "size" (bytes) or "days"}; listing is the tool's
+(cluster_tools.scratch_alloc list: allocations and the disk); policy is {"auto_bytes",
+"auto_days", "guard"}. One table decides, every period counted from the day the
+allocation was made:
+
+    up to auto_bytes and auto_days        at once
+    beyond, up to the hard caps           an administrator approves
+    past the hard caps (the tool's)       nobody
+
+Giving space back (release, a smaller size) is always at once. While the disk is at or
+past `guard` (a fraction) full, anything that grows (a new allocation, a larger size,
+an extension) waits for an administrator.
 """
 
 from .requests import Refused
 
-
-def _mine(allocations, user, alloc_id):
-    entry = next((a for a in allocations if str(a["id"]) == str(alloc_id)), None)
-    if entry is None:
-        raise Refused(f"there is no allocation {alloc_id}")
-    if entry["user"] != user:
-        raise Refused(f"allocation {alloc_id} is {entry['user']}'s")
-    return entry
+DAY = 86400
 
 
-def held(allocations, user, but=None):
-    """The bytes USER's live allocations hold (but one, when resizing it)."""
-    return sum(
-        a["bytes"] for a in allocations if a["user"] == user and a["state"] != "released" and a["id"] != but
-    )
+def _theirs(listing, user):
+    return next((a for a in listing["allocations"] if a["user"] == user and a["state"] != "released"), None)
 
 
-def decide(request, allocations, policy):
+def decide(request, listing, policy, now):
     op, user = request["op"], request["user"]
-    if op == "release":
-        _mine(allocations, user, request["id"])
+    entry = _theirs(listing, user)
+    if op == "create" and entry:
+        raise Refused("이미 스크래치 공간이 있습니다: 크기를 바꾸거나 연장하세요")
+    if op != "create" and not entry:
+        raise Refused("스크래치 공간이 없습니다")
+    if op == "release" or (op == "resize" and request["size"] <= entry["bytes"]):
         return "auto", "giving space back is always automatic"
+    disk = listing["disk"]
+    if disk["bytes"] and disk["used"] / disk["bytes"] >= policy["guard"]:
+        return "admin", f"the scratch disk is {100 * disk['used'] / disk['bytes']:.0f}% full"
     if op == "create":
-        total = held(allocations, user) + request["size"]
-        if request["days"] > policy["auto_days"]:
-            return "admin", f"longer than {policy['auto_days']} days"
-        if total > policy["auto_bytes"]:
-            return "admin", "more than the automatic total for one person"
-        return "auto", "within the automatic size and period"
+        if request["size"] > policy["auto_bytes"] or request["days"] > policy["auto_days"]:
+            return "admin", "larger or longer than what is given at once"
+        return "auto", "within what is given at once"
     if op == "resize":
-        entry = _mine(allocations, user, request["id"])
-        if request["size"] <= entry["bytes"]:
-            return "auto", "a smaller size is always automatic"
-        if held(allocations, user, but=entry["id"]) + request["size"] > policy["auto_bytes"]:
-            return "admin", "more than the automatic total for one person"
-        return "auto", "within the automatic total"
+        if request["size"] > policy["auto_bytes"]:
+            return "admin", "larger than what is given at once"
+        return "auto", "within what is given at once"
     if op == "extend":
-        entry = _mine(allocations, user, request["id"])
-        if entry.get("extensions", 0) >= policy["auto_extensions"]:
-            return "admin", f"already extended {entry.get('extensions', 0)} times"
-        if request["days"] > policy["auto_days"]:
-            return "admin", f"longer than {policy['auto_days']} days"
-        return "auto", "within the automatic extensions"
+        end = max(entry["expires"], now) + request["days"] * DAY
+        if end > entry["created"] + policy["auto_days"] * DAY:
+            return "admin", f"past {policy['auto_days']} days from when it was made"
+        return "auto", f"within {policy['auto_days']} days from when it was made"
     raise Refused(f"unknown request {op!r}")

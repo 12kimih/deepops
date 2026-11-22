@@ -201,11 +201,12 @@
 # [scratch-server]): docs/slurm-cluster/scratch-alloc.md. The filesystem needs prjquota
 # in host_baseline_mount_options.
 #scratch_alloc_mount: /scratch
-#scratch_alloc_max_size: 20T
+#scratch_alloc_max_size: 10T
 #scratch_alloc_max_days: 180
-#scratch_alloc_auto_size: 2T
-#scratch_alloc_auto_days: 30
-#scratch_alloc_auto_extensions: 2
+#scratch_alloc_max_extend_days: 90
+#scratch_alloc_auto_size: 5T
+#scratch_alloc_auto_days: 90
+#scratch_alloc_guard: 0.8
 
 # NFS Server
 # This config will create an NFS server and share the given exports. options are the
