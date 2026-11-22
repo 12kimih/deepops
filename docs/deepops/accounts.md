@@ -63,7 +63,10 @@ Slurm stops earlier, the day after `ends`, also without a deploy: with
 The next deploy then deletes their Slurm associations (`slurm_accounting_revoke`, from
 `people_former`: left, or past `ends`), whatever `slurm_accounting_prune` says. Their
 container image stores age out unused (`container_storage_gc`). Their files stay for
-`people_leave_keep_days` (90) after `ends`; removing them is an administrator's step.
+`people_leave_keep_days` (90) after `ends`; removing them is an administrator's step
+(`playbooks/utilities/people-purge.yml`), which the alert `PeopleFilesDue` asks for:
+each deploy publishes when every such directory falls due, on the host where it is
+(`people_purge_due_timestamp_seconds`), so the day passing needs no deploy.
 Setting someone back to `status: active`, or dropping `ends:`, gives the account back: the
 entry loses its expiry and nologin shell (a new password is set, since leaving removed
 it), and a local account loses the lock `roles/people` put on it (expiry day 1, the `!`

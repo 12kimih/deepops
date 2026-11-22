@@ -9,8 +9,8 @@
 #   ansible-playbook -K playbooks/utilities/people-purge.yml --check
 #   ansible-playbook -K playbooks/utilities/people-purge.yml -e people_purge_confirm=<login>,<login>
 #
-#   -e hostlist=...   the hosts holding the files (default: slurm-nfs, the NFS servers)
-- hosts: "{{ hostlist | default('slurm-nfs') }}"
+#   -e hostlist=...   a subset (default: all; only a host where a directory is local acts)
+- hosts: "{{ hostlist | default('all') }}"
   become: true
   gather_facts: false
   roles:
@@ -18,7 +18,6 @@
   vars:
     people_purge_confirm: ""
     _people_purge_due: "{{ people | people_purge_due(people_leave_keep_days) }}"
-    _people_purge_targets: "{{ people | people_purge_targets(people_leave_keep_days, people_purge_paths) }}"
   tasks:
     - name: Name the people whose files are due
       ansible.builtin.debug:
@@ -38,36 +37,20 @@
       run_once: true
       when: not ansible_check_mode and _people_purge_due | length > 0
 
-    # findmnt reads the mount table, so a dead NFS server cannot hang this; a path whose
-    # filesystem is NFS here is removed on its server instead.
-    - name: Find which of their directories are local here
-      ansible.builtin.command:
-        argv: [findmnt, --noheadings, --output, "FSTYPE,TARGET", --target, "{{ item.path }}"]
-      loop: "{{ _people_purge_targets }}"
-      loop_control:
-        label: "{{ item.path }}"
-      register: people_purge_fstype
-      changed_when: false
-      check_mode: false
-
-    - name: Look at each local directory
-      ansible.builtin.stat:
-        path: "{{ item.item.path }}"
-        follow: false
-      loop: "{{ people_purge_fstype.results }}"
-      loop_control:
-        label: "{{ item.item.path }}"
-      # A path that is itself a filesystem's root (a mount point) is never removed.
-      when: not item.stdout is match('nfs') and (item.stdout.split() | last | default('')) != item.item.path
-      register: people_purge_stat
+    - name: Find the due people's own directories here
+      ansible.builtin.include_role:
+        name: people
+        tasks_from: purge_local
+        public: true
+      vars:
+        people_purge_dated: false
 
     - name: Measure what would go
       ansible.builtin.command:
-        argv: [du, -sh, --one-file-system, "{{ item.stat.path }}"]
-      loop: "{{ people_purge_stat.results | selectattr('stat', 'defined') | selectattr('stat.exists') | list }}"
+        argv: [du, -sh, --one-file-system, "{{ item.path }}"]
+      loop: "{{ people_purge_local }}"
       loop_control:
-        label: "{{ item.stat.path }}"
-      when: item.stat.isdir and item.stat.uid == item.item.item.uid
+        label: "{{ item.path }}"
       register: people_purge_du
       changed_when: false
       check_mode: false
@@ -78,8 +61,15 @@
 
     - name: Remove it
       ansible.builtin.file:
-        path: "{{ item.item.stat.path }}"
+        path: "{{ item.path }}"
         state: absent
-      loop: "{{ people_purge_du.results | selectattr('stdout', 'defined') | list }}"
+      loop: "{{ people_purge_local }}"
       loop_control:
-        label: "{{ item.item.stat.path }}"
+        label: "{{ item.path }}"
+
+    # What is gone leaves the alert's metric (roles/people writes it at every deploy).
+    - name: Publish when the remaining files fall due
+      ansible.builtin.include_role:
+        name: people
+        tasks_from: purge_metric
+        public: true

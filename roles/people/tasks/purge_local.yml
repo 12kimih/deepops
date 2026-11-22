@@ -1,0 +1,31 @@
+---
+# The directories of people_purge_paths ({login} filled in) that are this host's own:
+# on a local filesystem (findmnt reads the mount table, so a dead NFS server cannot hang
+# this, and an NFS path is its server's), a directory, owned by the person, and not
+# itself a mount point. people_purge_dated: everyone with an `ends` (the alert's
+# metric), else only those due now (playbooks/utilities/people-purge.yml). Sets
+# people_purge_local: [{login, uid, ends, due, path}].
+- name: Find which of the people's directories are on a local filesystem here
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, "FSTYPE,TARGET", --target, "{{ item.path }}"]
+  loop: "{{ people | people_purge_targets(people_leave_keep_days, people_purge_paths, dated=people_purge_dated) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: people_purge_fstype
+  changed_when: false
+  check_mode: false
+
+- name: Look at each local directory
+  ansible.builtin.stat:
+    path: "{{ item.item.path }}"
+    follow: false
+    get_checksum: false
+  loop: "{{ people_purge_fstype.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+  when: not item.stdout is match('nfs') and (item.stdout.split() | last | default('')) != item.item.path
+  register: people_purge_stat
+
+- name: Keep the person's own directories
+  ansible.builtin.set_fact:
+    people_purge_local: "{{ people_purge_stat.results | people_purge_owned }}"

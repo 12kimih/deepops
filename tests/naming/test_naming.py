@@ -146,8 +146,9 @@ class Naming(unittest.TestCase):
 
     def test_a_components_alert_rules_are_named_as_it(self):
         keys = {k.replace("_", "-") for k in registry()} | {
-            "os-updates"
-        }  # os_updates: a role, not a component
+            "os-updates",
+            "people",
+        }  # os_updates and people: roles, not components
         odd = {}
         for path in tracked("roles/prometheus/files/rules"):
             if path.name in GENERAL_RULE_FILES or path.stem in keys:

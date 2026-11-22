@@ -1,0 +1,29 @@
+---
+# When the files of each person with an `ends` fall due (ends + people_leave_keep_days),
+# for the directories that are this host's own (purge_local.yml), as a node_exporter
+# textfile: the alert PeopleFilesDue compares it with the time, so a day passing needs no
+# deploy. Written where such a directory is, or was (playbooks/utilities/people-purge.yml
+# writes it again after a removal).
+- name: Find the people's own directories here
+  ansible.builtin.include_tasks: purge_local.yml
+  vars:
+    people_purge_dated: true
+
+- name: Look for an earlier textfile of due files
+  ansible.builtin.stat:
+    path: "{{ node_exporter_prom_keep_dir }}/people-purge.prom"
+    get_checksum: false
+  register: people_purge_textfile
+
+- name: Publish when each person's files fall due
+  ansible.builtin.include_role:
+    name: textfile_keep
+  vars:
+    textfile_keep_name: people-purge
+    textfile_keep_content: |
+      # HELP people_purge_due_timestamp_seconds When a person's files here fall due for removal: their roster ends + people_leave_keep_days (roles/people).
+      # TYPE people_purge_due_timestamp_seconds gauge
+      {% for t in people_purge_local %}
+      people_purge_due_timestamp_seconds{login="{{ t.login }}",path="{{ t.path }}",ends="{{ t.ends }}"} {{ ((t.due ~ ' 00:00:00') | to_datetime('%Y-%m-%d %H:%M:%S')).strftime('%s') }}
+      {% endfor %}
+  when: people_purge_local | length > 0 or people_purge_textfile.stat.exists

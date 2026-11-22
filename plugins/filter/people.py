@@ -152,21 +152,25 @@ def people_former(people, today=None):
     return sorted(set(people or {}) - set(_member(people, today)))
 
 
-def people_purge_due(people, keep_days=90, today=None):
-    """{login: {uid, ends, due}} of everyone whose files are due for removal: their
-    `ends` lies more than KEEP_DAYS behind (dates YYYY-MM-DD; playbooks/utilities/
-    people-purge.yml). Someone without `ends` is never due (people_purge_undated)."""
+def people_purge_dates(people, keep_days=90):
+    """{login: {uid, ends, due}} of everyone with an `ends`: their files fall due KEEP_DAYS
+    after it (dates YYYY-MM-DD). Someone without `ends` never falls due
+    (people_purge_undated)."""
     import datetime
 
     out = {}
     for n, p in sorted((people or {}).items()):
         ends = _date((p or {}).get("ends"))
-        if ends is None:
-            continue
-        due = ends + datetime.timedelta(days=int(keep_days))
-        if _today(today) > due:
+        if ends is not None:
+            due = ends + datetime.timedelta(days=int(keep_days))
             out[n] = {"uid": p["uid"], "ends": ends.isoformat(), "due": due.isoformat()}
     return out
+
+
+def people_purge_due(people, keep_days=90, today=None):
+    """people_purge_dates of everyone whose files are due now (playbooks/utilities/
+    people-purge.yml): past their due day."""
+    return {n: d for n, d in people_purge_dates(people, keep_days).items() if _today(today) > _date(d["due"])}
 
 
 def people_purge_undated(people):
@@ -176,10 +180,11 @@ def people_purge_undated(people):
     )
 
 
-def people_purge_targets(people, keep_days=90, paths=(), today=None):
-    """[{login, uid, path}] for each due person (people_purge_due) and each of PATHS, a
-    template holding {login} below an absolute directory. Refuses a template that could
-    name anything but one person's own directory."""
+def people_purge_targets(people, keep_days=90, paths=(), today=None, dated=False):
+    """[{login, uid, ends, due, path}] for each due person (people_purge_due), or with
+    DATED everyone with an `ends` (people_purge_dates), and each of PATHS, a template
+    holding {login} below an absolute directory. Refuses a template that could name
+    anything but one person's own directory."""
     import posixpath
 
     for t in paths:
@@ -188,10 +193,28 @@ def people_purge_targets(people, keep_days=90, paths=(), today=None):
                 and "{" not in parent and posixpath.normpath(t) == t):  # fmt: skip
             raise ValueError(f"people_purge_paths: {t!r} must be /<dir>/{{login}}")
     out = []
-    for n, d in people_purge_due(people, keep_days, today).items():
+    people_of = people_purge_dates(people, keep_days) if dated else people_purge_due(people, keep_days, today)
+    for n, d in people_of.items():
         if not LOGIN.fullmatch(n):  # an empty or odd name must never make {login} mean its parent
             raise ValueError(f"people_purge_targets: {n!r} is not a login")
-        out += [{"login": n, "uid": d["uid"], "path": t.replace("{login}", n)} for t in paths]
+        out += [{"login": n, **d, "path": t.replace("{login}", n)} for t in paths]
+    return out
+
+
+def people_purge_owned(results):
+    """The purge targets of RESULTS (a stat loop over people_purge_targets, as
+    roles/people tasks/purge_local registers it) that exist as a directory, not a link,
+    owned by their person: what may be measured or removed."""
+    out = []
+    for r in results or []:
+        st, target = r.get("stat") or {}, (r.get("item") or {}).get("item") or {}
+        if (
+            st.get("exists")
+            and st.get("isdir")
+            and not st.get("islnk")
+            and st.get("uid") == target.get("uid")
+        ):
+            out.append(target)
     return out
 
 
@@ -644,9 +667,11 @@ class FilterModule:
             "people_active": people_active,
             "people_left": people_left,
             "people_former": people_former,
+            "people_purge_dates": people_purge_dates,
             "people_purge_due": people_purge_due,
             "people_purge_undated": people_purge_undated,
             "people_purge_targets": people_purge_targets,
+            "people_purge_owned": people_purge_owned,
             "people_with_role": people_with_role,
             "people_uids": people_uids,
             "people_attr": people_attr,

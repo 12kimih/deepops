@@ -1,0 +1,17 @@
+---
+groups:
+  - name: people
+    rules:
+      # A person's files past their roster ends + people_leave_keep_days, still on this
+      # host (roles/people writes the due times where the directories are; the purge
+      # playbook writes them again after a removal). One alert per directory.
+      - alert: PeopleFilesDue
+        expr: time() > people_purge_due_timestamp_seconds
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.path }} on {{ $labels.host }} is due for removal"
+          description: >-
+            {{ $labels.login }}'s membership ended on {{ $labels.ends }}. Preview with
+            playbooks/utilities/people-purge.yml --check, then run it with
+            -e people_purge_confirm=<the logins due>.
