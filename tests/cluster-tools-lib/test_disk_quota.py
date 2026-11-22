@@ -84,13 +84,8 @@ def run(host, cfg, action="apply"):
         act()
 
 
-CFG = {
-    "filesystems": ["/"],
-    "limits": {
-        "alice": {"block_warn": "10G", "block_hard": "20G", "inode_warn": 200000, "inode_hard": "500k"}
-    },
-    "release": ["bob"],
-}
+ALICE = {"block_warn": "10G", "block_hard": "20G", "inode_warn": 200000, "inode_hard": "500k"}
+CFG = {"filesystems": {"/": {"alice": ALICE}}, "release": ["alice", "bob"]}
 PROJECT = {
     "/home/shared/datasets": {"filesystem": "/home", "id": 101, "block_warn": "15T", "block_hard": "20T"}
 }
@@ -111,7 +106,7 @@ class Sizes(unittest.TestCase):
             dq.wanted({"a": {"block_warn": "30G", "block_hard": "20G"}})
 
     def test_the_kernel_gets_the_hard_limits_only(self):
-        self.assertEqual(dq.kernel(dq.levels("a", CFG["limits"]["alice"])), (0, 20 * GB, 0, 500000))
+        self.assertEqual(dq.kernel(dq.levels("a", ALICE)), (0, 20 * GB, 0, 500000))
 
 
 class Parse(unittest.TestCase):
@@ -172,17 +167,34 @@ class Apply(unittest.TestCase):
         )
 
     def test_accounting_only_sets_no_limit(self):
-        steps = plan(FakeHost(), {"filesystems": ["/"], "limits": {}, "release": ["alice"]})
+        steps = plan(FakeHost(), {"filesystems": {"/": {}}, "release": ["alice"]})
         self.assertFalse([s for s in steps if s.startswith("setquota -u ")])
         self.assertIn("quotaon -u /", steps)
 
-    def test_only_ext4_and_only_mounted(self):
+    def test_only_ext4_and_xfs_and_only_mounted(self):
         host = FakeHost()
-        host.files["/proc/self/mounts"] = "/dev/sda4 / xfs rw 0 0\n"
+        host.files["/proc/self/mounts"] = "/dev/sda4 / btrfs rw 0 0\n"
         with self.assertRaises(dq.Error):
             plan(host, CFG)
         with self.assertRaises(dq.Error):
-            plan(FakeHost(), {**CFG, "filesystems": ["/srv"]})
+            plan(FakeHost(), {**CFG, "filesystems": {"/srv": {}}})
+
+    def test_xfs_quotas_come_with_the_mount_only_limits_are_set(self):
+        host = FakeHost()
+        host.files["/proc/self/mounts"] = "/dev/md0 / xfs rw,noatime 0 0\n"
+        with self.assertRaisesRegex(dq.Error, "usrquota"):
+            plan(host, CFG)
+        host.files["/proc/self/mounts"] = "/dev/md0 / xfs rw,relatime,usrquota 0 0\n"
+        self.assertEqual(plan(host, CFG), [f"setquota -u alice 0 {20 * GB} 0 500000 /"])
+        csv = f"alice,ok,ok,10,0,{20 * GB},,1,0,0,\n"
+        host.csv = csv
+        self.assertEqual(plan(host, CFG, "remove"), ["setquota -u alice 0 0 0 0 /"], "no quotaoff, no file")
+
+    def test_each_filesystem_its_own_limits(self):
+        host = FakeHost(quota_file=True, on=True, home="rw,usrjquota=aquota.user,jqfmt=vfsv1")
+        host.exist.add("/home/aquota.user")
+        cfg = {"filesystems": {"/": {}, "/home": {"alice": {"block_hard": "10T"}}}, "release": ["alice"]}
+        self.assertEqual(plan(host, cfg), [f"setquota -u alice 0 {10 * TB} 0 0 /home"])
 
 
 class Projects(unittest.TestCase):

@@ -1,11 +1,12 @@
 # Disk quotas
 
 `roles/disk_quota` (switch `slurm_enable_disk_quota`, off by default) sets per-user
-quotas on local ext4 filesystems, the login nodes' disks (`slurm-login`) and the home
-server's `/home` (`slurm-nfs`), and per-directory (project) quotas, a whole tree's
-total, such as shared datasets. Which filesystems each host limits per user is
-`disk_quota_filesystems` (default `["/"]`); set it per host where a host plays both
-parts, e.g. `["/", "/home"]`.
+quotas on local ext4 and XFS filesystems, the login nodes' disks (`slurm-login`), the
+home server's `/home` (`slurm-nfs`) and the scratch server's `/scratch`
+(`scratch-server`), and per-directory (project) quotas, a whole tree's total. Each host
+lists its filesystems in `disk_quota_filesystems`, each with its own limits (default
+`{"/": {}}`); a host that plays several parts lists them all, e.g.
+`{"/": {...}, "/home": {...}}`.
 
 ## Two levels: warn and hard
 
@@ -23,15 +24,19 @@ filesystem, and the warn level (say 75 to 80% of it) to tell people in time.
 Everyone in the roster (`people.yml`), administrators too: their own accounts are users
 like any other, and what they do with `sudo` is root's, which a quota never limits.
 Root and the system accounts (the database, Slurm, the web server) are never limited.
-Each person gets `disk_quota_limits`, or their own `disk_quota` from the roster over it:
+On each filesystem each person gets its limits, or their own `disk_quota` for that
+filesystem from the roster over them:
 
 ```yaml
-# group_vars: the site's limits (setquota sizes: K, M, G, T; inodes: k, m, g, t)
-disk_quota_limits: {block_warn: 15G, block_hard: 20G, inode_warn: 400k, inode_hard: 500k}
-# people.yml: one person's own
+# group_vars: the site's limits per filesystem (setquota sizes: K, M, G, T; inodes: k, m, g, t)
+disk_quota_filesystems:
+  /: {block_warn: 15G, block_hard: 20G, inode_warn: 400k, inode_hard: 500k}
+  /home: {block_warn: 8T, block_hard: 10T}
+# people.yml: one person's own, on one filesystem
 people:
   alice:
-    disk_quota: {block_warn: 80G, block_hard: 100G}
+    disk_quota:
+      /home: {block_warn: 15T, block_hard: 20T}
 ```
 
 Someone who leaves the roster loses their limits; their files stay.
@@ -54,7 +59,7 @@ projects at run time (scratch allocations) use the same functions
 
 ## Count first, then limit
 
-With `disk_quota_limits: {}` (the default) quotas only count. A timer exports the usage
+A filesystem with `{}` (the default) only counts. A timer exports the usage
 every 15 minutes:
 
 | Metric | Labels |
@@ -138,9 +143,27 @@ sudo systemctl start nfs-server
 ```
 
 Then add `usrquota,prjquota` to `/home`'s entry in `host_baseline_mount_options`, `/home`
-to the server's `disk_quota_filesystems`, its projects to `disk_quota_projects`, and run
+with its limits to the server's `disk_quota_filesystems`, its projects to `disk_quota_projects`, and run
 `playbooks/generic/host-baseline.yml` and `playbooks/generic/disk-quota.yml` for the
 server (`-l <host> --check --diff` first).
+
+## XFS (/scratch)
+
+XFS keeps its quotas in the filesystem's metadata: no quota file, no quotacheck, and
+they are on from the mount with `usrquota` (and `prjquota` for project quotas). XFS
+reads its quota options only when it mounts, never on a remount, so adding one means
+unmounting once, while nothing uses the filesystem (a maintenance window):
+
+```bash
+sudo fuser -vm /scratch       # must list nothing
+sudo umount /scratch
+sudo mount /scratch           # with usrquota in its fstab entry (host_baseline_mount_options)
+sudo xfs_quota -x -c state /scratch   # User quota state: Accounting ON, Enforcement ON
+```
+
+Put `usrquota` in `/scratch`'s entry in `host_baseline_mount_options` first (it writes
+`/etc/fstab`), then the commands above, then `/scratch` with its limits in the scratch
+server's `disk_quota_filesystems` and `playbooks/generic/disk-quota.yml` for it.
 
 ## Removing it
 

@@ -141,13 +141,15 @@ class Derive(unittest.TestCase):
 
     def test_disk_quotas_are_the_default_under_each_persons_own(self):
         default = {"block_warn": "10G", "block_hard": "20G"}
-        got = people.people_disk_quotas(self.p, default)
-        self.assertEqual(got["alice"], {"block_warn": "50G", "block_hard": "100G"})
-        self.assertEqual(got["bob"], default)
-        self.assertNotIn("carol", got, "someone who left is limited no longer")
+        got = people.people_disk_quotas(self.p, {"/": default, "/scratch": {"block_hard": "5T"}})
+        self.assertEqual(got["/"]["alice"], {"block_warn": "50G", "block_hard": "100G"})
+        self.assertEqual(got["/"]["bob"], default)
+        self.assertNotIn("carol", got["/"], "someone who left is limited no longer")
+        self.assertEqual(got["/scratch"]["alice"], {"block_hard": "5T"}, "her own is for / alone")
         # No default: only who has their own, so quotas only count for the rest.
         self.assertEqual(
-            people.people_disk_quotas(self.p, {}), {"alice": {"block_warn": "50G", "block_hard": "100G"}}
+            people.people_disk_quotas(self.p, {"/": {}}),
+            {"/": {"alice": {"block_warn": "50G", "block_hard": "100G"}}},
         )
 
 
@@ -162,12 +164,16 @@ class Check(unittest.TestCase):
 
     def test_disk_quota_takes_only_its_limits(self):
         self.assertIn(
-            "people.bob.disk_quota: a mapping of block_warn, block_hard, inode_warn, inode_hard",
-            self.problems(lambda r: r["people"]["bob"].update(disk_quota={"size": "1G"})),
+            "people.bob.disk_quota: filesystem -> a mapping of block_warn, block_hard, inode_warn, inode_hard (/home: {block_hard: 20T})",
+            self.problems(lambda r: r["people"]["bob"].update(disk_quota={"/": {"size": "1G"}})),
         )
         self.assertIn(
-            "people.bob.disk_quota: a mapping of block_warn, block_hard, inode_warn, inode_hard",
+            "people.bob.disk_quota: filesystem -> a mapping of block_warn, block_hard, inode_warn, inode_hard (/home: {block_hard: 20T})",
             self.problems(lambda r: r["people"]["bob"].update(disk_quota="20G")),
+        )
+        self.assertIn(
+            "people.bob.disk_quota: filesystem -> a mapping of block_warn, block_hard, inode_warn, inode_hard (/home: {block_hard: 20T})",
+            self.problems(lambda r: r["people"]["bob"].update(disk_quota={"block_hard": "20G"})),
         )
 
     def test_duplicate_uid(self):

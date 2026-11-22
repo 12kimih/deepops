@@ -8,7 +8,7 @@ with what it is to become, and the list only shrinks.
 
 | Thing | Form | Example (role `disk_quota`) |
 |---|---|---|
-| Role directory, component key (`roles/deploy_defaults/vars/main.yml`), variable prefix | snake_case | `disk_quota`, `disk_quota_limits` |
+| Role directory, component key (`roles/deploy_defaults/vars/main.yml`), variable prefix | snake_case | `disk_quota`, `disk_quota_filesystems` |
 | Its switch | `slurm_enable_<key>` (`k8s_enable_<key>` on Kubernetes) | `slurm_enable_disk_quota` |
 | Its playbook | `<key-kebab>.yml` | `playbooks/generic/disk-quota.yml` |
 | A cluster tool it runs | the module `cluster_tools.<key>`, the command `<key-kebab>` | `cluster_tools.disk_quota`, `/usr/local/libexec/disk-quota` |
