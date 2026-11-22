@@ -26,6 +26,24 @@
     state: started
   when: nvidia_container_toolkit_cdi | bool
 
+# The units refresh on driver changes only, but the specification names files of other
+# packages too: a desktop purge removed the EGL Wayland ICD it mounts, and every
+# container given --device nvidia.com/gpu=all (dcgm-exporter) failed to start. apt
+# refreshes it after every dpkg run, without waiting (a refresh never holds apt up).
+- name: Refresh the CDI specification after every package change (Debian family)
+  ansible.builtin.copy:
+    content: |
+      // deepops (roles/nvidia_container_toolkit): the CDI specification names files of
+      // other packages; refresh it after every dpkg run.
+      DPkg::Post-Invoke { "if [ -d /run/systemd/system ]; then systemctl --no-block start nvidia-cdi-refresh.service || true; fi"; };
+    dest: "{{ nvidia_container_toolkit_apt_hook }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - nvidia_container_toolkit_cdi | bool
+    - ansible_facts.os_family == "Debian"
+
 - name: Check for the CDI specification
   ansible.builtin.stat:
     path: /var/run/cdi/nvidia.yaml
