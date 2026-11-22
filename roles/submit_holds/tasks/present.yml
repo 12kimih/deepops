@@ -16,14 +16,6 @@
       dest: "{{ _submit_holds_command }}"
       module: cluster_tools.submit_holds
 
-- name: Create the cluster tools configuration directory
-  ansible.builtin.file:
-    path: "{{ _submit_holds_config | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 - name: Write the submission holds configuration
   ansible.builtin.copy:
     dest: "{{ _submit_holds_config }}"

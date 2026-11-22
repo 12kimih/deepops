@@ -50,9 +50,9 @@
   notify: Check the recorded tool configs
   when: managed_dir_changed | bool
 
-- name: Create the site facts directory
+- name: Create the cluster tools configuration directory
   ansible.builtin.file:
-    path: "{{ cluster_tools_lib_info_file | dirname }}"
+    path: "{{ cluster_tools_lib_config_dir }}"
     state: directory
     owner: root
     group: root

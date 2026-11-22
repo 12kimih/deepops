@@ -30,6 +30,19 @@
   tags:
     - bmc
 
+# systemd reads the directory but does not ship it: only packages that drop a hook
+# make it (mdadm). Recorded as a dir: item, so a removal takes it only when empty.
+- name: Create the directory of the shutdown hooks
+  ansible.builtin.file:
+    path: "{{ bmc_cold_reboot_hook | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: bmc_cold_reboot | bool
+  tags:
+    - bmc
+
 - name: Install the cold reboot hook
   ansible.builtin.copy:
     src: bmc-cold-reboot
@@ -47,7 +60,8 @@
   ansible.builtin.set_fact:
     bmc_record_items: >-
       {{ kernel_modules_files | map('regex_replace', '^', 'file:') | list
-         + (['file:' ~ bmc_cold_reboot_hook] if bmc_cold_reboot | bool else []) }}
+         + (['file:' ~ bmc_cold_reboot_hook, 'dir:' ~ bmc_cold_reboot_hook | dirname]
+            if bmc_cold_reboot | bool else []) }}
   tags:
     - bmc
 

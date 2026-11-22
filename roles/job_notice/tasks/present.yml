@@ -18,14 +18,6 @@
       dest: "{{ job_notice_command }}"
       module: cluster_tools.job_notice
 
-- name: Create the cluster tools configuration directory
-  ansible.builtin.file:
-    path: "{{ _job_notice_config | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 - name: Write the notice configuration
   ansible.builtin.copy:
     dest: "{{ _job_notice_config }}"

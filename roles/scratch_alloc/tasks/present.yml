@@ -22,14 +22,6 @@
       dest: "{{ _scratch_alloc_command }}"
       module: cluster_tools.scratch_alloc
 
-- name: Create the cluster tools configuration directory
-  ansible.builtin.file:
-    path: "{{ _scratch_alloc_config | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 - name: Write the allocation configuration
   ansible.builtin.copy:
     dest: "{{ _scratch_alloc_config }}"

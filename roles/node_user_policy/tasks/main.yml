@@ -2,7 +2,15 @@
 - name: Restrict lingering
   when: node_user_policy_manage_linger | bool
   block:
+    # polkitd ships the rules directory; without polkitd no one but root can enable
+    # lingering anyway, so the rule is written only where it is installed.
+    - name: Look for polkitd's rules directory
+      ansible.builtin.stat:
+        path: /etc/polkit-1/rules.d
+      register: node_user_policy_polkit
+
     - name: Allow only root to enable lingering
+      when: node_user_policy_polkit.stat.isdir | default(false)
       ansible.builtin.template:
         src: 50-linger.rules.j2
         dest: /etc/polkit-1/rules.d/50-linger.rules

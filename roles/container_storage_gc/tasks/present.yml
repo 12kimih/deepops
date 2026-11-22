@@ -16,14 +16,6 @@
       dest: "{{ _container_storage_gc_command }}"
       module: cluster_tools.container_gc
 
-- name: Create the cluster tools configuration directory
-  ansible.builtin.file:
-    path: "{{ _container_storage_gc_config | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 - name: Write the container storage cleanup configuration
   ansible.builtin.copy:
     dest: "{{ _container_storage_gc_config }}"

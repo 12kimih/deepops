@@ -7,16 +7,6 @@
     component_record_action: begin
     component_record_items: "{{ slurm_usage_report_items }}"
 
-# Its configuration holds the bot token: root's alone (0600) in the cluster tools'
-# configuration directory, as every cluster tool's is.
-- name: Create the cluster tools configuration directory
-  ansible.builtin.file:
-    path: "{{ _slurm_usage_report_config | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 # The report is cluster_tools.usage_report, installed with the rest of the cluster's
 # Python by cluster_tools_lib, so it always matches the library it imports. This role
 # only wires it up.

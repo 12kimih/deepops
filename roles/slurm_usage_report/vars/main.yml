@@ -3,7 +3,7 @@
 # and the units' and the state directory's name.
 _slurm_usage_report_name: slurm-usage-report
 _slurm_usage_report_command: "/usr/local/libexec/{{ _slurm_usage_report_name }}"
-_slurm_usage_report_config: "/etc/cluster-tools/{{ _slurm_usage_report_name }}.json"
+_slurm_usage_report_config: "{{ cluster_tools_lib_config_dir }}/{{ _slurm_usage_report_name }}.json"
 # The runs: the hourly report, the weekly summary and the daily disk usage report, each
 # its own service and timer (one template pair), sharing the configuration; the weekly
 # and disk runs keep their own state files beside the hourly one's. args is a list, so

@@ -123,6 +123,14 @@
    ("Destination directory ... does not exist", 2026-11-22); and the restart after a
    drop-in changed needs systemd reloaded first, which the docker.socket and registry
    proxy drop-ins never did. component_record's own removal of recorded files stays.
+31. A copy or template task writes into a directory that is there on every supported
+   host (BASE_DIRS), that its role (or playbook) or one of the role's meta dependencies
+   makes with a directory task, or that a package or source build its role names ships
+   (PACKAGE_DIRS); a path written as the role's own variable is resolved. copy and
+   template do not make the directory, and
+   --check does not notice: the BMC's shutdown hook passed its preview and failed the
+   run, systemd ships no /usr/lib/systemd/system-shutdown (2026-11-22; rule 30 was the
+   same for drop-ins). A templated directory is not checked.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -183,6 +191,29 @@ SECRET_FILE = re.compile(
 )
 MINIMUM_FILES = 200  # a scan that sees fewer has lost its way
 
+
+# Rule 31: directories every supported host has (the OS base, systemd, apt or dnf).
+BASE_DIRS = frozenset({
+    "/etc", "/etc/default", "/etc/security", "/etc/security/limits.d", "/etc/sudoers.d", "/etc/pam.d",
+    "/etc/apt/sources.list.d", "/etc/apt/preferences.d", "/etc/apt/apt.conf.d", "/etc/sysctl.d", "/etc/modprobe.d",
+    "/etc/modules-load.d", "/etc/tmpfiles.d", "/etc/udev/rules.d", "/etc/logrotate.d", "/etc/cron.d",
+    "/etc/profile.d", "/etc/ssh", "/etc/ssh/sshd_config.d", "/etc/rsyslog.d", "/etc/netplan", "/etc/sysconfig",
+    "/etc/systemd", "/etc/systemd/system", "/etc/systemd/journald.conf.d", "/etc/ld.so.conf.d", "/etc/update-motd.d",
+    "/etc/apparmor.d", "/etc/cloud/cloud.cfg.d", "/etc/X11", "/usr/share/keyrings", "/usr/lib/systemd/system",
+    "/lib/systemd/system", "/root", "/opt", "/var/lib", "/usr/local", "/usr/local/bin", "/usr/local/sbin",
+    "/usr/local/lib", "/usr/local/libexec", "/usr/local/share", "/tmp", "/run", "/var/run", "/usr/sbin",
+    "/etc/ssh/ssh_config.d",
+})  # fmt: skip
+# Rule 31: a directory a package or a source build ships -> that package (or the build's
+# setting), which the writing role names: it installs it, or writes only where it is.
+PACKAGE_DIRS = {
+    "/etc/enroot/enroot.conf.d": "enroot", "/etc/enroot/environ.d": "enroot", "/etc/enroot/hooks.d": "enroot",
+    "/etc/enroot/mounts.d": "enroot", "/etc/munge": "munge", "/etc/sssd": "sssd", "/etc/polkit-1/rules.d": "polkitd",
+    "/etc/apache2": "apache2", "/etc/ood/config": "ondemand", "/etc/ood/config/clusters.d": "ondemand",
+    "/etc/containers": "podman", "/etc/unbound/unbound.conf.d": "unbound", "/etc/fail2ban/jail.d": "fail2ban",
+    "/etc/nhc": "nhc_configure", "/etc/nhc/scripts": "nhc_configure", "/var/yp": "nis",
+    "/usr/share/bash-completion/completions": "bash-completion",
+}  # fmt: skip
 
 # A backslash in a Python string literal that does not start a known escape.
 INVALID_ESCAPE = re.compile(r"\\(?:\\|[\n'\"abfnrtv0-7xuUN]|(.))", re.S)
@@ -1065,6 +1096,93 @@ class TaskRules(unittest.TestCase):
                         offenders.append(f"{rel(path)}: {task.get('name')} ({resolved(str(hits[0]), names)})")
         self.assertEqual(offenders, [], "write or remove a drop-in with systemd_dropin (rule 30)")
         self.assertGreaterEqual(seen, 9, "the scan finds the systemd_dropin tasks")
+
+    def test_a_written_file_has_its_directory(self):
+        scan, offenders, used, seen = Scan(minimum=MINIMUM_FILES), [], set(), 0
+
+        def owner(path):
+            parts = rel(path).split("/")
+            return "/".join(parts[:2]) if parts[0] == "roles" else rel(path)
+
+        # A role's own variables with a literal value, so a path written as one is checked.
+        values = {}
+        for var_file in role_var_files():
+            data = yaml.safe_load(var_file.read_text()) or {}
+            values.setdefault(owner(var_file), {}).update(
+                {k: v for k, v in data.items() if isinstance(v, str)}
+            )
+
+        def resolve(where, text):
+            for _ in range(5):
+                text = re.sub(
+                    r"\{\{\s*(\w+)\s*(\|\s*dirname\s*)?\}\}",
+                    lambda m: (
+                        (lambda v: v.rsplit("/", 1)[0] if m.group(2) and v else v)(
+                            values.get(where, {}).get(m.group(1), m.group(0))
+                        )
+                        or m.group(0)
+                    ),
+                    text,
+                )
+            return text
+
+        made, text = {}, {}
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if name == "file" and str(args.get("state")) == "directory":
+                    made_path = str(args.get("path", args.get("dest", "")))
+                    items = task.get("loop", task.get("with_items"))
+                    items = items if isinstance(items, list) else []
+                    if made_path == "{{ item }}":
+                        paths = items
+                    elif made_path == "{{ item.path }}":
+                        paths = [i.get("path", "") for i in items if isinstance(i, dict)]
+                    else:
+                        paths = [made_path]
+                    made.setdefault(owner(path), set()).update(resolve(owner(path), str(p)) for p in paths)
+            text[owner(path)] = text.get(owner(path), "") + path.read_text()
+        # A role's meta dependencies run first: what they make is there too.
+        deps = {}
+        for meta in tracked("roles/*/meta/main.yml"):
+            listed = (yaml.safe_load(meta.read_text()) or {}).get("dependencies") or []
+            deps[owner(meta)] = [f"roles/{d['role'] if isinstance(d, dict) else d}" for d in listed]
+
+        def closure(where, seen_roles=None):
+            seen_roles = seen_roles if seen_roles is not None else set()
+            if where in seen_roles:
+                return set()
+            seen_roles.add(where)
+            out = set(made.get(where, set()))
+            for dep in deps.get(where, []):
+                out |= closure(dep, seen_roles)
+            return out
+
+        for path in ansible_files():
+            for task in tasks(path):
+                name, args = module(task)
+                dest = resolve(owner(path), str(args.get("dest", "")))
+                if name not in ("copy", "template") or not dest.startswith("/"):
+                    continue
+                parent = dest.rstrip("/").rsplit("/", 1)[0] or "/"
+                if "{{" in parent:
+                    continue
+                seen += 1
+                there = closure(owner(path))
+                if parent in BASE_DIRS or parent in there or dest in there:  # dest: a directory copied into
+                    continue
+                package = PACKAGE_DIRS.get(parent)
+                if package and package in text[owner(path)]:
+                    used.add(parent)
+                    continue
+                offenders.append(f"{rel(path)}: {task.get('name')}: {parent}")
+        self.assertGreater(seen, 60, "the scan finds the copy and template tasks")
+        self.maxDiff = None
+        self.assertEqual(
+            offenders, [], "make the directory first, or name the package that ships it (rule 31)"
+        )
+        self.assertEqual(sorted(set(PACKAGE_DIRS) - used), [], "PACKAGE_DIRS entries no task needs any more")
+        scan.check(self)
 
     def test_scratch_exists_in_a_preview(self):
         scan, offenders, seen = Scan(minimum=MINIMUM_FILES), [], 0
