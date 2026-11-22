@@ -21,3 +21,5 @@ _host_baseline_without_awk: "{{ lookup('ansible.builtin.file', role_path ~ '/../
 _host_baseline_simulation: >-
   {{ ['sh', '-c', _host_baseline_simulate, 'simulate', host_baseline_unmarked | default([]) | join(' '),
       _host_baseline_without_awk] }}
+# The pin that keeps the site's absent packages out (tasks/main.yml).
+_host_baseline_absent_pin: /etc/apt/preferences.d/deepops-absent
