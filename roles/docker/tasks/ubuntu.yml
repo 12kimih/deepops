@@ -35,6 +35,9 @@
       key_url: "{{ lookup('ansible.builtin.vars', 'docker_' ~ ansible_facts.distribution | lower ~ '_repo_gpgkey') }}"
       key_checksum: "{{ docker_apt_key_checksum }}"
       key_fingerprint: "{{ docker_apt_key_fingerprint }}"
+      # The Engine stays at docker_engine_version through every upgrade (unattended, or
+      # the maintenance role's dist upgrade), as the install below takes it.
+      pin: {packages: docker-ce docker-ce-cli, pin: "version 5:{{ docker_engine_version }}-1~*", priority: 990}
       # What the older install docs left (the .list, the dearmored key elsewhere);
       # package_repos removes the other form of its own keyring itself.
       legacy_files:

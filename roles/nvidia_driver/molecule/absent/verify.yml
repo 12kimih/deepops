@@ -14,7 +14,7 @@
         path: "{{ item }}"
       loop:
         - /etc/systemd/system/nvidia-persistenced.service
-        - /etc/apt/preferences.d/deepops-nvidia-driver
+        - /etc/apt/preferences.d/zz-deepops-nvidia-driver
         - /var/run/reboot-required
         - /var/lib/deepops/reboot-requested-by/nvidia_driver
       register: files

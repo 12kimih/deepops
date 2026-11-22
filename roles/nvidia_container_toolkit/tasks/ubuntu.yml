@@ -29,6 +29,16 @@
       architectures: []
       key_url: "{{ nvidia_container_toolkit_repo_gpg_url }}"
       key_checksum: "{{ nvidia_container_toolkit_repo_gpg_checksum }}"
+      # The set stays at nvidia_container_toolkit_version through every upgrade (unattended,
+      # or the maintenance role's dist upgrade), from this repository or the CUDA one,
+      # which publishes the same versions as builds of its own: one record for both, so
+      # the installed build is kept. Unpinned, the record still names the set, so the
+      # NVIDIA driver's archive-only pin (roles/nvidia_driver, read after it) never refuses
+      # the CUDA builds and turns the installed one into a downgrade.
+      pin:
+        packages: "{{ nvidia_container_toolkit_packages | join(' ') }}"
+        pin: "version {{ nvidia_container_toolkit_version if nvidia_container_toolkit_version | length > 0 else '*' }}"
+        priority: "{{ 990 if nvidia_container_toolkit_version | length > 0 else 500 }}"
       # What this role and the install guide wrote before: the .list, the keyrings.
       legacy_files:
         - /etc/apt/sources.list.d/nvidia-container-toolkit.list

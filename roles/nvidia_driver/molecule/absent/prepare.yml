@@ -22,7 +22,7 @@
 
     - name: Write the role's archive pin
       ansible.builtin.copy:
-        dest: /etc/apt/preferences.d/deepops-nvidia-driver
+        dest: /etc/apt/preferences.d/zz-deepops-nvidia-driver
         content: |
           # roles/nvidia_driver (nvidia_driver_install_method: ubuntu_repo)
           Package: *nvidia*:any

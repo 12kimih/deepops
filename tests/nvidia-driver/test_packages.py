@@ -1,7 +1,6 @@
 """The packages roles/nvidia_driver installs from the Ubuntu archive: the full driver on
 the precompiled modules by default, the compute-only set with nvidia_driver_headless."""
 
-import fnmatch
 import sys
 import unittest
 from pathlib import Path
@@ -10,6 +9,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from ansible_yaml import ROOT, condition, load, render, role_defaults  # noqa: E402
+from repo_scan import ansible_files  # noqa: E402
 
 ROLE = ROOT / "roles/nvidia_driver"
 VARS = yaml.safe_load((ROLE / "vars/main.yml").read_text())
@@ -100,25 +100,31 @@ class GraphicsDispatchers(unittest.TestCase):
 
 
 class ArchivePin(unittest.TestCase):
-    """The archive-only pin refuses the CUDA repository's NVIDIA packages but the ones that
-    are not the driver's, exempt in a record ahead of it (apt takes the first match)."""
+    """The archive-only pin refuses the CUDA repository's NVIDIA packages; a version takes
+    the first record matching it, in the files' name order, so the pin is read after every
+    pin a role writes (package_repos: <repository>.pref), which hold their own packages."""
 
-    def test_the_container_toolkit_is_exempt_and_nothing_of_the_drivers(self):
-        exempt = VARS["nvidia_driver_archive_pin_exempt"]
-        toolkit = role_defaults("nvidia_container_toolkit")["nvidia_container_toolkit_packages"]
-        for name in toolkit:
-            self.assertTrue(any(fnmatch.fnmatchcase(name, g) for g in exempt), name)
-        for owned in VARS["_nvidia_driver_packages"]["Debian"]:
-            example = owned.replace("*", "580-server")
-            self.assertFalse(any(fnmatch.fnmatchcase(example, g) for g in exempt), owned)
+    def test_the_pin_is_read_after_every_repository_pin(self):
+        pin = Path(VARS["nvidia_driver_archive_pin"])
+        self.assertEqual(pin.parent, Path("/etc/apt/preferences.d"))
+        names = set()
 
-    def test_the_exemption_comes_first(self):
-        task = next(
-            t for t in load("roles/nvidia_driver/tasks/ubuntu.yml") if t["name"].startswith("Take the NVIDIA")
-        )
-        content = next(v for k, v in task.items() if k.split(".")[-1] == "copy")["content"]
-        self.assertLess(content.index("nvidia_driver_archive_pin_exempt"), content.index("'*nvidia*'"))
-        self.assertIn("Pin-Priority: 500", content.split("'*nvidia*'")[0])
+        def walk(node):
+            if isinstance(node, dict):
+                repo = node.get("package_repos_repo")
+                if isinstance(repo, dict) and "pin" in repo:
+                    names.add(repo["name"])
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+
+        for path in ansible_files():
+            walk(yaml.safe_load(path.read_text()))
+        self.assertIn("nvidia-container-toolkit", names)
+        for name in names:
+            self.assertLess(f"{name}.pref", pin.name, name)
 
 
 if __name__ == "__main__":

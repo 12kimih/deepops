@@ -1,7 +1,9 @@
 ---
 # The OSC repository (the manual method of the 4.2 release notes, which the release .deb
 # automates) and NodeSource for nodejs 22, each signed by a key whose checksum and
-# fingerprint are checked (roles/package_repos, tasks_from: repo).
+# fingerprint are checked (roles/package_repos, tasks_from: repo). Each holds the
+# versions this role installs through every upgrade (unattended, or the maintenance
+# role's dist upgrade), as the install takes them (vars/main.yml).
 - name: Add the package repositories
   ansible.builtin.include_role:
     name: package_repos
@@ -15,6 +17,9 @@
       key_url: "{{ open_ondemand_repo_key_url }}"
       key_checksum: "{{ open_ondemand_repo_key_checksum }}"
       key_fingerprint: "{{ open_ondemand_repo_key_fingerprint }}"
+      pin:
+        - {packages: ondemand, pin: "version {{ open_ondemand_version }}", priority: 990}
+        - {packages: ondemand-dex, pin: "version {{ open_ondemand_dex_version }}", priority: 990}
       # The release .deb's entry and this role's earlier key copies.
       legacy_files:
         - /etc/apt/sources.list.d/ondemand-web.list
@@ -26,6 +31,7 @@
       key_url: "{{ open_ondemand_nodejs_repo_key_url }}"
       key_checksum: "{{ open_ondemand_nodejs_repo_key_checksum }}"
       key_fingerprint: "{{ open_ondemand_nodejs_repo_key_fingerprint }}"
+      pin: {packages: nodejs, pin: "version {{ open_ondemand_nodejs_version }}", priority: 990}
       legacy_files:
         - /etc/apt/sources.list.d/nodesource.list
         - "{{ deepops_cache_dir }}/open-ondemand/nodesource.asc"
