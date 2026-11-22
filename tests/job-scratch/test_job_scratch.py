@@ -66,33 +66,44 @@ class Size(unittest.TestCase):
             self.assertFalse(holds("Check the request", reading(**bad)), bad)
 
 
-class CreateAndGrow(unittest.TestCase):
-    FITS = "Check the image fits and only grows"
+GROWS = "Check the image only grows"
+SPACE = "Check the filesystem has the space"
 
+
+def fits(values):
+    return holds(GROWS, values) and holds(SPACE, values)
+
+
+class CreateAndGrow(unittest.TestCase):
     def test_a_new_image_is_created_where_it_fits(self):
         values = reading()
-        self.assertTrue(holds(self.FITS, values))
+        self.assertTrue(fits(values))
         self.assertTrue(runs("Create the image", values))
         self.assertFalse(runs("Grow the image and its filesystem", values))
 
     def test_no_image_that_would_eat_the_reserve(self):
-        self.assertFalse(holds(self.FITS, reading(avail=TB2 // 2)))
+        # A disk already a quarter used: the space check alone refuses, and says so.
+        values = reading(avail=TB2 * 3 // 4)
+        self.assertTrue(holds(GROWS, values))
+        self.assertFalse(holds(SPACE, values))
 
     def test_a_larger_size_grows_it(self):
         values = reading(image=1000 * GIB, avail=TB2 - 1030 * GIB, mounted="/dev/loop3 xfs")
-        self.assertTrue(holds(self.FITS, values))
+        self.assertTrue(fits(values))
         self.assertFalse(runs("Create the image", values))
         self.assertTrue(runs("Grow the image and its filesystem", values))
 
     def test_the_same_size_does_nothing(self):
         image = TB2 * 70 // 100 // GIB * GIB
         values = reading(image=image, avail=TB2 - image - 30 * GIB, mounted="/dev/loop3 xfs")
-        self.assertTrue(holds(self.FITS, values))
+        self.assertTrue(fits(values))
         self.assertFalse(runs("Create the image", values))
         self.assertFalse(runs("Grow the image and its filesystem", values))
 
     def test_never_shrinks(self):
-        self.assertFalse(holds(self.FITS, reading(image=1800 * GIB, mounted="/dev/loop3 xfs")))
+        values = reading(image=1800 * GIB, mounted="/dev/loop3 xfs")
+        self.assertFalse(holds(GROWS, values))
+        self.assertTrue(holds(SPACE, values), "shrinking needs no space: only the growth check refuses")
 
 
 class FirstMount(unittest.TestCase):

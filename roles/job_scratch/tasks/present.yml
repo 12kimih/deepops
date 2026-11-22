@@ -69,18 +69,27 @@
       fstype: "{{ _lines[1].split()[1] | default('-') }}"
       occupied: "{{ _lines[2] }}"
 
-- name: Check the image fits and only grows
+- name: Check the image only grows
   ansible.builtin.assert:
-    that:
-      - _job_scratch.wanted | int >= _job_scratch.current | int
-      - (_job_scratch.wanted | int - _job_scratch.current | int)
-        <= (_job_scratch.fs_avail | int - _job_scratch.reserve | int)
+    that: _job_scratch.wanted | int >= _job_scratch.current | int
     fail_msg: >-
       {{ job_scratch_file }} is {{ _job_scratch.current | int | human_readable }} and
       job_scratch_size asks for {{ _job_scratch.wanted | int | human_readable }}: XFS cannot
-      shrink (remove the component and recreate it on an idle node), and growing takes no
-      more than leaves {{ job_scratch_reserve }} of the filesystem free
-      ({{ _job_scratch.fs_avail | int | human_readable }} free now).
+      shrink. Remove the component and deploy it again on an idle node.
+    quiet: true
+
+- name: Check the filesystem has the space
+  ansible.builtin.assert:
+    that: >-
+      _job_scratch.wanted | int - _job_scratch.current | int
+      <= _job_scratch.fs_avail | int - _job_scratch.reserve | int
+    fail_msg: >-
+      {{ job_scratch_file }} needs {{ (_job_scratch.wanted | int - _job_scratch.current | int) | human_readable }}
+      more, keeping {{ job_scratch_reserve }} of the filesystem
+      ({{ _job_scratch.reserve | int | human_readable }}) free, but only
+      {{ _job_scratch.fs_avail | int | human_readable }} is free of
+      {{ _job_scratch.fs_size | int | human_readable }}. Free the space on the root
+      filesystem first (du -xh --max-depth=3 / shows what holds it); nothing was changed.
     quiet: true
 
 # Mounting over directories running jobs use would hide them from those jobs.
