@@ -1,0 +1,25 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the foreign architectures
+      ansible.builtin.command:
+        argv: [dpkg, --print-foreign-architectures]
+      register: foreign
+      changed_when: false
+
+    - name: Read the library in each architecture
+      ansible.builtin.command:
+        argv: [dpkg-query, -W, -f, "${db:Status-Abbrev} ${binary:Package}\n", "zlib1g:*"]
+      register: zlib
+      changed_when: false
+      failed_when: false
+
+    - name: Check i386 is gone with its package, and the native library stays
+      ansible.builtin.assert:
+        that:
+          - foreign.stdout == ''
+          - zlib.stdout_lines | select('match', '^ii') | map('split') | map('last') | list == ['zlib1g:amd64']
+        fail_msg: "foreign={{ foreign.stdout_lines }} zlib={{ zlib.stdout_lines }}"

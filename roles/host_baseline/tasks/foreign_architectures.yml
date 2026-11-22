@@ -1,0 +1,62 @@
+---
+# The dpkg foreign architectures a host has are host_baseline_foreign_architectures, no
+# more: one left behind (i386, for a desktop driver's 32-bit libraries) keeps apt
+# fetching its package lists and lets its packages hold their native twins (a Multi-Arch:
+# same library is one version in every architecture: an i386 build from the CUDA
+# repository held the archive driver's amd64 library, 2026-11). An extra architecture's
+# packages are removed first (tasks_from: absent, its preview and its protected-package
+# refusal), then the architecture; a missing one is added. Debian family.
+- name: Keep the declared foreign architectures (Debian)
+  when: ansible_facts.os_family == 'Debian'
+  block:
+    - name: Read the foreign architectures dpkg has
+      ansible.builtin.command:
+        argv: [dpkg, --print-foreign-architectures]
+      register: host_baseline_foreign
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+
+    - name: Note the architectures to remove and to add
+      ansible.builtin.set_fact:
+        host_baseline_foreign_extra: "{{ host_baseline_foreign.stdout_lines | difference(host_baseline_foreign_architectures) }}"
+        host_baseline_foreign_missing: "{{ host_baseline_foreign_architectures | difference(host_baseline_foreign.stdout_lines) }}"
+
+    # Installed, or removed with its conffiles kept ("rc"): dpkg refuses to drop an
+    # architecture any package of it is still known in.
+    - name: Find the packages of the architectures to remove
+      ansible.builtin.command:
+        argv: "{{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${binary:Package}\\n']
+                  + host_baseline_foreign_extra | map('regex_replace', '^', '*:') | list }}"
+      register: host_baseline_foreign_packages
+      changed_when: false
+      failed_when: host_baseline_foreign_packages.rc > 1
+      check_mode: false  # read-only; --check needs the result
+      when: host_baseline_foreign_extra | length > 0
+
+    - name: Remove the packages of the architectures to remove
+      ansible.builtin.include_tasks: absent.yml
+      vars:
+        host_baseline_absent_packages: >-
+          {{ host_baseline_foreign_packages.stdout_lines | reject('match', '.n') | map('split') | map('last')
+             | unique | list }}
+      when:
+        - host_baseline_foreign_extra | length > 0
+        - host_baseline_foreign_packages.stdout_lines | reject('match', '.n') | list | length > 0
+
+    - name: Remove the architectures
+      change_command:
+        argv: [dpkg, --remove-architecture, "{{ item }}"]
+      loop: "{{ host_baseline_foreign_extra }}"
+      register: host_baseline_foreign_removed
+
+    - name: Add the declared architectures
+      change_command:
+        argv: [dpkg, --add-architecture, "{{ item }}"]
+      loop: "{{ host_baseline_foreign_missing }}"
+      register: host_baseline_foreign_added
+
+    # apt reads the architectures from dpkg: its lists follow at the next update.
+    - name: Refresh the package lists for the architectures now kept
+      ansible.builtin.apt:
+        update_cache: true
+      when: host_baseline_foreign_removed is changed or host_baseline_foreign_added is changed

@@ -113,6 +113,15 @@
              if ansible_facts.os_family == 'Debian' else host_baseline_present }}
       when: host_baseline_present | length > 0
 
+    # A removal of another architecture's packages alone (an i386 left by a desktop driver):
+    # every name carries an architecture that is not the host's.
+    - name: Note whether the removal is another architecture's alone (Debian)
+      ansible.builtin.set_fact:
+        host_baseline_removal_foreign: >-
+          {{ ansible_facts.os_family == 'Debian' and host_baseline_removal | length > 0
+             and host_baseline_removal | reject('search', ':(?!' ~ (ansible_facts.architecture | deb_architecture) ~ '$|all$)') | list | length == 0 }}
+      when: host_baseline_present | length > 0
+
     # What apt would take beyond the packages named: none of it may be protected (a
     # setting's pattern, or a package a component records), checked before anything goes.
     - name: Refuse a removal that takes a protected package with it
@@ -151,7 +160,28 @@
         name: "{{ host_baseline_removal }}"
         state: absent
         purge: "{{ true if ansible_facts.os_family == 'Debian' else omit }}"
-      register: host_baseline_removed
+      register: host_baseline_removed_native
+      when:
+        - host_baseline_present | length > 0
+        - not host_baseline_removal_foreign
+
+    # Every package another architecture's (tasks_from: foreign_architectures): its
+    # Essential packages (libc6:i386) are essential to its own programs only, which go
+    # with them, and apt refuses them without being told; the module cannot tell it.
+    - name: Remove the packages of another architecture (Debian)
+      change_command:
+        argv: "{{ ['apt-get', 'purge', '-y', '-q', '--allow-remove-essential'] + host_baseline_removal }}"
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      register: host_baseline_removed_foreign
+      when:
+        - host_baseline_present | length > 0
+        - host_baseline_removal_foreign
+
+    - name: Note whether anything was removed
+      ansible.builtin.set_fact:
+        host_baseline_removed:
+          changed: "{{ host_baseline_removed_native is changed or host_baseline_removed_foreign is changed }}"
       when: host_baseline_present | length > 0
 
     # A preview removes nothing, so an install later in the run that needs the removal

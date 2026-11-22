@@ -1,0 +1,9 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Keep no foreign architecture
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: foreign_architectures
