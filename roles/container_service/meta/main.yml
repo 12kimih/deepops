@@ -2,3 +2,5 @@
 galaxy_info:
   namespace: deepops
   role_name: container_service
+dependencies:
+  - role: deepops_paths  # deepops_container_label

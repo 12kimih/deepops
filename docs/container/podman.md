@@ -5,12 +5,28 @@ imports images but cannot build one from a Dockerfile. For that, the compute nod
 have rootless [Podman](https://podman.io/): build the image inside a CPU job, then
 import it into Enroot as a squashfs file and run that file with Pyxis.
 
+- [Coming from Docker](#coming-from-docker)
 - [Build and import](#build-and-import)
 - [In a batch job](#in-a-batch-job)
 - [Where images live](#where-images-live)
 - [What does not work](#what-does-not-work)
 - [Troubleshooting](#troubleshooting)
 - [For administrators](#for-administrators)
+
+## Coming from Docker
+
+Containers run inside Slurm jobs, so the job's GPUs, CPUs, memory and cleanup apply to
+them. The Docker daemon on a compute node serves the cluster's own services; using it
+directly is an administrator's exception (the roster's `docker` role, which is root on
+the node), and a container it runs past the cleanup grace period raises an alert.
+
+| With Docker | On the cluster |
+|---|---|
+| `docker run --gpus 1 IMAGE CMD` | `srun --gpus=1 --container-image=IMAGE CMD` (Pyxis) |
+| `docker run -v /data:/data IMAGE` | `srun --container-image=IMAGE --container-mounts=/data:/data CMD` |
+| `docker build -t NAME .` | `podman build -t localhost/NAME .` in a CPU job (below) |
+| `docker save` / a local image for Pyxis | `enroot import -o NAME.sqsh podman://localhost/NAME` |
+| `docker push` | `podman push localhost/NAME REGISTRY/NAME` |
 
 ## Build and import
 
@@ -164,6 +180,16 @@ Ubuntu 24.04):
 - **AppArmor.** Ubuntu 24.04 restricts unprivileged user namespaces. The apparmor
   package's `podman`, `crun` and `slirp4netns` profiles grant them to those programs
   only; the role fails if they are missing and loads any that is not loaded.
+
+- **Containers outside Slurm.** Every container deepops starts carries the label
+  `deepops.unit` (`deepops_container_label`, set by `roles/container_service`). The
+  daily cleanup counts the node's Docker containers without it, running and stopped,
+  and those created more than `container_storage_gc_unused_days` ago
+  (`container_storage_docker_unmanaged`, `container_storage_docker_unmanaged_stale`);
+  it never touches them. A running one past that age raises `ContainerOutsideSlurm`.
+  `docker-prune.timer` (`roles/docker`, `docker_prune_after`) removes stopped
+  containers, unused images and build cache by age, then cuts the build cache to
+  `docker_prune_build_cache_max`.
 
 Changing `podman_subid_base` or `podman_subid_count` moves every range; users then
 need `podman system migrate` (or `podman system reset -f`) on each node.

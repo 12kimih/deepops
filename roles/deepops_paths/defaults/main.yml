@@ -7,6 +7,10 @@ deepops_dir: /opt/deepops
 # builds, which a run may recreate). Every role names them through these.
 deepops_state_dir: /var/lib/deepops
 deepops_cache_dir: /var/cache/deepops
+# The label on every container deepops starts (roles/container_service sets it to the
+# unit's name): a container without it on a node is someone's own, outside Slurm, and
+# the daily container storage cleanup counts it (roles/container_storage_gc).
+deepops_container_label: deepops.unit
 # The Helm client every role drives (roles/helm_release, roles/runai); Kubespray puts
 # it in its bin_dir, /usr/local/bin.
 helm_bin: /usr/local/bin/helm

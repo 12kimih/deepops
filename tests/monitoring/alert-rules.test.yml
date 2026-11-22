@@ -1021,3 +1021,21 @@ tests:
             exp_annotations:
               summary: "n1 has reported no disk quota usage for an hour"
               description: "`journalctl -u disk-quota-metrics` and `systemctl list-timers disk-quota-metrics.timer` on the host."
+
+  - name: a container outside Slurm past the grace period warns; a stopped or new one does not
+    interval: 1m
+    input_series:
+      - series: 'container_storage_docker_unmanaged_stale{host="n1", instance="n1:9100", state="running"}'
+        values: '1x5'
+      - series: 'container_storage_docker_unmanaged_stale{host="n2", instance="n2:9100", state="running"}'
+        values: '0x5'
+      - series: 'container_storage_docker_unmanaged_stale{host="n2", instance="n2:9100", state="stopped"}'
+        values: '3x5'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ContainerOutsideSlurm
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "1 container(s) on n1 run outside Slurm past the grace period"
+              description: "Docker containers deepops did not start have run on the node longer than the cleanup grace period, outside Slurm's limits and cleanup: `docker ps --filter label!=deepops.unit` on the host. Stop them, and run the work as a job (pyxis, or podman in a job; docs/container/podman.md)."
