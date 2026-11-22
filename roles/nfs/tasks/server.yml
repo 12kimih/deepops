@@ -237,10 +237,10 @@
       dest: /etc/systemd/system/nfs-server-restart.service
     - src: nfs-server-autorestart.conf.j2
       dest: /etc/systemd/system/nfs-server.service.d/auto-restart.conf
+  register: nfs_autorestart_units
   when:
     - nfs_exports | length > 0
     - nfs_server_autorestart | bool
-  notify: Reload systemd
   tags:
     - nfs
 
@@ -252,8 +252,17 @@
     - /etc/systemd/system/nfs-server.service.d/auto-restart.conf
     - /etc/systemd/system/nfs-server-restart.service
     - "{{ nfs_server_start_failed_check }}"
+  register: nfs_autorestart_removed
   when: not (nfs_server_autorestart | bool)
-  notify: Reload systemd
+  tags:
+    - nfs
+
+# Read before the start, so a server started here already carries OnFailure= (a handler
+# at the end of the run read the units only after it).
+- name: Read the changed nfs-server units
+  systemd_unit:
+    daemon_reload: true
+  when: nfs_autorestart_units is changed or nfs_autorestart_removed is changed
   tags:
     - nfs
 

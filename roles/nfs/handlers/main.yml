@@ -1,8 +1,4 @@
 ---
-- name: Reload systemd
-  systemd_unit:
-    daemon_reload: true
-
 # Live, without a restart: a running nfsd changes its thread count in place.
 - name: Apply nfsd thread count
   change_command:
