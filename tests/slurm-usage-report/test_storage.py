@@ -200,24 +200,6 @@ class RenderTests(unittest.TestCase):
         self.assertIn("Writes there fail until you free space.", storage.dm_text(rows[0]))
 
 
-class DueTests(unittest.TestCase):
-    """Who is told: a first crossing at once, a hard limit every day, the same warn level
-    every repeat_days; someone back under a level is forgotten."""
-
-    def test_policy(self):
-        rows = storage.over_warn(storage.collect(site(), NOW))
-        told = {}
-        self.assertEqual([r[2] for r in storage.due(rows, told, NOW, 7)], ["bob", "alice"])
-        for r in rows:
-            told[storage.row_key(r)] = {"kind": r[4][0][3], "at": NOW}
-        self.assertEqual([r[2] for r in storage.due(rows, told, NOW + storage.DAY, 7)], ["bob"])
-        # A daily timer can run a little early: the seventh day still counts.
-        self.assertEqual(len(storage.due(rows, told, NOW + 7 * storage.DAY - 600, 7)), 2)
-        self.assertEqual(len(storage.due(rows, told, NOW + storage.DAY, 0)), 2, "0: every day")
-        storage.due([r for r in rows if r[2] == "bob"], told, NOW, 7)
-        self.assertEqual(set(told), {"login / bob"}, "alice is back under: forgotten")
-
-
 class RunTests(unittest.TestCase):
     """usage_report --storage: posts the report, notes everyone past a level when asked,
     and posts nothing when no disk usage is counted."""
@@ -276,7 +258,7 @@ class RunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             posted, _, saved = self.run_storage(site(), notify=["mention"], state=d)
             self.assertEqual(set(saved["told"]), {"login / alice", "login / bob"})
-            self.assertEqual(saved["told"]["login / bob"], {"kind": "hard", "at": NOW})
+            self.assertEqual(saved["told"]["login / bob"], NOW)
             self.assertIn("<@UALICE> (alice)", posted[0][2])
             # The next day: bob is still at his hard limit, alice past the same warn level.
             posted, _, _ = self.run_storage(site(), notify=["mention"], state=d, now=NOW + storage.DAY)

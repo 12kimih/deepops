@@ -202,22 +202,22 @@ class IdleTests(unittest.TestCase):
         report.analyze(jobs, gpu, window=7200, threshold=0)
         self.assertEqual([report.gib(j) for j in jobs], ["12G", "12G+", "n/a"])
 
-    def test_owner_notified_once_then_after_repeat(self):
+    def test_idle_since_is_kept_and_forgotten_when_no_longer_idle(self):
         state, j = {}, self.job("1", 7200, [("n", 0)])
-        report.track_idle([j], state, now=1000, window=7200, repeat=3600, notify=["mention"])
-        self.assertTrue(j["notify"])
-        state["1"]["notified"] = 1000
-        report.track_idle([j], state, now=2000, window=7200, repeat=3600, notify=["mention"])
-        self.assertFalse(j["notify"])
-        report.track_idle([j], state, now=4700, window=7200, repeat=3600, notify=["mention"])
-        self.assertTrue(j["notify"])
-        report.track_idle([], state, now=5000, window=7200, repeat=3600, notify=["mention"])
+        report.track_idle([j], state, now=10000, window=7200)
+        self.assertEqual(state["1"], {"since": 2800, "notified": None})
+        self.assertIs(j["state"], state["1"])
+        report.track_idle([j], state, now=20000, window=7200)
+        self.assertEqual(state["1"]["since"], 2800, "the first time it turned idle stays")
+        report.track_idle([], state, now=30000, window=7200)
         self.assertEqual(state, {})
 
-    def test_no_notification_when_disabled(self):
-        j = self.job("1", 7200, [("n", 0)])
-        report.track_idle([j], {}, now=1000, window=7200, repeat=3600, notify=[])
-        self.assertFalse(j["notify"])
+    def test_a_persons_jobs_are_one_group_most_gpus_first(self):
+        a, b = self.job("a", 7200, [("n", 0)]), self.job("b", 7200, [("n", 1), ("n", 2)])
+        c = dict(self.job("c", 7200, [("n", 3)]), user="v")
+        self.assertEqual({u: [j["id"] for j in js] for u, js in report.by_owner([a, b, c]).items()},
+                         {"u": ["b", "a"], "v": ["c"]})  # fmt: skip
+        self.assertEqual(report.job_lines([a]), "- `a` (1 GPU, running 2:00:00)")
 
 
 class RenderTests(unittest.TestCase):
@@ -257,7 +257,8 @@ class RenderTests(unittest.TestCase):
         data["reasons"] = [
             (f"gpu{k}", "drain", "2026-01-01T00:00:00", "root", "maintenance window") for k in range(100)
         ]
-        data["idle"] = [dict(j, notify=False) for j in jobs[:200]]
+        data["idle"] = jobs[:200]
+        data["due"] = []
         cfg = {"idle_util_threshold": 0, "idle_hours": 2, "notify": ["mention"], "dashboard_url": ""}
         (text, summary), thread = report.render(data, cfg, lambda user, mention: user)
         self.assertTrue(text)
@@ -296,9 +297,9 @@ class RunTests(unittest.TestCase):
             cfg = {"channel": "#gpu", "state_file": f"{d}/state.json", "idle_hours": 2, "idle_util_threshold": 1,
                    "notify": ["dm"], "notify_repeat_hours": 24, "cancel_after_hours": 0, "prometheus_url": "",
                    "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
-                   "dm_text": "{job}", "admin_channel": "#admin",
+                   "dm_text": "{jobs}", "admin_channel": "#admin",
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
-                   "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
+                   "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
                    "storage_top": 10, "storage_notify": ["mention"], "storage_repeat_days": 7,
                    "people": []}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
@@ -336,10 +337,10 @@ class GpuIndexTests(unittest.TestCase):
 class ConfigTests(unittest.TestCase):
     BASE = {"slack_token": "t", "channel": "#c", "prometheus_url": "", "idle_hours": 2,
             "idle_util_threshold": 0, "notify": ["mention"], "notify_repeat_hours": 6,
-            "dm_text": "{job} {gpus} {hours} {runtime}", "cancel_after_hours": 0, "user_map": {},
+            "dm_text": "{jobs} {count} {hours}", "cancel_after_hours": 0, "user_map": {},
             "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin",
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
-            "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
+            "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
             "storage_top": 10, "storage_notify": ["mention", "dm"], "storage_repeat_days": 7,
             "people": ["alice"]}  # fmt: skip
 
@@ -372,59 +373,69 @@ class ConfigTests(unittest.TestCase):
                          ' "3": {"since": 5}, "4": {"since": true, "notified": null}}}'):  # fmt: skip
                 Path(f"{d}/s").write_text(text)
                 state = report.load_state(f"{d}/s")
-                self.assertEqual(set(state), {"idle", "users"})
+                self.assertEqual(set(state), {"idle", "told", "users"})
                 self.assertEqual(set(state["idle"]) - {"2"}, set())
 
 
 class CancelTests(unittest.TestCase):
-    """Cancelling: interactive sessions only (unless configured), and only once the owner
-    was told and then warned cancel_warn_hours ahead, each in an earlier run."""
+    """Cancelling: any job, batch or interactive, and only once its owner was told and
+    warned in earlier runs; one warning per person for all their jobs about to go."""
 
-    def run_act(self, notified, warned=None, interactive=True, only=True, warn=1):
-        self.job = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": False, "runtime": 9,
-                    "interactive": interactive, "state": {"since": NOW - 30 * 3600, "notified": notified}}  # fmt: skip
+    CFG = {"notify": ["mention"], "cancel_after_hours": 24, "channel": "#c", "idle_hours": 2,
+           "cancel_warn_hours": 1, "cancel_warn_text": "{count}: {jobs} in {hours}h", "dm_text": "{jobs}"}  # fmt: skip
+
+    def job(self, jid, notified, warned=None, user="u"):
+        state = {"since": NOW - 30 * 3600, "notified": notified}
         if warned is not None:
-            self.job["state"]["warned"] = warned
-        cfg = {"notify": ["mention"], "cancel_after_hours": 24, "channel": "#c", "cancel_interactive_only": only,
-               "cancel_warn_hours": warn, "cancel_warn_text": "{job} in {hours}h"}  # fmt: skip
+            state["warned"] = warned
+        return {"id": jid, "label": jid, "user": user, "gpus": [("n", 0)], "runtime": 9, "state": state}
+
+    def run_act(self, jobs, due=(), member="UU", **cfg):
         self.slack = mock.Mock()
         self.slack.post.return_value = "ts"
+        self.told = {}
+        report_data = {"idle": jobs, "due": list(due), "told": self.told}
         with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
-                mock.patch.object(report, "slack_id", lambda *a: "UU"), mock.patch.object(report, "run") as run:  # fmt: skip
-            report.act({"idle": [self.job]}, cfg, lambda u, m: u, self.slack, {}, NOW)
-        return run.call_count
+                mock.patch.object(report, "slack_id", lambda *a: member), mock.patch.object(report, "run") as run, \
+                mock.patch("sys.stderr"):  # fmt: skip
+            report.act(report_data, dict(self.CFG, **cfg), lambda u, m: u, self.slack, {}, NOW)
+        return [c.args[1] for c in run.call_args_list]
 
     def test_warned_first_then_cancelled_in_a_later_run(self):
-        self.assertEqual(self.run_act(NOW - 3600), 0, "told but not yet warned: warned now, not cancelled")
-        self.assertEqual(self.job["state"]["warned"], NOW)
-        self.assertIn("7 in 1h", str(self.slack.post.call_args))
-        self.assertEqual(self.run_act(NOW - 3600, warned=NOW - 600), 1)
+        j = self.job("7", NOW - 3600)
+        self.assertEqual(self.run_act([j]), [], "told but not yet warned: warned now, not cancelled")
+        self.assertEqual(j["state"]["warned"], NOW)
+        self.assertEqual(self.run_act([self.job("7", NOW - 3600, warned=NOW - 600)]), ["7"])
 
-    def test_a_batch_job_is_never_cancelled_unless_configured(self):
-        self.assertEqual(self.run_act(NOW - 3600, warned=NOW - 600, interactive=False), 0)
-        self.assertEqual(self.run_act(NOW - 3600, warned=NOW - 600, interactive=False, only=False), 1)
+    def test_one_warning_per_person_for_all_their_jobs(self):
+        jobs = [self.job("7", NOW - 3600), self.job("8", NOW - 3600), self.job("9", NOW - 3600, user="v")]
+        self.run_act(jobs)
+        texts = [c.args[1] for c in self.slack.post.call_args_list]
+        self.assertEqual(len(texts), 2, "one DM to u, one to v")
+        self.assertTrue(texts[0].startswith("2: - `7`"), texts[0])
+
+    def test_batch_and_interactive_alike(self):
+        batch = dict(self.job("7", NOW - 3600, warned=NOW - 600), interactive=False)
+        self.assertEqual(self.run_act([batch]), ["7"])
+
+    def test_told_once_per_person_and_every_job_of_theirs_counts_as_told(self):
+        jobs = [self.job("7", None), self.job("8", None)]
+        self.run_act(jobs, due=["u"], notify=["dm"], cancel_after_hours=0)
+        self.assertEqual(self.slack.post.call_count, 1, "one DM for both jobs")
+        self.assertEqual(self.told, {"u": NOW})
+        self.assertEqual([j["state"]["notified"] for j in jobs], [NOW, NOW])
 
     def test_an_owner_without_a_slack_member_is_not_counted_as_told(self):
-        j = {"id": "7", "label": "7", "user": "u", "gpus": [("n", 0)], "notify": True, "runtime": 9,
-             "state": {"since": NOW - 30 * 3600, "notified": None}}  # fmt: skip
-        cfg = {
-            "notify": ["dm"],
-            "cancel_after_hours": 24,
-            "channel": "#c",
-            "dm_text": "{job}",
-            "idle_hours": 2,
-            "cancel_interactive_only": True,
-            "cancel_warn_hours": 1,
-            "cancel_warn_text": "{job}",
-        }
-        with mock.patch.object(report, "post_report", lambda *a: ("#c", "ts")), \
-                mock.patch.object(report, "slack_id", lambda *a: ""), mock.patch("sys.stderr"):  # fmt: skip
-            report.act({"idle": [j]}, cfg, lambda u, m: u, mock.Mock(), {}, NOW)
+        j = self.job("7", None)
+        self.run_act([j], due=["u"], member="", notify=["dm"])
         self.assertIsNone(j["state"]["notified"])
+        self.assertEqual(self.told, {})
 
     def test_cancelled_only_after_the_owner_was_told_in_an_earlier_run(self):
-        self.assertEqual(self.run_act(None, warned=NOW - 600), 0)  # never told (lost state, failed DM)
-        self.assertEqual(self.run_act(NOW - 3600, warn=0), 1)  # no separate warning configured
+        self.assertEqual(self.run_act([self.job("7", None, warned=NOW - 600)]), [])  # never told
+        self.assertEqual(
+            self.run_act([self.job("7", NOW - 3600)], cancel_warn_hours=0), ["7"]
+        )  # no warning step
 
 
 class WeeklyTests(unittest.TestCase):
@@ -432,8 +443,7 @@ class WeeklyTests(unittest.TestCase):
     idlest mentioned; a person over both thresholds for repeat_weeks weeks running is
     reported to the administrators, with their numbers and what to do."""
 
-    CFG = {"repeat_weeks": 2, "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "cancel_interactive_only": True,
-           "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}"}  # fmt: skip
+    CFG = {"repeat_weeks": 2, "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5}
 
     class Prom:
         def query(self, expr):

@@ -37,9 +37,12 @@ cluster_bot_admins: "{{ people | default({}) | people_with_role('admin') }}"
 
 # Days before a deadline the person it concerns gets a DM, once each: an allocation's
 # end (its owner) and a person's last day (`ends` in the roster: what stops when, and to
-# move their files away while they can still log in).
-cluster_bot_scratch_remind_days: [7, 1]
-cluster_bot_leave_remind_days: [30, 14, 7, 1]
+# move their files away while they can still log in). One set for both; either may
+# differ. A stage the deadline was already inside when the bot first saw it is skipped
+# (whoever set a date ten days off knows it), except the last, always sent.
+cluster_bot_remind_days: [14, 7, 1]
+cluster_bot_scratch_remind_days: "{{ cluster_bot_remind_days }}"
+cluster_bot_leave_remind_days: "{{ cluster_bot_remind_days }}"
 
 # Account requests (/join, /leave) become pull requests on the site configuration, made
 # as the bot's GitHub App (docs/slurm-cluster/cluster-bot.md: creating it). Empty repo

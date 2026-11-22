@@ -2,8 +2,10 @@
 
 Reads jobs and node state from Slurm's JSON output, per-GPU utilisation from
 Prometheus (dcgm-exporter). Posts a summary card with the detail in its thread, and
-mentions (or DMs) the owner of each job whose GPUs all stayed idle for the whole
-window. Can optionally cancel jobs idle for longer.
+tells each person whose jobs' GPUs all stayed idle for the whole window, once for all
+their idle jobs (mentioned, or sent a DM), again every notify_repeat_hours while any
+stays idle (clustertools.notices). Can optionally cancel jobs idle for longer, any job,
+each only after its owner was told and warned in earlier runs.
 
 With --weekly it posts the week instead: for each person, the GPU-hours their jobs held
 and how many of them sat idle, the people who idled most mentioned, from the per-job
@@ -27,7 +29,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import config, storage_report
+from . import config, notices, storage_report
 from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
@@ -50,7 +52,11 @@ from .slurm import (
 from .vocab import job_holds, node_unavailable
 
 NOTIFY = {"mention", "dm"}
-DM_FIELDS = {"job": "1234_5", "gpus": 8, "hours": "2", "runtime": "1:00:00"}
+# The fields a DM text may use: the person's jobs, one line each, how many, the hours.
+DM_FIELDS = {"jobs": "- `1234_5` (8 GPU, running 1:00:00)", "count": 1, "hours": "2"}
+# An hourly run starts a few seconds later some hours: a notice due every N hours may
+# go this much early, so it never slips to the next run.
+RUN_LEEWAY = 300
 WEEK_DAYS = 7
 WEEK_TOP = 5  # the idlest people mentioned in the weekly summary
 WEEKS_KEPT = 8  # weeks of each person's numbers the weekly summary remembers
@@ -80,8 +86,6 @@ def parse_jobs(data, now):
                     "running": "RUNNING" in state,
                     "partition": job.get("partition", ""),
                     "qos": job.get("qos", ""),
-                    # srun and salloc sessions: someone holds the GPUs at a shell
-                    "interactive": job.get("batch_flag") is False,
                     "runtime": max(0, now - (num(job.get("start_time")) or now)),
                     "gpus": gpus,
                     "gpu_type": ",".join(sorted({t for t in types.values() if t})),
@@ -221,15 +225,29 @@ def analyze(jobs, gpu, window, threshold):
     return idle
 
 
-def track_idle(idle, state, now, window, repeat, notify):
-    """Remember when each job turned idle; mark jobs whose owner is due a notification."""
+def track_idle(idle, state, now, window):
+    """Remember when each job turned idle (a job no longer idle is forgotten); each idle
+    job gets its record as j["state"]: since, notified (its owner told of it), warned."""
     ids = {j["id"] for j in idle}
     for jid in [k for k in state if k not in ids]:
         del state[jid]
     for j in idle:
-        s = state.setdefault(j["id"], {"since": now - window, "notified": None})
-        j["state"] = s
-        j["notify"] = bool(notify) and (s["notified"] is None or now - s["notified"] >= repeat)
+        j["state"] = state.setdefault(j["id"], {"since": now - window, "notified": None})
+
+
+def by_owner(jobs):
+    """{user: [their jobs]}, users and jobs in a stable order (most GPUs first)."""
+    out = defaultdict(list)
+    for j in sorted(jobs, key=lambda j: (j["user"], -len(j["gpus"]), j["label"])):
+        out[j["user"]].append(j)
+    return dict(out)
+
+
+def job_lines(jobs):
+    """One line per job for a person's notice."""
+    return "\n".join(
+        f"- `{j['label']}` ({len(j['gpus'])} GPU, running {duration(j['runtime'])})" for j in jobs
+    )
 
 
 # --- Rendering ------------------------------------------------------------------
@@ -279,13 +297,17 @@ def render(report, cfg, who):
     if idle:
         rule = f"every GPU at or under {cfg['idle_util_threshold']:g}% for {cfg['idle_hours']:g}h+"
         lines = [f":zzz: *Idle GPU jobs*  _{rule}_"]
-        for j in sorted(idle, key=lambda j: -len(j["gpus"])):
-            hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
-            lines.append(
-                f"• {who(j['user'], 'mention' in cfg['notify'] and j['notify'])}  "
-                f"`{j['label']}`  {len(j['gpus'])}x {j['gpu_type'] or 'GPU'} on {hosts}  "
-                f"running {duration(j['runtime'])}"
-            )
+        owners = by_owner(idle)
+        for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
+            jobs = owners[user]
+            told = "mention" in cfg["notify"] and user in report.get("due", ())
+            lines.append(f"• {who(user, told)}  {len(jobs)} job{'s' if len(jobs) > 1 else ''}")
+            for j in jobs:
+                hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
+                lines.append(
+                    f"    `{j['label']}`  {len(j['gpus'])}x {j['gpu_type'] or 'GPU'} on {hosts}  "
+                    f"running {duration(j['runtime'])}"
+                )
         lines.append("_Cancel with `scancel <job>` if you no longer need it._")
         blocks.extend(sections("\n".join(lines)))
     if report["reasons"]:
@@ -366,7 +388,7 @@ CONFIG_KEYS = {
     "idle_util_threshold": (int, float), "notify": list, "notify_repeat_hours": (int, float),
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
     "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
-    "repeat_idle_share": (int, float), "repeat_weeks": int, "cancel_interactive_only": bool,
+    "repeat_idle_share": (int, float), "repeat_weeks": int,
     "cancel_warn_hours": (int, float), "cancel_warn_text": str, "storage_top": int,
     "storage_notify": list, "storage_repeat_days": (int, float), "people": list,
 }  # fmt: skip
@@ -409,17 +431,20 @@ def load_config(path):
 
 
 def load_state(path):
-    """What earlier runs recorded, {"idle": {job: {since, notified}}, "users": {...}}.
-    A missing or damaged file, or a damaged entry, is a fresh start for what it held."""
+    """What earlier runs recorded, {"idle": {job: {since, notified}}, "told": {user: when
+    they were last told}, "users": {...}}. A missing or damaged file, or a damaged entry,
+    is a fresh start for what it held."""
     try:
         with open(path) as f:
             state = json.load(f)
     except (OSError, ValueError):
         state = {}
     state = state if isinstance(state, dict) else {}
-    idle, users = state.get("idle"), state.get("users")
+    idle, users, told = state.get("idle"), state.get("users"), state.get("told")
     number = (int, float)
+    told = told if isinstance(told, dict) else {}
     return {
+        "told": {k: v for k, v in told.items() if notices.told_at(told, k) is not None},
         "idle": {
             k: v
             for k, v in (idle.items() if isinstance(idle, dict) else ())
@@ -474,15 +499,18 @@ def report_once():
         total_gpus=sum(report["nodes"].values()),
         idle=analyze(report["jobs"], gpu, window, cfg["idle_util_threshold"]),
     )
-    track_idle(
-        report["idle"],
-        state.setdefault("idle", {}),
-        now,
-        window,
-        cfg["notify_repeat_hours"] * 3600,
-        [] if preview else cfg["notify"],
-    )
-    cache = state.setdefault("users", {})
+    track_idle(report["idle"], state["idle"], now, window)
+    # Whom this run tells: a preview tells no one, and records nothing.
+    report["due"] = (
+        []
+        if preview or not cfg["notify"]
+        else notices.due(
+            sorted(by_owner(report["idle"])), state["told"], now, cfg["notify_repeat_hours"] * 3600,
+            leeway=RUN_LEEWAY,
+        )
+    )  # fmt: skip
+    report["told"] = state["told"]
+    cache = state["users"]
 
     who = namer(cfg, slack, cache)
 
@@ -609,8 +637,8 @@ def post_thread(slack, channel, card, thread):
 
 def storage(cfg, args):
     """The daily disk usage report. The people past a level who are due a notice
-    (storage_report.due: a first crossing, a hard limit, the same warn level every
-    storage_repeat_days) are mentioned on the card or sent a DM, as storage_notify says,
+    (clustertools.notices: a first crossing, a hard limit every day, the same warn level
+    every storage_repeat_days) are mentioned on the card or sent a DM, as storage_notify says,
     and recorded once it reached them. A preview posts to --to and sends and records
     nothing; one failed DM does not stop the others, and the run fails at the end naming
     them."""
@@ -624,8 +652,14 @@ def storage(cfg, args):
     cache, told = state.get("users", {}), state.get("told", {})
     preview = args.dry_run or bool(args.to)
     notify = cfg["storage_notify"]
-    due = storage_report.due(storage_report.over_warn(data), told, now, cfg["storage_repeat_days"])
-    keys = {storage_report.row_key(r) for r in due}
+    rows = storage_report.over_warn(data)
+    keys = set(
+        notices.due(
+            [storage_report.row_key(r) for r in rows], told, now, cfg["storage_repeat_days"] * storage_report.DAY,
+            urgent={storage_report.row_key(r) for r in rows if r[4][0][3] == "hard"}, leeway=storage_report.LEEWAY,
+        )
+    )  # fmt: skip
+    due = [r for r in rows if storage_report.row_key(r) in keys]
     who = namer(cfg, slack, cache)
     card, thread = storage_report.render(
         data, who, cfg["storage_top"], set(cfg["people"]), keys if "mention" in notify else set()
@@ -643,7 +677,7 @@ def storage(cfg, args):
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {row[2]}: {e}")
         if delivered:
-            told[storage_report.row_key(row)] = {"kind": row[4][0][3], "at": int(now)}
+            told[storage_report.row_key(row)] = int(now)
     if not preview:
         write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
     if failures:
@@ -657,71 +691,76 @@ def post_report(report, cfg, who, slack, to):
     return channel, post_thread(slack, channel, card, thread)
 
 
-def cancellable(idle, cfg):
-    """The idle jobs the policy may cancel: interactive sessions only, unless configured
-    otherwise (a batch job ends by itself; a shell holds GPUs until someone exits)."""
-    return [j for j in idle if j.get("interactive") or not cfg["cancel_interactive_only"]]
-
-
 def act(report, cfg, who, slack, cache, now):
-    """Post the report, notify the owners of idle jobs and cancel those idle too long.
-    One failed notification or cancellation does not stop the rest; the run still
-    fails at the end, naming them."""
+    """Post the report, tell the people due a notice (report["due"]) about all their idle
+    jobs at once, and cancel jobs idle too long, warning each person once ahead for all
+    their jobs about to go. One failed notice or cancellation does not stop the rest; the
+    run still fails at the end, naming them."""
     channel, ts = post_report(report, cfg, who, slack, None)
     failures = []
-    for j in report["idle"]:
-        if not j["notify"]:
-            continue
-        # Notified means a message reached the owner: the report's mention (posted above,
-        # which needs their Slack member) or a DM. Only then may cancelling follow.
+    owners = by_owner(report["idle"])
+    hours = f"{cfg['idle_hours']:g}"
+    for user in report["due"]:
+        jobs = owners[user]
+        # Told means a message reached them: the report's mention (posted above, which
+        # needs their Slack member) or a DM. Only then may cancelling follow.
         try:
-            member = slack_id(j["user"], cfg, slack, cache)
+            member = slack_id(user, cfg, slack, cache)
         except (RuntimeError, OSError) as e:
-            failures.append(f"looking up {j['user']} for {j['label']}: {e}")
+            failures.append(f"looking up {user}: {e}")
             continue
         if not member:
-            print(f"slurm-usage-report: {j['user']} has no Slack member; {j['label']} not notified",
-                  file=sys.stderr)  # fmt: skip
+            print(f"slurm-usage-report: {user} has no Slack member; not told of idle jobs", file=sys.stderr)
             continue  # so never cancelled either
         delivered = "mention" in cfg["notify"]
         if "dm" in cfg["notify"]:
             try:
-                slack.post(
-                    slack.channel(member),
-                    cfg["dm_text"].format(
-                        job=j["label"],
-                        gpus=len(j["gpus"]),
-                        hours=f"{cfg['idle_hours']:g}",
-                        runtime=duration(j["runtime"]),
-                    ),
-                )
+                text = cfg["dm_text"].format(jobs=job_lines(jobs), count=len(jobs), hours=hours)
+                slack.post(slack.channel(member), text)
                 delivered = True
             except (RuntimeError, OSError) as e:
-                failures.append(f"notifying {j['user']} of {j['label']}: {e}")
+                failures.append(f"notifying {user}: {e}")
         if delivered:
-            j["state"]["notified"] = now
+            report["told"][user] = now
+            for j in jobs:
+                j["state"]["notified"] = now
 
     if cfg["cancel_after_hours"] > 0:
-        cancelled = []
         limit, warn = cfg["cancel_after_hours"] * 3600, cfg["cancel_warn_hours"] * 3600
-        for j in cancellable(report["idle"], cfg):
-            idle = now - j["state"]["since"]
-            # The last word before a cancel: a DM cancel_warn_hours ahead, once.
-            if warn and idle >= limit - warn and not j["state"].get("warned"):
-                try:
-                    member = slack_id(j["user"], cfg, slack, cache)
-                    if member:
-                        slack.post(slack.channel(member), cfg["cancel_warn_text"].format(
-                            job=j["label"], gpus=len(j["gpus"]), hours=f"{cfg['cancel_warn_hours']:g}",
-                            runtime=duration(j["runtime"])))  # fmt: skip
+        # The last word before a cancel: one DM per person, cancel_warn_hours ahead, for
+        # all their jobs about to go, once each.
+        for user, jobs in owners.items():
+            ahead = [
+                j
+                for j in jobs
+                if warn and now - j["state"]["since"] >= limit - warn and not j["state"].get("warned")
+            ]
+            if not ahead:
+                continue
+            try:
+                member = slack_id(user, cfg, slack, cache)
+                if member:
+                    text = cfg["cancel_warn_text"].format(
+                        jobs=job_lines(ahead), count=len(ahead), hours=f"{cfg['cancel_warn_hours']:g}"
+                    )
+                    slack.post(slack.channel(member), text)
+                    for j in ahead:
                         j["state"]["warned"] = now
-                except (RuntimeError, OSError) as e:
-                    failures.append(f"warning {j['user']} of {j['label']}: {e}")
+            except (RuntimeError, OSError) as e:
+                failures.append(f"warning {user}: {e}")
+        cancelled = []
+        for j in report["idle"]:
             # Only once the owner was told, and warned, in an earlier run: a lost state
             # file or a failed message never turns into a cancel without warning.
             told = j["state"]["notified"]
             warned = j["state"].get("warned") if warn else told
-            if told is None or told >= now or warned is None or warned >= now or idle < limit:
+            if (
+                told is None
+                or told >= now
+                or warned is None
+                or warned >= now
+                or now - j["state"]["since"] < limit
+            ):
                 continue
             try:
                 run("scancel", j["id"])
@@ -729,18 +768,13 @@ def act(report, cfg, who, slack, cache, now):
             except Failed as e:
                 failures.append(f"scancel {j['id']}: {e}")
         if cancelled:
-            slack.post(
-                channel,
-                "Idle jobs cancelled",
-                sections(
-                    "\n".join(
-                        f":no_entry: {who(j['user'], bool(cfg['notify']))}  `{j['label']}` was cancelled after "
-                        f"{cfg['cancel_after_hours']:g}h with idle GPUs"
-                        for j in cancelled
-                    )
-                ),
-                thread_ts=ts,
-            )
+            lines = [
+                f":no_entry: {who(user, bool(cfg['notify']))}  "
+                + ", ".join(f"`{j['label']}`" for j in jobs)
+                + f" cancelled after {cfg['cancel_after_hours']:g}h with idle GPUs"
+                for user, jobs in by_owner(cancelled).items()
+            ]
+            slack.post(channel, "Idle jobs cancelled", sections("\n".join(lines)), thread_ts=ts)
     if failures:
         raise RuntimeError("; ".join(failures))
 

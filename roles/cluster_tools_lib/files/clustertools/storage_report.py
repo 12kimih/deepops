@@ -3,7 +3,7 @@
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
     (text, blocks), thread = render(data, who, top, people, mention)
     over_warn(data)                        -> the people past a warn level, with figures
-    due(rows, told, now, repeat_days)      -> those of them to tell this run
+    row_key(row)                           -> the key of a person's notices (clustertools.notices)
 
 For each filesystem whose users' space is counted (roles/disk_quota, its textfile
 metrics), the disk: how full, how much is free and how that changed in a day; its
@@ -26,8 +26,8 @@ from .slack import MAX_BLOCKS, bar, sections, table
 DAY = 86400
 # When a host's usage is older than this, the report says so (the alert fires at an hour).
 STALE = 3600
-# A daily timer runs a little earlier or later each day: a notice due every N days is
-# sent up to this much early, so a weekly one never slips to the eighth day.
+# A daily timer runs a little earlier or later each day: a notice due every N days may
+# go this much early (clustertools.notices), so a weekly one never slips to the eighth day.
 LEEWAY = 3600
 HOW = "`quota -s` on the host shows your own usage there."
 
@@ -126,24 +126,6 @@ def over_warn(data):
 def row_key(row):
     """A row of over_warn's key in the notices' record: "host filesystem user"."""
     return " ".join(row[:3])
-
-
-def due(rows, told, now, repeat_days):
-    """The ROWS (over_warn) whose person is told this run, by TOLD ({key: {"kind",
-    "at"}}: the last notice each got): a first crossing at once, a hard limit every run,
-    the same warn level again every REPEAT_DAYS (0: every run). Someone no longer past a
-    level leaves TOLD, so passing it again is a first crossing; the caller records a
-    notice once it reached them."""
-    current = {row_key(r): r for r in rows}
-    for key in set(told) - set(current):
-        del told[key]
-    out = []
-    for key, row in current.items():
-        last = told.get(key)
-        hard = row[4][0][3] == "hard"
-        if not isinstance(last, dict) or hard or now - last.get("at", 0) >= repeat_days * DAY - LEEWAY:
-            out.append(row)
-    return out
 
 
 def where(host, filesystem):

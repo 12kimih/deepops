@@ -10,7 +10,8 @@ there runs only the services the host offers (below).
 Features today: scratch allocations (`/scratch`, see [scratch-alloc.md](scratch-alloc.md)):
 ask, extend, resize and release from a form; requests within the automatic limits are
 applied at once, larger ones wait for an administrator's button in the admin channel;
-owners get a DM `cluster_bot_scratch_remind_days` before an allocation ends, with an extend button.
+owners get a DM `cluster_bot_scratch_remind_days` before an allocation ends (14, 7 and 1
+days by default, `cluster_bot_remind_days`), with an extend button.
 
 Account requests (`/join`, `/leave`): a newcomer gives a login, a name, a team (the
 accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH
@@ -22,11 +23,14 @@ administrator merges it and runs `slurm-cluster.yml --tags people`; the roster s
 only source of accounts.
 
 Before a person's last day (`ends` in the roster) the bot DMs them
-`cluster_bot_leave_remind_days` before (30, 14, 7 and 1 days by default): new jobs stop
-after that day, login stops `people_leave_grace_days` later, so files are to be moved
-before then. The dates come from the roster as deployed (`people_leaving` in
-`plugins/filter/people.py`, the same derivation the accounts apply), so a changed `ends`
-reaches the bot with the next `--tags people` run and its countdown starts over.
+`cluster_bot_leave_remind_days` before (14, 7 and 1 days by default, the same
+`cluster_bot_remind_days`): new jobs stop after that day, login stops
+`people_leave_grace_days` later, so files are to be moved before then. The dates come from
+the roster as deployed (`people_leaving` in `plugins/filter/people.py`, the same
+derivation the accounts apply), so a changed `ends` reaches the bot with the next `--tags
+people` run and its countdown starts over. A stage the deadline was already inside when
+the bot first saw it is skipped (an allocation made for ten days gets no 14-day reminder;
+a bot started late does not catch up), except the last, which is always sent.
 
 Unban requests (`/unban-request`): someone whose address fail2ban banned (bans are for
 good, `roles/fail2ban`) gives the address and what happened. The bot checks the address
