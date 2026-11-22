@@ -11,6 +11,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import in_tree  # noqa: E402
+from repo_scan import tracked  # noqa: E402
 
 mod = in_tree.load("roles/stale_files/library/stale_files.py")
 pf = sys.modules["ansible.module_utils.package_files"]
@@ -145,6 +146,17 @@ class Evidence(unittest.TestCase):
         mod.remove(self.put("perl/5.38.2/auto/Slurm/Slurm.so"), (str(self.tmp / "perl/5.38.2"),))
         self.assertFalse((self.tmp / "perl/5.38.2/auto").exists())
         self.assertTrue((self.tmp / "perl/5.38.2").is_dir())
+
+    def test_every_host_rule_list_is_written_once(self):
+        # The Slurm hosts' report assembled the host rules itself and left the site's out,
+        # so a site rule (a hand-installed tree) never showed in a report there.
+        spelled = [
+            str(p.relative_to(ROOT))
+            for p in tracked("roles/*/tasks/*.yml", "roles/*/defaults/*.yml")
+            if "stale_files_host_rules +" in p.read_text() or "+ stale_files_site_rules" in p.read_text()
+        ]
+        self.assertEqual(spelled, ["roles/stale_files/defaults/main.yml"])
+        self.assertIn("stale_files_default_rules", (ROOT / "roles/slurm/tasks/stale-files.yml").read_text())
 
     def test_a_script_rule_without_names_is_refused(self):
         with self.assertRaises(ValueError):
