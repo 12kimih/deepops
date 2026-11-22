@@ -1,5 +1,5 @@
-# {{ ansible_managed }}
-PATH=/sbin:/usr/sbin:/bin:/usr/bin:{{ slurm_install_prefix }}/bin
+# Managed by roles/nhc ({{ ansible_managed }}).
+PATH={{ ['/sbin', '/usr/sbin', '/bin', '/usr/bin', slurm_install_prefix ~ '/bin'] | unique | join(':') }}
 NHC_RM=slurm
 SLURM_SINFO={{ slurm_install_prefix }}/bin/sinfo
 SLURM_SCONTROL={{ slurm_install_prefix }}/bin/scontrol

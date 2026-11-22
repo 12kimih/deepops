@@ -5,3 +5,19 @@ nhc_items:
   - "file:{{ nhc_config_dir }}/nhc/scripts/deepops.nhc"
   - "file:{{ nhc_config_dir }}/nhc/nhc.conf"
   - "file:{{ nhc_sysconfig_dir }}/nhc"
+
+# What an NHC `make install` from before roles/source_build left, which no manifest
+# lists: NHC's own names under the paths nhc_configure gives it. Removed only where NHC is
+# absent (absent.yml), after the build's manifest and the record took theirs; nothing a
+# package owns is touched (roles/stale_files).
+nhc_stale_files_rules:
+  - name: NHC installed before its build kept a manifest
+    type: glob
+    globs:
+      - "{{ nhc_install_dir }}/sbin/nhc"
+      - "{{ nhc_install_dir }}/sbin/nhc-genconf"
+      - "{{ nhc_install_dir }}/sbin/nhc-wrapper"
+      - "{{ nhc_libexec_dir }}/nhc"
+      - "{{ nhc_config_dir }}/nhc"
+      - "{{ nhc_config_dir }}/logrotate.d/nhc"
+      - "{{ nhc_sysconfig_dir }}/nhc"

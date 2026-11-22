@@ -42,6 +42,12 @@ nhc_build_key: "nhc {{ nhc_version }}: {{ nhc_configure }}"
 # to check a filesystem DeepOps does not manage.
 nhc_check_mounts: "{{ nfs_mounts | default([]) | map(attribute='mountpoint') | list }}"
 
+# Network interfaces NHC asserts are up (check_hw_eth), by name: none by default, since
+# which links a node needs is the site's to say. The template once listed every
+# interface it found, commented out, Docker's bridges and veths included: they come and
+# go with containers, so the file changed on every run.
+nhc_check_interfaces: []
+
 # Local directories whose filesystem drains the node when nearly full (less than
 # nhc_min_free of its space or inodes left): a job filling its /tmp (slurm_job_private_dirs)
 # fills the disk below it, and with it slurmd's spool and the logs. Each is checked on

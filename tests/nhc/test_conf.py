@@ -60,6 +60,18 @@ class NhcConf(unittest.TestCase):
         cpu = conf("debian.yml", "Debian")
         self.assertNotIn("check_nv_", cpu)
 
+    def test_the_file_does_not_follow_the_interfaces_up_now(self):
+        """Docker's bridges and veths come and go with containers: listing what is up now
+        changed nhc.conf on every run. Only nhc_check_interfaces is checked."""
+        churn = {**FACTS, "interfaces": ["lo", "eth0", "br-1a2b", "veth9c8d", "docker0"]}
+        self.assertEqual(
+            conf("debian.yml", "Debian"),
+            conf("debian.yml", "Debian", ansible_facts={**churn, "os_family": "Debian"}),
+        )
+        self.assertNotIn("check_hw_eth", conf("debian.yml", "Debian"))
+        text = conf("debian.yml", "Debian", nhc_check_interfaces=["eth0", "ib0"])
+        self.assertIn(" node1 || check_hw_eth eth0\n node1 || check_hw_eth ib0\n", text)
+
     def test_each_gpu_check_turns_off(self):
         text = conf("debian.yml", "Debian", gpus=8, nhc_gpu_drain_xids=[], nhc_gpu_check_remapped_rows=False)
         self.assertNotIn("check_nv_xid", text)
