@@ -1,0 +1,39 @@
+#!/bin/sh
+# {{ ansible_managed }} (roles/bmc, bmc_cold_reboot).
+# systemd-shutdown runs this last, the root filesystem read-only, with the verb: reboot,
+# poweroff, halt or kexec. On a reboot it asks this host's own BMC, in-band (the IPMI
+# device, no password), to power-cycle the chassis with the power off for
+# {{ bmc_cold_reboot_off_seconds }} s: this host's hardware comes back whole only from a cold start
+# with a real off time (the BMC's own interval, about a second, was too short for its
+# risers). Every clean reboot is covered (Slurm's RebootProgram, the maintenance
+# playbooks, a plain reboot); a kernel panic's restart is not.
+#
+# Its evidence outlives the power cut: an OEM entry in the BMC's event log
+# (`ipmitool sel elist`: "OEM record e0" with 646565706f70732d636f6c64, "deepops-cold")
+# says the hook ran and reached the BMC; the console (SOL) shows each step. If the BMC
+# does not answer, the warm reboot goes on and NHC drains the node for its missing devices.
+PATH=${BMC_COLD_REBOOT_PATH:-/usr/sbin:/usr/bin:/sbin:/bin}
+export PATH  # explicit, whatever the caller passes; timeout runs ipmitool through it
+log() {
+    echo "bmc-cold-reboot: $*" 2>/dev/null >/dev/kmsg || true
+    echo "bmc-cold-reboot: $*" 2>/dev/null >/dev/console || true
+}
+ipmi() { timeout 10 ipmitool -I open "$@"; }
+[ "$1" = reboot ] || exit 0
+device=${BMC_COLD_REBOOT_DEVICE:-/dev/ipmi0}
+if [ ! -c "$device" ]; then
+    log "no $device: this stays a warm reboot"
+    exit 0
+fi
+# IPMI Set Power Cycle Interval (chassis, 0Bh): the seconds the power stays off.
+ipmi raw 0x00 0x0b {{ '0x%02x' | format(bmc_cold_reboot_off_seconds | int) }} >/dev/null 2>&1 || log "the BMC refused the power cycle interval; it keeps its own"
+# IPMI Add SEL Entry (storage, 44h): an OEM non-timestamped record, "deepops-cold".
+ipmi raw 0x0a 0x44 0x00 0x00 0xe0 0x64 0x65 0x65 0x70 0x6f 0x70 0x73 0x2d 0x63 0x6f 0x6c 0x64 0x00 >/dev/null 2>&1 || log "the BMC did not record the event"
+if ! ipmi chassis power cycle; then
+    log "the BMC did not answer: this stays a warm reboot"
+    exit 0
+fi
+log "the BMC power-cycles the chassis, off for {{ bmc_cold_reboot_off_seconds }} s"
+# The BMC cuts the power within seconds; the warm reboot waits for it until then, inside
+# systemd-shutdown's 90 s limit for a hook.
+sleep "${BMC_COLD_REBOOT_WAIT:-45}"

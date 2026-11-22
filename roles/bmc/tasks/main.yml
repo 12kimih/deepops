@@ -44,8 +44,8 @@
     - bmc
 
 - name: Install the cold reboot hook
-  ansible.builtin.copy:
-    src: bmc-cold-reboot
+  ansible.builtin.template:
+    src: bmc-cold-reboot.j2
     dest: "{{ bmc_cold_reboot_hook }}"
     owner: root
     group: root

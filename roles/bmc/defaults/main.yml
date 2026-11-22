@@ -54,6 +54,10 @@ bmc_power_undrained: false
 # RebootProgram, the maintenance playbooks and a plain reboot all shut down cleanly first.
 # Per host in host_vars; false removes the hook.
 bmc_cold_reboot: false
+# How long the power stays off in that cycle (IPMI Set Power Cycle Interval, 1-255 s):
+# the BMC's own default, about a second, did not bring a riser's GPUs back; 80 s by
+# hand did (gpu-class server, 2026-11-23).
+bmc_cold_reboot_off_seconds: 30
 
 # RMCP+ cipher suite for out-of-band sessions. Pinned rather than negotiated: ipmitool
 # asks for the strongest suite it knows, and a BMC that does not offer it answers
