@@ -114,6 +114,9 @@
 28. A tempfile task sets check_mode: false, and so does the task removing what it made:
    tempfile is skipped under --check, so every later task naming its .path failed the
    preview (helm_release's authenticated install, 2026-11). Scratch is not a host change.
+29. A kernel module is loaded at boot through roles/kernel_modules, never modprobe's
+   persistent: that wrote /etc/modules-load.d with no diff, and the BMC role and the
+   IPMI exporter each wrote the same file, so removing the exporter took the BMC's.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -1031,6 +1034,16 @@ class TaskRules(unittest.TestCase):
                         offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertGreaterEqual(seen, 4, "the scan finds the tempfile tasks and their removals")
         self.assertEqual(offenders, [], "set check_mode: false (rule 28)")
+        scan.check(self)
+
+    def test_kernel_modules_load_at_boot_one_way(self):
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if name == "modprobe" and "persistent" in args:
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "include roles/kernel_modules (rule 29)")
         scan.check(self)
 
     def test_modules_run_commands_bounded(self):

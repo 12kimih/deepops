@@ -124,6 +124,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── job_scratch
 │   ├── k8s-internal-container-registry
 │   ├── kerberos_client
+│   ├── kernel_modules
 │   ├── ldap_server
 │   ├── lmod
 │   ├── local_accounts
