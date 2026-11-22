@@ -10,6 +10,7 @@ that already matches does nothing; removal takes the quotas back. No real comman
 
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
@@ -39,7 +40,7 @@ class FakeHost:
         )
         self.project_ids = dict(project_ids or {})
         self.exist = {"/aquota.user"} if quota_file else set()
-        self.ran, self.removed = [], []
+        self.ran, self.removed, self.scanned = [], [], []
 
     def read(self, path):
         return self.files[path]
@@ -54,7 +55,11 @@ class FakeHost:
         self.ran.append(["xfs_quota", "-x", "-c", cmd, mount])
         return self.xfs_report if cmd.startswith("quota ") else ""
 
-    def run(self, argv, check=True):
+    def scan(self, argv):
+        self.scanned.append(argv)
+        return self.run(argv)
+
+    def run(self, argv, check=True, timeout=None):
         self.ran.append(argv)
         if argv[0] == "tune2fs":
             return (
@@ -145,6 +150,16 @@ class Apply(unittest.TestCase):
             ["quotacheck -cum /", "quotaon -u /", f"setquota -u alice 0 {20 * GB} 0 500000 /"],
         )
         self.assertFalse([a for a in host.ran if a[:2] == ["setquota", "-t"]], "no grace period is ever set")
+        run(host, CFG)
+        self.assertEqual(host.scanned, [["quotacheck", "-cum", "/"]], "the whole-filesystem read")
+
+    def test_a_scan_runs_at_idle_priority_for_up_to_a_day(self):
+        with mock.patch.object(dq.proc, "run") as run:
+            run.return_value.stdout = ""
+            dq.Host().scan(["quotacheck", "-cum", "/home"])
+        argv, kwargs = run.call_args
+        self.assertEqual(argv[0], dq.IDLE + ["quotacheck", "-cum", "/home"])
+        self.assertEqual(kwargs["timeout"], dq.SCAN_TIMEOUT)
 
     def test_a_mount_without_its_quota_options_is_refused_naming_them(self):
         with self.assertRaisesRegex(
@@ -222,7 +237,7 @@ class Projects(unittest.TestCase):
             ],
         )
         run(host, {"projects": PROJECT, **LEVELS})
-        self.assertIn(["chattr", "-R", "-p", "101", "+P", "/home/shared/datasets"], host.ran)
+        self.assertIn(["chattr", "-R", "-p", "101", "+P", "/home/shared/datasets"], host.scanned)
         self.assertIn(["setquota", "-P", "101", "0", str(20 * TB), "0", "0", "/home"], host.ran)
 
     def test_a_project_that_matches_needs_nothing(self):
@@ -262,7 +277,7 @@ class Projects(unittest.TestCase):
         )
         run(host, {"projects": PROJECT}, "remove")
         self.assertIn(["setquota", "-P", "101", "0", "0", "0", "0", "/home"], host.ran)
-        self.assertFalse([a for a in host.ran if a[0] == "chattr"])
+        self.assertFalse(host.scanned)
 
 
 class Remove(unittest.TestCase):

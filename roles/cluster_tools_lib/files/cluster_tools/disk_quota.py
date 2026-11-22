@@ -66,7 +66,12 @@ QUOTA_FILE = "aquota.user"
 PROJECT_OPTIONS = {"ext4": ("prjquota",), "xfs": ("prjquota", "pquota", "pqnoenforce")}
 _UNITS = {"": 1, "K": 1, "M": 1024, "G": 1024**2, "T": 1024**3}
 _INODE_UNITS = {"": 1, "k": 10**3, "m": 10**6, "g": 10**9, "t": 10**12}
-TIMEOUT = 600  # quotacheck and chattr -R read a whole filesystem or tree
+TIMEOUT = 600
+# quotacheck and chattr -R read every inode of a filesystem or tree: hours for hundreds
+# of millions of files (a home server), so they get a day, and run at idle I/O and CPU
+# priority, after what people are doing.
+SCAN_TIMEOUT = 86400
+IDLE = ["ionice", "-c", "3", "nice", "-n", "19"]
 
 
 class Error(Exception):
@@ -176,8 +181,12 @@ class Host:
     def exists(self, path):
         return os.path.exists(path)
 
-    def run(self, argv, check=True):
-        return proc.run(argv, timeout=TIMEOUT, capture_output=True, text=True, check=check).stdout
+    def run(self, argv, check=True, timeout=TIMEOUT):
+        return proc.run(argv, timeout=timeout, capture_output=True, text=True, check=check).stdout
+
+    def scan(self, argv):
+        """ARGV, a command that reads a whole filesystem or tree: idle priority, a day."""
+        return self.run(IDLE + list(argv), timeout=SCAN_TIMEOUT)
 
     def xfs_quota(self, mount, cmd):
         return self.run(["xfs_quota", "-x", "-c", cmd, mount])
@@ -229,7 +238,7 @@ def filesystem_steps(host, mount, cfg):
     quota_file = os.path.join(mount, QUOTA_FILE)
     if not feature and not host.exists(quota_file):
         check = ["quotacheck", "-cum", mount]
-        steps.append((" ".join(check), lambda: host.run(check)))
+        steps.append((" ".join(check), lambda: host.scan(check)))
     # quotaon on a filesystem whose quotas are on already fails: asked only when off.
     if steps or not re.search(r"\bis on\b", host.run(["quotaon", "-pu", mount], check=False)):
         on = ["quotaon", "-u", mount]
@@ -278,7 +287,7 @@ def project_set(host, mount, path, pid):
     if require_project_quota(host, mount) == "xfs":
         host.xfs_quota(mount, f"project -s -p {path} {pid}")
     else:
-        host.run(["chattr", "-R", "-p", str(pid), "+P", path])
+        host.scan(["chattr", "-R", "-p", str(pid), "+P", path])
 
 
 def project_limit(host, mount, pid, hard_bytes, warn_bytes=0):
