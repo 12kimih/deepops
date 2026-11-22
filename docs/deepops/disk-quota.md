@@ -12,12 +12,20 @@ lists its filesystems in `disk_quota_filesystems`, each with its own limits (def
 
 | Level | Settings | What happens past it |
 |---|---|---|
-| warn | `block_warn`, `inode_warn` | Nothing is refused. The level is exported with the usage; an alert names who is past it, and the people's notices (Slack) read it. |
 | hard | `block_hard`, `inode_hard` | The kernel refuses the write at once. The only limit enforced. |
+| warn | `cluster_user_warn_fraction` (0.9) of each hard limit | Nothing is refused. The level is exported with the usage; an alert names who is past it, and the people's notices (Slack) read it. |
 
-The warn level is never set in the kernel: its soft limit stays 0, so there is no grace
-period that turns into a refusal days later. Choose the hard limit to protect the
-filesystem, and the warn level (say 75 to 80% of it) to tell people in time.
+A limit is set by its hard limits alone; every warn level is the one fraction of its hard
+limit, the same fraction every personal warning on the cluster uses, so the two never
+drift. The
+warn level is never set in the kernel: its soft limit stays 0, so there is no grace
+period that turns into a refusal days later.
+
+The file count follows the space: where a limit names no `inode_hard`, it is
+`block_hard`'s TiB times `disk_quota_inodes_per_tib` (0 by default: none). Millions of
+small files slow the file server's metadata for everyone, and every scan and backup of
+it, whatever space they take; at 3000000 per TiB a full quota's files average a third
+of a MiB, which datasets in archive formats (tar, WebDataset, HDF5, Arrow) pass easily.
 
 ## Who is limited
 
@@ -30,13 +38,13 @@ filesystem from the roster over them:
 ```yaml
 # group_vars: the site's limits per filesystem (setquota sizes: K, M, G, T; inodes: k, m, g, t)
 disk_quota_filesystems:
-  /: {block_warn: 15G, block_hard: 20G, inode_warn: 400k, inode_hard: 500k}
-  /home: {block_warn: 8T, block_hard: 10T}
+  /: {block_hard: 20G, inode_hard: 500k}
+  /home: {block_hard: 10T}          # 30m files with disk_quota_inodes_per_tib: 3000000
 # people.yml: one person's own, on one filesystem
 people:
   alice:
     disk_quota:
-      /home: {block_warn: 15T, block_hard: 20T}
+      /home: {block_hard: 20T}
 ```
 
 Someone who leaves the roster loses their limits; their files stay.
@@ -47,7 +55,7 @@ Someone who leaves the roster loses their limits; their files stay.
 
 ```yaml
 disk_quota_projects:
-  /home/shared/datasets: {id: 101, block_warn: 15T, block_hard: 20T}
+  /home/shared/datasets: {id: 101, block_hard: 20T}
 ```
 
 Each id is unique on its filesystem. The tree is marked with it (new files inherit it);

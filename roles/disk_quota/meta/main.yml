@@ -4,6 +4,7 @@ dependencies:
   - role: cluster_tools_lib  # cluster_tools.disk_quota
   - role: prometheus_paths  # node_exporter_prom_dir
   - role: people_defaults  # people
+  - role: deploy_defaults  # cluster_user_warn_fraction
 
 galaxy_info:
   namespace: deepops

@@ -45,4 +45,4 @@ groups:
           summary: "{{ $labels.project }} on {{ $labels.host }} is past its warn level"
           description: >-
             Nothing is refused yet: only the hard limit stops writes. Free space there,
-            or raise its block_hard and block_warn in disk_quota_projects.
+            or raise its block_hard in disk_quota_projects.

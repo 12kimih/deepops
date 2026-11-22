@@ -37,9 +37,12 @@ class Config(unittest.TestCase):
         self.assertNotIn("grace_days", cfg, "a warn level only notifies: no grace period to set")
         self.assertEqual(cfg["projects"], {})
         self.assertTrue(cfg["textfile"].endswith("/disk-quota.prom"))
+        self.assertEqual(
+            (cfg["warn_fraction"], cfg["inodes_per_tib"]), (0.9, 0), "the cluster's one fraction"
+        )
 
     def test_site_limits_reach_every_active_person(self):
-        cfg = config(disk_quota_filesystems={"/": {"block_warn": "10G", "block_hard": "20G"}})
+        cfg = config(disk_quota_filesystems={"/": {"block_hard": "20G"}})
         self.assertEqual(sorted(cfg["filesystems"]["/"]), ["alice", "bob", "dave"])
         self.assertEqual(cfg["filesystems"]["/"]["alice"]["block_hard"], "100G")
 

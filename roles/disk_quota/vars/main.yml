@@ -9,6 +9,8 @@ _disk_quota_cfg:
   # Everyone the roster names: where a filesystem no longer limits them (left, or
   # limited no longer), what they had there is lifted.
   release: "{{ _disk_quota_roster | list | sort }}"
+  warn_fraction: "{{ cluster_user_warn_fraction | float }}"
+  inodes_per_tib: "{{ disk_quota_inodes_per_tib | int }}"
   projects: "{{ disk_quota_projects | project_filesystems(ansible_facts.mounts) }}"
   textfile: "{{ _disk_quota_textfile }}"
 

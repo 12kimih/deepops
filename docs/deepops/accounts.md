@@ -54,7 +54,7 @@ Under groups, netgroups and services, anything the roster does not declare is re
 People are never removed. An account the roster does not list stops the run, so the
 roster gains it as `status: left`.
 Someone leaving has `ends:` (their last day) and keeps logging in for
-`people_leave_grace_days` (30) more days: the entry's `shadowExpire` and the local
+`people_leave_grace_days` (60, `cluster_user_stale_days`) more days: the entry's `shadowExpire` and the local
 account's expiry are that day, both from `people_login_ends` (one derivation,
 `people_login_expires` in plugins/filter/people.py), so login stops then without a deploy.
 Slurm stops earlier, the day after `ends`, also without a deploy: with
@@ -63,7 +63,7 @@ Slurm stops earlier, the day after `ends`, also without a deploy: with
 The next deploy then deletes their Slurm associations (`slurm_accounting_revoke`, from
 `people_former`: left, or past `ends`), whatever `slurm_accounting_prune` says. Their
 container image stores age out unused (`container_storage_gc`). Their files stay for
-`people_leave_keep_days` (90) after `ends`; removing them is an administrator's step
+`people_leave_keep_days` (60, `cluster_user_stale_days`) after `ends`; removing them is an administrator's step
 (`playbooks/utilities/people-purge.yml`), which the alert `PeopleFilesDue` asks for:
 each deploy publishes when every such directory falls due, on the host where it is
 (`people_purge_due_timestamp_seconds`), so the day passing needs no deploy.

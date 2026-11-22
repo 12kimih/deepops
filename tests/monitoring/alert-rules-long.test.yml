@@ -320,4 +320,4 @@ tests:
           - exp_labels: {severity: info, host: nfs, instance: "nfs:9100", filesystem: /home, project: /home/shared/datasets, project_id: "101"}
             exp_annotations:
               summary: "/home/shared/datasets on nfs is past its warn level"
-              description: "Nothing is refused yet: only the hard limit stops writes. Free space there, or raise its block_hard and block_warn in disk_quota_projects."
+              description: "Nothing is refused yet: only the hard limit stops writes. Free space there, or raise its block_hard in disk_quota_projects."
