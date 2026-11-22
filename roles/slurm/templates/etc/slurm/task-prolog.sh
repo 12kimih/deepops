@@ -5,7 +5,7 @@
 # skipped: a task prolog that fails cancels the task.
 # https://slurm.schedmd.com/prolog_epilog.html
 # The task's PATH is the user's; the parts get the system's.
-export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH={{ deepops_system_path }}
 for part in '{{ slurm_config_dir }}'/task-prolog.d/*; do
     [ -x "$part" ] || continue
     timeout 10 "$part" 2>/dev/null | grep -E '^(export [A-Za-z_][A-Za-z0-9_]*=|unset [A-Za-z_][A-Za-z0-9_]*$)' || :

@@ -7,6 +7,11 @@ deepops_dir: /opt/deepops
 # builds, which a run may recreate). Every role names them through these.
 deepops_state_dir: /var/lib/deepops
 deepops_cache_dir: /var/cache/deepops
+# The command search path of a script a daemon runs with little or no environment
+# (slurmd's prolog and epilog, systemd-shutdown's hooks): set and exported by the script,
+# so a program it runs through timeout, xargs or env is found in sbin too (glibc's own
+# fallback is /bin:/usr/bin only).
+deepops_system_path: /usr/sbin:/usr/bin:/sbin:/bin
 # Where each role's kernel settings go, the role's name and .conf after it
 # (roles/host_baseline tasks_from: sysctl). systemd-sysctl applies the files of
 # /etc/sysctl.d, /run/sysctl.d and /usr/lib/sysctl.d in name order and the last

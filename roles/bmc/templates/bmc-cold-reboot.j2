@@ -12,7 +12,7 @@
 # (`ipmitool sel elist`: "OEM record e0" with 646565706f70732d636f6c64, "deepops-cold")
 # says the hook ran and reached the BMC; the console (SOL) shows each step. If the BMC
 # does not answer, the warm reboot goes on and NHC drains the node for its missing devices.
-PATH=${BMC_COLD_REBOOT_PATH:-/usr/sbin:/usr/bin:/sbin:/bin}
+PATH=${BMC_COLD_REBOOT_PATH:-{{ deepops_system_path }}}
 export PATH  # explicit, whatever the caller passes; timeout runs ipmitool through it
 log() {
     echo "bmc-cold-reboot: $*" 2>/dev/null >/dev/kmsg || true

@@ -51,6 +51,7 @@ VARS = role_defaults(
     "slurm_user_runtime_root",
     "slurm_log_files",
     "slurm_job_private_dirs",
+    "deepops_system_path",
 )
 
 SCOPES = ("job", "user")
