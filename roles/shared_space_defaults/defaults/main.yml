@@ -1,0 +1,23 @@
+---
+# The shared space, named once for every role that reads it: roles/shared_space (the
+# directories on the home server), the directory roles (the projects' groups, through
+# roles/directory_defaults) and roles/cluster_bot (project requests and notices).
+# docs/slurm-cluster/shared-space.md.
+
+# The service account (roles/system_accounts) whose home the shared space is, and that
+# alone writes the shared data: /home/shared for the account shared.
+shared_space_writer: shared
+shared_space_root: "{{ system_accounts[shared_space_writer].home }}"
+# The shared data's directories under the root, the writer's alone to write.
+shared_space_data: [datasets, models, containers]
+
+# Collaboration folders (<shared_space_root>/projects/<name>): the people roster's
+# `projects` (checked with the roster, edited by the cluster bot's project requests), each
+# {gid, read_gid, owners, members, viewers, purpose}: group <name> for its owners and
+# members (read and write), group <name>-read for its viewers (read).
+#
+#   shared_projects: "{{ people_roster.projects | default({}) }}"
+shared_projects: {}
+# Where a new project's two GIDs are looked for (the bot's project requests): the lowest
+# free from here, never a person's UID or another group's.
+shared_projects_gid_min: 50000

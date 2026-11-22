@@ -54,6 +54,14 @@ _cluster_bot_cfg:
   leave:
     remind_days: "{{ cluster_bot_leave_remind_days }}"
     leaving: "{{ people | people_leaving(people_leave_grace_days) }}"
+  # Collaboration folders (roles/shared_space): the projects as deployed (the Home tab, and
+  # whom to tell of a change), and what a new project's GIDs avoid.
+  projects:
+    deployed: "{{ shared_projects }}"
+    root: "{{ shared_space_root }}/projects"
+    gid_min: "{{ shared_projects_gid_min | int }}"
+    reserved_gids: "{{ directory_groups | map(attribute='gid') | map('int') | list }}"
+    seen: "{{ _cluster_bot_home }}/projects-seen.json"
 
 # What this component installs, for its record (roles/component_record). The bot's state
 # files and key in its home stay (data).

@@ -13,3 +13,4 @@ galaxy_info:
       versions: ["8", "9"]
 dependencies:
   - role: deploy_defaults  # directory_service, ldap_suffix, nis_domain
+  - role: shared_space_defaults  # shared_projects, whose groups join directory_groups_all

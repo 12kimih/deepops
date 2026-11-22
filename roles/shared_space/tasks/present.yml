@@ -54,19 +54,29 @@
     mode: "2770"
   loop: "{{ shared_projects | list | sort }}"
 
-# Default ACLs: a member's new file or directory is the group's to change too, whatever
-# their umask, and nobody else's to read.
-- name: Give every member write access to what any member adds
+# ACLs: whatever a member adds is the project group's to change too, whatever their
+# umask (default entries); the viewers' group <name>-read reads the folder and everything
+# in it (access and default entries); nobody else reads. Roles are group memberships, so
+# a role change never touches a file.
+- name: Give the members write and the viewers read access to everything in the folder
   ansible.posix.acl:
     path: "{{ shared_space_root }}/projects/{{ item.0 }}"
-    default: true
+    default: "{{ item.1.default }}"
     etype: "{{ item.1.etype }}"
+    entity: "{{ (item.0 ~ '-read') if item.1.etype == 'group' and item.1.read else omit }}"
     permissions: "{{ item.1.permissions }}"
     state: present
-  loop: "{{ shared_projects | list | sort | product([{'etype': 'user', 'permissions': 'rwx'}, {'etype': 'group', 'permissions': 'rwx'},
-            {'etype': 'mask', 'permissions': 'rwx'}, {'etype': 'other', 'permissions': '---'}]) | list }}"
+  loop: "{{ shared_projects | list | sort | product(_shared_space_acl) | list }}"
   loop_control:
-    label: "{{ item.0 }} default:{{ item.1.etype }}:{{ item.1.permissions }}"
+    label: "{{ item.0 }} {{ 'default:' if item.1.default else '' }}{{ item.1.etype }}:{{ (item.0 ~ '-read') if item.1.read else '' }}:{{ item.1.permissions }}"
+  vars:
+    _shared_space_acl:
+      - {default: true, etype: user, read: false, permissions: rwx}
+      - {default: true, etype: group, read: false, permissions: rwx}
+      - {default: true, etype: group, read: true, permissions: r-x}
+      - {default: true, etype: mask, read: false, permissions: rwx}
+      - {default: true, etype: other, read: false, permissions: "---"}
+      - {default: false, etype: group, read: true, permissions: r-x}
 
 - name: Find the collaboration folders on disk
   find_present:
@@ -74,12 +84,12 @@
     file_type: directory
   register: shared_space_found
 
-# Never removed: their files stay until an administrator moves them to the lead's home.
+# Never removed: their files stay until an administrator moves them to an owner's home.
 - name: List the folders no longer declared
   ansible.builtin.debug:
     msg: >-
       Not in shared_projects, kept with their files: {{ _undeclared | join(', ') }}. Move
-      each to its lead's home (or declare it again).
+      each to one of its owners' homes (or declare it again).
   vars:
     _undeclared: "{{ shared_space_found.files | map(attribute='path') | map('basename') | reject('in', shared_projects) | sort }}"
   when: _undeclared | length > 0

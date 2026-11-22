@@ -1,6 +1,7 @@
 ---
-# A person's UID or per-user GID must not be a service account's (roles/system_accounts).
-- name: Refuse roster IDs the service accounts use
+# A person's login, UID or per-user GID must not be a service account's
+# (roles/system_accounts): either would make the two one account.
+- name: Refuse roster names and IDs the service accounts use
   ansible.builtin.assert:
     that: (people | people_local_accounts | accounts_disjoint(system_accounts)) is mapping
     quiet: true

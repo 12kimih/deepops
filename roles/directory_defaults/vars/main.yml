@@ -1,4 +1,5 @@
 ---
 # Every cluster group the directory servers publish: the site's own (directory_groups)
-# and one per collaboration folder (shared_projects), declared once each.
-directory_groups_all: "{{ directory_groups + (shared_projects | shared_project_groups) }}"
+# and one per collaboration folder (shared_projects, the roster's projects), declared
+# once each.
+directory_groups_all: "{{ directory_groups + (shared_projects | people_project_groups) }}"

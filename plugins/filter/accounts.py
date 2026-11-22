@@ -67,12 +67,13 @@ def local_accounts_check(accounts, shell="/usr/sbin/nologin"):
 
 
 def overlap(first, second):
-    """The IDs (UID or GID, the group's ID defaulting to the UID) two mappings share."""
+    """What two mappings of accounts share: a name, or an ID (UID or GID, the group's ID
+    defaulting to the UID). Either one would make two accounts one."""
 
     def ids(accounts):
         return {n: {a["uid"], a.get("gid", a["uid"])} for n, a in (accounts or {}).items()}
 
-    found = []
+    found = [f"{name} is the name of both" for name in sorted(set(first or {}) & set(second or {}))]
     for name, mine in ids(first).items():
         for other, theirs in ids(second).items():
             found += [f"{name} and {other} both use ID {i}" for i in sorted(mine & theirs)]
@@ -80,10 +81,10 @@ def overlap(first, second):
 
 
 def accounts_disjoint(first, second):
-    """FIRST unchanged, or an error when it shares a UID or GID with SECOND."""
+    """FIRST unchanged, or an error when it shares a name, UID or GID with SECOND."""
     problems = overlap(first, second)
     if problems:
-        _fail("accounts share an ID", problems)
+        _fail("accounts share a name or an ID", problems)
     return first
 
 

@@ -36,6 +36,18 @@ several_accounts: [admin]
 # Names no person may have: the directories under the home root that are no one's home
 # (the shared space, roles/shared_space).
 reserved_logins: [shared]
+
+# Collaboration folders (roles/shared_space): group <name> for owners and members (read
+# and write), group <name>-read for viewers (read). Owners manage people and roles; the
+# cluster bot's project requests edit this (docs/slurm-cluster/shared-space.md).
+#projects:
+#  vision:
+#    gid: 50001
+#    read_gid: 50002
+#    owners: [alice]
+#    members: [bob]
+#    viewers: [dave]
+#    purpose: shared eval set
 people:
   alice:
     uid: 1001

@@ -1,7 +1,6 @@
 ---
 dependencies:
-  - role: people_defaults  # people_home_root
-  - role: directory_defaults  # shared_projects
+  - role: shared_space_defaults  # the layout, shared_projects
   - role: system_accounts  # the writer's account
 
 galaxy_info:

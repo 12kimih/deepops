@@ -23,6 +23,9 @@ features:
     - command: /unban-request
       description: "Ask to lift the ban on an address after failed logins"
       should_escape: false
+    - command: /project
+      description: "Start a collaboration folder (the Home tab manages yours)"
+      should_escape: false
 oauth_config:
   scopes:
     bot:

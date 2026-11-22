@@ -132,29 +132,5 @@ class Changes(unittest.TestCase):
         )
 
 
-class Projects(unittest.TestCase):
-    """shared_project_groups: a collaboration folder's group, from its one declaration."""
-
-    def test_one_group_per_project_with_its_members(self):
-        got = directory.shared_project_groups(
-            {"vision": {"gid": 5101, "members": ["alice", "bob"], "lead": "alice", "purpose": "eval set"}}
-        )
-        self.assertEqual(got, [{"name": "vision", "gid": 5101, "members": ["alice", "bob"]}])
-        self.assertEqual(directory.shared_project_groups({}), [])
-
-    def test_each_mistake_is_named(self):
-        from ansible.errors import AnsibleFilterError
-
-        for project, word in (
-            ({"gid": 500, "members": ["a"], "lead": "a"}, "gid"),
-            ({"gid": 5101, "members": [], "lead": "a"}, "members"),
-            ({"gid": 5101, "members": ["a"], "lead": "b"}, "lead"),
-        ):
-            with self.subTest(word=word), self.assertRaisesRegex(AnsibleFilterError, word):
-                directory.shared_project_groups({"p1": project})
-        with self.assertRaisesRegex(AnsibleFilterError, "lowercase"):
-            directory.shared_project_groups({"Bad_Name": {"gid": 5101, "members": ["a"], "lead": "a"}})
-
-
 if __name__ == "__main__":
     unittest.main()

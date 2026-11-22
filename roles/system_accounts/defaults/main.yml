@@ -40,9 +40,12 @@ system_accounts:
     home: /var/lib/clusterbot
     shell: /bin/sh
     comment: Cluster bot
-  # The one writer of the shared datasets, models and container images (roles/shared_space):
-  # what it stores counts to its own budget, not to a person's quota.
-  shareddata:
+  # The shared space (roles/shared_space) is this account's home, /home/<name> as for any
+  # login, and it alone writes the shared datasets, models and container images there:
+  # what it stores counts to its own budget, not a person's quota. The role makes the
+  # home (root's, so the account can rename nothing at its top).
+  shared:
     uid: 22082
-    home: /var/lib/shareddata
-    comment: Shared data writer
+    home: /home/shared
+    create_home: false
+    comment: Shared space

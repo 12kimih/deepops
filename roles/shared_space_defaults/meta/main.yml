@@ -1,0 +1,16 @@
+---
+dependencies:
+  - role: system_accounts  # the writer's account, whose home the shared space is
+
+galaxy_info:
+  namespace: deepops
+  role_name: shared_space_defaults
+  author: DeepOps
+  description: The shared space and its collaboration folders, named once
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

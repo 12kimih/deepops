@@ -247,6 +247,8 @@
 # people_check validates the roster wherever it is used.
 #people_roster: "{{ lookup('ansible.builtin.file', inventory_dir ~ '/people.yml') | from_yaml | people_check }}"  # example
 #people: "{{ people_roster.people }}"  # example
+# The roster's collaboration folders (roles/shared_space), one group each.
+#shared_projects: "{{ people_roster.projects | default({}) }}"  # example
 # Administrators: sudo on every node and SSH to compute nodes without a job.
 #cluster_admins: "{{ people | people_with_role('admin') }}"  # example
 # Service accounts (Slurm, its package builder, EasyBuild, ...) with UIDs and GIDs fixed on
@@ -274,10 +276,11 @@
 #    home: /var/lib/clusterbot
 #    shell: /bin/sh
 #    comment: Cluster bot
-#  shareddata:
+#  shared:
 #    uid: 22082
-#    home: /var/lib/shareddata
-#    comment: Shared data writer
+#    home: /home/shared
+#    create_home: false
+#    comment: Shared space
 
 ################################################################################
 # NVIDIA                                                                       #
@@ -519,12 +522,8 @@ docker_iptables_enabled: true
 #    members: "{{ people | people_with_role('docker') }}"
 #directory_groups_exclusive: true
 #
-# Collaboration folders (roles/shared_space): <shared space>/projects/<name>, one group
-# each, named as the project, published with the groups above. The lead asks for member
-# changes; files count to their writer's quota.
-#shared_projects: {}
-#shared_projects:  # example
-#  vision-benchmark: {gid: 5101, members: [alice, bob], lead: alice, purpose: shared eval set}
+# Collaboration folders (roles/shared_space) add one group each to these: the roster's
+# `projects` (shared_projects, set beside people above).
 #
 # Netgroups every directory publishes. Use these, not a group, for anything that must
 # give the same answer inside a Slurm job and over a direct SSH login: a netgroup is
