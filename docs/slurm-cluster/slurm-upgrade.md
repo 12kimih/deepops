@@ -202,7 +202,9 @@ each partition back as it was. Then it takes a backup, adds the new cluster to
 accounting, stops `slurmctld`, sets the old `clustername` file aside (kept as
 `clustername.<old name>.<time>`), deploys the controller under the new name (the
 accounting associations from `slurm_accounting_file` are created for it), and restarts
-`slurmd` and `sackd`, which fetch the new configuration. The restarted `slurmctld` takes
+`slurmd` and `sackd`, which fetch the new configuration, and checks that each node runs
+on it (its copy names the new cluster, and `slurmctld` holds each `slurmd`'s
+registration). The restarted `slurmctld` takes
 each partition's state from `slurm.conf` again (it starts without `-R`), so the drain
 ends with the rename. The old cluster's history stays in the database:
 `sacct -M <old name>`, `sreport -M <old name>` (`gpu-usage JOB` looks in every cluster).

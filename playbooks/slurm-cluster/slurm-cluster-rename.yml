@@ -14,7 +14,8 @@
 #   3. a backup now; the new cluster in accounting
 #   4. stop slurmctld, set the old clustername file aside, deploy the controller under
 #      the new name (slurm.conf, accounting associations from slurm_accounting_file)
-#   5. restart slurmd and sackd, which fetch the new configuration
+#   5. restart slurmd and sackd, which fetch the new configuration, and check that each
+#      node runs on it (roles/slurm/tasks/node_registered.yml)
 #
 #   ansible-playbook -K playbooks/slurm-cluster/slurm-cluster-rename.yml
 # See docs/slurm-cluster/slurm-upgrade.md (Renaming the cluster).
@@ -158,3 +159,9 @@
         name: sackd
         state: restarted
       when: not is_compute
+
+    - name: Check that each node runs on the new configuration
+      ansible.builtin.include_role:
+        name: slurm
+        public: true
+        tasks_from: node_registered

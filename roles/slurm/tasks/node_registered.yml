@@ -1,0 +1,39 @@
+---
+# The one check that a node's Slurm daemon came up with the controller's configuration,
+# after a start, a restart or a rename. A started unit proves only that the process
+# runs: slurmd that cannot reach slurmctld, or one whose MUNGE credential it refuses,
+# keeps running while the node stays NOT_RESPONDING and takes no job; sackd likewise
+# keeps running with no configuration to hand the commands.
+#   - both, off the controllers (which read their own files): the daemon's copy of the
+#     configuration (/run/slurm/conf), the one the node's commands and pam_slurm_adopt
+#     read, names slurm_cluster_name
+#   - slurmd: slurmctld has its registration (not NOT_RESPONDING) from slurm_version
+#   - sackd: the controllers answer this node's commands (scontrol ping)
+# NodeName is the inventory name (templates/etc/slurm/slurm.conf).
+- name: Check that the node runs on the controller's configuration
+  when: not ansible_check_mode
+  block:
+    - name: Wait for the daemon's copy of the configuration
+      ansible.builtin.wait_for:
+        path: /run/slurm/conf/slurm.conf
+        search_regex: (?im)^ClusterName={{ slurm_cluster_name }}\s*$
+        timeout: 120
+      when: not is_controller
+
+    - name: Wait for slurmctld to hold this node's registration
+      ansible.builtin.command:
+        argv: ["{{ slurm_install_prefix }}/bin/scontrol", -o, show, node, "{{ inventory_hostname }}"]
+      register: slurm_node_registration
+      until: >-
+        slurm_node_registration.rc == 0
+        and slurm_node_registration.stdout is not search('State=\\S*NOT_RESPONDING')
+        and slurm_node_registration.stdout is search('Version=' ~ (slurm_version | regex_escape) ~ '(\\s|$)')
+      retries: 12
+      delay: 10
+      changed_when: false
+      check_mode: false  # read-only
+      when: is_compute
+
+    - name: Ask the controllers whether they answer this node
+      ansible.builtin.include_tasks: controller_healthy.yml
+      when: not is_compute
