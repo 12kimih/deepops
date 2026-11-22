@@ -39,6 +39,12 @@
     argv: [systemctl, try-reload-or-restart, docker.service]
   when: not docker_restart_done | default(false)
 
+# The note holds for this flush only: a reload notified after it is sent.
+- name: Forget that dockerd restarted
+  ansible.builtin.set_fact:
+    docker_restart_done: false
+  listen: [Restart dockerd, Reload dockerd]
+
 # A daemon that came back without its API (a socket file removed under it, a refused
 # configuration) fails the run here instead of every client failing later.
 - name: Look whether dockerd runs

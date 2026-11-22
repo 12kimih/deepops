@@ -40,6 +40,17 @@
   loop_control:
     label: "{{ item.key }} ({{ item.value.gid }})"
 
+# useradd copies the skeleton into a home it makes, and warns about one already there (a
+# service's data directory made before its account): a home the host has is only named.
+- name: Look for each account's home
+  ansible.builtin.stat:
+    path: "{{ item.value.home }}"
+    get_checksum: false
+  loop: "{{ local_accounts_wanted | dict2items | selectattr('value.home', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.key }} ({{ item.value.home }})"
+  register: local_accounts_homes
+
 - name: Create or update each account
   ansible.builtin.user:
     name: "{{ item.key }}"
@@ -48,8 +59,11 @@
     comment: "{{ item.value.comment | default(omit) }}"
     shell: "{{ item.value.shell }}"
     home: "{{ item.value.home | default(omit) }}"
-    create_home: "{{ item.value.create_home }}"
+    create_home: "{{ item.value.create_home and item.key not in _homes_present }}"
     system: "{{ item.value.system }}"
   loop: "{{ local_accounts_wanted | dict2items }}"
   loop_control:
     label: "{{ item.key }} ({{ item.value.uid }})"
+  vars:
+    _homes_present: "{{ local_accounts_homes.results | default([]) | selectattr('stat.exists', 'defined')
+                        | selectattr('stat.exists') | map(attribute='item.key') | list }}"
