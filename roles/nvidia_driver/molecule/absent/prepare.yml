@@ -25,7 +25,7 @@
         dest: /etc/apt/preferences.d/deepops-nvidia-driver
         content: |
           # roles/nvidia_driver (nvidia_driver_install_method: ubuntu_repo)
-          Package: *nvidia*
+          Package: *nvidia*:any
           Pin: origin developer.download.nvidia.com
           Pin-Priority: -1
         mode: "0644"

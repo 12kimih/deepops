@@ -3,9 +3,11 @@
 A package unknown to apt fails as apt does, unless a repository the same run adds is
 pending (package_repos_unrefreshed): then the install is previewed as a change. A package
 apt knows is apt's own result either way. With removals pending (host_baseline_unremoved)
-a failed install is asked of apt again with them in the same transaction."""
+a failed install is asked of apt again on dpkg's status without them: the host as the
+run's removal leaves it."""
 
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -14,6 +16,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
 import unrecorded  # noqa: E402
 
 PLAYBOOK = Path(sys.executable).with_name("ansible-playbook")
@@ -68,16 +72,72 @@ class RepoPackage(unittest.TestCase):
             self.assertEqual(done.returncode, 0, done.stdout[-3000:] + done.stderr[-2000:])
 
 
+STATUS = """Package: keep
+Status: install ok installed
+Architecture: amd64
+
+Package: old
+Status: install ok installed
+Architecture: i386
+
+Package: old
+Status: install ok installed
+Architecture: amd64
+
+Package: native
+Status: install ok installed
+Architecture: all
+
+Package: other-arch
+Status: install ok installed
+Architecture: i386
+"""
+
+
 class Simulation(unittest.TestCase):
-    def test_the_install_and_the_removals_are_one_transaction(self):
+    def test_the_install_takes_the_tasks_arguments(self):
         self.assertEqual(
-            rp.simulation_argv({"name": ["a", "b=1.0"], "install_recommends": False}, ["old:i386"]),
-            ["apt-get", "-s", "-q", "install", "--no-install-recommends", "a", "b=1.0", "old:i386-"],
+            rp.simulation_argv({"name": ["a", "b=1.0"], "install_recommends": False}),
+            ["install", "--no-install-recommends", "a", "b=1.0"],
         )
         self.assertEqual(
-            rp.simulation_argv({"name": "a, b", "default_release": "noble-backports"}, ["x"]),
-            ["apt-get", "-s", "-q", "install", "-t", "noble-backports", "a", "b", "x-"],
+            rp.simulation_argv({"name": "a, b", "default_release": "noble-backports"}),
+            ["install", "-t", "noble-backports", "a", "b"],
         )
+
+    def simulate(self, removals):
+        """The command, run against STATUS with dpkg and apt-get standing in: apt-get
+        prints its arguments and the status file it was given."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "status").write_text(STATUS)
+            (base / "bin").mkdir()
+            (base / "bin/dpkg").write_text("#!/bin/sh\necho amd64\n")
+            (base / "bin/apt-get").write_text(
+                '#!/bin/sh\necho "ARGS $*"\nfor a; do case "$a" in Dir::State::status=*) cat "${a#*=}";; esac; done\n'
+            )
+            for tool in ("dpkg", "apt-get"):
+                (base / "bin" / tool).chmod(0o755)
+            command = rp.simulation_command({"name": ["new"]}, removals, status=str(base / "status"))
+            env = {**os.environ, "PATH": f"{base / 'bin'}:/usr/bin:/bin"}
+            out = subprocess.run(
+                ["/bin/sh", "-c", command],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=bounds.CHILD,
+                check=True,
+            ).stdout
+        return out
+
+    def test_the_removed_packages_are_gone_from_the_status_apt_reads(self):
+        out = self.simulate(["old:i386", "native", "absent"])
+        self.assertIn("ARGS -s -q -o Dir::State::status=", out)
+        self.assertTrue(out.splitlines()[0].endswith(" install new"))
+        packages = [line.split(" ", 1)[1] for line in out.splitlines() if line.startswith("Package: ")]
+        # old:amd64 stays (only the i386 one goes); a bare name means the native arch or all.
+        self.assertEqual(packages, ["keep", "old", "other-arch"])
+        self.assertIn("Architecture: amd64", out.split("Package: old", 1)[1].split("\n\n", 1)[0])
 
     def test_apts_answer_is_the_preview(self):
         failed = {"failed": True, "msg": "held broken packages"}

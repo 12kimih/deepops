@@ -209,7 +209,7 @@
             mode: "0644"
             content: |
               # Managed by DeepOps (roles/package_repos): {{ package_repos_r.name }}
-              Package: {{ package_repos_r.pin.packages | default('*') }}
+              Package: {{ package_repos_r.pin.packages | default('*') | apt_pin_packages }}
               Pin: {{ package_repos_r.pin.pin }}
               Pin-Priority: {{ package_repos_r.pin.priority | int }}
           register: package_repos_pin
