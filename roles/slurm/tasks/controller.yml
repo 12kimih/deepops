@@ -123,6 +123,7 @@
     _params: "{{ (_conf | regex_findall('(?m)^ *SlurmctldParameters *= *(.+)') | last | default('') | trim).split(',') }}"
     _prolog_flags: "{{ (_conf | regex_findall('(?m)^ *PrologFlags *= *(.+)') | last | default('') | trim).split(',') }}"
     _namespace: "{{ ['namespace/linux'] if slurm_job_private_dirs | length > 0 else [] }}"
+    _notices: "{{ deepops_components.job_notice | default('absent') == 'present' }}"
   ansible.builtin.assert:
     that:
       - _conf | regex_findall('(?m)^ *ClusterName *= *(.+)') | map('trim') | list == [slurm_cluster_name]
@@ -131,6 +132,7 @@
       - _conf | regex_findall('(?m)^ *NamespaceType *= *(.+)') | map('trim') | list == _namespace
       - _conf | regex_findall('(?m)^ *JobContainerType *=') | length == 0
       - _namespace | length == 0 or 'Contain' in _prolog_flags
+      - not _notices or _conf | regex_findall('(?m)^ *MailProg *= *(.+)') | map('trim') | list == [job_notice_command]
     fail_msg: >-
       {{ slurm_conf_template }} must set ClusterName={{ '{{' }} slurm_cluster_name {{ '}}' }}
       and include enable_configless in SlurmctldParameters (the nodes fetch their
@@ -139,6 +141,8 @@
       Per-job private directories follow slurm_job_private_dirs alone: NamespaceType=namespace/linux
       with Contain in PrologFlags when it lists any, else no NamespaceType, and never
       JobContainerType (deprecated: Slurm warns it was replaced with NamespaceType).
+      With job notices on this host (slurm_enable_job_notices), MailProg={{ '{{' }} job_notice_command {{ '}}' }}
+      ({{ job_notice_command }}): any other MailProg sends them as local mail.
     quiet: true
   tags:
     - config

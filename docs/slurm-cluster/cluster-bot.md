@@ -87,13 +87,23 @@ whether job notices reach them, with a switch to turn them off or on.
 
 Job notices (`roles/job_notice`, switch `slurm_enable_job_notices`, on by default):
 Slurm's MailProg on the controllers is `job-notice`, which sends a job's notice as a
-Slack DM instead of mail. Only jobs that ask get one, as Slurm defines it:
-`sbatch --mail-type=END,FAIL`, or `export SBATCH_MAIL_TYPE=END,FAIL` in a person's
-shell for every job. A person's notices within ten minutes of the first become one
+Slack DM instead of mail. Turning it on does not notify every job: only a job that asks
+gets one, as Slurm defines it. What to tell users:
+
+```bash
+#SBATCH --mail-type=END,FAIL          # in a job script: a DM when this job ends or fails
+sbatch --mail-type=END,FAIL job.sh    # the same on the command line
+export SBATCH_MAIL_TYPE=END,FAIL      # in ~/.bashrc: every job they submit asks
+```
+
+Other types are Slurm's (`BEGIN`, `TIME_LIMIT_80`, `ALL`, ...; sbatch(1)); the notice goes to
+the job's own user unless `--mail-user` names another. A person's notices within ten minutes of the first become one
 message updated in place, so an array of jobs is one DM. The Home tab's switch writes
 `cluster_bot_prefs_file`, which `job-notice` reads, so it needs the bot on the
 controller (the first `slurm-master`, its default host). Without `slack_bot_token`
-nothing is sent and jobs are unaffected.
+nothing is sent and jobs are unaffected. A site's own slurm.conf template must say
+`MailProg={{ job_notice_command }}`; the deploy stops on any other while job notices are
+on, since Slurm would send them as local mail instead.
 
 ## Turning it on
 
