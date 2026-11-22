@@ -46,7 +46,10 @@ class Grafana:
             status, raw = e.code, e.read()
         if status not in ok:
             raise RuntimeError(f"{method} {path}: HTTP {status}: {raw[:200].decode(errors='replace')}")
-        return status, (json.loads(raw) if raw.strip() else None)
+        try:
+            return status, (json.loads(raw) if raw.strip() else None)
+        except ValueError as e:  # a proxy's error page, a Grafana still starting
+            raise RuntimeError(f"{method} {path}: not JSON: {raw[:200].decode(errors='replace')}") from e
 
     def get(self, path, ok=(200,)):
         return self.call("GET", path, ok=ok)
@@ -156,17 +159,17 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     user = args.user
-    if args.password_stdin:
-        password = sys.stdin.readline().rstrip("\n")
-    elif args.ini:
-        ini = configparser.ConfigParser(interpolation=None)
-        ini.read(args.ini)
-        user = ini.get("security", "admin_user", fallback=user)
-        password = ini.get("security", "admin_password")
-    else:
+    if not args.password_stdin and not args.ini:
         p.error("one of --ini or --password-stdin is required")
-
     try:
+        if args.password_stdin:
+            password = sys.stdin.readline().rstrip("\n")
+        else:
+            ini = configparser.ConfigParser(interpolation=None)
+            if not ini.read(args.ini):
+                raise OSError(f"{args.ini} cannot be read")
+            user = ini.get("security", "admin_user", fallback=user)
+            password = ini.get("security", "admin_password")
         actions = reconcile(
             Grafana(args.url, user, password),
             args.folder_uid,
@@ -175,7 +178,15 @@ def main(argv=None):
             args.retire,
             args.check,
         )
-    except (RuntimeError, OSError, urllib.error.URLError) as e:
+    except (OSError, configparser.Error) as e:  # no configuration, or no Grafana answering
+        if args.check:
+            # A first install's preview: nothing written, nothing started yet. The run
+            # that starts Grafana reconciles. A Grafana that answers wrongly still fails.
+            print(json.dumps({"changed": False, "actions": [f"not reconciled yet ({e}): the run will"]}))
+            return 0
+        print(f"grafana_reconcile: {e}", file=sys.stderr)
+        return 1
+    except RuntimeError as e:  # Grafana answered, but not as it should (401, not JSON)
         print(f"grafana_reconcile: {e}", file=sys.stderr)
         return 1
     print(

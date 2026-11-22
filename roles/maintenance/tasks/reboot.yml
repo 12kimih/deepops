@@ -96,21 +96,25 @@
             bmc_power_action: cycle
             bmc_power_undrained: "{{ maintenance_reboot_undrained }}"
 
-        - name: Wait for the host to come back
-          ansible.builtin.wait_for_connection:
-            delay: 60
-            timeout: "{{ maintenance_reboot_timeout }}"
+        # The cycle only previews under --check: there is no boot to wait for or prove.
+        - name: Confirm the host booted again
+          when: not ansible_check_mode
+          block:
+            - name: Wait for the host to come back
+              ansible.builtin.wait_for_connection:
+                delay: 60
+                timeout: "{{ maintenance_reboot_timeout }}"
 
-        - name: Read the boot after the power cycle
-          ansible.builtin.slurp:
-            src: /proc/sys/kernel/random/boot_id
-          register: maintenance_boot_after
+            - name: Read the boot after the power cycle
+              ansible.builtin.slurp:
+                src: /proc/sys/kernel/random/boot_id
+              register: maintenance_boot_after
 
-        - name: Require that the host really booted again
-          ansible.builtin.assert:
-            that: maintenance_boot_after.content != maintenance_boot_before.content
-            fail_msg: "{{ inventory_hostname }} answers with the same boot as before the power cycle."
-            quiet: true
+            - name: Require that the host really booted again
+              ansible.builtin.assert:
+                that: maintenance_boot_after.content != maintenance_boot_before.content
+                fail_msg: "{{ inventory_hostname }} answers with the same boot as before the power cycle."
+                quiet: true
 
     # The work the asking roles could only do on the new kernel or module (a driver's
     # persistence check, a kernel setting's check): each runs again, then its request

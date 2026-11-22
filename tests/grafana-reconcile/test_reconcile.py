@@ -194,8 +194,27 @@ class ReconcileTests(unittest.TestCase):
         try:
             self.assertEqual(reconcile.main(argv), 1)
             self.assertIn("HTTP 401", sys.stderr.getvalue())
+            sys.stdin = io.StringIO("wrong\n")
+            self.assertEqual(reconcile.main(argv + ["--check"]), 1, "a wrong answer fails a preview too")
         finally:
             sys.stdin, sys.stderr = stdin, stderr
+
+    def test_a_first_preview_without_grafana_reconciles_later(self):
+        import contextlib
+        import io
+
+        base = ["--folder-uid", "new", "--folder-title", "t", "--dashboards-path", self.tmp.name]
+        missing_ini = ["--url", self.api.url, "--ini", os.path.join(self.tmp.name, "absent.ini")]
+        with tempfile.NamedTemporaryFile("w", suffix=".ini") as ini:
+            ini.write("[security]\nadmin_password = x\n")
+            ini.flush()
+            closed = ["--url", "http://127.0.0.1:9", "--ini", ini.name]  # discard port: refused
+            for argv in (missing_ini, closed):
+                out, err = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    self.assertEqual(reconcile.main(argv + base + ["--check"]), 0)
+                    self.assertFalse(json.loads(out.getvalue())["changed"])
+                    self.assertEqual(reconcile.main(argv + base), 1, "the run itself fails")
 
 
 if __name__ == "__main__":
