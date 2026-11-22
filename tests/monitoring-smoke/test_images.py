@@ -69,10 +69,14 @@ def wait_http(url, timeout=120, auth=None):
         try:
             with urllib.request.urlopen(request, timeout=5) as resp:
                 return resp.read()
+        except urllib.error.HTTPError as e:  # a server still starting (503): closed
+            with e:
+                if time.time() > deadline:
+                    raise
         except (urllib.error.URLError, ConnectionError, OSError):
             if time.time() > deadline:
                 raise
-            time.sleep(1)
+        time.sleep(1)
 
 
 class Container:
