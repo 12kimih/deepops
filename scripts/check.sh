@@ -3,7 +3,8 @@
 #   scripts/check.sh          everything
 #   scripts/check.sh --fast   the quick subset pre-commit runs on each commit (style,
 #                             generated docs, linters, sensitive data, the unit suites
-#                             not marked .slow); CI runs everything
+#                             not marked .slow, ansible-lint of the changed Ansible
+#                             files); CI runs everything
 #   scripts/check.sh --missing-tools   the packages of the tools it needs that are missing
 #
 # The checks are independent, so they run in parallel (CHECK_JOBS at a time, default
@@ -90,6 +91,21 @@ for test_file in "${test_files[@]}"; do
     module="$(basename "${test_file}" .py)"
     step "unit tests (${suite}/${module})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} '${strict}' -q '${module}'"
 done
+
+# ansible-lint renders every template, which nothing else in --fast does; on all of
+# the repository it takes minutes, so --fast lints the Ansible files this branch
+# changes (against main, and what is staged), the full check all of them.
+if "${fast}"; then
+    base="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)"
+    mapfile -t changed_ansible < <(
+        { git diff --name-only --diff-filter=d "${base}" -- roles playbooks
+          git diff --cached --name-only --diff-filter=d -- roles playbooks; } \
+            | grep -E '[.]ya?ml$' | grep -v '/files/' | sort -u
+    )
+    if [ "${#changed_ansible[@]}" -gt 0 ]; then
+        step "ansible-lint (the changed Ansible files)" ansible-lint -q "${changed_ansible[@]}"
+    fi
+fi
 
 if ! "${fast}"; then
     mapfile -t missing < <(missing_tools)
