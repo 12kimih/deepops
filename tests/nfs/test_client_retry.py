@@ -40,6 +40,7 @@ class Host:
     def __init__(self, mounted, serving, start_status=0):
         self.mounted, self.serving, self.start_status = set(mounted), set(serving), start_status
         self.started, self.probed = [], []
+        self.env = {}  # no JOURNAL_STREAM: plain lines, as nfs-mount.yml shows them
 
     def run(self, argv, timeout):
         assert timeout and timeout > 0, argv
@@ -63,7 +64,7 @@ class Host:
 
     def main(self, *args):
         with mock.patch.object(nmm, "run", self.run), mock.patch.object(nmm, "serves", self.serves):
-            with mock.patch("builtins.print") as out:
+            with mock.patch("builtins.print") as out, mock.patch.dict(nmm.os.environ, self.env, clear=False):
                 status = nmm.main(list(args))
         return status, [c.args[0] for c in out.call_args_list]
 
@@ -76,6 +77,18 @@ class MountMissing(unittest.TestCase):
         self.assertEqual(status, 1)  # /scratch is still missing
         self.assertIn("/scratch: gpu8 does not serve NFS (port 2049); not mounted", lines)
         self.assertIn("/sw: mounted", lines)
+
+    def test_under_the_timer_a_mount_is_notice_and_a_miss_is_warning(self):
+        host = Host(mounted={"/home"}, serving={"master"})
+        host.env = {"JOURNAL_STREAM": "8:1234"}
+        _, lines = host.main()
+        self.assertIn("<5>/sw: mounted", lines)
+        self.assertIn("<4>/scratch: gpu8 does not serve NFS (port 2049); not mounted", lines)
+
+    def test_nothing_missing_prints_nothing(self):
+        host = Host(mounted={"/home", "/sw", "/scratch"}, serving=set())
+        host.env = {"JOURNAL_STREAM": "8:1234"}
+        self.assertEqual(host.main(), (0, []))
 
     def test_noauto_and_automount_entries_are_left_alone(self):
         host = Host(mounted={"/home", "/sw", "/scratch"}, serving={"master", "gpu8", "filer"})
@@ -140,6 +153,7 @@ class Units(unittest.TestCase):
         timer = (ROOT / "roles/nfs_client/templates/nfs-client-retry.timer.j2").read_text()
         self.assertIn("SuccessExitStatus=1", service)
         self.assertIn("TimeoutStartSec=", service)
+        self.assertIn("LogLevelMax=notice", service)
         self.assertIn("OnUnitInactiveSec=1min", timer)
         defaults = (ROOT / "roles/nfs_client/defaults/main.yml").read_text()
         self.assertNotIn("x-systemd.automount", defaults.split("nfs_mount_options:")[1].splitlines()[0])

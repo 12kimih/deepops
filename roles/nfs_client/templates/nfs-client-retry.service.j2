@@ -13,3 +13,6 @@ ExecStart={{ nfs_client_retry_program }} --textfile {{ node_exporter_prom_dir }}
 SuccessExitStatus=1
 # Every step is bounded (a 5 s probe, a 120 s start per entry); this bounds the whole run.
 TimeoutStartSec=15min
+# A run every minute: systemd's own start and finish lines (info) stay out of the journal;
+# what the retry did comes at notice (a mount) or warning (still missing).
+LogLevelMax=notice
