@@ -3,7 +3,8 @@
 
     config_lint.py [--fix]              run every check
     config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
-                                        doc-vars, doc-limits, doc-gpu, duplicates, shadow
+                                        doc-vars, doc-limits, doc-gpu, duplicates, shadow,
+                                        copies
 
 A role's defaults own each setting's default and a config states only what differs
 (scripts/deepops/settings.py models both):
@@ -38,6 +39,11 @@ duplicates no variable file sets a key twice in one mapping: Ansible keeps the l
 shadow     no group or host has its variables in two places (all.yml beside all/, or
            all.yml beside all.yaml): Ansible reads one and drops the other without a
            word, so a whole file of settings can vanish when a directory appears.
+copies     no site file equals config.example's: but for the inventory and its variables,
+           which Ansible reads from the inventory directory alone, config.example's
+           file is what the tools read while the site has none (scripts/common.sh
+           deepops_config_file), so a copy says nothing and hides the next update.
+           --fix deletes it.
 
 Only paths and line numbers are printed for config/, which is private.
 DEEPOPS_CONFIG_DIR selects the site config (default config/). Under the commit hook
@@ -68,6 +74,9 @@ PATH = re.compile(
 # The settings deepops no longer reads (roles/retired_settings): naming one there is not a
 # read, and a document or config that names one is told what replaced it.
 RETIRED_FILE = ROOT / "roles" / "retired_settings" / "vars" / "main.yml"
+# What Ansible reads from the inventory directory alone (scripts/setup.sh starts a site
+# config with them): config.example's copy of these is never read for a site.
+INVENTORY_DIR = ("inventory", "group_vars", "host_vars")
 # Read by Ansible itself or by tools outside the repository, not by our code.
 READ_ELSEWHERE = {"ansible_user", "ansible_host", "ansible_python_interpreter", "ansible_become"}
 
@@ -138,9 +147,13 @@ class Fixes:
 
     def __init__(self):
         self.edits = {}
+        self.removals = set()
 
     def add(self, path, first, last, lines):
         self.edits.setdefault(Path(path), []).append((first, last, lines))
+
+    def remove(self, path):
+        self.removals.add(Path(path))
 
     def apply(self):
         for path, edits in self.edits.items():
@@ -148,7 +161,9 @@ class Fixes:
             for first, last, lines in sorted(edits, reverse=True):
                 text[first - 1 : last] = lines
             path.write_text("\n".join(text) + "\n")
-        return sorted(self.edits)
+        for path in self.removals:
+            path.unlink()
+        return sorted(set(self.edits) | self.removals)
 
 
 def where(label, rel, entry, private):
@@ -609,8 +624,30 @@ def check_mapping_keys():
     return problems
 
 
+def check_copies(fix=None):
+    example = settings.Tree(EXAMPLE, tracked_only=False)
+    problems = []
+    for label, tree, private in configs():
+        if not private:
+            continue
+        for rel in tree.files():
+            if rel.split("/", 1)[0] not in INVENTORY_DIR and tree.text(rel) == example.text(rel):
+                problems.append(
+                    found(
+                        "copies",
+                        f"{label}/{rel}",
+                        1,
+                        "equals config.example's, the default; delete it",
+                        private,
+                    )
+                )
+                if fix is not None and tree.rev is None:
+                    fix.remove(CONFIG / rel)
+    return problems
+
+
 # A check that can fix takes a Fixes to collect its edits in.
-FIXABLE = {"commented", "redundant"}
+FIXABLE = {"commented", "redundant", "copies"}
 CHECKS = {
     "commented": check_commented,
     "redundant": check_redundant,
@@ -623,6 +660,7 @@ CHECKS = {
     "proxy-credentials": check_proxy_credentials,
     "mapping-keys": check_mapping_keys,
     "shadow": check_shadow,
+    "copies": check_copies,
     "retired": check_retired,
     "removals": check_removals,
 }

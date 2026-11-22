@@ -138,15 +138,18 @@ k8s_nfs_export_path: /export/deepops_nfs
 container_registry_hostname: registry.local
 # Component playbooks run on their own
 # NVIDIA MIG Manager (playbooks/nvidia-software/nvidia-mig.yml,
-# https://github.com/NVIDIA/mig-parted): the profile; the site's mig-parted config
-# (mig_manager_config_src) and where it lands on the node; and the hooks file. The
-# hooks are what keeps a layout across reboots: the package's apply-start hook writes
-# the config, hooks and profile into the service's override.conf, which reapplies
-# them at boot. The package links hooks.yaml to the hooks that fit the GPU (minimal
-# ones from Hopper on); they also stop and restart the GPU's services around a mode
-# change.
+# https://github.com/NVIDIA/mig-parted): the profile; the mig-parted configuration;
+# and the hooks file. The configuration is the package's own unless the site names a
+# reviewed file of its own (mig_manager_config_src, copied to mig_manager_config): the
+# package generates it from the GPUs' MIG profiles at every boot
+# (/etc/nvidia-mig-manager/config.yaml, service.sh), so its profile names fit the GPU.
+# The hooks are what keeps a layout across reboots: the package's apply-start hook
+# writes the config, hooks and profile into the service's override.conf, which
+# reapplies them at boot. The package links hooks.yaml to the hooks that fit the GPU
+# (minimal ones from Hopper on); they also stop and restart the GPU's services around
+# a mode change.
 mig_manager_profile: all-disabled
-mig_manager_config_src: "{{ inventory_dir }}/nvidia-mig-config.yml"
+mig_manager_config_src: ""
 mig_manager_config: /etc/nvidia-mig-manager/config.yml
 mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml
 # The containers the GPU checks run: playbooks/ngc-ready-server.yml, the NCCL test of

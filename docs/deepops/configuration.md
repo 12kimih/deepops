@@ -15,17 +15,20 @@
 
 ## The DeepOps configuration directory
 
-When you first clone the DeepOps repository and run `scripts/setup.sh`, one of the first things that the setup script does is copy the [`config.example` directory](../../config.example) to a new directory called `config`.
-This directory is your DeepOps configuration directory, and contains several files that govern the behavior of the Ansible playbooks used by DeepOps.
+When you first clone the DeepOps repository and run `scripts/setup.sh`, the setup script creates a new directory called `config` from the [`config.example` directory](../../config.example): the inventory and its variables (`inventory`, `group_vars/`, `host_vars/`), which Ansible reads from the inventory directory alone.
+This directory is your DeepOps configuration directory, and contains the files that govern the behavior of the Ansible playbooks used by DeepOps.
 
-In particular, this directory includes:
+Every other file of `config.example` (Helm values, Kubeflow manifests, `env.sh`, `requirements.yml`, the example playbooks) is the default the tools read while `config/` has none of its own (`deepops_config_file` in `scripts/common.sh`).
+To change one, put your version at the same path under `config/`. A file left equal to `config.example`'s says nothing and would hide the next update, so `scripts/deepops/config_lint.py` refuses it (`--fix` deletes it).
+
+In particular, the configuration includes:
 
 - `config/inventory`: The [Ansible inventory file](https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html) that lists the hosts in your cluster
 - `config/group_vars/all.yml`: An Ansible [variables file](https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html) that contains variables we expect to work for all hosts
 - `config/group_vars/k8s_cluster.yml`: Variables specific to deploying Kubernetes clusters
 - `config/group_vars/slurm-cluster.yml`: Variables specific to deploying Slurm clusters
-- `config/env.sh`: Global variables that override default variable values for all `sh` files in `scripts/*`.
-- `config/requirements.yml`: An Ansible Galaxy [requirements file](https://docs.ansible.com/ansible/latest/galaxy/user_guide.html#installing-roles-and-collections-from-the-same-requirements-yml-file) that contains a list of custom Collections and Roles to install. Collections and Roles required by DeepOps are stored in a separate `roles/requirements.yml` file, which should not be modified.
+- `config/env.sh` (optional): Global variables that override default variable values for all `sh` files in `scripts/*`.
+- `config/requirements.yml` (optional): An Ansible Galaxy [requirements file](https://docs.ansible.com/ansible/latest/galaxy/user_guide.html#installing-roles-and-collections-from-the-same-requirements-yml-file) that contains a list of custom Collections and Roles to install. Collections and Roles required by DeepOps are stored in a separate `roles/requirements.yml` file, which should not be modified.
 
 It's expected that most DeepOps deployments will make changes to these files!
 The inventory file will be different for every cluster;

@@ -18,7 +18,7 @@ Environment variables:
 
 Config file (checked in order):
     1. Path in MAAS_INVENTORY_CONFIG env var
-    2. config/maas-inventory.yml (repo-relative, created by setup.sh)
+    2. config/maas-inventory.yml (repo-relative, from config.example/maas-inventory.yml)
     3. ~/.config/maas-inventory.yml
 
 Usage:
@@ -99,7 +99,7 @@ def load_config():
         config_paths = []
         if os.environ.get("MAAS_INVENTORY_CONFIG"):
             config_paths.append(Path(os.environ["MAAS_INVENTORY_CONFIG"]))
-        # Repo-relative: config/maas-inventory.yml (created by setup.sh)
+        # Repo-relative: config/maas-inventory.yml
         repo_root = Path(__file__).parent.parent
         config_paths.append(repo_root / "config" / "maas-inventory.yml")
         config_paths.append(Path.home() / ".config" / "maas-inventory.yml")

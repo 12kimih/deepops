@@ -12,19 +12,11 @@ HELM_CHARTS_REPO_INGRESS="${HELM_CHARTS_REPO_INGRESS:-https://kubernetes.github.
 HELM_INGRESS_CHART_VERSION="${HELM_INGRESS_CHART_VERSION:-4.15.1}"
 # HELM_INGRESS_CONFIG, defaults below based on presence of metallb
 
-${SCRIPT_DIR}/k8s/install_helm.sh
+"${ROOT_DIR}/scripts/k8s/install_helm.sh"
 
 # Allow overriding the app name with an env var
 app_name="${NGINX_INGRESS_APP_NAME:-ingress-nginx}"
 
-# Allow overriding config dir to look in
-DEEPOPS_CONFIG_DIR=${DEEPOPS_CONFIG_DIR:-"${ROOT_DIR}/config"}
-
-if [ ! -d "${DEEPOPS_CONFIG_DIR}" ]; then
-	echo "Can't find configuration in ${DEEPOPS_CONFIG_DIR}"
-	echo "Please set DEEPOPS_CONFIG_DIR env variable to point to config location"
-	exit 1
-fi
 
 if ! kubectl version ; then
     echo "Unable to talk to Kubernetes API"

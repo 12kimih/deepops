@@ -242,7 +242,7 @@ when machines are provisioned, released, or reassigned.
 
 ### Setup
 
-1. Run `scripts/setup.sh` (or manually copy `config.example/` to `config/`).
+1. Run `scripts/setup.sh`, then copy `config.example/maas-inventory.yml` to `config/`.
 
 2. Edit `config/maas-inventory.yml` with your MAAS server details:
 

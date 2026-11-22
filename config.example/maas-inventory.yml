@@ -1,8 +1,8 @@
 ---
 # MAAS Dynamic Inventory Configuration
 #
-# This file is copied to config/maas-inventory.yml by scripts/setup.sh.
-# Edit your private copy there (config/ is gitignored).
+# Copy this file to config/maas-inventory.yml and edit it there (config/ is
+# gitignored).
 #
 # You can also set MAAS_INVENTORY_CONFIG=/path/to/config.yml or use
 # environment variables (MAAS_API_URL, MAAS_API_KEY, etc.).

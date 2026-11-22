@@ -155,11 +155,18 @@ else
     install_hook "${REPO_DIR}" reference-transaction branch-guard.sh
 fi
 
-# Copy default configuration
+# Start the site configuration with what Ansible reads from the inventory directory
+# alone: the inventory and its variables (config.example's settings, to edit). Every
+# other file of config.example is the default the tools read while the site has none
+# (scripts/common.sh deepops_config_file), so a copy would only hide its updates; a
+# site adds a file there to change it. config_lint.py's INVENTORY_DIR names the same.
 if grep -i deepops README.md >/dev/null 2>&1 ; then
     if [ ! -d "${CONFIG_DIR}" ] ; then
-        cp -rfp "${ROOT_DIR}/config.example" "${CONFIG_DIR}"
-        echo "Copied default configuration to ${CONFIG_DIR}"
+        mkdir -p "${CONFIG_DIR}"
+        for part in inventory group_vars host_vars ; do
+            cp -rp "${ROOT_DIR}/config.example/${part}" "${CONFIG_DIR}/"
+        done
+        echo "Created ${CONFIG_DIR} from config.example (inventory, group_vars, host_vars)"
     else
         echo "Configuration directory '${CONFIG_DIR}' exists, not overwriting"
     fi

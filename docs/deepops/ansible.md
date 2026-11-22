@@ -156,9 +156,8 @@ at an empty directory.
 _Create server inventory_
 
 ```bash
-# Copy the default configuration
-# This should be in the deepops directory and will be done automatically by setup.sh
-cp -r config.example config
+# scripts/setup.sh started config/ from config.example: the inventory and its
+# variables (docs/deepops/configuration.md)
 
 # Review and edit the inventory file to set IPs/hostnames for servers
 cat config/inventory

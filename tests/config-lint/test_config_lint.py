@@ -2,12 +2,18 @@
 
 import importlib.util
 import os
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
+
 spec = importlib.util.spec_from_file_location("config_lint", ROOT / "scripts" / "deepops" / "config_lint.py")
 cl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cl)
@@ -133,8 +139,6 @@ class Redundant(Configs):
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
         git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", str(self.site)]
         self.write("", "x: 2\n")
-        import subprocess
-
         subprocess.run(git[:-2] + ["init", "-q", str(self.site)], check=True, env=env)
         subprocess.run(git + ["add", "-A"], check=True, env=env)
         subprocess.run(git + ["commit", "-qm", "c"], check=True, env=env)
@@ -150,6 +154,47 @@ class Redundant(Configs):
             fix = cl.Fixes()
             cl.check_redundant(fix)
             self.assertEqual(fix.edits, {})
+
+
+class Copies(Configs):
+    def test_a_copy_is_reported_and_deleted_but_the_inventory_and_its_variables_stay(self):
+        for base in (self.example, self.site):
+            (base / "helm").mkdir()
+            (base / "helm/values.yml").write_text("a: 1\n")
+            (base / "group_vars/all.yml").write_text("#x: 1\n")
+            (base / "inventory").write_text("[g]\nh1\n")
+        (self.example / "helm/other.yml").write_text("b: 1\n")
+        (self.site / "helm/other.yml").write_text("b: 2\n")
+        (self.site / "env.sh").write_text("export A=1\n")
+        self.assertEqual(cl.check_copies(), ["copies: config/helm/values.yml:1"])
+        fix = cl.Fixes()
+        cl.check_copies(fix)
+        fix.apply()
+        self.assertFalse((self.site / "helm/values.yml").exists())
+        self.assertTrue((self.site / "group_vars/all.yml").exists())
+        self.assertTrue((self.site / "inventory").exists())
+        self.assertEqual(cl.check_copies(), [])
+
+    def test_setup_starts_a_site_config_with_what_the_check_leaves(self):
+        setup = (ROOT / "scripts/setup.sh").read_text()
+        parts = re.search(r"for part in ([\w ]+?) ; do", setup).group(1).split()
+        self.assertEqual(tuple(parts), cl.INVENTORY_DIR)
+
+    def test_a_tool_reads_the_site_file_else_config_example(self):
+        with tempfile.TemporaryDirectory() as site:
+            (Path(site) / "helm").mkdir()
+            (Path(site) / "helm/mine.yml").write_text("a: 1\n")
+            script = "source scripts/common.sh >/dev/null; deepops_config_file helm/mine.yml; deepops_config_file helm/metallb.yml"
+            out = subprocess.run(
+                ["bash", "-c", script],
+                cwd=ROOT,
+                env={**os.environ, "DEEPOPS_CONFIG_DIR": site, "DEEPOPS_VERSION": "test"},
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=bounds.CHILD,
+            ).stdout.splitlines()
+        self.assertEqual(out, [f"{site}/helm/mine.yml", f"{ROOT}/config.example/helm/metallb.yml"])
 
 
 class Repository(unittest.TestCase):
