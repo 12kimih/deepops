@@ -238,6 +238,51 @@ class DocVars(unittest.TestCase):
         self.assertEqual(self.problems("set `slurm_install_nhc: true`; the `no_wdelay` option\n"), [])
 
 
+class DocAnchors(unittest.TestCase):
+    """A section link must name a heading the page has: a renamed heading left a table
+    of contents (and the site guides' links to the usage policy) pointing nowhere."""
+
+    def test_github_slugs(self):
+        text = (
+            "# Firewall\n## Host firewall (roles/egress_policy)\n## `sq` and **qos**\n"
+            "## 7. AI 사용 규정 (필독)\n## Notes\n## Notes\n```\n## not a heading\n```\n"
+            '<a id="custom"></a>\n'
+        )
+        self.assertEqual(
+            cl.slugs(text),
+            {"firewall", "host-firewall-rolesegress_policy", "sq-and-qos", "7-ai-사용-규정-필독", "notes",
+             "notes-1", "custom"},
+        )  # fmt: skip
+
+    def test_links_are_checked_on_the_page_and_across_pages(self):
+        pages = [
+            ("docs/a.md", "# A\n[ok](#a) [bad](#gone) [there](b.md#b-part) [no](b.md#nope)\n", None),
+            ("docs/b.md", "# B part\n```\n[in code](#ignored)\n```\n[web](https://x.org/p#q)\n", None),
+        ]
+        with mock.patch.object(cl, "documents", return_value=pages):
+            self.assertEqual(
+                cl.check_doc_anchors(),
+                [
+                    "doc-anchors: docs/a.md:2: docs/a.md has no section #gone",
+                    "doc-anchors: docs/a.md:2: docs/b.md has no section #nope",
+                ],
+            )
+
+
+class DocRepeats(unittest.TestCase):
+    """A section pasted in twice: config-defaults-vs-upstream.md carried four sections
+    twice, the copies already disagreeing."""
+
+    def test_a_run_of_text_seen_before_is_found(self):
+        block = "".join(f"line {i}\n" for i in range(cl.DOC_REPEAT))
+        self.assertEqual(cl.repeats("# T\n" + block + "middle\n" + block), (cl.DOC_REPEAT + 3, 2))
+
+    def test_code_blocks_and_short_repeats_pass(self):
+        code = "```\n" + "".join(f"out {i}\n" for i in range(cl.DOC_REPEAT)) + "```\n"
+        short = "".join(f"line {i}\n" for i in range(cl.DOC_REPEAT - 1))
+        self.assertIsNone(cl.repeats(code + "text\n" + code + short + "x\n" + short))
+
+
 class SiteDocs(Configs):
     """The site's own guides hand out deepops' playbooks: a page there kept sending
     admins to playbooks deepops had removed, since only deepops' pages were checked."""

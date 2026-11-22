@@ -14,7 +14,9 @@ Generators:
   versions              every pinned version, image and chart in role defaults
   role-variables:ROLE   the variables of roles/ROLE/defaults/main.yml, with the
                         comment above each one as its description
-  role-tree             the in-tree roles, as a directory tree
+  tree:DIR              what is directly under DIR: its directories holding tracked
+                        files, its submodules and its tracked files, as a tree
+  role-tree             tree:roles (Galaxy's roles/galaxy left out)
 
 Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
@@ -31,7 +33,7 @@ import cli  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 BLOCK = re.compile(
-    r"(<!-- BEGIN GENERATED: (?P<name>[\w:.-]+) -->\n)(?P<body>.*?)(<!-- END GENERATED: (?P=name) -->)", re.S
+    r"(<!-- BEGIN GENERATED: (?P<name>[\w:./-]+) -->\n)(?P<body>.*?)(<!-- END GENERATED: (?P=name) -->)", re.S
 )
 PIN = re.compile(r"(version|_container|_image|_tag|_branch)$|_version_|_chart_version$")
 
@@ -120,19 +122,35 @@ def gen_role_variables(role):
     return "\n".join(rows) + "\n"
 
 
-def gen_role_tree(_arg):
-    # Tracked roles only, like every other check: a role another checkout has not
-    # committed yet must not make this page stale for everyone.
-    names = sorted(
-        {p.relative_to(ROOT).parts[1] for p in tracked("roles") if len(p.relative_to(ROOT).parts) > 2}
-    )
-    names = [n for n in names if n != "galaxy"]
+def gen_tree(top):
+    """What is directly under TOP (a path in the repository): directories holding a
+    tracked file, submodules and tracked files. Tracked paths only, like every other
+    check: what another checkout has not committed yet must not make a page stale for
+    everyone."""
+    depth = len(Path(top).parts)
+    names = set()
+    for path in tracked(top):
+        parts = path.relative_to(ROOT).parts
+        if len(parts) > depth:
+            names.add(parts[depth] + ("/" if len(parts) > depth + 1 or path.is_dir() else ""))
+    if top == "roles":
+        names.discard("galaxy/")
+    names = sorted(names, key=lambda n: (not n.endswith("/"), n))
     branches = ["├──"] * (len(names) - 1) + ["└──"]
-    tree = "\n".join(f"│   {b} {n}" for b, n in zip(branches, names))
-    return f"```text\n├── roles\n{tree}\n```\n"
+    tree = "\n".join(f"│   {b} {n.rstrip('/')}" for b, n in zip(branches, names))
+    return f"```text\n├── {top}\n{tree}\n```\n"
 
 
-GENERATORS = {"versions": gen_versions, "role-variables": gen_role_variables, "role-tree": gen_role_tree}
+def gen_role_tree(_arg):
+    return gen_tree("roles")
+
+
+GENERATORS = {
+    "versions": gen_versions,
+    "role-variables": gen_role_variables,
+    "role-tree": gen_role_tree,
+    "tree": gen_tree,
+}
 
 
 def render(match):

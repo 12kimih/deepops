@@ -52,6 +52,42 @@ class TrackedTests(unittest.TestCase):
                 self.assertEqual(gen.roles(), ["kept"])
                 self.assertNotIn("stray", gen.gen_role_tree(""))
 
+    def test_a_tree_lists_directories_then_files_under_any_path(self):
+        import functools
+        import os
+        import subprocess
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+            for rel in (
+                "scripts/setup.sh",
+                "scripts/deepops/x.py",
+                "config.example/group_vars/all.yml",
+                "scripts/new.sh",
+            ):
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text("x\n")
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True, env=env)
+            subprocess.run(
+                ["git", "add", "scripts/setup.sh", "scripts/deepops", "config.example"],
+                cwd=root,
+                check=True,
+                env=env,
+            )
+            listing = functools.partial(gen.tracked, root=root)
+            with (
+                mock.patch.object(gen, "ROOT", root),
+                mock.patch.object(gen, "tracked", listing),
+                mock.patch.dict(os.environ, env, clear=True),
+            ):
+                self.assertEqual(
+                    gen.gen_tree("scripts"), "```text\n├── scripts\n│   ├── deepops\n│   └── setup.sh\n```\n"
+                )
+                self.assertIn("│   └── all.yml", gen.gen_tree("config.example/group_vars"))
+
 
 if __name__ == "__main__":
     unittest.main()
