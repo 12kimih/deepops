@@ -25,6 +25,11 @@ Hard caps, the configuration's, whoever asks: a size of max_bytes, an end at mos
 max_days after the allocation was made (an extension adds at most max_extend_days).
 What a request gets without an administrator is the cluster bot's to decide.
 
+Every sweep adds to each person's ledger the bytes allocated and the bytes used, times
+the time since the last sweep: their cumulative byte-seconds from their first allocation,
+kept after an allocation goes, so who has held how much for how long is known for good
+(the fairness an administrator weighs when the disk is full, and the daily report).
+
 At its end date an allocation is frozen: its limit drops to what it holds, so nothing
 more can be written but everything can be read and copied away. After grace_days it is
 removed. A released one is moved aside at once and removed by the next sweep, so
@@ -130,6 +135,7 @@ class Registry:
                 data = json.loads(Path(self.path).read_text())
             except FileNotFoundError:
                 data = {"allocations": {}}
+            data.setdefault("ledger", {})
             yield data
             write_atomic(self.path, json.dumps(data, indent=1, sort_keys=True) + "\n", mode=0o600)
 
@@ -222,9 +228,26 @@ def release(host, cfg, data, login, now):
     return entry
 
 
+def account(host, cfg, data, now):
+    """Add to each person's ledger what they held and used since the last sweep (since the
+    allocation was made, the first time): byte-seconds, allocated and used."""
+    for login, entry in sorted(data["allocations"].items()):
+        if entry["state"] == "released":
+            continue
+        book = data.setdefault("ledger", {}).setdefault(
+            login, {"allocated_byte_seconds": 0, "used_byte_seconds": 0, "since": entry["created"]}
+        )
+        last = max(book.get("last", entry["created"]), entry["created"])
+        seconds = max(0, int(now - last))
+        book["allocated_byte_seconds"] += entry["bytes"] * seconds
+        book["used_byte_seconds"] += used_bytes(host, cfg["mount"], entry["uid"]) * seconds
+        book["last"] = int(now)
+
+
 def sweep(host, cfg, data, now):
-    """Freeze what reached its end date, remove what stayed frozen past the grace period
-    and what was released; each change as a line."""
+    """Account what each holds (account()), freeze what reached its end date, remove what
+    stayed frozen past the grace period and what was released; each change as a line."""
+    account(host, cfg, data, now)
     out, grace = [], cfg["grace_days"] * DAY
     for login, entry in sorted(data["allocations"].items()):
         if entry["state"] == "active" and now >= entry["expires"]:
@@ -248,10 +271,12 @@ def sweep(host, cfg, data, now):
 
 
 def listing(host, cfg, data, login=None):
-    """The allocations (LOGIN's alone, when given) and the disk: what the bot decides with."""
+    """The allocations and the ledger (LOGIN's alone, when given) and the disk: what the
+    bot decides with."""
     size, used = host.disk(cfg["mount"])
     return {
         "allocations": [e for n, e in sorted(data["allocations"].items()) if login in (None, n)],
+        "ledger": {n: b for n, b in sorted(data.get("ledger", {}).items()) if login in (None, n)},
         "disk": {"bytes": size, "used": used},
     }
 
@@ -263,6 +288,9 @@ def metrics(host, cfg, data, now):
         values[key("scratch_alloc_limit_bytes", **labels)] = entry["bytes"]
         values[key("scratch_alloc_used_bytes", **labels)] = used_bytes(host, cfg["mount"], entry["uid"])
         values[key("scratch_alloc_expires_timestamp_seconds", **labels)] = entry["expires"]
+    for login, book in data.get("ledger", {}).items():
+        values[key("scratch_alloc_allocated_byte_seconds_total", user=login)] = book["allocated_byte_seconds"]
+        values[key("scratch_alloc_used_byte_seconds_total", user=login)] = book["used_byte_seconds"]
     size, used = host.disk(cfg["mount"])
     values[key("scratch_alloc_disk_bytes")] = size
     values[key("scratch_alloc_disk_used_bytes")] = used

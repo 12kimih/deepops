@@ -200,8 +200,12 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"],
                                       text="사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요.")  # fmt: skip
             return
-        client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text="내 스크래치 공간",
-                                  blocks=blocks.home(scratch.mine(user)))  # fmt: skip
+        view = blocks.home(scratch.mine(user))
+        if body["user_id"] in admins:  # what waits for them, the people who used least first
+            view += blocks.queue(engine.held("scratch"), scratch.run("list"))
+        client.chat_postEphemeral(
+            channel=body["channel_id"], user=body["user_id"], text="내 스크래치 공간", blocks=view
+        )
 
     @app.action("scratch.new")
     def new(ack, body, client):

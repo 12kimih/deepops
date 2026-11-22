@@ -128,6 +128,27 @@ class ScratchAllocTests(unittest.TestCase):
         self.assertEqual(host.dirs, set())
         self.assertTrue(lines[-1].startswith("removed alice"))
 
+    def test_the_ledger_adds_what_was_held_and_used_and_outlives_the_allocation(self):
+        host, data = Host(XFS), {"allocations": {}, "ledger": {}}
+        sa.create(host, CFG, data, "alice", "1T", 3, "", 0)
+        host.used["1001"] = 1024**3  # 1 TiB used, in KiB
+        sa.sweep(host, CFG, data, DAY)
+        book = data["ledger"]["alice"]
+        self.assertEqual(
+            (book["allocated_byte_seconds"], book["used_byte_seconds"]), (1024**4 * DAY, 1024**4 * DAY)
+        )
+        sa.sweep(host, CFG, data, 2 * DAY)
+        self.assertEqual(
+            book["allocated_byte_seconds"], 2 * 1024**4 * DAY, "only the time since the last sweep"
+        )
+        sa.release(host, CFG, data, "alice", 2 * DAY)
+        sa.sweep(host, CFG, data, 3 * DAY)
+        self.assertEqual(data["allocations"], {})
+        self.assertEqual(
+            data["ledger"]["alice"]["allocated_byte_seconds"], 2 * 1024**4 * DAY, "kept, not grown"
+        )
+        self.assertIn("alice", sa.listing(host, CFG, data, "alice")["ledger"])
+
     def test_the_listing_carries_the_disk(self):
         host, data = Host(XFS), fresh()
         sa.create(host, CFG, data, "alice", "1T", 30, "", 0)

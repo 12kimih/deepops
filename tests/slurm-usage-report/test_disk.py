@@ -218,7 +218,7 @@ class RenderTests(unittest.TestCase):
         details = text_of(thread[0][1])
         self.assertIn("Scratch", details)
         self.assertIn("70G free of 100G", details)
-        self.assertIn("alice  5G         1G    20%   10d", details)
+        self.assertRegex(details, r"alice +5G +1G +20% +10d +0.0")
         self.assertIn("frozen", details)
         self.assertNotIn("@alice", details)
         self.assertIsNone(disk_report.collect_scratch(Prom({})), "no allocations: no section")

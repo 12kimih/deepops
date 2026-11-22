@@ -112,10 +112,17 @@ def collect_scratch(prom):
         return None
     used = series(prom, "scratch_alloc_used_bytes", ("user", "state"))
     ends = series(prom, "scratch_alloc_expires_timestamp_seconds", ("user", "state"))
+    held = {k[1]: v for k, v in series(prom, "scratch_alloc_allocated_byte_seconds_total", ("user",)).items()}
     disk_bytes = series(prom, "scratch_alloc_disk_bytes", ())
     disk_used = series(prom, "scratch_alloc_disk_used_bytes", ())
     allocations = {
-        k[1]: {"limit": v, "used": used.get(k, 0), "expires": ends.get(k), "state": k[2]}
+        k[1]: {
+            "limit": v,
+            "used": used.get(k, 0),
+            "expires": ends.get(k),
+            "state": k[2],
+            "held": held.get(k[1], 0),
+        }
         for k, v in limits.items()
     }
     return {
@@ -142,10 +149,14 @@ def scratch_lines(scratch, now):
                 size(a["used"]),
                 share,
                 left,
+                f"{a['held'] / (1024**4 * DAY):.1f}",
                 "" if a["state"] == "active" else a["state"],
             )
         )
-    return f"{head}\n{table(('USER', 'ALLOCATED', 'USED', 'USE', 'LEFT', ''), rows)}"
+    note = (
+        "TB-DAYS: allocated so far, from their first allocation (the fairness weighed when the disk is full)."
+    )
+    return f"{head}\n{table(('USER', 'ALLOCATED', 'USED', 'USE', 'LEFT', 'TB-DAYS', ''), rows)}\n{note}"
 
 
 def past(entry):

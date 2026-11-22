@@ -5,8 +5,9 @@ theirs. Approving a held request is the engine's (cluster_bot.blocks).
 """
 
 from .blocks import button as _button
-from .blocks import field
-from .scratch import human, summary
+from .blocks import field, held
+from .scratch import describe, human, summary
+from .scratch_policy import standing
 
 SIZES = ["100G", "500G", "1T", "2T", "5T", "10T"]
 
@@ -96,3 +97,25 @@ def reminder(a, days_left):
             ],
         },
     ]
+
+
+def queue(waiting, listing):
+    """For an administrator: the scratch requests waiting for a decision, the people who
+    have used least first (their cumulative allocated TB-days, the tool's ledger), each
+    with its standing and the buttons."""
+    if not waiting:
+        return []
+    ledger = listing.get("ledger") or {}
+    order = sorted(
+        waiting,
+        key=lambda kr: (
+            ledger.get(kr[1]["user"], {}).get("allocated_byte_seconds", 0),
+            kr[1].get("asked", 0),
+        ),
+    )
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": "*승인 대기* (누적 사용이 적은 사람부터)"}}
+    ]
+    for key, req in order:
+        blocks += held(req["user"], f"{describe(req)}  ({standing(listing, req['user'])})", key)
+    return blocks

@@ -52,6 +52,17 @@ class LogicTests(unittest.TestCase):
             [e["action_id"] for b in none if b["type"] == "actions" for e in b["elements"]], ["scratch.new"]
         )
 
+    def test_the_queue_puts_who_used_least_first(self):
+        waiting = [("k1", {"kind": "scratch", "op": "create", "user": "bob", "size": 6 * 1024**4, "days": 7, "asked": 1}),
+                   ("k2", {"kind": "scratch", "op": "create", "user": "carol", "size": 6 * 1024**4, "days": 7, "asked": 2})]  # fmt: skip
+        listing = {"allocations": [], "disk": {"bytes": 1, "used": 0},
+                   "ledger": {"bob": {"allocated_byte_seconds": 10**18}, "carol": {"allocated_byte_seconds": 0}}}  # fmt: skip
+        blocks = scratch_blocks.queue(waiting, listing)
+        texts = [b["text"]["text"] for b in blocks if b["type"] == "section"][1:]
+        self.assertTrue(texts[0].startswith("carol"), texts)
+        self.assertIn("누적 할당", texts[0])
+        self.assertEqual(scratch_blocks.queue([], listing), [])
+
     def test_forms_name_the_fields_their_handlers_read(self):
         form = scratch_blocks.new_form({"auto_bytes": 5 * 1024**4, "auto_days": 90, "guard": 0.8})
         self.assertEqual([b.get("block_id") for b in form["blocks"][1:]], ["size", "days", "reason"])
