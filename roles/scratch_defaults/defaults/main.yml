@@ -6,16 +6,20 @@
 # The mount point (XFS or ext4, with project quotas) that holds the allocations.
 scratch_alloc_mount: /scratch
 
-# Hard caps the tool enforces whoever asks: one allocation's size and how far its end
-# date may be from today.
-scratch_alloc_max_size: 20T
+# A person has one allocation, <mount>/<login>. One table decides a request, every period
+# counted from the day the allocation was made: up to auto_size and auto_days it is
+# given at once; beyond, up to the hard caps max_size and max_days, an administrator
+# approves; past the caps nobody can. An extension adds at most max_extend_days.
+# Giving space back is always at once.
+scratch_alloc_max_size: 10T
 scratch_alloc_max_days: 180
+scratch_alloc_max_extend_days: 90
+scratch_alloc_auto_size: 5T
+scratch_alloc_auto_days: 90
 
-# What a request may get without an administrator (the cluster bot reads these): size,
-# period, and how many extensions within those.
-scratch_alloc_auto_size: 2T
-scratch_alloc_auto_days: 30
-scratch_alloc_auto_extensions: 2
+# While the scratch disk is this full (a fraction), anything that grows (a new
+# allocation, a larger size, an extension) waits for an administrator.
+scratch_alloc_guard: 0.8
 
 # After its end date an allocation is read-only for this many days, then removed: the
 # cluster's period for users to clean up.
@@ -23,6 +27,3 @@ scratch_alloc_grace_days: "{{ cluster_user_grace_days }}"
 
 # How often the end dates are kept and the usage exported (systemd OnUnitActiveSec).
 scratch_alloc_sweep_interval: 15min
-
-# The first project ID handed out (project quota IDs; below are free for others).
-scratch_alloc_first_id: 1000

@@ -66,7 +66,7 @@ write, never through a shell.
 
 | Service | Offered by | Command | Requests |
 |---|---|---|---|
-| `scratch` | `roles/scratch_alloc` | `scratch-alloc ... serve` | create, resize, extend, release, list |
+| `scratch-alloc` | `roles/scratch_alloc` | `scratch-alloc ... serve` | create, resize, extend, release, list |
 | `bans` | `roles/fail2ban` (while there is a bot) | `cluster-bans serve` | list, unban IP |
 
 The shared pieces (dispatcher, sudo rule, authorized key) are items of every role that

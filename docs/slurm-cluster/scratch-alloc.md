@@ -1,32 +1,41 @@
 # Scratch allocations
 
-Fast scratch space is handed out per request instead of as one directory per person:
-each allocation is a directory of its own, `<mount>/<user>-<id>`, with a size limit and
-an end date. `roles/scratch_alloc` installs the tool (`cluster_tools.scratch_alloc`, as
+Fast scratch space is asked for, one allocation per person: `<mount>/<login>`
+(`/scratch/alice`), as `/home/<login>` is a home, with a size limit and an end date.
+`roles/scratch_alloc` installs the tool (`cluster_tools.scratch_alloc`, as
 `/usr/local/sbin/scratch-alloc`) and a timer on the host whose filesystem holds the
-scratch space (`[scratch-server]`, switch `slurm_enable_scratch_alloc`).
+scratch space (`[scratch-server]`, switch `slurm_enable_scratch_alloc`); people ask with
+the cluster bot's `/scratch`.
+
+## What a request gets
+
+One table, every period counted from the day the allocation was made:
+
+| Size | Period | Decided |
+|---|---|---|
+| up to `scratch_alloc_auto_size` (5TB) | up to `scratch_alloc_auto_days` (90 days) | at once |
+| up to `scratch_alloc_max_size` (10TB) | up to `scratch_alloc_max_days` (180 days) | an administrator approves |
+| past those | | nobody (the tool refuses) |
+
+A new allocation, a larger size and an extension all go by it; an extension adds at most
+`scratch_alloc_max_extend_days` (90) at a time. Giving space back (release, a smaller
+size) is always at once. While the scratch disk is `scratch_alloc_guard` (80%) full or
+more, anything that grows waits for an administrator. Nothing is ever shrunk by the
+system: the daily disk report shows each allocation, its use and days left.
 
 ## How an allocation lives
 
 | Stage | What happens |
 |---|---|
-| Created | The directory is made, the user's alone (0700), with a project quota (XFS or ext4) of the requested size. |
+| Created | `<mount>/<login>` is made, theirs alone (0700), or taken as it is when it is already their own directory (files and all); its project quota (ID: the person's UID) is the size. |
 | Resized | The project quota changes; data stays. |
 | Extended | The end date moves (from the end date, or from today once it passed); a frozen allocation gets its size back. |
 | Ended | At the end date the sweep freezes it: its limit drops to what it holds, so it can be read and copied away but not grow. |
 | Removed | `scratch_alloc_grace_days` after the end (the cluster's cleanup period, `cluster_user_grace_days`), or at once when released: a released allocation is moved aside immediately and deleted by the next sweep. |
 
-The registry (`<deepops_state_dir>/scratch-alloc/registry.json`, written whole under a
-lock) is the record of every allocation, so a request takes effect the moment it is
-accepted. The registry and the allocations are data: turning the component off never
-removes them.
-
-## Limits
-
-- `scratch_alloc_max_size` and `scratch_alloc_max_days` are hard caps the tool enforces
-  whoever asks.
-- `scratch_alloc_auto_size`, `scratch_alloc_auto_days` and `scratch_alloc_auto_extensions`
-  are what a request gets without an administrator; the cluster bot reads them.
+The registry (`/var/lib/scratch-alloc/registry.json`, written whole under a lock) records
+each allocation, so a request takes effect the moment it is accepted. The registry and
+the allocations are data: turning the component off never removes them.
 
 ## The filesystem
 
@@ -40,14 +49,15 @@ quotas on, asks for the reboot that applies them. ext4 also needs its `project` 
 ## Commands (root on the scratch server)
 
 ```bash
-scratch-alloc /etc/cluster-tools/scratch-alloc.json list [USER]
-scratch-alloc /etc/cluster-tools/scratch-alloc.json create USER SIZE DAYS [REASON]
-scratch-alloc /etc/cluster-tools/scratch-alloc.json resize ID SIZE
-scratch-alloc /etc/cluster-tools/scratch-alloc.json extend ID DAYS
-scratch-alloc /etc/cluster-tools/scratch-alloc.json release ID
+scratch-alloc /etc/cluster-tools/scratch-alloc.json list [LOGIN]
+scratch-alloc /etc/cluster-tools/scratch-alloc.json create LOGIN SIZE DAYS [REASON]
+scratch-alloc /etc/cluster-tools/scratch-alloc.json resize LOGIN SIZE
+scratch-alloc /etc/cluster-tools/scratch-alloc.json extend LOGIN DAYS
+scratch-alloc /etc/cluster-tools/scratch-alloc.json release LOGIN
 ```
 
-Each prints the allocation as JSON. The timer runs `sweep` and `metrics` every
-`scratch_alloc_sweep_interval`; `scratch_alloc_limit_bytes`, `scratch_alloc_used_bytes`
-and `scratch_alloc_expires_timestamp_seconds` (labels `id`, `user`, `state`) go to
-node_exporter.
+Each prints the allocation as JSON (`list`: the allocations and the disk). The timer runs
+`sweep` and `metrics` every `scratch_alloc_sweep_interval`: `scratch_alloc_limit_bytes`,
+`scratch_alloc_used_bytes` and `scratch_alloc_expires_timestamp_seconds` (labels `user`,
+`state`), and the disk's `scratch_alloc_disk_bytes` and `scratch_alloc_disk_used_bytes`,
+go to node_exporter.

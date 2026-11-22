@@ -3,7 +3,7 @@ policy (scratch_policy) decides, the scratch server applies, and every result is
 the person reads.
 
     feature = ScratchFeature(executor, policy)
-    feature.mine(user) -> the user's allocations
+    feature.mine(user) -> the user's allocation, as a list (empty or one)
 
 The executor runs cluster_tools.scratch_alloc on the scratch server (a
 cluster_bot.remote.Remote for SERVICE) and returns its JSON.
@@ -15,7 +15,7 @@ from . import scratch_policy
 from .requests import Feature
 
 # The scratch server's service for the bot (roles/scratch_alloc offers it by this name).
-SERVICE = "scratch"
+SERVICE = "scratch-alloc"
 
 
 def human(n):
@@ -35,10 +35,10 @@ def describe(req):
     if op == "create":
         return f"새 스크래치 {human(req['size'])}, {req['days']}일 ({req.get('reason') or '사유 없음'})"
     if op == "resize":
-        return f"{req['id']}번 크기를 {human(req['size'])}로"
+        return f"스크래치 크기를 {human(req['size'])}로"
     if op == "extend":
-        return f"{req['id']}번 {req['days']}일 연장"
-    return f"{req['id']}번 반납"
+        return f"스크래치 {req['days']}일 연장"
+    return "스크래치 반납"
 
 
 def words(req):
@@ -47,10 +47,10 @@ def words(req):
     if op == "create":
         return ["create", req["user"], f"{req['size'] // 1024}K", req["days"], req.get("reason", "")]
     if op == "resize":
-        return ["resize", req["id"], f"{req['size'] // 1024}K"]
+        return ["resize", req["user"], f"{req['size'] // 1024}K"]
     if op == "extend":
-        return ["extend", req["id"], req["days"]]
-    return ["release", req["id"]]
+        return ["extend", req["user"], req["days"]]
+    return ["release", req["user"]]
 
 
 def summary(a):
@@ -58,7 +58,7 @@ def summary(a):
     state = {"active": "사용 중", "frozen": "만료됨(읽기 전용)", "released": "반납됨"}.get(
         a["state"], a["state"]
     )
-    return f"`{a['path']}` {human(a['bytes'])}, {day(a['expires'])}까지, {state} (번호 {a['id']})"
+    return f"`{a['path']}` {human(a['bytes'])}, {day(a['expires'])}까지, {state}"
 
 
 class ScratchFeature(Feature):
@@ -66,21 +66,23 @@ class ScratchFeature(Feature):
         self.run, self.policy = executor, policy
 
     def mine(self, user):
-        return self.run("list", user)
+        return [a for a in self.run("list", user)["allocations"] if a["state"] != "released"]
 
     def deadlines(self):
-        """The active allocations' end dates (a cluster_bot.reminders source's)."""
+        """The active allocations' end dates, by login (a cluster_bot.reminders source's)."""
         return {
-            str(a["id"]): (a["expires"], a["user"], a) for a in self.run("list") if a["state"] == "active"
+            a["user"]: (a["expires"], a["user"], a)
+            for a in self.run("list")["allocations"]
+            if a["state"] == "active"
         }
 
     def decide(self, req):
-        return scratch_policy.decide(req, self.run("list"), self.policy)
+        return scratch_policy.decide(req, self.run("list"), self.policy, time.time())
 
     def apply(self, req):
         a = self.run(*words(req))
         if req["op"] == "release":
-            return f"{a['id']}번을 반납했습니다. 곧 지워집니다.", a
+            return f"{a['path']}을(를) 반납했습니다. 곧 지워집니다.", a
         return f"완료: {summary(a)}", a
 
     def describe(self, req):

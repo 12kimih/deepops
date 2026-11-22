@@ -2,20 +2,20 @@
 _scratch_alloc_command: /usr/local/sbin/scratch-alloc
 _scratch_alloc_config: /etc/cluster-tools/scratch-alloc.json
 _scratch_alloc_textfile: "{{ node_exporter_prom_dir }}/scratch-alloc.prom"
-_scratch_alloc_units: [scratch-alloc-sweep.service, scratch-alloc-sweep.timer]
+_scratch_alloc_units: [scratch-alloc.service, scratch-alloc.timer]
 _scratch_alloc_cfg:
   mount: "{{ scratch_alloc_mount }}"
-  registry: "{{ deepops_state_dir }}/scratch-alloc/registry.json"
-  first_id: "{{ scratch_alloc_first_id | int }}"
+  registry: /var/lib/scratch-alloc/registry.json
   max_bytes: "{{ scratch_alloc_max_size }}"
   max_days: "{{ scratch_alloc_max_days | int }}"
+  max_extend_days: "{{ scratch_alloc_max_extend_days | int }}"
   grace_days: "{{ scratch_alloc_grace_days | int }}"
   textfile: "{{ _scratch_alloc_textfile }}"
 
 # What this component installs, for its record (roles/component_record). The registry and
 # the allocations are data and stay.
 scratch_alloc_items: >-
-  {{ ['package:xfsprogs', 'package:quota', 'unit:scratch-alloc-sweep.timer', 'unit:scratch-alloc-sweep.service']
+  {{ ['package:xfsprogs', 'package:quota', 'unit:scratch-alloc.timer', 'unit:scratch-alloc.service']
      + _scratch_alloc_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ _scratch_alloc_command, 'file:' ~ _scratch_alloc_config, 'file:' ~ _scratch_alloc_textfile,
         'file:' ~ cluster_tools_lib_config_records ~ '/scratch_alloc.json']
@@ -24,5 +24,5 @@ scratch_alloc_items: >-
 # The cluster bot's requests (roles/cluster_bot_access): the allocation command's serve
 # mode, which takes only those.
 _scratch_alloc_bot_service:
-  name: scratch
+  name: scratch-alloc
   argv: ["{{ _scratch_alloc_command }}", "{{ _scratch_alloc_config }}", serve]

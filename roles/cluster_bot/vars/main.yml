@@ -46,7 +46,7 @@ _cluster_bot_cfg:
     policy:
       auto_bytes: "{{ scratch_alloc_auto_size | kib * 1024 }}"
       auto_days: "{{ scratch_alloc_auto_days | int }}"
-      auto_extensions: "{{ scratch_alloc_auto_extensions | int }}"
+      guard: "{{ scratch_alloc_guard | float }}"
     remind_days: "{{ cluster_bot_scratch_remind_days }}"
   bans:
     hosts: "{{ dict(_cluster_bot_ban_hosts | zip(_cluster_bot_ban_hosts | map('extract', _cluster_bot_addresses))) }}"

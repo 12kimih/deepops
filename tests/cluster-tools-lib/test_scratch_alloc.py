@@ -1,7 +1,8 @@
-"""cluster_tools.scratch_alloc: a request becomes a directory of its own with a project
-quota at once; resize, extend and release act on the registry and the quota; at the end
-date the allocation freezes at what it holds, and after the grace period, or once
-released, it goes. A filesystem without project quotas (XFS or ext4) is refused, naming the option."""
+"""cluster_tools.scratch_alloc: one allocation per person, /scratch/<login>, made (or
+taken as it is when theirs) with a project quota whose ID is their UID; resize, extend
+and release act on the registry and the quota; at the end date it freezes at what it
+holds, and after the grace period, or once released, it goes. A filesystem without
+project quotas (XFS or ext4) is refused, naming the option."""
 
 import json
 import os
@@ -18,7 +19,7 @@ DAY = sa.DAY
 
 class Host(sa.Host):
     def __init__(self, mounts):
-        self.mounts, self.commands, self.dirs, self.used = mounts, [], set(), {}
+        self.mounts, self.commands, self.dirs, self.used, self.owners = mounts, [], set(), {}, {}
 
     def read(self, path):
         return self.mounts
@@ -32,6 +33,10 @@ class Host(sa.Host):
 
     def make_dir(self, path, uid, gid):
         self.dirs.add(path)
+        self.owners[path] = uid
+
+    def owner(self, path):
+        return (self.owners.get(path, 0), True) if path in self.dirs else None
 
     def rename(self, src, dst):
         self.dirs.discard(src)
@@ -46,67 +51,90 @@ class Host(sa.Host):
     def user(self, name):
         return (1001, 1001) if name == "alice" else None
 
+    def disk(self, mount):
+        return 100 * 1024**4, 30 * 1024**4
+
 
 XFS = "/dev/md0 /scratch xfs rw,noatime,attr2,inode64,prjquota 0 0\n"
-CFG = {"mount": "/scratch", "max_bytes": "20T", "max_days": 180, "grace_days": 14}
+CFG = {"mount": "/scratch", "max_bytes": "10T", "max_days": 180, "max_extend_days": 90, "grace_days": 14}
 
 
 def fresh():
-    return {"next_id": 1000, "allocations": {}}
+    return {"allocations": {}}
 
 
 class ScratchAllocTests(unittest.TestCase):
-    def test_create_makes_a_directory_with_its_quota(self):
+    def test_create_makes_the_persons_directory_with_their_uid_as_the_project(self):
         host, data = Host(XFS), fresh()
         out = sa.create(host, CFG, data, "alice", "2T", 30, "training data", 0)
-        self.assertEqual(out["path"], "/scratch/alice-1000")
-        self.assertEqual(out["bytes"], 2 * 1024**4)
-        self.assertEqual(out["expires"], 30 * DAY)
-        self.assertIn("project -s -p /scratch/alice-1000 1000", host.commands)
-        self.assertIn(f"limit -p bsoft=0 bhard={2 * 1024**3}k 1000", host.commands)
-        self.assertEqual(data["next_id"], 1001)
+        self.assertEqual((out["path"], out["uid"]), ("/scratch/alice", 1001))
+        self.assertEqual((out["bytes"], out["expires"]), (2 * 1024**4, 30 * DAY))
+        self.assertIn("project -s -p /scratch/alice 1001", host.commands)
+        self.assertIn(f"limit -p bsoft=0 bhard={2 * 1024**3}k 1001", host.commands)
+        with self.assertRaisesRegex(sa.Error, "already"):
+            sa.create(host, CFG, data, "alice", "1T", 30, "", 0)
+
+    def test_their_own_directory_is_taken_as_it_is_and_someone_elses_refused(self):
+        host = Host(XFS)
+        host.dirs.add("/scratch/alice")
+        host.owners["/scratch/alice"] = 1001
+        out = sa.create(host, CFG, fresh(), "alice", "1T", 30, "", 0)
+        self.assertEqual(out["path"], "/scratch/alice")
+        host.owners["/scratch/alice"] = 1002
+        with self.assertRaisesRegex(sa.Error, "not alice's own"):
+            sa.create(host, CFG, fresh(), "alice", "1T", 30, "", 0)
 
     def test_requests_past_the_hard_caps_or_for_nobody_are_refused(self):
-        host = Host(XFS)
         for user, size, days in (
             ("bob", "1T", 1),
-            ("alice", "21T", 1),
+            ("alice", "11T", 1),
             ("alice", "1T", 181),
             ("alice", "x", 1),
         ):
             with self.subTest(user=user, size=size, days=days), self.assertRaises(sa.Error):
-                sa.create(host, CFG, fresh(), user, size, days, "", 0)
+                sa.create(Host(XFS), CFG, fresh(), user, size, days, "", 0)
 
     def test_resize_extend_and_release(self):
         host, data = Host(XFS), fresh()
         sa.create(host, CFG, data, "alice", "1T", 30, "", 0)
-        sa.resize(host, CFG, data, 1000, "3T")
-        self.assertEqual(data["allocations"]["1000"]["bytes"], 3 * 1024**4)
-        sa.extend(host, CFG, data, 1000, 14, 0)
-        self.assertEqual(data["allocations"]["1000"]["expires"], 44 * DAY)
-        with self.assertRaises(sa.Error):
-            sa.extend(host, CFG, data, 1000, 170, 0)  # past max_days from today
-        sa.release(host, CFG, data, 1000, 5)
-        self.assertEqual(data["allocations"]["1000"]["state"], "released")
-        self.assertIn("/scratch/.released/1000", host.dirs)
+        sa.resize(host, CFG, data, "alice", "3T")
+        self.assertEqual(data["allocations"]["alice"]["bytes"], 3 * 1024**4)
+        sa.extend(host, CFG, data, "alice", 90, 0)
+        self.assertEqual(data["allocations"]["alice"]["expires"], 120 * DAY)
+        with self.assertRaisesRegex(sa.Error, "1 to 90"):
+            sa.extend(host, CFG, data, "alice", 91, 0)  # one extension adds at most 90 days
+        sa.extend(host, CFG, data, "alice", 60, 0)  # to 180 days from when it was made
+        with self.assertRaisesRegex(sa.Error, "180 days from when it was made"):
+            sa.extend(host, CFG, data, "alice", 1, 0)
+        sa.release(host, CFG, data, "alice", 5)
+        self.assertEqual(data["allocations"]["alice"]["state"], "released")
+        self.assertIn("/scratch/.released/alice-5", host.dirs)
 
     def test_sweep_freezes_then_removes_after_the_grace_period(self):
         host, data = Host(XFS), fresh()
         sa.create(host, CFG, data, "alice", "1T", 1, "", 0)
-        host.used["1000"] = 5000
+        host.used["1001"] = 5000
         self.assertEqual(sa.sweep(host, CFG, data, DAY - 1), [])
         lines = sa.sweep(host, CFG, data, DAY)
-        self.assertEqual(data["allocations"]["1000"]["state"], "frozen")
-        self.assertIn("limit -p bsoft=0 bhard=5000k 1000", host.commands)
-        self.assertTrue(lines[0].startswith("froze 1000"))
+        self.assertEqual(data["allocations"]["alice"]["state"], "frozen")
+        self.assertIn("limit -p bsoft=0 bhard=5000k 1001", host.commands)
+        self.assertTrue(lines[0].startswith("froze alice"))
         # Extending a frozen allocation gives its size back.
-        sa.extend(host, CFG, data, 1000, 1, DAY)
-        self.assertEqual(data["allocations"]["1000"]["state"], "active")
+        sa.extend(host, CFG, data, "alice", 1, DAY)
+        self.assertEqual(data["allocations"]["alice"]["state"], "active")
         sa.sweep(host, CFG, data, 2 * DAY)
         lines = sa.sweep(host, CFG, data, 2 * DAY + 14 * DAY)
         self.assertEqual(data["allocations"], {})
         self.assertEqual(host.dirs, set())
-        self.assertTrue(lines[-1].startswith("removed 1000"))
+        self.assertTrue(lines[-1].startswith("removed alice"))
+
+    def test_the_listing_carries_the_disk(self):
+        host, data = Host(XFS), fresh()
+        sa.create(host, CFG, data, "alice", "1T", 30, "", 0)
+        listing = sa.listing(host, CFG, data, "alice")
+        self.assertEqual([a["user"] for a in listing["allocations"]], ["alice"])
+        self.assertEqual(listing["disk"], {"bytes": 100 * 1024**4, "used": 30 * 1024**4})
+        self.assertEqual(sa.listing(host, CFG, data, "bob")["allocations"], [])
 
     def test_the_filesystem_must_have_project_quotas(self):
         sa.check_mount(Host(XFS), "/scratch")
@@ -120,10 +148,12 @@ class ScratchAllocTests(unittest.TestCase):
 
     def test_the_registry_is_written_whole_under_its_lock(self):
         with tempfile.TemporaryDirectory() as tmp:
-            reg = sa.Registry(os.path.join(tmp, "r", "registry.json"), 1000)
+            reg = sa.Registry(os.path.join(tmp, "r", "registry.json"))
             with reg.open() as data:
-                data["next_id"] = 1005
-            self.assertEqual(json.loads(Path(reg.path).read_text())["next_id"], 1005)
+                data["allocations"]["alice"] = {"user": "alice"}
+            self.assertEqual(
+                json.loads(Path(reg.path).read_text())["allocations"], {"alice": {"user": "alice"}}
+            )
             self.assertEqual(os.stat(reg.path).st_mode & 0o777, 0o600)
 
     def test_the_bot_key_may_ask_only_for_requests(self):
@@ -132,7 +162,7 @@ class ScratchAllocTests(unittest.TestCase):
             ["scratch-alloc", "c.json", "create", "alice", "2T", "30"],
         )
         self.assertEqual(
-            sa.served("c.json", "extend 1000 7"), ["scratch-alloc", "c.json", "extend", "1000", "7"]
+            sa.served("c.json", "extend alice 7"), ["scratch-alloc", "c.json", "extend", "alice", "7"]
         )
         self.assertEqual(sa.served("c.json", "create alice 2T 30 'two words'")[-1], "two words")
         # A reason with spaces arrives quoted; unquoted it is too many words.
@@ -140,7 +170,7 @@ class ScratchAllocTests(unittest.TestCase):
             "sweep",
             "metrics",
             "rm -rf /",
-            "extend 1000",
+            "extend alice",
             "",
             "list a b",
             "create alice 2T 30 my run",

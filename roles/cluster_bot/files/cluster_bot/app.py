@@ -224,7 +224,7 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
             submit(
                 client,
                 slack_id,
-                {"kind": "scratch", "op": "release", "user": user, "id": int(action["value"])},
+                {"kind": "scratch", "op": "release", "user": user},  # their own: one per person
             )
 
     @app.view("scratch.create")
@@ -247,8 +247,7 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
         if not user:
             return
         value = view["state"]["values"]["v"]["v"]
-        req = {"kind": "scratch", "op": view["callback_id"].split(".")[1], "user": user,
-               "id": int(view["private_metadata"])}  # fmt: skip
+        req = {"kind": "scratch", "op": view["callback_id"].split(".")[1], "user": user}
         if req["op"] == "extend":
             req["days"] = int(value["value"])
         else:

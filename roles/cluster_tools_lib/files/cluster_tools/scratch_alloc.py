@@ -1,34 +1,37 @@
-"""scratch_alloc: space on the fast scratch filesystem, handed out per request, each with
-its own size limit (a project quota) and an end date.
+"""scratch_alloc: space on the fast scratch filesystem, one allocation per person, asked
+for: /scratch/<login>, with a size limit (a project quota) and an end date.
 
-    scratch-alloc CONFIG.json create USER SIZE DAYS [REASON]   a new allocation
-    scratch-alloc CONFIG.json resize ID SIZE                   a new size limit
-    scratch-alloc CONFIG.json extend ID DAYS                   DAYS more from today or its end
-    scratch-alloc CONFIG.json release ID                       given back now
-    scratch-alloc CONFIG.json list [USER]                      every allocation, as JSON
+    scratch-alloc CONFIG.json create LOGIN SIZE DAYS [REASON]  LOGIN's allocation
+    scratch-alloc CONFIG.json resize LOGIN SIZE                a new size limit
+    scratch-alloc CONFIG.json extend LOGIN DAYS                DAYS more past its end date
+    scratch-alloc CONFIG.json release LOGIN                    given back now
+    scratch-alloc CONFIG.json list [LOGIN]                     the allocations and the disk, as JSON
     scratch-alloc CONFIG.json sweep                            the end dates kept (a timer)
     scratch-alloc CONFIG.json metrics                          each allocation's size and use
     scratch-alloc CONFIG.json serve                            one of the above, from SSH
 
 serve is the forced command of the cluster bot's SSH key: it takes the request from
-SSH_ORIGINAL_COMMAND (one of create, resize, extend, release, list, with their
-arguments, nothing else) and runs it as above, so the key can do nothing else.
+SSH_ORIGINAL_COMMAND (create, resize, extend, release or list, with their arguments,
+nothing else) and runs it as above.
 
-Run as root on the host whose filesystem holds the scratch space. An allocation is
-the directory <mount>/<user>-<id>, the user's alone (0700), whose project quota is its
-size; the registry (a JSON file next to it, written atomically under a lock) is the
-record of every allocation, so a request is applied the moment it is accepted.
+Run as root on the host whose filesystem holds the scratch space. A person has at most
+one allocation, the directory <mount>/<login>, theirs alone (0700), whose project quota
+(its ID is the person's UID, as unique on the filesystem as the account is) is its
+size. A directory already there that is theirs is taken as it is, files and all. The
+registry (a JSON file, written atomically under a lock) records each allocation, so a
+request is applied the moment it is accepted.
+
+Hard caps, the configuration's, whoever asks: a size of max_bytes, an end at most
+max_days after the allocation was made (an extension adds at most max_extend_days).
+What a request gets without an administrator is the cluster bot's to decide.
 
 At its end date an allocation is frozen: its limit drops to what it holds, so nothing
-more can be written but everything can be read and copied away. After grace_days
-(the cluster's period for users to clean up) it is removed. A released one is moved
-aside at once and removed by the next sweep, so release never waits on a large delete.
-Who may ask for what (sizes and periods allowed without an administrator) is the
-cluster bot's to decide; this tool refuses only what the configuration's hard caps
-forbid.
+more can be written but everything can be read and copied away. After grace_days it is
+removed. A released one is moved aside at once and removed by the next sweep, so
+release never waits on a large delete.
 
-CONFIG: {"mount": "/scratch", "registry": "/var/lib/deepops/scratch-alloc/registry.json",
-         "first_id": 1000, "max_bytes": "20T", "max_days": 180, "grace_days": 14,
+CONFIG: {"mount": "/scratch", "registry": "/var/lib/scratch-alloc/registry.json",
+         "max_bytes": "10T", "max_days": 180, "max_extend_days": 90, "grace_days": 14,
          "textfile": "/run/prometheus/scratch-alloc.prom"}
 Python 3.9 or newer, standard library only.
 """
@@ -38,6 +41,7 @@ import json
 import os
 import pwd
 import shutil
+import stat
 import sys
 import time
 from contextlib import contextmanager
@@ -65,6 +69,14 @@ class Host(disk_quota.Host):
         os.chown(path, uid, gid)
         os.chmod(path, 0o700)
 
+    def owner(self, path):
+        """(uid, is a directory and no link) of PATH, or None when there is nothing."""
+        try:
+            st = os.lstat(path)
+        except FileNotFoundError:
+            return None
+        return st.st_uid, stat.S_ISDIR(st.st_mode)
+
     def rename(self, src, dst):
         os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
         os.rename(src, dst)
@@ -81,6 +93,11 @@ class Host(disk_quota.Host):
         except KeyError:
             return None
         return entry.pw_uid, entry.pw_gid
+
+    def disk(self, mount):
+        """(bytes, used bytes) of the filesystem at MOUNT."""
+        st = os.statvfs(mount)
+        return st.f_blocks * st.f_frsize, (st.f_blocks - st.f_bfree) * st.f_frsize
 
 
 def nbytes(size):
@@ -99,10 +116,10 @@ def check_mount(host, mount):
 
 
 class Registry:
-    """The allocations, read and written whole under an exclusive lock."""
+    """The allocations, by login, read and written whole under an exclusive lock."""
 
-    def __init__(self, path, first_id):
-        self.path, self.first_id = path, first_id
+    def __init__(self, path):
+        self.path = path
 
     @contextmanager
     def open(self):
@@ -112,7 +129,7 @@ class Registry:
             try:
                 data = json.loads(Path(self.path).read_text())
             except FileNotFoundError:
-                data = {"next_id": self.first_id, "allocations": {}}
+                data = {"allocations": {}}
             yield data
             write_atomic(self.path, json.dumps(data, indent=1, sort_keys=True) + "\n", mode=0o600)
 
@@ -126,108 +143,129 @@ def set_limit(host, mount, pid, limit):
     disk_quota.project_limit(host, mount, pid, max(limit, 0))
 
 
-def find(data, alloc_id):
-    entry = data["allocations"].get(str(alloc_id))
+def find(data, login):
+    entry = data["allocations"].get(login)
     if not entry:
-        raise Error(f"no allocation {alloc_id}")
+        raise Error(f"{login} has no allocation")
     return entry
 
 
-def create(host, cfg, data, user, size, days, reason, now):
-    ids = host.user(user)
-    if not ids:
-        raise Error(f"no account {user!r}")
-    limit, days = nbytes(size), int(days)
-    if limit <= 0 or limit > nbytes(cfg["max_bytes"]):
-        raise Error(f"{size} is outside 1 KiB to {cfg['max_bytes']}")
-    if not 0 < days <= cfg["max_days"]:
-        raise Error(f"{days} days is outside 1 to {cfg['max_days']}")
-    pid = data["next_id"]
-    path = os.path.join(cfg["mount"], f"{user}-{pid}")
-    if host.exists(path):
-        raise Error(f"{path} exists already")
-    host.make_dir(path, *ids)
-    disk_quota.project_set(host, cfg["mount"], path, pid)
-    set_limit(host, cfg["mount"], pid, limit)
-    data["next_id"] = pid + 1
-    data["allocations"][str(pid)] = {
-        "user": user, "path": path, "bytes": limit, "created": int(now),
-        "expires": int(now + days * DAY), "state": "active", "reason": reason, "extensions": 0,
-    }  # fmt: skip
-    return data["allocations"][str(pid)] | {"id": pid}
-
-
-def resize(host, cfg, data, alloc_id, size):
-    entry = find(data, alloc_id)
-    if entry["state"] != "active":
-        raise Error(f"allocation {alloc_id} is {entry['state']}: extend it first")
+def _size(cfg, size):
     limit = nbytes(size)
     if limit <= 0 or limit > nbytes(cfg["max_bytes"]):
         raise Error(f"{size} is outside 1 KiB to {cfg['max_bytes']}")
-    set_limit(host, cfg["mount"], alloc_id, limit)
-    entry["bytes"] = limit
-    return entry | {"id": int(alloc_id)}
+    return limit
 
 
-def extend(host, cfg, data, alloc_id, days, now):
-    """DAYS more, counted from the end date (or from today once it has passed); a frozen
-    allocation gets its size limit back."""
-    entry = find(data, alloc_id)
+def create(host, cfg, data, login, size, days, reason, now):
+    """LOGIN's allocation: <mount>/<login>, made, or taken as it is when theirs already."""
+    if login in data["allocations"]:
+        raise Error(f"{login} has an allocation already: resize or extend it")
+    ids = host.user(login)
+    if not ids:
+        raise Error(f"no account {login!r}")
+    limit, days = _size(cfg, size), int(days)
+    if not 0 < days <= cfg["max_days"]:
+        raise Error(f"{days} days is outside 1 to {cfg['max_days']}")
+    path = os.path.join(cfg["mount"], login)
+    there = host.owner(path)
+    if there is None:
+        host.make_dir(path, *ids)
+    elif there != (ids[0], True):
+        raise Error(f"{path} is there and not {login}'s own directory")
+    disk_quota.project_set(host, cfg["mount"], path, ids[0])
+    set_limit(host, cfg["mount"], ids[0], limit)
+    data["allocations"][login] = {
+        "user": login, "uid": ids[0], "path": path, "bytes": limit, "created": int(now),
+        "expires": int(now + days * DAY), "state": "active", "reason": reason,
+    }  # fmt: skip
+    return data["allocations"][login]
+
+
+def resize(host, cfg, data, login, size):
+    entry = find(data, login)
+    if entry["state"] != "active":
+        raise Error(f"{login}'s allocation is {entry['state']}: extend it first")
+    entry["bytes"] = _size(cfg, size)
+    set_limit(host, cfg["mount"], entry["uid"], entry["bytes"])
+    return entry
+
+
+def extend(host, cfg, data, login, days, now):
+    """DAYS more past its end date (or today once that passed), at most max_extend_days at
+    a time and never past max_days from when it was made; a frozen allocation gets its
+    size limit back."""
+    entry = find(data, login)
     if entry["state"] == "released":
-        raise Error(f"allocation {alloc_id} was released")
+        raise Error(f"{login}'s allocation was released")
     days = int(days)
-    start = max(entry["expires"], now)
-    if not 0 < days or start + days * DAY > now + cfg["max_days"] * DAY:
-        raise Error(f"an allocation ends at most {cfg['max_days']} days from today")
+    if not 0 < days <= cfg["max_extend_days"]:
+        raise Error(f"an extension adds 1 to {cfg['max_extend_days']} days")
+    end = max(entry["expires"], now) + days * DAY
+    if end > entry["created"] + cfg["max_days"] * DAY:
+        raise Error(f"an allocation lasts at most {cfg['max_days']} days from when it was made")
     if entry["state"] == "frozen":
-        set_limit(host, cfg["mount"], alloc_id, entry["bytes"])
+        set_limit(host, cfg["mount"], entry["uid"], entry["bytes"])
         entry["state"] = "active"
-    entry["expires"] = int(start + days * DAY)
-    entry["extensions"] = entry.get("extensions", 0) + 1
-    return entry | {"id": int(alloc_id)}
+    entry["expires"] = int(end)
+    return entry
 
 
-def release(host, cfg, data, alloc_id, now):
-    """Given back now: out of the user's sight at once, removed by the next sweep."""
-    entry = find(data, alloc_id)
+def release(host, cfg, data, login, now):
+    """Given back now: out of the person's sight at once, removed by the next sweep."""
+    entry = find(data, login)
     if entry["state"] == "released":
-        return entry | {"id": int(alloc_id)}
+        return entry
     if host.exists(entry["path"]):
-        host.rename(entry["path"], os.path.join(cfg["mount"], TRASH, str(alloc_id)))
+        host.rename(entry["path"], os.path.join(cfg["mount"], TRASH, f"{login}-{int(now)}"))
     entry["state"], entry["released"] = "released", int(now)
-    return entry | {"id": int(alloc_id)}
+    return entry
 
 
 def sweep(host, cfg, data, now):
     """Freeze what reached its end date, remove what stayed frozen past the grace period
     and what was released; each change as a line."""
     out, grace = [], cfg["grace_days"] * DAY
-    for alloc_id, entry in sorted(data["allocations"].items(), key=lambda kv: int(kv[0])):
+    for login, entry in sorted(data["allocations"].items()):
         if entry["state"] == "active" and now >= entry["expires"]:
-            set_limit(host, cfg["mount"], alloc_id, max(used_bytes(host, cfg["mount"], alloc_id), 4096))
+            set_limit(
+                host, cfg["mount"], entry["uid"], max(used_bytes(host, cfg["mount"], entry["uid"]), 4096)
+            )
             entry["state"], entry["frozen"] = "frozen", int(now)
-            out.append(f"froze {alloc_id} ({entry['user']}): ended, read-only for {cfg['grace_days']} days")
+            out.append(f"froze {login}: ended, read-only for {cfg['grace_days']} days")
         elif entry["state"] == "frozen" and now >= entry["expires"] + grace:
-            out += [f"released {alloc_id} ({entry['user']}): grace period over"]
-            release(host, cfg, data, alloc_id, now)
+            out.append(f"released {login}: grace period over")
+            release(host, cfg, data, login, now)
         if entry["state"] == "released":
-            trash = os.path.join(cfg["mount"], TRASH, alloc_id)
+            trash = os.path.join(cfg["mount"], TRASH, f"{login}-{entry['released']}")
             if host.exists(trash):
                 host.remove_tree(trash)
-            # Its files are gone with it, so the project ID only needs its limit cleared.
-            set_limit(host, cfg["mount"], alloc_id, 0)
-            del data["allocations"][alloc_id]
-            out.append(f"removed {alloc_id} ({entry['user']})")
+            # Its files are gone with it, so the project only needs its limit cleared.
+            set_limit(host, cfg["mount"], entry["uid"], 0)
+            del data["allocations"][login]
+            out.append(f"removed {login}")
     return out
+
+
+def listing(host, cfg, data, login=None):
+    """The allocations (LOGIN's alone, when given) and the disk: what the bot decides with."""
+    size, used = host.disk(cfg["mount"])
+    return {
+        "allocations": [e for n, e in sorted(data["allocations"].items()) if login in (None, n)],
+        "disk": {"bytes": size, "used": used},
+    }
 
 
 def metrics(host, cfg, data, now):
     values = {}
-    for alloc_id, entry in data["allocations"].items():
-        labels = {"id": alloc_id, "user": entry["user"], "state": entry["state"]}
+    for login, entry in data["allocations"].items():
+        labels = {"user": login, "state": entry["state"]}
         values[key("scratch_alloc_limit_bytes", **labels)] = entry["bytes"]
-        values[key("scratch_alloc_used_bytes", **labels)] = used_bytes(host, cfg["mount"], alloc_id)
+        values[key("scratch_alloc_used_bytes", **labels)] = used_bytes(host, cfg["mount"], entry["uid"])
         values[key("scratch_alloc_expires_timestamp_seconds", **labels)] = entry["expires"]
+    size, used = host.disk(cfg["mount"])
+    values[key("scratch_alloc_disk_bytes")] = size
+    values[key("scratch_alloc_disk_used_bytes")] = used
     values[key("scratch_alloc_last_success_timestamp_seconds")] = int(now)
     return render(values)
 
@@ -250,7 +288,7 @@ def served(config, original):
     return ["scratch-alloc", config, *words]
 
 
-CONFIG_KEYS = {"mount": str, "registry": str, "first_id": int, "max_bytes": (int, str), "max_days": int,
+CONFIG_KEYS = {"mount": str, "registry": str, "max_bytes": (int, str), "max_days": int, "max_extend_days": int,
                "grace_days": int, "textfile": str}  # fmt: skip
 
 
@@ -276,7 +314,7 @@ def main(argv=None):
         host, now, op, rest = Host(), time.time(), args[1], args[2:]
         try:
             check_mount(host, cfg["mount"])
-            with Registry(cfg["registry"], cfg["first_id"]).open() as data:
+            with Registry(cfg["registry"]).open() as data:
                 if op == "create":
                     result = create(host, cfg, data, rest[0], rest[1], rest[2], " ".join(rest[3:]), now)
                 elif op == "resize":
@@ -286,8 +324,7 @@ def main(argv=None):
                 elif op == "release":
                     result = release(host, cfg, data, rest[0], now)
                 elif op == "list":
-                    result = [e | {"id": int(i)} for i, e in sorted(data["allocations"].items())
-                              if not rest or e["user"] == rest[0]]  # fmt: skip
+                    result = listing(host, cfg, data, rest[0] if rest else None)
                 elif op == "sweep":
                     result = sweep(host, cfg, data, now)
                 else:

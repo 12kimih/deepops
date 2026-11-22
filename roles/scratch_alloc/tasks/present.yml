@@ -92,7 +92,7 @@
 
 - name: Keep the end dates and export the usage regularly
   systemd_unit:
-    name: scratch-alloc-sweep.timer
+    name: scratch-alloc.timer
     enabled: true
     state: "{{ 'restarted' if scratch_alloc_units is changed else 'started' }}"
     daemon_reload: true
