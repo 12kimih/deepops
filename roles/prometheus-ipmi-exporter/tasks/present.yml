@@ -24,12 +24,11 @@
     container_image: "{{ ipmi_exporter_container }}"
 
 - name: Load IPMI kernel modules
-  community.general.modprobe:
-    name: "{{ item }}"
-    state: present
-    persistent: present
-  loop: "{{ ipmi_exporter_kernel_modules }}"
-  failed_when: false
+  ansible.builtin.include_role:
+    name: kernel_modules
+  vars:
+    kernel_modules: "{{ ipmi_exporter_kernel_modules }}"
+    kernel_modules_optional: true
 
 - name: Check for the IPMI device
   ansible.builtin.stat:

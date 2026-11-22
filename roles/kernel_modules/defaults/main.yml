@@ -1,0 +1,16 @@
+---
+# kernel_modules -- load kernel modules now and at every boot, the one way roles do it:
+#
+#   - ansible.builtin.include_role:
+#       name: kernel_modules
+#     vars:
+#       kernel_modules: [ipmi_si, ipmi_devintf]
+#       kernel_modules_optional: true   # a host may refuse one (no BMC): not a failure
+#
+# Each module that loads gets /etc/modules-load.d/<module>.conf (one the host refuses
+# gets none: it would fail every boot), written whole (so --diff shows it) and the
+# same whoever asks, so two roles needing one module never rewrite each
+# other's file. kernel_modules_files lists those files, for the caller's record
+# (roles/component_record): a file stays while any component that needs it remains.
+kernel_modules: []
+kernel_modules_optional: false

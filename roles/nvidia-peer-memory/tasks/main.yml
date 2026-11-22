@@ -53,11 +53,11 @@
     - is_dgx.stat.exists
     - nvidia_peermem_info.rc | default(1) != 0
 
-- name: Modprobe nv_peer_mem
-  community.general.modprobe:
-    name: nv_peer_mem
-    state: present
-    persistent: present  # write /etc/modules-load.d so it loads at boot
+- name: Load nv_peer_mem now and at boot
+  ansible.builtin.include_role:
+    name: kernel_modules
+  vars:
+    kernel_modules: [nv_peer_mem]
   when:
     - ansible_facts.ansible_local['gpus']['count'] | int > 0
     - is_dgx.stat.exists

@@ -1,0 +1,31 @@
+---
+- name: Load the modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ kernel_modules }}"
+  register: kernel_modules_loaded
+  failed_when: kernel_modules_loaded is failed and not kernel_modules_optional | bool
+
+# Only a module that loads is loaded at boot: one the host refuses (ipmi_si on a board
+# without a BMC) would fail systemd-modules-load on every boot.
+- name: Name the boot-time files
+  ansible.builtin.set_fact:
+    kernel_modules_boot: "{{ _loaded }}"
+    kernel_modules_files: "{{ _loaded | map('regex_replace', '^(.*)$', '/etc/modules-load.d/\\1.conf') | list }}"
+  vars:
+    # A refusal is the module's rc (failed_when keeps an optional one from failing).
+    _loaded: "{{ kernel_modules_loaded.results | rejectattr('rc', 'defined') | map(attribute='item') | list }}"
+
+# systemd-modules-load reads these at boot (modules-load.d(5)). community.general.modprobe
+# could write them too (persistent), but shows no diff and writes no mark.
+- name: Load the modules at every boot
+  ansible.builtin.copy:
+    dest: "/etc/modules-load.d/{{ item }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by roles/kernel_modules: loaded at boot for deepops.
+      {{ item }}
+  loop: "{{ kernel_modules_boot }}"

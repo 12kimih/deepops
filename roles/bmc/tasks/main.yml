@@ -20,14 +20,27 @@
 # ipmi_si drives the KCS interface; ipmi_devintf exports it as /dev/ipmi0. A board
 # without a BMC refuses ipmi_si; the device check below decides what that means.
 - name: Load the in-band IPMI modules
-  community.general.modprobe:
-    name: "{{ item }}"
-    state: present
-    persistent: present
-  loop:
-    - ipmi_si
-    - ipmi_devintf
-  failed_when: false
+  ansible.builtin.include_role:
+    name: kernel_modules
+    apply:
+      tags: [bmc]
+  vars:
+    kernel_modules: [ipmi_si, ipmi_devintf]
+    kernel_modules_optional: true
+  tags:
+    - bmc
+
+# Recorded, so their boot-time files stay while this role needs them, whatever else
+# (the IPMI exporter) that also loads them is removed.
+- name: Record the IPMI modules the BMC needs
+  ansible.builtin.include_role:
+    name: component_record
+    apply:
+      tags: [bmc]
+  vars:
+    component_record_name: bmc
+    component_record_action: present
+    component_record_items: "{{ kernel_modules_files | map('regex_replace', '^', 'file:') | list }}"
   tags:
     - bmc
 
