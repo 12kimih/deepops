@@ -1,6 +1,8 @@
 """roles/job_scratch's decisions, evaluated as the tasks state them against made-up
-readings of a host: the image's size, when it may be created or grown, and when the
-first mount must wait for the node's jobs to end. No host is contacted."""
+readings of a host: the image's size (job_scratch_size at most, what the filesystem
+has room for beyond the reserve, never less than the image has), when it may be
+created or grown, and when the first mount must wait for the node's jobs to end. No
+host is contacted."""
 
 import sys
 import unittest
@@ -32,6 +34,9 @@ def reading(size=TB2, avail=TB2 - 30 * GIB, image=0, mounted="- -", occupied="",
     work = task("Work out the image's size")
     values.update(render(work["vars"], values))
     values["_job_scratch"] = render(work["set_fact"]["_job_scratch"], values)
+    values["_job_scratch"] = render(
+        task("Size the image within the space it can get")["set_fact"]["_job_scratch"], values
+    )
     return values
 
 
@@ -67,7 +72,7 @@ class Size(unittest.TestCase):
 
 
 GROWS = "Check the image only grows"
-SPACE = "Check the filesystem has the space"
+SPACE = "Check the filesystem has room for an image"
 
 
 def fits(values):
@@ -81,9 +86,17 @@ class CreateAndGrow(unittest.TestCase):
         self.assertTrue(runs("Create the image", values))
         self.assertFalse(runs("Grow the image and its filesystem", values))
 
-    def test_no_image_that_would_eat_the_reserve(self):
-        # A disk already a quarter used: the space check alone refuses, and says so.
+    def test_a_fuller_disk_gets_a_smaller_image_never_the_reserve(self):
+        # A disk already a quarter used: the image takes what is free beyond the reserve.
         values = reading(avail=TB2 * 3 // 4)
+        self.assertTrue(fits(values))
+        wanted = int(values["_job_scratch"]["wanted"])
+        self.assertLess(wanted, TB2 * 70 // 100)
+        self.assertLessEqual(wanted, TB2 * 3 // 4 - TB2 * 15 // 100)
+        self.assertGreater(wanted, TB2 * 3 // 4 - TB2 * 15 // 100 - GIB)
+
+    def test_a_disk_with_no_room_beyond_the_reserve_refuses(self):
+        values = reading(avail=TB2 * 10 // 100)
         self.assertTrue(holds(GROWS, values))
         self.assertFalse(holds(SPACE, values))
 
@@ -104,6 +117,13 @@ class CreateAndGrow(unittest.TestCase):
         values = reading(image=1800 * GIB, mounted="/dev/loop3 xfs")
         self.assertFalse(holds(GROWS, values))
         self.assertTrue(holds(SPACE, values), "shrinking needs no space: only the growth check refuses")
+
+    def test_an_image_larger_than_the_room_is_kept_as_it_is(self):
+        # The root filesystem filled up after the image was made: nothing grows, nothing shrinks.
+        values = reading(image=1300 * GIB, avail=50 * GIB, mounted="/dev/loop3 xfs")
+        self.assertTrue(fits(values))
+        self.assertEqual(int(values["_job_scratch"]["wanted"]), 1300 * GIB)
+        self.assertFalse(runs("Grow the image and its filesystem", values))
 
 
 class FirstMount(unittest.TestCase):

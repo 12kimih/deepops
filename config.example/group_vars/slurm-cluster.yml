@@ -164,7 +164,7 @@ slurm_ha_state_save_location: "/sw/slurm"
 # the OS's disk, and Slurm offers its size to --tmp (each node's TmpDisk). Deploy it
 # while the nodes run no jobs; a larger size later grows it in place, never smaller.
 #slurm_enable_job_scratch: false
-#job_scratch_size: "70%"      # of the root filesystem, or an absolute size (1200G, 3T)
+#job_scratch_size: "70%"      # at most, of the root filesystem, or an absolute size (1200G, 3T)
 #job_scratch_reserve: "15%"   # of the root filesystem left free beyond it
 
 ################################################################################

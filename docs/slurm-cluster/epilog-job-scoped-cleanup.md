@@ -132,8 +132,10 @@ slurmd, its logs and the container caches: one job that fills its `/tmp` fills
 them all, fails the other jobs on the node and drains it. `slurm_enable_job_scratch:
 true` (`roles/job_scratch`, on `slurm-node`, before Slurm in the deploy) gives the
 base an XFS filesystem of its own on every compute node alike: an image
-preallocated on the root filesystem (`job_scratch_file`, `job_scratch_size`, 70%
-by default, keeping `job_scratch_reserve` free) and loop-mounted at the base
+preallocated on the root filesystem (`job_scratch_file`, at most `job_scratch_size`,
+70% by default: a node whose root filesystem holds more gets a smaller image that
+keeps `job_scratch_reserve` free, and the preview says each node's size) and
+loop-mounted at the base
 (`nodev,nosuid,noatime`, with `prjquota` so a limit per job needs no remount).
 slurmd starts only with it mounted.
 
