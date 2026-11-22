@@ -174,7 +174,11 @@ the PCIe bus on a warm reboot until the next power cycle. For such a host set
 hostlist=<host>`. The role installs a systemd-shutdown hook
 (`/usr/lib/systemd/system-shutdown/bmc-cold-reboot`): after a clean shutdown, as the
 last step of every reboot, it asks the host's own BMC in-band (`/dev/ipmi0`, no
-password on the host) to power-cycle the chassis. Slurm's `RebootProgram`
+password on the host) to power-cycle the chassis with the power off for
+`bmc_cold_reboot_off_seconds` (30; the BMC's own interval of about a second did not
+bring a riser's GPUs back). It first writes an OEM entry into the BMC's event log, so
+`ipmitool sel elist` after the boot ("OEM record e0", data `646565706f70732d636f6c64`)
+shows the hook ran and reached the BMC even though the host's own logs end earlier. Slurm's `RebootProgram`
 (`scontrol reboot`), the maintenance playbooks and a plain `reboot` therefore all shut
 down cleanly first, then cold start. A poweroff stays a poweroff. A restart after a
 kernel panic does not pass through the hook. If the BMC does not answer, the reboot

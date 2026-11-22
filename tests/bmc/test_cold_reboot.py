@@ -7,8 +7,6 @@ and then is turned into a power cycle; a poweroff must stay a poweroff, and a ho
 without an IPMI device (or a BMC that does not answer) must still reboot.
 """
 
-import os
-import stat
 import subprocess
 import sys
 import tempfile
@@ -19,7 +17,21 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import bounds  # noqa: E402
 
-HOOK = ROOT / "roles/bmc/files/bmc-cold-reboot"
+TEMPLATE = ROOT / "roles/bmc/templates/bmc-cold-reboot.j2"
+
+
+def render(tmp, off=30):
+    """The hook as the role writes it (the template uses plain Jinja and format)."""
+    import jinja2
+
+    env = jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
+    path = Path(tmp, "bmc-cold-reboot")
+    text = env.from_string(TEMPLATE.read_text()).render(
+        ansible_managed="managed", bmc_cold_reboot_off_seconds=off
+    )
+    path.write_text(text)
+    path.chmod(0o755)
+    return path
 
 
 class ColdReboot(unittest.TestCase):
@@ -37,12 +49,12 @@ class ColdReboot(unittest.TestCase):
                 path.write_text(f"#!/bin/sh\n{body}\n")
                 path.chmod(0o755)
             env = {
-                "PATH": f"{bin_dir}:/usr/bin:/bin",
+                "BMC_COLD_REBOOT_PATH": f"{bin_dir}:/usr/bin:/bin",
                 # a character device every host has, standing in for /dev/ipmi0
                 "BMC_COLD_REBOOT_DEVICE": "/dev/null" if device else str(Path(d, "none")),
             }
             done = subprocess.run(
-                ["sh", str(HOOK), verb],
+                ["sh", str(render(d)), verb],
                 env=env,
                 capture_output=True,
                 text=True,
@@ -51,10 +63,20 @@ class ColdReboot(unittest.TestCase):
             )
             return done.returncode, calls.read_text().splitlines() if calls.exists() else []
 
-    def test_a_reboot_asks_the_bmc_for_a_power_cycle_and_waits(self):
+    def test_a_reboot_sets_the_off_time_leaves_evidence_then_cycles_and_waits(self):
         status, calls = self.run_hook("reboot")
         self.assertEqual(status, 0)
-        self.assertEqual(calls, ["timeout 20", "ipmitool -I open chassis power cycle", "sleep 60"])
+        ipmi = [c for c in calls if c.startswith("ipmitool")]
+        self.assertEqual(ipmi[0], "ipmitool -I open raw 0x00 0x0b 0x1e")  # 30 s off
+        self.assertTrue(
+            ipmi[1].startswith("ipmitool -I open raw 0x0a 0x44 0x00 0x00 0xe0 0x64 0x65 0x65 0x70")
+        )
+        self.assertEqual(ipmi[2], "ipmitool -I open chassis power cycle")
+        self.assertEqual(calls[-1], "sleep 45")
+
+    def test_the_off_time_is_one_byte_of_seconds(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIn("raw 0x00 0x0b 0x50", render(d, off=80).read_text())
 
     def test_poweroff_halt_and_kexec_are_left_alone(self):
         for verb in ("poweroff", "halt", "kexec"):
@@ -66,16 +88,19 @@ class ColdReboot(unittest.TestCase):
     def test_a_bmc_that_does_not_answer_lets_the_warm_reboot_go_on(self):
         status, calls = self.run_hook("reboot", ipmitool_status=1)
         self.assertEqual(status, 0)
-        self.assertNotIn("sleep 60", calls)
+        self.assertNotIn("sleep 45", calls)
 
     def test_systemd_shutdown_can_run_it_within_its_hook_timeout(self):
-        # systemd-shutdown kills a hook after 90 s; the BMC call and the wait stay under.
-        self.assertTrue(HOOK.stat().st_mode & stat.S_IXUSR)
-        text = HOOK.read_text()
-        self.assertIn("timeout 20 ipmitool", text)
-        self.assertIn(":-60}", text)
-        self.assertLess(20 + 60, 90)
-        self.assertTrue(os.access(HOOK, os.X_OK))
+        # systemd-shutdown kills a hook after 90 s: three BMC calls of at most 10 s and
+        # the wait stay under, and the role installs it executable.
+        with tempfile.TemporaryDirectory() as d:
+            text = render(d).read_text()
+        self.assertIn("timeout 10 ipmitool", text)
+        self.assertIn(":-45}", text)
+        self.assertLess(3 * 10 + 45, 90)
+        tasks = (ROOT / "roles/bmc/tasks/main.yml").read_text()
+        self.assertIn("src: bmc-cold-reboot.j2", tasks)
+        self.assertIn('mode: "0755"', tasks)
 
 
 if __name__ == "__main__":
