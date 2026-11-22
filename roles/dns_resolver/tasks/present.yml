@@ -3,10 +3,22 @@
   ansible.builtin.service_facts:
 
 # The host reaches unbound through systemd-resolved, as unbound's own guide sets it up.
+# A static /etc/resolv.conf (playbooks/generic/dns-config.yml writes one, with
+# systemd-resolved stopped) would bypass it: that host is refused, not taken over.
+- name: Look at /etc/resolv.conf
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+  register: dns_resolver_resolv
+
 - name: Check for systemd-resolved
   ansible.builtin.assert:
-    that: "'systemd-resolved.service' in ansible_facts.services"
-    fail_msg: "{{ inventory_hostname }} has no systemd-resolved, which this role points at the resolver."
+    that:
+      - "'systemd-resolved.service' in ansible_facts.services"
+      - dns_resolver_resolv.stat.lnk_source | default('') is search('/run/systemd/resolve/')
+    fail_msg: >-
+      {{ inventory_hostname }} has no systemd-resolved, or /etc/resolv.conf is not its
+      (a static file, as playbooks/generic/dns-config.yml writes): this role points
+      systemd-resolved at the resolver, which such a host would never ask.
 
 - name: Record what this component installs
   ansible.builtin.include_role:

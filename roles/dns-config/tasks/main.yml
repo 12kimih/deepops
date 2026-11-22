@@ -6,6 +6,17 @@
     fail_msg: "Set dns_config_servers in config/group_vars."
     quiet: true
 
+# The two ways to set a host's resolver exclude each other: this one stops
+# systemd-resolved, which roles/dns_resolver points at its unbound.
+- name: Refuse a host that resolves through roles/dns_resolver
+  ansible.builtin.assert:
+    that: "'dns_resolver' not in (ansible_facts.ansible_local.deepops_components.components | default({}))"
+    fail_msg: >-
+      {{ inventory_hostname }} resolves through unbound (roles/dns_resolver); this playbook
+      would stop systemd-resolved under it. Remove that first (dns_resolver absent), or
+      leave this host out.
+    quiet: true
+
 # systemd-resolved manages /etc/resolv.conf as a symlink to a stub resolver on
 # Ubuntu 18.04+ (including 22.04/24.04/26.04). Disable it so a static
 # /etc/resolv.conf can be written.
@@ -37,8 +48,11 @@
     group: root
     mode: "0644"
 
-- name: Update /etc/nsswitch.conf
-  ansible.builtin.lineinfile:
-    path: /etc/nsswitch.conf
-    regexp: "^hosts:"
-    line: "hosts: files dns"
+# Its own token only (roles/nsswitch): a whole `hosts: files dns` line dropped what
+# other clients put there.
+- name: Look up host names in DNS
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: dns
+    nsswitch_databases: [hosts]
