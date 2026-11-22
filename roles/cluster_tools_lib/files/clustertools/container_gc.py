@@ -26,7 +26,6 @@ The run's result is written as node_exporter textfile metrics:
 Runs as root from a daily timer. Python 3.9 or newer, standard library only.
 """
 
-import json
 import os
 import re
 import stat
@@ -35,7 +34,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from . import proc
+from . import config, proc
 from .cli import run_main
 from .files import write_atomic
 from .prom import series
@@ -321,6 +320,16 @@ def textfile(lines, ok, now):
     return "".join(line + "\n" for line in sorted(out))
 
 
+CONFIG_KEYS = {"textfile": str, "unused_days": int, "max_used_percent": int,
+               "active_uids": (list, type(None)), "stores": list}  # fmt: skip
+CONFIG_OPTIONAL = {"uid_min": int}
+
+
+def load_config(path):
+    """The config roles/container_storage_gc writes (clustertools.config)."""
+    return config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
+
+
 def main(argv=None):
     argv = sys.argv if argv is None else argv
     if len(argv) not in (2, 3) or (len(argv) == 3 and argv[2] != "--dry-run"):
@@ -329,7 +338,7 @@ def main(argv=None):
     dry_run = len(argv) == 3
 
     def body():
-        cfg = json.loads(Path(argv[1]).read_text())
+        cfg = load_config(argv[1])
         now = time.time()
         lines, ok = run(cfg, dry_run, now)
         if not dry_run and cfg.get("textfile"):

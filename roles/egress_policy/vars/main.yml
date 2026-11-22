@@ -14,6 +14,7 @@ _egress_policy_metrics_items: >-
   {{ _egress_policy_metrics_units | map('regex_replace', '^', 'unit:') | list
      + _egress_policy_metrics_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ _egress_policy_metrics_command, 'file:' ~ _egress_policy_metrics_config,
-        'file:' ~ egress_policy_metrics_textfile_dir ~ '/' ~ _egress_policy_textfile] }}
+        'file:' ~ egress_policy_metrics_textfile_dir ~ '/' ~ _egress_policy_textfile,
+        'file:' ~ cluster_tools_lib_config_records ~ '/egress_policy.json'] }}
 egress_policy_items: >-
   {{ _egress_policy_base_items + (_egress_policy_metrics_items if egress_policy_metrics else []) }}

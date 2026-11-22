@@ -17,4 +17,4 @@ slurm_usage_report_items: >-
   {{ _slurm_usage_report_units | map('regex_replace', '^', 'unit:') | list
      + _slurm_usage_report_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ slurm_usage_report_script, 'file:' ~ slurm_usage_report_config_dir ~ '/config.json',
-        'dir:' ~ slurm_usage_report_config_dir] }}
+        'dir:' ~ slurm_usage_report_config_dir, 'file:' ~ cluster_tools_lib_config_records ~ '/slurm_usage_report.json'] }}

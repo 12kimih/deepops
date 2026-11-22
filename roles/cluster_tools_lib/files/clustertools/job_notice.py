@@ -26,6 +26,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from . import config
 from .files import write_atomic
 from .slack import Error as SlackError
 from .slack import Slack, member
@@ -97,13 +98,27 @@ def muted(cfg, login):
         return False
 
 
+CONFIG_KEYS = {"token_file": str, "members": dict, "email_domain": str, "state_file": str,
+               "coalesce_seconds": int, "prefs_file": str}  # fmt: skip
+CONFIG_OPTIONAL = {"dry_run": bool}
+
+
+def load_config(path):
+    """The config roles/job_notice writes (clustertools.config)."""
+    return config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
+
+
 def main(argv=None, env=None, now=None):
     args = (sys.argv if argv is None else argv)[1:]
     env = os.environ if env is None else env
     if len(args) < 4 or args[1] != "-s":
         print(USAGE, file=sys.stderr)
         return 2
-    cfg = json.loads(Path(args[0]).read_text())
+    try:
+        cfg = load_config(args[0])
+    except config.ConfigError as e:
+        print(f"job-notice: {e}", file=sys.stderr)
+        return 2
     token = Path(cfg["token_file"]).read_text().strip() if cfg.get("token_file") else ""
     login = recipient_login(args[-1], cfg.get("email_domain", ""))
     if not token or muted(cfg, login or args[-1]):

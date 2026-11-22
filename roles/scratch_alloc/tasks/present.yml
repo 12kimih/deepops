@@ -37,6 +37,14 @@
     group: root
     mode: "0644"
     content: "{{ _scratch_alloc_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} clustertools.scratch_alloc %s"
+
+- name: Record the scratch alloc configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: scratch_alloc, module: clustertools.scratch_alloc, file: "{{ _scratch_alloc_config }}", playbook: playbooks/generic/scratch-alloc.yml}
 
 # Project quotas are a mount-time option: without them no allocation can be limited.
 - name: Read the scratch filesystem's type and options

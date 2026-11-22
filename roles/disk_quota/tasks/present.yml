@@ -37,6 +37,14 @@
     group: root
     mode: "0600"
     content: "{{ _disk_quota_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} clustertools.disk_quota %s"
+
+- name: Record the disk quota configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: disk_quota, module: clustertools.disk_quota, file: "{{ _disk_quota_config }}", playbook: playbooks/generic/disk-quota.yml}
 
 # A container's filesystems are the host's: it never remounts or limits them.
 - name: Set up the quotas

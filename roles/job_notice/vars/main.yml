@@ -15,5 +15,6 @@ _job_notice_cfg:
 job_notice_items:
   - "file:{{ job_notice_command }}"
   - "file:{{ _job_notice_config }}"
+  - "file:{{ cluster_tools_lib_config_records }}/job_notice.json"
   - "file:{{ _job_notice_token }}"
   - "dir:{{ _job_notice_state_dir }}"

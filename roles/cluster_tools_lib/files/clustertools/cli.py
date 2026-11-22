@@ -13,7 +13,7 @@ import pwd
 import shlex
 import sys
 
-from . import render, slurm
+from . import config, render, slurm
 
 # Value completers: a single field per line from a standard Slurm command, so the
 # completion never parses free text and never needs this package to be importable. They
@@ -309,10 +309,13 @@ def me():
 def run_main(name, body):
     """Run BODY() -> exit status, with the failures every command shares, each as one
     line: Slurm's (slurm.Error, with its own status: 127 for a missing client, else 1)
-    and a file's (1). Ctrl-C and a closed pipe end quietly. Anything else is a bug and
+    a config's (2, clustertools.config) and a file's (1). Ctrl-C and a closed pipe end quietly. Anything else is a bug and
     keeps its traceback, rather than being reported as Slurm's."""
     try:
         return body() or 0
+    except config.ConfigError as e:  # names the file and the key
+        print(f"{name}: {e}", file=sys.stderr)
+        return 2
     except slurm.Error as e:
         print(f"{name}: {e}", file=sys.stderr)
         return e.status

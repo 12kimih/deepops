@@ -18,4 +18,5 @@ _disk_quota_cfg:
 disk_quota_items: >-
   {{ ['package:quota', 'unit:disk-quota-metrics.timer', 'unit:disk-quota-metrics.service']
      + _disk_quota_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
-     + ['file:' ~ _disk_quota_command, 'file:' ~ _disk_quota_config, 'file:' ~ _disk_quota_textfile] }}
+     + ['file:' ~ _disk_quota_command, 'file:' ~ _disk_quota_config, 'file:' ~ _disk_quota_textfile,
+        'file:' ~ cluster_tools_lib_config_records ~ '/disk_quota.json'] }}

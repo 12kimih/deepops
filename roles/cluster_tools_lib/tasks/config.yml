@@ -1,0 +1,31 @@
+---
+# Record a tool's config, so a later package that would refuse it fails a deploy instead
+# of the tool's next run (clustertools.config). Include it once the role wrote the file
+# (validated with cluster_tools_lib_config_validate):
+#   ansible.builtin.include_role:
+#     name: cluster_tools_lib
+#     tasks_from: config
+#   vars:
+#     cluster_tools_lib_config:
+#       role: ROLE                      # the record's name, and what a play's check skips
+#       module: clustertools.MODULE     # defines load_config(path)
+#       file: /etc/.../config.json
+#       playbook: playbooks/.../X.yml   # what rewrites the file
+# The role's removal deletes the record with the file (cluster_tools_lib_config_records).
+- name: Create the directory of the tool config records
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_config_records }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Record the config of {{ cluster_tools_lib_config.role }}
+  ansible.builtin.copy:
+    content: |
+      {{ {'role': cluster_tools_lib_config.role, 'module': cluster_tools_lib_config.module,
+          'config': cluster_tools_lib_config.file, 'playbook': cluster_tools_lib_config.playbook} | to_nice_json }}
+    dest: "{{ cluster_tools_lib_config_records }}/{{ cluster_tools_lib_config.role }}.json"
+    owner: root
+    group: root
+    mode: "0644"

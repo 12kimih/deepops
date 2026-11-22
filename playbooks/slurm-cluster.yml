@@ -1,6 +1,18 @@
 ---
 # Slurm Cluster Playbook
 
+# A site deploy runs every component's play: a check that holds only once all of them
+# ran waits for the last play (roles/cluster_tools_lib, the recorded tool configs).
+- name: Mark the hosts as in a site deploy
+  hosts: all
+  gather_facts: false
+  tags:
+    - always
+  tasks:
+    - name: Note the site deploy
+      ansible.builtin.set_fact:
+        deepops_site_run: slurm-cluster
+
 # First, before any host changes: a deploy needs no hand-made secret files.
 - name: Create the missing site secrets
   import_playbook: slurm-cluster/site-secrets.yml
@@ -654,3 +666,9 @@
   roles:
     - role: deploy_record
       deploy_record_name: slurm-cluster
+  tasks:
+    # Every role ran: no tool may now refuse the config another play wrote.
+    - name: Check the recorded tool configs
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: configs

@@ -17,6 +17,15 @@
     managed_dir_sources: "{{ cluster_tools_lib_modules }}"
     managed_dir_keep: [__pycache__]
 
+# A changed package may refuse a config another playbook wrote (clustertools.config):
+# checked once this play's roles wrote theirs (handlers/main.yml).
+- name: Note that the package changed under the recorded tool configs
+  ansible.builtin.debug:
+    msg: the clustertools package changed; the recorded tool configs are checked after this play
+  changed_when: managed_dir_changed | bool
+  notify: Check the recorded tool configs
+  when: managed_dir_changed | bool
+
 - name: Create the site facts directory
   ansible.builtin.file:
     path: "{{ cluster_tools_lib_info_file | dirname }}"
