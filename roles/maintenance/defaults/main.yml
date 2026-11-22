@@ -96,8 +96,10 @@ maintenance_verify_dcgm_timeout: {1: 600, 2: 1200, 3: 7200, 4: 28800}
 # wherever an nhc binary happens to be: a stale hand install elsewhere is not a health check.
 maintenance_verify_nhc: "{{ inventory_hostname in groups['slurm-node'] | default([]) and slurm_install_nhc | bool }}"
 
-# Kernel policy settings every host must share; consistency.yml fails when they differ.
-# The user-namespace restriction is the one a site most often changes by hand on one
-# node. (Not user.max_*_namespaces: their defaults scale with memory.)
+# Kernel policy settings every host must share, each with the playbook that sets it;
+# consistency.yml fails when they differ and names that playbook. The user-namespace
+# restriction is the one a site most often changes by hand on one node (a `sysctl -w`
+# that the next run of its playbook undoes). (Not user.max_*_namespaces: their defaults
+# scale with memory.)
 maintenance_consistency_sysctls:
-  - kernel.apparmor_restrict_unprivileged_userns
+  kernel.apparmor_restrict_unprivileged_userns: playbooks/container/enroot.yml

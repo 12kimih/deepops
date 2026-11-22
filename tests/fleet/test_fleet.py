@@ -1,10 +1,17 @@
 """fleet_drift (plugins/filter/fleet.py)."""
 
 import importlib.util
+import re
+import sys
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from repo_scan import ansible_files  # noqa: E402
+
 spec = importlib.util.spec_from_file_location("fleet", ROOT / "plugins" / "filter" / "fleet.py")
 fleet = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fleet)
@@ -79,6 +86,27 @@ class FleetDrift(unittest.TestCase):
         )
         self.assertEqual(len(drift), 1)
         self.assertTrue(drift[0].startswith("machine-id shared by a,b:"), drift)
+
+
+class SysctlOwners(unittest.TestCase):
+    def test_each_compared_sysctl_names_the_playbook_whose_role_sets_it(self):
+        # The comparison's failure tells the operator which playbook brings a differing
+        # sysctl back; a name that went stale would send them to the wrong run.
+        owners = yaml.safe_load((ROOT / "roles/maintenance/defaults/main.yml").read_text())[
+            "maintenance_consistency_sysctls"
+        ]
+        self.assertIsInstance(owners, dict)
+        for key, playbook in owners.items():
+            with self.subTest(key=key):
+                text = (ROOT / playbook).read_text()
+                roles = set(re.findall(r"(?:role|name): ([a-z_]+)", text))
+                setters = [
+                    p
+                    for p in ansible_files()
+                    if p.parent.name == "tasks" and re.search(rf"^\s+{re.escape(key)}:", p.read_text(), re.M)
+                ]
+                self.assertTrue(setters, f"no role sets {key}")
+                self.assertTrue({p.parts[-3] for p in setters} & roles, f"{playbook} runs none of {setters}")
 
 
 if __name__ == "__main__":
