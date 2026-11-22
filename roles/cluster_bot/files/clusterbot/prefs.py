@@ -8,8 +8,7 @@ The file is world-readable (it holds logins, nothing secret) so a tool running a
 another user (job notices run as SlurmUser) reads it; it is replaced atomically.
 """
 
-import json
-import os
+from . import state
 
 
 class Prefs:
@@ -17,12 +16,8 @@ class Prefs:
         self.path = path
 
     def _read(self):
-        try:
-            with open(self.path) as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            return {"muted": []}
-        return {"muted": sorted(set(data.get("muted") or []))}
+        data = state.read(self.path, {})
+        return {"muted": sorted(set((data if isinstance(data, dict) else {}).get("muted") or []))}
 
     def muted(self, login):
         return login in self._read()["muted"]
@@ -32,8 +27,4 @@ class Prefs:
         muted = set(data["muted"])
         (muted.add if value else muted.discard)(login)
         data["muted"] = sorted(muted)
-        tmp = self.path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(data, f)
-        os.chmod(tmp, 0o644)
-        os.replace(tmp, self.path)
+        state.write(self.path, data, mode=0o644)

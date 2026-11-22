@@ -10,7 +10,9 @@ in the repository), reserved (system account IDs). The roster stays the only sou
 accounts: the bot proposes, a person reviews, the deploy applies.
 """
 
+import datetime
 import re
+import time
 
 from ruamel.yaml import YAML
 
@@ -22,6 +24,16 @@ from .github import Error as GitHubError
 def load(text):
     """A YAML document (ruamel, pure Python: the bot's venv has no compiled YAML)."""
     return YAML(typ="safe", pure=True).load(text)
+
+
+def leaving_deadlines(leaving):
+    """People leaving ({login: {ends, login_expires}}, people_leaving of the roster as
+    deployed) as clusterbot.reminders deadlines: the end of each last day, local time."""
+    out = {}
+    for login, dates in leaving.items():
+        after = datetime.date.fromisoformat(dates["ends"]) + datetime.timedelta(days=1)
+        out[login] = (int(time.mktime(after.timetuple())), login, {"user": login, **dates})
+    return out
 
 
 class _RosterFeature(Feature):

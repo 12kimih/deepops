@@ -6,8 +6,9 @@ one handler per action. Each handler reads Slack's input, asks a feature module
 
 CONFIG (written by roles/cluster_bot): bot_token_file, app_token_file, channels {help,
 admin}, members {Slack member ID: cluster user}, admins [member IDs], pending (the held
-requests of every feature, clusterbot.requests), and scratch {host, key, user,
-known_hosts, policy, reminders, remind_days}; scratch.host empty leaves it off.
+requests of every feature, clusterbot.requests), reminders (what went out,
+clusterbot.reminders), scratch {host, key, user, known_hosts, policy, remind_days}
+(scratch.host empty leaves it off), leave {remind_days, leaving (people_leaving)}.
 """
 
 import json
@@ -16,10 +17,10 @@ import threading
 import time
 from pathlib import Path
 
-from . import accounts_blocks, home_blocks
+from . import accounts_blocks, home_blocks, reminders, state
 from . import blocks as shared
 from . import scratch_blocks as blocks
-from .accounts import JoinFeature, LeaveFeature
+from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .prefs import Prefs
 from .requests import Engine
 from .scratch import ScratchFeature, SshExecutor
@@ -232,30 +233,19 @@ def build(cfg, engine, scratch, join=None):
     return app
 
 
-def remind_once(scratch, client, cfg, state, now):
-    """DM the owners of allocations that end within one of remind_days, once per stage."""
-    by_user = {u: s for s, u in cfg["members"].items()}
-    stages = sorted(cfg["scratch"]["remind_days"], reverse=True)
-    live = {str(a["id"]): a for a in scratch.run("list") if a["state"] == "active"}
-    for key in list(state):
-        if key not in live:
-            del state[key]
-    for key, a in live.items():
-        left = (a["expires"] - now) / 86400
-        due = [d for d in stages if left <= d]
-        if not due:
-            state.pop(key, None)  # extended past every stage: remind again next time
-            continue
-        if state.get(key, 10**9) <= due[-1]:
-            continue
-        slack_id = by_user.get(a["user"])
-        if slack_id:
-            client.chat_postMessage(
-                channel=slack_id,
-                text="스크래치 공간이 곧 만료됩니다",
-                blocks=blocks.reminder(a, max(1, round(left))),
-            )
-        state[key] = due[-1]
+def reminder_sources(cfg, scratch):
+    """What the bot reminds people of before a deadline (clusterbot.reminders)."""
+    leave = cfg["leave"]
+    sources = {
+        "leave": reminders.Source(
+            leave["remind_days"], lambda: leaving_deadlines(leave["leaving"]), accounts_blocks.leave_reminder
+        )
+    }
+    if scratch is not None:
+        sources["scratch"] = reminders.Source(
+            cfg["scratch"]["remind_days"], scratch.deadlines, blocks.reminder
+        )
+    return sources
 
 
 def main(argv=None):
@@ -281,19 +271,19 @@ def main(argv=None):
     engine = Engine(features, cfg["pending"])
     app = build(cfg, engine, scratch, join)
 
-    def reminders():
-        path = Path(sc["reminders"])
+    sources, slack_of = reminder_sources(cfg, scratch), {u: s for s, u in cfg["members"].items()}.get
+
+    def remind_forever():
         while True:
             try:
-                state = json.loads(path.read_text()) if path.exists() else {}
-                remind_once(scratch, app.client, cfg, state, time.time())
-                path.write_text(json.dumps(state))
+                sent = state.read(cfg["reminders"], {})
+                reminders.remind(sources, app.client, slack_of, sent, time.time())
+                state.write(cfg["reminders"], sent)
             except Exception as e:  # noqa: BLE001 - one failed round must not stop the next
                 print(f"clusterbot: reminders: {e}", file=sys.stderr, flush=True)
             time.sleep(REMIND_EVERY)
 
-    if scratch is not None:
-        threading.Thread(target=reminders, daemon=True).start()
+    threading.Thread(target=remind_forever, daemon=True).start()
     SocketModeHandler(app, cfg["app_token"]).start()
 
 

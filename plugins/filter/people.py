@@ -104,6 +104,17 @@ def people_shadow_day(day):
     return (_date(day) - datetime.date(1970, 1, 1)).days if _date(day) else ""
 
 
+def people_leaving(people, grace_days=30):
+    """Active people with an end date, login -> {ends, login_expires} (both YYYY-MM-DD,
+    sorted by login): what tells them in time to move their files away (the cluster
+    bot's reminders) reads it, so the dates are the ones the accounts apply."""
+    return {
+        n: {"ends": _date(p["ends"]).isoformat(), "login_expires": people_login_expires(p, grace_days)}
+        for n, p in sorted(_active(people).items())
+        if _date(p.get("ends"))
+    }
+
+
 def _active(people):
     return {n: p or {} for n, p in (people or {}).items() if (p or {}).get("status", "active") == "active"}
 
@@ -393,4 +404,5 @@ class FilterModule:
             "people_check": people_check,
             "people_login_expires": people_login_expires,
             "people_shadow_day": people_shadow_day,
+            "people_leaving": people_leaving,
         }
