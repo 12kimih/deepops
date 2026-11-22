@@ -25,6 +25,14 @@ An apt preview names what it would install (repo_package_installs, as apt's simu
 lists them), so a task after it can tell what the install brings (a kernel module, say)
 rather than only that it changes something.
 
+`refuse` (apt only: regular expressions on package names, with `refuse_reason`) keeps an
+install from bringing what it must not, as apt would resolve it: before a run installs
+anything, and in its preview, apt's simulation is read, and an install that would bring
+a refused package fails naming it and the reason. A driver install that pulled a new
+kernel onto some nodes only (the archive's prebuilt NVIDIA modules for the newer
+kernel, 2026-11) is refused that way: kernels change on every node at once, in a
+maintenance upgrade.
+
 The module is `use` (apt or dnf; default: the host's package manager, as
 ansible.builtin.package finds it), which takes every other argument as given.
 """
@@ -88,8 +96,10 @@ BEGIN { RS = ""; ORS = "\n\n"; "dpkg --print-architecture" | getline native
 
 def simulation_command(args, removals, status="/var/lib/dpkg/status"):
     """A shell command: apt-get's simulation of the install on a host without REMOVALS."""
-    without = shlex.join(["awk", "-v", f"drop={' '.join(removals)}", _WITHOUT, status])
     simulate = shlex.join(["env", "LC_ALL=C", "apt-get", "-s", "-q"])
+    if not removals:
+        return f"{simulate} {shlex.join(simulation_argv(args))}"
+    without = shlex.join(["awk", "-v", f"drop={' '.join(removals)}", _WITHOUT, status])
     return (
         "tmp=$(mktemp) && trap 'rm -f \"$tmp\"' EXIT && "
         f'{without} > "$tmp" && {simulate} -o "Dir::State::status=$tmp" {shlex.join(simulation_argv(args))}'
@@ -114,6 +124,20 @@ def apt_reason(*texts):
         if in_unmet or line.startswith(("E:", "W:")):
             reason.append(line.strip())
     return " ".join(reason) or "apt gave no reason"
+
+
+def refused_in(installs, patterns):
+    """The INSTALLS a pattern of PATTERNS (regular expressions, from the start) matches."""
+    return [name for name in installs if any(re.match(p, name.split(":", 1)[0]) for p in patterns)]
+
+
+def refusal(refused, reason):
+    return {
+        "failed": True,
+        "changed": False,
+        "msg": f"the install would bring {', '.join(refused)}, which this task refuses: {reason}",
+        "repo_package_refused": refused,
+    }
 
 
 def with_removals(result, removals, simulated):
@@ -154,16 +178,43 @@ class ActionModule(ActionBase):
             use = facts.get("ansible_facts", {}).get("ansible_pkg_mgr")
         if use not in MODULES:
             raise AnsibleActionFail(f"repo_package: use must be one of {', '.join(MODULES)}, not {use!r}")
-        done = self._execute_module(module_name=MODULES[use], module_args=args, task_vars=task_vars)
+        refuse, reason = list(args.pop("refuse", None) or []), args.pop("refuse_reason", "")
+        if refuse and (use != "apt" or not reason):
+            raise AnsibleActionFail("repo_package: refuse is for apt, and needs a refuse_reason")
         pending = list(task_vars.get("package_repos_unrefreshed") or [])
         removals = list(task_vars.get("host_baseline_unremoved") or [])
+        if refuse and not self._task.check_mode:
+            # Before anything is installed: apt's own answer to what the install brings,
+            # from the package lists the install would read (refreshed first, if asked).
+            if args.get("update_cache"):
+                cache = {k: args.pop(k) for k in ("update_cache", "cache_valid_time") if k in args}
+                refreshed = self._execute_module(
+                    module_name=MODULES[use], module_args=cache, task_vars=task_vars
+                )
+                if refreshed.get("failed"):
+                    result.update(refreshed)
+                    return result
+            simulated = self._simulate(args, [])
+            refused = (
+                refused_in(installs_of(simulated.get("stdout")), refuse) if simulated.get("rc") == 0 else []
+            )
+            if refused:
+                result.update(refusal(refused, reason))
+                return result
+        done = self._execute_module(module_name=MODULES[use], module_args=args, task_vars=task_vars)
         if self._task.check_mode and done.get("failed") and pending:
             done = preview(done, pending, args.get("name", []))
         elif self._task.check_mode and done.get("failed") and removals and use == "apt":
-            command = simulation_command(args, removals)
-            simulated = self._low_level_execute_command(f"/bin/sh -c {shlex.quote(command)}", sudoable=True)
-            done = with_removals(done, removals, simulated)
+            done = with_removals(done, removals, self._simulate(args, removals))
         elif self._task.check_mode and not done.get("failed") and use == "apt":
             done["repo_package_installs"] = installs_of(done.get("stdout"))
+        refused = refused_in(done.get("repo_package_installs") or [], refuse)
+        if refused:  # the preview of a run that refuses before installing
+            done = {**refusal(refused, reason), "repo_package_installs": done["repo_package_installs"]}
         result.update(done)
         return result
+
+    def _simulate(self, args, removals):
+        """apt's simulation of the install on the host without REMOVALS (read-only)."""
+        command = simulation_command(args, removals)
+        return self._low_level_execute_command(f"/bin/sh -c {shlex.quote(command)}", sudoable=True)
