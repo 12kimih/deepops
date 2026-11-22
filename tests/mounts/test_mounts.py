@@ -65,5 +65,32 @@ class ProjectFilesystems(unittest.TestCase):
         self.assertEqual(project_filesystems({}, MOUNTS), {})
 
 
+class MountOptionsPending(unittest.TestCase):
+    """XFS accepts a quota option on a remount and leaves it off (gpu8's /scratch,
+    2026-11-23): what the kernel has mounted decides whether a reboot is needed."""
+
+    pending = staticmethod(_mounts.mount_options_pending)
+    DECLARED = {
+        "/scratch": "defaults,relatime,usrquota",
+        "/home": "defaults,usrjquota=aquota.user,jqfmt=vfsv1",
+    }
+
+    def test_an_xfs_quota_the_remount_left_off(self):
+        mounts = [{"mount": "/scratch", "fstype": "xfs", "options": "rw,relatime,attr2,inode64,noquota"},
+                  {"mount": "/home", "fstype": "ext4", "options": "rw,usrjquota=aquota.user,jqfmt=vfsv1"}]  # fmt: skip
+        self.assertEqual(self.pending(self.DECLARED, mounts), ["/scratch"])
+
+    def test_on_once_mounted_with_it_in_any_spelling(self):
+        mounts = [{"mount": "/scratch", "fstype": "xfs", "options": "rw,relatime,usrquota"}]
+        self.assertEqual(self.pending({"/scratch": "uquota"}, mounts), [])
+        self.assertEqual(self.pending(self.DECLARED, mounts), [])
+
+    def test_ext4_and_unmounted_are_not_its_concern(self):
+        self.assertEqual(
+            self.pending(self.DECLARED, [{"mount": "/home", "fstype": "ext4", "options": "rw"}]), []
+        )
+        self.assertEqual(self.pending(self.DECLARED, []), [])
+
+
 if __name__ == "__main__":
     unittest.main()
