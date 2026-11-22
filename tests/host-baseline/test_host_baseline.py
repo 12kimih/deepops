@@ -152,6 +152,14 @@ class NeededPackagesStay(unittest.TestCase):
         needed = ["ii  libopengl0:amd64", "ii  libc6:amd64", "un  libgl1", "rc  linux-image-6.8.0-1-generic"]
         self.assertEqual(self.unmarked(needed, ["libopengl0", "libgl1", "zlib1g"]), ["libopengl0"])
 
+    def test_only_names_given_whole_are_read_for_marking(self):
+        # linux-image-* also matches old kernels, which must stay automatic for apt.
+        read = "Read which packages the host needs are installed (Debian)"
+        values = {"host_baseline_protected_packages": ["libopengl0", "linux-image-*", "slurm-smd*", "munge"],
+                  "_host_baseline_recorded": ["podman"]}  # fmt: skip
+        argv = render(self.TASKS[read]["ansible.builtin.command"]["argv"], values)
+        self.assertEqual(argv[4:], ["libopengl0", "munge", "podman"])
+
     def test_nothing_is_marked_or_installed_when_all_are_manual(self):
         values = {**self.facts(["ii  libc6:amd64"], []), "host_baseline_present": ["gdm3"],
                   "host_baseline_unmarked": self.unmarked(["ii  libc6:amd64"], [])}  # fmt: skip
