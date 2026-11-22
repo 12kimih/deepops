@@ -120,7 +120,14 @@
       when: retire_local_userdel is changed and not ansible_check_mode
 
     # userdel takes a per-user group with its user; groupdel would still find that name
-    # through the directory and fail on the local file, so the files are read again.
+    # through the directory and fail on the local file, so the files are read again. A
+    # user still logged in keeps its account, so its primary group stays too (groupdel
+    # refuses it, 2026-11-23: 21 people logged in on the controller).
+    - name: Read the local accounts left
+      ansible.builtin.getent:
+        database: passwd
+        service: files
+
     - name: Read the local groups left
       ansible.builtin.getent:
         database: group
@@ -129,9 +136,14 @@
     - name: Remove the local groups
       change_command:
         argv: [groupdel, "{{ item }}"]
-      loop: "{{ retire_local.groups | select('in', ansible_facts.getent_group) | list }}"
+      loop: >-
+        {{ retire_local.groups | select('in', ansible_facts.getent_group)
+           | reject('in', ansible_facts.getent_group | dict2items
+                          | selectattr('value.1', 'in', ansible_facts.getent_passwd.values() | map(attribute=2) | list)
+                          | map(attribute='key') | list)
+           | list }}
 
     - name: Report accounts still logged in
       ansible.builtin.debug:
-        msg: "Still logged in, kept for now: {{ retire_local_userdel.results | selectattr('rc', 'defined') | selectattr('rc', 'eq', 8) | map(attribute='item') | list }}"
+        msg: "Still logged in, kept with their groups for now (run this again once they have logged out): {{ retire_local_userdel.results | selectattr('rc', 'defined') | selectattr('rc', 'eq', 8) | map(attribute='item') | list }}"
       when: retire_local_userdel.results | selectattr('rc', 'defined') | selectattr('rc', 'eq', 8) | list | length > 0
