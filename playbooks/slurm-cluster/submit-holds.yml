@@ -10,4 +10,4 @@
     - role: deploy_defaults
     - role: submit_holds
       submit_holds_state: "{{ deepops_components.submit_holds | component_phase(deepops_phase) }}"
-  tags: ['submit-holds']
+  tags: ['submit-holds', 'people']  # the end dates come from the roster

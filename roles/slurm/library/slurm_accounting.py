@@ -370,8 +370,10 @@ def ordered_accounts(accounts):
     return order
 
 
-def plan(spec, cur_qos, cur_accounts, cur_users, cluster, prune=False):
-    """The sacctmgr argument lists that make the database match spec, and what is unmanaged."""
+def plan(spec, cur_qos, cur_accounts, cur_users, cluster, prune=False, revoke=()):
+    """The sacctmgr argument lists that make the database match spec, and what is unmanaged.
+    The associations of the users in REVOKE that spec does not want are deleted even
+    without PRUNE: people who left (people_former), whose access ends on the day."""
     where_cluster = [f"cluster={cluster}"]
     cmds = []
     want_qos = desired_qos(spec)
@@ -454,10 +456,13 @@ def plan(spec, cur_qos, cur_accounts, cur_users, cluster, prune=False):
             if (u, a) != (ROOT, ROOT) and a not in want_users.get(u, {}).get("associations", {})
         ),
     }
-    if prune:
-        for item in unmanaged["associations"]:
-            user, account = item.split("@")
+    revoke = set(revoke)
+    for item in unmanaged["associations"]:
+        user, account = item.split("@")
+        if prune or user in revoke:
             cmds.append(["delete", "user", "where", f"name={user}", f"account={account}", *where_cluster])
+    unmanaged["associations"] = [i for i in unmanaged["associations"] if i.split("@")[0] not in revoke]
+    if prune:
         # Children before parents: Slurm refuses to delete an account that still has some.
         doomed = set(unmanaged["accounts"])
         for name in [a for a in reversed(ordered_accounts(cur_accounts)) if a in doomed]:
@@ -498,6 +503,12 @@ def check_qos_tiers(spec, weights, flags):
     return None
 
 
+def still_running(cmd, output):
+    """Whether sacctmgr refused to delete an association because jobs still run under
+    it ("Job(s) active, cancel job(s) before remove"): a revoked user's jobs finish."""
+    return cmd[:2] == ["delete", "user"] and "active" in output.lower() and "job" in output.lower()
+
+
 # --- module ----------------------------------------------------------------------
 
 
@@ -507,6 +518,7 @@ def main():
             "spec": {"type": "dict", "required": True},
             "cluster": {"type": "str", "required": True},
             "prune": {"type": "bool", "default": False},
+            "revoke": {"type": "list", "elements": "str", "default": []},
             "sacctmgr": {"type": "str", "default": "sacctmgr"},
             "priority_weights": {"type": "dict", "default": {}},
             "priority_flags": {"type": "list", "elements": "str", "default": []},
@@ -540,7 +552,13 @@ def main():
     }
     try:
         planned, unmanaged = plan(
-            module.params["spec"], cur_qos, cur_accounts, cur_users, cluster, module.params["prune"]
+            module.params["spec"],
+            cur_qos,
+            cur_accounts,
+            cur_users,
+            cluster,
+            module.params["prune"],
+            module.params["revoke"],
         )
     except ValueError as exc:
         module.fail_json(msg=str(exc))
@@ -561,6 +579,9 @@ def main():
         for cmd in cmds:
             rc, out, err = deepops_command.run(module, [sacctmgr, "-i", *cmd])
             if rc != 0 and "Nothing new added" not in (out + err) and "Nothing modified" not in (out + err):
+                if still_running(cmd, out + err):  # the next run deletes it
+                    module.warn(f"sacctmgr {' '.join(cmd)}: jobs still run under it; kept for now")
+                    continue
                 module.fail_json(msg=f"sacctmgr {' '.join(cmd)} failed: {(err or out).strip()}", **result)
     module.exit_json(**result)
 

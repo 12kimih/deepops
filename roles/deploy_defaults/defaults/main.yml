@@ -91,11 +91,15 @@ slurm_enable_disk_quota: false
 # datasets, models and container images one account writes for everyone, and the
 # collaboration folders of shared_projects. Off by default.
 slurm_enable_shared_space: false
-# Submission holds (roles/submit_holds, on slurm-master): a person at a disk hard limit
-# cannot submit Slurm jobs until they free space, told why at submit time; their running
-# jobs go on. Off by default; needs the disk quota metrics and the rendered job_submit.lua
-# (slurm_job_submit_plugins: lua with the role's template). Run slurm.yml after it.
+# Submission holds (roles/submit_holds, on slurm-master): who cannot submit Slurm jobs
+# for now, told why at submit time; their running jobs go on. A person past their roster
+# `ends` is held from the next day, without a deploy; with submit_holds_disk, a person at
+# a disk hard limit too, until they free space. Off by default; needs the rendered
+# job_submit.lua (slurm_job_submit_plugins: lua with the role's template). Run slurm.yml
+# after it.
 slurm_enable_submit_holds: false
+# Hold a person at a disk hard limit as well (needs the disk quota metrics). Off by default.
+submit_holds_disk: false
 # The date (YYYY-MM-DD) holds start, a grace for everyone already at a hard limit when they
 # are turned on: before it no one is held, and the disk report says from when they will
 # be. "" holds at once.

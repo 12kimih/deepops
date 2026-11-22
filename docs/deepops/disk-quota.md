@@ -78,13 +78,15 @@ being reported, and who or which project has been past its warn level for an hou
 ## No new Slurm jobs at a hard limit
 
 With `slurm_enable_submit_holds` (off by default; `roles/submit_holds`, on the controllers)
-someone at a hard limit, of space or of files, on any counted filesystem cannot submit
+and `submit_holds_disk`, someone at a hard limit, of space or of files, on any counted
+filesystem cannot submit
 Slurm jobs until they free space there. `sbatch`, `srun` and `salloc` refuse the job
 with the reason (where, how much, `quota -s` to look); their running jobs go on.
 
 | Setting | What it does |
 |---|---|
-| `slurm_enable_submit_holds` | Turns the holds on (and the disk report says what a hard limit means for Slurm) |
+| `slurm_enable_submit_holds` | Turns the holds on: a person past their roster `ends` is held from the next day (docs/deepops/accounts.md) |
+| `submit_holds_disk` | Holds a person at a hard limit too (and the disk report says what a hard limit means for Slurm). Off by default |
 | `submit_holds_from` | `YYYY-MM-DD`: no one is held before this date, the grace for everyone already at a limit when the holds are turned on; the disk report and its DMs say from when. `""` holds at once |
 | `submit_holds_interval` | How often the holds are worked out again (5 minutes) |
 

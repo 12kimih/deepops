@@ -258,6 +258,10 @@ slurm_accounting_prune: false
 # Lets them come from a people roster (the people_accounting filter) instead of being
 # listed per account in the file.
 slurm_accounting_users: {}
+# Logins whose associations go even without prune, those the file does not list: people
+# who left or are past their end (the people_former filter), so their access ends at the
+# next deploy whatever prune says.
+slurm_accounting_revoke: []
 
 # job_submit plugin (empty = none; "lua" deploys job_submit.lua from
 # slurm_job_submit_template and slurm_job_submit_policy). All other slurm.conf tuning belongs in your own complete

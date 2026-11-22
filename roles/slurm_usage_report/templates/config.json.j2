@@ -22,6 +22,6 @@
   "disk_notify": slurm_usage_report_disk_notify,
   "disk_repeat_days": slurm_usage_report_disk_repeat_days | float,
   "people": slurm_usage_report_people,
-  "holds_on": slurm_enable_submit_holds | bool,
+  "holds_on": slurm_enable_submit_holds | bool and submit_holds_disk | bool,
   "holds_from": submit_holds_from_time | int
 } | to_nice_json }}

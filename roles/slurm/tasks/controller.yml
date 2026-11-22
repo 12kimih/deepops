@@ -397,6 +397,7 @@
     sacctmgr: "{{ slurm_install_prefix }}/bin/sacctmgr"
     cluster: "{{ slurm_cluster_name }}"
     prune: "{{ slurm_accounting_prune }}"
+    revoke: "{{ slurm_accounting_revoke }}"
     priority_flags: "{{ (_slurm_priority.PriorityFlags | default('')).split(',') | select | list }}"
     priority_weights:
       qos: "{{ _slurm_priority.PriorityWeightQOS | default(0) }}"
