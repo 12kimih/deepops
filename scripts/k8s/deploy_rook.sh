@@ -15,9 +15,6 @@ source ${ROOT_DIR}/scripts/common.sh
 HELM_ROOK_CHART_REPO="${HELM_ROOK_CHART_REPO:-https://charts.rook.io/release}"
 HELM_ROOK_CHART_VERSION="${HELM_ROOK_CHART_VERSION:-v1.1.1}"
 
-# Allow overriding config dir to look in
-DEEPOPS_CONFIG_DIR=${DEEPOPS_CONFIG_DIR:-"${ROOT_DIR}/config"}
-
 # Default creds to create
 DEEPOPS_ROOK_USER="${DEEPOPS_ROOK_USER:-admin}"
 DEEPOPS_ROOK_PASS="${DEEPOPS_ROOK_PASS:-deepops}"
@@ -25,12 +22,6 @@ DEEPOPS_ROOK_PASS="${DEEPOPS_ROOK_PASS:-deepops}"
 # Setting to set Rook as default or non-default storageclass
 DEEPOPS_ROOK_SC_NAME="${DEEPOPS_ROOK_SC_NAME:-rook-ceph-block}"
 DEEPOPS_ROOK_NO_DEFAULT="${DEEPOPS_ROOK_NO_DEFAULT:-}"
-
-if [ ! -d "${DEEPOPS_CONFIG_DIR}" ]; then
-    echo "Can't find configuration in ${DEEPOPS_CONFIG_DIR}"
-    echo "Please set DEEPOPS_CONFIG_DIR env variable to point to config location"
-    exit 1
-fi
 
 echo "DEPRECATION NOTICE: This script is deprecated with no support and not guaranteed to work"
 
@@ -157,7 +148,7 @@ function install_rook() {
   fi
 
   # Install Helm if it is not already installed
-  ${SCRIPT_DIR}/install_helm.sh
+  "${ROOT_DIR}/scripts/k8s/install_helm.sh"
 
   if ! kubectl get ns rook-ceph >/dev/null 2>&1 ; then
     kubectl create ns rook-ceph

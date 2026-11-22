@@ -26,7 +26,7 @@ and backed up while staying invisible to the public fork.
 
 ```bash
 cd <deepops>
-cp -rfp config.example config        # or run scripts/setup.sh
+scripts/setup.sh    # starts config/ from config.example: inventory, group_vars, host_vars
 ```
 
 ### 2. Make `config/` its own private git repo

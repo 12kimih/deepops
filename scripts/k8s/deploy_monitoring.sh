@@ -14,21 +14,13 @@ cd "${ROOT_DIR}" || exit 1
 # Source common libraries and env variables
 source ${ROOT_DIR}/scripts/common.sh
 
-# Allow overriding config dir to look in
-DEEPOPS_CONFIG_DIR=${DEEPOPS_CONFIG_DIR:-"${ROOT_DIR}/config"}
-
-if [ ! -d "${DEEPOPS_CONFIG_DIR}" ]; then
-        echo "Can't find configuration in ${DEEPOPS_CONFIG_DIR}"
-        echo "Please set DEEPOPS_CONFIG_DIR env variable to point to config location"
-        exit 1
-fi
 
 HELM_CHARTS_REPO_PROMETHEUS="${HELM_CHARTS_REPO_PROMETHEUS:-https://prometheus-community.github.io/helm-charts}"
 HELM_PROMETHEUS_CHART_VERSION="${HELM_PROMETHEUS_CHART_VERSION:-92.14.0}"
 ingress_name="ingress-nginx"
 
-PROMETHEUS_YAML_CONFIG="${PROMETHEUS_YAML_CONFIG:-${DEEPOPS_CONFIG_DIR}/helm/monitoring.yml}"
-PROMETHEUS_YAML_NO_PERSIST_CONFIG="${PROMETHEUS_YAML_NO_PERSIST_CONFIG:-${DEEPOPS_CONFIG_DIR}/helm/monitoring-no-persist.yml}"
+PROMETHEUS_YAML_CONFIG="${PROMETHEUS_YAML_CONFIG:-$(deepops_config_file helm/monitoring.yml)}"
+PROMETHEUS_YAML_NO_PERSIST_CONFIG="${PROMETHEUS_YAML_NO_PERSIST_CONFIG:-$(deepops_config_file helm/monitoring-no-persist.yml)}"
 # The exporter, its image and its counters are the Slurm stack's (roles/nvidia-dcgm-exporter):
 # one pin and one counters file for both, so the GPU dashboard reads the same metrics.
 DCGM_EXPORTER_DEFAULTS="${ROOT_DIR}/roles/nvidia-dcgm-exporter/defaults/main.yml"

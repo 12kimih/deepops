@@ -183,7 +183,7 @@ Because `config/` is git-ignored by DeepOps, keep your server-specific settings
 and secrets there and manage that directory as a separate **private** repo:
 
 ```sh
-cp -r config.example config
+scripts/setup.sh    # starts config/ from config.example (docs/deepops/configuration.md)
 cd config && git init && git remote add origin git@github.com:yourorg/deepops-config.git
 ansible-vault encrypt_string --prompt --name slurm_db_password   # vault each secret inline
 ```

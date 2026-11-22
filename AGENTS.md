@@ -27,8 +27,8 @@ handling.
 
 ```bash
 git submodule update --init --recursive
-./scripts/setup.sh                      # uv, the locked .venv, Galaxy collections, .venv-kubespray
-cp -r config.example config             # then edit config/inventory
+./scripts/setup.sh                      # uv, the locked .venv, Galaxy collections, .venv-kubespray, config/
+$EDITOR config/inventory                # setup.sh started config/ from config.example
 ansible-playbook -k playbooks/bootstrap/bootstrap-ssh.yml   # only for hosts that still take a password
 python3 scripts/validation/deepops_doctor.py --json   # verify before deploying
 ```

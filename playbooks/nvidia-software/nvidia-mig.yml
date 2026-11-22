@@ -1,14 +1,18 @@
 ---
-# Install the NVIDIA MIG Manager tooling on all MIG-capable nodes
-# Copy over the custom MIG config to all nodes and apply them
-# The profile is mig_manager_profile (roles/deploy_defaults; override it in
-# config/group_vars or per node)
+# Install the NVIDIA MIG Manager tooling on all MIG-capable nodes and apply the
+# profile, mig_manager_profile (roles/deploy_defaults; override it in config/group_vars
+# or per node), from the package's mig-parted configuration or the site's own.
 
 # Check if MIG capabilities and software on nodes
 - hosts: all
   become: true
   roles:
     - role: deploy_defaults
+  vars:
+    # The package's configuration, which its service generates from the GPUs at every
+    # boot (service.sh), else the site's own (mig_manager_config_src).
+    mig_package_config: /etc/nvidia-mig-manager/config.yaml
+    mig_config_file: "{{ mig_manager_config if mig_manager_config_src | length > 0 else mig_package_config }}"
   tasks:
     # ansible_facts.ansible_local['gpus']['count'] comes from lspci, so it reports the GPUs the
     # node has even while the Slurm login setup hides them from ssh sessions.
@@ -72,6 +76,47 @@
         dest: "{{ mig_manager_config }}"
         mode: "0644"
       register: mig_config
+      when:
+        - has_mig.rc == 0
+        - mig_manager_config_src | length > 0
+
+    # The package's own, as its service writes it at boot (service.sh, the same header
+    # included), so a boot that follows rewrites the same file. nvidia-mig-parted reads
+    # the GPUs, so it needs the probe's isolation from the ssh cgroup.
+    - name: Generate the package's mig-parted configuration from the GPUs
+      ansible.builtin.command: >-
+        systemd-run --wait --pipe --collect --quiet --
+        nvidia-mig-parted generate-config
+      register: mig_generated
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when:
+        - has_mig.rc == 0
+        - mig_manager_config_src | length == 0
+
+    - name: Write the package's mig-parted configuration
+      ansible.builtin.copy:
+        content: |
+          # DO NOT EDIT: Auto-generated from hardware on every boot.
+          # To use a custom config, set MIG_PARTED_CONFIG_FILE.
+
+          {{ mig_generated.stdout }}
+        dest: "{{ mig_package_config }}"
+        mode: "0644"
+      register: mig_config
+      when:
+        - has_mig.rc == 0
+        - mig_manager_config_src | length == 0
+
+    # What the boot-time reapply uses (override.conf, written by the package's
+    # apply-start hook): a changed file, hooks or profile is applied again so the hook
+    # persists it, even when the GPUs already hold the layout.
+    - name: Read what the boot-time MIG reapply uses
+      ansible.builtin.command:
+        argv: [systemctl, show, --property=Environment, --value, nvidia-mig-manager.service]
+      register: mig_persisted
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
       when: has_mig.rc == 0
 
     # Whether the GPUs already hold the profile: then nothing is applied, and the GPUs
@@ -79,7 +124,7 @@
     - name: Check whether the MIG configuration is in place
       ansible.builtin.command: >-
         systemd-run --wait --pipe --collect --quiet --
-        nvidia-mig-parted assert -f {{ mig_manager_config }}
+        nvidia-mig-parted assert -f {{ mig_config_file }}
         -c {{ mig_manager_profile }}
       register: mig_in_place
       changed_when: false
@@ -100,7 +145,7 @@
           - --pipe
           - --collect
           - --quiet
-          - "--setenv=MIG_PARTED_CONFIG_FILE={{ mig_manager_config }}"
+          - "--setenv=MIG_PARTED_CONFIG_FILE={{ mig_config_file }}"
           - "--setenv=MIG_PARTED_HOOKS_FILE={{ mig_manager_hooks }}"
           - "--setenv=MIG_PARTED_SELECTED_CONFIG={{ mig_manager_profile }}"
           - --
@@ -111,17 +156,35 @@
       # persists it for the boot-time reapply.
       when:
         - has_mig.rc == 0
-        - mig_in_place.rc != 0 or mig_config is changed
+        - >-
+          mig_in_place.rc != 0 or mig_config is changed
+          or not (mig_persisted.stdout.split() is superset(mig_environment))
+      vars:
+        mig_environment:
+          - MIG_PARTED_CONFIG_FILE={{ mig_config_file }}
+          - MIG_PARTED_HOOKS_FILE={{ mig_manager_hooks }}
+          - MIG_PARTED_SELECTED_CONFIG={{ mig_manager_profile }}
 
     - name: Assert MIG configuration was applied
       ansible.builtin.command: >-
         systemd-run --wait --pipe --collect --quiet --
-        nvidia-mig-parted assert -f {{ mig_manager_config }}
+        nvidia-mig-parted assert -f {{ mig_config_file }}
         -c {{ mig_manager_profile }}
       changed_when: false
       when:
         - not ansible_check_mode
         - mig_apply is changed
+
+    # The site's own configuration once the site leaves it: the boot-time reapply names
+    # the package's now (applied above whenever it named another file).
+    - name: Remove the site's former mig-parted configuration
+      ansible.builtin.file:
+        path: "{{ mig_manager_config }}"
+        state: absent
+      when:
+        - has_mig.rc == 0
+        - mig_manager_config_src | length == 0
+        - mig_manager_config != mig_package_config
 
     # The CDI specification lists the MIG devices, and nvidia-cdi-refresh does not
     # follow a MIG change (cdi-support.html, known limitations): regenerate it.

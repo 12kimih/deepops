@@ -19,8 +19,7 @@ description: Deploy a Slurm GPU cluster with DeepOps and prove it works. Use whe
 
    ```bash
    git submodule update --init --recursive
-   ./scripts/setup.sh
-   cp -r config.example config
+   ./scripts/setup.sh   # also starts config/ (inventory, group_vars, host_vars) from config.example
    ```
 
 2. Edit `config/inventory`: put the controller under `[slurm-master]` and

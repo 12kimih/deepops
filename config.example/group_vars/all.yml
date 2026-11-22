@@ -566,7 +566,9 @@ maas_region_controller_url: 'http://{{ maas_region_controller }}:5240/MAAS'
 
 # Default profile when using NVIDIA MIG Manager: https://github.com/NVIDIA/mig-parted
 #mig_manager_profile: all-disabled
-#mig_manager_config_src: "{{ inventory_dir }}/nvidia-mig-config.yml"
+# A reviewed mig-parted configuration of your own; empty uses the package's, which it
+# generates from the GPUs at every boot (roles/deploy_defaults).
+#mig_manager_config_src: ""
 #mig_manager_config: /etc/nvidia-mig-manager/config.yml
 # The hooks file; the package's keeps the layout across reboots (roles/deploy_defaults).
 #mig_manager_hooks: /etc/nvidia-mig-manager/hooks.yaml

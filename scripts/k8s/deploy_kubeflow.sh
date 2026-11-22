@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-# Get the DeepOps root_dir and config_dir
+# Get the DeepOps root_dir
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR="${SCRIPT_DIR}/../.."
-CONFIG_DIR="${ROOT_DIR}/config"
 
-# Source common libraries and env variables
+# Source common libraries and env variables (DEEPOPS_CONFIG_DIR, deepops_config_file)
 source ${ROOT_DIR}/scripts/common.sh
 
 # Poll for these to be available with the -w flag
@@ -16,18 +15,17 @@ export KUBEFLOW_TIMEOUT="${KUBEFLOW_TIMEOUT:-600}"
 export KUBEFLOW_DEPLOY_TIMEOUT="${KUBEFLOW_DEPLOY_TIMEOUT:-1200}"
 
 # Define Kubeflow manifests location
-export KUBEFLOW_MANIFESTS_DEST="${KUBEFLOW_MANIFESTS_DEST:-${CONFIG_DIR}/kubeflow-install/manifests}"
+export KUBEFLOW_MANIFESTS_DEST="${KUBEFLOW_MANIFESTS_DEST:-${DEEPOPS_CONFIG_DIR}/kubeflow-install/manifests}"
 export KUBEFLOW_MANIFESTS_URL="${KUBEFLOW_MANIFESTS_URL:-https://github.com/kubeflow/manifests}"
 export KUBEFLOW_MANIFESTS_VERSION="${KUBEFLOW_MANIFESTS_VERSION:-v1.7.0}"
 
 # Define configuration we're injecting into the manifests location
-export KUBEFLOW_DEEPOPS_CONFIG_DIR="${KUBEFLOW_DEEPOPS_CONFIG_DIR:-${CONFIG_DIR}/files/kubeflow}"
-export KUBEFLOW_DEEPOPS_DEX_CONFIG="${KUBEFLOW_DEEPOPS_DEX_CONFIG:-${KUBEFLOW_DEEPOPS_CONFIG_DIR}/dex-config-map.yaml}"
-export KUBEFLOW_DEEPOPS_USERNS_PARAMS="${KUBEFLOW_DEEPOPS_USERNS_PARAMS:-${KUBEFLOW_DEEPOPS_CONFIG_DIR}/user-namespace-params.env}"
+export KUBEFLOW_DEEPOPS_DEX_CONFIG="${KUBEFLOW_DEEPOPS_DEX_CONFIG:-$(deepops_config_file files/kubeflow/dex-config-map.yaml)}"
+export KUBEFLOW_DEEPOPS_USERNS_PARAMS="${KUBEFLOW_DEEPOPS_USERNS_PARAMS:-$(deepops_config_file files/kubeflow/user-namespace-params.env)}"
 
 # Define Kustomize location
 export KUSTOMIZE_URL="${KUSTOMIZE_URL:-https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.1.0/kustomize_v5.1.0_linux_amd64.tar.gz}"
-export KUSTOMIZE="${KUSTOMIZE:-${CONFIG_DIR}/kustomize}"
+export KUSTOMIZE="${KUSTOMIZE:-${DEEPOPS_CONFIG_DIR}/kustomize}"
 
 function help_me() {
   echo "Usage:"
@@ -161,7 +159,7 @@ function stand_up() {
   pushd "${KUBEFLOW_MANIFESTS_DEST}" || exit 1
 
   wget -O "${KUSTOMIZE}.tgz" "${KUSTOMIZE_URL}"
-  tar -xvf "${KUSTOMIZE}.tgz" -C "${CONFIG_DIR}"
+  tar -xvf "${KUSTOMIZE}.tgz" -C "${DEEPOPS_CONFIG_DIR}"
   chmod +x "${KUSTOMIZE}"
 
   echo "Beginning Kubeflow deployment"

@@ -30,15 +30,23 @@ class Hooks(unittest.TestCase):
 
     def render(self, values):
         variables = {**DEFAULTS, "inventory_dir": "/cfg", **values}
+        for name, value in PLAY["vars"].items():  # the play's, in order, as Ansible would
+            variables[name] = render(value, variables)
         return [render(arg, variables) for arg in module(APPLY)[1]["argv"]]
 
     def test_the_packaged_hooks_and_the_selected_profile_reach_the_environment(self):
         args = self.render({"mig_manager_profile": "all-1g.10gb"})
         self.assertEqual(args[:5], ["systemd-run", "--wait", "--pipe", "--collect", "--quiet"])
         self.assertIn("--setenv=MIG_PARTED_HOOKS_FILE=/etc/nvidia-mig-manager/hooks.yaml", args)
-        self.assertIn("--setenv=MIG_PARTED_CONFIG_FILE=/etc/nvidia-mig-manager/config.yml", args)
+        self.assertIn("--setenv=MIG_PARTED_CONFIG_FILE=/etc/nvidia-mig-manager/config.yaml", args)
         self.assertIn("--setenv=MIG_PARTED_SELECTED_CONFIG=all-1g.10gb", args)
         self.assertEqual(args[args.index("--") + 1 :], ["nvidia-mig-parted", "apply"])
+
+    def test_the_package_configuration_unless_the_site_names_its_own(self):
+        # The package generates config.yaml from the GPUs at every boot (service.sh); a
+        # site's own lands at mig_manager_config.
+        args = self.render({"mig_manager_config_src": "/cfg/mig.yml"})
+        self.assertIn("--setenv=MIG_PARTED_CONFIG_FILE=/etc/nvidia-mig-manager/config.yml", args)
 
     def test_a_site_hooks_file_with_spaces_stays_one_argument(self):
         args = self.render({"mig_manager_hooks": "/etc/mig/custom hooks.yaml"})

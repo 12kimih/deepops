@@ -21,8 +21,7 @@ description: Deploy a Kubernetes GPU cluster with DeepOps (Kubespray + GPU Opera
 
    ```bash
    git submodule update --init --recursive
-   ./scripts/setup.sh
-   cp -r config.example config
+   ./scripts/setup.sh   # also starts config/ (inventory, group_vars, host_vars) from config.example
    ```
 
 2. Edit `config/inventory`: control plane nodes under
