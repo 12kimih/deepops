@@ -97,11 +97,20 @@ class Installed(unittest.TestCase):
         )
 
     def test_a_tool_the_package_no_longer_has_names_the_playbook(self):
-        self.record("renamed", {"a": 1}, module="cluster_tools.no_such_tool")
+        self.record("dropped", {"a": 1}, module="cluster_tools.no_such_tool")
         problems = config.installed(self.records)
         self.assertEqual(len(problems), 1)
-        self.assertIn("cluster_tools.no_such_tool is not a tool of this package", problems[0])
-        self.assertTrue(problems[0].endswith("; rerun playbooks/renamed.yml"))
+        self.assertIn("no_such_tool is not a tool of this package", problems[0])
+        self.assertTrue(problems[0].endswith("; rerun playbooks/dropped.yml"))
+
+    def test_a_record_written_before_a_package_rename_still_checks(self):
+        # Hosts hold records naming clustertools.<tool> (before the rename): the tool's
+        # name decides, so they stay valid and a misfit is still found.
+        good = {"table": "t", "inbound_table": "i", "user_uids": [], "tunnel_programs": []}
+        self.record("renamed", good, module="clustertools.egress_metrics")
+        self.assertEqual(config.installed(self.records), [])
+        self.record("renamed", {"table": "t"}, module="clustertools.egress_metrics")
+        self.assertIn("inbound_table is missing", config.installed(self.records)[0])
 
     def test_a_damaged_record_is_reported(self):
         (self.records / "bad.json").write_text("{")
