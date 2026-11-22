@@ -6,10 +6,15 @@ undo a stop; starting docker.service started nothing back, so a Docker stop and 
 WantedBy=docker.service starts it with Docker; systemd_unit enables an enabled unit
 again, so a unit that gains it gets the link."""
 
+import sys
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from ansible_yaml import render, role_defaults  # noqa: E402
 
 TEMPLATE = (ROOT / "roles/container_service/templates/container.service.j2").read_text()
 
@@ -37,6 +42,29 @@ class Unit(unittest.TestCase):
         self.assertIn("ExecStartPre=/usr/bin/docker info --format ok", TEMPLATE)
         self.assertIn("StartLimitBurst=5", TEMPLATE.split("[Service]")[0])
         self.assertIn("StartLimitIntervalSec=300", TEMPLATE.split("[Service]")[0])
+
+    def unit(self, **service):
+        keys = yaml.safe_load((ROOT / "roles/container_service/defaults/main.yml").read_text())[
+            "container_service_keys"
+        ]
+        values = {
+            "_container_service": {**keys, "unit": "docker.x.service", "image": "x@sha256:1", **service}
+        }
+        return render(TEMPLATE, {**role_defaults("deepops_paths"), **values, "ansible_managed": "managed"})
+
+    def test_a_unit_it_needs_at_boot_orders_it(self):
+        """dcgm-exporter's --device nvidia.com/gpu=all reads the CDI specification that
+        nvidia-cdi-refresh writes at boot: started first, it could find none."""
+        after = [
+            line
+            for line in self.unit(after=["nvidia-cdi-refresh.service"]).splitlines()
+            if line.startswith("After=")
+        ]
+        self.assertEqual(after, ["After=docker.service network-online.target nvidia-cdi-refresh.service"])
+        plain = self.unit()
+        self.assertIn("After=docker.service network-online.target\nRequires=docker.service\n", plain)
+        dcgm = (ROOT / "roles/nvidia-dcgm-exporter/tasks/present.yml").read_text()
+        self.assertIn("after: [nvidia-cdi-refresh.service]", dcgm)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,9 @@
 #                creates it as an empty directory, so a file not yet written became a
 #                directory that hid the file forever after (the registry's config.yml)
 #   args         the container's arguments
+#   after        units it starts after at boot besides Docker (After= only: a unit not
+#                installed there is ignored): what writes a file the container needs
+#                then, such as the CDI specification its --device names
 #   state, enabled   the service's (started, true)
 #   notify       the caller's handlers to notify when the unit changes
 #   health_url   where it answers 200 once serving (/-/ready, /metrics); with it the role
@@ -32,6 +35,7 @@ container_service_keys:
   env: {}
   mounts: []
   args: []
+  after: []
   state: started
   enabled: true
   notify: []
