@@ -3,7 +3,7 @@ test or a molecule scenario.
 
     subprocess.run([... "ansible-playbook" ...], env=unrecorded.env(KEY="value"))
 
-ansible.cfg records every run with ARA (callback_plugins = ./.callback_plugins), so the
+ansible.cfg records every run with ARA (callback_plugins = ./plugins/callback), so the
 operator's history shows what each run did. A run that is not the operator's points
 ANSIBLE_CALLBACK_PLUGINS at an empty directory instead and loads no callback. ansible.cfg
 also names the site's vault password file (config/.vault-pass), without which Ansible
