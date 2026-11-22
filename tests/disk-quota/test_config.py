@@ -1,6 +1,6 @@
 """roles/disk_quota writes cluster_tools.disk_quota's configuration from the roster: every
-active person limited (the site's limits under their own), the rest of the roster
-released, nobody outside it named."""
+active person limited on each filesystem (the site's limits there under their own), the
+whole roster named for release where it is not limited, nobody outside it named."""
 
 import json
 import sys
@@ -31,18 +31,27 @@ def config(**overrides):
 class Config(unittest.TestCase):
     def test_counting_only_limits_who_has_their_own(self):
         cfg = config()
-        self.assertEqual(cfg["filesystems"], ["/"])
-        self.assertEqual(list(cfg["limits"]), ["alice"])
-        self.assertEqual(cfg["release"], ["bob", "carol", "dave"])
+        self.assertEqual(list(cfg["filesystems"]), ["/"])
+        self.assertEqual(list(cfg["filesystems"]["/"]), ["alice"])
+        self.assertEqual(cfg["release"], ["alice", "bob", "carol", "dave"])
         self.assertNotIn("grace_days", cfg, "a warn level only notifies: no grace period to set")
         self.assertEqual(cfg["projects"], {})
         self.assertTrue(cfg["textfile"].endswith("/disk-quota.prom"))
 
     def test_site_limits_reach_every_active_person(self):
-        cfg = config(disk_quota_limits={"block_warn": "10G", "block_hard": "20G"})
-        self.assertEqual(sorted(cfg["limits"]), ["alice", "bob", "dave"])
-        self.assertEqual(cfg["limits"]["alice"]["block_hard"], "100G")
-        self.assertEqual(cfg["release"], ["carol"])
+        cfg = config(disk_quota_filesystems={"/": {"block_warn": "10G", "block_hard": "20G"}})
+        self.assertEqual(sorted(cfg["filesystems"]["/"]), ["alice", "bob", "dave"])
+        self.assertEqual(cfg["filesystems"]["/"]["alice"]["block_hard"], "100G")
+
+    def test_each_filesystem_has_its_own_limits(self):
+        cfg = config(disk_quota_filesystems={"/": {}, "/scratch": {"block_hard": "5T"}})
+        self.assertEqual(list(cfg["filesystems"]["/"]), ["alice"], "alice's own limit is for / alone")
+        self.assertEqual(sorted(cfg["filesystems"]["/scratch"]), ["alice", "bob", "dave"])
+        self.assertEqual(cfg["filesystems"]["/scratch"]["alice"], {"block_hard": "5T"})
+
+    def test_the_old_list_is_refused_by_name(self):
+        with self.assertRaisesRegex(Exception, "disk_quota_filesystems is filesystem"):
+            config(disk_quota_filesystems=["/"])
 
     def test_each_project_carries_the_filesystem_it_lives_on(self):
         mounts = [{"mount": "/"}, {"mount": "/home"}]
@@ -56,8 +65,8 @@ class Config(unittest.TestCase):
         )
 
     def test_no_roster_names_nobody(self):
-        cfg = config(people={}, disk_quota_limits={"block_hard": "20G"})
-        self.assertEqual((cfg["limits"], cfg["release"]), ({}, []))
+        cfg = config(people={}, disk_quota_filesystems={"/": {"block_hard": "20G"}})
+        self.assertEqual((cfg["filesystems"], cfg["release"]), ({"/": {}}, []))
 
 
 if __name__ == "__main__":

@@ -31,8 +31,8 @@ A roster file declares the roles a site uses and the people:
           admin: {qos: [high, urgent]}
         default_account: admin    # needed with several accounts
         roles: [admin]
-        disk_quota: {block_warn: 50G, block_hard: 100G}  # optional, over the site's
-                                  # default per-user disk quota (roles/disk_quota)
+        disk_quota:               # optional, per filesystem, over the site's limits
+          /home: {block_warn: 15T, block_hard: 20T}   # there (roles/disk_quota)
         status: active            # active (default) or left
         ends: 2027-02-28          # optional: the last day of membership (graduation)
 
@@ -362,8 +362,18 @@ def check(roster, uid_min=UID_MIN):
             if req and req not in held:
                 problems.append(f"{where}.roles: {role} requires {req}")
         quota = p.get("disk_quota")
-        if quota is not None and (not isinstance(quota, dict) or set(quota) - set(QUOTA_KEYS)):
-            problems.append(f"{where}.disk_quota: a mapping of {', '.join(QUOTA_KEYS)}")
+        if quota is not None and not (
+            isinstance(quota, dict)
+            and all(
+                isinstance(mount, str) and mount.startswith("/")
+                and isinstance(lim, dict) and not set(lim) - set(QUOTA_KEYS)
+                for mount, lim in quota.items()
+            )
+        ):  # fmt: skip
+            problems.append(
+                f"{where}.disk_quota: filesystem -> a mapping of {', '.join(QUOTA_KEYS)}"
+                " (/home: {block_hard: 20T})"
+            )
         accounts = p.get("accounts") or {}
         if not isinstance(accounts, dict):
             problems.append(f"{where}.accounts: must be a mapping of account -> options")
@@ -640,14 +650,24 @@ def roster_project_close(text, name, uid_min=UID_MIN):
     return _dump_checked(rt, doc, uid_min)
 
 
-def people_disk_quotas(people, default=None):
-    """{login: limits} for every active person: their own disk_quota over DEFAULT (a
-    mapping of QUOTA_KEYS). Someone with neither is left out: not limited."""
+def people_disk_quotas(people, filesystems):
+    """{filesystem: {login: limits}} for every active person: on each of FILESYSTEMS
+    ({filesystem: the site's limits there, a mapping of QUOTA_KEYS}) their own
+    disk_quota for it over the site's. Someone with neither there is left out of it:
+    not limited there."""
+    if not isinstance(filesystems, dict):
+        from ansible.errors import AnsibleFilterError  # only under Ansible, as above
+
+        raise AnsibleFilterError(
+            f"disk_quota_filesystems is filesystem -> its limits ({{'/': {{}}}}), not {filesystems!r}"
+        )
     out = {}
-    for name, p in sorted(_active(people).items()):
-        limits = {**(default or {}), **(p.get("disk_quota") or {})}
-        if any(limits.get(k) not in (None, "", 0, "0") for k in QUOTA_KEYS):
-            out[name] = limits
+    for mount, default in sorted(filesystems.items()):
+        out[mount] = {}
+        for name, p in sorted(_active(people).items()):
+            limits = {**(default or {}), **((p.get("disk_quota") or {}).get(mount) or {})}
+            if any(limits.get(k) not in (None, "", 0, "0") for k in QUOTA_KEYS):
+                out[mount][name] = limits
     return out
 
 

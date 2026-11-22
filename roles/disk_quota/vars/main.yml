@@ -4,12 +4,11 @@ _disk_quota_config: "{{ cluster_tools_lib_config_dir }}/disk-quota.json"
 _disk_quota_textfile: "{{ node_exporter_prom_dir }}/disk-quota.prom"
 _disk_quota_units: [disk-quota.service, disk-quota.timer]
 _disk_quota_roster: "{{ people | default({}) }}"
-_disk_quota_users: "{{ _disk_quota_roster | people_disk_quotas(disk_quota_limits) }}"
 _disk_quota_cfg:
-  filesystems: "{{ disk_quota_filesystems }}"
-  limits: "{{ _disk_quota_users }}"
-  # Everyone else the roster names, left or limited no longer: limits they had go.
-  release: "{{ _disk_quota_roster | list | difference(_disk_quota_users | list) | sort }}"
+  filesystems: "{{ _disk_quota_roster | people_disk_quotas(disk_quota_filesystems) }}"
+  # Everyone the roster names: where a filesystem no longer limits them (left, or
+  # limited no longer), what they had there is lifted.
+  release: "{{ _disk_quota_roster | list | sort }}"
   projects: "{{ disk_quota_projects | project_filesystems(ansible_facts.mounts) }}"
   textfile: "{{ _disk_quota_textfile }}"
 

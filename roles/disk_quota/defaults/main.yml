@@ -1,14 +1,14 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): per-user disk quotas on
-# local ext4 filesystems and per-directory (project) quotas (cluster_tools.disk_quota). A deploy sets it from
+# local ext4 and XFS filesystems and per-directory (project) quotas (cluster_tools.disk_quota). A deploy sets it from
 # deepops_components (slurm_enable_disk_quota, on slurm-login and slurm-nfs): a login
 # node shares its disk with whatever else runs there (on a small cluster the controller,
 # its database and the logs), and one user's /tmp, /var/tmp or enroot cache could fill
 # it; the home server's /home is everyone's. docs/deepops/disk-quota.md.
 #
 # Everyone in the roster is limited, administrators too (their own accounts; what they
-# do with sudo is root's and never limited), each with disk_quota_limits or their own
-# disk_quota in the roster; root and system accounts are never limited. Usage and limits
+# do with sudo is root's and never limited), on each filesystem with its limits in
+# disk_quota_filesystems or their own disk_quota for it in the roster; root and system accounts are never limited. Usage and limits
 # are exported as metrics (disk_quota_used_bytes, disk_quota_project_used_bytes, ...)
 # every disk_quota_metrics_interval.
 #
@@ -20,18 +20,17 @@
 # https://www.kernel.org/doc/html/latest/filesystems/ext4/overview.html#quota
 disk_quota_state: present
 
-# Local ext4 mount points whose users' space is limited, per host (["/", "/home"] on a
-# login node that is also the home server).
-disk_quota_filesystems: ["/"]
-
-# Every roster person's limits, two levels each: the hard limit (block_hard: setquota
-# sizes, K, M, G, T; inode_hard: numbers, or with k, m, g, t), the only one enforced (a
-# write past it fails at once), and the warn level (block_warn, inode_warn), which only
-# notifies: it is exported with the usage for the alerts and the people's notices, never
-# set in the kernel (no soft limit, so no grace period that later refuses writes). {}
-# sets none: quotas only count, so the metrics show how the space is used before limits
-# are chosen. A person's own disk_quota in the roster (people.yml) overrides these.
-disk_quota_limits: {}
+# The local ext4 or XFS filesystems whose users' space is counted, per host, each with
+# every roster person's limits there ({"/": {}, "/home": {block_warn: 8T, block_hard:
+# 10T}} on a login node that is also the home server). Two levels each: the hard limit
+# (block_hard: setquota sizes, K, M, G, T; inode_hard: numbers, or with k, m, g, t), the
+# only one enforced (a write past it fails at once), and the warn level (block_warn,
+# inode_warn), which only notifies: it is exported with the usage for the alerts and the
+# people's notices, never set in the kernel (no soft limit, so no grace period that later
+# refuses writes). {} sets none: quotas only count, so the metrics show how the space is
+# used before limits are chosen. A person's own disk_quota for a filesystem in the
+# roster (people.yml) overrides the site's there.
+disk_quota_filesystems: {"/": {}}
 
 # Directories whose whole tree has a limit (project quota), path: {id, block_warn,
 # block_hard}; each id unique on its filesystem, which needs prjquota in its mount

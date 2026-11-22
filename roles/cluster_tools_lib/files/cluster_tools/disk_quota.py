@@ -7,23 +7,29 @@
 Each step is printed as it is taken (or would be, with --check), one line each. CONFIG
 "-" is read from standard input (a preview of a configuration not written yet):
 
-    {"filesystems": ["/"],
-     "limits": {"alice": {"block_warn": "10G", "block_hard": "20G",
-                          "inode_warn": "200k", "inode_hard": "500k"}},
-     "release": ["bob"],
+    {"filesystems": {"/": {},
+                     "/home": {"alice": {"block_warn": "8T", "block_hard": "10T",
+                                         "inode_warn": "20m", "inode_hard": "25m"}}},
+     "release": ["alice", "bob"],
      "projects": {"/home/shared/datasets": {"filesystem": "/home", "id": 101,
                                             "block_warn": "15T", "block_hard": "20T"}},
      "textfile": "/run/prometheus/disk-quota.prom"}
+
+Each filesystem has its own people's limits ({} counts only). Every name in release
+that a filesystem does not limit has whatever limit it had there lifted (the roster:
+someone left, or limited no longer).
 
 A limit has two levels. The hard limit is the only one the kernel enforces: a write past
 it fails at once. The warn level is never sent to the kernel (its soft limit stays 0, so
 there is no grace period that turns into a refusal later); it is exported with the
 usage, for the alerts and the people's notices.
 
-User quotas are on ext4. A filesystem with ext4's quota feature (tune2fs -O quota) needs
-usrquota in its mount options; one without it keeps journaled quota files
+User quotas are on ext4 and XFS. An ext4 filesystem with its quota feature (tune2fs -O
+quota) needs usrquota in its mount options; one without it keeps journaled quota files
 (usrjquota=aquota.user,jqfmt=vfsv1, created by quotacheck), which can be turned on while
-it is mounted. Project quotas (a directory tree's total) are on ext4 with the project
+it is mounted. XFS keeps quotas in its metadata, on from the mount with usrquota
+(uquota): XFS turns them on only at mount time, never on a remount, so adding the option
+means unmounting it once. Project quotas (a directory tree's total) are on ext4 with the project
 feature and prjquota, or on XFS with prjquota (pquota). The mount options are not this
 tool's to write: /etc/fstab has one writer (roles/host_baseline,
 host_baseline_mount_options), which also remounts, so a filesystem mounted without them
@@ -51,6 +57,8 @@ from .prom import key, render
 MOUNTS = "/proc/self/mounts"
 JOURNALED = ["usrjquota=aquota.user", "jqfmt=vfsv1"]
 FEATURE = ["usrquota"]
+# The mount options that turn XFS user quotas on (/proc/self/mounts says usrquota).
+XFS_USER_OPTIONS = ("usrquota", "uquota", "quota", "uqnoenforce")
 QUOTA_FILE = "aquota.user"
 # The mount options that turn project quotas on, per filesystem type.
 PROJECT_OPTIONS = {"ext4": ("prjquota",), "xfs": ("prjquota", "pquota", "pqnoenforce")}
@@ -197,8 +205,13 @@ def quota_options(feature):
 def filesystem_steps(host, mount, cfg):
     """[(description, action)] that turn MOUNT's per-user quotas on, in order."""
     device, fstype, live = _mounted(host, mount)
+    if fstype == "xfs":
+        # On from the mount itself: nothing to create or turn on.
+        if not set(live) & set(XFS_USER_OPTIONS):
+            _refuse_options(mount, "usrquota")
+        return []
     if fstype != "ext4":
-        raise Error(f"{mount} is {fstype}; user quotas are set on ext4 only")
+        raise Error(f"{mount} is {fstype}; user quotas are set on ext4 and xfs")
     feature = has_feature(host.run(["tune2fs", "-l", device]))
     options = quota_options(feature)
     if not all(o in live for o in options):
@@ -217,7 +230,7 @@ def filesystem_steps(host, mount, cfg):
 
 def limit_steps(host, mount, cfg, fresh=False):
     """[(description, action)] that set every user's hard limits on MOUNT (soft 0)."""
-    want = wanted(cfg.get("limits"))
+    want = wanted(cfg["filesystems"][mount])
     have = {} if fresh else report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
     steps = []
     for user, values in sorted(want.items()):
@@ -320,9 +333,18 @@ def remove_steps(host, mount, cfg):
     quotas and the quota file. The mount options are host_baseline_mount_options' to
     drop: with them left, the next boot turns quotas on again."""
     steps = []
+    _, fstype, _ = _mounted(host, mount)
+    if fstype == "xfs":
+        # Its quotas go with the mount option; the limits are lifted here.
+        have = report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
+        for user in sorted(set(cfg["filesystems"][mount]) | set(cfg.get("release") or [])):
+            if user in have and any(_limits_of(have[user])):
+                argv = ["setquota", "-u", user, "0", "0", "0", "0", mount]
+                steps.append((" ".join(argv), lambda a=argv: host.run(a)))
+        return steps
     if re.search(r"\bis on\b", host.run(["quotaon", "-pu", mount], check=False)):
         have = report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
-        for user in sorted(set(cfg.get("limits") or {}) | set(cfg.get("release") or [])):
+        for user in sorted(set(cfg["filesystems"][mount]) | set(cfg.get("release") or [])):
             if user in have and any(_limits_of(have[user])):
                 argv = ["setquota", "-u", user, "0", "0", "0", "0", mount]
                 steps.append((" ".join(argv), lambda a=argv: host.run(a)))
@@ -357,8 +379,8 @@ def metrics(host, cfg, now):
     """Usage and limits, as textfile metrics: the hard limit as the kernel holds it, the
     warn level from the configuration (the kernel never has it)."""
     values = {}
-    want = wanted(cfg.get("limits"))
-    for mount in cfg.get("filesystems") or []:
+    for mount, limits in (cfg.get("filesystems") or {}).items():
+        want = wanted(limits)
         for user, (bu, _, bh, iu, _, ih) in report(
             host.run(["repquota", "-u", "-v", "-O", "csv", mount])
         ).items():
@@ -388,10 +410,10 @@ def steps_for(host, cfg, action):
     out = []
     if action == "remove":
         out += remove_project_steps(host, cfg)
-        for mount in cfg.get("filesystems") or []:
+        for mount in cfg.get("filesystems") or {}:
             out += remove_steps(host, mount, cfg)
         return out
-    for mount in cfg.get("filesystems") or []:
+    for mount in cfg.get("filesystems") or {}:
         fs = filesystem_steps(host, mount, cfg)
         out += fs
         # Quotas not on yet (they are turned on above): nothing can be read, and every
@@ -402,7 +424,7 @@ def steps_for(host, cfg, action):
 
 USAGE = "usage: disk-quota CONFIG.json apply|remove [--check] | metrics"
 
-CONFIG_KEYS = {"filesystems": list, "limits": dict, "release": list, "projects": dict, "textfile": str}
+CONFIG_KEYS = {"filesystems": dict, "release": list, "projects": dict, "textfile": str}
 
 
 def load_config(path):
