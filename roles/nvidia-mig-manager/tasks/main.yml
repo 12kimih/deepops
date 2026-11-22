@@ -25,13 +25,13 @@
   check_mode: false  # read-only; --check needs the result
 
 # A node whose GPUs cannot be queried is not a node without MIG: installing
-# nothing and reporting it as converged hides a broken driver. The lspci fact
+# nothing and reporting it as converged hides a broken driver. The gpus fact (PCI bus)
 # keeps nodes with no NVIDIA hardware out of this.
 - name: Fail when the MIG capability probe could not run
   ansible.builtin.fail:
     msg: >-
       Could not read the MIG mode of the GPUs on this node.
-      nvidia-smi is unavailable or did not answer, while lspci reports
+      nvidia-smi is unavailable or did not answer, while the PCI bus has
       {{ ansible_facts.ansible_local['gpus']['count'] }} NVIDIA GPU(s).
       Install the driver on this node, or exclude it from this play.
   when:

@@ -80,7 +80,7 @@ maintenance_verify_units: >-
   {{ (['slurmd'] if inventory_hostname in groups['slurm-node'] | default([]) else [])
      + (['mariadb', 'munge', 'slurmdbd', 'slurmctld'] if inventory_hostname in groups['slurm-master'] | default([]) else [])
      + (['nfs-server'] if inventory_hostname in groups['slurm-nfs'] | default([]) else []) }}
-# A compute node without GPUs (maintenance_gpus_baseline: lspci when the run started)
+# A compute node without GPUs (maintenance_gpus_baseline: the gpus fact when the run started)
 # is checked without them.
 maintenance_verify_gpus: >-
   {{ inventory_hostname in groups['slurm-node'] | default([])
