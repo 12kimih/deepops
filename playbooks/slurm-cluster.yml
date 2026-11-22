@@ -131,8 +131,17 @@
   vars:
     deepops_phase: install
 
+- name: Put the job directories on their own filesystem
+  import_playbook: slurm-cluster/job-scratch.yml
+  vars:
+    deepops_phase: install
+  tags:
+    - job-scratch
+
 - name: Install Slurm
   import_playbook: slurm-cluster/slurm.yml
+  vars:
+    deepops_phase: install
 
 - name: Back up the Slurm controller daily, with a monthly restore test
   import_playbook: slurm-cluster/slurm-backup.yml
@@ -413,6 +422,13 @@
     deepops_phase: remove
   tags:
     - slurm-backup
+
+- name: Remove the job directories' own filesystem where it is no longer wanted
+  import_playbook: slurm-cluster/job-scratch.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - job-scratch
 
 - name: Remove Node Health Check where it is no longer wanted
   import_playbook: slurm-cluster/nhc.yml

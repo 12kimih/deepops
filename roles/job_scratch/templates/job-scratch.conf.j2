@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# The job directories' filesystem (roles/job_scratch): slurmd waits for it and stops
+# without it.
+[Unit]
+RequiresMountsFor={{ slurm_job_private_base }}

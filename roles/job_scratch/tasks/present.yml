@@ -1,0 +1,174 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: job_scratch
+    component_record_action: begin
+    component_record_items: "{{ job_scratch_items }}"
+
+- name: Check the request
+  ansible.builtin.assert:
+    that:
+      - slurm_job_private_dirs | length > 0
+      - job_scratch_size is match('^[1-9][0-9]*([GT]|%)$')
+      - job_scratch_reserve is match('^[0-9]+%$')
+      - (job_scratch_size is not match('.*%$')) or (job_scratch_size[:-1] | int + job_scratch_reserve[:-1] | int <= 100)
+      - job_scratch_file is match('^/[^ ,]+$')
+      - not job_scratch_file.startswith(slurm_job_private_base ~ '/')
+    fail_msg: >-
+      job_scratch holds slurm_job_private_dirs (now {{ slurm_job_private_dirs }}, which must
+      not be empty); job_scratch_size is a percentage or a size in G or T (got
+      {{ job_scratch_size }}), job_scratch_reserve a percentage, the two together at most
+      100%, and job_scratch_file an absolute path outside {{ slurm_job_private_base }}.
+    quiet: true
+
+- name: Install the XFS tools
+  ansible.builtin.package:
+    name: xfsprogs
+    state: present
+
+- name: Read the filesystem the image takes its space from
+  ansible.builtin.command:
+    argv: [findmnt, --bytes, --noheadings, --output, "SIZE,AVAIL", --target, "{{ job_scratch_file | dirname }}"]
+  register: job_scratch_host_fs
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the image and what is mounted at the job directories
+  ansible.builtin.command:
+    argv:
+      - sh
+      - -c
+      - |
+        stat -c %s -- "$1" 2>/dev/null || echo 0
+        findmnt --noheadings --output SOURCE,FSTYPE --mountpoint "$2" || echo "- -"
+        find "$2" -mindepth 1 -maxdepth 1 2>/dev/null | head -n 1
+      - read-job-scratch
+      - "{{ job_scratch_file }}"
+      - "{{ slurm_job_private_base }}"
+  register: job_scratch_found
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Work out the image's size
+  vars:
+    _gib: "{{ 1024**3 }}"
+    _fs: "{{ job_scratch_host_fs.stdout.split() | map('int') | list }}"
+    _lines: "{{ job_scratch_found.stdout_lines + ['', '', ''] }}"
+  ansible.builtin.set_fact:
+    _job_scratch:
+      fs_size: "{{ _fs[0] }}"
+      fs_avail: "{{ _fs[1] }}"
+      reserve: "{{ _fs[0] * (job_scratch_reserve[:-1] | int) // 100 }}"
+      wanted: >-
+        {{ ((_fs[0] * (job_scratch_size[:-1] | int) // 100) if job_scratch_size.endswith('%')
+            else (job_scratch_size ~ 'B') | human_to_bytes) // (_gib | int) * (_gib | int) }}
+      current: "{{ _lines[0] | int }}"
+      source: "{{ _lines[1].split()[0] | default('-') }}"
+      fstype: "{{ _lines[1].split()[1] | default('-') }}"
+      occupied: "{{ _lines[2] }}"
+
+- name: Check the image fits and only grows
+  ansible.builtin.assert:
+    that:
+      - _job_scratch.wanted | int >= _job_scratch.current | int
+      - (_job_scratch.wanted | int - _job_scratch.current | int)
+        <= (_job_scratch.fs_avail | int - _job_scratch.reserve | int)
+    fail_msg: >-
+      {{ job_scratch_file }} is {{ _job_scratch.current | int | human_readable }} and
+      job_scratch_size asks for {{ _job_scratch.wanted | int | human_readable }}: XFS cannot
+      shrink (remove the component and recreate it on an idle node), and growing takes no
+      more than leaves {{ job_scratch_reserve }} of the filesystem free
+      ({{ _job_scratch.fs_avail | int | human_readable }} free now).
+    quiet: true
+
+# Mounting over directories running jobs use would hide them from those jobs.
+- name: Check no job uses the directories the filesystem will be mounted on
+  ansible.builtin.assert:
+    that: _job_scratch.source != '-' or _job_scratch.occupied == ''
+    fail_msg: >-
+      {{ slurm_job_private_base }} holds job directories ({{ _job_scratch.occupied }}):
+      drain the node and let its jobs end before the first deploy of job_scratch.
+    quiet: true
+
+- name: Create the image
+  change_command:
+    argv:
+      - sh
+      - -c
+      - 'umask 077 && fallocate --length "$2" -- "$1" && mkfs.xfs -q -L job-scratch -- "$1"'
+      - create-job-scratch
+      - "{{ job_scratch_file }}"
+      - "{{ _job_scratch.wanted }}"
+  when: _job_scratch.current | int == 0
+
+# fallocate extends the file, losetup makes the loop device see it, xfs_growfs grows
+# the mounted filesystem into it; running jobs keep their files.
+- name: Grow the image and its filesystem
+  change_command:
+    argv:
+      - sh
+      - -c
+      - 'fallocate --length "$2" -- "$1" && if [ "$3" != - ]; then losetup --set-capacity "$3" && xfs_growfs -- "$4" >/dev/null; fi'
+      - grow-job-scratch
+      - "{{ job_scratch_file }}"
+      - "{{ _job_scratch.wanted }}"
+      - "{{ _job_scratch.source }}"
+      - "{{ slurm_job_private_base }}"
+  when: 0 < _job_scratch.current | int < _job_scratch.wanted | int
+
+- name: Mount it at the job directories
+  ansible.posix.mount:
+    path: "{{ slurm_job_private_base }}"
+    src: "{{ job_scratch_file }}"
+    fstype: xfs
+    opts: "{{ _job_scratch_opts }}"
+    state: mounted
+  when: not deepops_containerized | bool
+
+- name: Make slurmd wait for it
+  ansible.builtin.template:
+    src: job-scratch.conf.j2
+    dest: "{{ _job_scratch_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: job_scratch_dropin
+
+- name: Load slurmd's new ordering
+  systemd_unit:
+    daemon_reload: true
+  when: job_scratch_dropin is changed
+
+- name: Create the local facts directory
+  ansible.builtin.file:
+    path: "{{ _job_scratch_fact | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Report its size to Slurm
+  ansible.builtin.template:
+    src: job_scratch.fact.j2
+    dest: "{{ _job_scratch_fact }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check the job directories are on it
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, FSTYPE, --mountpoint, "{{ slurm_job_private_base }}"]
+  register: job_scratch_mounted
+  changed_when: false
+  failed_when: job_scratch_mounted.stdout | trim != 'xfs'
+  when: not ansible_check_mode and not deepops_containerized | bool
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: job_scratch
+    component_record_action: present
+    component_record_items: "{{ job_scratch_items }}"

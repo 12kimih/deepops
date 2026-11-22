@@ -103,6 +103,41 @@ class SlurmConf(unittest.TestCase):
         self.assertTrue(dbd["PidFile"].startswith("/run/slurmdbd/"))
 
 
+def node_line(conf, name="node01"):
+    line = next(x for x in conf.splitlines() if x.strip().startswith(f"NodeName={name} "))
+    return dict(word.split("=", 1) for word in line.split())
+
+
+class JobFilesystem(unittest.TestCase):
+    """TmpFS and each node's TmpDisk (roles/job_scratch)."""
+
+    def conf(self, size_mb=None, **overrides):
+        facts = {
+            "ansible_facts": {
+                **FACTS["ansible_facts"],
+                "ansible_local": dict(FACTS["ansible_facts"]["ansible_local"]),
+            }
+        }
+        if size_mb is not None:
+            facts["ansible_facts"]["ansible_local"]["job_scratch"] = {"size_mb": size_mb}
+        return rendered("slurm_conf_template", hostvars={"node01": facts}, **overrides)
+
+    def test_slurmd_measures_the_job_directories(self):
+        self.assertEqual(settings(self.conf())["TmpFS"], DEFAULTS["slurm_job_private_base"])
+
+    def test_a_node_offers_its_job_filesystem_in_whole_gib(self):
+        self.assertEqual(node_line(self.conf(1300000))["TmpDisk"], str(1300000 // 1024 * 1024))
+
+    def test_no_filesystem_of_its_own_offers_none(self):
+        for size in (None, 0, 1000):
+            self.assertNotIn("TmpDisk", node_line(self.conf(size)), size)
+
+    def test_without_private_directories_neither(self):
+        conf = self.conf(1300000, slurm_job_private_dirs=[])
+        self.assertNotIn("TmpFS", settings(conf))
+        self.assertNotIn("TmpDisk", node_line(conf))
+
+
 class GresConf(unittest.TestCase):
     def test_gpus_are_auto_detected_never_listed(self):
         lines = [x for x in rendered("slurm_gres_conf_template").splitlines() if x and not x.startswith("#")]

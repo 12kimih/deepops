@@ -1,0 +1,17 @@
+---
+dependencies:
+  - role: slurm_paths  # slurm_job_private_base, slurm_job_private_dirs
+  - role: deepops_paths  # deepops_containerized
+
+galaxy_info:
+  namespace: deepops
+  role_name: job_scratch
+  author: DeepOps
+  description: The per-job private directories on an XFS filesystem of their own, sized for Slurm's --tmp
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

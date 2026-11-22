@@ -147,8 +147,10 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    small-file reads are latency-bound random I/O that melts a single NFS head. The
    `enroot_*_path` defaults are already node-local -- **do not** repoint them at an NFS
    mount (see the warning in `config.example/group_vars/all.yml`). Stage datasets to
-   local `/tmp` (or a mounted NVMe scratch via `TMPDIR`/`sbcast`), compute locally,
-   copy results back.
+   the job's own local `/tmp` (`$TMPDIR`, removed with the job; ask for the space
+   with `--tmp=SIZE` where `slurm_enable_job_scratch` gives it a filesystem of its
+   own, docs/slurm-cluster/epilog-job-scoped-cleanup.md), compute locally, copy
+   results back.
 
 2. **Client mount options.** The default `nfs_mount_options` is now
    `rw,hard,vers=4.2,nconnect=16,rsize=1048576,wsize=1048576,proto=tcp,timeo=600,retrans=2,noatime,_netdev,nofail`.

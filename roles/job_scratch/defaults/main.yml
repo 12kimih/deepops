@@ -1,0 +1,26 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): the per-job private
+# directories (slurm_job_private_base, roles/slurm_paths) on a filesystem of their own,
+# so a job that fills its /tmp fills that filesystem and not the node's root, where the
+# OS, slurmd, its logs and the container caches live. A deploy sets it from
+# deepops_components (slurm_enable_job_scratch, on slurm-node).
+#
+# The filesystem is XFS in a file preallocated on the root filesystem and loop-mounted
+# at slurm_job_private_base (most nodes have one disk, all of it the root filesystem),
+# mounted with prjquota so a later limit per job needs no remount. Slurm learns its size
+# (TmpFS, each node's TmpDisk in roles/slurm), so `--tmp=SIZE` places a job on a node
+# with that much. Deploy it while the node runs no jobs: the first mount would hide the
+# directories of running ones, and the role stops if it finds any.
+job_scratch_state: present
+
+# The size: a percentage of the filesystem holding the image, or an absolute size
+# ("1200G", "3T"). Growing it later grows the filesystem in place (running jobs keep
+# theirs); XFS cannot shrink, so a smaller size stops the role (remove and recreate it
+# on an idle node instead).
+job_scratch_size: "70%"
+# The image file (a filesystem in a file), on the filesystem it takes its space from.
+job_scratch_file: /var/lib/slurm-job-scratch.img
+# Space the root filesystem keeps free beyond the image, as a percentage of its size:
+# creating or growing the image stops rather than go below it (roles/nhc drains a node
+# at nhc_min_free).
+job_scratch_reserve: "15%"
