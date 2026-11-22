@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # The GPUs at their highest power limit and clocks for the job that has the node to
-# itself. A GPU that supports neither is logged, never a failed part (a drained node).
+# itself. A GPU that supports neither is left as it is; a failure is logged, never a
+# failed part (a drained node).
 set -u
 
 command -v nvidia-smi >/dev/null || exit 0
-for helper in set_gpu_power_levels.sh set_gpu_clocks.sh; do
-    timeout 120 '{{ slurm_config_dir }}'/shared/bin/"$helper" max \
-        || logger -t slurm-exclusive "$helper max failed" || :
-done
+timeout 120 '{{ slurm_config_dir }}'/shared/bin/set_gpu_levels.sh max \
+    || logger -t slurm-exclusive "set_gpu_levels.sh max failed" || :
 exit 0

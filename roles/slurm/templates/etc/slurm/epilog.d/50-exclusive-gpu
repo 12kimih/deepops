@@ -12,19 +12,29 @@ gpu_pids() {
     timeout 60 nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | grep -E '^[0-9]+$'
 }
 
-for pid in $(gpu_pids); do
-    logger -t slurm-epilog "Killing residual GPU process $pid" || :
-    kill -9 "$pid" 2>/dev/null || :
-done
-sleep 5
-if [ -n "$(gpu_pids)" ]; then
-    logger -t slurm-epilog "Residual GPU processes survived; draining $node_name" || :
-    timeout 30 {{ slurm_install_prefix }}/bin/scontrol update nodename="$node_name" state=drain reason='Residual GPU processes found' \
-        || logger -t slurm-epilog "could not drain $node_name" || :
+# Only a job that left a process behind waits for it: up to 5 s for the killed
+# processes to exit, then nvidia-smi is asked again.
+residual="$(gpu_pids)"
+if [ -n "$residual" ]; then
+    for pid in $residual; do
+        logger -t slurm-epilog "Killing residual GPU process $pid" || :
+        kill -9 "$pid" 2>/dev/null || :
+    done
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        alive=""
+        for pid in $residual; do
+            kill -0 "$pid" 2>/dev/null && alive=1
+        done
+        [ -z "$alive" ] && break
+        sleep 0.5
+    done
+    if [ -n "$(gpu_pids)" ]; then
+        logger -t slurm-epilog "Residual GPU processes survived; draining $node_name" || :
+        timeout 30 '{{ slurm_install_prefix }}'/bin/scontrol update nodename="$node_name" state=drain reason='Residual GPU processes found' \
+            || logger -t slurm-epilog "could not drain $node_name" || :
+    fi
 fi
 
-for helper in set_gpu_power_levels.sh set_gpu_clocks.sh; do
-    timeout 120 '{{ slurm_config_dir }}'/shared/bin/"$helper" default \
-        || logger -t slurm-epilog "$helper default failed" || :
-done
+timeout 120 '{{ slurm_config_dir }}'/shared/bin/set_gpu_levels.sh default \
+    || logger -t slurm-epilog "set_gpu_levels.sh default failed" || :
 exit 0
