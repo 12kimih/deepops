@@ -97,6 +97,8 @@ def installed(records=RECORDS, skip=()):
             check(module, path)
         except ConfigError as e:
             problems.append(f"{e}; rerun {playbook}")
+        except (ImportError, AttributeError):  # a tool renamed or dropped from the package
+            problems.append(f"{path}: {module} is not a tool of this package; rerun {playbook}")
     return problems
 
 
