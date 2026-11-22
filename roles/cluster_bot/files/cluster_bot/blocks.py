@@ -1,5 +1,5 @@
 """Block Kit pieces every feature shares: buttons, form fields, and the administrators'
-message for a held request (clusterbot.requests), approved or denied with
+message for a held request (cluster_bot.requests), approved or denied with
 request.approve and request.deny whatever the feature."""
 
 

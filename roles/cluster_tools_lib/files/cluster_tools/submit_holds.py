@@ -3,7 +3,7 @@
     submit-holds CONFIG.json     write the holds file and its metrics (as root, on a
                                  controller, every few minutes)
 
-A person at a disk hard limit (clustertools.disk_report: the disk quota metrics, as
+A person at a disk hard limit (cluster_tools.disk_report: the disk quota metrics, as
 the daily disk report reads them) is held: their new jobs are refused, with the reason,
 until they free space there. Running jobs go on. Before `disk_from` (Unix time, 0: at
 once) no one is held: the grace a site gives everyone already at a limit when it turns
@@ -34,7 +34,7 @@ CONFIG_KEYS = {"prometheus_url": str, "file": str, "disk_from": (int, float), "t
 
 
 def load_config(path):
-    """The config, checked whole (clustertools.config)."""
+    """The config, checked whole (cluster_tools.config)."""
     return config.require(path, CONFIG_KEYS)
 
 

@@ -1,6 +1,6 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): per-user disk quotas on
-# local ext4 filesystems and per-directory (project) quotas (clustertools.disk_quota). A deploy sets it from
+# local ext4 filesystems and per-directory (project) quotas (cluster_tools.disk_quota). A deploy sets it from
 # deepops_components (slurm_enable_disk_quota, on slurm-login and slurm-nfs): a login
 # node shares its disk with whatever else runs there (on a small cluster the controller,
 # its database and the logs), and one user's /tmp, /var/tmp or enroot cache could fill

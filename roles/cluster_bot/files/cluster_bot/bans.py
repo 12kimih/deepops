@@ -1,4 +1,4 @@
-"""Unban requests as a feature of the request engine (clusterbot.requests): someone
+"""Unban requests as a feature of the request engine (cluster_bot.requests): someone
 whose address fail2ban banned asks, an administrator approves (bans are for good, so a
 person always looks), and the ban is lifted on every host that holds it.
 
@@ -6,7 +6,7 @@ person always looks), and the ban is lifted on every host that holds it.
     feature.where(ip) -> {host: [ban, ...]} where IP is banned now
     watch(feature, post, update, seen)   one round of the administrators' ban watch
 
-Each host runs clustertools.bans for SERVICE: list, unban IP.
+Each host runs cluster_tools.bans for SERVICE: list, unban IP.
 req: user, ip (as address() writes it), reason.
 """
 

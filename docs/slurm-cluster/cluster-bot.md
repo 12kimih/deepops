@@ -61,7 +61,7 @@ command, which runs as root with the rest of the request and takes only what the
 ask. The bot's key is authorized there for one forced command,
 `sudo -n /usr/local/sbin/cluster-bot-serve /etc/cluster-bot-access`, the only command its
 sudo rule allows, and only from the bot host's cluster address. The dispatcher
-(`clustertools.bot_serve`) runs a service only from a file of root's that nobody else may
+(`cluster_tools.bot_serve`) runs a service only from a file of root's that nobody else may
 write, never through a shell.
 
 | Service | Offered by | Command | Requests |
@@ -143,6 +143,6 @@ the app's settings are updated from it.
 | `/etc/cluster-bot/bot.token`, `app.token` | The tokens, read by the bot alone; never on a command line |
 | `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |
 | `/etc/cluster-bot/known_hosts` | The host keys of the hosts it reaches, read from each host |
-| `/var/lib/clusterbot/` | Its SSH key and state: held requests, reminders sent, bans seen (kept on removal) |
+| `/var/lib/cluster-bot/` | Its SSH key and state: held requests, reminders sent, bans seen (kept on removal) |
 | `/etc/cluster-bot-access/<service>.json` | On a host it acts on: a service offered to it |
-| `/var/lib/clusterbot/.ssh/authorized_keys` | On a host it acts on: its key, for the dispatcher only |
+| `/var/lib/cluster-bot/.ssh/authorized_keys` | On a host it acts on: its key, for the dispatcher only |

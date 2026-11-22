@@ -31,16 +31,16 @@ from pathlib import Path
 # Slurm is read through the cluster tools' one Slurm module (its JSON, its timeouts,
 # its node vocabulary), from this checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import proc, slurm, vocab  # noqa: E402
+from cluster_tools import proc, slurm, vocab  # noqa: E402
 
 
-# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+# (rc, stdout, stderr), never raising; bounded (cluster_tools.proc).
 run = functools.partial(proc.outcome, timeout=60)
 
 
 def summarize_nodes(nodes):
     """(details, states, unavailable) from Slurm's node records (scontrol --json),
-    classified the way every cluster tool classifies them (clustertools.vocab):
+    classified the way every cluster tool classifies them (cluster_tools.vocab):
     details is [{name, state, gpus_configured}] by name, states {full state: count},
     unavailable the names of nodes no new job can start on."""
     nodes = sorted(nodes, key=lambda n: n["name"])

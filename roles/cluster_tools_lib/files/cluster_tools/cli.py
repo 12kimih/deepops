@@ -309,7 +309,7 @@ def me():
 def run_main(name, body):
     """Run BODY() -> exit status, with the failures every command shares, each as one
     line: Slurm's (slurm.Error, with its own status: 127 for a missing client, else 1)
-    a config's (2, clustertools.config) and a file's (1). Ctrl-C and a closed pipe end quietly. Anything else is a bug and
+    a config's (2, cluster_tools.config) and a file's (1). Ctrl-C and a closed pipe end quietly. Anything else is a bug and
     keeps its traceback, rather than being reported as Slurm's."""
     try:
         return body() or 0

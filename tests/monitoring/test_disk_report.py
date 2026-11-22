@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the daily disk report's PromQL (clustertools.disk_report) with promtool:
+"""Execute the daily disk report's PromQL (cluster_tools.disk_report) with promtool:
 the disks it reads are exactly the filesystems the quota metrics count (no cluster)."""
 
 import sys
@@ -12,7 +12,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
-from clustertools import disk_report  # noqa: E402
+from cluster_tools import disk_report  # noqa: E402
 
 
 def labels(**kw):

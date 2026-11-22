@@ -44,7 +44,7 @@ class TestSlurmNodes(unittest.TestCase):
         self.assertEqual(states, {"idle": 1, "mixed": 1, "allocated": 1})
 
     def test_a_node_no_job_can_start_on_is_unavailable(self):
-        # The cluster tools' one definition (clustertools.vocab.node_schedulable):
+        # The cluster tools' one definition (cluster_tools.vocab.node_schedulable):
         # down, not responding, drained, draining or in maintenance is out; powered
         # down (Slurm powers it up for a job) and reserved are in.
         nodes = [
@@ -340,7 +340,7 @@ if __name__ == "__main__":
 
 
 class TestValidatorsStartProcessesOneWay(unittest.TestCase):
-    """A validator's one-shot command goes through clustertools.proc (bounded, its whole
+    """A validator's one-shot command goes through cluster_tools.proc (bounded, its whole
     session killed on a timeout, undecodable bytes replaced, never raising): six copies of
     a run() helper had drifted, one without errors="replace" and one without a timeout
     message. Popen stays for what must outlive a call (a port-forward, a stream)."""
@@ -356,4 +356,4 @@ class TestValidatorsStartProcessesOneWay(unittest.TestCase):
             for n, line in enumerate(Path(SCRIPTS_DIR, name).read_text().splitlines(), 1)
             if one_shot.search(line)
         ]
-        self.assertEqual(offenders, [], "run commands with clustertools.proc (outcome or run)")
+        self.assertEqual(offenders, [], "run commands with cluster_tools.proc (outcome or run)")

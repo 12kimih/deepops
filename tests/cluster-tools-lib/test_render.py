@@ -1,4 +1,4 @@
-"""Unit tests for clustertools.render (roles/cluster_tools_lib), no terminal needed."""
+"""Unit tests for cluster_tools.render (roles/cluster_tools_lib), no terminal needed."""
 
 import io
 import re
@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import render  # noqa: E402
+from cluster_tools import render  # noqa: E402
 
 ANSI = re.compile(r"\033\[[0-9;]*m")
 

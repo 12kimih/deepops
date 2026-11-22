@@ -1,7 +1,7 @@
 ---
 dependencies:
   - role: deploy_defaults  # submit_holds_from
-  - role: cluster_tools_lib  # clustertools.submit_holds
+  - role: cluster_tools_lib  # cluster_tools.submit_holds
   - role: prometheus_paths  # prometheus_url, node_exporter_prom_dir
   - role: slurm_paths  # slurm_submit_holds_file
 

@@ -1,5 +1,5 @@
 ---
-# Disk quotas (roles/disk_quota textfile metrics, clustertools.disk_quota). The disk
+# Disk quotas (roles/disk_quota textfile metrics, cluster_tools.disk_quota). The disk
 # itself is watched by the filesystem rules in host.yml; these say when the usage stopped
 # being reported, and who (or which shared directory) is past its warn level: a level
 # that only notifies (the kernel enforces the hard limit alone, at once).

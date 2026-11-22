@@ -1,6 +1,6 @@
 ---
 # cluster_bot_access -- one service a role offers the cluster bot on this host, and the
-# bot's single way in that every service shares (clustertools.bot_serve):
+# bot's single way in that every service shares (cluster_tools.bot_serve):
 #
 #   - ansible.builtin.include_role:
 #       name: cluster_bot_access
@@ -10,7 +10,7 @@
 #         argv: [/usr/local/sbin/scratch-alloc, /etc/cluster-tools/scratch-alloc.json, serve]
 #
 # argv runs as root with SSH_ORIGINAL_COMMAND set to the rest of the request, so the
-# service must take only what the bot may ask (clustertools.bot_serve.request). The
+# service must take only what the bot may ask (cluster_tools.bot_serve.request). The
 # offering role lists cluster_bot_access_items and its service's file
 # (<cluster_bot_serve_dir>/<name>.json) among its items, so roles/component_record
 # removes the service with the role and the shared way in with the last such role.

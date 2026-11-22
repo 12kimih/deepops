@@ -1,6 +1,6 @@
 ---
 # The cluster bot's Slack app (api.slack.com/apps, "From a manifest"): what
-# clusterbot.app handles. Change it together with the app's commands and actions.
+# cluster_bot.app handles. Change it together with the app's commands and actions.
 display_information:
   name: Cluster bot
 features:

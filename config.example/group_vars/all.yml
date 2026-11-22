@@ -274,9 +274,9 @@
 #    uid: 472
 #    home: /var/lib/grafana
 #    comment: Grafana
-#  clusterbot:
+#  cluster-bot:
 #    uid: 22081
-#    home: /var/lib/clusterbot
+#    home: /var/lib/cluster-bot
 #    shell: /bin/sh
 #    comment: Cluster bot
 #  shared:

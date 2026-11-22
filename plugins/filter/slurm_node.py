@@ -8,7 +8,7 @@ Slurm reports a base state and flags (["MIXED", "DRAIN"]). The maintenance steps
 `scontrol show node -o`'s State= with regular expressions before, and each misread it
 its own way: MIXED+DRAIN (jobs still running) passed as drained, a pre-reboot
 IDLE+DRAIN+NOT_RESPONDING as registered, a reason that merely contained "gres" as an
-invalid registration. This reads the flags whole, through clustertools, the one
+invalid registration. This reads the flags whole, through cluster_tools, the one
 implementation of Slurm's JSON and node vocabulary in this repository, and answers the
 questions those steps ask:
 
@@ -36,7 +36,7 @@ from pathlib import Path
 from ansible.errors import AnsibleFilterError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles" / "cluster_tools_lib" / "files"))
-from clustertools import slurm, vocab  # noqa: E402
+from cluster_tools import slurm, vocab  # noqa: E402
 
 
 def slurm_node(text, reason=None):

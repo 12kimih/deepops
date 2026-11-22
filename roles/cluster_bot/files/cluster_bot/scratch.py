@@ -1,12 +1,12 @@
-"""Scratch allocations as a feature of the request engine (clusterbot.requests): the
+"""Scratch allocations as a feature of the request engine (cluster_bot.requests): the
 policy (scratch_policy) decides, the scratch server applies, and every result is a line
 the person reads.
 
     feature = ScratchFeature(executor, policy)
     feature.mine(user) -> the user's allocations
 
-The executor runs clustertools.scratch_alloc on the scratch server (a
-clusterbot.remote.Remote for SERVICE) and returns its JSON.
+The executor runs cluster_tools.scratch_alloc on the scratch server (a
+cluster_bot.remote.Remote for SERVICE) and returns its JSON.
 """
 
 import time
@@ -69,7 +69,7 @@ class ScratchFeature(Feature):
         return self.run("list", user)
 
     def deadlines(self):
-        """The active allocations' end dates (a clusterbot.reminders source's)."""
+        """The active allocations' end dates (a cluster_bot.reminders source's)."""
         return {
             str(a["id"]): (a["expires"], a["user"], a) for a in self.run("list") if a["state"] == "active"
         }

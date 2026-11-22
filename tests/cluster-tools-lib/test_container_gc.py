@@ -1,4 +1,4 @@
-"""clustertools.container_gc against temporary stores and a fake /proc.
+"""cluster_tools.container_gc against temporary stores and a fake /proc.
 
 Each store's path comes from the tool's own configuration; a store is removed when its
 user left, when it went unused, or oldest-first while the disk is too full, and never
@@ -15,8 +15,8 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import container_gc as gc  # noqa: E402
-from clustertools import prom  # noqa: E402
+from cluster_tools import container_gc as gc  # noqa: E402
+from cluster_tools import prom  # noqa: E402
 
 ME = os.getuid()
 DAY = 86400

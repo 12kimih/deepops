@@ -1,4 +1,4 @@
-"""Unit tests for clustertools.banner (roles/cluster_tools_lib): the login banner."""
+"""Unit tests for cluster_tools.banner (roles/cluster_tools_lib): the login banner."""
 
 import re
 import subprocess
@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import banner, render  # noqa: E402
+from cluster_tools import banner, render  # noqa: E402
 
 ANSI = re.compile(r"\033\[[0-9;]*m")
 COMMANDS = [{"name": "sq", "text": "queue and node usage"}, {"name": "qos", "text": "your QoS"}]

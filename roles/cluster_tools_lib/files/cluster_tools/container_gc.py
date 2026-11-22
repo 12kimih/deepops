@@ -397,7 +397,7 @@ DOCKER_KEYS = ("socket", "label")
 
 
 def load_config(path):
-    """The config roles/container_storage_gc writes (clustertools.config)."""
+    """The config roles/container_storage_gc writes (cluster_tools.config)."""
     cfg = config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
     docker = cfg.get("docker")
     if docker is not None and (

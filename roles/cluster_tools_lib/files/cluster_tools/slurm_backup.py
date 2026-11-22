@@ -67,7 +67,7 @@ CONFIG_OPTIONAL = {"restore_database": str}
 
 
 def load_config(path):
-    """The config roles/slurm_backup writes (clustertools.config), and one the commands can
+    """The config roles/slurm_backup writes (cluster_tools.config), and one the commands can
     run: every problem is named."""
     cfg = config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
     problems = problems_in(cfg)

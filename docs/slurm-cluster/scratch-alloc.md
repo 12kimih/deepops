@@ -2,7 +2,7 @@
 
 Fast scratch space is handed out per request instead of as one directory per person:
 each allocation is a directory of its own, `<mount>/<user>-<id>`, with a size limit and
-an end date. `roles/scratch_alloc` installs the tool (`clustertools.scratch_alloc`, as
+an end date. `roles/scratch_alloc` installs the tool (`cluster_tools.scratch_alloc`, as
 `/usr/local/sbin/scratch-alloc`) and a timer on the host whose filesystem holds the
 scratch space (`[scratch-server]`, switch `slurm_enable_scratch_alloc`).
 
@@ -31,7 +31,7 @@ removes them.
 ## The filesystem
 
 The scratch filesystem is XFS or ext4 with project quotas, which the tool sets through
-`clustertools.disk_quota` (the same functions as roles/disk_quota's projects). Add
+`cluster_tools.disk_quota` (the same functions as roles/disk_quota's projects). Add
 `prjquota` to its options in `host_baseline_mount_options` (host_vars of the scratch
 server); roles/host_baseline writes `/etc/fstab` and, since a remount cannot turn XFS
 quotas on, asks for the reboot that applies them. ext4 also needs its `project` feature

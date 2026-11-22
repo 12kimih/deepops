@@ -1,10 +1,10 @@
 ---
-# Where each role records its tool's config (clustertools.config RECORDS).
+# Where each role records its tool's config (cluster_tools.config RECORDS).
 cluster_tools_lib_config_records: /etc/cluster-tools/configs.d
-# clustertools.config's command line with the package at a given path first on sys.path
+# cluster_tools.config's command line with the package at a given path first on sys.path
 # (-I keeps PYTHONPATH and the user's site-packages out, as the commands do).
 _cluster_tools_lib_config_code: >-
-  import sys; sys.path.insert(0, sys.argv[1]); from clustertools.config import main; sys.exit(main(sys.argv[2:]))
+  import sys; sys.path.insert(0, sys.argv[1]); from cluster_tools.config import main; sys.exit(main(sys.argv[2:]))
 # A role's validate for its tool's config: "{{ cluster_tools_lib_config_validate }} MODULE %s".
 cluster_tools_lib_config_validate: >-
   {{ [cluster_tools_lib_python, '-I', '-c', _cluster_tools_lib_config_code, cluster_tools_lib_dir, 'check']

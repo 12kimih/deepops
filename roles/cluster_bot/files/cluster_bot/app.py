@@ -1,13 +1,13 @@
 """The cluster bot's Slack app: Socket Mode (an outbound connection, no port to open),
 one handler per action. Each handler reads Slack's input, asks a feature module
-(clusterbot.scratch) and posts the outcome; nothing is decided here.
+(cluster_bot.scratch) and posts the outcome; nothing is decided here.
 
-    python3 -m clusterbot.app CONFIG.json
+    python3 -m cluster_bot.app CONFIG.json
 
 CONFIG (written by roles/cluster_bot): bot_token_file, app_token_file, channels {help,
 admin}, members {Slack member ID: cluster user}, admins [member IDs], pending (the held
-requests of every feature, clusterbot.requests), reminders (what went out,
-clusterbot.reminders), ssh {key, user, known_hosts} (clusterbot.remote, to the hosts
+requests of every feature, cluster_bot.requests), reminders (what went out,
+cluster_bot.reminders), ssh {key, user, known_hosts} (cluster_bot.remote, to the hosts
 it acts on), scratch {host, policy, remind_days} (host empty leaves it off), bans
 {hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
 leave {remind_days, leaving (people_leaving)}.
@@ -255,7 +255,7 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
             req["size"] = size_bytes(value["selected_option"]["value"])
         submit(client, slack_id, req)
 
-    # Collaboration folders (clusterbot.projects): the Home tab's buttons and menu, and
+    # Collaboration folders (cluster_bot.projects): the Home tab's buttons and menu, and
     # the forms they open.
     def project_req(slack_id, op, name, **more):
         login = user_of(slack_id)
@@ -389,7 +389,7 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
 
 
 def reminder_sources(cfg, scratch):
-    """What the bot reminds people of before a deadline (clusterbot.reminders)."""
+    """What the bot reminds people of before a deadline (cluster_bot.reminders)."""
     leave = cfg["leave"]
     sources = {
         "leave": reminders.Source(
@@ -412,14 +412,14 @@ def every(seconds, name, round_):
             try:
                 round_()
             except Exception as e:  # noqa: BLE001 - one failed round must not stop the next
-                print(f"clusterbot: {name}: {e}", file=sys.stderr, flush=True)
+                print(f"cluster-bot: {name}: {e}", file=sys.stderr, flush=True)
             time.sleep(seconds)
 
     threading.Thread(target=loop, name=name, daemon=True).start()
 
 
 def admin_messages(client, channel):
-    """(post, update) for messages the bot keeps in CHANNEL (clusterbot.bans.watch): post
+    """(post, update) for messages the bot keeps in CHANNEL (cluster_bot.bans.watch): post
     returns the message as {channel ID, ts} and pins it on request (a pin Slack refuses
     leaves it unpinned, never unrecorded); update says False when the message is gone
     (deleted), and raises on any other refusal."""
@@ -432,7 +432,9 @@ def admin_messages(client, channel):
             try:
                 client.pins_add(channel=message["channel"], timestamp=message["ts"])
             except SlackApiError as e:  # the message stands unpinned (the bot is not in the channel)
-                print(f"clusterbot: pin in {channel}: {e.response.get('error')}", file=sys.stderr, flush=True)
+                print(
+                    f"cluster-bot: pin in {channel}: {e.response.get('error')}", file=sys.stderr, flush=True
+                )
         return message
 
     def update(message, text, blocks):

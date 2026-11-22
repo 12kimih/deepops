@@ -1,5 +1,5 @@
 ---
-# The submission holds (roles/submit_holds, clustertools.submit_holds): job_submit.lua
+# The submission holds (roles/submit_holds, cluster_tools.submit_holds): job_submit.lua
 # trusts their file for half an hour, then holds no one, so a writer that stopped is said
 # well before.
 groups:

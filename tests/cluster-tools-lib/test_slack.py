@@ -1,4 +1,4 @@
-"""clustertools.slack: the one Slack client. A member is found from the map, by email, or
+"""cluster_tools.slack: the one Slack client. A member is found from the map, by email, or
 not at all, and an answer is reused for a day; a member ID becomes a DM channel; a
 dry run prints instead of posting; a refusal names the method and Slack's reason."""
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import slack  # noqa: E402
+from cluster_tools import slack  # noqa: E402
 
 
 class Fake(slack.Slack):

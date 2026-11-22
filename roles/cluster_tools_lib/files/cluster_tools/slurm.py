@@ -181,14 +181,14 @@ def check(kind, data):
     if not isinstance(data.get(key), list):
         raise SchemaError(
             f"Slurm {release} gave no '{key}' list for {kind}; "
-            "clustertools.slurm.QUERIES needs updating for this release"
+            "cluster_tools.slurm.QUERIES needs updating for this release"
         )
     for record in data[key]:
         missing = [f for f in FIELDS[kind] if f not in record]
         if missing:
             raise SchemaError(
                 f"Slurm {release} {kind} lack {', '.join(missing)}; "
-                "clustertools.slurm.FIELDS needs updating for this release"
+                "cluster_tools.slurm.FIELDS needs updating for this release"
             )
     return data
 

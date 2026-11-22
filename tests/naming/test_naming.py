@@ -139,7 +139,7 @@ class Naming(unittest.TestCase):
         found = {}
         for tasks in (p for p in tracked("roles") if p.parent.name == "tasks" and p.suffix == ".yml"):
             role = tasks.parts[-3]
-            for module in re.findall(r"module: \"?clustertools\.([a-z_]+)", tasks.read_text()):
+            for module in re.findall(r"module: \"?cluster_tools\.([a-z_]+)", tasks.read_text()):
                 if module != role and role not in ("cluster_tools", "cluster_tools_lib"):
                     found[role] = module
         self.assertEqual(found, MODULE_NOT_ROLE)

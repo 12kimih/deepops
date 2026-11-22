@@ -1,27 +1,34 @@
 ---
 # cluster_tools_lib_source: the package on the controller, for what runs it there (the
 # login banner, drawn at deploy time and so in a preview too).
-- name: Collect the clustertools modules
+- name: Collect the cluster_tools modules
   ansible.builtin.set_fact:
-    cluster_tools_lib_modules: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/clustertools/*.py') | sort }}"
+    cluster_tools_lib_modules: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/cluster_tools/*.py') | sort }}"
     cluster_tools_lib_source: "{{ role_path }}/files"
 
 # The package is its modules, nothing else: a copy of the directory would also ship the
 # controller's __pycache__, and a module dropped from the package would stay importable.
 # The bytecode cache Python keeps on the host goes only when the package changed.
-- name: Publish the clustertools package
+- name: Publish the cluster_tools package
   ansible.builtin.include_role:
     name: managed_dir
   vars:
-    managed_dir_path: "{{ cluster_tools_lib_dir }}/clustertools"
+    managed_dir_path: "{{ cluster_tools_lib_dir }}/cluster_tools"
     managed_dir_sources: "{{ cluster_tools_lib_modules }}"
     managed_dir_keep: [__pycache__]
 
-# A changed package may refuse a config another playbook wrote (clustertools.config):
+# The package's earlier name (clustertools, until 2026-11): the commands run the new one,
+# so the old directory is nothing's.
+- name: Remove the package of its earlier name
+  ansible.builtin.file:
+    path: "{{ cluster_tools_lib_dir }}/clustertools"
+    state: absent
+
+# A changed package may refuse a config another playbook wrote (cluster_tools.config):
 # checked once this play's roles wrote theirs (handlers/main.yml).
 - name: Note that the package changed under the recorded tool configs
   ansible.builtin.debug:
-    msg: the clustertools package changed; the recorded tool configs are checked after this play
+    msg: the cluster_tools package changed; the recorded tool configs are checked after this play
   changed_when: managed_dir_changed | bool
   notify: Check the recorded tool configs
   when: managed_dir_changed | bool

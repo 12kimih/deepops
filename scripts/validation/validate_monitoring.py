@@ -38,9 +38,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "scripts/deepops"))
-from clustertools import metrics as slurm_metrics  # noqa: E402
-from clustertools.prometheus import Error as PrometheusError  # noqa: E402
-from clustertools.prometheus import Prometheus  # noqa: E402
+from cluster_tools import metrics as slurm_metrics  # noqa: E402
+from cluster_tools.prometheus import Error as PrometheusError  # noqa: E402
+from cluster_tools.prometheus import Prometheus  # noqa: E402
 from repo_files import tracked  # noqa: E402
 
 RULES = ROOT / "roles" / "prometheus" / "files" / "rules"

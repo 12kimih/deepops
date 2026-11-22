@@ -1,4 +1,4 @@
-"""clusterbot.bans through the request engine: an unban is asked only for an address
+"""cluster_bot.bans through the request engine: an unban is asked only for an address
 banned now, always waits for an administrator, is lifted on every host, and a host that
 cannot be reached is said, never hidden. The service names the bot asks for are the ones
 the roles offer, and the request reaches the host as words, never through a shell."""
@@ -14,7 +14,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
-from clusterbot import bans, remote, requests, scratch  # noqa: E402
+from cluster_bot import bans, remote, requests, scratch  # noqa: E402
 
 BAN = {"ip": "192.0.2.7", "jail": "sshd", "since": "2026-11-20 03:12:44"}
 

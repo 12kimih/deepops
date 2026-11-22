@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROLE = Path(__file__).resolve().parents[2] / "roles/cluster_bot"
 sys.path.insert(0, str(ROLE / "files"))
-from clusterbot import accounts, accounts_blocks, app, reminders, scratch, scratch_blocks, state  # noqa: E402
+from cluster_bot import accounts, accounts_blocks, app, reminders, scratch, scratch_blocks, state  # noqa: E402
 
 DAY = 86400
 ALLOC = {"id": 1000, "user": "alice", "bytes": 1024**4, "state": "active", "path": "/scratch/alice-1000",
@@ -152,7 +152,7 @@ class LogicTests(unittest.TestCase):
         manifest = yaml.safe_load((ROLE / "files/slack-app-manifest.yml").read_text())
         declared = {c["command"] for c in manifest["features"]["slash_commands"]}
         handled = set(
-            re.findall(r'@app\.command\("([^"]+)"\)', (ROLE / "files/clusterbot/app.py").read_text())
+            re.findall(r'@app\.command\("([^"]+)"\)', (ROLE / "files/cluster_bot/app.py").read_text())
         )
         self.assertEqual(declared, handled)
         self.assertTrue(manifest["settings"]["socket_mode_enabled"])

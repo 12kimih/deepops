@@ -1,6 +1,6 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): who may not submit Slurm
-# jobs for now, and why (clustertools.submit_holds), written on the controllers, where
+# jobs for now, and why (cluster_tools.submit_holds), written on the controllers, where
 # the rendered job_submit.lua reads it. A deploy sets it from deepops_components
 # (slurm_enable_submit_holds, on slurm-master). Held: a person at a disk hard limit (the
 # disk quota metrics, as the daily disk report reads them), from submit_holds_from on;

@@ -1,4 +1,4 @@
-"""clustertools.slurm_backup: retention, metrics, and full runs against stub tools."""
+"""cluster_tools.slurm_backup: retention, metrics, and full runs against stub tools."""
 
 import gzip
 import json
@@ -18,8 +18,8 @@ TOOLS = ("sh", "bash", "gzip", "cat", "ls", "rm", "mkdir", "mv", "sha256sum", "t
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles" / "cluster_tools_lib" / "files"))
-from clustertools import prom  # noqa: E402
-from clustertools import slurm_backup as sb  # noqa: E402
+from cluster_tools import prom  # noqa: E402
+from cluster_tools import slurm_backup as sb  # noqa: E402
 
 
 class Pure(unittest.TestCase):

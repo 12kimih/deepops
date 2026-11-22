@@ -1,5 +1,5 @@
 ---
-# cluster_tools_lib -- all of the cluster's own Python, as one package (clustertools):
+# cluster_tools_lib -- all of the cluster's own Python, as one package (cluster_tools):
 # reading Slurm, its vocabulary, rendering, and every program built on them (sq, qos,
 # the usage report). It is installed as one set, so a deploy of any role that depends on
 # this one can never leave a program behind the library it imports. Roles only wire a
@@ -19,7 +19,7 @@ cluster_tools_lib_dir: /usr/local/lib/cluster-tools
 cluster_tools_lib_python: /usr/bin/python3
 
 # Site facts Slurm cannot know, for the cluster's commands, login banner and alerts.
-# Rendered once to cluster_tools_lib_info_file and read through clustertools.site; a key
+# Rendered once to cluster_tools_lib_info_file and read through cluster_tools.site; a key
 # left empty is left out, and every reader skips what is missing. Set the real values in
 # config (they are private); derive a value from its own setting, never restate it.
 cluster_info:
@@ -33,5 +33,5 @@ cluster_info:
 cluster_tools_lib_derived_info:
   dashboard_url: "{{ grafana_root_url }}"
   prometheus_url: "{{ prometheus_url }}"  # gpu-usage reads Prometheus here
-# clustertools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.
+# cluster_tools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.
 cluster_tools_lib_info_file: /etc/cluster-tools/cluster.json

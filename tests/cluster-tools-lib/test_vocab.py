@@ -1,4 +1,4 @@
-"""Unit tests for clustertools.vocab (roles/cluster_tools_lib), no cluster needed."""
+"""Unit tests for cluster_tools.vocab (roles/cluster_tools_lib), no cluster needed."""
 
 import json
 import sys
@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import vocab  # noqa: E402
+from cluster_tools import vocab  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 # Slurm's own names, from the source of the pinned release (scripts/deepops/slurm_names.py).

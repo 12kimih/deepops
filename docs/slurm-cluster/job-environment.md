@@ -17,7 +17,7 @@ name order by `shared/bin/run-parts.sh` (prolog, epilog) and `task-prolog.sh`.
 | podman runtime (`$XDG_RUNTIME_DIR/containers`, `libpod`) | the job runtime dir | podman | with the job runtime dir |
 
 The prolog, epilog and cleanup read the enroot and podman paths from the tools' own
-files at run time (`shared/lib/enroot-paths.sh`, `clustertools.container_gc`), so a
+files at run time (`shared/lib/enroot-paths.sh`, `cluster_tools.container_gc`), so a
 path changed in one setting is followed everywhere.
 
 ## Task prolog

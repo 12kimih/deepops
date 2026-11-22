@@ -1,4 +1,4 @@
-"""clustertools.job_notice: Slurm's MailProg as Slack DMs. A notice reaches the job
+"""cluster_tools.job_notice: Slurm's MailProg as Slack DMs. A notice reaches the job
 user's Slack ID; notices close together become one message updated in place; a
 muted person or a missing token gets nothing and the call still succeeds."""
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import job_notice as jn  # noqa: E402
+from cluster_tools import job_notice as jn  # noqa: E402
 
 ENV = {"SLURM_JOB_ID": "42", "SLURM_JOB_NAME": "train", "SLURM_JOB_STATE": "COMPLETED",
        "SLURM_JOB_RUN_TIME": "01:02:03", "SLURM_JOB_EXIT_CODE_MAX": "0"}  # fmt: skip

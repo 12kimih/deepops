@@ -1,4 +1,4 @@
-"""clustertools.egress_metrics against a fake /proc and nft table.
+"""cluster_tools.egress_metrics against a fake /proc and nft table.
 
 A user's listener on a non-loopback address is reported, with whether the inbound
 filter keeps it from the outside; system accounts, loopback and UDP client sockets are
@@ -14,8 +14,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import egress_metrics as em  # noqa: E402
-from clustertools import prom  # noqa: E402
+from cluster_tools import egress_metrics as em  # noqa: E402
+from cluster_tools import prom  # noqa: E402
 
 CFG = {"table": "egress_policy", "inbound_table": "ingress_policy", "user_uids": ["1000-60000", "65536-4294967294"],
        "tunnel_programs": ["cloudflared", "lt", "code tunnel", "tailscaled"]}  # fmt: skip

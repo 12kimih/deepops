@@ -1,4 +1,4 @@
-"""Tests for sq (clustertools.sq) on a busy-cluster scenario built over
+"""Tests for sq (cluster_tools.sq) on a busy-cluster scenario built over
 the real Slurm 25.11 fixture (see scenario.py). The cases follow the shell version's
 regression tests, then the behaviour the Python version adds."""
 
@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 import scenario
-from clustertools import vocab
+from cluster_tools import vocab
 from common import FAKE_PATH, LIB, run_tool
 
 TMP = tempfile.TemporaryDirectory()
@@ -273,7 +273,7 @@ class FailureTests(unittest.TestCase):
         self.assertIn("no answer in 1 s (slurmctld slow, or rate limiting", r.stderr)
 
     def test_the_interval_backs_off_while_slurm_fails(self):
-        code = f"import sys; sys.path.insert(0, {LIB!r}); from clustertools import sq; sys.exit(sq.main())"
+        code = f"import sys; sys.path.insert(0, {LIB!r}); from cluster_tools import sq; sys.exit(sq.main())"
         env = {"PATH": FAKE_PATH, "FIXTURES": str(SCENE), "LANG": "C.UTF-8",
                "USER": "user1", "FAKE_FAIL": "down"}  # fmt: skip
         if not shutil.which("timeout"):

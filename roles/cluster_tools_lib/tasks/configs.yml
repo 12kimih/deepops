@@ -1,5 +1,5 @@
 ---
-# Every recorded tool config against the package this run publishes (clustertools.config
+# Every recorded tool config against the package this run publishes (cluster_tools.config
 # installed): a tool that would refuse its config fails the deploy here, naming the
 # playbook that rewrites it, rather than its own next run. The roles listed in
 # cluster_tools_lib_configs_skip write and validate their config in this play
@@ -18,14 +18,14 @@
     - name: Create a directory for the package being previewed
       ansible.builtin.tempfile:
         state: directory
-        suffix: .clustertools
+        suffix: .cluster_tools
       register: cluster_tools_lib_staged
       check_mode: false  # a scratch copy for the check, removed below
       when: ansible_check_mode
 
     - name: Copy the package being previewed
       ansible.builtin.copy:
-        src: "{{ role_path }}/files/clustertools"
+        src: "{{ role_path }}/files/cluster_tools"
         dest: "{{ cluster_tools_lib_staged.path }}/"
         mode: preserve
       check_mode: false  # a scratch copy for the check, removed below

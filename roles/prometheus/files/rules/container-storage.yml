@@ -1,6 +1,6 @@
 ---
 # Users' container image stores (roles/container_storage_gc textfile metrics,
-# clustertools.container_gc). The disk itself is watched by the filesystem rules in
+# cluster_tools.container_gc). The disk itself is watched by the filesystem rules in
 # host.yml; these say when the daily cleanup stopped working, and when a container
 # deepops did not start has run on a node past the site's grace period.
 groups:

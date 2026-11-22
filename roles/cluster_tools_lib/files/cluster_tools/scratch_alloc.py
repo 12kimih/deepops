@@ -58,7 +58,7 @@ class Error(Exception):
 
 class Host(disk_quota.Host):
     """The commands and files the tool reads and changes: replaced in the tests. Project
-    quotas go through clustertools.disk_quota (its Host: read, run, xfs_quota)."""
+    quotas go through cluster_tools.disk_quota (its Host: read, run, xfs_quota)."""
 
     def make_dir(self, path, uid, gid):
         os.mkdir(path, 0o700)
@@ -255,7 +255,7 @@ CONFIG_KEYS = {"mount": str, "registry": str, "first_id": int, "max_bytes": (int
 
 
 def load_config(path):
-    """The config roles/scratch_alloc writes (clustertools.config)."""
+    """The config roles/scratch_alloc writes (cluster_tools.config)."""
     return config.require(path, CONFIG_KEYS)
 
 

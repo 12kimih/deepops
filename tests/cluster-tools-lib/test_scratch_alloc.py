@@ -1,4 +1,4 @@
-"""clustertools.scratch_alloc: a request becomes a directory of its own with a project
+"""cluster_tools.scratch_alloc: a request becomes a directory of its own with a project
 quota at once; resize, extend and release act on the registry and the quota; at the end
 date the allocation freezes at what it holds, and after the grace period, or once
 released, it goes. A filesystem without project quotas (XFS or ext4) is refused, naming the option."""
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import scratch_alloc as sa  # noqa: E402
+from cluster_tools import scratch_alloc as sa  # noqa: E402
 
 DAY = sa.DAY
 

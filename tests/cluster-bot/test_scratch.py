@@ -1,4 +1,4 @@
-"""clusterbot.scratch through the request engine (clusterbot.requests): a request within the automatic limits is applied at once, one
+"""cluster_bot.scratch through the request engine (cluster_bot.requests): a request within the automatic limits is applied at once, one
 beyond them waits for an administrator (and survives a restart), a refusal of the
 scratch server comes back as a message, and the command line sent over SSH is exactly
 the request."""
@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
-from clusterbot import requests, scratch  # noqa: E402
+from cluster_bot import requests, scratch  # noqa: E402
 
 T = 1024**4
 POLICY = {"auto_bytes": 2 * T, "auto_days": 30, "auto_extensions": 2}

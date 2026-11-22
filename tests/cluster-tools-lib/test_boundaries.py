@@ -2,8 +2,8 @@
 
 A throttled Slurm RPC never fails, it stalls (the client library retries it for ever),
 and a read from a hung NFS mount never returns, so an unbounded call hangs whatever
-made it. clustertools.proc.run is the one way to start a process and refuses one
-without a timeout; clustertools.slurm.run is the one way to call Slurm.
+made it. cluster_tools.proc.run is the one way to start a process and refuses one
+without a timeout; cluster_tools.slurm.run is the one way to call Slurm.
 """
 
 import ast
@@ -17,15 +17,15 @@ from pathlib import Path
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
-from clustertools import cli, proc, slurm  # noqa: E402
+from cluster_tools import cli, proc, slurm  # noqa: E402
 
 sys.path.insert(0, str(ROLES.parent / "tests/lib"))
 from repo_scan import tracked  # noqa: E402
 
-# All of the cluster's own Python: the clustertools package.
+# All of the cluster's own Python: the cluster_tools package.
 SOURCES = tracked("roles/cluster_tools_lib/files/*.py")
-READER = ROLES / "cluster_tools_lib/files/clustertools/slurm.py"
-PROC = ROLES / "cluster_tools_lib/files/clustertools/proc.py"
+READER = ROLES / "cluster_tools_lib/files/cluster_tools/slurm.py"
+PROC = ROLES / "cluster_tools_lib/files/cluster_tools/proc.py"
 SLURM = (
     "scontrol", "squeue", "sinfo", "sacctmgr", "sacct", "scancel", "sprio", "sshare", "srun", "sbatch",
     "salloc", "sstat", "sdiag", "sreport", "scrontrol", "strigger", "sattach",
@@ -44,7 +44,7 @@ class BoundaryTests(unittest.TestCase):
                 r"(subprocess|os\.system|os\.popen|os\.exec\w*|os\.spawn\w*|os\.posix_spawn\w*)\b", line
             )
         ]
-        self.assertEqual(offenders, [], "start processes with clustertools.proc.run, which is bounded")
+        self.assertEqual(offenders, [], "start processes with cluster_tools.proc.run, which is bounded")
 
     def test_a_timeout_kills_what_the_process_started(self):
         # subprocess.run kills only its own child: a pipeline's members (a dump and its
@@ -92,10 +92,10 @@ class BoundaryTests(unittest.TestCase):
         offenders = [
             f"{p.relative_to(ROLES)}:{n}"
             for p in SOURCES
-            if p not in (READER, ROLES / "cluster_tools_lib/files/clustertools/cli.py")
+            if p not in (READER, ROLES / "cluster_tools_lib/files/cluster_tools/cli.py")
             for n in self.slurm_argvs(ast.parse(p.read_text()))
         ]
-        self.assertEqual(offenders, [], "call Slurm through clustertools.slurm.run")
+        self.assertEqual(offenders, [], "call Slurm through cluster_tools.slurm.run")
 
     def test_the_check_sees_an_argv_built_apart(self):
         tree = ast.parse(

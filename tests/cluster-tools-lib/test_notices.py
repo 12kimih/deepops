@@ -1,4 +1,4 @@
-"""clustertools.notices: who is told this run. Never told, told REPEAT ago (a little
+"""cluster_tools.notices: who is told this run. Never told, told REPEAT ago (a little
 early with LEEWAY), or urgent; someone no longer current is forgotten."""
 
 import sys
@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import notices  # noqa: E402
+from cluster_tools import notices  # noqa: E402
 
 
 class NoticeTests(unittest.TestCase):

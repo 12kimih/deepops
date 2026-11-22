@@ -3,7 +3,7 @@
     decide(request, allocations, policy) -> ("auto", why) or ("admin", why)
 
 A request is {"op": create|resize|extend|release, "user", and "size" (bytes) or "days"
-or "id"}; allocations are the registry's entries (clustertools.scratch_alloc list);
+or "id"}; allocations are the registry's entries (cluster_tools.scratch_alloc list);
 policy is {"auto_bytes", "auto_days", "auto_extensions"}. Within those a request is
 applied at once; beyond them an administrator approves it. Giving space back (release,
 a smaller size) is always automatic. Someone may not act on another person's

@@ -1,4 +1,4 @@
-"""Unit tests for clustertools.cli (roles/cluster_tools_lib)."""
+"""Unit tests for cluster_tools.cli (roles/cluster_tools_lib)."""
 
 import contextlib
 import io
@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import slurm  # noqa: E402
-from clustertools.cli import COMPLETERS, Command, Opt, run_main  # noqa: E402
+from cluster_tools import slurm  # noqa: E402
+from cluster_tools.cli import COMPLETERS, Command, Opt, run_main  # noqa: E402
 
 CMD = Command(
     "demo",

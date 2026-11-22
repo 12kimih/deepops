@@ -1,4 +1,4 @@
-"""Tests for clustertools.files."""
+"""Tests for cluster_tools.files."""
 
 import sys
 import tempfile
@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools.files import write_atomic  # noqa: E402
+from cluster_tools.files import write_atomic  # noqa: E402
 
 
 class WriteTests(unittest.TestCase):

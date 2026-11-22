@@ -1,4 +1,4 @@
-"""Tests for gpu-usage (clustertools.gpu_usage) against Slurm 26.05 accounting fixtures."""
+"""Tests for gpu-usage (cluster_tools.gpu_usage) against Slurm 26.05 accounting fixtures."""
 
 import copy
 import json
@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 
 from common import HERE, run_tool
-from clustertools import gpu_usage, render, slurm
-from clustertools.prometheus import Error as PrometheusError
+from cluster_tools import gpu_usage, render, slurm
+from cluster_tools.prometheus import Error as PrometheusError
 
 ACCOUNTING = json.loads((HERE / "fixtures/slurm-26.05/accounting.json").read_text())
 ANSI = re.compile(r"\033\[[0-9;]*m")

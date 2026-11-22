@@ -3,7 +3,7 @@ dependencies:
   - role: slurm_paths  # job_notice_command, slurm_username
   - role: deepops_paths  # deepops_state_dir
   - role: slack_defaults  # slack_bot_token, slack_members, slack_email_domain
-  - role: cluster_tools_lib  # clustertools.job_notice
+  - role: cluster_tools_lib  # cluster_tools.job_notice
 
 galaxy_info:
   namespace: deepops

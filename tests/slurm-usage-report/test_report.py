@@ -1,4 +1,4 @@
-"""Unit tests for the Slurm usage report, clustertools.usage_report (no cluster needed)."""
+"""Unit tests for the Slurm usage report, cluster_tools.usage_report (no cluster needed)."""
 
 import json
 import sys
@@ -9,7 +9,7 @@ from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
-from clustertools import usage_report as report  # noqa: E402
+from cluster_tools import usage_report as report  # noqa: E402
 
 
 NOW = 1_800_000_000

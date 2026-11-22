@@ -1,4 +1,4 @@
-"""roles/disk_quota writes clustertools.disk_quota's configuration from the roster: every
+"""roles/disk_quota writes cluster_tools.disk_quota's configuration from the roster: every
 active person limited (the site's limits under their own), the rest of the roster
 released, nobody outside it named."""
 

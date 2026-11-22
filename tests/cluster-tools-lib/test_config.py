@@ -1,4 +1,4 @@
-"""clustertools.config, and that every role shipping a tool config holds to it.
+"""cluster_tools.config, and that every role shipping a tool config holds to it.
 
 A tool's config is checked whole by the tool's load_config, at deploy time by the role
 (validate) and by every later package (the records), so a package that would refuse a
@@ -20,7 +20,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from clustertools import config  # noqa: E402
+from cluster_tools import config  # noqa: E402
 from repo_scan import ansible_files  # noqa: E402
 
 ROLES = ROOT / "roles"
@@ -71,7 +71,7 @@ class Installed(unittest.TestCase):
         self.records = self.base / "configs.d"
         self.records.mkdir()
 
-    def record(self, role, cfg, module="clustertools.egress_metrics"):
+    def record(self, role, cfg, module="cluster_tools.egress_metrics"):
         path = self.base / f"{role}.cfg.json"
         if cfg is not None:
             path.write_text(json.dumps(cfg))
@@ -97,10 +97,10 @@ class Installed(unittest.TestCase):
         )
 
     def test_a_tool_the_package_no_longer_has_names_the_playbook(self):
-        self.record("renamed", {"a": 1}, module="clustertools.no_such_tool")
+        self.record("renamed", {"a": 1}, module="cluster_tools.no_such_tool")
         problems = config.installed(self.records)
         self.assertEqual(len(problems), 1)
-        self.assertIn("clustertools.no_such_tool is not a tool of this package", problems[0])
+        self.assertIn("cluster_tools.no_such_tool is not a tool of this package", problems[0])
         self.assertTrue(problems[0].endswith("; rerun playbooks/renamed.yml"))
 
     def test_a_damaged_record_is_reported(self):

@@ -14,7 +14,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ slurm_metrics_command }}"
-      module: clustertools.metrics
+      module: cluster_tools.metrics
 
 - name: Install systemd units
   ansible.builtin.template:

@@ -1,4 +1,4 @@
-"""clusterbot.projects: collaboration folder requests go through the engine to a pull
+"""cluster_bot.projects: collaboration folder requests go through the engine to a pull
 request made with the roster's own editors. Owners manage at once, anyone joins with an
 owner's approval, a new project or a closing waits for an administrator; whoever's role
 changes is told once the change is deployed."""
@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import in_tree  # noqa: E402
 import yaml  # noqa: E402
-from clusterbot import projects, projects_blocks, requests  # noqa: E402
+from cluster_bot import projects, projects_blocks, requests  # noqa: E402
 
 people = in_tree.load("plugins/filter/people.py")
 

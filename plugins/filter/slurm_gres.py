@@ -7,7 +7,7 @@ A hand-maintained gres.conf states facts about hardware (how many GPUs, which
 checks the facts against the node; the policy is the site's and is never compared.
 Returns the sorted device files of the node's Name=<name> lines, or None when
 AutoDetect (other than off) applies to the node, since Slurm then finds them itself.
-Host lists (NodeName=gpu[1-3], File=/dev/nvidia[0-3,5]) expand with clustertools,
+Host lists (NodeName=gpu[1-3], File=/dev/nvidia[0-3,5]) expand with cluster_tools,
 the one implementation of Slurm's host list syntax in this repository.
 """
 
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles" / "cluster_tools_lib" / "files"))
-from clustertools.slurm import hostnames  # noqa: E402
+from cluster_tools.slurm import hostnames  # noqa: E402
 
 
 def _fields(line):

@@ -20,9 +20,9 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
-# The validators start processes the cluster tools' one way (clustertools.proc).
+# The validators start processes the cluster tools' one way (cluster_tools.proc).
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from clustertools import proc  # noqa: E402
+from cluster_tools import proc  # noqa: E402
 
 PACKAGES = ["ondemand", "ondemand-dex", "ondemand-nginx", "ondemand-passenger", "nodejs"]
 # The role installs this check with its package and conffile lists (one source).
@@ -30,7 +30,7 @@ DPKG_VERIFY = "/usr/local/sbin/open-ondemand-dpkg-verify"
 CLUSTERS_D = Path("/etc/ood/config/clusters.d")
 
 
-# (rc, stdout, stderr), never raising; bounded (clustertools.proc).
+# (rc, stdout, stderr), never raising; bounded (cluster_tools.proc).
 run = functools.partial(proc.outcome, timeout=60)
 
 

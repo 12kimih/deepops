@@ -2,7 +2,7 @@
 things, drawn in the shared palette.
 
 script() returns an update-motd.d fragment. The banner is drawn once, at deploy time,
-so a login only prints text; the colours come from clustertools.render, the one palette
+so a login only prints text; the colours come from cluster_tools.render, the one palette
 every command uses. The text sits in a quoted here-document: a title or description
 holding $ or a backquote is printed as written, never run by the login shell.
 

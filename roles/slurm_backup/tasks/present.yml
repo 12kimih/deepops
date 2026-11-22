@@ -7,7 +7,7 @@
     component_record_action: begin
     component_record_items: "{{ slurm_backup_items }}"
 
-# The program is clustertools.slurm_backup, shipped with the library it imports.
+# The program is cluster_tools.slurm_backup, shipped with the library it imports.
 - name: Install the backup command
   ansible.builtin.include_role:
     name: cluster_tools_lib
@@ -15,7 +15,7 @@
   vars:
     cluster_tools_lib_command:
       dest: "{{ slurm_backup_script }}"
-      module: clustertools.slurm_backup
+      module: cluster_tools.slurm_backup
 
 # A destination on an NFS export with root_squash cannot be created by this host's
 # root, so its directory is made on the export's server, owned by the writer.
@@ -53,7 +53,7 @@
                   'work_dir': slurm_backup_work_dir, 'metrics_file': slurm_backup_metrics_file,
                   'step_timeout': slurm_backup_step_timeout,
                   'destinations': slurm_backup_destinations} | to_nice_json }}\n"
-    validate: "{{ cluster_tools_lib_config_validate }} clustertools.slurm_backup %s"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.slurm_backup %s"
   register: slurm_backup_config_written
 
 - name: Record the slurm backup configuration
@@ -61,7 +61,7 @@
     name: cluster_tools_lib
     tasks_from: config
   vars:
-    cluster_tools_lib_config: {role: slurm_backup, module: clustertools.slurm_backup, file: "{{ slurm_backup_config }}", playbook: playbooks/slurm-cluster/slurm-backup.yml}
+    cluster_tools_lib_config: {role: slurm_backup, module: cluster_tools.slurm_backup, file: "{{ slurm_backup_config }}", playbook: playbooks/slurm-cluster/slurm-backup.yml}
 
 - name: Install the backup service
   ansible.builtin.template:

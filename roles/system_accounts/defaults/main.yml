@@ -35,9 +35,9 @@ system_accounts:
     comment: Grafana
   # The cluster bot (roles/cluster_bot): runs the Slack app on its host and acts on the
   # others only through keys with forced commands (a shell, so sshd can run them).
-  clusterbot:
+  cluster-bot:
     uid: 22081
-    home: /var/lib/clusterbot
+    home: /var/lib/cluster-bot
     shell: /bin/sh
     comment: Cluster bot
   # The shared space (roles/shared_space) is this account's home, /home/<name> as for any

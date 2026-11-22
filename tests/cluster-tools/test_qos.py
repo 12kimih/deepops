@@ -1,12 +1,12 @@
-"""Tests for qos (clustertools.qos) against Slurm 25.11 fixtures."""
+"""Tests for qos (cluster_tools.qos) against Slurm 25.11 fixtures."""
 
 import json
 import re
 import unittest
 
 from common import load, run_tool, running
-from clustertools import qos
-from clustertools import render
+from cluster_tools import qos
+from cluster_tools import render
 
 ANSI = re.compile(r"\033\[[0-9;]*m")
 

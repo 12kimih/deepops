@@ -14,3 +14,4 @@ galaxy_info:
 dependencies:
   - role: deploy_defaults  # deepops_component_registry (cluster_bot_host)
   - role: people_defaults  # people (slack_members)
+  - role: system_accounts  # the bot's account, whose home holds its key (cluster_bot_key)

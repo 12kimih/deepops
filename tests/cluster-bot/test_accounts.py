@@ -1,4 +1,4 @@
-"""clusterbot.accounts: /join and /leave go through the engine to a pull request made
+"""cluster_bot.accounts: /join and /leave go through the engine to a pull request made
 with the roster's own editors (plugins/filter/people.py); bad logins, keys, teams and
 duplicates are refused before an administrator sees them."""
 
@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import bounds  # noqa: E402
 import in_tree  # noqa: E402
-from clusterbot import accounts, accounts_blocks, requests  # noqa: E402
+from cluster_bot import accounts, accounts_blocks, requests  # noqa: E402
 
 people = in_tree.load("plugins/filter/people.py")
 
