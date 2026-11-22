@@ -9,6 +9,8 @@ retired_settings:
   hosts_custom_hosts_marker: nothing (hosts_entries are written once, in roles/deepops_hosts' own part)
   slurm_container_storage_gc: slurm_enable_container_storage_gc in roles/deploy_defaults (off removes the cleanup)
   docker_rh_repo_url: docker_rh_repo_base_url (and docker_rh_repo_gpgkey) in roles/docker
+  docker_image_prune_until: docker_prune_after in roles/docker (it now also prunes stopped containers, the build cache and anonymous volumes; default cluster_user_grace_days)
+  docker_image_prune_schedule: docker_prune_schedule in roles/docker
   nvidia_container_toolkit_enable_docker: roles/docker enables and starts Docker (docker_service_enabled, docker_service_state)
   nvidia_container_toolkit_rpm_repo_url: nvidia_container_toolkit_repo_base_url (a mirror) in roles/nvidia_container_toolkit
   nvidia_driver_ubuntu_cuda_keyring_url: package_repos_cuda_base in roles/package_repos

@@ -1,7 +1,8 @@
 ---
-# What the component installs, for its record (roles/component_record). The image
-# prune units only while pruning is on, so turning it off removes them. Images and
-# volumes (/var/lib/docker) are data and stay.
+# What the component installs, for its record (roles/component_record). The prune
+# units only while pruning is on, so turning it off removes them (and the record removes
+# the docker-image-prune units earlier versions installed). /var/lib/docker is data and
+# stays.
 # The repository's files, named by roles/package_repos.
 _docker_repo_items:
   Debian: [file:/etc/apt/sources.list.d/docker.sources, file:/etc/apt/keyrings/docker.asc,
@@ -9,10 +10,10 @@ _docker_repo_items:
   RedHat: [file:/etc/yum.repos.d/docker.repo, file:/etc/pki/rpm-gpg/RPM-GPG-KEY-docker,
            "file:{{ deepops_cache_dir }}/package-repos/docker.key"]
 _docker_prune_items:
-  - unit:docker-image-prune.timer
-  - unit:docker-image-prune.service
-  - file:/etc/systemd/system/docker-image-prune.timer
-  - file:/etc/systemd/system/docker-image-prune.service
+  - unit:docker-prune.timer
+  - unit:docker-prune.service
+  - file:/etc/systemd/system/docker-prune.timer
+  - file:/etc/systemd/system/docker-prune.service
 _docker_all_items: >-
   {{ ['unit:docker.socket', 'unit:docker.service', 'file:/etc/docker/daemon.json',
       'file:/etc/sysctl.d/90-docker.conf']
@@ -22,7 +23,7 @@ _docker_all_items: >-
 docker_items: >-
   {{ _docker_all_items
      | reject('in', [] if docker_tune_kernel | bool else ['file:/etc/sysctl.d/90-docker.conf'])
-     | reject('in', [] if docker_image_prune_until | length > 0 else _docker_prune_items)
+     | reject('in', [] if docker_prune_after | length > 0 else _docker_prune_items)
      | list }}
 # DGX OS's drop-in, with options that conflict with a stock install: always retired.
 docker_dgx_override: /etc/systemd/system/docker.service.d/docker-override.conf
