@@ -2,7 +2,8 @@
 # Pull one container image at deploy time, pinned by digest (repo:tag@sha256:...): the
 # tag documents the version, the digest is what runs, so a moved tag can never change a
 # service. Services then start from the local image and never pull, so a registry
-# outage or a rewritten tag cannot break or alter a restart.
+# outage or a rewritten tag cannot break or alter a restart. A converged run pulls
+# nothing.
 #   ansible.builtin.include_role:
 #     name: container_image
 #   vars:
@@ -15,9 +16,19 @@
       (docker buildx imagetools inspect repo:tag shows it); keep the digest when mirroring.
     quiet: true
 
+# The digest is the image: one already here is the one wanted, so nothing is pulled
+# (and the registry is not asked) unless it is missing, and --check says so.
+- name: Look for the local image {{ container_image }}
+  ansible.builtin.command:
+    argv: [docker, image, inspect, --format, "{{ '{{.Id}}' }}", "{{ container_image }}"]
+  register: container_image_local
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only
+
 - name: Pull {{ container_image }}
   change_command:
     cmd: docker pull {{ container_image | quote }}
   register: container_image_pull
-  changed_when: >-
-    ansible_check_mode or ('Downloaded newer image' in container_image_pull.stdout)
+  changed_when: true
+  when: container_image_local.rc != 0
