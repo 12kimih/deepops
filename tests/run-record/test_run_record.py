@@ -1,9 +1,9 @@
 """Every Ansible run is recorded with ARA; test runs are not; no_log values never are.
 
 The operator ran a playbook, copied its output and pasted it to whoever reviewed it,
-often cut short. ARA (ansible.cfg callback_plugins -> .callback_plugins, linked by
-scripts/setup.sh to the package's own directory) keeps each run's tasks, results and
-diffs in ~/.ara/server, read with `ara`. scripts/check.sh and scripts/deepops/molecule.py
+often cut short. ARA (ansible.cfg callback_plugins -> plugins/callback, the package's
+recorder with names and paths bounded) keeps each run's tasks, results and diffs in
+~/.ara/server, read with `ara`. scripts/check.sh and scripts/deepops/molecule.py
 point ANSIBLE_CALLBACK_PLUGINS at an empty directory, so test playbooks leave no record.
 """
 
@@ -41,43 +41,38 @@ PLAY = f"""
 """
 
 
+CALLBACKS = ROOT / "plugins" / "callback"
+LONG = "x" * 300  # an ad-hoc command longer than the 255 characters ARA stores
+
+
 class Wiring(unittest.TestCase):
     def test_ansible_cfg(self):
         cfg = configparser.ConfigParser()
         cfg.read(ROOT / "ansible.cfg")
-        self.assertEqual(cfg["defaults"]["callback_plugins"], "./.callback_plugins")
+        self.assertEqual(cfg["defaults"]["callback_plugins"], "./plugins/callback")
+        self.assertEqual(sorted(p.name for p in tracked("plugins/callback/*")), ["ara_default.py"])
 
-    def test_setup_links_the_package_directory(self):
-        """setup.sh's own lines link .callback_plugins to the directory ARA names, and stop
-        setup when it names none (an empty link left every run unrecorded)."""
+    def test_setup_drops_the_old_link_only(self):
+        """Earlier setup.sh linked .callback_plugins to the package's directory: setup.sh's
+        own lines remove that link, and leave anything else by that name."""
         setup = (ROOT / "scripts/setup.sh").read_text()
-        block = re.search(r"^ARA_PLUGINS=.*?^ln -sfn .*? \.callback_plugins$", setup, re.M | re.S)
-        self.assertIsNotNone(block, "setup.sh links .callback_plugins from ARA_PLUGINS")
-        self.assertIn("/.callback_plugins", (ROOT / ".gitignore").read_text().splitlines())
-        for answer, linked in (("print-dir", True), ("print-nothing", False), ("fail", False)):
-            with self.subTest(answer=answer), tempfile.TemporaryDirectory() as tmp:
-                tmp = Path(tmp)
-                (tmp / "plugins").mkdir()
-                (tmp / "bin").mkdir()
-                (tmp / "bin/uv").write_text(
-                    f"#!/bin/sh\ncase {answer} in print-dir) echo {tmp / 'plugins'} ;; fail) exit 1 ;; esac\n"
-                )
-                (tmp / "bin/uv").chmod(0o755)
-                proc = subprocess.run(
-                    ["bash", "-c", block.group(0) + "\necho done"],
-                    cwd=tmp,
-                    env={**os.environ, "PATH": f"{tmp / 'bin'}:{os.environ['PATH']}"},
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                link = tmp / ".callback_plugins"
-                self.assertEqual(link.is_symlink(), linked)
-                if linked:
-                    self.assertEqual((proc.returncode, os.readlink(link)), (0, str(tmp / "plugins")))
+        self.assertNotIn("ara.setup.callback_plugins", setup)
+        block = re.search(r'^case "\$\(readlink \.callback_plugins.*?^esac$', setup, re.M | re.S)
+        self.assertIsNotNone(block, "setup.sh removes the old .callback_plugins link")
+        package = subprocess.run(
+            [sys.executable, "-m", "ara.setup.callback_plugins"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        for kind, gone in (("ara link", True), ("other link", False), ("file", False)):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                old = Path(tmp, ".callback_plugins")
+                if kind == "file":
+                    old.write_text("mine\n")
                 else:
-                    self.assertEqual(proc.returncode, 1)
-                    self.assertIn("ARA's callback plugins were not found", proc.stderr)
+                    old.symlink_to(package if kind == "ara link" else tmp)
+                subprocess.run(
+                    ["bash", "-c", block.group(0)], cwd=tmp, check=True, timeout=unrecorded.TIMEOUT
+                )
+                self.assertEqual(not (old.exists() or old.is_symlink()), gone)
 
     def test_tests_record_nothing(self):
         """Every test and scenario that starts Ansible runs it unrecorded, alone or in check.sh."""
@@ -127,12 +122,9 @@ class Recording(unittest.TestCase):
         return json.loads(out.stdout)
 
     def test_a_run_is_recorded_without_secrets(self):
-        callbacks = subprocess.run(
-            [sys.executable, "-m", "ara.setup.callback_plugins"], capture_output=True, text=True, check=True
-        ).stdout.strip()
         base = Path(tempfile.mkdtemp()) / "ara"
         self.addCleanup(subprocess.run, ["rm", "-rf", str(base.parent)])
-        env = self.run_play(base, callbacks)
+        env = self.run_play(base, CALLBACKS)
         playbooks = self.ara(env, "playbook", "list")
         self.assertEqual([p["status"] for p in playbooks], ["completed"])
         content = json.dumps([self.ara(env, "result", "show", str(r["id"]), "--with-content")
@@ -140,6 +132,43 @@ class Recording(unittest.TestCase):
         self.assertIn("visible-output", content)
         self.assertNotIn(SECRET, content)
         self.assertNotIn(SECRET.encode(), (base / "ansible.sqlite").read_bytes())
+
+    def run_adhoc(self, base, callbacks):
+        """A recorded ad-hoc command of more than 255 characters; its output."""
+        env = {**unrecorded.env(), "ARA_BASE_DIR": str(base), "ANSIBLE_CALLBACK_PLUGINS": str(callbacks),
+               "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"), "ANSIBLE_LOCALHOST_WARNING": "false"}  # fmt: skip
+        out = subprocess.run(
+            [str(BIN / "ansible"), "-i", "localhost,", "localhost", "-c", "local", "-m", "ansible.builtin.command",
+             "-a", f"echo {LONG}"],
+            env=env, capture_output=True, text=True, timeout=unrecorded.TIMEOUT,
+        )  # fmt: skip
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+        return env, out.stdout + out.stderr
+
+    def test_a_long_ad_hoc_command_is_recorded(self):
+        base = Path(tempfile.mkdtemp()) / "ara"
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(base.parent)])
+        env, output = self.run_adhoc(base, CALLBACKS)
+        self.assertNotIn("WARNING", output)
+        [playbook] = self.ara(env, "playbook", "list")
+        self.assertEqual(playbook["status"], "completed")
+        shown = self.ara(env, "playbook", "show", str(playbook["id"]))  # list shortens paths for display
+        self.assertTrue(shown["path"].startswith("Ad-Hoc: ansible.builtin.command: echo xxx"))
+        self.assertEqual(len(shown["path"]), 255)
+        self.assertEqual(shown["arguments"]["module_args"], f"echo {LONG}", "the whole command is kept")
+        [result] = self.ara(env, "result", "list")
+        self.assertEqual(result["status"], "changed", "a command is a change unless told otherwise")
+
+    def test_ara_alone_still_refuses_it(self):
+        """ARA's own callback (1.8.0) cannot record it; when this fails, upstream bounds the
+        path itself and plugins/callback can go back to the package's directory."""
+        callbacks = subprocess.run(
+            [sys.executable, "-m", "ara.setup.callback_plugins"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        base = Path(tempfile.mkdtemp()) / "ara"
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(base.parent)])
+        _, output = self.run_adhoc(base, callbacks)
+        self.assertIn("Failed to post on /api/v1/playbooks", output)
 
     def test_an_empty_callback_directory_records_nothing(self):
         base = Path(tempfile.mkdtemp()) / "ara"

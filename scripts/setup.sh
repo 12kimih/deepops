@@ -108,12 +108,12 @@ fi
 command -v uv >/dev/null 2>&1 || { echo "ERROR: Unable to install uv" >&2; exit 1; }
 cd "${REPO_DIR}" || exit 1
 uv sync --locked || { echo "ERROR: uv sync failed" >&2; exit 1; }
-# Every Ansible run is recorded with ARA (ansible.cfg callback_plugins): the link
-# follows the installed ARA, wherever its package lives.
-# A failed lookup must stop here: ln with an empty target leaves runs unrecorded.
-ARA_PLUGINS="$(uv run --locked python -m ara.setup.callback_plugins)" && [ -d "${ARA_PLUGINS}" ] \
-    || { echo "ERROR: ARA's callback plugins were not found (uv run python -m ara.setup.callback_plugins)" >&2; exit 1; }
-ln -sfn "${ARA_PLUGINS}" .callback_plugins
+# Every Ansible run is recorded with ARA through plugins/callback (ansible.cfg). Earlier
+# versions linked .callback_plugins to the ARA package's callback directory: that link
+# goes, and nothing else by that name.
+case "$(readlink .callback_plugins 2>/dev/null)" in
+    */ara/plugins/callback) rm -f .callback_plugins ;;
+esac
 # The tools scripts/check.sh runs from outside .venv, the missing ones (CI does the same).
 mapfile -t CHECK_DEB < <(scripts/check.sh --missing-tools)
 if [ "${#CHECK_DEB[@]}" -gt 0 ] ; then

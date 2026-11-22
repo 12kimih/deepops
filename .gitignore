@@ -12,8 +12,6 @@
 # virtualenv
 /.venv/
 /.venv-kubespray/
-# ARA's callback directory, linked by scripts/setup.sh
-/.callback_plugins
 
 # ansible-lint / ansible runtime cache
 /.ansible/
