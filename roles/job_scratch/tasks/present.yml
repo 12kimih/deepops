@@ -66,7 +66,7 @@
             else (job_scratch_size ~ 'B') | human_to_bytes) // (_gib | int) * (_gib | int) }}
       # What the image can reach: its own size plus what is free beyond the reserve.
       room: >-
-        {{ ((_lines[0] | int) + _fs[1] - _fs[0] * (job_scratch_reserve[:-1] | int) // 100)
+        {{ ((_lines[0] | int) + (_fs[1] | int) - (_fs[0] | int) * (job_scratch_reserve[:-1] | int) // 100)
            // (_gib | int) * (_gib | int) }}
       current: "{{ _lines[0] | int }}"
       source: "{{ _lines[1].split()[0] | default('-') }}"
