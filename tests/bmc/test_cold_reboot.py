@@ -39,6 +39,12 @@ def render(tmp, off=30):
     return path
 
 
+def sel(text):
+    """The Add SEL Entry call the hook makes for TEXT: an OEM e0 record of 13 bytes."""
+    data = " ".join(f"0x{b:02x}" for b in f"dpcr {text}".ljust(13)[:13].encode())
+    return f"ipmitool -I open raw 0x0a 0x44 0x00 0x00 0xe0 {data}"
+
+
 class ColdReboot(unittest.TestCase):
     def run_hook(self, verb, device=True, ipmitool_status=0):
         with tempfile.TemporaryDirectory() as d:
@@ -68,41 +74,46 @@ class ColdReboot(unittest.TestCase):
             )
             return done.returncode, calls.read_text().splitlines() if calls.exists() else []
 
-    def test_a_reboot_sets_the_off_time_leaves_evidence_then_cycles_and_waits(self):
+    def test_a_reboot_records_its_start_sets_the_off_time_then_cycles_and_waits(self):
         status, calls = self.run_hook("reboot")
         self.assertEqual(status, 0)
         ipmi = [c for c in calls if c.startswith("ipmitool")]
-        self.assertEqual(ipmi[0], "ipmitool -I open raw 0x00 0x0b 0x1e")  # 30 s off
-        self.assertTrue(
-            ipmi[1].startswith("ipmitool -I open raw 0x0a 0x44 0x00 0x00 0xe0 0x64 0x65 0x65 0x70")
-        )
-        self.assertEqual(ipmi[2], "ipmitool -I open chassis power cycle")
+        self.assertEqual(ipmi[0], sel("start-reboot"))  # first, before any test
+        self.assertEqual(ipmi[1], "ipmitool -I open raw 0x00 0x0b 0x1e")  # 30 s off
+        self.assertEqual(ipmi[2], sel("cycling"))
+        self.assertEqual(ipmi[3], "ipmitool -I open chassis power cycle")
         self.assertEqual(calls[-1], "sleep 45")
 
     def test_the_off_time_is_one_byte_of_seconds(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertIn("raw 0x00 0x0b 0x50", render(d, off=80).read_text())
 
-    def test_poweroff_halt_and_kexec_are_left_alone(self):
+    def test_poweroff_halt_and_kexec_are_recorded_and_left_alone(self):
         for verb in ("poweroff", "halt", "kexec"):
-            self.assertEqual(self.run_hook(verb), (0, []), verb)
+            status, calls = self.run_hook(verb)
+            self.assertEqual(
+                (status, [c for c in calls if c.startswith("ipmitool")]), (0, [sel(f"start-{verb}")])
+            )
 
-    def test_no_ipmi_device_is_a_plain_reboot(self):
-        self.assertEqual(self.run_hook("reboot", device=False), (0, []))
+    def test_no_ipmi_device_is_a_plain_reboot_and_says_so(self):
+        status, calls = self.run_hook("reboot", device=False)
+        self.assertEqual(status, 0)
+        self.assertEqual([c for c in calls if c.startswith("ipmitool")][-1], sel("no-dev"))
 
     def test_a_bmc_that_does_not_answer_lets_the_warm_reboot_go_on(self):
         status, calls = self.run_hook("reboot", ipmitool_status=1)
         self.assertEqual(status, 0)
         self.assertNotIn("sleep 45", calls)
+        self.assertEqual([c for c in calls if c.startswith("ipmitool")][-1], sel("no-answer"))
 
     def test_systemd_shutdown_can_run_it_within_its_hook_timeout(self):
         # systemd-shutdown kills a hook after 90 s: three BMC calls of at most 10 s and
         # the wait stay under, and the role installs it executable.
         with tempfile.TemporaryDirectory() as d:
             text = render(d).read_text()
-        self.assertIn("timeout 10 ipmitool", text)
+        self.assertIn("timeout 5 ipmitool", text)
         self.assertIn(":-45}", text)
-        self.assertLess(3 * 10 + 45, 90)
+        self.assertLess(5 * 5 + 45, 90)
         tasks = (ROOT / "roles/bmc/tasks/main.yml").read_text()
         self.assertIn("src: bmc-cold-reboot.j2", tasks)
         self.assertIn('mode: "0755"', tasks)
