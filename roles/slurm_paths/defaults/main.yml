@@ -5,15 +5,8 @@
 # The slurm-smd packages (roles/slurm) install the commands under /usr and the plugins
 # in the multiarch library directory; nothing here moves them.
 slurm_install_prefix: /usr
-# Debian multiarch tuple per architecture: not derivable from the architecture name
-# (armv7l is arm-linux-gnueabihf, ppc64le powerpc64le-linux-gnu).
-slurm_multiarch_map:
-  x86_64: x86_64-linux-gnu
-  aarch64: aarch64-linux-gnu
-  arm64: aarch64-linux-gnu
-  armv7l: arm-linux-gnueabihf
-  ppc64le: powerpc64le-linux-gnu
-slurm_multiarch: "{{ slurm_multiarch_map.get(ansible_facts.architecture, ansible_facts.architecture ~ '-linux-gnu') }}"
+# The Debian multiarch tuple (plugins/filter/arch.py).
+slurm_multiarch: "{{ ansible_facts.architecture | multiarch_tuple }}"
 slurm_plugin_dir: "/usr/lib/{{ slurm_multiarch }}/slurm"
 slurm_config_dir: /etc/slurm
 # Slurm's log files, keyed by the tag a forwarded line carries: slurm.conf and
