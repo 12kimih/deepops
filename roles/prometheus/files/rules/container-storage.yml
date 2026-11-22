@@ -31,7 +31,7 @@ groups:
       # created longer ago than the grace period: someone's own, outside Slurm, its
       # limits and its cleanup. Containers belong in jobs (pyxis, or podman in a job).
       - alert: ContainerOutsideSlurm
-        expr: sum by (instance, host) (container_storage_docker_unmanaged_stale{state="running"}) > 0
+        expr: sum by (instance, host) (container_storage_gc_docker_unmanaged_stale{state="running"}) > 0
         labels: {severity: warning}
         annotations:
           summary: "{{ $value }} container(s) on {{ $labels.host }} run outside Slurm past the grace period"

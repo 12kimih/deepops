@@ -28,8 +28,8 @@ that deepops did not start (no `label`, which roles/container_service sets) are 
 never touched: they run outside Slurm, its limits and its cleanup, so they are only
 made visible. docker-prune.timer (roles/docker) removes them once stopped and old.
 
-  container_storage_docker_unmanaged{state}        running or stopped
-  container_storage_docker_unmanaged_stale{state}  of those, created more than
+  container_storage_gc_docker_unmanaged{state}        running or stopped
+  container_storage_gc_docker_unmanaged_stale{state}  of those, created more than
                                                    unused_days ago
 
 Runs as root from a daily timer. Python 3.9 or newer, standard library only.
@@ -305,7 +305,7 @@ def unmanaged(containers, label, stale_before):
         if container.get("Created", 0) < stale_before:
             counts[(state, True)] += 1
     return [
-        series("container_storage_docker_unmanaged_stale" if stale else "container_storage_docker_unmanaged",
+        series("container_storage_gc_docker_unmanaged_stale" if stale else "container_storage_gc_docker_unmanaged",
                {"state": state}, count)
         for (state, stale), count in sorted(counts.items())
     ]  # fmt: skip
