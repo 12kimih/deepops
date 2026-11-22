@@ -92,7 +92,7 @@
   vars:
     _tree: "{{ _slurm_build_account.home }}/slurm-{{ slurm_version }}"
     _pyxis_tree: "{{ _slurm_build_account.home }}/pyxis-{{ slurm_pyxis_version }}"
-    _nvml: "/usr/local/cuda-{{ slurm_nvml_cuda_version }}/targets/{{ ansible_facts.architecture | replace('aarch64', 'sbsa') }}-linux"
+    _nvml: "/usr/local/cuda-{{ slurm_nvml_cuda_version }}/targets/{{ ansible_facts.architecture | cuda_architecture }}-linux"
     # pyxis builds against the slurm-smd-dev of this version: just built, or published.
     _pyxis_deb: "{{ _slurm_build_account.home }}/{{ slurm_pyxis_package }}_{{ slurm_pyxis_deb_version }}_{{ slurm_deb_arch.stdout }}.deb"
     _slurm_debs: >-

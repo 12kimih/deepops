@@ -26,10 +26,10 @@ package_repos_cuda_base: "https://developer.download.nvidia.com/compute/cuda/rep
 # NVIDIA publishes one repository per OS release; a brand-new release may have none
 # yet: set this to the previous one (e.g. "24.04") until it does.
 package_repos_cuda_release: "{{ ansible_facts.distribution_version if ansible_facts.os_family == 'Debian' else ansible_facts.distribution_major_version }}"
-# NVIDIA names the Arm server directory sbsa, not aarch64.
+# NVIDIA names the Arm server directory sbsa (plugins/filter/arch.py).
 package_repos_cuda_dir: >-
   {{ ('ubuntu' if ansible_facts.os_family == 'Debian' else 'rhel') ~ (package_repos_cuda_release | string | replace('.', '')) }}/{{
-  'sbsa' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}
+  ansible_facts.architecture | cuda_architecture }}
 package_repos_cuda_url: "{{ package_repos_cuda_base }}/{{ package_repos_cuda_dir }}"
 package_repos_cuda_keyring: cuda-keyring_1.1-1_all.deb
 # Debian: the key the keyring package installs and the source that trusts only it (also
