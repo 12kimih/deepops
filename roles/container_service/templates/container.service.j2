@@ -18,7 +18,7 @@ RestartSec=10
 ExecStartPre=/usr/bin/docker info --format ok
 ExecStartPre=-/usr/bin/docker stop %n
 ExecStartPre=-/usr/bin/docker rm %n
-ExecStart=/usr/bin/docker run --rm --name %n \
+ExecStart=/usr/bin/docker run --rm --name %n --label {{ deepops_container_label }}=%n \
 {% for option in _container_service.options %}
   {{ option }} \
 {% endfor %}

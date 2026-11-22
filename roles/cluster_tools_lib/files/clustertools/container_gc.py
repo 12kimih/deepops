@@ -23,11 +23,23 @@ The run's result is written as node_exporter textfile metrics:
   container_storage_gc_busy{store}             stores spared because they were in use
   container_storage_gc_used_ratio{store}       the store filesystem's use after the run
 
+With docker in the config ({socket, label}), the containers the node's dockerd holds
+that deepops did not start (no `label`, which roles/container_service sets) are counted,
+never touched: they run outside Slurm, its limits and its cleanup, so they are only
+made visible. docker-prune.timer (roles/docker) removes them once stopped and old.
+
+  container_storage_docker_unmanaged{state}        running or stopped
+  container_storage_docker_unmanaged_stale{state}  of those, created more than
+                                                   unused_days ago
+
 Runs as root from a daily timer. Python 3.9 or newer, standard library only.
 """
 
+import http.client
+import json
 import os
 import re
+import socket
 import stat
 import sys
 import tempfile
@@ -41,6 +53,7 @@ from .prom import series
 
 UID_TOKENS = ("$(id -u)", "${UID}", "$UID")
 REMOVE_TIMEOUT = 3600
+DOCKER_TIMEOUT = 30
 TRASH_PREFIX = ".gc-"
 
 
@@ -249,6 +262,55 @@ def remove_trash(trash):
     return True
 
 
+class _UnixHTTPConnection(http.client.HTTPConnection):
+    """HTTP over a unix socket: the Docker Engine API on dockerd's own socket."""
+
+    def __init__(self, path):
+        super().__init__("localhost", timeout=DOCKER_TIMEOUT)
+        self._path = path
+
+    def connect(self):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
+        sock.connect(self._path)
+        self.sock = sock
+
+
+def docker_containers(path):
+    """Every container the dockerd at socket PATH holds (GET /containers/json?all=1), or
+    None when no dockerd is there."""
+    if not os.path.exists(path):
+        return None
+    conn = _UnixHTTPConnection(path)
+    try:
+        conn.request("GET", "/containers/json?all=1")
+        response = conn.getresponse()
+        body = response.read()
+    finally:
+        conn.close()
+    if response.status != 200:
+        raise OSError(f"{path}: the Docker API answered {response.status}")
+    return json.loads(body)
+
+
+def unmanaged(containers, label, stale_before):
+    """The metric lines for CONTAINERS without LABEL: running or stopped, and how many
+    of each were created before STALE_BEFORE (epoch seconds)."""
+    counts = {(state, stale): 0 for state in ("running", "stopped") for stale in (False, True)}
+    for container in containers:
+        if label in (container.get("Labels") or {}):
+            continue
+        state = "running" if container.get("State") == "running" else "stopped"
+        counts[(state, False)] += 1
+        if container.get("Created", 0) < stale_before:
+            counts[(state, True)] += 1
+    return [
+        series("container_storage_docker_unmanaged_stale" if stale else "container_storage_docker_unmanaged",
+               {"state": state}, count)
+        for (state, stale), count in sorted(counts.items())
+    ]  # fmt: skip
+
+
 def run(cfg, dry_run=False, now=None, proc_root="/proc"):
     """Collect every store in CFG; returns the metric lines and whether all went well."""
     now = time.time() if now is None else now
@@ -310,6 +372,14 @@ def run(cfg, dry_run=False, now=None, proc_root="/proc"):
             lines.append(
                 series("container_storage_gc_used_ratio", {"store": name}, round(used_ratio(parent), 4))
             )
+    if cfg.get("docker"):
+        try:
+            containers = docker_containers(cfg["docker"]["socket"])
+        except (OSError, ValueError) as e:  # dockerd down: no count, the cleanup still ran
+            log(f"docker: {e}")
+            containers = None
+        if containers is not None:
+            lines += unmanaged(containers, cfg["docker"]["label"], now - unused)
     return lines, ok
 
 
@@ -322,12 +392,20 @@ def textfile(lines, ok, now):
 
 CONFIG_KEYS = {"textfile": str, "unused_days": int, "max_used_percent": int,
                "active_uids": (list, type(None)), "stores": list}  # fmt: skip
-CONFIG_OPTIONAL = {"uid_min": int}
+CONFIG_OPTIONAL = {"uid_min": int, "docker": dict}
+DOCKER_KEYS = ("socket", "label")
 
 
 def load_config(path):
     """The config roles/container_storage_gc writes (clustertools.config)."""
-    return config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
+    cfg = config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
+    docker = cfg.get("docker")
+    if docker is not None and (
+        sorted(docker) != sorted(DOCKER_KEYS)
+        or not all(isinstance(docker[k], str) and docker[k] for k in DOCKER_KEYS)
+    ):
+        raise config.ConfigError(f"{path}: docker takes exactly {', '.join(DOCKER_KEYS)}, each a string")
+    return cfg
 
 
 def main(argv=None):

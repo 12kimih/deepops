@@ -1,7 +1,8 @@
 ---
 # Users' container image stores (roles/container_storage_gc textfile metrics,
 # clustertools.container_gc). The disk itself is watched by the filesystem rules in
-# host.yml; these say when the daily cleanup stopped working.
+# host.yml; these say when the daily cleanup stopped working, and when a container
+# deepops did not start has run on a node past the site's grace period.
 groups:
   - name: container-storage
     rules:
@@ -26,3 +27,16 @@ groups:
         annotations:
           summary: "The container storage cleanup on {{ $labels.host }} has reported no success for 3 days"
           description: "`journalctl -u container-storage-gc` and `systemctl list-timers container-storage-gc.timer` on the host."
+      # A running container without deepops' label (roles/container_service sets it),
+      # created longer ago than the grace period: someone's own, outside Slurm, its
+      # limits and its cleanup. Containers belong in jobs (pyxis, or podman in a job).
+      - alert: ContainerOutsideSlurm
+        expr: sum by (instance, host) (container_storage_docker_unmanaged_stale{state="running"}) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $value }} container(s) on {{ $labels.host }} run outside Slurm past the grace period"
+          description: >-
+            Docker containers deepops did not start have run on the node longer than the
+            cleanup grace period, outside Slurm's limits and cleanup:
+            `docker ps --filter label!=deepops.unit` on the host. Stop them, and run the
+            work as a job (pyxis, or podman in a job; docs/container/podman.md).

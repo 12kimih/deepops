@@ -33,3 +33,5 @@ _container_storage_gc_cfg:
     {{ (container_storage_gc_people | people_active | dict2items | map(attribute='value.uid') | map('int') | list)
        if container_storage_gc_people | length > 0 else none }}
   stores: "{{ _container_storage_gc_stores }}"
+  # Counted only, never removed (roles/docker's prune removes what Docker keeps unused).
+  docker: {socket: "{{ docker_api_socket }}", label: "{{ deepops_container_label }}"}

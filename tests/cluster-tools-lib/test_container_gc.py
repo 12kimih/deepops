@@ -191,5 +191,107 @@ class Collect(unittest.TestCase):
         self.assertIn(prom.key("container_storage_gc_last_success_timestamp_seconds"), values)
 
 
+class FakeDockerd:
+    """A unix socket that answers GET /containers/json?all=1 with CONTAINERS, as dockerd."""
+
+    def __init__(self, path, containers, status=200):
+        import socketserver
+        import threading
+        from http.server import BaseHTTPRequestHandler
+
+        body = json.dumps(containers).encode()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.server.paths.append(self.path)
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        class Server(socketserver.UnixStreamServer):
+            def get_request(self):
+                request, _ = super().get_request()
+                return request, ("local", 0)
+
+        self.server = Server(str(path), Handler)
+        self.server.paths = []
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+class UnmanagedContainers(unittest.TestCase):
+    """Containers deepops did not start are counted, never touched."""
+
+    LABEL = "deepops.unit"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.now = time.time()
+        self.containers = [
+            {"State": "running", "Created": self.now - 30 * DAY, "Labels": {self.LABEL: "docker.node-exporter.service"}},
+            {"State": "running", "Created": self.now - 30 * DAY, "Labels": {"maintainer": "x"}},
+            {"State": "running", "Created": self.now - DAY, "Labels": None},
+            {"State": "exited", "Created": self.now - 120 * DAY, "Labels": {}},
+        ]  # fmt: skip
+
+    def counts(self, lines):
+        values = prom.parse("".join(line + "\n" for line in lines))
+        return {k: int(v) for k, v in values.items()}
+
+    def test_the_label_marks_deepops_and_age_marks_stale(self):
+        got = self.counts(gc.unmanaged(self.containers, self.LABEL, self.now - 14 * DAY))
+        self.assertEqual(got[prom.key("container_storage_docker_unmanaged", state="running")], 2)
+        self.assertEqual(got[prom.key("container_storage_docker_unmanaged_stale", state="running")], 1)
+        self.assertEqual(got[prom.key("container_storage_docker_unmanaged", state="stopped")], 1)
+        self.assertEqual(got[prom.key("container_storage_docker_unmanaged_stale", state="stopped")], 1)
+
+    def test_the_engine_api_is_read_over_dockerds_socket(self):
+        sock = Path(self.tmp.name, "docker.sock")
+        dockerd = FakeDockerd(sock, self.containers)
+        self.addCleanup(dockerd.close)
+        self.assertEqual(gc.docker_containers(str(sock)), self.containers)
+        self.assertEqual(dockerd.server.paths, ["/containers/json?all=1"])
+
+    def test_no_dockerd_means_no_count_and_the_run_still_succeeds(self):
+        cfg = {"unused_days": 14, "max_used_percent": 100, "active_uids": None, "stores": [],
+               "docker": {"socket": str(Path(self.tmp.name, "missing.sock")), "label": self.LABEL}}  # fmt: skip
+        lines, ok = gc.run(cfg, now=self.now)
+        self.assertTrue(ok)
+        self.assertEqual([line for line in lines if "docker" in line], [])
+
+    def test_an_api_error_is_logged_not_fatal(self):
+        sock = Path(self.tmp.name, "docker.sock")
+        dockerd = FakeDockerd(sock, {"message": "no"}, status=500)
+        self.addCleanup(dockerd.close)
+        cfg = {"unused_days": 14, "max_used_percent": 100, "active_uids": None, "stores": [],
+               "docker": {"socket": str(sock), "label": self.LABEL}}  # fmt: skip
+        lines, ok = gc.run(cfg, now=self.now)
+        self.assertTrue(ok)
+        self.assertEqual([line for line in lines if "docker" in line], [])
+
+    def test_the_config_takes_exactly_socket_and_label(self):
+        base = {"textfile": "", "unused_days": 14, "max_used_percent": 80, "active_uids": None, "stores": []}
+        for docker, good in (({"socket": "/run/docker.sock", "label": "deepops.unit"}, True),
+                             ({"socket": "/run/docker.sock"}, False), ({"socket": "", "label": "x"}, False),
+                             ({"socket": "/s", "label": "x", "extra": 1}, False)):  # fmt: skip
+            path = Path(self.tmp.name, "gc.json")
+            path.write_text(json.dumps({**base, "docker": docker}))
+            with self.subTest(docker=docker):
+                if good:
+                    self.assertEqual(gc.load_config(path)["docker"], docker)
+                else:
+                    with self.assertRaises(ValueError):
+                        gc.load_config(path)
+
+
 if __name__ == "__main__":
     unittest.main()
