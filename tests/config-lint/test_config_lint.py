@@ -299,6 +299,10 @@ class SiteDocs(Configs):
         )
         self.assertEqual(cl.check_doc_paths(), ["doc-paths: config/admin-docs/page.md:1"])
 
+    def test_a_korean_particle_against_a_path_is_not_part_of_it(self):
+        self.page("scripts/check.sh가 둘 다 합니다\nplaybooks/utilities/power.yml처럼 씁니다\n")
+        self.assertEqual(cl.check_doc_paths(), [])
+
     def test_a_limit_to_a_site_host_passes_and_an_unknown_name_does_not(self):
         (self.example / "inventory").write_text((ROOT / "config.example" / "inventory").read_text())
         self.page(

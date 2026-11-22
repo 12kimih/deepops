@@ -75,8 +75,11 @@ from repo_files import tracked  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config.example"
 CONFIG = Path(os.environ.get("DEEPOPS_CONFIG_DIR", ROOT / "config"))
+# ASCII: a path is ASCII, and a Korean particle written against one ("scripts/check.sh가")
+# is not part of it (Python's \w would take Hangul too).
 PATH = re.compile(
-    r"(?<![\w./-])((?:roles|playbooks|scripts|docs|config\.example|tests|skills|plugins)/[\w./-]*[\w/])"
+    r"(?<![\w./-])((?:roles|playbooks|scripts|docs|config\.example|tests|skills|plugins)/[\w./-]*[\w/])",
+    re.ASCII,
 )
 # The settings deepops no longer reads (roles/retired_settings): naming one there is not a
 # read, and a document or config that names one is told what replaced it.
