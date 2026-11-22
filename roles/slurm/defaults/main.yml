@@ -223,6 +223,10 @@ slurm_manage_gpus: true
 # templates/ directory of this role, but we provide variables so that they
 # can be overridden.
 slurm_conf_template: "etc/slurm/slurm.conf"
+# Each node's TmpDisk in MiB, {node: size}: worked out on the controller from the
+# job filesystem's fact (roles/job_scratch) before slurm.conf is rendered; a site's own
+# template writes TmpDisk={{ slurm_tmp_disk[node] }} on the lines of the nodes it lists.
+slurm_tmp_disk: {}
 slurm_cgroup_conf_template: "etc/slurm/cgroup.conf"
 slurm_gres_conf_template: "etc/slurm/gres.conf"
 slurm_dbd_conf_template: "etc/slurm/slurmdbd.conf"

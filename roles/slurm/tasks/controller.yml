@@ -115,6 +115,22 @@
     quiet: true
   when: slurm_state_clustername.content is defined
 
+# One place works out each node's TmpDisk, for the bundled template and a site's own:
+# its job filesystem (roles/job_scratch, the local fact) in whole MiB rounded down to a
+# GiB like RealMemory (never above what slurmd measures, which drains the node), only
+# with per-job private directories on it; nodes without one are not listed.
+- name: Work out each node's TmpDisk
+  ansible.builtin.set_fact:
+    slurm_tmp_disk: >-
+      {%- set ns = namespace(out={}) -%}
+      {%- for node in groups['slurm-node'] if slurm_job_private_dirs | length > 0 -%}
+      {%- set mb = hostvars[node]['ansible_facts']['ansible_local']['job_scratch']['size_mb'] | default(0) | int // 1024 * 1024 -%}
+      {%- if mb > 0 %}{% set ns.out = ns.out | combine({node: mb}) %}{% endif -%}
+      {%- endfor -%}
+      {{ ns.out }}
+  tags:
+    - config
+
 # The nodes run on what this slurm.conf says (configless): it must serve them their
 # configuration and carry the cluster's name, also when it is a site's own template.
 - name: Check the slurm.conf template
@@ -124,6 +140,8 @@
     _prolog_flags: "{{ (_conf | regex_findall('(?m)^ *PrologFlags *= *(.+)') | last | default('') | trim).split(',') }}"
     _namespace: "{{ ['namespace/linux'] if slurm_job_private_dirs | length > 0 else [] }}"
     _notices: "{{ deepops_components.job_notice | default('absent') == 'present' }}"
+    _tmp_disk_set: "{{ _conf | regex_findall('(?m)^ *NodeName=(\\S+) .*\\bTmpDisk=([0-9]+)') | map('join', '=') | sort }}"
+    _tmp_disk_wanted: "{{ slurm_tmp_disk | dict2items | map(attribute='key') | zip(slurm_tmp_disk | dict2items | map(attribute='value') | map('string')) | map('join', '=') | sort }}"
   ansible.builtin.assert:
     that:
       - _conf | regex_findall('(?m)^ *ClusterName *= *(.+)') | map('trim') | list == [slurm_cluster_name]
@@ -133,6 +151,8 @@
       - _conf | regex_findall('(?m)^ *JobContainerType *=') | length == 0
       - _namespace | length == 0 or 'Contain' in _prolog_flags
       - not _notices or _conf | regex_findall('(?m)^ *MailProg *= *(.+)') | map('trim') | list == [job_notice_command]
+      - _namespace | length == 0 or _conf | regex_findall('(?m)^ *TmpFS *= *(.+)') | map('trim') | list == [slurm_job_private_base]
+      - _tmp_disk_set == _tmp_disk_wanted
     fail_msg: >-
       {{ slurm_conf_template }} must set ClusterName={{ '{{' }} slurm_cluster_name {{ '}}' }}
       and include enable_configless in SlurmctldParameters (the nodes fetch their
@@ -143,6 +163,10 @@
       JobContainerType (deprecated: Slurm warns it was replaced with NamespaceType).
       With job notices on this host (slurm_enable_job_notices), MailProg={{ '{{' }} job_notice_command {{ '}}' }}
       ({{ job_notice_command }}): any other MailProg sends them as local mail.
+      With per-job private directories, TmpFS={{ '{{' }} slurm_job_private_base {{ '}}' }}
+      ({{ slurm_job_private_base }}), and on each node's line TmpDisk={{ '{{' }} slurm_tmp_disk[node] {{ '}}' }}
+      where slurm_tmp_disk has the node, nowhere else (wanted {{ _tmp_disk_wanted }},
+      found {{ _tmp_disk_set }}).
     quiet: true
   tags:
     - config
