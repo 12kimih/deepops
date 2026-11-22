@@ -66,10 +66,11 @@ _UNITS = {"": 1, "K": 1, "M": 1024, "G": 1024**2, "T": 1024**3}
 _INODE_UNITS = {"": 1, "k": 10**3, "m": 10**6, "g": 10**9, "t": 10**12}
 TIMEOUT = 600
 # quotacheck and chattr -R read every inode of a filesystem or tree: hours for hundreds
-# of millions of files (a home server), so they get a day, and run at idle I/O and CPU
-# priority, after what people are doing.
+# of millions of files (a home server), so they get a day, at the lowest best-effort I/O
+# priority and a low CPU one: behind what people are doing, yet always moving (the idle
+# I/O class gets the disk only when nothing else wants it, never on a busy NFS server).
 SCAN_TIMEOUT = 86400
-IDLE = ["ionice", "-c", "3", "nice", "-n", "19"]
+LOW = ["nice", "-n", "10", "ionice", "-c", "2", "-n", "7"]
 
 
 class Error(Exception):
@@ -183,8 +184,8 @@ class Host:
         return proc.run(argv, timeout=timeout, capture_output=True, text=True, check=check).stdout
 
     def scan(self, argv):
-        """ARGV, a command that reads a whole filesystem or tree: idle priority, a day."""
-        return self.run(IDLE + list(argv), timeout=SCAN_TIMEOUT)
+        """ARGV, a command that reads a whole filesystem or tree: low priority, a day."""
+        return self.run(LOW + list(argv), timeout=SCAN_TIMEOUT)
 
     def xfs_quota(self, mount, cmd):
         return self.run(["xfs_quota", "-x", "-c", cmd, mount])

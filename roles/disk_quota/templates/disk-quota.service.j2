@@ -9,8 +9,11 @@ TimeoutStartSec=10min
 # The directory may sit on /run, which is empty after a boot.
 ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
 ExecStart={{ _disk_quota_command }} {{ _disk_quota_config }} metrics
+# Behind what people do, yet always moving: the lowest best-effort I/O priority, never
+# the idle class, which a busy disk can starve.
 Nice=10
-IOSchedulingClass=idle
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
 # Run every few minutes by its timer: systemd's own start and finish lines (info) stay
 # out of the journal, and whatever the program prints is kept (notice, unless it gives
 # a level), so the journal holds what it did, not that it ran.
