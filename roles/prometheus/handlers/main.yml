@@ -7,6 +7,14 @@
     state: restarted
   when: prometheus_service_state == 'started'
 
+# A restart reads the configuration anew, so a reload notified with it is not sent
+# again (handlers run as written: the restart, this note, the reload, the forget).
+- name: Note that prometheus restarted
+  ansible.builtin.set_fact:
+    prometheus_restart_done: true
+  listen: Restart prometheus
+  when: prometheus_service_state == 'started'
+
 # SIGHUP reloads the configuration, as the docs describe; the HTTP /-/reload would need
 # --web.enable-lifecycle, which also serves an unauthenticated /-/quit. Retries cover a
 # restart that is still starting up (the container is named after the unit).
@@ -17,4 +25,12 @@
   until: prometheus_reload is succeeded
   retries: 10
   delay: 3
-  when: prometheus_service_state == 'started'
+  when:
+    - prometheus_service_state == 'started'
+    - not prometheus_restart_done | default(false)
+
+# The note holds for this flush only: a reload notified after it is sent.
+- name: Forget the restart
+  ansible.builtin.set_fact:
+    prometheus_restart_done: false
+  listen: [Restart prometheus, Reload prometheus]
