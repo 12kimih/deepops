@@ -84,11 +84,10 @@ def run(host, cfg, action="apply"):
         act()
 
 
-ALICE = {"block_warn": "10G", "block_hard": "20G", "inode_warn": 200000, "inode_hard": "500k"}
-CFG = {"filesystems": {"/": {"alice": ALICE}}, "release": ["alice", "bob"]}
-PROJECT = {
-    "/home/shared/datasets": {"filesystem": "/home", "id": 101, "block_warn": "15T", "block_hard": "20T"}
-}
+ALICE = {"block_hard": "20G", "inode_hard": "500k"}
+LEVELS = {"warn_fraction": 0.9, "inodes_per_tib": 0}
+CFG = {"filesystems": {"/": {"alice": ALICE}}, "release": ["alice", "bob"], **LEVELS}
+PROJECT = {"/home/shared/datasets": {"filesystem": "/home", "id": 101, "block_hard": "20T"}}
 
 
 class Sizes(unittest.TestCase):
@@ -101,12 +100,22 @@ class Sizes(unittest.TestCase):
             with self.subTest(size=bad), self.assertRaises(dq.Error):
                 dq.kib(bad)
 
-    def test_a_warn_level_above_its_hard_limit_is_refused(self):
-        with self.assertRaises(dq.Error):
-            dq.wanted({"a": {"block_warn": "30G", "block_hard": "20G"}})
+    def test_a_warn_level_of_its_own_is_refused(self):
+        with self.assertRaisesRegex(dq.Error, "warn_fraction"):
+            dq.wanted({"a": {"block_warn": "10G", "block_hard": "20G"}}, LEVELS)
+
+    def test_each_warn_level_is_the_fraction_of_its_hard_limit(self):
+        self.assertEqual(dq.levels("a", ALICE, LEVELS), (int(20 * GB * 0.9), 20 * GB, 450000, 500000))
+
+    def test_the_file_count_follows_the_space_unless_named(self):
+        ratio = {**LEVELS, "inodes_per_tib": 3000000}
+        self.assertEqual(dq.levels("a", {"block_hard": "10T"}, ratio)[2:], (27000000, 30000000))
+        self.assertEqual(dq.levels("a", {"block_hard": "5T"}, ratio)[3], 15000000)
+        self.assertEqual(dq.levels("a", ALICE, ratio)[3], 500000, "an inode_hard of its own wins")
+        self.assertEqual(dq.levels("a", {"block_hard": "10T"}, LEVELS)[3], 0, "0 per TiB: no file limit")
 
     def test_the_kernel_gets_the_hard_limits_only(self):
-        self.assertEqual(dq.kernel(dq.levels("a", ALICE)), (0, 20 * GB, 0, 500000))
+        self.assertEqual(dq.kernel(dq.levels("a", ALICE, LEVELS)), (0, 20 * GB, 0, 500000))
 
 
 class Parse(unittest.TestCase):
@@ -167,7 +176,7 @@ class Apply(unittest.TestCase):
         )
 
     def test_accounting_only_sets_no_limit(self):
-        steps = plan(FakeHost(), {"filesystems": {"/": {}}, "release": ["alice"]})
+        steps = plan(FakeHost(), {"filesystems": {"/": {}}, "release": ["alice"], **LEVELS})
         self.assertFalse([s for s in steps if s.startswith("setquota -u ")])
         self.assertIn("quotaon -u /", steps)
 
@@ -193,7 +202,11 @@ class Apply(unittest.TestCase):
     def test_each_filesystem_its_own_limits(self):
         host = FakeHost(quota_file=True, on=True, home="rw,usrjquota=aquota.user,jqfmt=vfsv1")
         host.exist.add("/home/aquota.user")
-        cfg = {"filesystems": {"/": {}, "/home": {"alice": {"block_hard": "10T"}}}, "release": ["alice"]}
+        cfg = {
+            "filesystems": {"/": {}, "/home": {"alice": {"block_hard": "10T"}}},
+            "release": ["alice"],
+            **LEVELS,
+        }
         self.assertEqual(plan(host, cfg), [f"setquota -u alice 0 {10 * TB} 0 0 /home"])
 
 
@@ -201,14 +214,14 @@ class Projects(unittest.TestCase):
     def test_an_ext4_project_gets_its_tree_and_hard_limit(self):
         host = FakeHost(home="rw,prjquota", pon=False)
         self.assertEqual(
-            plan(host, {"projects": PROJECT}),
+            plan(host, {"projects": PROJECT, **LEVELS}),
             [
                 "quotaon -P /home",
                 "make /home/shared/datasets project 101",
                 f"limit project 101 (/home/shared/datasets) to {20 * TB} KiB",
             ],
         )
-        run(host, {"projects": PROJECT})
+        run(host, {"projects": PROJECT, **LEVELS})
         self.assertIn(["chattr", "-R", "-p", "101", "+P", "/home/shared/datasets"], host.ran)
         self.assertIn(["setquota", "-P", "101", "0", str(20 * TB), "0", "0", "/home"], host.ran)
 
@@ -218,11 +231,11 @@ class Projects(unittest.TestCase):
             project_ids={"/home/shared/datasets": 101},
             pcsv=f"#101,ok,ok,5,0,{20 * TB},,1,0,0,\n",
         )
-        self.assertEqual(plan(host, {"projects": PROJECT}), [])
+        self.assertEqual(plan(host, {"projects": PROJECT, **LEVELS}), [])
 
     def test_a_filesystem_without_project_quotas_is_refused(self):
         with self.assertRaisesRegex(dq.Error, "without prjquota"):
-            plan(FakeHost(home="rw,usrquota"), {"projects": PROJECT})
+            plan(FakeHost(home="rw,usrquota"), {"projects": PROJECT, **LEVELS})
 
     def test_xfs_projects_go_through_xfs_quota(self):
         host = FakeHost()
@@ -280,12 +293,15 @@ class Metrics(unittest.TestCase):
             get("disk_quota_limit_bytes", filesystem="/", kind="hard", user="alice"), str(20 * GB * 1024)
         )
         self.assertEqual(
-            get("disk_quota_limit_bytes", filesystem="/", kind="warn", user="alice"), str(10 * GB * 1024)
+            get("disk_quota_limit_bytes", filesystem="/", kind="warn", user="alice"),
+            str(int(20 * GB * 0.9) * 1024),
         )
         self.assertIsNone(get("disk_quota_limit_bytes", filesystem="/", kind="hard", user="root"))
         labels = {"filesystem": "/home", "project": "/home/shared/datasets", "project_id": "101"}
         self.assertEqual(get("disk_quota_project_used_bytes", **labels), str(7 * 1024))
-        self.assertEqual(get("disk_quota_project_limit_bytes", kind="warn", **labels), str(15 * TB * 1024))
+        self.assertEqual(
+            get("disk_quota_project_limit_bytes", kind="warn", **labels), str(int(20 * TB * 0.9) * 1024)
+        )
         self.assertEqual(get("disk_quota_last_success_timestamp_seconds"), "1700000000")
 
 

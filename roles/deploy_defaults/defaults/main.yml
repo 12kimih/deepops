@@ -124,6 +124,13 @@ slurm_enable_job_notices: true
 # other user-facing cleanup reads this one value. Quotas have none: their warn level only
 # notifies, and only the hard limit refuses a write.
 cluster_user_grace_days: 14
+# When a person's files count as unused: what the cluster removes once they have gone
+# this long untouched (files on /scratch, a former member's files and login) and what
+# the cleanup reports list. One value, so every cleanup agrees.
+cluster_user_stale_days: 60
+# Every personal warning comes at this fraction of the limit it warns about: a person's
+# warn level of each hard limit (roles/disk_quota). Only hard limits refuse anything.
+cluster_user_warn_fraction: 0.9
 
 # Components whose removal is explicit only (removal: explicit in the registry,
 # roles/deploy_defaults/vars/main.yml: the driver, authentication, Slurm, MUNGE, the NFS

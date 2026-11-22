@@ -8,21 +8,23 @@ Each step is printed as it is taken (or would be, with --check), one line each. 
 "-" is read from standard input (a preview of a configuration not written yet):
 
     {"filesystems": {"/": {},
-                     "/home": {"alice": {"block_warn": "8T", "block_hard": "10T",
-                                         "inode_warn": "20m", "inode_hard": "25m"}}},
+                     "/home": {"alice": {"block_hard": "10T"}}},
      "release": ["alice", "bob"],
+     "warn_fraction": 0.9, "inodes_per_tib": 3000000,
      "projects": {"/home/shared/datasets": {"filesystem": "/home", "id": 101,
-                                            "block_warn": "15T", "block_hard": "20T"}},
+                                            "block_hard": "20T"}},
      "textfile": "/run/prometheus/disk-quota.prom"}
 
 Each filesystem has its own people's limits ({} counts only). Every name in release
 that a filesystem does not limit has whatever limit it had there lifted (the roster:
 someone left, or limited no longer).
 
-A limit has two levels. The hard limit is the only one the kernel enforces: a write past
-it fails at once. The warn level is never sent to the kernel (its soft limit stays 0, so
-there is no grace period that turns into a refusal later); it is exported with the
-usage, for the alerts and the people's notices.
+A limit is its hard limits: block_hard, and inode_hard, or else block_hard's TiB times
+inodes_per_tib (0: none), so the file count follows the space. The hard limit is the
+only one the kernel enforces: a write past it fails at once. Each has its warn level,
+warn_fraction of it, never sent to the kernel (its soft limit stays 0, so there is no
+grace period that turns into a refusal later); it is exported with the usage, for the
+alerts and the people's notices.
 
 User quotas are on ext4 and XFS. An ext4 filesystem with its quota feature (tune2fs -O
 quota) needs usrquota in its mount options; one without it keeps journaled quota files
@@ -86,24 +88,31 @@ def inodes(count):
     return int(m.group(1)) * _INODE_UNITS[m.group(2)]
 
 
-def levels(name, lim):
-    """(block_warn, block_hard, inode_warn, inode_hard) of LIM in KiB and inodes."""
-    values = (
-        kib(lim.get("block_warn", 0)),
-        kib(lim.get("block_hard", 0)),
-        inodes(lim.get("inode_warn", 0)),
-        inodes(lim.get("inode_hard", 0)),
+LIMIT_KEYS = ("block_hard", "inode_hard")
+TIB_KIB = 1024**3
+
+
+def levels(name, lim, cfg):
+    """(block_warn, block_hard, inode_warn, inode_hard) of LIM in KiB and inodes: the
+    hard limits, the inodes from the blocks where LIM names none (cfg's inodes_per_tib),
+    each warn level cfg's warn_fraction of its hard limit."""
+    unknown = sorted(set(lim) - set(LIMIT_KEYS))
+    if unknown:
+        raise Error(
+            f"{name}: {', '.join(unknown)}: a limit is {' and '.join(LIMIT_KEYS)};"
+            " each warn level is warn_fraction of its hard limit"
+        )
+    block = kib(lim.get("block_hard", 0))
+    count = (
+        inodes(lim["inode_hard"]) if "inode_hard" in lim else block * int(cfg["inodes_per_tib"]) // TIB_KIB
     )
-    if (values[0] and values[1] and values[0] > values[1]) or (
-        values[2] and values[3] and values[2] > values[3]
-    ):
-        raise Error(f"{name}: a warn level above its hard limit")
-    return values
+    fraction = float(cfg["warn_fraction"])
+    return int(block * fraction), block, int(count * fraction), count
 
 
-def wanted(limits):
+def wanted(limits, cfg):
     """{user: (block_warn, block_hard, inode_warn, inode_hard)}."""
-    return {user: levels(user, lim) for user, lim in (limits or {}).items()}
+    return {user: levels(user, lim, cfg) for user, lim in (limits or {}).items()}
 
 
 def kernel(values):
@@ -230,7 +239,7 @@ def filesystem_steps(host, mount, cfg):
 
 def limit_steps(host, mount, cfg, fresh=False):
     """[(description, action)] that set every user's hard limits on MOUNT (soft 0)."""
-    want = wanted(cfg["filesystems"][mount])
+    want = wanted(cfg["filesystems"][mount], cfg)
     have = {} if fresh else report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
     steps = []
     for user, values in sorted(want.items()):
@@ -301,13 +310,18 @@ def project_used(host, mount, pid):
     return _project_report(host, mount, fstype, pid)[0] * 1024
 
 
+def _project_limits(proj):
+    """A project's limit: the space alone (its files are not counted per project)."""
+    return {k: v for k, v in proj.items() if k not in ("filesystem", "id")}
+
+
 def project_steps(host, cfg):
     """[(description, action)] that make each configured project's tree and limit."""
     steps = []
     on_checked = set()
     for path, proj in sorted((cfg.get("projects") or {}).items()):
         mount, pid = proj["filesystem"], int(proj["id"])
-        warn, hard, _, _ = levels(path, proj)
+        warn, hard, _, _ = levels(path, _project_limits(proj), cfg)
         fstype = require_project_quota(host, mount)
         if fstype == "ext4" and mount not in on_checked:
             on_checked.add(mount)
@@ -380,7 +394,7 @@ def metrics(host, cfg, now):
     warn level from the configuration (the kernel never has it)."""
     values = {}
     for mount, limits in (cfg.get("filesystems") or {}).items():
-        want = wanted(limits)
+        want = wanted(limits, cfg)
         for user, (bu, _, bh, iu, _, ih) in report(
             host.run(["repquota", "-u", "-v", "-O", "csv", mount])
         ).items():
@@ -396,7 +410,7 @@ def metrics(host, cfg, now):
     for path, proj in sorted((cfg.get("projects") or {}).items()):
         mount, pid = proj["filesystem"], int(proj["id"])
         used, _, hard = _project_report(host, mount, require_project_quota(host, mount), pid)
-        warn = levels(path, proj)[0]
+        warn = levels(path, _project_limits(proj), cfg)[0]
         labels = {"filesystem": mount, "project": path, "project_id": str(pid)}
         values[key("disk_quota_project_used_bytes", **labels)] = used * 1024
         for kind, b in (("warn", warn), ("hard", hard)):
@@ -424,7 +438,14 @@ def steps_for(host, cfg, action):
 
 USAGE = "usage: disk-quota CONFIG.json apply|remove [--check] | metrics"
 
-CONFIG_KEYS = {"filesystems": dict, "release": list, "projects": dict, "textfile": str}
+CONFIG_KEYS = {
+    "filesystems": dict,
+    "release": list,
+    "projects": dict,
+    "warn_fraction": float,
+    "inodes_per_tib": int,
+    "textfile": str,
+}
 
 
 def load_config(path):

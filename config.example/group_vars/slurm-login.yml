@@ -20,7 +20,7 @@
 #host_baseline_mount_options: {"/": "defaults,noatime,errors=remount-ro,usrjquota=aquota.user,jqfmt=vfsv1"}  # example
 #disk_quota_filesystems: {"/": {}}
 #disk_quota_filesystems:  # example
-#  /: {block_warn: 10G, block_hard: 20G, inode_warn: 200k, inode_hard: 500k}
+#  /: {block_hard: 20G, inode_hard: 500k}
 #disk_quota_projects: {}
 #disk_quota_projects:  # example
-#  /home/shared/datasets: {id: 101, block_warn: 15T, block_hard: 20T}
+#  /home/shared/datasets: {id: 101, block_hard: 20T}

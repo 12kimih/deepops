@@ -21,19 +21,23 @@
 disk_quota_state: present
 
 # The local ext4 or XFS filesystems whose users' space is counted, per host, each with
-# every roster person's limits there ({"/": {}, "/home": {block_warn: 8T, block_hard:
-# 10T}} on a login node that is also the home server). Two levels each: the hard limit
-# (block_hard: setquota sizes, K, M, G, T; inode_hard: numbers, or with k, m, g, t), the
-# only one enforced (a write past it fails at once), and the warn level (block_warn,
-# inode_warn), which only notifies: it is exported with the usage for the alerts and the
-# people's notices, never set in the kernel (no soft limit, so no grace period that later
-# refuses writes). {} sets none: quotas only count, so the metrics show how the space is
-# used before limits are chosen. A person's own disk_quota for a filesystem in the
-# roster (people.yml) overrides the site's there.
+# every roster person's hard limits there ({"/": {}, "/home": {block_hard: 10T}} on a
+# login node that is also the home server): block_hard (setquota sizes, K, M, G, T) and
+# inode_hard (numbers, or with k, m, g, t; else from block_hard, disk_quota_inodes_per_tib).
+# Only they are enforced (a write past one fails at once). Each has its warn level,
+# cluster_user_warn_fraction of it, which only notifies: exported with the usage for the
+# alerts and the people's notices, never set in the kernel (no soft limit, so no grace
+# period that later refuses writes). {} sets none: quotas only count, so the metrics show
+# how the space is used before limits are chosen. A person's own disk_quota for a
+# filesystem in the roster (people.yml) overrides the site's there.
 disk_quota_filesystems: {"/": {}}
 
-# Directories whose whole tree has a limit (project quota), path: {id, block_warn,
-# block_hard}; each id unique on its filesystem, which needs prjquota in its mount
+# Files allowed per TiB of a block_hard where no inode_hard is set, so the file count
+# follows the space (3000000: a full quota's files average a third of a MiB); 0 limits
+# no file count.
+disk_quota_inodes_per_tib: 0
+
+# Directories whose whole tree has a limit (project quota), path: {id, block_hard}; each id unique on its filesystem, which needs prjquota in its mount
 # options (ext4 with the project feature, or XFS). The tree and its data stay when a
 # project goes; only its limit is lifted.
 disk_quota_projects: {}

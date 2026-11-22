@@ -188,6 +188,12 @@
 # How long users have to clean up before the cluster removes their data (unused
 # container stores, ended scratch allocations, ...): one value for all of them.
 #cluster_user_grace_days: 14
+# When files count as unused: removed after this long untouched (/scratch, a former
+# member's files and login) and listed by the cleanup reports.
+#cluster_user_stale_days: 60
+# Every personal warning at this fraction of the limit it warns about (a person's warn
+# level of each hard limit).
+#cluster_user_warn_fraction: 0.9
 
 ################################################################################
 # STORAGE                                                                      #

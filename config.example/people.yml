@@ -61,7 +61,7 @@ people:
     roles: [admin, docker]
     # Over the site's per-user disk quota, per filesystem (roles/disk_quota).
     disk_quota:
-      /: {block_warn: 50G, block_hard: 100G}
+      /: {block_hard: 100G}
   bob:
     uid: 1002
     slack: U0BOB0002

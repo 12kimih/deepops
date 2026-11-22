@@ -1,5 +1,5 @@
 ---
-# Remove the files of the people whose end lies people_leave_keep_days (90) behind:
+# Remove the files of the people whose end lies people_leave_keep_days (60) behind:
 # each of people_purge_paths ({login} filled in) on the hosts where it is a local
 # directory, never through an NFS mount. Only a directory the person owns goes. A
 # preview lists each with its size; the run removes nothing unless people_purge_confirm

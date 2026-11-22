@@ -32,7 +32,7 @@ A roster file declares the roles a site uses and the people:
         default_account: admin    # needed with several accounts
         roles: [admin]
         disk_quota:               # optional, per filesystem, over the site's limits
-          /home: {block_warn: 15T, block_hard: 20T}   # there (roles/disk_quota)
+          /home: {block_hard: 20T}  # there (roles/disk_quota)
         status: active            # active (default) or left
         ends: 2027-02-28          # optional: the last day of membership (graduation)
 
@@ -56,7 +56,7 @@ import re
 
 STATUSES = ("active", "left")
 KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status", "disk_quota", "ends"}
-QUOTA_KEYS = ("block_warn", "block_hard", "inode_warn", "inode_hard")
+QUOTA_KEYS = ("block_hard", "inode_hard")  # warn levels: cluster_user_warn_fraction of them
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
 TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "reserved_logins", "projects", "people"}
@@ -99,7 +99,7 @@ def _member(people, today=None):
     return {n: p for n, p in _active(people).items() if not _ended(p, today)}
 
 
-def people_login_expires(person, grace_days=30):
+def people_login_expires(person, grace_days):
     """The day PERSON's login stops, "YYYY-MM-DD", or "" for no end: ends + GRACE_DAYS
     for someone leaving; 1970-01-02, long past, for someone who has left. The one
     derivation the directory (shadowExpire) and local accounts (expires) both use."""
@@ -121,7 +121,7 @@ def people_shadow_day(day):
     return (_date(day) - datetime.date(1970, 1, 1)).days if _date(day) else ""
 
 
-def people_leaving(people, grace_days=30):
+def people_leaving(people, grace_days):
     """Active people with an end date, login -> {ends, login_expires} (both YYYY-MM-DD,
     sorted by login): what tells them in time to move their files away (the cluster
     bot's reminders) reads it, so the dates are the ones the accounts apply."""
@@ -152,7 +152,7 @@ def people_former(people, today=None):
     return sorted(set(people or {}) - set(_member(people, today)))
 
 
-def people_purge_dates(people, keep_days=90):
+def people_purge_dates(people, keep_days):
     """{login: {uid, ends, due}} of everyone with an `ends`: their files fall due KEEP_DAYS
     after it (dates YYYY-MM-DD). Someone without `ends` never falls due
     (people_purge_undated)."""
@@ -167,7 +167,7 @@ def people_purge_dates(people, keep_days=90):
     return out
 
 
-def people_purge_due(people, keep_days=90, today=None):
+def people_purge_due(people, keep_days, today=None):
     """people_purge_dates of everyone whose files are due now (playbooks/utilities/
     people-purge.yml): past their due day."""
     return {n: d for n, d in people_purge_dates(people, keep_days).items() if _today(today) > _date(d["due"])}
@@ -180,7 +180,7 @@ def people_purge_undated(people):
     )
 
 
-def people_purge_targets(people, keep_days=90, paths=(), today=None, dated=False):
+def people_purge_targets(people, keep_days, paths=(), today=None, dated=False):
     """[{login, uid, ends, due, path}] for each due person (people_purge_due), or with
     DATED everyone with an `ends` (people_purge_dates), and each of PATHS, a template
     holding {login} below an absolute directory. Refuses a template that could name

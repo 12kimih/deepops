@@ -11,4 +11,5 @@ galaxy_info:
       versions: [jammy, noble]
     - name: EL
       versions: ["8", "9"]
-dependencies: []
+dependencies:
+  - role: deploy_defaults  # cluster_user_stale_days

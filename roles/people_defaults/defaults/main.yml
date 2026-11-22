@@ -21,10 +21,10 @@ people_home_mode: "0750"
 # Leaving (plugins/filter/people.py): past a person's `ends` their login lasts this many
 # days more, to take their files away (no jobs, no roles); then it stops, on the same day
 # in the directory and the local accounts (people_login_expires).
-people_leave_grace_days: 30
+people_leave_grace_days: "{{ cluster_user_stale_days }}"
 # After someone has left (status: left), how long their files are kept before an
 # administrator archives or removes them (reported, never removed by a deploy).
-people_leave_keep_days: 90
+people_leave_keep_days: "{{ cluster_user_stale_days }}"
 # What playbooks/utilities/people-purge.yml removes of such a person, {login} filled
 # in: each a directory below an absolute one, removed on the host where it is local.
 people_purge_paths: ["{{ people_home_root }}/{login}"]
