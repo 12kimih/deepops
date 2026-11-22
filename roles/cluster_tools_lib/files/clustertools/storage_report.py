@@ -1,8 +1,9 @@
 """storage_report: the daily disk usage report, from the disk quota metrics.
 
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
-    (text, blocks), thread = render(data, who, top, people)
+    (text, blocks), thread = render(data, who, top, people, mention)
     over_warn(data)                        -> the people past a warn level, with figures
+    due(rows, told, now, repeat_days)      -> those of them to tell this run
 
 For each filesystem whose users' space is counted (roles/disk_quota, its textfile
 metrics), the disk: how full, how much is free and how that changed in a day; its
@@ -10,7 +11,10 @@ largest users among PEOPLE (the roster's active logins), with their day's growth
 their levels, and everyone else (root, the services, people who left) on one line; the
 projects (directory trees with one limit). Everyone past a warn level is named: the
 warn level only notifies, and the hard limit is the one the kernel enforces, at once.
-It reads Prometheus and changes nothing; clustertools.usage_report --storage posts it.
+A person is told (mentioned, or sent a DM) when they first pass a level, every day at
+a hard limit, and again every repeat_days while past the same warn level; the card
+lists everyone past a level every day. It reads Prometheus and changes nothing;
+clustertools.usage_report --storage posts it.
 Python 3.9 or newer, standard library only.
 """
 
@@ -22,6 +26,9 @@ from .slack import MAX_BLOCKS, bar, sections, table
 DAY = 86400
 # When a host's usage is older than this, the report says so (the alert fires at an hour).
 STALE = 3600
+# A daily timer runs a little earlier or later each day: a notice due every N days is
+# sent up to this much early, so a weekly one never slips to the eighth day.
+LEEWAY = 3600
 HOW = "`quota -s` on the host shows your own usage there."
 
 # The disks behind the counted filesystems: node_exporter's mount point is the quota
@@ -116,6 +123,29 @@ def over_warn(data):
     return sorted(rows, key=lambda r: (r[4][0][3] != "hard", -r[3]["used"], r[:3]))
 
 
+def row_key(row):
+    """A row of over_warn's key in the notices' record: "host filesystem user"."""
+    return " ".join(row[:3])
+
+
+def due(rows, told, now, repeat_days):
+    """The ROWS (over_warn) whose person is told this run, by TOLD ({key: {"kind",
+    "at"}}: the last notice each got): a first crossing at once, a hard limit every run,
+    the same warn level again every REPEAT_DAYS (0: every run). Someone no longer past a
+    level leaves TOLD, so passing it again is a first crossing; the caller records a
+    notice once it reached them."""
+    current = {row_key(r): r for r in rows}
+    for key in set(told) - set(current):
+        del told[key]
+    out = []
+    for key, row in current.items():
+        last = told.get(key)
+        hard = row[4][0][3] == "hard"
+        if not isinstance(last, dict) or hard or now - last.get("at", 0) >= repeat_days * DAY - LEEWAY:
+            out.append(row)
+    return out
+
+
 def where(host, filesystem):
     return f"{host}:{filesystem}"
 
@@ -156,9 +186,9 @@ def describe(row):
     return where(host, filesystem), figure(used), state, kind == "hard"
 
 
-def past_line(row, who):
+def past_line(row, who, mention=True):
     place, amount, state, hard = describe(row)
-    return f"{':no_entry:' if hard else ':warning:'} {who(row[2], True)} on {place}: {amount}, {state}"
+    return f"{':no_entry:' if hard else ':warning:'} {who(row[2], mention)} on {place}: {amount}, {state}"
 
 
 def others_line(rest, shown=3):
@@ -168,10 +198,11 @@ def others_line(rest, shown=3):
     return f"Not in the roster (root, services, people who left): {names}{more}; {size(sum(e['used'] for _, e in rest))} together"
 
 
-def render(data, who, top, people=()):
+def render(data, who, top, people=(), mention=None):
     """The summary card (text, blocks) and the thread [(text, blocks)]: every disk and
     everyone past a level on the card; each filesystem's TOP people, everyone else, and
-    the projects in the thread. With no PEOPLE (no roster) every user is ranked."""
+    the projects in the thread. With no PEOPLE (no roster) every user is ranked. Of those
+    past a level, the keys in MENTION (row_key) are mentioned; None mentions them all."""
     stamp = datetime.fromtimestamp(data["now"]).strftime("%Y-%m-%d")
     rows = over_warn(data)
     full = []
@@ -184,7 +215,10 @@ def render(data, who, top, people=()):
     card = [{"type": "header", "text": {"type": "plain_text", "text": f"Disk usage {stamp}"}}]
     card += sections("\n".join(disk_line(k, d) for k, d in data["disks"].items()))
     if rows:
-        card += sections("*Past a level*\n" + "\n".join(past_line(r, who) for r in rows))
+        card += sections(
+            "*Past a level*\n"
+            + "\n".join(past_line(r, who, mention is None or row_key(r) in mention) for r in rows)
+        )
     stale = sorted(
         f"{h} (last {datetime.fromtimestamp(t).strftime('%m-%d %H:%M')})"
         for h, t in data["reported"].items()

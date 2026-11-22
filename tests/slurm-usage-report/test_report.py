@@ -300,7 +300,8 @@ class RunTests(unittest.TestCase):
                    "dm_text": "{job}", "dashboard_url": "", "admin_channel": "#admin",
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
                    "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
-                   "storage_top": 10, "storage_notify": ["mention"], "people": []}  # fmt: skip
+                   "storage_top": 10, "storage_notify": ["mention"], "storage_repeat_days": 7,
+                   "people": []}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
             slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
@@ -340,7 +341,8 @@ class ConfigTests(unittest.TestCase):
             "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin",
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
             "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
-            "storage_top": 10, "storage_notify": ["mention", "dm"], "people": ["alice"]}  # fmt: skip
+            "storage_top": 10, "storage_notify": ["mention", "dm"], "storage_repeat_days": 7,
+            "people": ["alice"]}  # fmt: skip
 
     def load(self, **change):
         with tempfile.TemporaryDirectory() as d:
@@ -359,7 +361,8 @@ class ConfigTests(unittest.TestCase):
                              ({"cancel_after_hours": 12, "cancel_warn_text": "{user}"}, "cancel_warn_text"),
                              ({"cancel_after_hours": 24, "notify": []}, "notify"),
                              ({"channel": None}, "channel"), ({"storage_notify": ["email"]}, "storage_notify"),
-                             ({"storage_top": 0}, "storage_top"), ({"people": "alice"}, "people")):  # fmt: skip
+                             ({"storage_top": 0}, "storage_top"),
+                             ({"storage_repeat_days": -1}, "storage_repeat_days"), ({"people": "alice"}, "people")):  # fmt: skip
             with self.subTest(change=change), self.assertRaisesRegex(report.ConfigError, word):
                 self.load(**change)
 

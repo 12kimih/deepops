@@ -200,15 +200,35 @@ class RenderTests(unittest.TestCase):
         self.assertIn("Writes there fail until you free space.", storage.dm_text(rows[0]))
 
 
+class DueTests(unittest.TestCase):
+    """Who is told: a first crossing at once, a hard limit every day, the same warn level
+    every repeat_days; someone back under a level is forgotten."""
+
+    def test_policy(self):
+        rows = storage.over_warn(storage.collect(site(), NOW))
+        told = {}
+        self.assertEqual([r[2] for r in storage.due(rows, told, NOW, 7)], ["bob", "alice"])
+        for r in rows:
+            told[storage.row_key(r)] = {"kind": r[4][0][3], "at": NOW}
+        self.assertEqual([r[2] for r in storage.due(rows, told, NOW + storage.DAY, 7)], ["bob"])
+        # A daily timer can run a little early: the seventh day still counts.
+        self.assertEqual(len(storage.due(rows, told, NOW + 7 * storage.DAY - 600, 7)), 2)
+        self.assertEqual(len(storage.due(rows, told, NOW + storage.DAY, 0)), 2, "0: every day")
+        storage.due([r for r in rows if r[2] == "bob"], told, NOW, 7)
+        self.assertEqual(set(told), {"login / bob"}, "alice is back under: forgotten")
+
+
 class RunTests(unittest.TestCase):
     """usage_report --storage: posts the report, notes everyone past a level when asked,
     and posts nothing when no disk usage is counted."""
 
     CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, storage_top=10, storage_notify=["mention", "dm"],
-               people=["alice", "bob", "carol"])  # fmt: skip
+               storage_repeat_days=7, people=["alice", "bob", "carol"])  # fmt: skip
 
-    def run_storage(self, prom, *extra, notify=("mention", "dm")):
+    def run_storage(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
+        """(posts [(channel, text, blocks as text)], the failure, storage.json): one run at
+        NOW, keeping its state in the directory STATE (a fresh one when None)."""
         posted = []
 
         class Slack:
@@ -223,10 +243,11 @@ class RunTests(unittest.TestCase):
             def post(self, channel, text, blocks=None, thread_ts=None):
                 if channel == "UBOB":
                     raise RuntimeError("Slack chat.postMessage failed: channel_not_found")
-                posted.append((channel, text, thread_ts))
+                posted.append((channel, text, json.dumps(blocks)))
                 return "ts"
 
-        with tempfile.TemporaryDirectory() as d:
+        with tempfile.TemporaryDirectory() as fresh:
+            d = state or fresh
             cfg = dict(self.CFG, state_file=f"{d}/state.json", storage_notify=list(notify))
             args = mock.Mock(dry_run=False, to=None)
             for flag in extra:
@@ -234,6 +255,7 @@ class RunTests(unittest.TestCase):
             with (
                 mock.patch.object(report, "Prometheus", lambda url: prom),
                 mock.patch.object(report, "Slack", Slack),
+                mock.patch.object(report.time, "time", lambda: now),
             ):
                 try:
                     report.storage(cfg, args)
@@ -249,6 +271,18 @@ class RunTests(unittest.TestCase):
         self.assertEqual([p[0] for p in posted if p[0].startswith("U")], ["UALICE"])
         self.assertIn("notifying bob", error)
         self.assertEqual(saved["users"]["alice"]["id"], "UALICE")
+
+    def test_told_once_then_again_when_due_and_the_card_mentions_only_them(self):
+        with tempfile.TemporaryDirectory() as d:
+            posted, _, saved = self.run_storage(site(), notify=["mention"], state=d)
+            self.assertEqual(set(saved["told"]), {"login / alice", "login / bob"})
+            self.assertEqual(saved["told"]["login / bob"], {"kind": "hard", "at": NOW})
+            self.assertIn("<@UALICE> (alice)", posted[0][2])
+            # The next day: bob is still at his hard limit, alice past the same warn level.
+            posted, _, _ = self.run_storage(site(), notify=["mention"], state=d, now=NOW + storage.DAY)
+            self.assertIn("<@UBOB> (bob)", posted[0][2])
+            self.assertNotIn("<@UALICE>", posted[0][2])
+            self.assertIn("alice on login:/", posted[0][2], "still listed, not mentioned")
 
     def test_a_preview_sends_and_records_nothing(self):
         posted, error, saved = self.run_storage(site(), ("to", "UME"))

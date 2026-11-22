@@ -28,6 +28,10 @@ slurm_usage_report_repeat_weeks: 2
 slurm_usage_report_storage_schedule: "*-*-* 09:00:00"
 slurm_usage_report_storage_top: 10
 slurm_usage_report_storage_notify: [mention]
+# A person is told when they first pass a level, every day at a hard limit (their writes
+# fail), and again every repeat_days while past the same warn level (0: every day). The
+# card lists everyone past a level every day, mentioning only those told.
+slurm_usage_report_storage_repeat_days: 7
 # The people the disk report ranks (the roster's active logins); everyone else on a disk
 # (root, the services, people who left) is one line. [] ranks every user.
 slurm_usage_report_people: "{{ people | people_active | list | sort }}"
