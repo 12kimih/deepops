@@ -34,55 +34,18 @@
   tags:
     - people
 
-# create_home sets the mode only on a home it creates, so existing homes are checked
-# here. people_home_mode is a ceiling: a home with any permission beyond it is set to
-# it, while a stricter one (0700) is left as its owner chose.
-- name: Read the home directories' modes
-  ansible.builtin.stat:
-    path: "{{ people_home_root }}/{{ item.key }}"
-  loop: "{{ people | people_active | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
-  register: people_homes
-  tags:
-    - people
-
-# useradd makes a local account's home; a directory account's is made here, from
-# /etc/skel, owned by the roster's numbers (they resolve once the directory answers).
-- name: Create the homes of active people who have none
-  ansible.builtin.file:
-    path: "{{ people_home_root }}/{{ item.item.key }}"
-    state: directory
-    owner: "{{ item.item.value.uid }}"
-    group: "{{ item.item.value.uid }}"
-    mode: "{{ people_home_mode }}"
-  loop: "{{ people_homes.results | rejectattr('stat.exists') | list }}"
-  loop_control:
-    label: "{{ item.item.key }}"
-  tags:
-    - people
-
-- name: Fill the new homes from /etc/skel
-  ansible.builtin.copy:
-    src: /etc/skel/
-    dest: "{{ people_home_root }}/{{ item.item.key }}/"
-    remote_src: true
-    owner: "{{ item.item.value.uid }}"
-    group: "{{ item.item.value.uid }}"
-  loop: "{{ people_homes.results | rejectattr('stat.exists') | list }}"
-  loop_control:
-    label: "{{ item.item.key }}"
-  tags:
-    - people
-
-- name: Take away permissions beyond the home mode
-  ansible.builtin.file:
-    path: "{{ item.stat.path }}"
-    mode: "{{ people_home_mode }}"
-  loop: "{{ people_homes.results | selectattr('stat.exists') | list }}"
-  loop_control:
-    label: "{{ item.item.key }} ({{ item.stat.mode }})"
-  when: item.stat.mode | mode_exceeds(people_home_mode)
+# Every active person's home: made where missing (from /etc/skel), its mode held to
+# people_home_mode (person_dirs.yml, which /scratch's directories use too).
+- name: Make each active person's home
+  ansible.builtin.include_tasks:
+    file: person_dirs.yml
+    apply:
+      tags:
+        - people
+  vars:
+    people_dirs_root: "{{ people_home_root }}"
+    people_dirs_mode: "{{ people_home_mode }}"
+    people_dirs_skel: true
   tags:
     - people
 

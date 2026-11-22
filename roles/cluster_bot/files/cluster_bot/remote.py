@@ -1,8 +1,8 @@
 """The bot's requests to the hosts it acts on: over its SSH key, whose one forced command
 there (cluster_tools.bot_serve) runs only the services roles offer on that host.
 
-    run = Remote(host, key, user, known_hosts, "scratch")
-    run("list", "alice") -> the service's JSON answer, or Failed with its reason
+    run = Remote(host, key, user, known_hosts, "bans")
+    run("list") -> the service's JSON answer, or Failed with its reason
 
 The request is the service's name and its words, quoted as a shell would quote them; the
 host splits them back without running a shell.

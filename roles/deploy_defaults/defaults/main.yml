@@ -108,9 +108,10 @@ submit_holds_from: ""
 # --tmp (roles/job_scratch), on slurm-node: off by default (it preallocates disk);
 # deploy it while the nodes run no jobs
 slurm_enable_job_scratch: false
-# Fast scratch space handed out per request, each with a size limit and an end date
-# (roles/scratch_alloc), on [scratch-server]
-slurm_enable_scratch_alloc: false
+# The fast scratch space, every active person's own directory on it, as under /home
+# (roles/scratch_space), on [scratch-server]; each person's space there is their user
+# quota (roles/disk_quota on the same host)
+slurm_enable_scratch_space: false
 # The cluster's Slack app for requests users make themselves (roles/cluster_bot), on the
 # first slurm-master; needs slack_bot_token and slack_app_token
 slurm_enable_cluster_bot: false
@@ -120,7 +121,7 @@ slurm_enable_cluster_bot: false
 slurm_enable_job_notices: true
 
 # How long users have to clean up what the cluster will otherwise remove: unused
-# container stores (roles/container_storage_gc), ended scratch allocations, and every
+# container stores (roles/container_storage_gc), unused files on /scratch, and every
 # other user-facing cleanup reads this one value. Quotas have none: their warn level only
 # notifies, and only the hard limit refuses a write.
 cluster_user_grace_days: 14

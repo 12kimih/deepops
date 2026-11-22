@@ -1,0 +1,9 @@
+---
+# Nothing goes: the directories hold people's data.
+- name: Leave the scratch space as it is
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: scratch_space
+    component_record_action: absent
+    component_record_items: "{{ scratch_space_items }}"

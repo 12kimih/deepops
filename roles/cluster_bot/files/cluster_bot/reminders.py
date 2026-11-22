@@ -1,5 +1,5 @@
 """Reminders before a deadline: a DM at each of a source's stages (days before), once
-each, for every feature that has deadlines (scratch allocations ending, people leaving).
+each, for every feature that has deadlines (people leaving).
 
     remind(sources, client, slack_of, state, now)
 

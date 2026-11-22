@@ -88,8 +88,7 @@ def collect(prom, now):
         prom, now, "disk_quota_project_used_bytes", "disk_quota_project_limit_bytes",
         "", "", ("filesystem", "project"),
     )  # fmt: skip
-    scratch = collect_scratch(prom)
-    if not users and not projects and not scratch:
+    if not users and not projects:
         return None
     sizes = series(prom, disk_query("node_filesystem_size_bytes"), ("mountpoint",))
     avail = series(prom, disk_query("node_filesystem_avail_bytes"), ("mountpoint",))
@@ -100,63 +99,7 @@ def collect(prom, now):
         for k in sorted(counted)
     }
     reported = {k[0]: v for k, v in series(prom, "disk_quota_last_success_timestamp_seconds", ()).items()}
-    return {"now": now, "disks": disks, "users": users, "projects": projects, "reported": reported,
-            "scratch": scratch}  # fmt: skip
-
-
-def collect_scratch(prom):
-    """The scratch allocations (cluster_tools.scratch_alloc's metrics): {"disk": {bytes,
-    used}, "allocations": {login: {limit, used, expires, state}}}, or None without them."""
-    limits = series(prom, 'scratch_alloc_limit_bytes{state!="released"}', ("user", "state"))
-    if not limits:
-        return None
-    used = series(prom, "scratch_alloc_used_bytes", ("user", "state"))
-    ends = series(prom, "scratch_alloc_expires_timestamp_seconds", ("user", "state"))
-    held = {k[1]: v for k, v in series(prom, "scratch_alloc_allocated_byte_seconds_total", ("user",)).items()}
-    disk_bytes = series(prom, "scratch_alloc_disk_bytes", ())
-    disk_used = series(prom, "scratch_alloc_disk_used_bytes", ())
-    allocations = {
-        k[1]: {
-            "limit": v,
-            "used": used.get(k, 0),
-            "expires": ends.get(k),
-            "state": k[2],
-            "held": held.get(k[1], 0),
-        }
-        for k, v in limits.items()
-    }
-    return {
-        "disk": {"bytes": sum(disk_bytes.values()), "used": sum(disk_used.values())},
-        "allocations": dict(sorted(allocations.items())),
-    }
-
-
-def scratch_lines(scratch, now):
-    """The scratch section: the disk on one line, then each allocation (no mention: seeing
-    who holds what is the point)."""
-    disk = scratch["disk"]
-    head = ":zap: *Scratch*"
-    if disk["bytes"]:
-        head += f"  `{bar(100 * disk['used'] / disk['bytes'])}`  {size(disk['bytes'] - disk['used'])} free of {size(disk['bytes'])}"
-    rows = []
-    for login, a in sorted(scratch["allocations"].items(), key=lambda r: (-r[1]["limit"], r[0])):
-        left = "" if a["expires"] is None else f"{max(0, int((a['expires'] - now) // DAY))}d"
-        share = f"{100 * a['used'] / a['limit']:.0f}%" if a["limit"] else "-"
-        rows.append(
-            (
-                login,
-                size(a["limit"]),
-                size(a["used"]),
-                share,
-                left,
-                f"{a['held'] / (1024**4 * DAY):.1f}",
-                "" if a["state"] == "active" else a["state"],
-            )
-        )
-    note = (
-        "TB-DAYS: allocated so far, from their first allocation (the fairness weighed when the disk is full)."
-    )
-    return f"{head}\n{table(('USER', 'ALLOCATED', 'USED', 'USE', 'LEFT', 'TB-DAYS', ''), rows)}\n{note}"
+    return {"now": now, "disks": disks, "users": users, "projects": projects, "reported": reported}
 
 
 def past(entry):
@@ -321,8 +264,6 @@ def render(data, who, top, people=(), mention=None, hold=None):
         ]
         head = ":open_file_folder: *Projects* (a directory tree with one limit)"
         detail += sections(f"{head}\n{table(('PROJECT', 'ON', 'USED', 'DAY', 'WARN', 'HARD'), body)}")
-    if data.get("scratch"):
-        detail += sections(scratch_lines(data["scratch"], data["now"]))
     thread = [("Disk usage details", detail[i : i + MAX_BLOCKS]) for i in range(0, len(detail), MAX_BLOCKS)]
     return (text, card), thread
 

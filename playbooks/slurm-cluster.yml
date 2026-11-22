@@ -353,8 +353,8 @@
   vars:
     deepops_phase: install
 
-- name: Hand out fast scratch space per request
-  import_playbook: generic/scratch-alloc.yml
+- name: Make every person's directory on the fast scratch space
+  import_playbook: generic/scratch-space.yml
   vars:
     deepops_phase: install
 
@@ -502,8 +502,8 @@
   vars:
     deepops_phase: remove
 
-- name: Remove the scratch allocation tool where it is no longer wanted
-  import_playbook: generic/scratch-alloc.yml
+- name: Leave the scratch space's directories where it is no longer wanted
+  import_playbook: generic/scratch-space.yml
   vars:
     deepops_phase: remove
 

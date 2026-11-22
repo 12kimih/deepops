@@ -199,30 +199,6 @@ class RenderTests(unittest.TestCase):
         self.assertIn("Writes there fail and new Slurm jobs are refused until you free space.",
                       disk_report.dm_text(bob, disk_report.hold_note(0, NOW)))  # fmt: skip
 
-    def test_scratch_allocations_are_shown_without_a_mention(self):
-        now_series = {
-            "scratch_alloc_limit_bytes": [row(5 * G, host="scratch", user="alice", state="active"),
-                                          row(2 * G, host="scratch", user="bob", state="frozen")],
-            "scratch_alloc_used_bytes": [row(1 * G, host="scratch", user="alice", state="active"),
-                                         row(2 * G, host="scratch", user="bob", state="frozen")],
-            "scratch_alloc_expires_timestamp_seconds": [row(NOW + 10 * disk_report.DAY, host="scratch", user="alice", state="active"),
-                                                        row(NOW - disk_report.DAY, host="scratch", user="bob", state="frozen")],
-            "scratch_alloc_disk_bytes": [row(100 * G, host="scratch")],
-            "scratch_alloc_disk_used_bytes": [row(30 * G, host="scratch")],
-        }  # fmt: skip
-        prom = site()
-        prom.now.update(now_series)
-        data = disk_report.collect(prom, NOW)
-        self.assertEqual(sorted(data["scratch"]["allocations"]), ["alice", "bob"])
-        _, thread = disk_report.render(data, who, top=10)
-        details = text_of(thread[0][1])
-        self.assertIn("Scratch", details)
-        self.assertIn("70G free of 100G", details)
-        self.assertRegex(details, r"alice +5G +1G +20% +10d +0.0")
-        self.assertIn("frozen", details)
-        self.assertNotIn("@alice", details)
-        self.assertIsNone(disk_report.collect_scratch(Prom({})), "no allocations: no section")
-
     def test_change(self):
         self.assertEqual(disk_report.change(5 * G, None), "new")
         self.assertEqual(disk_report.change(5 * G, 5 * G + 1000), "0")

@@ -22,7 +22,7 @@ class Dispatch(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.dir = os.path.join(tmp.name, "services")
         os.mkdir(self.dir, 0o755)
-        self.offer("scratch", ["/usr/local/sbin/scratch-alloc", "/etc/c.json", "serve"])
+        self.offer("bans", ["/usr/local/sbin/cluster-bans", "serve"])
 
     def offer(self, name, argv, mode=0o644):
         path = os.path.join(self.dir, name + ".json")
@@ -31,19 +31,19 @@ class Dispatch(unittest.TestCase):
         return path
 
     def test_the_first_word_picks_the_service_and_the_rest_is_its_request(self):
-        argv, request = bot_serve.resolve(self.dir, "scratch create alice 2T 30 'two words'", owner=ME)
-        self.assertEqual(argv, ["/usr/local/sbin/scratch-alloc", "/etc/c.json", "serve"])
-        self.assertEqual(request, "create alice 2T 30 'two words'", "quoting survives the hop")
+        argv, request = bot_serve.resolve(self.dir, "bans unban 203.0.113.7 'two words'", owner=ME)
+        self.assertEqual(argv, ["/usr/local/sbin/cluster-bans", "serve"])
+        self.assertEqual(request, "unban 203.0.113.7 'two words'", "quoting survives the hop")
 
     def test_what_is_not_offered_or_not_safe_is_refused(self):
         self.offer("open", ["/bin/sh"], mode=0o666)
         self.offer("relative", ["sh", "-c", "x"])
-        os.symlink(os.path.join(self.dir, "scratch.json"), os.path.join(self.dir, "linked.json"))
+        os.symlink(os.path.join(self.dir, "bans.json"), os.path.join(self.dir, "linked.json"))
         for request in (
-            "bans list",
-            "../scratch list",
+            "quota list",
+            "../bans list",
             "",
-            "Scratch list",
+            "Bans list",
             "open x",
             "relative",
             "linked list",
@@ -51,10 +51,10 @@ class Dispatch(unittest.TestCase):
             with self.subTest(request=request), self.assertRaises(bot_serve.Error):
                 bot_serve.resolve(self.dir, request, owner=ME)
         with self.assertRaises(bot_serve.Error):
-            bot_serve.resolve(self.dir, "scratch list", owner=ME + 1)  # not the owner's files
+            bot_serve.resolve(self.dir, "bans list", owner=ME + 1)  # not the owner's files
         os.chmod(self.dir, 0o777)
         with self.assertRaises(bot_serve.Error):
-            bot_serve.resolve(self.dir, "scratch list", owner=ME)
+            bot_serve.resolve(self.dir, "bans list", owner=ME)
 
     def test_a_service_takes_only_the_operations_and_counts_it_allows(self):
         arity = {"list": (0, 1), "unban": (1,)}
@@ -66,18 +66,18 @@ class Dispatch(unittest.TestCase):
 
     def test_the_service_runs_in_a_clean_environment_with_only_its_request(self):
         real = bot_serve.resolve
-        env = {"SSH_ORIGINAL_COMMAND": "scratch list alice", "LD_PRELOAD": "/tmp/x.so", "PATH": "/tmp"}
+        env = {"SSH_ORIGINAL_COMMAND": "bans list alice", "LD_PRELOAD": "/tmp/x.so", "PATH": "/tmp"}
         with mock.patch.dict(os.environ, env), mock.patch("cluster_tools.proc.become") as become, \
                 mock.patch.object(bot_serve, "resolve", lambda d, o: real(d, o, owner=ME)):  # fmt: skip
             bot_serve.main(["cluster-bot-serve", self.dir])
         argv, environment = become.call_args.args
-        self.assertEqual(argv, ["/usr/local/sbin/scratch-alloc", "/etc/c.json", "serve"])
+        self.assertEqual(argv, ["/usr/local/sbin/cluster-bans", "serve"])
         self.assertEqual(
             environment, {"PATH": bot_serve.PATH, "LANG": "C.UTF-8", "SSH_ORIGINAL_COMMAND": "list alice"}
         )
 
     def test_a_bad_request_is_refused_with_its_reason_and_nothing_runs(self):
-        with mock.patch.dict(os.environ, {"SSH_ORIGINAL_COMMAND": "bans list"}), \
+        with mock.patch.dict(os.environ, {"SSH_ORIGINAL_COMMAND": "quota list"}), \
                 mock.patch("cluster_tools.proc.become") as become:  # fmt: skip
             self.assertEqual(bot_serve.main(["cluster-bot-serve", self.dir]), 2)
         become.assert_not_called()

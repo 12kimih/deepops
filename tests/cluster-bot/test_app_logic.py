@@ -1,5 +1,4 @@
-"""The bot's Slack-free parts: the forms and messages carry what their handlers read,
-reminders go once per stage and start over when the deadline moves, and state files
+"""The bot's Slack-free parts: reminders go once per stage and start over when the deadline moves, and state files
 are replaced whole."""
 
 import datetime
@@ -13,11 +12,9 @@ from pathlib import Path
 
 ROLE = Path(__file__).resolve().parents[2] / "roles/cluster_bot"
 sys.path.insert(0, str(ROLE / "files"))
-from cluster_bot import accounts, accounts_blocks, app, reminders, scratch, scratch_blocks, state  # noqa: E402
+from cluster_bot import accounts, accounts_blocks, app, reminders, state  # noqa: E402
 
 DAY = 86400
-ALLOC = {"user": "alice", "bytes": 1024**4, "state": "active", "path": "/scratch/alice", "created": 0,
-         "expires": 10 * DAY}  # fmt: skip
 
 
 class Client:
@@ -30,48 +27,23 @@ class Client:
         self.sent.append(kw)
 
 
-def feature(allocs):
-    """The scratch feature over a stand-in server whose list is ALLOCS (and a disk)."""
-    return scratch.ScratchFeature(lambda *words: {"allocations": allocs, "disk": {"bytes": 1, "used": 0}}, {})
+def deadlines(items):
+    """A feature's deadlines over ITEMS (a list of {user, ends, live}): {user: (ends, user,
+    item)} for the live ones, as a feature's deadlines() gives them."""
+    return lambda: {i["user"]: (i["ends"], i["user"], i) for i in items if i.get("live", True)}
+
+
+def message(item, left):
+    return "곧 기한입니다", []
 
 
 SLACK_OF = {"alice": "UALICE"}.get
 
 
 class LogicTests(unittest.TestCase):
-    def test_home_offers_what_to_do_with_your_one_allocation_or_to_ask_for_it(self):
-        blocks = scratch_blocks.home([ALLOC])
-        actions = [e["action_id"] for b in blocks if b["type"] == "actions" for e in b["elements"]]
-        self.assertEqual(
-            actions, ["scratch.extend", "scratch.resize", "scratch.release"], "one each: no second"
-        )
-        release = blocks[2]["elements"][2]
-        self.assertIn("confirm", release, "giving space back asks first")
-        none = scratch_blocks.home([])
-        self.assertEqual(
-            [e["action_id"] for b in none if b["type"] == "actions" for e in b["elements"]], ["scratch.new"]
-        )
-
-    def test_the_queue_puts_who_used_least_first(self):
-        waiting = [("k1", {"kind": "scratch", "op": "create", "user": "bob", "size": 6 * 1024**4, "days": 7, "asked": 1}),
-                   ("k2", {"kind": "scratch", "op": "create", "user": "carol", "size": 6 * 1024**4, "days": 7, "asked": 2})]  # fmt: skip
-        listing = {"allocations": [], "disk": {"bytes": 1, "used": 0},
-                   "ledger": {"bob": {"allocated_byte_seconds": 10**18}, "carol": {"allocated_byte_seconds": 0}}}  # fmt: skip
-        blocks = scratch_blocks.queue(waiting, listing)
-        texts = [b["text"]["text"] for b in blocks if b["type"] == "section"][1:]
-        self.assertTrue(texts[0].startswith("carol"), texts)
-        self.assertIn("누적 할당", texts[0])
-        self.assertEqual(scratch_blocks.queue([], listing), [])
-
-    def test_forms_name_the_fields_their_handlers_read(self):
-        form = scratch_blocks.new_form({"auto_bytes": 5 * 1024**4, "auto_days": 90, "guard": 0.8})
-        self.assertEqual([b.get("block_id") for b in form["blocks"][1:]], ["size", "days", "reason"])
-        self.assertEqual(scratch_blocks.number_form("extend", "alice")["private_metadata"], "alice")
-        self.assertEqual(app.size_bytes("2T"), 2 * 1024**4)
-
     def test_reminders_once_per_stage_and_again_after_an_extension(self):
-        allocs = [dict(ALLOC)]
-        sources = {"scratch": reminders.Source([7, 1], feature(allocs).deadlines, scratch_blocks.reminder)}
+        items = [{"user": "alice", "ends": 10 * DAY}]
+        sources = {"notice": reminders.Source([7, 1], deadlines(items), message)}
         client, sent = Client(), {}
         for now in (
             2,
@@ -82,16 +54,16 @@ class LogicTests(unittest.TestCase):
             reminders.remind(sources, client, SLACK_OF, sent, now * DAY)
         self.assertEqual(
             [(m["channel"], m["text"]) for m in client.sent],
-            [("UALICE", "스크래치 공간이 곧 만료됩니다")] * 2,
+            [("UALICE", "곧 기한입니다")] * 2,
         )
-        allocs[0]["expires"] = 13 * DAY  # extended by three days, inside the 7-day window
+        items[0]["ends"] = 13 * DAY  # moved by three days, inside the 7-day window
         reminders.remind(sources, client, SLACK_OF, sent, 9.6 * DAY)  # 3.4 days left: they just chose it
         self.assertEqual(len(client.sent), 2, "no 7-day reminder right after extending into it")
         reminders.remind(sources, client, SLACK_OF, sent, 12.5 * DAY)  # the 1-day one
         self.assertEqual(len(client.sent), 3, "a moved deadline starts its countdown over")
-        allocs[0]["state"] = "frozen"
+        items[0]["live"] = False
         reminders.remind(sources, client, SLACK_OF, sent, 12.6 * DAY)
-        self.assertEqual(sent, {"scratch": {}}, "what is no longer listed leaves the record")
+        self.assertEqual(sent, {"notice": {}}, "what is no longer listed leaves the record")
 
     def test_a_stage_already_passed_when_first_seen_is_skipped_but_never_the_last(self):
         sent = {}
@@ -109,22 +81,22 @@ class LogicTests(unittest.TestCase):
         due = reminders.due({"k": 10 * DAY}, [30, 14, 7, 1], {}, 9.5 * DAY)
         self.assertEqual(due, [("k", 1, 1)], "a bot that was down sends one reminder, not four")
         sources = {
-            "scratch": reminders.Source([7, 1], feature([dict(ALLOC)]).deadlines, scratch_blocks.reminder)
+            "notice": reminders.Source([7, 1], deadlines([{"user": "alice", "ends": 10 * DAY}]), message)
         }
         sent = {}
         reminders.remind(sources, Client(), SLACK_OF, sent, 0)  # first seen ten days off
         reminders.remind(sources, Client(fail=True), SLACK_OF, sent, 4 * DAY)
-        self.assertIsNone(sent["scratch"]["alice"][1], "nothing went out, so no stage is recorded")
+        self.assertIsNone(sent["notice"]["alice"][1], "nothing went out, so no stage is recorded")
         client = Client()
         reminders.remind(sources, client, SLACK_OF, sent, 4.1 * DAY)
         self.assertEqual(len(client.sent), 1)
 
     def test_one_failing_source_does_not_stop_the_others(self):
         def broken():
-            raise RuntimeError("the scratch server is away")
+            raise RuntimeError("the server is away")
 
         sources = {
-            "scratch": reminders.Source([7, 1], broken, scratch_blocks.reminder),
+            "notice": reminders.Source([7, 1], broken, message),
             "leave": reminders.Source(
                 [7], lambda: {"alice": (5 * DAY, "alice", {})}, lambda item, left: ("t", [])
             ),
@@ -139,7 +111,7 @@ class LogicTests(unittest.TestCase):
         self.assertEqual((user, item), ("alice", {"user": "alice", **dates}))
         self.assertEqual(datetime.datetime.fromtimestamp(deadline), datetime.datetime(2027, 3, 1))
         sources = app.reminder_sources(
-            {"leave": {"remind_days": [30, 14, 7, 1], "leaving": {"alice": dates}}}, None
+            {"leave": {"remind_days": [30, 14, 7, 1], "leaving": {"alice": dates}}}
         )
         client, sent = Client(), {}
         day_before = time.mktime(datetime.datetime(2027, 2, 28, 9).timetuple())

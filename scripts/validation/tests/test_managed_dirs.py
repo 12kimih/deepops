@@ -22,7 +22,7 @@ GLOBS = ("fileglob", "filetree")
 # file -> why a glob install there must not remove what it did not install
 SHARED = {
     # A new home is filled from /etc/skel once, as useradd does; it is its user's then.
-    "roles/people/tasks/main.yml": "a new home's first files, the user's from then on",
+    "roles/people/tasks/person_dirs.yml": "a new home's first files, the user's from then on",
 }
 
 

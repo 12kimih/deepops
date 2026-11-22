@@ -186,7 +186,7 @@
 #deepops_component_removals: []
 
 # How long users have to clean up before the cluster removes their data (unused
-# container stores, ended scratch allocations, ...): one value for all of them.
+# container stores, unused files on /scratch, ...): one value for all of them.
 #cluster_user_grace_days: 14
 # When files count as unused: removed after this long untouched (/scratch, a former
 # member's files and login) and listed by the cleanup reports.
@@ -203,16 +203,12 @@
 #autofs_mount: "/home"  # example
 #autofs_map: "auto.home_linux"  # example
 
-# Fast scratch space per request (roles/scratch_alloc, slurm_enable_scratch_alloc, on
-# [scratch-server]): docs/slurm-cluster/scratch-alloc.md. The filesystem needs prjquota
-# in host_baseline_mount_options.
-#scratch_alloc_mount: /scratch
-#scratch_alloc_max_size: 10T
-#scratch_alloc_max_days: 180
-#scratch_alloc_max_extend_days: 90
-#scratch_alloc_auto_size: 5T
-#scratch_alloc_auto_days: 90
-#scratch_alloc_guard: 0.8
+# The fast scratch space (roles/scratch_space, slurm_enable_scratch_space, on
+# [scratch-server]): every person's directory on it; docs/slurm-cluster/scratch.md. Each
+# person's space there is their user quota: on that host, disk_quota_filesystems with
+# /scratch and its block_hard (and disk_quota_inodes_per_tib), and usrquota in its
+# host_baseline_mount_options.
+#scratch_space_root: /scratch
 
 # NFS Server
 # This config will create an NFS server and share the given exports. options are the

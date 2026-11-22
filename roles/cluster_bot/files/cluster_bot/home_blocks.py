@@ -1,18 +1,12 @@
 """The bot's Home tab: a person's own view of the cluster, opened from the bot's profile."""
 
 from .blocks import button
-from .scratch import summary
 
 
-def home(login, allocations, muted, features):
-    """LOGIN's Home tab: their scratch allocations, whether job notices reach them, and
-    the commands they can use (FEATURES: the request kinds this cluster runs)."""
+def home(login, muted, features):
+    """LOGIN's Home tab: whether job notices reach them, and the commands they can use
+    (FEATURES: the request kinds this cluster runs)."""
     blocks = [{"type": "header", "text": {"type": "plain_text", "text": f"{login}님의 클러스터"}}]
-    if "scratch" in features:
-        live = [a for a in allocations if a["state"] != "released"]
-        lines = "\n".join(summary(a) for a in live) or "배정받은 스크래치 공간이 없습니다."
-        blocks += [{"type": "section", "text": {"type": "mrkdwn", "text": f"*스크래치 공간*\n{lines}"}},
-                   {"type": "context", "elements": [{"type": "mrkdwn", "text": "`/scratch`로 신청, 연장, 크기 변경, 반납"}]}]  # fmt: skip
     state = "받지 않음" if muted else "받음"
     blocks += [
         {"type": "divider"},

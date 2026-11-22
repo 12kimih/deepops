@@ -274,11 +274,11 @@ deepops_component_registry:
   shared_space:
     rules:
       - {switch: "{{ slurm_enable_shared_space }}", group: slurm-nfs, first: true}
-  # Fast scratch space per request (roles/scratch_alloc), on the host whose XFS
-  # filesystem holds it. The allocations and their registry are data: never removed.
-  scratch_alloc:
+  # The fast scratch space, every person's directory on it (roles/scratch_space), on the
+  # host whose local filesystem holds it. The directories are data: never removed.
+  scratch_space:
     rules:
-      - {switch: "{{ slurm_enable_scratch_alloc }}", group: scratch-server}
+      - {switch: "{{ slurm_enable_scratch_space }}", group: scratch-server}
   # The cluster's Slack app (roles/cluster_bot), on one host: the first slurm-master.
   cluster_bot:
     rules:

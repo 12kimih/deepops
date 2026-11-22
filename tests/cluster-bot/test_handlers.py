@@ -46,7 +46,7 @@ from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
 
 CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
-       "channels": {"help": "#help", "admin": "#admin"}, "scratch": {"policy": {"auto_bytes": 1, "auto_days": 30}}}  # fmt: skip
+       "channels": {"help": "#help", "admin": "#admin"}}  # fmt: skip
 
 
 def submitted(state, user, callback, metadata=""):
@@ -68,7 +68,7 @@ class Handlers(unittest.TestCase):
         self.engine.submit.return_value = mock.Mock(status="done", text="ok", request={})
         self.join = mock.Mock(teams=mock.Mock(return_value=["team-a"]))
         self.client = mock.MagicMock()
-        self.app = app.build(CFG, self.engine, None, self.join, unban=mock.Mock())
+        self.app = app.build(CFG, self.engine, self.join, unban=mock.Mock())
 
     def call(self, kind, name, **kw):
         """As Bolt calls a listener: only the arguments it declares."""

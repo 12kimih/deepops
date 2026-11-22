@@ -1,0 +1,15 @@
+---
+# The fast scratch space (roles/scratch_space): every active person's own directory on
+# it. Every host it runs on converges to deepops_components (present on scratch-server
+# while slurm_enable_scratch_space is on; the directories and their data always stay).
+#
+#   ansible-playbook -K playbooks/generic/scratch-space.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: scratch_space
+      scratch_space_state: "{{ deepops_components.scratch_space | component_phase(deepops_phase) }}"
+  tags:
+    - scratch-space
+    - people

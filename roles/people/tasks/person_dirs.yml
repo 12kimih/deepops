@@ -1,0 +1,46 @@
+---
+# A directory of each active person's own under people_dirs_root, as their home is under
+# /home: made where missing, owned by the roster's numbers (they resolve once the
+# directory answers), filled from /etc/skel with people_dirs_skel. people_dirs_mode is a
+# ceiling: a directory with any permission beyond it is set to it, while a stricter one
+# (0700) is left as its owner chose. useradd makes a local account's home; this makes
+# the rest (a directory account's home, a scratch directory).
+- name: Read the directories of each active person under {{ people_dirs_root }}
+  ansible.builtin.stat:
+    path: "{{ people_dirs_root }}/{{ item.key }}"
+  loop: "{{ people | people_active | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: people_dirs_found
+
+- name: Create the directories of active people who have none under {{ people_dirs_root }}
+  ansible.builtin.file:
+    path: "{{ people_dirs_root }}/{{ item.item.key }}"
+    state: directory
+    owner: "{{ item.item.value.uid }}"
+    group: "{{ item.item.value.uid }}"
+    mode: "{{ people_dirs_mode }}"
+  loop: "{{ people_dirs_found.results | rejectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Fill the new directories from /etc/skel under {{ people_dirs_root }}
+  ansible.builtin.copy:
+    src: /etc/skel/
+    dest: "{{ people_dirs_root }}/{{ item.item.key }}/"
+    remote_src: true
+    owner: "{{ item.item.value.uid }}"
+    group: "{{ item.item.value.uid }}"
+  loop: "{{ people_dirs_found.results | rejectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: people_dirs_skel | default(false) | bool
+
+- name: Take away permissions beyond the directories' mode under {{ people_dirs_root }}
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    mode: "{{ people_dirs_mode }}"
+  loop: "{{ people_dirs_found.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item.key }} ({{ item.stat.mode }})"
+  when: item.stat.mode | mode_exceeds(people_dirs_mode)

@@ -5,8 +5,8 @@ request's first word names a service, the rest is that service's own request.
 
 DIR holds a file per service a role offers the bot on this host, <service>.json:
 {"argv": [command, ...]}. The command runs with SSH_ORIGINAL_COMMAND set to the rest of
-the request, so each service parses and limits its own (scratch-alloc ... serve, for
-one); nothing is run through a shell. A service file must be root's and writable by
+the request, so each service parses and limits its own (cluster-bans serve, for one);
+nothing is run through a shell. A service file must be root's and writable by
 nobody else, or the request is refused: the files decide what root runs.
 
 A service reads its request with request(), the one way to split it: as a shell

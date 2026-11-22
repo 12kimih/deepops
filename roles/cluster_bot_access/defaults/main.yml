@@ -6,8 +6,8 @@
 #       name: cluster_bot_access
 #     vars:
 #       cluster_bot_access_service:
-#         name: scratch                       # the request's first word
-#         argv: [/usr/local/sbin/scratch-alloc, /etc/cluster-tools/scratch-alloc.json, serve]
+#         name: bans                          # the request's first word
+#         argv: [/usr/local/sbin/cluster-bans, serve]
 #
 # argv runs as root with SSH_ORIGINAL_COMMAND set to the rest of the request, so the
 # service must take only what the bot may ask (cluster_tools.bot_serve.request). The
