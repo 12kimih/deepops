@@ -4,8 +4,8 @@
 # firefox snap's host-hunspell bind mount: "rm: cannot remove
 # '/var/snap/firefox/common/host-hunspell': Device or resource busy", 2026-11-22). So,
 # as Ubuntu removes snapd: each snap through snapd first (applications, then the bases,
-# snapd's own snap last), then whatever is still mounted from /snap or /var/snap is
-# unmounted, its mount unit stopped; snapd's purge then finds nothing left. A host where
+# snapd's own snap last), then the snap mount units are stopped and whatever is still
+# mounted from /snap or /var/snap unmounted; snapd's purge then finds nothing left. A host where
 # snapd already went half way (no snap command, its mounts still up) gets the second
 # step alone.
 - name: Read the installed snaps
@@ -30,13 +30,6 @@
     _snap_self: '\s\S*\bsnapd\b\S*$'
   when: host_baseline_snaps.stdout_lines | length > 0
 
-- name: Read the snap mounts still up
-  ansible.builtin.command:
-    argv: [findmnt, --list, --noheadings, --output, TARGET]
-  register: host_baseline_snap_mounts
-  changed_when: false
-  check_mode: false  # read-only; --check needs the result
-
 - name: Read the snap mount units
   ansible.builtin.command:
     argv: [systemctl, list-units, --all, --plain, --no-legend, --type=mount, "snap-*", "var-snap-*"]
@@ -48,6 +41,14 @@
   change_command:
     argv: "{{ ['systemctl', 'stop'] + host_baseline_snap_units.stdout_lines | map('split') | map('first') | list }}"
   when: host_baseline_snap_units.stdout_lines | length > 0
+
+# After the units stopped: what they did not take down (a mount no unit holds).
+- name: Read the snap mounts still up
+  ansible.builtin.command:
+    argv: [findmnt, --list, --noheadings, --output, TARGET]
+  register: host_baseline_snap_mounts
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
 
 # Deepest first: a mount inside another goes before it.
 - name: Unmount what is still mounted from /snap or /var/snap
