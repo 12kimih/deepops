@@ -188,8 +188,9 @@ Ubuntu 24.04):
   (`container_storage_gc_docker_unmanaged`, `container_storage_gc_docker_unmanaged_stale`);
   it never touches them. A running one past that age raises `ContainerOutsideSlurm`.
   `docker-prune.timer` (`roles/docker`, `docker_prune_after`) removes stopped
-  containers and unused images by age; the build cache is BuildKit's own garbage
-  collection (daemon.json `builder.gc`, capped at `docker_build_cache_max`).
+  containers, unused images and build cache by age. BuildKit's own garbage
+  collection (daemon.json `builder.gc`, capped at `docker_build_cache_max`) runs
+  between, but by size only, and it undercounts on overlay2.
 
 Changing `podman_subid_base` or `podman_subid_count` moves every range; users then
 need `podman system migrate` (or `podman system reset -f`) on each node.
