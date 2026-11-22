@@ -1,4 +1,4 @@
-# {{ ansible_managed }}
+# Managed by roles/nhc ({{ ansible_managed }}).
 
 # Check number of CPU cores
  {{ ansible_facts.hostname }} || check_hw_cpuinfo {{ ansible_facts.ansible_local.topology.cpu_topology.sockets }} {{ ansible_facts.ansible_local.topology.cpu_topology.physical_cores }} {{ ansible_facts.ansible_local.topology.cpu_topology.logical_cpus }}
@@ -26,13 +26,13 @@
 {% endfor %}
 
 {% endif %}
-# Check that Ethernet connections are up
-# (commented out as this detects interfaces that may not need to be online)
-{% set my_interfaces = ansible_facts.interfaces|select('match', '(?!^(lo|docker|nodelocaldns)).*')|default(None) -%}
-{% for interface in my_interfaces %}
-# {{ ansible_facts.hostname }} || check_hw_eth {{ interface }}
+{% if nhc_check_interfaces | length > 0 %}
+# Check that the network interfaces the node needs are up (nhc_check_interfaces)
+{% for interface in nhc_check_interfaces %}
+ {{ ansible_facts.hostname }} || check_hw_eth {{ interface }}
 {% endfor %}
 
+{% endif %}
 {% if nhc_check_pcie_acs | bool %}
 # PCIe ACS back on (roles/pcie_acs): GPUs below one PCIe switch lose peer-to-peer
  {{ ansible_facts.hostname }} || check_pcie_acs {{ pcie_acs_program }}
