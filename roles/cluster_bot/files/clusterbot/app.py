@@ -7,8 +7,10 @@ one handler per action. Each handler reads Slack's input, asks a feature module
 CONFIG (written by roles/cluster_bot): bot_token_file, app_token_file, channels {help,
 admin}, members {Slack member ID: cluster user}, admins [member IDs], pending (the held
 requests of every feature, clusterbot.requests), reminders (what went out,
-clusterbot.reminders), scratch {host, key, user, known_hosts, policy, remind_days}
-(scratch.host empty leaves it off), leave {remind_days, leaving (people_leaving)}.
+clusterbot.reminders), ssh {key, user, known_hosts} (clusterbot.remote, to the hosts
+it acts on), scratch {host, policy, remind_days} (host empty leaves it off), bans
+{hosts {name: address}} (none leaves unban requests off), leave {remind_days, leaving
+(people_leaving)}.
 """
 
 import json
@@ -17,13 +19,17 @@ import threading
 import time
 from pathlib import Path
 
-from . import accounts_blocks, home_blocks, reminders, state
+from . import accounts_blocks, bans_blocks, home_blocks, reminders, state
 from . import blocks as shared
 from . import scratch_blocks as blocks
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
+from .bans import SERVICE as BANS
+from .bans import UnbanFeature, address
 from .prefs import Prefs
+from .remote import Remote
 from .requests import Engine
-from .scratch import ScratchFeature, SshExecutor
+from .scratch import SERVICE as SCRATCH
+from .scratch import ScratchFeature
 
 UNITS = {"G": 1024**3, "T": 1024**4}
 REMIND_EVERY = 3600
@@ -40,7 +46,7 @@ def load(path):
     return cfg
 
 
-def build(cfg, engine, scratch, join=None):
+def build(cfg, engine, scratch, join=None, unban=None):
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
@@ -142,6 +148,33 @@ def build(cfg, engine, scratch, join=None):
             req = {"kind": "leave", "user": login, "ends": values["ends"]["v"]["selected_date"],
                    "asked_by": user_of(slack_id) or slack_id}  # fmt: skip
             submit(client, slack_id, req)
+
+    @app.command("/unban-request")
+    def unban_command(ack, body, client):
+        ack()
+        if unban is None or not user_of(body["user_id"]):
+            text = ("사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요." if unban
+                    else "이 클러스터는 Slack으로 차단 해제 신청을 받지 않습니다.")  # fmt: skip
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            return
+        client.views_open(trigger_id=body["trigger_id"], view=bans_blocks.unban_form())
+
+    @app.view("unban.submit")
+    def unban_submit(ack, body, client, view):
+        v = view["state"]["values"]
+        ip = address(v["ip"]["v"]["value"])
+        if ip is None:
+            ack(response_action="errors", errors={"ip": "IP 주소 형식이 아닙니다 (예: 203.0.113.7)"})
+            return
+        ack()
+        slack_id = body["user"]["id"]
+        user = user_of(slack_id)
+        if user:
+            submit(
+                client,
+                slack_id,
+                {"kind": "unban", "user": user, "ip": ip, "reason": v["reason"]["v"]["value"] or ""},
+            )
 
     @app.command("/scratch")
     def scratch_command(ack, body, client):
@@ -253,13 +286,19 @@ def main(argv=None):
 
     argv = sys.argv if argv is None else argv
     cfg = load(argv[1])
-    sc = cfg["scratch"]
-    scratch = None
-    if sc["host"]:
-        scratch = ScratchFeature(
-            SshExecutor(sc["host"], sc["key"], sc["user"], sc["known_hosts"]), sc["policy"]
+    ssh = cfg["ssh"]
+
+    def remote(host, service):
+        return Remote(host, ssh["key"], ssh["user"], ssh["known_hosts"], service)
+
+    features, scratch, join, unban = {}, None, None, None
+    if cfg["scratch"]["host"]:
+        scratch = features["scratch"] = ScratchFeature(
+            remote(cfg["scratch"]["host"], SCRATCH), cfg["scratch"]["policy"]
         )
-    features, join = {"scratch": scratch} if scratch else {}, None
+    if cfg["bans"]["hosts"]:
+        hosts = {name: remote(addr, BANS) for name, addr in cfg["bans"]["hosts"].items()}
+        unban = features["unban"] = UnbanFeature(hosts)
     gh = cfg.get("github") or {}
     if gh.get("repo"):
         from . import github, people_roster  # the roster module the role installs
@@ -269,7 +308,7 @@ def main(argv=None):
         join = JoinFeature(repo, people_roster, settings)
         features.update(join=join, leave=LeaveFeature(repo, people_roster, settings))
     engine = Engine(features, cfg["pending"])
-    app = build(cfg, engine, scratch, join)
+    app = build(cfg, engine, scratch, join, unban)
 
     sources, slack_of = reminder_sources(cfg, scratch), {u: s for s, u in cfg["members"].items()}.get
 

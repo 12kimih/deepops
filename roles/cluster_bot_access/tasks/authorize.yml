@@ -1,0 +1,51 @@
+---
+# The bot's key, for the dispatcher only, on a host that offers it a service. Included by
+# main.yml, and run alone by playbooks/generic/cluster-bot.yml right after the bot made
+# its key, so a host that offered a service earlier in a first deploy (fail2ban runs
+# before the bot) needs no second run. From main.yml the service just offered counts
+# even before it exists (a preview).
+- name: Look for the services offered to the bot
+  find_present:
+    paths: "{{ cluster_bot_serve_dir }}"
+    patterns: "*.json"
+  register: cluster_bot_access_offered
+
+- name: Note whether this host offers the bot anything
+  ansible.builtin.set_fact:
+    _cluster_bot_access_on: >-
+      {{ cluster_bot_host | length > 0
+         and (_cluster_bot_access_offering | default(false) or cluster_bot_access_offered.matched > 0) }}
+
+- name: Read the bot's public key on its host
+  ansible.builtin.slurp:
+    src: "{{ cluster_bot_key }}.pub"
+  delegate_to: "{{ cluster_bot_host }}"
+  register: cluster_bot_access_key
+  failed_when: false
+  run_once: true  # the same key for every host: no condition of one host's here
+  when: cluster_bot_host | length > 0
+
+- name: Create the bot's SSH directory
+  ansible.builtin.file:
+    path: "{{ cluster_bot_authorized_keys | dirname }}"
+    state: directory
+    owner: "{{ cluster_bot_user }}"
+    group: "{{ cluster_bot_user }}"
+    mode: "0700"
+  when: _cluster_bot_access_on
+
+# from= the bot host's cluster address: the key is useless anywhere else.
+- name: Allow the bot's key, for the dispatcher only
+  ansible.builtin.copy:
+    dest: "{{ cluster_bot_authorized_keys }}"
+    owner: "{{ cluster_bot_user }}"
+    group: "{{ cluster_bot_user }}"
+    mode: "0600"
+    content: |
+      # roles/cluster_bot_access: the cluster bot on {{ cluster_bot_host }}, the services in {{ cluster_bot_serve_dir }} only.
+      {% if cluster_bot_access_key.content is defined %}
+      command="sudo -n {{ cluster_bot_serve }}",restrict,from="{{ _from }}" {{ cluster_bot_access_key.content | b64decode | trim }}
+      {% endif %}
+  vars:
+    _from: "{{ (hostvars | cluster_addresses([cluster_bot_host], cluster_networks))[cluster_bot_host] }}"
+  when: _cluster_bot_access_on

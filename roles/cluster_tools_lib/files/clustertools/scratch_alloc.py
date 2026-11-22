@@ -37,14 +37,13 @@ import fcntl
 import json
 import os
 import pwd
-import shlex
 import shutil
 import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import disk_quota
+from . import bot_serve, disk_quota
 from .cli import run_main
 from .files import write_atomic
 from .prom import key, render
@@ -243,11 +242,11 @@ SERVED = {"create", "resize", "extend", "release", "list"}
 
 
 def served(config, original):
-    """The argv a request over SSH (SSH_ORIGINAL_COMMAND) stands for, or an Error. The
-    request is split as a shell would split words, never run by one."""
-    words = shlex.split(original or "")
-    if not words or words[0] not in SERVED or len(words) - 1 not in ARITY[words[0]]:
-        raise Error(f"not a request this key may make: {original!r}")
+    """The argv a request over SSH (SSH_ORIGINAL_COMMAND) stands for, or an Error."""
+    try:
+        words = bot_serve.request(original, {op: ARITY[op] for op in SERVED})
+    except bot_serve.Error as e:
+        raise Error(str(e)) from None
     return ["scratch-alloc", config, *words]
 
 

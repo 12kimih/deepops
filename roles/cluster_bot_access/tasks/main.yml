@@ -1,0 +1,69 @@
+---
+- name: Check the service
+  ansible.builtin.assert:
+    that:
+      - cluster_bot_access_service.name | default('') is match('^[a-z][a-z0-9-]{0,31}$')
+      - cluster_bot_access_service.argv | default('') is not string
+      - cluster_bot_access_service.argv | default([]) | length > 0
+      - cluster_bot_access_service.argv[0] is match('^/')
+    fail_msg: >-
+      cluster_bot_access_service needs a name (lowercase letters, digits, -) and an argv
+      whose first word is an absolute path; got {{ cluster_bot_access_service }}.
+    quiet: true
+
+# Resolved here: an include argument is evaluated inside the role it includes, where this
+# role's dependencies (slack_defaults, system_accounts) are not in scope.
+- name: Note the bot's account and dispatcher
+  ansible.builtin.set_fact:
+    _cluster_bot_access_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
+    _cluster_bot_access_command: {dest: "{{ cluster_bot_serve_command }}", module: clustertools.bot_serve}
+
+- name: Create the bot's account
+  ansible.builtin.include_role:
+    name: local_accounts
+  vars:
+    local_accounts: "{{ _cluster_bot_access_account }}"
+
+- name: Install the cluster tools library
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+
+- name: Install the bot's dispatcher
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command: "{{ _cluster_bot_access_command }}"
+
+- name: Create the directory of the services offered to the bot
+  ansible.builtin.file:
+    path: "{{ cluster_bot_serve_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "Offer the bot {{ cluster_bot_access_service.name }}"
+  ansible.builtin.copy:
+    dest: "{{ cluster_bot_serve_dir }}/{{ cluster_bot_access_service.name }}.json"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ {'argv': cluster_bot_access_service.argv} | to_nice_json }}\n"
+
+- name: Let the bot run the dispatcher as root, only that
+  ansible.builtin.copy:
+    dest: "{{ cluster_bot_serve_sudoers }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+    content: |
+      # roles/cluster_bot_access: the cluster bot's requests, nothing else.
+      Defaults:{{ cluster_bot_user }} env_keep += "SSH_ORIGINAL_COMMAND"
+      {{ cluster_bot_user }} ALL=(root) NOPASSWD: {{ cluster_bot_serve }}
+
+- name: Authorize the bot's key
+  ansible.builtin.include_tasks: authorize.yml
+  vars:
+    _cluster_bot_access_offering: true

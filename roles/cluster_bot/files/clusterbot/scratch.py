@@ -5,40 +5,17 @@ the person reads.
     feature = ScratchFeature(executor, policy)
     feature.mine(user) -> the user's allocations
 
-The executor runs clustertools.scratch_alloc on the scratch server (over the bot's SSH
-key, whose forced command accepts nothing else) and returns its JSON.
+The executor runs clustertools.scratch_alloc on the scratch server (a
+clusterbot.remote.Remote for SERVICE) and returns its JSON.
 """
 
-import json
-import shlex
-import subprocess
 import time
 
 from . import scratch_policy
-from .requests import Failed, Feature
+from .requests import Feature
 
-TIMEOUT = 120
-
-
-class SshExecutor:
-    """scratch-alloc on the scratch server, over the bot's SSH key (forced command serve)."""
-
-    def __init__(self, host, key, user, known_hosts):
-        self.host, self.key, self.user, self.known_hosts = host, key, user, known_hosts
-
-    def __call__(self, *words):
-        argv = ["ssh", "-i", self.key, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
-                "-o", "StrictHostKeyChecking=yes", "-o", f"UserKnownHostsFile={self.known_hosts}",
-                f"{self.user}@{self.host}", shlex.join(str(w) for w in words)]  # fmt: skip
-        try:
-            done = subprocess.run(
-                argv, capture_output=True, text=True, errors="replace", timeout=TIMEOUT, check=False
-            )
-        except subprocess.TimeoutExpired:
-            raise Failed(f"the scratch server did not answer within {TIMEOUT}s") from None
-        if done.returncode != 0:
-            raise Failed((done.stderr or done.stdout).strip().removeprefix("scratch-alloc: ") or "it refused")
-        return json.loads(done.stdout)
+# The scratch server's service for the bot (roles/scratch_alloc offers it by this name).
+SERVICE = "scratch"
 
 
 def human(n):

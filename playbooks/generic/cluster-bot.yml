@@ -13,3 +13,15 @@
   tags:
     - cluster-bot
     - people  # members and admins come from the roster
+
+# The hosts that already offer the bot a service (roles/cluster_bot_access: fail2ban
+# runs before this play) authorize the key it may just have made.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  tasks:
+    - name: Authorize the bot's key where a service is offered to it
+      ansible.builtin.include_role:
+        name: cluster_bot_access
+        tasks_from: authorize
+  tags:
+    - cluster-bot

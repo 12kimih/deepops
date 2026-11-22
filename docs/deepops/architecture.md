@@ -84,6 +84,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── build_record
 │   ├── cachefilesd
 │   ├── cluster_bot
+│   ├── cluster_bot_access
 │   ├── cluster_sudoers
 │   ├── cluster_tools
 │   ├── cluster_tools_lib

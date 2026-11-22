@@ -30,7 +30,8 @@ slack_app_token: ""
 
 # The cluster bot (roles/cluster_bot): its local account on every host it runs on or
 # acts on (roles/system_accounts), the host it runs on, and its SSH key there, whose
-# public half other roles install with a forced command (roles/scratch_alloc).
+# public half the hosts it acts on authorize for one forced command
+# (roles/cluster_bot_access).
 cluster_bot_user: clusterbot
 cluster_bot_host: >-
   {{ (deepops_component_registry | component_hosts(groups, 'cluster_bot', deepops_component_removals))[:1] | join }}

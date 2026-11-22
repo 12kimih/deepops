@@ -1,10 +1,16 @@
 ---
 fail2ban_dropin: /etc/fail2ban/jail.d/deepops.local
 # What this component installs, for its record (roles/component_record).
-fail2ban_items:
-  - package:fail2ban
-  - unit:fail2ban.service
-  - "file:{{ fail2ban_dropin }}"
+fail2ban_items: >-
+  {{ ['package:fail2ban', 'unit:fail2ban.service', 'file:' ~ fail2ban_dropin]
+     + ((cluster_bot_access_items + ['file:' ~ _fail2ban_bans_command,
+                                     'file:' ~ cluster_bot_serve_dir ~ '/' ~ _fail2ban_bot_service.name ~ '.json'])
+        if cluster_bot_host | length > 0 else []) }}
+# The cluster bot's view of the bans (clustertools.bans): the list, and an unban.
+_fail2ban_bans_command: /usr/local/sbin/cluster-bans
+_fail2ban_bot_service:
+  name: bans
+  argv: ["{{ _fail2ban_bans_command }}", serve]
 # A whole copy of jail.conf saved as jail.local (the way it was often set up by hand)
 # is told by jail.conf's own header; it overrides every distribution default.
 fail2ban_copied_jail_local: "Changes:  in most of the cases you should not modify this"

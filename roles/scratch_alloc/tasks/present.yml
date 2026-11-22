@@ -64,62 +64,13 @@
     _fields: "{{ scratch_alloc_mounted.stdout | default('') | split }}"
   when: not deepops_containerized | bool and not ansible_check_mode
 
-# The bot (roles/cluster_bot) asks over SSH with its own key, whose forced command runs
-# serve through the one sudo rule below; serve takes only allocation requests. Until the
-# bot's key exists on its host there is no way in to write.
-- name: Note the bot's account
-  ansible.builtin.set_fact:
-    _scratch_alloc_bot_account: "{{ {cluster_bot_user: system_accounts[cluster_bot_user]} }}"
-
-- name: Create the bot's account
+# The bot (roles/cluster_bot) asks over SSH; serve takes only allocation requests.
+- name: Offer the bot allocation requests
   ansible.builtin.include_role:
-    name: local_accounts
+    name: cluster_bot_access
   vars:
-    local_accounts: "{{ _scratch_alloc_bot_account }}"
-
-- name: Let the bot run the allocation command's serve mode as root, only that
-  ansible.builtin.copy:
-    dest: "{{ _scratch_alloc_sudoers }}"
-    owner: root
-    group: root
-    mode: "0440"
-    validate: visudo -cf %s
-    content: |
-      # roles/scratch_alloc: the cluster bot's requests, nothing else.
-      Defaults:{{ cluster_bot_user }} env_keep += "SSH_ORIGINAL_COMMAND"
-      {{ cluster_bot_user }} ALL=(root) NOPASSWD: {{ _scratch_alloc_serve }}
-
-- name: Read the bot's public key on its host
-  ansible.builtin.slurp:
-    src: "{{ cluster_bot_key }}.pub"
-  delegate_to: "{{ cluster_bot_host }}"
-  register: scratch_alloc_bot_key
-  failed_when: false
-  run_once: true
+    cluster_bot_access_service: "{{ _scratch_alloc_bot_service }}"
   when: cluster_bot_host | length > 0
-
-- name: Create the bot's SSH directory
-  ansible.builtin.file:
-    path: "{{ _scratch_alloc_bot_keys | dirname }}"
-    state: directory
-    owner: "{{ cluster_bot_user }}"
-    group: "{{ cluster_bot_user }}"
-    mode: "0700"
-
-# from= the bot host's cluster address: the key is useless anywhere else.
-- name: Allow the bot's key, for its requests only
-  ansible.builtin.copy:
-    dest: "{{ _scratch_alloc_bot_keys }}"
-    owner: "{{ cluster_bot_user }}"
-    group: "{{ cluster_bot_user }}"
-    mode: "0600"
-    content: |
-      # roles/scratch_alloc: the cluster bot on {{ cluster_bot_host }}, allocation requests only.
-      {% if scratch_alloc_bot_key.content is defined %}
-      command="sudo -n {{ _scratch_alloc_serve }}",restrict,from="{{ _from }}" {{ scratch_alloc_bot_key.content | b64decode | trim }}
-      {% endif %}
-  vars:
-    _from: "{{ (hostvars | cluster_addresses([cluster_bot_host], cluster_networks))[cluster_bot_host] }}"
 
 - name: Install the sweep units
   ansible.builtin.template:

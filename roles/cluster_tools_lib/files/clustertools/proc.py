@@ -2,6 +2,7 @@
 
     proc.run(argv, timeout=SECONDS, **subprocess.run options)
     rc, out, err = proc.outcome(argv, timeout=SECONDS, input=None, env=None)
+    proc.become(argv, env)                  the process becomes ARGV and never returns
 
 A process that never answers (a Slurm RPC the client retries for ever, a read from a
 hung NFS mount) hangs whatever waits for it, so a call without a positive timeout is
@@ -18,6 +19,10 @@ outcome() is run() for a check that reports instead of stopping (the validators)
 never raises, and gives the exit status with the stripped text output, 124 for a
 timeout, 127 for a missing command and 126 for one that cannot be started, as a shell
 would.
+
+become() is for a front command that only picks what runs (cluster-bot-serve): it
+starts nothing and waits for nothing, so it has no timeout of its own; whatever called
+the front command bounds the whole run, as it would the command itself.
 Python 3.9 or newer, standard library only.
 """
 
@@ -66,3 +71,8 @@ def outcome(argv, *, timeout, input=None, env=None):
     except OSError as e:
         return 126, "", f"{argv[0]}: {e.strerror or e}"
     return done.returncode, done.stdout.strip(), done.stderr.strip()
+
+
+def become(argv, env):
+    """Replace this process with ARGV (an absolute path first) in exactly ENV."""
+    os.execve(argv[0], list(argv), env)
