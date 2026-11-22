@@ -1,0 +1,14 @@
+---
+# A cluster maintenance window: the Slurm reservation (roles/maintenance_window) on the
+# controller and its notice in the announce channel, in one step. Moving the window
+# updates the reservation and posts again; nothing changes, nothing is posted.
+#
+#   ansible-playbook -K playbooks/utilities/maintenance-window.yml --check \
+#     -e maintenance_window_start=2026-12-01T09:00 -e maintenance_window_end=2026-12-01T18:00 \
+#     -e "maintenance_window_reason=driver update"
+#   ansible-playbook -K playbooks/utilities/maintenance-window.yml -e maintenance_window_state=absent
+- hosts: "{{ hostlist | default('slurm-master[0]') }}"
+  become: true
+  gather_facts: false
+  roles:
+    - maintenance_window

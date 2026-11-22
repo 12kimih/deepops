@@ -1,0 +1,59 @@
+---
+- name: Require the window's times
+  ansible.builtin.assert:
+    that:
+      - maintenance_window_state in ['present', 'absent']
+      - maintenance_window_state == 'absent' or maintenance_window_start is match('^(now|[0-9]{4}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9](:[0-9][0-9])?)$')
+      - maintenance_window_state == 'absent' or maintenance_window_end is match('^[0-9]{4}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9](:[0-9][0-9])?$')
+      - maintenance_window_state == 'absent' or maintenance_window_reason | length > 0
+    fail_msg: >-
+      Pass -e maintenance_window_start=YYYY-MM-DDTHH:MM (or now)
+      -e maintenance_window_end=YYYY-MM-DDTHH:MM -e "maintenance_window_reason=...",
+      or -e maintenance_window_state=absent to cancel.
+    quiet: true
+
+- name: Set the maintenance reservation
+  slurm_reservation:
+    name: "{{ maintenance_window_name }}"
+    state: "{{ maintenance_window_state }}"
+    start: "{{ maintenance_window_start or omit }}"
+    end: "{{ maintenance_window_end or omit }}"
+    nodes: "{{ maintenance_window_nodes }}"
+    scontrol: "{{ slurm_install_prefix }}/bin/scontrol"
+  register: maintenance_window_result
+
+# The times the notice names: the request's, or for a cancellation the window's own.
+- name: Write the notice
+  ansible.builtin.set_fact:
+    maintenance_window_text: >-
+      {{ (maintenance_window_text_present if maintenance_window_state == 'present' else maintenance_window_text_absent)
+         | replace('{start}', maintenance_window_start or maintenance_window_result.reservation.StartTime | default('?'))
+         | replace('{end}', maintenance_window_end or maintenance_window_result.reservation.EndTime | default('?'))
+         | replace('{reason}', maintenance_window_reason) }}
+
+- name: Show the notice
+  ansible.builtin.debug:
+    msg: "{{ maintenance_window_text }}"
+
+# The token goes in a header from the machine running Ansible, never on a command line.
+- name: Post the notice to Slack
+  ansible.builtin.uri:
+    url: https://slack.com/api/chat.postMessage
+    method: POST
+    headers:
+      Authorization: "Bearer {{ slack_bot_token }}"
+    body_format: json
+    body:
+      channel: "{{ slack_channels.announce }}"
+      text: "{{ maintenance_window_text }}"
+    status_code: 200
+  register: maintenance_window_post
+  failed_when: not (maintenance_window_post.json.ok | default(false))
+  no_log: true
+  delegate_to: localhost
+  become: false
+  when:
+    - maintenance_window_result is changed
+    - maintenance_window_notify | bool
+    - slack_bot_token | length > 0
+    - not ansible_check_mode

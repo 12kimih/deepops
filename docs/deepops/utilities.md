@@ -24,6 +24,7 @@ See [out-of-band management](bmc.md).
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
 | `utilities/reboot.yml` | all | detaches NFS, reboots and waits for the host (roles/maintenance). It does not drain Slurm, and must not target the control node it runs from |
+| `utilities/maintenance-window.yml` | slurm-master[0] | sets (or moves, or with `maintenance_window_state=absent` cancels) the Slurm maintenance reservation over the nodes, flags MAINT and IGNORE_JOBS, and posts the notice to `slack_channels.announce`; see `roles/maintenance_window` |
 | `utilities/nfs-mount.yml` | all | mounts the NFS entries in each host's fstab that are not mounted, once their servers answer |
 
 For nodes running jobs, `scontrol reboot ASAP nextstate=RESUME <nodes>` drains them,

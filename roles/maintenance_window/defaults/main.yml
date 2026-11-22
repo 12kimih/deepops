@@ -1,0 +1,24 @@
+---
+# maintenance_window -- a Slurm maintenance window and its Slack notice in one step
+# (playbooks/utilities/maintenance-window.yml, on the controller). A reservation over
+# the nodes (flags MAINT and IGNORE_JOBS, root only) from start to end: no job starts
+# that would still run at start, and none runs inside it but root's. Times are the
+# controller's local time, YYYY-MM-DDTHH:MM. A change posts the notice to
+# slack_channels.announce.
+
+# The reservation's name: one window at a time, so moving it updates it.
+maintenance_window_name: maintenance
+# present (create or move it) or absent (cancel it).
+maintenance_window_state: present
+maintenance_window_start: ""
+maintenance_window_end: ""
+maintenance_window_nodes: ALL
+# Why, for the notice.
+maintenance_window_reason: ""
+# Post the notice when the window is created, moved or cancelled.
+maintenance_window_notify: true
+# The notices; {start}, {end} and {reason} are filled in.
+maintenance_window_text_present: >-
+  Cluster maintenance from {start} to {end}: {reason}. Jobs that would still run at
+  {start} wait until after it; running jobs are not stopped before then.
+maintenance_window_text_absent: "The cluster maintenance from {start} to {end} is cancelled."
