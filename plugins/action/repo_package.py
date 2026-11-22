@@ -14,10 +14,12 @@ pending, is exactly the module's.
 A preview removes nothing either: roles/host_baseline (tasks_from absent) notes what
 the run would remove (host_baseline_unremoved), and an apt install the removal makes
 possible (another driver's leftovers in the way) failed its preview. When an apt install
-fails under --check with removals pending, repo_package asks apt about the run's real
-order in one simulated transaction, `apt-get -s install <names> <removed>-`: apt's
-answer is the preview, a change when it would succeed, the failure (with apt's reason)
-when it would not.
+fails under --check with removals pending, repo_package asks apt about the host as the
+run leaves it: apt-get simulates the install against a copy of dpkg's status without
+the removed packages (-o Dir::State::status). One transaction that removes and installs
+is not the run: apt resolves it as a whole and refused what the run's removal, then its
+install, does (an i386 library holding its amd64 twin, 2026-11). apt's answer is the
+preview, a change when it would succeed, the failure (with apt's reason) when not.
 
 An apt preview names what it would install (repo_package_installs, as apt's simulation
 lists them), so a task after it can tell what the install brings (a kernel module, say)
@@ -59,14 +61,39 @@ def names_of(names):
     return [str(n) for n in names or []]
 
 
-def simulation_argv(args, removals):
-    """apt-get's simulation of the install with the pending removals in one transaction."""
-    argv = ["apt-get", "-s", "-q", "install"]
+def simulation_argv(args):
+    """What apt-get's simulation of the install takes after its options."""
+    argv = ["install"]
     if args.get("install_recommends") is not None:
         argv.append("--install-recommends" if args["install_recommends"] else "--no-install-recommends")
     if args.get("default_release"):
         argv += ["-t", str(args["default_release"])]
-    return argv + names_of(args.get("name")) + [f"{package}-" for package in removals]
+    return argv + names_of(args.get("name"))
+
+
+# dpkg's status without the paragraphs of `drop` ("name" for the native architecture or
+# all, "name:arch" for that one): the host as the run's removal leaves it.
+_WITHOUT = r"""
+BEGIN { RS = ""; ORS = "\n\n"; "dpkg --print-architecture" | getline native
+        n = split(drop, d, " "); for (i = 1; i <= n; i++) D[d[i]] = 1 }
+{ p = ""; a = ""; m = split($0, L, "\n")
+  for (i = 1; i <= m; i++) {
+    if (L[i] ~ /^Package: /) p = substr(L[i], 10)
+    if (L[i] ~ /^Architecture: /) a = substr(L[i], 15)
+  }
+  if ((p ":" a) in D || ((a == native || a == "all") && p in D)) next
+  print }
+"""
+
+
+def simulation_command(args, removals, status="/var/lib/dpkg/status"):
+    """A shell command: apt-get's simulation of the install on a host without REMOVALS."""
+    without = shlex.join(["awk", "-v", f"drop={' '.join(removals)}", _WITHOUT, status])
+    simulate = shlex.join(["env", "LC_ALL=C", "apt-get", "-s", "-q"])
+    return (
+        "tmp=$(mktemp) && trap 'rm -f \"$tmp\"' EXIT && "
+        f'{without} > "$tmp" && {simulate} -o "Dir::State::status=$tmp" {shlex.join(simulation_argv(args))}'
+    )
 
 
 def installs_of(simulation):
@@ -133,8 +160,8 @@ class ActionModule(ActionBase):
         if self._task.check_mode and done.get("failed") and pending:
             done = preview(done, pending, args.get("name", []))
         elif self._task.check_mode and done.get("failed") and removals and use == "apt":
-            argv = simulation_argv(args, removals)
-            simulated = self._low_level_execute_command("LC_ALL=C " + shlex.join(argv), sudoable=True)
+            command = simulation_command(args, removals)
+            simulated = self._low_level_execute_command(f"/bin/sh -c {shlex.quote(command)}", sudoable=True)
             done = with_removals(done, removals, simulated)
         elif self._task.check_mode and not done.get("failed") and use == "apt":
             done["repo_package_installs"] = installs_of(done.get("stdout"))
