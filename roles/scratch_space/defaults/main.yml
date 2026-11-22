@@ -1,0 +1,20 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): the fast scratch space on
+# the host whose local filesystem holds it, every active person's own directory there,
+# <root>/<login>, as their home is under /home. A deploy sets it from deepops_components
+# (slurm_enable_scratch_space, on scratch-server). docs/slurm-cluster/scratch.md.
+#
+# Each person's space is their user quota on the filesystem (roles/disk_quota,
+# disk_quota_filesystems on this host), not a size of the directory: what they write
+# anywhere there counts. The directories hold people's data: absent removes nothing, and
+# a former member's goes with people-purge.yml (people_purge_paths).
+scratch_space_state: present
+
+# The scratch filesystem's mount point on this host.
+scratch_space_root: /scratch
+# The top directory's mode, root's: only the personal directories (and a collaboration
+# folders' directory) live at the top, so nobody makes a directory of their own there.
+scratch_space_root_mode: "0755"
+# A personal directory's mode, a ceiling as for homes: one with permissions beyond it is
+# set to it, a stricter one (0700) is left as its owner chose.
+scratch_space_mode: "{{ people_home_mode }}"

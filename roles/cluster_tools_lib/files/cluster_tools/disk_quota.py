@@ -38,8 +38,6 @@ host_baseline_mount_options), which also remounts, so a filesystem mounted witho
 is refused, saying which to add. Accounts with no entry in limits (root, system
 accounts) are never limited.
 
-The project functions (require_project_quota, project_set, project_limit, project_used)
-are also a library for tools that make projects at run time (cluster_tools.scratch_alloc).
 Python 3.9 or newer, standard library only.
 """
 
@@ -262,7 +260,7 @@ def limit_steps(host, mount, cfg, fresh=False):
     return steps
 
 
-# Project quotas: a library (scratch_alloc) and the deploy-time projects.
+# Project quotas: the deploy-time projects.
 
 
 def require_project_quota(host, mount):

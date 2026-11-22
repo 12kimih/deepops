@@ -1,9 +1,12 @@
 ---
+dependencies:
+  - role: people_defaults  # people, people_home_mode
+
 galaxy_info:
   namespace: deepops
-  role_name: scratch_defaults
+  role_name: scratch_space
   author: DeepOps
-  description: Fast scratch space per request, its limits and periods, named once
+  description: The fast scratch space, every active person's own directory on it
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:
@@ -11,5 +14,3 @@ galaxy_info:
       versions: [jammy, noble]
     - name: EL
       versions: ["8", "9"]
-dependencies:
-  - role: deploy_defaults  # cluster_user_grace_days

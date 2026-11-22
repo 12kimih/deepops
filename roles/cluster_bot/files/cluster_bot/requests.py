@@ -1,6 +1,6 @@
 """The request engine every feature of the bot goes through.
 
-    engine = Engine({"scratch": ScratchFeature(...), ...}, pending_path)
+    engine = Engine({"unban": UnbanFeature(...), ...}, pending_path)
     engine.submit(req)          -> Outcome(done | held | refused, text, data, req, key)
     engine.approve(key, admin)  -> Outcome      engine.deny(key, admin, why) -> Outcome
     engine.note(key, **info)    keeps where a held request's messages are
@@ -91,15 +91,6 @@ class Engine:
         whom = f"{', '.join(approvers)} 중 한 명의" if approvers else "관리자"
         return Outcome(
             "held", f"{whom} 승인을 기다립니다 ({why}): {feature.describe(req)}", request=req, key=key
-        )
-
-    def held(self, kind=None):
-        """The requests waiting for a decision (of KIND, when given): [(key, request)],
-        oldest first."""
-        pending = self._pending()
-        return sorted(
-            ((k, r) for k, r in pending.items() if kind in (None, r.get("kind"))),
-            key=lambda kr: kr[1].get("asked", 0),
         )
 
     def approvers(self, key):

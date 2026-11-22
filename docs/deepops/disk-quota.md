@@ -60,10 +60,8 @@ disk_quota_projects:
 
 Each id is unique on its filesystem. The tree is marked with it (new files inherit it);
 a file moved in from elsewhere on the filesystem is copied, so it is counted too. When a
-project goes, only its limit is lifted: the tree and its data stay. Tools that make
-projects at run time (scratch allocations) use the same functions
-(`cluster_tools.disk_quota`: `require_project_quota`, `project_set`, `project_limit`,
-`project_used`), on ext4 or XFS.
+project goes, only its limit is lifted: the tree and its data stay. Project quotas
+work on ext4 and XFS.
 
 ## Count first, then limit
 

@@ -170,7 +170,7 @@ class Roles(unittest.TestCase):
     def test_the_tools_that_read_a_role_written_config_are_all_recorded(self):
         self.assertEqual(
             sorted(recorded()),
-            ["container_storage_gc", "disk_quota", "egress_policy", "job_notice", "scratch_alloc",
+            ["container_storage_gc", "disk_quota", "egress_policy", "job_notice",
              "slurm_backup", "slurm_usage_report", "submit_holds"],
         )  # fmt: skip
 

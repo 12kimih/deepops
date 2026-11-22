@@ -7,12 +7,8 @@ It runs as its own account (`cluster_bot_user`, from `system_accounts`) under a 
 systemd unit, and acts on other hosts only over its SSH key, whose one forced command
 there runs only the services the host offers (below).
 
-Features today: scratch allocations (`/scratch`, see [scratch-alloc.md](scratch-alloc.md)):
-ask, extend, resize and release from a form; requests within the automatic limits are
-applied at once, larger ones wait for an administrator's button in the admin channel;
-owners get a DM `cluster_bot_scratch_remind_days` before an allocation ends (14, 7 and 1
-days by default, `cluster_bot_remind_days`), with an extend button. An administrator's `/scratch` also lists the requests waiting for them, the people who
-have used least (cumulative TB-days) first.
+Features today: account requests, unban requests, collaboration folders (below), and
+reminders before a person's last day.
 
 Account requests (`/join`, `/leave`): a newcomer gives a login, a name, a team (the
 accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH
@@ -67,7 +63,6 @@ write, never through a shell.
 
 | Service | Offered by | Command | Requests |
 |---|---|---|---|
-| `scratch-alloc` | `roles/scratch_alloc` | `scratch-alloc ... serve` | create, resize, extend, release, list |
 | `bans` | `roles/fail2ban` (while there is a bot) | `cluster-bans serve` | list, unban IP |
 
 The shared pieces (dispatcher, sudo rule, authorized key) are items of every role that
@@ -90,8 +85,8 @@ offer a service right after making it, so a first deploy needs no second run.
 
 The bot signs the App's token with the system's `openssl`; tokens last an hour.
 
-The Home tab (the bot's profile in Slack) shows each person their scratch allocations and
-whether job notices reach them, with a switch to turn them off or on.
+The Home tab (the bot's profile in Slack) shows each person whether job notices reach
+them, with a switch to turn them off or on, and their collaboration folders.
 
 Job notices (`roles/job_notice`, switch `slurm_enable_job_notices`, on by default):
 Slurm's MailProg on the controllers is `job-notice`, which sends a job's notice as a
@@ -119,11 +114,9 @@ on, since Slurm would send them as local mail instead.
    install it to the workspace, and create an app-level token with `connections:write`.
 2. Vault both tokens in the site config: `slack_bot_token` (xoxb-, already used by the
    notifiers) and `slack_app_token` (xapp-).
-3. Set `slurm_enable_cluster_bot: true` (and, for scratch, `slurm_enable_scratch_alloc:
-   true` with the scratch server in `[scratch-server]`).
+3. Set `slurm_enable_cluster_bot: true`.
 4. Run `playbooks/generic/cluster-bot.yml` (it also authorizes its key where fail2ban
-   offers the bans service), then `playbooks/generic/scratch-alloc.yml`; preview each with
-   `--check --diff` first.
+   offers the bans service); preview it with `--check --diff` first.
 
 Without both tokens the bot is installed but stopped. Who the bot knows comes from the
 people roster: `cluster_bot_members` (each person's `slack` attribute) and

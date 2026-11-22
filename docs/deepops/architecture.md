@@ -213,8 +213,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── rsyslog_defaults
 │   ├── rsyslog_server
 │   ├── runai
-│   ├── scratch_alloc
-│   ├── scratch_defaults
+│   ├── scratch_space
 │   ├── serial_console
 │   ├── shared_space
 │   ├── shared_space_defaults

@@ -168,8 +168,20 @@ retired_settings:
   slurm_usage_report_storage_top: slurm_usage_report_disk_top in roles/slurm_usage_report
   slurm_usage_report_storage_notify: slurm_usage_report_disk_notify in roles/slurm_usage_report
   slurm_usage_report_storage_repeat_days: slurm_usage_report_disk_repeat_days in roles/slurm_usage_report
-  scratch_alloc_auto_extensions: none; an extension is given at once while the allocation stays within scratch_alloc_auto_days of when it was made
-  scratch_alloc_first_id: none; an allocation's project ID is its owner's UID
+  scratch_alloc_auto_days: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_auto_extensions: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_auto_size: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_first_id: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_grace_days: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_guard: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_max_days: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_max_extend_days: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_max_size: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_mount: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_state: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  scratch_alloc_sweep_interval: nothing (scratch space is no longer allocated on request; every person has a directory on /scratch, roles/scratch_space, and their space there is their user quota, disk_quota_filesystems on the scratch server)
+  slurm_enable_scratch_alloc: slurm_enable_scratch_space in roles/deploy_defaults (every person's directory on /scratch, roles/scratch_space; their space is their user quota there, roles/disk_quota)
+  cluster_bot_scratch_remind_days: nothing (the bot no longer hands out scratch space; /scratch is every person's own, roles/scratch_space)
   slurm_deb_build_dir: system_accounts.slurmbuild.home (the build account's home) in roles/system_accounts
   slurm_user_home: system_accounts.slurm.home in roles/system_accounts
   slurm_user_uid: system_accounts.slurm.uid in roles/system_accounts

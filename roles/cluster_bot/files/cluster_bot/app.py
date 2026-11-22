@@ -1,6 +1,6 @@
 """The cluster bot's Slack app: Socket Mode (an outbound connection, no port to open),
 one handler per action. Each handler reads Slack's input, asks a feature module
-(cluster_bot.scratch) and posts the outcome; nothing is decided here.
+(cluster_bot.accounts, .bans, .projects) and posts the outcome; nothing is decided here.
 
     python3 -m cluster_bot.app CONFIG.json
 
@@ -8,7 +8,7 @@ CONFIG (written by roles/cluster_bot): bot_token_file, app_token_file, channels 
 admin}, members {Slack member ID: cluster user}, admins [member IDs], pending (the held
 requests of every feature, cluster_bot.requests), reminders (what went out,
 cluster_bot.reminders), ssh {key, user, known_hosts} (cluster_bot.remote, to the hosts
-it acts on), scratch {host, policy, remind_days} (host empty leaves it off), bans
+it acts on), bans
 {hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
 leave {remind_days, leaving (people_leaving)}.
 """
@@ -21,7 +21,6 @@ from pathlib import Path
 
 from . import accounts_blocks, bans_blocks, home_blocks, projects_blocks, reminders, state
 from . import blocks as shared
-from . import scratch_blocks as blocks
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .bans import SERVICE as BANS
 from .bans import UnbanFeature, address, watch
@@ -29,16 +28,9 @@ from .prefs import Prefs
 from .projects import ProjectFeature, notify_deployed
 from .remote import Remote
 from .requests import Engine
-from .scratch import SERVICE as SCRATCH
-from .scratch import ScratchFeature
 
-UNITS = {"G": 1024**3, "T": 1024**4}
 REMIND_EVERY = 3600
 BAN_WATCH_EVERY = 300
-
-
-def size_bytes(text):
-    return int(text[:-1]) * UNITS[text[-1]]
 
 
 def load(path):
@@ -48,12 +40,11 @@ def load(path):
     return cfg
 
 
-def build(cfg, engine, scratch, join=None, unban=None, project=None):
+def build(cfg, engine, join=None, unban=None, project=None):
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
     members, admins, channels = cfg["members"], set(cfg["admins"]), cfg["channels"]
-    policy = cfg["scratch"]["policy"]
 
     def user_of(slack_id):
         return members.get(slack_id)
@@ -99,8 +90,7 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
         login = user_of(slack_id)
         if not login:
             return
-        allocations = scratch.mine(login) if scratch else []
-        view = home_blocks.home(login, allocations, prefs.muted(login), engine.features)
+        view = home_blocks.home(login, prefs.muted(login), engine.features)
         if project is not None:
             view["blocks"] += projects_blocks.home(login, projects, projects_root)
         client.views_publish(user_id=slack_id, view=view)
@@ -187,76 +177,6 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
                 slack_id,
                 {"kind": "unban", "user": user, "ip": ip, "reason": v["reason"]["v"]["value"] or ""},
             )
-
-    @app.command("/scratch")
-    def scratch_command(ack, body, client):
-        ack()
-        user = user_of(body["user_id"])
-        if scratch is None:
-            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"],
-                                      text="이 클러스터에는 스크래치 공간 신청이 없습니다.")  # fmt: skip
-            return
-        if not user:
-            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"],
-                                      text="사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요.")  # fmt: skip
-            return
-        view = blocks.home(scratch.mine(user))
-        if body["user_id"] in admins:  # what waits for them, the people who used least first
-            view += blocks.queue(engine.held("scratch"), scratch.run("list"))
-        client.chat_postEphemeral(
-            channel=body["channel_id"], user=body["user_id"], text="내 스크래치 공간", blocks=view
-        )
-
-    @app.action("scratch.new")
-    def new(ack, body, client):
-        ack()
-        client.views_open(trigger_id=body["trigger_id"], view=blocks.new_form(policy))
-
-    @app.action("scratch.extend")
-    @app.action("scratch.resize")
-    def number(ack, body, client, action):
-        ack()
-        kind = action["action_id"].split(".")[1]
-        client.views_open(trigger_id=body["trigger_id"], view=blocks.number_form(kind, action["value"]))
-
-    @app.action("scratch.release")
-    def release(ack, body, client, action):
-        ack()
-        slack_id = body["user"]["id"]
-        user = user_of(slack_id)
-        if user:
-            submit(
-                client,
-                slack_id,
-                {"kind": "scratch", "op": "release", "user": user},  # their own: one per person
-            )
-
-    @app.view("scratch.create")
-    def create(ack, body, client, view):
-        ack()
-        v = view["state"]["values"]
-        slack_id = body["user"]["id"]
-        user = user_of(slack_id)
-        if user:
-            req = {"kind": "scratch", "op": "create", "user": user, "size": size_bytes(v["size"]["v"]["selected_option"]["value"]),
-                   "days": int(v["days"]["v"]["value"]), "reason": v["reason"]["v"]["value"] or ""}  # fmt: skip
-            submit(client, slack_id, req)
-
-    @app.view("scratch.extend")
-    @app.view("scratch.resize")
-    def change(ack, body, client, view):
-        ack()
-        slack_id = body["user"]["id"]
-        user = user_of(slack_id)
-        if not user:
-            return
-        value = view["state"]["values"]["v"]["v"]
-        req = {"kind": "scratch", "op": view["callback_id"].split(".")[1], "user": user}
-        if req["op"] == "extend":
-            req["days"] = int(value["value"])
-        else:
-            req["size"] = size_bytes(value["selected_option"]["value"])
-        submit(client, slack_id, req)
 
     # Collaboration folders (cluster_bot.projects): the Home tab's buttons and menu, and
     # the forms they open.
@@ -391,7 +311,7 @@ def build(cfg, engine, scratch, join=None, unban=None, project=None):
     return app
 
 
-def reminder_sources(cfg, scratch):
+def reminder_sources(cfg):
     """What the bot reminds people of before a deadline (cluster_bot.reminders)."""
     leave = cfg["leave"]
     sources = {
@@ -399,10 +319,6 @@ def reminder_sources(cfg, scratch):
             leave["remind_days"], lambda: leaving_deadlines(leave["leaving"]), accounts_blocks.leave_reminder
         )
     }
-    if scratch is not None:
-        sources["scratch"] = reminders.Source(
-            cfg["scratch"]["remind_days"], scratch.deadlines, blocks.reminder
-        )
     return sources
 
 
@@ -462,11 +378,7 @@ def main(argv=None):
     def remote(host, service):
         return Remote(host, ssh["key"], ssh["user"], ssh["known_hosts"], service)
 
-    features, scratch, join, unban, project = {}, None, None, None, None
-    if cfg["scratch"]["host"]:
-        scratch = features["scratch"] = ScratchFeature(
-            remote(cfg["scratch"]["host"], SCRATCH), cfg["scratch"]["policy"]
-        )
+    features, join, unban, project = {}, None, None, None
     if cfg["bans"]["hosts"]:
         hosts = {name: remote(addr, BANS) for name, addr in cfg["bans"]["hosts"].items()}
         unban = features["unban"] = UnbanFeature(hosts)
@@ -486,9 +398,9 @@ def main(argv=None):
                 {**settings, "gid_min": p["gid_min"], "reserved_gids": p["reserved_gids"]},
             )
     engine = Engine(features, cfg["pending"])
-    app = build(cfg, engine, scratch, join, unban, project)
+    app = build(cfg, engine, join, unban, project)
 
-    sources, slack_of = reminder_sources(cfg, scratch), {u: s for s, u in cfg["members"].items()}.get
+    sources, slack_of = reminder_sources(cfg), {u: s for s, u in cfg["members"].items()}.get
 
     def remind_round():
         sent = state.read(cfg["reminders"], {})

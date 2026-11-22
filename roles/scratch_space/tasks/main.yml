@@ -1,0 +1,14 @@
+---
+- name: Check the component state and the layout
+  ansible.builtin.assert:
+    that:
+      - scratch_space_state in ['present', 'absent', 'kept']
+      - scratch_space_root is match('^/.+[^/]$')
+    fail_msg: >-
+      scratch_space_state is present, absent or kept ({{ scratch_space_state }});
+      scratch_space_root an absolute path ({{ scratch_space_root }}).
+    quiet: true
+
+- name: "Make the scratch space {{ scratch_space_state }}"
+  ansible.builtin.include_tasks: "{{ scratch_space_state }}.yml"
+  when: scratch_space_state != 'kept'

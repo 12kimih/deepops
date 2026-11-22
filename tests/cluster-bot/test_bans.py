@@ -14,7 +14,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
-from cluster_bot import bans, remote, requests, scratch  # noqa: E402
+from cluster_bot import bans, remote, requests  # noqa: E402
 
 BAN = {"ip": "192.0.2.7", "jail": "sshd", "since": "2026-11-20 03:12:44"}
 
@@ -143,25 +143,22 @@ class Watch(unittest.TestCase):
 
 class Services(unittest.TestCase):
     def test_the_bot_asks_for_the_services_the_roles_offer(self):
-        for role, var, name in (("scratch_alloc", "_scratch_alloc_bot_service", scratch.SERVICE),
-                                ("fail2ban", "_fail2ban_bot_service", bans.SERVICE)):  # fmt: skip
+        for role, var, name in (("fail2ban", "_fail2ban_bot_service", bans.SERVICE),):
             offered = yaml.safe_load((ROOT / "roles" / role / "vars/main.yml").read_text())[var]["name"]
             self.assertEqual(offered, name, role)
 
     def test_the_request_goes_as_the_service_and_its_quoted_words(self):
         done = mock.Mock(returncode=0, stdout='{"ok": 1}', stderr="")
         with mock.patch("subprocess.run", return_value=done) as run:
-            out = remote.Remote("10.0.0.5", "/k", "bot", "/kh", "scratch")(
-                "create", "alice", "2T", 30, "two words"
-            )
+            out = remote.Remote("10.0.0.5", "/k", "bot", "/kh", "bans")("unban", "203.0.113.7", "two words")
         self.assertEqual(out, {"ok": 1})
         argv = run.call_args.args[0]
-        self.assertEqual(argv[-2:], ["bot@10.0.0.5", "scratch create alice 2T 30 'two words'"])
+        self.assertEqual(argv[-2:], ["bot@10.0.0.5", "bans unban 203.0.113.7 'two words'"])
         self.assertIn("StrictHostKeyChecking=yes", argv)
-        refused = mock.Mock(returncode=2, stdout="", stderr="scratch-alloc: no allocation 5\n")
+        refused = mock.Mock(returncode=2, stdout="", stderr="cluster-bans: not banned 203.0.113.8\n")
         with mock.patch("subprocess.run", return_value=refused), self.assertRaises(requests.Failed) as e:
-            remote.Remote("10.0.0.5", "/k", "bot", "/kh", "scratch")("release", 5)
-        self.assertEqual(str(e.exception), "no allocation 5")
+            remote.Remote("10.0.0.5", "/k", "bot", "/kh", "bans")("unban", "203.0.113.8")
+        self.assertEqual(str(e.exception), "not banned 203.0.113.8")
 
 
 if __name__ == "__main__":

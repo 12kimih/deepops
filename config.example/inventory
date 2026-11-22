@@ -64,8 +64,9 @@ kube_node
 [ldap-server]
 #login01
 
-# The host whose XFS filesystem holds the fast scratch space handed out per request
-# (roles/scratch_alloc, slurm_enable_scratch_alloc). Leave empty without one.
+# The host whose local filesystem holds the fast scratch space, every person's directory
+# on it (roles/scratch_space, slurm_enable_scratch_space) and their user quota there
+# (roles/disk_quota). Leave empty without one.
 [scratch-server]
 #gpu01
 

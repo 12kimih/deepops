@@ -6,8 +6,7 @@
 # (roles/system_accounts) and needs slack_bot_token and slack_app_token (roles/
 # slack_defaults); without them it is installed but not started.
 #
-# Features: scratch allocations (/scratch: ask, extend, resize, release; reminders
-# before an allocation ends), account requests (/join, /leave), unban requests
+# Features: account requests (/join, /leave), unban requests
 # (/unban-request, where fail2ban runs), reminders before a person's last day (the
 # roster's `ends`), the Home tab. It acts on other hosts through the services they offer
 # it (roles/cluster_bot_access).
@@ -31,17 +30,15 @@ cluster_bot_sha256:
     "3.48.0": 1213726e5b8015eeded608fcb3665c4e9b48af7f7f383ecc1b90af886d6aaa03
 
 # Who the bot knows: cluster user -> Slack member ID, and the administrators (cluster
-# users) who approve what goes beyond the automatic limits.
+# users) who approve the requests that wait for them.
 cluster_bot_members: "{{ slack_members }}"
 cluster_bot_admins: "{{ people | default({}) | people_with_role('admin') }}"
 
-# Days before a deadline the person it concerns gets a DM, once each: an allocation's
-# end (its owner) and a person's last day (`ends` in the roster: what stops when, and to
-# move their files away while they can still log in). One set for both; either may
-# differ. A stage the deadline was already inside when the bot first saw it is skipped
+# Days before a deadline the person it concerns gets a DM, once each: a person's last day
+# (`ends` in the roster: what stops when, and to move their files away while they can
+# still log in). A stage the deadline was already inside when the bot first saw it is skipped
 # (whoever set a date ten days off knows it), except the last, always sent.
 cluster_bot_remind_days: [14, 7, 1]
-cluster_bot_scratch_remind_days: "{{ cluster_bot_remind_days }}"
 cluster_bot_leave_remind_days: "{{ cluster_bot_remind_days }}"
 
 # Account requests (/join, /leave) become pull requests on the site configuration, made

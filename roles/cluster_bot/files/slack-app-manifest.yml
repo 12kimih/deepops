@@ -17,9 +17,6 @@ features:
     - command: /leave
       description: "Give back a cluster account (graduation)"
       should_escape: false
-    - command: /scratch
-      description: "Fast scratch space: ask, extend, resize, release"
-      should_escape: false
     - command: /unban-request
       description: "Ask to lift the ban on an address after failed logins"
       should_escape: false

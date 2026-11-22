@@ -1,0 +1,45 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: scratch_space
+    component_record_action: begin
+    component_record_items: "{{ scratch_space_items }}"
+
+# The mount point is host_baseline's and the filesystem's: a scratch space that is not
+# mounted would put people's directories on the root filesystem.
+- name: Check the scratch filesystem is mounted
+  ansible.builtin.assert:
+    that: scratch_space_root in (ansible_facts.mounts | map(attribute='mount'))
+    fail_msg: >-
+      {{ scratch_space_root }} is not a mounted filesystem on {{ inventory_hostname }}:
+      mount it (host_baseline_mount_options) before its directories are made.
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Make the scratch space's top directory
+  ansible.builtin.file:
+    path: "{{ scratch_space_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ scratch_space_root_mode }}"
+
+- name: Make each active person's directory
+  ansible.builtin.include_role:
+    name: people
+    tasks_from: person_dirs
+    public: true  # as every include of people: its defaults mean the same here
+  vars:
+    people_dirs_root: "{{ scratch_space_root }}"
+    people_dirs_mode: "{{ scratch_space_mode }}"
+    people_dirs_skel: false
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: scratch_space
+    component_record_action: present
+    component_record_items: "{{ scratch_space_items }}"
