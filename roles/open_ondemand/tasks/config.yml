@@ -96,12 +96,48 @@
     group: root
     mode: "0644"
 
-# Generates ood-portal.conf and the Dex config. Exit 3 means it changed them, 4 that it
-# refused because ood-portal.conf was edited by hand; anything but 0 or 3 stops the run
-# (systemd's ExecStartPre ignores its failures, so a bad config would go unnoticed).
+# ood-portal.conf is this role's: generated from the ood_portal.yml above, never edited
+# by hand. The generator keeps the checksum of what it last wrote and, without --force,
+# refuses a file that differs (exit 4: an earlier install's file, a hand edit), leaving
+# the portal on the old one (ARA 212). Such a file is kept in the backup directory, then
+# replaced.
+- name: Read the portal's Apache config and the checksum the generator last wrote
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop: [/etc/apache2/sites-available/ood-portal.conf, /etc/ood/config/ood_portal.sha256sum]
+  register: open_ondemand_portal_files
+  failed_when: false  # either may not exist yet
+
+- name: Keep a copy of a portal config the generator did not write
+  vars:
+    _conf: "{{ open_ondemand_portal_files.results[0] }}"
+    _sum: "{{ open_ondemand_portal_files.results[1] }}"
+  when:
+    - _conf.content is defined
+    - (_sum.content | default('') | b64decode | regex_search('[0-9a-f]{64}')) != (_conf.content | b64decode | hash('sha256'))
+  block:
+    - name: Create the backup directory for the portal config
+      ansible.builtin.file:
+        path: "{{ open_ondemand_backup_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Copy the portal config the generator did not write
+      ansible.builtin.copy:
+        src: /etc/apache2/sites-available/ood-portal.conf
+        dest: "{{ open_ondemand_backup_dir }}/ood-portal.conf.foreign-{{ (_conf.content | b64decode | hash('sha256'))[:12] }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0600"
+
+# Exit 3 means it changed them; anything but 0 or 3 stops the run (systemd's
+# ExecStartPre ignores its failures, so a bad config would go unnoticed).
 - name: Generate the Apache and Dex configuration
   change_command:
-    argv: ["{{ open_ondemand_portal_generator }}", --detailed-exitcodes]
+    argv: ["{{ open_ondemand_portal_generator }}", --force, --detailed-exitcodes]
   register: open_ondemand_generate
   changed_when: >-
     ansible_check_mode or (open_ondemand_generate.rc == 3)
