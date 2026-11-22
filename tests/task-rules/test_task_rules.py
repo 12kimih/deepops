@@ -871,7 +871,8 @@ class TaskRules(unittest.TestCase):
 
     def test_containers_see_host_paths_only_through_binds(self):
         run_volume = re.compile(r"\b(docker|podman)\b[^\n]*\brun\b[^\n]*\s(-v|--volume)(\s|=)")
-        argv_volume = re.compile(r"""["'](-v|--volume)["']""")
+        # In one argv list with docker or podman: awk -v and the like are no container.
+        argv_volume = re.compile(r"""\[[^\]]*["'](?:docker|podman)["'][^\]]*["'](?:-v|--volume)["']""")
         offenders, scan = [], Scan(minimum=MINIMUM_FILES)
         for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
@@ -888,8 +889,8 @@ class TaskRules(unittest.TestCase):
                 continue
             text = path.read_text(errors="replace")
             offenders += [f"{rel(path)}: {m.group(0)[:80]}" for m in run_volume.finditer(text)]
-            if path.suffix == ".py" and re.search(r"\bdocker\b", text):
-                offenders += [f"{rel(path)}: {m.group(0)}" for m in argv_volume.finditer(text)]
+            if path.suffix == ".py":
+                offenders += [f"{rel(path)}: {m.group(0)[:80]}" for m in argv_volume.finditer(text)]
         scan.check(self)
         self.assertEqual(offenders, [], "bind with --mount type=bind,src=,dst= (docker_container: mounts:)")
 

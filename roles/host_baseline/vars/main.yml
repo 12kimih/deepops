@@ -8,3 +8,16 @@ _host_baseline_recorded: >-
      | select('match', 'package:') | map('regex_replace', '^package:', '') | list }}
 _host_baseline_protected_regex: >-
   ^({{ host_baseline_protected_packages | map('regex_escape') | map('replace', '\*', '.*') | join('|') }})$
+# apt's simulation of the host with $1's packages marked installed by name: against a copy
+# of apt's extended_states without their paragraphs (absent means manual), so a preview,
+# which marked nothing, plans what the run will do. "<name>+" instead asked apt to
+# install each one's candidate, an upgrade the run never makes (a newer kernel shown
+# as gained, 2026-11). Arguments: the names, the awk program, then apt-get's.
+_host_baseline_simulate: >-
+  tmp=$(mktemp) && trap 'rm -f "$tmp"' EXIT &&
+  awk -v drop="$1" "$2" /var/lib/apt/extended_states > "$tmp" && shift 2 &&
+  LC_ALL=C apt-get -s -q -o "Dir::State::extended_states=$tmp" "$@"
+_host_baseline_without_awk: "{{ lookup('ansible.builtin.file', role_path ~ '/../../plugins/apt/paragraphs-without.awk') }}"
+_host_baseline_simulation: >-
+  {{ ['sh', '-c', _host_baseline_simulate, 'simulate', host_baseline_unmarked | default([]) | join(' '),
+      _host_baseline_without_awk] }}

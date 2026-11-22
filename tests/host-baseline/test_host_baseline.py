@@ -19,6 +19,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
 from ansible_yaml import condition, render  # noqa: E402
 from repo_scan import ansible_files  # noqa: E402
 
@@ -165,12 +166,37 @@ class NeededPackagesStay(unittest.TestCase):
                   "host_baseline_unmarked": self.unmarked(["ii  libc6:amd64"], [])}  # fmt: skip
         self.assertFalse(condition(self.TASKS[self.MARK]["when"], values))
 
-    def test_the_plan_keeps_what_was_marked(self):
-        values = {"host_baseline_present": ["gdm3"], "host_baseline_unmarked": ["libopengl0"]}
-        argv = render(self.TASKS[self.PLAN]["ansible.builtin.command"]["argv"], values)
-        self.assertEqual(
-            argv[-2:], ["gdm3", "libopengl0+"], "kept as if installed by name, even in a preview"
-        )
+    def test_the_plan_sees_what_was_marked_without_upgrading_it(self):
+        # A preview marked nothing: both simulations read apt's extended_states without
+        # the marked packages' paragraphs (absent = manual). "<name>+" upgraded them.
+        hb_vars = yaml.safe_load((ROOT / "roles/host_baseline/vars/main.yml").read_text())
+        awk = (ROOT / "plugins/apt/paragraphs-without.awk").read_text()
+        values = {"host_baseline_present": ["gdm3"], "host_baseline_unmarked": ["libopengl0", "libgl1"],
+                  "_host_baseline_simulate": hb_vars["_host_baseline_simulate"], "_host_baseline_without_awk": awk,
+                  "_host_baseline_simulation": hb_vars["_host_baseline_simulation"]}  # fmt: skip
+        for name, tail in ((self.PLAN, ["purge", "--autoremove", "gdm3"]),
+                           ("Note what was already unneeded (Debian)", ["autoremove"])):  # fmt: skip
+            argv = render(self.TASKS[name]["ansible.builtin.command"]["argv"], values)
+            self.assertEqual(argv[:2], ["sh", "-c"], name)
+            self.assertEqual(argv[3:6], ["simulate", "libopengl0 libgl1", awk], name)
+            self.assertEqual(argv[6:], tail, name)
+            self.assertNotIn("+", " ".join(argv[6:]), name)
+        self.assertIn("Dir::State::extended_states=", hb_vars["_host_baseline_simulate"])
+
+    def test_the_awk_drops_exactly_the_named_paragraphs(self):
+        states = "Package: libopengl0\nArchitecture: amd64\nAuto-Installed: 1\n\n" \
+                 "Package: zlib1g\nArchitecture: amd64\nAuto-Installed: 1\n\n" \
+                 "Package: libgl1\nArchitecture: i386\nAuto-Installed: 1\n"  # fmt: skip
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "extended_states").write_text(states)
+            out = subprocess.run(
+                ["awk", "-v", "drop=libopengl0 libgl1", (ROOT / "plugins/apt/paragraphs-without.awk").read_text(),
+                 str(Path(tmp, "extended_states"))],
+                capture_output=True, text=True, check=True, timeout=bounds.CHILD,
+            ).stdout  # fmt: skip
+        self.assertNotIn("libopengl0", out)
+        self.assertIn("zlib1g", out)
+        self.assertIn("libgl1", out, "an i386 copy stays unless named name:i386")
 
 
 class OneRemovalPath(unittest.TestCase):
