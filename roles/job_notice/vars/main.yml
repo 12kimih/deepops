@@ -1,6 +1,6 @@
 ---
-_job_notice_config: /etc/cluster-tools/job-notice.json
-_job_notice_token: /etc/cluster-tools/job-notice.token
+_job_notice_config: "{{ cluster_tools_lib_config_dir }}/job-notice.json"
+_job_notice_token: "{{ cluster_tools_lib_config_dir }}/job-notice.token"
 _job_notice_state_dir: "{{ deepops_state_dir }}/job-notice"
 _job_notice_cfg:
   token_file: "{{ _job_notice_token }}"

@@ -33,5 +33,8 @@ cluster_info:
 cluster_tools_lib_derived_info:
   dashboard_url: "{{ grafana_root_url }}"
   prometheus_url: "{{ prometheus_url }}"  # gpu-usage reads Prometheus here
+# Where every cluster tool's configuration lives (<tool>.json), made by this role's
+# main tasks, which every tool's role runs first as its meta dependency.
+cluster_tools_lib_config_dir: /etc/cluster-tools
 # cluster_tools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.
-cluster_tools_lib_info_file: /etc/cluster-tools/cluster.json
+cluster_tools_lib_info_file: "{{ cluster_tools_lib_config_dir }}/cluster.json"

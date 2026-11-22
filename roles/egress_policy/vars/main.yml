@@ -2,7 +2,7 @@
 # Where the role keeps what it installs; fixed, so absent finds what present wrote. The
 # table's ruleset and unit are named by roles/nft_table ('egress_policy' | nft_table_paths).
 _egress_policy_metrics_command: /usr/local/libexec/egress-policy-metrics
-_egress_policy_metrics_config: /etc/cluster-tools/egress-policy-metrics.json
+_egress_policy_metrics_config: "{{ cluster_tools_lib_config_dir }}/egress-policy-metrics.json"
 _egress_policy_metrics_units: [egress-policy-metrics.service, egress-policy-metrics.timer]
 _egress_policy_textfile: egress-policy.prom
 

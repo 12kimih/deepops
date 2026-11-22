@@ -1,6 +1,6 @@
 ---
 _disk_quota_command: /usr/local/libexec/disk-quota
-_disk_quota_config: /etc/cluster-tools/disk-quota.json
+_disk_quota_config: "{{ cluster_tools_lib_config_dir }}/disk-quota.json"
 _disk_quota_textfile: "{{ node_exporter_prom_dir }}/disk-quota.prom"
 _disk_quota_units: [disk-quota.service, disk-quota.timer]
 _disk_quota_roster: "{{ people | default({}) }}"

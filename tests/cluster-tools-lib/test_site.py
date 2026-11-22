@@ -37,7 +37,10 @@ class SiteTests(unittest.TestCase):
 
     def test_the_role_writes_where_the_module_reads(self):
         defaults = load(ROOT / "roles/cluster_tools_lib/defaults/main.yml")
-        self.assertEqual(defaults["cluster_tools_lib_info_file"], site.PATH)
+        info_file = defaults["cluster_tools_lib_info_file"].replace(
+            "{{ cluster_tools_lib_config_dir }}", defaults["cluster_tools_lib_config_dir"]
+        )
+        self.assertEqual(info_file, site.PATH)
         self.assertEqual(set(defaults["cluster_info"]), {"name", "docs_url", "login_host", "ssh_port"})
         self.assertEqual(set(defaults["cluster_tools_lib_derived_info"]), {"dashboard_url", "prometheus_url"})
 

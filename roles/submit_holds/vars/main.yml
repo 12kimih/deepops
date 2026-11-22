@@ -1,6 +1,6 @@
 ---
 _submit_holds_command: /usr/local/libexec/submit-holds
-_submit_holds_config: /etc/cluster-tools/submit-holds.json
+_submit_holds_config: "{{ cluster_tools_lib_config_dir }}/submit-holds.json"
 _submit_holds_textfile: "{{ node_exporter_prom_dir }}/submit-holds.prom"
 _submit_holds_units: [submit-holds.service, submit-holds.timer]
 _submit_holds_cfg:

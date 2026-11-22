@@ -21,14 +21,6 @@
       dest: "{{ _disk_quota_command }}"
       module: cluster_tools.disk_quota
 
-- name: Create the cluster tools configuration directory
-  ansible.builtin.file:
-    path: "{{ _disk_quota_config | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 # Names the roster's users and their limits: root's to read.
 - name: Write the disk quota configuration
   ansible.builtin.copy:
