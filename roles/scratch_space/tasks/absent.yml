@@ -1,6 +1,6 @@
 ---
-# Nothing goes: the directories hold people's data.
-- name: Leave the scratch space as it is
+# The cleanup goes (its timer and files); the directories stay: they hold people's data.
+- name: Remove the cleanup, leave the directories
   ansible.builtin.include_role:
     name: component_record
   vars:

@@ -36,6 +36,52 @@
     people_dirs_mode: "{{ scratch_space_mode }}"
     people_dirs_skel: false
 
+- name: Set up the cleanup
+  when: scratch_space_purge | bool
+  block:
+    - name: Install the scratch space command
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: command
+      vars:
+        cluster_tools_lib_command:
+          dest: "{{ _scratch_space_command }}"
+          module: cluster_tools.scratch_space
+
+    # Names the roster's logins and UIDs: root's to read.
+    - name: Write the scratch space configuration
+      ansible.builtin.copy:
+        dest: "{{ _scratch_space_config }}"
+        owner: root
+        group: root
+        mode: "0600"
+        content: "{{ _scratch_space_cfg | to_nice_json }}\n"
+        validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.scratch_space %s"
+
+    - name: Record the scratch space configuration
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: config
+      vars:
+        cluster_tools_lib_config: {role: scratch_space, module: cluster_tools.scratch_space, file: "{{ _scratch_space_config }}", playbook: playbooks/generic/scratch-space.yml}
+
+    - name: Install the cleanup units
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ _scratch_space_units }}"
+      register: scratch_space_units_written
+
+    - name: Enable the cleanup timer
+      systemd_unit:
+        name: scratch-space-purge.timer
+        enabled: true
+        state: "{{ 'restarted' if scratch_space_units_written is changed else 'started' }}"
+        daemon_reload: true
+
 - name: Record the component as present
   ansible.builtin.include_role:
     name: component_record

@@ -1,4 +1,27 @@
 ---
-# What this component installs, for its record (roles/component_record): nothing a removal
-# may take away. The directories hold people's data.
-scratch_space_items: []
+_scratch_space_command: /usr/local/libexec/scratch-space
+_scratch_space_config: "{{ cluster_tools_lib_config_dir }}/scratch-space.json"
+_scratch_space_textfile: "{{ node_exporter_prom_dir }}/scratch-space.prom"
+_scratch_space_units: [scratch-space-purge.service, scratch-space-purge.timer]
+_scratch_space_cfg:
+  root: "{{ scratch_space_root }}"
+  projects: "{{ scratch_space_projects }}"
+  people: "{{ people | people_attr('uid') }}"  # {login: UID}, active people
+  list_name: .purge-list
+  stale_days: "{{ scratch_space_stale_days | int }}"
+  grace_days: "{{ scratch_space_grace_days | int }}"
+  max_entries: "{{ scratch_space_purge_max_entries | int }}"
+  burst_files: "{{ scratch_space_purge_burst_files | int }}"
+  burst_share: "{{ scratch_space_purge_burst_share | float }}"
+  burst_window: "{{ scratch_space_purge_burst_window | int }}"
+  state: /var/lib/scratch-space/state.json
+  textfile: "{{ _scratch_space_textfile }}"
+
+# What this component installs, for its record (roles/component_record): the cleanup's
+# timer, its service and files. Never the directories: they hold people's data.
+scratch_space_items: >-
+  {{ (['unit:scratch-space-purge.timer', 'unit:scratch-space-purge.service']
+      + _scratch_space_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+      + ['file:' ~ _scratch_space_command, 'file:' ~ _scratch_space_config, 'file:' ~ _scratch_space_textfile,
+         'file:' ~ cluster_tools_lib_config_records ~ '/scratch_space.json'])
+     if scratch_space_purge | bool else [] }}

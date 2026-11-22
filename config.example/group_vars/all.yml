@@ -209,6 +209,11 @@
 # /scratch and its block_hard (and disk_quota_inodes_per_tib), and usrquota in its
 # host_baseline_mount_options.
 #scratch_space_root: /scratch
+# The daily cleanup of files unused for the stale period (cluster_user_stale_days), each
+# listed for its owner the grace period (cluster_user_grace_days) before it goes; people
+# see theirs with `scratch-space` (cluster_tools_commands). Needs relatime on /scratch.
+#scratch_space_purge: true
+#scratch_space_purge_on_calendar: "*-*-* 03:30:00"
 
 # NFS Server
 # This config will create an NFS server and share the given exports. options are the

@@ -1,0 +1,19 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=List the scratch space's files unused for {{ scratch_space_stale_days }} days and remove those listed {{ scratch_space_grace_days }} days ago
+RequiresMountsFor={{ scratch_space_root }}
+
+[Service]
+Type=oneshot
+# A oneshot has no start timeout by default; one hang would stop its timer for good.
+TimeoutStartSec=12h
+StateDirectory=scratch-space
+StateDirectoryMode=0700
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _scratch_space_command }} {{ _scratch_space_config }} purge
+# Behind what people do, yet always moving: the lowest best-effort I/O priority, never
+# the idle class, which a busy disk can starve.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

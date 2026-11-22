@@ -1,0 +1,38 @@
+---
+# The scratch space's daily cleanup (roles/scratch_space textfile metrics,
+# cluster_tools.scratch_space): when it stopped, files unused past their date are no
+# longer removed and people's lists go stale; the disk itself is watched by host.yml.
+groups:
+  - name: scratch-space
+    rules:
+      - alert: ScratchSpaceCleanupStale
+        expr: time() - scratch_space_last_success_timestamp_seconds > 3 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "The scratch space on {{ $labels.host }} has not been cleaned up for 3 days"
+          description: >-
+            The daily cleanup failed or did not run, so files unused past their date stay
+            and people's purge lists go stale: `journalctl -u scratch-space-purge` and
+            `systemctl list-timers scratch-space-purge.timer` on the host.
+      # No timestamp at all on a host with the unit installed: the alert above has
+      # nothing to compare, so the unit's presence stands in.
+      - alert: ScratchSpaceCleanupNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="scratch-space-purge.service"})
+          unless on (instance) scratch_space_last_success_timestamp_seconds
+        for: 3d
+        labels: {severity: warning}
+        annotations:
+          summary: "The scratch space cleanup on {{ $labels.host }} has reported no success for 3 days"
+          description: "`journalctl -u scratch-space-purge` and `systemctl list-timers scratch-space-purge.timer` on the host."
+      # The walk stopped at its bound: files past it are reached a day later, and a
+      # filesystem that always hits it is never cleaned whole.
+      - alert: ScratchSpaceCleanupTruncated
+        expr: scratch_space_purge_truncated == 1
+        for: 2d
+        labels: {severity: warning}
+        annotations:
+          summary: "The scratch space cleanup on {{ $labels.host }} stops at its entry bound"
+          description: >-
+            Each run looked at scratch_space_purge_max_entries entries and stopped: raise it
+            (roles/scratch_space) or find who holds the files (`quota -s`, disk report).
