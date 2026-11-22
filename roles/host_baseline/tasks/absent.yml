@@ -153,6 +153,10 @@
         - ansible_facts.os_family == 'Debian'
         - host_baseline_present | length > 0
 
+    - name: Take the snaps out before snapd
+      ansible.builtin.include_tasks: snaps.yml
+      when: "'snapd' in host_baseline_removal | default([]) | map('regex_replace', ':.*$', '') | list"
+
     - name: Remove the packages declared absent
       ansible.builtin.package:
         name: "{{ host_baseline_removal }}"
