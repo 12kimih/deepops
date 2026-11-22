@@ -154,18 +154,23 @@ docker_sysctls:
 # What Docker keeps that nothing uses goes on a schedule (docker-prune.timer): stopped
 # containers created more than docker_prune_after ago, images no container uses that were
 # built more than that ago (Docker keeps no time an image was last used: one pulled
-# yesterday but built last year goes, and is pulled again when wanted), build cache not
-# used for that long, then the anonymous volumes no container uses (a named volume is
-# data and stays).
-# Without it a node kept everything anyone ever ran, pulled or built: 215G of build cache
-# on one node, four-month-old stopped containers holding their images on another
-# (2026-11). The age is the site's one cleanup period (cluster_user_grace_days), as for
-# the other container stores (roles/container_storage_gc). "" = no timer (and an existing
-# one is removed).
+# yesterday but built last year goes, and is pulled again when wanted), then the
+# anonymous volumes no container uses (a named volume is data and stays). Docker itself
+# collects none of these.
+# Without it a node kept everything anyone ever ran or pulled: four-month-old stopped
+# containers holding their images (2026-11). The age is the site's one cleanup period
+# (cluster_user_grace_days), as for the other container stores
+# (roles/container_storage_gc). "" = no timer (and an existing one is removed).
 docker_prune_after: "{{ (cluster_user_grace_days | int * 24) ~ 'h' }}"
 docker_prune_schedule: daily
-# Then the build cache is cut down to this size, least recently used first, whatever its
-# age: removing an image releases the cache it held, which counts as a use, and that cache
-# keeps the older layers under it, so age alone left 113G on a node the day its images
-# went (BuildKit prunes only a record nothing holds). "" = no cap.
-docker_prune_build_cache_max: 10GB
+
+# The build cache is BuildKit's to collect, as Docker documents
+# (https://docs.docker.com/build/cache/garbage-collection/): daemon.json builder.gc, run
+# when dockerd starts and after every build, in Docker's own policy (what is easily
+# rebuilt after 2 days, anything unused for 60 days, then least recently used first down
+# to the cap). Left unset, the engine sizes it from the disk: it keeps 10% of the disk
+# for the cache and lets it grow to 80%, so a node kept 161G of build cache on the disk
+# its jobs' space comes from (2026-11). These set the cap and the floor; "" for the cap
+# leaves Docker's sizes.
+docker_build_cache_max: 10GB
+docker_build_cache_reserved: 2GB
