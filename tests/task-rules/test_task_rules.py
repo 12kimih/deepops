@@ -5,7 +5,9 @@
    purpose (`not ansible_check_mode`). Under --check Ansible skips commands, so the
    registered result is empty and every task that reads it fails or decides wrongly.
 2. A template task whose template renders a secret must set diff: false, or a
-   --diff preview prints the secret.
+   --diff preview prints the secret. So must a copy whose content holds one or whose
+   file is one by name (a private key, a kubeconfig, a token; no_log hides it as well):
+   the registry cache's CA key and the admin kubeconfig were printed (2026-11 audit).
 4. A play's hosts (`hosts:`, and the `hostlist` a playbook import passes) name inventory
    groups and may template only `hostlist`: they are resolved before group_vars
    load, so any other variable there silently ignores what config sets.
@@ -141,7 +143,13 @@ REBOOT_COMMAND = re.compile(
     re.M,
 )
 SECRET = re.compile(
-    r"\{\{[^}]*(password|passwd|_token|\btoken\b|secret|webhook|api_key|_pass\b|heartbeat_url|munge_key)[^}]*\}\}"
+    r"\{\{[^}]*(password|(?<!no)passwd|_token|\btoken\b|secret|webhook|api_key|_pass\b|heartbeat_url|munge_key)[^}]*\}\}"
+)
+# A file that is a secret by its name: a private key (not a loop's item.key), a
+# kubeconfig, a token, a password or credentials file, the MUNGE key.
+SECRET_FILE = re.compile(
+    r"(?<!item)\.key\b|private|password|passwd|secret|token|admin\.conf|kubeconfig|\.kube/config|credentials|htpasswd|munge",
+    re.I,
 )
 MINIMUM_FILES = 200  # a scan that sees fewer has lost its way
 
@@ -502,6 +510,22 @@ class TaskRules(unittest.TestCase):
                     if re.search(rf"\b{register}\s*[.\[]", text) and not text.strip().startswith(guard):
                         offenders.append(f"{rel(path)}: {task.get('name')} ({key})")
         self.assertEqual(offenders, [], "under --check nothing ran: guard these conditions as rule 19 says")
+        scan.check(self)
+
+    def test_secret_copies_hide_their_diff(self):
+        scan, offenders, seen = Scan(minimum=MINIMUM_FILES), [], 0
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, args = module(task)
+                if name != "copy":
+                    continue
+                files = " ".join(str(args.get(k, "")) for k in ("src", "dest"))
+                if SECRET_FILE.search(files) or SECRET.search(str(args.get("content", ""))):
+                    seen += 1
+                    if task.get("diff") is not False and task.get("no_log") is not True:
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertGreater(seen, 3, "the scan finds the copies of secrets")
+        self.assertEqual(offenders, [], "add diff: false to these copy tasks")
         scan.check(self)
 
     def test_secret_templates_hide_their_diff(self):

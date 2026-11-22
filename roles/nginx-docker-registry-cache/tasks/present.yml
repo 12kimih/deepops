@@ -24,6 +24,7 @@
     - "{{ nginx_docker_cache_ca_path }}"
 
 - name: Add pre-defined CA key file
+  diff: false  # a private key; --diff would print it
   ansible.builtin.copy:
     src: "{{ nginx_docker_cache_ca.key }}"
     dest: "{{ nginx_docker_cache_ca_path }}/ca.key"
