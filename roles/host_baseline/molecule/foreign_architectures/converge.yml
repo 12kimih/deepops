@@ -7,3 +7,19 @@
       ansible.builtin.include_role:
         name: host_baseline
         tasks_from: foreign_architectures
+
+    # A role that names nothing, or only packages not installed (docker's conflicting
+    # packages on every host, 2026-11): the removal and what follows it run clean.
+    - name: Remove nothing
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        host_baseline_absent_packages: []
+
+    - name: Remove only packages that are not installed
+      ansible.builtin.include_role:
+        name: host_baseline
+        tasks_from: absent
+      vars:
+        host_baseline_absent_packages: [deepops-no-such-package, "telnetd*"]
