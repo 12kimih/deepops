@@ -39,7 +39,7 @@ reboots each as it empties and returns it to service. See
 | `utilities/check-id-consistency.yml` | all | asserts that the groups the directory (NIS or LDAP) publishes resolve to their pinned GID on every node; read-only |
 | `utilities/fleet-consistency.yml` | slurm-cluster | are the hosts level: running kernel, shared packages, loaded NVIDIA driver, kernel policy sysctls, pending reboots, shared machine-ids; read-only |
 | `utilities/mofed.yml` | all | NVIDIA DOCA-OFED for InfiniBand or RoCE adapters |
-| `utilities/people-purge.yml` | slurm-nfs | removes the files (`people_purge_paths`) of everyone whose `ends` lies `people_leave_keep_days` behind, on the host where each is local, once `people_purge_confirm` names exactly them; see [accounts.md](accounts.md) |
+| `utilities/people-purge.yml` | all | removes the files (`people_purge_paths`) of everyone whose `ends` lies `people_leave_keep_days` behind, on the host where each is local, once `people_purge_confirm` names exactly them; see [accounts.md](accounts.md) |
 | `utilities/retire-local-accounts.yml` | all | the last step of a move to LDAP: removes the local copies of directory accounts; see [accounts.md](accounts.md) |
 
 ## Audits

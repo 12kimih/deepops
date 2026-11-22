@@ -63,10 +63,27 @@ class Derive(unittest.TestCase):
                 roster, 90, ["/home/{login}", "/scratch/{login}"], today="2026-04-02"
             ),
             [
-                {"login": "a", "uid": 1001, "path": "/home/a"},
-                {"login": "a", "uid": 1001, "path": "/scratch/a"},
+                {"login": "a", "uid": 1001, "ends": "2026-01-01", "due": "2026-04-01", "path": "/home/a"},
+                {"login": "a", "uid": 1001, "ends": "2026-01-01", "due": "2026-04-01", "path": "/scratch/a"},
             ],
         )
+        # dated: everyone with an end, due or not (what the alert's metric reads)
+        dated = people.people_purge_targets(roster, 90, ["/home/{login}"], today="2026-01-02", dated=True)
+        self.assertEqual([t["login"] for t in dated], ["a"])
+
+    def test_only_a_persons_own_directory_may_go(self):
+        t = {"login": "a", "uid": 1001, "path": "/home/a"}
+
+        def result(**st):
+            return {
+                "item": {"item": t},
+                "stat": {"exists": True, "isdir": True, "islnk": False, "uid": 1001, **st},
+            }
+
+        self.assertEqual(people.people_purge_owned([result()]), [t])
+        for st in ({"uid": 1002}, {"isdir": False}, {"islnk": True}, {"exists": False}):
+            self.assertEqual(people.people_purge_owned([result(**st)]), [], st)
+        self.assertEqual(people.people_purge_owned([{"item": {"item": t}, "skipped": True}]), [])
 
     def test_a_purge_path_names_one_persons_directory_only(self):
         for bad in [

@@ -775,6 +775,28 @@ tests:
               summary: "/home on m, exported over NFS, is over 80% full"
               description: "15% free. Ask the largest users to clean up before it slows every job."
 
+  - name: a leaver's files past their due time warn, one alert per directory
+    interval: 1m
+    input_series:
+      - series: 'people_purge_due_timestamp_seconds{host="m", instance="m:9100", login="olda", path="/home/olda", ends="2026-01-01"}'
+        values: '600x120'
+      - series: 'people_purge_due_timestamp_seconds{host="m", instance="m:9100", login="newb", path="/home/newb", ends="2027-01-01"}'
+        values: '99999999x120'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PeopleFilesDue
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: PeopleFilesDue
+        exp_alerts:
+          - exp_labels: {severity: warning, host: m, instance: "m:9100", login: olda, path: /home/olda, ends: "2026-01-01"}
+            exp_annotations:
+              summary: "/home/olda on m is due for removal"
+              description: >-
+                olda's membership ended on 2026-01-01. Preview with
+                playbooks/utilities/people-purge.yml --check, then run it with
+                -e people_purge_confirm=<the logins due>.
+
   - name: an NFS share the retry cannot mount warns after 15 minutes
     interval: 1m
     input_series:

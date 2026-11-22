@@ -138,3 +138,11 @@
   when: _want != _day[item] | default('-')
   tags:
     - people
+
+- name: Publish when the files of the people who leave fall due
+  ansible.builtin.include_tasks:
+    file: purge_metric.yml
+    apply:
+      tags: [people]
+  tags:
+    - people
