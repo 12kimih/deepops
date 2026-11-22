@@ -11,7 +11,8 @@ Features today: scratch allocations (`/scratch`, see [scratch-alloc.md](scratch-
 ask, extend, resize and release from a form; requests within the automatic limits are
 applied at once, larger ones wait for an administrator's button in the admin channel;
 owners get a DM `cluster_bot_scratch_remind_days` before an allocation ends (14, 7 and 1
-days by default, `cluster_bot_remind_days`), with an extend button.
+days by default, `cluster_bot_remind_days`), with an extend button. An administrator's `/scratch` also lists the requests waiting for them, the people who
+have used least (cumulative TB-days) first.
 
 Account requests (`/join`, `/leave`): a newcomer gives a login, a name, a team (the
 accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH

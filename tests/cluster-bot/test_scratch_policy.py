@@ -53,5 +53,18 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(decide({"op": "release", "user": "alice"}, used=0.95), "auto")
 
 
+class StandingTests(unittest.TestCase):
+    def test_what_waits_says_the_persons_cumulative_use_and_holding(self):
+        data = listing(0.3, ALICE)
+        data["ledger"] = {
+            "alice": {"allocated_byte_seconds": 3 * sp.TB_DAY, "used_byte_seconds": sp.TB_DAY // 2}
+        }
+        verdict, why = sp.decide({"op": "resize", "user": "alice", "size": 6 * T}, data, POLICY, 0)
+        self.assertEqual(verdict, "admin")
+        self.assertIn("누적 할당 3.0 TB·일, 실사용 0.5 TB·일, 지금 2.0TB", why)
+        verdict, why = sp.decide({"op": "resize", "user": "alice", "size": T}, data, POLICY, 0)
+        self.assertNotIn("누적", why, "what is given at once needs no weighing")
+
+
 if __name__ == "__main__":
     unittest.main()

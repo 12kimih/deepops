@@ -23,6 +23,16 @@ size) is always at once. While the scratch disk is `scratch_alloc_guard` (80%) f
 more, anything that grows waits for an administrator. Nothing is ever shrunk by the
 system: the daily disk report shows each allocation, its use and days left.
 
+## Who has held how much: the ledger
+
+Every sweep adds to each person's ledger the bytes allocated and the bytes used, times
+the time since the last sweep. The totals run from a person's first allocation and stay
+after an allocation goes: TB-days, allocated and used. A request that waits for an
+administrator says the requester's (cumulative allocated and used TB-days, and what they
+hold now), and an administrator's `/scratch` lists what waits with the people who have
+used least first: when the disk is full and many ask, that is the fairness to decide by.
+The daily disk report shows the same totals.
+
 ## How an allocation lives
 
 | Stage | What happens |
@@ -59,5 +69,6 @@ scratch-alloc /etc/cluster-tools/scratch-alloc.json release LOGIN
 Each prints the allocation as JSON (`list`: the allocations and the disk). The timer runs
 `sweep` and `metrics` every `scratch_alloc_sweep_interval`: `scratch_alloc_limit_bytes`,
 `scratch_alloc_used_bytes` and `scratch_alloc_expires_timestamp_seconds` (labels `user`,
-`state`), and the disk's `scratch_alloc_disk_bytes` and `scratch_alloc_disk_used_bytes`,
-go to node_exporter.
+`state`), the disk's `scratch_alloc_disk_bytes` and `scratch_alloc_disk_used_bytes`, and
+each person's ledger, `scratch_alloc_allocated_byte_seconds_total` and
+`scratch_alloc_used_byte_seconds_total` (label `user`), go to node_exporter.

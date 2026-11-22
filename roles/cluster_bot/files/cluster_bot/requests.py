@@ -93,6 +93,15 @@ class Engine:
             "held", f"{whom} 승인을 기다립니다 ({why}): {feature.describe(req)}", request=req, key=key
         )
 
+    def held(self, kind=None):
+        """The requests waiting for a decision (of KIND, when given): [(key, request)],
+        oldest first."""
+        pending = self._pending()
+        return sorted(
+            ((k, r) for k, r in pending.items() if kind in (None, r.get("kind"))),
+            key=lambda kr: kr[1].get("asked", 0),
+        )
+
     def approvers(self, key):
         """Who may approve the held request KEY besides an administrator: logins, [] for
         administrators only (or no such request)."""
