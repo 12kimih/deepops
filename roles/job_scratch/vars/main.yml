@@ -1,0 +1,16 @@
+---
+# slurmd starts only with the filesystem mounted: without it the job directories would
+# land on the root filesystem again.
+_job_scratch_dropin: /etc/systemd/system/slurmd.service.d/job-scratch.conf
+_job_scratch_opts: loop,noatime,nodev,nosuid,prjquota
+# Its size for slurm.conf, read afresh on every fact gathering (cached facts are a day old).
+_job_scratch_fact: /etc/ansible/facts.d/job_scratch.fact
+
+# What this component installs, for its record (roles/component_record): the fstab
+# entry, the slurmd ordering and the image (a removal frees its space at the next boot,
+# when the mount goes).
+job_scratch_items:
+  - "mount:{{ slurm_job_private_base }}"
+  - "file:{{ _job_scratch_dropin }}"
+  - "file:{{ _job_scratch_fact }}"
+  - "file:{{ job_scratch_file }}"

@@ -125,6 +125,30 @@ Deploy it while the nodes run no jobs: a running job's directories stay where
 the old settings put them. See `namespace.yaml(5)` and
 https://slurm.schedmd.com/namespace.yaml.html.
 
+### A filesystem of their own (`--tmp`)
+
+On a node whose only disk is the root filesystem, the base shares it with the OS,
+slurmd, its logs and the container caches: one job that fills its `/tmp` fills
+them all, fails the other jobs on the node and drains it. `slurm_enable_job_scratch:
+true` (`roles/job_scratch`, on `slurm-node`, before Slurm in the deploy) gives the
+base an XFS filesystem of its own on every compute node alike: an image
+preallocated on the root filesystem (`job_scratch_file`, `job_scratch_size`, 70%
+by default, keeping `job_scratch_reserve` free) and loop-mounted at the base
+(`nodev,nosuid,noatime`, with `prjquota` so a limit per job needs no remount).
+slurmd starts only with it mounted.
+
+Slurm learns each node's size: `TmpFS` is the base, and each node's `TmpDisk` the
+filesystem's size in whole GiB (a local fact read on every deploy), so a job asks
+for space with `--tmp=500G` and runs only where that much exists. A job that asks
+for none may still use what is free; the filesystem bounds them all together.
+
+The first deploy needs the node idle: mounting over the base would hide the
+directories of running jobs, and the role stops if it finds any. A larger
+`job_scratch_size` later grows the filesystem in place (running jobs keep their
+files); XFS cannot shrink, so a smaller one stops the role. Turning it off removes
+the fstab entry, slurmd's ordering and the image; the mount and its space go at
+the next boot.
+
 ## IPC objects
 
 System V shared memory segments, semaphores and message queues, and POSIX

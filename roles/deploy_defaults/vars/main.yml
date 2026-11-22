@@ -232,6 +232,10 @@ deepops_component_registry:
   openmpi:
     rules:
       - {switch: "{{ slurm_cluster_install_openmpi }}", group: slurm-cluster}
+  # The job directories' own filesystem on the compute nodes, before slurmd uses it.
+  job_scratch:
+    rules:
+      - {switch: "{{ slurm_enable_job_scratch }}", group: slurm-node}
   # Node Health Check on the compute nodes; slurmd's health check follows the switch.
   nhc:
     rules:

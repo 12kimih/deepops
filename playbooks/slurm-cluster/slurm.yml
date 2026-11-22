@@ -2,6 +2,12 @@
 - name: Create the missing site secrets
   import_playbook: site-secrets.yml
 
+# Run alone, before the facts below (slurm.conf gives each node the size of its job
+# filesystem); a deploy imports it itself, before Slurm.
+- name: Put the job directories on their own filesystem
+  import_playbook: job-scratch.yml
+  when: deepops_phase == 'converge'
+
 - hosts: all
   become: true
   roles:

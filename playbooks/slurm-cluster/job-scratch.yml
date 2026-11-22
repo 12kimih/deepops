@@ -1,0 +1,16 @@
+---
+# The per-job private directories on an XFS filesystem of their own (roles/job_scratch),
+# sized for Slurm's --tmp. Every host it runs on converges to deepops_components
+# (present on slurm-node while slurm_enable_job_scratch is on, removed elsewhere).
+# Imported by slurm.yml before Slurm reads each node's size; a first deploy needs the
+# node idle (the role stops otherwise).
+#
+#   ansible-playbook -K playbooks/slurm-cluster/job-scratch.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: job_scratch
+      job_scratch_state: "{{ deepops_components.job_scratch | component_phase(deepops_phase) }}"
+  tags:
+    - job-scratch

@@ -1,0 +1,10 @@
+---
+# The fstab entry, slurmd's ordering and the image go; the mount stays until the next
+# boot (jobs may be using it), which also frees the image's space.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: job_scratch
+    component_record_action: absent
+    component_record_items: "{{ job_scratch_items }}"
