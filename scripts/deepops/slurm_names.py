@@ -54,6 +54,7 @@ def newest_parser(tag):
         except urllib.error.HTTPError as e:
             if e.code != 404:
                 raise
+            e.close()  # the error is the response
             if found:
                 return found
         else:

@@ -93,7 +93,8 @@ def check_tls_and_login(result, url, host, port, min_days):
         resp = opener.open(url.rstrip("/") + "/pun/sys/dashboard", timeout=15)
         status, location = resp.status, resp.headers.get("Location", "")
     except urllib.error.HTTPError as exc:
-        status, location = exc.code, exc.headers.get("Location", "")
+        with exc:  # the error is the response
+            status, location = exc.code, exc.headers.get("Location", "")
     except (OSError, urllib.error.URLError) as exc:
         result["errors"].append(f"portal request failed: {exc}")
         return

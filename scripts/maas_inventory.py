@@ -162,6 +162,7 @@ def maas_api_get(url, api_key):
         with urllib.request.urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode())
     except urllib.error.HTTPError as e:
+        e.close()  # the error is the response
         print(f"MAAS API error: {e.code} {e.reason}", file=sys.stderr)
         if e.code == 401:
             print("Check your MAAS_API_KEY value.", file=sys.stderr)

@@ -81,12 +81,14 @@ while IFS= read -r name; do isolated+=(-u "${name}"); done < <(compgen -e | grep
 # The tracked tests/<suite>/test_*.py, like every other check, one check per file so a
 # slow suite's files run side by side; each runs from its suite directory, as discover
 # would run it.
+# Through tests/lib/strict_unittest.py: unittest that also fails on a ResourceWarning.
+strict="$(pwd)/tests/lib/strict_unittest.py"
 mapfile -d '' -t test_files < <(git ls-files -z -- 'tests/*/test_*.py')
 for test_file in "${test_files[@]}"; do
     suite="$(dirname "${test_file}")"
     if "${fast}" && [ -e "${suite}/.slow" ]; then continue; fi
     module="$(basename "${test_file}" .py)"
-    step "unit tests (${suite}/${module})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} -m unittest -q '${module}'"
+    step "unit tests (${suite}/${module})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} '${strict}' -q '${module}'"
 done
 
 if ! "${fast}"; then
@@ -95,7 +97,7 @@ if ! "${fast}"; then
         echo "Missing tools; run scripts/setup.sh, or: sudo apt-get install ${missing[*]}" >&2
         exit 2
     fi
-    step "unit tests (scripts/validation/tests)" "${isolated[@]}" "${python}" -m unittest discover -s scripts/validation/tests -q
+    step "unit tests (scripts/validation/tests)" "${isolated[@]}" "${python}" "${strict}" discover -s scripts/validation/tests -q
     step "ansible-lint" ansible-lint -q
     for playbook in playbooks/slurm-cluster.yml playbooks/k8s-cluster.yml; do
         step "syntax-check ${playbook}" ansible-playbook -i config.example/inventory --syntax-check "${playbook}"

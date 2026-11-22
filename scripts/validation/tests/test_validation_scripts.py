@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import unittest
+from pathlib import Path
 from unittest import mock
 
 SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -341,7 +342,7 @@ class TestValidatorsStartProcessesOneWay(unittest.TestCase):
             f"{name}:{n}"
             for name in sorted(os.listdir(SCRIPTS_DIR))
             if name.endswith(".py")
-            for n, line in enumerate(open(os.path.join(SCRIPTS_DIR, name)).read().splitlines(), 1)
+            for n, line in enumerate(Path(SCRIPTS_DIR, name).read_text().splitlines(), 1)
             if one_shot.search(line)
         ]
         self.assertEqual(offenders, [], "run commands with clustertools.proc (outcome or run)")
