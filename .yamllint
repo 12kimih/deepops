@@ -69,5 +69,6 @@ rules:
     level: warning
   colons:
     level: warning
-  commas:
-    level: warning
+  # An error: in a flow sequence a comma splits the item, so `[cmd, --opt=a,b]` passes
+  # cmd three arguments (an nvidia-smi --query-gpu list did). Quote such an item.
+  commas: enable

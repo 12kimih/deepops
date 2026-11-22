@@ -69,7 +69,7 @@ mig-configs:
         "3g.40gb": 1
 
   custom-config-a100-40:
-    - devices: [0,1,2,3]
+    - devices: [0, 1, 2, 3]
       mig-enabled: false
     - devices: [4]
       mig-enabled: true
@@ -91,7 +91,7 @@ mig-configs:
         "3g.20gb": 1
 
   custom-config-a100-80:
-    - devices: [0,1,2,3]
+    - devices: [0, 1, 2, 3]
       mig-enabled: false
     - devices: [4]
       mig-enabled: true
