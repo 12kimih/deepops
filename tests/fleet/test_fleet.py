@@ -108,6 +108,29 @@ class SysctlOwners(unittest.TestCase):
                 self.assertTrue(setters, f"no role sets {key}")
                 self.assertTrue({p.parts[-3] for p in setters} & roles, f"{playbook} runs none of {setters}")
 
+    def test_each_package_installed_from_a_release_file_names_its_playbook(self):
+        # apt-upgrade.yml cannot level a package no repository carries; its role's
+        # playbook can, and the comparison's failure must say which.
+        defaults = yaml.safe_load((ROOT / "roles/maintenance/defaults/main.yml").read_text())
+        owners = defaults["maintenance_consistency_packages"]
+        from_files = {
+            p.relative_to(ROOT).parts[1]
+            for p in ansible_files()
+            if p.parent.name == "tasks" and re.search(r"^\s+deb: ", p.read_text(), re.M)
+        }
+        named = set()
+        for playbook in set(owners.values()):
+            text = (ROOT / playbook).read_text()
+            named |= set(re.findall(r"(?:role|name): ([a-z_-]+)", text))
+        # The CUDA keyring's .deb bootstraps the CUDA repository, which then carries it.
+        levelled_by_their_repository = {"package_repos"}
+        self.assertTrue(from_files, "no role installs a release file")
+        self.assertEqual(
+            from_files - named - levelled_by_their_repository,
+            set(),
+            "add the package and its playbook to maintenance_consistency_packages",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -103,3 +103,13 @@ maintenance_verify_nhc: "{{ inventory_hostname in groups['slurm-node'] | default
 # scale with memory.)
 maintenance_consistency_sysctls:
   kernel.apparmor_restrict_unprivileged_userns: playbooks/container/enroot.yml
+
+# The packages a role installs from a release file rather than a repository, each with
+# its playbook: the maintenance upgrade (apt-upgrade.yml) cannot level them, the role's
+# next run does, so a difference names that playbook. tests/fleet keeps it complete.
+maintenance_consistency_packages:
+  enroot: playbooks/container/enroot.yml
+  enroot+caps: playbooks/container/enroot.yml
+  enroot-hardened: playbooks/container/enroot.yml
+  enroot-hardened+caps: playbooks/container/enroot.yml
+  nvidia-mig-manager: playbooks/nvidia-software/nvidia-mig.yml

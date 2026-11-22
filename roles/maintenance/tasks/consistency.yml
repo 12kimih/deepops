@@ -73,5 +73,5 @@
     fail_msg: |-
       {{ _drift | length }} differences between {{ _hosts | join(', ') }}:
       {{ _drift[:60] | join(_nl) }}{{ _nl ~ '...' if _drift | length > 60 else '' }}
-      Bring them level with playbooks/utilities/apt-upgrade.yml{% for key, playbook in maintenance_consistency_sysctls.items() if ('sysctl ' ~ key ~ ':') in _drift | join(_nl) %}, {{ key }} with {{ playbook }}{% endfor %};
+      Bring them level with playbooks/utilities/apt-upgrade.yml{% for kind, owners in [('sysctl', maintenance_consistency_sysctls), ('package', maintenance_consistency_packages)] %}{% for name, playbook in owners.items() if (kind ~ ' ' ~ name ~ ':') in _drift | join(_nl) %}, {{ kind }} {{ name }} with {{ playbook }}{% endfor %}{% endfor %};
       a pending reboot or a stale NVIDIA module goes with playbooks/utilities/reboot.yml.
