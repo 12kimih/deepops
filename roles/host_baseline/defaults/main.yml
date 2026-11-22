@@ -49,6 +49,11 @@ host_baseline_protected_packages:
   - libopengl0
   - libvulkan1
 
+# The dpkg foreign architectures a host keeps (Debian family; i386 for 32-bit programs).
+# Another one is removed with its packages (through the absent removal and its
+# protected-package refusal), a listed one added. Cluster hosts run 64-bit programs only.
+host_baseline_foreign_architectures: []
+
 # Units a site keeps off (tasks_from: masked, owner "site"): stopped, disabled and
 # masked, so neither a dependency nor a socket starts them; for a service a metapackage
 # brings and nothing here uses (multipathd without a SAN). Units not installed are left

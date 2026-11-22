@@ -173,6 +173,9 @@
 # A removal never takes along a package a component records or one of these (it stops
 # instead, before anything goes): extend the list for the site's own essentials.
 #host_baseline_protected_packages: [apt, dpkg, sudo, systemd, ..., slurm-smd*, munge]  # example
+# The dpkg foreign architectures a host keeps (i386 for 32-bit programs); another one goes
+# with its packages.
+#host_baseline_foreign_architectures: []
 # The site's own leftovers for roles/stale_files (what a person installed by hand and the
 # site retired); nothing a package owns is taken.
 #stale_files_site_rules:  # example

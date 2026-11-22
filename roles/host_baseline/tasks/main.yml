@@ -2,6 +2,9 @@
 - name: Remove the packages declared absent
   ansible.builtin.include_tasks: absent.yml
 
+- name: Keep only the declared foreign architectures
+  ansible.builtin.include_tasks: foreign_architectures.yml
+
 - name: Keep the site's unused units off
   ansible.builtin.include_tasks: masked.yml
   vars:
