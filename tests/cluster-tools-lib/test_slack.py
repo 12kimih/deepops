@@ -54,5 +54,26 @@ class SlackTests(unittest.TestCase):
                 slack.Slack("xoxb-test").post("#nope", "x")
 
 
+class BlockTests(unittest.TestCase):
+    def test_a_long_text_is_split_at_lines_and_nothing_is_lost(self):
+        # Every line reaches Slack: a dropped one could be the mention that tells an owner.
+        rows = [f"row {i:04d} " + "x" * 40 for i in range(200)]
+        text = "head\n```\n" + "\n".join(rows) + "\n```"
+        parts = [b["text"]["text"] for b in slack.sections(text)]
+        self.assertGreater(len(parts), 1)
+        for p in parts:
+            self.assertLessEqual(len(p), 3000)
+            self.assertEqual(p.count("```") % 2, 0, "each part closes the code block it opens")
+        lines = [ln for p in parts for ln in p.splitlines() if ln.startswith("row ")]
+        self.assertEqual(lines, rows)
+        self.assertEqual([b["text"]["text"] for b in slack.sections("short")], ["short"])
+        long = slack.sections("y" * 7000)
+        self.assertTrue(all(len(b["text"]["text"]) <= 3000 for b in long))
+        self.assertEqual(sum(len(b["text"]["text"]) for b in long), 7000, "a long line is split, not cut")
+
+    def test_table_pads_columns_in_a_code_block(self):
+        self.assertEqual(slack.table(("A", "BB"), [("xyz", 1)]), "```\nA    BB\nxyz  1\n```")
+
+
 if __name__ == "__main__":
     unittest.main()

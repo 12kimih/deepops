@@ -1,6 +1,7 @@
 """Unit tests for the Slurm usage report, clustertools.usage_report (no cluster needed)."""
 
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -267,22 +268,6 @@ class RenderTests(unittest.TestCase):
                 self.assertLessEqual(len(b.get("text", {}).get("text", "")), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
-    def test_a_long_text_is_split_at_lines_and_nothing_is_lost(self):
-        # Every line reaches Slack: a dropped one could be the mention that tells an owner.
-        rows = [f"row {i:04d} " + "x" * 40 for i in range(200)]
-        text = "head\n```\n" + "\n".join(rows) + "\n```"
-        parts = [b["text"]["text"] for b in report.sections(text)]
-        self.assertGreater(len(parts), 1)
-        for p in parts:
-            self.assertLessEqual(len(p), 3000)
-            self.assertEqual(p.count("```") % 2, 0, "each part closes the code block it opens")
-        lines = [ln for p in parts for ln in p.splitlines() if ln.startswith("row ")]
-        self.assertEqual(lines, rows)
-        self.assertEqual([b["text"]["text"] for b in report.sections("short")], ["short"])
-        long = report.sections("y" * 7000)
-        self.assertTrue(all(len(b["text"]["text"]) <= 3000 for b in long))
-        self.assertEqual(sum(len(b["text"]["text"]) for b in long), 7000, "a long line is split, not cut")
-
     def test_bar(self):
         self.assertEqual(report.bar(100), "█" * 10 + " 100%")
         self.assertEqual(report.bar(0), "░" * 10 + "   0%")
@@ -319,7 +304,8 @@ class RunTests(unittest.TestCase):
                    "slack_token": "t", "user_map": {"alice": "UALICE", "bob": "UBOB"}, "email_domain": "",
                    "dm_text": "{job}", "dashboard_url": "", "admin_channel": "#admin",
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
-                   "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}"}  # fmt: skip
+                   "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
+                   "storage_top": 10, "storage_notify": ["mention"], "people": []}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
             slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
@@ -358,7 +344,8 @@ class ConfigTests(unittest.TestCase):
             "dm_text": "{job} {gpus} {hours} {runtime}", "cancel_after_hours": 0, "user_map": {},
             "email_domain": "", "state_file": "/nonexistent", "admin_channel": "#admin",
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
-                   "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}"}  # fmt: skip
+            "cancel_interactive_only": True, "cancel_warn_hours": 1, "cancel_warn_text": "{job} {hours}",
+            "storage_top": 10, "storage_notify": ["mention", "dm"], "people": ["alice"]}  # fmt: skip
 
     def load(self, **change):
         with tempfile.TemporaryDirectory() as d:
@@ -376,9 +363,18 @@ class ConfigTests(unittest.TestCase):
                              ({"cancel_after_hours": 12, "cancel_warn_hours": 10}, "cancel_warn_hours"),
                              ({"cancel_after_hours": 12, "cancel_warn_text": "{user}"}, "cancel_warn_text"),
                              ({"cancel_after_hours": 24, "notify": []}, "notify"),
-                             ({"channel": None}, "channel")):  # fmt: skip
+                             ({"channel": None}, "channel"), ({"storage_notify": ["email"]}, "storage_notify"),
+                             ({"storage_top": 0}, "storage_top"), ({"people": "alice"}, "people")):  # fmt: skip
             with self.subTest(change=change), self.assertRaisesRegex(report.ConfigError, word):
                 self.load(**change)
+
+    def test_the_role_writes_every_key_the_report_requires(self):
+        # The deploy validates the file with --check-config: a key the report requires
+        # and the template lacks would fail every deploy, one it writes and the report
+        # ignores would be a setting that does nothing.
+        template = (ROLES / "slurm_usage_report/templates/config.json.j2").read_text()
+        written = set(re.findall(r'^\s*"(\w+)":', template, re.M)) - {"_comment"}
+        self.assertEqual(written, set(report.CONFIG_KEYS))
 
     def test_a_damaged_state_file_is_a_fresh_start(self):
         with tempfile.TemporaryDirectory() as d:

@@ -6,6 +6,7 @@
     slack.channel("U0123ABCD")              -> a member's DM channel (names, IDs as is)
     member(slack, user, user_map, email_domain, cache) -> a person's Slack member ID
     slack.call(method, **params)            -> any other method, parsed
+    sections(text), table(header, rows)     -> message blocks within Slack's limits
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
 Each call is bounded by TIMEOUT seconds. Interactive features (buttons, forms, Socket
@@ -25,6 +26,8 @@ TIMEOUT = 30
 MEMBER = re.compile(r"[UW][A-Z0-9]+")
 # How long a looked-up member ID is trusted (seconds).
 MEMBER_TTL = 86400
+MAX_BLOCKS = 45  # Slack allows 50 blocks per message
+MAX_SECTION = 2900  # and 3000 characters per section text
 
 
 class Error(RuntimeError):
@@ -102,3 +105,35 @@ def member(slack, user, user_map, email_domain, cache):
         found = slack.call("users.lookupByEmail", email=target).get("user", {}).get("id", "")
     cache[user] = {"id": found, "checked": time.time()}
     return found
+
+
+# --- Message blocks -----------------------------------------------------------
+
+
+def table(header, rows):
+    """A fixed-width table in a code block; Slack renders it monospaced."""
+    widths = [max(len(str(c)) for c in col) for col in zip(header, *rows)]
+
+    def fmt(r):
+        return "  ".join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip()
+
+    return "```\n" + "\n".join([fmt(header)] + [fmt(r) for r in rows]) + "\n```"
+
+
+def sections(text):
+    """Slack sections holding all of TEXT. Slack rejects a section over 3000 characters,
+    failing the whole post, so a longer text is split at lines into several, a code block
+    closed at the end of one and reopened in the next. Nothing is cut: a line left out
+    could be the mention that tells an owner about their idle job."""
+    chunks, cur, fenced = [], [], False
+    width = MAX_SECTION - 8  # room for a code fence closed and reopened around a piece
+    pieces = [ln[i : i + width] for ln in text.split("\n") for i in range(0, max(len(ln), 1), width)]
+    for line in pieces:
+        if cur and len("\n".join(cur + [line])) + 4 > MAX_SECTION:
+            chunks.append("\n".join(cur + (["```"] if fenced else [])))
+            cur = ["```"] if fenced else []
+        cur.append(line)
+        if line.startswith("```"):
+            fenced = not fenced
+    chunks.append("\n".join(cur))
+    return [{"type": "section", "text": {"type": "mrkdwn", "text": c}} for c in chunks if c.strip("`\n")]

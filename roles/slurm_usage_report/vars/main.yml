@@ -1,12 +1,14 @@
 ---
-# The runs: the hourly report and the weekly summary, each its own service and timer
-# (one template pair), sharing the configuration; the weekly run keeps its own state
-# file beside the hourly one's.
+# The runs: the hourly report, the weekly summary and the daily disk usage report, each
+# its own service and timer (one template pair), sharing the configuration; the weekly
+# and disk runs keep their own state files beside the hourly one's.
 slurm_usage_report_runs:
   - {unit: "{{ slurm_usage_report_svc_name }}", args: "", schedule: "{{ slurm_usage_report_schedule }}",
-     what: report}
+     what: GPU usage report}
   - {unit: "{{ slurm_usage_report_svc_name }}-weekly", args: "--weekly",
-     schedule: "{{ slurm_usage_report_weekly_schedule }}", what: weekly summary}
+     schedule: "{{ slurm_usage_report_weekly_schedule }}", what: weekly GPU usage summary}
+  - {unit: "{{ slurm_usage_report_svc_name }}-storage", args: "--storage",
+     schedule: "{{ slurm_usage_report_storage_schedule }}", what: daily disk usage report}
 # What this component installs, for its record (roles/component_record). Its state files
 # (when each job turned idle, whom it notified, each person's weeks) are data and stay.
 _slurm_usage_report_units: "{{ slurm_usage_report_runs | map(attribute='unit') | product(['.timer', '.service']) | map('join') | list }}"

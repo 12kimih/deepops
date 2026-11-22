@@ -10,7 +10,12 @@ and how many of them sat idle, the people who idled most mentioned, from the per
 GPU usage Prometheus keeps (job_device:dcgm_gpu_util_ratio:max). Seeing it is the
 point: no job is touched. Someone who idled heavily (repeat_idle_gpu_hours and
 repeat_idle_share) for repeat_weeks weeks in a row is reported to the administrators'
-channel with the weeks' numbers, their jobs now and what to do. Standard library only.
+channel with the weeks' numbers, their jobs now and what to do.
+
+With --storage it posts the day's disk usage instead (clustertools.storage_report, from
+the disk quota metrics): every counted filesystem, its largest people (config people,
+the roster's) and projects, and everyone past a warn level, mentioned or sent a DM
+(storage_notify). Standard library only.
 """
 
 import argparse
@@ -22,11 +27,12 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
+from . import storage_report
 from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import Slack
+from .slack import MAX_BLOCKS, Slack, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -42,8 +48,6 @@ from .slurm import (
 )
 from .vocab import job_holds, node_unavailable
 
-MAX_BLOCKS = 45  # Slack allows 50 blocks per message
-MAX_SECTION = 2900  # and 3000 characters per section text
 NOTIFY = {"mention", "dm"}
 DM_FIELDS = {"job": "1234_5", "gpus": 8, "hours": "2", "runtime": "1:00:00"}
 BAR_WIDTH = 10
@@ -245,35 +249,6 @@ def gib(job):
     return f"{job['mem_gib']:.0f}G" + ("+" if job["mem_known"] < len(job["gpus"]) else "")
 
 
-def table(header, rows):
-    """A fixed-width table in a code block; Slack renders it monospaced."""
-    widths = [max(len(str(c)) for c in col) for col in zip(header, *rows)]
-
-    def fmt(r):
-        return "  ".join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip()
-
-    return "```\n" + "\n".join([fmt(header)] + [fmt(r) for r in rows]) + "\n```"
-
-
-def sections(text):
-    """Slack sections holding all of TEXT. Slack rejects a section over 3000 characters,
-    failing the whole post, so a longer text is split at lines into several, a code block
-    closed at the end of one and reopened in the next. Nothing is cut: a line left out
-    could be the mention that tells an owner about their idle job."""
-    chunks, cur, fenced = [], [], False
-    width = MAX_SECTION - 8  # room for a code fence closed and reopened around a piece
-    pieces = [ln[i : i + width] for ln in text.split("\n") for i in range(0, max(len(ln), 1), width)]
-    for line in pieces:
-        if cur and len("\n".join(cur + [line])) + 4 > MAX_SECTION:
-            chunks.append("\n".join(cur + (["```"] if fenced else [])))
-            cur = ["```"] if fenced else []
-        cur.append(line)
-        if line.startswith("```"):
-            fenced = not fenced
-    chunks.append("\n".join(cur))
-    return [{"type": "section", "text": {"type": "mrkdwn", "text": c}} for c in chunks if c.strip("`\n")]
-
-
 def render(report, cfg, who):
     """Summary (text, blocks) and the thread messages [(text, blocks)]."""
     jobs, idle, total = report["jobs"], report["idle"], max(report["total_gpus"], 1)
@@ -399,7 +374,8 @@ CONFIG_KEYS = {
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
     "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
     "repeat_idle_share": (int, float), "repeat_weeks": int, "cancel_interactive_only": bool,
-    "cancel_warn_hours": (int, float), "cancel_warn_text": str,
+    "cancel_warn_hours": (int, float), "cancel_warn_text": str, "storage_top": int,
+    "storage_notify": list, "people": list,
 }  # fmt: skip
 
 
@@ -421,8 +397,11 @@ def load_config(path):
     for key, kind in CONFIG_KEYS.items():
         if not isinstance(cfg.get(key), kind) or (kind is not bool and isinstance(cfg.get(key), bool)):
             raise ConfigError(f"{path}: {key} is missing or not a {getattr(kind, '__name__', 'number')}")
-    if set(cfg["notify"]) - NOTIFY:
-        raise ConfigError(f"{path}: notify takes only {', '.join(sorted(NOTIFY))}")
+    for key in ("notify", "storage_notify"):
+        if set(cfg[key]) - NOTIFY:
+            raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
+    if cfg["storage_top"] < 1:
+        raise ConfigError(f"{path}: storage_top must be 1 or more")
     if cfg["idle_hours"] <= 0:
         raise ConfigError(f"{path}: idle_hours must be above 0")
     try:
@@ -489,13 +468,18 @@ def report_once():
         help="post a preview there instead; notifies, cancels and records nothing",
     )
     ap.add_argument("--check-config", action="store_true", help="check the config and exit")
-    ap.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
+    other = ap.add_mutually_exclusive_group()
+    other.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
+    other.add_argument("--storage", action="store_true", help="post the daily disk usage report instead")
     args = ap.parse_args()
     cfg = load_config(args.config)
     if args.check_config:
         return
     if args.weekly:
         weekly(cfg, args)
+        return
+    if args.storage:
+        storage(cfg, args)
         return
     preview = args.dry_run or bool(args.to)
     state = load_state(cfg["state_file"])
@@ -607,15 +591,8 @@ def weekly(cfg, args):
     slack = Slack(cfg["slack_token"], args.dry_run)
     now = time.time()
     rows = collect_week(Prometheus(cfg["prometheus_url"]), cfg["idle_util_threshold"])
-    path = os.path.join(os.path.dirname(cfg["state_file"]), "weekly.json")
-    try:
-        with open(path) as f:
-            state = json.load(f)
-    except (OSError, ValueError):
-        state = {}
-    state = state if isinstance(state, dict) else {}
-    weeks = state["weeks"] if isinstance(state.get("weeks"), dict) else {}
-    cache = state["users"] if isinstance(state.get("users"), dict) else {}
+    path, state = side_state(cfg, "weekly.json")
+    weeks, cache = state.get("weeks", {}), state.get("users", {})
     who = namer(cfg, slack, cache)
     preview = args.dry_run or bool(args.to)
     text, blocks = render_week(rows, who)
@@ -629,14 +606,63 @@ def weekly(cfg, args):
         write_atomic(path, json.dumps({"weeks": weeks, "users": cache}), mode=0o600)
 
 
-def post_report(report, cfg, who, slack, to):
-    """The summary card and its thread; returns (channel, ts) of the card."""
-    (text, summary), thread = render(report, cfg, who)
-    channel = slack.channel(to) if to else cfg["channel"]
-    ts = slack.post(channel, text, summary)
+def side_state(cfg, name):
+    """(path, {key: dict}) of a run's own state file beside the hourly one's (weekly.json,
+    storage.json), so runs on different timers never race over one file; a missing or
+    damaged file, or a damaged entry, is a fresh start for what it held."""
+    path = os.path.join(os.path.dirname(cfg["state_file"]), name)
+    try:
+        with open(path) as f:
+            state = json.load(f)
+    except (OSError, ValueError):
+        state = {}
+    state = state if isinstance(state, dict) else {}
+    return path, {k: v for k, v in state.items() if isinstance(v, dict)}
+
+
+def post_thread(slack, channel, card, thread):
+    """Post the card (text, blocks) and its thread [(text, blocks)]; the card's ts."""
+    ts = slack.post(channel, *card)
     for t, blocks in thread:
         slack.post(channel, t, blocks, thread_ts=ts)
-    return channel, ts
+    return ts
+
+
+def storage(cfg, args):
+    """The daily disk usage report; with dm in storage_notify, a note to everyone past a
+    level. A preview posts to --to and sends and records nothing; one failed note does not
+    stop the others, and the run fails at the end naming them."""
+    data = storage_report.collect(Prometheus(cfg["prometheus_url"]), time.time())
+    if data is None:
+        print("slurm-usage-report: no disk usage is counted anywhere (roles/disk_quota); nothing to post")
+        return
+    slack = Slack(cfg["slack_token"], args.dry_run)
+    path, state = side_state(cfg, "storage.json")
+    cache = state.get("users", {})
+    preview = args.dry_run or bool(args.to)
+    who = namer(cfg, slack, cache) if "mention" in cfg["storage_notify"] else (lambda user, mention: user)
+    card, thread = storage_report.render(data, who, cfg["storage_top"], set(cfg["people"]))
+    post_thread(slack, slack.channel(args.to) if args.to else cfg["channel"], card, thread)
+    failures = []
+    if "dm" in cfg["storage_notify"] and not preview:
+        for row in storage_report.over_warn(data):
+            try:
+                member = slack_id(row[2], cfg, slack, cache)
+                if member:
+                    slack.post(slack.channel(member), storage_report.dm_text(row))
+            except (RuntimeError, OSError) as e:
+                failures.append(f"notifying {row[2]}: {e}")
+    if not preview:
+        write_atomic(path, json.dumps({"users": cache}), mode=0o600)
+    if failures:
+        raise RuntimeError("; ".join(failures))
+
+
+def post_report(report, cfg, who, slack, to):
+    """The summary card and its thread; returns (channel, ts) of the card."""
+    card, thread = render(report, cfg, who)
+    channel = slack.channel(to) if to else cfg["channel"]
+    return channel, post_thread(slack, channel, card, thread)
 
 
 def cancellable(idle, cfg):
