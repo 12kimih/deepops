@@ -27,6 +27,10 @@ target is installed: the other userspace's metapackage of the same branch (headl
 full). Removed earlier, its dependencies, the running driver among them, would go and
 come back. Everything else (the branch's shared packages, branchless ones such as
 libnvidia-egl-wayland1) stays.
+
+The packages among apt names that put an NVIDIA kernel module on disk (a preview's
+installs: a reboot follows only those):
+    {{ names | nvidia_module_packages }}   -> ["linux-modules-nvidia-580-server-open-generic", ...]
 """
 
 import re
@@ -67,6 +71,23 @@ def nvidia_module_on_disk(version, license_text):
     modules are "Dual MIT/GPL", the proprietary ones "NVIDIA")."""
     version = str(version or "").strip()
     return f"{version} {_flavor('GPL' in str(license_text or ''))}" if version else ""
+
+
+# Packages that put an NVIDIA kernel module on disk: the archive's prebuilt modules and
+# the objects linked at install, and every DKMS package (the archive's nvidia-dkms-*, the
+# CUDA repository's nvidia-kernel-open-dkms and nvidia-dkms-*). What the userspace,
+# X driver and libraries bring needs no reboot.
+_MODULE_PREFIXES = ("linux-modules-nvidia-", "linux-objects-nvidia-")
+
+
+def nvidia_module_packages(names):
+    """The NAMES (apt names, an arch suffix allowed) that install an NVIDIA kernel module."""
+    found = []
+    for package in names or []:
+        name = str(package).split(":", 1)[0]
+        if name.startswith(_MODULE_PREFIXES) or (name.startswith("nvidia-") and "dkms" in name):
+            found.append(package)
+    return found
 
 
 # Packages that come in both kernel module flavours: "-open" right after the branch
@@ -112,4 +133,5 @@ class FilterModule:
             "nvidia_module_loaded": nvidia_module_loaded,
             "nvidia_module_on_disk": nvidia_module_on_disk,
             "nvidia_driver_leftovers": nvidia_driver_leftovers,
+            "nvidia_module_packages": nvidia_module_packages,
         }

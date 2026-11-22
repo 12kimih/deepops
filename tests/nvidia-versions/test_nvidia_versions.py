@@ -117,5 +117,27 @@ class DriverLeftovers(unittest.TestCase):
         )
 
 
+class ModulePackages(unittest.TestCase):
+    def test_only_what_puts_a_kernel_module_on_disk(self):
+        # gpu-style headless -> full: userspace, X driver and libraries need no reboot.
+        full = [
+            "libnvidia-common-580-server",
+            "libnvidia-egl-wayland1",
+            "libnvidia-gl-580-server",
+            "xserver-xorg-video-nvidia-580-server",
+            "nvidia-driver-580-server-open",
+        ]
+        self.assertEqual(nv.nvidia_module_packages(full), [])
+        modules = [
+            "linux-modules-nvidia-580-server-open-6.8.0-149-generic",
+            "linux-objects-nvidia-580-server-open-6.8.0-149-generic",
+            "nvidia-dkms-580-open",
+            "nvidia-kernel-open-dkms",
+            "nvidia-dkms-580:amd64",
+        ]
+        self.assertEqual(nv.nvidia_module_packages(full + modules), modules)
+        self.assertEqual(nv.nvidia_module_packages(None), [])
+
+
 if __name__ == "__main__":
     unittest.main()

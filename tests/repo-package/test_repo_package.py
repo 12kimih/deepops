@@ -87,9 +87,31 @@ class Simulation(unittest.TestCase):
         self.assertTrue(ok["changed"])
         self.assertNotIn("failed", ok)
         self.assertEqual(ok["diff"]["prepared"], "would install new\n")
+        self.assertEqual(ok["repo_package_installs"], ["new"])
         refused = rp.with_removals(failed, ["old"], {"rc": 100, "stdout": "", "stderr": "E: unmet"})
         self.assertTrue(refused["failed"])
         self.assertIn("E: unmet", refused["msg"])
+
+    def test_a_refusal_names_apts_reason_not_the_connections_notice(self):
+        # become with a password runs over a pty: apt's own output comes on stdout and
+        # ssh's closing notice on stderr, which once hid the reason.
+        stdout = (
+            "Reading package lists...\nSome packages could not be installed.\n"
+            "The following packages have unmet dependencies:\n"
+            " libnvidia-gl-580-server : Depends: libnvidia-egl-wayland1\n"
+            "E: Unable to correct problems, you have held broken packages.\n"
+        )
+        simulated = {"rc": 100, "stdout": stdout, "stderr": "Shared connection to host closed.\n"}
+        refused = rp.with_removals({"failed": True, "msg": "m"}, ["old:i386"], simulated)
+        self.assertIn("libnvidia-gl-580-server : Depends: libnvidia-egl-wayland1", refused["msg"])
+        self.assertIn("E: Unable to correct problems", refused["msg"])
+        self.assertNotIn("Shared connection", refused["msg"])
+        self.assertEqual(refused["repo_package_simulation"]["rc"], 100)
+
+    def test_installs_are_what_apt_would_install_or_upgrade(self):
+        out = "Remv old [1]\nInst a (2 archive [amd64])\nInst b:i386 [1] (2 archive [i386])\nConf a (2)\n"
+        self.assertEqual(rp.installs_of(out), ["a", "b:i386"])
+        self.assertEqual(rp.installs_of(None), [])
 
 
 if __name__ == "__main__":

@@ -30,8 +30,7 @@
 # A reboot is needed when the running module is not the one on disk, by version and by
 # flavor (plugins/filter/nvidia.py): a first install, a new version, open <-> proprietary.
 # Not for every install: packages reinstalled at the running version (headless -> full)
-# load nothing new. On re-runs this re-fires a reboot that was skipped. Under --check
-# nothing is installed, so a pending install stands for it.
+# load nothing new. On re-runs this re-fires a reboot that was skipped.
 - name: Read the running NVIDIA kernel module version
   ansible.builtin.command: cat /proc/driver/nvidia/version
   register: nvidia_driver_loaded_version
@@ -53,10 +52,17 @@
   failed_when: false
   check_mode: false
 
+# A run compares the module on disk with the loaded one. A preview installs nothing, so
+# it asks what the install would bring: a reboot only for a package that puts a kernel
+# module on disk (an apt preview names them, repo_package_installs); where the preview
+# cannot name them (dnf, a repository not indexed yet), any install.
 - name: Determine whether the NVIDIA driver needs a reboot
   ansible.builtin.set_fact:
     nvidia_driver_reboot_needed: >-
-      {{ (ansible_check_mode and nvidia_driver_install is defined and nvidia_driver_install.changed) or
+      {{ (ansible_check_mode and nvidia_driver_install is defined and
+          ((nvidia_driver_install.repo_package_installs | nvidia_module_packages | length > 0)
+           if nvidia_driver_install.repo_package_installs is defined
+           else nvidia_driver_install is changed)) or
          (nvidia_driver_module_on_disk | length > 0 and
           nvidia_driver_module_on_disk != (nvidia_driver_loaded_version.stdout | default('') | nvidia_module_loaded)) }}
 

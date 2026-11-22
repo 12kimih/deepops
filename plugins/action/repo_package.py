@@ -19,6 +19,10 @@ order in one simulated transaction, `apt-get -s install <names> <removed>-`: apt
 answer is the preview, a change when it would succeed, the failure (with apt's reason)
 when it would not.
 
+An apt preview names what it would install (repo_package_installs, as apt's simulation
+lists them), so a task after it can tell what the install brings (a kernel module, say)
+rather than only that it changes something.
+
 The module is `use` (apt or dnf; default: the host's package manager, as
 ansible.builtin.package finds it), which takes every other argument as given.
 """
@@ -65,6 +69,26 @@ def simulation_argv(args, removals):
     return argv + names_of(args.get("name")) + [f"{package}-" for package in removals]
 
 
+def installs_of(simulation):
+    """The packages apt's simulation would install or upgrade ("Inst NAME ...")."""
+    return re.findall(r"(?m)^Inst (\S+)", simulation or "")
+
+
+def apt_reason(*texts):
+    """Why apt refuses, from its output: the unmet dependencies it lists and its E: lines.
+    Over a pty (become with a password) apt's stderr arrives on stdout and the connection's
+    own notices ("Shared connection to ... closed.") on stderr, so both are read."""
+    reason, in_unmet = [], False
+    for line in "\n".join(t for t in texts if t).splitlines():
+        if "unmet dependencies" in line:
+            in_unmet = True
+        elif in_unmet and not line.startswith(" "):
+            in_unmet = False  # the list is the indented lines after its heading
+        if in_unmet or line.startswith(("E:", "W:")):
+            reason.append(line.strip())
+    return " ".join(reason) or "apt gave no reason"
+
+
 def with_removals(result, removals, simulated):
     """The preview of an install that follows removals the preview did not make."""
     rc, out, err = simulated.get("rc"), simulated.get("stdout", ""), simulated.get("stderr", "")
@@ -72,15 +96,17 @@ def with_removals(result, removals, simulated):
         result = dict(result)
         result["msg"] = (
             f"{result.get('msg', '').strip()}; with {', '.join(removals)} removed first, as the run "
-            f"does, apt still refuses: {(err or out).strip()}"
+            f"does, apt still refuses: {apt_reason(out, err)}"
         )
+        result["repo_package_simulation"] = {"rc": rc, "stdout": out, "stderr": err}
         return result
-    installs = re.findall(r"(?m)^Inst (\S+)", out)
+    installs = installs_of(out)
     return {
         "changed": bool(installs),
         "msg": f"would install {', '.join(installs) or 'nothing'} once the run removes {', '.join(removals)}",
         "diff": {"prepared": "".join(f"would install {name}\n" for name in installs)},
         "stdout": out,
+        "repo_package_installs": installs,
         "repo_package_after_removal": removals,
     }
 
@@ -110,5 +136,7 @@ class ActionModule(ActionBase):
             argv = simulation_argv(args, removals)
             simulated = self._low_level_execute_command("LC_ALL=C " + shlex.join(argv), sudoable=True)
             done = with_removals(done, removals, simulated)
+        elif self._task.check_mode and not done.get("failed") and use == "apt":
+            done["repo_package_installs"] = installs_of(done.get("stdout"))
         result.update(done)
         return result
