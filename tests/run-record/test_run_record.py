@@ -51,7 +51,9 @@ class Wiring(unittest.TestCase):
         cfg = configparser.ConfigParser()
         cfg.read(ROOT / "ansible.cfg")
         self.assertEqual(cfg["defaults"]["callback_plugins"], "./plugins/callback")
-        self.assertEqual(sorted(p.name for p in tracked("plugins/callback/*")), ["ara_default.py"])
+        self.assertEqual(
+            sorted(p.name for p in tracked("plugins/callback/*")), ["ara_default.py", "run_lock.py"]
+        )
 
     def test_quoted_settings_match_ansible_cfg(self):
         """A comment, docstring or document quoting an ansible.cfg setting (`key = value`)
@@ -127,7 +129,10 @@ class Recording(unittest.TestCase):
         self.addCleanup(subprocess.run, ["rm", "-rf", str(d)])
         (d / "play.yml").write_text(PLAY)
         # unrecorded.env for its throwaway vault password; the callbacks are this test's own.
+        # HOME: run_lock's lock (plugins/callback) in the throwaway base, not shared with
+        # another checkout's test running the same play at the same time.
         env = {**unrecorded.env(), "ARA_BASE_DIR": str(base), "ANSIBLE_CALLBACK_PLUGINS": str(callbacks),
+               "HOME": str(base),
                "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"), "ANSIBLE_LOCALHOST_WARNING": "false",
                # facts gathered every time, into memory, never the operator's fact cache
                "ANSIBLE_GATHERING": "implicit", "ANSIBLE_CACHE_PLUGIN": "memory"}  # fmt: skip
