@@ -242,6 +242,22 @@ class SnapsBeforeSnapd(unittest.TestCase):
         self.assertEqual(got, ["/var/snap/firefox/common/host-hunspell", "/var/snap", "/snap/firefox/9171"])
 
 
+class AbsentStaysOut(unittest.TestCase):
+    """The site's absent list is pinned out after the removal, every architecture."""
+
+    MAIN = ROOT / "roles" / "host_baseline" / "tasks" / "main.yml"
+    TASKS = [t for t in walk(yaml.safe_load(MAIN.read_text()))]
+
+    def test_the_pin_follows_the_removal_and_names_every_architecture(self):
+        names = [t.get("name") for t in self.TASKS]
+        pin = "Keep the packages declared absent out (Debian)"
+        self.assertLess(names.index("Remove the packages declared absent"), names.index(pin))
+        content = next(t for t in self.TASKS if t.get("name") == pin)["ansible.builtin.copy"]["content"]
+        got = render(content, {"host_baseline_absent_packages": ["snapd", "gnome-*", "apache2*"]})
+        self.assertIn("Package: snapd:any gnome-*:any apache2*:any\n", got)
+        self.assertIn("Pin-Priority: -1", got)
+
+
 class OneRemovalPath(unittest.TestCase):
     def test_only_host_baseline_removes_packages(self):
         offenders = []

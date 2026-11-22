@@ -2,6 +2,34 @@
 - name: Remove the packages declared absent
   ansible.builtin.include_tasks: absent.yml
 
+# What the site declares absent stays out: apt refuses to install it again (Pin-Priority
+# -1, every architecture), so a dependency or a later role that would bring one back
+# (snapd by a transitional package, a desktop by a metapackage) fails loudly instead of
+# reinstalling it unseen. Only the site's list: a role removing a package to replace it
+# (another driver's) may want it back. An empty list removes the pin.
+- name: Keep the packages declared absent out (Debian)
+  ansible.builtin.copy:
+    dest: "{{ _host_baseline_absent_pin }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by roles/host_baseline (host_baseline_absent_packages): never installed again.
+      Package: {{ host_baseline_absent_packages | apt_pin_packages }}
+      Pin: version *
+      Pin-Priority: -1
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - host_baseline_absent_packages | length > 0
+
+- name: Remove the pin when nothing is declared absent (Debian)
+  ansible.builtin.file:
+    path: "{{ _host_baseline_absent_pin }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - host_baseline_absent_packages | length == 0
+
 - name: Keep only the declared foreign architectures
   ansible.builtin.include_tasks: foreign_architectures.yml
 
