@@ -526,5 +526,48 @@ do
     PLUGIN = saved
 end
 
+print("== S. submission holds ==")
+-- The rendered file with SUBMIT_HOLDS_FILE set, a holds file written here, and a clock
+-- the test moves (the plugin reads os.time at each call).
+do
+    local saved, real_time = PLUGIN, os.time
+    local path = os.tmpname()
+    local now = 1800000000
+    os.time = function() return now end
+    local function write(stamp, lines)
+        local f = assert(io.open(path, "w"))
+        f:write(stamp and ("generated " .. stamp .. "\n") or "", table.concat(lines, "\n"), "\n")
+        f:close()
+    end
+    local n
+    PLUGIN, n = PLUGIN:gsub('local SUBMIT_HOLDS_FILE%s*=%s*"[^"]*"', 'local SUBMIT_HOLDS_FILE = "' .. path .. '"', 1)
+    assert(n == 1, "no SUBMIT_HOLDS_FILE line in " .. plugin_path)
+    write(now - 60, {"1000 Disk at its hard limit: free space to submit again."})
+    with_site(TWO_TYPES)
+    t = {partition = "cpu"}
+    check("S1 a held person's job is refused", submit(t), slurm.ERROR)
+    check("S1 told why", logged("free space to submit again"), true)
+    t = {partition = "cpu", user_id = 1001}
+    check("S2 someone else submits", submit(t), slurm.SUCCESS)
+    t = {partition = "cpu", user_id = 1000}
+    LOG = {}
+    check("S3 root submitting for a held person is refused", slurm_job_submit(t, {}, 0), slurm.ERROR)
+    write(now, {})
+    t = {partition = "cpu"}
+    check("S4 read at most once a minute", submit(t), slurm.ERROR)
+    now = now + 60
+    check("S4 then read again: released", submit({partition = "cpu"}), slurm.SUCCESS)
+    write(now - 1801, {"1000 held"})
+    now = now + 60
+    check("S5 a file not refreshed for 30 min holds no one", submit({partition = "cpu"}), slurm.SUCCESS)
+    write(nil, {"1000 held"})
+    now = now + 60
+    check("S6 a file without its stamp holds no one", submit({partition = "cpu"}), slurm.SUCCESS)
+    os.remove(path)
+    now = now + 60
+    check("S7 no file holds no one", submit({partition = "cpu"}), slurm.SUCCESS)
+    os.time, PLUGIN = real_time, saved
+end
+
 print(string.format("\n%s: %d passed, %d failed", plugin_path, pass, fail))
 os.exit(fail == 0 and 0 or 1)

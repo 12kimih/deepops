@@ -1,0 +1,13 @@
+{{ ansible_managed | comment }}
+# roles/submit_holds
+[Unit]
+Description=Work out who may not submit Slurm jobs for now
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=5min
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _submit_holds_command }} {{ _submit_holds_config }}

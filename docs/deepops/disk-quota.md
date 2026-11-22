@@ -75,6 +75,32 @@ users (the controller's database, the logs) a reserve: roughly, the space users 
 share divided by how many could fill theirs at once. Alerts report when the usage stops
 being reported, and who or which project has been past its warn level for an hour.
 
+## No new Slurm jobs at a hard limit
+
+With `slurm_enable_submit_holds` (off by default; `roles/submit_holds`, on the controllers)
+someone at a hard limit, of space or of files, on any counted filesystem cannot submit
+Slurm jobs until they free space there. `sbatch`, `srun` and `salloc` refuse the job
+with the reason (where, how much, `quota -s` to look); their running jobs go on.
+
+| Setting | What it does |
+|---|---|
+| `slurm_enable_submit_holds` | Turns the holds on (and the disk report says what a hard limit means for Slurm) |
+| `submit_holds_from` | `YYYY-MM-DD`: no one is held before this date, the grace for everyone already at a limit when the holds are turned on; the disk report and its DMs say from when. `""` holds at once |
+| `submit_holds_interval` | How often the holds are worked out again (5 minutes) |
+
+A timer on the controllers reads the disk quota metrics from Prometheus (the same
+figures and the same "at a hard limit" as the daily disk report) and writes
+`/etc/slurm/submit-holds`; the rendered `job_submit.lua` reads that file at most once a
+minute. A file not refreshed for half an hour, a missing one or one that cannot be read
+holds no one, so a monitoring outage never stops everyone's jobs nor keeps someone held
+who has freed space; `SubmitHoldsStale` warns after 15 minutes without a run. A site's
+own `job_submit.lua` (not the role's template) does not read the holds.
+
+Turning them on: set the switch and the date, run
+`playbooks/slurm-cluster/submit-holds.yml`, then `playbooks/slurm-cluster/slurm.yml` so
+the controllers' `job_submit.lua` reads the file (`--check --diff` first, both).
+Announce the date before it comes.
+
 ## Mount options
 
 `/etc/fstab` has one writer, `host_baseline_mount_options` (roles/host_baseline, which

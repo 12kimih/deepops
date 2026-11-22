@@ -1,0 +1,10 @@
+---
+# The record removes the timer, the command, its configuration and the holds file: no
+# file holds no one.
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: submit_holds
+    component_record_action: absent
+    component_record_items: "{{ submit_holds_items }}"

@@ -3,7 +3,9 @@
 -- sessions on a team QoS). Rendered by roles/slurm from slurm_job_submit_policy: the
 -- [1] block is the site's settings, the rest is the same for every cluster. Edit the
 -- setting, never this file on a host. It runs inside slurmctld holding locks -- keep it
--- pure string parsing, no I/O. https://slurm.schedmd.com/job_submit_plugins.html
+-- pure string parsing, no I/O. The one exception is [2d]: a small local file of
+-- submission holds, read at most once a minute and kept in memory between calls.
+-- https://slurm.schedmd.com/job_submit_plugins.html
 --
 -- WHY THE TYPE STAMPING MATTERS -- do not "optimise" it away.
 -- QoS/association GrpTRES limits written against a typed TRES (gres/gpu:a100=4) are
@@ -61,6 +63,9 @@
 --                          holds its GPUs while someone sits at a shell, so it runs
 --                          only on such a QoS (a team's own, e.g. "^high_"), which
 --                          it must name with --qos. "" = no such rule.
+--   SUBMIT_HOLDS_FILE      the submission holds (roles/submit_holds writes it): people
+--                          who may not submit for now, each with the reason they are
+--                          shown. Set by the role, not here; "" = no holds.
 {% endraw %}
 {%- set p = slurm_job_submit_policy -%}
 {%- macro lua_str(s) -%}"{{ s | string | replace('\\', '\\\\') | replace('"', '\\"') }}"{%- endmacro -%}
@@ -78,6 +83,7 @@ local GPU_JOBS_USE_DEFAULTS = {{ lua_bool(p.gpu_jobs_use_defaults) }}
 local GPUS_PER_NODE         = { {{ p.gpus_per_node | map('int') | join(', ') }} }
 local GPU_NODES_SHARED      = {{ lua_bool(p.gpu_nodes_shared) }}
 local INTERACTIVE_GPU_QOS   = {{ lua_str(p.interactive_gpu_qos) }}
+local SUBMIT_HOLDS_FILE     = {{ lua_str(job_submit_holds_file | default('')) }}
 {% raw %}
 -- Derived once at load, from the [1] block above.
 --   GPU_TYPE_PARTITION    type      -> the partition list to route that type to
@@ -539,10 +545,55 @@ local function route_gpu_job(job_desc, gpu_type)
     end
 end
 
+-- [2d] Submission holds (SUBMIT_HOLDS_FILE): people who may not submit for now, such as
+-- someone at a disk hard limit (roles/submit_holds). The file is a line
+-- "generated <unix time>", then "<uid> <reason>" per person. It is read at most every
+-- HOLDS_REREAD seconds (Slurm keeps this script's state between calls) and trusted for
+-- HOLDS_MAX_AGE: a file its writer stopped refreshing, a missing one or one that cannot
+-- be read holds no one, so a broken writer never stops everyone, nor keeps someone
+-- held who has freed their space. Only new submissions are held; running jobs go on.
+local HOLDS_REREAD, HOLDS_MAX_AGE = 60, 1800
+local holds = {read = nil, by_uid = {}}
+
+local function read_holds(now)
+    local by_uid = {}
+    local f = io.open(SUBMIT_HOLDS_FILE, "r")
+    if not f then return by_uid end
+    local stamp = tonumber(string.match(f:read("*l") or "", "^generated%s+(%d+)"))
+    if stamp and now - stamp <= HOLDS_MAX_AGE then
+        for line in f:lines() do
+            local uid, why = string.match(line, "^(%d+)%s+(.+)$")
+            if uid then by_uid[tonumber(uid)] = why end
+        end
+    end
+    f:close()
+    return by_uid
+end
+
+local function submit_hold(uid)
+    if SUBMIT_HOLDS_FILE == nil or SUBMIT_HOLDS_FILE == "" then return nil end
+    local now = os.time()
+    if holds.read == nil or now - holds.read >= HOLDS_REREAD then
+        holds.read = now
+        local ok, by_uid = pcall(read_holds, now)
+        holds.by_uid = ok and by_uid or {}
+    end
+    return holds.by_uid[tonumber(uid)]
+end
+
 -- [3] Submit hook. Resolve the GPU type first, then route on it -- one lookup, so a
 -- typed request, one typed by its partition and one falling back to the site default
 -- all reach their partitions the same way.
 local function job_submit(job_desc, part_list, submit_uid)
+    -- Whose job it is: root may submit for someone else (--uid), who is the one held.
+    local uid = job_desc.user_id
+    if uid == nil or uid == slurm.NO_VAL then uid = submit_uid end
+    local why = submit_hold(uid)
+    if why then
+        slurm.log_user("%s", why)
+        return slurm.ERROR
+    end
+
     local has_partition = is_nonempty(job_desc.partition)
     local want_gpu, gpu_type, gpu_count, gpu_multi = detect_gpu(job_desc)
 

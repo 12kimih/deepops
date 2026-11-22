@@ -26,6 +26,7 @@ PROGRAMS = {
     "slurm_backup",
     "egress_metrics",
     "container_gc",
+    "submit_holds",
 }
 
 

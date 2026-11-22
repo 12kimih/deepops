@@ -1,0 +1,19 @@
+---
+_submit_holds_command: /usr/local/libexec/submit-holds
+_submit_holds_config: /etc/cluster-tools/submit-holds.json
+_submit_holds_textfile: "{{ node_exporter_prom_dir }}/submit-holds.prom"
+_submit_holds_units: [submit-holds.service, submit-holds.timer]
+_submit_holds_cfg:
+  prometheus_url: "{{ submit_holds_prometheus_url }}"
+  file: "{{ slurm_submit_holds_file }}"
+  disk_from: "{{ submit_holds_from_time | int }}"
+  textfile: "{{ _submit_holds_textfile }}"
+
+# What this component installs, for its record (roles/component_record): the timer and
+# its service before their files. The holds file goes too, so a removal holds no one, and
+# the record of its config (roles/cluster_tools_lib).
+submit_holds_items: >-
+  {{ ['unit:submit-holds.timer', 'unit:submit-holds.service']
+     + _submit_holds_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ _submit_holds_command, 'file:' ~ _submit_holds_config, 'file:' ~ _submit_holds_textfile,
+        'file:' ~ slurm_submit_holds_file, 'file:' ~ cluster_tools_lib_config_records ~ '/submit_holds.json'] }}

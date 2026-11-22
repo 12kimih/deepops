@@ -1,0 +1,19 @@
+---
+dependencies:
+  - role: deploy_defaults  # submit_holds_from
+  - role: cluster_tools_lib  # clustertools.submit_holds
+  - role: prometheus_paths  # prometheus_url, node_exporter_prom_dir
+  - role: slurm_paths  # slurm_submit_holds_file
+
+galaxy_info:
+  namespace: deepops
+  role_name: submit_holds
+  author: DeepOps
+  description: Who may not submit Slurm jobs for now (a disk hard limit), for job_submit.lua
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

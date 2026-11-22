@@ -168,8 +168,20 @@ def describe(row):
     return where(host, filesystem), figure(used), state, kind == "hard"
 
 
-def past_line(row, who, mention=True):
+def hold_note(hold, now):
+    """What a hard limit means for Slurm (clustertools.submit_holds): HOLD is None (no
+    holds) or the Unix time they start."""
+    if hold is None:
+        return ""
+    if now >= hold:
+        return "new Slurm jobs are refused until you free space"
+    return f"from {datetime.fromtimestamp(hold):%Y-%m-%d}, new Slurm jobs are refused while at it"
+
+
+def past_line(row, who, mention=True, note=""):
     place, amount, state, hard = describe(row)
+    if hard and note:
+        state += f"; {note}"
     return f"{':no_entry:' if hard else ':warning:'} {who(row[2], mention)} on {place}: {amount}, {state}"
 
 
@@ -180,11 +192,12 @@ def others_line(rest, shown=3):
     return f"Not in the roster (root, services, people who left): {names}{more}; {size(sum(e['used'] for _, e in rest))} together"
 
 
-def render(data, who, top, people=(), mention=None):
+def render(data, who, top, people=(), mention=None, hold=None):
     """The summary card (text, blocks) and the thread [(text, blocks)]: every disk and
     everyone past a level on the card; each filesystem's TOP people, everyone else, and
     the projects in the thread. With no PEOPLE (no roster) every user is ranked. Of those
-    past a level, the keys in MENTION (row_key) are mentioned; None mentions them all."""
+    past a level, the keys in MENTION (row_key) are mentioned; None mentions them all.
+    HOLD (hold_note) says what a hard limit means for their Slurm jobs."""
     stamp = datetime.fromtimestamp(data["now"]).strftime("%Y-%m-%d")
     rows = over_warn(data)
     full = []
@@ -199,7 +212,10 @@ def render(data, who, top, people=(), mention=None):
     if rows:
         card += sections(
             "*Past a level*\n"
-            + "\n".join(past_line(r, who, mention is None or row_key(r) in mention) for r in rows)
+            + "\n".join(
+                past_line(r, who, mention is None or row_key(r) in mention, hold_note(hold, data["now"]))
+                for r in rows
+            )
         )
     stale = sorted(
         f"{h} (last {datetime.fromtimestamp(t).strftime('%m-%d %H:%M')})"
@@ -252,12 +268,12 @@ def render(data, who, top, people=(), mention=None):
     return (text, card), thread
 
 
-def dm_text(row):
-    """The note to someone past a level: where, how much, and what to do."""
+def dm_text(row, note=""):
+    """The note to someone past a level: where, how much, what it means (NOTE, hold_note,
+    at a hard limit) and what to do."""
     place, amount, state, hard = describe(row)
-    act = (
-        "Writes there fail until you free space."
-        if hard
-        else "Nothing is refused yet: free space before the hard limit."
-    )
+    if hard:
+        act = "Writes there fail" + (f" and {note}" if note else " until you free space") + "."
+    else:
+        act = "Nothing is refused yet: free space before the hard limit."
     return f"Your disk use on {place} is {amount}, {state}. {act} {HOW}"

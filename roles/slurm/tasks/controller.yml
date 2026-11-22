@@ -185,11 +185,14 @@
 # job_submit.lua when the lua plugin is enabled: the role's template rendered from
 # slurm_job_submit_policy (only its [1] block is Jinja; the Lua is raw), or a site's own
 # file installed as it is. Only slurmctld reads it. https://slurm.schedmd.com/job_submit_plugins.html
+# The rendered one reads the submission holds where roles/submit_holds writes them.
 - name: Configure job_submit.lua
   ansible.builtin.template:
     src: "{{ slurm_job_submit_template }}"
     dest: "{{ slurm_config_dir }}/job_submit.lua"
     mode: "0644"
+  vars:
+    job_submit_holds_file: "{{ slurm_submit_holds_file if deepops_components.submit_holds | default('absent') == 'present' else '' }}"
   when:
     - "'lua' in (slurm_job_submit_plugins)"
     - slurm_job_submit_template is match('.*[.]j2$')
