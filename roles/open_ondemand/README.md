@@ -60,7 +60,7 @@ the portal host.
 |---|---|---|
 | `open_ondemand_state` | `present` | present or absent (docs/deepops/component-state.md); a deploy sets it from deepops_components. |
 | `open_ondemand_series` | `'4.2'` | Pinned versions. A bump changes the series, the repo path and these together; read that series' release notes first (config keys and dependencies change per minor). |
-| `open_ondemand_version` | `4.2.5` |  |
+| `open_ondemand_version` | `4.2.5` | Their upstream is the series' APT repository they install from (noble's index; OSC publishes each release there some days after its git tag), so a pin is never ahead of what apt can install. |
 | `open_ondemand_dex_version` | `2.45.1.2` |  |
 | `open_ondemand_nodejs_version` | `22.23.5-1nodesource1` | OOD 4.2 depends on nodejs >= 22, << 23, which the distribution does not ship. |
 | `open_ondemand_repo_url` | `https://apt.osc.edu/ondemand/{{ open_ondemand_series }}/web/apt` | Package repositories. Each key file is fetched with a fixed checksum, then its fingerprint is checked against the publisher's, so a changed key stops the run. |
