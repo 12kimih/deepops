@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from pathlib import Path
 
 from ansible.errors import AnsibleActionFail
 from ansible.plugins.action import ActionBase
@@ -81,19 +82,9 @@ def simulation_argv(args):
     return argv + names_of(args.get("name"))
 
 
-# dpkg's status without the paragraphs of `drop` ("name" for the native architecture or
-# all, "name:arch" for that one): the host as the run's removal leaves it.
-_WITHOUT = r"""
-BEGIN { RS = ""; ORS = "\n\n"; "dpkg --print-architecture" | getline native
-        n = split(drop, d, " "); for (i = 1; i <= n; i++) D[d[i]] = 1 }
-{ p = ""; a = ""; m = split($0, L, "\n")
-  for (i = 1; i <= m; i++) {
-    if (L[i] ~ /^Package: /) p = substr(L[i], 10)
-    if (L[i] ~ /^Architecture: /) a = substr(L[i], 15)
-  }
-  if ((p ":" a) in D || ((a == native || a == "all") && p in D)) next
-  print }
-"""
+# The state file without the paragraphs of `drop`: plugins/apt/paragraphs-without.awk,
+# shared with roles/host_baseline.
+_WITHOUT = (Path(__file__).resolve().parents[1] / "apt" / "paragraphs-without.awk").read_text()
 
 
 def simulation_command(args, removals, status="/var/lib/dpkg/status"):

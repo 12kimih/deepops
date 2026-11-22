@@ -79,11 +79,11 @@
     # them: their reverse dependencies, and with --autoremove the packages apt installed
     # only as their dependencies. What apt would autoremove already is not this
     # removal's: it stays. A package a person or a role installed by name is marked
-    # manual and is never autoremoved; "<name>+" asks the same of the packages just
-    # marked, so a preview, which marked nothing, plans what the run will do.
+    # manual and is never autoremoved; both simulations see the packages just marked as
+    # such (_host_baseline_simulate), so a preview plans what the run will do.
     - name: Note what was already unneeded (Debian)
       ansible.builtin.command:
-        argv: [apt-get, -s, -q, autoremove]
+        argv: "{{ _host_baseline_simulation + ['autoremove'] }}"
       register: host_baseline_unneeded_before
       changed_when: false
       check_mode: false  # read-only; --check needs the result
@@ -93,9 +93,7 @@
 
     - name: Work out what removing them would take with them (Debian)
       ansible.builtin.command:
-        argv: >-
-          {{ ['apt-get', '-s', '-q', 'purge', '--autoremove'] + host_baseline_present
-             + host_baseline_unmarked | map('regex_replace', '$', '+') | list }}
+        argv: "{{ _host_baseline_simulation + ['purge', '--autoremove'] + host_baseline_present }}"
       register: host_baseline_plan
       changed_when: false
       check_mode: false  # read-only; --check needs the result
