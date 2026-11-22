@@ -10,7 +10,8 @@
           installs only the version an admin approved.
         quiet: true
 
-    # Downloaded once, on the controller, and only accepted if it matches the pin.
+    # Downloaded once, on the controller, and only accepted if it matches the pin; a
+    # preview fetches it too, since what it installs is read from it.
     - name: Fetch the approved rules
       ansible.builtin.get_url:
         url: "{{ ai_agent_rules_url }}"
@@ -20,6 +21,7 @@
       delegate_to: localhost
       run_once: true
       become: false
+      check_mode: false  # a pinned download into the controller's temp, not a host change
       vars:
         ai_agent_rules_download: "{{ lookup('env', 'TMPDIR') | default('/tmp', true) }}/ai-agent-rules-{{ ai_agent_rules_sha256 }}.md"
       register: ai_agent_rules_fetch

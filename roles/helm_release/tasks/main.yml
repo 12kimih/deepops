@@ -78,20 +78,15 @@
         - helm_release_needs_change | bool
         - helm_release.repo_password | default('') | length > 0
       block:
-        - name: Create root's scratch directory
-          ansible.builtin.file:
-            path: "{{ deepops_cache_dir }}"
-            state: directory
-            owner: root
-            group: root
-            mode: "0755"
-
+        # Scratch, made and removed by every run, a preview's too: the install it
+        # previews names it (rule 28).
+        # mkdtemp's: root's own, mode 0700, so the credentials stay root's.
         - name: Create a private Helm repository config
           ansible.builtin.tempfile:
             state: directory
-            path: "{{ deepops_cache_dir }}"
             prefix: helm-repo-
           register: helm_release_repo_dir
+          check_mode: false
 
         - name: Add the repository with its credentials
           ansible.builtin.command:
@@ -131,4 +126,5 @@
           ansible.builtin.file:
             path: "{{ helm_release_repo_dir.path }}"
             state: absent
+          check_mode: false  # the scratch the preview made too
           when: helm_release_repo_dir.path is defined

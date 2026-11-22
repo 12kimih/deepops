@@ -10,6 +10,7 @@ and an empty tree passed every test. Here is the one walker they all use:
   ansible_files()      tracked task, handler and playbook files (.yml and .yaml)
   role_var_files()     tracked role defaults and vars files
   tasks(path)          every task, in plays, blocks, rescues, always and handlers
+  conditioned_tasks(path)  (task, its when and every enclosing block's and play's)
   module(task)         (canonical module name, its arguments as a dict)
   references(node)     the variable names a node's templates and conditions use
   defined_here(node)   the names a node defines itself (vars, set_fact, register)
@@ -88,27 +89,40 @@ def load(path):
         return None
 
 
-def _walk(items):
+def _when(node):
+    when = node.get("when", [])
+    return [str(c) for c in (when if isinstance(when, list) else [when])]
+
+
+def _walk(items, inherited):
     for task in items or []:
         if not isinstance(task, dict):
             continue
-        yield task
+        conds = inherited + _when(task)
+        yield task, conds
         for key in NESTED:
-            yield from _walk(task.get(key))
+            yield from _walk(task.get(key), conds)
 
 
-def tasks(path):
-    """Every task in PATH: a playbook's plays (their task lists and handlers) or a task
-    file, with blocks, rescues and always sections walked into."""
+def conditioned_tasks(path):
+    """(task, conditions) of every task in PATH, as tasks() walks them: the conditions
+    are the task's own when and every enclosing block's (and play's), outermost first."""
     data = load(path)
     if not isinstance(data, list):
         return
     for item in data:
         if isinstance(item, dict) and ("hosts" in item or "import_playbook" in item):
             for key in PLAY_LISTS:
-                yield from _walk(item.get(key))
+                yield from _walk(item.get(key), _when(item))
         else:
-            yield from _walk([item])
+            yield from _walk([item], [])
+
+
+def tasks(path):
+    """Every task in PATH: a playbook's plays (their task lists and handlers) or a task
+    file, with blocks, rescues and always sections walked into."""
+    for task, _ in conditioned_tasks(path):
+        yield task
 
 
 # The actions that run a command: change_command and change_shell (plugins/action) are

@@ -107,6 +107,13 @@
 26. An in-tree module runs a command through plugins/module_utils/deepops_command.py,
    never module.run_command or subprocess: run_command takes no timeout, so a sacctmgr
    with slurmdbd gone or a stuck systemctl held the whole play (2026-11 audit).
+27. A task of a module that previews itself under --check (PREVIEWING: change_command,
+   systemd_unit, file, copy, template, apt, ...) has no `not ansible_check_mode` in its
+   when, in any form: `not ansible_check_mode or X` hid Lmod's profile links from every
+   first-install preview. A gate stays only with its reason in CHECK_GATED_OK.
+28. A tempfile task sets check_mode: false, and so does the task removing what it made:
+   tempfile is skipped under --check, so every later task naming its .path failed the
+   preview (helm_release's authenticated install, 2026-11). Scratch is not a host change.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -124,7 +131,18 @@ from jinja2 import nodes
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
-from repo_scan import CHANGES, COMMANDS, SERVICES, Scan, ansible_files, module, role_var_files, tasks, tracked  # noqa: E402
+from repo_scan import (  # noqa: E402
+    CHANGES,
+    COMMANDS,
+    SERVICES,
+    Scan,
+    ansible_files,
+    conditioned_tasks,
+    module,
+    role_var_files,
+    tasks,
+    tracked,
+)
 
 # How a change task's conditions on its own result start (rule 19).
 CHECK_GUARDS = {
@@ -329,6 +347,34 @@ BACKUP_OK = {
 }
 # file -> why it changes the host through command or shell (rule 19)
 UPSTREAM_DGX = "upstream DGX role, kept as NVIDIA ships it (outside ansible-lint too)"
+# Modules that preview themselves under --check: a `not ansible_check_mode` in their when
+# hides from the preview a change the run then makes (rule 27).
+PREVIEWING = {
+    "systemd_unit", "change_command", "change_shell", "repo_package", "file", "copy", "template",
+    "lineinfile", "blockinfile", "replace", "assemble", "apt", "dnf", "package", "user", "group",
+}  # fmt: skip
+# (file, task name) -> why it stays out of the preview.
+CHECK_GATED_OK = {
+    ("roles/build_record/tasks/main.yml",
+     "Mark the install incomplete until it is redone ({{ build_record_path | basename }})"):
+        "bookkeeping of a build the preview did not run",
+    ("roles/deploy_record/tasks/main.yml", "Record this deploy on the host"): "a preview deploys nothing",
+    ("roles/enroot/tasks/redhat.yml", "RHEL | install enroot from the release .rpm"):
+        "the package file is fetched only by the run",
+    ("roles/enroot/tasks/ubuntu.yml", "Ubuntu | install enroot from the release .deb"):
+        "the package file is fetched only by the run",
+    ("roles/nvidia_cuda_toolkit/tasks/present.yml", "Generate one Lmod modulefile per CUDA minor"):
+        "a modulefile reads the toolkit the run installs",
+    ("roles/internal_ca/tasks/cert.yml", "Install the certificate"):
+        "the certificate is signed for the key the run creates",
+    ("roles/open_ondemand/tasks/absent.yml", "Create the backup directory"):
+        "the archive of the configuration is data the run keeps, not a change it previews",
+    ("roles/sshd/tasks/main.yml", "Move ssh.socket to the new ports and addresses"):
+        "the ports are read from the configuration the run writes (sshd -T)",
+    ("roles/sshd/tasks/main.yml", "Reload sshd"): "the ports are read from the configuration the run writes",
+    ("roles/package_repos/tasks/repo.yml", "Refresh the package index"):
+        "repo_package previews installs from an unrefreshed index (package_repos_unrefreshed)",
+}  # fmt: skip
 PLAIN_CHANGE_OK = {
     "roles/nvidia-dgx-firmware/tasks/check-firmware.yml": UPSTREAM_DGX,
     "roles/nvidia-dgx-firmware/tasks/clean.yml": UPSTREAM_DGX,
@@ -461,24 +507,24 @@ class TaskRules(unittest.TestCase):
         scan.check(self)
 
     def test_a_previewing_task_runs_under_check(self):
-        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        scan, offenders = Scan(CHECK_GATED_OK, MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):
-            for task in tasks(path):
+            for task, conds in conditioned_tasks(path):
                 name, _ = module(task)
-                when = task.get("when")
-                text = " and ".join(map(str, when)) if isinstance(when, list) else str(when or "")
+                text = " and ".join(conds)
                 # Ansible refuses async under --check, so an async change has a twin
                 # that previews it (roles/netplan apply.yml).
                 if (
-                    name in ("systemd_unit", "change_command", "change_shell")
+                    name in PREVIEWING
                     and "async" not in task
-                    and re.search(r"(?<!or )\bnot ansible_check_mode\b(?! or)", text)
+                    and re.search(r"\bnot ansible_check_mode\b", text)
+                    and not scan.excuse((rel(path), task.get("name")))
                 ):
                     offenders.append(f"{rel(path)}: {task.get('name')}")
         self.assertEqual(
             offenders,
             [],
-            "systemd_unit and change_command preview themselves: no `when: not ansible_check_mode`",
+            "these preview themselves: no `not ansible_check_mode` in their when (rule 27)",
         )
         scan.check(self)
 
@@ -770,24 +816,11 @@ class TaskRules(unittest.TestCase):
         # A preview installs nothing: on a host without Docker every community.docker
         # task failed the preview of a first deploy. Each is skipped under
         # docker_preview_installs (roles/docker), or under --check altogether.
-        def walk(items, inherited):
-            for task in items or []:
-                if not isinstance(task, dict):
-                    continue
-                when = task.get("when", [])
-                conds = inherited + [str(c) for c in (when if isinstance(when, list) else [when])]
-                yield task, conds
-                for key in ("block", "rescue", "always"):
-                    yield from walk(task.get(key), conds)
-
         scan, offenders, seen = Scan(minimum=MINIMUM_FILES), [], 0
         for path in map(scan.seen, ansible_files()):
             if not rel(path).startswith("roles/") or "/molecule/" in rel(path):
                 continue
-            data = yaml.safe_load(path.read_text())
-            if not isinstance(data, list) or any(isinstance(i, dict) and "hosts" in i for i in data):
-                continue
-            for task, conds in walk(data, []):
+            for task, conds in conditioned_tasks(path):
                 if not any(str(k).startswith("community.docker.") for k in task):
                     continue
                 seen += 1
@@ -979,6 +1012,26 @@ class TaskRules(unittest.TestCase):
                 continue  # NVIDIA's DGX roles are kept as shipped
             offenders += [f"{rel(path)}: {t.get('name')}" for t in tasks(path) if module(t)[0] in SERVICES]
         self.assertEqual(offenders, [], "use systemd_unit (plugins/action/systemd_unit.py)")
+
+    def test_scratch_exists_in_a_preview(self):
+        scan, offenders, seen = Scan(minimum=MINIMUM_FILES), [], 0
+        for path in map(scan.seen, ansible_files()):
+            found = list(tasks(path))
+            made = {t.get("register") for t in found if module(t)[0] == "tempfile"}
+            for task in found:
+                name, args = module(task)
+                removes = (
+                    name == "file"
+                    and str(args.get("state")) == "absent"
+                    and any(f"{r}.path" in str(args.get("path", "")) for r in made if r)
+                )
+                if name == "tempfile" or removes:
+                    seen += 1
+                    if task.get("check_mode") is not False:
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertGreaterEqual(seen, 4, "the scan finds the tempfile tasks and their removals")
+        self.assertEqual(offenders, [], "set check_mode: false (rule 28)")
+        scan.check(self)
 
     def test_modules_run_commands_bounded(self):
         spawn = {"run", "Popen", "call", "check_call", "check_output"}

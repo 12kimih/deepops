@@ -545,19 +545,23 @@
 # Whether the index lists exactly the packages there, hashed by an InRelease the key the
 # nodes trust signed: decided by that evidence, not by this run having copied a package,
 # so a run that failed between the copy and the signature is finished by the next one.
+# The key comes from the site config on stdin, and a repository not there yet (a first
+# preview made no directory) is stale: --check reads only what exists.
 - name: Check the repository's index and signature
   ansible.builtin.shell:
     cmd: |
       set -eu
-      work=$(mktemp -d {{ deepops_cache_dir }}/slurm-repo-check.XXXXXX)
+      [ -d {{ slurm_repo_dir | quote }} ] || { echo stale; exit 0; }
+      work=$(mktemp -d)
       trap 'rm -rf "$work"' EXIT
       cd {{ slurm_repo_dir | quote }}
       apt-ftparchive packages . | cmp -s - Packages || { echo stale; exit 0; }
-      gpg --homedir "$work" --batch --quiet --import {{ deepops_cache_dir }}/slurm-repo.asc
+      gpg --homedir "$work" --batch --quiet --import
       gpg --homedir "$work" --batch --quiet --verify InRelease 2>/dev/null || { echo unsigned; exit 0; }
       grep -q "$(sha256sum Packages | cut -d' ' -f1)" InRelease || { echo stale; exit 0; }
       echo current
     executable: /bin/bash
+    stdin: "{{ lookup('ansible.builtin.file', slurm_repo_signing_pubkey_file) }}"
   register: slurm_repo_index
   changed_when: false
   check_mode: false  # read-only; --check needs the result

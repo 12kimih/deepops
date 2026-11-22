@@ -273,15 +273,19 @@
         dest: "{{ artifacts_dir }}/kubectl"
         flat: true
       run_once: true
+      register: k8s_kubectl_fetch
       when: local_uname.stdout == remote_uname.stdout
 
+    # A preview fetched nothing: a file it would make has no mode to set yet.
     - name: Ensure fetched kubectl is executable
       ansible.builtin.file:
         path: "{{ artifacts_dir }}/kubectl"
         mode: "0755"
       delegate_to: localhost
       run_once: true
-      when: local_uname.stdout == remote_uname.stdout
+      when:
+        - local_uname.stdout == remote_uname.stdout
+        - not (ansible_check_mode and k8s_kubectl_fetch is changed)
 
     - name: Get kubectl version for cross-platform download
       ansible.builtin.command: /usr/local/bin/kubectl version --client -o json

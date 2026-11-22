@@ -1,7 +1,10 @@
 ---
+# cluster_tools_lib_source: the package on the controller, for what runs it there (the
+# login banner, drawn at deploy time and so in a preview too).
 - name: Collect the clustertools modules
   ansible.builtin.set_fact:
     cluster_tools_lib_modules: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/clustertools/*.py') | sort }}"
+    cluster_tools_lib_source: "{{ role_path }}/files"
 
 # The package is its modules, nothing else: a copy of the directory would also ship the
 # controller's __pycache__, and a module dropped from the package would stay importable.

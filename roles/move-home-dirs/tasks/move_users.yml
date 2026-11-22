@@ -15,6 +15,7 @@
     state: directory
     suffix: -move-home-dirs
   register: tmp_user_key_dir
+  check_mode: false  # scratch every run makes and removes (rule 28)
   delegate_to: 127.0.0.1
   become: false
   run_once: true
@@ -101,6 +102,7 @@
       ansible.builtin.file:
         path: "{{ tmp_user_key_dir.path }}"
         state: absent
+      check_mode: false
       delegate_to: 127.0.0.1
       become: false
       run_once: true

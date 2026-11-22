@@ -68,10 +68,6 @@
   vars:
     source_build: "{{ lmod_source_build }}"
 
-- name: Note whether Lmod was built
-  ansible.builtin.set_fact:
-    lmod_build: "{{ source_build_built }}"
-
 # Earlier versions built in, and kept, this tree.
 - name: Remove the build tree earlier versions kept
   ansible.builtin.file:
@@ -111,7 +107,6 @@
   loop:
     - {src: profile, dest: z00_lmod.sh}
     - {src: cshrc, dest: z00_lmod.csh}
-  when: not ansible_check_mode or not lmod_build
 
 - name: Find the installed shells
   ansible.builtin.stat:
@@ -156,9 +151,7 @@
     state: link
     force: true
     follow: false
-  when:
-    - "'fish' in lmod_installed_shells"
-    - not ansible_check_mode or not lmod_build
+  when: "'fish' in lmod_installed_shells"
 
 # Superseded: the trees used to reach Lmod through LMOD_SITE_MODULEPATH snippets, which
 # only bash and csh login shells read; /etc/lmod/.modulespath covers every shell.
@@ -170,6 +163,7 @@
 
 # As a user would meet it: an unprivileged account with a clean environment, in every
 # way each installed shell starts (login, interactive, a command over ssh, a script).
+# It proves what this run wrote, so a preview, which wrote nothing, has nothing to prove.
 - name: Check every shell finds this Lmod
   ansible.builtin.script:
     cmd: >-
@@ -178,8 +172,7 @@
       --ssh-reads-system-rc {{ (ansible_facts.os_family == 'Debian') | string | lower }}
     executable: python3
   changed_when: false
-  check_mode: false  # read-only; --check needs the result
-  when: not ansible_check_mode or not lmod_build
+  when: not ansible_check_mode
 
 - name: Record the component as present
   ansible.builtin.include_role:
