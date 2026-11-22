@@ -199,6 +199,49 @@ class NeededPackagesStay(unittest.TestCase):
         self.assertIn("libgl1", out, "an i386 copy stays unless named name:i386")
 
 
+class SnapsBeforeSnapd(unittest.TestCase):
+    """snapd's purge failed on a snap mount it could not take down and left snapd half
+    removed (2026-11-22): the snaps go through snapd first, then any mount left."""
+
+    SNAPS = ROOT / "roles" / "host_baseline" / "tasks" / "snaps.yml"
+    TASKS = {t.get("name"): t for t in walk(yaml.safe_load(SNAPS.read_text()))}
+    LISTED = [
+        "bare      1.0       5     latest/stable  canonical**  base",
+        "core24    20260824  2124  latest/stable  canonical**  base",
+        "firefox   146.0     9171  latest/stable  mozilla**    -",
+        "snapd     2.78      25935 latest/stable  canonical**  snapd",
+        "htop      3.4       6664  latest/stable  maxiberta    -",
+    ]
+
+    def test_applications_go_first_then_bases_then_snapd(self):
+        task = self.TASKS["Remove each snap through snapd, applications first"]
+        order = render(task["loop"], {**task["vars"], "host_baseline_snaps": {"stdout_lines": self.LISTED}})
+        self.assertEqual([line.split()[0] for line in order], ["firefox", "htop", "bare", "core24", "snapd"])
+
+    def test_it_runs_before_the_removal_and_only_for_snapd(self):
+        # The block and its removal task share the name: the task is the last of them.
+        names = [t.get("name") for t in walk(yaml.safe_load(ABSENT.read_text()))]
+        removal = len(names) - 1 - names[::-1].index("Remove the packages declared absent")
+        self.assertLess(names.index("Take the snaps out before snapd"), removal)
+        when = NeededPackagesStay.TASKS["Take the snaps out before snapd"]["when"]
+        self.assertTrue(condition(when, {"host_baseline_removal": ["gdm3", "snapd"]}))
+        self.assertTrue(condition(when, {"host_baseline_removal": ["snapd:amd64"]}))
+        self.assertFalse(condition(when, {"host_baseline_removal": ["gdm3", "snapd-glib"]}))
+
+    def test_only_snap_mounts_are_unmounted_deepest_first(self):
+        task = self.TASKS["Unmount what is still mounted from /snap or /var/snap"]
+        mounts = [
+            "/",
+            "/snap/firefox/9171",
+            "/var/snap/firefox/common/host-hunspell",
+            "/snapshots",
+            "/var/snap",
+            "/home",
+        ]
+        got = render(task["loop"], {"host_baseline_snap_mounts": {"stdout_lines": mounts}})
+        self.assertEqual(got, ["/var/snap/firefox/common/host-hunspell", "/var/snap", "/snap/firefox/9171"])
+
+
 class OneRemovalPath(unittest.TestCase):
     def test_only_host_baseline_removes_packages(self):
         offenders = []

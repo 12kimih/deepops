@@ -1,0 +1,61 @@
+---
+# Before snapd itself goes (tasks/absent.yml): snapd's purge removes every snap it still
+# has and fails on a mount it cannot take down, which leaves snapd half removed (the
+# firefox snap's host-hunspell bind mount: "rm: cannot remove
+# '/var/snap/firefox/common/host-hunspell': Device or resource busy", 2026-11-22). So,
+# as Ubuntu removes snapd: each snap through snapd first (applications, then the bases,
+# snapd's own snap last), then whatever is still mounted from /snap or /var/snap is
+# unmounted, its mount unit stopped; snapd's purge then finds nothing left. A host where
+# snapd already went half way (no snap command, its mounts still up) gets the second
+# step alone.
+- name: Read the installed snaps
+  ansible.builtin.command:
+    argv: [sh, -c, 'command -v snap >/dev/null || exit 0; snap list --unicode=never | tail -n +2']
+  register: host_baseline_snaps
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Remove each snap through snapd, applications first
+  change_command:
+    argv: [snap, remove, --purge, "{{ item }}"]
+  loop: >-
+    {{ (host_baseline_snaps.stdout_lines | reject('search', _snap_kind) | list)
+       + (host_baseline_snaps.stdout_lines | select('search', _snap_kind) | reject('search', _snap_self) | list)
+       + (host_baseline_snaps.stdout_lines | select('search', _snap_self) | list) }}
+  loop_control:
+    label: "{{ item.split()[0] }}"
+  vars:
+    # The Notes column, last: a base or core snap, and snapd's own.
+    _snap_kind: '\s\S*\b(base|core|snapd)\b\S*$'
+    _snap_self: '\s\S*\bsnapd\b\S*$'
+  when: host_baseline_snaps.stdout_lines | length > 0
+
+- name: Read the snap mounts still up
+  ansible.builtin.command:
+    argv: [findmnt, --list, --noheadings, --output, TARGET]
+  register: host_baseline_snap_mounts
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Read the snap mount units
+  ansible.builtin.command:
+    argv: [systemctl, list-units, --all, --plain, --no-legend, --type=mount, "snap-*", "var-snap-*"]
+  register: host_baseline_snap_units
+  changed_when: false
+  check_mode: false  # read-only; --check needs the result
+
+- name: Stop the snap mount units
+  change_command:
+    argv: "{{ ['systemctl', 'stop'] + host_baseline_snap_units.stdout_lines | map('split') | map('first') | list }}"
+  when: host_baseline_snap_units.stdout_lines | length > 0
+
+# Deepest first: a mount inside another goes before it.
+- name: Unmount what is still mounted from /snap or /var/snap
+  change_command:
+    argv: [umount, "{{ item }}"]
+  loop: >-
+    {{ host_baseline_snap_mounts.stdout_lines | select('match', '^/(var/)?snap(/|$)') | sort(reverse=true) | list }}
+  register: host_baseline_snap_unmounted
+  failed_when: >-
+    not ansible_check_mode and host_baseline_snap_unmounted.rc != 0
+    and 'not mounted' not in host_baseline_snap_unmounted.stderr
