@@ -96,6 +96,13 @@ class Installed(unittest.TestCase):
             config.main(["installed", "--dir", str(self.records), "--skip=old", "--skip=deploying"]), 0
         )
 
+    def test_a_tool_the_package_no_longer_has_names_the_playbook(self):
+        self.record("renamed", {"a": 1}, module="clustertools.no_such_tool")
+        problems = config.installed(self.records)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("clustertools.no_such_tool is not a tool of this package", problems[0])
+        self.assertTrue(problems[0].endswith("; rerun playbooks/renamed.yml"))
+
     def test_a_damaged_record_is_reported(self):
         (self.records / "bad.json").write_text("{")
         self.assertIn("a damaged record", config.installed(self.records)[0])
