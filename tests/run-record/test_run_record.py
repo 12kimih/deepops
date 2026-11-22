@@ -11,6 +11,7 @@ import configparser
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -83,7 +84,8 @@ class Recording(unittest.TestCase):
         d = Path(tempfile.mkdtemp())
         self.addCleanup(subprocess.run, ["rm", "-rf", str(d)])
         (d / "play.yml").write_text(PLAY)
-        env = {**os.environ, "ARA_BASE_DIR": str(base), "ANSIBLE_CALLBACK_PLUGINS": str(callbacks),
+        # unrecorded.env for its throwaway vault password; the callbacks are this test's own.
+        env = {**unrecorded.env(), "ARA_BASE_DIR": str(base), "ANSIBLE_CALLBACK_PLUGINS": str(callbacks),
                "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"), "ANSIBLE_LOCALHOST_WARNING": "false",
                # facts gathered every time, into memory, never the operator's fact cache
                "ANSIBLE_GATHERING": "implicit", "ANSIBLE_CACHE_PLUGIN": "memory"}  # fmt: skip
@@ -121,6 +123,27 @@ class Recording(unittest.TestCase):
         self.addCleanup(os.rmdir, empty)
         self.run_play(base, empty)
         self.assertFalse((base / "ansible.sqlite").exists())
+
+
+class NoSiteSecret(unittest.TestCase):
+    def test_a_test_run_starts_where_no_site_config_is(self):
+        """ansible.cfg names config/.vault-pass, and Ansible does not start without it: a
+        test run takes unrecorded's throwaway password instead (CI has no site config)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            shutil.copy(ROOT / "ansible.cfg", tmp)
+            base = {k: v for k, v in os.environ.items() if k != "ANSIBLE_VAULT_PASSWORD_FILE"}
+            env = unrecorded.env(base, ANSIBLE_CONFIG=str(Path(tmp, "ansible.cfg")))
+            self.assertNotIn(".vault-pass", env["ANSIBLE_VAULT_PASSWORD_FILE"])
+            argv = [str(BIN / "ansible"), "localhost", "-m", "ansible.builtin.ping"]
+            for case, run_env in (
+                ("site file missing", base | {"ANSIBLE_CONFIG": env["ANSIBLE_CONFIG"]}),
+                ("unrecorded", env),
+            ):
+                with self.subTest(case=case):
+                    out = subprocess.run(
+                        argv, cwd=tmp, env=run_env, capture_output=True, text=True, timeout=unrecorded.TIMEOUT
+                    )
+                    self.assertEqual(out.returncode == 0, case == "unrecorded", out.stdout + out.stderr)
 
 
 if __name__ == "__main__":

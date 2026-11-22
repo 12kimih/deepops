@@ -118,10 +118,14 @@ fi
 jobs_max="${CHECK_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 logs="$(mktemp -d)"
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -rf "${logs}"' EXIT
-# The test playbooks are not runs to keep: no callback plugin directory, no ARA record
-# (scripts/deepops/unrecorded.py, the same for a test run on its own).
+# The test playbooks are not runs to keep: no callback plugin directory, no ARA record;
+# and they need no site secret: a throwaway vault password file for the one ansible.cfg
+# names, so the checks run where no site config is (scripts/deepops/unrecorded.py, the
+# same for a test run on its own).
 mkdir "${logs}/no-callbacks"
 export ANSIBLE_CALLBACK_PLUGINS="${logs}/no-callbacks"
+(umask 077 && od -An -N16 -tx1 /dev/urandom | tr -d ' \n' >"${logs}/vault-pass")
+export ANSIBLE_VAULT_PASSWORD_FILE="${logs}/vault-pass"
 run_one() {
     local i="$1" start=${SECONDS} status=ok
     nice -n 10 bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
