@@ -7,13 +7,15 @@
     component_record_action: begin
     component_record_items: "{{ slurm_usage_report_items }}"
 
-- name: Create config dir
+# Its configuration holds the bot token: root's alone (0600) in the cluster tools'
+# configuration directory, as every cluster tool's is.
+- name: Create the cluster tools configuration directory
   ansible.builtin.file:
-    path: "{{ slurm_usage_report_config_dir }}"
+    path: "{{ _slurm_usage_report_config | dirname }}"
     state: directory
     owner: root
     group: root
-    mode: "0700"
+    mode: "0755"
 
 # The report is clustertools.usage_report, installed with the rest of the cluster's
 # Python by cluster_tools_lib, so it always matches the library it imports. This role
@@ -29,7 +31,7 @@
     tasks_from: command
   vars:
     cluster_tools_lib_command:
-      dest: "{{ slurm_usage_report_script }}"
+      dest: "{{ _slurm_usage_report_command }}"
       module: clustertools.usage_report
 
 # Holds the bot token.
@@ -37,7 +39,7 @@
   diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:
     src: config.json.j2
-    dest: "{{ slurm_usage_report_config_dir }}/config.json"
+    dest: "{{ _slurm_usage_report_config }}"
     owner: root
     group: root
     mode: "0600"
@@ -57,7 +59,7 @@
     cluster_tools_lib_config:
       role: slurm_usage_report
       module: clustertools.usage_report
-      file: "{{ slurm_usage_report_config_dir }}/config.json"
+      file: "{{ _slurm_usage_report_config }}"
       playbook: playbooks/slurm-cluster/slurm-usage-report.yml
   tags:
     - people

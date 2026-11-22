@@ -80,13 +80,13 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_cancel_after_hours: 0
 #slurm_usage_report_user_map: "{{ slack_members }}"
 # The daily disk usage report, from the disk quota metrics (slurm_enable_disk_quota):
-# each counted filesystem, its storage_top largest people, the projects, and everyone past
-# a warn level (storage_notify: mention, dm, both or []), told at once, daily at a hard
-# limit, and every storage_repeat_days while past the same warn level (0: every day).
-#slurm_usage_report_storage_schedule: "*-*-* 09:00:00"
-#slurm_usage_report_storage_top: 10
-#slurm_usage_report_storage_notify: [mention]
-#slurm_usage_report_storage_repeat_days: 7
+# each counted filesystem, its disk_top largest people, the projects, and everyone past
+# a warn level (disk_notify: mention, dm, both or []), told at once, daily at a hard
+# limit, and every disk_repeat_days while past the same warn level (0: every day).
+#slurm_usage_report_disk_schedule: "*-*-* 09:00:00"
+#slurm_usage_report_disk_top: 10
+#slurm_usage_report_disk_notify: [mention]
+#slurm_usage_report_disk_repeat_days: 7
 
 # AI coding agents (roles/ai_agent_rules): the site's agent rules file (Markdown
 # starting with <!-- cluster-agent-rules -->), installed for Claude Code

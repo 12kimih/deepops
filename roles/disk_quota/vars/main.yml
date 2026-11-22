@@ -2,7 +2,7 @@
 _disk_quota_command: /usr/local/libexec/disk-quota
 _disk_quota_config: /etc/cluster-tools/disk-quota.json
 _disk_quota_textfile: "{{ node_exporter_prom_dir }}/disk-quota.prom"
-_disk_quota_units: [disk-quota-metrics.service, disk-quota-metrics.timer]
+_disk_quota_units: [disk-quota.service, disk-quota.timer]
 _disk_quota_roster: "{{ people | default({}) }}"
 _disk_quota_users: "{{ _disk_quota_roster | people_disk_quotas(disk_quota_limits) }}"
 _disk_quota_cfg:
@@ -16,7 +16,7 @@ _disk_quota_cfg:
 # What this component installs, for its record (roles/component_record): the timer and
 # its service before their files. The cluster tools' directory stays (shared).
 disk_quota_items: >-
-  {{ ['package:quota', 'unit:disk-quota-metrics.timer', 'unit:disk-quota-metrics.service']
+  {{ ['package:quota', 'unit:disk-quota.timer', 'unit:disk-quota.service']
      + _disk_quota_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ _disk_quota_command, 'file:' ~ _disk_quota_config, 'file:' ~ _disk_quota_textfile,
         'file:' ~ cluster_tools_lib_config_records ~ '/disk_quota.json'] }}

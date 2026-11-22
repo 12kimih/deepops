@@ -248,20 +248,20 @@ week's numbers, their jobs now and the steps to take. The weekly run is its own 
 keeps its own state file (`weekly.json` beside the hourly one's); `--weekly` with
 `--dry-run` or `--to` previews it.
 
-Every morning (`slurm_usage_report_storage_schedule`) it posts the day's disk usage, from
+Every morning (`slurm_usage_report_disk_schedule`) it posts the day's disk usage, from
 the disk quota metrics ([disk-quota.md](../deepops/disk-quota.md); without them it posts
 nothing). The card has each counted filesystem's disk (how full, what is free, how the
 use changed in a day) and everyone past a warn level or at a hard limit, worst first.
-The thread lists each filesystem's `slurm_usage_report_storage_top` largest people (the
+The thread lists each filesystem's `slurm_usage_report_disk_top` largest people (the
 roster's active logins, `slurm_usage_report_people`), with their day's growth and levels;
-everyone else there (root, the services, people who left) on one line; and the projects. `slurm_usage_report_storage_notify` says
+everyone else there (root, the services, people who left) on one line; and the projects. `slurm_usage_report_disk_notify` says
 how the people past a level hear about it: `mention` on the card, `dm`, both, or `[]`.
 They are told when they first pass a level, every day while at a hard limit (their
-writes fail), and again every `slurm_usage_report_storage_repeat_days` (7) while past the
+writes fail), and again every `slurm_usage_report_disk_repeat_days` (7) while past the
 same warn level (0: every day); the card lists everyone past a level every day, mentioning
-only those told. Who was told when is kept in `storage.json` beside the hourly state.
+only those told. Who was told when is kept in `disk.json` beside the hourly state.
 A host whose usage was not reported in the last hour is named, since its figures are
-older. `--storage` with `--dry-run` or `--to` previews it.
+older. `--disk` with `--dry-run` or `--to` previews it.
 
 The role needs a Slack app bot token (`slack_bot_token` in roles/slack_defaults, scopes `chat:write`, `im:write`,
 `users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack

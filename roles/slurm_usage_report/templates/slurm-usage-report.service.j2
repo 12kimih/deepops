@@ -8,8 +8,8 @@ After=network-online.target
 Type=oneshot
 # A oneshot has no start timeout by default; one hang would stop its timer for good.
 TimeoutStartSec=20min
-ExecStart={{ ([slurm_usage_report_script, '--config', slurm_usage_report_config_dir ~ '/config.json'] + item.args) | join(' ') }}
-StateDirectory={{ slurm_usage_report_svc_name }}
+ExecStart={{ ([_slurm_usage_report_command, '--config', _slurm_usage_report_config] + item.args) | join(' ') }}
+StateDirectory={{ _slurm_usage_report_name }}
 ProtectSystem=full
 PrivateTmp=true
 NoNewPrivileges=true

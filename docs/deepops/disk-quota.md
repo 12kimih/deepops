@@ -65,7 +65,7 @@ every 15 minutes:
 | `disk_quota_project_limit_bytes` | `filesystem`, `project`, `project_id`, `kind` |
 | `disk_quota_last_success_timestamp_seconds` | |
 
-The usage report's daily disk report (`slurm_usage_report_storage_schedule`,
+The usage report's daily disk report (`slurm_usage_report_disk_schedule`,
 [slurm-monitor.md](../slurm-cluster/slurm-monitor.md#slack-usage-report)) posts the same
 figures each morning: every counted filesystem, its largest people and their day's growth,
 the projects, and everyone past a warn level, so the people concerned hear about it.

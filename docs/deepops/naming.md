@@ -14,7 +14,7 @@ with what it is to become, and the list only shrinks.
 | A cluster tool it runs | the module `clustertools.<key>`, the command `<key-kebab>` | `clustertools.disk_quota`, `/usr/local/libexec/disk-quota` |
 | Its systemd units | `<key-kebab>[-<what>].service`, `.timer` | `disk-quota.service` |
 | Its configuration | `/etc/cluster-tools/<key-kebab>.json` | `/etc/cluster-tools/disk-quota.json` |
-| Its state | `/var/lib/deepops/<key-kebab>/` | |
+| Its state | `/var/lib/<key-kebab>/` (systemd StateDirectory=) | `/var/lib/slurm-usage-report/` |
 | Its textfile metrics | `<key-kebab>.prom`, every metric `<key>_...` | `disk_quota_used_bytes` |
 | When it last worked | `<key>_last_success_timestamp_seconds` | `disk_quota_last_success_timestamp_seconds` |
 | Its alert rules | `roles/prometheus/files/rules/<key-kebab>.yml`, alerts `<Key>...` in CamelCase | `DiskQuotaStale` |

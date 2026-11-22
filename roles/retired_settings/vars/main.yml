@@ -160,6 +160,13 @@ retired_settings:
   nis_client_nsswitch: none; each directory client adds its own source to nsswitch.conf (roles/nsswitch)
   easybuild_home: system_accounts.easybuild.home (the build account's home) in roles/system_accounts
   cluster_tools_profile_file: cluster_tools_profile_name in roles/cluster_tools (the name without .sh; a .csh is written beside it)
+  slurm_usage_report_script: none; the command's path is the role's own (/usr/local/libexec/slurm-usage-report)
+  slurm_usage_report_config_dir: none; the configuration is /etc/cluster-tools/slurm-usage-report.json, as every cluster tool's
+  slurm_usage_report_svc_name: none; the units and the state directory are named slurm-usage-report by the role
+  slurm_usage_report_storage_schedule: slurm_usage_report_disk_schedule in roles/slurm_usage_report (the daily disk report)
+  slurm_usage_report_storage_top: slurm_usage_report_disk_top in roles/slurm_usage_report
+  slurm_usage_report_storage_notify: slurm_usage_report_disk_notify in roles/slurm_usage_report
+  slurm_usage_report_storage_repeat_days: slurm_usage_report_disk_repeat_days in roles/slurm_usage_report
   slurm_deb_build_dir: system_accounts.slurmbuild.home (the build account's home) in roles/system_accounts
   slurm_user_home: system_accounts.slurm.home in roles/system_accounts
   slurm_user_uid: system_accounts.slurm.uid in roles/system_accounts

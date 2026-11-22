@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the daily disk report's PromQL (clustertools.storage_report) with promtool:
+"""Execute the daily disk report's PromQL (clustertools.disk_report) with promtool:
 the disks it reads are exactly the filesystems the quota metrics count (no cluster)."""
 
 import sys
@@ -12,7 +12,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
-from clustertools import storage_report  # noqa: E402
+from clustertools import disk_report  # noqa: E402
 
 
 def labels(**kw):
@@ -44,7 +44,7 @@ class StorageQueryTests(unittest.TestCase):
                     ],
                     "promql_expr_test": [
                         {
-                            "expr": storage_report.disk_query("node_filesystem_size_bytes"),
+                            "expr": disk_report.disk_query("node_filesystem_size_bytes"),
                             "eval_time": "2m",
                             "exp_samples": [
                                 {"labels": labels(**login, mountpoint="/"), "value": 400},

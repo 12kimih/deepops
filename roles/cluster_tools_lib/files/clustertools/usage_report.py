@@ -14,10 +14,10 @@ point: no job is touched. Someone who idled heavily (repeat_idle_gpu_hours and
 repeat_idle_share) for repeat_weeks weeks in a row is reported to the administrators'
 channel with the weeks' numbers, their jobs now and what to do.
 
-With --storage it posts the day's disk usage instead (clustertools.storage_report, from
+With --disk it posts the day's disk usage instead (clustertools.disk_report, from
 the disk quota metrics): every counted filesystem, its largest people (config people,
 the roster's) and projects, and everyone past a warn level, mentioned or sent a DM
-(storage_notify). Standard library only.
+(disk_notify). Standard library only.
 """
 
 import argparse
@@ -29,7 +29,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import config, notices, storage_report
+from . import config, notices, disk_report
 from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
@@ -389,8 +389,8 @@ CONFIG_KEYS = {
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
     "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
     "repeat_idle_share": (int, float), "repeat_weeks": int,
-    "cancel_warn_hours": (int, float), "cancel_warn_text": str, "storage_top": int,
-    "storage_notify": list, "storage_repeat_days": (int, float), "people": list,
+    "cancel_warn_hours": (int, float), "cancel_warn_text": str, "disk_top": int,
+    "disk_notify": list, "disk_repeat_days": (int, float), "people": list,
     "holds_on": bool, "holds_from": (int, float),
 }  # fmt: skip
 
@@ -400,13 +400,13 @@ def load_config(path):
     it, at deploy time (the role validates the file, clustertools.config) and never a
     traceback part-way through notifying owners."""
     cfg = config.require(path, CONFIG_KEYS)
-    for key in ("notify", "storage_notify"):
+    for key in ("notify", "disk_notify"):
         if set(cfg[key]) - NOTIFY:
             raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
-    if cfg["storage_top"] < 1:
-        raise ConfigError(f"{path}: storage_top must be 1 or more")
-    if cfg["storage_repeat_days"] < 0:
-        raise ConfigError(f"{path}: storage_repeat_days must be 0 (every day) or more")
+    if cfg["disk_top"] < 1:
+        raise ConfigError(f"{path}: disk_top must be 1 or more")
+    if cfg["disk_repeat_days"] < 0:
+        raise ConfigError(f"{path}: disk_repeat_days must be 0 (every day) or more")
     if cfg["idle_hours"] <= 0:
         raise ConfigError(f"{path}: idle_hours must be above 0")
     try:
@@ -468,7 +468,7 @@ def load_state(path):
 
 def report_once():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--config", default="/etc/slurm-usage-report/config.json")
+    ap.add_argument("--config", default="/etc/cluster-tools/slurm-usage-report.json")
     ap.add_argument("--dry-run", action="store_true", help="print instead of posting")
     ap.add_argument(
         "--to",
@@ -477,14 +477,14 @@ def report_once():
     )
     other = ap.add_mutually_exclusive_group()
     other.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
-    other.add_argument("--storage", action="store_true", help="post the daily disk usage report instead")
+    other.add_argument("--disk", action="store_true", help="post the daily disk usage report instead")
     args = ap.parse_args()
     cfg = load_config(args.config)
     if args.weekly:
         weekly(cfg, args)
         return
-    if args.storage:
-        storage(cfg, args)
+    if args.disk:
+        disk(cfg, args)
         return
     preview = args.dry_run or bool(args.to)
     state = load_state(cfg["state_file"])
@@ -616,7 +616,7 @@ def weekly(cfg, args):
 
 def side_state(cfg, name):
     """(path, {key: dict}) of a run's own state file beside the hourly one's (weekly.json,
-    storage.json), so runs on different timers never race over one file; a missing or
+    disk.json), so runs on different timers never race over one file; a missing or
     damaged file, or a damaged entry, is a fresh start for what it held."""
     path = os.path.join(os.path.dirname(cfg["state_file"]), name)
     try:
@@ -636,35 +636,35 @@ def post_thread(slack, channel, card, thread):
     return ts
 
 
-def storage(cfg, args):
+def disk(cfg, args):
     """The daily disk usage report. The people past a level who are due a notice
     (clustertools.notices: a first crossing, a hard limit every day, the same warn level
-    every storage_repeat_days) are mentioned on the card or sent a DM, as storage_notify says,
+    every disk_repeat_days) are mentioned on the card or sent a DM, as disk_notify says,
     and recorded once it reached them. A preview posts to --to and sends and records
     nothing; one failed DM does not stop the others, and the run fails at the end naming
     them."""
     now = time.time()
-    data = storage_report.collect(Prometheus(cfg["prometheus_url"]), now)
+    data = disk_report.collect(Prometheus(cfg["prometheus_url"]), now)
     if data is None:
         print("slurm-usage-report: no disk usage is counted anywhere (roles/disk_quota); nothing to post")
         return
     slack = Slack(cfg["slack_token"], args.dry_run)
-    path, state = side_state(cfg, "storage.json")
+    path, state = side_state(cfg, "disk.json")
     cache, told = state.get("users", {}), state.get("told", {})
     preview = args.dry_run or bool(args.to)
-    notify = cfg["storage_notify"]
-    rows = storage_report.over_warn(data)
+    notify = cfg["disk_notify"]
+    rows = disk_report.over_warn(data)
     keys = set(
         notices.due(
-            [storage_report.row_key(r) for r in rows], told, now, cfg["storage_repeat_days"] * storage_report.DAY,
-            urgent={storage_report.row_key(r) for r in rows if r[4][0][3] == "hard"}, leeway=storage_report.LEEWAY,
+            [disk_report.row_key(r) for r in rows], told, now, cfg["disk_repeat_days"] * disk_report.DAY,
+            urgent={disk_report.row_key(r) for r in rows if r[4][0][3] == "hard"}, leeway=disk_report.LEEWAY,
         )
     )  # fmt: skip
-    due = [r for r in rows if storage_report.row_key(r) in keys]
+    due = [r for r in rows if disk_report.row_key(r) in keys]
     who = namer(cfg, slack, cache)
     hold = cfg["holds_from"] if cfg["holds_on"] else None
-    card, thread = storage_report.render(
-        data, who, cfg["storage_top"], set(cfg["people"]), keys if "mention" in notify else set(), hold
+    card, thread = disk_report.render(
+        data, who, cfg["disk_top"], set(cfg["people"]), keys if "mention" in notify else set(), hold
     )
     post_thread(slack, slack.channel(args.to) if args.to else cfg["channel"], card, thread)
     failures = []
@@ -676,13 +676,13 @@ def storage(cfg, args):
                 if member:
                     slack.post(
                         slack.channel(member),
-                        storage_report.dm_text(row, storage_report.hold_note(hold, now)),
+                        disk_report.dm_text(row, disk_report.hold_note(hold, now)),
                     )
                     delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {row[2]}: {e}")
         if delivered:
-            told[storage_report.row_key(row)] = int(now)
+            told[disk_report.row_key(row)] = int(now)
     if not preview:
         write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
     if failures:

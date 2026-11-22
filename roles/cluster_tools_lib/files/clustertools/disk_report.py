@@ -1,4 +1,4 @@
-"""storage_report: the daily disk usage report, from the disk quota metrics.
+"""disk_report: the daily disk usage report, from the disk quota metrics.
 
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
     (text, blocks), thread = render(data, who, top, people, mention)
@@ -14,7 +14,7 @@ warn level only notifies, and the hard limit is the one the kernel enforces, at 
 A person is told (mentioned, or sent a DM) when they first pass a level, every day at
 a hard limit, and again every repeat_days while past the same warn level; the card
 lists everyone past a level every day. It reads Prometheus and changes nothing;
-clustertools.usage_report --storage posts it.
+clustertools.usage_report --disk posts it.
 Python 3.9 or newer, standard library only.
 """
 
