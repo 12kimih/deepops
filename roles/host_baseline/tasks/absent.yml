@@ -33,12 +33,15 @@
     # take it as a dependency nothing else holds, whichever role ran first: a desktop's
     # purge would have autoremoved libopengl0, which jobs load and which the driver role
     # installs by name only once it runs (2026-11-22). Only what is installed and marked
-    # automatic; nothing is installed.
+    # automatic, and only names given whole: a pattern (linux-image-*) also matches the
+    # old kernels, which must stay automatic for apt to remove them; patterns are kept by
+    # the refusal below. Nothing is installed.
     - name: Read which packages the host needs are installed (Debian)
       ansible.builtin.command:
         argv: >-
           {{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${binary:Package}\n']
-             + host_baseline_protected_packages + _host_baseline_recorded }}
+             + host_baseline_protected_packages | reject('search', '[*?\[]') | list
+             + _host_baseline_recorded }}
       register: host_baseline_needed
       changed_when: false
       failed_when: host_baseline_needed.rc > 1
