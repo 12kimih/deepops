@@ -16,6 +16,9 @@ UCF_REGISTRY = "/var/lib/ucf/registry"
 # Paths read from a file or a command are decoded as the OS decodes file names
 # (os.fsdecode), so a name that is not UTF-8 equals the one os.walk yields: decoded with
 # errors="replace", a package's own file would not match itself and count as unowned.
+# How long a whole-database query (rpm -qal, dpkg --verify) may take: a held rpm lock
+# or a hung NFS path must end the run with an error, not hold it forever.
+QUERY_TIMEOUT = 900
 FS = {"encoding": sys.getfilesystemencoding(), "errors": sys.getfilesystemencodeerrors()}
 
 
@@ -35,7 +38,9 @@ def owned_paths():
                 paths.update(line.split()[-1] for line in registry if len(line.split()) > 1)
         return paths
     try:
-        out = subprocess.run(["rpm", "-qal"], capture_output=True, check=False, **FS).stdout
+        out = subprocess.run(
+            ["rpm", "-qal"], capture_output=True, check=False, timeout=QUERY_TIMEOUT, **FS
+        ).stdout
     except OSError:  # no rpm either: nothing is owned
         return paths
     paths.update(line for line in out.splitlines() if line.startswith("/"))

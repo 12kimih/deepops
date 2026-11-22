@@ -61,7 +61,7 @@ options:
 
 import shlex
 
-from ansible.module_utils import deepops_diff
+from ansible.module_utils import deepops_command, deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
 QOS_FIELDS = "name,priority,preempt,preemptmode,flags,grptres,maxtrespu,maxwall,usagefactor,description"
@@ -521,7 +521,7 @@ def main():
     sacctmgr, cluster = module.params["sacctmgr"], module.params["cluster"]
 
     def read(*args):
-        rc, out, err = module.run_command([sacctmgr, "-nP", *args])
+        rc, out, err = deepops_command.run(module, [sacctmgr, "-nP", *args])
         if rc != 0:
             module.fail_json(msg=f"sacctmgr {' '.join(args)} failed: {err.strip()}")
         return out
@@ -559,7 +559,7 @@ def main():
     result["diff"] = deepops_diff.actions(lines) if cmds else {}
     if not module.check_mode:
         for cmd in cmds:
-            rc, out, err = module.run_command([sacctmgr, "-i", *cmd])
+            rc, out, err = deepops_command.run(module, [sacctmgr, "-i", *cmd])
             if rc != 0 and "Nothing new added" not in (out + err) and "Nothing modified" not in (out + err):
                 module.fail_json(msg=f"sacctmgr {' '.join(cmd)} failed: {(err or out).strip()}", **result)
     module.exit_json(**result)

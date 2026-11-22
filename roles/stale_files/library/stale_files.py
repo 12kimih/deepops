@@ -63,7 +63,7 @@ import struct
 import subprocess
 
 from ansible.module_utils import deepops_diff
-from ansible.module_utils.package_files import FS, canonical, owned_paths, staged_paths
+from ansible.module_utils.package_files import FS, QUERY_TIMEOUT, canonical, owned_paths, staged_paths
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.deepops_marks import named_deepops, text_marked
 
@@ -343,7 +343,9 @@ PROMPT_COPY_SKIP = ("/etc/xml/",)
 
 def run_lines(argv):
     try:
-        return subprocess.run(argv, capture_output=True, check=False, **FS).stdout.splitlines()
+        return subprocess.run(
+            argv, capture_output=True, check=False, timeout=QUERY_TIMEOUT, **FS
+        ).stdout.splitlines()
     except OSError:
         return []
 
