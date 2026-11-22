@@ -72,8 +72,8 @@ def current():
     return q, a, u
 
 
-def plan(spec, prune=False):
-    cmds, unmanaged = acct.plan(spec, *current(), CLUSTER, prune=prune)
+def plan(spec, prune=False, revoke=()):
+    cmds, unmanaged = acct.plan(spec, *current(), CLUSTER, prune=prune, revoke=revoke)
     return [c for c in cmds if not isinstance(c, tuple)], unmanaged
 
 
@@ -227,6 +227,25 @@ class Plan(unittest.TestCase):
         self.assertFalse(any(c[0] == "delete" for c in cmds))
         cmds, _ = plan(s, prune=True)
         self.assertIn(["delete", "user", "where", "name=bob", "account=a", f"cluster={CLUSTER}"], cmds)
+
+    def test_a_revoked_user_loses_their_associations_without_prune(self):
+        # Someone who left: their access ends at the deploy, whatever prune says, and
+        # nothing else unmanaged goes with them.
+        s = copy(SPEC)
+        s["accounts"]["a"]["members"] = []
+        cmds, unmanaged = plan(s, revoke=["bob"])
+        deletes = [c for c in cmds if c[0] == "delete"]
+        self.assertEqual(
+            deletes, [["delete", "user", "where", "name=bob", "account=a", f"cluster={CLUSTER}"]]
+        )
+        self.assertNotIn("bob@a", unmanaged["associations"])
+        self.assertIn("alice@a", unmanaged["associations"])
+
+    def test_a_delete_refused_for_running_jobs_is_kept_for_the_next_run(self):
+        refusal = " Error with request: Job(s) active, cancel job(s) before remove\n"
+        self.assertTrue(acct.still_running(["delete", "user", "where", "name=bob"], refusal))
+        self.assertFalse(acct.still_running(["delete", "account", "where", "name=a"], refusal))
+        self.assertFalse(acct.still_running(["delete", "user", "where", "name=bob"], "Error: Unknown"))
 
     def test_parents_are_created_before_children(self):
         s = copy(SPEC)

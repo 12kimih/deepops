@@ -3,19 +3,24 @@
     submit-holds CONFIG.json     write the holds file and its metrics (as root, on a
                                  controller, every few minutes)
 
-A person at a disk hard limit (cluster_tools.disk_report: the disk quota metrics, as
-the daily disk report reads them) is held: their new jobs are refused, with the reason,
-until they free space there. Running jobs go on. Before `disk_from` (Unix time, 0: at
-once) no one is held: the grace a site gives everyone already at a limit when it turns
-holds on.
+Held, their new jobs refused with the reason while running jobs go on:
+- a person past their membership's end (`ends`: login -> {ends, login_expires}, the
+  roster's people_leaving): from the day after `ends`, local time, with no deploy; their
+  login lasts until login_expires to move their files. Needs no Prometheus.
+- with `disk`, a person at a disk hard limit (cluster_tools.disk_report: the disk quota
+  metrics, as the daily disk report reads them), until they free space there. Before
+  `disk_from` (Unix time, 0: at once) no one is held for it: the grace a site gives
+  everyone already at a limit when it turns disk holds on.
 
 The file is a line "generated <unix time>", then "<uid> <reason>" per person held; the
 rendered job_submit.lua reads it at most once a minute and trusts it for half an hour,
-so a run that fails (Prometheus away) leaves the last file, and a writer that stopped
-holds no one once it is stale (an alert says so: SubmitHoldsStale). A login the host
-cannot resolve is skipped, said on standard error.
+so a writer that stopped holds no one once it is stale (an alert says so:
+SubmitHoldsStale). A run that cannot read Prometheus still writes the ends holds and
+keeps the last file's disk holds, exits 1 and leaves the metrics (so the alert fires).
+A login the host cannot resolve is skipped, said on standard error.
 
-CONFIG: prometheus_url, file (the holds), disk_from, textfile (node_exporter's).
+CONFIG: prometheus_url, file (the holds), disk, disk_from, ends, textfile
+(node_exporter's).
 Python 3.9 or newer, standard library only.
 """
 
@@ -30,7 +35,12 @@ from .prom import key, render
 from .prometheus import Error as PrometheusError
 from .prometheus import Prometheus
 
-CONFIG_KEYS = {"prometheus_url": str, "file": str, "disk_from": (int, float), "textfile": str}
+CONFIG_KEYS = {
+    "prometheus_url": str, "file": str, "disk": bool, "disk_from": (int, float), "ends": dict, "textfile": str,
+}  # fmt: skip
+# How an ends hold's reason begins: what a run that could not read the disk metrics
+# tells apart from the disk holds it keeps.
+ENDED = "Your membership ended on"
 
 
 def load_config(path):
@@ -59,17 +69,49 @@ def disk_holds(data):
     return out
 
 
-def holds(data, cfg, now, uid=uid_of):
-    """{uid: reason} of everyone held NOW; nobody before disk_from."""
-    if data is None or now < cfg["disk_from"]:
-        return {}
+def ends_holds(ends, now):
+    """{login: reason} for everyone past their end NOW (the day after `ends`, local)."""
+    today = time.strftime("%Y-%m-%d", time.localtime(now))
+    return {
+        login: (
+            f"{ENDED} {e['ends']}. New jobs are refused; your login lasts until"
+            f" {e['login_expires']} to move your files away."
+        )
+        for login, e in sorted(ends.items())
+        if str(e.get("ends", "")) and today > str(e["ends"])
+    }
+
+
+def holds(data, cfg, now, uid=None):
+    """{uid: reason} of everyone held NOW: past their end, or (with disk, from disk_from
+    on, when DATA was read) at a disk hard limit. An end goes first: it is the lasting one."""
+    uid = uid or uid_of
+    reasons = {}
+    if cfg["disk"] and data is not None and now >= cfg["disk_from"]:
+        reasons.update(disk_holds(data))
+    reasons.update(ends_holds(cfg["ends"], now))
     out = {}
-    for login, why in sorted(disk_holds(data).items()):
+    for login, why in sorted(reasons.items()):
         n = uid(login)
         if n is None:
             print(f"submit-holds: {login} has no account here; not held", file=sys.stderr)
             continue
         out[n] = why
+    return out
+
+
+def kept_disk_holds(path):
+    """{uid: reason} of the disk holds in the file at PATH (none when it is missing)."""
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines()[1:]
+    except OSError:
+        return {}
+    out = {}
+    for line in lines:
+        uid, _, why = line.partition(" ")
+        if uid.isdigit() and not why.startswith(ENDED):
+            out[int(uid)] = why
     return out
 
 
@@ -99,13 +141,17 @@ def main(argv=None):
     def body():
         cfg = load_config(args[0])
         now = time.time()
-        try:
-            data = disk_report.collect(Prometheus(cfg["prometheus_url"]), now)
-        except PrometheusError as e:  # the last file stays, trusted until it is stale
-            print(f"submit-holds: {e}", file=sys.stderr)
-            return 1
-        held = holds(data, cfg, now)
+        data, kept, failed = None, {}, False
+        if cfg["disk"]:
+            try:
+                data = disk_report.collect(Prometheus(cfg["prometheus_url"]), now)
+            except PrometheusError as e:  # the ends holds still go out; the disk ones stay
+                print(f"submit-holds: {e}", file=sys.stderr)
+                kept, failed = kept_disk_holds(cfg["file"]), True
+        held = {**kept, **holds(data, cfg, now)}
         write_atomic(cfg["file"], text(held, now), mode=0o644)
+        if failed:
+            return 1
         write_atomic(cfg["textfile"], metrics(held, cfg, now), mode=0o644)
         return 0
 

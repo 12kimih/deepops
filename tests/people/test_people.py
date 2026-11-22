@@ -37,6 +37,15 @@ class Derive(unittest.TestCase):
         self.assertEqual(people.people_left(self.p), ["carol"])
         self.assertNotIn("carol", people.people_active(self.p))
 
+    def test_former_people_are_those_left_or_past_their_end(self):
+        roster = {
+            "a": {"uid": 1001},
+            "b": {"uid": 1002, "ends": "2026-01-31"},
+            "c": {"uid": 1003, "status": "left"},
+        }
+        self.assertEqual(people.people_former(roster, today="2026-01-31"), ["c"])
+        self.assertEqual(people.people_former(roster, today="2026-02-01"), ["b", "c"])
+
     def test_attribute_map(self):
         self.assertEqual(
             people.people_attr(self.p, "slack"),

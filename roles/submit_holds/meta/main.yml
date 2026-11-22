@@ -1,6 +1,7 @@
 ---
 dependencies:
-  - role: deploy_defaults  # submit_holds_from
+  - role: deploy_defaults  # submit_holds_from, submit_holds_disk
+  - role: people_defaults  # people_leave_grace_days
   - role: cluster_tools_lib  # cluster_tools.submit_holds
   - role: prometheus_paths  # prometheus_url, node_exporter_prom_dir
   - role: slurm_paths  # slurm_submit_holds_file
@@ -9,7 +10,7 @@ galaxy_info:
   namespace: deepops
   role_name: submit_holds
   author: DeepOps
-  description: Who may not submit Slurm jobs for now (a disk hard limit), for job_submit.lua
+  description: Who may not submit Slurm jobs for now (an end, a disk hard limit), for job_submit.lua
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:

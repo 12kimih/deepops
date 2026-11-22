@@ -146,6 +146,12 @@ def people_left(people):
     return sorted(set(people or {}) - set(_active(people)))
 
 
+def people_former(people, today=None):
+    """Sorted logins of the roster who are no longer members: left, or past their end.
+    What holds nothing any more (their Slurm associations go, slurm_accounting revoke)."""
+    return sorted(set(people or {}) - set(_member(people, today)))
+
+
 def people_with_role(people, role, today=None):
     """Sorted login names of members holding role (none once past their end)."""
     return sorted(n for n, p in _member(people, today).items() if role in (p.get("roles") or []))
@@ -594,6 +600,7 @@ class FilterModule:
         return {
             "people_active": people_active,
             "people_left": people_left,
+            "people_former": people_former,
             "people_with_role": people_with_role,
             "people_uids": people_uids,
             "people_attr": people_attr,

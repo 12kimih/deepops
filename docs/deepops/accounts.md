@@ -57,6 +57,13 @@ Someone leaving has `ends:` (their last day) and keeps logging in for
 `people_leave_grace_days` (30) more days: the entry's `shadowExpire` and the local
 account's expiry are that day, both from `people_login_ends` (one derivation,
 `people_login_expires` in plugins/filter/people.py), so login stops then without a deploy.
+Slurm stops earlier, the day after `ends`, also without a deploy: with
+`slurm_enable_submit_holds`, `roles/submit_holds` holds everyone past their end, and
+`sbatch`, `srun` and `salloc` refuse their new jobs with the dates (running jobs go on).
+The next deploy then deletes their Slurm associations (`slurm_accounting_revoke`, from
+`people_former`: left, or past `ends`), whatever `slurm_accounting_prune` says. Their
+container image stores age out unused (`container_storage_gc`). Their files stay for
+`people_leave_keep_days` (90) after `ends`; removing them is an administrator's step.
 Setting someone back to `status: active`, or dropping `ends:`, gives the account back: the
 entry loses its expiry and nologin shell (a new password is set, since leaving removed
 it), and a local account loses the lock `roles/people` put on it (expiry day 1, the `!`
