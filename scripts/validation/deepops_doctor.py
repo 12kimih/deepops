@@ -23,8 +23,9 @@ import shutil
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
 # The validators start processes the cluster tools' one way (clustertools.proc).
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 from clustertools import proc  # noqa: E402
 
 
@@ -63,6 +64,23 @@ def count_positive_stdout_hosts(results):
     for result in results.values():
         first = (result.get("stdout") or "").split("\n")[0].strip()
         if first.isdigit() and int(first) > 0:
+            hosts += 1
+    return hosts
+
+
+# The fact the playbooks read for a host's NVIDIA GPUs (roles/facts), run as is.
+GPUS_FACT = ROOT / "roles/facts/files/gpus.fact"
+
+
+def count_gpu_hosts(results):
+    """Count hosts whose gpus.fact answered a positive count."""
+    hosts = 0
+    for result in results.values():
+        try:
+            count = json.loads(result.get("stdout") or "").get("count", 0)
+        except (ValueError, AttributeError):
+            continue
+        if isinstance(count, int) and count > 0:
             hosts += 1
     return hosts
 
@@ -206,11 +224,11 @@ def main():
             ),
         )
 
-        rc, results = ad_hoc(inventory, "shell", "lspci 2>/dev/null | grep -ci nvidia || true")
+        rc, results = ad_hoc(inventory, "script", str(GPUS_FACT))
         # Facts for the operator, not checks: they cannot fail, so they are not in
         # "checks" (where a pass that cannot fail would mean nothing); a count that
         # could not be read is null, not 0.
-        info["gpu_hosts"] = count_positive_stdout_hosts(results) if rc == 0 else None
+        info["gpu_hosts"] = count_gpu_hosts(results) if rc == 0 else None
 
         rc, results = ad_hoc(
             inventory,
