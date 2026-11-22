@@ -9,8 +9,8 @@ admin}, members {Slack member ID: cluster user}, admins [member IDs], pending (t
 requests of every feature, clusterbot.requests), reminders (what went out,
 clusterbot.reminders), ssh {key, user, known_hosts} (clusterbot.remote, to the hosts
 it acts on), scratch {host, policy, remind_days} (host empty leaves it off), bans
-{hosts {name: address}} (none leaves unban requests off), leave {remind_days, leaving
-(people_leaving)}.
+{hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
+leave {remind_days, leaving (people_leaving)}.
 """
 
 import json
@@ -24,7 +24,7 @@ from . import blocks as shared
 from . import scratch_blocks as blocks
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .bans import SERVICE as BANS
-from .bans import UnbanFeature, address
+from .bans import UnbanFeature, address, watch
 from .prefs import Prefs
 from .remote import Remote
 from .requests import Engine
@@ -33,6 +33,7 @@ from .scratch import ScratchFeature
 
 UNITS = {"G": 1024**3, "T": 1024**4}
 REMIND_EVERY = 3600
+BAN_WATCH_EVERY = 300
 
 
 def size_bytes(text):
@@ -281,12 +282,56 @@ def reminder_sources(cfg, scratch):
     return sources
 
 
+def every(seconds, name, round_):
+    """ROUND_() now and then every SECONDS, on a thread of its own; a failed round is
+    printed and the next one runs."""
+
+    def loop():
+        while True:
+            try:
+                round_()
+            except Exception as e:  # noqa: BLE001 - one failed round must not stop the next
+                print(f"clusterbot: {name}: {e}", file=sys.stderr, flush=True)
+            time.sleep(seconds)
+
+    threading.Thread(target=loop, name=name, daemon=True).start()
+
+
+def admin_messages(client, channel):
+    """(post, update) for messages the bot keeps in CHANNEL (clusterbot.bans.watch): post
+    returns the message as {channel ID, ts} and pins it on request (a pin Slack refuses
+    leaves it unpinned, never unrecorded); update says False when the message is gone
+    (deleted), and raises on any other refusal."""
+    from slack_sdk.errors import SlackApiError
+
+    def post(text, blocks, pin=False):
+        sent = client.chat_postMessage(channel=channel, text=text, blocks=blocks)
+        message = {"channel": sent["channel"], "ts": sent["ts"]}
+        if pin:
+            try:
+                client.pins_add(channel=message["channel"], timestamp=message["ts"])
+            except SlackApiError as e:  # the message stands unpinned (the bot is not in the channel)
+                print(f"clusterbot: pin in {channel}: {e.response.get('error')}", file=sys.stderr, flush=True)
+        return message
+
+    def update(message, text, blocks):
+        try:
+            client.chat_update(channel=message["channel"], ts=message["ts"], text=text, blocks=blocks)
+        except SlackApiError as e:
+            if e.response.get("error") in ("message_not_found", "cant_update_message"):
+                return False
+            raise
+        return True
+
+    return post, update
+
+
 def main(argv=None):
     from slack_bolt.adapter.socket_mode import SocketModeHandler
 
     argv = sys.argv if argv is None else argv
     cfg = load(argv[1])
-    ssh = cfg["ssh"]
+    ssh, channels = cfg["ssh"], cfg["channels"]
 
     def remote(host, service):
         return Remote(host, ssh["key"], ssh["user"], ssh["known_hosts"], service)
@@ -312,17 +357,21 @@ def main(argv=None):
 
     sources, slack_of = reminder_sources(cfg, scratch), {u: s for s, u in cfg["members"].items()}.get
 
-    def remind_forever():
-        while True:
-            try:
-                sent = state.read(cfg["reminders"], {})
-                reminders.remind(sources, app.client, slack_of, sent, time.time())
-                state.write(cfg["reminders"], sent)
-            except Exception as e:  # noqa: BLE001 - one failed round must not stop the next
-                print(f"clusterbot: reminders: {e}", file=sys.stderr, flush=True)
-            time.sleep(REMIND_EVERY)
+    def remind_round():
+        sent = state.read(cfg["reminders"], {})
+        reminders.remind(sources, app.client, slack_of, sent, time.time())
+        state.write(cfg["reminders"], sent)
 
-    threading.Thread(target=remind_forever, daemon=True).start()
+    every(REMIND_EVERY, "reminders", remind_round)
+    if unban is not None:
+        post, update = admin_messages(app.client, channels["admin"])
+
+        def watch_round():
+            seen = state.read(cfg["bans"]["seen"], {})
+            watch(unban, post, update, seen)
+            state.write(cfg["bans"]["seen"], seen)
+
+        every(BAN_WATCH_EVERY, "ban watch", watch_round)
     SocketModeHandler(app, cfg["app_token"]).start()
 
 

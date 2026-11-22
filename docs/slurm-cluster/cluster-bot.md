@@ -34,6 +34,14 @@ is banned now on a host where fail2ban runs, an administrator approves, and the 
 lifted on every such host (`fail2ban-client unban`, which also drops it from fail2ban's
 database). The form refuses what is not an IP address before anything is asked.
 
+The administrators see the bans in their channel without asking: every five minutes the
+bot reads each such host's list, tells the bans made since its last look in one message
+(a wave of bans is one message), and keeps one pinned message listing the bans now,
+newest first, edited in place. Its first look only learns the bans made before it; a
+host it cannot read keeps its bans on the list as last seen and is named there. No Slack
+token is ever on those hosts: the bot reads them over the `bans` service. Invite the bot
+to the admin channel so it can pin the list.
+
 ### How the bot acts on other hosts
 
 A role that lets the bot do something on its hosts offers a service through
@@ -114,6 +122,6 @@ the app's settings are updated from it.
 | `/etc/cluster-bot/bot.token`, `app.token` | The tokens, read by the bot alone; never on a command line |
 | `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |
 | `/etc/cluster-bot/known_hosts` | The host keys of the hosts it reaches, read from each host |
-| `/var/lib/clusterbot/` | Its SSH key and state: held requests, reminders sent (kept on removal) |
+| `/var/lib/clusterbot/` | Its SSH key and state: held requests, reminders sent, bans seen (kept on removal) |
 | `/etc/cluster-bot-access/<service>.json` | On a host it acts on: a service offered to it |
 | `/var/lib/clusterbot/.ssh/authorized_keys` | On a host it acts on: its key, for the dispatcher only |

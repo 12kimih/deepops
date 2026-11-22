@@ -74,6 +74,73 @@ class Unban(unittest.TestCase):
         self.assertIn("no route to host", nobody.text)
 
 
+class Channel:
+    """The admin channel: messages posted, edited, pinned, and one that can be deleted."""
+
+    def __init__(self):
+        self.posted, self.updated, self.pinned, self.deleted = [], [], [], set()
+
+    def post(self, text, blocks, pin=False):
+        message = {"channel": "CADMIN", "ts": str(len(self.posted))}
+        self.posted.append(text)
+        if pin:
+            self.pinned.append(message["ts"])
+        return message
+
+    def update(self, message, text, blocks):
+        if message["ts"] in self.deleted:
+            return False
+        self.updated.append(text)
+        return True
+
+
+class Watch(unittest.TestCase):
+    def setUp(self):
+        self.hosts = {"login": Host([BAN]), "node1": Host()}
+        self.feature, self.channel, self.seen = bans.UnbanFeature(self.hosts), Channel(), {}
+
+    def round(self):
+        bans.watch(self.feature, self.channel.post, self.channel.update, self.seen)
+
+    def test_the_first_look_learns_what_is_banned_and_lists_it_once(self):
+        self.round()
+        self.assertEqual(self.channel.posted, ["현재 차단된 주소 1개"], "no notice for bans made before")
+        self.assertEqual(self.channel.pinned, ["0"])
+        self.round()
+        self.assertEqual(len(self.channel.posted), 1, "the list is edited in place")
+        self.assertEqual(self.channel.updated, ["현재 차단된 주소 1개"])
+
+    def test_new_bans_are_told_in_one_message_and_the_list_follows(self):
+        self.round()
+        wave = [
+            {"ip": f"198.51.100.{i}", "jail": "sshd", "since": f"2026-11-22 10:00:{i:02d}"} for i in range(60)
+        ]
+        self.hosts["node1"].banned = wave
+        self.round()
+        self.assertEqual(self.channel.posted[-1], "새로 차단된 주소 60개", "a wave is one message, not sixty")
+        self.assertEqual(self.channel.updated[-1], "현재 차단된 주소 61개")
+        text, blocks = bans.bans_blocks.ban_list([{**b, "host": "node1"} for b in wave], {})
+        self.assertIn("외 20개", str(blocks), "a long list is cut and counted")
+        self.assertTrue(all(len(b["text"]["text"]) < 3000 for b in blocks if b["type"] == "section"))
+
+    def test_a_host_that_cannot_be_read_keeps_its_bans_and_is_named(self):
+        self.round()
+        self.hosts["login"].down = True
+        self.round()
+        self.assertIn("login sshd 192.0.2.7", self.seen["bans"])
+        self.assertEqual(self.channel.updated[-1], "현재 차단된 주소 1개", "listed as last seen")
+        self.hosts["login"].down = False
+        self.round()
+        self.assertEqual(self.channel.posted, ["현재 차단된 주소 1개"], "back again is not new")
+
+    def test_a_deleted_list_is_posted_again(self):
+        self.round()
+        self.channel.deleted.add("0")
+        self.round()
+        self.assertEqual(self.channel.posted, ["현재 차단된 주소 1개"] * 2)
+        self.assertEqual(self.seen["list"]["ts"], "1")
+
+
 class Services(unittest.TestCase):
     def test_the_bot_asks_for_the_services_the_roles_offer(self):
         for role, var, name in (("scratch_alloc", "_scratch_alloc_bot_service", scratch.SERVICE),
