@@ -249,10 +249,10 @@ class UnmanagedContainers(unittest.TestCase):
 
     def test_the_label_marks_deepops_and_age_marks_stale(self):
         got = self.counts(gc.unmanaged(self.containers, self.LABEL, self.now - 14 * DAY))
-        self.assertEqual(got[prom.key("container_storage_docker_unmanaged", state="running")], 2)
-        self.assertEqual(got[prom.key("container_storage_docker_unmanaged_stale", state="running")], 1)
-        self.assertEqual(got[prom.key("container_storage_docker_unmanaged", state="stopped")], 1)
-        self.assertEqual(got[prom.key("container_storage_docker_unmanaged_stale", state="stopped")], 1)
+        self.assertEqual(got[prom.key("container_storage_gc_docker_unmanaged", state="running")], 2)
+        self.assertEqual(got[prom.key("container_storage_gc_docker_unmanaged_stale", state="running")], 1)
+        self.assertEqual(got[prom.key("container_storage_gc_docker_unmanaged", state="stopped")], 1)
+        self.assertEqual(got[prom.key("container_storage_gc_docker_unmanaged_stale", state="stopped")], 1)
 
     def test_the_engine_api_is_read_over_dockerds_socket(self):
         sock = Path(self.tmp.name, "docker.sock")

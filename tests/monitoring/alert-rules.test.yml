@@ -1025,11 +1025,11 @@ tests:
   - name: a container outside Slurm past the grace period warns; a stopped or new one does not
     interval: 1m
     input_series:
-      - series: 'container_storage_docker_unmanaged_stale{host="n1", instance="n1:9100", state="running"}'
+      - series: 'container_storage_gc_docker_unmanaged_stale{host="n1", instance="n1:9100", state="running"}'
         values: '1x5'
-      - series: 'container_storage_docker_unmanaged_stale{host="n2", instance="n2:9100", state="running"}'
+      - series: 'container_storage_gc_docker_unmanaged_stale{host="n2", instance="n2:9100", state="running"}'
         values: '0x5'
-      - series: 'container_storage_docker_unmanaged_stale{host="n2", instance="n2:9100", state="stopped"}'
+      - series: 'container_storage_gc_docker_unmanaged_stale{host="n2", instance="n2:9100", state="stopped"}'
         values: '3x5'
     alert_rule_test:
       - eval_time: 2m

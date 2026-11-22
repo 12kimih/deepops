@@ -185,7 +185,7 @@ Ubuntu 24.04):
   `deepops.unit` (`deepops_container_label`, set by `roles/container_service`). The
   daily cleanup counts the node's Docker containers without it, running and stopped,
   and those created more than `container_storage_gc_unused_days` ago
-  (`container_storage_docker_unmanaged`, `container_storage_docker_unmanaged_stale`);
+  (`container_storage_gc_docker_unmanaged`, `container_storage_gc_docker_unmanaged_stale`);
   it never touches them. A running one past that age raises `ContainerOutsideSlurm`.
   `docker-prune.timer` (`roles/docker`, `docker_prune_after`) removes stopped
   containers, unused images and build cache by age, then cuts the build cache to
