@@ -243,9 +243,9 @@
         dest: /etc/systemd/system/docker-prune.service
         mode: "0644"
         content: |
-          # Managed by roles/docker (docker_prune_after).
+          # Managed by roles/docker (docker_prune_after, docker_prune_build_cache_max).
           [Unit]
-          Description=Remove what Docker keeps unused: stopped containers, images and build cache older than {{ docker_prune_after }}, anonymous volumes
+          Description=Remove what Docker keeps unused: stopped containers, images and build cache older than {{ docker_prune_after }}{{ ', build cache over ' ~ docker_prune_build_cache_max if docker_prune_build_cache_max | length > 0 else '' }}, anonymous volumes
           # Only while Docker runs: a timer must not start a Docker stopped on purpose.
           Requisite=docker.service
           After=docker.service
@@ -256,6 +256,10 @@
           ExecStart=/usr/bin/docker container prune --force --filter until={{ docker_prune_after }}
           ExecStart=/usr/bin/docker image prune --all --force --filter until={{ docker_prune_after }}
           ExecStart=/usr/bin/docker builder prune --all --force --filter until={{ docker_prune_after }}
+          {% if docker_prune_build_cache_max | length > 0 %}
+          # A separate pass: with an age filter, BuildKit never counts the cache it keeps for age.
+          ExecStart=/usr/bin/docker builder prune --all --force --max-used-space {{ docker_prune_build_cache_max }}
+          {% endif %}
           ExecStart=/usr/bin/docker volume prune --force
 
     - name: Install the prune timer
