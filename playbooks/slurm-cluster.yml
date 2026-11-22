@@ -127,6 +127,12 @@
   tags:
     - people
 
+# After the directory, whose groups the collaboration folders belong to.
+- name: Set up the shared space on the home server
+  import_playbook: slurm-cluster/shared-space.yml
+  vars:
+    deepops_phase: install
+
 # Before NHC, which checks ACS stays off where this is present.
 - name: Turn PCIe ACS off for GPU peer-to-peer
   import_playbook: generic/pcie-acs.yml
@@ -488,6 +494,11 @@
 
 - name: Remove the disk quotas where they are no longer wanted
   import_playbook: generic/disk-quota.yml
+  vars:
+    deepops_phase: remove
+
+- name: Record the shared space as gone where it is no longer wanted (its data stays)
+  import_playbook: slurm-cluster/shared-space.yml
   vars:
     deepops_phase: remove
 

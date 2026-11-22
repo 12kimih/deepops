@@ -1,0 +1,93 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: shared_space
+    component_record_action: begin
+    component_record_items: "{{ shared_space_items }}"
+
+# Resolved here: an include argument is evaluated inside the role it includes, where this
+# role's dependencies (system_accounts) are not in scope.
+- name: Note the writer's account
+  ansible.builtin.set_fact:
+    _shared_space_account: "{{ {shared_space_writer: system_accounts[shared_space_writer]} }}"
+
+- name: Create the writer's account
+  ansible.builtin.include_role:
+    name: local_accounts
+  vars:
+    local_accounts: "{{ _shared_space_account }}"
+
+# setfacl, for the collaboration folders' default ACLs.
+- name: Install the ACL tools
+  ansible.builtin.package:
+    name: acl
+    state: present
+
+- name: Create the shared space and its projects directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: ["{{ shared_space_root }}", "{{ shared_space_root }}/projects"]
+
+# setgid: what the writer adds keeps the group; read-only to everyone else.
+- name: Create the shared data directories, the writer's alone to write
+  ansible.builtin.file:
+    path: "{{ shared_space_root }}/{{ item }}"
+    state: directory
+    owner: "{{ shared_space_writer }}"
+    group: "{{ shared_space_writer }}"
+    mode: "2755"
+  loop: "{{ shared_space_data }}"
+
+# setgid keeps each file in the project's group; members only.
+- name: Create the collaboration folders
+  ansible.builtin.file:
+    path: "{{ shared_space_root }}/projects/{{ item }}"
+    state: directory
+    owner: root
+    group: "{{ item }}"
+    mode: "2770"
+  loop: "{{ shared_projects | list | sort }}"
+
+# Default ACLs: a member's new file or directory is the group's to change too, whatever
+# their umask, and nobody else's to read.
+- name: Give every member write access to what any member adds
+  ansible.posix.acl:
+    path: "{{ shared_space_root }}/projects/{{ item.0 }}"
+    default: true
+    etype: "{{ item.1.etype }}"
+    permissions: "{{ item.1.permissions }}"
+    state: present
+  loop: "{{ shared_projects | list | sort | product([{'etype': 'user', 'permissions': 'rwx'}, {'etype': 'group', 'permissions': 'rwx'},
+            {'etype': 'mask', 'permissions': 'rwx'}, {'etype': 'other', 'permissions': '---'}]) | list }}"
+  loop_control:
+    label: "{{ item.0 }} default:{{ item.1.etype }}:{{ item.1.permissions }}"
+
+- name: Find the collaboration folders on disk
+  find_present:
+    paths: "{{ shared_space_root }}/projects"
+    file_type: directory
+  register: shared_space_found
+
+# Never removed: their files stay until an administrator moves them to the lead's home.
+- name: List the folders no longer declared
+  ansible.builtin.debug:
+    msg: >-
+      Not in shared_projects, kept with their files: {{ _undeclared | join(', ') }}. Move
+      each to its lead's home (or declare it again).
+  vars:
+    _undeclared: "{{ shared_space_found.files | map(attribute='path') | map('basename') | reject('in', shared_projects) | sort }}"
+  when: _undeclared | length > 0
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: shared_space
+    component_record_action: present
+    component_record_items: "{{ shared_space_items }}"

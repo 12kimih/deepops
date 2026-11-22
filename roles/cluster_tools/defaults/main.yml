@@ -52,9 +52,10 @@ cluster_tools_scripts: []
 # belongs (SINFO_FORMAT, SQUEUE_FORMAT, ...): unlike an alias, the environment is
 # inherited by job scripts and remote commands, so the output is the same everywhere.
 # Each entry is a default -- a value the session already carries wins. Emptying it
-# removes the file.
+# removes the files. Written for sh-family shells (<name>.sh) and csh-family ones
+# (<name>.csh), which roles/login_shells makes read /etc/profile.d too.
 cluster_tools_environment: {}
-cluster_tools_profile_file: z10-cluster-tools.sh
+cluster_tools_profile_name: z10-cluster-tools
 
 # Login banner: a title, the commands people should know about, and where to find
 # things. Installed as an update-motd.d fragment so it prints once per login instead

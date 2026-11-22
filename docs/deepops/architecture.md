@@ -197,6 +197,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── scratch_alloc
 │   ├── scratch_defaults
 │   ├── serial_console
+│   ├── shared_space
 │   ├── site_secrets
 │   ├── slack_defaults
 │   ├── slurm

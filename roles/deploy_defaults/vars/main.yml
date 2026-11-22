@@ -268,6 +268,10 @@ deepops_component_registry:
     rules:
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-login}
       - {switch: "{{ slurm_enable_disk_quota }}", group: slurm-nfs}
+  # Shared data and collaboration folders where /home is local; their data stays.
+  shared_space:
+    rules:
+      - {switch: "{{ slurm_enable_shared_space }}", group: slurm-nfs, first: true}
   # Fast scratch space per request (roles/scratch_alloc), on the host whose XFS
   # filesystem holds it. The allocations and their registry are data: never removed.
   scratch_alloc:

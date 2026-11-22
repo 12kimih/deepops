@@ -112,19 +112,21 @@
   loop_control:
     label: "{{ cluster_tools_bin_dir }}/{{ item.dest }}"
 
-- name: Publish the shell environment defaults
+- name: Publish the shell environment defaults, for sh and csh
   ansible.builtin.template:
-    src: profile.sh.j2
-    dest: "/etc/profile.d/{{ cluster_tools_profile_file }}"
+    src: "profile.{{ item }}.j2"
+    dest: "/etc/profile.d/{{ cluster_tools_profile_name }}.{{ item }}"
     owner: root
     group: root
     mode: "0644"
+  loop: [sh, csh]
   when: cluster_tools_environment | length > 0
 
 - name: Remove the shell environment defaults
   ansible.builtin.file:
-    path: "/etc/profile.d/{{ cluster_tools_profile_file }}"
+    path: "/etc/profile.d/{{ cluster_tools_profile_name }}.{{ item }}"
     state: absent
+  loop: [sh, csh]
   when: cluster_tools_environment | length == 0
 
 # Each file keeps its mode from the source, so an example job script stays runnable;

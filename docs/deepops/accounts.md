@@ -22,7 +22,10 @@ Settings (AUTH in `config.example/group_vars/all.yml`):
   turns LDAP on.
 - `directory_groups` and `directory_netgroups`: the cluster groups (the Docker socket
   group) and netgroups (administrator sudo) every directory publishes. Members come from
-  the roster.
+  the roster. Each collaboration folder of `shared_projects` adds its group to them
+  (`directory_groups_all`, [shared-space.md](../slurm-cluster/shared-space.md)).
+- The roster's `reserved_logins`: names no person may have, such as the shared space's
+  directory under `/home`; the roster check refuses them.
 - `ldap_readers`: the read-only accounts that search the directory. `sssd` is the
   nodes'; add `dex` for Open OnDemand's login. Their passwords are files under
   `ldap_secrets_dir` (`files/ldap/<reader>.password`). The first play of
@@ -42,7 +45,7 @@ The tree is RFC 2307: what NIS served, one to one, so the move keeps every UID a
 | Branch | Entries |
 |---|---|
 | `ou=people` | `uid=<login>`: the roster UID, GID = UID, home, shell. Someone who has left keeps the entry, so the UID stays reserved. The entry is expired (`shadowExpire: 1`), with a nologin shell and no password, so SSSD refuses every login, SSH keys included. |
-| `ou=groups` | the per-user groups (GID = UID) and `directory_groups`, members as `memberUid` |
+| `ou=groups` | the per-user groups (GID = UID) and `directory_groups_all` (`directory_groups` and the collaboration folders' groups), members as `memberUid` |
 | `ou=netgroups` | `directory_netgroups` as `nisNetgroupTriple` `(,user,)` |
 | `ou=services` | the read-only accounts |
 

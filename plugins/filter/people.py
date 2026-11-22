@@ -10,6 +10,8 @@ A roster file declares the roles a site uses and the people:
     several_accounts: [admin]     # optional: only these roles may be in several Slurm
                                   # accounts (each association has its own fair share,
                                   # so a second one doubles a person's); absent: anyone
+    reserved_logins: [shared]     # optional: names no person may have, such as a
+                                  # directory under the home root that is no one's home
     people:
       alice:
         uid: 1001                 # required, unique, >= 1000
@@ -49,7 +51,7 @@ KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status"
 QUOTA_KEYS = ("block_warn", "block_hard", "inode_warn", "inode_hard")
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
-TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "people"}
+TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "reserved_logins", "people"}
 
 
 def _date(value):
@@ -230,12 +232,18 @@ def check(roster, uid_min=UID_MIN):
     for role in several or []:
         if role not in roles:
             problems.append(f"several_accounts: unknown role {role}")
+    reserved = roster.get("reserved_logins") or []
+    if not isinstance(reserved, list) or not all(isinstance(r, str) for r in reserved):
+        problems.append("reserved_logins: must be a list of names")
+        reserved = []
     uids = {}
     for name, p in roster["people"].items():
         p = p or {}
         where = f"people.{name}"
         if not isinstance(name, str) or not LOGIN.match(name):
             problems.append(f"{where}: not a valid login name")
+        elif name in reserved:
+            problems.append(f"{where}: a reserved name (reserved_logins), no one's login")
         if not isinstance(p, dict):
             problems.append(f"{where}: must be a mapping")
             continue

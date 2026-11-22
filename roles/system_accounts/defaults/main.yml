@@ -40,3 +40,9 @@ system_accounts:
     home: /var/lib/clusterbot
     shell: /bin/sh
     comment: Cluster bot
+  # The one writer of the shared datasets, models and container images (roles/shared_space):
+  # what it stores counts to its own budget, not to a person's quota.
+  shareddata:
+    uid: 22082
+    home: /var/lib/shareddata
+    comment: Shared data writer

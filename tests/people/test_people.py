@@ -289,6 +289,17 @@ class Leaving(unittest.TestCase):
         problems = people.check({"people": {"x": {"uid": 1001, "ends": "next spring"}}})
         self.assertIn("people.x.ends: a date, YYYY-MM-DD", problems)
 
+    def test_a_reserved_name_is_no_ones_login(self):
+        problems = people.check({"reserved_logins": ["shared"], "people": {"shared": {"uid": 1001}}})
+        self.assertIn("people.shared: a reserved name (reserved_logins), no one's login", problems)
+        self.assertIn(
+            "reserved_logins: must be a list of names",
+            people.check({"reserved_logins": "shared", "people": {}}),
+        )
+        self.assertEqual(
+            people.check({"reserved_logins": ["shared"], "people": {"alice": {"uid": 1001}}}), []
+        )
+
     def test_leave_with_an_end_date_keeps_the_person_active(self):
         text = (ROOT / "config.example" / "people.yml").read_text()
         out = yaml.safe_load(people.roster_leave(text, "alice", ends="2027-02-28"))["people"]["alice"]
