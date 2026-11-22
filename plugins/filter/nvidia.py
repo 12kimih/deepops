@@ -15,6 +15,18 @@ The NVIDIA kernel module, as "<version> <open|proprietary>" ("" when there is no
     {{ version | nvidia_module_on_disk(license) }}   from modinfo -F version / -F license
 A module is current when the two are equal: a version alone misses a switch between the
 open and the proprietary modules of one release (Turing and newer have both).
+
+The Canonical archive's NVIDIA packages on a host that are not the target driver's:
+    {{ installed | nvidia_driver_leftovers('580-server', 'open', false, 'amd64') }}
+      -> {"before": [...], "after": [...]}
+installed is dpkg's ${binary:Package} (a name, ":<arch>" on a multi-arch one). "before"
+goes before the install, since apt cannot install the target beside it: another
+branch, the other kernel module flavour, or another architecture (an i386 library left
+by a desktop driver holds its amd64 twin to its own version). "after" goes once the
+target is installed: the other userspace's metapackage of the same branch (headless or
+full). Removed earlier, its dependencies, the running driver among them, would go and
+come back. Everything else (the branch's shared packages, branchless ones such as
+libnvidia-egl-wayland1) stays.
 """
 
 import re
@@ -57,6 +69,41 @@ def nvidia_module_on_disk(version, license_text):
     return f"{version} {_flavor('GPL' in str(license_text or ''))}" if version else ""
 
 
+# Packages that come in both kernel module flavours: "-open" right after the branch
+# marks the open one.
+_FLAVOURED = (
+    "linux-modules-nvidia-",
+    "linux-objects-nvidia-",
+    "linux-signatures-nvidia-",
+    "nvidia-kernel-source-",
+    "nvidia-dkms-",
+    "nvidia-headless-",
+    "nvidia-driver-",
+)
+_BRANCH = re.compile(r"-(\d{3,}(?:-server)?)(?=-|$)")
+
+
+def nvidia_driver_leftovers(installed, branch, kernel_modules, headless, arch):
+    branch = str(branch)
+    target_open = kernel_modules == "open"
+    other_userspace = "nvidia-driver-" if headless else "nvidia-headless-"
+    out = {"before": [], "after": []}
+    for package in installed or []:
+        name, _, package_arch = str(package).strip().partition(":")
+        if not name:
+            continue
+        found = _BRANCH.search(name)
+        if package_arch and package_arch not in (arch, "all"):
+            out["before"].append(package)
+        elif found and found.group(1) != branch:
+            out["before"].append(package)
+        elif found and name.startswith(_FLAVOURED) and name[found.end() :].startswith("-open") != target_open:
+            out["before"].append(package)
+        elif found and name.startswith(other_userspace):
+            out["after"].append(package)
+    return out
+
+
 class FilterModule:
     def filters(self):
         return {
@@ -64,4 +111,5 @@ class FilterModule:
             "cuda_release_for_driver": cuda_release_for_driver,
             "nvidia_module_loaded": nvidia_module_loaded,
             "nvidia_module_on_disk": nvidia_module_on_disk,
+            "nvidia_driver_leftovers": nvidia_driver_leftovers,
         }

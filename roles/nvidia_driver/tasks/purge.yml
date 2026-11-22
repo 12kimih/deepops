@@ -1,19 +1,19 @@
 ---
-# The packages of another driver (nvidia_driver_existing_packages, found by the
-# distribution's tasks, which name the target in nvidia_driver_purge_target) go before the target is installed. Removing the running driver
-# breaks every GPU job until the reboot (NVML: driver/library version mismatch), so a
-# Slurm node that takes jobs is refused first.
-- name: Switch the driver only on a drained node
+# Removes another driver's packages (nvidia_driver_purge_packages, named by the
+# distribution's tasks with nvidia_driver_purge_target, the driver they make way for).
+# Removing the running driver breaks every GPU job until the reboot (NVML:
+# driver/library version mismatch), so a Slurm node that takes jobs is refused first.
+- name: Remove packages only on a drained node
   when:
     - nvidia_driver_purge_existing | bool
-    - nvidia_driver_existing_packages.stdout_lines | default([]) | length > 0
+    - nvidia_driver_purge_packages | length > 0
   block:
     - name: Require the node drained
       ansible.builtin.include_role:
         name: maintenance
         tasks_from: require_drained
       vars:
-        maintenance_change: "a driver switch to {{ nvidia_driver_purge_target }}"
+        maintenance_change: "the removal of {{ nvidia_driver_purge_packages | join(', ') }} for {{ nvidia_driver_purge_target }}"
         maintenance_drain_hint: >-
           playbooks/utilities/nvidia-driver-switch.yml -e hostlist={{ inventory_hostname }}
           drains it, switches the driver, reboots it, checks it and returns it.
@@ -23,4 +23,4 @@
         name: host_baseline
         tasks_from: absent
       vars:
-        host_baseline_absent_packages: "{{ nvidia_driver_existing_packages.stdout_lines }}"
+        host_baseline_absent_packages: "{{ nvidia_driver_purge_packages }}"

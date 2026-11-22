@@ -316,8 +316,9 @@
 # RHEL/Rocky package/stream overrides (empty = build from toggles):
 #nvidia_driver_rhel_module_stream: ""
 #nvidia_driver_rhel_package: ""
-# Purge any pre-existing NVIDIA driver packages before installing (clean
-# reinstall). Container Toolkit packages are excluded from the purge.
+# Purge the NVIDIA packages that are not the target driver's (another branch, kernel
+# module flavour or architecture before the install, the other userspace after it).
+# Container Toolkit packages are never purged.
 #nvidia_driver_purge_existing: true
 # Ubuntu archive: the full driver (CUDA, OpenGL/EGL/Vulkan without a display, NVENC/
 # NVDEC) on precompiled modules; true installs only CUDA and the tools
