@@ -151,10 +151,14 @@ docker_sysctls:
   net.ipv4.neigh.default.gc_thresh2: "4096"
   net.ipv4.neigh.default.gc_thresh3: "8192"
 
-# Images no container uses, older than this, are removed weekly by a systemd timer
-# (docker image prune --all --filter until=...). Without it a node keeps every image
-# anyone ever pulled or built: months-old images that nobody vetted, and disk.
-# Images of running or stopped containers are never pruned. "" = no timer (and an
-# existing one is removed).
-docker_image_prune_until: "720h"
-docker_image_prune_schedule: weekly
+# What Docker keeps that nothing uses goes on a schedule (docker-prune.timer): stopped
+# containers, images no container uses and the build cache, each older than
+# docker_prune_after, then the anonymous volumes no container uses (a named volume is data
+# and stays).
+# Without it a node kept everything anyone ever ran, pulled or built: 215G of build cache
+# on one node, four-month-old stopped containers holding their images on another
+# (2026-11). The age is the site's one cleanup period (cluster_user_grace_days), as for
+# the other container stores (roles/container_storage_gc). "" = no timer (and an existing
+# one is removed).
+docker_prune_after: "{{ (cluster_user_grace_days | int * 24) ~ 'h' }}"
+docker_prune_schedule: daily

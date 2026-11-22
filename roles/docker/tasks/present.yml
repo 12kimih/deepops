@@ -233,17 +233,19 @@
     host_baseline_sysctl_file: /etc/sysctl.d/90-docker.conf
   when: docker_tune_kernel | bool
 
-- name: Prune unused images on a schedule
-  when: docker_image_prune_until | length > 0
+# Containers first: an image a stopped container holds is in use until it goes. Each
+# step stops the rest when it fails, so a failure shows as the failed unit.
+- name: Prune what Docker keeps unused, on a schedule
+  when: docker_prune_after | length > 0
   block:
-    - name: Install the image prune service
+    - name: Install the prune service
       ansible.builtin.copy:
-        dest: /etc/systemd/system/docker-image-prune.service
+        dest: /etc/systemd/system/docker-prune.service
         mode: "0644"
         content: |
-          # Managed by roles/docker (docker_image_prune_until).
+          # Managed by roles/docker (docker_prune_after).
           [Unit]
-          Description=Remove Docker images no container uses, older than {{ docker_image_prune_until }}
+          Description=Remove Docker containers, images, build cache and volumes unused for {{ docker_prune_after }}
           # Only while Docker runs: a timer must not start a Docker stopped on purpose.
           Requisite=docker.service
           After=docker.service
@@ -251,28 +253,31 @@
           [Service]
           Type=oneshot
           TimeoutStartSec=1h
-          ExecStart=/usr/bin/docker image prune --all --force --filter until={{ docker_image_prune_until }}
+          ExecStart=/usr/bin/docker container prune --force --filter until={{ docker_prune_after }}
+          ExecStart=/usr/bin/docker image prune --all --force --filter until={{ docker_prune_after }}
+          ExecStart=/usr/bin/docker builder prune --all --force --filter until={{ docker_prune_after }}
+          ExecStart=/usr/bin/docker volume prune --force
 
-    - name: Install the image prune timer
+    - name: Install the prune timer
       ansible.builtin.copy:
-        dest: /etc/systemd/system/docker-image-prune.timer
+        dest: /etc/systemd/system/docker-prune.timer
         mode: "0644"
         content: |
-          # Managed by roles/docker (docker_image_prune_schedule).
+          # Managed by roles/docker (docker_prune_schedule).
           [Unit]
-          Description=Prune unused Docker images ({{ docker_image_prune_schedule }})
+          Description=Prune what Docker keeps unused ({{ docker_prune_schedule }})
 
           [Timer]
-          OnCalendar={{ docker_image_prune_schedule }}
+          OnCalendar={{ docker_prune_schedule }}
           RandomizedDelaySec=1h
           Persistent=true
 
           [Install]
           WantedBy=timers.target
 
-    - name: Enable the image prune timer
+    - name: Enable the prune timer
       systemd_unit:
-        name: docker-image-prune.timer
+        name: docker-prune.timer
         enabled: true
         state: started
         daemon_reload: true
