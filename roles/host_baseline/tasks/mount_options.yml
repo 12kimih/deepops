@@ -3,10 +3,17 @@
 # the entries the installer wrote keep their device (UUID) and order; only the options
 # field is the site's. A filesystem another host serves is the mounting role's
 # (nfs_mount_options in roles/nfs_client), never set here. A changed entry is remounted
-# so the running system takes it now; an option the kernel takes only at mount time
-# (an XFS quota, a data= mode) asks for a reboot instead.
+# so the running system takes it now; an option the kernel takes only at mount time (an
+# XFS quota, which a remount accepts and ignores; a data= mode, which it refuses) asks
+# for a reboot instead, found from what the kernel then has mounted.
 - name: Apply the declared mount options
   when: host_baseline_mount_options | length > 0
+  vars:
+    _host_baseline_mount_pending: >-
+      {{ (host_baseline_mount_remount.results | default([]) | selectattr('failed', 'defined') | selectattr('failed')
+          | map(attribute='item.item.path') | list
+          + (host_baseline_mount_options | mount_options_pending(ansible_facts.mounts | default([]))))
+         | unique | sort }}
   block:
     - name: Read /etc/fstab
       ansible.builtin.slurp:
@@ -57,12 +64,17 @@
       register: host_baseline_mount_remount
       failed_when: false
 
+    # A remount can succeed and still leave an option off (XFS takes its quota options
+    # only when it mounts): what the kernel now has is read back, not assumed.
+    - name: Read the mounts as the kernel has them now
+      ansible.builtin.setup:
+        gather_subset: [mounts]
+      when: host_baseline_mount_remount.results | default([]) | length > 0
+
     - name: Ask for a reboot for the options a remount could not take
       ansible.builtin.include_role:
         name: maintenance
         tasks_from: reboot_request
       vars:
-        maintenance_reason: >-
-          mount {{ host_baseline_mount_remount.results | selectattr('failed', 'defined') | selectattr('failed')
-          | map(attribute='item.item.path') | join(', ') }} with its new options
-      when: host_baseline_mount_remount.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0
+        maintenance_reason: "mount {{ _host_baseline_mount_pending | join(', ') }} with its new options"
+      when: _host_baseline_mount_pending | length > 0

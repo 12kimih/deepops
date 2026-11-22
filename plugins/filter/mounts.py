@@ -3,6 +3,8 @@
 "/var/spool/slurmd-private" | mount_point(ansible_facts.mounts)  -> "/" (or "/var" ...)
 fstab_text | fstab_entries   -> [{src, path, fstype, opts, dump, passno}, ...]
 projects | project_filesystems(ansible_facts.mounts) -> each with its "filesystem"
+declared | mount_options_pending(ansible_facts.mounts) -> mount points still without
+    an option the kernel takes only when it mounts (an XFS quota)
 
 The deepest mount at or above the path, by whole path components: /var/tmpfoo is
 not under /var/tmp. The path need not exist yet. Tools that check a filesystem by
@@ -68,10 +70,40 @@ def fstab_entries(text):
     return entries
 
 
+# Options XFS reads only when it mounts: a remount with them returns success and leaves
+# them off, so a remount alone never shows they are missing. Each as the kernel lists it.
+MOUNT_TIME_ONLY = {
+    "xfs": {
+        "usrquota": "usrquota", "uquota": "usrquota", "quota": "usrquota", "uqnoenforce": "usrquota",
+        "grpquota": "grpquota", "gquota": "grpquota", "gqnoenforce": "grpquota",
+        "prjquota": "prjquota", "pquota": "prjquota", "pqnoenforce": "prjquota",
+    },
+}  # fmt: skip
+
+
+def mount_options_pending(declared, mounts):
+    """The mount points of DECLARED ({mount point: options}) whose mounted filesystem
+    lacks an option of MOUNT_TIME_ONLY that the declaration names: they take it only at
+    the next mount (a reboot)."""
+    live = {m["mount"]: m for m in mounts or [] if isinstance(m, dict) and "mount" in m}
+    pending = []
+    for path, options in sorted((declared or {}).items()):
+        entry = live.get(path)
+        if entry is None:
+            continue
+        only = MOUNT_TIME_ONLY.get(entry.get("fstype"), {})
+        want = {only[o] for o in str(options).split(",") if o in only}
+        have = set(str(entry.get("options", "")).split(","))
+        if want - have:
+            pending.append(path)
+    return pending
+
+
 class FilterModule:
     def filters(self):
         return {
             "mount_point": mount_point,
             "fstab_entries": fstab_entries,
             "project_filesystems": project_filesystems,
+            "mount_options_pending": mount_options_pending,
         }
