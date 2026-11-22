@@ -166,6 +166,23 @@ Anything but `status` and `on` refuses the machine running Ansible, and a Slurm 
 node that takes or runs jobs, as a reboot does: drain it first (a hung node Slurm
 already counts DOWN passes), or pass `-e bmc_power_undrained=true` to act anyway.
 
+### Hardware that needs a cold start
+
+Some hardware comes back whole only from a cold start: devices (GPUs, NICs) drop off
+the PCIe bus on a warm reboot until the next power cycle. For such a host set
+`bmc_cold_reboot: true` in its host_vars and run `playbooks/utilities/bmc.yml -e
+hostlist=<host>`. The role installs a systemd-shutdown hook
+(`/usr/lib/systemd/system-shutdown/bmc-cold-reboot`): after a clean shutdown, as the
+last step of every reboot, it asks the host's own BMC in-band (`/dev/ipmi0`, no
+password on the host) to power-cycle the chassis. Slurm's `RebootProgram`
+(`scontrol reboot`), the maintenance playbooks and a plain `reboot` therefore all shut
+down cleanly first, then cold start. A poweroff stays a poweroff. A restart after a
+kernel panic does not pass through the hook. If the BMC does not answer, the reboot
+stays warm and NHC drains the node for its missing GPUs; `power.yml -e
+bmc_power_action=cycle` then cold-starts it from outside. This is a workaround for a
+hardware or firmware fault, so keep the vendor case open and set the value back to
+`false` (which removes the hook) once a firmware or BIOS fix lands.
+
 For the console, use `ipmitool` directly -- it is interactive, so it does not belong in
 a playbook. Pass the same `-C` the role uses, or ipmitool negotiates its own and a board
 that does not offer it answers `invalid role`:

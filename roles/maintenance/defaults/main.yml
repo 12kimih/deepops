@@ -56,10 +56,6 @@ maintenance_dnf_nobest: false
 maintenance_detach_nfs: true
 # A GPU server can spend several minutes in POST and memory training.
 maintenance_reboot_timeout: 1800
-# How the reboot step restarts a host: os (systemctl reboot) or bmc_cycle (chassis power
-# cycle through the BMC, roles/bmc: for hardware that comes back whole only from a cold
-# start). Per host in host_vars.
-maintenance_reboot_method: os
 # reboot_request: the role that asks (default: the one including it); its request
 # waits in maintenance_reboot_requests_dir (roles/deepops_paths), and the reboot step
 # runs each requesting role again after the reboot.

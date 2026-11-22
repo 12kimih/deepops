@@ -60,12 +60,9 @@
           systemctl stop '*.automount' 2>/dev/null || true
           umount -l -f -a -t nfs,nfs4 2>/dev/null || true
           exit 0
-      # Only a clean shutdown can hang on a dead mount; a power cycle has none. And once
-      # /home is gone, a new SSH session (the persistent one lapses while the other
+      # Once /home is gone, a new SSH session (the persistent one lapses while the other
       # hosts of the batch reboot) cannot read authorized_keys and is refused.
-      when:
-        - maintenance_detach_nfs | bool
-        - maintenance_reboot_method == 'os'
+      when: maintenance_detach_nfs | bool
 
     # ansible.cfg's single connection attempt and keepalives let the reboot module
     # re-check its deadline between probes and see the node come back.
@@ -76,45 +73,6 @@
         post_reboot_delay: 15
         reboot_timeout: "{{ maintenance_reboot_timeout }}"
         connect_timeout: 5
-      when: maintenance_reboot_method == 'os'
-
-    # A host whose hardware comes back whole only from a cold start (devices that drop
-    # off the bus on a warm reboot) is power-cycled through its BMC instead.
-    - name: Power-cycle the host through its BMC
-      when: maintenance_reboot_method == 'bmc_cycle'
-      block:
-        - name: Read the boot before the power cycle
-          ansible.builtin.slurp:
-            src: /proc/sys/kernel/random/boot_id
-          register: maintenance_boot_before
-
-        - name: Cycle the chassis power
-          ansible.builtin.include_role:
-            name: bmc
-            tasks_from: chassis
-          vars:
-            bmc_power_action: cycle
-            bmc_power_undrained: "{{ maintenance_reboot_undrained }}"
-
-        # The cycle only previews under --check: there is no boot to wait for or prove.
-        - name: Confirm the host booted again
-          when: not ansible_check_mode
-          block:
-            - name: Wait for the host to come back
-              ansible.builtin.wait_for_connection:
-                delay: 60
-                timeout: "{{ maintenance_reboot_timeout }}"
-
-            - name: Read the boot after the power cycle
-              ansible.builtin.slurp:
-                src: /proc/sys/kernel/random/boot_id
-              register: maintenance_boot_after
-
-            - name: Require that the host really booted again
-              ansible.builtin.assert:
-                that: maintenance_boot_after.content != maintenance_boot_before.content
-                fail_msg: "{{ inventory_hostname }} answers with the same boot as before the power cycle."
-                quiet: true
 
     # The work the asking roles could only do on the new kernel or module (a driver's
     # persistence check, a kernel setting's check): each runs again, then its request

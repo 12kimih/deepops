@@ -48,6 +48,13 @@ bmc_power_action: status
 # Slurm already counts DOWN passes. true acts anyway, losing its jobs.
 bmc_power_undrained: false
 
+# A host whose hardware comes back whole only from a cold start (devices that drop off
+# the bus on a warm reboot): every clean reboot ends in a chassis power cycle its own BMC
+# does, asked in-band by a systemd-shutdown hook (files/bmc-cold-reboot), so Slurm's
+# RebootProgram, the maintenance playbooks and a plain reboot all shut down cleanly first.
+# Per host in host_vars; false removes the hook.
+bmc_cold_reboot: false
+
 # RMCP+ cipher suite for out-of-band sessions. Pinned rather than negotiated: ipmitool
 # asks for the strongest suite it knows, and a BMC that does not offer it answers
 # "invalid role" instead of falling back. 3 (HMAC-SHA1 + AES-128) is the baseline every
