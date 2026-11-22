@@ -152,9 +152,11 @@ docker_sysctls:
   net.ipv4.neigh.default.gc_thresh3: "8192"
 
 # What Docker keeps that nothing uses goes on a schedule (docker-prune.timer): stopped
-# containers, images no container uses and the build cache, each older than
-# docker_prune_after, then the anonymous volumes no container uses (a named volume is data
-# and stays).
+# containers created more than docker_prune_after ago, images no container uses that were
+# built more than that ago (Docker keeps no time an image was last used: one pulled
+# yesterday but built last year goes, and is pulled again when wanted), build cache not
+# used for that long, then the anonymous volumes no container uses (a named volume is
+# data and stays).
 # Without it a node kept everything anyone ever ran, pulled or built: 215G of build cache
 # on one node, four-month-old stopped containers holding their images on another
 # (2026-11). The age is the site's one cleanup period (cluster_user_grace_days), as for
