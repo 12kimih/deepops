@@ -6,6 +6,7 @@ not. Tunnel programs are found by executable, script or subcommand name. The cou
 come from the egress table, exposure from the ingress table (roles/ingress_policy).
 """
 
+import ipaddress
 import os
 import sys
 import tempfile
@@ -131,6 +132,22 @@ class EgressMetricsTests(unittest.TestCase):
         self.assertIn(
             ("tcp", "0.0.0.0", "8888", "bob", "python3", "true"), self.listeners(self.metrics(TABLE, OPEN))
         )
+
+    def test_an_internal_address_range_is_internal(self):
+        """auto-merge prints adjacent networks as one address range: still internal."""
+        MERGED = {"nftables": [*INBOUND["nftables"][:3],
+                  {"set": {"name": "internal4", "elem": [{"range": ["9.255.0.0", "10.0.255.255"]}, "192.0.2.7"]}},
+                  {"set": {"name": "inbound_tcp", "elem": [{"range": [8000, 8888]}]}},
+                  INBOUND["nftables"][-1]]}  # fmt: skip
+        # 8080 is open from outside: only the internal address keeps it in.
+        self.assertIn(
+            ("tcp", "10.0.0.5", "8080", "dave", "torchrun", "false"),
+            self.listeners(self.metrics(TABLE, MERGED)),
+        )
+        state = em.policy(MERGED)
+        self.assertTrue(em.in_set(state, "internal4", ipaddress.ip_address("192.0.2.7")))
+        self.assertFalse(em.in_set(state, "internal4", ipaddress.ip_address("10.1.0.0")))
+        self.assertFalse(em.in_set(state, "internal4", 8080))
 
     def test_without_the_tables_every_listener_is_exposed(self):
         values = self.metrics(None, None)

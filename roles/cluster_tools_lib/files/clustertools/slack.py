@@ -10,7 +10,8 @@
     bar(percent)                            -> a text gauge for a code span or table
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
-Each call is bounded by TIMEOUT seconds. Interactive features (buttons, forms, Socket
+Each call is bounded by TIMEOUT seconds. A call Slack rate-limits (HTTP 429) is sent
+again once, after the Retry-After it names (at most RETRY_MAX seconds). Interactive features (buttons, forms, Socket
 Mode) are the cluster bot's (roles/cluster_bot); this module only sends and reads.
 Python 3.9 or newer, standard library only.
 """
@@ -18,11 +19,14 @@ Python 3.9 or newer, standard library only.
 import json
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
 API = "https://slack.com/api/"
 TIMEOUT = 30
+# The longest Retry-After a rate-limited call waits before its one retry (seconds).
+RETRY_MAX = 60
 # A Slack member ID (users, and workspace-wide W... IDs).
 MEMBER = re.compile(r"[UW][A-Z0-9]+")
 # How long a looked-up member ID is trusted (seconds).
@@ -45,14 +49,24 @@ class Slack:
             self._print(method, params)
             return {"ok": True, "ts": "dry-run", "channel": {"id": "dry-run"}}
         data = urllib.parse.urlencode(params).encode()
-        req = urllib.request.Request(
-            API + method, data=data, headers={"Authorization": f"Bearer {self.token}"}
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                body = json.load(resp)
-        except (OSError, ValueError) as e:
-            raise Error(f"Slack {method} failed: {e}") from e
+        for attempt in (1, 2):
+            req = urllib.request.Request(
+                API + method, data=data, headers={"Authorization": f"Bearer {self.token}"}
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    body = json.load(resp)
+                break
+            except urllib.error.HTTPError as e:
+                with e:
+                    wait = _retry_after(e) if e.code == 429 and attempt == 1 else None
+                    if wait is None:
+                        raise Error(f"Slack {method} failed: {e}") from None
+                time.sleep(wait)
+            except (OSError, ValueError) as e:
+                raise Error(f"Slack {method} failed: {e}") from e
+        if not isinstance(body, dict):
+            raise Error(f"Slack {method} failed: the answer is not a JSON object")
         if not body.get("ok") and body.get("error") != "users_not_found":
             raise Error(f"Slack {method} failed: {body.get('error')} {body.get('response_metadata', '')}")
         return body
@@ -90,6 +104,15 @@ class Slack:
         if blocks:
             params["blocks"] = json.dumps(blocks)
         return self.call("chat.update", **params)
+
+
+def _retry_after(error):
+    """The seconds a 429 asks to wait, within RETRY_MAX; None when it names none."""
+    try:
+        wait = int(error.headers.get("Retry-After", ""))
+    except (TypeError, ValueError):
+        return None
+    return wait if 0 <= wait <= RETRY_MAX else None
 
 
 def member(slack, user, user_map, email_domain, cache):

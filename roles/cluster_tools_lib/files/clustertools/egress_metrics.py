@@ -41,7 +41,6 @@ from .prom import series
 INTERPRETERS = {"node", "nodejs", "python", "python3", "ruby", "perl", "bash", "sh", "deno", "bun"}
 TCP_LISTEN = "0A"
 UDP_UNCONNECTED = "07"
-NETWORKS = (ipaddress.IPv4Network, ipaddress.IPv6Network)
 
 
 def uid_ranges(specs):
@@ -174,21 +173,36 @@ def tunnel_matches(names, argv, programs):
     return hits
 
 
+def _value(value):
+    return value if isinstance(value, int) else ipaddress.ip_address(value)
+
+
 def set_elements(elems):
-    """An nft JSON set's elements as (low, high) pairs of ints or ip networks."""
+    """An nft JSON set's elements, each as one (low, high) pair of ints (ports) or ip
+    addresses: a single value, a prefix and a range alike. An interval set with
+    auto-merge prints adjacent networks as one address range."""
     out = []
     for e in elems or []:
-        if isinstance(e, dict) and "range" in e:
-            out.append(tuple(e["range"]))
-        elif isinstance(e, dict) and "prefix" in e:
-            out.append(ipaddress.ip_network(f"{e['prefix']['addr']}/{e['prefix']['len']}"))
-        elif isinstance(e, dict) and "elem" in e:
+        if isinstance(e, dict) and "elem" in e:
             out += set_elements([e["elem"]["val"]])
+        elif isinstance(e, dict) and "range" in e:
+            low, high = e["range"]
+            out.append((_value(low), _value(high)))
+        elif isinstance(e, dict) and "prefix" in e:
+            net = ipaddress.ip_network(f"{e['prefix']['addr']}/{e['prefix']['len']}", strict=False)
+            out.append((net.network_address, net.broadcast_address))
         elif isinstance(e, int):
             out.append((e, e))
         else:
-            out.append(ipaddress.ip_network(str(e)))
+            net = ipaddress.ip_network(str(e), strict=False)
+            out.append((net.network_address, net.broadcast_address))
     return out
+
+
+def in_set(state, name, value):
+    """Whether VALUE (a port or an address) is in the set NAME; an address only matches
+    addresses of its own version."""
+    return any(type(low) is type(value) and low <= value <= high for low, high in state["sets"].get(name, []))
 
 
 def policy(table_json):
@@ -207,11 +221,9 @@ def policy(table_json):
 def exposed(state, proto, addr, port):
     if not state["inbound"]:
         return True
-    if not addr.is_unspecified:
-        nets = state["sets"].get("internal4" if addr.version == 4 else "internal6", [])
-        if any(isinstance(n, NETWORKS) and addr in n for n in nets):
-            return False
-    return any(low <= port <= high for low, high in state["sets"].get(f"inbound_{proto}", []))
+    if not addr.is_unspecified and in_set(state, f"internal{addr.version}", addr):
+        return False
+    return in_set(state, f"inbound_{proto}", port)
 
 
 _NAMES = {}

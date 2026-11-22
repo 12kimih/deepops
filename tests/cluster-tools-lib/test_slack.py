@@ -2,10 +2,12 @@
 not at all, and an answer is reused for a day; a member ID becomes a DM channel; a
 dry run prints instead of posting; a refusal names the method and Slack's reason."""
 
+import email.message
 import io
 import json
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest import mock
 
@@ -52,6 +54,42 @@ class SlackTests(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", return_value=reply):
             with self.assertRaisesRegex(slack.Error, "chat.postMessage failed: channel_not_found"):
                 slack.Slack("xoxb-test").post("#nope", "x")
+
+    def http_error(self, code, retry_after=None):
+        headers = email.message.Message()
+        if retry_after is not None:
+            headers["Retry-After"] = retry_after
+        return urllib.error.HTTPError(slack.API + "chat.postMessage", code, "x", headers, io.BytesIO(b"{}"))
+
+    def test_a_rate_limited_call_is_sent_again_after_retry_after(self):
+        ok = io.BytesIO(json.dumps({"ok": True, "ts": "1.2"}).encode())
+        with (
+            mock.patch("urllib.request.urlopen", side_effect=[self.http_error(429, "7"), ok]) as urlopen,
+            mock.patch("time.sleep") as sleep,
+        ):
+            self.assertEqual(slack.Slack("xoxb-test").post("#c", "x"), "1.2")
+        sleep.assert_called_once_with(7)
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_a_second_429_or_another_error_fails_once(self):
+        for errors in (
+            [self.http_error(429, "1"), self.http_error(429, "1")],
+            [self.http_error(429)],
+            [self.http_error(429, "3600")],
+            [self.http_error(500)],
+        ):
+            with self.subTest(errors=[(e.code, e.headers.get("Retry-After")) for e in errors]):
+                with (
+                    mock.patch("urllib.request.urlopen", side_effect=errors),
+                    mock.patch("time.sleep"),
+                    self.assertRaisesRegex(slack.Error, "chat.postMessage failed: HTTP Error"),
+                ):
+                    slack.Slack("xoxb-test").post("#c", "x")
+
+    def test_an_answer_that_is_not_an_object_fails(self):
+        with mock.patch("urllib.request.urlopen", return_value=io.BytesIO(b"[1]")):
+            with self.assertRaisesRegex(slack.Error, "not a JSON object"):
+                slack.Slack("xoxb-test").post("#c", "x")
 
 
 class BlockTests(unittest.TestCase):
