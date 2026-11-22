@@ -24,6 +24,22 @@ RELOADABLE = {
     "authorization-plugins", "insecure-registries", "registry-mirrors", "shutdown-timeout",
 }  # fmt: skip
 
+
+def write_atomic(target, text, mode):
+    """TARGET replaced whole, never left half written (a broken record or daemon.json
+    would stop every later run, and dockerd)."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}-")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.chmod(tmp, mode)
+        os.replace(tmp, target)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 args = json.load(sys.stdin)
 path, record = Path(args["path"]), Path(args["record"])
 want, drop_if, check = args["want"], args["drop_if"], args.get("check", False)
@@ -46,12 +62,6 @@ print(json.dumps({"changed": keys, "reload": bool(keys) and set(keys) <= RELOADA
 if check:
     sys.exit(10 if changed else 0)
 if changed:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".daemon.json-")
-    with os.fdopen(fd, "w") as f:
-        f.write(json.dumps(data, indent=2) + "\n")
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
-record.parent.mkdir(parents=True, exist_ok=True)
-record.write_text(json.dumps(sorted(want)) + "\n")
+    write_atomic(path, json.dumps(data, indent=2) + "\n", 0o644)
+write_atomic(record, json.dumps(sorted(want)) + "\n", 0o644)
 sys.exit(10 if changed else 0)
