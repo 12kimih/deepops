@@ -28,8 +28,14 @@ FACTS = {
 }
 
 
-def conf(varfile, family, gpus=0, **overrides):
+def conf(varfile, family, gpus=0, record=None, **overrides):
+    """nhc.conf for a host of FAMILY with GPUS, whose component record (roles/component_record)
+    holds RECORD ({component: state})."""
     local = {**FACTS["ansible_local"], "gpus": {"count": gpus}}
+    if record is not None:
+        local["deepops_components"] = {
+            "components": {k: {"state": v, "version": ""} for k, v in record.items()}
+        }
     variables = {
         **role_defaults("nhc"),
         **yaml.safe_load((ROLE / "vars" / varfile).read_text()),
@@ -77,17 +83,23 @@ class NhcConf(unittest.TestCase):
         self.assertNotIn("check_nv_xid", text)
         self.assertNotIn("check_nv_remapped_rows", text)
 
-    def test_acs_is_checked_where_its_component_is_present(self):
+    def test_acs_is_checked_where_its_component_is_installed(self):
+        """The record says what a host has; the configured state only what it should get.
+        Configured present before roles/pcie_acs had run, the check ran a program no node
+        had yet and would have drained them all."""
         program = role_defaults("deepops_paths")["pcie_acs_program"]
-        for state, checked in (("present", True), ("absent", False), ("kept", False)):
-            with self.subTest(state=state):
-                text = conf(
-                    "debian.yml",
-                    "Debian",
-                    deepops_components={"pcie_acs": state},
-                    pcie_acs_program=program,
-                )
+        for state, checked in (("present", True), ("begin", False), ("absent", False)):
+            with self.subTest(recorded=state):
+                text = conf("debian.yml", "Debian", record={"pcie_acs": state}, pcie_acs_program=program)
                 self.assertEqual(f"check_pcie_acs {program}\n" in text, checked)
+        configured_only = conf(
+            "debian.yml",
+            "Debian",
+            record={},
+            deepops_components={"pcie_acs": "present"},
+            pcie_acs_program=program,
+        )
+        self.assertNotIn("check_pcie_acs", configured_only)
         self.assertNotIn("check_pcie_acs", conf("debian.yml", "Debian"))
 
     def test_a_full_local_filesystem_drains_the_node(self):
