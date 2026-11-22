@@ -42,7 +42,7 @@ GROUPS = {"slurm-master": ["ctl01", "ctl02"], "slurm-node": ["node01"]}
 
 
 def variables(**overrides):
-    return {
+    values = {
         **DEFAULTS,
         **EXAMPLE,
         **FACTS,
@@ -51,6 +51,11 @@ def variables(**overrides):
         "hostvars": {"node01": FACTS},
         **overrides,
     }
+    # Each node's TmpDisk, as the controller works it out before rendering (controller.yml).
+    if "slurm_tmp_disk" not in overrides:
+        work = task("roles/slurm/tasks/controller.yml", "Work out each node's TmpDisk")
+        values["slurm_tmp_disk"] = render(work["set_fact"]["slurm_tmp_disk"], values)
+    return values
 
 
 def rendered(template_var, **overrides):
@@ -131,6 +136,20 @@ class JobFilesystem(unittest.TestCase):
     def test_no_filesystem_of_its_own_offers_none(self):
         for size in (None, 0, 1000):
             self.assertNotIn("TmpDisk", node_line(self.conf(size)), size)
+
+    def test_the_controller_check_wants_tmpfs_and_each_nodes_tmpdisk(self):
+        check = ControllerCheck()
+        facts = {"ansible_facts": {**FACTS["ansible_facts"], "ansible_local": {
+            **FACTS["ansible_facts"]["ansible_local"], "job_scratch": {"size_mb": 1300000}}}}  # fmt: skip
+        conf = self.conf(1300000)
+        self.assertTrue(check.passes(conf, hostvars={"node01": facts}))
+        # A site's own template that left them out, as one did.
+        without_disk = conf.replace(f" TmpDisk={1300000 // 1024 * 1024}", "")
+        self.assertFalse(check.passes(without_disk, hostvars={"node01": facts}))
+        without_fs = "\n".join(x for x in conf.splitlines() if not x.startswith("TmpFS="))
+        self.assertFalse(check.passes(without_fs, hostvars={"node01": facts}))
+        # A TmpDisk where the node has no filesystem of its own is refused too.
+        self.assertFalse(check.passes(conf))
 
     def test_without_private_directories_neither(self):
         conf = self.conf(1300000, slurm_job_private_dirs=[])
