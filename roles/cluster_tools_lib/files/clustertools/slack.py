@@ -7,6 +7,7 @@
     member(slack, user, user_map, email_domain, cache) -> a person's Slack member ID
     slack.call(method, **params)            -> any other method, parsed
     sections(text), table(header, rows)     -> message blocks within Slack's limits
+    bar(percent)                            -> a text gauge for a code span or table
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
 Each call is bounded by TIMEOUT seconds. Interactive features (buttons, forms, Socket
@@ -28,6 +29,7 @@ MEMBER = re.compile(r"[UW][A-Z0-9]+")
 MEMBER_TTL = 86400
 MAX_BLOCKS = 45  # Slack allows 50 blocks per message
 MAX_SECTION = 2900  # and 3000 characters per section text
+BAR_WIDTH = 10
 
 
 class Error(RuntimeError):
@@ -108,6 +110,15 @@ def member(slack, user, user_map, email_domain, cache):
 
 
 # --- Message blocks -----------------------------------------------------------
+
+
+def bar(pct, width=BAR_WIDTH):
+    """PCT (0 to 100, None unknown) as a gauge of WIDTH blocks and the percent; the same
+    width either way, so a table's columns line up."""
+    if pct is None:
+        return "n/a".ljust(width + 5)
+    filled = round(max(0.0, min(pct, 100.0)) / 100 * width)
+    return "█" * filled + "░" * (width - filled) + f" {pct:3.0f}%"
 
 
 def table(header, rows):
