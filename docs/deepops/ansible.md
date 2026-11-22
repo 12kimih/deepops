@@ -137,6 +137,16 @@ A role that adds a package repository (`roles/package_repos`) installs through
 neither written nor indexed, so its packages are still unknown; the install then shows
 as the change it will be ("would install X from Y") instead of failing the preview.
 
+### One run at a time
+
+A run of `ansible-playbook` that changes hosts (anything but `--check`) holds a lock on
+its inventory until it ends (`plugins/callback/run_lock.py`). A second such run stops
+before its first play and names the run holding the lock: two runs at once interfere,
+as when a rolling upgrade rebooted a node a Slurm deploy beside it was configuring.
+Previews, ad-hoc commands and runs against another inventory (molecule) are not held
+back. The lock goes with the process however it ends, so nothing is left to clean up;
+the locks live in `~/.cache/deepops/run-locks`.
+
 ### Run history (ARA)
 
 Every `ansible-playbook` and `ansible` run is recorded by
