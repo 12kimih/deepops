@@ -358,6 +358,24 @@ tests:
             exp_annotations:
               summary: "/ on n1 will fill within 24h"
 
+  # A one-time allocation (a job scratch image) is a step, not a trend: flat an hour after.
+  - name: HostDiskFillingUp stays quiet after one large allocation
+    interval: 5m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{host="n1",instance="n1:9100",mountpoint="/",fstype="ext4",device="/dev/sda1"}'
+        values: '80x12 20x60'
+      - series: 'node_filesystem_size_bytes{host="n1",instance="n1:9100",mountpoint="/",fstype="ext4",device="/dev/sda1"}'
+        values: '100x72'
+      - series: 'node_filesystem_readonly{host="n1",instance="n1:9100",mountpoint="/",fstype="ext4",device="/dev/sda1"}'
+        values: '0x72'
+    alert_rule_test:
+      - eval_time: 1h30m
+        alertname: HostDiskFillingUp
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: HostDiskFillingUp
+        exp_alerts: []
+
   - name: HostInodesAlmostExhausted fires
     interval: 1m
     input_series:

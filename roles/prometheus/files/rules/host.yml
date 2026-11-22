@@ -22,9 +22,13 @@ groups:
         annotations:
           summary: "{{ $labels.mountpoint }} on {{ $labels.host }} is over 97% full"
           description: "{{ $value | humanizePercentage }} free. Writes will start failing."
+      # The six-hour trend and the last hour's both fill it: one large allocation (a job
+      # scratch image of 70% of the disk) is a step the six-hour trend reads as filling
+      # for six hours, while the last hour's is flat an hour after it.
       - alert: HostDiskFillingUp
         expr: |
           predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}[6h], 24 * 3600) < 0
+          and predict_linear(node_filesystem_avail_bytes[1h], 24 * 3600) < 0
           and node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.25
           and node_filesystem_readonly == 0
         for: 1h
