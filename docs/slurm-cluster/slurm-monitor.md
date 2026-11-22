@@ -227,12 +227,15 @@ utilisation bar and GPU memory.
 A job counts as idle when it has run for `slurm_usage_report_idle_hours` and every GPU it
 holds stayed at or under `slurm_usage_report_idle_util_threshold` percent the whole time
 (DCGM `DCGM_FI_DEV_GPU_UTIL_RATIO`, shown in percent). `slurm_usage_report_notify` lists how its owner hears about
-it: `mention` in the report thread, `dm`, both, or `[]` for neither. Owners are notified
-when a job first turns idle and then every `slurm_usage_report_notify_repeat_hours`, not on
-every report; the thread lists idle jobs either way.
-`slurm_usage_report_cancel_after_hours` cancels idle jobs after that long (0 = never) and
-says so in the report thread. A job is cancelled only after its owner was notified in an
-earlier report, so the setting must exceed `slurm_usage_report_idle_hours` and needs
+it: `mention` in the report thread, `dm`, both, or `[]` for neither. Each person is told
+once for all their idle jobs (one line in the thread, one mention, one DM), when a job of
+theirs first turns idle and then every `slurm_usage_report_notify_repeat_hours` while any
+stays idle, not on every report; the thread lists idle jobs either way.
+`slurm_usage_report_cancel_after_hours` cancels any job, batch or interactive, whose GPUs
+sat idle that long (0 = never) and says so in the report thread. A job is cancelled only
+after its owner was told of it in an earlier report and warned
+`slurm_usage_report_cancel_warn_hours` ahead (one DM for all their jobs about to go), so
+the setting must exceed `slurm_usage_report_idle_hours` and needs
 `slurm_usage_report_notify`; the deploy checks the config and stops on a mistake.
 
 Every Monday (`slurm_usage_report_weekly_schedule`) it also posts the week: for each

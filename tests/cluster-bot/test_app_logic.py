@@ -67,12 +67,25 @@ class LogicTests(unittest.TestCase):
             [("UALICE", "스크래치 공간이 곧 만료됩니다")] * 2,
         )
         allocs[0]["expires"] = 13 * DAY  # extended by three days, inside the 7-day window
-        reminders.remind(sources, client, SLACK_OF, sent, 9.6 * DAY)  # 3.4 days left: the 7-day stage again
-        reminders.remind(sources, client, SLACK_OF, sent, 12.5 * DAY)  # and the 1-day one
-        self.assertEqual(len(client.sent), 4, "a moved deadline starts its countdown over")
+        reminders.remind(sources, client, SLACK_OF, sent, 9.6 * DAY)  # 3.4 days left: they just chose it
+        self.assertEqual(len(client.sent), 2, "no 7-day reminder right after extending into it")
+        reminders.remind(sources, client, SLACK_OF, sent, 12.5 * DAY)  # the 1-day one
+        self.assertEqual(len(client.sent), 3, "a moved deadline starts its countdown over")
         allocs[0]["state"] = "frozen"
         reminders.remind(sources, client, SLACK_OF, sent, 12.6 * DAY)
         self.assertEqual(sent, {"scratch": {}}, "what is no longer listed leaves the record")
+
+    def test_a_stage_already_passed_when_first_seen_is_skipped_but_never_the_last(self):
+        sent = {}
+        self.assertEqual(
+            reminders.due({"k": 10 * DAY}, [14, 7, 1], sent, 0), [], "10 days off: not the 14-day one"
+        )
+        self.assertEqual(reminders.due({"k": 10 * DAY}, [14, 7, 1], sent, 3.5 * DAY), [("k", 7, 7)])
+        seen = {}
+        self.assertEqual(reminders.due({"k": 30 * DAY}, [14, 7, 1], seen, 0), [], "seen 30 days off")
+        self.assertEqual(reminders.due({"k": 30 * DAY}, [14, 7, 1], seen, 16.5 * DAY), [("k", 14, 14)])
+        old = {"k": [10 * DAY, None]}  # a record kept from before first sight: every stage counts
+        self.assertEqual(reminders.due({"k": 10 * DAY}, [14, 7, 1], old, 0), [("k", 10, 14)])
 
     def test_after_a_pause_only_the_nearest_stage_and_a_failed_message_again(self):
         due = reminders.due({"k": 10 * DAY}, [30, 14, 7, 1], {}, 9.5 * DAY)
@@ -81,8 +94,9 @@ class LogicTests(unittest.TestCase):
             "scratch": reminders.Source([7, 1], feature([dict(ALLOC)]).deadlines, scratch_blocks.reminder)
         }
         sent = {}
+        reminders.remind(sources, Client(), SLACK_OF, sent, 0)  # first seen ten days off
         reminders.remind(sources, Client(fail=True), SLACK_OF, sent, 4 * DAY)
-        self.assertEqual(sent, {"scratch": {}}, "nothing went out, so nothing is recorded")
+        self.assertIsNone(sent["scratch"]["1000"][1], "nothing went out, so no stage is recorded")
         client = Client()
         reminders.remind(sources, client, SLACK_OF, sent, 4.1 * DAY)
         self.assertEqual(len(client.sent), 1)
