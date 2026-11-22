@@ -245,7 +245,7 @@
         content: |
           # Managed by roles/docker (docker_prune_after).
           [Unit]
-          Description=Remove Docker containers, images, build cache and volumes unused for {{ docker_prune_after }}
+          Description=Remove what Docker keeps unused: stopped containers, images and build cache older than {{ docker_prune_after }}, anonymous volumes
           # Only while Docker runs: a timer must not start a Docker stopped on purpose.
           Requisite=docker.service
           After=docker.service
