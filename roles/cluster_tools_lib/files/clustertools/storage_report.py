@@ -17,12 +17,11 @@ Python 3.9 or newer, standard library only.
 from datetime import datetime
 
 from .render import size
-from .slack import MAX_BLOCKS, sections, table
+from .slack import MAX_BLOCKS, bar, sections, table
 
 DAY = 86400
 # When a host's usage is older than this, the report says so (the alert fires at an hour).
 STALE = 3600
-BAR_WIDTH = 10
 HOW = "`quota -s` on the host shows your own usage there."
 
 # The disks behind the counted filesystems: node_exporter's mount point is the quota
@@ -129,18 +128,12 @@ def change(now, before):
     return "0" if abs(d) < 1024**2 else ("+" if d > 0 else "") + size(d)
 
 
-def bar(used, total):
-    pct = 100 * used / total if total else 0
-    filled = round(max(0.0, min(pct, 100.0)) / 100 * BAR_WIDTH)
-    return "█" * filled + "░" * (BAR_WIDTH - filled) + f" {pct:3.0f}%"
-
-
 def disk_line(key, disk):
     """One line on a disk: how full, what is free, how the free space changed in a day."""
     if not disk["size"] or disk["avail"] is None:
         return f"*{where(*key)}*  no disk figures (node_exporter)"
     used = disk["size"] - disk["avail"]
-    line = f"*{where(*key)}*  `{bar(used, disk['size'])}`  {size(disk['avail'])} free of {size(disk['size'])}"
+    line = f"*{where(*key)}*  `{bar(100 * used / disk['size'])}`  {size(disk['avail'])} free of {size(disk['size'])}"
     if disk["avail_before"] is not None:
         line += f", {change(used, disk['size'] - disk['avail_before'])} used in a day"
     return line

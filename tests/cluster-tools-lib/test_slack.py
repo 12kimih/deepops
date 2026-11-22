@@ -71,6 +71,11 @@ class BlockTests(unittest.TestCase):
         self.assertTrue(all(len(b["text"]["text"]) <= 3000 for b in long))
         self.assertEqual(sum(len(b["text"]["text"]) for b in long), 7000, "a long line is split, not cut")
 
+    def test_bar(self):
+        self.assertEqual(slack.bar(100), "█" * 10 + " 100%")
+        self.assertEqual(slack.bar(0), "░" * 10 + "   0%")
+        self.assertTrue(slack.bar(None).startswith("n/a"))
+
     def test_table_pads_columns_in_a_code_block(self):
         self.assertEqual(slack.table(("A", "BB"), [("xyz", 1)]), "```\nA    BB\nxyz  1\n```")
 

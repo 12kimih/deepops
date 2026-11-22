@@ -268,11 +268,6 @@ class RenderTests(unittest.TestCase):
                 self.assertLessEqual(len(b.get("text", {}).get("text", "")), 3000)
         self.assertLessEqual(len(summary[0]["text"]["text"]), 150)
 
-    def test_bar(self):
-        self.assertEqual(report.bar(100), "█" * 10 + " 100%")
-        self.assertEqual(report.bar(0), "░" * 10 + "   0%")
-        self.assertTrue(report.bar(None).startswith("n/a"))
-
 
 class RunTests(unittest.TestCase):
     """report_once: a failure part-way still records what this run did."""

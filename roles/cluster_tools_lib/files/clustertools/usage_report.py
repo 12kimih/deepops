@@ -32,7 +32,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MAX_BLOCKS, Slack, sections, table
+from .slack import MAX_BLOCKS, Slack, bar, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -50,7 +50,6 @@ from .vocab import job_holds, node_unavailable
 
 NOTIFY = {"mention", "dm"}
 DM_FIELDS = {"job": "1234_5", "gpus": 8, "hours": "2", "runtime": "1:00:00"}
-BAR_WIDTH = 10
 WEEK_DAYS = 7
 WEEK_TOP = 5  # the idlest people mentioned in the weekly summary
 WEEKS_KEPT = 8  # weeks of each person's numbers the weekly summary remembers
@@ -233,13 +232,6 @@ def track_idle(idle, state, now, window, repeat, notify):
 
 
 # --- Rendering ------------------------------------------------------------------
-
-
-def bar(pct):
-    if pct is None:
-        return "n/a".ljust(BAR_WIDTH + 5)
-    filled = round(max(0.0, min(pct, 100.0)) / 100 * BAR_WIDTH)
-    return "█" * filled + "░" * (BAR_WIDTH - filled) + f" {pct:3.0f}%"
 
 
 def gib(job):
