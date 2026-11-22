@@ -48,11 +48,36 @@ class Wiring(unittest.TestCase):
         self.assertEqual(cfg["defaults"]["callback_plugins"], "./.callback_plugins")
 
     def test_setup_links_the_package_directory(self):
+        """setup.sh's own lines link .callback_plugins to the directory ARA names, and stop
+        setup when it names none (an empty link left every run unrecorded)."""
         setup = (ROOT / "scripts/setup.sh").read_text()
-        self.assertIn(
-            'ln -sfn "$(uv run --locked python -m ara.setup.callback_plugins)" .callback_plugins', setup
-        )
+        block = re.search(r"^ARA_PLUGINS=.*?^ln -sfn .*? \.callback_plugins$", setup, re.M | re.S)
+        self.assertIsNotNone(block, "setup.sh links .callback_plugins from ARA_PLUGINS")
         self.assertIn("/.callback_plugins", (ROOT / ".gitignore").read_text().splitlines())
+        for answer, linked in (("print-dir", True), ("print-nothing", False), ("fail", False)):
+            with self.subTest(answer=answer), tempfile.TemporaryDirectory() as tmp:
+                tmp = Path(tmp)
+                (tmp / "plugins").mkdir()
+                (tmp / "bin").mkdir()
+                (tmp / "bin/uv").write_text(
+                    f"#!/bin/sh\ncase {answer} in print-dir) echo {tmp / 'plugins'} ;; fail) exit 1 ;; esac\n"
+                )
+                (tmp / "bin/uv").chmod(0o755)
+                proc = subprocess.run(
+                    ["bash", "-c", block.group(0) + "\necho done"],
+                    cwd=tmp,
+                    env={**os.environ, "PATH": f"{tmp / 'bin'}:{os.environ['PATH']}"},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                link = tmp / ".callback_plugins"
+                self.assertEqual(link.is_symlink(), linked)
+                if linked:
+                    self.assertEqual((proc.returncode, os.readlink(link)), (0, str(tmp / "plugins")))
+                else:
+                    self.assertEqual(proc.returncode, 1)
+                    self.assertIn("ARA's callback plugins were not found", proc.stderr)
 
     def test_tests_record_nothing(self):
         """Every test and scenario that starts Ansible runs it unrecorded, alone or in check.sh."""
