@@ -5,9 +5,14 @@ allocation id). Approving a held request is the engine's (clusterbot.blocks).
 """
 
 from .blocks import button as _button
+from .blocks import field
 from .scratch import human, summary
 
 SIZES = ["100G", "500G", "1T", "2T", "5T", "10T"]
+
+
+def _sizes():
+    return [{"text": {"type": "plain_text", "text": s}, "value": s} for s in SIZES]
 
 
 def home(allocations):
@@ -47,14 +52,10 @@ def new_form(policy):
         "submit": {"type": "plain_text", "text": "신청"},
         "blocks": [
             {"type": "context", "elements": [{"type": "mrkdwn", "text": auto}]},
-            {"type": "input", "block_id": "size", "label": {"type": "plain_text", "text": "크기"},
-             "element": {"type": "static_select", "action_id": "v",
-                         "options": [{"text": {"type": "plain_text", "text": s}, "value": s} for s in SIZES]}},
-            {"type": "input", "block_id": "days", "label": {"type": "plain_text", "text": "기간 (일)"},
-             "element": {"type": "number_input", "action_id": "v", "is_decimal_allowed": False,
-                         "min_value": "1", "initial_value": str(policy["auto_days"])}},
-            {"type": "input", "block_id": "reason", "label": {"type": "plain_text", "text": "사유 (빠른 I/O가 필요한 이유)"},
-             "element": {"type": "plain_text_input", "action_id": "v", "multiline": True}},
+            field("size", "크기", {"type": "static_select", "options": _sizes()}),
+            field("days", "기간 (일)", {"type": "number_input", "is_decimal_allowed": False, "min_value": "1",
+                                       "initial_value": str(policy["auto_days"])}),
+            field("reason", "사유 (빠른 I/O가 필요한 이유)", {"type": "plain_text_input", "multiline": True}),
         ],
     }  # fmt: skip
 
@@ -64,17 +65,15 @@ def number_form(kind, alloc_id):
     if kind == "extend":
         label, element = (
             "연장할 기간 (일)",
-            {"type": "number_input", "action_id": "v", "is_decimal_allowed": False, "min_value": "1"},
+            {"type": "number_input", "is_decimal_allowed": False, "min_value": "1"},
         )
     else:
-        label = "새 크기"
-        element = {"type": "static_select", "action_id": "v",
-                   "options": [{"text": {"type": "plain_text", "text": s}, "value": s} for s in SIZES]}  # fmt: skip
+        label, element = "새 크기", {"type": "static_select", "options": _sizes()}
     return {
         "type": "modal", "callback_id": f"scratch.{kind}", "private_metadata": str(alloc_id),
         "title": {"type": "plain_text", "text": "스크래치 연장" if kind == "extend" else "크기 변경"},
         "submit": {"type": "plain_text", "text": "요청"},
-        "blocks": [{"type": "input", "block_id": "v", "label": {"type": "plain_text", "text": label}, "element": element}],
+        "blocks": [field("v", label, element)],
     }  # fmt: skip
 
 

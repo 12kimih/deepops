@@ -1,0 +1,18 @@
+---
+dependencies:
+  - role: slack_defaults  # cluster_bot_user, cluster_bot_host, cluster_bot_key, the paths
+  - role: system_accounts  # the bot's account
+  - role: network_defaults  # the bot host's cluster address
+
+galaxy_info:
+  namespace: deepops
+  role_name: cluster_bot_access
+  author: DeepOps
+  description: The cluster bot's one forced command on a host, and the services it may run there
+  license: BSD-3-Clause
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["8", "9"]

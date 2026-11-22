@@ -1,7 +1,9 @@
 ---
 # present, absent or kept (docs/deepops/component-state.md): fail2ban, banning an address
 # after repeated failed logins. A deploy sets it from deepops_components
-# (slurm_enable_fail2ban, kube_enable_fail2ban).
+# (slurm_enable_fail2ban, kube_enable_fail2ban). While the cluster has a bot
+# (roles/cluster_bot) it offers it the ban list and unbans (/unban-request, an
+# administrator approves; roles/cluster_bot_access).
 fail2ban_state: present
 
 # [DEFAULT] settings of the site's jail.d/deepops.local, over the distribution's

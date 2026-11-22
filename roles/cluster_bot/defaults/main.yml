@@ -7,8 +7,10 @@
 # slack_defaults); without them it is installed but not started.
 #
 # Features: scratch allocations (/scratch: ask, extend, resize, release; reminders
-# before an allocation ends), account requests (/join, /leave), reminders before a
-# person's last day (the roster's `ends`), the Home tab.
+# before an allocation ends), account requests (/join, /leave), unban requests
+# (/unban-request, where fail2ban runs), reminders before a person's last day (the
+# roster's `ends`), the Home tab. It acts on other hosts through the services they offer
+# it (roles/cluster_bot_access).
 cluster_bot_state: present
 
 # Slack's Python SDK and Bolt, installed with pip --require-hashes into the bot's venv

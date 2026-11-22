@@ -64,6 +64,24 @@
     enabled: true
     state: started
 
+# The cluster bot reads the ban list and lifts a ban an administrator approved
+# (/unban-request) through cluster-bans alone (roles/cluster_bot_access).
+- name: Offer the bot the ban list and unbans
+  when: cluster_bot_host | length > 0
+  block:
+    - name: Offer the bot the bans service
+      ansible.builtin.include_role:
+        name: cluster_bot_access
+      vars:
+        cluster_bot_access_service: "{{ _fail2ban_bot_service }}"
+
+    - name: Install the ban command
+      ansible.builtin.include_role:
+        name: cluster_tools_lib
+        tasks_from: command
+      vars:
+        cluster_tools_lib_command: {dest: "{{ _fail2ban_bans_command }}", module: clustertools.bans}
+
 - name: Record the component as present
   ansible.builtin.include_role:
     name: component_record

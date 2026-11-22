@@ -67,13 +67,14 @@ class Handlers(unittest.TestCase):
         self.engine.submit.return_value = mock.Mock(status="done", text="ok", request={})
         self.join = mock.Mock(teams=mock.Mock(return_value=["team-a"]))
         self.client = mock.MagicMock()
-        self.app = app.build(CFG, self.engine, None, self.join)
+        self.app = app.build(CFG, self.engine, None, self.join, unban=mock.Mock())
 
     def call(self, kind, name, **kw):
         """As Bolt calls a listener: only the arguments it declares."""
         fn = self.app.handlers[(kind, name)]
         offered = {"ack": mock.Mock(), "client": self.client, **kw}
         fn(**{k: v for k, v in offered.items() if k in inspect.signature(fn).parameters})
+        return offered["ack"]
 
     def test_join_opens_its_form_and_a_submission_becomes_a_join_request(self):
         self.call("command", "/join", body={"user_id": "UNEW", "channel_id": "C", "trigger_id": "T"})
@@ -86,6 +87,31 @@ class Handlers(unittest.TestCase):
         self.assertEqual(
             (req["kind"], req["user"], req["account"], req["slack"]), ("join", "carl", "team-a", "UNEW")
         )
+
+    def test_unban_checks_the_address_in_the_form_and_submits_it_written_one_way(self):
+        self.call(
+            "command", "/unban-request", body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T"}
+        )
+        self.assertEqual(self.client.views_open.call_args.kwargs["view"]["callback_id"], "unban.submit")
+        body, view = submitted({"ip": {"v": {"value": "not-an-ip"}}, "reason": {"v": {"value": None}}},
+                               "UALICE", "unban.submit")  # fmt: skip
+        ack = self.call("view", "unban.submit", body=body, view=view)
+        self.assertEqual(ack.call_args.kwargs["response_action"], "errors", "the form says what is wrong")
+        self.engine.submit.assert_not_called()
+        body, view = submitted({"ip": {"v": {"value": " 2001:DB8::1 "}}, "reason": {"v": {"value": "typo"}}},
+                               "UALICE", "unban.submit")  # fmt: skip
+        self.call("view", "unban.submit", body=body, view=view)
+        req = self.engine.submit.call_args.args[0]
+        self.assertEqual(
+            (req["kind"], req["user"], req["ip"], req["reason"]), ("unban", "alice", "2001:db8::1", "typo")
+        )
+
+    def test_unban_needs_a_person_of_the_roster(self):
+        self.call(
+            "command", "/unban-request", body={"user_id": "USTRANGER", "channel_id": "C", "trigger_id": "T"}
+        )
+        self.client.views_open.assert_not_called()
+        self.client.chat_postEphemeral.assert_called_once()
 
     def test_someone_with_an_account_cannot_join_again(self):
         self.call("command", "/join", body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T"})

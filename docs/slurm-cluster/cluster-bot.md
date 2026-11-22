@@ -4,8 +4,8 @@
 commands, forms and buttons for requests users make themselves. It connects to Slack in
 Socket Mode, an outbound WebSocket, so no port is opened and no public URL is needed.
 It runs as its own account (`cluster_bot_user`, from `system_accounts`) under a hardened
-systemd unit, and acts on other hosts only through SSH keys each of which may run one
-forced command there.
+systemd unit, and acts on other hosts only over its SSH key, whose one forced command
+there runs only the services the host offers (below).
 
 Features today: scratch allocations (`/scratch`, see [scratch-alloc.md](scratch-alloc.md)):
 ask, extend, resize and release from a form; requests within the automatic limits are
@@ -27,6 +27,33 @@ after that day, login stops `people_leave_grace_days` later, so files are to be 
 before then. The dates come from the roster as deployed (`people_leaving` in
 `plugins/filter/people.py`, the same derivation the accounts apply), so a changed `ends`
 reaches the bot with the next `--tags people` run and its countdown starts over.
+
+Unban requests (`/unban-request`): someone whose address fail2ban banned (bans are for
+good, `roles/fail2ban`) gives the address and what happened. The bot checks the address
+is banned now on a host where fail2ban runs, an administrator approves, and the ban is
+lifted on every such host (`fail2ban-client unban`, which also drops it from fail2ban's
+database). The form refuses what is not an IP address before anything is asked.
+
+### How the bot acts on other hosts
+
+A role that lets the bot do something on its hosts offers a service through
+`roles/cluster_bot_access`: a file `/etc/cluster-bot-access/<service>.json` naming the
+command, which runs as root with the rest of the request and takes only what the bot may
+ask. The bot's key is authorized there for one forced command,
+`sudo -n /usr/local/sbin/cluster-bot-serve /etc/cluster-bot-access`, the only command its
+sudo rule allows, and only from the bot host's cluster address. The dispatcher
+(`clustertools.bot_serve`) runs a service only from a file of root's that nobody else may
+write, never through a shell.
+
+| Service | Offered by | Command | Requests |
+|---|---|---|---|
+| `scratch` | `roles/scratch_alloc` | `scratch-alloc ... serve` | create, resize, extend, release, list |
+| `bans` | `roles/fail2ban` (while there is a bot) | `cluster-bans serve` | list, unban IP |
+
+The shared pieces (dispatcher, sudo rule, authorized key) are items of every role that
+offers a service, so `roles/component_record` removes them with the last of those roles.
+`playbooks/generic/cluster-bot.yml` authorizes the bot's key on the hosts that already
+offer a service right after making it, so a first deploy needs no second run.
 
 ### The GitHub App for account requests
 
@@ -64,8 +91,8 @@ nothing is sent and jobs are unaffected.
    notifiers) and `slack_app_token` (xapp-).
 3. Set `slurm_enable_cluster_bot: true` (and, for scratch, `slurm_enable_scratch_alloc:
    true` with the scratch server in `[scratch-server]`).
-4. Run `playbooks/generic/cluster-bot.yml`, then `playbooks/generic/scratch-alloc.yml`
-   (it installs the bot's public key on the scratch server); preview each with
+4. Run `playbooks/generic/cluster-bot.yml` (it also authorizes its key where fail2ban
+   offers the bans service), then `playbooks/generic/scratch-alloc.yml`; preview each with
    `--check --diff` first.
 
 Without both tokens the bot is installed but stopped. Who the bot knows comes from the
@@ -88,3 +115,5 @@ the app's settings are updated from it.
 | `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |
 | `/etc/cluster-bot/known_hosts` | The host keys of the hosts it reaches, read from each host |
 | `/var/lib/clusterbot/` | Its SSH key and state: held requests, reminders sent (kept on removal) |
+| `/etc/cluster-bot-access/<service>.json` | On a host it acts on: a service offered to it |
+| `/var/lib/clusterbot/.ssh/authorized_keys` | On a host it acts on: its key, for the dispatcher only |

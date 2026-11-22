@@ -44,7 +44,7 @@
     label: "{{ item.path }}"
 
 # The bot's own key: its way to the hosts it acts on, each of which allows it for one
-# forced command (roles/scratch_alloc). Made on this host, never copied.
+# forced command (roles/cluster_bot_access). Made on this host, never copied.
 - name: Create the bot's SSH key
   ansible.builtin.command:
     argv: [ssh-keygen, -q, -t, ed25519, -N, "", -C, "{{ cluster_bot_user }}@{{ inventory_hostname }}", -f, "{{ cluster_bot_key }}"]
@@ -129,16 +129,15 @@
   no_log: true
   notify: Restart the cluster bot
 
-- name: Read the scratch server's host key
+- name: Read the host keys of the hosts the bot reaches
   ansible.builtin.slurp:
     src: /etc/ssh/ssh_host_ed25519_key.pub
-  delegate_to: "{{ _cluster_bot_scratch_host }}"
-  register: cluster_bot_scratch_hostkey
-  when: _cluster_bot_scratch_host | length > 0
+  delegate_to: "{{ item }}"
+  loop: "{{ _cluster_bot_reaches }}"
+  register: cluster_bot_hostkeys
 
-# The hosts the bot reaches, each with its key read from the host itself: the bot never
-# trusts a key on first use.
-- name: Pin the scratch server's host key
+# Each with its key read from the host itself: the bot never trusts a key on first use.
+- name: Pin the host keys of the hosts the bot reaches
   ansible.builtin.copy:
     dest: "{{ _cluster_bot_known_hosts }}"
     owner: root
@@ -146,9 +145,9 @@
     mode: "0644"
     content: |
       # roles/cluster_bot: the hosts the bot reaches.
-      {% if cluster_bot_scratch_hostkey.content is defined %}
-      {{ _cluster_bot_cfg.scratch.host }} {{ (cluster_bot_scratch_hostkey.content | b64decode).split()[:2] | join(' ') }}
-      {% endif %}
+      {% for key in cluster_bot_hostkeys.results | default([]) if key.content is defined %}
+      {{ _cluster_bot_addresses[key.item] }} {{ (key.content | b64decode).split()[:2] | join(' ') }}
+      {% endfor %}
 
 - name: Write the bot's configuration
   ansible.builtin.copy:

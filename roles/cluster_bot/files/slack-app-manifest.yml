@@ -20,6 +20,9 @@ features:
     - command: /scratch
       description: "Fast scratch space: ask, extend, resize, release"
       should_escape: false
+    - command: /unban-request
+      description: "Ask to lift the ban on an address after failed logins"
+      should_escape: false
 oauth_config:
   scopes:
     bot:

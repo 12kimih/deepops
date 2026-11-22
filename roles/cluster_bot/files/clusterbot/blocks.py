@@ -1,6 +1,6 @@
-"""Block Kit pieces every feature shares: buttons and the administrators' message for a
-held request (clusterbot.requests), approved or denied with request.approve and
-request.deny whatever the feature."""
+"""Block Kit pieces every feature shares: buttons, form fields, and the administrators'
+message for a held request (clusterbot.requests), approved or denied with
+request.approve and request.deny whatever the feature."""
 
 
 def button(text, action, value, style=None, confirm=None):
@@ -15,6 +15,12 @@ def button(text, action, value, style=None, confirm=None):
     if confirm:
         b["confirm"] = confirm
     return b
+
+
+def field(block_id, label, element, optional=False):
+    """A form field. Its value is read back as state.values[BLOCK_ID]["v"]."""
+    return {"type": "input", "block_id": block_id, "optional": optional,
+            "label": {"type": "plain_text", "text": label}, "element": {**element, "action_id": "v"}}  # fmt: skip
 
 
 def held(user_mention, text, key):

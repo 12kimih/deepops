@@ -17,11 +17,11 @@ _scratch_alloc_cfg:
 scratch_alloc_items: >-
   {{ ['package:xfsprogs', 'package:quota', 'unit:scratch-alloc-sweep.timer', 'unit:scratch-alloc-sweep.service']
      + _scratch_alloc_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
-     + ['file:' ~ _scratch_alloc_command, 'file:' ~ _scratch_alloc_config, 'file:' ~ _scratch_alloc_textfile,
-        'file:' ~ _scratch_alloc_sudoers, 'file:' ~ _scratch_alloc_bot_keys] }}
-# The cluster bot's way in: its key may run the allocation command's serve mode as root,
-# nothing else (the forced command, and the one sudo rule).
-_scratch_alloc_sudoers: /etc/sudoers.d/deepops-scratch-alloc
-_scratch_alloc_bot_home: "{{ system_accounts[cluster_bot_user].home }}"
-_scratch_alloc_bot_keys: "{{ _scratch_alloc_bot_home }}/.ssh/authorized_keys"
-_scratch_alloc_serve: "{{ _scratch_alloc_command }} {{ _scratch_alloc_config }} serve"
+     + ['file:' ~ _scratch_alloc_command, 'file:' ~ _scratch_alloc_config, 'file:' ~ _scratch_alloc_textfile]
+     + ((cluster_bot_access_items + ['file:' ~ cluster_bot_serve_dir ~ '/' ~ _scratch_alloc_bot_service.name ~ '.json'])
+        if cluster_bot_host | length > 0 else []) }}
+# The cluster bot's requests (roles/cluster_bot_access): the allocation command's serve
+# mode, which takes only those.
+_scratch_alloc_bot_service:
+  name: scratch
+  argv: ["{{ _scratch_alloc_command }}", "{{ _scratch_alloc_config }}", serve]

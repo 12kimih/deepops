@@ -10,7 +10,13 @@ _cluster_bot_unit: cluster-bot.service
 _cluster_bot_github_key: "{{ _cluster_bot_etc }}/github-app.pem"
 _cluster_bot_known_hosts: "{{ _cluster_bot_etc }}/known_hosts"
 _cluster_bot_ready: "{{ slack_bot_token | length > 0 and slack_app_token | length > 0 }}"
-_cluster_bot_scratch_host: "{{ (groups['scratch-server'] | default([]))[:1] | join }}"
+# The hosts the bot acts on, by the component that offers it a service there
+# (roles/cluster_bot_access), and their cluster addresses (the from= of its key).
+_cluster_bot_scratch_host: >-
+  {{ (deepops_component_registry | component_hosts(groups, 'scratch_alloc', deepops_component_removals))[:1] | join }}
+_cluster_bot_ban_hosts: "{{ deepops_component_registry | component_hosts(groups, 'fail2ban', deepops_component_removals) }}"
+_cluster_bot_reaches: "{{ ([_cluster_bot_scratch_host] | select | list + _cluster_bot_ban_hosts) | unique }}"
+_cluster_bot_addresses: "{{ hostvars | cluster_addresses(_cluster_bot_reaches, cluster_networks) }}"
 _cluster_bot_cfg:
   bot_token_file: "{{ _cluster_bot_tokens.bot }}"
   app_token_file: "{{ _cluster_bot_tokens.app }}"
@@ -31,16 +37,19 @@ _cluster_bot_cfg:
     accounting: files/slurm/accounting.yml
     reserved: "{{ system_accounts.values() | map(attribute='uid') | list }}"
     exclude: "{{ cluster_bot_join_exclude }}"
-  scratch:
-    host: "{{ (hostvars | cluster_addresses([_cluster_bot_scratch_host], cluster_networks))[_cluster_bot_scratch_host] if _cluster_bot_scratch_host else '' }}"
+  ssh:
     key: "{{ cluster_bot_key }}"
     user: "{{ cluster_bot_user }}"
     known_hosts: "{{ _cluster_bot_known_hosts }}"
+  scratch:
+    host: "{{ _cluster_bot_addresses[_cluster_bot_scratch_host] if _cluster_bot_scratch_host else '' }}"
     policy:
       auto_bytes: "{{ scratch_alloc_auto_size | kib * 1024 }}"
       auto_days: "{{ scratch_alloc_auto_days | int }}"
       auto_extensions: "{{ scratch_alloc_auto_extensions | int }}"
     remind_days: "{{ cluster_bot_scratch_remind_days }}"
+  bans:
+    hosts: "{{ dict(_cluster_bot_ban_hosts | zip(_cluster_bot_ban_hosts | map('extract', _cluster_bot_addresses))) }}"
   leave:
     remind_days: "{{ cluster_bot_leave_remind_days }}"
     leaving: "{{ people | people_leaving(people_leave_grace_days) }}"

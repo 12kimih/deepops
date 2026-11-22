@@ -11,3 +11,4 @@ galaxy_info:
       versions: [jammy, noble]
 dependencies:
   - role: network_defaults  # cluster_networks, never banned
+  - role: slack_defaults  # cluster_bot_host, the bot's way in (cluster_bot_access_items)
