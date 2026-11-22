@@ -1,16 +1,24 @@
 ---
 # Kernel settings a role owns (host_baseline_sysctls, key: value), the one way roles set
-# them: written to the role's own file (host_baseline_sysctl_file) and applied, every
-# other assignment of the same keys in the administrator's files removed (one source
-# per key), then the value boot will apply is checked. systemd-sysctl reads the files
-# in name order across /etc, /run and /usr/lib and the last wins, so a hand edit in
-# /etc/sysctl.conf (read as 99-sysctl.conf) undid a role's setting at every boot while
-# the running value looked right. Skipped in a container: its kernel is the host's.
+# them: written to the role's own file and applied, then the value boot will apply is
+# checked. The file (host_baseline_sysctl_file) is deepops_sysctl_prefix and the role's
+# name, sorting after every file of the distribution and the administrator, so it wins
+# at boot and nobody else's file is edited: a hand line in /etc/sysctl.conf (read as
+# 99-sysctl.conf) once undid a role's setting at every boot, and removing such lines
+# edited the packages' conffiles. Skipped in a container: its kernel is the host's.
 - name: Apply the kernel settings
   when:
     - host_baseline_sysctls | length > 0
     - not deepops_containerized | bool
   block:
+    - name: Check the file of the kernel settings
+      ansible.builtin.assert:
+        that: host_baseline_sysctl_file == deepops_sysctl_prefix ~ (ansible_parent_role_names | default([]) | first | default('')) ~ '.conf'
+        fail_msg: >-
+          host_baseline_sysctl_file is {{ host_baseline_sysctl_file }}; a role's kernel
+          settings go to {{ deepops_sysctl_prefix }}<role>.conf, which boot applies last.
+        quiet: true
+
     - name: Write and apply the kernel settings
       ansible.posix.sysctl:
         name: "{{ item.key }}"
@@ -20,21 +28,6 @@
         state: present
         reload: true
       loop: "{{ host_baseline_sysctls | dict2items }}"
-
-    - name: Find the other sysctl files under /etc
-      find_present:
-        paths: /etc/sysctl.d
-        patterns: "*.conf"
-        file_type: file
-      register: host_baseline_sysctl_files
-
-    - name: Remove the other assignments of these keys
-      ansible.builtin.lineinfile:
-        path: "{{ item.0 }}"
-        regexp: '^\s*-?\s*{{ item.1 | regex_replace("[./]", "[./]") }}\s*='
-        state: absent
-      loop: "{{ (host_baseline_sysctl_files.files | map(attribute='path') | reject('eq', host_baseline_sysctl_file) | list
-                 + ['/etc/sysctl.conf']) | product(host_baseline_sysctls.keys() | list) | list }}"
 
     - name: Read the kernel settings in the order boot applies them
       ansible.builtin.command: systemd-analyze cat-config sysctl.d
@@ -48,7 +41,7 @@
         that: _wrong | length == 0
         fail_msg: >-
           {{ _wrong | join('; ') }} on {{ inventory_hostname }}. A file sorting after
-          {{ host_baseline_sysctl_file }} outside /etc sets them; change it at its source.
+          {{ host_baseline_sysctl_file }} sets them; change it at its source.
         quiet: true
       vars:
         _wrong: "{{ host_baseline_sysctl_boot.stdout | sysctl_boot_mismatches(host_baseline_sysctls) }}"

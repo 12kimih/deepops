@@ -143,7 +143,7 @@ docker_retired_unit_files: []
 #
 # Sized here for a few hundred concurrent containers. A host that runs more should
 # raise them further (gc_thresh 4096/8192/16384 covers ~1000 containers). Written to
-# /etc/sysctl.d/90-docker.conf, so the values survive a reboot.
+# the role's file in /etc/sysctl.d, so the values survive a reboot.
 docker_tune_kernel: true
 docker_sysctls:
   fs.inotify.max_user_instances: "1024"

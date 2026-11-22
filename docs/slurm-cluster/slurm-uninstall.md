@@ -263,7 +263,7 @@ only when also listed in `deepops_component_removals`.
 When retiring Enroot, restore the site's intended AppArmor policy, not just
 its files. The enroot package ships the scoped profile `/etc/apparmor.d/enroot`
 and removing the package removes it. If `enroot_apparmor_global_disable` was
-enabled, `/etc/sysctl.d/90-enroot.conf` set
+enabled, `/etc/sysctl.d/zz-deepops-enroot.conf` set
 `kernel.apparmor_restrict_unprivileged_userns=0` for the whole host; the removal
 deletes that file, but not the running kernel value. Apply the site's intended
 value with the distribution's sysctl tooling (or reboot), and verify it with

@@ -1,7 +1,7 @@
 ---
 # A site still setting a name this role read before stops the deploy.
 dependencies:
-  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir, deepops_containerized
+  - role: deepops_paths  # deepops_cache_dir, deepops_state_dir, deepops_containerized, deepops_sysctl_prefix
   - role: retired_settings  # docker_image_prune_until, docker_image_prune_schedule
   - role: deploy_defaults  # cluster_user_grace_days (docker_prune_after)
   - role: docker_restart  # docker_daemon_restart, docker_api_socket, the restart handlers

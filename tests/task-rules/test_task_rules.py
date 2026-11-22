@@ -849,7 +849,7 @@ class TaskRules(unittest.TestCase):
     def test_only_host_baseline_sets_kernel_settings(self):
         # A sysctl written straight to a file was undone at boot by a later file (a hand
         # line in /etc/sysctl.conf) while the running value looked right; the shared
-        # task removes the other assignments and checks the value boot applies.
+        # task writes the role's file, which boot applies last, and checks the value.
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):
             for task in tasks(path):
