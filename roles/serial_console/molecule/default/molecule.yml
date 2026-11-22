@@ -6,3 +6,4 @@ provisioner:
         # The boot loader files are what this role writes; no boot configuration is
         # built in the container (it has no /boot/grub/grub.cfg) and no reboot is asked.
         deepops_containerized: false
+        serial_console_enabled: true  # the role default is off

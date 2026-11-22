@@ -11,8 +11,9 @@ container_storage_gc_items: >-
      + ['file:' ~ _container_storage_gc_command, 'file:' ~ _container_storage_gc_config,
         'file:' ~ _container_storage_gc_textfile, 'file:' ~ cluster_tools_lib_config_records ~ '/container_storage_gc.json'] }}
 # Each store: where its per-user path is set, and the programs that use it (process
-# names, matched as prefixes). A podman store is recreated empty for its user, as
-# roles/podman makes it under a root-owned parent; enroot makes its own.
+# names, matched as prefixes). A podman store is recreated empty for its user (not for
+# one who left the roster), as roles/podman makes it under a root-owned parent; enroot
+# makes its own.
 _container_storage_gc_stores:
   - name: podman
     kind: podman

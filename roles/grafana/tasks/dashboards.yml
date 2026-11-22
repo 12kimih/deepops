@@ -8,7 +8,7 @@
 #     name: grafana
 #     tasks_from: dashboards
 #   vars:
-#     grafana_dashboard_set: slurm   # its files: grafana_dashboard_sets (roles/prometheus_paths)
+#     grafana_dashboard_set: slurm_metrics   # its files: grafana_dashboard_sets (roles/prometheus_paths)
 - name: Create the dashboard directory ({{ grafana_dashboard_set }})
   ansible.builtin.file:
     path: "{{ grafana_dashboards_dir }}/{{ grafana_dashboard_set }}"

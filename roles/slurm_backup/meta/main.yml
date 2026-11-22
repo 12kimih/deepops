@@ -1,7 +1,7 @@
 ---
 dependencies:
   - role: cluster_tools_lib
-  - role: prometheus_paths  # node_exporter_prom_dir, prometheus_port
+  - role: prometheus_paths  # node_exporter_prom_dir, node_exporter_prom_keep_dir
   - role: slurm_paths  # slurm_state_save_location
 
 galaxy_info:

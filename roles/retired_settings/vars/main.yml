@@ -9,7 +9,7 @@ retired_settings:
   hosts_custom_hosts_marker: nothing (hosts_entries are written once, in roles/deepops_hosts' own part)
   slurm_container_storage_gc: slurm_enable_container_storage_gc in roles/deploy_defaults (off removes the cleanup)
   docker_rh_repo_url: docker_rh_repo_base_url (and docker_rh_repo_gpgkey) in roles/docker
-  docker_image_prune_until: docker_prune_after in roles/docker (it now also prunes stopped containers, the build cache and anonymous volumes; default cluster_user_grace_days)
+  docker_image_prune_until: docker_prune_after in roles/docker (it now also prunes stopped containers and anonymous volumes, the build cache being BuildKit's own builder.gc, docker_build_cache_max; default cluster_user_grace_days)
   docker_image_prune_schedule: docker_prune_schedule in roles/docker
   docker_prune_build_cache_max: docker_build_cache_max in roles/docker (BuildKit's own garbage collection, daemon.json builder.gc, instead of a timer pass)
   nvidia_container_toolkit_enable_docker: roles/docker enables and starts Docker (docker_service_enabled, docker_service_state)

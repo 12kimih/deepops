@@ -1,4 +1,4 @@
-<!-- Vendored into DeepOps from https://github.com/DeepOps/ansible-role-chrony at commit c9022153036dfdde4e2b313aecde4a46cd6f6687, since rewritten. -->
+<!-- Vendored into DeepOps from DeepOps/ansible-role-chrony, a fork of unxnn/ansible-role-chrony (its LICENSE kept), at commit c95f84431c8c3ed693e88b35c87edf792fcf152f (meta/.galaxy_install_info), since rewritten. -->
 # deepops_chrony
 
 Time sync with chrony (chrony.conf(5)), as a deepops component: `chrony_install` in
