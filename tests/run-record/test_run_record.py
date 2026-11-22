@@ -42,7 +42,8 @@ PLAY = f"""
 
 
 CALLBACKS = ROOT / "plugins" / "callback"
-LONG = "x" * 300  # an ad-hoc command longer than the 255 characters ARA stores
+LIMIT = 255  # the characters ARA's server stores in a path or a name
+LONG = "x" * 300  # an ad-hoc command longer than that
 
 
 class Wiring(unittest.TestCase):
@@ -133,13 +134,13 @@ class Recording(unittest.TestCase):
         self.assertNotIn(SECRET, content)
         self.assertNotIn(SECRET.encode(), (base / "ansible.sqlite").read_bytes())
 
-    def run_adhoc(self, base, callbacks):
+    def run_adhoc(self, base, callbacks, command=None):
         """A recorded ad-hoc command of more than 255 characters; its output."""
         env = {**unrecorded.env(), "ARA_BASE_DIR": str(base), "ANSIBLE_CALLBACK_PLUGINS": str(callbacks),
                "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"), "ANSIBLE_LOCALHOST_WARNING": "false"}  # fmt: skip
         out = subprocess.run(
             [str(BIN / "ansible"), "-i", "localhost,", "localhost", "-c", "local", "-m", "ansible.builtin.command",
-             "-a", f"echo {LONG}"],
+             "-a", command or f"echo {LONG}"],
             env=env, capture_output=True, text=True, timeout=unrecorded.TIMEOUT,
         )  # fmt: skip
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
@@ -158,6 +159,19 @@ class Recording(unittest.TestCase):
         self.assertEqual(shown["arguments"]["module_args"], f"echo {LONG}", "the whole command is kept")
         [result] = self.ara(env, "result", "list")
         self.assertEqual(result["status"], "changed", "a command is a change unless told otherwise")
+
+    def test_a_cut_on_a_blank_is_recorded(self):
+        """The server strips a trailing blank: the file is found again under that path."""
+        prefix = "Ad-Hoc: ansible.builtin.command: echo "
+        command = "echo " + "y" * (LIMIT - 1 - len(prefix)) + " " + "z" * 60
+        self.assertEqual((prefix + command[5:])[LIMIT - 1], " ", "the cut ends on the blank")
+        base = Path(tempfile.mkdtemp()) / "ara"
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(base.parent)])
+        env, output = self.run_adhoc(base, CALLBACKS, command)
+        self.assertNotIn("WARNING", output)
+        self.assertNotIn("ERROR", output)
+        [result] = self.ara(env, "result", "list")
+        self.assertEqual(result["status"], "changed")
 
     def test_ara_alone_still_refuses_it(self):
         """ARA's own callback (1.8.0) cannot record it; when this fails, upstream bounds the

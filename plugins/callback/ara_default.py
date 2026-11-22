@@ -24,8 +24,11 @@ BOUNDED = ("path", "name")
 
 
 def bounded(value):
-    """A name or path the server accepts: the first LIMIT characters."""
-    return value[:LIMIT] if isinstance(value, str) else value
+    """A name or path as the server stores it: the server (a REST framework CharField)
+    strips surrounding blanks before it checks the length, so a cut that ends on a
+    blank is stripped too. A file is found again by this value: one that differed by a
+    trailing blank was created twice (500) and the run's tasks went unrecorded."""
+    return value.strip()[:LIMIT].rstrip() if isinstance(value, str) else value
 
 
 class BoundedClient:
