@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import in_tree  # noqa: E402
 
 mod = in_tree.load("roles/stale_files/library/stale_files.py")
+pf = sys.modules["ansible.module_utils.package_files"]
 
 
 class Evidence(unittest.TestCase):
@@ -115,6 +116,26 @@ class Evidence(unittest.TestCase):
         self.assertTrue(mod.owned_below("/usr/lib/x", owned))
         self.assertFalse(mod.owned_below("/usr/lib/y", owned))
 
+    def test_what_deepops_records_installing_is_never_removed(self):
+        # The ignore list once only left the report: a rule matching a file deepops
+        # recorded installing (roles/component_record) removed it all the same.
+        mine = self.put("bin/tool", "#!/bin/sh\nslurm\n", 0o755)
+        gone = self.put("bin/old", "#!/bin/sh\nslurm\n", 0o755)
+        held = self.put("tree/sub/kept")
+        rules = [
+            {
+                "name": "s",
+                "type": "scripts",
+                "dirs": [str(self.tmp / "bin")],
+                "names": ["tool", "old"],
+                "contains": "slurm",
+            },
+            {"name": "t", "type": "glob", "globs": [str(self.tmp / "tre*")]},
+        ]
+        stale, kept, _ = mod.plan(rules, set(), [mine, held])
+        self.assertEqual(stale, {"s": [gone]})
+        self.assertEqual(sorted(kept), sorted([mine, str(self.tmp / "tree")]))
+
     def test_removal_prunes_only_below_its_bound(self):
         # Unbounded, it walked up and removed every directory it emptied, the scratch
         # directory itself here, /usr/local/src on a host.
@@ -160,7 +181,7 @@ class Evidence(unittest.TestCase):
 
     def test_ucf_kept_configuration_counts_as_owned(self):
         registry = self.put("ucf/registry", "openssh-server \t /etc/ssh/sshd_config\n")
-        with mock.patch.object(mod, "UCF_REGISTRY", registry):
+        with mock.patch.object(pf, "UCF_REGISTRY", registry):
             self.assertIn("/etc/ssh/sshd_config", mod.owned_paths())
 
     def test_a_name_that_is_not_utf8_is_owned_as_the_os_spells_it(self):
@@ -171,7 +192,7 @@ class Evidence(unittest.TestCase):
         (self.tmp / "ucf").mkdir()
         registry = self.tmp / "ucf" / "registry"
         registry.write_bytes(b"pkg \t " + name + b"\n")
-        with mock.patch.object(mod, "UCF_REGISTRY", str(registry)):
+        with mock.patch.object(pf, "UCF_REGISTRY", str(registry)):
             owned = mod.owned_paths()
         walked = [p for p in mod.files_in([str(self.tmp)]) if p.endswith(".conf")]
         self.assertEqual(walked, [os.fsdecode(name)])
@@ -278,7 +299,7 @@ class Evidence(unittest.TestCase):
 
     def test_merged_usr_names_one_path(self):
         """dpkg lists a newer kernel under /usr/lib/modules; its tree under /lib is owned."""
-        with mock.patch.object(mod, "MERGED", ("/lib", "/bin")):
+        with mock.patch.object(pf, "MERGED", ("/lib", "/bin")):
             owned = {mod.canonical("/usr/lib/modules/6.14.0-1-generic/kernel/x.ko")}
             self.assertTrue(mod.owned_below("/lib/modules/6.14.0-1-generic", owned))
             self.assertTrue(mod.owned_below("/usr/lib/modules/6.14.0-1-generic", owned))

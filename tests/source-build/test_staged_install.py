@@ -24,7 +24,8 @@ class StagedInstall(unittest.TestCase):
         self.host = self.tmp / "host"
         (self.host / "usr/local/bin").mkdir(parents=True)
         (self.host / "usr/local/bin/someone-elses").write_text("x")
-        self.manifest = str(self.tmp / "m.json")
+        (self.tmp / "manifests").mkdir()
+        self.manifest = str(self.tmp / "manifests/m.json")
 
     def stage(self, version, files):
         stage = self.tmp / f"stage-{version}"
@@ -36,7 +37,7 @@ class StagedInstall(unittest.TestCase):
 
     def install(self, stage):
         files, dirs = mod.staged(stage)
-        old_files, old_dirs = mod.read_manifest(self.manifest)
+        old_files, old_dirs = mod.manifest_paths(self.manifest)
         made = mod.copy_into_place(str(self.host), stage, files, dirs)
         mod.remove_files(str(self.host), old_files - files)
         mod.remove_empty_dirs(str(self.host), old_dirs - dirs)
@@ -53,7 +54,7 @@ class StagedInstall(unittest.TestCase):
 
     def test_removal_takes_what_it_listed_and_only_the_directories_it_made(self):
         self.install(self.stage("1", {"/usr/local/bin/tool": "1", "/opt/apps/tool/1/x": "x"}))
-        files, dirs = mod.read_manifest(self.manifest)
+        files, dirs = mod.manifest_paths(self.manifest)
         mod.remove_files(str(self.host), files)
         mod.remove_empty_dirs(str(self.host), dirs)
         self.assertFalse((self.host / "opt").exists())
@@ -65,6 +66,24 @@ class StagedInstall(unittest.TestCase):
         os.symlink("9", Path(stage) / "opt/apps/lmod/lmod")
         self.install(stage)
         self.assertEqual(os.readlink(self.host / "opt/apps/lmod/lmod"), "9")
+
+    def test_a_file_a_package_or_another_install_owns_is_refused(self):
+        # Overwritten and listed, it went with this install's removal or next version.
+        (self.host / "usr/local/bin/pkg-tool").write_text("p")
+        (self.host / "usr/local/bin/other-tool").write_text("o")
+        (self.tmp / "manifests/other.json").write_text(json.dumps({"files": ["/usr/local/bin/other-tool"]}))
+        files, _ = mod.staged(
+            self.stage("1", {"/usr/local/bin/pkg-tool": "1", "/usr/local/bin/other-tool": "1",
+                             "/usr/local/bin/someone-elses": "1", "/usr/local/bin/new": "1"})
+        )  # fmt: skip
+        packages = {mod.canonical(str(self.host / "usr/local/bin/pkg-tool"))}
+        self.assertEqual(
+            mod.taken(str(self.host), files, self.manifest, packages),
+            ["/usr/local/bin/other-tool", "/usr/local/bin/pkg-tool"],
+        )
+        # Its own files from the last install are its to replace.
+        self.install(self.stage("0", {"/usr/local/bin/new": "0"}))
+        self.assertEqual(mod.taken(str(self.host), {"/usr/local/bin/new"}, self.manifest, packages), [])
 
 
 if __name__ == "__main__":

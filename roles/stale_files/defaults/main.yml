@@ -7,7 +7,7 @@
 #   stale_files_state   absent removes what they match; report only lists it
 #   stale_files_report  with report: also count the files under these no package owns
 #                       and no rule matched, for a person to judge
-#   stale_files_ignore  paths the count leaves out (what deepops itself installs there)
+#   stale_files_ignore  paths deepops itself installs there: never removed, never counted
 stale_files_rules: "{{ stale_files_host_rules + stale_files_site_rules }}"
 # A site's own leftovers, in the rule types library/stale_files.py takes: what a person
 # installed by hand there and the site retired (e.g. a hand-copied binary under

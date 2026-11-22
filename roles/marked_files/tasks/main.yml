@@ -2,9 +2,10 @@
 - name: Remove the files deepops made
   marked_file:
     paths: "{{ marked_files_absent }}"
+    role: "{{ marked_files_role }}"
   register: marked_files_result
 
 - name: Report the files left as a site's own
   ansible.builtin.debug:
-    msg: "Left alone, not written by deepops: {{ marked_files_result.kept | join(', ') }}"
+    msg: "Left alone, not written by roles/{{ marked_files_role }}: {{ marked_files_result.kept | join(', ') }}"
   when: marked_files_result.kept | default([]) | length > 0

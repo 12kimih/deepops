@@ -56,15 +56,14 @@ package's or a rule's say, again only for a person to judge (nothing is removed)
 """
 
 import glob
-import json
 import os
 import re
 import shutil
 import struct
 import subprocess
-import sys
 
 from ansible.module_utils import deepops_diff
+from ansible.module_utils.package_files import FS, canonical, owned_paths, staged_paths
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.deepops_marks import named_deepops, text_marked
 
@@ -75,69 +74,15 @@ options:
   rules: {type: list, elements: dict, required: true}
   state: {type: str, choices: [absent, report], default: absent}
   report: {type: list, elements: path, default: []}
-  ignore: {type: list, elements: path, default: []}
+  ignore:
+    type: list
+    elements: path
+    default: []
+    description: What deepops itself installs there; never removed (nor anything above it), never counted.
   audit: {type: bool, default: false}
   config_dirs: {type: list, elements: path, default: []}
   manifests: {type: path, description: The directory of staged_install manifests (*.json).}
 """
-
-
-# --- package ownership ---------------------------------------------------------------
-UCF_REGISTRY = "/var/lib/ucf/registry"
-# Paths read from a file or a command are decoded as the OS decodes file names
-# (os.fsdecode), so a name that is not UTF-8 equals the one os.walk yields: decoded with
-# errors="replace", a package's own file would not match itself and count as unowned.
-FS = {"encoding": sys.getfilesystemencoding(), "errors": sys.getfilesystemencodeerrors()}
-
-
-def owned_paths():
-    """Every path a package owns (dpkg, else rpm). On Debian that includes the
-    configuration files a package's scripts keep through ucf (/etc/ssh/sshd_config,
-    /etc/default/grub): dpkg does not list them, ucf's registry does."""
-    paths = set()
-    info = "/var/lib/dpkg/info"
-    if os.path.isdir(info):
-        for name in os.listdir(info):
-            if name.endswith(".list"):
-                with open(os.path.join(info, name), **FS) as listing:
-                    paths.update(line.rstrip("\n") for line in listing if line.strip())
-        if os.path.isfile(UCF_REGISTRY):
-            with open(UCF_REGISTRY, **FS) as registry:
-                paths.update(line.split()[-1] for line in registry if len(line.split()) > 1)
-        return paths
-    try:
-        out = subprocess.run(["rpm", "-qal"], capture_output=True, check=False, **FS).stdout
-        paths.update(line for line in out.splitlines() if line.startswith("/"))
-    except OSError:
-        pass
-    return paths
-
-
-def staged_paths(manifests):
-    """Every file and directory a staged install's manifest in MANIFESTS lists."""
-    paths = set()
-    if not manifests:
-        return paths
-    for manifest in glob.glob(os.path.join(manifests, "*.json")):
-        with open(manifest, **FS) as f:
-            data = json.load(f)
-        paths.update(data.get("files", []), data.get("dirs", []))
-    return paths
-
-
-# Merged /usr: /lib, /bin and /sbin are links into /usr, and dpkg lists a file under
-# whichever name its package was built with (a kernel's modules under /lib/modules, a
-# newer one's under /usr/lib/modules). Every path is compared spelled one way, or an
-# installed kernel's module tree reads as nobody's.
-MERGED = tuple(f"/{d}" for d in ("bin", "sbin", "lib", "lib32", "lib64", "libx32") if os.path.islink(f"/{d}"))
-
-
-def canonical(path):
-    """PATH with a merged-/usr alias spelled through /usr (/lib/x -> /usr/lib/x)."""
-    for alias in MERGED:
-        if path == alias or path.startswith(alias + "/"):
-            return "/usr" + path
-    return path
 
 
 def owned_below(path, owned):
@@ -483,6 +428,30 @@ def audit(config_dirs, owned, claimed):
     }
 
 
+class RuleError(Exception):
+    pass
+
+
+def plan(rules, owned, ignore):
+    """What each rule matches, split into what goes (by rule name), what stays because a
+    package owns it or something under it, or because IGNORE names it or something under
+    it (what deepops itself installs there), and how far up each removal prunes."""
+    keep = owned | {canonical(p).rstrip("/") for p in ignore}
+    stale, kept, within = {}, [], {}
+    for rule in rules:
+        try:
+            paths = match_rule(rule)
+        except (KeyError, ValueError, re.error) as err:
+            raise RuleError(f"stale_files rule {rule.get('name', rule)}: {err}") from err
+        mine = [p for p in paths if not owned_below(p, keep)]
+        kept += [p for p in paths if p not in mine]
+        if mine:
+            stale[rule.get("name", rule["type"])] = mine
+            for path in mine:
+                within[path] = within.get(path, ()) + prune_within(rule)
+    return stale, kept, within
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -497,18 +466,10 @@ def main():
         supports_check_mode=True,
     )
     owned = {canonical(p) for p in owned_paths() | staged_paths(module.params["manifests"])}
-    stale, kept, within = {}, [], {}
-    for rule in module.params["rules"]:
-        try:
-            paths = match_rule(rule)
-        except (KeyError, ValueError, re.error) as err:
-            module.fail_json(msg=f"stale_files rule {rule.get('name', rule)}: {err}")
-        mine = [p for p in paths if not owned_below(p, owned)]
-        kept += [p for p in paths if p not in mine]
-        if mine:
-            stale[rule.get("name", rule["type"])] = mine
-            for path in mine:
-                within[path] = within.get(path, ()) + prune_within(rule)
+    try:
+        stale, kept, within = plan(module.params["rules"], owned, module.params["ignore"])
+    except RuleError as err:
+        module.fail_json(msg=str(err))
     every = sorted({p for paths in stale.values() for p in paths})
     removing = module.params["state"] == "absent" and every
     if removing and not module.check_mode:
