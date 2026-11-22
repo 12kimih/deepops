@@ -757,6 +757,25 @@ tests:
               summary: "/home on m, exported over NFS, is over 80% full"
               description: "15% free. Ask the largest users to clean up before it slows every job."
 
+  - name: an NFS share the retry cannot mount warns after 15 minutes
+    interval: 1m
+    input_series:
+      - series: 'nfs_client_mount_missing{host="n1", instance="n1:9100", mountpoint="/home"}'
+        values: '1x30'
+      - series: 'nfs_client_mount_missing{host="n2", instance="n2:9100", mountpoint="/home"}'
+        values: '1x5 0x25'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: NfsMountMissing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: NfsMountMissing
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", mountpoint: /home}
+            exp_annotations:
+              summary: "/home is not mounted on n1"
+              description: "Retried every minute for 15 minutes. Check its NFS server; journalctl -u nfs-client-retry on the node shows each attempt."
+
   - name: stale allocation data warns and silences the busy-GPU alert
     interval: 1m
     input_series:

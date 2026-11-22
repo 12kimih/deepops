@@ -13,3 +13,4 @@ galaxy_info:
       versions: ["8", "9"]
 dependencies:
   - role: nfs_common  # its settings and items; installed by present.yml
+  - role: prometheus_paths  # node_exporter_prom_dir, where the retry's metric goes

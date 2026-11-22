@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Mount the NFS entries of this host's fstab that are not mounted, once their server serves.
+
+    nfs-client-retry [--wait SECONDS] [--textfile FILE]
+
+Boot tries each fstab mount once, and nofail lets a node that came up before its server
+finish booting without the share (no automount: an autofs /home took the cluster's boot
+apart, docs/slurm-cluster/slurm-nfs.md). This is the retry: a timer runs it every minute
+(roles/nfs_client), and playbooks/utilities/nfs-mount.yml runs the same file with a
+longer --wait. fstab, not the deploy's list, is what it mounts: what this host was set
+up to mount.
+
+Nothing here can wedge it, whatever state a server is in: the mount tables are read with
+findmnt (a stat on a hard mount whose server is gone never returns), a server is asked
+whether it serves with a TCP connect to 2049 under a timeout, and the mount itself is
+the entry's systemd mount unit started under `timeout` (the unit's own start timeout
+bounds a server that answers but does not serve the export). An occupied mountpoint is
+left alone: a hard mount recovers by itself once its server is back.
+
+Each attempt is one line on stdout (the journal, for the timer). With --textfile, one
+gauge per fstab entry, nfs_client_mount_missing{mountpoint=...} 1 or 0, and the time of the
+run, written atomically for node_exporter's textfile collector: a node that keeps
+retrying shows. Exit status 0 when every entry is mounted, 1 otherwise.
+Python 3.9 or newer, standard library only.
+"""
+
+import argparse
+import json
+import os
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+PORT = 2049
+PROBE_TIMEOUT = 5
+START_TIMEOUT = 120
+POLL = 5
+
+
+def run(argv, timeout):
+    """(status, stdout) of ARGV, bounded by TIMEOUT seconds (status 124 when it ran out)."""
+    try:
+        done = subprocess.run(
+            argv, capture_output=True, text=True, errors="replace", timeout=timeout, check=False
+        )
+    except subprocess.TimeoutExpired:
+        return 124, ""
+    except OSError as e:
+        return 127, str(e)
+    return done.returncode, done.stdout
+
+
+def fstab_entries():
+    """The NFS entries of fstab, mounted at boot (no noauto, no automount)."""
+    status, out = run(
+        ["findmnt", "--fstab", "--json", "--types", "nfs,nfs4", "--output", "TARGET,SOURCE,OPTIONS"], 30
+    )
+    if status not in (0, 1) or not out.strip():  # 1: no such entry
+        return []
+    entries = []
+    for fs in json.loads(out).get("filesystems", []):
+        options = (fs.get("options") or "").split(",")
+        if "noauto" in options or "x-systemd.automount" in options:
+            continue
+        entries.append({"target": fs["target"], "source": fs["source"]})
+    return entries
+
+
+def mounted_targets():
+    status, out = run(["findmnt", "--kernel", "--list", "--noheadings", "--output", "TARGET"], 30)
+    return set(out.split("\n")) - {""} if status == 0 else set()
+
+
+def mount_unit(target):
+    """The systemd mount unit of TARGET, as systemd-fstab-generator names it."""
+    status, out = run(["systemd-escape", "--path", "--suffix=mount", target], 10)
+    return out.strip() if status == 0 and out.strip() else target
+
+
+def server(source):
+    """The host of an NFS source, host:/path or [v6]:/path."""
+    return source.rsplit(":/", 1)[0].strip("[]")
+
+
+def serves(host, timeout=PROBE_TIMEOUT):
+    try:
+        with socket.create_connection((host, PORT), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def write_textfile(path, entries, missing, now):
+    lines = [
+        "# HELP nfs_client_mount_missing 1 while an NFS entry of fstab is not mounted (nfs-client-retry).",
+        "# TYPE nfs_client_mount_missing gauge",
+    ]
+    for entry in sorted(entries, key=lambda e: e["target"]):
+        label = entry["target"].replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'nfs_client_mount_missing{{mountpoint="{label}"}} {int(entry["target"] in missing)}')
+    if not missing:  # a run that leaves one missing is no success (the gauges say which)
+        lines += [
+            "# HELP nfs_client_last_success_timestamp_seconds When nfs-client-retry last found every entry mounted.",
+            "# TYPE nfs_client_last_success_timestamp_seconds gauge",
+            f"nfs_client_last_success_timestamp_seconds {int(now)}",
+        ]
+    directory = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".nfs-client.")
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--wait", type=int, default=0, help="seconds to wait for each server to serve (default 0: one probe)"
+    )
+    parser.add_argument("--textfile", help="write the node_exporter metrics here")
+    args = parser.parse_args(argv)
+
+    entries = fstab_entries()
+    present = mounted_targets()
+    for entry in (e for e in entries if e["target"] not in present):
+        host = server(entry["source"])
+        deadline = time.monotonic() + args.wait
+        up = serves(host)
+        while not up and time.monotonic() < deadline:
+            time.sleep(POLL)
+            up = serves(host)
+        if not up:
+            print(f"{entry['target']}: {host} does not serve NFS (port {PORT}); not mounted")
+            continue
+        unit = mount_unit(entry["target"])
+        status, _ = run(["systemctl", "start", unit], START_TIMEOUT)
+        print(
+            f"{entry['target']}: "
+            + ("mounted" if status == 0 else f"mount failed ({unit}: systemctl status {status})")
+        )
+
+    missing = {e["target"] for e in entries} - mounted_targets()
+    if args.textfile and os.path.isdir(os.path.dirname(args.textfile) or "."):  # no node_exporter: no metric
+        write_textfile(args.textfile, entries, missing, time.time())
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

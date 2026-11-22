@@ -99,6 +99,7 @@ SOURCES = {
     "disk_quota": r"disk_quota_\w+",
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "nfs": r"nfs_export_\w+",  # what roles/nfs exports (roles/textfile_keep)
+    "nfs_client": r"nfs_client_\w+",  # the mounts the retry could not make (roles/nfs_client)
     "tls": r"\w+_tls_cert_\w+",  # each service's certificate (rules/tls.yml)
     "prometheus": r"prometheus_\w+|up|scrape_\w+|ALERTS|ALERTS_FOR_STATE",
     "alertmanager": r"alertmanager_\w+",

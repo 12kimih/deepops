@@ -107,15 +107,22 @@ So the default carries no `x-systemd.automount`. Set it per mount for a share no
 sandboxes, never for `/home`. [Boot failures](../deepops/boot-failures.md) records what
 this looks like on a console.
 
-The boot race above is real and still unsolved here; `nofail` means a node that loses the
-race comes up without the share rather than not at all. Once the servers are up,
-`playbooks/utilities/nfs-mount.yml` mounts what is missing: for every NFS entry in a
-host's `/etc/fstab` that is not mounted, it waits for the server to answer on port 2049
-and starts the entry's mount unit. It reads fstab rather than `nfs_mounts`, so it mounts
-only what the host was set up to mount. An automatic retry must not put autofs on `/home`
-either -- use a `noauto` entry plus a unit that retries `mount`, or the `autofs` daemon
-with a wildcard map under `/home/<user>` rather than on `/home` itself (see
-`roles/autofs` and `autofs_map` in `group_vars/all.yml`).
+So the boot keeps the plain entries with `nofail` (a node that loses the race comes up
+without the share rather than not at all) and the client retries what it lost:
+`nfs_client_retry` (default true) installs `nfs-client-retry` and a timer that runs it
+every minute from boot. For every NFS entry in the host's `/etc/fstab` that is not
+mounted (`noauto` and automount entries aside), it asks the server whether it serves --
+a TCP connect to port 2049 under a 5 s timeout -- and only then starts the entry's mount
+unit, under `timeout`. It reads the mount tables with `findmnt`, never a `stat` (which
+does not return on a hard mount whose server is gone), so no state of a server can wedge
+it; each attempt is a journal line (`journalctl -u nfs-client-retry`), and
+`nfs_client_mount_missing` per entry goes to node_exporter, so `NfsMountMissing` warns when a
+share stays missing for 15 minutes. Until it is mounted, NHC (which checks every
+`nfs_mounts` entry) keeps the node out of Slurm, and returns it by itself afterwards.
+`playbooks/utilities/nfs-mount.yml` runs the same script once, waiting up to
+`nfs_mount_wait_timeout` for each server, on any host (it ships the script with the
+`script` module). It reads fstab rather than `nfs_mounts`, so it mounts only what the
+host was set up to mount.
 
 Consequences worth knowing:
 
