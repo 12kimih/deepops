@@ -1,11 +1,17 @@
 ---
+# Resolved here, where nfs_client's dependencies (node_exporter_prom_dir) are in scope:
+# an include argument is evaluated inside the included role.
+- name: List what this component installs
+  ansible.builtin.set_fact:
+    nfs_client_record_items: "{{ nfs_client_items + nfs_common_items }}"
+
 - name: Record what this component installs
   ansible.builtin.include_role:
     name: component_record
   vars:
     component_record_name: nfs_client
     component_record_action: begin
-    component_record_items: "{{ nfs_client_items + nfs_common_items }}"
+    component_record_items: "{{ nfs_client_record_items }}"
 
 - name: Set up what servers and clients share
   ansible.builtin.include_role:
@@ -23,4 +29,4 @@
   vars:
     component_record_name: nfs_client
     component_record_action: present
-    component_record_items: "{{ nfs_client_items + nfs_common_items }}"
+    component_record_items: "{{ nfs_client_record_items }}"

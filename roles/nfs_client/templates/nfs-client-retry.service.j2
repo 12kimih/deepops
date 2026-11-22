@@ -1,0 +1,15 @@
+{{ ansible_managed | comment }}
+# Mount the NFS shares of fstab that boot left unmounted (roles/nfs_client): a timer runs
+# this every minute, from shortly after boot. Exit status 1 is "still missing", not a
+# failure of the unit: the nfs_client_mount_missing metric shows a node that keeps retrying.
+[Unit]
+Description=Mount the NFS shares that are missing
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ nfs_client_retry_program }} --textfile {{ node_exporter_prom_dir }}/nfs-client.prom
+SuccessExitStatus=1
+# Every step is bounded (a 5 s probe, a 120 s start per entry); this bounds the whole run.
+TimeoutStartSec=15min

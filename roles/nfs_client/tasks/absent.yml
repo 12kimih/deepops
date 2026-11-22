@@ -1,10 +1,15 @@
 ---
 # The fstab entries and the detach unit go, and the shared part when the server does not
 # need it. A live mount stays until the next boot: never unmounted under its users.
+# Resolved here, where nfs_client's dependencies are in scope (see present.yml).
+- name: List what this component installed
+  ansible.builtin.set_fact:
+    nfs_client_record_items: "{{ nfs_client_items }}"
+
 - name: Remove what this component installed
   ansible.builtin.include_role:
     name: component_record
   vars:
     component_record_name: nfs_client
     component_record_action: absent
-    component_record_items: "{{ nfs_client_items }}"
+    component_record_items: "{{ nfs_client_record_items }}"

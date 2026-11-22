@@ -71,6 +71,44 @@
   tags:
     - nfs
 
+# The retry of what boot left unmounted: the script, and a timer that runs it every
+# minute (files/nfs-client-retry says why each step is bounded). Started now too, so a
+# share missing at this run is retried from here on.
+- name: Install the NFS mount retry
+  ansible.builtin.copy:
+    src: nfs-client-retry
+    dest: "{{ nfs_client_retry_program }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: nfs_client_retry | bool
+  tags:
+    - nfs
+
+- name: Install the NFS mount retry units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "{{ nfs_client_retry_unit }}.service"
+    - "{{ nfs_client_retry_unit }}.timer"
+  when: nfs_client_retry | bool
+  tags:
+    - nfs
+
+- name: Run the NFS mount retry every minute
+  systemd_unit:
+    name: "{{ nfs_client_retry_unit }}.timer"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: nfs_client_retry | bool
+  tags:
+    - nfs
+
 - name: RedHat | Install management prereq
   ansible.builtin.dnf:
     name: "python3-libsemanage"

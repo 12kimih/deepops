@@ -5,7 +5,13 @@
 # mountpoint directory is not (it is where data appears). The detach unit is an item only
 # while wanted, so switching it off removes it.
 nfs_client_detach_unit: nfs-detach-on-shutdown.service
+nfs_client_retry_program: /usr/local/sbin/nfs-client-retry
+nfs_client_retry_unit: nfs-client-retry
 nfs_client_items: >-
   {{ (['unit:' ~ nfs_client_detach_unit, 'file:/etc/systemd/system/' ~ nfs_client_detach_unit]
       if nfs_detach_on_shutdown | bool else [])
+     + (['unit:' ~ nfs_client_retry_unit ~ '.timer', 'file:/etc/systemd/system/' ~ nfs_client_retry_unit ~ '.timer',
+         'file:/etc/systemd/system/' ~ nfs_client_retry_unit ~ '.service', 'file:' ~ nfs_client_retry_program,
+         'file:' ~ node_exporter_prom_dir ~ '/nfs-client.prom']
+        if nfs_client_retry | bool else [])
      + nfs_mounts | map(attribute='mountpoint') | map('regex_replace', '^', 'mount:') | list }}

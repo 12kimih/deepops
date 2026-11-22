@@ -29,3 +29,9 @@ nfs_detach_on_shutdown: true
 # How long playbooks/utilities/nfs-mount.yml waits for a server to serve NFS before it
 # gives up on that server's mounts.
 nfs_mount_wait_timeout: 300
+
+# Retry the mounts boot left behind (a server that was not up yet): a timer runs
+# nfs-client-retry every minute, which mounts each missing fstab NFS entry whose server
+# serves, every step bounded, and publishes nfs_client_mount_missing for node_exporter.
+# Never an automount (docs/slurm-cluster/slurm-nfs.md). false removes the timer.
+nfs_client_retry: true

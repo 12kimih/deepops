@@ -45,6 +45,16 @@ groups:
         annotations:
           summary: "{{ $labels.mountpoint }} on {{ $labels.host }}, exported over NFS, is over 80% full"
           description: "{{ $value | humanizePercentage }} free. Ask the largest users to clean up before it slows every job."
+      # An NFS share of fstab still unmounted after the client's retry timer has tried for
+      # 15 minutes (roles/nfs_client, nfs-client-retry): its server is down or does not
+      # serve the export. NHC keeps the node out of Slurm meanwhile.
+      - alert: NfsMountMissing
+        expr: nfs_client_mount_missing == 1
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.mountpoint }} is not mounted on {{ $labels.host }}"
+          description: "Retried every minute for 15 minutes. Check its NFS server; journalctl -u nfs-client-retry on the node shows each attempt."
       - alert: HostInodesAlmostExhausted
         expr: |
           node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|ramfs|nfs.*|fuse.*"}
