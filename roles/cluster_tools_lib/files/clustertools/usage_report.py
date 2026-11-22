@@ -367,7 +367,7 @@ CONFIG_KEYS = {
     "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
     "repeat_idle_share": (int, float), "repeat_weeks": int, "cancel_interactive_only": bool,
     "cancel_warn_hours": (int, float), "cancel_warn_text": str, "storage_top": int,
-    "storage_notify": list, "people": list,
+    "storage_notify": list, "storage_repeat_days": (int, float), "people": list,
 }  # fmt: skip
 
 
@@ -394,6 +394,8 @@ def load_config(path):
             raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
     if cfg["storage_top"] < 1:
         raise ConfigError(f"{path}: storage_top must be 1 or more")
+    if cfg["storage_repeat_days"] < 0:
+        raise ConfigError(f"{path}: storage_repeat_days must be 0 (every day) or more")
     if cfg["idle_hours"] <= 0:
         raise ConfigError(f"{path}: idle_hours must be above 0")
     try:
@@ -621,31 +623,44 @@ def post_thread(slack, channel, card, thread):
 
 
 def storage(cfg, args):
-    """The daily disk usage report; with dm in storage_notify, a note to everyone past a
-    level. A preview posts to --to and sends and records nothing; one failed note does not
-    stop the others, and the run fails at the end naming them."""
-    data = storage_report.collect(Prometheus(cfg["prometheus_url"]), time.time())
+    """The daily disk usage report. The people past a level who are due a notice
+    (storage_report.due: a first crossing, a hard limit, the same warn level every
+    storage_repeat_days) are mentioned on the card or sent a DM, as storage_notify says,
+    and recorded once it reached them. A preview posts to --to and sends and records
+    nothing; one failed DM does not stop the others, and the run fails at the end naming
+    them."""
+    now = time.time()
+    data = storage_report.collect(Prometheus(cfg["prometheus_url"]), now)
     if data is None:
         print("slurm-usage-report: no disk usage is counted anywhere (roles/disk_quota); nothing to post")
         return
     slack = Slack(cfg["slack_token"], args.dry_run)
     path, state = side_state(cfg, "storage.json")
-    cache = state.get("users", {})
+    cache, told = state.get("users", {}), state.get("told", {})
     preview = args.dry_run or bool(args.to)
-    who = namer(cfg, slack, cache) if "mention" in cfg["storage_notify"] else (lambda user, mention: user)
-    card, thread = storage_report.render(data, who, cfg["storage_top"], set(cfg["people"]))
+    notify = cfg["storage_notify"]
+    due = storage_report.due(storage_report.over_warn(data), told, now, cfg["storage_repeat_days"])
+    keys = {storage_report.row_key(r) for r in due}
+    who = namer(cfg, slack, cache)
+    card, thread = storage_report.render(
+        data, who, cfg["storage_top"], set(cfg["people"]), keys if "mention" in notify else set()
+    )
     post_thread(slack, slack.channel(args.to) if args.to else cfg["channel"], card, thread)
     failures = []
-    if "dm" in cfg["storage_notify"] and not preview:
-        for row in storage_report.over_warn(data):
+    for row in due:
+        delivered = "mention" in notify
+        if "dm" in notify and not preview:
             try:
                 member = slack_id(row[2], cfg, slack, cache)
                 if member:
                     slack.post(slack.channel(member), storage_report.dm_text(row))
+                    delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {row[2]}: {e}")
+        if delivered:
+            told[storage_report.row_key(row)] = {"kind": row[4][0][3], "at": int(now)}
     if not preview:
-        write_atomic(path, json.dumps({"users": cache}), mode=0o600)
+        write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
     if failures:
         raise RuntimeError("; ".join(failures))
 

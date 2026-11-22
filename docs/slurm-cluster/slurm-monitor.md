@@ -253,6 +253,10 @@ The thread lists each filesystem's `slurm_usage_report_storage_top` largest peop
 roster's active logins, `slurm_usage_report_people`), with their day's growth and levels;
 everyone else there (root, the services, people who left) on one line; and the projects. `slurm_usage_report_storage_notify` says
 how the people past a level hear about it: `mention` on the card, `dm`, both, or `[]`.
+They are told when they first pass a level, every day while at a hard limit (their
+writes fail), and again every `slurm_usage_report_storage_repeat_days` (7) while past the
+same warn level (0: every day); the card lists everyone past a level every day, mentioning
+only those told. Who was told when is kept in `storage.json` beside the hourly state.
 A host whose usage was not reported in the last hour is named, since its figures are
 older. `--storage` with `--dry-run` or `--to` previews it.
 
