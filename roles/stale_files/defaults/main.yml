@@ -2,13 +2,16 @@
 # roles/stale_files: the leftovers of retired installs, found by evidence and removed
 # (library/stale_files.py says what each rule type takes). A component's own rules
 # live with it (roles/slurm: slurm_stale_files_rules); the ones here fit any host.
-#   stale_files_rules   the rules to apply (default: stale_files_host_rules, then the
-#                       site's own stale_files_site_rules)
+#   stale_files_rules   the rules to apply (default: stale_files_default_rules, the
+#                       host rules here, then the site's own stale_files_site_rules)
 #   stale_files_state   absent removes what they match; report only lists it
 #   stale_files_report  with report: also count the files under these no package owns
 #                       and no rule matched, for a person to judge
 #   stale_files_ignore  paths deepops itself installs there: never removed, never counted
-stale_files_rules: "{{ stale_files_host_rules + stale_files_site_rules }}"
+# Every host's rules, written once: the default, and what a component's own run adds
+# to a report (roles/slurm), so a report on any host shows the site's rules too.
+stale_files_default_rules: "{{ stale_files_host_rules + stale_files_site_rules }}"
+stale_files_rules: "{{ stale_files_default_rules }}"
 # A site's own leftovers, in the rule types library/stale_files.py takes: what a person
 # installed by hand there and the site retired (e.g. a hand-copied binary under
 # /usr/local/bin). Nothing a package owns is ever taken.
