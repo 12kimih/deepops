@@ -152,6 +152,49 @@ def people_former(people, today=None):
     return sorted(set(people or {}) - set(_member(people, today)))
 
 
+def people_purge_due(people, keep_days=90, today=None):
+    """{login: {uid, ends, due}} of everyone whose files are due for removal: their
+    `ends` lies more than KEEP_DAYS behind (dates YYYY-MM-DD; playbooks/utilities/
+    people-purge.yml). Someone without `ends` is never due (people_purge_undated)."""
+    import datetime
+
+    out = {}
+    for n, p in sorted((people or {}).items()):
+        ends = _date((p or {}).get("ends"))
+        if ends is None:
+            continue
+        due = ends + datetime.timedelta(days=int(keep_days))
+        if _today(today) > due:
+            out[n] = {"uid": p["uid"], "ends": ends.isoformat(), "due": due.isoformat()}
+    return out
+
+
+def people_purge_undated(people):
+    """Sorted logins who have left without an `ends` date: their files never fall due."""
+    return sorted(
+        n for n, p in (people or {}).items() if (p or {}).get("status") == "left" and not _date(p.get("ends"))
+    )
+
+
+def people_purge_targets(people, keep_days=90, paths=(), today=None):
+    """[{login, uid, path}] for each due person (people_purge_due) and each of PATHS, a
+    template holding {login} below an absolute directory. Refuses a template that could
+    name anything but one person's own directory."""
+    import posixpath
+
+    for t in paths:
+        parent = posixpath.dirname(t)
+        if not (t.startswith("/") and posixpath.basename(t) == "{login}" and parent not in ("", "/")
+                and "{" not in parent and posixpath.normpath(t) == t):  # fmt: skip
+            raise ValueError(f"people_purge_paths: {t!r} must be /<dir>/{{login}}")
+    out = []
+    for n, d in people_purge_due(people, keep_days, today).items():
+        if not LOGIN.fullmatch(n):  # an empty or odd name must never make {login} mean its parent
+            raise ValueError(f"people_purge_targets: {n!r} is not a login")
+        out += [{"login": n, "uid": d["uid"], "path": t.replace("{login}", n)} for t in paths]
+    return out
+
+
 def people_with_role(people, role, today=None):
     """Sorted login names of members holding role (none once past their end)."""
     return sorted(n for n, p in _member(people, today).items() if role in (p.get("roles") or []))
@@ -601,6 +644,9 @@ class FilterModule:
             "people_active": people_active,
             "people_left": people_left,
             "people_former": people_former,
+            "people_purge_due": people_purge_due,
+            "people_purge_undated": people_purge_undated,
+            "people_purge_targets": people_purge_targets,
             "people_with_role": people_with_role,
             "people_uids": people_uids,
             "people_attr": people_attr,
