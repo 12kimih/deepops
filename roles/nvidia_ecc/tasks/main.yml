@@ -18,7 +18,7 @@
     - name: Read each GPU's ECC mode
       ansible.builtin.command:
         argv: [systemd-run, --wait, --pipe, --collect, --quiet, --,
-               nvidia-smi, --query-gpu=index,ecc.mode.current,ecc.mode.pending, --format=csv,noheader]
+               nvidia-smi, '--query-gpu=index,ecc.mode.current,ecc.mode.pending', '--format=csv,noheader']
       register: nvidia_ecc_report
       changed_when: false
       check_mode: false  # read-only; --check needs the result
