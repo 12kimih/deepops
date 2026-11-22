@@ -24,7 +24,7 @@ platforms:
   # The name is the role's (scripts/deepops/molecule.py sets it) and the scenario's, so
   # scenarios run at once on one Docker host never share a container.
   - name: "${DEEPOPS_MOLECULE_INSTANCE:-instance}-${MOLECULE_SCENARIO_NAME}"
-    image: "geerlingguy/docker-ubuntu2404-ansible:latest@sha256:fa0889a991fe4f9404efc2f53d5960804f4e409e74bff6ad2443992cc57915c4"
+    image: "geerlingguy/docker-ubuntu2404-ansible:latest@sha256:01adc699145ab47eb196b5aa7b056af80548502f8bc99e230afcffb6700cac3d"
     pre_build_image: true
     # The image ships a policy-rc.d that refuses every service start a package asks
     # for; a node has none (roles/quiet_install writes its own only for an install).
