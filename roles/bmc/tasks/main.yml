@@ -30,9 +30,30 @@
   tags:
     - bmc
 
+- name: Install the cold reboot hook
+  ansible.builtin.copy:
+    src: bmc-cold-reboot
+    dest: "{{ bmc_cold_reboot_hook }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: bmc_cold_reboot | bool
+  tags:
+    - bmc
+
+# Resolved here, where this role's settings are in scope: an include argument is
+# evaluated inside the included role.
+- name: List what the BMC needs on the host
+  ansible.builtin.set_fact:
+    bmc_record_items: >-
+      {{ kernel_modules_files | map('regex_replace', '^', 'file:') | list
+         + (['file:' ~ bmc_cold_reboot_hook] if bmc_cold_reboot | bool else []) }}
+  tags:
+    - bmc
+
 # Recorded, so their boot-time files stay while this role needs them, whatever else
-# (the IPMI exporter) that also loads them is removed.
-- name: Record the IPMI modules the BMC needs
+# (the IPMI exporter) that also loads them is removed; the hook goes once unwanted.
+- name: Record what the BMC needs on the host
   ansible.builtin.include_role:
     name: component_record
     apply:
@@ -40,7 +61,7 @@
   vars:
     component_record_name: bmc
     component_record_action: present
-    component_record_items: "{{ kernel_modules_files | map('regex_replace', '^', 'file:') | list }}"
+    component_record_items: "{{ bmc_record_items }}"
   tags:
     - bmc
 

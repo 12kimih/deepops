@@ -183,3 +183,4 @@ retired_settings:
   egress_policy_trusted_interfaces: ingress_policy_trusted_interfaces in roles/ingress_policy
   egress_policy_inbound_lockout_check: ingress_policy_lockout_check in roles/ingress_policy
   docker_login_reauth: nothing (roles/docker-login logs in again when the password changed; forcing it reported a change every run)
+  maintenance_reboot_method: "bmc_cold_reboot: true in the host's host_vars (roles/bmc): every reboot then ends in a BMC power cycle"

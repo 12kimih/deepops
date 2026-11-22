@@ -1,0 +1,3 @@
+---
+# systemd-shutdown runs every executable here just before the reboot (bmc_cold_reboot).
+bmc_cold_reboot_hook: /usr/lib/systemd/system-shutdown/bmc-cold-reboot
