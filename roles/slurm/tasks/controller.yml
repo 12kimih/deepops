@@ -22,21 +22,24 @@
     - policycoreutils-python-utils
   when: ansible_facts.os_family == "RedHat"
 
-- name: Allow mysql to read libaio.so.1
+# Earlier versions labelled all of /lib64 mysqld_db_t "so mysql reads libaio": every
+# system library then carried a database type other confined services may be denied,
+# and restorecon ran on every deploy. The distribution's policy already lets mysqld_t
+# read lib_t; the rule goes, and the labels return to the policy's once.
+- name: Retire the /lib64 file context earlier versions set
   community.general.sefcontext:
     target: "/lib64(/.*)?"
     setype: mysqld_db_t
-    state: present
+    state: absent
+  register: slurm_lib64_context
   when:
     - ansible_facts.os_family == "RedHat"
     - (ansible_facts.selinux is defined) and (ansible_facts.selinux.status != "disabled")
 
-- name: Apply new SELinux file context to filesystem
+- name: Give /lib64 back the policy's labels
   change_command:
-    cmd: restorecon -irv /lib64
-  when:
-    - ansible_facts.os_family == "RedHat"
-    - (ansible_facts.selinux is defined) and (ansible_facts.selinux.status != "disabled")
+    argv: [restorecon, -iR, /lib64]
+  when: slurm_lib64_context is changed
 
 # Boot-enable MariaDB on both families (slurmdbd + the mysql_user task depend on it,
 # and it must survive a reboot). On Debian the apt preset starts it but does not

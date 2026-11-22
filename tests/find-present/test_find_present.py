@@ -45,6 +45,15 @@ class FindPresent(unittest.TestCase):
         self.assertEqual(result["matched"], 1)
         self.assertEqual([Path(f["path"]).name for f in result["files"]], ["a.yml"])
 
+    def test_files_come_sorted_by_path(self):
+        # find lists in directory order: root's authorized_keys followed it.
+        names = ["m.yml", "a.yml", "z.yml", "b.yml", "k.yml"]
+        with tempfile.TemporaryDirectory() as d:
+            for name in names:
+                (Path(d) / name).write_text("x: 1\n")
+            result, _, _ = run(d)
+        self.assertEqual([Path(f["path"]).name for f in result["files"]], sorted(names))
+
 
 if __name__ == "__main__":
     unittest.main()

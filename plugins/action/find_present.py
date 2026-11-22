@@ -7,6 +7,10 @@ every host that never had it, and a --check run looks into directories the same 
 would make, so each deploy printed a warning per host for what is simply nothing to
 find. find_present takes find's arguments, asks the host which of the paths are
 directories, and runs find on those alone; with none, it returns find's empty result.
+
+The files come sorted by path: find lists them in directory order, which differs between
+hosts and runs, so what a task builds from them (root's authorized_keys) would change
+with no change on the host.
 """
 
 from __future__ import annotations
@@ -39,7 +43,8 @@ class ActionModule(ActionBase):
             result.update({"changed": False, "files": [], "matched": 0, "examined": 0, "skipped_paths": {}})
             return result
         args["paths"] = present
-        result.update(
-            self._execute_module(module_name="ansible.legacy.find", module_args=args, task_vars=task_vars)
-        )
+        found = self._execute_module(module_name="ansible.legacy.find", module_args=args, task_vars=task_vars)
+        if isinstance(found.get("files"), list):
+            found["files"] = sorted(found["files"], key=lambda f: str(f.get("path", "")))
+        result.update(found)
         return result
