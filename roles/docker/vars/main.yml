@@ -1,4 +1,6 @@
 ---
+# The kernel limits it raises (roles/host_baseline tasks_from: sysctl).
+docker_sysctl_file: "{{ deepops_sysctl_prefix }}docker.conf"
 # What the component installs, for its record (roles/component_record). The prune
 # units only while pruning is on, so turning it off removes them (and the record removes
 # the docker-image-prune units earlier versions installed). /var/lib/docker is data and
@@ -16,13 +18,13 @@ _docker_prune_items:
   - file:/etc/systemd/system/docker-prune.service
 _docker_all_items: >-
   {{ ['unit:docker.socket', 'unit:docker.service', 'file:/etc/docker/daemon.json',
-      'file:/etc/sysctl.d/90-docker.conf']
+      'file:' ~ docker_sysctl_file]
      + docker_packages | map('regex_replace', '^', 'package:') | list
      + _docker_repo_items[ansible_facts.os_family] | default([])
      + _docker_prune_items }}
 docker_items: >-
   {{ _docker_all_items
-     | reject('in', [] if docker_tune_kernel | bool else ['file:/etc/sysctl.d/90-docker.conf'])
+     | reject('in', [] if docker_tune_kernel | bool else ['file:' ~ docker_sysctl_file])
      | reject('in', [] if docker_prune_after | length > 0 else _docker_prune_items)
      | list }}
 # DGX OS's drop-in, with options that conflict with a stock install: always retired.

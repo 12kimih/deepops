@@ -22,4 +22,4 @@ galaxy_info:
     - slurm
 dependencies:
   - role: retired_settings  # enroot_configure_kernel_options_versions
-  - role: deepops_paths  # deepops_containerized
+  - role: deepops_paths  # deepops_containerized, deepops_sysctl_prefix

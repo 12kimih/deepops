@@ -183,7 +183,7 @@ hardware in `config/group_vars/slurm-cluster.yml`** (site-specific values belong
    histogram -- it was removed in kernel 2.6.32 and always reads zero. (`rpc.nfsd(8)`)
 
 4. **Server/client socket buffers.** DeepOps now raises the TCP buffers for the NFS
-   data path automatically (`nfs_tune_network: true` -> `/etc/sysctl.d/30-nfs-tuning.conf`:
+   data path automatically (`nfs_tune_network: true` -> `/etc/sysctl.d/zz-deepops-nfs_common.conf`:
    `net.core.{r,w}mem_max=2147483647` (~2 GiB, the ESnet 100G ceiling), 1 GiB
    `tcp_{r,w}mem` autotune ceilings, `netdev_max_backlog=300000`). Set it false to
    opt out.

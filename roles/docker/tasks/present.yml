@@ -233,7 +233,7 @@
     tasks_from: sysctl
   vars:
     host_baseline_sysctls: "{{ docker_sysctls }}"
-    host_baseline_sysctl_file: /etc/sysctl.d/90-docker.conf
+    host_baseline_sysctl_file: "{{ docker_sysctl_file }}"
   when: docker_tune_kernel | bool
 
 # Containers first: an image a stopped container holds is in use until it goes. Each

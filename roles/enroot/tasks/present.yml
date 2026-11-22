@@ -18,7 +18,7 @@
     host_baseline_sysctls:
       user.max_user_namespaces: "{{ enroot_max_user_namespaces }}"
       user.max_mnt_namespaces: "{{ enroot_max_mnt_namespaces }}"
-    host_baseline_sysctl_file: /etc/sysctl.d/90-enroot.conf
+    host_baseline_sysctl_file: "{{ enroot_sysctl_file }}"
 
 - name: Install enroot (Ubuntu)
   ansible.builtin.include_tasks: ubuntu.yml

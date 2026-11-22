@@ -7,6 +7,12 @@ deepops_dir: /opt/deepops
 # builds, which a run may recreate). Every role names them through these.
 deepops_state_dir: /var/lib/deepops
 deepops_cache_dir: /var/cache/deepops
+# Where each role's kernel settings go, the role's name and .conf after it
+# (roles/host_baseline tasks_from: sysctl). systemd-sysctl applies the files of
+# /etc/sysctl.d, /run/sysctl.d and /usr/lib/sysctl.d in name order and the last
+# assignment wins: zz sorts after the distribution's files and the administrator's
+# 99-sysctl.conf, so a role's value is the one boot applies without editing theirs.
+deepops_sysctl_prefix: /etc/sysctl.d/zz-deepops-
 # The label on every container deepops starts (roles/container_service sets it to the
 # unit's name): a container without it on a node is someone's own, outside Slurm, and
 # the daily container storage cleanup counts it (roles/container_storage_gc).

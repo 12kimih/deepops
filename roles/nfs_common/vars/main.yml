@@ -1,6 +1,6 @@
 ---
 nfs_common_package: "{{ 'nfs-utils' if ansible_facts.os_family == 'RedHat' else 'nfs-common' }}"
-nfs_common_sysctl_file: /etc/sysctl.d/30-nfs-tuning.conf
+nfs_common_sysctl_file: "{{ deepops_sysctl_prefix }}nfs_common.conf"
 
 # What the shared part installs. The server and the client each record these with their
 # own items, so the last of them to go removes them (roles/component_record).

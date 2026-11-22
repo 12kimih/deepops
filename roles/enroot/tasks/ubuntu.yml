@@ -63,8 +63,8 @@
     path: /proc/sys/kernel/apparmor_restrict_unprivileged_userns
   register: enroot_userns_knob
 
-# The wanted value is always written, so it no longer depends on a hand-run `sysctl -w`
-# or an /etc/sysctl.conf line (gpu nodes were found at 0 that way): 1 keeps the kernel
+# The wanted value is always written and applied, and boot applies the role's file
+# last (an /etc/sysctl.conf line once left gpu nodes at 0): 1 keeps the kernel
 # restriction, 0 is the escape hatch.
 - name: Ubuntu | set the user namespace restriction
   ansible.builtin.include_role:
@@ -73,7 +73,7 @@
   vars:
     host_baseline_sysctls:
       kernel.apparmor_restrict_unprivileged_userns: "{{ '0' if enroot_apparmor_global_disable | bool else '1' }}"
-    host_baseline_sysctl_file: /etc/sysctl.d/90-enroot.conf
+    host_baseline_sysctl_file: "{{ enroot_sysctl_file }}"
   when: enroot_userns_knob.stat.exists
 
 - name: Ubuntu | check for enroot's AppArmor profile

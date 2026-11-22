@@ -5,6 +5,12 @@
 - name: Keep only the declared foreign architectures
   ansible.builtin.include_tasks: foreign_architectures.yml
 
+- name: Keep the distribution's sysctl.d files as shipped
+  ansible.builtin.include_tasks: sysctl_distribution.yml
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not deepops_containerized | bool
+
 - name: Keep the site's unused units off
   ansible.builtin.include_tasks: masked.yml
   vars:
