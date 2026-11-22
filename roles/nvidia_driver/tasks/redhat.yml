@@ -81,6 +81,7 @@
   ansible.builtin.include_tasks: purge.yml
   vars:
     nvidia_driver_purge_target: "{{ nvidia_driver_rhel_package_resolved }}"
+    nvidia_driver_purge_packages: "{{ nvidia_driver_existing_packages.stdout_lines | default([]) }}"
 
 - name: Reset the NVIDIA driver dnf module (RHEL/Rocky)
   change_command:

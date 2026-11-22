@@ -40,19 +40,20 @@
          if nvidia_driver_install_method == 'ubuntu_repo'
          else ('nvidia-open' if nvidia_driver_kernel_modules == 'open' else 'cuda-drivers') }}
 
-# A switch: the target is not installed, or (NVIDIA repo, whose package name carries no
-# branch) the installed one is of another branch. A new pin alone never replaces an
-# installed nvidia-open, so a switch removes the old driver and installs afresh.
-- name: Decide whether the driver switches (Ubuntu)
+# The NVIDIA repository's package names carry no branch, so there a switch is told from
+# the target: not installed, or of another branch. A switch removes every NVIDIA
+# package first (a new pin alone never replaces an installed nvidia-open).
+- name: Decide whether the driver switches (Ubuntu, nvidia_repo)
   ansible.builtin.set_fact:
     nvidia_driver_switch: >-
       {{ (nvidia_driver_target_package | trim) not in ansible_facts.packages
-         or (nvidia_driver_install_method == 'nvidia_repo'
-             and ansible_facts.packages[nvidia_driver_target_package | trim][0].version is not match(nvidia_driver_branch ~ '\.')) }}
-  when: nvidia_driver_purge_existing | bool
+         or ansible_facts.packages[nvidia_driver_target_package | trim][0].version is not match(nvidia_driver_branch ~ '\.') }}
+  when:
+    - nvidia_driver_purge_existing | bool
+    - nvidia_driver_install_method == 'nvidia_repo' or nvidia_driver_package | length > 0
 
 # The Canonical archive's precompiled modules (linux-modules-, linux-objects-,
-# linux-signatures-nvidia-*) go too, or the old branch's module stays on disk.
+# linux-signatures-nvidia-*) count too, or the old branch's module stays on disk.
 - name: Find pre-existing NVIDIA driver packages (Ubuntu)
   ansible.builtin.shell:
     cmd: >-
@@ -62,15 +63,29 @@
       | grep -vE 'container' || true
   register: nvidia_driver_existing_packages
   changed_when: false
-  check_mode: false
-  when:
-    - nvidia_driver_purge_existing | bool
-    - nvidia_driver_switch | bool
+  check_mode: false  # read-only; --check needs the result
+  when: nvidia_driver_purge_existing | bool
+
+# The archive's names carry the branch and the flavour, so what is not the target's is
+# told package by package (plugins/filter/nvidia.py, nvidia_driver_leftovers): another
+# branch, flavour or architecture goes before the install, the other userspace (headless
+# or full) of the same branch after it. The running driver is never removed to be
+# installed again.
+- name: Note the packages that are not the target driver's (Ubuntu)
+  ansible.builtin.set_fact:
+    nvidia_driver_leftovers: >-
+      {{ _installed | nvidia_driver_leftovers(nvidia_driver_ubuntu_branch, nvidia_driver_kernel_modules,
+                                              nvidia_driver_headless | bool, ansible_facts.architecture | deb_architecture)
+         if nvidia_driver_install_method == 'ubuntu_repo' and nvidia_driver_package | length == 0
+         else {'before': _installed if nvidia_driver_switch | default(false) | bool else [], 'after': []} }}
+  vars:
+    _installed: "{{ nvidia_driver_existing_packages.stdout_lines | default([]) }}"
 
 - name: Remove the other NVIDIA driver packages (Ubuntu)
   ansible.builtin.include_tasks: purge.yml
   vars:
     nvidia_driver_purge_target: "{{ nvidia_driver_target_package }}"
+    nvidia_driver_purge_packages: "{{ nvidia_driver_leftovers.before }}"
 
 # --- Method: ubuntu_repo (Canonical archive) ---------------------------------
 # The CUDA repository (added for DCGM) also publishes driver packages, some newer than
@@ -103,6 +118,13 @@
     install_recommends: false
     update_cache: true
   register: nvidia_driver_install_archive
+  when: nvidia_driver_install_method == 'ubuntu_repo'
+
+- name: Remove the other userspace of the branch (Ubuntu)
+  ansible.builtin.include_tasks: purge.yml
+  vars:
+    nvidia_driver_purge_target: "{{ nvidia_driver_target_package }}"
+    nvidia_driver_purge_packages: "{{ nvidia_driver_leftovers.after }}"
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
 # --- Method: nvidia_repo (NVIDIA CUDA apt repo) ------------------------------

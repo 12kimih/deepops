@@ -53,10 +53,14 @@ nvidia_driver_package: ""
 nvidia_driver_rhel_module_stream: ""
 nvidia_driver_rhel_package: ""
 
-# Purge any pre-existing NVIDIA driver packages before installing. This avoids
-# the broken mixed-package state that prevents the kernel module from building.
-# Container Toolkit packages (libnvidia-container*, nvidia-container-toolkit*)
-# are deliberately excluded from the purge.
+# Purge the NVIDIA packages that are not the target driver's, so no mixed state keeps the
+# target from installing or its module from loading. From the Canonical archive, whose
+# names carry the branch and flavour: another branch, kernel module flavour or
+# architecture before the install, the other userspace (headless or full) of the branch
+# after it; the running driver is never removed to be installed again. Elsewhere (the
+# NVIDIA repository, RHEL, nvidia_driver_package): every NVIDIA package, when the
+# target is missing or of another branch. Container Toolkit packages
+# (libnvidia-container*, nvidia-container-toolkit*) are never purged.
 nvidia_driver_purge_existing: true
 
 # A driver change asks for a reboot (roles/maintenance, reboot_request) to load the new
