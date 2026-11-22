@@ -16,7 +16,8 @@
 #         key_checksum: "sha256:..."
 #         key_src: ""                   # ... or a file under the inventory (vaulted is fine)
 #         key_fingerprint: "3D4C..."    # optional: the key must carry it
-#         pin: {pin: "origin apt.osc.edu", priority: 600, packages: "*"}   # Debian; optional
+#         pin: {pin: "origin apt.osc.edu", priority: 600, packages: "*"}   # Debian; optional,
+#                                       # or a list of them (each its record, in order)
 #         legacy_files: []              # entries earlier setups left for the same repository
 #                                       # (an old .list, a trusted.gpg.d key, ...)
 #         module_hotfixes: false        # RHEL family, optional (e.g. CUDA on EL8)
@@ -209,9 +210,14 @@
             mode: "0644"
             content: |
               # Managed by DeepOps (roles/package_repos): {{ package_repos_r.name }}
-              Package: {{ package_repos_r.pin.packages | default('*') | apt_pin_packages }}
-              Pin: {{ package_repos_r.pin.pin }}
-              Pin-Priority: {{ package_repos_r.pin.priority | int }}
+              {% for pin in ([package_repos_r.pin] if package_repos_r.pin is mapping else package_repos_r.pin) %}
+              {% if not loop.first %}
+
+              {% endif %}
+              Package: {{ pin.packages | default('*') | apt_pin_packages }}
+              Pin: {{ pin.pin }}
+              Pin-Priority: {{ pin.priority | int }}
+              {% endfor %}
           register: package_repos_pin
           when: package_repos_r.pin is defined
 

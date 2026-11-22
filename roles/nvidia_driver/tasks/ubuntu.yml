@@ -91,33 +91,31 @@
 # The CUDA repository (added for DCGM) also publishes driver packages, some newer than
 # the archive's (fabricmanager, nscq): with the archive's driver they must never come
 # from there, or an upgrade mixes two builds of one branch, in any architecture
-# (apt_pin_packages: an i386 build let in once held its amd64 twin's version). The
-# NVIDIA packages that are not the driver's are exempt, in a record ahead of the pin:
-# apt applies the first record that matches a version, in file order too, so no other
-# role's file could lift this one.
+# (apt_pin_packages: an i386 build let in once held its amd64 twin's version). apt gives
+# a version the first record that matches it, in the files' order: the file is named to
+# be read last, so the roles that hold NVIDIA packages of their own (the Container
+# Toolkit's version pin, roles/nvidia_container_toolkit) decide those first.
 - name: Take the NVIDIA driver packages from the Ubuntu archive only
   ansible.builtin.copy:
-    dest: /etc/apt/preferences.d/deepops-nvidia-driver
+    dest: "{{ nvidia_driver_archive_pin }}"
     owner: root
     group: root
     mode: "0644"
     content: |
       # roles/nvidia_driver (nvidia_driver_install_method: ubuntu_repo)
-      # Not the driver's: as the repository offers them.
-      Package: {{ nvidia_driver_archive_pin_exempt | apt_pin_packages }}
-      Pin: origin developer.download.nvidia.com
-      Pin-Priority: 500
-
       Package: {{ '*nvidia*' | apt_pin_packages }}
       Pin: origin developer.download.nvidia.com
       Pin-Priority: -1
   when: nvidia_driver_install_method == 'ubuntu_repo'
 
-- name: Drop the archive-only pin (Ubuntu, nvidia_repo)
+# The name the pin had before (read first, so it overrode the toolkit's), and the pin
+# itself once the driver comes from the NVIDIA repository.
+- name: Remove the archive-only pin where it does not belong
   ansible.builtin.file:
-    path: /etc/apt/preferences.d/deepops-nvidia-driver
+    path: "{{ item }}"
     state: absent
-  when: nvidia_driver_install_method == 'nvidia_repo'
+  loop: "{{ ['/etc/apt/preferences.d/deepops-nvidia-driver']
+            + ([nvidia_driver_archive_pin] if nvidia_driver_install_method == 'nvidia_repo' else []) }}"
 
 # The archive builds a driver's prebuilt modules for the newest kernel only: a driver
 # newer than the modules of the running kernel would pull that kernel in with it, on

@@ -2,8 +2,8 @@
 # What the component installs, for its record (roles/component_record). The packages by
 # family, as patterns the package manager resolves: the branch and the kernel flavour
 # are in their names, a branch switch is purge.yml's, and what they pulled in goes with
-# them (roles/host_baseline). Never the container toolkit's (nvidia_driver_archive_pin_exempt),
-# a component of its own.
+# them (roles/host_baseline). Never the container toolkit's (nvidia-container-*,
+# libnvidia-container*), a component of its own.
 _nvidia_driver_packages:
   Debian:
     - linux-modules-nvidia-*
@@ -60,17 +60,12 @@ nvidia_driver_packages_owned: "{{ _nvidia_driver_packages[ansible_facts.os_famil
 nvidia_driver_items: >-
   {{ nvidia_driver_packages_owned | map('regex_replace', '^', 'package:') | list
      + ['unit:nvidia-persistenced.service', 'file:/etc/systemd/system/nvidia-persistenced.service',
-        'file:/etc/apt/preferences.d/deepops-nvidia-driver'] }}
+        'file:' ~ nvidia_driver_archive_pin, 'file:/etc/apt/preferences.d/deepops-nvidia-driver'] }}
 
 # The module modprobe would load, "<version> <open|proprietary>" ("" when none).
 nvidia_driver_module_on_disk: >-
   {{ nvidia_driver_ondisk_version.stdout | default('') | nvidia_module_on_disk(nvidia_driver_ondisk_license.stdout | default('')) }}
 
-# The NVIDIA packages the archive-only pin (tasks/ubuntu.yml) leaves to the repositories:
-# the Container Toolkit (roles/nvidia_container_toolkit's packages), which its own
-# repository and the CUDA repository publish at the same versions, each its own build.
-# Refused from the CUDA repository, a toolkit installed from there became a downgrade
-# to the other build in every maintenance upgrade (2026-11).
-nvidia_driver_archive_pin_exempt:
-  - libnvidia-container*
-  - nvidia-container-*
+# The archive-only pin (tasks/ubuntu.yml), named to be read after every other pin
+# (apt reads preferences.d in name order and a version takes the first record matching it).
+nvidia_driver_archive_pin: /etc/apt/preferences.d/zz-deepops-nvidia-driver

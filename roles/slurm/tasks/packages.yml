@@ -29,7 +29,9 @@
       uris: "file:{{ slurm_repo_dir }}"
       suites: [./]
       key_src: "{{ slurm_repo_signing_pubkey_file }}"
-      pin: {packages: slurm-smd slurm-smd-*, pin: "version {{ slurm_deb_version }}", priority: 990}
+      pin:
+        - {packages: slurm-smd slurm-smd-*, pin: "version {{ slurm_deb_version }}", priority: 990}
+        - {packages: "{{ slurm_pyxis_package }}", pin: "version {{ slurm_pyxis_deb_version }}", priority: 990}
       # The one-line source and the extensionless hold this role wrote before.
       legacy_files: [/etc/apt/sources.list.d/deepops-slurm.list, /etc/apt/preferences.d/deepops-slurm]
 
