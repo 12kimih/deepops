@@ -52,17 +52,6 @@
     mode: "0644"
   notify: "Restart nis"
 
-# Every database NIS serves reads it, or nodes drift: one left unmanaged keeps whatever
-# the OS install or another package wrote, and the same lookup resolves differently per
-# node. SSSD's source goes (one directory client per host).
-- name: Read accounts from NIS
-  ansible.builtin.include_role:
-    name: nsswitch
-  vars:
-    nsswitch_source: nis
-    nsswitch_databases: "{{ nis_client_databases }}"
-    nsswitch_replaces: [sss]
-
 # Only the NIS master serves maps. A server left on a client (ypserv brings ypxfrd and
 # yppasswdd) answers map transfers and password changes for the domain from a copy
 # nobody keeps current; one was found on a compute node, its daemons still running
@@ -75,6 +64,10 @@
     host_baseline_absent_packages: >-
       {{ ([] if inventory_hostname in groups['nis-master'] | default([]) else ['ypserv'])
       + directory_remove_caches }}
+
+# A changed server or domain restarts ypbind (the handler) before the start below.
+- name: Apply a pending ypbind restart
+  ansible.builtin.meta: flush_handlers
 
 # The NIS client daemon is ypbind.service on BOTH families: ypbind-mt on Debian/
 # Ubuntu (there is no nis.service since Debian bullseye / Ubuntu 20.04) and ypbind on
@@ -89,6 +82,33 @@
     daemon_reload: true
   tags:
     - molecule-notest
+
+# nsswitch.conf names NIS only once ypbind is bound: before, every account lookup on the
+# host would wait out NIS's timeout (logins, sudo, every job's prolog).
+- name: Wait for ypbind to bind to the server
+  ansible.builtin.command:
+    argv: [ypwhich]
+  register: nis_client_bound
+  until: nis_client_bound.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  check_mode: false  # read-only
+  when: not ansible_check_mode
+  tags:
+    - molecule-notest
+
+# Every database NIS serves reads it, or nodes drift: one left unmanaged keeps whatever
+# the OS install or another package wrote, and the same lookup resolves differently per
+# node. SSSD's source goes (one directory client per host).
+- name: Read accounts from NIS
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: nis
+    nsswitch_databases: "{{ nis_client_databases }}"
+    nsswitch_replaces: [sss]
+
 
 - name: Record the component as present
   ansible.builtin.include_role:

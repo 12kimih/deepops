@@ -86,21 +86,16 @@
     - ansible_facts.os_family == 'RedHat'
     - sssd_client_authselect.stdout | default('') is not match('^sssd')
 
-- name: Read accounts from SSSD (Debian)
-  ansible.builtin.include_role:
-    name: nsswitch
-  vars:
-    nsswitch_source: sss
-    nsswitch_databases: "{{ sssd_client_databases }}"
-    nsswitch_replaces: [nis]
-  when: ansible_facts.os_family == 'Debian'
-
 - name: Remove the name-service caches
   ansible.builtin.include_role:
     name: host_baseline
     tasks_from: absent
   vars:
     host_baseline_absent_packages: "{{ directory_remove_caches }}"
+
+# A new configuration or CA restarts sssd (the handler) before the start below.
+- name: Apply a pending sssd restart
+  ansible.builtin.meta: flush_handlers
 
 - name: Start SSSD
   systemd_unit:
@@ -123,6 +118,28 @@
   change_command:
     argv: [systemctl, kill, --signal=SIGUSR2, sssd]
   when: sssd_client_online.stdout is search('Offline')
+
+# nsswitch.conf names SSSD only once it answers from the directory: before, an account
+# the directory alone holds would not resolve on the host.
+- name: Wait for SSSD to reach the directory
+  ansible.builtin.command:
+    argv: [sssctl, domain-status, "{{ sssd_client_domain }}", --online]
+  register: sssd_client_reached
+  until: sssd_client_reached.stdout is search('Online status:\\s*Online')
+  retries: 12
+  delay: 5
+  changed_when: false
+  check_mode: false  # read-only
+  when: not ansible_check_mode
+
+- name: Read accounts from SSSD (Debian)
+  ansible.builtin.include_role:
+    name: nsswitch
+  vars:
+    nsswitch_source: sss
+    nsswitch_databases: "{{ sssd_client_databases }}"
+    nsswitch_replaces: [nis]
+  when: ansible_facts.os_family == 'Debian'
 
 # A roster change this run made in the directory (a revoked admin, a new member) takes
 # effect at once rather than when the cached answers expire.

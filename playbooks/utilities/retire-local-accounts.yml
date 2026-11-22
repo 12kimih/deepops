@@ -25,6 +25,9 @@
   vars:
     retire_local_accounts_keep_group: sudo
     retire_local_accounts_backup: /var/backups/deepops-local-accounts
+    retire_local_subid_files: >-
+      {{ retire_local_subid.results | default([]) | selectattr('stat.exists', 'defined')
+         | selectattr('stat.exists') | map(attribute='item') | list }}
   tasks:
     - name: Check the host reads accounts from LDAP
       ansible.builtin.assert:
@@ -76,13 +79,23 @@
           kept {{ retire_local_kept }}; another number in the directory (fix
           before anything else): {{ retire_local.mismatched }}
 
+    # userdel also drops the user's subordinate ID ranges (shadow 4.2+), which the
+    # directory does not serve: roles/podman writes them from the roster, and they are
+    # put back below as they were.
+    - name: Look for subordinate ID files
+      ansible.builtin.stat:
+        path: "/etc/{{ item }}"
+        get_checksum: false
+      loop: [subuid, subgid]
+      register: retire_local_subid
+
     - name: Keep a copy of the account files
       ansible.builtin.copy:
         src: "/etc/{{ item }}"
         dest: "{{ retire_local_accounts_backup }}/{{ retire_local_stamp }}/"
         remote_src: true
         mode: preserve
-      loop: [passwd, group, shadow, gshadow]
+      loop: "{{ ['passwd', 'group', 'shadow', 'gshadow'] + retire_local_subid_files }}"
       when: retire_local.users | length + retire_local.groups | length > 0
       register: retire_local_backup
 
@@ -96,6 +109,15 @@
         ansible_check_mode or (retire_local_userdel.rc == 0)
       failed_when: >-
         not ansible_check_mode and (retire_local_userdel.rc not in [0, 8])
+
+    - name: Put back the subordinate ID ranges userdel dropped
+      ansible.builtin.copy:
+        src: "{{ retire_local_accounts_backup }}/{{ retire_local_stamp }}/{{ item }}"
+        dest: "/etc/{{ item }}"
+        remote_src: true
+        mode: preserve
+      loop: "{{ retire_local_subid_files }}"
+      when: retire_local_userdel is changed and not ansible_check_mode
 
     # userdel takes a per-user group with its user; groupdel would still find that name
     # through the directory and fail on the local file, so the files are read again.
