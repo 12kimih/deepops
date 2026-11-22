@@ -64,7 +64,9 @@ or a run from another operator's machine.
   finds is adopted into the record, as `build_record` adopts existing builds. Hosts
   deployed before the record existed, and leftovers installed by hand, are cleaned up
   like anything recorded. Without a record, absent takes only what shows deepops made
-  it: a mark in a file (`plugins/module_utils/deepops_marks.py`), or, for a file an
+  it: a name or text that says deepops or names the role (`# Managed by roles/<role>`;
+  `plugins/module_utils/deepops_marks.py`: a bare `Ansible managed` is any Ansible's,
+  a site's too, so it never counts for a removal), or, for a file an
   earlier version wrote unmarked, its whole content matching that version's shape
   (`<role>_legacy` in the role's vars/main.yml, passed as `component_record_legacy`:
   regexes anchored on deepops' own text, so a site's file of the same name or one

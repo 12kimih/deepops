@@ -32,7 +32,8 @@ options:
       - C(absent) drops the component; I(items) adopts what it installed before the
         record existed (only items no other component needs become orphans), and only
         what shows deepops made it, so a site's own file or service of the same name is
-        never removed: a file whose name or text says so (module_utils/deepops_marks.py);
+        never removed: a file whose name or text says deepops or names I(role)
+        (module_utils/deepops_marks.py: made_by; "Ansible managed" is any Ansible's);
         a unit whose unit file does; a container named deepops, or named as such a unit;
         a directory named deepops or holding an adopted file; a package named in
         I(exclusive_packages) (another role may install it unrecorded); an fstab entry as
@@ -60,6 +61,10 @@ options:
         its items (C(<role>_legacy) in its vars/main.yml).
     type: dict
     default: {}
+  role:
+    description: The role that writes the component's files ("# Managed by roles/ROLE").
+    type: str
+    default: ""
   write:
     description:
       - False computes the record and the orphans without writing it. The role calls it
@@ -92,7 +97,7 @@ import tempfile
 
 from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.deepops_marks import made_by_deepops, named_deepops
+from ansible.module_utils.deepops_marks import made_by, named_deepops
 
 KINDS = ("package", "unit", "container", "file", "dir", "mount")
 
@@ -203,6 +208,7 @@ def main():
             "exclusive_packages": {"type": "list", "elements": "str", "default": []},
             "legacy": {"type": "dict", "default": {}},
             "write": {"type": "bool", "default": True},
+            "role": {"type": "str", "default": ""},
         },
         supports_check_mode=True,
     )
@@ -235,11 +241,11 @@ def main():
         if kind in ("file", "dir") and not os.path.lexists(ident):
             return False
         if kind == "file":
-            return made_by_deepops(ident) or (ident in p["legacy"] and legacy(ident))
+            return made_by(ident, p["role"]) or (ident in p["legacy"] and legacy(ident))
         if kind == "dir":
             return named_deepops(ident)
         rc, out, _ = module.run_command(["systemctl", "show", "-P", "FragmentPath", ident])
-        return rc == 0 and bool(out.strip()) and made_by_deepops(out.strip())
+        return rc == 0 and bool(out.strip()) and made_by(out.strip(), p["role"])
 
     record, orphans, before = apply(
         data, p["name"], p["action"], p["items"], p["version"], set(p["exclusive_packages"]), evidence

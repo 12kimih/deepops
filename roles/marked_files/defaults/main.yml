@@ -1,6 +1,8 @@
 ---
 # marked_files -- remove files a role wrote at paths a site may also use, only where
-# they show deepops made them (plugins/module_utils/deepops_marks.py):
+# they show deepops made them: their name or text says deepops, or names the role that
+# wrote them, "roles/<role>" (plugins/module_utils/deepops_marks.py: made_by; a bare
+# "Ansible managed" is any Ansible's, a site's too):
 #
 #   - ansible.builtin.include_role:
 #       name: marked_files
@@ -9,3 +11,5 @@
 #
 # marked_files_result.removed and .kept list what went and what stayed (a site's own).
 marked_files_absent: []
+# The role whose mark the files carry: the one that includes this role.
+marked_files_role: "{{ ansible_parent_role_names | first }}"

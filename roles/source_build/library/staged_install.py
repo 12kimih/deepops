@@ -6,17 +6,24 @@ a version change leaves nothing of the old one behind; state=absent removes ever
 the manifest lists. Directories this install created are listed too and go when they
 are empty; directories that were there before are never removed.
 
+A staged file never replaces one a package owns or another manifest lists: the install
+stops first, naming them, as dpkg refuses to overwrite another package's file (once
+listed here, this manifest's removal would take it). A file nothing owns is replaced and
+listed, as the release this install supersedes left it (an earlier plain `make install`).
+
 `make install` alone keeps no such list, so what an old release installed under a
 shared prefix outlived it, and the build tree had to be kept for `make uninstall`
 (2026-11-20: Slurm's contrib, Perl API and documentation under /usr/local).
 """
 
+import glob
 import json
 import os
 import shutil
 
 from ansible.module_utils import deepops_diff
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.package_files import canonical, manifest_paths, owned_paths
 
 DOCUMENTATION = r"""
 module: staged_install
@@ -34,15 +41,6 @@ def at(root, path):
     return os.path.join(root, path.lstrip("/"))
 
 
-def read_manifest(path):
-    try:
-        with open(path) as f:
-            data = json.load(f)
-        return set(data.get("files", [])), set(data.get("dirs", []))
-    except FileNotFoundError:
-        return set(), set()
-
-
 def staged(stage):
     """The files (and links) and directories of a stage, as host paths."""
     files, dirs = set(), set()
@@ -56,6 +54,23 @@ def staged(stage):
         for name in names:
             files.add(os.path.join(host, name))
     return files, dirs
+
+
+def taken(root, files, manifest, packages=None):
+    """The FILES (paths the manifest lists) that exist below ROOT and are not MANIFEST's
+    but a package's (PACKAGES: host paths, canonical) or another manifest's beside it:
+    overwriting one would hand it to this install."""
+    mine, _ = manifest_paths(manifest)
+    there = [p for p in sorted(files - mine) if os.path.lexists(at(root, p))]
+    if not there:
+        return []
+    others = set()
+    for other in glob.glob(os.path.join(os.path.dirname(manifest), "*.json")):
+        if os.path.abspath(other) != os.path.abspath(manifest):
+            others |= manifest_paths(other)[0]
+    if packages is None:
+        packages = {canonical(p) for p in owned_paths()}
+    return [p for p in there if p in others or canonical(at(root, p)) in packages]
 
 
 def remove_files(root, paths):
@@ -114,7 +129,7 @@ def main():
         supports_check_mode=True,
     )
     manifest, root = module.params["manifest"], module.params["root"]
-    old_files, old_dirs = read_manifest(manifest)
+    old_files, old_dirs = manifest_paths(manifest)
     if module.params["state"] == "absent":
         changed = bool(old_files or old_dirs or os.path.exists(manifest))
         if changed and not module.check_mode:
@@ -128,6 +143,12 @@ def main():
 
     stage = module.params["stage"].rstrip("/")
     new_files, new_dirs = staged(stage)
+    refused = taken(root, new_files, manifest)
+    if refused:
+        module.fail_json(
+            msg="staged_install: these files belong to a package or another install; remove "
+            f"or move them first: {', '.join(refused)}"
+        )
     gone_files = old_files - new_files
     diff = deepops_diff.actions(
         [f"install {len(new_files)} files from {stage} into {root}"]

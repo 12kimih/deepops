@@ -37,3 +37,6 @@ component_record_exclusive_packages: []
 # deepops' own text (<role>_legacy in the component's vars/main.yml), never a site value.
 component_record_legacy: {}
 component_record_path: /etc/ansible/facts.d/deepops_components.fact
+# The calling role: its mark ("# Managed by roles/<role>") lets absent adopt a file it
+# wrote; it also names the role's reboot request.
+component_record_role: "{{ ansible_parent_role_names | default([]) | first | default('') }}"

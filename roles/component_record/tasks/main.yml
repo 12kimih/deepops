@@ -19,6 +19,7 @@
     version: "{{ component_record_version | string }}"
     exclusive_packages: "{{ component_record_exclusive_packages }}"
     legacy: "{{ component_record_legacy }}"
+    role: "{{ component_record_role }}"
     write: false
   register: component_record_result
   changed_when: false
@@ -26,11 +27,11 @@
 # The calling role, removed, has nothing to run again after a pending reboot.
 - name: Withdraw the removed component's reboot request
   ansible.builtin.file:
-    path: "{{ maintenance_reboot_requests_dir }}/{{ ansible_parent_role_names | first }}"
+    path: "{{ maintenance_reboot_requests_dir }}/{{ component_record_role }}"
     state: absent
   when:
     - component_record_action == 'absent'
-    - ansible_parent_role_names | default([]) | length > 0
+    - component_record_role | length > 0
 
 # What this call removed, by kind: only what was there (an orphan adopted on a host that
 # never had it removes nothing). Callers restart or rebuild on this, never on the orphans.
@@ -168,3 +169,4 @@
     version: "{{ component_record_version | string }}"
     exclusive_packages: "{{ component_record_exclusive_packages }}"
     legacy: "{{ component_record_legacy }}"
+    role: "{{ component_record_role }}"

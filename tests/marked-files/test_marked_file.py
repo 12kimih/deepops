@@ -13,8 +13,9 @@ import unrecorded  # noqa: E402
 
 
 def run(paths, check=False):
+    args = {"paths": [str(p) for p in paths], "role": "node_user_policy"}
     argv = ["ansible", "localhost", "-M", "roles/marked_files/library", "-m", "marked_file",
-            "-a", json.dumps({"paths": [str(p) for p in paths]})] + (["--check", "--diff"] if check else [])  # fmt: skip
+            "-a", json.dumps(args)] + (["--check", "--diff"] if check else [])  # fmt: skip
     env = unrecorded.env(ANSIBLE_LOAD_CALLBACK_PLUGINS="1", ANSIBLE_STDOUT_CALLBACK="ansible.builtin.json")
     done = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, env=env, timeout=unrecorded.TIMEOUT)
     return json.loads(done.stdout)["plays"][0]["tasks"][0]["hosts"]["localhost"]
@@ -23,18 +24,23 @@ def run(paths, check=False):
 class MarkedFile(unittest.TestCase):
     def test_only_marked_files_go(self):
         with tempfile.TemporaryDirectory() as tmp:
-            ours, theirs = Path(tmp) / "cron.allow", Path(tmp) / "hand.allow"
+            ours, hand = Path(tmp) / "cron.allow", Path(tmp) / "hand.allow"
             ours.write_text("# Managed by roles/node_user_policy\nroot\n")
-            theirs.write_text("root\nalice\n")
-            preview = run([ours, theirs, Path(tmp) / "missing"], check=True)
+            hand.write_text("root\nalice\n")
+            # A site's own Ansible writes "Ansible managed" too; another role is not this one.
+            site, other = Path(tmp) / "site.allow", Path(tmp) / "other.allow"
+            site.write_text("# Ansible managed\nroot\n")
+            other.write_text("# Managed by roles/node_user_policy_extra\nroot\n")
+            theirs = [hand, other, site]
+            preview = run([ours, *theirs, Path(tmp) / "missing"], check=True)
             self.assertTrue(ours.exists(), "--check removes nothing")
             self.assertEqual(preview["diff"], {"prepared": f"remove {ours}\n"}, "the preview says which")
-            got = run([ours, theirs, Path(tmp) / "missing"])
-            self.assertEqual((got["removed"], got["kept"]), ([str(ours)], [str(theirs)]))
+            got = run([ours, *theirs, Path(tmp) / "missing"])
+            self.assertEqual((got["removed"], got["kept"]), ([str(ours)], [str(p) for p in theirs]))
             self.assertEqual(preview["removed"], got["removed"])
             self.assertFalse(ours.exists())
-            self.assertTrue(theirs.exists(), "a site's own list stays")
-            self.assertFalse(run([ours, theirs])["changed"])
+            self.assertTrue(all(p.exists() for p in theirs), "a site's own list stays")
+            self.assertFalse(run([ours, *theirs])["changed"])
 
 
 if __name__ == "__main__":
