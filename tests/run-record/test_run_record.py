@@ -53,6 +53,27 @@ class Wiring(unittest.TestCase):
         self.assertEqual(cfg["defaults"]["callback_plugins"], "./plugins/callback")
         self.assertEqual(sorted(p.name for p in tracked("plugins/callback/*")), ["ara_default.py"])
 
+    def test_quoted_settings_match_ansible_cfg(self):
+        """A comment, docstring or document quoting an ansible.cfg setting (`key = value`)
+        quotes the file: one still named .callback_plugins after the callback moved."""
+        cfg = configparser.ConfigParser()
+        cfg.read(ROOT / "ansible.cfg")
+        settings = dict(cfg["defaults"])
+        # As prose quotes one: after "(" or a backtick, never a Python assignment.
+        quoted = re.compile(rf"[(`]({'|'.join(map(re.escape, settings))}) = ([^\s`)]+)")
+        wrong = []
+        for path in tracked("*.py", "*.md", "*.yml", "*.sh", "*.j2", "*.cfg"):
+            if path.name == "ansible.cfg" or "submodules" in path.parts:
+                continue
+            for number, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
+                for key, value in quoted.findall(line):
+                    actual = settings[key]
+                    if not (actual.startswith(value[:-3]) if value.endswith("...") else value == actual):
+                        wrong.append(
+                            f"{path.relative_to(ROOT)}:{number}: {key} = {value} (ansible.cfg: {actual})"
+                        )
+        self.assertEqual(wrong, [])
+
     def test_setup_drops_the_old_link_only(self):
         """Earlier setup.sh linked .callback_plugins to the package's directory: setup.sh's
         own lines remove that link, and leave anything else by that name."""
