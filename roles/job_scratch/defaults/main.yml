@@ -13,8 +13,9 @@
 # directories of running ones, and the role stops if it finds any.
 job_scratch_state: present
 
-# The size: a percentage of the filesystem holding the image, or an absolute size
-# ("1200G", "3T"). Growing it later grows the filesystem in place (running jobs keep
+# The largest size: a percentage of the filesystem holding the image, or an absolute size
+# ("1200G", "3T"). A node whose filesystem has less room (free space plus the image,
+# minus job_scratch_reserve) gets an image that fits, never smaller than the one it has. Growing it later grows the filesystem in place (running jobs keep
 # theirs); XFS cannot shrink, so a smaller size stops the role (remove and recreate it
 # on an idle node instead).
 job_scratch_size: "70%"

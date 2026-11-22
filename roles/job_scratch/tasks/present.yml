@@ -61,9 +61,13 @@
       fs_size: "{{ _fs[0] }}"
       fs_avail: "{{ _fs[1] }}"
       reserve: "{{ _fs[0] * (job_scratch_reserve[:-1] | int) // 100 }}"
-      wanted: >-
+      asked: >-
         {{ ((_fs[0] * (job_scratch_size[:-1] | int) // 100) if job_scratch_size.endswith('%')
             else (job_scratch_size ~ 'B') | human_to_bytes) // (_gib | int) * (_gib | int) }}
+      # What the image can reach: its own size plus what is free beyond the reserve.
+      room: >-
+        {{ ((_lines[0] | int) + _fs[1] - _fs[0] * (job_scratch_reserve[:-1] | int) // 100)
+           // (_gib | int) * (_gib | int) }}
       current: "{{ _lines[0] | int }}"
       source: "{{ _lines[1].split()[0] | default('-') }}"
       fstype: "{{ _lines[1].split()[1] | default('-') }}"
@@ -71,26 +75,36 @@
 
 - name: Check the image only grows
   ansible.builtin.assert:
-    that: _job_scratch.wanted | int >= _job_scratch.current | int
+    that: _job_scratch.asked | int >= _job_scratch.current | int
     fail_msg: >-
       {{ job_scratch_file }} is {{ _job_scratch.current | int | human_readable }} and
-      job_scratch_size asks for {{ _job_scratch.wanted | int | human_readable }}: XFS cannot
+      job_scratch_size asks for {{ _job_scratch.asked | int | human_readable }}: XFS cannot
       shrink. Remove the component and deploy it again on an idle node.
     quiet: true
 
-- name: Check the filesystem has the space
+# job_scratch_size is an upper bound: a node whose root filesystem holds more gets a
+# smaller image (Slurm's TmpDisk follows it), never one that eats into the reserve, and
+# never smaller than the image it has.
+- name: Size the image within the space it can get
+  ansible.builtin.set_fact:
+    _job_scratch: "{{ _job_scratch | combine({'wanted': [[_job_scratch.asked | int, _job_scratch.room | int] | min, _job_scratch.current | int] | max}) }}"
+
+- name: Check the filesystem has room for an image
   ansible.builtin.assert:
-    that: >-
-      _job_scratch.wanted | int - _job_scratch.current | int
-      <= _job_scratch.fs_avail | int - _job_scratch.reserve | int
+    that: _job_scratch.wanted | int > 0
     fail_msg: >-
-      {{ job_scratch_file }} needs {{ (_job_scratch.wanted | int - _job_scratch.current | int) | human_readable }}
-      more, keeping {{ job_scratch_reserve }} of the filesystem
-      ({{ _job_scratch.reserve | int | human_readable }}) free, but only
-      {{ _job_scratch.fs_avail | int | human_readable }} is free of
-      {{ _job_scratch.fs_size | int | human_readable }}. Free the space on the root
-      filesystem first (du -xh --max-depth=3 / shows what holds it); nothing was changed.
+      {{ job_scratch_file }} would get nothing: {{ _job_scratch.fs_avail | int | human_readable }}
+      is free of {{ _job_scratch.fs_size | int | human_readable }} and {{ job_scratch_reserve }}
+      ({{ _job_scratch.reserve | int | human_readable }}) stays free. Free the space on the
+      root filesystem first (du -xh --max-depth=3 / shows what holds it); nothing was changed.
     quiet: true
+
+- name: Say the image's size
+  ansible.builtin.debug:
+    msg: >-
+      {{ job_scratch_file }}: {{ _job_scratch.wanted | int | human_readable }}
+      (job_scratch_size {{ _job_scratch.asked | int | human_readable }}, room
+      {{ _job_scratch.room | int | human_readable }}, now {{ _job_scratch.current | int | human_readable }})
 
 # Mounting over directories running jobs use would hide them from those jobs.
 - name: Check no job uses the directories the filesystem will be mounted on
