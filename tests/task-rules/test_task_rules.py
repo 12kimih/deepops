@@ -779,6 +779,28 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "call it as {{ slurm_install_prefix }}/bin/<command>")
         scan.check(self)
 
+    def test_scripts_a_daemon_runs_set_the_system_path(self):
+        # slurmd runs its prolog and epilog with almost no environment, and a program run
+        # through timeout, xargs or env is then looked up in glibc's /bin:/usr/bin only, never
+        # sbin. Each entry script exports deepops_system_path (roles/deepops_paths), written
+        # out nowhere else.
+        base = "roles/slurm/templates/etc/slurm"
+        entries = [f"{base}/prolog.sh", f"{base}/epilog.sh", f"{base}/task-prolog.sh",
+                   "roles/bmc/templates/bmc-cold-reboot.j2"]  # fmt: skip
+        for entry in entries:
+            self.assertRegex(
+                (ROOT / entry).read_text(), r"(?m)^(export )?PATH=.*\{\{ deepops_system_path \}\}", entry
+            )
+        spelled = [
+            rel(p)
+            for p in tracked("roles/*/templates/**", "roles/*/files/**")
+            # a Python tool cannot read a role variable; its own PATH (bot_serve) differs anyway
+            if p.is_file()
+            and p.suffix != ".py"
+            and "/usr/sbin:/usr/bin:/sbin:/bin" in p.read_text(errors="replace")
+        ]
+        self.assertEqual(spelled, [], "name it as {{ deepops_system_path }}")
+
     def test_only_the_maintenance_role_reboots(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):

@@ -13,11 +13,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import bounds  # noqa: E402
 
 TEMPLATE = ROOT / "roles/bmc/templates/bmc-cold-reboot.j2"
+DEFAULTS = yaml.safe_load((ROOT / "roles/deepops_paths/defaults/main.yml").read_text())
 
 
 def render(tmp, off=30):
@@ -27,7 +30,9 @@ def render(tmp, off=30):
     env = jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
     path = Path(tmp, "bmc-cold-reboot")
     text = env.from_string(TEMPLATE.read_text()).render(
-        ansible_managed="managed", bmc_cold_reboot_off_seconds=off
+        ansible_managed="managed",
+        bmc_cold_reboot_off_seconds=off,
+        deepops_system_path=DEFAULTS["deepops_system_path"],
     )
     path.write_text(text)
     path.chmod(0o755)
