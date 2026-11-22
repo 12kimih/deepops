@@ -17,7 +17,11 @@ the entry's systemd mount unit started under `timeout` (the unit's own start tim
 bounds a server that answers but does not serve the export). An occupied mountpoint is
 left alone: a hard mount recovers by itself once its server is back.
 
-Each attempt is one line on stdout (the journal, for the timer). With --textfile, one
+Each attempt is one line on stdout, and a run with nothing missing prints nothing. Under
+the timer that is the journal: a mount at notice, a share still missing at warning
+(sd-daemon level prefixes, used only when stdout is the journal, JOURNAL_STREAM), and the
+unit keeps systemd's own start and finish lines out (LogLevelMax=notice), so the journal
+holds what the retry did, not that it ran. With --textfile, one
 gauge per fstab entry, nfs_client_mount_missing{mountpoint=...} 1 or 0, and the time of the
 run, written atomically for node_exporter's textfile collector: a node that keeps
 retrying shows. Exit status 0 when every entry is mounted, 1 otherwise.
@@ -37,6 +41,14 @@ PORT = 2049
 PROBE_TIMEOUT = 5
 START_TIMEOUT = 120
 POLL = 5
+
+
+NOTICE, WARNING = 5, 4
+
+
+def say(level, text):
+    """One line for the journal at LEVEL when stdout is the journal, else plain."""
+    print(f"<{level}>{text}" if os.environ.get("JOURNAL_STREAM") else text, flush=True)
 
 
 def run(argv, timeout):
@@ -132,14 +144,14 @@ def main(argv=None):
             time.sleep(POLL)
             up = serves(host)
         if not up:
-            print(f"{entry['target']}: {host} does not serve NFS (port {PORT}); not mounted")
+            say(WARNING, f"{entry['target']}: {host} does not serve NFS (port {PORT}); not mounted")
             continue
         unit = mount_unit(entry["target"])
         status, _ = run(["systemctl", "start", unit], START_TIMEOUT)
-        print(
-            f"{entry['target']}: "
-            + ("mounted" if status == 0 else f"mount failed ({unit}: systemctl status {status})")
-        )
+        if status == 0:
+            say(NOTICE, f"{entry['target']}: mounted")
+        else:
+            say(WARNING, f"{entry['target']}: mount failed ({unit}: systemctl status {status})")
 
     missing = {e["target"] for e in entries} - mounted_targets()
     if args.textfile and os.path.isdir(os.path.dirname(args.textfile) or "."):  # no node_exporter: no metric

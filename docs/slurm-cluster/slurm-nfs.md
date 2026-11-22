@@ -115,7 +115,9 @@ mounted (`noauto` and automount entries aside), it asks the server whether it se
 a TCP connect to port 2049 under a 5 s timeout -- and only then starts the entry's mount
 unit, under `timeout`. It reads the mount tables with `findmnt`, never a `stat` (which
 does not return on a hard mount whose server is gone), so no state of a server can wedge
-it; each attempt is a journal line (`journalctl -u nfs-client-retry`), and
+it; each attempt is a journal line (`journalctl -u nfs-client-retry`: a mount at
+notice, a share still missing at warning; a run with nothing missing writes nothing, not
+even systemd's start and finish lines), and
 `nfs_client_mount_missing` per entry goes to node_exporter, so `NfsMountMissing` warns when a
 share stays missing for 15 minutes. Until it is mounted, NHC (which checks every
 `nfs_mounts` entry) keeps the node out of Slurm, and returns it by itself afterwards.
