@@ -46,3 +46,13 @@ groups:
           description: >-
             Nothing is refused yet: only the hard limit stops writes. Free space there,
             or raise its block_hard and block_warn in disk_quota_projects.
+      # The submission holds (roles/submit_holds): job_submit.lua trusts their file for
+      # half an hour, then holds no one, so a writer that stopped is said well before.
+      - alert: SubmitHoldsStale
+        expr: time() - submit_holds_last_success_timestamp_seconds > 900
+        labels: {severity: warning}
+        annotations:
+          summary: "The submission holds on {{ $labels.host }} have not been worked out for 15 minutes"
+          description: >-
+            After 30 minutes job_submit.lua holds no one. `journalctl -u submit-holds` and
+            `systemctl list-timers submit-holds.timer` on the host (Prometheus reachable?).

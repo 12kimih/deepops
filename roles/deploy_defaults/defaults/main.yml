@@ -87,6 +87,15 @@ slurm_enable_coredump: true
 # (roles/disk_quota): off by default; needs the quota mount options in
 # host_baseline_mount_options
 slurm_enable_disk_quota: false
+# Submission holds (roles/submit_holds, on slurm-master): a person at a disk hard limit
+# cannot submit Slurm jobs until they free space, told why at submit time; their running
+# jobs go on. Off by default; needs the disk quota metrics and the rendered job_submit.lua
+# (slurm_job_submit_plugins: lua with the role's template). Run slurm.yml after it.
+slurm_enable_submit_holds: false
+# The date (YYYY-MM-DD) holds start, a grace for everyone already at a hard limit when they
+# are turned on: before it no one is held, and the disk report says from when they will
+# be. "" holds at once.
+submit_holds_from: ""
 # The per-job private directories on an XFS filesystem of their own, sized for Slurm's
 # --tmp (roles/job_scratch), on slurm-node: off by default (it preallocates disk);
 # deploy it while the nodes run no jobs

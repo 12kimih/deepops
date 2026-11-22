@@ -391,6 +391,7 @@ CONFIG_KEYS = {
     "repeat_idle_share": (int, float), "repeat_weeks": int,
     "cancel_warn_hours": (int, float), "cancel_warn_text": str, "storage_top": int,
     "storage_notify": list, "storage_repeat_days": (int, float), "people": list,
+    "holds_on": bool, "holds_from": (int, float),
 }  # fmt: skip
 
 
@@ -661,8 +662,9 @@ def storage(cfg, args):
     )  # fmt: skip
     due = [r for r in rows if storage_report.row_key(r) in keys]
     who = namer(cfg, slack, cache)
+    hold = cfg["holds_from"] if cfg["holds_on"] else None
     card, thread = storage_report.render(
-        data, who, cfg["storage_top"], set(cfg["people"]), keys if "mention" in notify else set()
+        data, who, cfg["storage_top"], set(cfg["people"]), keys if "mention" in notify else set(), hold
     )
     post_thread(slack, slack.channel(args.to) if args.to else cfg["channel"], card, thread)
     failures = []
@@ -672,7 +674,10 @@ def storage(cfg, args):
             try:
                 member = slack_id(row[2], cfg, slack, cache)
                 if member:
-                    slack.post(slack.channel(member), storage_report.dm_text(row))
+                    slack.post(
+                        slack.channel(member),
+                        storage_report.dm_text(row, storage_report.hold_note(hold, now)),
+                    )
                     delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {row[2]}: {e}")

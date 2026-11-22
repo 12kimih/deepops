@@ -1,0 +1,13 @@
+---
+# Who may not submit Slurm jobs for now (roles/submit_holds), on the controllers, where
+# job_submit.lua reads it; removed elsewhere. Run slurm.yml after turning it on, so the
+# controllers' job_submit.lua reads the holds.
+#
+#   ansible-playbook -K playbooks/slurm-cluster/submit-holds.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: submit_holds
+      submit_holds_state: "{{ deepops_components.submit_holds | component_phase(deepops_phase) }}"
+  tags: ['submit-holds']

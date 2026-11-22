@@ -238,6 +238,11 @@
   vars:
     deepops_phase: install
 
+- name: Hold the submissions of people at a disk hard limit
+  import_playbook: slurm-cluster/submit-holds.yml
+  vars:
+    deepops_phase: install
+
 # Present where the switch and group say, removed elsewhere (deepops_components).
 - name: Set up rsyslog forwarding from compute nodes to head node | Install rsyslog server
   import_playbook: generic/rsyslog-server.yml
@@ -520,6 +525,11 @@
 
 - name: Remove the job notice sender where it is no longer wanted
   import_playbook: slurm-cluster/job-notice.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the submission holds where they are no longer wanted
+  import_playbook: slurm-cluster/submit-holds.yml
   vars:
     deepops_phase: remove
 

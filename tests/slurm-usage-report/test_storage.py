@@ -184,6 +184,19 @@ class RenderTests(unittest.TestCase):
         _, thread = storage.render(data, who, top=10)
         self.assertIn("the largest of 5 users", text_of(thread[0][1]), "no roster: everyone is ranked")
 
+    def test_a_hard_limit_says_what_it_means_for_slurm(self):
+        data = storage.collect(site(), NOW)
+        (_, card), _ = storage.render(data, who, top=10, hold=NOW + 2 * storage.DAY)
+        self.assertIn("writes there fail now; from ", text_of(card))
+        self.assertIn(", new Slurm jobs are refused while at it", text_of(card))
+        (_, card), _ = storage.render(data, who, top=10, hold=0)
+        self.assertIn("; new Slurm jobs are refused until you free space", text_of(card))
+        (_, card), _ = storage.render(data, who, top=10)
+        self.assertNotIn("Slurm", text_of(card), "no holds: nothing said")
+        bob = storage.over_warn(data)[0]
+        self.assertIn("Writes there fail and new Slurm jobs are refused until you free space.",
+                      storage.dm_text(bob, storage.hold_note(0, NOW)))  # fmt: skip
+
     def test_change(self):
         self.assertEqual(storage.change(5 * G, None), "new")
         self.assertEqual(storage.change(5 * G, 5 * G + 1000), "0")
@@ -206,7 +219,7 @@ class RunTests(unittest.TestCase):
 
     CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, storage_top=10, storage_notify=["mention", "dm"],
-               storage_repeat_days=7, people=["alice", "bob", "carol"])  # fmt: skip
+               storage_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0)  # fmt: skip
 
     def run_storage(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
         """(posts [(channel, text, blocks as text)], the failure, storage.json): one run at

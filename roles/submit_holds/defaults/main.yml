@@ -1,0 +1,17 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): who may not submit Slurm
+# jobs for now, and why (clustertools.submit_holds), written on the controllers, where
+# the rendered job_submit.lua reads it. A deploy sets it from deepops_components
+# (slurm_enable_submit_holds, on slurm-master). Held: a person at a disk hard limit (the
+# disk quota metrics, as the daily disk report reads them), from submit_holds_from on;
+# their new jobs are refused with the reason until they free space, running jobs go on.
+# docs/deepops/disk-quota.md.
+submit_holds_state: present
+
+# How often the holds are worked out again (systemd OnUnitActiveSec). job_submit.lua
+# trusts the file for half an hour and an alert fires after 15 minutes without a run
+# (SubmitHoldsStale): keep this well under both.
+submit_holds_interval: 5min
+
+# Prometheus, which holds every host's disk quota metrics.
+submit_holds_prometheus_url: "{{ prometheus_url }}"

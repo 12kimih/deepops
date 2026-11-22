@@ -1,0 +1,12 @@
+{{ ansible_managed | comment }}
+# roles/submit_holds
+[Unit]
+Description=Work out who may not submit Slurm jobs for now, regularly
+
+[Timer]
+OnActiveSec=30s
+OnBootSec=2min
+OnUnitActiveSec={{ submit_holds_interval }}
+
+[Install]
+WantedBy=timers.target

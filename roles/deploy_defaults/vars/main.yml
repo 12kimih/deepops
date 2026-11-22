@@ -138,6 +138,10 @@ deepops_component_registry:
   job_notice:
     rules:
       - {switch: "{{ slurm_enable_job_notices }}", group: slurm-master}
+  # Who may not submit for now, on every controller (job_submit.lua reads it there).
+  submit_holds:
+    rules:
+      - {switch: "{{ slurm_enable_submit_holds }}", group: slurm-master}
   slurm_usage_report:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}
@@ -277,3 +281,9 @@ deepops_component_registry:
 # This host's desired state of each component: present or absent.
 deepops_components: >-
   {{ deepops_component_registry | components_desired(groups, inventory_hostname, deepops_component_removals) }}
+
+# submit_holds_from (YYYY-MM-DD, local midnight) as Unix time, 0 for "" (at once): one
+# reading for the holds (roles/submit_holds) and the disk report that announces them.
+submit_holds_from_time: >-
+  {{ (((submit_holds_from ~ ' 00:00:00') | to_datetime('%Y-%m-%d %H:%M:%S')).strftime('%s') | int)
+     if submit_holds_from | length > 0 else 0 }}

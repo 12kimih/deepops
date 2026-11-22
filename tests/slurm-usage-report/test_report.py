@@ -301,7 +301,7 @@ class RunTests(unittest.TestCase):
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
                    "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
                    "storage_top": 10, "storage_notify": ["mention"], "storage_repeat_days": 7,
-                   "people": []}  # fmt: skip
+                   "people": [], "holds_on": False, "holds_from": 0}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
             slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
@@ -342,7 +342,7 @@ class ConfigTests(unittest.TestCase):
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
             "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
             "storage_top": 10, "storage_notify": ["mention", "dm"], "storage_repeat_days": 7,
-            "people": ["alice"]}  # fmt: skip
+            "people": ["alice"], "holds_on": False, "holds_from": 0}  # fmt: skip
 
     def load(self, **change):
         with tempfile.TemporaryDirectory() as d:

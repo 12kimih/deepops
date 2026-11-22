@@ -90,3 +90,6 @@ slurm_username: slurm
 
 # Slurm's MailProg: job notices as Slack DMs (roles/job_notice), for the jobs that ask.
 job_notice_command: /usr/local/sbin/job-notice
+# Who may not submit for now and why (roles/submit_holds writes it on the controllers;
+# the rendered job_submit.lua reads it).
+slurm_submit_holds_file: "{{ slurm_config_dir }}/submit-holds"
