@@ -109,6 +109,37 @@ class Collect(unittest.TestCase):
         )
         self.assertEqual([p.name for p in self.stores.iterdir()], [str(ME)])  # no trash left
 
+    def test_a_store_only_read_is_in_use(self):
+        # enroot imports again from its cached layers without writing them.
+        path = self.store(20)
+        os.utime(path / "storage.lock", (time.time(), time.time() - 20 * DAY))
+        gc.run(self.cfg, proc_root=self.proc)
+        self.assertTrue((path / "storage.lock").exists())
+
+    def test_a_users_trash_lookalike_neither_blocks_nor_is_taken(self):
+        # The parent is writable by users (1777): a name they can guess could block the
+        # rename, and a .gc-* directory of theirs was deleted as a leftover.
+        path = self.store(20)
+        theirs = self.stores / ".gc-mine"
+        theirs.mkdir(mode=0o755)
+        (theirs / "keep").write_text("")
+        lines, ok = gc.run(self.cfg, proc_root=self.proc)
+        self.assertTrue(ok)
+        self.assertEqual(list(path.iterdir()), [])
+        self.assertTrue((theirs / "keep").exists())
+        self.assertEqual(sorted(p.name for p in self.stores.iterdir()), [".gc-mine", str(ME)])
+
+    def test_one_store_that_cannot_move_does_not_stop_the_run(self):
+        path = self.store(20)
+        with mock.patch.object(gc.os, "rename", side_effect=PermissionError("EPERM")):
+            lines, ok = gc.run(self.cfg, proc_root=self.proc)
+        self.assertFalse(ok)
+        self.assertTrue((path / "storage.lock").exists())
+        self.assertEqual(
+            self.metrics(lines)[prom.key("container_storage_gc_removed", store="podman", reason="unused")],
+            "0",
+        )
+
     def test_a_store_in_use_is_never_removed(self):
         path = self.store(20)
         self.running("conmon")

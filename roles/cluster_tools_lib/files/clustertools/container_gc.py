@@ -29,7 +29,9 @@ Runs as root from a daily timer. Python 3.9 or newer, standard library only.
 import json
 import os
 import re
+import stat
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -40,6 +42,7 @@ from .prom import series
 
 UID_TOKENS = ("$(id -u)", "${UID}", "$UID")
 REMOVE_TIMEOUT = 3600
+TRASH_PREFIX = ".gc-"
 
 
 def log(msg):
@@ -136,19 +139,28 @@ def busy(uid, programs, procs):
 
 
 def last_used(path):
-    """The newest change in PATH, its entries and theirs (no deeper: a store's lock
-    files and databases sit there and change with every write)."""
+    """The newest use of PATH, its entries and theirs (no deeper: a store's lock files
+    and databases sit there and change with every write). A file counts when it was
+    written or read: an image only ever imported again (enroot reads its cached layers)
+    is in use. A directory counts only when written: listing it here sets its access
+    time. Under noatime a read is not seen, so only writes count, as before."""
     newest = 0.0
     level = [str(path)]
     for _ in range(3):
         nxt = []
         for p in level:
             try:
-                newest = max(newest, os.lstat(p).st_mtime)
-                if os.path.isdir(p) and not os.path.islink(p):
-                    nxt.extend(os.path.join(p, e) for e in os.listdir(p))
+                st = os.lstat(p)
             except OSError:
                 continue
+            if stat.S_ISDIR(st.st_mode):
+                newest = max(newest, st.st_mtime)
+                try:
+                    nxt.extend(os.path.join(p, e) for e in os.listdir(p))
+                except OSError:
+                    continue
+            else:
+                newest = max(newest, st.st_mtime, st.st_atime)
         level = nxt
     return newest
 
@@ -184,16 +196,49 @@ def stores_found(parent, regex, uid_min):
 
 
 def remove(path, st, recreate, dry_run):
+    """Move PATH into a fresh trash directory beside it, recreate it empty for its user
+    where RECREATE says, then delete the trash. The trash is made by mkdtemp: ours
+    (this uid, mode 0700) under a name no one can guess, so a user who writes to the
+    parent cannot take or block it. Whether the store went; a failure is logged and the
+    run goes on with the next store."""
     if dry_run:
         return True
     parent = os.path.dirname(path)
-    trash = os.path.join(parent, f".gc-{os.path.basename(path)}-{os.getpid()}")
-    os.rename(path, trash)
-    if recreate:
-        os.mkdir(path, 0o700)
-        os.chown(path, st.st_uid, st.st_gid)
-        os.chmod(path, 0o700)
+    try:
+        trash = tempfile.mkdtemp(prefix=TRASH_PREFIX, dir=parent)
+        os.rename(path, os.path.join(trash, "store"))
+        if recreate:
+            os.mkdir(path, 0o700)
+            os.chown(path, st.st_uid, st.st_gid)
+            os.chmod(path, 0o700)
+    except OSError as e:
+        log(f"could not remove {path}: {e}")
+        return False
     return remove_trash(trash)
+
+
+def leftover_trash(parent):
+    """The trash directories an interrupted run left in PARENT: only ours (this uid,
+    mode 0700), never one a user made under the same prefix."""
+    try:
+        names = os.listdir(parent)
+    except OSError:
+        return []
+    out = []
+    for name in sorted(names):
+        path = os.path.join(parent, name)
+        try:
+            st = os.lstat(path)
+        except OSError:
+            continue
+        if (
+            name.startswith(TRASH_PREFIX)
+            and stat.S_ISDIR(st.st_mode)
+            and st.st_uid == os.geteuid()
+            and stat.S_IMODE(st.st_mode) == 0o700
+        ):
+            out.append(path)
+    return out
 
 
 def remove_trash(trash):
@@ -222,9 +267,8 @@ def run(cfg, dry_run=False, now=None, proc_root="/proc"):
             log(f"{name}: no per-user path in {store['config']}; skipped")
             continue
         parent, regex = found
-        for leftover in Path(parent).glob(".gc-*") if os.path.isdir(parent) else ():
-            if not dry_run and leftover.is_dir() and not leftover.is_symlink():
-                remove_trash(str(leftover))
+        for leftover in () if dry_run else leftover_trash(parent):
+            remove_trash(leftover)
         removed = {"left": 0, "unused": 0, "full": 0}
         spared = 0
         idle = []
@@ -245,8 +289,10 @@ def run(cfg, dry_run=False, now=None, proc_root="/proc"):
                 continue
             recreate = store.get("recreate", False) and reason != "left"
             log(f"{name}: {verb} {path} ({reason})")
-            ok = remove(path, st, recreate, dry_run) and ok
-            removed[reason] += 1
+            if remove(path, st, recreate, dry_run):
+                removed[reason] += 1
+            else:
+                ok = False
         for _, uid, path, st in sorted(idle):
             if dry_run or used_ratio(parent) <= limit:
                 break
@@ -254,8 +300,10 @@ def run(cfg, dry_run=False, now=None, proc_root="/proc"):
                 spared += 1
                 continue
             log(f"{name}: {verb} {path} (filesystem above {cfg['max_used_percent']}%)")
-            ok = remove(path, st, store.get("recreate", False), dry_run) and ok
-            removed["full"] += 1
+            if remove(path, st, store.get("recreate", False), dry_run):
+                removed["full"] += 1
+            else:
+                ok = False
         for reason, count in sorted(removed.items()):
             lines.append(series("container_storage_gc_removed", {"store": name, "reason": reason}, count))
         lines.append(series("container_storage_gc_busy", {"store": name}, spared))
