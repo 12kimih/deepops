@@ -18,12 +18,13 @@
 - name: Remove each snap through snapd, applications first
   change_command:
     argv: [snap, remove, --purge, "{{ item }}"]
+  # The names (each line's first column), in that order: one value for the command and
+  # its label.
   loop: >-
-    {{ (host_baseline_snaps.stdout_lines | reject('search', _snap_kind) | list)
-       + (host_baseline_snaps.stdout_lines | select('search', _snap_kind) | reject('search', _snap_self) | list)
-       + (host_baseline_snaps.stdout_lines | select('search', _snap_self) | list) }}
-  loop_control:
-    label: "{{ item.split()[0] }}"
+    {{ ((host_baseline_snaps.stdout_lines | reject('search', _snap_kind) | list)
+        + (host_baseline_snaps.stdout_lines | select('search', _snap_kind) | reject('search', _snap_self) | list)
+        + (host_baseline_snaps.stdout_lines | select('search', _snap_self) | list))
+       | map('split') | map('first') | list }}
   vars:
     # The Notes column, last: a base or core snap, and snapd's own.
     _snap_kind: '\s\S*\b(base|core|snapd)\b\S*$'

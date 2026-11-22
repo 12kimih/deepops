@@ -216,7 +216,11 @@ class SnapsBeforeSnapd(unittest.TestCase):
     def test_applications_go_first_then_bases_then_snapd(self):
         task = self.TASKS["Remove each snap through snapd, applications first"]
         order = render(task["loop"], {**task["vars"], "host_baseline_snaps": {"stdout_lines": self.LISTED}})
-        self.assertEqual([line.split()[0] for line in order], ["firefox", "htop", "bare", "core24", "snapd"])
+        self.assertEqual(order, ["firefox", "htop", "bare", "core24", "snapd"])
+        # What runs is each snap's name, never its whole line (2026-11-23: every removal
+        # failed with "not found", the line given as the name).
+        argv = [render(task["change_command"]["argv"], {"item": name}) for name in order]
+        self.assertEqual(argv[0], ["snap", "remove", "--purge", "firefox"])
 
     def test_it_runs_before_the_removal_and_only_for_snapd(self):
         # The block and its removal task share the name: the task is the last of them.
