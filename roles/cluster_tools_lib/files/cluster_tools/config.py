@@ -17,6 +17,11 @@ that writes it), and
     python3 -m cluster_tools.config installed [--skip ROLE ...] [--dir DIR]
         every recorded config against this package; each misfit is a line naming the
         playbook that rewrites it, and the exit status is 1
+
+A record names its tool by the module's last part and is checked against the tool of
+that name in this package, whatever package the record's writer knew: a package renamed
+since (clustertools -> cluster_tools, 2026-11) leaves every record valid, and a deploy is
+never stopped for a name only.
 """
 
 import argparse
@@ -93,12 +98,13 @@ def installed(records=RECORDS, skip=()):
             continue
         if role in skip or not Path(path).exists():
             continue
+        tool = str(module).rsplit(".", 1)[-1]
         try:
-            check(module, path)
+            check(f"{__package__}.{tool}", path)
         except ConfigError as e:
             problems.append(f"{e}; rerun {playbook}")
-        except (ImportError, AttributeError):  # a tool renamed or dropped from the package
-            problems.append(f"{path}: {module} is not a tool of this package; rerun {playbook}")
+        except (ImportError, AttributeError):  # a tool dropped from the package
+            problems.append(f"{path}: {tool} is not a tool of this package; rerun {playbook}")
     return problems
 
 
