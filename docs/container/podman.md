@@ -173,7 +173,7 @@ Ubuntu 24.04):
   `container_storage_gc_people`, after `container_storage_gc_unused_days` without a
   change, or least recently used first while the filesystem is above
   `container_storage_gc_max_used_percent`, never while that user runs the tool. A
-  podman store is recreated empty for its user. Its metrics feed the
+  podman store is recreated empty for its user, unless they left. Its metrics feed the
   `ContainerStorageCleanupStale` alert; the disk itself is covered by the existing
   filesystem alerts. `container-storage-gc /etc/cluster-tools/container-storage-gc.json
   --dry-run` lists what it would remove for leaving or being unused.

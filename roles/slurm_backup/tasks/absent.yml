@@ -1,6 +1,6 @@
 ---
-# The backup sets on each destination are data and stay, as do the dumps' scratch
-# database and the destinations' directories.
+# The backup sets on each destination are data and stay, as do the destinations'
+# directories.
 - name: Remove what this component installed
   ansible.builtin.include_role:
     name: component_record

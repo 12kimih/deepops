@@ -62,8 +62,8 @@ docker_rh_repo_gpgkey: "{{ docker_rh_repo_base_url }}/gpg"
 docker_service_enabled: true
 docker_service_state: started
 
-# Daemon-wide options merged into /etc/docker/daemon.json. Empty leaves the file
-# alone. MERGED, not rewritten: nvidia_container_toolkit writes the NVIDIA runtime
+# Daemon-wide options merged into /etc/docker/daemon.json. Empty adds nothing to the
+# keys the settings below write (live-restore, the log driver, builder.gc, ...). MERGED, not rewritten: nvidia_container_toolkit writes the NVIDIA runtime
 # and the NGC shm/ulimit defaults into the same file and docker_socket_group writes
 # the socket group, so a whole-file template would silently drop whichever role ran
 # first.

@@ -7,8 +7,10 @@
 # writes <dest>/daily/<date>/ with a SHA256SUMS file and, on the weekly day, the same
 # set under weekly/<date>/; older sets beyond the counts are deleted.
 #
-# The restore test loads the newest local dump into a scratch database, compares every
-# table with the live database and checks the archive and checksums. Both commands
+# The restore test fetches the newest daily set of the first destination, checks the
+# archive and checksums, loads the dump into a scratch database and checks every live
+# table is in it with a plausible row count (not more than live, not empty when live is
+# not); the scratch database is dropped after. Both commands
 # write node_exporter textfile metrics (slurm_backup_last_success_timestamp_seconds,
 # slurm_backup_restore_test_last_success_timestamp_seconds, ...), so an alert can fire
 # when a backup goes stale.
@@ -42,7 +44,7 @@ slurm_backup_weekly_day: 7
 
 slurm_backup_script: /usr/local/sbin/slurm-backup
 slurm_backup_config: /etc/slurm-backup.json
-# node_exporter's textfile collector directory (roles/prometheus-node-exporter).
+# node_exporter's textfile collector directory (node_exporter_prom_dir, roles/prometheus_paths).
 slurm_backup_textfile_dir: "{{ node_exporter_prom_dir }}"
 slurm_backup_textfile: slurm-backup.prom
 # Root-only working directory: the set being built and the lock backup and restore-test

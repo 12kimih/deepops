@@ -14,8 +14,8 @@ so this follows whatever the roles wrote there. A user's whole store is removed 
 
 never while the uid runs one of the store's busy programs (checked again just before
 each removal). A store is renamed away first, then recreated empty and owned by its
-user where the config says so (a parent only root may write to), then deleted without
-crossing a mount. Only a real directory owned by the uid its name carries is touched.
+user where the config says so (a parent only root may write to) unless the user left,
+then deleted without crossing a mount. Only a real directory owned by the uid its name carries is touched.
 The run's result is written as node_exporter textfile metrics:
 
   container_storage_gc_last_success_timestamp_seconds
