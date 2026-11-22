@@ -29,11 +29,55 @@
           {{ host_baseline_query.stdout_lines | reject('match', '.n') | map('split') | map('last') | unique | list
           if ansible_facts.os_family == 'Debian' else host_baseline_absent_packages }}
 
+    # What the host needs is marked installed by name before the plan, so no removal can
+    # take it as a dependency nothing else holds, whichever role ran first: a desktop's
+    # purge would have autoremoved libopengl0, which jobs load and which the driver role
+    # installs by name only once it runs (2026-11-22). Only what is installed and marked
+    # automatic; nothing is installed.
+    - name: Read which packages the host needs are installed (Debian)
+      ansible.builtin.command:
+        argv: >-
+          {{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${binary:Package}\n']
+             + host_baseline_protected_packages + _host_baseline_recorded }}
+      register: host_baseline_needed
+      changed_when: false
+      failed_when: host_baseline_needed.rc > 1
+      check_mode: false  # read-only; --check needs the result
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - host_baseline_present | length > 0
+
+    - name: Read which packages apt installed only as dependencies (Debian)
+      ansible.builtin.command:
+        argv: [apt-mark, showauto]
+      register: host_baseline_auto
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - host_baseline_present | length > 0
+
+    - name: Note the needed packages still marked automatic (Debian)
+      ansible.builtin.set_fact:
+        host_baseline_unmarked: >-
+          {{ host_baseline_needed.stdout_lines | select('match', '.i ') | map('split') | map('last')
+             | map('regex_replace', ':.*$', '') | unique | intersect(host_baseline_auto.stdout_lines) | list
+             if ansible_facts.os_family == 'Debian' else [] }}
+      when: host_baseline_present | length > 0
+
+    - name: Mark them installed by name (Debian)
+      change_command:
+        argv: "{{ ['apt-mark', 'manual'] + host_baseline_unmarked }}"
+      when:
+        - host_baseline_present | length > 0
+        - host_baseline_unmarked | length > 0
+
     # apt-get -s works out, without changing anything, what removing them takes with
     # them: their reverse dependencies, and with --autoremove the packages apt installed
     # only as their dependencies. What apt would autoremove already is not this
     # removal's: it stays. A package a person or a role installed by name is marked
-    # manual and is never autoremoved.
+    # manual and is never autoremoved; "<name>+" asks the same of the packages just
+    # marked, so a preview, which marked nothing, plans what the run will do.
     - name: Note what was already unneeded (Debian)
       ansible.builtin.command:
         argv: [apt-get, -s, -q, autoremove]
@@ -46,7 +90,9 @@
 
     - name: Work out what removing them would take with them (Debian)
       ansible.builtin.command:
-        argv: "{{ ['apt-get', '-s', '-q', 'purge', '--autoremove'] + host_baseline_present }}"
+        argv: >-
+          {{ ['apt-get', '-s', '-q', 'purge', '--autoremove'] + host_baseline_present
+             + host_baseline_unmarked | map('regex_replace', '$', '+') | list }}
       register: host_baseline_plan
       changed_when: false
       check_mode: false  # read-only; --check needs the result
@@ -76,18 +122,12 @@
           packages, or remove that component first.
         quiet: true
       vars:
-        host_baseline_recorded: >-
-          {{ (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
-             | select('match', 'package:') | map('regex_replace', '^package:', '') | list }}
-        host_baseline_protected_regex: >-
-          ^({{ host_baseline_protected_packages | map('regex_escape') | map('replace', '\*', '.*')
-               | join('|') }})$
         host_baseline_taken: >-
           {{ host_baseline_removal | difference(host_baseline_present)
              | map('regex_replace', ':.*$', '') | unique
-             | select('in', host_baseline_recorded)
+             | select('in', _host_baseline_recorded)
              | union(host_baseline_removal | difference(host_baseline_present)
-                     | map('regex_replace', ':.*$', '') | select('match', host_baseline_protected_regex))
+                     | map('regex_replace', ':.*$', '') | select('match', _host_baseline_protected_regex))
              | list }}
       when: host_baseline_present | length > 0
 

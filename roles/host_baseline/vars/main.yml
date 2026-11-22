@@ -1,3 +1,10 @@
 ---
 # The record of the units an owner masked (tasks_from: masked).
 _host_baseline_masked_record: "{{ deepops_state_dir }}/masked-units/{{ host_baseline_masked_owner }}"
+# The packages a host needs: host_baseline_protected_packages (shell-style patterns) and
+# every package a component records. A removal never takes one (tasks_from: absent).
+_host_baseline_recorded: >-
+  {{ (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
+     | select('match', 'package:') | map('regex_replace', '^package:', '') | list }}
+_host_baseline_protected_regex: >-
+  ^({{ host_baseline_protected_packages | map('regex_escape') | map('replace', '\*', '.*') | join('|') }})$
