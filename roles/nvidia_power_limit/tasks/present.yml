@@ -32,7 +32,7 @@
 # ssh service hides them (DeviceAllow, see slurm login-compute-setup).
 #
 # Gate on a working driver rather than just GPU presence: a node can have an NVIDIA
-# card (lspci, roles/facts) but no driver yet, in which case nvidia-smi is absent. With
+# card (the gpus fact, roles/facts) but no driver yet, in which case nvidia-smi is absent. With
 # no cap that could apply there is nothing to reset, so the node passes; with one (its
 # own watts, or any per-model cap while it has GPUs, whose model only nvidia-smi
 # names), it cannot be applied, so the node fails (under --check only a warning: the

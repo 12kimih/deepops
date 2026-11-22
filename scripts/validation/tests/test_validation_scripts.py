@@ -198,6 +198,17 @@ class TestDoctorParsers(unittest.TestCase):
         self.assertEqual(hosts, 2)
         self.assertIn("slurm-node", groups)
 
+    def test_count_gpu_hosts(self):
+        results = {
+            "n1": {"stdout": '{"count": 8, "device_ids": []}'},
+            "n2": {"stdout": '{"count": 0, "device_ids": []}'},
+            "n3": {"stdout": "lspci not installed"},
+            "n4": {"stdout": "[]"},
+            "n5": {"unreachable": True},
+        }
+        self.assertEqual(deepops_doctor.count_gpu_hosts(results), 1)
+        self.assertTrue(deepops_doctor.GPUS_FACT.is_file())
+
     def test_count_positive_stdout_hosts(self):
         results = {"n1": {"stdout": "2"}, "n2": {"stdout": "0"}, "n3": {"stdout": "not-a-number"}, "n4": {}}
         self.assertEqual(deepops_doctor.count_positive_stdout_hosts(results), 1)

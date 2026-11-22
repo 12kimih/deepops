@@ -183,7 +183,7 @@ class MigApplyFailureContract(unittest.TestCase):
                 )
 
     def test_a_failed_probe_is_reported_rather_than_skipped(self):
-        # rc 2 is the probe's own "the query never ran"; the lspci fact keeps
+        # rc 2 is the probe's own "the query never ran"; the gpus fact (PCI bus) keeps
         # nodes without NVIDIA hardware out of it.
         for path in (MIG_PLAYBOOK, MIG_ROLE):
             with self.subTest(path=path):
