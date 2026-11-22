@@ -185,6 +185,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 # Someone at a disk hard limit cannot submit Slurm jobs until they free space, from
 # submit_holds_from (YYYY-MM-DD; "" at once: the grace for those already at one)
 #slurm_enable_submit_holds: false
+# Shared data and collaboration folders on the home server (docs/slurm-cluster/shared-space.md)
+#slurm_enable_shared_space: false
 #submit_holds_from: ""
 
 ################################################################################

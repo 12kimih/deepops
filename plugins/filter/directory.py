@@ -200,10 +200,40 @@ def ldap_reader_dn(name, suffix):
     return _dn(f"cn={name}", "ou=services", suffix)
 
 
+def shared_project_groups(projects):
+    """The cluster groups of the collaboration folders (shared_projects in
+    roles/directory_defaults, the folders roles/shared_space makes): one group per
+    project, named as it, its GID and members, for directory_groups_all. A project's lead
+    is one of its members."""
+    import re
+
+    from ansible.errors import AnsibleFilterError
+
+    out = []
+    for name, p in sorted((projects or {}).items()):
+        p = p or {}
+        members = p.get("members") or []
+        problems = []
+        if not re.fullmatch(r"[a-z][a-z0-9-]{1,31}", str(name)):
+            problems.append("its name must be lowercase letters, digits and dashes (2 to 32)")
+        gid = p.get("gid")
+        if not isinstance(gid, int) or isinstance(gid, bool) or gid < UID_MIN:
+            problems.append(f"gid must be an integer >= {UID_MIN}")
+        if not isinstance(members, list) or not members:
+            problems.append("members must list its members")
+        elif p.get("lead") not in members:
+            problems.append("lead must be one of its members")
+        if problems:
+            raise AnsibleFilterError(f"shared_projects.{name}: " + "; ".join(problems))
+        out.append({"name": str(name), "gid": gid, "members": list(members)})
+    return out
+
+
 class FilterModule:
     def filters(self):
         return {
             "directory_entries": directory_entries,
+            "shared_project_groups": shared_project_groups,
             "directory_local_leftovers": directory_local_leftovers,
             "ldap_reader_dn": ldap_reader_dn,
         }

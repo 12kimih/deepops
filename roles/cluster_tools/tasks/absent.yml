@@ -8,7 +8,7 @@
 # host set up before records existed, the profile file it publishes.
 - name: Look for what this component published
   ansible.builtin.stat:
-    path: "/etc/profile.d/{{ cluster_tools_profile_file }}"
+    path: "/etc/profile.d/{{ cluster_tools_profile_name }}.sh"
   register: cluster_tools_published
 
 - name: Withdraw everything this component published

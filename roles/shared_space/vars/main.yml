@@ -1,0 +1,5 @@
+---
+# What this component installs, for its record (roles/component_record): nothing a removal
+# may take away. The directories hold people's data, the writer's account owns files, and
+# the ACL tools are the system's.
+shared_space_items: []

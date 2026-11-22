@@ -1,5 +1,5 @@
 ---
-# Verify that every cluster group (directory_groups, roles/directory_defaults) resolves
+# Verify that every cluster group (directory_groups_all, roles/directory_defaults) resolves
 # to its pinned GID on every node, whichever directory publishes it (NIS or LDAP).
 # Read-only; changes nothing. Fails the play on the first mismatch so it can gate a
 # maintenance run.
@@ -24,18 +24,18 @@
   tags:
     - check-id-consistency
   roles:
-    - role: directory_defaults  # directory_groups
+    - role: directory_defaults  # directory_groups_all
   tasks:
     - name: Skip when the directory publishes no groups
       ansible.builtin.meta: end_host
-      when: (directory_groups | length) == 0
+      when: (directory_groups_all | length) == 0
 
     - name: Resolve each published group on this node
       ansible.builtin.getent:
         database: group
         key: "{{ item.name }}"
         fail_key: false
-      loop: "{{ directory_groups }}"
+      loop: "{{ directory_groups_all }}"
       loop_control:
         label: "{{ item.name }}"
       register: check_id_resolved

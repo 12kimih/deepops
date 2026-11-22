@@ -1,0 +1,19 @@
+---
+- name: Check the component state and the layout
+  ansible.builtin.assert:
+    that:
+      - shared_space_state in ['present', 'absent', 'kept']
+      - shared_space_root is match('^/.+[^/]$')
+      - shared_space_data | select('match', '^[a-z][a-z0-9_-]*$') | list | length == shared_space_data | length
+      - "'projects' not in shared_space_data"
+      - shared_space_writer in system_accounts
+    fail_msg: >-
+      shared_space_state is present, absent or kept ({{ shared_space_state }});
+      shared_space_root an absolute path ({{ shared_space_root }}); shared_space_data plain
+      names other than projects ({{ shared_space_data }}); shared_space_writer an account
+      of system_accounts ({{ shared_space_writer }}).
+    quiet: true
+
+- name: "Make the shared space {{ shared_space_state }}"
+  ansible.builtin.include_tasks: "{{ shared_space_state }}.yml"
+  when: shared_space_state != 'kept'

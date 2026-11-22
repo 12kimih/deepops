@@ -1,0 +1,21 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): the shared space on the
+# home server, where /home is local. A deploy sets it from deepops_components
+# (slurm_enable_shared_space, on slurm-nfs). docs/slurm-cluster/shared-space.md.
+#
+#   <root>/<data>              datasets, models, container images: written by one account
+#                              (shared_space_writer), read by everyone, its own budget
+#   <root>/projects/<name>     collaboration folders (shared_projects in
+#                              roles/directory_defaults): one group each; files keep the
+#                              group and are writable by every member, and count to
+#                              their writer's quota
+#
+# A folder is never removed: one taken off shared_projects keeps its files (the group goes)
+# and is listed on each run, for an administrator to move to its lead's home. The root's
+# name is no one's login: list it in the roster's reserved_logins.
+shared_space_state: present
+
+shared_space_root: "{{ people_home_root }}/shared"
+shared_space_data: [datasets, models, containers]
+# The service account (roles/system_accounts) that alone writes the shared data.
+shared_space_writer: shareddata

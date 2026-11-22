@@ -158,6 +158,7 @@ retired_settings:
   nis_client_remove_caches: directory_remove_caches in roles/directory_defaults
   nis_client_nsswitch: none; each directory client adds its own source to nsswitch.conf (roles/nsswitch)
   easybuild_home: system_accounts.easybuild.home (the build account's home) in roles/system_accounts
+  cluster_tools_profile_file: cluster_tools_profile_name in roles/cluster_tools (the name without .sh; a .csh is written beside it)
   slurm_deb_build_dir: system_accounts.slurmbuild.home (the build account's home) in roles/system_accounts
   slurm_user_home: system_accounts.slurm.home in roles/system_accounts
   slurm_user_uid: system_accounts.slurm.uid in roles/system_accounts

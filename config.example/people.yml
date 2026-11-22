@@ -32,6 +32,10 @@ member_keys: [slack]
 # Only these roles may be in several Slurm accounts: each association has its own fair
 # share, so a second account would double a person's.
 several_accounts: [admin]
+
+# Names no person may have: the directories under the home root that are no one's home
+# (the shared space, roles/shared_space).
+reserved_logins: [shared]
 people:
   alice:
     uid: 1001

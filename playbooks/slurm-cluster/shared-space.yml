@@ -1,0 +1,13 @@
+---
+# The shared space on the home server (roles/shared_space): shared data and the
+# collaboration folders, whose groups the directory publishes (run the directory's
+# playbook first, so the groups resolve here).
+#
+#   ansible-playbook -K playbooks/slurm-cluster/shared-space.yml [-l <hosts>] --check --diff
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: shared_space
+      shared_space_state: "{{ deepops_components.shared_space | component_phase(deepops_phase) }}"
+  tags: ['shared-space', 'people']  # the project groups' members come from the roster

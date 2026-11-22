@@ -20,7 +20,7 @@
   become: true
   gather_facts: false
   roles:
-    - role: directory_defaults  # directory_groups, directory_service
+    - role: directory_defaults  # directory_groups_all, directory_service
     - role: people_defaults  # people
   vars:
     retire_local_accounts_keep_group: sudo
@@ -48,7 +48,7 @@
         argv: "{{ ['getent', '-s', 'sss', item.database] + item.names }}"
       loop:
         - {database: passwd, names: "{{ people | list }}"}
-        - {database: group, names: "{{ people | list + directory_groups | map(attribute='name') | list }}"}
+        - {database: group, names: "{{ people | list + directory_groups_all | map(attribute='name') | list }}"}
       loop_control:
         label: "{{ item.database }}"
       register: retire_local_directory
@@ -65,7 +65,7 @@
         retire_local_kept: "{{ retire_local_accounts_keep }}"
         retire_local_stamp: "{{ now(fmt='%Y%m%d-%H%M%S') }}"
         retire_local: >-
-          {{ people | directory_local_leftovers(directory_groups,
+          {{ people | directory_local_leftovers(directory_groups_all,
                retire_local_files.results[0].ansible_facts.getent_passwd,
                retire_local_files.results[1].ansible_facts.getent_group,
                retire_local_directory.results[0].stdout_lines,
