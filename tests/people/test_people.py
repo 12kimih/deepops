@@ -289,6 +289,67 @@ class Leaving(unittest.TestCase):
         problems = people.check({"people": {"x": {"uid": 1001, "ends": "next spring"}}})
         self.assertIn("people.x.ends: a date, YYYY-MM-DD", problems)
 
+    PROJECTS = """\
+people:
+  alice: {uid: 1001}
+  bob: {uid: 1002}
+  carol: {uid: 1003}
+  dave: {uid: 1004, status: left}
+"""
+
+    def test_a_project_is_two_groups_of_active_people_with_an_owner(self):
+        def problems(proj, name="vision"):
+            roster = yaml.safe_load(self.PROJECTS)
+            roster["projects"] = {name: proj}
+            return people.project_problems(roster)
+
+        ok = {"gid": 50001, "read_gid": 50002, "owners": ["alice"], "members": ["bob"], "viewers": ["carol"]}
+        self.assertEqual(problems(ok), [])
+        self.assertEqual(people.people_project_groups({"vision": ok}), [
+            {"name": "vision", "gid": 50001, "members": ["alice", "bob"]},
+            {"name": "vision-read", "gid": 50002, "members": ["carol"]},
+        ])  # fmt: skip
+        for change, word in (({"gid": 1002}, "a person's UID"), ({"read_gid": 50001}, "also vision.gid"),
+                             ({"owners": []}, "at least one owner"), ({"members": ["dave"]}, "dave is not an active"),
+                             ({"viewers": ["bob"]}, "one role each"), ({"lead": "alice"}, "unknown key")):  # fmt: skip
+            with self.subTest(word=word):
+                self.assertTrue(
+                    any(word in p for p in problems({**ok, **change})), problems({**ok, **change})
+                )
+        self.assertTrue(any("no login has" in p for p in problems(ok, name="bob")))
+        self.assertTrue(any("lowercase" in p for p in problems(ok, name="Bad_Name")))
+
+    def test_project_editors_keep_the_roster_valid(self):
+        text, gid, read_gid = people.roster_project_new(
+            self.PROJECTS, "vision", ["alice"], "eval set", members=["bob"], reserved=[50000], gid_min=50000
+        )
+        self.assertEqual((gid, read_gid), (50001, 50002), "the lowest free GIDs above the reserved")
+        proj = yaml.safe_load(text)["projects"]["vision"]
+        self.assertEqual((proj["owners"], proj["members"], proj["purpose"]), (["alice"], ["bob"], "eval set"))
+        text = people.roster_project_set(text, "vision", "carol", "viewers")
+        text = people.roster_project_set(text, "vision", "bob", "owners")
+        proj = yaml.safe_load(text)["projects"]["vision"]
+        self.assertEqual(
+            (proj["owners"], proj.get("members"), proj["viewers"]), (["alice", "bob"], None, ["carol"])
+        )
+        self.assertEqual(
+            list(proj), ["gid", "read_gid", "owners", "viewers", "purpose"], "roles keep their order"
+        )
+        text = people.roster_project_set(text, "vision", "alice", None)
+        with self.assertRaisesRegex(people.EditError, "only owner"):
+            people.roster_project_set(text, "vision", "bob", "members")
+        with self.assertRaisesRegex(people.EditError, "only owner"):
+            people.roster_leave(text, "bob")
+        with self.assertRaisesRegex(people.EditError, "already viewers"):
+            people.roster_project_set(text, "vision", "carol", "viewers")
+        with self.assertRaisesRegex(people.EditError, "not an active person"):
+            people.roster_project_set(text, "vision", "dave", "members")
+        left = yaml.safe_load(people.roster_leave(text, "carol"))
+        self.assertNotIn("viewers", left["projects"]["vision"], "someone who leaves leaves its projects")
+        text = people.roster_project_purpose(text, "vision", "")
+        self.assertNotIn("purpose", yaml.safe_load(text)["projects"]["vision"])
+        self.assertNotIn("vision", yaml.safe_load(people.roster_project_close(text, "vision"))["projects"])
+
     def test_a_reserved_name_is_no_ones_login(self):
         problems = people.check({"reserved_logins": ["shared"], "people": {"shared": {"uid": 1001}}})
         self.assertIn("people.shared: a reserved name (reserved_logins), no one's login", problems)

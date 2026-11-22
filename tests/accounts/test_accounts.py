@@ -68,12 +68,18 @@ class Check(unittest.TestCase):
         )
         self.assertEqual(accounts.overlap({"p": {"uid": 5}}, {"s": {"uid": 6}}), [])
 
+    def test_overlap_counts_a_shared_name(self):
+        # A person named as a service account (slurm, shared) would be that account.
+        self.assertEqual(
+            accounts.overlap({"shared": {"uid": 5}}, {"shared": {"uid": 6}}), ["shared is the name of both"]
+        )
+
 
 class Registry(unittest.TestCase):
     def test_the_service_accounts_are_valid(self):
         self.assertEqual(accounts.check(SYSTEM), [])
 
-    def test_no_example_person_takes_a_service_id(self):
+    def test_no_example_person_takes_a_service_name_or_id(self):
         self.assertEqual(accounts.overlap(people.people_local_accounts(EXAMPLE), SYSTEM), [])
 
     def test_only_local_accounts_creates_accounts(self):

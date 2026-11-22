@@ -36,7 +36,10 @@ def leaving_deadlines(leaving):
     return out
 
 
-class _RosterFeature(Feature):
+class RosterFeature(Feature):
+    """A feature that proposes roster edits: reads the roster at the base branch and opens
+    a pull request with the edited file (Join, Leave, projects)."""
+
     def __init__(self, repo, people, settings):
         self.repo, self.people, self.s = repo, people, settings
 
@@ -46,9 +49,12 @@ class _RosterFeature(Feature):
         except GitHubError as e:
             raise Failed(str(e)) from None
 
-    def _roster(self):
+    def _document(self):
         text, _ = self._read(self.s["roster"])
-        return load(text)["people"]
+        return load(text)
+
+    def _roster(self):
+        return self._document()["people"]
 
     def _propose(self, branch, text, sha, title, body):
         try:
@@ -57,7 +63,7 @@ class _RosterFeature(Feature):
             raise Failed(str(e)) from None
 
 
-class JoinFeature(_RosterFeature):
+class JoinFeature(RosterFeature):
     """req: user (the requested login), name, account, key (a public key line), slack."""
 
     def teams(self):
@@ -103,7 +109,7 @@ class JoinFeature(_RosterFeature):
         return f"새 계정 {req['user']} ({req['account']})"
 
 
-class LeaveFeature(_RosterFeature):
+class LeaveFeature(RosterFeature):
     """req: user (the login that leaves), ends (their last day, YYYY-MM-DD), asked_by.
     The PR sets `ends`: the account stays for the grace period, then login stops."""
 

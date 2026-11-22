@@ -19,13 +19,14 @@ import threading
 import time
 from pathlib import Path
 
-from . import accounts_blocks, bans_blocks, home_blocks, reminders, state
+from . import accounts_blocks, bans_blocks, home_blocks, projects_blocks, reminders, state
 from . import blocks as shared
 from . import scratch_blocks as blocks
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .bans import SERVICE as BANS
 from .bans import UnbanFeature, address, watch
 from .prefs import Prefs
+from .projects import ProjectFeature, notify_deployed
 from .remote import Remote
 from .requests import Engine
 from .scratch import SERVICE as SCRATCH
@@ -47,7 +48,7 @@ def load(path):
     return cfg
 
 
-def build(cfg, engine, scratch, join=None, unban=None):
+def build(cfg, engine, scratch, join=None, unban=None, project=None):
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
@@ -56,6 +57,10 @@ def build(cfg, engine, scratch, join=None, unban=None):
 
     def user_of(slack_id):
         return members.get(slack_id)
+
+    slack_of = {login: slack_id for slack_id, login in members.items()}.get
+    projects = (cfg.get("projects") or {}).get("deployed") or {}
+    projects_root = (cfg.get("projects") or {}).get("root", "")
 
     def tell(client, slack_id, outcome):
         """The outcome: a line in the help channel (the request's thread when it has one)
@@ -69,15 +74,20 @@ def build(cfg, engine, scratch, join=None, unban=None):
     def submit(client, slack_id, req):
         outcome = engine.submit(req)
         if outcome.status == "held":
+            approvers = engine.approvers(outcome.key)
             first = client.chat_postMessage(
                 channel=channels["help"],
-                text=f"<@{slack_id}> {engine.describe(req)}: 관리자 승인 대기",
+                text=f"<@{slack_id}> {engine.describe(req)}: 승인 대기",
             )
-            client.chat_postMessage(
-                channel=channels["admin"],
-                text=outcome.text,
-                blocks=shared.held(f"<@{slack_id}>", outcome.text, outcome.key),
-            )
+            # Held for some people (a project's owners): each gets the buttons in a DM;
+            # otherwise the administrators, in their channel.
+            places = [s for s in map(slack_of, approvers) if s] or [channels["admin"]]
+            for place in places:
+                client.chat_postMessage(
+                    channel=place,
+                    text=outcome.text,
+                    blocks=shared.held(f"<@{slack_id}>", outcome.text, outcome.key),
+                )
             engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
             client.chat_postMessage(channel=slack_id, text=outcome.text)
         else:
@@ -90,9 +100,10 @@ def build(cfg, engine, scratch, join=None, unban=None):
         if not login:
             return
         allocations = scratch.mine(login) if scratch else []
-        client.views_publish(
-            user_id=slack_id, view=home_blocks.home(login, allocations, prefs.muted(login), engine.features)
-        )
+        view = home_blocks.home(login, allocations, prefs.muted(login), engine.features)
+        if project is not None:
+            view["blocks"] += projects_blocks.home(login, projects, projects_root)
+        client.views_publish(user_id=slack_id, view=view)
 
     @app.event("app_home_opened")
     def home_opened(event, client):
@@ -244,15 +255,125 @@ def build(cfg, engine, scratch, join=None, unban=None):
             req["size"] = size_bytes(value["selected_option"]["value"])
         submit(client, slack_id, req)
 
+    # Collaboration folders (clusterbot.projects): the Home tab's buttons and menu, and
+    # the forms they open.
+    def project_req(slack_id, op, name, **more):
+        login = user_of(slack_id)
+        return {"kind": "project", "op": op, "user": login, "project": name, **more} if login else None
+
+    def logins(slack_ids):
+        """The roster logins of Slack members, and the members the roster lacks."""
+        found = [user_of(s) for s in slack_ids]
+        return [x for x in found if x], [s for s, x in zip(slack_ids, found) if not x]
+
+    @app.command("/project")
+    def project_command(ack, body, client):
+        ack()
+        if project is None or not user_of(body["user_id"]):
+            text = (
+                "명부에 이 Slack 계정이 없습니다."
+                if project
+                else "이 클러스터는 공동작업 폴더 신청을 받지 않습니다."
+            )
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            return
+        client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.new_form())
+
+    @app.action("project.new")
+    def project_new(ack, body, client):
+        ack()
+        client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.new_form())
+
+    @app.action("project.join")
+    def project_join(ack, body, client):
+        ack()
+        view = projects_blocks.join_form(projects, user_of(body["user"]["id"]))
+        if view is None:
+            client.chat_postMessage(channel=body["user"]["id"], text="참여를 요청할 프로젝트가 없습니다.")
+            return
+        client.views_open(trigger_id=body["trigger_id"], view=view)
+
+    @app.action("project.menu")
+    def project_menu(ack, body, client, action):
+        ack()
+        op, name = action["selected_option"]["value"].split(":", 1)
+        slack_id = body["user"]["id"]
+        if op == "manage":
+            client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.manage_form(name))
+        elif op == "purpose":
+            purpose = (projects.get(name) or {}).get("purpose", "")
+            client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.purpose_form(name, purpose))
+        else:  # leave, close: the request itself (each says what it will do in its DM)
+            req = project_req(slack_id, op, name)
+            if req:
+                submit(client, slack_id, req)
+
+    @app.view("project.new.submit")
+    def project_new_submit(ack, body, client, view):
+        v = view["state"]["values"]
+        name = v["name"]["v"]["value"].strip()
+        picked = {
+            role: logins((v[role]["v"] or {}).get("selected_users") or [])
+            for role in ("owners", "members", "viewers")
+        }
+        missing = sorted({s for _, gone in picked.values() for s in gone})
+        if missing:
+            ack(
+                response_action="errors",
+                errors={
+                    "members": "명부에 없는 Slack 계정이 있습니다: " + " ".join(f"<@{s}>" for s in missing)
+                },
+            )
+            return
+        ack()
+        slack_id = body["user"]["id"]
+        req = project_req(slack_id, "new", name, purpose=(v["purpose"]["v"]["value"] or "").strip(),
+                          **{role: found for role, (found, _) in picked.items()})  # fmt: skip
+        if req:
+            submit(client, slack_id, req)
+
+    @app.view("project.join.submit")
+    def project_join_submit(ack, body, client, view):
+        ack()
+        v, slack_id = view["state"]["values"], body["user"]["id"]
+        req = project_req(slack_id, "join", v["project"]["v"]["selected_option"]["value"],
+                          role=v["role"]["v"]["selected_option"]["value"])  # fmt: skip
+        if req:
+            submit(client, slack_id, req)
+
+    @app.view("project.manage.submit")
+    def project_manage_submit(ack, body, client, view):
+        v = view["state"]["values"]
+        login = user_of(v["person"]["v"]["selected_user"])
+        if not login:
+            ack(response_action="errors", errors={"person": "명부에 없는 Slack 계정입니다"})
+            return
+        ack()
+        role = v["role"]["v"]["selected_option"]["value"]
+        slack_id = body["user"]["id"]
+        req = project_req(
+            slack_id, "set", view["private_metadata"], login=login, role=None if role == "remove" else role
+        )
+        if req:
+            submit(client, slack_id, req)
+
+    @app.view("project.purpose.submit")
+    def project_purpose_submit(ack, body, client, view):
+        ack()
+        slack_id = body["user"]["id"]
+        purpose = (view["state"]["values"]["purpose"]["v"]["value"] or "").strip()
+        req = project_req(slack_id, "purpose", view["private_metadata"], purpose=purpose)
+        if req:
+            submit(client, slack_id, req)
+
     @app.action("request.approve")
     @app.action("request.deny")
     def decide(ack, body, client, action):
         ack()
         admin = body["user"]["id"]
-        if admin not in admins:
-            client.chat_postEphemeral(
-                channel=body["channel"]["id"], user=admin, text="관리자만 승인할 수 있습니다."
-            )
+        # An administrator, or one of the people the request is held for (a project's owners).
+        if admin not in admins and user_of(admin) not in engine.approvers(action["value"]):
+            client.chat_postMessage(channel=admin, text="이 요청을 승인할 수 있는 사람이 아닙니다.")
             return
         if action["action_id"] == "request.approve":
             outcome = engine.approve(action["value"], f"<@{admin}>")
@@ -336,7 +457,7 @@ def main(argv=None):
     def remote(host, service):
         return Remote(host, ssh["key"], ssh["user"], ssh["known_hosts"], service)
 
-    features, scratch, join, unban = {}, None, None, None
+    features, scratch, join, unban, project = {}, None, None, None, None
     if cfg["scratch"]["host"]:
         scratch = features["scratch"] = ScratchFeature(
             remote(cfg["scratch"]["host"], SCRATCH), cfg["scratch"]["policy"]
@@ -352,8 +473,15 @@ def main(argv=None):
         settings = {**cfg["roster"], "base": gh["base"]}
         join = JoinFeature(repo, people_roster, settings)
         features.update(join=join, leave=LeaveFeature(repo, people_roster, settings))
+        if cfg.get("projects"):
+            p = cfg["projects"]
+            project = features["project"] = ProjectFeature(
+                repo,
+                people_roster,
+                {**settings, "gid_min": p["gid_min"], "reserved_gids": p["reserved_gids"]},
+            )
     engine = Engine(features, cfg["pending"])
-    app = build(cfg, engine, scratch, join, unban)
+    app = build(cfg, engine, scratch, join, unban, project)
 
     sources, slack_of = reminder_sources(cfg, scratch), {u: s for s, u in cfg["members"].items()}.get
 
@@ -363,6 +491,11 @@ def main(argv=None):
         state.write(cfg["reminders"], sent)
 
     every(REMIND_EVERY, "reminders", remind_round)
+    if project is not None:  # a deploy restarts the bot: whose role changed, told once
+        p = cfg["projects"]
+        notify_deployed(p["deployed"], p["seen"], p["root"], slack_of,
+                        lambda who, text: app.client.chat_postMessage(channel=who, text=text),
+                        projects_blocks.notice)  # fmt: skip
     if unban is not None:
         post, update = admin_messages(app.client, channels["admin"])
 

@@ -6,7 +6,8 @@
     engine.note(key, **info)    keeps where a held request's messages are
 
 A request is a dict with "kind" (the feature) and "user"; the feature decides it
-(auto, or admin with the reason), applies it, and describes it in one line. A held
+(auto; admin; or ("people", [login, ...]): any one of them, a project's owners say, or
+an administrator; with the reason), applies it, and describes it in one line. A held
 request is kept in a JSON file (atomic, 0600), so an approval survives a restart.
 A feature adds only its policy and its action; the flow is the same for all.
 """
@@ -36,7 +37,8 @@ class Outcome:
 
 
 class Feature:
-    """What a feature provides. decide -> ("auto" | "admin", why); apply -> (text, data)."""
+    """What a feature provides. decide -> ("auto" | "admin" | ("people", [login]), why);
+    apply -> (text, data)."""
 
     def decide(self, req):
         raise NotImplementedError
@@ -80,13 +82,21 @@ class Engine:
             return Outcome("refused", f"처리할 시스템에 닿지 못했습니다: {e}", request=req)
         if verdict == "auto":
             return self._apply(req)
+        # Who approves: the administrators, or any of some people (an administrator may too).
+        approvers = list(verdict[1]) if isinstance(verdict, tuple) and verdict[0] == "people" else []
         pending = self._pending()
         key = secrets.token_hex(4)
-        pending[key] = {**req, "why": why, "asked": int(time.time())}
+        pending[key] = {**req, "why": why, "asked": int(time.time()), "approvers": approvers}
         self._save(pending)
+        whom = f"{', '.join(approvers)} 중 한 명의" if approvers else "관리자"
         return Outcome(
-            "held", f"관리자 승인을 기다립니다 ({why}): {feature.describe(req)}", request=req, key=key
+            "held", f"{whom} 승인을 기다립니다 ({why}): {feature.describe(req)}", request=req, key=key
         )
+
+    def approvers(self, key):
+        """Who may approve the held request KEY besides an administrator: logins, [] for
+        administrators only (or no such request)."""
+        return list((self._pending().get(key) or {}).get("approvers") or [])
 
     def note(self, key, **info):
         pending = self._pending()
@@ -115,6 +125,6 @@ class Engine:
             return Outcome("refused", "이미 처리된 요청입니다.")
         return Outcome(
             "refused",
-            f"관리자가 거절했습니다: {self.describe(req)} ({admin}{', ' + why if why else ''})",
+            f"거절되었습니다: {self.describe(req)} ({admin}{', ' + why if why else ''})",
             request=req,
         )

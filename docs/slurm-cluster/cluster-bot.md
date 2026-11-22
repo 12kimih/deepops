@@ -32,6 +32,13 @@ people` run and its countdown starts over. A stage the deadline was already insi
 the bot first saw it is skipped (an allocation made for ten days gets no 14-day reminder;
 a bot started late does not catch up), except the last, which is always sent.
 
+Collaboration folders (`/project` and the Home tab): start a project, ask to join one,
+and, as its owner, add people with a role (owner, member, viewer), change roles, take
+people out, change its purpose or ask to close it. Each is a pull request on the roster's
+`projects`; joining waits for one of the project's owners (a DM with buttons), starting
+and closing for an administrator, the rest opens at once. After a deploy everyone whose
+role changed is told. See [shared-space.md](shared-space.md#in-slack-the-cluster-bot).
+
 Unban requests (`/unban-request`): someone whose address fail2ban banned (bans are for
 good, `roles/fail2ban`) gives the address and what happened. The bot checks the address
 is banned now on a host where fail2ban runs, an administrator approves, and the ban is

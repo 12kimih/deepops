@@ -64,6 +64,7 @@ class Handlers(unittest.TestCase):
         self.prefs = os.path.join(tmp.name, "prefs.json")
         CFG["prefs_file"] = self.prefs
         self.engine = mock.Mock(features={"join": object()})
+        self.engine.approvers.return_value = []  # held for the administrators
         self.engine.submit.return_value = mock.Mock(status="done", text="ok", request={})
         self.join = mock.Mock(teams=mock.Mock(return_value=["team-a"]))
         self.client = mock.MagicMock()
@@ -139,6 +140,14 @@ class Handlers(unittest.TestCase):
             "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
         )
         self.engine.approve.assert_called_once_with("k", "<@UBOSS>")
+        # One of the people a request is held for (a project's owner) decides it too.
+        self.engine.approve.reset_mock()
+        self.engine.approvers.return_value = ["alice"]
+        body["user"]["id"] = "UALICE"
+        self.call(
+            "action", "request.approve", body=body, action={"action_id": "request.approve", "value": "k"}
+        )
+        self.engine.approve.assert_called_once_with("k", "<@UALICE>")
 
     def test_the_home_tab_turns_job_notices_off_and_job_notice_obeys(self):
         self.call("event", "app_home_opened", event={"tab": "home", "user": "UALICE"})

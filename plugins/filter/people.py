@@ -12,6 +12,14 @@ A roster file declares the roles a site uses and the people:
                                   # so a second one doubles a person's); absent: anyone
     reserved_logins: [shared]     # optional: names no person may have, such as a
                                   # directory under the home root that is no one's home
+    projects:                     # optional: collaboration folders (roles/shared_space)
+      vision:
+        gid: 50001                # group vision: owners and members (read and write)
+        read_gid: 50002           # group vision-read: viewers (read); no person's UID
+        owners: [alice]           # one or more: manage people, roles and purpose
+        members: [bob]            # active people, one role each
+        viewers: [carol]
+        purpose: shared eval set  # optional
     people:
       alice:
         uid: 1001                 # required, unique, >= 1000
@@ -51,7 +59,14 @@ KEYS = {"uid", "name", "shell", "accounts", "default_account", "roles", "status"
 QUOTA_KEYS = ("block_warn", "block_hard", "inode_warn", "inode_hard")
 LOGIN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 UID_MIN = 1000
-TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "reserved_logins", "people"}
+TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "reserved_logins", "projects", "people"}
+# A project's roles, most rights first: owners manage it (people, roles, purpose) and
+# read and write, members read and write, viewers read.
+PROJECT_ROLES = ("owners", "members", "viewers")
+PROJECT_KEYS = {"gid", "read_gid", "purpose", *PROJECT_ROLES}
+# The viewers' group is <name>-read; a group name is at most 32 characters.
+READ_SUFFIX = "-read"
+PROJECT_NAME = re.compile(r"^[a-z][a-z0-9-]{1,26}$")
 
 
 def _date(value):
@@ -299,7 +314,84 @@ def check(roster, uid_min=UID_MIN):
             for key in member_keys:
                 if p.get(key) in (None, ""):
                     problems.append(f"{where}.{key}: required for an active Slurm user")
+    return problems + project_problems(roster, uid_min)
+
+
+def project_people(proj):
+    """{login: role} of a project: owners, members and viewers (one role each)."""
+    return {login: role for role in PROJECT_ROLES for login in (proj.get(role) or [])}
+
+
+def project_problems(roster, uid_min=UID_MIN):
+    """Problems of the roster's projects: each two groups of active people, <name> (its
+    owners and members: read and write) and <name>-read (its viewers: read), each with
+    its own GID (no person's UID: their per-user group has it), at least one owner, one
+    role a person, and names that are no one's login."""
+    projects = roster.get("projects") or {}
+    if not isinstance(projects, dict):
+        return ["projects: must be a mapping of name -> {gid, read_gid, owners, members, viewers, purpose}"]
+    people = roster.get("people") or {}
+    active = {n for n, p in people.items() if (p or {}).get("status", "active") != "left"}
+    taken_names = set(people) | set(roster.get("reserved_logins") or [])
+    uids = {(p or {}).get("uid") for p in people.values()}
+    problems, gids = [], {}
+    for name, proj in projects.items():
+        where = f"projects.{name}"
+        if not isinstance(name, str) or not PROJECT_NAME.match(name):
+            problems.append(f"{where}: a name of lowercase letters, digits and dashes (2 to 27)")
+        elif {name, f"{name}{READ_SUFFIX}"} & taken_names:
+            problems.append(f"{where}: its groups ({name}, {name}{READ_SUFFIX}) need names no login has")
+        if not isinstance(proj, dict):
+            problems.append(f"{where}: must be a mapping")
+            continue
+        for key in sorted(set(proj) - PROJECT_KEYS):
+            problems.append(f"{where}.{key}: unknown key")
+        for key in ("gid", "read_gid"):
+            gid = proj.get(key)
+            if not isinstance(gid, int) or isinstance(gid, bool) or gid < uid_min:
+                problems.append(f"{where}.{key}: must be an integer >= {uid_min}")
+            elif gid in uids:
+                problems.append(f"{where}.{key}: {gid} is a person's UID (their per-user group)")
+            elif gid in gids:
+                problems.append(f"{where}.{key}: {gid} is also {gids[gid]}'s")
+            else:
+                gids[gid] = f"{name}.{key}"
+        seen = {}
+        for role in PROJECT_ROLES:
+            logins = proj.get(role) or []
+            if not isinstance(logins, list):
+                problems.append(f"{where}.{role}: must be a list of logins")
+                continue
+            for login in logins:
+                if login not in active:
+                    problems.append(f"{where}.{role}: {login} is not an active person of the roster")
+                if login in seen:
+                    problems.append(f"{where}: {login} is listed as {seen[login]} and {role}; one role each")
+                seen.setdefault(login, role)
+        if not proj.get("owners"):
+            problems.append(f"{where}.owners: at least one owner")
+        if not isinstance(proj.get("purpose", ""), str):
+            problems.append(f"{where}.purpose: must be text")
     return problems
+
+
+def people_project_groups(projects):
+    """The cluster groups of each project (roster `projects`, checked by check()), for
+    directory_groups_all: <name> {gid, owners and members} and <name>-read {read_gid,
+    viewers}, so a role change is a membership change and never touches a file."""
+    out = []
+    for name, p in sorted((projects or {}).items()):
+        out.append(
+            {
+                "name": str(name),
+                "gid": p["gid"],
+                "members": list(p.get("owners") or []) + list(p.get("members") or []),
+            }
+        )
+        out.append(
+            {"name": f"{name}{READ_SUFFIX}", "gid": p["read_gid"], "members": list(p.get("viewers") or [])}
+        )
+    return out
 
 
 class EditError(ValueError):
@@ -369,9 +461,110 @@ def roster_leave(text, login, ends=None, uid_min=UID_MIN):
         except (TypeError, ValueError):
             raise EditError(f"ends: {ends} is not a date, YYYY-MM-DD") from None
         return _dump_checked(rt, doc, uid_min)
+    for name, proj in (doc.get("projects") or {}).items():
+        if project_people(proj).get(login):
+            _set_role(proj, name, login, None)
     for key in ("roles", "accounts", "default_account", "disk_quota"):
         entry.pop(key, None)
     entry["status"] = "left"
+    return _dump_checked(rt, doc, uid_min)
+
+
+def _project(doc, name):
+    proj = (doc.get("projects") or {}).get(name)
+    if proj is None:
+        raise EditError(f"project {name} is not in the roster")
+    return proj
+
+
+def _set_role(proj, name, login, role):
+    """LOGIN takes ROLE in PROJ (None: leaves it); the last owner never goes."""
+    from ruamel.yaml.comments import CommentedSeq
+
+    current = project_people(proj).get(login)
+    if current == "owners" and role != "owners" and len(proj["owners"]) == 1:
+        raise EditError(f"{login} is the only owner of project {name}: make someone else an owner first")
+    if current:
+        proj[current].remove(login)
+        if not proj[current]:
+            del proj[current]
+    if role:
+        if role not in proj:
+            proj[role] = CommentedSeq()
+            proj[role].fa.set_flow_style()
+        proj[role].append(login)
+        # The roles stay in their order, whatever order they were added in.
+        for key in [k for k in PROJECT_ROLES if k in proj]:
+            proj.move_to_end(key)
+        if "purpose" in proj:
+            proj.move_to_end("purpose")
+
+
+def roster_project_new(text, name, owners, purpose="", members=(), viewers=(), reserved=(), *, gid_min,
+                       uid_min=UID_MIN):  # fmt: skip
+    """TEXT with project NAME added: OWNERS (one or more), MEMBERS and VIEWERS, and its two
+    GIDs (gid, read_gid) given: the lowest free from GID_MIN (shared_projects_gid_min in
+    roles/shared_space_defaults), never a person's UID,
+    another project's or one in RESERVED (the site's other cluster groups). Returns
+    (text, gid, read_gid); EditError unless check() passes."""
+    from ruamel.yaml.comments import CommentedMap
+
+    rt, doc = _round_trip(text)
+    if doc.get("projects") is None:
+        doc["projects"] = CommentedMap()
+    projects = doc["projects"]
+    if name in projects:
+        raise EditError(f"project {name} is already in the roster")
+    taken = {p.get(k) for p in projects.values() for k in ("gid", "read_gid")}
+    taken |= {p.get("uid") for p in doc["people"].values() if p} | set(reserved)
+    free = []
+    gid = gid_min
+    while len(free) < 2:
+        if gid not in taken:
+            free.append(gid)
+        gid += 1
+    entry = CommentedMap(gid=free[0], read_gid=free[1])
+    for role, logins in (("owners", owners), ("members", members), ("viewers", viewers)):
+        for login in logins:
+            if login not in project_people(entry):  # one role each, the first given
+                _set_role(entry, name, login, role)
+    if purpose:
+        entry["purpose"] = purpose
+    projects.insert(sum(1 for other in projects if str(other) < name), name, entry)
+    return _dump_checked(rt, doc, uid_min), free[0], free[1]
+
+
+def roster_project_set(text, name, login, role, uid_min=UID_MIN):
+    """TEXT with LOGIN in project NAME as ROLE (owners, members or viewers), added or
+    moved; None removes them. The last owner never goes."""
+    if role is not None and role not in PROJECT_ROLES:
+        raise EditError(f"role {role} is not one of {', '.join(PROJECT_ROLES)}")
+    rt, doc = _round_trip(text)
+    proj = _project(doc, name)
+    current = project_people(proj).get(login)
+    if current == role:
+        raise EditError(f"{login} is already {role or 'out'} in project {name}")
+    _set_role(proj, name, login, role)
+    return _dump_checked(rt, doc, uid_min)
+
+
+def roster_project_purpose(text, name, purpose, uid_min=UID_MIN):
+    """TEXT with project NAME's purpose set ("" removes it)."""
+    rt, doc = _round_trip(text)
+    proj = _project(doc, name)
+    if purpose:
+        proj["purpose"] = purpose
+    else:
+        proj.pop("purpose", None)
+    return _dump_checked(rt, doc, uid_min)
+
+
+def roster_project_close(text, name, uid_min=UID_MIN):
+    """TEXT without project NAME: its groups go, its folder and files stay for an
+    administrator to move to an owner's home (roles/shared_space lists it)."""
+    rt, doc = _round_trip(text)
+    _project(doc, name)
+    del doc["projects"][name]
     return _dump_checked(rt, doc, uid_min)
 
 
@@ -410,6 +603,7 @@ class FilterModule:
             "people_subids": people_subids,
             "people_disk_quotas": people_disk_quotas,
             "people_check": people_check,
+            "people_project_groups": people_project_groups,
             "people_login_expires": people_login_expires,
             "people_shadow_day": people_shadow_day,
             "people_leaving": people_leaving,

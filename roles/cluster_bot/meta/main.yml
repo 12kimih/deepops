@@ -7,6 +7,8 @@ dependencies:
   - role: network_defaults  # cluster addresses
   - role: scratch_defaults  # the automatic limits it decides with
   - role: people_defaults  # people (members, admins)
+  - role: shared_space_defaults  # shared_projects, the shared space's root
+  - role: directory_defaults  # directory_groups (GIDs a new project avoids)
 
 galaxy_info:
   namespace: deepops
