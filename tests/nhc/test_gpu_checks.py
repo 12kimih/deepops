@@ -7,6 +7,7 @@ later by NHC itself), and drained on application faults such as XID 13 and 31.
 
 from pathlib import Path
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -15,8 +16,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from ansible_yaml import role_defaults  # noqa: E402
+from nhc_checks import CHECKS, argv  # noqa: E402
 
-CHECKS = ROOT / "roles" / "nhc" / "files" / "deepops.nhc"
 DRAIN = " ".join(str(x) for x in role_defaults("nhc")["nhc_gpu_drain_xids"])
 
 KERNEL_LOG = """\
@@ -26,15 +27,23 @@ NVRM: Xid (PCI:0000:3b:00): 31, pid=4242, name=python, Ch 00000008, intr 0000000
 """
 
 
-def run(check, args="", kernel_log="", remapped=""):
+def run(check, args="", kernel_log="", remapped="", tools=None):
+    """(status, reason) of CHECK ARGS, with stub commands: journalctl and nvidia-smi
+    print KERNEL_LOG and REMAPPED; TOOLS maps more names to (output, status), and a
+    name mapped to None is missing."""
+    stubs = {"journalctl": (kernel_log, 0), "nvidia-smi": (remapped, 0), **(tools or {})}
     with tempfile.TemporaryDirectory() as tmp:
-        for name, out in (("journalctl", kernel_log), ("nvidia-smi", remapped)):
-            stub = Path(tmp, name)
-            stub.write_text(f"#!/bin/sh\ncat <<'END'\n{out}END\n")
-            stub.chmod(0o755)
+        for name, stub in stubs.items():
+            path = Path(tmp, name)
+            if stub is None:
+                path.write_text("#!/bin/sh\nexit 127\n")
+            else:
+                out, status = stub
+                path.write_text(f"#!/bin/sh\ncat <<'END'\n{out}END\nexit {status}\n")
+            path.chmod(0o755)
         env = {**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}"}
         proc = subprocess.run(
-            ["bash", "-c", f". {CHECKS}; {check} {args}"],
+            argv(f"{check} {args}"),
             env=env,
             capture_output=True,
             text=True,
@@ -78,6 +87,108 @@ class RemappedRows(unittest.TestCase):
             run("check_nv_remapped_rows", remapped=out),
             (1, "GPU row remapping: 00000000:3B:00.0 pending,00000000:5A:00.0 failed"),
         )
+
+
+class FailedTools(unittest.TestCase):
+    """A check whose tool fails or reports what it cannot read fails, with its reason:
+    passing on no output kept a node whose GPU hung nvidia-smi in service."""
+
+    def test_nvidia_smi_failing_fails_every_gpu_check(self):
+        broken = {"nvidia-smi": ("", 124)}
+        for check, args in (
+            ("check_nv_gpu_count", "8"),
+            ("check_nv_remapped_rows", ""),
+            ("check_nv_retired_pages", ""),
+            ("check_nv_pcie_link_width", "16"),
+        ):
+            with self.subTest(check=check):
+                self.assertEqual(
+                    run(check, args, tools=broken),
+                    (1, f"{check}: nvidia-smi{' -L' if check == 'check_nv_gpu_count' else ''} failed"),
+                )
+
+    def test_gpu_count(self):
+        out = "GPU 0: A (UUID: a)\n  MIG 1g.10gb Device 0: (UUID: m)\nGPU 1: A (UUID: b)\n"
+        self.assertEqual(run("check_nv_gpu_count", "2", tools={"nvidia-smi": (out, 0)}), (0, ""))
+        self.assertEqual(
+            run("check_nv_gpu_count", "8", tools={"nvidia-smi": (out, 0)}),
+            (1, "check_nv_gpu_count: 2 GPUs, 8 expected"),
+        )
+
+    def test_link_width_not_read_fails(self):
+        smi = {"nvidia-smi": ("00000000:3B:00.0, 16\n00000000:5A:00.0, [N/A]\n00000000:86:00.0, 8\n", 0)}
+        self.assertEqual(
+            run("check_nv_pcie_link_width", "16", tools=smi),
+            (
+                1,
+                "check_nv_pcie_link_width: GPU PCIe link width not x16: 00000000:5A:00.0 x[N/A],00000000:86:00.0 x8",
+            ),
+        )
+        ok = {"nvidia-smi": ("00000000:3B:00.0, 16\n", 0)}
+        self.assertEqual(run("check_nv_pcie_link_width", "16", tools=ok), (0, ""))
+
+    def test_retired_pages(self):
+        smi = {"nvidia-smi": ("00000000:3B:00.0, No\n00000000:5A:00.0, [N/A]\n", 0)}
+        self.assertEqual(run("check_nv_retired_pages", tools=smi), (0, ""))
+        smi = {"nvidia-smi": ("00000000:3B:00.0, Yes\n", 0)}
+        self.assertEqual(
+            run("check_nv_retired_pages", tools=smi),
+            (
+                1,
+                "check_nv_retired_pages: GPU retired pages pending on 00000000:3B:00.0, reboot to retire them",
+            ),
+        )
+
+    def test_missing_dcgmi_fails(self):
+        self.assertEqual(
+            run("check_nv_dcgmi_diag", tools={"dcgmi": None}),
+            (1, "check_nv_dcgmi_diag: DCGM diag -r 1 failed"),
+        )
+        self.assertEqual(
+            run("check_nv_dcgmi_diag", tools={"dcgmi": ("|  Deployment  |  Pass  |\n", 0)}), (0, "")
+        )
+
+    def test_unreadable_kernel_log_fails(self):
+        self.assertEqual(
+            run("check_nv_xid", DRAIN, tools={"journalctl": ("", 1)}),
+            (1, "check_nv_xid: the kernel log of this boot cannot be read"),
+        )
+
+    def test_ipoib_matches_the_netdev_exactly(self):
+        out = "mlx5_0 port 1 ==> ib0 (Up)\nmlx5_1 port 1 ==> ib1 (Down)\n"
+        tools = {"ibdev2netdev": (out, 0)}
+        self.assertEqual(run("check_ipoib_up", "ib0", tools=tools), (0, ""))
+        self.assertEqual(
+            run("check_ipoib_up", "ib1", tools=tools), (1, "check_ipoib_up: IPoIB not up on ib1")
+        )
+        self.assertEqual(run("check_ipoib_up", "ib", tools=tools), (1, "check_ipoib_up: IPoIB not up on ib"))
+
+    def test_ber_not_read_fails(self):
+        good = {"mlxlink": ("Effective Physical BER          : 15E-255\n", 0)}
+        bad = {"mlxlink": ("Effective Physical BER          : 1E-7\n", 0)}
+        self.assertEqual(run("check_ib_link_ber", "mlx5_0", tools=good), (0, ""))
+        self.assertEqual(
+            run("check_ib_link_ber", "mlx5_0", tools=bad),
+            (1, "check_ib_link_ber: BER on mlx5_0 is too high (1E-7)"),
+        )
+        self.assertEqual(
+            run("check_ib_link_ber", "mlx5_0", tools={"mlxlink": ("", 1)}),
+            (1, "check_ib_link_ber: no effective BER read on mlx5_0"),
+        )
+
+    def test_acs_reason_is_one_line_without_quotes(self):
+        tools = {"acs": ("ACS on at 0000:01:00.0\nit's on at 0000:02:00.0\n", 1)}
+        rc, out = run("check_pcie_acs", "acs", tools=tools)
+        self.assertEqual((rc, out), (1, "ACS on at 0000:01:00.0, its on at 0000:02:00.0"))
+
+
+class ExampleConf(unittest.TestCase):
+    def test_every_check_the_example_names_exists(self):
+        """The shipped example calls only checks NHC or deepops.nhc defines."""
+        defined = set(re.findall(r"^(\w+)\(\)", CHECKS.read_text(), re.M))
+        example = (ROOT / "roles" / "nhc" / "templates" / "nhc.conf.example-dgxa100").read_text()
+        used = set(re.findall(r"\|\|\s*(check_(?:nv|ib|ipoib|num|pcie)\w*)", example))
+        self.assertLessEqual(used, defined)
 
 
 if __name__ == "__main__":

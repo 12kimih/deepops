@@ -1,90 +1,142 @@
 # NHC -- Custom checks for DeepOps
+#
+# A failing check calls NHC's die with its reason, as NHC's own checks do: that reason
+# is what Slurm shows on the drained node (a plain "return 1" leaves only "Check ...
+# returned 1"). A check whose tool fails, hangs or reports nothing it can read fails
+# too: the node is not known to be healthy, and passing on no output hid broken GPUs.
+# Reasons hold no single quote (NHC passes them to its offline helper inside one).
 
-function check_nv_drv_version() {
-	expected_vers=$1
-	if ! cat /proc/driver/nvidia/version | head -n1 | grep $expected_vers 2>&1 >/dev/null ; then
-		echo "GPU driver version incorrect"
-		return 1
-	fi
-	return 0
+# Bounds every nvidia-smi: a GPU that has fallen off the bus can hang it.
+NV_SMI_TIMEOUT=60
+
+# nvidia-smi ARGS..., bounded in time; its status is its own (124 when timed out).
+nv_smi() {
+    timeout "$NV_SMI_TIMEOUT" nvidia-smi "$@" 2>/dev/null
 }
 
-function check_nv_gpu_count() {
-	expected_count=$1
-	# Physical GPUs only: -L also lists each MIG instance, on a line of its own.
-	actual_count="$(timeout 60 nvidia-smi -L | grep -c '^GPU ')"
-	if [ "$expected_count" -ne "$actual_count" ]; then
-		echo "GPU count incorrect"
-		return 1
-	fi
-	return 0
+check_nv_drv_version() {
+    local expected="$1" line
+    if ! read -r line </proc/driver/nvidia/version 2>/dev/null; then
+        die 1 "${FUNCNAME[0]}: no NVIDIA driver loaded"
+        return 1
+    fi
+    if ! grep -qwF -- "$expected" <<<"$line"; then
+        die 1 "${FUNCNAME[0]}: GPU driver is not $expected"
+        return 1
+    fi
+    return 0
 }
 
-function check_nv_retired_pages() {
-	if nvidia-smi --query-gpu=retired_pages.pending --format=csv | grep -i yes 2>&1 >/dev/null ; then
-		echo "GPU retired pages pending, need to reboot"
-		return 1
-	fi
-	return 0
+check_nv_gpu_count() {
+    local expected="$1" out actual
+    # Physical GPUs only: -L also lists each MIG instance, on a line of its own.
+    if ! out="$(nv_smi -L)"; then
+        die 1 "${FUNCNAME[0]}: nvidia-smi -L failed"
+        return 1
+    fi
+    actual="$(grep -c '^GPU ' <<<"$out")"
+    if [ "$actual" -ne "$expected" ]; then
+        die 1 "${FUNCNAME[0]}: $actual GPUs, $expected expected"
+        return 1
+    fi
+    return 0
 }
 
-function check_nv_pcie_link_width() {
-	expected=$1
-	for actual in $(nvidia-smi --query-gpu=pcie.link.width.current --format=csv | grep -v pcie.link.width.current); do
-		if [ $actual -ne $expected ]; then
-			echo "GPU link width incorrect - $actual"
-			return $actual
-		fi
-	done
-	return 0
+# Page retirement (before Ampere; newer GPUs remap rows and report N/A here, which passes).
+check_nv_retired_pages() {
+    local out found
+    if ! out="$(nv_smi --query-gpu=gpu_bus_id,retired_pages.pending --format=csv,noheader)"; then
+        die 1 "${FUNCNAME[0]}: nvidia-smi failed"
+        return 1
+    fi
+    found="$(awk -F', *' 'tolower($2) == "yes" { print $1 }' <<<"$out" | paste -s -d ',')"
+    if [ -n "$found" ]; then
+        die 1 "${FUNCNAME[0]}: GPU retired pages pending on $found, reboot to retire them"
+        return 1
+    fi
+    return 0
 }
 
-function check_nv_dcgmi_diag() {
-	if dcgmi diag -r 1 2>&1 | grep -i -E 'Error|Fail' ; then
-		echo "DCGM diag failed"
-		return 1
-	fi
-	return 0
+# A width that is not the expected number, N/A included, fails: a GPU that cannot say
+# its link width is not known to have it.
+check_nv_pcie_link_width() {
+    local expected="$1" out found
+    if ! out="$(nv_smi --query-gpu=gpu_bus_id,pcie.link.width.current --format=csv,noheader)"; then
+        die 1 "${FUNCNAME[0]}: nvidia-smi failed"
+        return 1
+    fi
+    found="$(awk -F', *' -v want="$expected" 'NF && $2 != want { print $1 " x" $2 }' <<<"$out" | paste -s -d ',')"
+    if [ -z "$out" ] || [ -n "$found" ]; then
+        die 1 "${FUNCNAME[0]}: GPU PCIe link width not x$expected: ${found:-no GPUs}"
+        return 1
+    fi
+    return 0
 }
 
-function check_ipoib_up() {
-	interface=$1
-	if ! ibdev2netdev | grep $interface | grep -q Up ; then
-		echo "IPoIB not up on $interface"
-		return 1
-	fi
-	return 0
+# dcgmi exits non-zero when a test fails or DCGM is unreachable; a missing dcgmi fails.
+check_nv_dcgmi_diag() {
+    local out
+    if ! out="$(timeout 900 dcgmi diag -r 1 2>&1)" || grep -qiE 'error|fail' <<<"$out"; then
+        die 1 "${FUNCNAME[0]}: DCGM diag -r 1 failed"
+        return 1
+    fi
+    return 0
 }
 
-function check_ib_link_ber() {
-	interface=$1
-	# Check (negative) exponent of bit error rate
-	ber_exp="$(mlxlink -d $interface -c | grep "Effective Physical BER" | cut -d : -f 2 | cut -d - -f 2)"
-	if [ $ber_exp -lt 9 ]; then
-		echo "BER rate on $interface is too high"
-		return 1
-	fi
-	return 0
+# ibdev2netdev prints "mlx5_0 port 1 ==> ib0 (Up)": the netdev named exactly, Up.
+check_ipoib_up() {
+    local interface="$1" out
+    if ! out="$(ibdev2netdev 2>/dev/null)"; then
+        die 1 "${FUNCNAME[0]}: ibdev2netdev failed"
+        return 1
+    fi
+    if ! awk -v want="$interface" '$5 == want && $6 == "(Up)" { up = 1 } END { exit !up }' <<<"$out"; then
+        die 1 "${FUNCNAME[0]}: IPoIB not up on $interface"
+        return 1
+    fi
+    return 0
+}
+
+# The (negative) exponent of the effective bit error rate, at least 9 (BER 1e-9 or lower).
+check_ib_link_ber() {
+    local interface="$1" ber_exp
+    ber_exp="$(mlxlink -d "$interface" -c 2>/dev/null | sed -n -E 's/.*Effective Physical BER *: *[0-9.]+E-([0-9]+).*/\1/p' | head -n1)"
+    if [ -z "$ber_exp" ]; then
+        die 1 "${FUNCNAME[0]}: no effective BER read on $interface"
+        return 1
+    fi
+    if [ "$((10#$ber_exp))" -lt 9 ]; then
+        die 1 "${FUNCNAME[0]}: BER on $interface is too high (1E-$ber_exp)"
+        return 1
+    fi
+    return 0
 }
 
 check_num_numa_nodes() {
-	expected=$1
-	actual="$(lscpu | grep "NUMA.*CPU" | wc -l)"
-	if [ $expected -ne $actual ]; then
-		echo "Incorrect number of NUMA nodes"
-		return 1
-	fi
-	return 0
+    local expected="$1" nodes
+    nodes=(/sys/devices/system/node/node[0-9]*)
+    [ -e "${nodes[0]}" ] || nodes=()
+    if [ "${#nodes[@]}" -ne "$expected" ]; then
+        die 1 "${FUNCNAME[0]}: ${#nodes[@]} NUMA nodes, $expected expected"
+        return 1
+    fi
+    return 0
 }
 
-check_num_nvme_devs() {
-	expected=$1
-	actual="$(nvme list | grep "/dev/nvme" | wc -l)"
-	if [ $expected -ne $actual ]; then
-		echo "Incorrect number of NVME devices"
-		return 1
-	fi
-	return 0
+# NVMe namespaces (nvme0n1, ...); the per-path nodes of a multipath namespace
+# (nvme0c0n1) are not devices of their own.
+check_num_nvme_devices() {
+    local expected="$1" dev actual=0
+    for dev in /sys/block/nvme[0-9]*n[0-9]*; do
+        [ -e "$dev" ] || continue
+        [[ "${dev##*/}" == nvme*c*n* ]] && continue
+        actual=$((actual + 1))
+    done
+    if [ "$actual" -ne "$expected" ]; then
+        die 1 "${FUNCNAME[0]}: $actual NVMe devices, $expected expected"
+        return 1
+    fi
+    return 0
 }
 
 # The GPU faults NVIDIA lists as needing a GPU reset or a reboot (XID catalog), in this
@@ -92,41 +144,48 @@ check_num_nvme_devs() {
 # reboots, and NHC puts it back on its own once the new boot logs none of them.
 # Arguments: the XIDs that drain, each one argument.
 check_nv_xid() {
-	local found
-	found="$(journalctl -k -b 0 --no-pager -o cat 2>/dev/null \
-		| sed -n -E 's/.*NVRM: Xid \(([^)]*)\): ([0-9]+).*/\2 \1/p' \
-		| awk -v drain=" $* " 'index(drain, " " $1 " ") { print "XID " $1 " on " $2 }' \
-		| sort -u | paste -s -d ',')"
-	if [ -n "$found" ]; then
-		echo "GPU fault, reboot to clear: $found"
-		return 1
-	fi
-	return 0
+    local log found
+    if ! log="$(journalctl -k -b 0 --no-pager -o cat 2>/dev/null)"; then
+        die 1 "${FUNCNAME[0]}: the kernel log of this boot cannot be read"
+        return 1
+    fi
+    found="$(sed -n -E 's/.*NVRM: Xid \(([^)]*)\): ([0-9]+).*/\2 \1/p' <<<"$log" \
+        | awk -v drain=" $* " 'index(drain, " " $1 " ") { print "XID " $1 " on " $2 }' \
+        | sort -u | paste -s -d ',')"
+    if [ -n "$found" ]; then
+        die 1 "GPU fault, reboot to clear: $found"
+        return 1
+    fi
+    return 0
 }
 
 # Row remapping (Ampere and newer): a pending remap takes effect only at the next GPU
 # reset, a failed one means the GPU is out of spare rows (NVIDIA's RMA criterion).
 # GPUs without row remapping report N/A and pass.
 check_nv_remapped_rows() {
-	local found
-	found="$(timeout 60 nvidia-smi --query-remapped-rows=gpu_bus_id,remapped_rows.pending,remapped_rows.failure \
-		--format=csv,noheader 2>/dev/null \
-		| awk -F', *' 'tolower($2) ~ /^(yes|1)$/ { print $1 " pending" } tolower($3) ~ /^(yes|1)$/ { print $1 " failed" }' \
-		| paste -s -d ',')"
-	if [ -n "$found" ]; then
-		echo "GPU row remapping: $found"
-		return 1
-	fi
-	return 0
+    local out found
+    if ! out="$(nv_smi --query-remapped-rows=gpu_bus_id,remapped_rows.pending,remapped_rows.failure --format=csv,noheader)"; then
+        die 1 "${FUNCNAME[0]}: nvidia-smi failed"
+        return 1
+    fi
+    found="$(awk -F', *' 'tolower($2) ~ /^(yes|1)$/ { print $1 " pending" } tolower($3) ~ /^(yes|1)$/ { print $1 " failed" }' <<<"$out" \
+        | paste -s -d ',')"
+    if [ -n "$found" ]; then
+        die 1 "GPU row remapping: $found"
+        return 1
+    fi
+    return 0
 }
 
 # PCIe ACS on again on a device where roles/pcie_acs turned it off (a firmware or
 # hotplug reset): peer-to-peer traffic goes through the CPU. $1 is its program.
 check_pcie_acs() {
-	local found
-	if ! found="$("$1" check 2>&1)"; then
-		echo "${found:-$1 check failed}"
-		return 1
-	fi
-	return 0
+    local found
+    if ! found="$("$1" check 2>&1)"; then
+        found="${found:-$1 check failed}"
+        found="${found//$'\n'/, }"
+        die 1 "${found//\'/}"
+        return 1
+    fi
+    return 0
 }
