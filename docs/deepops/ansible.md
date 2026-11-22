@@ -100,6 +100,11 @@ would run: ipmitool -I open lan set 1 defgw ipaddr 192.0.2.1
 changed: [node1] => (item=defgw ipaddr)
 ```
 
+A command that adds something only if it is missing (`sacctmgr add cluster`) names a
+read-only probe with `unless:` (an argv; a pipe goes in `["sh", "-c", "..."]`). The
+probe runs under `--check` too: when it exits 0, nothing runs and nothing is reported,
+so the preview lists only what the run will add.
+
 A command whose outcome only its output tells (`kubectl apply`, `sacctmgr add`) is
 reported as a change under `--check` too: nothing ran, so the preview cannot know.
 `tests/task-rules` enforces the convention (rule 19).

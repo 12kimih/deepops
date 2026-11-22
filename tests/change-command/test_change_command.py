@@ -44,10 +44,20 @@ PLAY = """
         argv: [echo, made]
       register: r_guarded
       changed_when: ansible_check_mode or ('made' in r_guarded.stdout)
+    - name: Unless a probe holds
+      change_command:
+        argv: [touch, "{{ out }}/held"]
+        unless: [test, -d, "{{ out }}"]
+      register: r_held
+    - name: Unless a probe fails
+      change_command:
+        argv: [touch, "{{ out }}/unheld"]
+        unless: [test, -e, "{{ out }}/unheld"]
+      register: r_unheld
     - name: Record
       ansible.builtin.copy:
         content: "{{ {'argv': r_argv, 'cmd': r_cmd, 'shell': r_shell, 'creates': r_creates,
-                     'guarded': r_guarded} | to_json }}"
+                     'guarded': r_guarded, 'held': r_held, 'unheld': r_unheld} | to_json }}"
         dest: "{{ record }}"
         mode: "0600"
       check_mode: false
@@ -75,21 +85,26 @@ class ChangeCommand(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             got, files, stdout = run(Path(tmp), "--check", "--diff")
         self.assertEqual(files, [])
-        for key in ("argv", "cmd", "shell", "guarded"):
+        for key in ("argv", "cmd", "shell", "guarded", "unheld"):
             self.assertTrue(got[key]["changed"], key)
             self.assertNotIn("rc", got[key], key)
         self.assertTrue(got["argv"]["cmd"].startswith("touch ") and got["argv"]["cmd"].endswith("/argv"))
         self.assertEqual(got["cmd"]["cmd"], f"cd {Path(tmp) / 'out'} && touch cmd")
         self.assertIn("would run: echo hi > ", stdout)
         self.assertFalse(got["creates"]["changed"])
+        # unless runs its read-only probe in a preview too: what is there is no change.
+        self.assertFalse(got["held"]["changed"])
+        self.assertIn("not needed", got["held"]["msg"])
 
     def test_without_check_it_is_command(self):
         with tempfile.TemporaryDirectory() as tmp:
             got, files, _ = run(Path(tmp))
-        self.assertEqual(files, ["argv", "cmd", "shell"])
+        self.assertEqual(files, ["argv", "cmd", "shell", "unheld"])
         self.assertEqual((got["argv"]["rc"], got["shell"]["stdout"]), (0, "done"))
         self.assertTrue(got["argv"]["changed"] and got["guarded"]["changed"])
         self.assertFalse(got["creates"]["changed"])
+        self.assertFalse(got["held"]["changed"])
+        self.assertTrue(got["unheld"]["changed"])
 
 
 if __name__ == "__main__":
