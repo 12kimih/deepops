@@ -54,11 +54,13 @@
 - hosts: all
   gather_facts: false
   tasks:
+    # git names each submodule it registers or checks out; a converged tree says nothing.
     - name: Make sure kubespray is at the correct version
       change_command:
-        cmd: git submodule update --init
-      args:
+        argv: [git, submodule, update, --init]
         chdir: "{{ playbook_dir | dirname }}"
+      register: k8s_submodule
+      changed_when: ansible_check_mode or ((k8s_submodule.stdout + k8s_submodule.stderr) | trim | length > 0)
       delegate_to: localhost
       run_once: true
   vars:
@@ -179,9 +181,16 @@
   tasks:
     - name: Remove swap from fstab
       ansible.builtin.lineinfile: path=/etc/fstab regexp='swap' state=absent
+    - name: Read the active swap
+      ansible.builtin.command:
+        argv: [swapon, --noheadings, --show=NAME]
+      register: k8s_swap
+      changed_when: false
+      check_mode: false  # read-only; --check needs the result
     - name: Disable swap
       change_command:
-        cmd: swapoff -a
+        argv: [swapoff, -a]
+      when: k8s_swap.stdout | trim | length > 0
   tags:
     - swap
 
@@ -365,11 +374,36 @@
         ansible_check_mode or ('is installed.' not in k8s_admin_helm.stdout)
       delegate_to: localhost
       run_once: true
+    # The taint is absent where a control-plane host is also in kube_node: removed only
+    # where the node carries it.
+    - name: Kubeadm | Read the control-plane taint
+      ansible.builtin.command:
+        argv:
+          - "{{ artifacts_dir }}/kubectl"
+          - --kubeconfig
+          - "{{ artifacts_dir }}/admin.conf"
+          - get
+          - node
+          - "{{ inventory_hostname }}"
+          - -o
+          - "jsonpath={.spec.taints[*].key}"
+      register: k8s_taints
+      changed_when: false
+      failed_when: false  # no cluster yet (a first preview): nothing to remove
+      check_mode: false  # read-only; --check needs the result
+      delegate_to: localhost
     - name: Kubeadm | Remove taint for master with node role
       change_command:
-        cmd: "{{ artifacts_dir }}/kubectl --kubeconfig {{ artifacts_dir }}/admin.conf taint node {{ inventory_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
+        argv:
+          - "{{ artifacts_dir }}/kubectl"
+          - --kubeconfig
+          - "{{ artifacts_dir }}/admin.conf"
+          - taint
+          - node
+          - "{{ inventory_hostname }}"
+          - node-role.kubernetes.io/control-plane:NoSchedule-
       delegate_to: localhost
-      failed_when: false # Taint will not be present if kube_control_plane also under kube_node
+      when: "'node-role.kubernetes.io/control-plane' in k8s_taints.stdout.split()"
 
 - name: Install k8s GPU feature discovery
   import_playbook: k8s-cluster/nvidia-k8s-gpu-feature-discovery.yml

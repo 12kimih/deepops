@@ -71,6 +71,20 @@
         src: "{{ mig_manager_config_src }}"
         dest: "{{ mig_manager_config }}"
         mode: "0644"
+      register: mig_config
+      when: has_mig.rc == 0
+
+    # Whether the GPUs already hold the profile: then nothing is applied, and the GPUs
+    # and their CDI devices are left as they are. Read-only, so --check sees it.
+    - name: Check whether the MIG configuration is in place
+      ansible.builtin.command: >-
+        systemd-run --wait --pipe --collect --quiet --
+        nvidia-mig-parted assert -f {{ mig_manager_config }}
+        -c {{ mig_manager_profile }}
+      register: mig_in_place
+      changed_when: false
+      failed_when: false
+      check_mode: false  # read-only; --check needs the result
       when: has_mig.rc == 0
 
     # As the package's own service applies it (service.sh): the configuration, hooks
@@ -92,7 +106,12 @@
           - --
           - nvidia-mig-parted
           - apply
-      when: has_mig.rc == 0
+      register: mig_apply
+      # A changed configuration is applied even when the GPUs match it, so the hook
+      # persists it for the boot-time reapply.
+      when:
+        - has_mig.rc == 0
+        - mig_in_place.rc != 0 or mig_config is changed
 
     - name: Assert MIG configuration was applied
       ansible.builtin.command: >-
@@ -100,7 +119,9 @@
         nvidia-mig-parted assert -f {{ mig_manager_config }}
         -c {{ mig_manager_profile }}
       changed_when: false
-      when: has_mig.rc == 0
+      when:
+        - not ansible_check_mode
+        - mig_apply is changed
 
     # The CDI specification lists the MIG devices, and nvidia-cdi-refresh does not
     # follow a MIG change (cdi-support.html, known limitations): regenerate it.
@@ -115,5 +136,5 @@
         name: nvidia-cdi-refresh.service
         state: restarted
       when:
-        - has_mig.rc == 0
+        - mig_apply is changed
         - mig_cdi_refresh.stat.exists
