@@ -19,9 +19,11 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
+from ansible_yaml import condition, render  # noqa: E402
 from repo_scan import ansible_files  # noqa: E402
 
 SCRIPT = ROOT / "roles" / "host_baseline" / "files" / "orphan-services"
+ABSENT = ROOT / "roles" / "host_baseline" / "tasks" / "absent.yml"
 PACKAGE_MODULES = {
     f"{prefix}{m}" for prefix in ("", "ansible.builtin.") for m in ("apt", "dnf", "yum", "package")
 }
@@ -119,6 +121,48 @@ class OrphanServices(unittest.TestCase):
     def test_leaves_running_programs(self):
         root = self.proc([("/usr/sbin/sshd", "0::/system.slice/ssh.service")])
         self.assertEqual(self.run_script(root), "")
+
+
+class NeededPackagesStay(unittest.TestCase):
+    """What the host needs is marked installed by name before a removal is planned, so a
+    desktop's purge cannot autoremove libopengl0 whichever role ran first (2026-11-22)."""
+
+    TASKS = {t.get("name"): t for t in walk(yaml.safe_load(ABSENT.read_text()))}
+    NAMES = list(TASKS)
+    MARK = "Mark them installed by name (Debian)"
+    UNMARKED = "Note the needed packages still marked automatic (Debian)"
+    PLAN = "Work out what removing them would take with them (Debian)"
+
+    def facts(self, needed, auto):
+        return {"ansible_facts": {"os_family": "Debian"},
+                "host_baseline_needed": {"stdout_lines": needed}, "host_baseline_auto": {"stdout_lines": auto}}  # fmt: skip
+
+    def unmarked(self, needed, auto):
+        return render(self.TASKS[self.UNMARKED]["ansible.builtin.set_fact"]["host_baseline_unmarked"],
+                      self.facts(needed, auto))  # fmt: skip
+
+    def test_the_mark_comes_before_the_plan(self):
+        self.assertLess(
+            self.NAMES.index(self.MARK), self.NAMES.index("Note what was already unneeded (Debian)")
+        )
+        self.assertLess(self.NAMES.index(self.MARK), self.NAMES.index(self.PLAN))
+        self.assertIn("change_command", self.TASKS[self.MARK], "a preview shows the mark")
+
+    def test_only_installed_automatic_needed_packages_are_marked(self):
+        needed = ["ii  libopengl0:amd64", "ii  libc6:amd64", "un  libgl1", "rc  linux-image-6.8.0-1-generic"]
+        self.assertEqual(self.unmarked(needed, ["libopengl0", "libgl1", "zlib1g"]), ["libopengl0"])
+
+    def test_nothing_is_marked_or_installed_when_all_are_manual(self):
+        values = {**self.facts(["ii  libc6:amd64"], []), "host_baseline_present": ["gdm3"],
+                  "host_baseline_unmarked": self.unmarked(["ii  libc6:amd64"], [])}  # fmt: skip
+        self.assertFalse(condition(self.TASKS[self.MARK]["when"], values))
+
+    def test_the_plan_keeps_what_was_marked(self):
+        values = {"host_baseline_present": ["gdm3"], "host_baseline_unmarked": ["libopengl0"]}
+        argv = render(self.TASKS[self.PLAN]["ansible.builtin.command"]["argv"], values)
+        self.assertEqual(
+            argv[-2:], ["gdm3", "libopengl0+"], "kept as if installed by name, even in a preview"
+        )
 
 
 class OneRemovalPath(unittest.TestCase):
