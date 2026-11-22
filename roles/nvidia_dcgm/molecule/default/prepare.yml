@@ -29,5 +29,5 @@
     - name: Report one GPU
       ansible.builtin.copy:
         dest: /etc/ansible/facts.d/gpus.fact
-        content: '{"count": 1}'
+        content: '{"count": 1, "device_ids": ["0x2330"]}'
         mode: "0644"

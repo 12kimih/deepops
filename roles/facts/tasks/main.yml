@@ -4,20 +4,6 @@
   ansible.builtin.meta: end_role
   when: facts_ready | bool
 
-- name: Apt install pciutils
-  ansible.builtin.apt:
-    name: pciutils
-    update_cache: true
-    cache_valid_time: 3600
-  when: ansible_facts.os_family == 'Debian'
-  environment: "{{ proxy_env }}"
-
-- name: Dnf install pciutils
-  ansible.builtin.dnf:
-    name: pciutils
-  when: ansible_facts.os_family == 'RedHat'
-  environment: "{{ proxy_env }}"
-
 - name: Create fact directory
   ansible.builtin.file:
     path: /etc/ansible/facts.d

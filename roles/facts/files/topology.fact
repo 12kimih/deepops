@@ -1,18 +1,28 @@
 #!/bin/bash
-SOCKETS=`lscpu | grep "Socket(s):"  | cut -d : -f 2 | awk '{print $1}'`
-THREADSPERCORE=`lscpu | grep "Thread(s) per core:" | cut -d : -f 2 | awk '{print $1}'`
-CORESPERSOCKET=`lscpu | grep "Core(s) per socket:" | cut -d : -f 2 | awk '{print $1}'`
-echo "{"
-echo "  \"cpu_topology\": {"
-echo "    \"sockets\": \"$SOCKETS\","
-echo "    \"cores_per_socket\": \"$CORESPERSOCKET\","
-echo "    \"threads_per_core\": \"$THREADSPERCORE\"",
-echo "    \"physical_cores\": \"$(expr $SOCKETS \* $CORESPERSOCKET)\"",
-echo "    \"logical_cpus\": \"$(expr $SOCKETS \* $CORESPERSOCKET \* $THREADSPERCORE)\""
-echo "  },"
-echo "  \"gpu_topology\": ["
-gpus=$(lspci | grep -E "(3D|VGA compatible) controller: NVIDIA" | awk '{print $1}' | sed 's/^0000://g' | cut -d : -f 1 \
-    | while read -r bus; do printf '"%s",' "$(cat "/sys/class/pci_bus/0000:${bus}/cpulistaffinity")"; done | sed 's/,$//')
-echo "    $gpus"
-echo "  ]"
-echo "}"
+# {"cpu_topology": {...}}: the online CPUs' sockets, physical cores and logical CPUs,
+# counted from sysfs (lscpu's labels change with its version and locale). A physical
+# core is one set of hyperthread siblings, so core IDs that repeat across dies or
+# sockets count once each.
+# SYSFS_CPU is the CPU directory, for the tests.
+declare -A packages=() cores=()
+logical=0
+for cpu in "${SYSFS_CPU:-/sys/devices/system/cpu}"/cpu[0-9]*; do
+    online=1
+    [ -r "$cpu/online" ] && read -r online <"$cpu/online"
+    [ "$online" = 1 ] || continue
+    read -r package <"$cpu/topology/physical_package_id" 2>/dev/null || continue
+    siblings_file="$cpu/topology/core_cpus_list"
+    [ -r "$siblings_file" ] || siblings_file="$cpu/topology/thread_siblings_list"
+    read -r siblings <"$siblings_file" 2>/dev/null || continue
+    packages[$package]=1
+    cores[$siblings]=1
+    logical=$((logical + 1))
+done
+sockets=${#packages[@]}
+physical=${#cores[@]}
+if [ "$sockets" -eq 0 ] || [ "$physical" -eq 0 ]; then
+    echo '{"cpu_topology": {}}'
+    exit 0
+fi
+printf '{"cpu_topology": {"sockets": %d, "cores_per_socket": %d, "threads_per_core": %d, "physical_cores": %d, "logical_cpus": %d}}\n' \
+    "$sockets" "$((physical / sockets))" "$((logical / physical))" "$physical" "$logical"

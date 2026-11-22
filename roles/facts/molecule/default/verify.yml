@@ -19,3 +19,8 @@
           - ansible_facts.ansible_local.gpus is mapping
           - ansible_facts.ansible_local.memory is mapping
           - ansible_facts.ansible_local.topology is mapping
+          - ansible_facts.ansible_local.gpus.device_ids | length == ansible_facts.ansible_local.gpus.count
+          - ansible_facts.ansible_local.topology.cpu_topology.logical_cpus
+            == ansible_facts.ansible_local.topology.cpu_topology.physical_cores
+            * ansible_facts.ansible_local.topology.cpu_topology.threads_per_core
+          - ansible_facts.ansible_local.topology.cpu_topology.logical_cpus == ansible_facts.processor_vcpus

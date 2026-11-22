@@ -1,7 +1,22 @@
 #!/bin/bash
-if ! command -v lspci >/dev/null 2>&1; then
-    echo lspci not installed
-    exit 1
-fi
-count=$(lspci | grep -E "(3D|VGA compatible) controller: NVIDIA" --count)
-echo "{ \"count\": $count }"
+# {"count": N, "device_ids": ["0x2330", ...]}: the NVIDIA GPUs on this host's PCI
+# buses (display controllers, VGA or 3D, of vendor 0x10de), whether or not a driver
+# has them, with each one's PCI device ID (it tells the GPU generation before a driver
+# answers). Read from sysfs, so the output is JSON on any host: lspci missing once
+# made it a sentence Ansible could not load.
+# SYSFS_PCI is the device directory, for the tests.
+count=0
+ids=""
+for dev in "${SYSFS_PCI:-/sys/bus/pci/devices}"/*; do
+    read -r vendor <"$dev/vendor" 2>/dev/null || continue
+    read -r class <"$dev/class" 2>/dev/null || continue
+    read -r device <"$dev/device" 2>/dev/null || continue
+    [ "$vendor" = 0x10de ] || continue
+    case "$class" in
+        0x0300* | 0x0302*)
+            count=$((count + 1))
+            ids="${ids:+$ids, }\"$device\""
+            ;;
+    esac
+done
+printf '{"count": %d, "device_ids": [%s]}\n' "$count" "$ids"

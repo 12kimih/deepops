@@ -16,19 +16,16 @@
       failed_when: false
       check_mode: false  # read-only
 
+    # roles/facts gpus.fact, read again: the GPUs on the PCIe bus now.
     - name: Count the GPUs on the PCIe bus now
-      ansible.builtin.shell:
-        cmd: set -o pipefail; lspci | grep -cE '(3D|VGA compatible) controller. NVIDIA' || true
-        executable: /bin/bash
-      register: maintenance_gpus_bus
-      changed_when: false
-      check_mode: false  # read-only
+      ansible.builtin.setup:
+        filter: ansible_local
 
     - name: Fail when a GPU is missing
       ansible.builtin.fail:
         msg: >-
           {{ maintenance_gpus.stdout_lines | select('match', 'GPU [0-9]') | list | length }} of
-          {{ maintenance_gpus_expected }} GPUs answer, {{ maintenance_gpus_bus.stdout | trim }} are on the
+          {{ maintenance_gpus_expected }} GPUs answer, {{ ansible_facts.ansible_local.gpus.count }} are on the
           PCIe bus. Fewer on the bus: a GPU, riser or PCIe switch dropped off; power-cycle the node
           through its BMC, and if they stay gone it is hardware. All on the bus: the driver failed for
           some; see dmesg | grep -E 'NVRM|Xid'.

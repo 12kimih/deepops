@@ -1,5 +1,13 @@
 #!/bin/bash
-# printf "%d" keeps the value an integer regardless of locale: the default
-# awk print emits a float whose decimal separator follows LC_NUMERIC, which
-# on comma-decimal locales produces invalid JSON and breaks the local fact.
-echo "{ \"total_mb\": $(free -m | awk '/^Mem:/ {printf "%d", $2*0.95}') }"
+# {"total_mb": N}: 95% of the memory the kernel reports, in MiB, an integer. Read from
+# /proc/meminfo: free's labels and awk's decimal separator both follow the locale, and
+# either made the fact invalid JSON.
+# MEMINFO is the file, for the tests.
+total_kb=0
+while read -r name value _; do
+    if [ "$name" = MemTotal: ]; then
+        total_kb="$value"
+        break
+    fi
+done <"${MEMINFO:-/proc/meminfo}"
+printf '{"total_mb": %d}\n' "$((total_kb * 95 / 100 / 1024))"
