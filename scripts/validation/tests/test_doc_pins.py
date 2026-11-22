@@ -24,6 +24,29 @@ PIN = re.compile(
 )
 
 
+# A component named in prose, and the role default that pins it.
+PROSE_PINS = {
+    "Slurm": "slurm_version",
+    "Enroot": "enroot_version",
+    "enroot": "enroot_version",
+    "Pyxis": "slurm_pyxis_version",
+    "pyxis": "slurm_pyxis_version",
+    "NHC": "nhc_version",
+    "Lmod": "lmod_version",
+    "OpenMPI": "openmpi_version",
+    "Open MPI": "openmpi_version",
+    "EasyBuild": "easybuild_version",
+    "Container Toolkit": "nvidia_container_toolkit_version",
+    "Docker Engine": "docker_engine_version",
+    "MIG Manager": "mig_manager_version",
+}
+PROSE = re.compile(r"\b(" + "|".join(map(re.escape, PROSE_PINS)) + r")\s+v?(\d+\.\d+(?:\.\d+)?)")
+# Words beside a version that make it a requirement or history, not the pin.
+PROSE_NOT_A_PIN = ("or newer", "or later", "since", "before", "older", "earlier")
+# Pages that record a past test environment as such.
+PROSE_HISTORY = {"docs/k8s-cluster/roce-perf-k8s.md"}
+
+
 def role_defaults():
     found = {}
     for path in tracked("roles/*/defaults/main.yml"):
@@ -76,6 +99,27 @@ class DocPinTests(unittest.TestCase):
                         if m.group(1) not in tags:
                             stale.append(f"{doc.relative_to(ROOT)}:{number}: {repo}:{m.group(1)}")
         self.assertEqual(stale, [], "name the pinned tag, or none (docs/deepops/versions.md lists them)")
+
+    def test_prose_names_the_pinned_version(self):
+        """ "Slurm 25.11.x" in a sentence went stale with the next bump as surely as a
+        `slurm_version:` line: a component named in prose with a version names the one
+        its role pins (that version or its major.minor). A version that only states a
+        requirement or history says so ("or newer", "since") and is not a pin."""
+        defaults = role_defaults()
+        stale = []
+        for doc in tracked("docs/*.md", "roles/*/README.md", "skills/*.md", "README.md", "AGENTS.md"):
+            rel = str(doc.relative_to(ROOT))
+            if rel in PROSE_HISTORY:
+                continue
+            for number, line in enumerate(doc.read_text().splitlines(), 1):
+                for m in PROSE.finditer(line):
+                    name, version = m.group(1), m.group(2)
+                    pinned = defaults[PROSE_PINS[name]]
+                    around = line[max(0, m.start() - 12) : m.end() + 12].lower()
+                    if pinned.startswith(version) or any(w in around for w in PROSE_NOT_A_PIN):
+                        continue
+                    stale.append(f"{rel}:{number}: {name} {version}, the role pins {pinned}")
+        self.assertEqual(stale, [], "name the variable or docs/deepops/versions.md, not a number")
 
 
 if __name__ == "__main__":

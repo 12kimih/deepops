@@ -3,7 +3,8 @@
 
     config_lint.py [--fix]              run every check
     config_lint.py [--fix] CHECK ...    run some: commented, redundant, dead, doc-paths,
-                                        doc-vars, doc-limits, doc-gpu, duplicates, shadow,
+                                        doc-vars, doc-limits, doc-anchors, doc-repeats, doc-gpu,
+                                        duplicates, shadow,
                                         copies
 
 A role's defaults own each setting's default and a config states only what differs
@@ -28,6 +29,12 @@ doc-vars   every setting a document tells a reader to set (`name: value`) or lis
 doc-limits every `ansible-playbook -l X playbooks/...` a document shows limits to hosts the
            play targets: -l only narrows a play's own hosts, so a group outside them
            (or one config.example/inventory does not know) runs nothing there.
+doc-anchors every link to a section (page.md#heading, or #heading on the same page) names
+           a heading the target page has, by GitHub's slug of it: a renamed or
+           removed section left a table of contents pointing nowhere.
+doc-repeats no document holds the same run of DOC_REPEAT text lines twice (code blocks
+           aside, where a sample output may repeat): a section pasted in again by an
+           edit (one page carried four sections twice, the copies already apart).
 doc-gpu    every GPU command a document runs on a node through ansible or ssh goes
            through systemd-run: the Slurm login setup hides the GPUs from the ssh
            service, so nvidia-smi there finds none (the roles' tasks do the same).
@@ -460,6 +467,87 @@ REMOTE_COMMAND = re.compile(r"\bansible\b[^`\n]*?\s-a\s[^`\n]*|\bssh\s[^`\n|]*")
 GPU_TOOL = re.compile(r"\b(nvidia-smi|nvidia-mig-parted)\b")
 
 
+# A Markdown link's target and section: [text](page.md#heading) or [text](#heading).
+LINK = re.compile(r"\]\(([^)\s#]*)#([^)\s]+)\)")
+FENCE = re.compile(r"^\s*(```|~~~)")
+
+
+def slugs(text):
+    """The anchors GitHub gives TEXT's headings (lower case, punctuation dropped, spaces as
+    hyphens, -1, -2 for repeats) and the explicit ones (<a id/name="...">)."""
+    found, seen, fenced = set(), {}, False
+    for line in text.splitlines():
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        heading = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
+        if heading:
+            title = re.sub(r"`|\*\*|__|\[([^\]]*)\]\([^)]*\)", r"\1", heading.group(1))
+            slug = re.sub(r"[^\w\- ]", "", title.strip().lower()).replace(" ", "-")
+            count = seen.get(slug, 0)
+            seen[slug] = count + 1
+            found.add(slug if count == 0 else f"{slug}-{count}")
+        found.update(re.findall(r"<a\s+(?:id|name)=[\"']([^\"']+)[\"']", line))
+    return found
+
+
+def check_doc_anchors():
+    pages = {shown: (text, site) for shown, text, site in documents()}
+    anchors = {shown: slugs(text) for shown, (text, _) in pages.items()}
+    problems = []
+    for shown, (text, site) in pages.items():
+        fenced = False
+        for number, line in enumerate(text.splitlines(), 1):
+            if FENCE.match(line):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            for target, section in LINK.findall(line):
+                if "://" in target:
+                    continue
+                page = os.path.normpath(os.path.join(os.path.dirname(shown), target)) if target else shown
+                if page in anchors and section.lower() not in anchors[page]:
+                    problems.append(
+                        found("doc-anchors", shown, number, f"{page} has no section #{section}", site)
+                    )
+    return problems
+
+
+# How many consecutive text lines a repeat must span to count.
+DOC_REPEAT = 8
+
+
+def repeats(text):
+    """(line, earlier line) of the first run of DOC_REPEAT non-blank lines outside code
+    blocks that TEXT already held, not overlapping it; None when there is none."""
+    lines, fenced = [], False
+    for number, line in enumerate(text.splitlines(), 1):
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if not fenced and line.strip():
+            lines.append((number, line.rstrip()))
+    seen = {}
+    for k in range(len(lines) - DOC_REPEAT + 1):
+        run = tuple(line for _, line in lines[k : k + DOC_REPEAT])
+        first = seen.setdefault(run, k)
+        if k - first >= DOC_REPEAT:
+            return lines[k][0], lines[first][0]
+    return None
+
+
+def check_doc_repeats():
+    problems = []
+    for shown, text, site in documents():
+        hit = repeats(text)
+        if hit:
+            problems.append(found("doc-repeats", shown, hit[0], f"repeats lines from {hit[1]} on", site))
+    return problems
+
+
 def check_doc_gpu():
     problems = []
     for shown, text, site in documents():
@@ -655,6 +743,8 @@ CHECKS = {
     "doc-paths": check_doc_paths,
     "doc-vars": check_doc_vars,
     "doc-limits": check_doc_limits,
+    "doc-anchors": check_doc_anchors,
+    "doc-repeats": check_doc_repeats,
     "doc-gpu": check_doc_gpu,
     "duplicates": check_duplicates,
     "proxy-credentials": check_proxy_credentials,

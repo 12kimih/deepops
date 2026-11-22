@@ -82,12 +82,7 @@ my-cluster-compute-02
 ```
 
 If you want to further sub-divide your cluster, or target particular hosts with playbooks, you can add other inventory groups to this file!
-A component playbook targets its own group (the [NFS server playbook](../../playbooks/generic/nfs-server.yml) targets `slurm-nfs`, for example), and `--limit` or `-l` only narrows that group; it never adds hosts outside it.
-To run a playbook on another group, pass it as `hostlist`, e.g.:
-
-```bash
-ansible-playbook -e hostlist=nfs-server playbooks/generic/nfs-server.yml
-```
+A component's inventory group decides where it is installed: a component playbook runs on the whole cluster (`hostlist`, `slurm-cluster` by default) and converges every host to what its group says, present on the component's hosts (the [NFS server playbook](../../playbooks/generic/nfs-server.yml) installs the server on `slurm-nfs`, for example) and kept or removed elsewhere ([component state](component-state.md)). `--limit` or `-l` only narrows the hosts a play runs on; to move a component to other hosts, change its inventory group, not `hostlist`.
 
 For more information on using Ansible inventory files, we recommend reading the [Ansible documentation](https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html).
 
@@ -101,7 +96,7 @@ These variables are included in the various files under [`config/group_vars`](..
 DeepOps uses Ansible variables extensively as boolean "flags", to turn on and off optional features.
 In different situations, you may want to enable features that DeepOps doesn't set up by default, or turn off features that are enabled by default.
 
-For example, the [slurm-cluster playbook](../../playbooks/slurm-cluster.yml) automatically deploys a caching container registry on the login node by default.
+For example, the [slurm-cluster playbook](../../playbooks/slurm-cluster.yml) automatically deploys a container registry on the Slurm controller (`slurm-master`) by default.
 This is useful if you plan to use containers on your cluster, but you might not want to do this if you do all your development outside containers!
 This feature can be disabled by setting `slurm_enable_container_registry: false` in your DeepOps configuration.
 
@@ -149,15 +144,18 @@ Apart from that refresh, nothing connects to a host or decrypts a vaulted value.
 **Group variables** are applied to all the hosts in an Ansible inventory group.
 These variables are specified in files named for the inventory group used, in the `config/group_vars` directory:
 
-```console
-config/group_vars/
-|-- all.yml
-|-- k8s_cluster.yml
-|-- netapp-trident.yml
-|-- nis-master.yml
-|-- slurm-cluster.yml
-`-- slurm-login.yml
+<!-- BEGIN GENERATED: tree:config.example/group_vars -->
+```text
+├── config.example/group_vars
+│   ├── all.yml
+│   ├── k8s_cluster.yml
+│   ├── ldap-server.yml
+│   ├── netapp-trident.yml
+│   ├── nis-master.yml
+│   ├── slurm-cluster.yml
+│   └── slurm-login.yml
 ```
+<!-- END GENERATED: tree:config.example/group_vars -->
 
 So, for example, variables in the `all.yml` file will apply to all the hosts in your inventory;
 but variables in the `slurm-cluster.yml` file will only be used for hosts in the `slurm-cluster` inventory group.
@@ -203,10 +201,10 @@ And can make use of variables in your `config` directory like other playbooks.
 We recommend creating a separate Git repository for managing your cluster configuration, so that you can track changes to your cluster independently of DeepOps changes and upgrades.
 (The DeepOps [`.gitignore` file](../../.gitignore) is set up to facilitate this by ignoring directories that start with the string `config`, except for `config.example`.)
 
-A good practice is to start a new Git repository by copying the example configuration:
+A good practice is to start a new Git repository from the configuration `scripts/setup.sh` creates (the inventory, `group_vars` and `host_vars` of config.example; every other file of config.example is a default the tools read while the site has none, so copy one into `config/` only to change it):
 
 ```bash
-cp -R config.example/ config/
+./scripts/setup.sh
 cd config
 git init
 git add -A
@@ -231,7 +229,7 @@ cd config/group_vars/
 vim slurm-cluster.yml
 
 git add slurm-cluster.yml
-git commit -m "Pin Slurm to 25.11.6"
+git commit -m "Pin Slurm to <version>"
 ```
 
 ## Keeping secrets out of Git with Ansible Vault

@@ -15,20 +15,29 @@ Directory structure and explanation of this projects architecture
 
 ## config.example
 Template folder for `config` folder generated after running `scripts/setup.sh`.
-```bash
-.
+<!-- BEGIN GENERATED: tree:config.example -->
+```text
 ├── config.example
 │   ├── containers
 │   ├── files
 │   ├── group_vars
 │   ├── helm
 │   ├── host_vars
-│   └── playbooks
+│   ├── playbooks
+│   ├── README.md
+│   ├── env.sh
+│   ├── inventory
+│   ├── maas-inventory.yml
+│   ├── people.yml
+│   ├── requirements.yml
+│   └── sensitive-patterns
 ```
+<!-- END GENERATED: tree:config.example -->
 
 ## docs
 Documentation for all DeepOps functionality.
-```bash
+<!-- BEGIN GENERATED: tree:docs -->
+```text
 ├── docs
 │   ├── airgap
 │   ├── cloud-native
@@ -38,15 +47,19 @@ Documentation for all DeepOps functionality.
 │   ├── img
 │   ├── k8s-cluster
 │   ├── misc
+│   ├── model-workflows
 │   ├── ngc-ready
 │   ├── pxe
-│   └── slurm-cluster
+│   ├── slurm-cluster
+│   └── README.md
 ```
+<!-- END GENERATED: tree:docs -->
 
 
 ## playbooks
 Playbooks run via Ansible as part of complete Slurm or Kubernetes installation or ad-hoc plays.
-```bash
+<!-- BEGIN GENERATED: tree:playbooks -->
+```text
 ├── playbooks
 │   ├── bootstrap
 │   ├── container
@@ -56,8 +69,13 @@ Playbooks run via Ansible as part of complete Slurm or Kubernetes installation o
 │   ├── nvidia-software
 │   ├── provisioning
 │   ├── slurm-cluster
-│   └── utilities
+│   ├── utilities
+│   ├── k8s-cluster.yml
+│   ├── model-cache.yml
+│   ├── ngc-ready-server.yml
+│   └── slurm-cluster.yml
 ```
+<!-- END GENERATED: tree:playbooks -->
 
 
 ## roles
@@ -103,8 +121,8 @@ reader writes `| default(...)` for a defined variable;
 │   ├── disk_quota
 │   ├── dns-config
 │   ├── dns_resolver
-│   ├── docker
 │   ├── docker-login
+│   ├── docker
 │   ├── docker_daemon_json
 │   ├── docker_restart
 │   ├── docker_socket_group
@@ -139,13 +157,13 @@ reader writes `| default(...)` for a defined variable;
 │   ├── netapp-trident
 │   ├── netplan
 │   ├── network_defaults
-│   ├── nfs
 │   ├── nfs-client-provisioner
+│   ├── nfs
 │   ├── nfs_client
 │   ├── nfs_common
 │   ├── nft_table
-│   ├── nginx-docker-registry-cache
 │   ├── nginx-docker-registry-cache-client
+│   ├── nginx-docker-registry-cache
 │   ├── nginx_docker_cache_defaults
 │   ├── nhc
 │   ├── nis_client
@@ -153,10 +171,10 @@ reader writes `| default(...)` for a defined variable;
 │   ├── node_user_policy
 │   ├── nsswitch
 │   ├── nvidia-dcgm-exporter
-│   ├── nvidia-dgx
 │   ├── nvidia-dgx-firmware
-│   ├── nvidia-gpu-operator
+│   ├── nvidia-dgx
 │   ├── nvidia-gpu-operator-node-prep
+│   ├── nvidia-gpu-operator
 │   ├── nvidia-k8s-gpu-device-plugin
 │   ├── nvidia-k8s-gpu-feature-discovery
 │   ├── nvidia-mig-manager
@@ -179,10 +197,10 @@ reader writes `| default(...)` for a defined variable;
 │   ├── people
 │   ├── people_defaults
 │   ├── podman
-│   ├── prometheus
 │   ├── prometheus-ipmi-exporter
 │   ├── prometheus-node-exporter
 │   ├── prometheus-slurm-exporter
+│   ├── prometheus
 │   ├── prometheus_paths
 │   ├── proxy_defaults
 │   ├── pyxis
@@ -213,53 +231,93 @@ reader writes `| default(...)` for a defined variable;
 │   ├── standalone-container-registry
 │   ├── submit_holds
 │   ├── system_accounts
-│   └── textfile_keep
+│   ├── textfile_keep
+│   └── requirements.yml
 ```
 <!-- END GENERATED: role-tree -->
 
 ## scripts
 Various scripts used to setup environments and collect information.
-```bash
+<!-- BEGIN GENERATED: tree:scripts -->
+```text
 ├── scripts
-│   ├── airgap
+│   ├── dashboards
 │   ├── deepops
+│   ├── docs
 │   ├── generic
 │   ├── k8s
 │   ├── nginx-docker-cache
-│   └── slurm
+│   ├── slurm
+│   ├── validation
+│   ├── check.sh
+│   ├── common.sh
+│   ├── maas_deploy.sh
+│   ├── maas_inventory.py
+│   └── setup.sh
 ```
+<!-- END GENERATED: tree:scripts -->
 
 ## src
 Contains some source material such as GPU Dashboard for Grafana.
-```bash
+<!-- BEGIN GENERATED: tree:src -->
+```text
 ├── src
 │   ├── containers
-│   ├── dashboards
-│   └── repo
+│   └── dashboards
 ```
+<!-- END GENERATED: tree:src -->
 
 ## submodules
 Submodules linked/versioned as part of KubeSpray and Packer-mass setup.
-```bash
+<!-- BEGIN GENERATED: tree:submodules -->
+```text
 ├── submodules
-│   ├── kubespray
-│   └── packer-maas
+
 ```
+<!-- END GENERATED: tree:submodules -->
 
 ## virtual
 Various resources for setting up virtual envs used with DeepOps
-```bash
+<!-- BEGIN GENERATED: tree:virtual -->
+```text
 ├── virtual
 │   ├── scripts
-│   └── vars_files
+│   ├── vars_files
+│   ├── .gitignore
+│   ├── README.md
+│   ├── Vagrantfile-centos7
+│   ├── Vagrantfile-centos7-full
+│   ├── Vagrantfile-centos7-large-slurm
+│   ├── Vagrantfile-centos8
+│   ├── Vagrantfile-centos8-full
+│   ├── Vagrantfile-centos8-large-slurm
+│   ├── Vagrantfile-ubuntu18.04
+│   ├── Vagrantfile-ubuntu18.04-full
+│   ├── Vagrantfile-ubuntu18.04-large-slurm
+│   ├── Vagrantfile-ubuntu20.04
+│   ├── Vagrantfile-ubuntu20.04-full
+│   ├── Vagrantfile-ubuntu20.04-large-slurm
+│   ├── Vagrantfile-ubuntu22.04
+│   ├── Vagrantfile-ubuntu22.04-full
+│   ├── Vagrantfile-ubuntu22.04-large-slurm
+│   ├── cluster_up.sh
+│   ├── k8s_environment.sh
+│   ├── vagrant_shutdown.sh
+│   ├── vagrant_startup.sh
+│   ├── virtual_inventory
+│   ├── virtual_inventory_full
+│   └── virtual_inventory_large_slurm
 ```
+<!-- END GENERATED: tree:virtual -->
 
 ## workloads
 Sample workloads which one can use after setting up their cluster.
-```bash
-└── workloads
-    ├── bit
-    ├── examples
-    ├── jenkins
-    └── services
+<!-- BEGIN GENERATED: tree:workloads -->
+```text
+├── workloads
+│   ├── bit
+│   ├── examples
+│   ├── jenkins
+│   └── services
 ```
+<!-- END GENERATED: tree:workloads -->
