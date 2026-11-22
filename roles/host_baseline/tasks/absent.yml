@@ -176,12 +176,6 @@
         - host_baseline_present | length > 0
         - host_baseline_removal_foreign
 
-    - name: Note whether anything was removed
-      ansible.builtin.set_fact:
-        host_baseline_removed:
-          changed: "{{ host_baseline_removed_native is changed or host_baseline_removed_foreign is changed }}"
-      when: host_baseline_present | length > 0
-
     # A preview removes nothing, so an install later in the run that needs the removal
     # (another driver's packages in the way) would fail its own preview: what the run
     # would remove is noted for it (plugins/action/repo_package.py), as package_repos
@@ -191,12 +185,12 @@
         host_baseline_unremoved: "{{ (host_baseline_unremoved | default([]) + host_baseline_removal) | unique }}"
       when:
         - ansible_check_mode
-        - host_baseline_removed is changed
+        - (host_baseline_removed_native is changed or host_baseline_removed_foreign is changed)
 
 # Only after this run removed something, and only daemons whose own main process runs
 # a removed program (files/orphan-services): stopped, never disabled.
 - name: Stop the services still running a removed program
-  when: host_baseline_removed is changed
+  when: (host_baseline_removed_native is changed or host_baseline_removed_foreign is changed)
   block:
     - name: Look for services still running a removed program
       ansible.builtin.script: orphan-services
