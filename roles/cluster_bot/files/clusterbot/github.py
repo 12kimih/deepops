@@ -65,7 +65,9 @@ def call(method, path, bearer, payload=None):
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             body = resp.read()
     except urllib.error.HTTPError as e:
-        raise Error(f"GitHub {method} {path}: {e.code} {e.read().decode(errors='replace')[:300]}") from None
+        with e:  # the error is the response: closed once read
+            why = e.read().decode(errors="replace")[:300]
+        raise Error(f"GitHub {method} {path}: {e.code} {why}") from None
     except OSError as e:
         raise Error(f"GitHub {method} {path}: {e}") from None
     return json.loads(body) if body else {}

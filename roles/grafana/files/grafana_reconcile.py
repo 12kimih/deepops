@@ -43,7 +43,8 @@ class Grafana:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 status, raw = resp.status, resp.read()
         except urllib.error.HTTPError as e:
-            status, raw = e.code, e.read()
+            with e:  # the error is the response: closed once read
+                status, raw = e.code, e.read()
         if status not in ok:
             raise RuntimeError(f"{method} {path}: HTTP {status}: {raw[:200].decode(errors='replace')}")
         try:

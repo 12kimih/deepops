@@ -61,6 +61,7 @@ def _registry(url, method="HEAD"):
     except urllib.error.HTTPError as e:
         if e.code != 401:
             raise
+        e.close()  # the error is the response; only its headers are read
         # The registry names where to get an anonymous token for this repository.
         challenge = dict(re.findall(r'(\w+)="([^"]*)"', e.headers.get("WWW-Authenticate", "")))
         query = urllib.parse.urlencode({k: v for k, v in challenge.items() if k in ("service", "scope")})

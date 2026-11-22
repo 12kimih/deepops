@@ -36,10 +36,11 @@ class Prometheus:
             with urllib.request.urlopen(self.url + path + query, timeout=self.timeout) as resp:  # noqa: S310
                 body = resp.read()
         except urllib.error.HTTPError as e:  # a refused query says why in its body
-            try:
-                why = json.loads(e.read()).get("error") or e.reason
-            except (ValueError, AttributeError, OSError):
-                why = e.reason
+            with e:  # the error is the response: closed once read
+                try:
+                    why = json.loads(e.read()).get("error") or e.reason
+                except (ValueError, AttributeError, OSError):
+                    why = e.reason
             raise Error(f"{self.url}{path}: HTTP {e.code}: {why}") from None
         except (urllib.error.URLError, OSError) as e:
             raise Error(f"{self.url}: {getattr(e, 'reason', None) or e}") from None

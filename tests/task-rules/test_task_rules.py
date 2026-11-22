@@ -375,6 +375,8 @@ CHECK_GATED_OK = {
     ("roles/sshd/tasks/main.yml", "Move ssh.socket to the new ports and addresses"):
         "the ports are read from the configuration the run writes (sshd -T)",
     ("roles/sshd/tasks/main.yml", "Reload sshd"): "the ports are read from the configuration the run writes",
+    ("playbooks/utilities/retire-local-accounts.yml", "Put back the subordinate ID ranges userdel dropped"):
+        "restores from the backup the run makes, after the userdel the run makes",
     ("roles/package_repos/tasks/repo.yml", "Refresh the package index"):
         "repo_package previews installs from an unrefreshed index (package_repos_unrefreshed)",
 }  # fmt: skip

@@ -124,16 +124,18 @@ class TransientExecutionContract(unittest.TestCase):
     def test_mig_administration_is_covered_too(self):
         # The probe is useless on its own: once it succeeds, apply and assert
         # drive the very same GPUs and need the same isolation.
+        # assert runs twice: before apply (is the layout in place?) and after (did it take?).
         commands = [command for _, command in gpu_commands(MIG_PLAYBOOK)]
-        for fragment in (
-            "nvidia-smi --query-gpu=mig.mode.current",
-            "nvidia-mig-parted apply",
-            "nvidia-mig-parted assert",
+        for fragment, count in (
+            ("nvidia-smi --query-gpu=mig.mode.current", 1),
+            ("nvidia-mig-parted apply", 1),
+            ("nvidia-mig-parted assert", 2),
         ):
             with self.subTest(fragment=fragment):
                 matching = [c for c in commands if fragment in c]
-                self.assertEqual(len(matching), 1, fragment)
-                self.assertIn(TRANSIENT_SERVICE, matching[0])
+                self.assertEqual(len(matching), count, fragment)
+                for command in matching:
+                    self.assertIn(TRANSIENT_SERVICE, command)
 
     def test_mig_operations_run_privileged(self):
         plays = yaml.safe_load((ROOT / MIG_PLAYBOOK).read_text(encoding="utf-8"))

@@ -83,6 +83,10 @@ def validate(cache_dir, repo_id, revision, required_files):
     return result
 
 
+# How long a killed check is waited for before it is left behind.
+REAP_TIMEOUT = 5
+
+
 def validate_bounded(args, timeout):
     """validate() in a child process, given TIMEOUT seconds. A read from a hung
     storage mount blocks in the kernel, where no signal reaches it, so the bound has
@@ -100,6 +104,11 @@ def validate_bounded(args, timeout):
         return json.loads(out)
     except subprocess.TimeoutExpired:
         child.kill()
+        child.stdout.close()
+        try:  # reaped when the kill lands; one stuck in the kernel stays abandoned
+            child.wait(timeout=REAP_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            pass
         return {
             "schema_version": 1, "ok": False, "repo_id": args.repo_id, "revision": args.revision,
             "snapshot_path": None, "checked_files": [],

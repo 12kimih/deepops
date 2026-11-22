@@ -37,7 +37,8 @@ class FakeGrafana:
                 if not name.endswith(".json"):
                     continue
                 rel = os.path.relpath(os.path.join(dirpath, name), self.path)
-                uid = json.load(open(os.path.join(dirpath, name)))["uid"]
+                with open(os.path.join(dirpath, name)) as f:
+                    uid = json.load(f)["uid"]
                 if uid not in self.dashboards:
                     self.folders.setdefault(self.provider_folder, "provider")
                     self.dashboards[uid] = {"folder": self.provider_folder, "provisioned": rel}
@@ -128,6 +129,7 @@ class ReconcileTests(unittest.TestCase):
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)  # cleanups run last first: after shutdown
         self.addCleanup(self.server.shutdown)
         self.api = reconcile.Grafana(f"http://127.0.0.1:{self.server.server_port}", "admin", "pw")
 
