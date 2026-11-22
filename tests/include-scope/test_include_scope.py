@@ -34,7 +34,7 @@ from repo_scan import ansible_files, module, tasks, tracked  # noqa: E402
 # Ansible's own defaults, not the repository's ansible.cfg (whose settings and
 # fact cache would hide what a role does elsewhere): only the paths it adds are kept.
 os.environ["ANSIBLE_CONFIG"] = str(Path(__file__).with_name("ansible.cfg"))
-os.environ["ANSIBLE_CALLBACK_PLUGINS"] = unrecorded.callback_dir()
+os.environ.update(unrecorded.env({}))  # no callbacks, no site vault password
 os.environ["ANSIBLE_ROLES_PATH"] = str(ROOT / "roles")
 os.environ["ANSIBLE_FILTER_PLUGINS"] = str(ROOT / "plugins" / "filter")
 os.environ["ANSIBLE_ACTION_PLUGINS"] = str(ROOT / "plugins" / "action")
