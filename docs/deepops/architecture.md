@@ -254,6 +254,7 @@ Various scripts used to setup environments and collect information.
 │   ├── common.sh
 │   ├── maas_deploy.sh
 │   ├── maas_inventory.py
+│   ├── push.sh
 │   └── setup.sh
 ```
 <!-- END GENERATED: tree:scripts -->
