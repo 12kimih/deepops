@@ -138,10 +138,12 @@ Every `ansible-playbook` and `ansible` run is recorded by
 [ARA](https://ara.recordsansible.org/) (pinned in `pyproject.toml`): its command line
 options (`--check`, `--diff`, `--limit`), each task's result per host, output, diffs
 and the recap. Nobody has to copy terminal output to show what a run did, and the
-history stays. `scripts/setup.sh` links `.callback_plugins` (`ansible.cfg`) to ARA's
-callback; the records live in `~/.ara/server` (owner-only), one database per operator.
-Ad-hoc commands are recorded too (`bin_ansible_callbacks` in `ansible.cfg`), listed as
-`Ad-Hoc: <module>`.
+history stays. `ansible.cfg` loads `plugins/callback/ara_default.py`: ARA's own callback,
+with the names and paths it sends kept within the 255 characters the server stores (it
+refused a longer one, and the run went unrecorded). The records live in `~/.ara/server`
+(owner-only), one database per operator. Ad-hoc commands are recorded too
+(`bin_ansible_callbacks` in `ansible.cfg`), listed as `Ad-Hoc: <module>: <arguments>`,
+shortened when long; the whole command stays in the run's arguments.
 
 ```bash
 uv run ara playbook list                                  # runs, newest first
