@@ -1,0 +1,85 @@
+---
+# Remove the files of the people whose end lies people_leave_keep_days (90) behind:
+# each of people_purge_paths ({login} filled in) on the hosts where it is a local
+# directory, never through an NFS mount. Only a directory the person owns goes. A
+# preview lists each with its size; the run removes nothing unless people_purge_confirm
+# names exactly the logins due, so a wrong `ends` cannot delete anything by itself (and
+# their login stopped 60 days before). The roster entry stays: its UID is never reused.
+#
+#   ansible-playbook -K playbooks/utilities/people-purge.yml --check
+#   ansible-playbook -K playbooks/utilities/people-purge.yml -e people_purge_confirm=<login>,<login>
+#
+#   -e hostlist=...   the hosts holding the files (default: slurm-nfs, the NFS servers)
+- hosts: "{{ hostlist | default('slurm-nfs') }}"
+  become: true
+  gather_facts: false
+  roles:
+    - role: people_defaults
+  vars:
+    people_purge_confirm: ""
+    _people_purge_due: "{{ people | people_purge_due(people_leave_keep_days) }}"
+    _people_purge_targets: "{{ people | people_purge_targets(people_leave_keep_days, people_purge_paths) }}"
+  tasks:
+    - name: Name the people whose files are due
+      ansible.builtin.debug:
+        msg: >-
+          Due: {{ _people_purge_due | dict2items | map(attribute='key') | join(', ') or 'no one' }}.
+          {{ ('Left without an ends date, so never due: ' ~ (people | people_purge_undated | join(', ')))
+             if people | people_purge_undated | length > 0 else '' }}
+      run_once: true
+
+    - name: Refuse a run that does not name exactly the people due
+      ansible.builtin.assert:
+        that: (people_purge_confirm | split(',') | map('trim') | select | sort) == (_people_purge_due | list | sort)
+        fail_msg: >-
+          Due: {{ _people_purge_due | list | sort | join(',') or '(no one)' }}. Preview with --check, then
+          pass -e people_purge_confirm=<exactly those logins, comma-separated>.
+        quiet: true
+      run_once: true
+      when: not ansible_check_mode and _people_purge_due | length > 0
+
+    # findmnt reads the mount table, so a dead NFS server cannot hang this; a path whose
+    # filesystem is NFS here is removed on its server instead.
+    - name: Find which of their directories are local here
+      ansible.builtin.command:
+        argv: [findmnt, --noheadings, --output, "FSTYPE,TARGET", --target, "{{ item.path }}"]
+      loop: "{{ _people_purge_targets }}"
+      loop_control:
+        label: "{{ item.path }}"
+      register: people_purge_fstype
+      changed_when: false
+      check_mode: false
+
+    - name: Look at each local directory
+      ansible.builtin.stat:
+        path: "{{ item.item.path }}"
+        follow: false
+      loop: "{{ people_purge_fstype.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+      # A path that is itself a filesystem's root (a mount point) is never removed.
+      when: not item.stdout is match('nfs') and (item.stdout.split() | last | default('')) != item.item.path
+      register: people_purge_stat
+
+    - name: Measure what would go
+      ansible.builtin.command:
+        argv: [du, -sh, --one-file-system, "{{ item.stat.path }}"]
+      loop: "{{ people_purge_stat.results | selectattr('stat', 'defined') | selectattr('stat.exists') | list }}"
+      loop_control:
+        label: "{{ item.stat.path }}"
+      when: item.stat.isdir and item.stat.uid == item.item.item.uid
+      register: people_purge_du
+      changed_when: false
+      check_mode: false
+
+    - name: List what goes
+      ansible.builtin.debug:
+        msg: "{{ people_purge_du.results | selectattr('stdout', 'defined') | map(attribute='stdout') | list or 'Nothing here.' }}"
+
+    - name: Remove it
+      ansible.builtin.file:
+        path: "{{ item.item.stat.path }}"
+        state: absent
+      loop: "{{ people_purge_du.results | selectattr('stdout', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.item.stat.path }}"

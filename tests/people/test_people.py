@@ -46,6 +46,42 @@ class Derive(unittest.TestCase):
         self.assertEqual(people.people_former(roster, today="2026-01-31"), ["c"])
         self.assertEqual(people.people_former(roster, today="2026-02-01"), ["b", "c"])
 
+    def test_files_fall_due_keep_days_after_the_end(self):
+        roster = {
+            "a": {"uid": 1001, "ends": "2026-01-01"},
+            "b": {"uid": 1002, "status": "left"},
+            "c": {"uid": 1003},
+        }
+        self.assertEqual(people.people_purge_due(roster, 90, today="2026-04-01"), {})
+        self.assertEqual(
+            people.people_purge_due(roster, 90, today="2026-04-02"),
+            {"a": {"uid": 1001, "ends": "2026-01-01", "due": "2026-04-01"}},
+        )
+        self.assertEqual(people.people_purge_undated(roster), ["b"])
+        self.assertEqual(
+            people.people_purge_targets(
+                roster, 90, ["/home/{login}", "/scratch/{login}"], today="2026-04-02"
+            ),
+            [
+                {"login": "a", "uid": 1001, "path": "/home/a"},
+                {"login": "a", "uid": 1001, "path": "/scratch/a"},
+            ],
+        )
+
+    def test_a_purge_path_names_one_persons_directory_only(self):
+        for bad in [
+            "/{login}",
+            "home/{login}",
+            "/home/{login}/..",
+            "/home/x{login}",
+            "/{login}/home/{login}",
+        ]:
+            with self.assertRaises(ValueError, msg=bad):
+                people.people_purge_targets({}, 90, [bad])
+        for login in ["", ".", ".."]:
+            with self.assertRaises(ValueError, msg=login):
+                people.people_purge_targets({login: {"uid": 1, "ends": "2020-01-01"}}, 90, ["/home/{login}"])
+
     def test_attribute_map(self):
         self.assertEqual(
             people.people_attr(self.p, "slack"),
