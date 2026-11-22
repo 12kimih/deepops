@@ -131,7 +131,9 @@ Run each command from `~/deepops`. Preview with `--check` first.
    The playbook keeps a copy of `passwd`, `group`, `shadow` and `gshadow` under
    `/var/backups/deepops-local-accounts`. It removes an entry only where the directory
    answers with the same number. It keeps the break-glass administrators, the members of
-   the local `sudo` group.
+   the local `sudo` group. `userdel` also drops a user's subordinate ID ranges
+   (`/etc/subuid`, `/etc/subgid`), which the directory does not serve; the playbook
+   copies them first and puts them back.
 
 5. **Retire NIS.** Set `nis_domain: ""` and `nis_server: ""`, and add `nis_client` and
    `nis_server` to `deepops_component_removals`. Then run `playbooks/slurm-cluster.yml`;
