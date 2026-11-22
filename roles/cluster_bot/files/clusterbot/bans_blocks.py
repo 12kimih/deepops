@@ -18,3 +18,48 @@ def unban_form():
             field("reason", "어떤 상황이었나요?", {"type": "plain_text_input", "multiline": True}),
         ],
     }  # fmt: skip
+
+
+# The most bans one message lists (a section holds 3000 characters); the rest are counted.
+LIST_MAX = 40
+
+
+def _line(b):
+    return f"`{b['ip']}` {b['host']} ({b['jail']}), {b['since']}부터"
+
+
+def _sections(lines):
+    """LINES as sections, each under Slack's 3000 characters."""
+    out, chunk = [], []
+    for line in lines:
+        if chunk and len("\n".join([*chunk, line])) > 2900:
+            out.append(chunk)
+            chunk = []
+        chunk.append(line)
+    if chunk:
+        out.append(chunk)
+    return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(c)}} for c in out]
+
+
+def new_bans(bans):
+    """The administrators' notice of the bans made since the last look: (text, blocks)."""
+    text = f"새로 차단된 주소 {len(bans)}개"
+    shown = [_line(b) for b in bans[:LIST_MAX]]
+    if len(bans) > LIST_MAX:
+        shown.append(f"외 {len(bans) - LIST_MAX}개")
+    return text, [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}, *_sections(shown)]
+
+
+def ban_list(bans, errors):
+    """The bans now, newest first, as the one message kept up to date: (text, blocks).
+    ERRORS ({host: why}) are the hosts not read this time."""
+    text = f"현재 차단된 주소 {len(bans)}개"
+    lines = [_line(b) for b in bans[:LIST_MAX]] or ["없음"]
+    if len(bans) > LIST_MAX:
+        lines.append(f"외 {len(bans) - LIST_MAX}개 (가장 최근 {LIST_MAX}개만 보입니다)")
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}, *_sections(lines)]
+    note = "해제는 `/unban-request`로 신청을 받아 승인합니다."
+    if errors:
+        note = "읽지 못한 호스트: " + ", ".join(f"{h} ({e})" for h, e in sorted(errors.items())) + ". " + note
+    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": note}]})
+    return text, blocks

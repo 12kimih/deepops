@@ -50,6 +50,7 @@ _cluster_bot_cfg:
     remind_days: "{{ cluster_bot_scratch_remind_days }}"
   bans:
     hosts: "{{ dict(_cluster_bot_ban_hosts | zip(_cluster_bot_ban_hosts | map('extract', _cluster_bot_addresses))) }}"
+    seen: "{{ _cluster_bot_home }}/bans-seen.json"
   leave:
     remind_days: "{{ cluster_bot_leave_remind_days }}"
     leaving: "{{ people | people_leaving(people_leave_grace_days) }}"

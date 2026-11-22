@@ -30,6 +30,7 @@ oauth_config:
       - chat:write.public
       - commands
       - im:write
+      - pins:write
       - users:read
       - users:read.email
 settings:
