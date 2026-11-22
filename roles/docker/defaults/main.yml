@@ -154,9 +154,10 @@ docker_sysctls:
 # What Docker keeps that nothing uses goes on a schedule (docker-prune.timer): stopped
 # containers created more than docker_prune_after ago, images no container uses that were
 # built more than that ago (Docker keeps no time an image was last used: one pulled
-# yesterday but built last year goes, and is pulled again when wanted), then the
-# anonymous volumes no container uses (a named volume is data and stays). Docker itself
-# collects none of these.
+# yesterday but built last year goes, and is pulled again when wanted), build cache last
+# used more than that ago, then the anonymous volumes no container uses (a named volume
+# is data and stays). Docker itself collects none of these but the build cache, by size
+# only (below).
 # Without it a node kept everything anyone ever ran or pulled: four-month-old stopped
 # containers holding their images (2026-11). The age is the site's one cleanup period
 # (cluster_user_grace_days), as for the other container stores
@@ -171,6 +172,9 @@ docker_prune_schedule: daily
 # to the cap). Left unset, the engine sizes it from the disk: it keeps 10% of the disk
 # for the cache and lets it grow to 80%, so a node kept 161G of build cache on the disk
 # its jobs' space comes from (2026-11). These set the cap and the floor; "" for the cap
-# leaves Docker's sizes.
+# leaves Docker's sizes. The cap alone does not bound the disk: on the overlay2 graph
+# driver BuildKit counted its cache at a fifth of what it held (a node with 10.6GB of
+# build cache had 53G of layers, all freed by pruning it, 2026-11), so it never
+# collected; the prune timer also removes cache unused for docker_prune_after.
 docker_build_cache_max: 10GB
 docker_build_cache_reserved: 2GB
