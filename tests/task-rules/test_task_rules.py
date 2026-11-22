@@ -922,6 +922,38 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "when: not docker_preview_installs | default(false)")
         scan.check(self)
 
+    def test_commands_debconf_may_ask_run_noninteractive(self):
+        # Without a terminal debconf falls back to its Teletype frontend and reads
+        # end-of-file as "no": pam-auth-update kept hand-edited PAM files, exited 0, and
+        # a node named SSSD for accounts while PAM never asked it (gpu1, 2026-11-23).
+        asks = re.compile(
+            r"\b(pam-auth-update|dpkg-reconfigure|mk-build-deps)\b"
+            r"|\bapt(-get)?\s+(-\S+\s+)*(install|remove|purge|upgrade|dist-upgrade|full-upgrade)\b"
+            r"|\bdpkg\s+(-\S+\s+)*(-i|--install|--configure|--purge|-P|-r|--remove)(?=\s|$)"
+        )
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            if "/molecule/" in rel(path):
+                continue
+            for task in tasks(path):
+                name, args = module(task)
+                if name not in ("command", "shell", "change_command", "change_shell") or not isinstance(
+                    args, dict
+                ):
+                    continue
+                line = command_line(args)
+                if not asks.search(line):
+                    continue
+                said = (
+                    "DEBIAN_FRONTEND" in line
+                    or "DEBIAN_FRONTEND" in str(task.get("environment", ""))
+                    or "DEBIAN_FRONTEND" in str(args.get("env", ""))
+                )
+                if not said:
+                    offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "environment: {DEBIAN_FRONTEND: noninteractive}")
+        scan.check(self)
+
     def test_only_host_baseline_sets_kernel_settings(self):
         # A sysctl written straight to a file was undone at boot by a later file (a hand
         # line in /etc/sysctl.conf) while the running value looked right; the shared

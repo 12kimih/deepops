@@ -62,12 +62,31 @@
   check_mode: false  # read-only; --check needs the result
   when: ansible_facts.os_family == 'Debian'
 
+# Without a terminal debconf falls back to its Teletype frontend, reads end-of-file as
+# "no" to "override local changes to /etc/pam.d/common-*?" and pam-auth-update leaves
+# the files as they were, still exiting 0 (gpu1, 2026-11-23: nsswitch then named SSSD,
+# PAM did not, and sudo refused every password). Noninteractive takes the default,
+# override: the profiles are the PAM configuration (pam-auth-update keeps the old files
+# as *.pam-old).
 - name: Let PAM ask SSSD (Debian)
   change_command:
     argv: [pam-auth-update, --enable, sss]
+  environment:
+    DEBIAN_FRONTEND: noninteractive
   when:
     - ansible_facts.os_family == 'Debian'
     - sssd_client_pam.rc == 1
+
+# Checked, not assumed: nsswitch below names SSSD only once PAM asks it, else accounts
+# resolve from the directory while no password is accepted for them.
+- name: Require PAM to ask SSSD (Debian)
+  ansible.builtin.command:
+    argv: [grep, -q, pam_sss.so, /etc/pam.d/common-auth]
+  changed_when: false
+  check_mode: false  # read-only
+  when:
+    - ansible_facts.os_family == 'Debian'
+    - not ansible_check_mode
 
 # RHEL: authselect owns PAM and nsswitch.conf; its sssd profile is both.
 - name: Read the authselect profile (RHEL)
