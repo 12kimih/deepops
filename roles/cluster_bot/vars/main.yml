@@ -18,6 +18,7 @@ _cluster_bot_cfg:
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
   admins: "{{ cluster_bot_admins | map('extract', cluster_bot_members) | select | list }}"
   pending: "{{ _cluster_bot_home }}/requests-pending.json"
+  reminders: "{{ _cluster_bot_home }}/reminders-sent.json"
   prefs_file: "{{ cluster_bot_prefs_file }}"
   github:
     repo: "{{ cluster_bot_github_repo }}"
@@ -39,8 +40,10 @@ _cluster_bot_cfg:
       auto_bytes: "{{ scratch_alloc_auto_size | kib * 1024 }}"
       auto_days: "{{ scratch_alloc_auto_days | int }}"
       auto_extensions: "{{ scratch_alloc_auto_extensions | int }}"
-    reminders: "{{ _cluster_bot_home }}/scratch-reminders.json"
-    remind_days: "{{ cluster_bot_remind_days }}"
+    remind_days: "{{ cluster_bot_scratch_remind_days }}"
+  leave:
+    remind_days: "{{ cluster_bot_leave_remind_days }}"
+    leaving: "{{ people | people_leaving(people_leave_grace_days) }}"
 
 # What this component installs, for its record (roles/component_record). The bot's state
 # files and key in its home stay (data).

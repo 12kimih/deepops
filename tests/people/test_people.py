@@ -268,6 +268,13 @@ class Leaving(unittest.TestCase):
             expires, {"now": "", "soon": "2027-03-30", "past": "2026-11-30", "gone": "1970-01-02"}
         )
 
+    def test_who_is_leaving_with_the_dates_the_accounts_apply(self):
+        self.assertEqual(
+            people.people_leaving(self.ROSTER, 30),
+            {"past": {"ends": "2026-10-31", "login_expires": "2026-11-30"},
+             "soon": {"ends": "2027-02-28", "login_expires": "2027-03-30"}},
+        )  # fmt: skip
+
     def test_a_person_past_their_end_has_no_association_and_no_role(self):
         today = "2026-11-22"
         self.assertEqual(sorted(people.people_accounting(self.ROSTER, today)), ["now", "soon"])

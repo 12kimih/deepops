@@ -91,6 +91,12 @@ class ScratchFeature(Feature):
     def mine(self, user):
         return self.run("list", user)
 
+    def deadlines(self):
+        """The active allocations' end dates (a clusterbot.reminders source's)."""
+        return {
+            str(a["id"]): (a["expires"], a["user"], a) for a in self.run("list") if a["state"] == "active"
+        }
+
     def decide(self, req):
         return scratch_policy.decide(req, self.run("list"), self.policy)
 

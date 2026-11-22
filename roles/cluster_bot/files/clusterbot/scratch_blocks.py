@@ -79,12 +79,12 @@ def number_form(kind, alloc_id):
 
 
 def reminder(a, days_left):
-    """The DM before an allocation ends, with the way to extend it."""
+    """The DM before an allocation ends, with the way to extend it: (text, blocks)."""
     when = "내일" if days_left <= 1 else f"{days_left}일 뒤"
     text = (
         f"스크래치 공간 {summary(a)}이 {when} 만료됩니다. 만료되면 읽기 전용이 되고, 유예 기간 뒤 지워집니다."
     )
-    return [
+    return "스크래치 공간이 곧 만료됩니다", [
         {"type": "section", "text": {"type": "mrkdwn", "text": text}},
         {
             "type": "actions",

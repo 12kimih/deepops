@@ -10,7 +10,7 @@ forced command there.
 Features today: scratch allocations (`/scratch`, see [scratch-alloc.md](scratch-alloc.md)):
 ask, extend, resize and release from a form; requests within the automatic limits are
 applied at once, larger ones wait for an administrator's button in the admin channel;
-owners get a DM `cluster_bot_remind_days` before an allocation ends, with an extend button.
+owners get a DM `cluster_bot_scratch_remind_days` before an allocation ends, with an extend button.
 
 Account requests (`/join`, `/leave`): a newcomer gives a login, a name, a team (the
 accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH
@@ -20,6 +20,13 @@ request on the site configuration made with the roster's own editors
 (`plugins/filter/people.py`, as `scripts/deepops/people.py add` and `leave`). An
 administrator merges it and runs `slurm-cluster.yml --tags people`; the roster stays the
 only source of accounts.
+
+Before a person's last day (`ends` in the roster) the bot DMs them
+`cluster_bot_leave_remind_days` before (30, 14, 7 and 1 days by default): new jobs stop
+after that day, login stops `people_leave_grace_days` later, so files are to be moved
+before then. The dates come from the roster as deployed (`people_leaving` in
+`plugins/filter/people.py`, the same derivation the accounts apply), so a changed `ends`
+reaches the bot with the next `--tags people` run and its countdown starts over.
 
 ### The GitHub App for account requests
 

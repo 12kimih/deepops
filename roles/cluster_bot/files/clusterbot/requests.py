@@ -11,11 +11,11 @@ request is kept in a JSON file (atomic, 0600), so an approval survives a restart
 A feature adds only its policy and its action; the flow is the same for all.
 """
 
-import json
-import os
 import secrets
 import time
 from dataclasses import dataclass, field
+
+from . import state
 
 
 class Refused(Exception):
@@ -53,19 +53,10 @@ class Engine:
         self.features, self.pending_path = features, pending_path
 
     def _pending(self):
-        try:
-            with open(self.pending_path) as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            return {}
+        return state.read(self.pending_path, {})
 
     def _save(self, pending):
-        os.makedirs(os.path.dirname(self.pending_path), mode=0o700, exist_ok=True)
-        tmp = self.pending_path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(pending, f)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, self.pending_path)
+        state.write(self.pending_path, pending)
 
     def describe(self, req):
         return self.features[req["kind"]].describe(req)

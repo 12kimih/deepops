@@ -7,7 +7,8 @@
 # slack_defaults); without them it is installed but not started.
 #
 # Features: scratch allocations (/scratch: ask, extend, resize, release; reminders
-# before an allocation ends, cluster_bot_remind_days).
+# before an allocation ends), account requests (/join, /leave), reminders before a
+# person's last day (the roster's `ends`), the Home tab.
 cluster_bot_state: present
 
 # Slack's Python SDK and Bolt, installed with pip --require-hashes into the bot's venv
@@ -32,8 +33,11 @@ cluster_bot_sha256:
 cluster_bot_members: "{{ slack_members }}"
 cluster_bot_admins: "{{ people | default({}) | people_with_role('admin') }}"
 
-# Days before an allocation's end its owner is reminded, once each.
-cluster_bot_remind_days: [7, 1]
+# Days before a deadline the person it concerns gets a DM, once each: an allocation's
+# end (its owner) and a person's last day (`ends` in the roster: what stops when, and to
+# move their files away while they can still log in).
+cluster_bot_scratch_remind_days: [7, 1]
+cluster_bot_leave_remind_days: [30, 14, 7, 1]
 
 # Account requests (/join, /leave) become pull requests on the site configuration, made
 # as the bot's GitHub App (docs/slurm-cluster/cluster-bot.md: creating it). Empty repo
