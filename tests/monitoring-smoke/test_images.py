@@ -36,7 +36,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "deepops"))
+sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import unrecorded  # noqa: E402
+from ansible_yaml import role_defaults  # noqa: E402
 
 ANSIBLE = ROOT / ".venv" / "bin" / "ansible-playbook"
 TEST_PASSWORD = "smoke-test-only"
@@ -116,19 +118,16 @@ class MonitoringImages(unittest.TestCase):
 
     @classmethod
     def render(cls):
-        """The roles' templates, rendered by Ansible with their defaults and SITE."""
+        """The roles' templates, rendered by Ansible with their defaults and SITE. The
+        defaults are each role's as a play sees them, its meta dependencies' included
+        (tests/lib role_defaults): a hand-kept list of files missed a shared-defaults role
+        a role came to depend on."""
         out = cls.tmp / "rendered"
-        defaults = [
-            ROOT / "roles" / r / "defaults/main.yml"
-            for r in (
-                "deepops_paths",
-                "slurm_paths",
-                "prometheus_paths",
-                "prometheus",
-                "alertmanager",
-                "grafana",
-            )
-        ]
+        values = {}
+        for role in ("prometheus", "alertmanager", "grafana"):
+            values.update(role_defaults(role))
+        defaults = cls.tmp / "defaults.yml"
+        defaults.write_text(yaml.safe_dump(values))
         templates = {
             "prometheus/prometheus.yml": "roles/prometheus/templates/prometheus.yml.j2",
             "alertmanager/alertmanager.yml": "roles/alertmanager/templates/alertmanager.yml.j2",
@@ -140,7 +139,7 @@ class MonitoringImages(unittest.TestCase):
             {
                 "hosts": "localhost",
                 "gather_facts": False,
-                "vars_files": [str(p) for p in defaults],
+                "vars_files": [str(defaults)],
                 "tasks": [
                     {
                         "ansible.builtin.file": {
