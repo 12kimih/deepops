@@ -101,6 +101,8 @@ SOURCES = {
     "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)
+    "io_usage": r"io_usage_\w+",  # each job's and login's I/O (roles/io_usage)
+    "io_fairness": r"io_fairness_\w+",  # whether iocost shares a disk (roles/io_fairness)
     "nfs": r"nfs_export_\w+",  # what roles/nfs exports (roles/textfile_keep)
     "nfs_client": r"nfs_client_\w+",  # the mounts the retry could not make (roles/nfs_client)
     "people": r"people_purge_\w+",  # when a leaver's files fall due (roles/people)

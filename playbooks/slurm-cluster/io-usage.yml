@@ -1,0 +1,13 @@
+---
+# Each job's, login's and slice's I/O on every node, every minute (roles/io_usage),
+# as node_exporter textfile counters. Count now with
+#   sudo systemctl start io-usage.service
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: io_usage
+      io_usage_state: "{{ deepops_components.io_usage | component_phase(deepops_phase) }}"
+  tags: ['io-usage']

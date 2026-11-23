@@ -1,0 +1,8 @@
+---
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: io_usage
+    component_record_action: absent
+    component_record_items: "{{ io_usage_items }}"

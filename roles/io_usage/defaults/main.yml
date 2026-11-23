@@ -1,0 +1,14 @@
+---
+# io_usage -- who does I/O on each node, every minute (cluster_tools.io_usage): each
+# Slurm job's syscall reads and writes, each login's disk I/O, and how long each slice
+# waited for I/O, as node_exporter textfile counters. With node_exporter's mountstats
+# (roles/prometheus-node-exporter), what a node sends to each NFS export, they say
+# which node and which jobs drive an export's load (roles/io_notice, the dashboards).
+# docs/slurm-cluster/io-fairness.md.
+
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+io_usage_state: present
+
+# The cgroups whose I/O waits are reported (io.pressure), relative to the cgroup root.
+io_usage_slices: [system.slice, user.slice]

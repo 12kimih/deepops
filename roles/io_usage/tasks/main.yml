@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: io_usage_state in ['present', 'absent', 'kept']
+    fail_msg: "io_usage_state must be present, absent or kept, not {{ io_usage_state }}."
+    quiet: true
+
+- name: "Make io_usage {{ io_usage_state }}"
+  ansible.builtin.include_tasks: "{{ io_usage_state }}.yml"
+  when: io_usage_state != 'kept'

@@ -13,8 +13,26 @@ iocost never throttles I/O issued from the root cgroup. The NFS server's threads
 cannot share one NFS export between the jobs of different users. What it does is keep
 the server's own logins from crowding out the exports, because a saturated disk raises
 latency, iocost slows its vrate, and the weighted slices wait while `nfsd` does not.
-Which node and which jobs drive the NFS traffic is attributed by the I/O usage
-counters and notices.
+Which node and which jobs drive the NFS traffic is attributed instead (next section).
+
+## Who does the I/O
+
+Two sources, on every node, with the monitoring stack:
+
+- node_exporter's `mountstats` collector counts what each node reads from and writes to
+  each NFS export over the wire; Prometheus records it per node and mount point as
+  `host_mount:nfs_read_bytes:rate5m` and `host_mount:nfs_write_bytes:rate5m`.
+- `roles/io_usage` counts, every minute, each Slurm job's reads and writes through
+  system calls (`io_usage_job_read_bytes_total`, `io_usage_job_written_bytes_total`,
+  `{job_id, user}`), each login's disk I/O (`io_usage_login_*_bytes_total`,
+  `{user, device}`) and how long each slice waited for I/O
+  (`io_usage_slice_pressure_seconds_total`).
+
+The job counters are `rchar` and `wchar` of `/proc/<pid>/io` summed over the job's
+processes (the cgroup path names `job_<id>`): page cache, pipes and sockets are in them,
+so they rank the jobs on a busy node, they are not NFS bytes. A task that already exited
+still counts: the kernel adds a reaped child's counts to its parent, and counts a
+process takes with it when it leaves the job are kept.
 
 ## Measure the disk
 

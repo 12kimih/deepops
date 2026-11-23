@@ -22,6 +22,9 @@ prometheus_exporters:
   - {component: node_exporter, port: "{{ node_exporter_port }}", module: node-exporter}
   - {component: ipmi_exporter, port: "{{ ipmi_exporter_port }}", module: ipmi-exporter}
   - {component: dcgm_exporter, port: "{{ dcgm_exporter_port }}", module: dcgm-exporter}
+# Where node_exporter's container sees the host's root: its mount table shows every
+# host mount under it (mountstats' mountpoint label), which the scrape strips again.
+node_exporter_rootfs: /host
 # How often Prometheus scrapes, which Grafana also needs to size its queries.
 prometheus_cfg_scrape_interval: 15s
 # node_exporter's textfile collector directory, which every textfile writer fills.

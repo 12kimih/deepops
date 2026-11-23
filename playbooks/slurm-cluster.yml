@@ -254,6 +254,13 @@
   vars:
     deepops_phase: install
 
+- name: Count each job's and login's I/O on every node
+  import_playbook: slurm-cluster/io-usage.yml
+  vars:
+    deepops_phase: install
+  tags:
+    - io-usage
+
 - name: Install monitoring services | Install the Slack usage report
   import_playbook: slurm-cluster/slurm-usage-report.yml
   vars:
@@ -467,6 +474,13 @@
     deepops_phase: remove
   tags:
     - gpu-diag-idle
+
+- name: Remove the I/O usage counters where they are no longer wanted
+  import_playbook: slurm-cluster/io-usage.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - io-usage
 
 - name: Turn iocost off where it is no longer wanted
   import_playbook: slurm-cluster/io-fairness.yml

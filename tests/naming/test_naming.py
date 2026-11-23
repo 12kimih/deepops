@@ -45,7 +45,8 @@ KEY_NOT_ROLE = {
 
 # One switch for a stack of components is a choice, not a mismatch.
 STACK_SWITCHES = {"slurm_enable_monitoring": {"prometheus", "alertmanager", "grafana", "node_exporter",
-                                              "ipmi_exporter", "dcgm_exporter", "slurm_metrics", "slurm_usage_report"}}  # fmt: skip
+                                              "ipmi_exporter", "dcgm_exporter", "slurm_metrics", "slurm_usage_report",
+                                              "io_usage"}}  # fmt: skip
 # Switches not named slurm_enable_<key> / kube_enable_<key>: key -> switch(es) today.
 SWITCH_NOT_KEY = {
     "chrony": "chrony_install", "gpu_operator": "deepops_gpu_operator_enabled",

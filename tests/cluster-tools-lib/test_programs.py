@@ -29,6 +29,7 @@ PROGRAMS = {
     "submit_holds",
     "gpu_diag_idle",
     "io_fairness",
+    "io_usage",
 }
 
 
