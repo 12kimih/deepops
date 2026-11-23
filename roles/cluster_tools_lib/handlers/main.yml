@@ -1,9 +1,0 @@
----
-# After a play that published a changed package (tasks/main.yml): the roles of this play
-# write and validate their own configs, every other recorded one is checked here. A site
-# deploy (deepops_site_run) checks once at its end instead, when every role has run.
-- name: Check the recorded tool configs
-  ansible.builtin.include_tasks: configs.yml
-  vars:
-    cluster_tools_lib_configs_skip: "{{ ansible_play_role_names }}"
-  when: deepops_site_run is not defined

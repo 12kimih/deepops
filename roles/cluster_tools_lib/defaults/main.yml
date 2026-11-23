@@ -36,5 +36,8 @@ cluster_tools_lib_derived_info:
 # Where every cluster tool's configuration lives (<tool>.json), made by this role's
 # main tasks, which every tool's role runs first as its meta dependency.
 cluster_tools_lib_config_dir: /etc/cluster-tools
+# Publish the package even though the recorded tool configs it was checked against refuse
+# it (tasks/configs.yml): only to break a deadlock, then run the playbooks it named at once.
+cluster_tools_lib_publish_refused: false
 # cluster_tools.site.PATH reads the same file; tests/cluster-tools-lib keeps them equal.
 cluster_tools_lib_info_file: "{{ cluster_tools_lib_config_dir }}/cluster.json"

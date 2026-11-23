@@ -1,11 +1,12 @@
 ---
 # Every recorded tool config against the package this run publishes (cluster_tools.config
-# installed): a tool that would refuse its config fails the deploy here, naming the
-# playbook that rewrites it, rather than its own next run. The roles listed in
-# cluster_tools_lib_configs_skip write and validate their config in this play
-# themselves. Under --check nothing is published, so the controller's package is staged
-# in a temporary directory and checked instead. A host with no record has no tool to
-# check.
+# installed), staged in a temporary directory: tasks/main.yml runs it BEFORE replacing the
+# live package, so a tool that would refuse its config stops the run while the live tools
+# still run on their own package and config, naming the playbook that rewrites it. A new
+# required key whose config another playbook writes would otherwise break that tool
+# until its playbook ran (disk quota and the usage report, ARA 243, 2026-11-23). The
+# roles listed in cluster_tools_lib_configs_skip write and validate their config in this
+# play themselves. A host with no record has no tool to check.
 - name: Look for recorded tool configs
   find_present:
     paths: "{{ cluster_tools_lib_config_records }}"
@@ -15,27 +16,25 @@
 - name: Check the recorded tool configs
   when: cluster_tools_lib_records.matched > 0
   block:
-    - name: Create a directory for the package being previewed
+    - name: Create a directory for the package being published
       ansible.builtin.tempfile:
         state: directory
         suffix: .cluster_tools
       register: cluster_tools_lib_staged
       check_mode: false  # a scratch copy for the check, removed below
-      when: ansible_check_mode
 
-    - name: Copy the package being previewed
+    - name: Copy the package being published
       ansible.builtin.copy:
         src: "{{ role_path }}/files/cluster_tools"
         dest: "{{ cluster_tools_lib_staged.path }}/"
         mode: preserve
       check_mode: false  # a scratch copy for the check, removed below
-      when: ansible_check_mode
 
     - name: Check every recorded tool config against the package
       ansible.builtin.command:
         argv: >-
           {{ [cluster_tools_lib_python, '-I', '-c', _cluster_tools_lib_config_code,
-              cluster_tools_lib_staged.path if ansible_check_mode else cluster_tools_lib_dir,
+              cluster_tools_lib_staged.path,
               'installed', '--dir', cluster_tools_lib_config_records]
              + (cluster_tools_lib_configs_skip | default([]) | map('regex_replace', '^', '--skip=') | list) }}
       register: cluster_tools_lib_configs
@@ -43,18 +42,20 @@
       failed_when: false
       check_mode: false  # read-only; --check needs the result
 
-    - name: Remove the package copy of the preview
+    - name: Remove the staged copy of the package
       ansible.builtin.file:
         path: "{{ cluster_tools_lib_staged.path }}"
         state: absent
       check_mode: false  # the scratch copy made above
-      when: ansible_check_mode
 
     - name: Require that every tool takes its recorded config
       ansible.builtin.assert:
-        that: cluster_tools_lib_configs.rc == 0
+        that: cluster_tools_lib_configs.rc == 0 or cluster_tools_lib_publish_refused | bool
         quiet: true
         fail_msg: >-
-          The cluster tools this run publishes refuse these configs, each written by
+          The cluster tools this run would publish refuse these configs, each written by
           another playbook: {{ cluster_tools_lib_configs.stderr_lines | join('; ') }}.
-          Run the named playbooks, which rewrite them.
+          The live package is unchanged. A key a new tool requires belongs in its
+          optional keys (cluster_tools.config.require) while older configs lack it; or
+          run the named playbooks first, or -e cluster_tools_lib_publish_refused=true to
+          publish anyway and run them right after.
