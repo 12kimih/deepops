@@ -18,6 +18,16 @@
 #       members: "{{ people | people_with_role('docker') }}"
 directory_groups: []
 
+# Directory groups every host also keeps in its local files (by name and GID, no
+# members), because a unit resolves the name at boot, before any directory answers: the
+# Docker socket's group (roles/docker_socket_group publishes it). Moving a host's
+# accounts to the directory never takes these away (playbooks/utilities/
+# retire-local-accounts.yml): without the local entry docker.socket fails at boot, and
+# on the LDAP server itself the directory is not up yet at all (master, 2026-11-23).
+directory_local_groups: >-
+  {{ [docker_socket_group] if (docker_socket_group | default('') | length > 0
+     and docker_socket_group_create_local | default(true) | bool) else [] }}
+
 # true: members is the whole membership, so taking someone off the list revokes it on
 # the next run. false: members are only added (for a group other tooling also fills).
 directory_groups_exclusive: true
