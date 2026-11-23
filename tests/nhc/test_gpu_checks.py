@@ -254,6 +254,27 @@ class FailedTools(unittest.TestCase):
             (1, "check_ib_link_ber: no effective BER read on mlx5_0"),
         )
 
+    def test_a_removed_acs_program_is_not_a_failure(self):
+        # pcie_acs absent deletes the program before NHC is redeployed: draining every node
+        # for it would be the removal's fault, not theirs.
+        self.assertEqual(run("check_pcie_acs", "/nonexistent/pcie-acs"), (0, ""))
+
+    def test_a_shared_mount_is_checked_while_fstab_lists_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fstab = Path(tmp, "fstab")
+            fstab.write_text("server:/data /data nfs4 defaults 0 0\n# server:/old /old nfs4 defaults 0 0\n")
+            stubs = 'check_file_test() { return 0; }; check_fs_mount_rw() { die 1 "check_fs_mount_rw: $2 not mounted"; }; '
+            env = {**os.environ, "NHC_FSTAB": str(fstab)}
+
+            def check(mountpoint):
+                proc = subprocess.run(argv(stubs + f"check_shared_mount {mountpoint}"), env=env,
+                                      capture_output=True, text=True, check=False)  # fmt: skip
+                return proc.returncode, proc.stdout.strip()
+
+            self.assertEqual(check("/data"), (1, "check_fs_mount_rw: /data not mounted"))
+            self.assertEqual(check("/old"), (0, ""), "commented out: removed on purpose")
+            self.assertEqual(check("/gone"), (0, ""), "no longer in fstab: removed on purpose")
+
     def test_acs_reason_is_one_line_without_quotes(self):
         tools = {"acs": ("ACS on at 0000:01:00.0\nit's on at 0000:02:00.0\n", 1)}
         rc, out = run("check_pcie_acs", "acs", tools=tools)
