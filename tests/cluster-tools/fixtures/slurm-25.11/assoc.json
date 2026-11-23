@@ -11,7 +11,8 @@
    "qos": [
     "normal"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": ""
   },
   {
    "account": "root",
@@ -24,7 +25,83 @@
    "qos": [
     "normal"
    ],
-   "user": "root"
+   "user": "root",
+   "parent_account": ""
+  },
+  {
+   "account": "t1",
+   "cluster": "testcluster",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t1",
+    "low"
+   ],
+   "user": "",
+   "parent_account": "root"
+  },
+  {
+   "account": "t2",
+   "cluster": "testcluster",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t2",
+    "low"
+   ],
+   "user": "",
+   "parent_account": "root"
+  },
+  {
+   "account": "t3",
+   "cluster": "testcluster",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t3",
+    "low"
+   ],
+   "user": "",
+   "parent_account": "root"
+  },
+  {
+   "account": "t4",
+   "cluster": "testcluster",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t4",
+    "low"
+   ],
+   "user": "",
+   "parent_account": "root"
+  },
+  {
+   "account": "t5",
+   "cluster": "testcluster",
+   "default": {
+    "qos": "low"
+   },
+   "is_default": false,
+   "partition": "",
+   "qos": [
+    "high_t5",
+    "low"
+   ],
+   "user": "",
+   "parent_account": "root"
   },
   {
    "account": "acct1",
@@ -37,7 +114,8 @@
    "qos": [
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "root"
   },
   {
    "account": "acct1",
@@ -52,7 +130,8 @@
     "hotfix",
     "low"
    ],
-   "user": "user14"
+   "user": "user14",
+   "parent_account": "root"
   },
   {
    "account": "acct1",
@@ -67,7 +146,8 @@
     "hotfix",
     "low"
    ],
-   "user": "user28"
+   "user": "user28",
+   "parent_account": "root"
   },
   {
    "account": "acct2",
@@ -80,7 +160,8 @@
    "qos": [
     "normal"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "root"
   },
   {
    "account": "acct2",
@@ -93,7 +174,8 @@
    "qos": [
     "normal"
    ],
-   "user": "root"
+   "user": "root",
+   "parent_account": "root"
   },
   {
    "account": "acct6",
@@ -106,7 +188,8 @@
    "qos": [
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "root"
   },
   {
    "account": "acct3",
@@ -120,7 +203,8 @@
     "high_t1",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t1"
   },
   {
    "account": "acct4",
@@ -134,7 +218,8 @@
     "high_t1",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t1"
   },
   {
    "account": "acct4",
@@ -148,7 +233,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user2"
+   "user": "user2",
+   "parent_account": "t1"
   },
   {
    "account": "acct4",
@@ -162,7 +248,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user10"
+   "user": "user10",
+   "parent_account": "t1"
   },
   {
    "account": "acct4",
@@ -176,7 +263,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user24"
+   "user": "user24",
+   "parent_account": "t1"
   },
   {
    "account": "acct5",
@@ -190,7 +278,8 @@
     "high_t1",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t1"
   },
   {
    "account": "acct5",
@@ -204,7 +293,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user1"
+   "user": "user1",
+   "parent_account": "t1"
   },
   {
    "account": "acct5",
@@ -218,7 +308,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user11"
+   "user": "user11",
+   "parent_account": "t1"
   },
   {
    "account": "acct5",
@@ -232,7 +323,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user22"
+   "user": "user22",
+   "parent_account": "t1"
   },
   {
    "account": "acct5",
@@ -246,7 +338,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user41"
+   "user": "user41",
+   "parent_account": "t1"
   },
   {
    "account": "acct5",
@@ -260,7 +353,8 @@
     "high_t1",
     "low"
    ],
-   "user": "user49"
+   "user": "user49",
+   "parent_account": "t1"
   },
   {
    "account": "acct7",
@@ -274,7 +368,8 @@
     "high_t2",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t2"
   },
   {
    "account": "acct8",
@@ -288,7 +383,8 @@
     "high_t2",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t2"
   },
   {
    "account": "acct8",
@@ -302,7 +398,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user5"
+   "user": "user5",
+   "parent_account": "t2"
   },
   {
    "account": "acct8",
@@ -316,7 +413,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user13"
+   "user": "user13",
+   "parent_account": "t2"
   },
   {
    "account": "acct8",
@@ -330,7 +428,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user14"
+   "user": "user14",
+   "parent_account": "t2"
   },
   {
    "account": "acct8",
@@ -344,7 +443,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user30"
+   "user": "user30",
+   "parent_account": "t2"
   },
   {
    "account": "acct8",
@@ -358,7 +458,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user39"
+   "user": "user39",
+   "parent_account": "t2"
   },
   {
    "account": "acct9",
@@ -372,7 +473,8 @@
     "high_t2",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t2"
   },
   {
    "account": "acct9",
@@ -386,7 +488,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user25"
+   "user": "user25",
+   "parent_account": "t2"
   },
   {
    "account": "acct9",
@@ -400,7 +503,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user32"
+   "user": "user32",
+   "parent_account": "t2"
   },
   {
    "account": "acct9",
@@ -414,7 +518,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user44"
+   "user": "user44",
+   "parent_account": "t2"
   },
   {
    "account": "acct9",
@@ -428,7 +533,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user45"
+   "user": "user45",
+   "parent_account": "t2"
   },
   {
    "account": "acct9",
@@ -442,7 +548,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user47"
+   "user": "user47",
+   "parent_account": "t2"
   },
   {
    "account": "acct10",
@@ -456,7 +563,8 @@
     "high_t2",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t2"
   },
   {
    "account": "acct10",
@@ -470,7 +578,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user8"
+   "user": "user8",
+   "parent_account": "t2"
   },
   {
    "account": "acct10",
@@ -484,7 +593,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user16"
+   "user": "user16",
+   "parent_account": "t2"
   },
   {
    "account": "acct10",
@@ -498,7 +608,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user34"
+   "user": "user34",
+   "parent_account": "t2"
   },
   {
    "account": "acct10",
@@ -512,7 +623,8 @@
     "high_t2",
     "low"
    ],
-   "user": "user36"
+   "user": "user36",
+   "parent_account": "t2"
   },
   {
    "account": "acct11",
@@ -526,7 +638,8 @@
     "high_t3",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -540,7 +653,8 @@
     "high_t3",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -554,7 +668,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user9"
+   "user": "user9",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -568,7 +683,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user15"
+   "user": "user15",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -582,7 +698,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user21"
+   "user": "user21",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -596,7 +713,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user23"
+   "user": "user23",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -610,7 +728,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user26"
+   "user": "user26",
+   "parent_account": "t3"
   },
   {
    "account": "acct12",
@@ -624,7 +743,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user46"
+   "user": "user46",
+   "parent_account": "t3"
   },
   {
    "account": "acct13",
@@ -638,7 +758,8 @@
     "high_t3",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t3"
   },
   {
    "account": "acct13",
@@ -652,7 +773,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user6"
+   "user": "user6",
+   "parent_account": "t3"
   },
   {
    "account": "acct13",
@@ -666,7 +788,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user18"
+   "user": "user18",
+   "parent_account": "t3"
   },
   {
    "account": "acct13",
@@ -680,7 +803,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user29"
+   "user": "user29",
+   "parent_account": "t3"
   },
   {
    "account": "acct13",
@@ -694,7 +818,8 @@
     "high_t3",
     "low"
    ],
-   "user": "user42"
+   "user": "user42",
+   "parent_account": "t3"
   },
   {
    "account": "acct14",
@@ -708,7 +833,8 @@
     "high_t4",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t4"
   },
   {
    "account": "acct15",
@@ -722,7 +848,8 @@
     "high_t4",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t4"
   },
   {
    "account": "acct15",
@@ -736,7 +863,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user7"
+   "user": "user7",
+   "parent_account": "t4"
   },
   {
    "account": "acct15",
@@ -750,7 +878,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user35"
+   "user": "user35",
+   "parent_account": "t4"
   },
   {
    "account": "acct15",
@@ -764,7 +893,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user37"
+   "user": "user37",
+   "parent_account": "t4"
   },
   {
    "account": "acct15",
@@ -778,7 +908,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user38"
+   "user": "user38",
+   "parent_account": "t4"
   },
   {
    "account": "acct16",
@@ -792,7 +923,8 @@
     "high_t4",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t4"
   },
   {
    "account": "acct16",
@@ -806,7 +938,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user4"
+   "user": "user4",
+   "parent_account": "t4"
   },
   {
    "account": "acct16",
@@ -820,7 +953,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user20"
+   "user": "user20",
+   "parent_account": "t4"
   },
   {
    "account": "acct16",
@@ -834,7 +968,8 @@
     "high_t4",
     "low"
    ],
-   "user": "user40"
+   "user": "user40",
+   "parent_account": "t4"
   },
   {
    "account": "acct17",
@@ -848,7 +983,8 @@
     "high_t5",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t5"
   },
   {
    "account": "acct18",
@@ -862,7 +998,8 @@
     "high_t5",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t5"
   },
   {
    "account": "acct18",
@@ -876,7 +1013,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user3"
+   "user": "user3",
+   "parent_account": "t5"
   },
   {
    "account": "acct18",
@@ -890,7 +1028,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user12"
+   "user": "user12",
+   "parent_account": "t5"
   },
   {
    "account": "acct18",
@@ -904,7 +1043,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user27"
+   "user": "user27",
+   "parent_account": "t5"
   },
   {
    "account": "acct18",
@@ -918,7 +1058,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user31"
+   "user": "user31",
+   "parent_account": "t5"
   },
   {
    "account": "acct18",
@@ -932,7 +1073,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user48"
+   "user": "user48",
+   "parent_account": "t5"
   },
   {
    "account": "acct19",
@@ -946,7 +1088,8 @@
     "high_t5",
     "low"
    ],
-   "user": ""
+   "user": "",
+   "parent_account": "t5"
   },
   {
    "account": "acct19",
@@ -960,7 +1103,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user17"
+   "user": "user17",
+   "parent_account": "t5"
   },
   {
    "account": "acct19",
@@ -974,7 +1118,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user19"
+   "user": "user19",
+   "parent_account": "t5"
   },
   {
    "account": "acct19",
@@ -988,7 +1133,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user28"
+   "user": "user28",
+   "parent_account": "t5"
   },
   {
    "account": "acct19",
@@ -1002,7 +1148,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user33"
+   "user": "user33",
+   "parent_account": "t5"
   },
   {
    "account": "acct19",
@@ -1016,7 +1163,8 @@
     "high_t5",
     "low"
    ],
-   "user": "user43"
+   "user": "user43",
+   "parent_account": "t5"
   }
  ],
  "meta": {

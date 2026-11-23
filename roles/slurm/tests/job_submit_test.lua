@@ -517,7 +517,7 @@ do
     check("R1 told to name the team QoS", logged("add %-%-qos=<team QoS>"), true)
     t = {gres = "gpu:a100:1", qos = "low"}
     check("R2 on the default QoS refused", submit(t), slurm.ERROR)
-    t = {gres = "gpu:a100:1", qos = "high_d"}
+    t = {gres = "gpu:a100:1", qos = "high_t1"}
     check("R3 on a team QoS accepted", submit(t), slurm.SUCCESS)
     t = {gres = "gpu:a100:1", script = "#!/bin/bash\ntrain"}
     check("R4 a batch job needs no team QoS", submit(t), slurm.SUCCESS)

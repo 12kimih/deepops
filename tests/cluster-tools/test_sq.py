@@ -172,16 +172,25 @@ class GpuUserTests(unittest.TestCase):
         self.assertRegex(text, r"USER +TEAM +A10 hi/lo  +A30 hi/lo  +PEND")
         self.assertRegex(text, r"(?m)^. user1 +acct1 +4 / - +2 / - +- *$")
 
-    def test_each_high_qos_quota_names_its_holders_most_first(self):
-        quotas = {q["qos"]: q for q in model()["high_qos_quotas"]}
+    def test_each_teams_quota_names_its_holders_most_first(self):
+        quotas = {q["qos"]: q for q in model()["teams"]}
         self.assertNotIn("normal", quotas)  # the lowest priority is no high tier
         self.assertNotIn("hotfix", quotas)  # high, but no quota and nobody on it
         a30 = next(k for k in quotas["high_t1"]["gpus"] if k["type"] == "a30")
         self.assertEqual((a30["limit"], a30["used"]), (6, 13))
         self.assertEqual(a30["holders"][0], ["user2", 10])
         text = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii"))
-        self.assertRegex(text, r"high_t1 +A10 .* 4/0 +user1 4")  # held where it is not allowed
-        self.assertRegex(text, r"high_t2 +A10 .* 0/14 +-")
+        self.assertEqual(quotas["high_t1"]["team"], "t1")  # the account that grants it, not its sub-accounts
+        self.assertRegex(text, r"(?m)^  t1 +A10 +4/0 +user1 4$")  # held where it is not allowed
+        self.assertRegex(text, r"(?m)^  t2 +A10 .* 0/14 +-$")
+
+    def test_holders_end_the_row_and_are_cut_to_the_terminal(self):
+        wide = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii", env={"COLUMNS": "200"}))
+        self.assertRegex(wide, r"(?m) 13/6  user2 10, user1 2, user4 1$")
+        narrow = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii", env={"COLUMNS": "40"}))
+        a30 = next(line for line in narrow.splitlines() if " 13/6 " in line)
+        self.assertLessEqual(len(a30), 40)
+        self.assertRegex(a30, r"\+3 more$")
 
     def test_without_the_qos_the_split_is_said_to_be_unknown(self):
         broken = SCENE / "noqos"
@@ -191,7 +200,7 @@ class GpuUserTests(unittest.TestCase):
         r = sq("--no-queue", "--no-resources", "--ascii", env={"FIXTURES": str(broken)})
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("QoS unread", r.stdout)
-        self.assertNotIn("HIGH QOS QUOTAS", r.stdout)
+        self.assertNotIn("TEAMS", r.stdout)
 
 
 class QueueTests(unittest.TestCase):

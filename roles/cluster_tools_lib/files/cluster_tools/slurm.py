@@ -152,7 +152,7 @@ FIELDS = {
     "jobs": _JOB_FIELDS,
     "jobs_detail": (*_JOB_FIELDS, "gres_detail"),
     "qos": ("name", "priority", "preempt", "flags", "limits"),
-    "associations": ("cluster", "account", "user", "qos", "default", "is_default"),
+    "associations": ("cluster", "account", "parent_account", "user", "qos", "default", "is_default"),
     "accounting": (
         "cluster",
         "job_id",
