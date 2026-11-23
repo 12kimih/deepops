@@ -17,12 +17,18 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "BMC sensor {{ $labels.name }} on {{ $labels.host }} is critical"
+          description: >-
+            `ipmitool sdr elist` on {{ $labels.host }} (or its BMC's web page) shows the
+            reading and its limits: a fan, power supply or airflow problem.
       - alert: BmcSensorWarning
         expr: '{__name__=~"ipmi_(temperature|fan_speed|voltage|current|power|sensor)_state", type!~"Power Supply|Physical Security"} == 1'
         for: 15m
         labels: {severity: warning}
         annotations:
           summary: "BMC sensor {{ $labels.name }} on {{ $labels.host }} is in warning"
+          description: >-
+            `ipmitool sdr elist` on {{ $labels.host }} (or its BMC's web page) shows the
+            reading and its limits.
       # Intrusion is a latched security event, not a hardware failure: it stays set after
       # the cover was opened until someone clears it in the BMC.
       - alert: ChassisIntrusion
@@ -39,9 +45,16 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "Cooling or drive fault reported by the BMC of {{ $labels.host }}"
+          description: >-
+            `ipmitool chassis status` and `ipmitool sel elist last 20` on {{ $labels.host
+            }} say which fault and since when.
       - alert: BmcUnreadable
         expr: ipmi_up{collector=~"bmc|ipmi"} == 0
         for: 15m
         labels: {severity: warning}
         annotations:
           summary: "ipmi-exporter cannot read the {{ $labels.collector }} data of {{ $labels.host }}"
+          description: >-
+            The BMC alerts are blind for this host: `ipmitool mc info` on {{ $labels.host
+            }} tests the BMC (the ipmi_devintf module must be loaded); `ipmitool mc reset
+            cold` restarts a hung one.

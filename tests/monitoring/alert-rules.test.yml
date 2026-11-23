@@ -98,6 +98,7 @@ tests:
           - exp_labels: {severity: critical, host: n1}
             exp_annotations:
               summary: "Cooling or drive fault reported by the BMC of n1"
+              description: "`ipmitool chassis status` and `ipmitool sel elist last 20` on n1 say which fault and since when."
 
   - name: BMC sensors of every type, PSU and chassis intrusion separately
     interval: 1m
@@ -115,6 +116,7 @@ tests:
           - exp_labels: {severity: critical, host: n1, name: "CPU1 Temp"}
             exp_annotations:
               summary: "BMC sensor CPU1 Temp on n1 is critical"
+              description: "`ipmitool sdr elist` on n1 (or its BMC's web page) shows the reading and its limits: a fan, power supply or airflow problem."
       - eval_time: 3m
         alertname: PowerSupplyFault
         exp_alerts:
@@ -157,9 +159,11 @@ tests:
           - exp_labels: {severity: critical, instance: "n1:9400", host: n1}
             exp_annotations:
               summary: "n1 reports 1 fewer GPUs than it did in the last 7 days"
+              description: "`lspci -d 10de:` on n1 counts the GPUs the bus sees: all of them means the driver lost some (see `journalctl -k | grep -E 'NVRM|Xid'`), fewer means hardware. Drain the node, then power-cycle it through its BMC (playbooks/utilities/power.yml)."
           - exp_labels: {severity: critical, instance: "n2:9400", host: n2}
             exp_annotations:
               summary: "n2 reports 1 fewer GPUs than it did in the last 7 days"
+              description: "`lspci -d 10de:` on n2 counts the GPUs the bus sees: all of them means the driver lost some (see `journalctl -k | grep -E 'NVRM|Xid'`), fewer means hardware. Drain the node, then power-cycle it through its BMC (playbooks/utilities/power.yml)."
 
   - name: disk alerts skip network filesystems
     interval: 1m
@@ -231,9 +235,11 @@ tests:
           - exp_labels: {severity: warning, host: n1, instance: "n1:9400", gpu: "1"}
             exp_annotations:
               summary: "GPU 1 on n1 at 91C, near its slowdown temperature"
+              description: "Near its slowdown temperature the GPU throttles. Check the node's fans and inlet air (`ipmitool sdr type Temperature` on n1, the BmcSensor alerts) and whether its neighbours run hot too (the room's cooling)."
           - exp_labels: {severity: warning, host: n2, instance: "n2:9400", gpu: "0"}
             exp_annotations:
               summary: "GPU 0 on n2 at 86C, near its slowdown temperature"
+              description: "Near its slowdown temperature the GPU throttles. Check the node's fans and inlet air (`ipmitool sdr type Temperature` on n2, the BmcSensor alerts) and whether its neighbours run hot too (the room's cooling)."
 
   - name: hardware slowdown clock events alert, power capping does not
     interval: 1m
@@ -265,6 +271,7 @@ tests:
           - exp_labels: {gpu: "2", host: "n1", instance: "n1:9400", severity: "critical"}
             exp_annotations:
               summary: "GPU 2 on n1 fell off the bus (XID 79)"
+              description: "The GPU is gone until the node is power-cycled; NHC drains the node on XID 79. Once its jobs end, power-cycle it through its BMC (playbooks/utilities/power.yml); a GPU still missing after that is hardware (the GPU, its riser or PCIe switch)."
 
   - name: GpuRowRemapFailure fires
     interval: 1m
@@ -308,6 +315,7 @@ tests:
           - exp_labels: {gpu: "2", host: "n1", instance: "n1:9400", severity: "warning"}
             exp_annotations:
               summary: "GPU 2 memory on n1 at 92C, near its limit"
+              description: "Memory near its limit throttles and raises ECC errors. Check the node's fans and inlet air (`ipmitool sdr type Temperature` on n1) as for a hot GPU."
 
   - name: GpuPcieReplaysHigh fires
     interval: 1m
@@ -357,6 +365,7 @@ tests:
           - exp_labels: {device: "/dev/sda1", fstype: "ext4", host: "n1", instance: "n1:9100", mountpoint: "/", severity: "warning"}
             exp_annotations:
               summary: "/ on n1 will fill within 24h"
+              description: "`du -xh --max-depth=2 / 2>/dev/null | sort -h | tail` on n1 finds what grows."
 
   # A one-time allocation (a job scratch image) is a step, not a trend: flat an hour after.
   - name: HostDiskFillingUp stays quiet after one large allocation
@@ -392,6 +401,7 @@ tests:
           - exp_labels: {device: "/dev/sda1", fstype: "ext4", host: "n1", instance: "n1:9100", mountpoint: "/", severity: "warning"}
             exp_annotations:
               summary: "/ on n1 has under 5% inodes left"
+              description: "Many small files: `du --inodes -x --max-depth=2 / 2>/dev/null | sort -n | tail` on n1 finds where."
 
   - name: HostMemoryExhausted fires
     interval: 1m
@@ -407,6 +417,7 @@ tests:
           - exp_labels: {host: "n1", instance: "n1:9100", severity: "warning"}
             exp_annotations:
               summary: "n1 has under 3% memory available"
+              description: "The kernel's OOM killer is next. `ps -eo pid,user,rss,comm --sort=-rss | head` on n1 shows who holds the memory; work on a login node belongs in a Slurm job."
 
   - name: HostClockNotSynchronised fires
     interval: 1m
@@ -436,6 +447,7 @@ tests:
           - exp_labels: {host: "n1", instance: "n1:9100", name: "nfs-server.service", severity: "warning", state: "failed", type: "simple"}
             exp_annotations:
               summary: "nfs-server.service failed on n1"
+              description: "`systemctl status nfs-server.service` and `journalctl -b -u nfs-server.service` on n1 say why; once fixed, `systemctl reset-failed nfs-server.service` clears the alert. A user@<uid>.service is that person's own systemd manager."
 
   - name: HostMemoryUncorrectableErrors fires
     interval: 1m
@@ -479,6 +491,7 @@ tests:
           - exp_labels: {device: "md0", host: "n1", instance: "n1:9100", severity: "critical"}
             exp_annotations:
               summary: "RAID md0 on n1 is degraded"
+              description: "`cat /proc/mdstat` and `mdadm --detail /dev/md0` on n1 show the missing member: replace that disk and add it back before a second one fails."
 
   - name: HostRaidDiskFailed fires
     interval: 1m
@@ -492,6 +505,7 @@ tests:
           - exp_labels: {device: "md0", host: "n1", instance: "n1:9100", severity: "critical", state: "failed"}
             exp_annotations:
               summary: "A disk in RAID md0 on n1 has failed"
+              description: "`mdadm --detail /dev/md0` on n1 names the failed disk: check it with `smartctl -a`, replace it and add the new one (`mdadm --add`)."
 
   - name: HostNetworkErrors fires
     interval: 1m
@@ -507,6 +521,7 @@ tests:
           - exp_labels: {device: "ens3f0np0", host: "n1", instance: "n1:9100", severity: "warning"}
             exp_annotations:
               summary: "Network errors on ens3f0np0 of n1"
+              description: "`ip -s link show ens3f0np0` and `ethtool -S ens3f0np0` on n1 show which counters grow; a cable, transceiver or switch port is the usual cause."
 
   - name: PrometheusRuleEvaluationFailing fires
     interval: 1m
@@ -520,6 +535,7 @@ tests:
           - exp_labels: {host: "m", instance: "localhost:9090", job: "prometheus", rule_group: "/etc/prometheus/rules/gpu.yml;gpu", severity: "warning"}
             exp_annotations:
               summary: "Prometheus rule group /etc/prometheus/rules/gpu.yml;gpu fails to evaluate"
+              description: "The alerts of that group are blind meanwhile: `journalctl -u docker.prometheus.service` on the monitoring host names the rule and its error."
 
   - name: PrometheusNotificationsFailing fires
     interval: 1m
@@ -533,6 +549,7 @@ tests:
           - exp_labels: {alertmanager: "http://localhost:9093/api/v2/alerts", host: "m", instance: "localhost:9090", job: "prometheus", severity: "critical"}
             exp_annotations:
               summary: "Prometheus cannot deliver alerts to Alertmanager"
+              description: "No alert reaches anyone: check Alertmanager on the monitoring host (`systemctl status docker.alertmanager.service`) and Prometheus' log (`journalctl -u docker.prometheus.service`)."
 
   - name: AlertmanagerNotificationsFailing fires
     interval: 1m
@@ -546,6 +563,7 @@ tests:
           - exp_labels: {host: "m", instance: "localhost:9093", integration: "slack", job: "alertmanager", reason: "other", severity: "critical"}
             exp_annotations:
               summary: "Alertmanager fails to send to slack"
+              description: "Alerts reach Alertmanager but not slack: `journalctl -u docker.alertmanager.service` on the monitoring host says why (an expired webhook or token, the bot not in the channel)."
 
   - name: PrometheusTsdbCompactionsFailing fires
     interval: 1m
@@ -559,6 +577,7 @@ tests:
           - exp_labels: {host: "m", instance: "localhost:9090", job: "prometheus", severity: "warning"}
             exp_annotations:
               summary: "Prometheus TSDB compactions are failing"
+              description: "The metrics database stops shrinking and may fill its disk: `journalctl -u docker.prometheus.service` on the monitoring host; a full disk or a corrupt block is the usual cause."
 
   - name: BmcSensorWarning fires
     interval: 1m
@@ -572,6 +591,7 @@ tests:
           - exp_labels: {host: "n1", id: "1009", instance: "n1:9290", name: "FAN2", severity: "warning"}
             exp_annotations:
               summary: "BMC sensor FAN2 on n1 is in warning"
+              description: "`ipmitool sdr elist` on n1 (or its BMC's web page) shows the reading and its limits."
 
   - name: BmcUnreadable fires
     interval: 1m
@@ -585,6 +605,7 @@ tests:
           - exp_labels: {collector: "ipmi", host: "n1", instance: "n1:9290", severity: "warning"}
             exp_annotations:
               summary: "ipmi-exporter cannot read the ipmi data of n1"
+              description: "The BMC alerts are blind for this host: `ipmitool mc info` on n1 tests the BMC (the ipmi_devintf module must be loaded); `ipmitool mc reset cold` restarts a hung one."
 
   - name: watchdog always fires
     interval: 1m

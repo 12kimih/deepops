@@ -18,6 +18,11 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} fell off the bus (XID 79)"
+          description: >-
+            The GPU is gone until the node is power-cycled; NHC drains the node on XID
+            79. Once its jobs end, power-cycle it through its BMC
+            (playbooks/utilities/power.yml); a GPU still missing after that is hardware
+            (the GPU, its riser or PCIe switch).
       # Counted against the most the host reported in 7 days, while its exporter answers
       # (a dead exporter is ExporterDown's), so a host whose GPUs all vanish counts too.
       - alert: GpuMissing
@@ -32,6 +37,11 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "{{ $labels.host }} reports {{ $value }} fewer GPUs than it did in the last 7 days"
+          description: >-
+            `lspci -d 10de:` on {{ $labels.host }} counts the GPUs the bus sees: all of
+            them means the driver lost some (see `journalctl -k | grep -E 'NVRM|Xid'`),
+            fewer means hardware. Drain the node, then power-cycle it through its BMC
+            (playbooks/utilities/power.yml).
       - alert: GpuRowRemapFailure
         expr: DCGM_FI_DEV_ROW_REMAP_FAILED > 0
         labels: {severity: critical}
@@ -54,6 +64,11 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "GPU {{ $labels.gpu }} on {{ $labels.host }} at {{ $value }}C, near its slowdown temperature"
+          description: >-
+            Near its slowdown temperature the GPU throttles. Check the node's fans and
+            inlet air (`ipmitool sdr type Temperature` on {{ $labels.host }}, the
+            BmcSensor alerts) and whether its neighbours run hot too (the room's
+            cooling).
       - alert: GpuMemoryTemperatureHigh
         expr: |
           DCGM_FI_DEV_MEMORY_TEMP_CELSIUS > on (instance, gpu) group_left () (DCGM_FI_DEV_MEMORY_MAX_OP_TEMP_CELSIUS - 5)
@@ -62,6 +77,10 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "GPU {{ $labels.gpu }} memory on {{ $labels.host }} at {{ $value }}C, near its limit"
+          description: >-
+            Memory near its limit throttles and raises ECC errors. Check the node's fans
+            and inlet air (`ipmitool sdr type Temperature` on {{ $labels.host }}) as for
+            a hot GPU.
       # The exporter counts clock events per reason over its window (label clock_event).
       # Hardware slowdown, hardware thermal and power brake mean cooling or power trouble;
       # power capping under load is normal and ignored.

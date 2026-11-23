@@ -14,20 +14,36 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "Prometheus rule group {{ $labels.rule_group }} fails to evaluate"
+          description: >-
+            The alerts of that group are blind meanwhile: `journalctl -u
+            docker.prometheus.service` on the monitoring host names the rule and its
+            error.
       - alert: PrometheusNotificationsFailing
         expr: rate(prometheus_notifications_errors_total[5m]) > 0
         for: 10m
         labels: {severity: critical}
         annotations:
           summary: "Prometheus cannot deliver alerts to Alertmanager"
+          description: >-
+            No alert reaches anyone: check Alertmanager on the monitoring host
+            (`systemctl status docker.alertmanager.service`) and Prometheus' log
+            (`journalctl -u docker.prometheus.service`).
       - alert: AlertmanagerNotificationsFailing
         expr: rate(alertmanager_notifications_failed_total[5m]) > 0
         for: 10m
         labels: {severity: critical}
         annotations:
           summary: "Alertmanager fails to send to {{ $labels.integration }}"
+          description: >-
+            Alerts reach Alertmanager but not {{ $labels.integration }}: `journalctl -u
+            docker.alertmanager.service` on the monitoring host says why (an expired
+            webhook or token, the bot not in the channel).
       - alert: PrometheusTsdbCompactionsFailing
         expr: increase(prometheus_tsdb_compactions_failed_total[3h]) > 0
         labels: {severity: warning}
         annotations:
           summary: "Prometheus TSDB compactions are failing"
+          description: >-
+            The metrics database stops shrinking and may fill its disk: `journalctl -u
+            docker.prometheus.service` on the monitoring host; a full disk or a corrupt
+            block is the usual cause.
