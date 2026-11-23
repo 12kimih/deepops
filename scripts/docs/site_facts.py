@@ -20,6 +20,9 @@ Facts:
   slurm     KillWait from the slurm.conf template the site renders, and what preemption
             gives a job: GraceTime, which every preempted QoS has equal to KillWait
             (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
+  quota     each counted filesystem with limits (the hosts' disk_quota_filesystems):
+            block_hard and its warn level in TiB, inode_hard (its own, or block_hard's TiB
+            times disk_quota_inodes_per_tib) and its warn level (cluster_user_warn_fraction)
   dates     the site's announced dates (config schedule.yml, name: YYYY-MM-DD), so a
             page states each once; only date values pass
   cluster   the nodes (CPUs, memory, GPUs) and partitions (their nodes, time limit) the
@@ -60,8 +63,11 @@ PUBLIC = {
     },
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
+    "quota": None,  # each limited filesystem, its fields QUOTA_FIELDS
 }
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+QUOTA_FIELDS = {"block_hard_tib", "block_warn_tib", "inode_hard", "inode_warn"}
+_TIB = {"K": 1 / 1024**3, "M": 1 / 1024**2, "G": 1 / 1024, "T": 1}
 POLICY = {
     "stale_days": "cluster_user_stale_days",
     "grace_days": "cluster_user_grace_days",
@@ -183,6 +189,30 @@ def schedule(config):
     return out
 
 
+def quota_limits(config, settings_):
+    """{mount: {block_hard_tib, block_warn_tib, inode_hard, inode_warn}} for every counted
+    filesystem whose site limits (disk_quota_filesystems in the hosts' host_vars) set a
+    block_hard; derived as roles/disk_quota derives them."""
+    ratio = int(settings_.get("disk_quota_inodes_per_tib") or 0)
+    fraction = float(settings_.get("cluster_user_warn_fraction") or 0)
+    out = {}
+    for host in host_quotas(config).values():
+        for mount, lim in (host["filesystems"] or {}).items():
+            hard = str((lim or {}).get("block_hard", ""))
+            m = re.fullmatch(r"(\d+(?:\.\d+)?)([KMGT])", hard)
+            if not m:
+                continue
+            tib = float(m.group(1)) * _TIB[m.group(2)]
+            inodes = int(lim["inode_hard"]) if "inode_hard" in lim else int(tib * ratio)
+            out[mount] = {
+                "block_hard_tib": round(tib, 3),
+                "block_warn_tib": round(tib * fraction, 3),
+                "inode_hard": inodes,
+                "inode_warn": int(inodes * fraction),
+            }
+    return out
+
+
 def host_quotas(config):
     """{host: {filesystems, inodes_per_tib}} from the site's host_vars (private)."""
     out = {}
@@ -200,6 +230,7 @@ def facts(config):
         "policy": {field: s.get(key) for field, key in POLICY.items()},
         "slurm": slurm_values(config),
         "dates": schedule(config),
+        "quota": quota_limits(config, s),
         "cluster": cluster(config),
         "slack": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
@@ -214,6 +245,10 @@ def public(every):
         value = every.get(key)
         if key == "commands":
             out[key] = {c: {f: v for f, v in d.items() if f in fields} for c, d in (value or {}).items()}
+        elif key == "quota":
+            out[key] = {
+                m: {f: v for f, v in d.items() if f in QUOTA_FIELDS} for m, d in (value or {}).items()
+            }
         elif fields is None:  # names the site chooses; the values are checked by kind
             out[key] = {f: v for f, v in (value or {}).items() if isinstance(v, str) and DATE.fullmatch(v)}
         else:
