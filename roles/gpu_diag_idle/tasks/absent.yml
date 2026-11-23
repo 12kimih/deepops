@@ -1,0 +1,9 @@
+---
+# Each node's last result stays in the work directory (data).
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: gpu_diag_idle
+    component_record_action: absent
+    component_record_items: "{{ gpu_diag_idle_items }}"

@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: gpu_diag_idle_state in ['present', 'absent', 'kept']
+    fail_msg: "gpu_diag_idle_state must be present, absent or kept, not {{ gpu_diag_idle_state }}."
+    quiet: true
+
+- name: "Make gpu_diag_idle {{ gpu_diag_idle_state }}"
+  ansible.builtin.include_tasks: "{{ gpu_diag_idle_state }}.yml"
+  when: gpu_diag_idle_state != 'kept'

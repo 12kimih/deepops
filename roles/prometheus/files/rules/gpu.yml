@@ -100,3 +100,55 @@ groups:
         annotations:
           summary: "PCIe replays on {{ $labels.host }} GPU {{ $labels.gpu }}"
           description: "{{ $value }} in 1h; check the riser, slot or cabling."
+      # The weekly DCGM diagnostics on idle GPU nodes (roles/gpu_diag_idle). A failure is
+      # confirmed by a rerun before it counts; with gpu_diag_idle_drain_on_failure the node
+      # is drained with the reason "gpu-diag: <tests>", which only an administrator lifts.
+      - alert: GpuDiagFailed
+        expr: gpu_diag_idle_result{result="fail"} == 1
+        labels: {severity: critical}
+        annotations:
+          summary: "DCGM diagnostics failed twice on {{ $labels.node }}: {{ $labels.tests }}"
+          description: >-
+            {{ if eq $labels.drained "yes" }}The node is drained. {{ end }}The raw result is
+            /var/lib/gpu-diag-idle/raw/{{ $labels.node }}.json on {{ $labels.host }}. Run the
+            diagnostics again (playbooks/utilities/gpu-diag.yml -e hostlist={{ $labels.node }});
+            once they pass, `scontrol update nodename={{ $labels.node }} state=resume`.
+      - alert: GpuDiagFlaky
+        expr: gpu_diag_idle_result{result="flaky"} == 1
+        labels: {severity: warning}
+        annotations:
+          summary: "DCGM diagnostics on {{ $labels.node }} failed ({{ $labels.tests }}), then passed on the rerun"
+          description: >-
+            The node stays in service. A repeat next week points at the hardware: the raw
+            result is /var/lib/gpu-diag-idle/raw/{{ $labels.node }}.json on {{ $labels.host }}.
+      - alert: GpuDiagError
+        expr: gpu_diag_idle_result{result="error"} == 1
+        labels: {severity: warning}
+        annotations:
+          summary: "The weekly DCGM diagnostics could not run on {{ $labels.node }}"
+          description: >-
+            A problem of the tool (the host engine, a timeout, output it cannot read), not a
+            GPU verdict, so the node was not drained: `journalctl -u gpu-diag-idle` on
+            {{ $labels.host }}.
+      # A GPU node no pass found idle for four weeks, counted once the diagnostics have run
+      # that long: from the first pass, not from the deploy.
+      - alert: GpuDiagOverdue
+        expr: |
+          (
+            max by (node) (slurm_gpu_configured)
+            unless on (node) (time() - gpu_diag_idle_node_last_success_timestamp_seconds < 28 * 86400)
+          )
+          and on () (gpu_diag_idle_since_seconds > 0
+                     and time() - gpu_diag_idle_since_seconds > 28 * 86400)
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }}'s GPUs have not been diagnosed for four weeks"
+          description: >-
+            No weekly pass found it idle. Run the diagnostics in a quiet hour
+            (playbooks/utilities/gpu-diag.yml -e hostlist={{ $labels.node }} drains it first).
+      - alert: GpuDiagNotRunning
+        expr: gpu_diag_idle_last_success_timestamp_seconds > 0 and time() - gpu_diag_idle_last_success_timestamp_seconds > 8 * 86400
+        labels: {severity: warning}
+        annotations:
+          summary: "The weekly DCGM diagnostics have not run for 8 days on {{ $labels.host }}"
+          description: "`systemctl list-timers gpu-diag-idle*` and `journalctl -u gpu-diag-idle` on {{ $labels.host }}."

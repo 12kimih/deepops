@@ -204,6 +204,7 @@ retired_settings:
   os_updates_metrics_textfile_dir: node_exporter_prom_dir (roles/prometheus_paths), the one directory roles/textfile_keep restores into
   slurm_backup_textfile_dir: node_exporter_prom_dir (roles/prometheus_paths), the one directory roles/textfile_keep restores into
   slurm_metrics_textfile_dir: node_exporter_prom_dir (roles/prometheus_paths), the one directory roles/textfile_keep restores into
+  maintenance_verify_dcgm_timeout: dcgm_diag_timeout in roles/slurm_paths (shared with roles/gpu_diag_idle)
   maintenance_reboot_method: "bmc_cold_reboot: true in the host's host_vars (roles/bmc): every reboot then ends in a BMC power cycle"
   package_repos_ubuntu_mirror: package_repos_ubuntu_mirrors in roles/package_repos, a list apt falls back along (the first that answers serves)
   package_repos_ubuntu_security_mirror: package_repos_ubuntu_security_mirrors in roles/package_repos (a list, as package_repos_ubuntu_mirrors)

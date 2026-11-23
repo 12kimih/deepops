@@ -141,7 +141,8 @@ clients before the server.
   file on the Prometheus host (left behind, ExporterDown fires forever); the
   dashboards it provisions through `grafana` `tasks_from: dashboards`; every textfile
   writer's `.prom` file in the node exporter's directory and its persistent copy
-  (slurm_metrics, slurm_backup, os_updates, slurm_usage_report, egress_policy). These
+  (slurm_metrics, slurm_backup, gpu_diag_idle, os_updates, slurm_usage_report,
+  egress_policy). These
   go through `recorded_files`, so the owner of the directory keeps the rest.
 - Data and configuration never share a directory: Grafana's provisioned dashboards
   move from `/var/lib/grafana` (its database: data) to `/etc/grafana/dashboards`

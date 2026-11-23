@@ -76,6 +76,13 @@ def run(*cmd):
         raise Failed(f"{cmd[0]}: {failure(e)}") from None
 
 
+def step(*cmd, timeout):
+    """(returncode, stdout, stderr) of a long Slurm call whose exit status is its own
+    result to read (srun of a job step), bounded by TIMEOUT seconds; never raises: a
+    timeout is 124, a missing client 127 (proc.outcome)."""
+    return proc.outcome(cmd, timeout=timeout)
+
+
 def failure(error):
     """One line on why a Slurm call failed: Slurm's own first line, or the timeout."""
     if isinstance(error, proc.TimeoutExpired):

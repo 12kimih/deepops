@@ -1,0 +1,28 @@
+---
+# The name its kept metrics go by in roles/textfile_keep (the textfile without .prom).
+gpu_diag_idle_keep_name: "{{ gpu_diag_idle_textfile | regex_replace('[.]prom$', '') }}"
+# The program's configuration, as cluster_tools.gpu_diag_idle reads it.
+gpu_diag_idle_settings:
+  level: "{{ gpu_diag_idle_level | int }}"
+  timeouts: "{{ dcgm_diag_timeout }}"
+  period_days: "{{ gpu_diag_idle_period_days | float }}"
+  budget_seconds: "{{ gpu_diag_idle_budget_seconds | int }}"
+  drain_on_failure: "{{ gpu_diag_idle_drain_on_failure | bool }}"
+  reservation_prefix: "{{ gpu_diag_idle_reservation_prefix }}"
+  textfile_dir: "{{ node_exporter_prom_dir }}"
+  textfile: "{{ gpu_diag_idle_textfile }}"
+  metrics_file: "{{ gpu_diag_idle_metrics_file }}"
+  state_file: "{{ gpu_diag_idle_work_dir }}/state.json"
+  raw_dir: "{{ gpu_diag_idle_work_dir }}/raw"
+# What this component installs, for its record (roles/component_record): the timer
+# before its files, the kept metrics with their boot restore. Its state stays (data).
+gpu_diag_idle_items:
+  - unit:gpu-diag-idle.timer
+  - file:/etc/systemd/system/gpu-diag-idle.timer
+  - file:/etc/systemd/system/gpu-diag-idle.service
+  - "file:{{ gpu_diag_idle_command }}"
+  - "file:{{ gpu_diag_idle_config }}"
+  - "file:{{ gpu_diag_idle_metrics_file }}"
+  - "file:{{ node_exporter_prom_dir }}/{{ gpu_diag_idle_textfile }}"
+  - "file:/etc/tmpfiles.d/deepops-textfile-{{ gpu_diag_idle_keep_name }}.conf"
+  - "file:{{ cluster_tools_lib_config_records }}/gpu_diag_idle.json"

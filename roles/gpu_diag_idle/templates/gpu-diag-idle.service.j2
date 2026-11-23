@@ -1,0 +1,10 @@
+# Managed by roles/gpu_diag_idle.
+[Unit]
+Description=DCGM diagnostics on the idle GPU nodes
+After=slurmctld.service
+
+[Service]
+Type=oneshot
+ExecStart={{ gpu_diag_idle_command }} run {{ gpu_diag_idle_config }}
+# The program stops starting nodes within its budget; this bounds a hang it cannot see.
+TimeoutStartSec={{ gpu_diag_idle_budget_seconds | int + 3600 }}

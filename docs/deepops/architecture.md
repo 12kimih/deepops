@@ -133,6 +133,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── facts
 │   ├── fail2ban
 │   ├── free_space
+│   ├── gpu_diag_idle
 │   ├── grafana
 │   ├── helm_release
 │   ├── host_baseline
