@@ -1,7 +1,7 @@
 {{ ansible_managed | comment }}
 # sssd.conf(5), sssd-ldap(5). docs/deepops/accounts.md.
 [sssd]
-services = nss, pam
+services = {{ sssd_client_responders | join(', ') }}
 domains = {{ sssd_client_domain }}
 
 [domain/{{ sssd_client_domain }}]
