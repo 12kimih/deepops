@@ -15,8 +15,10 @@ host_regex: {{ open_ondemand_host_regex | to_json }}
 oidc_crypto_passphrase: {{ open_ondemand_oidc_crypto_passphrase | to_json }}
 dex:
   connectors: {{ open_ondemand_dex_connectors | to_json }}
-{% if open_ondemand_proxied_services | length > 0 %}
 custom_vhost_directives:
+  # Plain HTTP on the TLS port (a browser given http://): mod_ssl answers 400; sending
+  # that answer to the https:// address turns it into the redirect people expect.
+  - 'ErrorDocument 400 https://{{ open_ondemand_servername }}:{{ open_ondemand_port | int }}/'
 {% for header in open_ondemand_proxied_services | map(attribute='user_header', default='') | select | unique %}
   # A client never sets the user header itself (early: before any other processing).
   - 'RequestHeader unset {{ header }} early'
@@ -32,4 +34,3 @@ custom_vhost_directives:
   - '  ProxyPassReverse "{{ svc.upstream }}"'
   - '</Location>'
 {% endfor %}
-{% endif %}
