@@ -274,6 +274,15 @@
 #people: "{{ people_roster.people }}"  # example
 # The roster's collaboration folders (roles/shared_space), one group each.
 #shared_projects: "{{ people_roster.projects | default({}) }}"  # example
+# The shared Hugging Face model cache (roles/model_cache_defaults,
+# playbooks/model-cache.yml): the NFS mount, the writer and the readers' group, the
+# directory (empty: <mount>/hf-cache) and its mode (2755: every user reads every model).
+# Here, where every host reads model_cache_root for the users' HF_HUB_CACHE.
+#model_cache_mount: ""
+#model_cache_owner: ""
+#model_cache_group: ""
+#model_cache_root: ""
+#model_cache_mode: "2750"
 # Administrators: sudo on every node and SSH to compute nodes without a job.
 #cluster_admins: "{{ people | people_with_role('admin') }}"  # example
 # Service accounts (Slurm, its package builder, EasyBuild, ...) with UIDs and GIDs fixed on

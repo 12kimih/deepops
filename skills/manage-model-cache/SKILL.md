@@ -14,8 +14,8 @@ for the supported CLI version, exact configuration and working download example.
 1. Confirm the approved existing NFS mount, one designated writer account,
    reader group, model license/access, available capacity and immutable revision.
    Do not create mounts, change exports, create users, or grant access implicitly.
-2. Review `config/inventory`, `config/group_vars/model-cache-warmer.yml` and, in
-   `config/group_vars/all.yml`, `model_cache_root` and `user_environment.HF_HUB_CACHE`.
+2. Review `config/inventory` and, in `config/group_vars/all.yml`, the `model_cache_*`
+   settings (roles/model_cache_defaults) and `user_environment.HF_HUB_CACHE`.
    Exactly one host belongs to `model-cache-warmer`. All readers need matching
    numeric group IDs and an existing mount at the intended workload path.
 3. Keep `HF_HOME`, `HF_TOKEN_PATH` and `HF_XET_CACHE` private; share only

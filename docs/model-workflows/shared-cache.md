@@ -43,22 +43,17 @@ models, obtain access separately using the writer's private `hf auth login`.
 ## 1. Prepare the cache (provisioning machine)
 
 Add exactly one host to `[model-cache-warmer]` in `config/inventory`. In
-`config/group_vars/model-cache-warmer.yml` set site-owned values, for example:
+`config/group_vars/all.yml`, where every host reads them, set the site's values of
+`roles/model_cache_defaults` and the users' variable naming the cache, for example:
 
 ```yaml
 model_cache_mount: /shared
 model_cache_owner: model-writer
 model_cache_group: model-readers
-# 2750 (default): the reader group reads. 2755: every user reads every model.
-#model_cache_mode: "2750"
-```
-
-and in `config/group_vars/all.yml`, where every host reads it, the cache and the
-users' variable naming it:
-
-```yaml
 # A dedicated directory below the mount. Default: <model_cache_mount>/hf-cache.
 model_cache_root: /shared/hf-cache
+# 2750 (default): the reader group reads. 2755: every user reads every model.
+#model_cache_mode: "2750"
 user_environment:
   HF_HUB_CACHE: "{{ model_cache_root }}/hub"
 ```

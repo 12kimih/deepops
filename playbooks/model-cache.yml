@@ -2,25 +2,23 @@
 # Precondition: the site already mounted shared storage and provisioned identities.
 # Run only on the designated writer. No mount, account, package, or download changes.
 # The writer is a client of the NFS mount or its server (the mount is in its active
-# exports). Users find the cache through HF_HUB_CACHE in user_environment
-# (roles/user_environment_defaults), "{{ model_cache_root }}/hub": set model_cache_root
-# in group_vars/all.yml, where every host reads it.
+# exports). The settings are roles/model_cache_defaults'; users find the cache through
+# HF_HUB_CACHE in user_environment (roles/user_environment_defaults), "{{ model_cache_root }}/hub".
 - name: Prepare a shared model cache on existing storage
   hosts: model-cache-warmer
   gather_facts: true
+  roles:
+    - role: model_cache_defaults
   vars:
-    model_cache_path: "{{ model_cache_root | default(model_cache_mount ~ '/hf-cache') }}"
-    # 2750: the reader group reads. 2755: every user reads every model in the cache (the
-    # site's decision on licences); match the mode another role gives the same directory.
-    model_cache_dir_mode: "{{ model_cache_mode | default('2750') }}"
+    model_cache_path: "{{ model_cache_root if model_cache_root | length > 0 else model_cache_mount ~ '/hf-cache' }}"
   tasks:
     - name: Require one explicit cache writer and site configuration
       ansible.builtin.assert:
         that:
           - ansible_play_hosts_all | length == 1
-          - model_cache_mount is defined
-          - model_cache_owner is defined
-          - model_cache_group is defined
+          - model_cache_mount | length > 0
+          - model_cache_owner | length > 0
+          - model_cache_group | length > 0
         fail_msg: Configure one model-cache-warmer host, model_cache_mount, model_cache_owner and model_cache_group.
 
     - name: Validate dedicated cache path
@@ -33,7 +31,7 @@
           - "'//' not in model_cache_mount"
           - model_cache_path is match('^/[A-Za-z0-9_/-]+$')
           - model_cache_path.startswith(model_cache_mount ~ '/')
-          - model_cache_dir_mode in ['2750', '2755']
+          - model_cache_mode in ['2750', '2755']
           - not model_cache_path.endswith('/')
           - "'..' not in model_cache_path"
           - "'//' not in model_cache_path"
@@ -89,7 +87,7 @@
         state: directory
         owner: "{{ model_cache_owner }}"
         group: "{{ model_cache_group }}"
-        mode: "{{ model_cache_dir_mode }}"
+        mode: "{{ model_cache_mode }}"
       loop:
         - "{{ model_cache_path }}"
         - "{{ model_cache_path }}/hub"

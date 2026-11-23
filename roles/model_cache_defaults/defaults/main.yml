@@ -1,0 +1,16 @@
+---
+# The shared Hugging Face model cache (playbooks/model-cache.yml), named once: the
+# playbook prepares it on its one writer, and every host reads model_cache_root for the
+# users' HF_HUB_CACHE (user_environment, roles/user_environment_defaults). Set these in
+# group_vars/all.yml, where every host reads them; empty: no shared cache.
+# docs/model-workflows/shared-cache.md.
+
+# The existing NFS mount the cache lives on, the writer's account and the readers' group.
+model_cache_mount: ""
+model_cache_owner: ""
+model_cache_group: ""
+# A dedicated directory below the mount (empty: <model_cache_mount>/hf-cache).
+model_cache_root: ""
+# 2750: the reader group reads. 2755: every user reads every model in the cache (the
+# site's decision on licences); match the mode another role gives the same directory.
+model_cache_mode: "2750"
