@@ -162,6 +162,10 @@ docker_sysctls:
 # containers holding their images (2026-11). The age is the site's one cleanup period
 # (cluster_user_grace_days), as for the other container stores
 # (roles/container_storage_gc). "" = no timer (and an existing one is removed).
+# deepops' own services lose nothing to it: roles/container_service runs each with
+# `docker run --rm`, so a stopped one is never a container to prune, and the image of a
+# service stopped longer than this is pulled again at its next start, the same digest
+# (a registry outage then is the only exposure).
 docker_prune_after: "{{ (cluster_user_grace_days | int * 24) ~ 'h' }}"
 docker_prune_schedule: daily
 
