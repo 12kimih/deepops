@@ -64,6 +64,9 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  admin: "#alerts"
 #  help: "#help"
 #  announce: "#announcements"
+# The Slack user group people tag in the help channel for the administrators.
+#slack_admin_group: ""
+#slack_admin_group: "@sysadmin"  # example
 
 # Hourly GPU usage report and idle-GPU nudges, a weekly per-person summary of GPU-hours
 # held and left idle, and a daily disk usage report (roles/slurm_usage_report), posted to

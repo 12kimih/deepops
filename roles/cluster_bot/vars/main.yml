@@ -19,6 +19,7 @@ _cluster_bot_cfg:
   bot_token_file: "{{ _cluster_bot_tokens.bot }}"
   app_token_file: "{{ _cluster_bot_tokens.app }}"
   channels: {help: "{{ slack_channels.help }}", admin: "{{ slack_channels.admin }}"}
+  admin_group: "{{ slack_admin_group }}"
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
   admins: "{{ cluster_bot_admins | map('extract', cluster_bot_members) | select | list }}"
   pending: "{{ _cluster_bot_home }}/requests-pending.json"
