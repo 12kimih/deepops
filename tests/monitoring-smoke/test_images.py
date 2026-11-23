@@ -222,6 +222,41 @@ class MonitoringImages(unittest.TestCase):
         ) as am:  # fmt: skip
             wait_http(am.url + "/-/ready")
 
+    def test_a_slack_message_lists_what_fires_and_a_resolved_one_is_short(self):
+        """roles/alertmanager/files/slack.tmpl rendered by this amtool on alert data: one
+        message per kind of alert (group_by alertname), only what still fires listed, a
+        description they share once, and a resolved group one struck line per host."""
+        image = default("alertmanager", "alertmanager_container")
+        data = self.tmp / "slack-cases"
+        data.mkdir()
+        shutil.copy(ROOT / "roles/alertmanager/files/slack.tmpl", data)
+
+        def alert(host, status):
+            return {"status": status, "labels": {"alertname": "HostDown", "severity": "critical", "host": host},
+                    "annotations": {"summary": f"{host} is down", "description": "No scrape for 5 minutes."}}  # fmt: skip
+
+        cases = {
+            "firing": ("firing", [alert(h, "firing") for h in ("n1", "n2", "n3")],
+                       ":red_circle: Critical: HostDown (3) || *n1 is down*\n*n2 is down*\n*n3 is down*\nNo scrape for 5 minutes."),
+            "mixed": ("firing", [alert("n1", "firing"), alert("n2", "resolved"), alert("n3", "resolved")],
+                      ":red_circle: Critical: HostDown on n1 || *n1 is down*\nNo scrape for 5 minutes.\n_2 resolved since_"),
+            "resolved": ("resolved", [alert(h, "resolved") for h in ("n1", "n2", "n3")],
+                         ":white_check_mark: Resolved: HostDown (3) || ~n1 is down~\n~n2 is down~\n~n3 is down~"),
+        }  # fmt: skip
+        for name, (status, alerts, expected) in cases.items():
+            (data / f"{name}.json").write_text(json.dumps({
+                "receiver": "slack", "status": status, "alerts": alerts, "groupLabels": {"alertname": "HostDown"},
+                "commonLabels": {"alertname": "HostDown", "severity": "critical"},
+                "commonAnnotations": {"description": "No scrape for 5 minutes."}, "externalURL": "http://am",
+            }))  # fmt: skip
+            with self.subTest(case=name):
+                out = docker("run", "--rm", "-u", f"{os.getuid()}", "--network", "none",
+                             "--mount", f"type=bind,src={data},dst=/t,readonly", "--entrypoint", "amtool", image,
+                             "template", "render", "--template.glob=/t/slack.tmpl", f"--template.data=/t/{name}.json",
+                             '--template.text={{ template "slack.title" . }} || {{ template "slack.text" . }}',
+                             check=False)  # fmt: skip
+                self.assertEqual(out.stdout.strip(), expected, out.stderr)
+
     def test_grafana_provisions_every_dashboard(self):
         image = default("grafana", "grafana_container")
         etc, data = self.tmp / "grafana-etc", self.tmp / "grafana-data"

@@ -5,8 +5,16 @@ alertmanager_state: present
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_config_src: templates/alertmanager.yml.j2
 alertmanager_container: "prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c"
-# Slack incoming webhook. Empty leaves the receiver without Slack, so alerts go nowhere.
+# Slack incoming webhook. Empty leaves the receiver without Slack, so alerts go nowhere,
+# unless they go through the bot (alertmanager_slack_bot).
 alertmanager_slack_api_url: ""
+# Post through the cluster's Slack bot (slack_bot_token, roles/slack_defaults; scope
+# chat:write) instead of the webhook: an alert group's one message is then edited as it
+# changes, so a resolved alert turns its message green instead of posting a second one,
+# and every later notice of the group goes into that message's thread (Alertmanager 0.35:
+# update_message, post_updates_to_thread). The bot must be a member of the channel, or
+# Slack refuses its posts: invite it, then turn this on.
+alertmanager_slack_bot: false
 # The administrators' channel and mention (roles/slack_defaults), the critical alerts' too.
 alertmanager_slack_channel: "{{ slack_channels.admin }}"
 alertmanager_slack_critical_mention: "{{ slack_admin_mention }}"

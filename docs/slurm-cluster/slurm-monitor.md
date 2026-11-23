@@ -200,7 +200,8 @@ URL with a 2 minute period and 5 minutes of grace): Alertmanager pings it about 
 and the external service alerts when the pings stop, which covers a dead monitoring host. Without the URL, Watchdog
 is dropped.
 
-Alertmanager groups alerts by `alertname` and `host`, repeats unresolved ones every
+Alertmanager groups alerts by `alertname` (one message per kind of alert, naming the
+hosts it fires on; a firing message lists only what still fires), repeats unresolved ones every
 `alertmanager_repeat_interval` (critical: `alertmanager_critical_repeat_interval`), and
 suppresses every other alert on a host while `HostDown` fires for it. To send alerts to
 Slack, create an incoming webhook and set (vaulted) in `config/`:
@@ -214,6 +215,11 @@ mention the administrators' user group, as every notice they must act on does: s
 ID in `slack_admin_group_id` (`roles/slack_defaults`; the `S...` ID, which the web
 client shows, not the `@handle`, which is `slack_admin_group`). Without it they
 mention no one.
+
+With `alertmanager_slack_bot: true` alerts go through the cluster's Slack bot
+(`slack_bot_token`, scope `chat:write`, invited to the channel) instead of the webhook:
+a group's one message is edited as it changes, so a resolved alert turns it green
+instead of posting a second message, and later notices go into its thread.
 
 The config is checked with `amtool` before it is written. Visit
 http://\<slurm-metric ip\>:9093 to view and silence alerts.
