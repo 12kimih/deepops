@@ -209,7 +209,7 @@ BASE_DIRS = frozenset({
 PACKAGE_DIRS = {
     "/etc/enroot/enroot.conf.d": "enroot", "/etc/enroot/environ.d": "enroot", "/etc/enroot/hooks.d": "enroot",
     "/etc/enroot/mounts.d": "enroot", "/etc/munge": "munge", "/etc/sssd": "sssd", "/etc/polkit-1/rules.d": "polkitd",
-    "/etc/apache2": "apache2", "/etc/ood/config": "ondemand", "/etc/ood/config/clusters.d": "ondemand",
+    "/etc/apache2": "apache2", "/etc/apache2/conf-available": "apache2", "/etc/ood/config": "ondemand", "/etc/ood/config/clusters.d": "ondemand",
     "/etc/containers": "podman", "/etc/unbound/unbound.conf.d": "unbound", "/etc/fail2ban/jail.d": "fail2ban",
     "/etc/nhc": "nhc_configure", "/etc/nhc/scripts": "nhc_configure", "/var/yp": "nis",
     "/usr/share/bash-completion/completions": "bash-completion",

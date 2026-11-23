@@ -96,6 +96,28 @@
     group: root
     mode: "0644"
 
+# Apache's own pages (errors, listings) say no version or OS: Ubuntu's security.conf
+# says both (ServerTokens OS, ServerSignature On). This file sorts after it in
+# conf-enabled, and the last ServerTokens wins.
+- name: Keep Apache's version and OS off its pages
+  ansible.builtin.copy:
+    dest: "{{ open_ondemand_apache_conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # {{ ansible_managed }}
+      ServerTokens Prod
+      ServerSignature Off
+  notify: Restart apache2
+
+- name: Enable that Apache setting
+  ansible.builtin.file:
+    src: "{{ open_ondemand_apache_conf }}"
+    dest: "/etc/apache2/conf-enabled/{{ open_ondemand_apache_conf | basename }}"
+    state: link
+  notify: Restart apache2
+
 # ood-portal.conf is this role's: generated from the ood_portal.yml above, never edited
 # by hand. The generator keeps the checksum of what it last wrote and, without --force,
 # refuses a file that differs (exit 4: an earlier install's file, a hand edit), leaving

@@ -18,6 +18,8 @@ open_ondemand_packages:
 # Apache modules the generated portal config and the proxied services need.
 open_ondemand_apache_modules: [ssl, rewrite, headers, proxy, proxy_http, proxy_wstunnel, lua, auth_openidc]
 open_ondemand_portal_generator: /opt/ood/ood-portal-generator/sbin/update_ood_portal
+# Apache's server-wide hardening, sorting after Ubuntu's conf-enabled/security.conf.
+open_ondemand_apache_conf: /etc/apache2/conf-available/zz-deepops-open-ondemand.conf
 # What this component installs, for its record (roles/component_record). apache2 comes
 # with ondemand as a dependency and stays when the component goes (other sites may use
 # it); /etc/ood and the generated Apache config go with the ondemand package's purge.
@@ -28,7 +30,8 @@ open_ondemand_items: >-
       'file:/etc/apt/keyrings/ondemand-web.asc', 'file:/etc/apt/keyrings/nodesource.asc',
       'file:{{ deepops_cache_dir }}/package-repos/ondemand-web.key', 'file:{{ deepops_cache_dir }}/package-repos/nodesource.key',
       'file:' ~ open_ondemand_tls_dir ~ '/fullchain.pem', 'file:' ~ open_ondemand_tls_dir ~ '/privkey.pem',
-      'dir:' ~ open_ondemand_tls_dir, 'file:/usr/local/sbin/open-ondemand-dpkg-verify']
+      'dir:' ~ open_ondemand_tls_dir, 'file:/usr/local/sbin/open-ondemand-dpkg-verify',
+      'file:/etc/apache2/conf-enabled/' ~ (open_ondemand_apache_conf | basename), 'file:' ~ open_ondemand_apache_conf]
      + (['unit:open-ondemand-tls-metrics.timer', 'unit:open-ondemand-tls-metrics.service',
          'file:/etc/systemd/system/open-ondemand-tls-metrics.timer',
          'file:/etc/systemd/system/open-ondemand-tls-metrics.service',
