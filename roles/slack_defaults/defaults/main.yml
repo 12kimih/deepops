@@ -24,9 +24,19 @@ slack_channels:
   help: "#help"
   announce: "#announcements"
 
-# The Slack user group people tag in the help channel to reach the administrators
-# (e.g. "@sysadmin"); the bot's help text names it. Empty: "the administrators".
+# The administrators' Slack user group. Its @handle is what people tag in the help channel,
+# and what the bot's help text and the docs name ("@sysadmin"; empty: "the
+# administrators"). Its ID (the group's S... ID, as Slack's API and a mention write it) is
+# how a notice an administrator has to act on mentions the group in
+# slack_channels.admin, so Slack notifies its members: critical alerts
+# (roles/alertmanager), the usage report's notices to administrators
+# (roles/slurm_usage_report), the cluster bot's held requests and new bans
+# (roles/cluster_bot); reports and the lists the bot keeps up to date do not. Empty ID:
+# those notices mention no one.
 slack_admin_group: ""
+slack_admin_group_id: ""
+# Derived from the ID, not a setting: the mention those notices carry.
+slack_admin_mention: "{{ '<!subteam^' ~ slack_admin_group_id ~ '>' if slack_admin_group_id | length > 0 else '' }}"
 
 # The Socket Mode app-level token (xapp-, vault it): the cluster bot's connection to
 # Slack, opened from inside (no port to open). Empty keeps the bot off.

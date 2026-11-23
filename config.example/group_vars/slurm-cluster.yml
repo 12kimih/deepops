@@ -49,24 +49,26 @@ slurm_ha_state_save_location: "/sw/slurm"
 # Vault secrets: ansible-vault encrypt_string --prompt --name <var>
 # Alertmanager incoming webhook; it posts to the channel chosen when it was created.
 #alertmanager_slack_api_url: "https://hooks.slack.com/services/T000/B000/XXXX"  # example
-#alertmanager_slack_channel: "#alerts"
-# Prepended to critical alerts: "<!subteam^S0123ABCD>" for a user group, or "<!channel>".
-#alertmanager_slack_critical_mention: ""
 # Dead man's switch: ping URL of an external check (e.g. healthchecks.io) that alerts
 # when the always-firing Watchdog alert stops arriving. Alertmanager pings about every
 # minute; give the check a 2 minute period (headroom for jitter) and 5 minutes of grace.
 #alertmanager_heartbeat_url: ""
 # The cluster's Slack workspace (roles/slack_defaults): the one bot token (xoxb-, vault
-# it) every feature that posts uses, and the channels by purpose.
+# it) every feature that posts uses, the channels by purpose (Alertmanager posts to
+# admin), and whom what an administrator must act on mentions there (critical alerts,
+# the usage report's and the bot's notices): a user group "<!subteam^S0123ABCD>" (its
+# ID: the group's profile > Copy group ID), "<!channel>", or "" for no one.
 #slack_bot_token: ""
 #slack_channels:
 #  status: "#gpu-usage"
 #  admin: "#alerts"
 #  help: "#help"
 #  announce: "#announcements"
-# The Slack user group people tag in the help channel for the administrators.
+# The administrators' Slack user group: the @handle people tag in the help channel, and
+# its ID (S..., the web client shows it), with which notices for them mention the group.
 #slack_admin_group: ""
 #slack_admin_group: "@sysadmin"  # example
+#slack_admin_group_id: ""
 
 # Hourly GPU usage report and idle-GPU nudges, a weekly per-person summary of GPU-hours
 # held and left idle, and a daily disk usage report (roles/slurm_usage_report), posted to

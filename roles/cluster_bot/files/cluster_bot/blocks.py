@@ -23,6 +23,15 @@ def field(block_id, label, element, optional=False):
             "label": {"type": "plain_text", "text": label}, "element": {**element, "action_id": "v"}}  # fmt: skip
 
 
+def mentioning(who, text, blocks):
+    """TEXT and BLOCKS with WHO first (the administrators' mention, cfg admin_mention), so
+    Slack notifies them: a message with blocks notifies whom its blocks mention. The bot's
+    counterpart of cluster_tools.slack.mentioning (the bot does not load that library)."""
+    if not who:
+        return text, blocks
+    return f"{who} {text}", [{"type": "section", "text": {"type": "mrkdwn", "text": who}}, *blocks]
+
+
 def held(user_mention, text, key):
     """The administrators' message for a request held for them (any feature)."""
     return [

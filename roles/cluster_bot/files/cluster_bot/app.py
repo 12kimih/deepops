@@ -74,11 +74,10 @@ def build(cfg, engine, join=None, unban=None, project=None):
             # otherwise the administrators, in their channel.
             places = [s for s in map(slack_of, approvers) if s] or [channels["admin"]]
             for place in places:
-                client.chat_postMessage(
-                    channel=place,
-                    text=outcome.text,
-                    blocks=shared.held(f"<@{slack_id}>", outcome.text, outcome.key),
-                )
+                text, blocks = outcome.text, shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
+                if place == channels["admin"]:
+                    text, blocks = shared.mentioning(cfg["admin_mention"], text, blocks)
+                client.chat_postMessage(channel=place, text=text, blocks=blocks)
             engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
             client.chat_postMessage(channel=slack_id, text=outcome.text)
         else:
@@ -340,14 +339,17 @@ def every(seconds, name, round_):
     threading.Thread(target=loop, name=name, daemon=True).start()
 
 
-def admin_messages(client, channel):
+def admin_messages(client, channel, mention=""):
     """(post, update) for messages the bot keeps in CHANNEL (cluster_bot.bans.watch): post
     returns the message as {channel ID, ts} and pins it on request (a pin Slack refuses
-    leaves it unpinned, never unrecorded); update says False when the message is gone
-    (deleted), and raises on any other refusal."""
+    leaves it unpinned, never unrecorded); a message not pinned (a notice to act on)
+    starts with MENTION. update says False when the message is gone (deleted), and raises
+    on any other refusal."""
     from slack_sdk.errors import SlackApiError
 
     def post(text, blocks, pin=False):
+        if not pin:  # a notice to act on mentions the administrators; a pinned list does not
+            text, blocks = shared.mentioning(mention, text, blocks)
         sent = client.chat_postMessage(channel=channel, text=text, blocks=blocks)
         message = {"channel": sent["channel"], "ts": sent["ts"]}
         if pin:
@@ -417,7 +419,7 @@ def main(argv=None):
                         lambda who, text: app.client.chat_postMessage(channel=who, text=text),
                         projects_blocks.notice)  # fmt: skip
     if unban is not None:
-        post, update = admin_messages(app.client, channels["admin"])
+        post, update = admin_messages(app.client, channels["admin"], cfg["admin_mention"])
 
         def watch_round():
             seen = state.read(cfg["bans"]["seen"], {})

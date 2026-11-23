@@ -1,7 +1,9 @@
 ---
-# prometheus_port, alertmanager_port and the other shared paths: roles/prometheus_paths.
+# prometheus_port, alertmanager_port and the other shared paths: roles/prometheus_paths;
+# the administrators' Slack channel and mention: roles/slack_defaults.
 dependencies:
   - role: prometheus_paths
+  - role: slack_defaults
 
 galaxy_info:
   namespace: deepops

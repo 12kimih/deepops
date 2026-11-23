@@ -42,11 +42,16 @@ class FakeApp:
 
 
 sys.modules["slack_bolt"] = types.SimpleNamespace(App=FakeApp)
+sys.modules.setdefault("slack_sdk", types.ModuleType("slack_sdk"))
+sys.modules.setdefault(
+    "slack_sdk.errors", types.SimpleNamespace(SlackApiError=type("SlackApiError", (Exception,), {}))
+)
 from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
 
 CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
-       "channels": {"help": "#help", "admin": "#admin"}, "admin_group": "@admins"}  # fmt: skip
+       "channels": {"help": "#help", "admin": "#admin"}, "admin_group": "@admins",
+       "admin_mention": "<!subteam^SADMINS>"}  # fmt: skip
 
 
 def submitted(state, user, callback, metadata=""):
@@ -106,6 +111,32 @@ class Handlers(unittest.TestCase):
         self.assertEqual(
             (req["kind"], req["user"], req["ip"], req["reason"]), ("unban", "alice", "2001:db8::1", "typo")
         )
+
+    def test_a_request_held_for_the_administrators_mentions_them_there_only(self):
+        self.engine.submit.return_value = mock.Mock(status="held", text="held", key="k1", request={})
+        self.client.chat_postMessage.return_value = {"ts": "1.0", "channel": "C"}
+        body, view = submitted({"ip": {"v": {"value": "192.0.2.1"}}, "reason": {"v": {"value": None}}},
+                               "UALICE", "unban.submit")  # fmt: skip
+        self.call("view", "unban.submit", body=body, view=view)
+        posts = {c.kwargs["channel"]: c.kwargs for c in self.client.chat_postMessage.call_args_list}
+        admin = posts["#admin"]
+        self.assertTrue(admin["text"].startswith("<!subteam^SADMINS> "))
+        self.assertEqual(
+            admin["blocks"][0]["text"]["text"], "<!subteam^SADMINS>", "the blocks notify, not the text"
+        )
+        self.assertNotIn("SADMINS", posts["#help"]["text"])
+
+    def test_ban_watch_notices_mention_the_administrators_the_pinned_list_not(self):
+        client = mock.MagicMock()
+        client.chat_postMessage.return_value = {"ts": "1.0", "channel": "C"}
+        post, _ = app.admin_messages(client, "#admin", "<!subteam^SADMINS>")
+        post("new ban", [{"type": "section", "text": {"type": "mrkdwn", "text": "new ban"}}])
+        post("the list", [{"type": "section", "text": {"type": "mrkdwn", "text": "the list"}}], pin=True)
+        notice, pinned = (c.kwargs for c in client.chat_postMessage.call_args_list)
+        self.assertTrue(notice["text"].startswith("<!subteam^SADMINS> "))
+        self.assertEqual(notice["blocks"][0]["text"]["text"], "<!subteam^SADMINS>")
+        self.assertEqual(pinned["text"], "the list")
+        self.assertEqual(len(pinned["blocks"]), 1)
 
     def test_unban_needs_a_person_of_the_roster(self):
         self.call(

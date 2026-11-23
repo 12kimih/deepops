@@ -37,7 +37,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MAX_BLOCKS, Slack, bar, sections, table
+from .slack import MAX_BLOCKS, Slack, bar, mentioning, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -389,7 +389,7 @@ CONFIG_KEYS = {
     "slack_token": str, "channel": str, "prometheus_url": str, "idle_hours": (int, float),
     "idle_util_threshold": (int, float), "notify": list, "notify_repeat_hours": (int, float),
     "dm_text": str, "cancel_after_hours": (int, float), "user_map": dict, "email_domain": str,
-    "state_file": str, "admin_channel": str, "repeat_idle_gpu_hours": (int, float),
+    "state_file": str, "admin_channel": str, "admin_mention": str, "repeat_idle_gpu_hours": (int, float),
     "repeat_idle_share": (int, float), "repeat_weeks": int,
     "cancel_warn_hours": (int, float), "cancel_warn_text": str, "disk_top": int,
     "disk_notify": list, "disk_repeat_days": (int, float), "people": list,
@@ -613,7 +613,9 @@ def weekly(cfg, args):
     remember_week(weeks, rows, now)
     heavy = repeaters(weeks, cfg)
     if heavy and (cfg["admin_channel"] or args.to):
-        text, blocks = render_repeaters(heavy, weeks, collect_slurm(now)["jobs"], cfg)
+        text, blocks = mentioning(
+            cfg["admin_mention"], *render_repeaters(heavy, weeks, collect_slurm(now)["jobs"], cfg)
+        )
         slack.post(slack.channel(args.to) if args.to else cfg["admin_channel"], text, blocks)
     if not preview:
         write_atomic(path, json.dumps({"weeks": weeks, "users": cache}), mode=0o600)
@@ -734,7 +736,9 @@ def purge_notices(cfg, slack, cache, state, now, preview):
                     told[key] = int(now)
             elif key in bursts and cfg["admin_channel"]:
                 k, n = bursts[key]
-                slack.post(cfg["admin_channel"], disk_report.burst_text(k, n))
+                slack.post(
+                    cfg["admin_channel"], *mentioning(cfg["admin_mention"], disk_report.burst_text(k, n))
+                )
                 told[key] = int(now)
         except (RuntimeError, OSError) as e:
             failures.append(f"scratch cleanup notice {key}: {e}")
