@@ -51,11 +51,18 @@ collaboration folders (`/scratch/projects`, each file counted to its owner):
    on the next run. Nothing else keeps a file: there is no button to press.
 3. On its date, a file still unused is removed, and the directories that leaves empty.
    A person's own directory and a collaboration folder itself always stay.
+4. Unless its owner has a running or suspended job then: the file is deferred once, by
+   `cluster_user_stale_days` more, and says so in the list and the notice. On that date
+   it goes even if jobs still run. When Slurm cannot be read, nothing is removed that day.
 
 "Used" is the later of the file's access and modification times, so data a job only
 reads stays; the filesystem is mounted `relatime`, which keeps access times at the cost
-of one update a day (under `noatime`, a file only read would look unused). The cleanup
-follows no symbolic link and enters no other filesystem.
+of one update a day (under `noatime`, a file only read would look unused). Over NFS
+that is not the whole story: a node that opens an unchanged file it has read before
+checks its attributes and reads its own cached copy, so the server never sees the read.
+A job re-reading the same small files (code, a config, an index) for weeks could look
+unused, which is what the running-job deferral (4) covers. The cleanup follows no
+symbolic link and enters no other filesystem.
 
 ### Seeing what will go
 

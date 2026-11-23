@@ -6,6 +6,14 @@
 /scratch is for data in use. A file nobody has used (read or written: the later of its
 access and modification times) for stale_days is due: it is listed in its owner's list
 file and removed grace_days after it was first listed, unless it is used before then.
+
+A file read over NFS from a client's page cache is not seen as used: the client checks
+its attributes and reads its cached copy, so the server's access time stays. A job that
+keeps re-reading the same small files for weeks could have them taken mid-run. So a file
+whose date has come is not removed while its owner has a running or suspended Slurm
+job: it is deferred once, by stale_days more, marked so in the list and the metrics, and
+goes on that date whatever runs then (never a standing exemption). When Slurm cannot be
+read, nothing is removed that run.
 Using it is the only way to keep it: the next run finds it in use and drops it from
 the list. The clock of a listed file is kept in the state file, so the grace period
 starts when its owner was first told, never earlier.
@@ -23,6 +31,7 @@ spared at once. The daily disk report (cluster_tools.usage_report --disk) tells 
 person once per new removal date, from this run's textfile metrics:
 
   scratch_space_purge_due_files{user}               files listed
+  scratch_space_purge_deferred_files{user}          of them, deferred once for running jobs
   scratch_space_purge_due_bytes{user}               their size
   scratch_space_purge_next_timestamp_seconds{user}  the earliest removal date
   scratch_space_purge_burst_files{user}             old files all used within one
@@ -48,7 +57,7 @@ import sys
 import time
 from collections import defaultdict
 
-from . import cleanup, config
+from . import cleanup, config, slurm, vocab
 from .cleanup import last_use, walk
 from .cli import Command, Opt, run_main
 from .files import write_atomic
@@ -92,6 +101,15 @@ class Host:
 
     def lstat(self, path):
         return os.lstat(path)
+
+    def running_users(self):
+        """Logins with a running or suspended Slurm job, or None when Slurm cannot be read
+        (the purge then removes nothing)."""
+        try:
+            jobs = slurm.load("jobs")["jobs"]
+        except slurm.Error:
+            return None
+        return {j["user_name"] for j in jobs if vocab.job_code(j["job_state"]) in ("R", "S", "CG")}
 
     def scandir(self, path):
         return os.scandir(path)
@@ -248,6 +266,8 @@ def plan(cfg, files, state, truncated, now):
         when = old["due"] if isinstance(old, dict) and "due" in old else now + cfg["grace_days"] * DAY
         since = old.get("since", now) if isinstance(old, dict) else now
         due[path] = {"user": owner, "due": when, "since": since, "bytes": nbytes}
+        if isinstance(old, dict) and old.get("deferred"):
+            due[path]["deferred"] = old["deferred"]  # once only: the date it was moved
     if truncated:
         for path, old in before.items():
             if path not in files and path not in due:
@@ -267,13 +287,24 @@ def still_stale(host, path, dev, cutoff):
 
 def remove(host, cfg, due, now, check, say):
     """Remove each due file whose date has come (looked at again first), then the
-    directories that removal emptied, deepest first; (files, bytes) removed."""
+    directories that removal emptied, deepest first; (files, bytes) removed. A file of a
+    person with a running job is deferred once instead; nothing goes when Slurm is
+    unreadable."""
     dev = host.lstat(cfg["root"]).st_dev
     cutoff = now - cfg["stale_days"] * DAY
     removed, nbytes, parents = 0, 0, set()
-    for path in sorted(due):
+    ready = [p for p in sorted(due) if due[p]["due"] <= now]
+    busy = host.running_users() if ready else set()
+    if busy is None:
+        say("Slurm could not be read: nothing is removed this run (a running job's files must not go)")
+        return removed, nbytes
+    for path in ready:
         entry = due[path]
-        if entry["due"] > now or not still_stale(host, path, dev, cutoff):
+        if not still_stale(host, path, dev, cutoff):
+            continue
+        if entry["user"] in busy and not entry.get("deferred"):
+            entry["due"], entry["deferred"] = now + cfg["stale_days"] * DAY, now
+            say(f"defer {escape(path)}: {entry['user']} has running jobs; it goes on its new date")
             continue
         say(f"remove {escape(path)}")
         if not check:
@@ -311,6 +342,10 @@ def list_text(cfg, entries, now):
         "# Each file goes on its date unless it is used before (read or written); `scratch-space`",
         "# shows the list with what was used since. DATE<TAB>BYTES<TAB>PATH",
     ]
+    held = sum(1 for _, e in entries if e.get("deferred"))
+    if held:
+        head.append(f"# {held} were deferred once because you had running jobs: they go on their date"
+                    " even if jobs still run then, unless used.")  # fmt: skip
     lines = [
         f"{time.strftime('%Y-%m-%d', time.localtime(e['due']))}\t{e.get('bytes', 0)}\t{escape(p)}"
         for p, e in sorted(entries, key=lambda pe: (pe[1]["due"], pe[0]))
@@ -338,14 +373,16 @@ def write_lists(host, cfg, due, now, say):
 
 def metrics(cfg, due, bursts, removed, scanned, truncated, now, candidates=()):
     values = cleanup.values(cfg["root"], candidates, now) if candidates is not None else {}
-    per = defaultdict(lambda: [0, 0, None])
+    per = defaultdict(lambda: [0, 0, None, 0])
     for entry in due.values():
         p = per[entry["user"]]
         p[0] += 1
         p[1] += entry.get("bytes", 0)
         p[2] = entry["due"] if p[2] is None else min(p[2], entry["due"])
-    for user, (n, nbytes, nxt) in sorted(per.items()):
+        p[3] += 1 if entry.get("deferred") else 0
+    for user, (n, nbytes, nxt, held) in sorted(per.items()):
         values[key("scratch_space_purge_due_files", user=user)] = n
+        values[key("scratch_space_purge_deferred_files", user=user)] = held
         values[key("scratch_space_purge_due_bytes", user=user)] = nbytes
         values[key("scratch_space_purge_next_timestamp_seconds", user=user)] = int(nxt)
     for user, n in sorted(bursts.items()):

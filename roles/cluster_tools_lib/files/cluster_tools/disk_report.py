@@ -358,6 +358,7 @@ def collect_purge(prom):
     files = series(prom, "scratch_space_purge_due_files", ("user",))
     nbytes = series(prom, "scratch_space_purge_due_bytes", ("user",))
     nxt = series(prom, "scratch_space_purge_next_timestamp_seconds", ("user",))
+    held = series(prom, "scratch_space_purge_deferred_files", ("user",))
     stale = {k[0]: v for k, v in series(prom, "scratch_space_purge_stale_days", ()).items()}
     due = {
         k: {
@@ -365,6 +366,7 @@ def collect_purge(prom):
             "bytes": nbytes.get(k, 0),
             "next": nxt.get(k),
             "stale_days": int(stale.get(k[0], 0)),
+            "deferred": int(held.get(k, 0)),
         }
         for k, v in files.items()
         if v > 0 and nxt.get(k)
@@ -385,7 +387,13 @@ def purge_dm_text(k, entry):
     return (
         f"{entry['files']} of your files on the scratch space ({size(entry['bytes'])}) have not been used"
         f" for {entry['stale_days']} days: the first go on {when} unless you use them before (read or write)."
-        f" {PURGE_HOW} /scratch is for data in use; keep what must last in your home."
+        + (
+            f" {entry['deferred']} of them were deferred because you have running jobs; they go on their"
+            " new date even if jobs still run, unless used."
+            if entry.get("deferred")
+            else ""
+        )
+        + f" {PURGE_HOW} /scratch is for data in use; keep what must last in your home."
     )
 
 
