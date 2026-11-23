@@ -27,15 +27,12 @@ import os
 import sys
 
 from . import config
+from .blockdev import Unusable, device_name, disk_of
 from .files import write_textfile
 
 CONFIG_KEYS = {"cgroup_root": str, "sys_root": str, "textfile": str, "devices": list}
 MODEL = ("rbps", "rseqiops", "rrandiops", "wbps", "wseqiops", "wrandiops")
 QOS = ("rpct", "rlat", "wpct", "wlat", "min", "max")
-
-
-class Unusable(RuntimeError):
-    """A mount iocost cannot be set for; str() says why."""
 
 
 def load_config(path):
@@ -62,29 +59,6 @@ def load_config(path):
     return cfg
 
 
-def device_number(path):
-    return os.stat(path).st_dev
-
-
-def disk_of(mount, sys_root="/sys"):
-    """MAJ:MIN of the whole request-based disk MOUNT's filesystem lives on."""
-    dev = device_number(mount)
-    major, minor = os.major(dev), os.minor(dev)
-    node = os.path.join(sys_root, "dev/block", f"{major}:{minor}")
-    if major == 0 or not os.path.isdir(node):
-        raise Unusable(f"{mount}: its filesystem has no block device of its own")
-    node = os.path.realpath(node)
-    if os.path.exists(os.path.join(node, "partition")):
-        node = os.path.dirname(node)
-    for stacked in ("dm", "md"):
-        if os.path.isdir(os.path.join(node, stacked)):
-            raise Unusable(f"{mount}: on a {stacked} device; iocost works on a request-based disk only")
-    if not os.path.isdir(os.path.join(node, "queue")):
-        raise Unusable(f"{mount}: {os.path.basename(node)} has no request queue")
-    with open(os.path.join(node, "dev")) as f:
-        return f.read().strip()
-
-
 def number(value):
     return f"{value:.2f}" if isinstance(value, float) else str(value)
 
@@ -109,6 +83,7 @@ def write(cgroup_root, name, line):
 
 
 def textfile(rows):
+    """ROWS: [(mount, device name, enabled)]."""
     lines = ["# HELP io_fairness_enabled Whether iocost shares the disk under the mount by cgroup weight.",
              "# TYPE io_fairness_enabled gauge"]  # fmt: skip
     for mount, device, on in rows:
@@ -143,7 +118,7 @@ def apply(cfg, reset=False, out=sys.stdout):
         if f"enable={int(enable)}" not in now.split():
             print(f"io-fairness: {dev['mount']} ({device}): the kernel holds '{now}'", file=sys.stderr)
             status = 1
-        rows.append((dev["mount"], device, enable))
+        rows.append((dev["mount"], device_name(cfg["sys_root"], device), enable))
         print(f"{dev['mount']} ({device}): iocost {'on' if enable else 'off'}", file=out)
     write_textfile(cfg["textfile"], textfile(rows))
     return status
