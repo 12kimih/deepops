@@ -237,13 +237,15 @@
 #    server: '{{ groups["slurm-master"][0] }}'
 #    path: /export/shared
 
-# Ubuntu's own archive from a mirror (roles/package_repos, tasks_from: ubuntu, run by
-# playbooks/generic/os-updates.yml): ubuntu.sources points there, trusting the OS's
-# archive key. Empty leaves the OS's sources alone. The -security suite comes from the
-# same mirror unless package_repos_ubuntu_security_mirror names another.
-#package_repos_ubuntu_mirror: ""
-#package_repos_ubuntu_mirror: https://mirror.example.org/ubuntu/  # example
-#package_repos_ubuntu_security_mirror: "{{ package_repos_ubuntu_mirror }}"
+# Ubuntu's own archive from mirrors in order of preference (roles/package_repos,
+# tasks_from: ubuntu, run by playbooks/generic/os-updates.yml): apt falls back to the
+# next when one fails, trusting the OS's archive key. Empty leaves the OS's sources
+# alone. The -security suite comes from the same list unless
+# package_repos_ubuntu_security_mirrors names others.
+#package_repos_ubuntu_mirrors: []
+#package_repos_ubuntu_mirrors: [https://mirror.example.org/ubuntu/, http://archive.ubuntu.com/ubuntu/]  # example
+#package_repos_ubuntu_security_mirrors: "{{ package_repos_ubuntu_mirrors }}"
+#package_repos_ubuntu_mirror_dir: /etc/apt/mirrors
 #package_repos_ubuntu_components: [main, restricted, universe, multiverse]
 
 # Extra Packages for Enterprise Linux (roles/package_repos; set for a mirror)

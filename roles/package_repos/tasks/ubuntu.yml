@@ -1,17 +1,21 @@
 ---
-# Ubuntu's own archive from the site's mirror (package_repos_ubuntu_mirror), as the
+# Ubuntu's own archive from the site's mirrors (package_repos_ubuntu_mirrors), as the
 # release ships it (/etc/apt/sources.list.d/ubuntu.sources, deb822), trusting the
-# archive key the ubuntu-keyring package keeps up to date, never a copy of it. Empty
-# leaves the OS's file alone. A different package_repos_ubuntu_security_mirror puts the
-# -security suite in its own source (ubuntu-security.sources), as Ubuntu's default file
-# keeps it on security.ubuntu.com.
+# archive key the ubuntu-keyring package keeps up to date, never a copy of it. The
+# source names a mirror list (URIs: mirror+file:...), the way Ubuntu's own cloud images
+# do, so apt falls back along it. Empty leaves the OS's file alone. Different
+# package_repos_ubuntu_security_mirrors put the -security suite in its own source
+# (ubuntu-security.sources), as Ubuntu's default file keeps it on security.ubuntu.com.
 - name: Point apt at the site's Ubuntu mirror
   when:
-    - package_repos_ubuntu_mirror | length > 0
+    - package_repos_ubuntu_mirrors | length > 0
     - ansible_facts.distribution == 'Ubuntu'
   vars:
     _codename: "{{ ansible_facts.distribution_release }}"
-    _separate: "{{ package_repos_ubuntu_security_mirror | regex_replace('/*$', '') != package_repos_ubuntu_mirror | regex_replace('/*$', '') }}"
+    _separate: "{{ package_repos_ubuntu_security_mirrors | map('regex_replace', '/*$', '') | list != package_repos_ubuntu_mirrors | map('regex_replace', '/*$', '') | list }}"
+    _lists:
+      ubuntu: "{{ package_repos_ubuntu_mirrors }}"
+      ubuntu-security: "{{ package_repos_ubuntu_security_mirrors }}"
   block:
     - name: Read the one-line sources list
       ansible.builtin.slurp:
@@ -33,11 +37,31 @@
           {{ (package_repos_sources_list.content | default('') | b64decode).splitlines()
              | map('trim') | select('match', '^deb(-src)?\s') | list }}
 
+    - name: Create the mirror list directory
+      ansible.builtin.file:
+        path: "{{ package_repos_ubuntu_mirror_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write the mirror lists apt falls back along
+      ansible.builtin.copy:
+        dest: "{{ package_repos_ubuntu_mirror_dir }}/{{ item }}.list"
+        content: "{{ _lists[item] | join('\n') }}\n"
+        mode: "0644"
+      loop: "{{ ['ubuntu'] + (['ubuntu-security'] if _separate else []) }}"
+      register: package_repos_ubuntu_mirror_lists
+
+    - name: Remove the security mirror list without its own source
+      ansible.builtin.file:
+        path: "{{ package_repos_ubuntu_mirror_dir }}/ubuntu-security.list"
+        state: absent
+      when: not _separate
+
     - name: Write the Ubuntu archive source
       ansible.builtin.deb822_repository:
         name: ubuntu
         types: [deb]
-        uris: ["{{ package_repos_ubuntu_mirror }}"]
+        uris: ["mirror+file:{{ package_repos_ubuntu_mirror_dir }}/ubuntu.list"]
         suites: "{{ [_codename, _codename ~ '-updates', _codename ~ '-backports'] + ([] if _separate else [_codename ~ '-security']) }}"
         components: "{{ package_repos_ubuntu_components }}"
         signed_by: /usr/share/keyrings/ubuntu-archive-keyring.gpg
@@ -47,7 +71,7 @@
       ansible.builtin.deb822_repository:
         name: ubuntu-security
         types: [deb]
-        uris: ["{{ package_repos_ubuntu_security_mirror }}"]
+        uris: ["mirror+file:{{ package_repos_ubuntu_mirror_dir }}/ubuntu-security.list"]
         suites: ["{{ _codename }}-security"]
         components: "{{ package_repos_ubuntu_components }}"
         signed_by: /usr/share/keyrings/ubuntu-archive-keyring.gpg
@@ -58,3 +82,4 @@
       ansible.builtin.apt:
         update_cache: true
       when: package_repos_ubuntu_archive is changed or package_repos_ubuntu_security is changed
+        or package_repos_ubuntu_mirror_lists is changed

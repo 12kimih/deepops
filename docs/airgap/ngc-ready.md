@@ -70,7 +70,7 @@ To deploy the NGC-Ready playbook offline, you will need to configure your server
 
 ### Configure servers to use your mirrors for the Linux distribution package repositories
 
-On Ubuntu, the cluster deploys point the distribution archive at your mirror (`package_repos_ubuntu_mirror`, applied by `playbooks/generic/os-updates.yml`); this NGC-ready playbook does not import it, so run that playbook first or configure the archive yourself. On Red Hat family systems, configure your servers to use your offline distribution mirrors directly.
+On Ubuntu, the cluster deploys point the distribution archive at your mirror (`package_repos_ubuntu_mirrors`, applied by `playbooks/generic/os-updates.yml`); this NGC-ready playbook does not import it, so run that playbook first or configure the archive yourself. On Red Hat family systems, configure your servers to use your offline distribution mirrors directly.
 
 On Ubuntu 24.04 servers, you should edit `/etc/apt/sources.list.d/ubuntu.sources` (`/etc/apt/sources.list` on older releases) to replace references to the Ubuntu distribution servers with your own mirror.
 For example,
