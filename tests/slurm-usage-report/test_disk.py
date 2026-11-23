@@ -251,7 +251,7 @@ class RunTests(unittest.TestCase):
     CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, disk_top=10, disk_notify=["mention", "dm"],
                disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
-               admin_channel="#admins")  # fmt: skip
+               admin_channel="#admins", admin_mention="<!subteam^SADMINS>")  # fmt: skip
 
     def run_disk(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
         """(posts [(channel, text, blocks as text)], the failure, disk.json): one run at
@@ -351,6 +351,7 @@ class RunTests(unittest.TestCase):
             self.assertIn("`scratch-space`", dm[0][1])
             admin = [p for p in posted if p[0] == self.CFG["admin_channel"] and "carol" in p[1]]
             self.assertEqual(len(admin), 1)
+            self.assertTrue(admin[0][1].startswith("<!subteam^SADMINS> "), "the administrators are mentioned")
             self.assertEqual(len(saved["purge_told"]), 2)
             # The next day, the same date: told already.
             posted, _, _ = self.run_disk(prom, state=d, now=NOW + disk_report.DAY)

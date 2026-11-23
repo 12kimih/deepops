@@ -207,9 +207,13 @@ Slack, create an incoming webhook and set (vaulted) in `config/`:
 
 ```yaml
 alertmanager_slack_api_url: "https://hooks.slack.com/services/..."
-alertmanager_slack_channel: "#alerts"
-alertmanager_slack_critical_mention: "<!subteam^S0123ABCD>"   # optional
 ```
+
+Alerts go to the administrators' channel, `slack_channels.admin`, and critical ones
+mention the administrators' user group, as every notice they must act on does: set its
+ID in `slack_admin_group_id` (`roles/slack_defaults`; the `S...` ID, which the web
+client shows, not the `@handle`, which is `slack_admin_group`). Without it they
+mention no one.
 
 The config is checked with `amtool` before it is written. Visit
 http://\<slurm-metric ip\>:9093 to view and silence alerts.

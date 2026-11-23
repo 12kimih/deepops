@@ -7,6 +7,7 @@
     member(slack, user, user_map, email_domain, cache) -> a person's Slack member ID
     slack.call(method, **params)            -> any other method, parsed
     sections(text), table(header, rows)     -> message blocks within Slack's limits
+    mentioning(who, text, blocks)           -> (text, blocks) that notify WHO first
     bar(percent)                            -> a text gauge for a code span or table
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
@@ -152,6 +153,17 @@ def table(header, rows):
         return "  ".join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip()
 
     return "```\n" + "\n".join([fmt(header)] + [fmt(r) for r in rows]) + "\n```"
+
+
+def mentioning(who, text, blocks=None):
+    """TEXT and BLOCKS with WHO first (a mention: <!subteam^S0123ABCD>, <@U0123ABCD>,
+    <!channel>), so Slack notifies them: a message with blocks notifies whom its blocks
+    mention, its text is only the fallback. An empty WHO leaves both as they are."""
+    if not who:
+        return text, blocks
+    return f"{who} {text}", (
+        [{"type": "section", "text": {"type": "mrkdwn", "text": who}}, *blocks] if blocks else blocks
+    )
 
 
 def sections(text):
