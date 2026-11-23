@@ -112,6 +112,10 @@
 # nfs_mount_options. Set per host group: a mount point named must be local on each host.
 #host_baseline_mount_options: {}
 #host_baseline_mount_options: {"/": "defaults,noatime,errors=remount-ro"}  # example
+# The access-time policy: only that option of each entry is set, the rest kept, so one
+# line fits every host (a mount point above keeps its full options there).
+#host_baseline_mount_atime: {}
+#host_baseline_mount_atime: {"/": relatime}  # example
 
 # Every host's locale (LANG) and time zone (roles/locale, playbooks/generic/locale.yml).
 #locale_lang: "en_US.UTF-8"
