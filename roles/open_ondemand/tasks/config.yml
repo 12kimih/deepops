@@ -88,6 +88,29 @@
     label: "{{ item.path }}"
   when: item.path | basename != open_ondemand_cluster_name ~ '.yml'
 
+- name: Check each proxied service keeps its path upstream
+  ansible.builtin.assert:
+    that: (item.upstream | urlsplit('path')) == item.path
+    fail_msg: >-
+      open_ondemand_proxied_services: {{ item.path }} goes to {{ item.upstream }}; the
+      upstream must end in the same path ({{ item.path }}), or a service served from its
+      sub path redirects every request back to it.
+    quiet: true
+  loop: "{{ open_ondemand_proxied_services }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+# The top menu (OOD merges every file in ondemand.d); per-user servers read it when
+# they start.
+- name: Write the portal's menu
+  ansible.builtin.template:
+    src: ondemand-menu.yml.j2
+    dest: "{{ open_ondemand_menu_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Stop the per-user servers
+
 - name: Describe the Slurm cluster
   ansible.builtin.template:
     src: cluster.yml.j2

@@ -1,0 +1,11 @@
+---
+# {{ ansible_managed }}
+# The portal's top menu: OOD's pinned apps and app groups, then each proxied service
+# that has a title (open_ondemand_proxied_services), in a new tab.
+nav_bar:
+{% for group in open_ondemand_nav_groups %}
+  - {{ group | to_json }}
+{% endfor %}
+{% for svc in open_ondemand_proxied_services if svc.title is defined %}
+  - {title: {{ svc.title | to_json }}, url: {{ svc.path | to_json }}, icon: {{ svc.icon | default('fas://external-link-alt') | to_json }}, new_tab: true}
+{% endfor %}
