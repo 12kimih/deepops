@@ -25,10 +25,10 @@ FilterModule = in_tree.load("plugins/filter/slurm_node.py").FilterModule
 
 
 def role_defaults(*names):
-    """The named settings as the roles define them (their defaults may template each
+    """The named settings as the roles define them (defaults and vars) (their defaults may template each
     other), so the tests render with the deployed values, never a copy of them."""
     found = {}
-    for path in tracked("roles/*/defaults/main.yml"):
+    for path in [*tracked("roles/*/defaults/main.yml"), *tracked("roles/*/vars/main.yml")]:
         found.update(yaml.safe_load(path.read_text()) or {})
     env = Environment(undefined=StrictUndefined, autoescape=False)  # noqa: S701 (not HTML)
 
@@ -52,6 +52,7 @@ VARS = role_defaults(
     "slurm_log_files",
     "slurm_job_private_dirs",
     "deepops_system_path",
+    "slurm_exclusive_governor_file",
 )
 
 SCOPES = ("job", "user")

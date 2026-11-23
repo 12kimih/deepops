@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# The CPU governor for the job that has the node to itself. A node without a cpufreq
-# driver, or whose cpupower does not match the running kernel, cannot set it; that
-# is logged, never a failed part, which would drain the node.
+# The CPU governor the prolog found, back after a job that had the node to itself
+# (prolog.d/50-exclusive-cpu kept it in {{ slurm_exclusive_governor_file }}). Without that
+# record nothing is changed: a fixed powersave pinned a passive driver (intel_cpufreq)
+# at its lowest frequency. A failure is logged, never a failed part.
 set -u
 
 command -v cpupower >/dev/null || exit 0
-if ! out=$(timeout 30 cpupower frequency-set -g powersave 2>&1); then
-    logger -t slurm-exclusive "CPU governor powersave not set: $out" || :
+saved='{{ slurm_exclusive_governor_file }}'
+[ -r "$saved" ] || exit 0
+before=$(tr -d '[:space:]' < "$saved")
+rm -f "$saved"
+[ -n "$before" ] || exit 0
+if ! out=$(timeout 30 cpupower frequency-set -g "$before" 2>&1); then
+    logger -t slurm-exclusive "CPU governor $before not restored: $out" || :
 fi
 exit 0

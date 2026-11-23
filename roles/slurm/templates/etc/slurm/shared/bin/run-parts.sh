@@ -28,26 +28,30 @@ squeue_bin="{{ slurm_install_prefix }}/bin/squeue"
 # Where each part's output goes (slurm_log_files in roles/slurm_paths).
 parts_log="{{ slurm_log_files['slurm-prolog-epilog'] }}"
 
-# Find out if we are running in exclusive mode: Slurm's own answer, squeue's
-# OverSubscribe (%h), which is NO exactly when the job has its nodes to itself.
-# Comparing allocated CPUs with the node's count never matched once CoreSpecCount
-# reserves cores (an exclusive job gets only the rest), nor across nodes of
-# different sizes, so the *-exclusive-* scripts never ran.
-#
-# The lookup runs inside a conditional on purpose. This script has "set -e", so
-# a bare assignment from a failing squeue aborts the whole prolog/epilog run and
-# fails the job; redirecting stderr does not suppress the exit status. A failed,
-# empty or non-numeric lookup must instead leave exclusive=0, which only skips
-# the *-exclusive-* scripts and lets every other script run.
+# The kernel's view of whose processes these are (shared/lib/epilog-job-scope.sh):
+# every process of a Slurm job sits in a job_<id> cgroup.
+epilog_proc_root=/proc
+job_scope_lib='{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh'
+
+# Does the job have the node to itself? Only then may the *-exclusive-* parts run: they
+# act on the whole node (every GPU's power and clocks, the CPU governor, the page
+# cache). Slurm's own answer is the job's Exclusive field (squeue -O Exclusive), NODE for
+# a whole-node allocation (--exclusive, or a partition with Exclusive=NODE); the prolog
+# and the epilog of a job both read the same field, so what one sets the other undoes.
+# OverSubscribe (%h) "does not encode exclusivity" (man squeue): on a partition with
+# OverSubscribe=NO every job reads NO, and taking that for exclusive ran these parts for
+# every job on shared nodes (2026-11-23: other jobs' GPU processes were killed). The
+# lookup runs inside a conditional because of "set -e": a failed squeue must skip the
+# parts, not fail the job.
 exclusive=0
-if oversubscribe=$(timeout "$squeue_timeout" "$squeue_bin" -h -j "$SLURM_JOBID" -o "%h" 2>/dev/null); then
-    case "$oversubscribe" in
-        NO) exclusive=1 ;;
-        OK|YES|USER|MCS|TOPO) ;;
-        *) log "[WARN] squeue returned no usable OverSubscribe for job ${SLURM_JOBID} ('${oversubscribe}'); treating the job as non-exclusive." ;;
+if job_exclusive=$(timeout "$squeue_timeout" "$squeue_bin" -h -j "$SLURM_JOB_ID" -O Exclusive 2>/dev/null); then
+    case "$(printf '%s' "$job_exclusive" | tr -d '[:space:]')" in
+        NODE) exclusive=1 ;;
+        NO|USER|MCS|TOPO) ;;
+        *) log "[WARN] squeue returned no usable Exclusive for job ${SLURM_JOB_ID} ('${job_exclusive}'); not running the node-wide parts." ;;
     esac
 else
-    log "[WARN] squeue failed for job ${SLURM_JOBID}; treating the job as non-exclusive."
+    log "[WARN] squeue failed for job ${SLURM_JOB_ID}; not running the node-wide parts."
 fi
 
 # Find out if there are any more jobs on this node for this user.
@@ -97,9 +101,6 @@ fi
 # unrecognised /proc/<pid>/cgroup data) the answer is the safe one: another job
 # may be here. The cleanup is deferred to the next job's epilog; it is never
 # guessed at.
-epilog_proc_root=/proc
-job_scope_lib='{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh'
-
 # node_view: clear (no other job's process found), other_job, or unknown.
 node_view=clear
 if compgen -G "$parts_dir/*-lastuserjob-*" >/dev/null; then
@@ -139,7 +140,7 @@ for script in "$parts_dir"/*; do
         continue
     fi
     if [[ "$script" == *"-exclusive-"* ]] && [ "$exclusive" = 0 ]; then
-        log "Skipping $script because the job was not run in exclusive mode."
+        log "Skipping $script because the job does not have the node to itself."
         continue
     fi
 {% if slurm_epilog_cleanup_scope == 'job' %}

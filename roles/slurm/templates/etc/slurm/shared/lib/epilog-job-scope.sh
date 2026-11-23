@@ -131,3 +131,4 @@ epilog_other_job_present() {
     [ "$unsure" = 0 ] || return 2
     return 1
 }
+
