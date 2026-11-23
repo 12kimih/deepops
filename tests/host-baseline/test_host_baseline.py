@@ -8,6 +8,7 @@ then stops each system service whose main process runs a removed program
 or a job inside slurmd running a deleted file must never stop those.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -18,6 +19,11 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+_spec = importlib.util.spec_from_file_location("packages_filter", ROOT / "plugins" / "filter" / "packages.py")
+_packages = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_packages)
+packages_protected_taken = _packages.packages_protected_taken
+
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import bounds  # noqa: E402
 from ansible_yaml import condition, render  # noqa: E402
@@ -157,9 +163,35 @@ class NeededPackagesStay(unittest.TestCase):
         # linux-image-* also matches old kernels, which must stay automatic for apt.
         read = "Read which packages the host needs are installed (Debian)"
         values = {"host_baseline_protected_packages": ["libopengl0", "linux-image-*", "slurm-smd*", "munge"],
-                  "_host_baseline_recorded": ["podman"]}  # fmt: skip
+                  "_host_baseline_recorded": ["podman", "nvidia-driver-*"]}  # fmt: skip
         argv = render(self.TASKS[read]["ansible.builtin.command"]["argv"], values)
         self.assertEqual(argv[4:], ["libopengl0", "munge", "podman"])
+
+    def test_a_recorded_pattern_protects_what_it_matches(self):
+        # Removing xserver-xorg-core takes the NVIDIA driver, which a component records as
+        # nvidia-driver-*: compared by exact name it went unrefused.
+        removal = ["xserver-xorg-core:amd64", "nvidia-driver-580-server-open:amd64", "libfoo1:amd64"]
+        self.assertEqual(packages_protected_taken(removal, ["xserver-xorg-core"], ["sudo", "nvidia-driver-*"]),
+                         ["nvidia-driver-580-server-open"])  # fmt: skip
+
+    def test_an_absent_pattern_matching_a_protected_package_is_refused(self):
+        self.assertEqual(packages_protected_taken(["linux-image-6.8.0-1-generic"], ["linux-image-*"],
+                                                  ["linux-image-*"]), ["linux-image-6.8.0-1-generic"])  # fmt: skip
+
+    def test_a_protected_package_named_whole_goes(self):
+        # A component's own removal names its package: a decision, not an accident.
+        self.assertEqual(packages_protected_taken(["systemd-coredump:amd64"], ["systemd-coredump"],
+                                                  ["systemd-coredump"]), [])  # fmt: skip
+
+    def test_the_refusal_goes_through_the_filter(self):
+        task = next(t for t in walk(yaml.safe_load(ABSENT.read_text()))
+                    if t.get("name") == "Refuse a removal that takes a protected package with it")  # fmt: skip
+        self.assertIn(
+            "packages_protected_taken(host_baseline_absent_packages,", task["vars"]["host_baseline_taken"]
+        )
+        self.assertIn(
+            "host_baseline_protected_packages + _host_baseline_recorded", task["vars"]["host_baseline_taken"]
+        )
 
     def test_nothing_is_marked_or_installed_when_all_are_manual(self):
         values = {**self.facts(["ii  libc6:amd64"], []), "host_baseline_present": ["gdm3"],
