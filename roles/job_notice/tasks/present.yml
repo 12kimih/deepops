@@ -7,6 +7,15 @@
     component_record_action: begin
     component_record_items: "{{ job_notice_items }}"
 
+# The slurm account (its group reads what follows), made as roles/slurm makes it, so
+# job notices deploy before Slurm, whose slurm.conf names their command (MailProg) and
+# whose controller refuses one not installed.
+- name: Create the slurm account
+  ansible.builtin.include_role:
+    name: slurm
+    tasks_from: setup-user
+    public: true  # slurm_username means the same in both roles
+
 # slurmctld runs MailProg as SlurmUser: the command, its configuration and the token
 # are readable by that group, writable by root alone (slurm.conf(5): MailProg).
 - name: Install the notice command

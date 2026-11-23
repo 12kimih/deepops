@@ -331,5 +331,42 @@ class ConfServer(unittest.TestCase):
         self.assertEqual(removed["file"]["state"], "absent")
 
 
+class Programs(unittest.TestCase):
+    """Every program slurm.conf names is installed where its daemon runs (programs.yml):
+    a MailProg whose role never ran sent no job notice (2026-11-23)."""
+
+    TASKS = load("roles/slurm/tasks/programs.yml")
+    CONF = (
+        "MailProg=/usr/local/sbin/job-notice\n"
+        'RebootProgram="/bin/systemctl reboot"\n'
+        "#PrologSlurmctld=/x\n"
+        "  Prolog=/etc/slurm/prolog.sh\n"
+    )
+
+    def programs(self, keys):
+        work = next(t for t in self.TASKS if t["name"].startswith("Read the programs"))
+        return render(work["set_fact"]["_slurm_programs"], {"_conf": self.CONF, "slurm_programs_keys": keys})
+
+    def test_each_named_program_is_its_first_word(self):
+        self.assertEqual(
+            self.programs(["MailProg", "PrologSlurmctld", "RebootProgram", "Prolog"]),
+            {
+                "MailProg": "/usr/local/sbin/job-notice",
+                "RebootProgram": "/bin/systemctl",
+                "Prolog": "/etc/slurm/prolog.sh",
+            },
+        )
+
+    def test_a_missing_program_is_refused_by_name(self):
+        check = next(t for t in self.TASKS if t["name"].startswith("Check the programs are installed"))
+        found = {"results": [{"item": {"key": "MailProg", "value": "/usr/local/sbin/job-notice"}, "stat": {"exists": False}},
+                             {"item": {"key": "RebootProgram", "value": "/bin/systemctl"}, "stat": {"exists": True}}]}  # fmt: skip
+        values = {"_slurm_programs_found": found}
+        for name in ("_absent", "_missing"):  # in order: one reads the other
+            values[name] = render(check["vars"][name], values)
+        self.assertEqual(values["_missing"], ["MailProg=/usr/local/sbin/job-notice"])
+        self.assertFalse(condition(check["assert"]["that"], values))
+
+
 if __name__ == "__main__":
     unittest.main()

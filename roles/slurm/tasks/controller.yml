@@ -195,6 +195,18 @@
   tags:
     - always
 
+- name: Check the programs slurmctld runs are installed
+  ansible.builtin.include_tasks:
+    file: programs.yml
+    apply:
+      tags:
+        - config
+  vars:
+    slurm_programs_daemon: slurmctld
+    slurm_programs_keys: [MailProg, PrologSlurmctld, EpilogSlurmctld, ResumeProgram, SuspendProgram, ResumeFailProgram]
+  tags:
+    - config
+
 - name: Configure slurm.conf
   ansible.builtin.template:
     src: "{{ slurm_conf_template }}"
