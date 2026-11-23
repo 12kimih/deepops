@@ -976,10 +976,6 @@ class TestPendingHints(unittest.TestCase):
         self.assertNotIn("abc", json.dumps(h))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class _Cmds(list):
     deletes = None
 
@@ -1089,3 +1085,7 @@ class TestNamespaceOwnership(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(fake.applied, [])
         self.assertFalse([c for c in cmds if "delete" in c])
+
+
+if __name__ == "__main__":
+    unittest.main()
