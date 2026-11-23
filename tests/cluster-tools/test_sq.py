@@ -2,18 +2,18 @@
 the real Slurm 25.11 fixture (see scenario.py). The cases follow the shell version's
 regression tests, then the behaviour the Python version adds."""
 
+import io
 import json
 import re
 import shutil
-import subprocess
-import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import scenario
 from cluster_tools import sq as sq_tool, vocab
-from common import FAKE_PATH, LIB, run_tool
+from common import run_tool
 
 TMP = tempfile.TemporaryDirectory()
 SCENE = Path(TMP.name)
@@ -353,14 +353,22 @@ class FailureTests(unittest.TestCase):
         self.assertIn("no answer in 1 s (slurmctld slow, or rate limiting", r.stderr)
 
     def test_the_interval_backs_off_while_slurm_fails(self):
-        code = f"import sys; sys.path.insert(0, {LIB!r}); from cluster_tools import sq; sys.exit(sq.main())"
-        env = {"PATH": FAKE_PATH, "FIXTURES": str(SCENE), "LANG": "C.UTF-8",
-               "USER": "user1", "FAKE_FAIL": "down"}  # fmt: skip
-        if not shutil.which("timeout"):
-            self.skipTest("no timeout(1)")
-        r = subprocess.run([shutil.which("timeout"), "3", sys.executable, "-I", "-c", code, "-i", "2"], env=env,
-                           capture_output=True, text=True)  # fmt: skip
-        self.assertIn("Slurm read failed, next try in 4s", r.stdout)
+        # In-process, the clock and the reads faked: a real process under timeout(1) printed
+        # nothing in time on a loaded host (2026-11-24). Doubling from the interval, capped.
+        waits = []
+
+        def sleep(seconds):
+            waits.append(seconds)
+            if len(waits) == 7:
+                raise KeyboardInterrupt
+
+        args, theme = sq_tool.COMMAND.parse(["-i", "2", "--no-color"])
+        out = io.StringIO()
+        with mock.patch.object(sq_tool, "frame", side_effect=sq_tool.slurm.Error("down")), \
+                mock.patch.object(sq_tool.time, "sleep", sleep), mock.patch.object(sq_tool.sys, "stdout", out):  # fmt: skip
+            self.assertEqual(sq_tool.watch(theme, args), 0)
+        self.assertEqual(waits, [4, 8, 16, 32, 60, 60, 60])
+        self.assertIn("Slurm read failed, next try in 4s", out.getvalue())
 
     def test_no_nodes_is_said_not_a_crash(self):
         with tempfile.TemporaryDirectory() as d:

@@ -52,8 +52,14 @@ class BoundaryTests(unittest.TestCase):
         marker = f"{os.getpid()}.25"
         with self.assertRaises(proc.TimeoutExpired):
             proc.run(["bash", "-o", "pipefail", "-c", '"$@" | cat', "bash", "sleep", marker], timeout=0.5)
-        time.sleep(0.2)
-        alive = subprocess.run(["pgrep", "-x", "-f", f"sleep {marker}"], capture_output=True, text=True)
+        # Gone within a deadline, not a fixed pause: on a loaded host the killed process
+        # may take longer than 0.2 s to leave the process table.
+        deadline = time.monotonic() + 10
+        while True:
+            alive = subprocess.run(["pgrep", "-x", "-f", f"sleep {marker}"], capture_output=True, text=True)
+            if not alive.stdout or time.monotonic() > deadline:
+                break
+            time.sleep(0.1)
         self.assertEqual(alive.stdout, "")
 
     def test_proc_refuses_an_unbounded_call(self):
