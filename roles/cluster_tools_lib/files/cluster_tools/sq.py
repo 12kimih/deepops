@@ -17,7 +17,7 @@ from fnmatch import fnmatchcase
 
 from . import render, slurm, vocab
 from . import cli
-from .cli import Command, Opt, run_main
+from .cli import Command, Opt, opt_all, opt_json, opt_me, opt_user, run_main
 from .render import Grid, width
 
 MIN_INTERVAL = 2  # slurmctld's per-user rate limit enforces; this only guards
@@ -61,9 +61,8 @@ COMMAND = Command(
     "sq",
     "the Slurm queue, who holds what, and what each partition pool has left",
     [
-        Opt("-m", "--me", brief=True, section="Filters", help="only your jobs"),
-        Opt("-u", "--user", metavar="USER", complete="users", brief=True, section="Filters",
-            help="only these users (comma list; * and ? match)"),
+        opt_me("only your jobs", section="Filters"),
+        opt_user("only these users (comma list; * and ? match)", section="Filters"),
         Opt("-p", "--partition", metavar="PART", complete="partitions", brief=True, section="Filters",
             help="only these partitions"),
         Opt("-w", "--nodelist", metavar="NODES", complete="nodes", brief=True, section="Filters",
@@ -76,8 +75,7 @@ COMMAND = Command(
         Opt("-n", "--name", metavar="NAMES", section="Filters", help="only these job names"),
         Opt("--queue", metavar="WHICH", choices=("mine", "all", "none"), default="mine", section="Sections",
             help="the job list: mine (default; a job filter shows what it selects), all, or none"),
-        Opt("-Q", dest="queue", action="store_const", const="all", brief=True, section="Sections",
-            help="everyone's jobs in the job list (--queue all)"),
+        opt_all("everyone's jobs in the job list (--queue all)", section="Sections", renamed=("-Q",)),
         Opt("--no-queue", dest="queue", action="store_const", const="none", section="Sections",
             help="no job list (--queue none)"),
         Opt("-U", "--users", negate=True, default=True, section="Sections",
@@ -91,8 +89,9 @@ COMMAND = Command(
             help="pending jobs above running ones (--no-group: job ID order)"),
         Opt("--split", negate=True, default=False, section="Sections",
             help="break each pool into the partitions it is split across"),
-        Opt("-T", "--totals", "--show-partitions", dest="view", action="store_const", const="partitions",
-            default="grouped", brief=True, section="Layout", help="pool totals only"),
+        Opt("-P", "--partitions", dest="view", action="store_const", const="partitions", default="grouped",
+            brief=True, section="Layout", help="pool totals only", aliases=("--show-partitions",),
+            renamed=("-T", "--totals")),
         Opt("-N", "--nodes", "--show-nodes", dest="view", action="store_const", const="nodes", brief=True,
             section="Layout", help="a flat node list, as in sinfo -N"),
         Opt("--gres", metavar="NAME", section="Layout",
@@ -100,7 +99,7 @@ COMMAND = Command(
         Opt("-i", "--interval", "--iterate", metavar="SEC", type=_interval, brief=True, section="Layout",
             help=f"redraw every SEC seconds (at least {MIN_INTERVAL}); while Slurm fails or does not "
             f"answer, the wait doubles, up to {MAX_BACKOFF}s or SEC if longer"),
-        Opt("--json", section="Output", help="the model as JSON, for scripts (ignores $SQ_OPTIONS)"),
+        opt_json("the model as JSON, for scripts (ignores $SQ_OPTIONS)"),
     ],
     env="SQ_OPTIONS",
     machine="--json",
@@ -218,10 +217,17 @@ def _read_nodes(data, gres):
                     counts[key[5:]] = counts.get(key[5:], 0) + 1
         gres = min(counts, key=lambda k: (-counts[k], k)) if counts else "gpu"
     for n in nodes:
+        n["gres_types"] = _typed(n["_tres"], gres)
         n["gres_total"] = _int(n.pop("_tres").get(f"gres/{gres}"))
         n["gres_used"] = _int(n.pop("_used").get(f"gres/{gres}"))
     nodes.sort(key=lambda n: _natural(n["name"]))
     return nodes, gres
+
+
+def _typed(tres, gres):
+    """{type: count} of the typed TRES of GRES in TRES (gres/gpu:a10=4 -> {"a10": 4})."""
+    head = f"gres/{gres}:"
+    return {k[len(head) :]: _int(v) for k, v in tres.items() if k.startswith(head) and _int(v)}
 
 
 def _parts(text):
@@ -253,6 +259,7 @@ def _read_jobs(data, gres, now):
             "tasks": slurm.job_tasks(j), "task_spec": j["array_task_string"] or "",
             "alloc": {"cpu": _int(alloc.get("cpu")), "mem": slurm.mem_mib(alloc.get("mem")),
                       "gres": _int(alloc.get(f"gres/{gres}"))},
+            "alloc_types": _typed(alloc, gres), "req_types": _typed(req, gres),
             "req": {"nodes": _int(req.get("node")) or slurm.num(j["node_count"]) or 0,
                     "cpu": _int(req.get("cpu")) or slurm.num(j["cpus"]) or 0,
                     "gres": _int(req.get(f"gres/{gres}"))},
@@ -265,7 +272,68 @@ def _family(partition):
     return m.group(1) if m else partition
 
 
-def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title=None):
+def _qos_classes(qos_data):
+    """{QoS: {"priority", "high", "limits"}} from sacctmgr's JSON, or {} without it. A
+    QoS is high when its priority is above the lowest any QoS has (the tier that may
+    preempt); its limits are its GrpTRES GPU quotas, {type: n}, "" for any type."""
+    if not qos_data:
+        return {}
+    rows = {}
+    for q in qos_data.get("qos") or []:
+        total = slurm.tres_list(((q.get("limits") or {}).get("max") or {}).get("tres", {}).get("total"))
+        limits = {k[len("gres/gpu:") :] if ":" in k else "": v for k, v in total.items()
+                  if k == "gres/gpu" or k.startswith("gres/gpu:")}  # fmt: skip
+        rows[q["name"]] = {"priority": slurm.num(q.get("priority")) or 0, "limits": limits}
+    floor = min((r["priority"] for r in rows.values()), default=0)
+    for r in rows.values():
+        r["high"] = r["priority"] > floor
+    return rows
+
+
+def _gpu_split(chosen, classes):
+    """Per user: teams (accounts), GPUs held by type under a high and a low QoS, and the
+    GPUs their pending jobs ask for."""
+    rows = {}
+    for j in chosen:
+        if not (j["holds"] or j["state"] == "PD"):
+            continue
+        u = rows.setdefault(j["user"], {"teams": set(), "high": {}, "low": {}, "pending_gpus": 0})
+        u["teams"].add(j["account"])
+        if j["holds"]:
+            side = u["high"] if (classes.get(j["qos"]) or {}).get("high") else u["low"]
+            for kind, n in (j["alloc_types"] or {"": j["alloc"]["gres"]}).items():
+                if n:
+                    side[kind] = side.get(kind, 0) + n
+        else:
+            u["pending_gpus"] += j["req"]["gres"] * j["tasks"]
+    return rows
+
+
+def _headroom(held, classes):
+    """Each high QoS with a GPU quota or GPUs in use: per GPU type its quota (None: no
+    limit), what its running jobs hold, and who holds it, most first."""
+    out = []
+    for name, q in sorted(classes.items()):
+        if not q["high"]:
+            continue
+        holders = {}
+        for j in held:
+            if j["qos"] == name:
+                for kind, n in (j["alloc_types"] or {"": j["alloc"]["gres"]}).items():
+                    if n:
+                        holders.setdefault(kind, {}).setdefault(j["user"], 0)
+                        holders[kind][j["user"]] += n
+        kinds = sorted(set(q["limits"]) | set(holders), key=lambda k: (k == "", k))
+        if not kinds:
+            continue
+        out.append({"qos": name, "gpus": [
+            {"type": k, "limit": q["limits"].get(k), "used": sum((holders.get(k) or {}).values()),
+             "holders": sorted((holders.get(k) or {}).items(), key=lambda x: (-x[1], x[0]))}
+            for k in kinds]})  # fmt: skip
+    return out
+
+
+def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title=None, qos_data=None):
     """The model of one snapshot: jobs, users, why jobs wait, and the resource pools.
     TITLE names the cluster row; Slurm's ClusterName otherwise."""
     now = int(time.time() if now is None else now)  # whole seconds, as Slurm keeps time
@@ -312,8 +380,14 @@ def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title
         users.values(), key=lambda u: (-u["gres"], -len(u["nodes"]), -u["cpu"], -u["pending"], u["user"])
     )
     user_nodes = len({h for u in user_rows for h in u["nodes"]})
+    classes = _qos_classes(qos_data)
+    split = _gpu_split(chosen, classes)
     for u in user_rows:
         u["nodes"] = len(u["nodes"])
+        s = split.get(u["user"]) or {"teams": set(), "high": {}, "low": {}, "pending_gpus": 0}
+        u.update(teams=sorted(t for t in s["teams"] if t), gpus={"high": s["high"], "low": s["low"]},
+                 pending_gpus=s["pending_gpus"])  # fmt: skip
+    gpu_types = sorted({k for n in nodes for k in n["gres_types"]}, key=_natural)
 
     why, details = {}, {}
     for j in chosen:
@@ -416,7 +490,8 @@ def build(nodes_data, parts_data, jobs_data, sel, me, gres=None, now=None, title
     return {
         "cluster": cluster, "gres": key, "has_gres": has_gres, "free_what": key if has_gres else "cpu",
         "gres_pinned": bool(gres), "jobs": [_public(j) for j in chosen],
-        "users": user_rows, "user_nodes": user_nodes,
+        "users": user_rows, "user_nodes": user_nodes, "gpu_types": gpu_types,
+        "qos_read": bool(classes), "headroom": _headroom(held, classes),
         "why": [{"family": k[0], "code": k[1], "partition": k[2], "user": k[3], **v} for k, v in why.items()],
         "why_details": details, "pools": pool_tree,
         "nodes": [node_row(n, "") for n in nodes], "node_filter": sel,
@@ -435,7 +510,8 @@ def _free(n, has_gres):
 
 
 def _public(j):
-    return {k: v for k, v in j.items() if k not in ("hosts", "partitions", "alloc", "req", "active")}
+    return {k: v for k, v in j.items()
+            if k not in ("hosts", "partitions", "alloc", "req", "active", "alloc_types", "req_types")}  # fmt: skip
 
 
 def resource_rows(model, view, split, glyphs):
@@ -614,7 +690,79 @@ def show_jobs(t, model, group=True, detail=False, scope="mine"):
     return g.render("JOBS", tally) + "\n"
 
 
+def _type_label(kind):
+    return kind.upper() if kind else "ANY"
+
+
+def show_gpu_users(t, model):
+    """Who holds which GPUs: per user their teams, then per GPU type what they hold
+    under a high QoS / a low one (exact numbers, "-" for none), and the GPUs their
+    pending jobs ask for."""
+    users = model["users"]
+    kinds = list(model["gpu_types"])
+    if any("" in u["gpus"]["high"] or "" in u["gpus"]["low"] for u in users):
+        kinds.append("")  # GPUs held without a type
+    # Two spaces before each GPU type: the columns are pairs, and one space ran them together.
+    heads = ["USER", "TEAM"] + [f"  {_type_label(k)} hi/lo" for k in kinds] + ["  PEND"]
+    g = Grid(t, heads, align=["l", "l"] + ["r"] * (len(kinds) + 1), maxw=[16, 16])
+
+    def pair(hi, lo):
+        return [(str(hi) if hi else "-", t.c["acc"] + t.bold if hi else "faint"), (" / ", "faint"),
+                (str(lo) if lo else "-", "muted" if lo else "faint")]  # fmt: skip
+
+    tot_hi, tot_lo, tot_pend = {}, {}, 0
+    for u in users:
+        own = u["user"] == model["mine"]
+        held = sum(u["gpus"]["high"].values()) + sum(u["gpus"]["low"].values())
+        name_style = t.c["self"] + t.bold if own else ("text" if held else "muted")
+        cells = [(u["user"], name_style), (",".join(u["teams"]) or "-", "sub")]
+        for k in kinds:
+            hi, lo = u["gpus"]["high"].get(k, 0), u["gpus"]["low"].get(k, 0)
+            tot_hi[k], tot_lo[k] = tot_hi.get(k, 0) + hi, tot_lo.get(k, 0) + lo
+            cells.append(pair(hi, lo))
+        cells.append(
+            (str(u["pending_gpus"]) if u["pending_gpus"] else "-", "warn" if u["pending_gpus"] else "faint")
+        )
+        tot_pend += u["pending_gpus"]
+        g.row(cells, gutter=(t.g["self"], "self") if own else "")
+    g.rule()
+    s = t.c["sub"] + t.bold
+    g.row([("total", s), ("", s)] + [pair(tot_hi[k], tot_lo[k]) for k in kinds] + [(str(tot_pend), s)])
+    tally = [(f"{len(users)} user{'s' * (len(users) != 1)}", "sub")]
+    if not model["qos_read"]:
+        tally.append(("QoS unread: hi/lo split unknown, all shown as lo", "warn"))
+    return g.render("USERS", tally) + "\n"
+
+
+def show_headroom(t, model):
+    """Each high QoS's GPU quota per type, how much of it is held, and by whom: what is
+    left to negotiate over. Bars here: a capacity view."""
+    rows = model["headroom"]
+    if not rows:
+        return ""
+    g = Grid(t, ["HIGH QOS", "GPU", "USED", "HOLDERS"], align=["l", "l", "l", "l"], maxw=[20])
+    for q in rows:
+        for i, k in enumerate(q["gpus"]):
+            if k["limit"] is None:
+                use = [(f"{k['used']} ", "text"), ("no limit", "faint")]
+            elif k["limit"] == 0 and not k["used"]:
+                use = [("not allowed", "faint")]
+            else:
+                full = k["used"] >= k["limit"]
+                use = [(t.bar(k["used"], k["limit"], 8, "crit" if full else "part"), ""),
+                       (f" {k['used']}/{k['limit']}", "crit" if full else "text")]  # fmt: skip
+            holders = ", ".join(f"{u} {n}" for u, n in k["holders"]) or "-"
+            mine = any(u == model["mine"] for u, _ in k["holders"])
+            g.row([(q["qos"] if i == 0 else "", "part"), (_type_label(k["type"]), "sub"), use,
+                   (holders, "self" if mine else ("text" if k["holders"] else "faint"))])  # fmt: skip
+    hint = "shared by every member of the team: ask the holders to free GPUs"
+    return g.render("HIGH QOS QUOTAS", [(hint, "sub")]) + "\n"
+
+
 def show_users(t, model):
+    if model["has_gres"] and model["gpu_types"]:
+        quotas = show_headroom(t, model)
+        return show_gpu_users(t, model) + ("\n" + quotas if quotas else "")
     users, gl = model["users"], model["gres"].upper()
     if not users:
         return t.section("USERS", 40, [("nobody", "faint")]) + "\n"
@@ -838,7 +986,8 @@ def to_json(model, args):
     resources = [item[1] for item in resource_rows(model, "grouped", True, plain) if item]
     return {
         "cluster": model["cluster"], "gres": model["gres"], "free": model["free_what"],
-        "jobs": model["jobs"], "users": model["users"], "pending": model["why"],
+        "jobs": model["jobs"], "users": model["users"], "gpu_types": model["gpu_types"],
+        "high_qos_quotas": model["headroom"], "pending": model["why"],
         "resources": [{k: v for k, v in r.items() if k not in ("occupancy", "partitions")} for r in resources],
     }  # fmt: skip
 
@@ -846,13 +995,32 @@ def to_json(model, args):
 # --- Running ------------------------------------------------------------------------
 
 
+QOS_TTL = 60  # how long a watch reuses the QoS read (sacctmgr asks slurmdbd)
+_qos_cache = {"at": 0.0, "data": None}
+
+
+def _qos(watching):
+    """sacctmgr's QoS, for the USERS view's high/low split and quotas; None when the
+    accounting database does not answer (the view says so). A watch reads it again
+    every QOS_TTL seconds, not at every redraw."""
+    if watching and _qos_cache["data"] is not None and time.time() - _qos_cache["at"] < QOS_TTL:
+        return _qos_cache["data"]
+    try:
+        data = slurm.load("qos")
+    except slurm.Error:  # no sacctmgr here, or slurmdbd away: the view goes without
+        return None
+    _qos_cache.update(at=time.time(), data=data)
+    return data
+
+
 def snapshot(args):
-    """One consistent read: three controller calls."""
+    """One consistent read: three controller calls, and the QoS for the USERS view."""
     nodes, parts, jobs = slurm.load("nodes"), slurm.load("partitions"), slurm.load("jobs")
+    qos = _qos(bool(args.interval)) if (args.users or args.json) else None
     me = cli.me()
     sel = Filters(me if args.me else "", args.user, args.partition, args.nodelist, args.states, args.jobs,
                   args.account, args.qos, args.name)  # fmt: skip
-    return build(nodes, parts, jobs, sel, me, args.gres, title=os.environ.get("CLUSTER_TITLE"))
+    return build(nodes, parts, jobs, sel, me, args.gres, title=os.environ.get("CLUSTER_TITLE"), qos_data=qos)
 
 
 def frame(theme, args):
@@ -891,6 +1059,8 @@ def watch(theme, args):
 def main(argv=None):
     def body():
         args, theme = COMMAND.parse(argv)
+        if args.all:  # -a: everyone's jobs, the shared vocabulary's "all"
+            args.queue = "all"
         if args.interval and not args.json:
             return watch(theme, args)
         if args.json:

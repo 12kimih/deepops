@@ -103,10 +103,16 @@ class CommandTests(unittest.TestCase):
         self.assertIsNone(re.search("[–—·…]| -- ", r.stdout))
 
     def test_json_is_the_model(self):
-        r = run_tool("qos", "--json", env={"QOS_OPTIONS": "--mine"})
+        r = run_tool("qos", "--json", env={"QOS_OPTIONS": "--me"})
         data = json.loads(r.stdout)
         self.assertEqual(data["user"], "user1")
         self.assertGreater(len(data["qos"]), 2, "--json must ignore $QOS_OPTIONS")
+
+    def test_mine_is_now_me_and_still_works(self):
+        r = run_tool("qos", "--mine", "--ascii")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("qos: --mine is now -m / --me", r.stderr)
+        self.assertEqual(r.stdout, run_tool("qos", "--me", "--ascii").stdout)
 
     def test_help_explains_the_table(self):
         self.assertIn("A limit of 0 is not a full quota", run_tool("qos", "--help").stdout)

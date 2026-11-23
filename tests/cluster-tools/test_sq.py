@@ -84,7 +84,7 @@ class TableTests(unittest.TestCase):
         self.assertEqual(users["user1"]["cpu"], 72)
 
     def test_reason_code_and_own_jobs_marked(self):
-        text = out("-Q", "--ascii", "--no-resources", "--no-users")
+        text = out("-a", "--ascii", "--no-resources", "--no-users")
         self.assertRegex(text, r"\(QOSMaxGRESPerJob\)")
         self.assertRegex(text, r"(?m)^> +90010 ")
 
@@ -154,6 +154,46 @@ class TableTests(unittest.TestCase):
         self.assertEqual((job["user"], job["state"], job["partition"][:3]), ("user3", "PD", "a30"))
 
 
+class GpuUserTests(unittest.TestCase):
+    """The USERS view on a typed-GPU cluster: per user their teams, GPUs by type split by a
+    high and a low QoS, and pending GPUs; then each high QoS's quota and its holders."""
+
+    def users(self):
+        return {u["user"]: u for u in model()["users"]}
+
+    def test_gpus_split_by_type_and_qos_class(self):
+        u = self.users()
+        self.assertEqual(u["user1"]["gpus"], {"high": {"a10": 4, "a30": 2}, "low": {}})
+        self.assertEqual(u["user2"]["teams"], ["acct1", "acct16"])
+        self.assertEqual(u["user8"]["pending_gpus"], 106)
+
+    def test_the_table_reads_hi_slash_lo_per_type(self):
+        text = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii"))
+        self.assertRegex(text, r"USER +TEAM +A10 hi/lo  +A30 hi/lo  +PEND")
+        self.assertRegex(text, r"(?m)^. user1 +acct1 +4 / - +2 / - +- *$")
+
+    def test_each_high_qos_quota_names_its_holders_most_first(self):
+        quotas = {q["qos"]: q for q in model()["high_qos_quotas"]}
+        self.assertNotIn("normal", quotas)  # the lowest priority is no high tier
+        self.assertNotIn("hotfix", quotas)  # high, but no quota and nobody on it
+        a30 = next(k for k in quotas["high_t1"]["gpus"] if k["type"] == "a30")
+        self.assertEqual((a30["limit"], a30["used"]), (6, 13))
+        self.assertEqual(a30["holders"][0], ["user2", 10])
+        text = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii"))
+        self.assertRegex(text, r"high_t1 +A10 .* 4/0 +user1 4")  # held where it is not allowed
+        self.assertRegex(text, r"high_t2 +A10 .* 0/14 +-")
+
+    def test_without_the_qos_the_split_is_said_to_be_unknown(self):
+        broken = SCENE / "noqos"
+        if not broken.exists():
+            shutil.copytree(SCENE, broken)
+            (broken / "qos.json").write_text("{not json")
+        r = sq("--no-queue", "--no-resources", "--ascii", env={"FIXTURES": str(broken)})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("QoS unread", r.stdout)
+        self.assertNotIn("HIGH QOS QUOTAS", r.stdout)
+
+
 class QueueTests(unittest.TestCase):
     """The job list shows your own jobs by default; the sections below summarise all."""
 
@@ -164,9 +204,17 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(self.ids(out("--ascii", "--no-users", "--no-resources")), {"90010", "90012"})
 
     def test_all_jobs_on_request(self):
-        everyone = self.ids(out("-Q", "--ascii", "--no-users", "--no-resources"))
+        everyone = self.ids(out("-a", "--ascii", "--no-users", "--no-resources"))
         self.assertTrue({"90010", "90011", "90013", "90001"} <= everyone)
         self.assertEqual(everyone, self.ids(out("--queue", "all", "--ascii", "--no-users", "--no-resources")))
+        self.assertEqual(everyone, self.ids(out("--all", "--ascii", "--no-users", "--no-resources")))
+
+    def test_the_renamed_options_still_work_and_say_their_new_names(self):
+        r = sq("-Q", "-T", "--ascii", "--no-users")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("sq: -Q is now -a / --all", r.stderr)
+        self.assertIn("sq: -T is now -P / --partitions", r.stderr)
+        self.assertEqual(self.ids(r.stdout), self.ids(out("-a", "-P", "--ascii", "--no-users")))
 
     def test_a_job_filter_shows_what_it_selects(self):
         self.assertEqual(self.ids(out("-u", "user4", "--ascii", "--no-users", "--no-resources")), {"90013"})

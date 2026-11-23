@@ -141,5 +141,34 @@ class CliTests(unittest.TestCase):
         self.assertIn("macchiato", out)
 
 
+class Vocabulary(unittest.TestCase):
+    def test_a_flag_two_commands_share_means_the_same_in_both(self):
+        # sq's -m was --me and qos's --mine, sq's "everyone" was -Q: one vocabulary now
+        # (cli.opt_me, opt_all, opt_user, opt_json), and a shared flag sets the same
+        # setting in every command.
+        import importlib
+
+        commands = [importlib.import_module(f"cluster_tools.{m}").COMMAND
+                    for m in ("sq", "qos", "gpu_usage", "scratch_space")]  # fmt: skip
+        meaning = {}
+        for c in commands:
+            for o in c.options:
+                if o.positional:
+                    continue
+                dest = o.dest or next(f for f in o.flags if f.startswith("--"))[2:].replace("-", "_")
+                for flag in o.flags + o.aliases + o.renamed:
+                    meaning.setdefault(flag, set()).add(dest)
+        self.assertEqual({f: d for f, d in meaning.items() if len(d) > 1}, {})
+        for flag, dest in (("-m", "me"), ("-a", "all"), ("-u", "user")):
+            self.assertEqual(meaning[flag], {dest}, flag)
+
+    def test_a_renamed_option_is_hidden_and_says_its_new_name(self):
+        c = Command("t", "test", [Opt("-n", "--new", help="new", renamed=("--old",), aliases=("--alt",))])
+        self.assertNotIn("--old", c.help(full=True))
+        self.assertNotIn("--alt", c.completion())
+        self.assertEqual(c.renames(["--old", "x", "--old"]), [("--old", "-n / --new")])
+        self.assertEqual(c.renames(["--alt"]), [])
+
+
 if __name__ == "__main__":
     unittest.main()

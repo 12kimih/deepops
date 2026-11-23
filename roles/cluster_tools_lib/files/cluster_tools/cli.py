@@ -2,7 +2,9 @@
 
 A command lists its options once. From that list come the parser, the brief help
 (-h), the full help (--help) and the bash completion (--completion bash), so the four
-can never disagree. Every command also takes the same style options, and reads
+can never disagree. One vocabulary across the commands: an option two commands share
+means the same in both (opt_me, opt_all, opt_user, opt_json below; tests/cluster-tools
+checks every shared flag), and a renamed option keeps working, saying its new name. Every command also takes the same style options, and reads
 defaults from an environment variable (SQ_OPTIONS for sq) as if typed first, so the
 command line always has the last word. Python 3.9 or newer, standard library only.
 """
@@ -32,7 +34,9 @@ COMPLETERS = {
 class Opt:
     """One option. FLAGS as in argparse; BRIEF puts it in -h; NEGATE adds a --no- form;
     COMPLETE names a COMPLETERS entry for its value; SECTION groups it under --help. A
-    single flag without a dash is a positional argument named METAVAR (required)."""
+    single flag without a dash is a positional argument named METAVAR (required).
+    ALIASES are accepted and never shown; RENAMED too, and a use of one says the new
+    name (an option renamed for the shared vocabulary keeps working a while)."""
 
     def __init__(
         self,
@@ -49,8 +53,11 @@ class Opt:
         const=None,
         type=None,
         choices=None,
+        aliases=(),
+        renamed=(),
     ):
         self.flags, self.help, self.dest, self.metavar = flags, help, dest, metavar
+        self.aliases, self.renamed = tuple(aliases), tuple(renamed)
         self.default, self.negate, self.brief = default, negate, brief
         self.complete, self.section = complete, section
         self.action, self.const, self.type, self.choices = action, const, type, choices
@@ -88,7 +95,7 @@ class Opt:
                 kw["const"] = self.const
             if self.default is not None:
                 kw["default"] = self.default
-        parser.add_argument(*self.flags, **kw)
+        parser.add_argument(*self.flags, *self.aliases, *self.renamed, **kw)
 
     def label(self):
         if self.positional:
@@ -134,6 +141,31 @@ STYLE = [
 ]
 
 
+# The shared vocabulary: an option more than one command takes is made here, so its
+# flags and meaning are the same in each (each command words its own help).
+
+
+def opt_me(help, **kw):
+    """-m/--me: only what is yours (squeue's own --me)."""
+    return Opt("-m", "--me", help=help, brief=True, **kw)
+
+
+def opt_all(help, **kw):
+    """-a/--all: everyone's or everything, instead of the default subset (as squeue -a,
+    docker ps -a)."""
+    return Opt("-a", "--all", dest="all", help=help, brief=True, **kw)
+
+
+def opt_user(help, metavar="USER", **kw):
+    """-u/--user: the user or users to look at."""
+    return Opt("-u", "--user", metavar=metavar, complete="users", help=help, brief=True, **kw)
+
+
+def opt_json(help="the model as JSON, for scripts", **kw):
+    """--json: the figures for scripts; it ignores the command's defaults variable."""
+    return Opt("--json", section="Output", help=help, **kw)
+
+
 class Command:
     """NAME and SUMMARY head the help; OPTIONS are Opt; ENV names the defaults variable;
     MACHINE is the option whose output scripts read, which ignores ENV defaults; NOTES
@@ -173,6 +205,18 @@ class Command:
                 ):
                     return flag, why
         return None
+
+    def renames(self, argv):
+        """(old flag, its new name) for each renamed option ARGV uses, once each."""
+        seen = []
+        for word in argv:
+            if word == "--":
+                break
+            for o in self.options:
+                for old in o.renamed:
+                    if (word == old or word.startswith(old + "=")) and old not in (s[0] for s in seen):
+                        seen.append((old, " / ".join(o.flags)))
+        return seen
 
     def parser(self):
         p = argparse.ArgumentParser(prog=self.name, add_help=False, allow_abbrev=False)
@@ -248,6 +292,8 @@ class Command:
         refused = self.refused(argv)
         if refused:
             self.parser().error(f"{refused[0]}: {refused[1]}")
+        for old, new in self.renames(argv):
+            print(f"{self.name}: {old} is now {new}", file=sys.stderr)
         args = self.parser().parse_args(argv)
         if args._brief or args._full:
             sys.stdout.write(self.help(full=args._full))
