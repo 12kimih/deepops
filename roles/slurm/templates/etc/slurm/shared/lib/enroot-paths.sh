@@ -3,6 +3,9 @@
 # enroot.conf.d/*.conf in name order, the last setting winning, as enroot reads them)
 # is the one place its per-user paths are set; reading it here at job time keeps the
 # prolog and epilog in step with it whichever play wrote it.
+# Its messages go through part_log (log.sh), loaded here so every part that sources
+# this library has it.
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 enroot_conf=/etc/enroot/enroot.conf
 
@@ -57,5 +60,5 @@ enroot_clear() {
 }
 
 enroot_log() {
-    logger -t slurm-enroot "$*" 2>/dev/null || :
+    part_log slurm-enroot "$*"
 }

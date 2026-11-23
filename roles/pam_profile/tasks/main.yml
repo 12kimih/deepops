@@ -1,0 +1,32 @@
+---
+# A PAM profile on or off, written only by pam-auth-update. Two writers of the same
+# common-* file undo each other: a hand edit (a regex commenting pam_systemd out for
+# pam_slurm_adopt) was put back by the next pam-auth-update (SSSD's, 2026-11-23), every
+# SSH login on the nodes started a user manager with desktop services again, and it
+# failed at logout (gpu5). pam-auth-update records the choice (debconf), so a later
+# profile change keeps it. --force writes the profiles over an edited file, which stays
+# beside them as *.pam-old. Debian family only; RHEL's authselect is its own writer.
+- name: Read whether PAM has the profile's module {{ pam_profile_module }}
+  ansible.builtin.command:
+    argv: [grep, -qE, "^[^#]*{{ pam_profile_module | regex_escape }}", "{{ pam_profile_file }}"]
+  register: pam_profile_read
+  changed_when: false
+  failed_when: pam_profile_read.rc > 1
+  check_mode: false  # read-only; --check needs the result
+
+- name: Turn the PAM profile on or off as wanted {{ pam_profile_name }}
+  change_command:
+    argv: [pam-auth-update, --force, "{{ '--enable' if pam_profile_enabled else '--disable' }}", "{{ pam_profile_name }}"]
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  when: (pam_profile_read.rc == 0) != (pam_profile_enabled | bool)
+
+# Checked, not assumed: pam-auth-update exits 0 even when it leaves the files alone.
+- name: Require the PAM profile in the wanted state {{ pam_profile_name }}
+  ansible.builtin.command:
+    argv: [grep, -qE, "^[^#]*{{ pam_profile_module | regex_escape }}", "{{ pam_profile_file }}"]
+  register: pam_profile_check
+  changed_when: false
+  failed_when: (pam_profile_check.rc == 0) != (pam_profile_enabled | bool) or pam_profile_check.rc > 1
+  check_mode: false
+  when: not ansible_check_mode

@@ -4,6 +4,7 @@
 # record nothing is changed: a fixed powersave pinned a passive driver (intel_cpufreq)
 # at its lowest frequency. A failure is logged, never a failed part.
 set -u
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 command -v cpupower >/dev/null || exit 0
 saved='{{ slurm_exclusive_governor_file }}'
@@ -12,6 +13,6 @@ before=$(tr -d '[:space:]' < "$saved")
 rm -f "$saved"
 [ -n "$before" ] || exit 0
 if ! out=$(timeout 30 cpupower frequency-set -g "$before" 2>&1); then
-    logger -t slurm-exclusive "CPU governor $before not restored: $out" || :
+    part_log slurm-exclusive "CPU governor $before not restored: $out"
 fi
 exit 0

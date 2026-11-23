@@ -4,10 +4,11 @@
 # Nothing here fails the prolog, which would drain the node: a problem is logged and
 # the job runs with the XDG_RUNTIME_DIR it brought.
 set -u
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 root='{{ slurm_user_runtime_root }}'
 dir="$root/$SLURM_JOB_UID"
-log() { logger -t slurm-runtime-dir "$*" 2>/dev/null || :; }
+log() { part_log slurm-runtime-dir "$*"; }
 
 case "$SLURM_JOB_UID" in
     ''|0|*[!0-9]*) exit 0 ;;  # root, or no usable uid

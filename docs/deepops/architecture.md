@@ -194,6 +194,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── openmpi
 │   ├── os_updates
 │   ├── package_repos
+│   ├── pam_profile
 │   ├── pcie_acs
 │   ├── people
 │   ├── people_defaults

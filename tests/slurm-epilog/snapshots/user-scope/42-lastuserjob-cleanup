@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -ex
+. '/etc/slurm/shared/lib/log.sh'
 
 # Sibling 40-lastuserjob-processes spares the accounts listed in
 # localusers.backup so that operators keep their login session when a job of
@@ -20,7 +21,7 @@ if [[ -n "$SLURM_JOB_USER" && "$SLURM_JOB_USER" != "root" ]]; then
     # the whole step when it fails: an unresolvable owner is not evidence that
     # nothing is owned.
     if ! id -u -- "$SLURM_JOB_USER" >/dev/null 2>&1; then
-        logger -s -t slurm-epilog \
+        part_log slurm-epilog \
             "cannot resolve ${SLURM_JOB_USER}; skipping file cleanup rather than deleting on a partial listing"
         exit 0
     fi
@@ -49,7 +50,7 @@ if [[ -n "$SLURM_JOB_USER" && "$SLURM_JOB_USER" != "root" ]]; then
         # left alone. Its siblings are deleted as before, so cleanup continues
         # around a mount instead of stopping at the first one.
         if [ ! -r /proc/self/mountinfo ]; then
-            logger -s -t slurm-epilog \
+            part_log slurm-epilog \
                 "cannot read /proc/self/mountinfo; skipping cleanup under ${dir} rather than deleting across an unknown mount boundary"
             continue
         fi
@@ -65,7 +66,7 @@ if [[ -n "$SLURM_JOB_USER" && "$SLURM_JOB_USER" != "root" ]]; then
         # the recursive delete back exactly where it was.
         mountlist=$(mktemp) || continue
         if ! awk '{print $5}' /proc/self/mountinfo >"$mountlist" 2>/dev/null; then
-            logger -s -t slurm-epilog \
+            part_log slurm-epilog \
                 "could not read the mount table; skipping cleanup under ${dir}"
             rm -f "$mountlist"
             continue
@@ -108,16 +109,16 @@ if [[ -n "$SLURM_JOB_USER" && "$SLURM_JOB_USER" != "root" ]]; then
                 fi
 
                 if [ -n "$nested" ]; then
-                    logger -s -t slurm-epilog \
+                    part_log slurm-epilog \
                         "leaving ${victim} alone: ${nested} is mounted under it"
                     continue
                 fi
 
                 rm -fr -- "$victim" ||:
             done <"$victims"
-            logger -s -t slurm-epilog "Removed residual user files under ${dir}"
+            part_log slurm-epilog "Removed residual user files under ${dir}"
         else
-            logger -s -t slurm-epilog \
+            part_log slurm-epilog \
                 "find failed under ${dir} for ${SLURM_JOB_USER}; leaving it alone"
         fi
         rm -f "$victims"

@@ -3,8 +3,9 @@
 # itself. A GPU that supports neither is left as it is; a failure is logged, never a
 # failed part (a drained node).
 set -u
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 command -v nvidia-smi >/dev/null || exit 0
 timeout 120 '{{ slurm_config_dir }}'/shared/bin/set_gpu_levels.sh max \
-    || logger -t slurm-exclusive "set_gpu_levels.sh max failed" || :
+    || part_log slurm-exclusive "set_gpu_levels.sh max failed"
 exit 0

@@ -3,6 +3,9 @@
 # login sessions on a node outlive their jobs, so a user's last job must not kill their
 # processes (40), revoke their SSH access (41), delete their files (42) or their IPC
 # objects (43). The one decision, so no part reads the list its own way.
+# Its messages go through part_log (log.sh), loaded here so every part that sources
+# this library has it.
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 localusers_backup='{{ slurm_config_dir }}/localusers.backup'
 
@@ -17,6 +20,6 @@ localusers_spared() {
         0) return 0 ;;
         1) return 1 ;;
     esac
-    logger -s -t slurm-epilog "localusers lookup failed (grep rc=${rc}, ${localusers_backup}); leaving $1 alone" || :
+    part_log slurm-epilog "localusers lookup failed (grep rc=${rc}, ${localusers_backup}); leaving $1 alone"
     return 0
 }

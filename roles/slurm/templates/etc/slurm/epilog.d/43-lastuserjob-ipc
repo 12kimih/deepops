@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 # System V shared memory, semaphores and message queues, and POSIX message queues,
 # outlive the processes that made them (an MPI or NCCL job that crashes leaves them).
 # systemd-logind removes a user's at their last logout, but not on a Slurm node
@@ -11,7 +12,7 @@ set -u
 
 sysvipc=/proc/sysvipc
 mqueue=/dev/mqueue
-log() { logger -s -t slurm-epilog "$*" || :; }
+log() { part_log slurm-epilog "$*"; }
 
 case "${SLURM_JOB_UID:-}" in
     ''|0|*[!0-9]*) exit 0 ;;  # root, or no usable uid

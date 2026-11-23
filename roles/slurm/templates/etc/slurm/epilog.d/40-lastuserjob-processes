@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -ex
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 # Sibling 41-lastuserjob-ssh already consults this list before it touches a
 # user, so that operator accounts do not lose access when their job ends.
@@ -41,19 +42,19 @@ if [ "$SLURM_JOB_USER" = root ]; then
 fi
 
 if [ ! -r "$job_scope_lib" ] || ! . "$job_scope_lib"; then
-    logger -s -t slurm-epilog \
+    part_log slurm-epilog \
         "cannot load ${job_scope_lib}; skipping process cleanup"
     exit 0
 fi
 
 if ! epilog_resolve_uid || [ "$epilog_uid" = 0 ]; then
-    logger -s -t slurm-epilog \
+    part_log slurm-epilog \
         "no usable uid for ${SLURM_JOB_USER}; skipping process cleanup"
     exit 0
 fi
 
 if ! pids=$(epilog_user_pids "$epilog_uid"); then
-    logger -s -t slurm-epilog \
+    part_log slurm-epilog \
         "cannot list processes under ${epilog_proc_root}; skipping process cleanup"
     exit 0
 fi
@@ -74,7 +75,7 @@ for pid in $pids; do
         0) ;;
         1) continue ;;  # exited since the listing
         *)
-            logger -s -t slurm-epilog \
+            part_log slurm-epilog \
                 "cannot classify pid ${pid} (unreadable or unrecognised cgroup data); leaving it alone"
             unsure=$((unsure + 1))
             continue
@@ -107,12 +108,12 @@ for pid in $pids; do
     fi
 done
 
-logger -s -t slurm-epilog \
+part_log slurm-epilog \
     "Job-scoped process cleanup for ${SLURM_JOB_USER} job ${SLURM_JOB_ID}: killed ${killed}, spared ${spared}, unclassified ${unsure}"
 {% else %}
 if [ "$SLURM_JOB_USER" != root ]; then
     if killall -9 -u "$SLURM_JOB_USER" ; then
-        logger -s -t slurm-epilog 'Killed residual user processes'
+        part_log slurm-epilog 'Killed residual user processes'
     fi
 fi
 {% endif %}
