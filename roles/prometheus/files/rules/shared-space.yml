@@ -1,0 +1,37 @@
+---
+# The shared data (roles/shared_space textfile metrics, cluster_tools.shared_data): its
+# hourly usage export, which the daily disk report and the budget alert read, and the
+# cluster bot's cleanup rounds (cluster_bot.data), seen as the bot reading the ledger.
+groups:
+  - name: shared-space
+    rules:
+      - alert: SharedDataUsageStale
+        expr: time() - shared_data_last_success_timestamp_seconds > 3 * 3600
+        labels: {severity: warning}
+        annotations:
+          summary: "The shared data's usage on {{ $labels.host }} has not been exported for 3 hours"
+          description: >-
+            The disk report and the budget alert show old figures: `journalctl -u
+            shared-data-metrics` and `systemctl list-timers shared-data-metrics.timer` on the host.
+      # No timestamp at all on a host with the unit installed: the alert above has
+      # nothing to compare, so the unit's presence stands in.
+      - alert: SharedDataUsageNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="shared-data-metrics.service"})
+          unless on (instance) shared_data_last_success_timestamp_seconds
+        for: 3h
+        labels: {severity: warning}
+        annotations:
+          summary: "The shared data's usage on {{ $labels.host }} has never been exported"
+          description: "`journalctl -u shared-data-metrics` and `systemctl list-timers shared-data-metrics.timer` on the host."
+      # The bot reads the ledger every 10 minutes; exported only while its service is
+      # offered, so a cluster without the bot never fires.
+      - alert: SharedDataCleanupStale
+        expr: time() - shared_data_bot_last_success_timestamp_seconds > 3 * 3600
+        labels: {severity: warning}
+        annotations:
+          summary: "The cluster bot has not checked the shared data on {{ $labels.host }} for 3 hours"
+          description: >-
+            Downloads are not told and unused entries get no notice nor removal: `systemctl
+            status cluster-bot` and `journalctl -u cluster-bot` on the bot's host (its SSH
+            to the home server's shared-data service).

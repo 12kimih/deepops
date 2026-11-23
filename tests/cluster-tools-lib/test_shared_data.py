@@ -7,10 +7,12 @@ import hashlib
 import io
 import json
 import os
+import socket
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
 from cluster_tools import bot_serve, prom, shared_data  # noqa: E402
@@ -44,7 +46,7 @@ class SharedData(unittest.TestCase):
         self.cfg = {"root": self.root, "kinds": ["datasets", "models"], "writer": "shared",
                     "budget": 10 << 20, "warn_fraction": 0.9, "ledger": os.path.join(tmp.name, "ledger.json"),
                     "hosts": [], "command": "/usr/local/sbin/cluster-shared-data", "config": "/etc/c.json",
-                    "project": "shared-data", "usage_metrics": True,
+                    "project": "shared-data", "usage_metrics": True, "bot_service": "",
                     "textfile": os.path.join(tmp.name, "prom", "shared-data.prom"), "textfile_kept": ""}  # fmt: skip
         self.started = []
         self.resolve = resolver({"intra.example": ["10.1.2.3"], "dual.example": [PUBLIC, "127.0.0.1"]})
@@ -158,6 +160,54 @@ class SharedData(unittest.TestCase):
         self.cfg["usage_metrics"] = False  # project quotas on: disk_quota exports it
         shared_data.metrics(self.cfg, 5000)
         self.assertNotIn("disk_quota", Path(self.cfg["textfile"]).read_text())
+
+    def test_the_connection_goes_to_the_address_that_was_checked(self):
+        # The check resolves the name once; a second lookup (rebinding to a private
+        # address) must never be what the connection uses.
+        connected, named = [], []
+
+        class Stop(Exception):
+            pass
+
+        class Context:
+            def wrap_socket(self, sock, server_hostname):
+                named.append(server_hostname)
+                raise Stop
+
+        def create_connection(address, timeout=None, *rest):
+            connected.append(address)
+            return object()
+
+        def rebound(*args, **kwargs):
+            raise AssertionError("the name was looked up again for the connection")
+
+        open_url = shared_data.opener_for([], self.resolve, Context())
+        with (
+            mock.patch.object(socket, "create_connection", create_connection),
+            mock.patch.object(socket, "getaddrinfo", rebound),
+            self.assertRaises(Stop),
+        ):
+            open_url("https://data.example:8443/set.tar", timeout=5)  # fmt: skip
+        self.assertEqual((connected, named), ([(PUBLIC, 8443)], ["data.example"]))
+        # A name that resolves to a private address is refused before any connection.
+        with (
+            mock.patch.object(socket, "create_connection", create_connection),
+            self.assertRaises(shared_data.Error),
+        ):
+            shared_data.opener_for([], self.resolve, Context())("https://intra.example/x", timeout=5)  # fmt: skip
+        self.assertEqual(len(connected), 1)
+
+    def test_the_bots_rounds_are_exported_while_its_service_is_offered(self):
+        shared_data.serve(self.cfg, "list", 4000)
+        shared_data.metrics(self.cfg, 5000)
+        self.assertNotIn("shared_data_bot", Path(self.cfg["textfile"]).read_text(), "no bot service")
+        service = Path(self.cfg["ledger"]).with_name("shared-data.json")
+        service.write_text("{}")
+        self.cfg["bot_service"] = str(service)
+        shared_data.metrics(self.cfg, 5000)
+        self.assertIn(
+            "shared_data_bot_last_success_timestamp_seconds{} 4000", Path(self.cfg["textfile"]).read_text()
+        )
 
     def test_the_config_the_role_writes_is_checked(self):
         path = Path(self.cfg["ledger"]).with_name("c.json")

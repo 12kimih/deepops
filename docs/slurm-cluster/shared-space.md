@@ -37,7 +37,8 @@ systemd unit running as `shared`, at the lowest best-effort I/O priority, into
 
 - Public sources only: `https`, no credentials in the URL, a host that resolves to
   global addresses alone (never a private, loopback or link-local network), every
-  redirect checked the same way; `shared_space_data_sources` limits the hosts (each and
+  redirect checked the same way, and the connection made to the address checked (TLS
+  still verifies the name; no proxy from the environment); `shared_space_data_sources` limits the hosts (each and
   below it) when set.
 - The file is kept as published: an archive stays packed (many small files on the
   shared filesystem slow everyone; jobs unpack into their own `/tmp`). Its sha256 is
@@ -62,6 +63,12 @@ so use is what people record. An entry no one but its requester recorded a use o
 with a "계속 씁니다" button, the help channel a "저도 씁니다" button for anyone who uses
 it. A press records a use and ends the notice; with none in `cluster_user_grace_days`
 (14), the bot removes the entry and tells the requester and the administrators.
+
+**Alerts** (`roles/prometheus` rules `shared-space.yml`): `SharedDataUsageStale` and
+`SharedDataUsageNeverReported` when the hourly export stops (the report's figures go
+old); `SharedDataCleanupStale` when the bot has not read the ledger for 3 hours (its
+rounds stopped: no download is told, no notice or removal happens). The service stamps
+each read, exported only while the bot's service is offered.
 
 ## Collaboration folders
 
