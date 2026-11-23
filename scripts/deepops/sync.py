@@ -6,7 +6,7 @@ A deploy reads roles, templates and config files from these checkouts while it r
 some of them only when a task reaches them; moving the checkout under it can hand it a
 mix of two commits. That happened twice in one evening (2026-11-23), each time from a
 hand-written "is a run going?" check that was wrong. This takes the same per-inventory
-locks a deploy holds for its whole life (plugins/callback/run_lock.py), so it refuses
+locks a deploy holds for its whole life (scripts/deepops/deploy_lock.py), so it refuses
 while any deploy runs, and no deploy can start while it moves the checkouts.
 
 Each checkout moves only forward (git merge --ff-only) and only when its tracked files
@@ -16,45 +16,22 @@ are unchanged; anything else is said and left as it is.
   sync.py --dry-run  say what would move, move nothing
 """
 
-import importlib.util
 import os
 import subprocess
 import sys
-from glob import glob
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cli  # noqa: E402
+import deploy_lock  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def run_lock():
-    """plugins/callback/run_lock.py, the one implementation of the deploy lock."""
-    spec = importlib.util.spec_from_file_location("run_lock", ROOT / "plugins" / "callback" / "run_lock.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", str(repo), *args], capture_output=True, text=True, errors="replace", check=check
     )
-
-
-def hold_deploy_locks(lock) -> tuple[list[int], list[str]]:
-    """Every deploy lock there is, held; or the runs holding some."""
-    paths = set(glob(os.path.join(lock.LOCKS, "*.lock")))
-    held, busy = [], []
-    holder = f"pid {os.getpid()}, scripts/deepops/sync.py moving the shared checkouts"
-    for path in sorted(paths):
-        fd, by = lock.acquire(path, holder)
-        if fd is None:
-            busy.append(by)
-        else:
-            held.append(fd)
-    return held, busy
 
 
 def forward(repo: Path, dry_run: bool) -> str:
@@ -84,7 +61,9 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--dry-run", action="store_true", help="say what would move, move nothing")
     opts = parser.parse_args(argv[1:])
 
-    held, busy = hold_deploy_locks(run_lock())
+    held, busy = deploy_lock.hold_all(
+        f"pid {os.getpid()}, scripts/deepops/sync.py moving the shared checkouts"
+    )
     try:
         if busy:
             for by in busy:

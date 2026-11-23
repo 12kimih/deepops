@@ -17,11 +17,17 @@ enabling.
 from __future__ import annotations
 
 import datetime
-import fcntl
 import getpass
-import hashlib
 import os
 import sys
+
+# The lock itself (where it lives, its name, taking it) is scripts/deepops/deploy_lock.py,
+# shared with scripts/deepops/sync.py, which must hold the same locks without ansible.
+# realpath: the file may be linked into another callback directory (tests do that).
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "scripts", "deepops")
+)
+from deploy_lock import LOCKS, acquire, lock_path  # noqa: E402,F401  (re-exported for tests)
 
 from ansible import context
 from ansible.plugins.callback import CallbackBase
@@ -38,31 +44,6 @@ description:
 
 display = Display()
 ADHOC = "__adhoc_playbook__"  # the name ansible's ad-hoc CLI gives its playbook
-
-
-LOCKS = os.path.expanduser("~/.cache/deepops/run-locks")
-
-
-def lock_path(inventory, base=LOCKS):
-    """The lock of a set of inventory sources (paths or host lists), the same for every
-    spelling of the same paths."""
-    sources = sorted(os.path.realpath(s) if os.path.exists(s) else s for s in inventory or ())
-    digest = hashlib.sha256("\0".join(sources).encode()).hexdigest()[:16]
-    return os.path.join(base, f"{digest}.lock")
-
-
-def acquire(path, holder):
-    """The open lock, or the text of the run holding it."""
-    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        with open(fd, closefd=True) as held:
-            return None, held.read().strip() or "a run that did not say who it is"
-    os.ftruncate(fd, 0)
-    os.pwrite(fd, holder.encode(), 0)
-    return fd, None
 
 
 class CallbackModule(CallbackBase):
