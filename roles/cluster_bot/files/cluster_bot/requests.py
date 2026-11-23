@@ -57,9 +57,6 @@ class Engine:
     def _pending(self):
         return state.read(self.pending_path, {})
 
-    def _save(self, pending):
-        state.write(self.pending_path, pending)
-
     def describe(self, req):
         return self.features[req["kind"]].describe(req)
 
@@ -84,10 +81,9 @@ class Engine:
             return self._apply(req)
         # Who approves: the administrators, or any of some people (an administrator may too).
         approvers = list(verdict[1]) if isinstance(verdict, tuple) and verdict[0] == "people" else []
-        pending = self._pending()
         key = secrets.token_hex(4)
-        pending[key] = {**req, "why": why, "asked": int(time.time()), "approvers": approvers}
-        self._save(pending)
+        with state.locked(self.pending_path, {}) as pending:
+            pending[key] = {**req, "why": why, "asked": int(time.time()), "approvers": approvers}
         whom = f"{', '.join(approvers)} 중 한 명의" if approvers else "관리자"
         return Outcome(
             "held", f"{whom} 승인을 기다립니다 ({why}): {feature.describe(req)}", request=req, key=key
@@ -99,17 +95,15 @@ class Engine:
         return list((self._pending().get(key) or {}).get("approvers") or [])
 
     def note(self, key, **info):
-        pending = self._pending()
-        if key in pending:
-            pending[key].update(info)
-            self._save(pending)
+        with state.locked(self.pending_path, {}) as pending:
+            if key in pending:
+                pending[key].update(info)
 
     def _take(self, key):
-        pending = self._pending()
-        req = pending.pop(key, None)
-        if req is not None:
-            self._save(pending)
-        return req
+        """The held request KEY, taken out under the lock: of two approvals at once, one
+        gets it, the other finds it gone."""
+        with state.locked(self.pending_path, {}) as pending:
+            return pending.pop(key, None)
 
     def approve(self, key, admin):
         req = self._take(key)

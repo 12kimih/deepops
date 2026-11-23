@@ -432,9 +432,8 @@ def main(argv=None):
     sources, slack_of = reminder_sources(cfg), {u: s for s, u in cfg["members"].items()}.get
 
     def remind_round():
-        sent = state.read(cfg["reminders"], {})
-        reminders.remind(sources, app.client, slack_of, sent, time.time())
-        state.write(cfg["reminders"], sent)
+        with state.locked(cfg["reminders"], {}) as sent:
+            reminders.remind(sources, app.client, slack_of, sent, time.time())
 
     every(REMIND_EVERY, "reminders", remind_round)
     if project is not None:  # a deploy restarts the bot: whose role changed, told once
@@ -446,9 +445,8 @@ def main(argv=None):
         post, update = admin_messages(app.client, channels["admin"], cfg["admin_mention"])
 
         def watch_round():
-            seen = state.read(cfg["bans"]["seen"], {})
-            watch(unban, post, update, seen)
-            state.write(cfg["bans"]["seen"], seen)
+            with state.locked(cfg["bans"]["seen"], {}) as seen:
+                watch(unban, post, update, seen)
 
         every(BAN_WATCH_EVERY, "ban watch", watch_round)
     SocketModeHandler(app, cfg["app_token"]).start()

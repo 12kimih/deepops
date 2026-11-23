@@ -34,4 +34,9 @@ class Remote:
         if done.returncode != 0:
             reason = (done.stderr or done.stdout).strip()
             raise Failed(reason.split(": ", 1)[-1] if reason else f"{self.host} refused ({done.returncode})")
-        return json.loads(done.stdout)
+        try:
+            return json.loads(done.stdout)
+        except ValueError:
+            # A reply that is not the service's JSON is the host's failure, reported as
+            # such, never an exception past the caller's report.
+            raise Failed(f"{self.host} answered what is not JSON: {done.stdout.strip()[:120]!r}") from None

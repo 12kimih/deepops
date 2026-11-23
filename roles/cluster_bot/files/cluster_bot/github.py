@@ -70,7 +70,10 @@ def call(method, path, bearer, payload=None):
         raise Error(f"GitHub {method} {path}: {e.code} {why}") from None
     except OSError as e:
         raise Error(f"GitHub {method} {path}: {e}") from None
-    return json.loads(body) if body else {}
+    try:
+        return json.loads(body) if body else {}
+    except ValueError:
+        raise Error(f"GitHub {method} {path}: an answer that is not JSON: {body[:120]!r}") from None
 
 
 class Repo:

@@ -91,6 +91,13 @@ class GitHub(unittest.TestCase):
         self.assertEqual(calls[2][2]["branch"], "join/x")
         self.assertEqual(calls[3][2], {"title": "T", "head": "join/x", "base": "main", "body": "B"})
 
+    def test_an_answer_that_is_not_json_is_a_github_error(self):
+        page = mock.MagicMock()
+        page.__enter__.return_value.read.return_value = b"<html>bad gateway</html>"
+        with mock.patch("urllib.request.urlopen", return_value=page), self.assertRaises(github.Error) as e:
+            github.call("GET", "/repos/o/r", "t")
+        self.assertIn("not JSON", str(e.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

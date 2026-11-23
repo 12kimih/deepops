@@ -23,8 +23,7 @@ class Prefs:
         return login in self._read()["muted"]
 
     def set_muted(self, login, value):
-        data = self._read()
-        muted = set(data["muted"])
-        (muted.add if value else muted.discard)(login)
-        data["muted"] = sorted(muted)
-        state.write(self.path, data, mode=0o644)
+        with state.locked(self.path, {}, mode=0o644) as data:
+            muted = set(data.get("muted") or [])
+            (muted.add if value else muted.discard)(login)
+            data["muted"] = sorted(muted)
