@@ -8,7 +8,11 @@ the cluster bot read them):
 | Path | What it holds | Who writes | Whose space |
 |---|---|---|---|
 | `/home/shared/datasets`, `models`, `containers` (`shared_space_data`) | Data many people read: public datasets, model weights, container images | The account `shared` (`shared_space_writer`), whose home `/home/shared` is | Its own budget (a project quota on `/home`, [disk-quota.md](../deepops/disk-quota.md#project-quotas)) |
-| `/home/shared/projects/<name>` | A collaboration folder | Its owners and members | Each file counts to its writer's quota |
+| `/home/shared/projects/<name>` | A collaboration folder (`place: home`, the default) | Its owners and members | Each file counts to its writer's quota |
+| `<scratch_space_root>/projects/<name>` | A collaboration folder on the scratch space (`place: scratch`, made by `roles/scratch_space` on the scratch server with the same groups and ACLs, `folders.yml`) | Its owners and members | Each file counts to its writer's scratch quota; files unused past the stale period go as everywhere on the scratch space |
+
+A project's `place` in the roster (`home` or `scratch`) says where its folder lives;
+the cluster bot's new-project form asks for it.
 
 `/home/shared` is the account's home as `/home/<login>` is anyone's (`shared_space_root`
 reads it from `system_accounts`); it stays root's, so the account can rename nothing at

@@ -387,6 +387,23 @@ people:
         self.assertTrue(any("no login has" in p for p in problems(ok, name="bob")))
         self.assertTrue(any("lowercase" in p for p in problems(ok, name="Bad_Name")))
 
+    def test_a_project_lives_on_home_or_scratch(self):
+        roster = yaml.safe_load(self.PROJECTS)
+        roster["projects"] = {
+            "vision": {"gid": 50001, "read_gid": 50002, "owners": ["alice"], "place": "scratch"}
+        }
+        self.assertEqual(people.project_problems(roster), [])
+        self.assertEqual(list(people.people_projects_at(roster["projects"], "scratch")), ["vision"])
+        self.assertEqual(people.people_projects_at(roster["projects"], "home"), {})
+        roster["projects"]["vision"]["place"] = "nfs"
+        self.assertIn("projects.vision.place: one of home, scratch", people.project_problems(roster))
+        with self.assertRaises(ValueError):
+            people.people_projects_at(roster["projects"], "tape")
+        text, _, _ = people.roster_project_new(
+            self.PROJECTS, "fast", ["alice"], gid_min=50000, place="scratch"
+        )
+        self.assertEqual(yaml.safe_load(text)["projects"]["fast"]["place"], "scratch")
+
     def test_project_editors_keep_the_roster_valid(self):
         text, gid, read_gid = people.roster_project_new(
             self.PROJECTS, "vision", ["alice"], "eval set", members=["bob"], reserved=[50000], gid_min=50000

@@ -20,6 +20,8 @@ A roster file declares the roles a site uses and the people:
         members: [bob]            # active people, one role each
         viewers: [carol]
         purpose: shared eval set  # optional
+        place: home               # optional: home (default) or scratch, the
+                                  # filesystem the folder lives on
     people:
       alice:
         uid: 1001                 # required, unique, >= 1000
@@ -63,7 +65,10 @@ TOP_KEYS = {"roles", "attributes", "member_keys", "several_accounts", "reserved_
 # A project's roles, most rights first: owners manage it (people, roles, purpose) and
 # read and write, members read and write, viewers read.
 PROJECT_ROLES = ("owners", "members", "viewers")
-PROJECT_KEYS = {"gid", "read_gid", "purpose", *PROJECT_ROLES}
+PROJECT_KEYS = {"gid", "read_gid", "purpose", "place", *PROJECT_ROLES}
+# Where a collaboration folder lives: the home filesystem (roles/shared_space) or the
+# scratch space (roles/scratch_space); its files count to their writers' quotas there.
+PROJECT_PLACES = ("home", "scratch")
 # The viewers' group is <name>-read; a group name is at most 32 characters.
 READ_SUFFIX = "-read"
 PROJECT_NAME = re.compile(r"^[a-z][a-z0-9-]{1,26}$")
@@ -454,7 +459,17 @@ def project_problems(roster, uid_min=UID_MIN):
             problems.append(f"{where}.owners: at least one owner")
         if not isinstance(proj.get("purpose", ""), str):
             problems.append(f"{where}.purpose: must be text")
+        if proj.get("place", "home") not in PROJECT_PLACES:
+            problems.append(f"{where}.place: one of {', '.join(PROJECT_PLACES)}")
     return problems
+
+
+def people_projects_at(projects, place):
+    """The projects (roster `projects`) whose folder lives at PLACE (PROJECT_PLACES; home
+    when a project names none)."""
+    if place not in PROJECT_PLACES:
+        raise ValueError(f"people_projects_at: {place!r} is not one of {', '.join(PROJECT_PLACES)}")
+    return {n: p for n, p in (projects or {}).items() if (p or {}).get("place", "home") == place}
 
 
 def people_project_groups(projects):
@@ -583,7 +598,7 @@ def _set_role(proj, name, login, role):
 
 
 def roster_project_new(text, name, owners, purpose="", members=(), viewers=(), reserved=(), *, gid_min,
-                       uid_min=UID_MIN):  # fmt: skip
+                       uid_min=UID_MIN, place="home"):  # fmt: skip
     """TEXT with project NAME added: OWNERS (one or more), MEMBERS and VIEWERS, and its two
     GIDs (gid, read_gid) given: the lowest free from GID_MIN (shared_projects_gid_min in
     roles/shared_space_defaults), never a person's UID,
@@ -612,6 +627,8 @@ def roster_project_new(text, name, owners, purpose="", members=(), viewers=(), r
                 _set_role(entry, name, login, role)
     if purpose:
         entry["purpose"] = purpose
+    if place != "home":  # home is the default, not written
+        entry["place"] = place
     projects.insert(sum(1 for other in projects if str(other) < name), name, entry)
     return _dump_checked(rt, doc, uid_min), free[0], free[1]
 
@@ -702,6 +719,7 @@ class FilterModule:
             "people_disk_quotas": people_disk_quotas,
             "people_check": people_check,
             "people_project_groups": people_project_groups,
+            "people_projects_at": people_projects_at,
             "people_login_expires": people_login_expires,
             "people_shadow_day": people_shadow_day,
             "people_leaving": people_leaving,

@@ -48,6 +48,7 @@ reserved_logins: [shared]
 #    members: [bob]
 #    viewers: [dave]
 #    purpose: shared eval set
+#    place: home              # or scratch: the folder on the scratch space
 people:
   alice:
     uid: 1001
