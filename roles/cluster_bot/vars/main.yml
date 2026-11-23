@@ -9,6 +9,9 @@ _cluster_bot_home: "{{ system_accounts[cluster_bot_user].home }}"
 _cluster_bot_unit: cluster-bot.service
 _cluster_bot_github_key: "{{ _cluster_bot_etc }}/github-app.pem"
 _cluster_bot_known_hosts: "{{ _cluster_bot_etc }}/known_hosts"
+# The Slack app manifest, generated at deploy from the subcommand table
+# (cluster_bot.commands): what the owner imports into the app (docs: cluster-bot.md).
+_cluster_bot_manifest: "{{ _cluster_bot_etc }}/slack-app-manifest.json"
 _cluster_bot_ready: "{{ slack_bot_token | length > 0 and slack_app_token | length > 0 }}"
 # The hosts the bot acts on, by the component that offers it a service there
 # (roles/cluster_bot_access), and their cluster addresses (the from= of its key).
@@ -19,6 +22,7 @@ _cluster_bot_cfg:
   bot_token_file: "{{ _cluster_bot_tokens.bot }}"
   app_token_file: "{{ _cluster_bot_tokens.app }}"
   channels: {help: "{{ slack_channels.help }}", admin: "{{ slack_channels.admin }}"}
+  command: "{{ cluster_bot_command }}"
   admin_group: "{{ slack_admin_group }}"
   admin_mention: "{{ slack_admin_mention }}"
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
@@ -62,6 +66,7 @@ cluster_bot_items:
   - "unit:{{ _cluster_bot_unit }}"
   - "file:/etc/systemd/system/{{ _cluster_bot_unit }}"
   - "file:{{ _cluster_bot_config }}"
+  - "file:{{ _cluster_bot_manifest }}"
   - "file:{{ _cluster_bot_tokens.bot }}"
   - "file:{{ _cluster_bot_tokens.app }}"
   - "file:{{ _cluster_bot_known_hosts }}"

@@ -50,15 +50,15 @@ def new_bans(bans):
     return text, [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}, *_sections(shown)]
 
 
-def ban_list(bans, errors):
+def ban_list(bans, errors, command="/cluster"):
     """The bans now, newest first, as the one message kept up to date: (text, blocks).
-    ERRORS ({host: why}) are the hosts not read this time."""
+    ERRORS ({host: why}) are the hosts not read this time; COMMAND is the bot's."""
     text = f"현재 차단된 주소 {len(bans)}개"
     lines = [_line(b) for b in bans[:LIST_MAX]] or ["없음"]
     if len(bans) > LIST_MAX:
         lines.append(f"외 {len(bans) - LIST_MAX}개 (가장 최근 {LIST_MAX}개만 보입니다)")
     blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}, *_sections(lines)]
-    note = "해제는 `/unban-request`로 신청을 받아 승인합니다."
+    note = f"해제는 `{command} unban`으로 신청을 받아 승인합니다."
     if errors:
         note = "읽지 못한 호스트: " + ", ".join(f"{h} ({e})" for h, e in sorted(errors.items())) + ". " + note
     blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": note}]})

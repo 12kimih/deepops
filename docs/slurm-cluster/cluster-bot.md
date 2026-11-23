@@ -7,10 +7,20 @@ It runs as its own account (`cluster_bot_user`, from `system_accounts`) under a 
 systemd unit, and acts on other hosts only over its SSH key, whose one forced command
 there runs only the services the host offers (below).
 
+Every request is a subcommand of ONE slash command, `cluster_bot_command` (`/cluster`
+by default): `/cluster join`, `/cluster leave`, `/cluster unban`, `/cluster project`,
+`/cluster help` (or just `/cluster`). Slack's slash commands are not namespaced (the app
+installed last wins a name) and `/leave` is Slack's own, so the bot claims one name; a
+second cluster in the same workspace sets another. The subcommands are one table
+(`cluster_bot/commands.py`, `SUBCOMMANDS`) that the dispatcher, the help, the Home tab,
+the Slack app manifest and these docs all come from; a test requires a handler, a help
+line and a doc line for each, and no command name Slack uses itself. App commands do not
+run inside message threads: use them in a channel or the bot's DM.
+
 Features today: account requests, unban requests, collaboration folders (below), and
 reminders before a person's last day.
 
-Account requests (`/join`, `/leave`): a newcomer gives a login, a name, a team (the
+Account requests (`/cluster join`, `/cluster leave`): a newcomer gives a login, a name, a team (the
 accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH
 public key; a person leaving (or an administrator, for anyone) asks to give an account
 back. Both are checked first, wait for an administrator's button, and then become a pull
@@ -29,14 +39,14 @@ people` run and its countdown starts over. A stage the deadline was already insi
 the bot first saw it is skipped (an allocation made for ten days gets no 14-day reminder;
 a bot started late does not catch up), except the last, which is always sent.
 
-Collaboration folders (`/project` and the Home tab): start a project, ask to join one,
+Collaboration folders (`/cluster project` and the Home tab): start a project, ask to join one,
 and, as its owner, add people with a role (owner, member, viewer), change roles, take
 people out, change its purpose or ask to close it. Each is a pull request on the roster's
 `projects`; joining waits for one of the project's owners (a DM with buttons), starting
 and closing for an administrator, the rest opens at once. After a deploy everyone whose
 role changed is told. See [shared-space.md](shared-space.md#in-slack-the-cluster-bot).
 
-Unban requests (`/unban-request`): someone whose address fail2ban banned (bans are for
+Unban requests (`/cluster unban`): someone whose address fail2ban banned (bans are for
 good, `roles/fail2ban`) gives the address and what happened. The bot checks the address
 is banned now on a host where fail2ban runs, an administrator approves, and the ban is
 lifted on every such host (`fail2ban-client unban`, which also drops it from fail2ban's
@@ -110,24 +120,40 @@ on, since Slurm would send them as local mail instead.
 
 ## Turning it on
 
-1. Create the Slack app from the manifest (below; api.slack.com/apps, "From a manifest"),
-   install it to the workspace, and create an app-level token with `connections:write`.
-2. Vault both tokens in the site config: `slack_bot_token` (xoxb-, already used by the
-   notifiers) and `slack_app_token` (xapp-).
-3. Set `slurm_enable_cluster_bot: true`.
-4. Run `playbooks/generic/cluster-bot.yml` (it also authorizes its key where fail2ban
-   offers the bans service); preview it with `--check --diff` first.
+The cluster has ONE Slack app, whose bot token (`slack_bot_token`) the usage reports, the
+job notices and this bot all use. Each deploy writes its manifest,
+`/etc/cluster-bot/slack-app-manifest.json`, from the subcommand table: the command, the
+app's and bot user's name (`cluster_bot_app_name`, cluster-bot; importing the manifest
+into an existing app renames it and keeps its tokens and webhook), interactivity, Socket Mode and every bot scope the cluster's Slack features
+need (`cluster_bot.commands.SCOPES`, each with why; a test fails when the code calls a
+Slack method whose scope is missing). The same file without a deploy:
+`cd roles/cluster_bot/files && python3 -m cluster_bot.commands manifest /cluster cluster-bot [EXTRA SCOPE ...]`
+(`cluster_bot_extra_scopes`: scopes the app keeps for other tools, incoming-webhook when
+Alertmanager posts through the app's webhook).
 
-Without both tokens the bot is installed but stopped. Who the bot knows comes from the
-people roster: `cluster_bot_members` (each person's `slack` attribute) and
-`cluster_bot_admins` (people with the `admin` role).
+1. In the app's settings (api.slack.com/apps, the app, "App Manifest"), paste the
+   manifest and save; reinstall the app to the workspace when Slack asks (new scopes).
+2. Under "Basic Information", "App-Level Tokens", generate a token with
+   `connections:write` (xapp-, for Socket Mode).
+3. Vault it in the site config as `slack_app_token`, the way `slack_bot_token` is vaulted:
+   `cd ~/deepops && uv run ansible-vault encrypt_string --stdin-name slack_app_token`
+   (paste the token, then Ctrl-D) and put the result in the group_vars file that holds
+   `slack_bot_token`.
+4. For account requests, the GitHub App (below): `cluster_bot_github_repo`,
+   `cluster_bot_github_app_id`, `cluster_bot_github_installation_id`, and its private key
+   vaulted as `cluster_bot_github_app_key`
+   (`uv run ansible-vault encrypt_string --stdin-name cluster_bot_github_app_key < key.pem`).
+5. Name the administrators' user group (roles/slack_defaults): `slack_admin_group`, the
+   @handle people tag in the help channel, and `slack_admin_group_id`, its S... ID (the
+   web client shows it in the group's details), with which the notices for the
+   administrators mention it. Slack notifies a group only by its ID.
+6. Set `slurm_enable_cluster_bot: true` and run `playbooks/generic/cluster-bot.yml` (it
+   also authorizes its key where fail2ban offers the bans service). A deploy that still
+   lacks a setting says which, by name; without both tokens the bot is installed but
+   stopped. Invite the app to the help and admin channels (`slack_channels`).
 
-## Slack app manifest
-
-[`roles/cluster_bot/files/slack-app-manifest.yml`](../../roles/cluster_bot/files/slack-app-manifest.yml)
-is the app's manifest: its slash commands, scopes, interactivity and Socket Mode. Paste
-it when creating the app; when a feature adds a command, the manifest changes with it and
-the app's settings are updated from it.
+Who the bot knows comes from the people roster: `cluster_bot_members` (each person's
+`slack` attribute) and `cluster_bot_admins` (people with the `admin` role).
 
 ## Files
 

@@ -65,7 +65,7 @@
     state: started
 
 # The cluster bot reads the ban list and lifts a ban an administrator approved
-# (/unban-request) through cluster-bans alone (roles/cluster_bot_access).
+# (its unban subcommand) through cluster-bans alone (roles/cluster_bot_access).
 - name: Offer the bot the ban list and unbans
   when: cluster_bot_host | length > 0
   block:

@@ -158,6 +158,45 @@
     content: "{{ _cluster_bot_cfg | to_nice_json }}\n"
   notify: Restart the cluster bot
 
+# The Slack app manifest from the subcommand table (cluster_bot.commands), with the
+# app's name and every scope the cluster's Slack features need: what the owner imports
+# into the app, so its command, scopes and events always match this bot.
+- name: Generate the Slack app manifest
+  ansible.builtin.command:
+    argv: "{{ ['python3', '-m', 'cluster_bot.commands', 'manifest', cluster_bot_command, cluster_bot_app_name] + cluster_bot_extra_scopes }}"
+    chdir: "{{ role_path }}/files"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: false
+  check_mode: false  # read-only; the preview shows the file it writes
+  register: cluster_bot_manifest
+
+- name: Write the Slack app manifest
+  ansible.builtin.copy:
+    dest: "{{ _cluster_bot_manifest }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ cluster_bot_manifest.stdout }}\n"
+
+# What the bot still lacks to run, by the settings that give it, so a deploy says the
+# whole list at once (docs/slurm-cluster/cluster-bot.md: setting it up).
+- name: Say what the cluster bot still needs
+  ansible.builtin.debug:
+    msg: >-
+      The cluster bot is installed but needs: {{ _missing | join('; ') }}. Import
+      {{ _cluster_bot_manifest }} into the Slack app first (docs/slurm-cluster/cluster-bot.md).
+  vars:
+    _missing: >-
+      {{ (['slack_bot_token (the app\'s xoxb- bot token, vaulted)'] if slack_bot_token | length == 0 else [])
+         + (['slack_app_token (a Socket Mode xapp- app-level token with connections:write, vaulted)'] if slack_app_token | length == 0 else [])
+         + (['cluster_bot_github_app_id, cluster_bot_github_installation_id and cluster_bot_github_app_key (vaulted) for account requests on ' ~ cluster_bot_github_repo]
+            if cluster_bot_github_repo | length > 0 and (cluster_bot_github_app_id | string | length == 0
+              or cluster_bot_github_installation_id | string | length == 0 or cluster_bot_github_app_key | length == 0) else [])
+         + (['slack_admin_group_id (the administrators\' user group S... ID) for their mentions'] if slack_admin_group_id | length == 0 else []) }}
+  when: _missing | length > 0
+
 - name: Install the bot's unit
   ansible.builtin.template:
     src: cluster-bot.service.j2
