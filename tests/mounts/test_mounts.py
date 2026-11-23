@@ -92,5 +92,39 @@ class MountOptionsPending(unittest.TestCase):
         self.assertEqual(self.pending(self.DECLARED, []), [])
 
 
+class AccessTime(unittest.TestCase):
+    """mount_atime: a site's access-time policy sets only that option, whatever else an
+    entry was installed with (owner 2026-11-23: system disks relatime, data noatime)."""
+
+    FSTAB = (
+        "UUID=a / ext4 defaults,noatime,errors=remount-ro,usrjquota=aquota.user,jqfmt=vfsv1 0 1\n"
+        "UUID=b /boot/efi vfat umask=0077 0 1\n"
+        "UUID=c /data xfs defaults,logbufs=8 0 0\n"
+        "UUID=d /plain ext4 errors=remount-ro\n"
+        "server:/home /home nfs rw,hard 0 0\n"
+    )
+
+    def atime(self, policy, declared=None):
+        return _mounts.mount_atime(fstab_entries(self.FSTAB), policy, declared)
+
+    def test_only_the_access_time_option_changes(self):
+        self.assertEqual(
+            self.atime({"/": "relatime", "/data": "noatime"}),
+            {"/": "defaults,errors=remount-ro,usrjquota=aquota.user,jqfmt=vfsv1,relatime",
+             "/data": "defaults,logbufs=8,noatime"},
+        )  # fmt: skip
+
+    def test_an_entry_without_one_gains_it(self):
+        self.assertEqual(self.atime({"/plain": "noatime"}), {"/plain": "errors=remount-ro,noatime"})
+
+    def test_full_options_and_network_mounts_are_left_alone(self):
+        self.assertEqual(self.atime({"/": "relatime"}, {"/": "defaults"}), {})
+        self.assertEqual(self.atime({"/home": "noatime"}), {})
+
+    def test_only_the_three_modes(self):
+        with self.assertRaises(ValueError):
+            self.atime({"/": "lazytime"})
+
+
 if __name__ == "__main__":
     unittest.main()

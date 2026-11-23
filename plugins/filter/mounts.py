@@ -5,6 +5,8 @@ fstab_text | fstab_entries   -> [{src, path, fstype, opts, dump, passno}, ...]
 projects | project_filesystems(ansible_facts.mounts) -> each with its "filesystem"
 declared | mount_options_pending(ansible_facts.mounts) -> mount points still without
     an option the kernel takes only when it mounts (an XFS quota)
+entries | mount_atime(policy, declared) -> {mount point: options} with only the
+    access-time option of each entry's options set to the policy's
 
 The deepest mount at or above the path, by whole path components: /var/tmpfoo is
 not under /var/tmp. The path need not exist yet. Tools that check a filesystem by
@@ -99,6 +101,29 @@ def mount_options_pending(declared, mounts):
     return pending
 
 
+# The access-time options of mount(8): one decides, and a policy sets only it.
+ATIME = ("atime", "noatime", "relatime", "norelatime", "strictatime", "nostrictatime")
+ATIME_MODES = ("noatime", "relatime", "strictatime")
+
+
+def mount_atime(entries, policy, declared=None):
+    """{mount point: options} for each entry (fstab_entries) POLICY ({mount point:
+    noatime|relatime|strictatime}) names: the entry's own options with its access-time
+    option replaced, or added, and the rest (errors=, quotas, a filesystem's own) kept.
+    A mount point DECLARED in full (host_baseline_mount_options) is left to that."""
+    bad = {p: m for p, m in (policy or {}).items() if m not in ATIME_MODES}
+    if bad:
+        raise ValueError(f"access-time modes are {', '.join(ATIME_MODES)}: {bad}")
+    out = {}
+    for entry in entries or []:
+        mode = (policy or {}).get(entry["path"])
+        if mode is None or entry["path"] in (declared or {}) or entry.get("network"):
+            continue
+        opts = [o for o in str(entry["opts"]).split(",") if o and o not in ATIME]
+        out[entry["path"]] = ",".join([*(opts or ["defaults"]), mode])
+    return out
+
+
 class FilterModule:
     def filters(self):
         return {
@@ -106,4 +131,5 @@ class FilterModule:
             "fstab_entries": fstab_entries,
             "project_filesystems": project_filesystems,
             "mount_options_pending": mount_options_pending,
+            "mount_atime": mount_atime,
         }

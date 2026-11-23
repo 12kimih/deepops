@@ -7,12 +7,12 @@
 # XFS quota, which a remount accepts and ignores; a data= mode, which it refuses) asks
 # for a reboot instead, found from what the kernel then has mounted.
 - name: Apply the declared mount options
-  when: host_baseline_mount_options | length > 0
+  when: host_baseline_mount_options | length > 0 or host_baseline_mount_atime | length > 0
   vars:
     _host_baseline_mount_pending: >-
       {{ (host_baseline_mount_remount.results | default([]) | selectattr('failed', 'defined') | selectattr('failed')
           | map(attribute='item.item.path') | list
-          + (host_baseline_mount_options | mount_options_pending(ansible_facts.mounts | default([]))))
+          + (host_baseline_mount_wanted | mount_options_pending(ansible_facts.mounts | default([]))))
          | unique | sort }}
   block:
     - name: Read /etc/fstab
@@ -20,11 +20,18 @@
         src: /etc/fstab
       register: host_baseline_fstab
 
-    - name: Note the entries the options name
+    # The full options a mount point is declared with, and for the access-time policy's
+    # the entry's own options with only that option set (plugins/filter/mounts.py).
+    - name: Work out each entry's options
+      vars:
+        _entries: "{{ host_baseline_fstab.content | b64decode | fstab_entries }}"
       ansible.builtin.set_fact:
+        host_baseline_mount_wanted: >-
+          {{ host_baseline_mount_options
+             | combine(_entries | mount_atime(host_baseline_mount_atime, host_baseline_mount_options)) }}
         host_baseline_mount_entries: >-
-          {{ host_baseline_fstab.content | b64decode | fstab_entries
-             | selectattr('path', 'in', host_baseline_mount_options) | list }}
+          {{ _entries | selectattr('path', 'in', (host_baseline_mount_options | list)
+                                                 + (host_baseline_mount_atime | list)) | list }}
 
     - name: Refuse a mount point that is not a local filesystem in /etc/fstab
       ansible.builtin.assert:
@@ -37,7 +44,9 @@
           {{- ('served by another host (set nfs_mount_options): ' ~ (_network | join(', '))) if _network else '' }}
         quiet: true
       vars:
-        _missing: "{{ host_baseline_mount_options.keys() | difference(host_baseline_mount_entries | map(attribute='path')) }}"
+        _missing: >-
+          {{ ((host_baseline_mount_options | list) + (host_baseline_mount_atime | list)) | unique
+             | difference(host_baseline_mount_entries | map(attribute='path')) }}
         _network: "{{ host_baseline_mount_entries | selectattr('network') | map(attribute='path') | list }}"
 
     - name: Set the mount options in /etc/fstab
@@ -45,7 +54,7 @@
         path: "{{ item.path }}"
         src: "{{ item.src }}"
         fstype: "{{ item.fstype }}"
-        opts: "{{ host_baseline_mount_options[item.path] }}"
+        opts: "{{ host_baseline_mount_wanted[item.path] }}"
         dump: "{{ item.dump }}"
         passno: "{{ item.passno }}"
         state: present

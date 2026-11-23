@@ -71,6 +71,13 @@ host_baseline_masked_owner: site
 # set per host group, e.g. {"/": "defaults,noatime,errors=remount-ro"}. Empty = left as
 # they are.
 host_baseline_mount_options: {}
+# A site's access-time policy, mount point: noatime, relatime or strictatime: only that
+# option of the entry's own options is set (errors=, quotas and a filesystem's own options
+# stay), so one policy line fits every host whatever its filesystems were installed
+# with, e.g. {"/": relatime} for every system disk. A mount point in
+# host_baseline_mount_options keeps its full options there. Applied as those are
+# (remounted now). Empty = left as they are.
+host_baseline_mount_atime: {}
 
 # Kernel settings (tasks_from: sysctl): the including role passes both.
 host_baseline_sysctls: {}
