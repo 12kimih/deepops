@@ -31,8 +31,10 @@ slack_channels:
 # slack_channels.admin, so Slack notifies its members: critical alerts
 # (roles/alertmanager), the usage report's notices to administrators
 # (roles/slurm_usage_report), the cluster bot's held requests and new bans
-# (roles/cluster_bot); reports and the lists the bot keeps up to date do not. Empty ID:
-# those notices mention no one.
+# (roles/cluster_bot); reports and the lists the bot keeps up to date do not. Empty ID
+# with a handle and the bot token: each run looks the ID up by the handle (this role's
+# tasks, usergroups.list) and says it, to pin here. No ID found: those notices mention
+# no one.
 slack_admin_group: ""
 slack_admin_group_id: ""
 # Derived from the ID, not a setting: the mention those notices carry.

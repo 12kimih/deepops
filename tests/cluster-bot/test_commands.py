@@ -34,6 +34,8 @@ CODE = [
     *tracked("roles/cluster_tools_lib/files/cluster_tools"),
 ]
 CODE = [p for p in CODE if p.suffix == ".py"]
+# The deploys' own calls (ansible.builtin.uri to slack.com/api/<method>).
+TASKS = [p for p in tracked("roles") if p.parent.name == "tasks" and p.suffix == ".yml"]
 FAMILIES = "chat|conversations|users|usergroups|pins|views|reactions|files|bookmarks|team|auth|apps"
 
 
@@ -44,6 +46,8 @@ def methods_called():
         found |= set(re.findall(rf"[\"']((?:{FAMILIES})\.[a-zA-Z]+)[\"']", text))
         for family, name in re.findall(rf"\bclient\.({FAMILIES})_([a-zA-Z]+)\(", text):
             found.add(f"{family}.{name}")
+    for path in TASKS:
+        found |= set(re.findall(rf"slack\.com/api/((?:{FAMILIES})\.[a-zA-Z]+)", path.read_text()))
     return found
 
 

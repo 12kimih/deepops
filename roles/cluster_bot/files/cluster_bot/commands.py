@@ -39,7 +39,8 @@ NAMES = tuple(s.name for s in SUBCOMMANDS)
 # this bot, the usage reports, the job notices. Its scopes are the union of what they
 # call: each Web API method the repository calls (cluster_bot, cluster_tools.slack and
 # the tools on it) maps to its scope here, and a test fails on a method missing here, so
-# importing the manifest into the existing app never drops one a feature needs.
+# importing the manifest into the existing app never drops one a feature needs. The
+# deploys call one too (roles/slack_defaults: usergroups.list), counted the same way.
 API_SCOPES = {
     "chat.postMessage": "chat:write",
     "chat.postEphemeral": "chat:write",
@@ -47,6 +48,7 @@ API_SCOPES = {
     "conversations.open": "im:write",
     "pins.add": "pins:write",
     "users.lookupByEmail": "users:read.email",
+    "usergroups.list": "usergroups:read",
     "views.open": None,  # forms: the interactivity of a slash command, no scope
     "views.publish": None,  # the Home tab: no scope
 }
@@ -58,6 +60,7 @@ SCOPES = {
     "pins:write": "pin the live ban list in the administrators' channel",
     "users:read": "users.lookupByEmail needs it beside users:read.email",
     "users:read.email": "find a person's Slack member by <login>@<domain> when the roster has no ID",
+    "usergroups:read": "find the administrators' user group's ID by its handle (roles/slack_defaults)",
 }
 
 
