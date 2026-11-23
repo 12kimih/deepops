@@ -41,6 +41,21 @@ class AlertRuleTests(unittest.TestCase):
         }
         self.assertEqual(sorted(alerts - tested), [], "alert rules without a firing test case")
 
+    def test_every_alert_says_what_to_do(self):
+        # A summary says what happened; whoever is paged needs the next step too (which
+        # unit, which command, on which host). Watchdog only feeds the dead man's switch.
+        rules = promtool_runner.ROOT / "roles/prometheus/files/rules"
+        bare = [
+            f"{path.name}: {rule['alert']}"
+            for path in sorted(rules.glob("*.yml"))
+            for group in yaml.safe_load(path.read_text())["groups"]
+            for rule in group["rules"]
+            if "alert" in rule
+            and rule["alert"] != "Watchdog"
+            and not (rule.get("annotations") or {}).get("description")
+        ]
+        self.assertEqual(bare, [], "give each alert a description: what to run, where")
+
     def test_no_two_alerts_watch_the_same_condition(self):
         # Two sessions once each added "the hosts run different kernels": every mismatch
         # then paged twice. An alert is its metrics (with their selectors), its thresholds

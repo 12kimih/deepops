@@ -35,6 +35,9 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.mountpoint }} on {{ $labels.host }} will fill within 24h"
+          description: >-
+            `du -xh --max-depth=2 {{ $labels.mountpoint }} 2>/dev/null | sort -h | tail`
+            on {{ $labels.host }} finds what grows.
       # A filesystem this host exports over NFS (what roles/nfs publishes): slower
       # well before it is full (fragmented free space, the slow inner tracks of disks),
       # and every node's jobs read from it, so it warns at 80%. Once per filesystem, however
@@ -68,12 +71,19 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.mountpoint }} on {{ $labels.host }} has under 5% inodes left"
+          description: >-
+            Many small files: `du --inodes -x --max-depth=2 {{ $labels.mountpoint }}
+            2>/dev/null | sort -n | tail` on {{ $labels.host }} finds where.
       - alert: HostMemoryExhausted
         expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.03
         for: 15m
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.host }} has under 3% memory available"
+          description: >-
+            The kernel's OOM killer is next. `ps -eo pid,user,rss,comm --sort=-rss |
+            head` on {{ $labels.host }} shows who holds the memory; work on a login node
+            belongs in a Slurm job.
       - alert: HostClockNotSynchronised
         expr: min_over_time(node_timex_sync_status[5m]) == 0 and node_timex_maxerror_seconds >= 16
         for: 10m
@@ -87,6 +97,11 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.name }} failed on {{ $labels.host }}"
+          description: >-
+            `systemctl status {{ $labels.name }}` and `journalctl -b -u {{ $labels.name
+            }}` on {{ $labels.host }} say why; once fixed, `systemctl reset-failed {{
+            $labels.name }}` clears the alert. A user@<uid>.service is that person's own
+            systemd manager.
       # PID 1 can hang (e.g. after a daemon-reexec) while running daemons keep working, so
       # nothing else notices; the systemd collector is then the first thing to fail.
       - alert: HostSystemdUnresponsive
@@ -114,11 +129,19 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "RAID {{ $labels.device }} on {{ $labels.host }} is degraded"
+          description: >-
+            `cat /proc/mdstat` and `mdadm --detail /dev/{{ $labels.device }}` on {{
+            $labels.host }} show the missing member: replace that disk and add it back
+            before a second one fails.
       - alert: HostRaidDiskFailed
         expr: node_md_disks{state="failed"} > 0
         labels: {severity: critical}
         annotations:
           summary: "A disk in RAID {{ $labels.device }} on {{ $labels.host }} has failed"
+          description: >-
+            `mdadm --detail /dev/{{ $labels.device }}` on {{ $labels.host }} names the
+            failed disk: check it with `smartctl -a`, replace it and add the new one
+            (`mdadm --add`).
       - alert: HostNetworkErrors
         expr: |
           rate(node_network_receive_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m])
@@ -127,3 +150,7 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "Network errors on {{ $labels.device }} of {{ $labels.host }}"
+          description: >-
+            `ip -s link show {{ $labels.device }}` and `ethtool -S {{ $labels.device }}`
+            on {{ $labels.host }} show which counters grow; a cable, transceiver or
+            switch port is the usual cause.
