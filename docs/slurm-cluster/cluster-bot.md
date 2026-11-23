@@ -9,7 +9,7 @@ there runs only the services the host offers (below).
 
 Every request is a subcommand of ONE slash command, `cluster_bot_command` (`/cluster`
 by default): `/cluster join`, `/cluster leave`, `/cluster unban`, `/cluster project`,
-`/cluster help` (or just `/cluster`). Slack's slash commands are not namespaced (the app
+`/cluster data`, `/cluster help` (or just `/cluster`). Slack's slash commands are not namespaced (the app
 installed last wins a name) and `/leave` is Slack's own, so the bot claims one name; a
 second cluster in the same workspace sets another. The subcommands are one table
 (`cluster_bot/commands.py`, `SUBCOMMANDS`) that the dispatcher, the help, the Home tab,
@@ -45,6 +45,11 @@ people out, change its purpose or ask to close it. Each is a pull request on the
 `projects`; joining waits for one of the project's owners (a DM with buttons), starting
 and closing for an administrator, the rest opens at once. After a deploy everyone whose
 role changed is told. See [shared-space.md](shared-space.md#in-slack-the-cluster-bot).
+
+Shared data requests (`/cluster data`): public data stored once for everyone under
+`/home/shared/<kind>/<name>`, approved by an administrator, downloaded by the home
+server's `shared-data` service as the shared account; the bot tells the requester when
+it is there, and runs its cleanup notices (shared-space.md#shared-data).
 
 Unban requests (`/cluster unban`): someone whose address fail2ban banned (bans are for
 good, `roles/fail2ban`) gives the address and what happened. The bot checks the address
@@ -164,6 +169,6 @@ Who the bot knows comes from the people roster: `cluster_bot_members` (each pers
 | `/etc/cluster-bot/bot.token`, `app.token` | The tokens, read by the bot alone; never on a command line |
 | `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |
 | `/etc/cluster-bot/known_hosts` | The host keys of the hosts it reaches, read from each host |
-| `/var/lib/cluster-bot/` | Its SSH key and state: held requests, reminders sent, bans seen (kept on removal) |
+| `/var/lib/cluster-bot/` | Its SSH key and state: held requests, reminders sent, bans seen, shared data notices (kept on removal) |
 | `/etc/cluster-bot-access/<service>.json` | On a host it acts on: a service offered to it |
 | `/var/lib/cluster-bot/.ssh/authorized_keys` | On a host it acts on: its key, for the dispatcher only |

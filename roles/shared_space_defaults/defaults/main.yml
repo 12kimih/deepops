@@ -1,7 +1,7 @@
 ---
 # The shared space, named once for every role that reads it: roles/shared_space (the
 # directories on the home server), the directory roles (the projects' groups, through
-# roles/directory_defaults) and roles/cluster_bot (project requests and notices).
+# roles/directory_defaults) and roles/cluster_bot (project and shared data requests).
 # docs/slurm-cluster/shared-space.md.
 
 # The service account (roles/system_accounts) whose home the shared space is, and that
@@ -10,6 +10,18 @@ shared_space_writer: shared
 shared_space_root: "{{ system_accounts[shared_space_writer].home }}"
 # The shared data's directories under the root, the writer's alone to write.
 shared_space_data: [datasets, models, containers]
+# The shared data's one budget, all its directories together. Until /home has project
+# quotas the daily disk report shows the usage against it (warned at
+# cluster_user_warn_fraction); with them, it is the data's disk_quota project limit
+# and shared_space_data_quota is true (docs/slurm-cluster/shared-space.md).
+shared_space_data_budget: 20T
+shared_space_data_quota: false
+# The hosts the cluster bot's downloads may come from, each and any host below it; []
+# takes any public https host (cluster_tools.shared_data).
+shared_space_data_sources: []
+# An entry no one but its requester said they use for this many days gets a notice, and
+# goes cluster_user_grace_days after it unless someone does (cluster_bot.data).
+shared_space_data_unused_days: 28
 
 # Collaboration folders (<shared_space_root>/projects/<name>): the people roster's
 # `projects` (checked with the roster, edited by the cluster bot's project requests), each

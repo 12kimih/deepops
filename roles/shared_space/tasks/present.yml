@@ -37,6 +37,73 @@
     mode: "2755"
   loop: "{{ shared_space_data }}"
 
+# Public data people ask the cluster bot for, downloaded as the writer, within one
+# budget (cluster_tools.shared_data).
+- name: Install the shared data command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command: {dest: "{{ _shared_space_data_command }}", module: cluster_tools.shared_data}
+
+- name: Make the shared data's ledger directory, the writer's
+  ansible.builtin.file:
+    path: "{{ _shared_space_data_ledger_dir }}"
+    state: directory
+    owner: "{{ shared_space_writer }}"
+    group: "{{ shared_space_writer }}"
+    mode: "0755"
+
+# Read by the downloads, which run as the writer: nothing secret in it.
+- name: Write the shared data configuration
+  ansible.builtin.copy:
+    dest: "{{ _shared_space_data_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _shared_space_data_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.shared_data %s"
+
+- name: Record the shared data configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: shared_space, module: cluster_tools.shared_data, file: "{{ _shared_space_data_config }}", playbook: playbooks/slurm-cluster/shared-space.yml}
+
+- name: Install the usage export units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _shared_space_data_units }}"
+  register: shared_space_units_written
+
+# The textfile directory is a tmpfs: the kept copy goes back at every boot.
+- name: Restore the kept usage at every boot
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: restore
+  vars:
+    textfile_keep_name: shared-data
+
+- name: Enable the usage export
+  systemd_unit:
+    name: shared-data-metrics.timer
+    enabled: true
+    state: "{{ 'restarted' if shared_space_units_written is changed else 'started' }}"
+    daemon_reload: true
+
+# The cluster bot's shared data requests reach the tool alone (roles/cluster_bot_access).
+- name: Offer the bot the shared data
+  ansible.builtin.include_role:
+    name: cluster_bot_access
+  vars:
+    cluster_bot_access_service: "{{ _shared_space_bot_service }}"
+  when: cluster_bot_host | length > 0
+
 # The collaboration folders whose place is home (folders.yml; the scratch space makes
 # the others, roles/scratch_space).
 - name: Make the collaboration folders on the home filesystem

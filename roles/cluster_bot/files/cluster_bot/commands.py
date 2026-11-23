@@ -31,6 +31,12 @@ SUBCOMMANDS = (
         "unban", "unban", "로그인 실패로 차단된 IP 주소의 해제 신청", "ask to lift a ban after failed logins"
     ),
     Sub("project", "project", "공동작업 폴더 만들기 (홈 탭에서 관리)", "start a collaboration folder"),
+    Sub(
+        "data",
+        "data",
+        "공유 데이터(데이터셋, 모델, 컨테이너 이미지) 받아 두기 신청",
+        "ask for public data stored once for everyone",
+    ),
     Sub("help", None, "이 안내", "this list"),
 )
 NAMES = tuple(s.name for s in SUBCOMMANDS)

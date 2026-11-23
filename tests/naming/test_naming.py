@@ -65,7 +65,7 @@ SWITCH_NOT_KEY = {
 # Roles whose cluster tool is a module of other words: role -> module today.
 MODULE_NOT_ROLE = {
     "cluster_bot_access": "bot_serve", "container_storage_gc": "container_gc", "egress_policy": "egress_metrics",
-    "fail2ban": "bans", "slurm_metrics": "metrics", "slurm_usage_report": "usage_report",
+    "fail2ban": "bans", "shared_space": "shared_data", "slurm_metrics": "metrics", "slurm_usage_report": "usage_report",
 }  # fmt: skip
 
 # Alert rule files that are a component's but not named as it: file -> component.

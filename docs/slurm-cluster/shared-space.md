@@ -7,7 +7,7 @@ the cluster bot read them):
 
 | Path | What it holds | Who writes | Whose space |
 |---|---|---|---|
-| `/home/shared/datasets`, `models`, `containers` (`shared_space_data`) | Data many people read: public datasets, model weights, container images | The account `shared` (`shared_space_writer`), whose home `/home/shared` is | Its own budget (a project quota on `/home`, [disk-quota.md](../deepops/disk-quota.md#project-quotas)) |
+| `/home/shared/datasets`, `models`, `containers` (`shared_space_data`) | Data many people read: public datasets, model weights, container images | The account `shared` (`shared_space_writer`), whose home `/home/shared` is | One budget, `shared_space_data_budget` (20T), below |
 | `/home/shared/projects/<name>` | A collaboration folder (`place: home`, the default) | Its owners and members | Each file counts to its writer's quota |
 | `<scratch_space_root>/projects/<name>` | A collaboration folder on the scratch space (`place: scratch`, made by `roles/scratch_space` on the scratch server with the same groups and ACLs, `folders.yml`) | Its owners and members | Each file counts to its writer's scratch quota; files unused past the stale period go as everywhere on the scratch space |
 
@@ -22,9 +22,46 @@ one.
 
 ## Shared data
 
-Read-only to everyone, writable by `shared` alone (mode 2755). People ask for what they
-need in the help channel; what is downloaded there is stored once for everyone instead
-of in each home. Read models by their path; keep `HF_HOME` (tokens) in your own home.
+Read-only to everyone, writable by `shared` alone (mode 2755). Read models by their
+path; keep `HF_HOME` (tokens) in your own home.
+
+**Asking for it.** `/cluster data` in Slack opens a form: the kind (datasets, models,
+containers), a name (the folder), the public https URL, the size and what it is for, and
+the sha256 when the source gives one. The bot refuses an existing name or a size the
+budget cannot take (counting downloads still running); otherwise an administrator
+approves it in the administrators' channel. Then the home server's
+`cluster-shared-data` (`cluster_tools.shared_data`, the bot's service there through
+`roles/cluster_bot_access`) checks it again and starts the download as a transient
+systemd unit running as `shared`, at the lowest best-effort I/O priority, into
+`/home/shared/<kind>/<name>/`. The requester gets a DM when it is there or failed.
+
+- Public sources only: `https`, no credentials in the URL, a host that resolves to
+  global addresses alone (never a private, loopback or link-local network), every
+  redirect checked the same way; `shared_space_data_sources` limits the hosts (each and
+  below it) when set.
+- The file is kept as published: an archive stays packed (many small files on the
+  shared filesystem slow everyone; jobs unpack into their own `/tmp`). Its sha256 is
+  checked when one was given, and it may not grow past the size asked (plus 10%).
+- The ledger, `/var/lib/shared-data/ledger.json`, records each entry: who asked, from
+  where, the size, the checksums, when it came and the uses people recorded.
+- Never on `/scratch`: the shared data is kept, the scratch space is cleaned.
+
+**The budget.** `shared_space_data_budget` (20T) covers all the data directories
+together. Until `/home` has project quotas, `shared-data-metrics.timer` (hourly) exports
+the usage as the disk quota metrics' project series (`project="shared-data"`, hard = the
+budget, warn = `cluster_user_warn_fraction` of it), so the daily disk report lists it,
+puts it on the card once past the warn level, and `DiskQuotaProjectOverWarnLevel`
+fires. Once `/home` has the project feature (disk-quota.md), give the data directories
+their project with `block_hard: "{{ shared_space_data_budget }}"` in
+`disk_quota_projects` and set `shared_space_data_quota: true`: the kernel then enforces
+the same figure and disk_quota exports it instead.
+
+**Cleanup.** Access times over NFS do not show reads (a client reads its cached copy),
+so use is what people record. An entry no one but its requester recorded a use of for
+`shared_space_data_unused_days` (28) since it came gets a notice: the requester a DM
+with a "계속 씁니다" button, the help channel a "저도 씁니다" button for anyone who uses
+it. A press records a use and ends the notice; with none in `cluster_user_grace_days`
+(14), the bot removes the entry and tells the requester and the administrators.
 
 ## Collaboration folders
 
@@ -80,5 +117,7 @@ removed by a deploy, nor when the switch is turned off.
    without `--check`.
 4. For Slack requests: the cluster bot with its GitHub App (cluster-bot.md); its one
    command's `project` subcommand comes with the generated manifest.
-5. For the shared data's budget, a project quota on its directories once `/home` has the
-   project feature (disk-quota.md: adding the quota features to /home).
+5. For shared data requests, the cluster bot (it reaches the home server's
+   `shared-data` service; run `playbooks/generic/cluster-bot.yml` after this playbook
+   so its key is authorized there). For the budget as a kernel limit, the project
+   quota above once `/home` has the project feature.

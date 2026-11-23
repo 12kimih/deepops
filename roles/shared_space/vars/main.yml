@@ -1,5 +1,40 @@
 ---
-# What this component installs, for its record (roles/component_record): nothing a removal
-# may take away. The directories hold people's data, the writer's account owns files, and
-# the ACL tools are the system's.
-shared_space_items: []
+# The shared data's downloads, ledger and budget (cluster_tools.shared_data): the cluster
+# bot's service on this host (roles/cluster_bot_access) and a daily usage export.
+_shared_space_data_command: /usr/local/sbin/cluster-shared-data
+_shared_space_data_config: "{{ cluster_tools_lib_config_dir }}/shared-data.json"
+_shared_space_data_textfile: "{{ node_exporter_prom_dir }}/shared-data.prom"
+_shared_space_data_kept: "{{ node_exporter_prom_keep_dir }}/shared-data.prom"
+_shared_space_data_units: [shared-data-metrics.service, shared-data-metrics.timer]
+# The writer's: its downloads record how they ended.
+_shared_space_data_ledger_dir: /var/lib/shared-data
+_shared_space_bot_service:
+  name: shared-data
+  argv: ["{{ _shared_space_data_command }}", "{{ _shared_space_data_config }}", serve]
+_shared_space_data_cfg:
+  root: "{{ shared_space_root }}"
+  kinds: "{{ shared_space_data }}"
+  writer: "{{ shared_space_writer }}"
+  budget: "{{ shared_space_data_budget | human_to_bytes }}"
+  warn_fraction: "{{ cluster_user_warn_fraction | float }}"
+  ledger: "{{ _shared_space_data_ledger_dir }}/ledger.json"
+  hosts: "{{ shared_space_data_sources }}"
+  command: "{{ _shared_space_data_command }}"
+  config: "{{ _shared_space_data_config }}"
+  project: shared-data
+  usage_metrics: "{{ not (shared_space_data_quota | bool) }}"
+  textfile: "{{ _shared_space_data_textfile }}"
+  textfile_kept: "{{ _shared_space_data_kept }}"
+
+# What this component installs, for its record (roles/component_record): the shared
+# data's tool, its timer and the bot's service. Never the directories, the ledger or the
+# writer's account: they hold data.
+shared_space_items: >-
+  {{ ['unit:shared-data-metrics.timer', 'unit:shared-data-metrics.service']
+     + _shared_space_data_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ _shared_space_data_command, 'file:' ~ _shared_space_data_config,
+        'file:' ~ _shared_space_data_textfile, 'file:' ~ _shared_space_data_kept,
+        'file:/etc/tmpfiles.d/deepops-textfile-shared-data.conf',
+        'file:' ~ cluster_tools_lib_config_records ~ '/shared_space.json']
+     + ((cluster_bot_access_items + ['file:' ~ cluster_bot_serve_dir ~ '/' ~ _shared_space_bot_service.name ~ '.json'])
+        if cluster_bot_host | length > 0 else []) }}

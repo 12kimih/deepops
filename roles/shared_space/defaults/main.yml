@@ -4,7 +4,9 @@
 # (slurm_enable_shared_space, on slurm-nfs). docs/slurm-cluster/shared-space.md.
 #
 #   <root>/<data>              datasets, models, container images: written by one account
-#                              (shared_space_writer), read by everyone, its own budget
+#                              (shared_space_writer), read by everyone, one budget
+#                              (shared_space_data_budget); people ask the cluster bot
+#                              (/cluster data), cluster_tools.shared_data downloads
 #   <root>/projects/<name>     collaboration folders (shared_projects, the roster's
 #                              projects): owners and members read and write (group
 #                              <name>), viewers read (group <name>-read); files keep the

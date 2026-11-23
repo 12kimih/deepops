@@ -60,7 +60,7 @@ class Commands(unittest.TestCase):
             if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "handlers"
         )
         self.assertEqual(handled, set(commands.NAMES))
-        help_text = commands.help_lines("/cluster", {"join", "unban", "project"})
+        help_text = commands.help_lines("/cluster", {s.feature for s in commands.SUBCOMMANDS if s.feature})
         docs = commands.doc_lines("/cluster")
         for name in commands.NAMES:
             self.assertIn(f"`/cluster {name}`", help_text)
