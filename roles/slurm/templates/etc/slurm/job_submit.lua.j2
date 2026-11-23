@@ -651,8 +651,13 @@ local function job_submit(job_desc, part_list, submit_uid)
     end
 
     -- Validate before rewriting anything, so a rejected job is reported as submitted.
-    local shape_rc = check_gpu_shape(job_desc)
-    if shape_rc ~= slurm.SUCCESS then return shape_rc end
+    -- root is exempt from the sizing rule, as in job_modify: an administrator's job may
+    -- take a node's every GPU however many it has (the weekly GPU diagnostics on a node
+    -- with 7); the type stamping and routing above and below still apply.
+    if submit_uid ~= 0 then
+        local shape_rc = check_gpu_shape(job_desc)
+        if shape_rc ~= slurm.SUCCESS then return shape_rc end
+    end
     if GPU_JOBS_USE_DEFAULTS then
         if wants_memory(job_desc) then
             return reject_memory()

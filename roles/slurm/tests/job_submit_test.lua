@@ -497,6 +497,16 @@ t = {tres_per_job = "gres/gpu:a10=12", min_nodes = 2}
 check("Q11 refused with the rule, not an internal error", submit(t), slurm.ERROR)
 check("Q11 the user reads the rule", logged("A job takes 1, 2, 4, 8 GPUs per node"), true)
 check("Q11 no internal failure", logged("failed internally"), false)
+-- root takes any count (a node's every GPU, 7 on one), with its type stamped and routed.
+t = {gres = "gpu:a10:7"}
+LOG = {}
+check("Q12 root may take 7 GPUs on a node", slurm_job_submit(t, {}, 0), slurm.SUCCESS)
+check("Q12 root's job is routed like any", t.partition, A10)
+check("Q12 a user may not", submit({gres = "gpu:a10:7"}), slurm.ERROR)
+t = {gres = "gpu:7"}
+LOG = {}
+check("Q12 root's untyped request gets the type", slurm_job_submit(t, {}, 0), slurm.SUCCESS)
+check("Q12 the type is stamped", t.gres:find("a10", 1, true) ~= nil or (t.tres_per_node or ""):find("a10", 1, true) ~= nil, true)
 
 print("== P. a Lua runtime error rejects instead of failing open ==")
 local broken = setmetatable({}, {__index = function() error("boom") end})
