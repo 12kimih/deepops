@@ -163,18 +163,23 @@
             TimeoutStartSec=15min
             ExecStart=/usr/local/sbin/os-updates-metrics {{ node_exporter_prom_dir }}
             Nice=10
-          # The textfile directory is usually tmpfs: republish the kept metrics at
-          # boot so the series never go absent until the next measurement.
+          # At every boot: the kept metrics at once (the textfile directory is usually
+          # tmpfs), with the reboot flag measured afresh, then a full measurement, so a
+          # boot after an upgrade never shows the packages it had before. Not the
+          # timer's OnBootSec: a daemon-reload can drop its pending boot trigger.
           publish.service: |
             # Managed by roles/os_updates.
             [Unit]
-            Description=Republish the kept pending-update metrics after boot
-            After=local-fs.target
+            Description=Publish the kept pending-update metrics, then measure them afresh, after boot
+            Wants=network-online.target
+            After=network-online.target local-fs.target
 
             [Service]
             Type=oneshot
-            TimeoutStartSec=1min
+            TimeoutStartSec=15min
             ExecStart=/usr/local/sbin/os-updates-metrics --publish {{ node_exporter_prom_dir }}
+            ExecStart=/usr/local/sbin/os-updates-metrics {{ node_exporter_prom_dir }}
+            Nice=10
 
             [Install]
             WantedBy=multi-user.target
@@ -185,12 +190,26 @@
 
             [Timer]
             OnCalendar=daily
-            OnBootSec=10min
             RandomizedDelaySec=1h
             Persistent=true
 
             [Install]
             WantedBy=timers.target
+
+    # After every dpkg run (unattended upgrades, a deploy's install, the maintenance
+    # upgrade): measure again, so the metrics never show what an upgrade replaced until
+    # the next daily run. --no-block: dpkg does not wait, and a start while one runs is
+    # a no-op; || true: a host without systemd (a container) still installs packages.
+    - name: Measure again after every package change
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/54deepops-os-updates-metrics
+        content: |
+          // Managed by DeepOps (roles/os_updates).
+          DPkg::Post-Invoke { "systemctl start --no-block os-updates-metrics.service >/dev/null 2>&1 || true"; };
+        owner: root
+        group: root
+        mode: "0644"
+        validate: apt-config -c %s dump
 
     - name: Enable the pending-updates metrics timer and boot republish
       systemd_unit:
@@ -229,5 +248,6 @@
         - /etc/systemd/system/os-updates-metrics.service
         - /etc/systemd/system/os-updates-metrics.publish.service
         - /etc/systemd/system/os-updates-metrics.timer
+        - /etc/apt/apt.conf.d/54deepops-os-updates-metrics
         - /var/lib/os-updates
         - "{{ node_exporter_prom_dir }}/os-updates.prom"
