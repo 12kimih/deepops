@@ -49,6 +49,8 @@ the burst figure makes it visible, and nothing is done about it automatically.
 Python 3.9 or newer, standard library only.
 """
 
+import errno
+import grp
 import json
 import os
 import pwd
@@ -103,22 +105,83 @@ class Host:
         return os.lstat(path)
 
     def running_users(self):
-        """Logins with a running or suspended Slurm job, or None when Slurm cannot be read
-        (the purge then removes nothing)."""
+        """Logins with a job that holds its allocation (vocab.job_holds: running, still
+        configuring, suspended, completing...), or None when Slurm cannot be read (the
+        purge then removes nothing)."""
         try:
             jobs = slurm.load("jobs")["jobs"]
         except slurm.Error:
             return None
-        return {j["user_name"] for j in jobs if vocab.job_code(j["job_state"]) in ("R", "S", "CG")}
+        return {j["user_name"] for j in jobs if vocab.job_holds(j["job_state"])}
+
+    def folder_members(self, folder):
+        """The logins of a collaboration folder's group (one group each), or None when it
+        cannot be read."""
+        try:
+            return set(grp.getgrgid(os.lstat(folder).st_gid).gr_mem)
+        except (OSError, KeyError):
+            return None
+
+    root = None  # set by scan: directories under it are read without following a link
 
     def scandir(self, path):
-        return os.scandir(path)
+        """PATH's entries; under the root reached as open_parent does, so a directory
+        swapped for a link while the walk runs lists nothing of another person's."""
+        if not (self.root and path.startswith(self.root + os.sep)):
+            return list(os.scandir(path))
+        fd, name = self.open_parent(self.root, path)
+        try:
+            dfd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+        finally:
+            os.close(fd)
+        try:
+            return list(os.scandir(dfd))
+        finally:
+            os.close(dfd)
 
-    def unlink(self, path):
-        os.unlink(path)
+    def open_parent(self, root, path):
+        """(directory fd, name) of PATH under ROOT, reached one component at a time
+        without following a link nor leaving ROOT's filesystem: a directory a user swaps
+        for a link between the scan and the removal leads nowhere (OSError)."""
+        parts = os.path.relpath(path, root).split(os.sep)
+        if parts[0] in ("", ".", ".."):
+            raise OSError(errno.EINVAL, "not under the root", path)
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open(root, flags)
+        try:
+            dev = os.fstat(fd).st_dev
+            for part in parts[:-1]:
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+                if os.fstat(fd).st_dev != dev:
+                    raise OSError(errno.EXDEV, "another filesystem", path)
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd, parts[-1]
 
-    def rmdir(self, path):
-        os.rmdir(path)
+    def unlink_same(self, root, path, ident, cutoff):
+        """Remove PATH only when it is still the file the scan saw (IDENT: device, inode,
+        owner), a file or link unused since CUTOFF; whether it went."""
+        fd, name = self.open_parent(root, path)
+        try:
+            st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            if (st.st_dev, st.st_ino, st.st_uid) != tuple(ident) or last_use(st) >= cutoff:
+                return False
+            if not (stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode)):
+                return False
+            os.unlink(name, dir_fd=fd)
+            return True
+        finally:
+            os.close(fd)
+
+    def rmdir(self, root, path):
+        fd, name = self.open_parent(root, path)
+        try:
+            os.rmdir(name, dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def write_list(self, directory, name, text, uid):
         """TEXT as DIRECTORY/NAME, owned by UID, readable by all, without following a link
@@ -203,11 +266,12 @@ def tops(host, cfg):
 
 
 def scan(host, cfg, now):
-    """What the filesystem holds: ({path: (login, size, last_use)} of the files with an
+    """What the filesystem holds: ({path: (login, size, last_use, (dev, ino, uid))} of the files with an
     owner in the roster, {login: files} of everyone's, {login: burst files}, entries
     looked at, whether the budget ran out)."""
     root_st = host.lstat(cfg["root"])
     dev = root_st.st_dev
+    host.root = cfg["root"]
     login_of = {int(uid): login for login, uid in cfg["people"].items()}
     files, totals, bursts = {}, defaultdict(int), {}
     buckets = defaultdict(lambda: defaultdict(int))
@@ -226,7 +290,7 @@ def scan(host, cfg, now):
             if owner is None:
                 continue
             totals[owner] += 1
-            files[path] = (owner, fst.st_size, last_use(fst))
+            files[path] = (owner, fst.st_size, last_use(fst), (fst.st_dev, fst.st_ino, fst.st_uid))
             # An old file (unchanged for stale_days) used in the last two days: the
             # bucket of its access time, for the burst figure.
             if fst.st_atime >= now - 2 * DAY and fst.st_atime - fst.st_mtime > stale:
@@ -259,13 +323,13 @@ def plan(cfg, files, state, truncated, now):
     stale = now - cfg["stale_days"] * DAY
     before = state.get("due", {})
     due = {}
-    for path, (owner, nbytes, used) in files.items():
+    for path, (owner, nbytes, used, ident) in files.items():
         if used >= stale:
             continue
         old = before.get(path)
         when = old["due"] if isinstance(old, dict) and "due" in old else now + cfg["grace_days"] * DAY
         since = old.get("since", now) if isinstance(old, dict) else now
-        due[path] = {"user": owner, "due": when, "since": since, "bytes": nbytes}
+        due[path] = {"user": owner, "due": when, "since": since, "bytes": nbytes, "ident": list(ident)}
         if isinstance(old, dict) and old.get("deferred"):
             due[path]["deferred"] = old["deferred"]  # once only: the date it was moved
     if truncated:
@@ -298,20 +362,44 @@ def remove(host, cfg, due, now, check, say):
     if busy is None:
         say("Slurm could not be read: nothing is removed this run (a running job's files must not go)")
         return removed, nbytes
+    members = {}
+
+    def busy_with(path, owner):
+        """Who keeps PATH busy: its owner, or in a collaboration folder any member (a
+        member's job may read a colleague's files); unreadable members count as busy."""
+        if owner in busy:
+            return owner
+        rel = os.path.relpath(path, cfg["projects"]).split(os.sep)
+        if rel[0] in ("", ".", ".."):
+            return None
+        folder = os.path.join(cfg["projects"], rel[0])
+        if folder not in members:
+            members[folder] = host.folder_members(folder)
+        if members[folder] is None:
+            return f"a member of {rel[0]} (its group cannot be read)"
+        holders = sorted(members[folder] & busy)
+        return f"{holders[0]} (a member of {rel[0]})" if holders else None
+
     for path in ready:
         entry = due[path]
         if not still_stale(host, path, dev, cutoff):
             continue
-        if entry["user"] in busy and not entry.get("deferred"):
+        who = busy_with(path, entry["user"])
+        if who and not entry.get("deferred"):
             entry["due"], entry["deferred"] = now + cfg["stale_days"] * DAY, now
-            say(f"defer {escape(path)}: {entry['user']} has running jobs; it goes on its new date")
+            say(f"defer {escape(path)}: {who} has running jobs; it goes on its new date")
             continue
+        if not entry.get("ident"):
+            continue  # kept from a cut-short walk: removed only once a scan has seen it again
         say(f"remove {escape(path)}")
         if not check:
             try:
-                host.unlink(path)
+                gone = host.unlink_same(cfg["root"], path, entry["ident"], cutoff)
             except OSError as e:
                 say(f"could not remove {escape(path)}: {e.strerror}")
+                continue
+            if not gone:
+                say(f"keep {escape(path)}: it is no longer the file that was listed")
                 continue
         removed += 1
         nbytes += entry.get("bytes", 0)
@@ -326,7 +414,7 @@ def remove(host, cfg, due, now, check, say):
                 d not in keep and os.path.dirname(d) != cfg["projects"] and d.startswith(cfg["root"] + os.sep)
             ):
                 try:
-                    host.rmdir(d)
+                    host.rmdir(cfg["root"], d)
                 except OSError:
                     break
                 say(f"remove the emptied directory {escape(d)}")
@@ -403,7 +491,7 @@ def purge(host, cfg, now, check=False, say=print):
     # The folders worth cleaning, from the same walk (cluster_tools.cleanup).
     folders = cleanup.Folders([os.path.join(cfg["root"], login) for login in cfg["people"]]
                               + [os.path.join(cfg["projects"], d) for d in projects_of(host, cfg)])  # fmt: skip
-    for path, (owner, nbytes, used) in files.items():
+    for path, (owner, nbytes, used, _) in files.items():
         folders.add(path, owner, nbytes, used)
     candidates = folders.ranked(now, cfg["stale_days"], cfg["cleanup_top"])
     due = plan(cfg, files, state, truncated, now)
