@@ -200,7 +200,8 @@ validation_python_container: "python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4
 # resets with gpu_clock_reset: true
 gpu_clock_lock: ""
 gpu_clock_reset: false
-# Packages playbooks/generic/software.yml adds on every host
+# Packages playbooks/generic/software.yml adds on every host, without their
+# recommendations (each one wanted is listed too)
 software_extra_packages: []
 # Vendor packages no repository carries (a RAID controller's CLI), each a .deb the site
 # keeps (under config/files) with its sha256: {file, sha256}. The file is the pin: a run
