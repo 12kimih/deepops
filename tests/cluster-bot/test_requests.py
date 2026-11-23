@@ -6,11 +6,13 @@ message."""
 import os
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_bot/files"))
-from cluster_bot import requests  # noqa: E402
+from cluster_bot import requests, state  # noqa: E402
 
 
 class Echo(requests.Feature):
@@ -51,6 +53,37 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(again.approve(held.key, "boss").status, "done")
         self.assertEqual(self.echo.applied, [3, 30])
         self.assertEqual(again.approve(held.key, "boss").text, "이미 처리된 요청입니다.")
+
+    def test_two_approvals_at_once_apply_it_once(self):
+        # Slack handlers run on threads: both approvals read the held request before
+        # either writes, unless the whole read, take, write is one locked step.
+        held = self.engine.submit({"kind": "echo", "user": "a", "n": 30})
+        meet, real = threading.Barrier(2), state.read
+
+        def read(path, default):
+            try:
+                meet.wait(timeout=0.5)
+            except threading.BrokenBarrierError:
+                pass
+            return real(path, default)
+
+        outs = []
+        with mock.patch.object(state, "read", read):
+            runs = [threading.Thread(target=lambda: outs.append(self.engine.approve(held.key, "boss")))
+                    for _ in range(2)]  # fmt: skip
+            for run in runs:
+                run.start()
+            for run in runs:
+                run.join()
+        self.assertEqual(self.echo.applied, [30])
+        self.assertEqual(sorted(o.status for o in outs), ["done", "refused"])
+
+    def test_a_change_that_raises_writes_nothing(self):
+        state.write(self.path, {"a": 1})
+        with self.assertRaises(KeyError), state.locked(self.path, {}) as doc:
+            doc["a"] = 2
+            raise KeyError
+        self.assertEqual(state.read(self.path, None), {"a": 1})
 
     def test_deny_refusal_failure_and_unknown_kind_are_messages(self):
         held = self.engine.submit({"kind": "echo", "user": "a", "n": 30})

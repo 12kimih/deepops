@@ -159,6 +159,11 @@ class Services(unittest.TestCase):
         with mock.patch("subprocess.run", return_value=refused), self.assertRaises(requests.Failed) as e:
             remote.Remote("10.0.0.5", "/k", "bot", "/kh", "bans")("unban", "203.0.113.8")
         self.assertEqual(str(e.exception), "not banned 203.0.113.8")
+        # A reply that is not JSON is that host's failure, never an exception past it.
+        garbled = mock.Mock(returncode=0, stdout="Welcome!\n", stderr="")
+        with mock.patch("subprocess.run", return_value=garbled), self.assertRaises(requests.Failed) as e:
+            remote.Remote("10.0.0.5", "/k", "bot", "/kh", "bans")("unban", "203.0.113.9")
+        self.assertIn("10.0.0.5", str(e.exception))
 
 
 if __name__ == "__main__":
