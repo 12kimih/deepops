@@ -1326,6 +1326,21 @@ class TaskRules(unittest.TestCase):
                 offenders.append(rel)
         self.assertEqual(offenders, [], "return diff=deepops_diff.text(...) or .actions(...) when changed")
 
+    def test_ansible_managed_only_in_a_template(self):
+        # ansible_managed is defined for the template module's source alone: in a copy's
+        # content (or any other module's arguments) it is undefined and fails the task at
+        # run time, which lint and the syntax check never see (ARA 219, 2026-11-23).
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                for key, value in task.items():
+                    if key.endswith("template") or key in ("name", "when", "tags"):
+                        continue
+                    if re.search(r"\bansible_managed\b", str(value)):
+                        offenders.append(f"{rel(path)}: {task.get('name')} ({key})")
+        self.assertEqual(offenders, [], "put the header in a template's source file")
+        scan.check(self)
+
     def test_conditions_spell_only_known_escapes(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):
