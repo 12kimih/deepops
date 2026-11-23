@@ -441,7 +441,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #  - { name: qos,        text: "your QoS: what it preempts, how full its quota is" }
 #  - { name: sinfo,      text: "partition and node state" }
 #cluster_tools_motd_links:  # example
-#  - { name: /sw/docs,     text: "the full guide: getting started, recipes, FAQ" }
+#  - { name: "{{ cluster_info.docs_url }}", text: "the guide: getting started, recipes, policy" }
 #  - { name: /sw/examples, text: "worked job examples, hello world to multi-node" }
 #  - { name: dashboard,    text: "{{ grafana_root_url }}" }
 
@@ -454,7 +454,8 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 # them on the one host that exports the share -- see config/host_vars/<head node>.
 #cluster_tools_shared_dirs:  # example
 #  - { src: "{{ inventory_dir }}/files/slurm/examples", dest: /sw/examples }
-#  - { src: "{{ inventory_dir }}/docs", dest: /sw/docs }
+# Destinations published before and retired since, removed whole on the next run.
+#cluster_tools_retired_shared_dirs: []
 
 ################################################################################
 # Enroot & Pyxis                                                               #

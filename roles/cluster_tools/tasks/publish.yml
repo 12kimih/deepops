@@ -131,6 +131,14 @@
 
 # Each file keeps its mode from the source, so an example job script stays runnable;
 # a fixed 0644 took the execute bit off every one.
+- name: Check no retired shared directory is still published
+  ansible.builtin.assert:
+    that: cluster_tools_shared_dirs | map(attribute='dest') | intersect(cluster_tools_retired_shared_dirs) | length == 0
+    fail_msg: >-
+      {{ cluster_tools_shared_dirs | map(attribute='dest') | intersect(cluster_tools_retired_shared_dirs) | join(', ') }}
+      is both in cluster_tools_shared_dirs and cluster_tools_retired_shared_dirs.
+    quiet: true
+
 - name: Publish the shared directories
   ansible.builtin.copy:
     src: "{{ item.src }}/"
@@ -142,6 +150,12 @@
   loop: "{{ cluster_tools_shared_dirs }}"
   loop_control:
     label: "{{ item.dest }}"
+
+- name: Remove the retired shared directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cluster_tools_retired_shared_dirs }}"
 
 - name: Check for update-motd.d
   ansible.builtin.stat:
