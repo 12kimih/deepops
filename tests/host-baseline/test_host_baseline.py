@@ -23,6 +23,7 @@ _spec = importlib.util.spec_from_file_location("packages_filter", ROOT / "plugin
 _packages = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_packages)
 packages_protected_taken = _packages.packages_protected_taken
+packages_recorded = _packages.packages_recorded
 
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import bounds  # noqa: E402
@@ -182,6 +183,24 @@ class NeededPackagesStay(unittest.TestCase):
         # A component's own removal names its package: a decision, not an accident.
         self.assertEqual(packages_protected_taken(["systemd-coredump:amd64"], ["systemd-coredump"],
                                                   ["systemd-coredump"]), [])  # fmt: skip
+
+    def test_components_retired_together_free_the_package_they_share(self):
+        # nis-client.yml on a host with the NIS client and server, both retired: yp-tools,
+        # recorded by both, was refused whichever went first (ARA 256, 2026-11-23).
+        items = {"package:yp-tools": ["nis_client", "nis_server"], "package:ypbind-mt": ["nis_client"],
+                 "package:munge": ["munge"], "unit:ypbind": ["nis_client"]}  # fmt: skip
+        both = {"nis_client": "absent", "nis_server": "absent", "munge": "present"}
+        self.assertEqual(packages_recorded(items, both), ["munge"])
+        one = {**both, "nis_server": "kept"}
+        self.assertEqual(packages_recorded(items, one), ["munge", "yp-tools"])
+        self.assertEqual(
+            packages_recorded(items, {}), ["munge", "yp-tools", "ypbind-mt"], "unknown: all stay"
+        )
+        removal = ["ypbind-mt:amd64", "yp-tools:amd64"]
+        self.assertEqual(packages_protected_taken(removal, ["ypbind-mt"], packages_recorded(items, both)), [])
+        self.assertEqual(
+            packages_protected_taken(removal, ["ypbind-mt"], packages_recorded(items, one)), ["yp-tools"]
+        )
 
     def test_the_refusal_goes_through_the_filter(self):
         task = next(t for t in walk(yaml.safe_load(ABSENT.read_text()))
