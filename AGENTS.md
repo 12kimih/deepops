@@ -172,7 +172,7 @@ Move a shared checkout (the clone deploys run from, and its config) only with
 
 Run before pushing: `scripts/check.sh` (every check CI runs; the pre-commit hook
 runs `scripts/check.sh --fast`). `scripts/push.sh` rebases onto origin/main, runs the
-full check and pushes, one worktree of a clone at a time (the next one waits). Public CI runs lint,
+full check and pushes; worktrees check at once, and a push whose base moved meanwhile is checked again first. Public CI runs lint,
 setup, and molecule checks on every PR. Deployment-affecting changes need
 GPU-backed validation evidence in the PR body.
 
