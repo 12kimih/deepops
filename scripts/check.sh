@@ -57,6 +57,14 @@ step "generated dashboards are current" "${python}" scripts/dashboards/build.py 
 step "role templates parse as Jinja" "${python}" scripts/deepops/check-template-syntax.py
 step "people rosters are valid (config.example, and config if present)" "${python}" scripts/deepops/people.py check
 step "configs state only what differs, nothing set goes unread, docs name real paths and settings" "${python}" scripts/deepops/config_lint.py
+# The docs' data files (scripts/docs/site_facts.py), when a checkout of each is named:
+# the user docs site's (DEEPOPS_DOCS_SITE) and the admin docs' (the site config's).
+if [ -n "${DEEPOPS_DOCS_SITE:-}" ]; then
+    facts=(--public "${DEEPOPS_DOCS_SITE}/data/site.json")
+    config_dir="${DEEPOPS_CONFIG_DIR:-config}"
+    [ -d "${config_dir}/admin-docs" ] && facts+=(--private "${config_dir}/admin-docs/_data/site.json")
+    step "the docs' data files match the code and the site config" "${python}" scripts/docs/site_facts.py "${facts[@]}" --check
+fi
 # Linters judge the files git tracks, staged ones included (git add a new file to have it
 # checked): what CI checks and what a commit contains, never another session's
 # half-written file in a shared working tree. .gitignore keeps the rest out.
