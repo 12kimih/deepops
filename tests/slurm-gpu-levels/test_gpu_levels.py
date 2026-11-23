@@ -113,7 +113,7 @@ class Helper(unittest.TestCase):
 
 
 class Epilog(unittest.TestCase):
-    def run_epilog(self, apps):
+    def run_epilog(self, apps, levels_rc=0):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             for sub in ("bin", "shared/bin", "slurm/bin"):
@@ -121,7 +121,7 @@ class Epilog(unittest.TestCase):
             (tmp / "bin" / "nvidia-smi").write_text(NVIDIA_SMI)
             for name, body in (
                 ("logger", "exit 0"),
-                ("shared/bin/set_gpu_levels.sh", 'echo "levels $*" >> "$CALLS"'),
+                ("shared/bin/set_gpu_levels.sh", f'echo "levels $*" >> "$CALLS"; exit {levels_rc}'),
             ):
                 (tmp / "bin" / name if "/" not in name else tmp / name).write_text(f"#!/bin/bash\n{body}\n")
             (tmp / "slurm" / "bin" / "scontrol").write_text('#!/bin/bash\necho "scontrol $*" >> "$CALLS"\n')
@@ -157,22 +157,19 @@ class Epilog(unittest.TestCase):
             lines = calls.read_text().splitlines()
         return proc.returncode, lines, elapsed
 
-    def test_a_clean_job_does_not_wait(self):
-        rc, calls, elapsed = self.run_epilog("")
+    def test_levels_go_back_and_nothing_is_killed(self):
+        # Slurm ends a job's processes (proctrack/cgroup) and drains a node whose processes
+        # will not die; a GPU process outside any job is someone's own. The inherited kill
+        # of every GPU process ended other jobs' processes on shared nodes (2026-11-23).
+        rc, calls, elapsed = self.run_epilog("999999999\\n")
         self.assertEqual(rc, 0)
-        self.assertEqual(calls, ["--query-compute-apps=pid --format=csv,noheader", "levels default"])
+        self.assertEqual(calls, ["levels default"])
         self.assertLess(elapsed, 3)
 
-    def test_a_process_that_survives_drains(self):
-        # The stub keeps reporting the process: it survived the kill.
-        rc, calls, _ = self.run_epilog("999999999\\n")
+    def test_a_failed_reset_does_not_fail_the_epilog(self):
+        rc, calls, _ = self.run_epilog("", levels_rc=1)
         self.assertEqual(rc, 0)
-        self.assertEqual(calls.count("--query-compute-apps=pid --format=csv,noheader"), 2)
-        self.assertIn(
-            "scontrol update nodename=node1 state=drain reason=Residual GPU processes found",
-            calls,
-        )
-        self.assertEqual(calls[-1], "levels default")
+        self.assertEqual(calls, ["levels default"])
 
 
 if __name__ == "__main__":

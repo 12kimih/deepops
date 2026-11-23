@@ -6,3 +6,8 @@ _slurm_build_account: "{{ system_accounts[slurm_deb_build_user] }}"
 # The controller's files slurmctld reads or serves (configless) that a run may rewrite:
 # kept before it does, put back when slurmctld refuses them (tasks/controller_restart.yml).
 slurm_controller_conf_files: [slurm.conf, job_submit.lua, cgroup.conf, gres.conf, namespace.yaml, plugstack.conf]
+
+# The CPU governor in force before a whole-node job (prolog.d/50-exclusive-cpu), put back
+# by its epilog (epilog.d/60-exclusive-cpu). Under /run: a reboot clears it, and the
+# kernel then starts with its own default governor anyway.
+slurm_exclusive_governor_file: /run/slurm-exclusive-governor

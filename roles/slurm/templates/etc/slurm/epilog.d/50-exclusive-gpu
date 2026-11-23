@@ -1,40 +1,14 @@
 #!/usr/bin/env bash
-# After a job that had the node to itself: no process may stay on a GPU, and the GPUs
-# go back to their default power and clocks. A process gone by the time it is killed
-# is fine; one that survives drains the node on purpose, with a reason. Anything else
-# that goes wrong is logged, never a failed part.
+# After the one job on the node (run-parts.sh runs *-exclusive-* parts only then): the
+# GPUs go back to their default power and clocks. Nothing here kills a process: Slurm
+# ends every process of a job itself (proctrack/cgroup, KillWait) and drains a node
+# whose processes will not die (UnkillableStepTimeout); a process on a GPU outside any
+# job is someone's own, which this part must not end, and the GpuBusyWithoutJob alert
+# names it. The inherited "kill every GPU process" step killed other jobs' processes
+# on shared nodes (2026-11-23). A failure is logged, never a failed part.
 set -u
 
 command -v nvidia-smi >/dev/null || exit 0
-node_name="${SLURMD_NODENAME:-$(hostname -s)}"
-
-gpu_pids() {
-    timeout 60 nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | grep -E '^[0-9]+$'
-}
-
-# Only a job that left a process behind waits for it: up to 5 s for the killed
-# processes to exit, then nvidia-smi is asked again.
-residual="$(gpu_pids)"
-if [ -n "$residual" ]; then
-    for pid in $residual; do
-        logger -t slurm-epilog "Killing residual GPU process $pid" || :
-        kill -9 "$pid" 2>/dev/null || :
-    done
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
-        alive=""
-        for pid in $residual; do
-            kill -0 "$pid" 2>/dev/null && alive=1
-        done
-        [ -z "$alive" ] && break
-        sleep 0.5
-    done
-    if [ -n "$(gpu_pids)" ]; then
-        logger -t slurm-epilog "Residual GPU processes survived; draining $node_name" || :
-        timeout 30 '{{ slurm_install_prefix }}'/bin/scontrol update nodename="$node_name" state=drain reason='Residual GPU processes found' \
-            || logger -t slurm-epilog "could not drain $node_name" || :
-    fi
-fi
-
 timeout 120 '{{ slurm_config_dir }}'/shared/bin/set_gpu_levels.sh default \
     || logger -t slurm-epilog "set_gpu_levels.sh default failed" || :
 exit 0

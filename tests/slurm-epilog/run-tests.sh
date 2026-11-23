@@ -122,9 +122,10 @@ setup_runparts() {
         fake_proc "$dir/proc" 1 0 '0::/init.scope'
     fi
 
-    # The script calls squeue twice: once for the exclusive check (-o "%h",
-    # OverSubscribe), once for the last-user-job count. Answer the first with a non-exclusive
-    # allocation so only the second is under test.
+    # The script calls squeue twice: once for the jobs on the node (-w only; the
+    # node-wide *-exclusive-* parts run only for the one job there), once for the
+    # user's jobs on the node (-u). $SQUEUE_NODE_JOBS answers the first (default: the
+    # same list as $SQUEUE_JOBS), so a case can put a job of another user on the node.
     # The stub must honour -t. A stub that answers the same way whatever states
     # were asked for would let the pre-fix script pass the SUSPENDED case too,
     # and the test would prove nothing. $SQUEUE_JOBS is "id:STATE" per line and
@@ -134,11 +135,13 @@ setup_runparts() {
 #!/usr/bin/env bash
 want_states=""
 prev=""
+by_user=""
 for arg in "$@"; do
-    if [ "$arg" = "%h" ]; then
-        echo "${SQUEUE_OVERSUBSCRIBE:-OK}"  # OverSubscribe: NO when the job is exclusive
-        exit 0
+    if [ "$arg" = "Exclusive" ]; then
+        echo "${SQUEUE_EXCLUSIVE:-NO}"  # Slurm's Exclusive field: NODE for --exclusive
+        exit "${SQUEUE_EXCLUSIVE_RC:-0}"
     fi
+    case "$arg" in -u|--user|--user=*) by_user=1 ;; esac
     case "$prev" in
         -t|--states) want_states="$arg" ;;
     esac
@@ -153,9 +156,11 @@ if [ -n "${SQUEUE_RC:-}" ] && [ "$SQUEUE_RC" != 0 ]; then
     exit "$SQUEUE_RC"
 fi
 
-[ -n "${SQUEUE_JOBS:-}" ] || exit 0
+jobs="${SQUEUE_JOBS:-}"
+[ -n "$by_user" ] || jobs="${SQUEUE_NODE_JOBS-$jobs}"
+[ -n "$jobs" ] || exit 0
 
-printf '%s\n' "$SQUEUE_JOBS" | while IFS=: read -r id state; do
+printf '%s\n' "$jobs" | while IFS=: read -r id state; do
     [ -n "$id" ] || continue
     # No -t at all means squeue's default; the scripts under test always pass
     # one, so treat a missing filter as "match everything" rather than guess.
@@ -1047,30 +1052,36 @@ else
     fi
 fi
 
-# --- exclusive jobs ----------------------------------------------------------------
-# Exclusive is Slurm's own OverSubscribe=NO, not a CPU count, which never matched once
-# CoreSpecCount reserves cores; and the node is asked for by its Slurm name.
+# --- node-wide (exclusive) parts ----------------------------------------------------
+# The *-exclusive-* parts act on the whole node, so they run only for a job Slurm gave
+# the whole node: its Exclusive field is NODE. OverSubscribe (%h) reads NO for every job
+# on an OverSubscribe=NO partition, shared or not (2026-11-23: every ending job's epilog
+# killed the other jobs' GPU processes).
 echo
-echo "run-parts.sh -- exclusive parts follow OverSubscribe, squeue asks for SLURMD_NODENAME"
+echo "run-parts.sh -- node-wide parts run only for a job with Exclusive=NODE"
 dir="$(setup_runparts)" || dir=""
 if [ -z "$dir" ]; then
-    no "exclusive parts run only for an exclusive job" "harness setup failed"
+    no "node-wide parts follow Slurm's Exclusive field" "harness setup failed"
 else
     rm -f "$dir/parts/"*
     printf '#!/usr/bin/env bash\ntouch "%s/RAN-X"\n' "$dir" > "$dir/parts/50-exclusive-x"; chmod +x "$dir/parts/50-exclusive-x"
-    runx() { PATH="$dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 SLURM_JOBID=1000 \
-             SLURMD_NODENAME=nodeA HOSTNAME=host-a SQUEUE_JOBS="" SQUEUE_RC=0 "$@" "$dir/run-parts.sh" "$dir/parts" >/dev/null 2>&1; }
-    runx env SQUEUE_OVERSUBSCRIBE=OK; shared_ran=$([ -e "$dir/RAN-X" ] && echo yes || echo no)
-    runx env SQUEUE_OVERSUBSCRIBE=NO; excl_ran=$([ -e "$dir/RAN-X" ] && echo yes || echo no)
-    if [ "$shared_ran/$excl_ran" = "no/yes" ]; then
-        ok "exclusive parts run only for an exclusive job (OverSubscribe=NO)"
+    runx() { rm -f "$dir/RAN-X"; PATH="$dir/bin:$PATH" SLURM_JOB_USER=alice SLURM_JOB_UID=1001 SLURM_JOB_ID=1000 SLURM_JOBID=1000 \
+             SLURMD_NODENAME=nodeA HOSTNAME=host-a SQUEUE_JOBS="" SQUEUE_RC=0 "$@" "$dir/run-parts.sh" "$dir/parts" >/dev/null 2>&1
+             [ -e "$dir/RAN-X" ] && echo ran || echo skipped; }
+    node=$(runx env SQUEUE_EXCLUSIVE=NODE)
+    shared=$(runx env SQUEUE_EXCLUSIVE=NO)
+    user=$(runx env SQUEUE_EXCLUSIVE=USER)
+    failed=$(runx env SQUEUE_EXCLUSIVE=NODE SQUEUE_EXCLUSIVE_RC=1)
+    if [ "$node/$shared/$user/$failed" = "ran/skipped/skipped/skipped" ]; then
+        ok "node-wide parts: Exclusive=NODE ran; NO, USER and a failed squeue skip"
     else
-        no "exclusive parts run only for an exclusive job (OverSubscribe=NO)" "shared=$shared_ran exclusive=$excl_ran"
+        no "node-wide parts follow Slurm's Exclusive field" "NODE=$node NO=$shared USER=$user failed=$failed"
     fi
-    if grep -q 'squeue_timeout' "$dir/run-parts.sh" && grep -q -- '-w "$node_name"' "$dir/run-parts.sh"; then
-        ok "squeue is bounded and asks for the node by its Slurm name"
+    if grep -q 'squeue_timeout' "$dir/run-parts.sh" && grep -q -- '-O Exclusive' "$dir/run-parts.sh" \
+       && ! grep -q '"%h"' "$dir/run-parts.sh"; then
+        ok "squeue is bounded, the Exclusive field is read, and OverSubscribe is not"
     else
-        no "squeue is bounded and asks for the node by its Slurm name" "see run-parts.sh"
+        no "squeue is bounded, the Exclusive field is read, and OverSubscribe is not" "see run-parts.sh"
     fi
 fi
 
