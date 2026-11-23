@@ -37,7 +37,16 @@
     mode: "0644"
   notify: Restart alertmanager
 
-# Holds the webhook secret: readable only by root and the container user (nobody).
+- name: Check that alerts through the Slack bot have its token
+  ansible.builtin.assert:
+    that: not alertmanager_slack_bot | bool or slack_bot_token | length > 0
+    fail_msg: >-
+      alertmanager_slack_bot posts alerts with the cluster's Slack bot token, but
+      slack_bot_token (roles/slack_defaults) is empty: set it, or leave the bot off and use
+      the webhook (alertmanager_slack_api_url).
+    quiet: true
+
+# Holds the webhook or bot token: readable only by root and the container user (nobody).
 - name: Install config file
   diff: false  # the file holds a secret; --diff would print it
   ansible.builtin.template:

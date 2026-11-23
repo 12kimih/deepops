@@ -1,17 +1,29 @@
-{{/* Written by roles/alertmanager; edits are overwritten. */}}
+{{/* Written by roles/alertmanager; edits are overwritten. One message per kind of alert
+(group_by alertname): the title says whether anything still fires and where, a firing
+message lists only what fires (a description they share, once), and a resolved one is one
+struck-through line per alert. */}}
 {{ define "slack.color" -}}
 {{ if eq .Status "resolved" }}good{{ else if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}
 {{- end }}
 
 {{ define "slack.title" -}}
 {{ if eq .Status "resolved" }}:white_check_mark: Resolved{{ else if eq .CommonLabels.severity "critical" }}:red_circle: Critical{{ else }}:large_orange_circle: Warning{{ end -}}
-: {{ .CommonLabels.alertname }}{{ with .CommonLabels.host }} on {{ . }}{{ end }}
-{{- if gt (len .Alerts) 1 }} ({{ len .Alerts }}){{ end }}
+: {{ .CommonLabels.alertname }}
+{{- $shown := .Alerts.Firing }}{{ if eq .Status "resolved" }}{{ $shown = .Alerts.Resolved }}{{ end }}
+{{- if eq (len $shown) 1 }}{{ with (index $shown 0).Labels.host }} on {{ . }}{{ end }}{{ else if gt (len $shown) 1 }} ({{ len $shown }}){{ end }}
 {{- end }}
 
 {{ define "slack.text" -}}
-{{ range .Alerts -}}
-{{ if eq .Status "resolved" }}~{{ .Annotations.summary }}~{{ else }}*{{ .Annotations.summary }}*{{ end }}
-{{ with .Annotations.description }}{{ . }}
-{{ end }}{{ end -}}
+{{ if eq .Status "resolved" -}}
+{{ range .Alerts.Resolved }}~{{ .Annotations.summary }}~
+{{ end -}}
+{{ else -}}
+{{ range .Alerts.Firing }}*{{ .Annotations.summary }}*
+{{ if not $.CommonAnnotations.description }}{{ with .Annotations.description }}{{ . }}
+{{ end }}{{ end }}{{ end -}}
+{{ with .CommonAnnotations.description }}{{ . }}
+{{ end -}}
+{{ with .Alerts.Resolved }}_{{ len . }} resolved since_
+{{ end -}}
+{{ end -}}
 {{- end }}
