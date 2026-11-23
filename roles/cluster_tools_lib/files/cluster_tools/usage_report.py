@@ -229,12 +229,20 @@ def analyze(jobs, gpu, window, threshold):
 
 def track_idle(idle, state, now, window):
     """Remember when each job turned idle (a job no longer idle is forgotten); each idle
-    job gets its record as j["state"]: since, notified (its owner told of it), warned."""
+    job gets its record as j["state"]: since, notified (its owner told of it), warned, and
+    seen (the last run that found it idle). A record no run has seen for a whole window
+    is started afresh: runs that failed in between (Slurm or Prometheus down) cannot tell
+    whether the job was busy meanwhile, and its old since and warning would cancel a job
+    idle again only now, without a fresh warning."""
     ids = {j["id"] for j in idle}
     for jid in [k for k in state if k not in ids]:
         del state[jid]
     for j in idle:
-        j["state"] = state.setdefault(j["id"], {"since": now - window, "notified": None})
+        record = state.get(j["id"])
+        if record is None or now - record.get("seen", float("-inf")) > window:
+            record = state[j["id"]] = {"since": now - window, "notified": None}
+        record["seen"] = now
+        j["state"] = record
 
 
 def by_owner(jobs):

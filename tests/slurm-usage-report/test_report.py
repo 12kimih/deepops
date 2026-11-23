@@ -205,12 +205,23 @@ class IdleTests(unittest.TestCase):
     def test_idle_since_is_kept_and_forgotten_when_no_longer_idle(self):
         state, j = {}, self.job("1", 7200, [("n", 0)])
         report.track_idle([j], state, now=10000, window=7200)
-        self.assertEqual(state["1"], {"since": 2800, "notified": None})
+        self.assertEqual(state["1"], {"since": 2800, "notified": None, "seen": 10000})
         self.assertIs(j["state"], state["1"])
-        report.track_idle([j], state, now=20000, window=7200)
+        report.track_idle([j], state, now=16000, window=7200)
         self.assertEqual(state["1"]["since"], 2800, "the first time it turned idle stays")
         report.track_idle([], state, now=30000, window=7200)
         self.assertEqual(state, {})
+
+    def test_a_record_no_run_saw_for_a_window_starts_afresh(self):
+        # Runs failed for longer than the window: whether the job was busy meanwhile is
+        # unknown, so its old since and warning must not cancel it at once.
+        state, j = {}, self.job("1", 7200, [("n", 0)])
+        state["1"] = {"since": 0, "notified": 100, "warned": 200, "seen": 1000}
+        report.track_idle([j], state, now=1000 + 7201, window=7200)
+        self.assertEqual(state["1"], {"since": 1001, "notified": None, "seen": 8201})
+        old = {"1": {"since": 0, "notified": 100}}  # a record from before "seen" existed
+        report.track_idle([j], old, now=5000, window=7200)
+        self.assertIsNone(old["1"]["notified"])
 
     def test_a_persons_jobs_are_one_group_most_gpus_first(self):
         a, b = self.job("a", 7200, [("n", 0)]), self.job("b", 7200, [("n", 1), ("n", 2)])
