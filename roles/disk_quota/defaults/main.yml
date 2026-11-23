@@ -37,8 +37,10 @@ disk_quota_filesystems: {"/": {}}
 # no file count.
 disk_quota_inodes_per_tib: 0
 
-# Directories whose whole tree has a limit (project quota), path: {id, block_hard}; each id unique on its filesystem, which needs prjquota in its mount
-# options (ext4 with the project feature, or XFS). The tree and its data stay when a
+# Directories whose whole tree has a limit (project quota), path: {id, block_hard}, on a
+# filesystem with prjquota in its mount options (ext4 with the project feature, or XFS).
+# Several trees may share one id: one limit for them together (they name the same
+# block_hard); otherwise each id is one tree's. The trees and their data stay when a
 # project goes; only its limit is lifted.
 disk_quota_projects: {}
 
