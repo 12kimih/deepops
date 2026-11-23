@@ -40,8 +40,7 @@
       ansible.builtin.command:
         argv: >-
           {{ ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${binary:Package}\n']
-             + host_baseline_protected_packages | reject('search', '[*?\[]') | list
-             + _host_baseline_recorded }}
+             + (host_baseline_protected_packages + _host_baseline_recorded) | reject('search', '[*?\[]') | list }}
       register: host_baseline_needed
       changed_when: false
       failed_when: host_baseline_needed.rc > 1
@@ -120,8 +119,10 @@
              and host_baseline_removal | reject('search', ':(?!' ~ (ansible_facts.architecture | deb_architecture) ~ '$|all$)') | list | length == 0 }}
       when: host_baseline_present | length > 0
 
-    # What apt would take beyond the packages named: none of it may be protected (a
-    # setting's pattern, or a package a component records), checked before anything goes.
+    # What apt would take beyond the packages named whole: none of it may be protected (a
+    # setting's pattern, or a package a component records, either a shell pattern), checked
+    # before anything goes; a protected package an absent pattern matches is refused too
+    # (plugins/filter/packages.py).
     - name: Refuse a removal that takes a protected package with it
       ansible.builtin.assert:
         that: host_baseline_taken | length == 0
@@ -133,12 +134,8 @@
         quiet: true
       vars:
         host_baseline_taken: >-
-          {{ host_baseline_removal | difference(host_baseline_present)
-             | map('regex_replace', ':.*$', '') | unique
-             | select('in', _host_baseline_recorded)
-             | union(host_baseline_removal | difference(host_baseline_present)
-                     | map('regex_replace', ':.*$', '') | select('match', _host_baseline_protected_regex))
-             | list }}
+          {{ host_baseline_removal
+             | packages_protected_taken(host_baseline_absent_packages, host_baseline_protected_packages + _host_baseline_recorded) }}
       when: host_baseline_present | length > 0
 
     # apt may also install a package to satisfy an alternative the removed one met

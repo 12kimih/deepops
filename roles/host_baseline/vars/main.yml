@@ -6,8 +6,6 @@ _host_baseline_masked_record: "{{ deepops_state_dir }}/masked-units/{{ host_base
 _host_baseline_recorded: >-
   {{ (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
      | select('match', 'package:') | map('regex_replace', '^package:', '') | list }}
-_host_baseline_protected_regex: >-
-  ^({{ host_baseline_protected_packages | map('regex_escape') | map('replace', '\*', '.*') | join('|') }})$
 # apt's simulation of the host with $1's packages marked installed by name: against a copy
 # of apt's extended_states without their paragraphs (absent means manual), so a preview,
 # which marked nothing, plans what the run will do. "<name>+" instead asked apt to
