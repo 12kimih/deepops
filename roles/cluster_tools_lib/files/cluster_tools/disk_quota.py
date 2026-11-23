@@ -502,16 +502,20 @@ CONFIG_KEYS = {
     "textfile": str,
     "scan": dict,
     "scan_textfile": str,
-    "scan_textfile_kept": str,
     "scan_top": int,
     "scan_max_entries": int,
     "stale_days": int,
 }
 
 
+# scan_textfile_kept: the scan's kept copy that survives a reboot; without it (a config
+# written before it existed) none is written, as before.
+CONFIG_OPTIONAL = {"scan_textfile_kept": str}
+
+
 def load_config(path):
     """The config roles/disk_quota writes (cluster_tools.config); "-" reads it from stdin."""
-    return config.require(path, CONFIG_KEYS)
+    return config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
 
 
 def main(argv=None):
@@ -541,7 +545,9 @@ def main(argv=None):
             if args[1] == "scan":
                 if cfg.get("scan"):
                     write_textfile(
-                        cfg["scan_textfile"], render(scan(host, cfg, time.time())), cfg["scan_textfile_kept"]
+                        cfg["scan_textfile"],
+                        render(scan(host, cfg, time.time())),
+                        cfg.get("scan_textfile_kept", ""),
                     )
                 return 0
             for text, action in steps_for(host, cfg, args[1]):
