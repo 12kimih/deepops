@@ -5,3 +5,4 @@
     - name: "Include docker_socket_group"
       ansible.builtin.include_role:
         name: "docker_socket_group"
+        public: true  # its include arguments read directory_defaults, its dependency

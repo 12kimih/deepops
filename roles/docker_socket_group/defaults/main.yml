@@ -1,34 +1,6 @@
 ---
-# docker_socket_group -- chown the Docker daemon's unix socket to a cluster-wide
-# group instead of the package-default `docker` group. Opt-in: the role is a no-op
-# until docker_socket_group is set.
-#
-# THE PROBLEM THIS SOLVES
-# The `docker` group is created by the Docker package with a distro-assigned system
-# GID (< 1000), and nothing keeps that number the same across nodes. Slurm resolves a
-# job's supplementary groups on the submit/controller node and ships the resulting
-# *numeric* GID list into the job (send_gids, on by default since 20.11); the compute
-# node renders those numbers through its own group database without re-resolving
-# them. So `usermod -aG docker <user>` on a compute node has no effect inside a job,
-# and being in `docker` on the submit node grants whatever group holds that same
-# number on the compute node -- which may be something else entirely.
-#
-# System GIDs also cannot be published: no directory serves the OS's own range (NIS's
-# /var/yp/Makefile drops GIDs below GID_MIN without a word). The fix is to point dockerd
-# at a group whose GID is pinned and 1000 or more, published cluster-wide
-# (directory_groups in roles/directory_defaults), and to chown the socket to THAT group
-# on every node.
-#
-# Set both to enable (e.g. dockerusers and 4000); keep them identical to the values the
-# group is published with. Empty: the role is a no-op.
-docker_socket_group: ""
-docker_socket_group_gid: ""
-
-# Also publish the group in the local files with the same pinned GID. dockerd resolves
-# the group name when it creates the socket, which on boot is routinely before the
-# directory client has bound: without a local entry docker.socket fails at every boot
-# and nothing retries it. Pinning the GID makes the local entry a harmless shadow.
-docker_socket_group_create_local: true
+# docker_socket_group, docker_socket_group_gid and docker_socket_group_create_local
+# live in roles/directory_defaults: the directory roles read them too.
 
 # The socket whose ownership decides who may talk to the daemon. The role compares
 # the group that owns this file against docker_socket_group on every run, so that a

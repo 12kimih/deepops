@@ -15,6 +15,7 @@
     - docker-socket-group
   roles:
     - role: proxy_defaults
+    - role: directory_defaults  # docker_socket_group
     - role: docker_socket_group
       when: docker_socket_group | length > 0
   environment: "{{ proxy_env }}"
