@@ -106,6 +106,10 @@ class Requests(unittest.TestCase):
             (nlp["gid"], nlp["read_gid"]), (50000, 50004), "past the projects' and the reserved GIDs"
         )
         self.assertEqual((nlp["owners"], nlp["members"], nlp["viewers"]), (["dave"], ["bob"], ["alice"]))
+        out = self.ask("dave", "new", name="fast", place="scratch")
+        self.engine.approve(out.key, "<@UADMIN>")
+        self.assertEqual(self.roster()["fast"]["place"], "scratch", "the folder's filesystem, recorded")
+        self.assertNotIn("place", nlp, "home is the default, not written")
         self.assertEqual(self.ask("dave", "new", name="vision").status, "refused", "the name is taken")
         self.assertEqual(self.ask("dave", "new", name="Bad_Name").status, "refused")
 
@@ -178,8 +182,10 @@ class Blocks(unittest.TestCase):
         self.assertIsNone(projects_blocks.join_form({"vision": self.PROJECTS["vision"]}, "alice"))
 
     def test_forms_name_the_fields_their_handlers_read(self):
-        self.assertEqual([b.get("block_id") for b in projects_blocks.new_form()["blocks"][:5]],
-                         ["name", "purpose", "owners", "members", "viewers"])  # fmt: skip
+        self.assertEqual([b.get("block_id") for b in projects_blocks.new_form()["blocks"][:6]],
+                         ["name", "purpose", "place", "owners", "members", "viewers"])  # fmt: skip
+        place = projects_blocks.new_form()["blocks"][2]["element"]
+        self.assertEqual([o["value"] for o in place["options"]], ["home", "scratch"])
         manage = projects_blocks.manage_form("vision")
         self.assertEqual((manage["private_metadata"], [b["block_id"] for b in manage["blocks"]]),
                          ("vision", ["person", "role"]))  # fmt: skip

@@ -36,6 +36,17 @@
     people_dirs_mode: "{{ scratch_space_mode }}"
     people_dirs_skel: false
 
+# The collaboration folders whose place is scratch, made as on the home filesystem
+# (roles/shared_space folders.yml); the cleanup covers them, their files counted to their
+# writers.
+- name: Make the collaboration folders on the scratch space
+  ansible.builtin.include_role:
+    name: shared_space
+    tasks_from: folders
+  vars:
+    shared_space_folders_dir: "{{ scratch_space_projects }}"
+    shared_space_folders: "{{ shared_projects | people_projects_at('scratch') }}"
+
 - name: Set up the cleanup
   when: scratch_space_purge | bool
   block:

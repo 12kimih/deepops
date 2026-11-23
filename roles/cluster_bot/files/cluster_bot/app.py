@@ -252,7 +252,8 @@ def build(cfg, engine, join=None, unban=None, project=None):
             return
         ack()
         slack_id = body["user"]["id"]
-        req = project_req(slack_id, "new", name, purpose=(v["purpose"]["v"]["value"] or "").strip(),
+        place = ((v.get("place") or {}).get("v", {}).get("selected_option") or {}).get("value", "home")
+        req = project_req(slack_id, "new", name, purpose=(v["purpose"]["v"]["value"] or "").strip(), place=place,
                           **{role: found for role, (found, _) in picked.items()})  # fmt: skip
         if req:
             submit(client, slack_id, req)

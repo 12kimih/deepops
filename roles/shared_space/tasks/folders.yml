@@ -1,0 +1,70 @@
+---
+# The collaboration folders shared_space_folders (roster projects) under
+# shared_space_folders_dir, on whichever filesystem it is: the home filesystem
+# (roles/shared_space) or the scratch space (roles/scratch_space). Owners and members read
+# and write (group <name>), viewers read (group <name>-read), files keep the group and
+# count to their writer's quota there. A folder is never removed.
+
+# setfacl, for the folders' default ACLs.
+- name: Install the ACL tools
+  ansible.builtin.package:
+    name: acl
+    state: present
+
+- name: Create the folders' directory
+  ansible.builtin.file:
+    path: "{{ shared_space_folders_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# setgid keeps each file in the project's group; members only.
+- name: Create the collaboration folders
+  ansible.builtin.file:
+    path: "{{ shared_space_folders_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: "{{ item }}"
+    mode: "2770"
+  loop: "{{ shared_space_folders | list | sort }}"
+
+# ACLs: whatever a member adds is the project group's to change too, whatever their
+# umask (default entries); the viewers' group <name>-read reads the folder and everything
+# in it (access and default entries); nobody else reads. Roles are group memberships, so
+# a role change never touches a file.
+- name: Give the members write and the viewers read access to everything in the folder
+  ansible.posix.acl:
+    path: "{{ shared_space_folders_dir }}/{{ item.0 }}"
+    default: "{{ item.1.default }}"
+    etype: "{{ item.1.etype }}"
+    entity: "{{ (item.0 ~ '-read') if item.1.etype == 'group' and item.1.read else omit }}"
+    permissions: "{{ item.1.permissions }}"
+    state: present
+  loop: "{{ shared_space_folders | list | sort | product(_shared_space_acl) | list }}"
+  loop_control:
+    label: "{{ item.0 }} {{ 'default:' if item.1.default else '' }}{{ item.1.etype }}:{{ (item.0 ~ '-read') if item.1.read else '' }}:{{ item.1.permissions }}"
+  vars:
+    _shared_space_acl:
+      - {default: true, etype: user, read: false, permissions: rwx}
+      - {default: true, etype: group, read: false, permissions: rwx}
+      - {default: true, etype: group, read: true, permissions: r-x}
+      - {default: true, etype: mask, read: false, permissions: rwx}
+      - {default: true, etype: other, read: false, permissions: "---"}
+      - {default: false, etype: group, read: true, permissions: r-x}
+
+- name: Find the collaboration folders on disk
+  find_present:
+    paths: "{{ shared_space_folders_dir }}"
+    file_type: directory
+  register: shared_space_found
+
+# Never removed: their files stay until an administrator moves them to an owner's home.
+- name: List the folders no longer declared
+  ansible.builtin.debug:
+    msg: >-
+      Not declared here (shared_projects, place), kept with their files: {{ _undeclared | join(', ') }}. Move
+      each to one of its owners' homes (or declare it again).
+  vars:
+    _undeclared: "{{ shared_space_found.files | map(attribute='path') | map('basename') | reject('in', shared_space_folders) | sort }}"
+  when: _undeclared | length > 0

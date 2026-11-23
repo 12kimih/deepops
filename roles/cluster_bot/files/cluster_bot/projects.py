@@ -84,7 +84,7 @@ class ProjectFeature(RosterFeature):
                 new, gid, read_gid = P.roster_project_new(
                     text, name, [req["user"], *req.get("owners", [])], req.get("purpose", ""),
                     members=req.get("members", []), viewers=req.get("viewers", []),
-                    reserved=self.s["reserved_gids"], gid_min=self.s["gid_min"],
+                    reserved=self.s["reserved_gids"], gid_min=self.s["gid_min"], place=req.get("place", "home"),
                 )  # fmt: skip
                 extra = f"\n- groups: {name} (gid {gid}), {name}{P.READ_SUFFIX} (gid {read_gid})"
             elif op == "set":
@@ -109,7 +109,7 @@ class ProjectFeature(RosterFeature):
     def describe_en(self, req):
         op, name = req["op"], req["project"]
         return {
-            "new": f"new project {name}",
+            "new": f"new project {name} on {req.get('place', 'home')}",
             "set": f"{req.get('login')} as {req.get('role') or 'nothing'} in {name}",
             "join": f"{req['user']} joins {name} as {req.get('role')}",
             "leave": f"{req['user']} leaves {name}",
@@ -120,7 +120,7 @@ class ProjectFeature(RosterFeature):
     def describe(self, req):
         op, name = req["op"], req["project"]
         return {
-            "new": f"새 프로젝트 {name}",
+            "new": f"새 프로젝트 {name} ({'/scratch' if req.get('place') == 'scratch' else '/home'})",
             "set": f"{name}: {req.get('login')}을(를) {role_name(req.get('role'))}(으)로",
             "join": f"{name} 참여 ({role_name(req.get('role'))})",
             "leave": f"{name}에서 나가기",

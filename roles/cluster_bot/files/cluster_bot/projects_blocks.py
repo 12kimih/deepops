@@ -64,12 +64,22 @@ def _modal(callback, title, blocks, submit="신청", metadata=""):
             "close": {"type": "plain_text", "text": "취소"}, "blocks": blocks}  # fmt: skip
 
 
+# Where a folder lives (people.PROJECT_PLACES): its files count to each writer's quota
+# on that filesystem.
+PLACE_NAMES = {
+    "home": "/home: 오래 보관할 데이터",
+    "scratch": "/scratch: 빠른 NVMe, 60일 안 쓴 파일은 정리됨",
+}
+
+
 def new_form():
     """A new project: its name and purpose, and whom to add (the asker owns it)."""
     people = {"type": "multi_users_select", "placeholder": {"type": "plain_text", "text": "Slack에서 고르기"}}
     return _modal("project.new.submit", "새 공동작업 폴더", [
         field("name", "이름 (영문 소문자, 숫자, -)", {"type": "plain_text_input", "max_length": 27}),
         field("purpose", "무엇을 위한 폴더인가요", {"type": "plain_text_input"}, optional=True),
+        field("place", "어디에 둘까요", {"type": "radio_buttons", "initial_option": _option(PLACE_NAMES["home"], "home"),
+                                        "options": [_option(PLACE_NAMES[p], p) for p in PLACE_NAMES]}),
         field("owners", "함께 관리할 사람 (관리자)", people, optional=True),
         field("members", "멤버 (읽고 쓰기)", people, optional=True),
         field("viewers", "열람자 (읽기만)", people, optional=True),
