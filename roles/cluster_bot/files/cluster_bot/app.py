@@ -90,7 +90,9 @@ def build(cfg, engine, join=None, unban=None, project=None):
         login = user_of(slack_id)
         if not login:
             return
-        view = home_blocks.home(login, prefs.muted(login), engine.features)
+        view = home_blocks.home(
+            login, prefs.muted(login), engine.features, cfg["channels"]["help"], cfg.get("admin_group", "")
+        )
         if project is not None:
             view["blocks"] += projects_blocks.home(login, projects, projects_root)
         client.views_publish(user_id=slack_id, view=view)

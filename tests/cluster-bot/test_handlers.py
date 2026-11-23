@@ -46,7 +46,7 @@ from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
 
 CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
-       "channels": {"help": "#help", "admin": "#admin"}}  # fmt: skip
+       "channels": {"help": "#help", "admin": "#admin"}, "admin_group": "@admins"}  # fmt: skip
 
 
 def submitted(state, user, callback, metadata=""):
@@ -161,6 +161,14 @@ class Handlers(unittest.TestCase):
         )
         self.call("action", "home.notices", body={"user": {"id": "UALICE"}}, action={"value": "on"})
         self.assertFalse(job_notice.muted({"prefs_file": self.prefs}, "alice"))
+
+    def test_the_home_tab_says_how_to_ask_for_help(self):
+        self.call("event", "app_home_opened", event={"tab": "home", "user": "UALICE"})
+        view = self.client.views_publish.call_args.kwargs["view"]
+        text = "\n".join(b["text"]["text"] for b in view["blocks"] if b.get("type") == "section")
+        self.assertIn("#help", text)
+        self.assertIn("스레드", text)
+        self.assertIn("@admins 잡이", text, "a ready-made example that tags the group")
 
 
 if __name__ == "__main__":

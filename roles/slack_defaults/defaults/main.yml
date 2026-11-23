@@ -24,6 +24,10 @@ slack_channels:
   help: "#help"
   announce: "#announcements"
 
+# The Slack user group people tag in the help channel to reach the administrators
+# (e.g. "@sysadmin"); the bot's help text names it. Empty: "the administrators".
+slack_admin_group: ""
+
 # The Socket Mode app-level token (xapp-, vault it): the cluster bot's connection to
 # Slack, opened from inside (no port to open). Empty keeps the bot off.
 slack_app_token: ""
