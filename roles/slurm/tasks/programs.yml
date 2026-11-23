@@ -1,0 +1,39 @@
+---
+# Every program slurm.conf names for this host's daemon (slurm_programs_keys) is
+# installed here: a missing one fails silently at run time (a MailProg whose role never
+# ran sent no job notice, 2026-11-23), so the deploy stops instead, naming it. The
+# value's first word is the program (RebootProgram="/bin/systemctl reboot").
+- name: Read the programs slurm.conf names for {{ slurm_programs_daemon }}
+  vars:
+    _conf: "{{ lookup('ansible.builtin.template', slurm_conf_template) }}"
+  ansible.builtin.set_fact:
+    _slurm_programs: >-
+      {%- set ns = namespace(out={}) -%}
+      {%- for key in slurm_programs_keys -%}
+      {%- set found = _conf | regex_findall('(?m)^ *' ~ key ~ ' *= *(.+)') -%}
+      {%- if found -%}
+      {%- set ns.out = ns.out | combine({key: (found | last | trim | replace('"', '')).split() | first}) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ns.out }}
+
+- name: Look for the programs slurm.conf names for {{ slurm_programs_daemon }}
+  ansible.builtin.stat:
+    path: "{{ item.value }}"
+  loop: "{{ _slurm_programs | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"
+  register: _slurm_programs_found
+
+- name: Check the programs are installed that slurm.conf names for {{ slurm_programs_daemon }}
+  ansible.builtin.assert:
+    that: _missing | length == 0
+    fail_msg: >-
+      slurm.conf names {{ _missing | join(', ') }}, not installed on {{ inventory_hostname }}:
+      deploy the component that installs it first (MailProg: job-notice.yml; HealthCheckProgram:
+      nhc.yml; Prolog, Epilog, TaskProlog: this role with slurm_enable_prolog_epilog), or
+      leave the line out of the template.
+    quiet: true
+  vars:
+    _absent: "{{ _slurm_programs_found.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
+    _missing: "{{ _absent | map(attribute='key') | zip(_absent | map(attribute='value')) | map('join', '=') | list }}"

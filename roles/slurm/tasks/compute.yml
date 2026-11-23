@@ -190,6 +190,14 @@
   when: slurm_enable_prolog_epilog
   tags: always
 
+- name: Check the programs slurmd runs are installed
+  ansible.builtin.include_tasks: programs.yml
+  vars:
+    slurm_programs_daemon: slurmd
+    slurm_programs_keys: [Prolog, Epilog, TaskProlog, TaskEpilog, SrunProlog, SrunEpilog, HealthCheckProgram, RebootProgram]
+  tags:
+    - always
+
 - name: Configure the SPANK plugins (pyxis)
   ansible.builtin.include_tasks: plugstack.yml
   tags:

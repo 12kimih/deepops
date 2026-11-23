@@ -156,6 +156,12 @@
   tags:
     - job-scratch
 
+# Before Slurm: slurm.conf names its command (MailProg), which the controller requires.
+- name: Send Slurm job notices as Slack DMs
+  import_playbook: slurm-cluster/job-notice.yml
+  vars:
+    deepops_phase: install
+
 - name: Install Slurm
   import_playbook: slurm-cluster/slurm.yml
   vars:
@@ -236,11 +242,6 @@
 
 - name: Install monitoring services | Install the Slack usage report
   import_playbook: slurm-cluster/slurm-usage-report.yml
-  vars:
-    deepops_phase: install
-
-- name: Send Slurm job notices as Slack DMs
-  import_playbook: slurm-cluster/job-notice.yml
   vars:
     deepops_phase: install
 
