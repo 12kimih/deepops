@@ -18,6 +18,8 @@ Facts:
   slurm     KillWait from the slurm.conf template the site renders, and what preemption
             gives a job: GraceTime, which every preempted QoS has equal to KillWait
             (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
+  dates     the site's announced dates (config schedule.yml, name: YYYY-MM-DD), so a
+            page states each once; only date values pass
   slack     the channels by purpose and the administrators' group (private)
   quotas    each host's disk_quota_filesystems and disk_quota_inodes_per_tib (private)
 
@@ -46,7 +48,9 @@ PUBLIC = {
     "commands": {"summary", "usage", "options"},
     "policy": {"stale_days", "grace_days", "warn_fraction"},
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
+    "dates": None,  # any name the site's schedule gives, its value a date
 }
+DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 POLICY = {
     "stale_days": "cluster_user_stale_days",
     "grace_days": "cluster_user_grace_days",
@@ -124,6 +128,17 @@ def slurm_values(config):
     }
 
 
+def schedule(config):
+    """{name: "YYYY-MM-DD"} from the site's schedule.yml; anything not a date is refused."""
+    out = {}
+    for name, value in (_yaml(Path(config) / "schedule.yml") if config else {}).items():
+        text = str(value)
+        if not DATE.fullmatch(text):
+            raise SystemExit(f"schedule.yml: {name}: {value!r} is not a date (YYYY-MM-DD)")
+        out[str(name)] = text
+    return out
+
+
 def host_quotas(config):
     """{host: {filesystems, inodes_per_tib}} from the site's host_vars (private)."""
     out = {}
@@ -140,6 +155,7 @@ def facts(config):
         "commands": commands(s.get("cluster_tools_builtin") or []),
         "policy": {field: s.get(key) for field, key in POLICY.items()},
         "slurm": slurm_values(config),
+        "dates": schedule(config),
         "slack": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }
@@ -153,6 +169,8 @@ def public(every):
         value = every.get(key)
         if key == "commands":
             out[key] = {c: {f: v for f, v in d.items() if f in fields} for c, d in (value or {}).items()}
+        elif fields is None:  # names the site chooses; the values are checked by kind
+            out[key] = {f: v for f, v in (value or {}).items() if isinstance(v, str) and DATE.fullmatch(v)}
         else:
             out[key] = {f: v for f, v in (value or {}).items() if f in fields}
     return out

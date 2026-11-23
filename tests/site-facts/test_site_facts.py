@@ -58,6 +58,20 @@ class Slurm(unittest.TestCase):
         self.assertIn("kill_wait_seconds", sf.slurm_values(None))
 
 
+class Dates(unittest.TestCase):
+    def test_the_schedule_passes_only_dates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            (config / "schedule.yml").write_text("notice_day: 2030-01-02\n")
+            self.assertEqual(sf.facts(config)["dates"], {"notice_day": "2030-01-02"})
+            (config / "schedule.yml").write_text("notice_day: soon\n")
+            with self.assertRaises(SystemExit):
+                sf.facts(config)
+        self.assertEqual(
+            sf.public({"dates": {"a": "2030-01-02", "b": "10.0.0.1"}})["dates"], {"a": "2030-01-02"}
+        )
+
+
 class PublicAllowList(unittest.TestCase):
     def test_only_allowed_keys_and_fields_reach_the_public_file(self):
         every = {
