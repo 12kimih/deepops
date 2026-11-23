@@ -1,4 +1,5 @@
-"""scripts/push.sh: checkouts of one clone check and push one at a time.
+"""scripts/push.sh: checkouts of one clone check at the same time and push one at a time;
+what is pushed is always what was checked.
 
 Each test builds a throwaway origin (bare), a clone with a worktree beside it, and a
 stub scripts/check.sh, and runs the real push.sh copied into the clone.
@@ -101,17 +102,23 @@ class Push(Base):
     def test_a_second_checkout_waits_for_the_first(self):
         lock = Path(git(self.clone, "rev-parse", "--absolute-git-dir")) / "deepops-push.lock"
         lock.write_text("pid 1, someone, /elsewhere, since then\n")
+        # The holder keeps the lock until this checkout's check has run, then 2 s more:
+        # the check needs no lock, the push does.
+        checked = self.tmp / "checked"
         holder = subprocess.Popen(
-            ["flock", str(lock), "sleep", "3"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+            ["flock", str(lock), "sh", "-c", f"until [ -e {checked} ]; do sleep 0.1; done; sleep 2"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )  # fmt: skip
         self.addCleanup(holder.kill)
-        time.sleep(0.5)
+        while not lock.exists() or subprocess.run(["flock", "-n", str(lock), "true"]).returncode == 0:
+            time.sleep(0.1)
+        self.check(self.wt, f"touch {checked}")
+        git(self.wt, "commit", "-q", "-am", "check that marks it ran")
         self.commit(self.wt, "b")
-        started = time.monotonic()
         out = self.push(self.wt)
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertIn("waiting for pid 1, someone", out.stderr)
-        self.assertGreater(time.monotonic() - started, 1.5)
+        self.assertIn("checked; waiting to push for pid 1, someone", out.stderr)
+        self.assertIsNotNone(holder.poll(), "pushed only after the holder let go")
         self.assertEqual(self.origin_files(), ["b", "scripts"])
 
     def test_origin_moving_during_the_check_checks_again(self):
@@ -129,8 +136,45 @@ class Push(Base):
         self.commit(self.wt, "b")
         out = self.push(self.wt)
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertIn("moved during the check", out.stderr)
+        self.assertIn("origin moved since the check", out.stderr)
         self.assertEqual(self.origin_files(), ["b", "c", "scripts"])
+
+    def test_checkouts_check_at_once_and_the_later_push_checks_again_on_the_first(self):
+        # Each check waits until both have started (the old script held the lock through
+        # the check, so the second never started and the first gave up) and logs a run.
+        log = self.tmp / "log"
+        log.mkdir()
+        self.check(
+            self.clone,
+            f"""touch {log}/$(basename "$PWD").started
+i=0; while [ "$(ls {log} | grep -c started)" -lt 2 ]; do i=$((i+1)); [ $i -gt 100 ] && exit 1; sleep 0.1; done
+echo "$(basename "$PWD") $(git rev-parse HEAD^)" >> {log}/runs""",
+        )
+        git(self.clone, "commit", "-q", "-am", "check that needs a peer")
+        git(self.clone, "push", "-q", "origin", "HEAD:main")
+        wt2 = self.tmp / "wt2"
+        git(self.clone, "worktree", "add", "-q", "--detach", str(wt2), "origin/main")
+        git(self.wt, "checkout", "-q", "--detach", "origin/main")
+        self.commit(self.wt, "b")
+        self.commit(wt2, "c")
+        runs = [subprocess.Popen(["bash", "scripts/push.sh"], cwd=c, env=ENV, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True) for c in (self.wt, wt2)]  # fmt: skip
+        outs = [p.communicate(timeout=bounds.CHILD) for p in runs]
+        self.assertEqual([p.returncode for p in runs], [0, 0], outs)
+        self.assertEqual(self.origin_files(), ["b", "c", "scripts"])
+        lines = (log / "runs").read_text().splitlines()
+        self.assertEqual(len(lines), 3, "one check each, and one again for the later push")
+        first = git(self.origin, "rev-parse", "main~1")
+        self.assertEqual(lines[-1].split()[1], first, "the later push was checked on the first push")
+        self.assertEqual(sum("origin moved since the check" in err for _, err in outs), 1)
+
+    def test_an_unmoved_origin_pushes_without_checking_again(self):
+        runs = self.tmp / "runs"
+        self.check(self.wt, f"echo run >> {runs}")
+        git(self.wt, "commit", "-q", "-am", "counting check")
+        out = self.push(self.wt)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(runs.read_text(), "run\n")
 
 
 class SiteConfig(Base):
@@ -173,6 +217,20 @@ class SiteConfig(Base):
         self.assertEqual(git(self.config, "rev-parse", "HEAD"), head, "the checkout did not move")
         self.assertEqual((self.config / "setting").read_text(), "old\n")
         self.assertEqual(git(self.config, "worktree", "list").count("\n"), 0, "the throwaway tree is gone")
+
+    def test_a_config_change_landed_during_the_check_is_checked_before_the_push(self):
+        peer = self.tmp / "config-peer"
+        git(self.tmp, "clone", "-q", str(self.config_origin), str(peer))
+        (peer / "setting").write_text("new\n")
+        git(peer, "commit", "-q", "-am", "peer")
+        flag = self.tmp / "landed"
+        self.check(self.wt, f'cat "$DEEPOPS_CONFIG_DIR/setting" >> {self.seen}; '
+                            f"[ -e {flag} ] || {{ touch {flag}; git -C {peer} push -q origin HEAD:main; }}")  # fmt: skip
+        git(self.wt, "commit", "-q", "-am", "check that lands a config change once")
+        out = self.push_with_config()
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("origin moved since the check", out.stderr)
+        self.assertEqual(self.seen.read_text(), "old\nnew\n", "checked again with the landed config")
 
     def test_an_unpushed_config_commit_is_checked_on_top(self):
         self.land_in_config("new\n")

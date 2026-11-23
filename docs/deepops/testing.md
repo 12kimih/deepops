@@ -15,10 +15,11 @@ DeepOps Testing, CI/CD, and Validation
 ## Linting
 
 `scripts/push.sh` pushes a checkout's commits to origin's main the safe way: it
-rebases onto origin/main, runs the full check and pushes, holding a lock in the clone's
-shared git directory throughout, so worktrees of one clone push one at a time and each
-checks on top of what the one before pushed (without it, a ten-minute check ended in a
-refused push whenever another worktree pushed meanwhile).
+rebases onto origin/main and runs the full check without a lock, so worktrees check at
+the same time, then takes a lock in the clone's shared git directory and pushes at once
+if neither origin/main nor the site config's origin moved since its check. If one did,
+it rebases and checks again holding the lock, so what is pushed is always what was
+checked, and the next worktree waits only for pushes and re-checks.
 
 `scripts/check.sh` runs every repository check: the style normalizer, generated docs,
 yamllint, `ansible-lint` with the project [`.ansible-lint`](../../.ansible-lint)
