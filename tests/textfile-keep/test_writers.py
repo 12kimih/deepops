@@ -21,6 +21,12 @@ sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import tracked  # noqa: E402
 
 SOON = 30 * 60
+# Writers that keep and publish their file themselves, with why textfile_keep's verbatim
+# copy would be wrong for them.
+KEEPS_ITS_OWN = {
+    "os_updates": "its boot unit publishes the kept state with the reboot flag measured afresh "
+    "(a verbatim copy would show the reboot just made as pending), then measures",
+}
 UNITS = {"": 1, "s": 1, "sec": 1, "m": 60, "min": 60, "h": 3600, "hr": 3600, "d": 86400}
 EARLY_KEYS = ("OnBootSec", "OnUnitActiveSec", "OnUnitInactiveSec")
 
@@ -85,7 +91,7 @@ class Writers(unittest.TestCase):
         offenders = [
             role
             for role, (defaults, found, keeps) in writers().items()
-            if any(not early(t, defaults) for t in found) and not keeps
+            if any(not early(t, defaults) for t in found) and not keeps and role not in KEEPS_ITS_OWN
         ]
         self.assertEqual(
             offenders, [], "include roles/textfile_keep (tasks_from: restore) and write the kept copy"
