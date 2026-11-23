@@ -1,0 +1,26 @@
+---
+# The environment every user gets, named once (a shared-defaults role: roles list it as a
+# meta dependency). roles/cluster_tools writes it to /etc/profile.d (every login, and the
+# jobs started from one), roles/slurm's task prolog sets the job value where it differs,
+# and the user docs show its paths (scripts/docs/site_facts.py). One list, so the three
+# agree; a test fails on one of these names set anywhere else.
+#
+# NAME: value (the same in a login and a job) or NAME: {login: value, job: value}. A
+# value starting with ~/ is under the user's home. Each is a default: a value the user
+# set themselves wins, in a login and in a job.
+user_environment_defaults:
+  # Hugging Face's own directory: the login token and the private caches. Private to
+  # each user, never on shared storage (HF_HUB_CACHE alone may be shared).
+  HF_HOME: ~/.cache/huggingface
+  # Package caches: thousands of small files, so inside a job they go to the job's own
+  # node-local /tmp (slurm_job_private_dirs), not to the shared home.
+  UV_CACHE_DIR: {login: ~/.cache/uv, job: /tmp/uv-cache}
+  PIP_CACHE_DIR: {login: ~/.cache/pip, job: /tmp/pip-cache}
+
+# The site's differences, by name: an entry replaces the default of that name, null
+# drops it. A shared read-only Hugging Face hub cache (playbooks/model-cache.yml):
+#   user_environment:
+#     HF_HUB_CACHE: "{{ model_cache_root }}/hub"
+# Tool defaults belong here too (SINFO_FORMAT, SQUEUE_FORMAT: see `man sinfo`): unlike an
+# alias, the environment reaches job scripts and remote commands.
+user_environment: {}

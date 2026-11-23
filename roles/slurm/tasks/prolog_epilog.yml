@@ -106,6 +106,23 @@
   tags:
     - epilog
 
+# A job value in /tmp is the job's own only where /tmp is a per-job private directory;
+# otherwise the first job's directory there is every later user's, and theirs fail.
+- name: Check the users' job environment is in the job's private directories
+  vars:
+    slurm_shared_tmp: "{{ ['/tmp', '/var/tmp', '/dev/shm'] | difference(slurm_job_private_dirs) }}"
+    slurm_shared_tmp_jobs: >-
+      {{ user_environment_entries | selectattr('job', 'match', '^(' ~ (slurm_shared_tmp | map('regex_escape') | join('|')) ~ ')(/|$)')
+         | map(attribute='name') | list if slurm_shared_tmp | length > 0 else [] }}
+  ansible.builtin.assert:
+    that: slurm_shared_tmp_jobs | length == 0
+    fail_msg: >-
+      user_environment gives {{ slurm_shared_tmp_jobs | join(', ') }} a job value in
+      {{ slurm_shared_tmp | join(', ') }}, which slurm_job_private_dirs does not make private to each job.
+    quiet: true
+  tags:
+    - prolog
+
 - name: Copy the task prolog
   ansible.builtin.template:
     src: etc/slurm/task-prolog.sh

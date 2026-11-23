@@ -1,10 +1,11 @@
 # {{ ansible_managed }}
-# Site shell defaults (roles/cluster_tools). Exported rather than aliased so job
-# scripts and remote commands see the same values.
+# The users' environment (user_environment, roles/user_environment_defaults), published
+# by roles/cluster_tools. Exported rather than aliased so job scripts and remote
+# commands see the same values.
 #
 # Each is a DEFAULT, not an override: a value the session already carries -- one the
-# client forwarded over SSH, say -- is left alone. A terminal knows its own
-# capabilities better than this file does.
-{% for name, value in cluster_tools_environment | dictsort %}
-[ -n {{ '"${' ~ name ~ ':-}"' }} ] || export {{ name }}={{ value | string | quote }}
+# client forwarded over SSH, or the user set -- is left alone.
+{% for e in cluster_tools_profile_entries %}
+{% set rest = e.login[2:] if e.login.startswith('~/') else e.login %}
+[ -n {{ '"${' ~ e.name ~ ':-}"' }} ] || export {{ e.name }}={{ '"$HOME"/' if e.login.startswith('~/') else '' }}{{ rest | quote }}
 {% endfor %}

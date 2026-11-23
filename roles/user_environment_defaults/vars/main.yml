@@ -1,0 +1,3 @@
+---
+# Derived, not a setting: the entries every reader renders (plugins/filter/user_environment.py).
+user_environment_entries: "{{ user_environment_defaults | user_environment(user_environment) }}"

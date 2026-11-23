@@ -7,12 +7,15 @@ registry entitlement, inference service, or model-management daemon is required.
 Model licenses and gated-repository access remain the operator's responsibility.
 
 This opt-in example does **not** mount/export storage, create accounts, install
-packages on cluster nodes, download weights automatically, or alter cluster-wide
-environment variables. It is not part of either cluster deployment playbook.
+packages on cluster nodes or download weights automatically. It is not part of
+either cluster deployment playbook. Users find the cache through `HF_HUB_CACHE`,
+which the site adds to `user_environment` (roles/user_environment_defaults, the
+one list of the users' environment: every login and job gets it).
 
 ## Prerequisites and trust boundary
 
-- Existing NFS mount at the **same path** on the writer and readers, with working
+- Existing NFS mount at the **same path** on the writer and readers (or the writer is
+  the NFS server, the path in its active exports, `exportfs -s`), with working
   POSIX locks and symlinks. The site owns export options, capacity, backups,
   availability and consistent numeric user/group IDs. Test those on the actual
   filesystem before downloading models. This example does not certify NFS.
@@ -22,7 +25,8 @@ environment variables. It is not part of either cluster deployment playbook.
   Root-squashed NFS is supported by doing cache writes **as the writer**, not root.
 - Every reader is authorized to read **every model in this cache**. Use separate
   caches/access groups for restricted models. Read-only storage is not a license
-  or entitlement check. Do not make this cache world-readable or group-writable.
+  or entitlement check. Never make it group-writable; make it world-readable
+  (`model_cache_mode: "2755"`) only when every user may read every model in it.
 - Only trusted operators can write the cache or its parent. Pause writers while
   validating/publishing a snapshot; the validator is not a defense against a
   malicious writer racing file changes. Never load unreviewed model code.
@@ -45,9 +49,22 @@ Add exactly one host to `[model-cache-warmer]` in `config/inventory`. In
 model_cache_mount: /shared
 model_cache_owner: model-writer
 model_cache_group: model-readers
-# Optional: a dedicated direct child of the mount. Default shown:
-model_cache_root: /shared/hf-cache
+# 2750 (default): the reader group reads. 2755: every user reads every model.
+#model_cache_mode: "2750"
 ```
+
+and in `config/group_vars/all.yml`, where every host reads it, the cache and the
+users' variable naming it:
+
+```yaml
+# A dedicated directory below the mount. Default: <model_cache_mount>/hf-cache.
+model_cache_root: /shared/hf-cache
+user_environment:
+  HF_HUB_CACHE: "{{ model_cache_root }}/hub"
+```
+
+The variable reaches users with the cluster tools' profile file
+(`playbooks/slurm-cluster/cluster-tools.yml`).
 
 Review the inventory and preview before applying:
 
@@ -59,8 +76,8 @@ ansible-playbook -i config/inventory playbooks/model-cache.yml
 
 The playbook fails if the mount is absent or is not NFS, more than one writer is
 selected, or cache directories are symlinks. It creates `hf-cache/` and `hub/`
-with writer ownership and mode `2750` (group read/traverse, not write). It writes
-`environment.sh` with mode `0640`, exporting only `HF_HUB_CACHE`. Existing cache
+with writer ownership and mode `2750` (group read/traverse, not write; or
+`model_cache_mode`), and removes the `environment.sh` older versions wrote. Existing cache
 contents are **not** recursively re-owned or permission-repaired. A rerun should
 report `changed=0`; audit pre-existing files separately.
 
@@ -84,7 +101,7 @@ downloading; public access does not replace that review. The commit hash, not
 
 ```bash
 umask 0027
-. /shared/hf-cache/environment.sh
+export HF_HUB_CACHE=/shared/hf-cache/hub   # already set where user_environment names it
 export MODEL_ID=openai-community/gpt2
 export MODEL_REVISION=607a30d783dfa663caf39e06633721c8d4cfcd7e
 "$HOME/.venvs/model-cache/bin/hf" download "$MODEL_ID" \

@@ -74,7 +74,7 @@ The example model, `openai-community/gpt2` at
 license and access requirements when selecting another model or revision.
 
 ```bash
-export HF_HUB_CACHE=/shared/hf-cache/hub
+: "${HF_HUB_CACHE:?the site sets the shared cache in user_environment}"
 export MODEL_ID=openai-community/gpt2
 export MODEL_REVISION=607a30d783dfa663caf39e06633721c8d4cfcd7e
 export MODEL_PATH="$HF_HUB_CACHE/models--openai-community--gpt2/snapshots/$MODEL_REVISION"

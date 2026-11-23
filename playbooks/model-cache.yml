@@ -1,11 +1,18 @@
 ---
 # Precondition: the site already mounted shared storage and provisioned identities.
 # Run only on the designated writer. No mount, account, package, or download changes.
+# The writer is a client of the NFS mount or its server (the mount is in its active
+# exports). Users find the cache through HF_HUB_CACHE in user_environment
+# (roles/user_environment_defaults), "{{ model_cache_root }}/hub": set model_cache_root
+# in group_vars/all.yml, where every host reads it.
 - name: Prepare a shared model cache on existing storage
   hosts: model-cache-warmer
   gather_facts: true
   vars:
     model_cache_path: "{{ model_cache_root | default(model_cache_mount ~ '/hf-cache') }}"
+    # 2750: the reader group reads. 2755: every user reads every model in the cache (the
+    # site's decision on licences); match the mode another role gives the same directory.
+    model_cache_dir_mode: "{{ model_cache_mode | default('2750') }}"
   tasks:
     - name: Require one explicit cache writer and site configuration
       ansible.builtin.assert:
@@ -25,20 +32,34 @@
           - "'..' not in model_cache_mount"
           - "'//' not in model_cache_mount"
           - model_cache_path is match('^/[A-Za-z0-9_/-]+$')
-          - model_cache_path | dirname == model_cache_mount
-          - model_cache_path != model_cache_mount
+          - model_cache_path.startswith(model_cache_mount ~ '/')
+          - model_cache_dir_mode in ['2750', '2755']
           - not model_cache_path.endswith('/')
           - "'..' not in model_cache_path"
           - "'//' not in model_cache_path"
-        fail_msg: Use a dedicated direct child of the existing shared mount; paths must be normalized.
+        fail_msg: >-
+          Use a dedicated directory below the existing shared mount (paths normalized) and
+          model_cache_mode 2750 or 2755.
+
+    # The NFS server writes its own export locally: `exportfs -s` lists what it exports.
+    - name: Read the exports this host serves
+      become: true
+      ansible.builtin.command: exportfs -s
+      register: model_cache_exports
+      changed_when: false
+      failed_when: false
+      check_mode: false
 
     - name: Refuse to populate a local directory when shared storage is absent
       ansible.builtin.assert:
-        that:
-          - >-
-            ansible_facts.mounts | selectattr('mount', 'equalto', model_cache_mount)
-            | selectattr('fstype', 'in', ['nfs', 'nfs4']) | list | length == 1
-        fail_msg: The configured mount must already be mounted as NFS; this playbook never mounts storage.
+        that: >-
+          ansible_facts.mounts | selectattr('mount', 'equalto', model_cache_mount)
+          | selectattr('fstype', 'in', ['nfs', 'nfs4']) | list | length == 1
+          or (model_cache_exports.rc == 0
+              and model_cache_mount in model_cache_exports.stdout_lines | map('split') | map('first') | list)
+        fail_msg: >-
+          The configured mount must already be mounted as NFS here, or exported by this host;
+          this playbook never mounts or exports storage.
 
     - name: Inspect cache directories without following symlinks
       become: true
@@ -68,20 +89,16 @@
         state: directory
         owner: "{{ model_cache_owner }}"
         group: "{{ model_cache_group }}"
-        mode: "2750"
+        mode: "{{ model_cache_dir_mode }}"
       loop:
         - "{{ model_cache_path }}"
         - "{{ model_cache_path }}/hub"
 
-    - name: Write explicit opt-in cache environment
+    # HF_HUB_CACHE comes from user_environment for every user now; the writer's old
+    # opt-in file is gone.
+    - name: Remove the old opt-in cache environment
       become: true
       become_user: "{{ model_cache_owner }}"
-      ansible.builtin.copy:
-        dest: "{{ model_cache_path }}/environment.sh"
-        owner: "{{ model_cache_owner }}"
-        group: "{{ model_cache_group }}"
-        mode: "0640"
-        content: |
-          # Source explicitly in the writer or consumer shell.
-          # Keep HF_HOME, HF_TOKEN_PATH and HF_XET_CACHE private to each user.
-          export HF_HUB_CACHE='{{ model_cache_path }}/hub'
+      ansible.builtin.file:
+        path: "{{ model_cache_path }}/environment.sh"
+        state: absent

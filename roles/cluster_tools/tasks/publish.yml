@@ -120,14 +120,14 @@
     group: root
     mode: "0644"
   loop: [sh, csh]
-  when: cluster_tools_environment | length > 0
+  when: cluster_tools_profile_entries | length > 0
 
 - name: Remove the shell environment defaults
   ansible.builtin.file:
     path: "/etc/profile.d/{{ cluster_tools_profile_name }}.{{ item }}"
     state: absent
   loop: [sh, csh]
-  when: cluster_tools_environment | length == 0
+  when: cluster_tools_profile_entries | length == 0
 
 # Each file keeps its mode from the source, so an example job script stays runnable;
 # a fixed 0644 took the execute bit off every one.

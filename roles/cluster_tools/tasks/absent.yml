@@ -20,7 +20,7 @@
     cluster_tools_libs: []
     cluster_tools_commands: []
     cluster_tools_scripts: []
-    cluster_tools_environment: {}
+    cluster_tools_profile_entries: []
     cluster_tools_shared_dirs: []
     cluster_tools_motd_title: ""
     cluster_tools_motd_news: true

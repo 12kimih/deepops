@@ -1,9 +1,10 @@
 # {{ ansible_managed }}
-# Site shell defaults for csh and tcsh (roles/cluster_tools), the same as
+# The users' environment for csh and tcsh (roles/cluster_tools), the same as
 # {{ cluster_tools_profile_name }}.sh: each is a DEFAULT, and a value the session already
 # carries (set and not empty) is left alone.
-{% for name, value in cluster_tools_environment | dictsort %}
-{% set quoted = "'" ~ (value | string | replace("'", "'\"'\"'")) ~ "'" %}
-if (! $?{{ name }}) setenv {{ name }} {{ quoted }}
-if ("${{ name }}" == "") setenv {{ name }} {{ quoted }}
+{% for e in cluster_tools_profile_entries %}
+{% set rest = e.login[2:] if e.login.startswith('~/') else e.login %}
+{% set quoted = ('"$HOME"/' if e.login.startswith('~/') else '') ~ "'" ~ (rest | replace("'", "'\"'\"'")) ~ "'" %}
+if (! $?{{ e.name }}) setenv {{ e.name }} {{ quoted }}
+if ("${{ e.name }}" == "") setenv {{ e.name }} {{ quoted }}
 {% endfor %}
