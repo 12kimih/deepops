@@ -3,6 +3,7 @@ _disk_quota_command: /usr/local/libexec/disk-quota
 _disk_quota_config: "{{ cluster_tools_lib_config_dir }}/disk-quota.json"
 _disk_quota_textfile: "{{ node_exporter_prom_dir }}/disk-quota.prom"
 _disk_quota_scan_textfile: "{{ node_exporter_prom_dir }}/disk-quota-scan.prom"
+_disk_quota_scan_kept: "{{ node_exporter_prom_keep_dir }}/disk-quota-scan.prom"
 _disk_quota_units: [disk-quota.service, disk-quota.timer, disk-quota-scan.service, disk-quota-scan.timer]
 _disk_quota_roster: "{{ people | default({}) }}"
 _disk_quota_cfg:
@@ -16,6 +17,7 @@ _disk_quota_cfg:
   textfile: "{{ _disk_quota_textfile }}"
   scan: "{{ disk_quota_scan }}"
   scan_textfile: "{{ _disk_quota_scan_textfile }}"
+  scan_textfile_kept: "{{ _disk_quota_scan_kept }}"
   scan_top: "{{ cluster_cleanup_top | int }}"
   scan_max_entries: "{{ disk_quota_scan_max_entries | int }}"
   stale_days: "{{ cluster_user_stale_days | int }}"
@@ -27,5 +29,6 @@ disk_quota_items: >-
       'unit:disk-quota-scan.timer', 'unit:disk-quota-scan.service']
      + _disk_quota_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ _disk_quota_command, 'file:' ~ _disk_quota_config, 'file:' ~ _disk_quota_textfile,
-        'file:' ~ _disk_quota_scan_textfile,
+        'file:' ~ _disk_quota_scan_textfile, 'file:' ~ _disk_quota_scan_kept,
+        'file:/etc/tmpfiles.d/deepops-textfile-disk-quota-scan.conf',
         'file:' ~ cluster_tools_lib_config_records ~ '/disk_quota.json'] }}

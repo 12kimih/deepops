@@ -51,6 +51,7 @@ class Base(unittest.TestCase):
             "list_name": ".purge-list", "stale_days": 60, "grace_days": 14, "max_entries": 100000,
             "burst_files": 3, "burst_share": 0.5, "burst_window": 600, "cleanup_top": 5,
             "state": os.path.join(self.tmp.name, "state.json"), "textfile": os.path.join(self.tmp.name, "s.prom"),
+            "textfile_kept": os.path.join(self.tmp.name, "keep", "s.prom"),
         }  # fmt: skip
         self.said = []
 
@@ -79,6 +80,7 @@ class Cleanup(Base):
         self.file("alice/live/out.bin", 1)
         self.run_at(NOW)
         text = Path(self.cfg["textfile"]).read_text()
+        self.assertEqual(Path(self.cfg["textfile_kept"]).read_text(), text, "the copy restored at boot")
         self.assertIn(
             f'disk_cleanup_candidate_unused_days{{filesystem="{self.root}",path="{self.root}/alice/old-runs",user="alice"}} 200',
             text,

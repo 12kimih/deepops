@@ -62,7 +62,7 @@ from collections import defaultdict
 from . import cleanup, config, slurm, vocab
 from .cleanup import last_use, walk
 from .cli import Command, Opt, run_main
-from .files import write_atomic
+from .files import write_atomic, write_textfile
 from .prom import key, render
 from .render import size
 
@@ -73,6 +73,7 @@ HEADER = "# scratch-space purge list"
 
 CONFIG_KEYS = {
     "root": str,
+    "textfile_kept": str,
     "projects": str,
     "people": dict,
     "list_name": str,
@@ -502,7 +503,11 @@ def purge(host, cfg, now, check=False, say=print):
         return
     write_atomic(cfg["state"], json.dumps({"due": due}), mode=0o600)
     write_lists(host, cfg, due, now, say)
-    write_atomic(cfg["textfile"], metrics(cfg, due, bursts, removed, scanned, truncated, now, candidates))
+    write_textfile(
+        cfg["textfile"],
+        metrics(cfg, due, bursts, removed, scanned, truncated, now, candidates),
+        cfg["textfile_kept"],
+    )
 
 
 # What a person sees.

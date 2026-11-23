@@ -86,6 +86,15 @@
       loop: "{{ _scratch_space_units }}"
       register: scratch_space_units_written
 
+    # The textfile directory is a tmpfs: the kept copy goes back at every boot, so the
+    # last run's result (and its last success) stays until the next run.
+    - name: Restore the kept metrics at every boot
+      ansible.builtin.include_role:
+        name: textfile_keep
+        tasks_from: restore
+      vars:
+        textfile_keep_name: scratch-space
+
     - name: Enable the cleanup timer
       systemd_unit:
         name: scratch-space-purge.timer
