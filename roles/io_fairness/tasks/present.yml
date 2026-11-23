@@ -1,0 +1,76 @@
+---
+- name: Check that there is a measured model to set
+  ansible.builtin.assert:
+    that: io_fairness_models | length > 0
+    fail_msg: >-
+      io_fairness_models is empty: measure each mount (docs/slurm-cluster/io-fairness.md)
+      or turn slurm_enable_io_fairness off.
+    quiet: true
+
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: io_fairness
+    component_record_action: begin
+    component_record_items: "{{ io_fairness_items }}"
+
+- name: Install the iocost command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ _io_fairness_command }}"
+      module: cluster_tools.io_fairness
+
+- name: Write the iocost configuration
+  ansible.builtin.copy:
+    dest: "{{ _io_fairness_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _io_fairness_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.io_fairness %s"
+  register: io_fairness_config
+
+- name: Record the iocost configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: io_fairness, module: cluster_tools.io_fairness, file: "{{ _io_fairness_config }}", playbook: playbooks/slurm-cluster/io-fairness.yml}
+
+# systemd re-applies a slice's IOWeight on daemon-reload, so open sessions get it too.
+- name: Weight the slices
+  systemd_dropin:
+    path: "/etc/systemd/system/{{ item.key }}.d/50-deepops-io-weight.conf"
+    content: "{{ lookup('ansible.builtin.template', 'io-weight.conf.j2') }}"
+  loop: "{{ io_fairness_slice_weights | dict2items + [{'key': 'user-.slice', 'value': io_fairness_user_weight}] }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Install the unit that sets iocost at every boot
+  ansible.builtin.template:
+    src: io-fairness.service.j2
+    dest: /etc/systemd/system/io-fairness.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: io_fairness_unit
+
+# A oneshot that stays active: a restart applies the configuration again.
+- name: Set iocost now and at every boot
+  systemd_unit:
+    name: io-fairness.service
+    enabled: true
+    state: "{{ 'restarted' if io_fairness_config is changed or io_fairness_unit is changed else 'started' }}"
+    daemon_reload: true
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: io_fairness
+    component_record_action: present
+    component_record_items: "{{ io_fairness_items }}"

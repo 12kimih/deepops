@@ -1,0 +1,19 @@
+---
+_io_fairness_command: /usr/local/sbin/io-fairness
+_io_fairness_config: /etc/io-fairness.json
+_io_fairness_textfile: "{{ node_exporter_prom_dir }}/io-fairness.prom"
+_io_fairness_dropins: >-
+  {{ (io_fairness_slice_weights | dict2items
+      | map(attribute='key') | map('regex_replace', '^(.*)$', '/etc/systemd/system/\1.d/50-deepops-io-weight.conf') | list)
+     + ['/etc/systemd/system/user-.slice.d/50-deepops-io-weight.conf'] }}
+# What this component installs, for its record (roles/component_record).
+io_fairness_items: >-
+  {{ ['unit:io-fairness.service', 'file:/etc/systemd/system/io-fairness.service',
+      'file:' ~ _io_fairness_command, 'file:' ~ _io_fairness_config, 'file:' ~ _io_fairness_textfile,
+      'file:' ~ cluster_tools_lib_config_records ~ '/io_fairness.json']
+     + _io_fairness_dropins | map('regex_replace', '^', 'file:') | list }}
+_io_fairness_cfg:
+  cgroup_root: /sys/fs/cgroup
+  sys_root: /sys
+  textfile: "{{ _io_fairness_textfile }}"
+  devices: "{{ io_fairness_models | io_fairness_devices(io_fairness_enable | bool) }}"

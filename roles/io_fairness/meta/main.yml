@@ -1,0 +1,8 @@
+---
+dependencies:
+  - role: cluster_tools_lib  # cluster_tools.io_fairness
+  - role: prometheus_paths  # node_exporter_prom_dir
+
+galaxy_info:
+  namespace: deepops
+  role_name: io_fairness

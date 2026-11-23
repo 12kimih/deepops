@@ -1,0 +1,18 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Share the disks under {{ io_fairness_models | list | join(', ') }} by cgroup weight (iocost)
+{% for mount in io_fairness_models | list | sort %}
+RequiresMountsFor={{ mount }}
+{% endfor %}
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+# A oneshot has no start timeout by default; a hung write would hold the boot.
+TimeoutStartSec=2min
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _io_fairness_command }} apply {{ _io_fairness_config }}
+
+[Install]
+WantedBy=multi-user.target

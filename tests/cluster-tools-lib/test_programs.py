@@ -28,6 +28,7 @@ PROGRAMS = {
     "container_gc",
     "submit_holds",
     "gpu_diag_idle",
+    "io_fairness",
 }
 
 

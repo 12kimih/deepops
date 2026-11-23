@@ -2,7 +2,9 @@
 ; targets of the device under /home. Non-destructive: it reads and writes only its own
 ; 64G scratch file, larger than the RAID controller's cache, 60 s per pattern, O_DIRECT:
 ; throughput (1M) and IOPS (4k, sequential and random) each way, as iocost's model takes them.
-; Run as root on the login node in a quiet hour (scripts/deepops/io_model.py reads the result).
+; Run as root on the host whose disk holds the mount (the NFS server), in a quiet hour;
+; for another mount, change filename. scripts/deepops/io_model.py reads the result
+; (docs/slurm-cluster/io-fairness.md).
 [global]
 filename=/home/.io-model-test
 size=64G

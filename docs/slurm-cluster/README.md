@@ -276,7 +276,7 @@ For more information about our syslog forwarding functionality, please see the [
 
 ## Configuring shared filesystems
 
-For information about configuring a shared NFS filesystem on your Slurm cluster, see the documentation on [Slurm and NFS](./slurm-nfs.md).
+For information about configuring a shared NFS filesystem on your Slurm cluster, see the documentation on [Slurm and NFS](./slurm-nfs.md). Sharing the NFS server's disks by cgroup weight with a measured model is [I/O sharing on the NFS server](./io-fairness.md), off by default.
 
 ## Installing tools and applications
 
