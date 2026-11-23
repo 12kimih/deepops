@@ -98,6 +98,7 @@ SOURCES = {
     "egress_policy": r"egress_policy_\w+",
     "disk_quota": r"disk_quota_\w+",
     "scratch_space": r"scratch_space_\w+",  # the scratch cleanup (roles/scratch_space)
+    "shared_data": r"shared_data_\w+",  # the shared data's export, the bot's rounds (roles/shared_space)
     "submit_holds": r"submit_holds_\w+",  # who may not submit (roles/submit_holds)
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)
     "nfs": r"nfs_export_\w+",  # what roles/nfs exports (roles/textfile_keep)

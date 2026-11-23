@@ -91,10 +91,11 @@ CONFIG_KEYS = {
     "config": str,
     "project": str,
     "usage_metrics": bool,
-    "bot_service": str,
     "textfile": str,
     "textfile_kept": str,
 }
+# bot_service: "" (no bot) when an older config lacks it.
+CONFIG_OPTIONAL = {"bot_service": str}
 
 
 class Error(Exception):
@@ -103,7 +104,8 @@ class Error(Exception):
 
 def load_config(path):
     """The config roles/shared_space writes (cluster_tools.config)."""
-    cfg = config.require(path, CONFIG_KEYS)
+    cfg = config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)
+    cfg.setdefault("bot_service", "")
     if not cfg["root"].startswith("/") or not all(NAME.fullmatch(k) for k in cfg["kinds"]):
         raise config.ConfigError(f"{path}: root is an absolute path and kinds are plain names")
     if cfg["budget"] < 1 or not 0 < cfg["warn_fraction"] <= 1:
