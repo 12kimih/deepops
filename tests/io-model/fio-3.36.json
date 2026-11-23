@@ -1,0 +1,148 @@
+{
+ "fio version": "fio-3.36",
+ "timestamp": 1795437709,
+ "global options": {
+  "size": "64M",
+  "direct": "0",
+  "ioengine": "libaio",
+  "time_based": "1",
+  "runtime": "1",
+  "ramp_time": "0",
+  "group_reporting": "1",
+  "percentile_list": "50:95:99"
+ },
+ "jobs": [
+  {
+   "jobname": "seq-read",
+   "error": 0,
+   "read": {
+    "bw_bytes": 621184383,
+    "iops": 592.407592,
+    "clat_ns": {
+     "percentile": {
+      "50.000000": 103284736,
+      "95.000000": 113770496,
+      "99.000000": 128450560
+     }
+    }
+   },
+   "write": {
+    "bw_bytes": 0,
+    "iops": 0.0,
+    "clat_ns": {
+     "mean": 0.0
+    }
+   }
+  },
+  {
+   "jobname": "seq-write",
+   "error": 0,
+   "read": {
+    "bw_bytes": 0,
+    "iops": 0.0,
+    "clat_ns": {
+     "mean": 0.0
+    }
+   },
+   "write": {
+    "bw_bytes": 214557350,
+    "iops": 204.617834,
+    "clat_ns": {
+     "percentile": {
+      "50.000000": 299892736,
+      "95.000000": 329252864,
+      "99.000000": 337641472
+     }
+    }
+   }
+  },
+  {
+   "jobname": "seq-read-4k",
+   "error": 0,
+   "read": {
+    "bw_bytes": 693770741,
+    "iops": 169377.622378,
+    "clat_ns": {
+     "percentile": {
+      "50.000000": 177152,
+      "95.000000": 995328,
+      "99.000000": 1204224
+     }
+    }
+   },
+   "write": {
+    "bw_bytes": 0,
+    "iops": 0.0,
+    "clat_ns": {
+     "mean": 0.0
+    }
+   }
+  },
+  {
+   "jobname": "seq-write-4k",
+   "error": 0,
+   "read": {
+    "bw_bytes": 0,
+    "iops": 0.0,
+    "clat_ns": {
+     "mean": 0.0
+    }
+   },
+   "write": {
+    "bw_bytes": 196420183,
+    "iops": 47954.146341,
+    "clat_ns": {
+     "percentile": {
+      "50.000000": 309248,
+      "95.000000": 528384,
+      "99.000000": 684032
+     }
+    }
+   }
+  },
+  {
+   "jobname": "rand-read",
+   "error": 0,
+   "read": {
+    "bw_bytes": 38848575,
+    "iops": 9484.515485,
+    "clat_ns": {
+     "percentile": {
+      "50.000000": 6520832,
+      "95.000000": 7307264,
+      "99.000000": 8454144
+     }
+    }
+   },
+   "write": {
+    "bw_bytes": 0,
+    "iops": 0.0,
+    "clat_ns": {
+     "mean": 0.0
+    }
+   }
+  },
+  {
+   "jobname": "rand-write",
+   "error": 0,
+   "read": {
+    "bw_bytes": 0,
+    "iops": 0.0,
+    "clat_ns": {
+     "mean": 0.0
+    }
+   },
+   "write": {
+    "bw_bytes": 237023776,
+    "iops": 57867.132867,
+    "clat_ns": {
+     "percentile": {
+      "50.000000": 284672,
+      "95.000000": 464896,
+      "99.000000": 610304
+     }
+    }
+   }
+  }
+ ]
+}
