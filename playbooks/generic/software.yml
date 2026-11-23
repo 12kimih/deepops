@@ -10,11 +10,24 @@
     - role: login_shells
       tags: [people]  # the shells people chose
   tasks:
+    # Only what is declared: a package's recommendations come only when listed too.
+    # ubuntu-server recommends snapd, needrestart and unattended-upgrades, which the site
+    # removes (needrestart restarting nfs-server hung every node, 2026-11-18).
     - name: Install extra packages
-      ansible.builtin.package:
+      ansible.builtin.apt:
         name: "{{ software_extra_packages }}"
         state: present
-      when: software_extra_packages | length > 0
+        install_recommends: false
+        update_cache: true
+        cache_valid_time: 3600
+      when: software_extra_packages | length > 0 and ansible_facts.os_family == "Debian"
+
+    - name: Install extra packages
+      ansible.builtin.dnf:
+        name: "{{ software_extra_packages }}"
+        state: present
+        install_weak_deps: false
+      when: software_extra_packages | length > 0 and ansible_facts.os_family == "RedHat"
 
     - name: Read each vendor package's checksum
       ansible.builtin.stat:
