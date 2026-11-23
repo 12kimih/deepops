@@ -3,8 +3,11 @@ fixture): the model's coefficients come from the right patterns, the latency tar
 from the random p95s, and a run the model must not be made from is refused."""
 
 import copy
+import datetime
 import json
+import os
 import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -39,7 +42,19 @@ class Model(unittest.TestCase):
         self.assertEqual(item["command"], "fio --output-format=json job.fio")
         self.assertEqual(set(item["model"]), set(io_model.MODEL))
         self.assertEqual(set(item["latency"]), set(io_model.PATTERNS))
-        self.assertRegex(str(item["measured"]), r"^\d{4}-\d\d-\d\d$")
+        self.assertRegex(item["measured"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d[+-]\d\d:\d\d$")
+
+    def test_the_run_is_dated_in_local_time_with_its_offset(self):
+        # A run that ended at 00:32 local time, nine hours ahead of UTC, was dated the
+        # day before (the UTC date).
+        old = os.environ.get("TZ")
+        self.addCleanup(lambda: (os.environ.pop("TZ", None) if old is None else os.environ.__setitem__("TZ", old),
+                                 time.tzset()))  # fmt: skip
+        os.environ["TZ"] = "XST-9"
+        time.tzset()
+        ended = int(datetime.datetime(2026, 11, 23, 15, 32, tzinfo=datetime.timezone.utc).timestamp())
+        item = io_model.entry({**FIXTURE, "timestamp": ended})
+        self.assertEqual(item["measured"], "2026-11-24T00:32+09:00")
 
 
 class Refused(unittest.TestCase):

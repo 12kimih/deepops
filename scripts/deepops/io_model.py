@@ -7,8 +7,8 @@ RESULT.json is `fio --output-format=json` of scripts/deepops/io-model.fio, run a
 on the host: six patterns on a scratch file larger than the device's cache, each for a
 minute, O_DIRECT: throughput at 1M (seq-read, seq-write) and
 IOPS at 4k, sequential (seq-read-4k, seq-write-4k) and random (rand-read, rand-write).
-It prints the config entry io_fairness_models[MOUNT] (YAML), with the date of the run
-and the command, so what the kernel is told always says where it came from:
+It prints the config entry io_fairness_models[MOUNT] (YAML), with when the run ended
+(local time and offset) and the command, so what the kernel is told always says where it came from:
 
   model  the linear model's coefficients (io.cost.model ctrl=user): rbps, rseqiops,
          rrandiops, wbps, wseqiops, wrandiops;
@@ -83,9 +83,11 @@ def entry(result, command=""):
         "min": 50,
         "max": 150,
     }
-    measured = datetime.datetime.fromtimestamp(result.get("timestamp", 0), datetime.timezone.utc).date()
+    # When the run ended, in the host's local time with its offset: a UTC date alone named
+    # the day before for a run just after local midnight.
+    measured = datetime.datetime.fromtimestamp(result.get("timestamp", 0)).astimezone()
     return {
-        "measured": measured.isoformat(),
+        "measured": measured.isoformat(timespec="minutes"),
         "command": command,
         "model": model,
         "qos": qos,
@@ -95,7 +97,7 @@ def entry(result, command=""):
 
 def as_yaml(mount, item):
     """The config block, in the shape config/group_vars holds it."""
-    lines = ["io_fairness_models:", f"  {mount}:", f"    measured: {item['measured']}",
+    lines = ["io_fairness_models:", f"  {mount}:", f"    measured: {json.dumps(item['measured'])}",
              f"    command: {json.dumps(item['command'])}"]  # fmt: skip
     for key in ("model", "qos"):
         values = ", ".join(f"{k}: {v}" for k, v in item[key].items())
