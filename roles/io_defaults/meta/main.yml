@@ -1,0 +1,6 @@
+---
+dependencies: []
+
+galaxy_info:
+  namespace: deepops
+  role_name: io_defaults

@@ -28,6 +28,15 @@ Two sources, on every node, with the monitoring stack:
   `{user, device}`) and how long each slice waited for I/O
   (`io_usage_slice_pressure_seconds_total`).
 
+When a node's NFS traffic to a measured export stays above `slurm_usage_report_io_share`
+(0.4) of what the disk serves (the model's `rbps` or `wbps`) for
+`slurm_usage_report_io_minutes` (15), `slurm-usage-report-io.timer` (every 5 minutes)
+sends the users of that node's `slurm_usage_report_io_top_jobs` (3) jobs by I/O a DM
+ending in `slurm_usage_report_io_advice`, and the administrators' channel one line per
+node, at once and every `slurm_usage_report_io_repeat_hours` (6) while it lasts. A root
+job is named to the administrators only. Preview what it would say with
+`sudo /usr/local/libexec/slurm-usage-report --io --to <your Slack member ID>`.
+
 The job counters are `rchar` and `wchar` of `/proc/<pid>/io` summed over the job's
 processes (the cgroup path names `job_<id>`): page cache, pipes and sockets are in them,
 so they rank the jobs on a busy node, they are not NFS bytes. A task that already exited

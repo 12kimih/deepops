@@ -11,11 +11,7 @@
 # deepops_components. absent turns iocost off and gives each disk back the kernel's model.
 io_fairness_state: present
 
-# {mount: {measured, command, model, qos, latency}}, each printed by
-# scripts/deepops/io_model.py from one fio run of scripts/deepops/io-model.fio on that
-# mount: model is the linear cost model (io.cost.model ctrl=user), qos the latency
-# targets (io.cost.qos); measured, command and latency are the record of the run.
-io_fairness_models: {}
+# The disks' measured models are io_fairness_models (roles/io_defaults).
 
 # Whether iocost shares by weight. false writes each model and its targets with iocost
 # off, so the numbers can be seen (sudo /usr/local/sbin/io-fairness show /etc/io-fairness.json)

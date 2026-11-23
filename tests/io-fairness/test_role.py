@@ -55,6 +55,13 @@ class Config(unittest.TestCase):
         self.assertIn("/home has no model or qos", str(caught.exception))
 
 
+class Notices(unittest.TestCase):
+    def test_the_io_notices_measure_a_node_against_the_disks_throughput(self):
+        mounts = render("{{ models | io_notice_mounts }}", {"models": {"/home": ENTRY}})
+        self.assertEqual(mounts, {"/home": {"read_bps": 1000000000, "write_bps": 800000000}})
+        self.assertEqual(render("{{ {} | io_notice_mounts }}", {}), {})
+
+
 class Weights(unittest.TestCase):
     def test_services_before_logins_and_everyone_equal_within(self):
         defaults = role_defaults("io_fairness")

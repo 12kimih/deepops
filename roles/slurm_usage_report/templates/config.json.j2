@@ -27,5 +27,11 @@
   "holds_from": submit_holds_from_time | int,
   "disk_fill": cluster_disk_fill_fraction | float,
   "disk_fill_mentions": slurm_usage_report_disk_fill_mentions | int,
-  "stale_days": cluster_user_stale_days | int
+  "stale_days": cluster_user_stale_days | int,
+  "io_mounts": io_fairness_models | io_notice_mounts,
+  "io_share": slurm_usage_report_io_share | float,
+  "io_minutes": slurm_usage_report_io_minutes | int,
+  "io_top_jobs": slurm_usage_report_io_top_jobs | int,
+  "io_repeat_hours": slurm_usage_report_io_repeat_hours | float,
+  "io_advice": slurm_usage_report_io_advice
 } | to_nice_json }}

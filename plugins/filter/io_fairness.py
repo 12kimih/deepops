@@ -21,6 +21,13 @@ def io_fairness_devices(models, enable):
     return out
 
 
+def io_notice_mounts(models):
+    """{mount: {read_bps, write_bps}}: what the disk behind each mount serves, its model's
+    sequential throughput (rbps, wbps), the I/O notices' measure of a node's share."""
+    return {dev["mount"]: {"read_bps": dev["model"]["rbps"], "write_bps": dev["model"]["wbps"]}
+            for dev in io_fairness_devices(models, False)}  # fmt: skip
+
+
 class FilterModule:
     def filters(self):
-        return {"io_fairness_devices": io_fairness_devices}
+        return {"io_fairness_devices": io_fairness_devices, "io_notice_mounts": io_notice_mounts}

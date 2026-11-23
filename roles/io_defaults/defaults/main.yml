@@ -1,0 +1,11 @@
+---
+# What the disks behind the NFS exports serve, measured, for every role that needs it
+# (roles/io_fairness sets iocost from it; roles/slurm_usage_report's I/O notices take
+# their thresholds from it), which depend on this role.
+
+# {mount: {measured, command, model, qos, latency}}, each printed by
+# scripts/deepops/io_model.py from one fio run of scripts/deepops/io-model.fio on that
+# mount (docs/slurm-cluster/io-fairness.md): model is the linear cost model (io.cost.model
+# ctrl=user, with rbps and wbps the disk's sequential throughput), qos the latency
+# targets (io.cost.qos); measured, command and latency are the record of the run.
+io_fairness_models: {}
