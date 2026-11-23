@@ -20,6 +20,8 @@ open_ondemand_apache_modules: [ssl, rewrite, headers, proxy, proxy_http, proxy_w
 open_ondemand_portal_generator: /opt/ood/ood-portal-generator/sbin/update_ood_portal
 # The portal's top menu, beside the package's ondemand.yml.
 open_ondemand_menu_file: /etc/ood/config/ondemand.d/deepops-menu.yml
+# The overview page's widget (the dashboard's config root views/widgets, a partial).
+open_ondemand_widget_file: /etc/ood/config/apps/dashboard/views/widgets/_cluster_overview.html.erb
 # Apache's server-wide hardening, sorting after Ubuntu's conf-enabled/security.conf.
 open_ondemand_apache_conf: /etc/apache2/conf-available/zz-deepops-open-ondemand.conf
 # What this component installs, for its record (roles/component_record). apache2 comes
@@ -34,7 +36,7 @@ open_ondemand_items: >-
       'file:' ~ open_ondemand_tls_dir ~ '/fullchain.pem', 'file:' ~ open_ondemand_tls_dir ~ '/privkey.pem',
       'dir:' ~ open_ondemand_tls_dir, 'file:/usr/local/sbin/open-ondemand-dpkg-verify',
       'file:/etc/apache2/conf-enabled/' ~ (open_ondemand_apache_conf | basename), 'file:' ~ open_ondemand_apache_conf,
-      'file:' ~ open_ondemand_menu_file]
+      'file:' ~ open_ondemand_menu_file, 'file:' ~ open_ondemand_widget_file]
      + (['unit:open-ondemand-tls-metrics.timer', 'unit:open-ondemand-tls-metrics.service',
          'file:/etc/systemd/system/open-ondemand-tls-metrics.timer',
          'file:/etc/systemd/system/open-ondemand-tls-metrics.service',

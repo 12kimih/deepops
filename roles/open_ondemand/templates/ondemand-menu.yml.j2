@@ -6,6 +6,18 @@ nav_bar:
 {% for group in open_ondemand_nav_groups %}
   - {{ group | to_json }}
 {% endfor %}
+{% if open_ondemand_overview %}
+  - {title: {{ open_ondemand_overview_title | to_json }}, url: "/pun/sys/dashboard/custom/cluster", icon: "fas://server"}
+{% endif %}
 {% for svc in open_ondemand_proxied_services if svc.title is defined %}
   - {title: {{ svc.title | to_json }}, url: {{ svc.path | to_json }}, icon: {{ svc.icon | default('fas://external-link-alt') | to_json }}, new_tab: true}
 {% endfor %}
+{% if open_ondemand_overview %}
+# The overview page: one widget (open_ondemand_overview_widget), rendered from the facts.
+custom_pages:
+  cluster:
+    rows:
+      - columns:
+          - width: 12
+            widgets: [cluster_overview]
+{% endif %}

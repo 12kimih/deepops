@@ -100,6 +100,33 @@
   loop_control:
     label: "{{ item.path }}"
 
+# The overview page's widget, where the dashboard looks for site views (its config root's
+# views/widgets); empty facts, none.
+- name: Make the dashboard's widget directory (and its parents)
+  ansible.builtin.file:
+    path: "{{ open_ondemand_widget_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: open_ondemand_overview | length > 0
+
+- name: Write the cluster overview widget
+  ansible.builtin.template:
+    src: cluster-overview.html.erb.j2
+    dest: "{{ open_ondemand_widget_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: open_ondemand_overview | length > 0
+  notify: Stop the per-user servers
+
+- name: Remove the cluster overview widget without facts
+  ansible.builtin.file:
+    path: "{{ open_ondemand_widget_file }}"
+    state: absent
+  when: open_ondemand_overview | length == 0
+
 # The top menu (OOD merges every file in ondemand.d); per-user servers read it when
 # they start.
 - name: Write the portal's menu

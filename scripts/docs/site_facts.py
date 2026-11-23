@@ -22,6 +22,8 @@ Facts:
             (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
   dates     the site's announced dates (config schedule.yml, name: YYYY-MM-DD), so a
             page states each once; only date values pass
+  cluster   the nodes (CPUs, memory, GPUs) and partitions (their nodes, time limit) the
+            site's slurm.conf template lists (private: the portal's overview page)
   slack     the channels by purpose and the administrators' group (private)
   quotas    each host's disk_quota_filesystems and disk_quota_inodes_per_tib (private)
 
@@ -127,11 +129,38 @@ def commands(names):
     return out
 
 
+def _slurm_conf(config):
+    site = Path(config) / "files/slurm/slurm.conf" if config else None
+    return site if site and site.exists() else ROOT / "roles/slurm/templates/etc/slurm/slurm.conf"
+
+
+def _pairs(line):
+    """KEY=VALUE words of a slurm.conf line, templates left out."""
+    line = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", "", line)
+    return dict(w.split("=", 1) for w in line.split() if "=" in w)
+
+
+def cluster(config):
+    """{nodes: [{name, cpus, memory_mb, gres}], partitions: [{name, nodes, max_time}]} from
+    the literal NodeName and PartitionName lines of the site's slurm.conf template."""
+    nodes, partitions = [], []
+    for line in _slurm_conf(config).read_text().splitlines():
+        if line.startswith("NodeName=") and "{%" not in line.split()[0]:
+            kv = _pairs(line)
+            nodes.append({"name": kv["NodeName"], "cpus": int(kv.get("CPUs", 0) or 0),
+                          "memory_mb": int(kv.get("RealMemory", 0) or 0), "gres": kv.get("Gres", "")})  # fmt: skip
+        elif line.startswith("PartitionName="):
+            kv = _pairs(line)
+            partitions.append(
+                {"name": kv["PartitionName"], "nodes": kv.get("Nodes", ""), "max_time": kv.get("MaxTime", "")}
+            )
+    return {"nodes": nodes, "partitions": partitions}
+
+
 def slurm_values(config):
     """KillWait from the site's slurm.conf template (config/files/slurm/slurm.conf), else
     the role's, and the preemption times that follow from it."""
-    site = Path(config) / "files/slurm/slurm.conf" if config else None
-    template = site if site and site.exists() else ROOT / "roles/slurm/templates/etc/slurm/slurm.conf"
+    template = _slurm_conf(config)
     m = re.search(r"(?m)^\s*KillWait\s*=\s*(\d+)\s*$", template.read_text())
     if not m:
         return {}
@@ -171,6 +200,7 @@ def facts(config):
         "policy": {field: s.get(key) for field, key in POLICY.items()},
         "slurm": slurm_values(config),
         "dates": schedule(config),
+        "cluster": cluster(config),
         "slack": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }
