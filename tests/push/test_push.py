@@ -35,7 +35,9 @@ def git(cwd, *args):
     ).stdout.strip()
 
 
-class Push(unittest.TestCase):
+class Base(unittest.TestCase):
+    """A throwaway origin, a clone with a worktree beside it, and the real push.sh."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp)
@@ -62,15 +64,17 @@ class Push(unittest.TestCase):
         git(checkout, "add", name)
         git(checkout, "commit", "-q", "-m", name)
 
-    def push(self, checkout, **kwargs):
+    def push(self, checkout, env=None, **kwargs):
         return subprocess.run(
-            ["bash", "scripts/push.sh"], cwd=checkout, env=ENV, capture_output=True, text=True,
+            ["bash", "scripts/push.sh"], cwd=checkout, env=env or ENV, capture_output=True, text=True,
             timeout=bounds.CHILD, **kwargs,
         )  # fmt: skip
 
     def origin_files(self):
         return sorted(git(self.origin, "ls-tree", "--name-only", "main").split())
 
+
+class Push(Base):
     def test_rebases_checks_and_pushes(self):
         self.commit(self.clone, "a")
         git(self.clone, "push", "-q", "origin", "HEAD:main")
@@ -127,6 +131,75 @@ class Push(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("moved during the check", out.stderr)
         self.assertEqual(self.origin_files(), ["b", "c", "scripts"])
+
+
+class SiteConfig(Base):
+    """The check reads the site config at its origin's main, with the checkout's own
+    unpushed commits on top, and never moves the checkout (a deploy may run from it)."""
+
+    def setUp(self):
+        super().setUp()
+        self.config_origin = self.tmp / "config.git"
+        git(self.tmp, "init", "-q", "--bare", "-b", "main", str(self.config_origin))
+        self.config = self.tmp / "config"
+        git(self.tmp, "clone", "-q", str(self.config_origin), str(self.config))
+        (self.config / "setting").write_text("old\n")
+        git(self.config, "add", "setting")
+        git(self.config, "commit", "-q", "-m", "config base")
+        git(self.config, "push", "-q", "origin", "HEAD:main")
+        self.seen = self.tmp / "seen"
+        self.check(self.wt, f'cat "$DEEPOPS_CONFIG_DIR/setting" > {self.seen}')
+        git(self.wt, "add", "-A")
+        git(self.wt, "commit", "-q", "-m", "check reads the config")
+
+    def push_with_config(self):
+        return self.push(self.wt, env={**ENV, "DEEPOPS_CONFIG_DIR": str(self.config)})
+
+    def land_in_config(self, value):
+        peer = self.tmp / "config-peer"
+        if not peer.exists():
+            git(self.tmp, "clone", "-q", str(self.config_origin), str(peer))
+        git(peer, "pull", "-q", "--ff-only")
+        (peer / "setting").write_text(value)
+        git(peer, "commit", "-q", "-am", "peer")
+        git(peer, "push", "-q", "origin", "HEAD:main")
+
+    def test_a_config_change_a_peer_landed_is_checked_and_the_checkout_stays(self):
+        self.land_in_config("new\n")
+        head = git(self.config, "rev-parse", "HEAD")
+        out = self.push_with_config()
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(self.seen.read_text(), "new\n")
+        self.assertEqual(git(self.config, "rev-parse", "HEAD"), head, "the checkout did not move")
+        self.assertEqual((self.config / "setting").read_text(), "old\n")
+        self.assertEqual(git(self.config, "worktree", "list").count("\n"), 0, "the throwaway tree is gone")
+
+    def test_an_unpushed_config_commit_is_checked_on_top(self):
+        self.land_in_config("new\n")
+        (self.config / "other").write_text("mine\n")
+        git(self.config, "add", "other")
+        git(self.config, "commit", "-q", "-m", "my half of a pair")
+        self.check(self.wt, f'cat "$DEEPOPS_CONFIG_DIR/setting" "$DEEPOPS_CONFIG_DIR/other" > {self.seen}')
+        git(self.wt, "commit", "-q", "-am", "check reads both")
+        out = self.push_with_config()
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(self.seen.read_text(), "new\nmine\n")
+
+    def test_uncommitted_config_edits_are_not_read(self):
+        (self.config / "setting").write_text("half done\n")
+        out = self.push_with_config()
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(self.seen.read_text(), "old\n")
+        self.assertEqual((self.config / "setting").read_text(), "half done\n")
+
+    def test_a_config_commit_that_does_not_rebase_is_refused(self):
+        self.land_in_config("theirs\n")
+        (self.config / "setting").write_text("mine\n")
+        git(self.config, "commit", "-q", "-am", "conflicting")
+        out = self.push_with_config()
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("do not rebase", out.stderr)
+        self.assertEqual(self.origin_files(), ["scripts"], "nothing pushed")
 
 
 if __name__ == "__main__":
