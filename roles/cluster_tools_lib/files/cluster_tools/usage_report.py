@@ -37,7 +37,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MAX_BLOCKS, Slack, bar, mentioning, sections, table
+from .slack import MAX_BLOCKS, Slack, bar, escape, mentioning, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -256,7 +256,7 @@ def by_owner(jobs):
 def job_lines(jobs):
     """One line per job for a person's notice."""
     return "\n".join(
-        f"- `{j['label']}` ({len(j['gpus'])} GPU, running {duration(j['runtime'])})" for j in jobs
+        f"- `{escape(j['label'])}` ({len(j['gpus'])} GPU, running {duration(j['runtime'])})" for j in jobs
     )
 
 

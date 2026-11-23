@@ -5,8 +5,10 @@
 Slurm calls it only for jobs that asked (--mail-type, or SBATCH_MAIL_TYPE in the
 user's shell), once per event, with the job in its environment (SLURM_JOB_ID,
 SLURM_JOB_NAME, SLURM_JOB_MAIL_TYPE, SLURM_JOB_STATE, SLURM_JOB_RUN_TIME,
-SLURM_JOB_EXIT_CODE_MAX, ...). The recipient (--mail-user, by default the job's user)
-becomes a Slack member through the roster's chat IDs (cluster_tools.slack.member).
+SLURM_JOB_EXIT_CODE_MAX, SLURM_JOB_USER, ...). The notice goes to the job's own user
+(SLURM_JOB_USER) alone, a Slack member through the roster's chat IDs
+(cluster_tools.slack.member): --mail-user may name anyone, so it is never a recipient.
+The job's name is shown as text (Slack's control characters escaped).
 
 A person's notices close together become one message: within `coalesce_seconds` of
 the first, each later one is added to it (chat.update), so a burst of jobs ending
@@ -29,7 +31,7 @@ from pathlib import Path
 from . import config
 from .files import write_atomic
 from .slack import Error as SlackError
-from .slack import Slack, member
+from .slack import Slack, escape, member
 
 COALESCE = 600
 SHOWN = 15  # lines listed in a coalesced message; the rest are counted
@@ -45,7 +47,7 @@ def recipient_login(recipient, email_domain):
 def line(env):
     """One line for a notice, from the job's environment."""
     state = env.get("SLURM_JOB_STATE", "") or env.get("SLURM_JOB_MAIL_TYPE", "")
-    head = f"`{env.get('SLURM_JOB_ID', '?')}` {env.get('SLURM_JOB_NAME', '')}".rstrip()
+    head = f"`{escape(env.get('SLURM_JOB_ID', '?'))}` {escape(env.get('SLURM_JOB_NAME', ''))}".rstrip()
     parts = [head, state, env.get("SLURM_JOB_RUN_TIME", "")]
     code = env.get("SLURM_JOB_EXIT_CODE_MAX")
     if code not in (None, "", "0"):
@@ -120,27 +122,24 @@ def main(argv=None, env=None, now=None):
         print(f"job-notice: {e}", file=sys.stderr)
         return 2
     token = Path(cfg["token_file"]).read_text().strip() if cfg.get("token_file") else ""
-    login = recipient_login(args[-1], cfg.get("email_domain", ""))
-    if not token or muted(cfg, login or args[-1]):
+    # The job's own user: --mail-user (the recipient argument) may name anyone.
+    login = env.get("SLURM_JOB_USER") or recipient_login(args[-1], cfg.get("email_domain", ""))
+    if not token or not login or muted(cfg, login):
         return 0
     slack = Slack(token, dry_run=cfg.get("dry_run", False))
     now = time.time() if now is None else now
     try:
         with locked_state(cfg["state_file"]) as state:
+            # Each person's open message ends with the window; "_members", the Slack ID
+            # cache, keeps its entries for their own lifetime (slack.member).
             for key in [
                 k
                 for k, v in state.items()
-                if now - v.get("first", 0) >= cfg.get("coalesce_seconds", COALESCE)
+                if not k.startswith("_") and now - v.get("first", 0) >= cfg.get("coalesce_seconds", COALESCE)
             ]:
                 del state[key]
             cache = state.setdefault("_members", {})
-            slack_id = (
-                member(slack, login, cfg.get("members", {}), cfg.get("email_domain", ""), cache)
-                if login
-                else ""
-            )
-            if not slack_id and "@" in args[-1]:
-                slack_id = member(slack, args[-1], {args[-1]: args[-1]}, "", cache)
+            slack_id = member(slack, login, cfg.get("members", {}), cfg.get("email_domain", ""), cache)
             if slack_id:
                 deliver(slack, state, slack_id, line(env), now, cfg.get("coalesce_seconds", COALESCE))
     except SlackError as e:

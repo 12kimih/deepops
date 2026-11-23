@@ -26,6 +26,17 @@ class Fake(slack.Slack):
 
 
 class SlackTests(unittest.TestCase):
+    def test_what_users_named_is_shown_as_text_and_columns_line_up(self):
+        self.assertEqual(slack.escape("<!channel> & <@U1>"), "&lt;!channel&gt; &amp; &lt;@U1&gt;")
+        out = slack.table(("PATH", "USER"), [("/scratch/x/<!here>", "alice"), ("/scratch/y", "bob")])
+        self.assertNotIn("<!here>", out)
+        lines = out.splitlines()[1:-1]
+        shown = [line.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") for line in lines]
+        self.assertEqual(
+            {line.index("alice") if "alice" in line else line.index("bob") for line in shown[1:]},
+            {len("/scratch/x/<!here>") + 2},
+        )
+
     def test_member_from_map_email_or_nothing_and_cached(self):
         client = Fake({"users.lookupByEmail": {"ok": True, "user": {"id": "U2"}}})
         cache = {}
