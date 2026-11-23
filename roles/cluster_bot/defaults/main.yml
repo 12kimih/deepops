@@ -6,11 +6,24 @@
 # (roles/system_accounts) and needs slack_bot_token and slack_app_token (roles/
 # slack_defaults); without them it is installed but not started.
 #
-# Features: account requests (/join, /leave), unban requests
-# (/unban-request, where fail2ban runs), reminders before a person's last day (the
-# roster's `ends`), the Home tab. It acts on other hosts through the services they offer
+# Features, all subcommands of one slash command (cluster_bot_command; Slack commands are
+# not namespaced, and /leave is Slack's own): account requests (join, leave), unban
+# requests (unban, where fail2ban runs), collaboration folders (project), help;
+# reminders before a person's last day (the roster's `ends`), the Home tab. It acts on other hosts through the services they offer
 # it (roles/cluster_bot_access).
 cluster_bot_state: present
+
+# The bot's one slash command; its subcommands come from cluster_bot.commands. Another
+# cluster sharing the workspace takes another name.
+cluster_bot_command: /cluster
+# The Slack app's and its bot user's name in the generated manifest (one app for the
+# cluster: its bot token is slack_bot_token). Importing the manifest into an existing
+# app renames it and keeps its tokens and webhook.
+cluster_bot_app_name: cluster-bot
+# Bot scopes the app keeps for what is not this code's, beside every scope the code
+# needs (cluster_bot.commands.SCOPES): incoming-webhook when another tool (Alertmanager)
+# posts through the app's webhook, so an import never drops it.
+cluster_bot_extra_scopes: []
 
 # Slack's Python SDK and Bolt, installed with pip --require-hashes into the bot's venv
 # (the wheels' sha256 from PyPI, per version).

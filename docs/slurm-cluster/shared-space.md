@@ -52,7 +52,7 @@ roles as `shared_projects: "{{ people_roster.projects | default({}) }}"`.
 
 | Who | What | How | Decided by |
 |---|---|---|---|
-| anyone | start a project (they own it), with other owners, members and viewers | `/project`, or the Home tab's "새 프로젝트" | an administrator |
+| anyone | start a project (they own it), with other owners, members and viewers | `/cluster project`, or the Home tab's "새 프로젝트" | an administrator |
 | anyone | join a project as a member or a viewer | Home tab, "참여 요청" | any one of its owners (a DM with buttons) |
 | an owner | add someone, change their role, take them out | Home tab, the project's menu | at once |
 | an owner | change the purpose | the project's menu | at once |
@@ -78,7 +78,7 @@ removed by a deploy, nor when the switch is turned off.
    project groups resolve on the home server.
 3. `playbooks/slurm-cluster/shared-space.yml -l <home server> --check --diff`, then
    without `--check`.
-4. For Slack requests: the cluster bot with its GitHub App (cluster-bot.md), and
-   `/project` in its app manifest.
+4. For Slack requests: the cluster bot with its GitHub App (cluster-bot.md); its one
+   command's `project` subcommand comes with the generated manifest.
 5. For the shared data's budget, a project quota on its directories once `/home` has the
    project feature (disk-quota.md: adding the quota features to /home).

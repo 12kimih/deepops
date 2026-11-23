@@ -10,7 +10,8 @@ requests of every feature, cluster_bot.requests), reminders (what went out,
 cluster_bot.reminders), ssh {key, user, known_hosts} (cluster_bot.remote, to the hosts
 it acts on), bans
 {hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
-leave {remind_days, leaving (people_leaving)}.
+leave {remind_days, leaving (people_leaving)}, command (the one slash command, its
+subcommands cluster_bot.commands').
 """
 
 import json
@@ -19,7 +20,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import accounts_blocks, bans_blocks, home_blocks, projects_blocks, reminders, state
+from . import accounts_blocks, bans_blocks, commands, home_blocks, projects_blocks, reminders, state
 from . import blocks as shared
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .bans import SERVICE as BANS
@@ -90,7 +91,12 @@ def build(cfg, engine, join=None, unban=None, project=None):
         if not login:
             return
         view = home_blocks.home(
-            login, prefs.muted(login), engine.features, cfg["channels"]["help"], cfg.get("admin_group", "")
+            login,
+            prefs.muted(login),
+            engine.features,
+            cfg["command"],
+            cfg["channels"]["help"],
+            cfg.get("admin_group", ""),
         )
         if project is not None:
             view["blocks"] += projects_blocks.home(login, projects, projects_root)
@@ -109,9 +115,7 @@ def build(cfg, engine, join=None, unban=None, project=None):
             prefs.set_muted(login, action["value"] == "off")
             publish_home(client, body["user"]["id"])
 
-    @app.command("/join")
-    def join_command(ack, body, client):
-        ack()
+    def join_command(body, client):
         if join is None or user_of(body["user_id"]):
             text = "이미 계정이 있습니다." if join else "이 클러스터는 Slack 계정 신청을 받지 않습니다."
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
@@ -127,9 +131,7 @@ def build(cfg, engine, join=None, unban=None, project=None):
         ack()
         submit(client, body["user"]["id"], req)
 
-    @app.command("/leave")
-    def leave_command(ack, body, client):
-        ack()
+    def leave_command(body, client):
         user = user_of(body["user_id"])
         if join is None or not user:
             client.chat_postEphemeral(
@@ -152,9 +154,7 @@ def build(cfg, engine, join=None, unban=None, project=None):
                    "asked_by": user_of(slack_id) or slack_id}  # fmt: skip
             submit(client, slack_id, req)
 
-    @app.command("/unban-request")
-    def unban_command(ack, body, client):
-        ack()
+    def unban_command(body, client):
         if unban is None or not user_of(body["user_id"]):
             text = ("사람 명부에 이 Slack 계정이 없습니다. 관리자에게 알려 주세요." if unban
                     else "이 클러스터는 Slack으로 차단 해제 신청을 받지 않습니다.")  # fmt: skip
@@ -190,9 +190,7 @@ def build(cfg, engine, join=None, unban=None, project=None):
         found = [user_of(s) for s in slack_ids]
         return [x for x in found if x], [s for s, x in zip(slack_ids, found) if not x]
 
-    @app.command("/project")
-    def project_command(ack, body, client):
-        ack()
+    def project_command(body, client):
         if project is None or not user_of(body["user_id"]):
             text = (
                 "명부에 이 Slack 계정이 없습니다."
@@ -202,6 +200,31 @@ def build(cfg, engine, join=None, unban=None, project=None):
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
             return
         client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.new_form())
+
+    def help_command(body, client):
+        client.chat_postEphemeral(
+            channel=body["channel_id"], user=body["user_id"],
+            text=commands.help_lines(
+                command, engine.features, home_blocks.help_text(channels["help"], cfg.get("admin_group", ""))
+            ),
+        )  # fmt: skip
+
+    # The one slash command (cfg command, /cluster): every request is a subcommand, the
+    # table cluster_bot.commands.SUBCOMMANDS names them, and each has its handler here.
+    handlers = {
+        "join": join_command,
+        "leave": leave_command,
+        "unban": unban_command,
+        "project": project_command,
+        "help": help_command,
+    }
+    command = cfg["command"]
+
+    @app.command(command)
+    def cluster_command(ack, body, client):
+        ack()
+        name, _ = commands.parse(body.get("text", ""))
+        handlers[name](body, client)
 
     @app.action("project.new")
     def project_new(ack, body, client):
@@ -387,6 +410,7 @@ def main(argv=None):
     if cfg["bans"]["hosts"]:
         hosts = {name: remote(addr, BANS) for name, addr in cfg["bans"]["hosts"].items()}
         unban = features["unban"] = UnbanFeature(hosts)
+        unban.command = cfg["command"]  # the ban list names how to ask for an unban
     gh = cfg.get("github") or {}
     if gh.get("repo"):
         from . import github, people_roster  # the roster module the role installs

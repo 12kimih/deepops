@@ -94,6 +94,10 @@ def watch(feature, post, update, seen):
     if new and not first:
         post(*bans_blocks.new_bans([now[k] for k in new]))
     seen["bans"] = now
-    text, blocks = bans_blocks.ban_list(sorted(now.values(), key=lambda b: b["since"], reverse=True), errors)
+    text, blocks = bans_blocks.ban_list(
+        sorted(now.values(), key=lambda b: b["since"], reverse=True),
+        errors,
+        getattr(feature, "command", "/cluster"),
+    )
     if not (seen.get("list") and update(seen["list"], text, blocks)):
         seen["list"] = post(text, blocks, pin=True)

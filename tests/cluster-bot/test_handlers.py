@@ -49,7 +49,7 @@ sys.modules.setdefault(
 from cluster_bot import app  # noqa: E402
 from cluster_tools import job_notice  # noqa: E402
 
-CFG = {"bot_token": "x", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
+CFG = {"bot_token": "x", "command": "/cluster", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
        "channels": {"help": "#help", "admin": "#admin"}, "admin_group": "@admins",
        "admin_mention": "<!subteam^SADMINS>"}  # fmt: skip
 
@@ -83,7 +83,11 @@ class Handlers(unittest.TestCase):
         return offered["ack"]
 
     def test_join_opens_its_form_and_a_submission_becomes_a_join_request(self):
-        self.call("command", "/join", body={"user_id": "UNEW", "channel_id": "C", "trigger_id": "T"})
+        self.call(
+            "command",
+            "/cluster",
+            body={"user_id": "UNEW", "channel_id": "C", "trigger_id": "T", "text": "join"},
+        )
         self.assertEqual(self.client.views_open.call_args.kwargs["view"]["callback_id"], "join.submit")
         state = {"login": {"v": {"value": " carl "}}, "name": {"v": {"value": "Carl"}},
                  "team": {"v": {"selected_option": {"value": "team-a"}}}, "key": {"v": {"value": "ssh-ed25519 AAA"}}}  # fmt: skip
@@ -96,7 +100,9 @@ class Handlers(unittest.TestCase):
 
     def test_unban_checks_the_address_in_the_form_and_submits_it_written_one_way(self):
         self.call(
-            "command", "/unban-request", body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T"}
+            "command",
+            "/cluster",
+            body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T", "text": "unban"},
         )
         self.assertEqual(self.client.views_open.call_args.kwargs["view"]["callback_id"], "unban.submit")
         body, view = submitted({"ip": {"v": {"value": "not-an-ip"}}, "reason": {"v": {"value": None}}},
@@ -140,13 +146,19 @@ class Handlers(unittest.TestCase):
 
     def test_unban_needs_a_person_of_the_roster(self):
         self.call(
-            "command", "/unban-request", body={"user_id": "USTRANGER", "channel_id": "C", "trigger_id": "T"}
+            "command",
+            "/cluster",
+            body={"user_id": "USTRANGER", "channel_id": "C", "trigger_id": "T", "text": "unban"},
         )
         self.client.views_open.assert_not_called()
         self.client.chat_postEphemeral.assert_called_once()
 
     def test_someone_with_an_account_cannot_join_again(self):
-        self.call("command", "/join", body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T"})
+        self.call(
+            "command",
+            "/cluster",
+            body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T", "text": "join"},
+        )
         self.client.views_open.assert_not_called()
 
     def test_leave_gives_back_only_ones_own_account_unless_admin(self):

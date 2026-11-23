@@ -3,7 +3,6 @@ are replaced whole."""
 
 import datetime
 import os
-import re
 import sys
 import tempfile
 import time
@@ -135,17 +134,6 @@ class LogicTests(unittest.TestCase):
             )
             Path(path).write_text("{half")
             self.assertEqual(state.read(path, {"default": True}), {"default": True})
-
-    def test_the_manifest_declares_every_command_the_app_handles(self):
-        import yaml
-
-        manifest = yaml.safe_load((ROLE / "files/slack-app-manifest.yml").read_text())
-        declared = {c["command"] for c in manifest["features"]["slash_commands"]}
-        handled = set(
-            re.findall(r'@app\.command\("([^"]+)"\)', (ROLE / "files/cluster_bot/app.py").read_text())
-        )
-        self.assertEqual(declared, handled)
-        self.assertTrue(manifest["settings"]["socket_mode_enabled"])
 
 
 if __name__ == "__main__":

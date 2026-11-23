@@ -1,5 +1,6 @@
 """The bot's Home tab: a person's own view of the cluster, opened from the bot's profile."""
 
+from . import commands
 from .blocks import button
 
 
@@ -20,9 +21,10 @@ def help_text(channel, group):
     )
 
 
-def home(login, muted, features, help_channel="", admin_group=""):
-    """LOGIN's Home tab: whether job notices reach them, the commands they can use
-    (FEATURES: the request kinds this cluster runs) and how to ask for help."""
+def home(login, muted, features, command="/cluster", help_channel="", admin_group=""):
+    """LOGIN's Home tab: whether job notices reach them, the subcommands of COMMAND they
+    can use (FEATURES: the request kinds this cluster runs; cluster_bot.commands' list)
+    and how to ask for help (help_text)."""
     blocks = [{"type": "header", "text": {"type": "plain_text", "text": f"{login}님의 클러스터"}}]
     state = "받지 않음" if muted else "받음"
     blocks += [
@@ -31,11 +33,9 @@ def home(login, muted, features, help_channel="", admin_group=""):
             f"*잡 알림*: {state}\n`--mail-type=END,FAIL`을 적은 잡이 끝나면 DM이 옵니다 (10분 안의 알림은 한 메시지로)."},
          "accessory": button("알림 켜기" if muted else "알림 끄기", "home.notices", "on" if muted else "off")},
     ]  # fmt: skip
-    commands = [line for kind, line in (("join", "`/leave`: 졸업 등으로 계정 정리 신청"),
-                                        ("unban", "`/unban-request`: 로그인 실패로 차단된 IP 주소의 해제 신청"))
-                if kind in features]  # fmt: skip
-    if commands:
-        blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "\n".join(commands)}]})
+    blocks.append(
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": commands.help_lines(command, features)}]}
+    )
     if help_channel:
         blocks += [
             {"type": "divider"},
