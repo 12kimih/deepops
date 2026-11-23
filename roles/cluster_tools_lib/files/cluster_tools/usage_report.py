@@ -19,7 +19,12 @@ the disk quota metrics): every counted filesystem, its largest people (config pe
 the roster's) and projects, and everyone past a warn level, mentioned or sent a DM
 (disk_notify); a filesystem at least disk_fill full names its disk_fill_mentions largest
 people, mentioned at most every disk_repeat_days; and the folders worth cleaning
-(unused past stale_days, cluster_tools.cleanup). Standard library only.
+(unused past stale_days, cluster_tools.cleanup).
+
+With --io it tells the users of the jobs doing most I/O on a node whose NFS traffic to
+an export stayed above io_share of what the disk behind it serves for io_minutes
+(cluster_tools.io_report), in a DM with io_advice, again every io_repeat_hours while it
+lasts, and the administrators in one line per node. Standard library only.
 """
 
 import argparse
@@ -31,7 +36,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from . import config, notices, disk_report
+from . import config, disk_report, io_report, notices
 from .config import ConfigError
 from .files import write_atomic
 from .prometheus import Prometheus
@@ -404,13 +409,24 @@ CONFIG_KEYS = {
     "holds_on": bool, "holds_from": (int, float),
     "disk_fill": (int, float), "disk_fill_mentions": int, "stale_days": int,
 }  # fmt: skip
+# Keys added after configs were written: optional, with these defaults, so the package
+# (which every host gets first) never refuses a config its role has not rewritten yet.
+# No io_mounts, no I/O notices.
+CONFIG_DEFAULTS = {"io_mounts": {}, "io_share": 0.4, "io_minutes": 15, "io_top_jobs": 3, "io_repeat_hours": 6,
+                   "io_advice": ""}  # fmt: skip
+CONFIG_OPTIONAL = {"io_mounts": dict, "io_share": (int, float), "io_minutes": int, "io_top_jobs": int,
+                   "io_repeat_hours": (int, float), "io_advice": str}  # fmt: skip
+
+
+def _positive(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
 
 
 def load_config(path):
     """The config, checked whole before anything runs: a mistake in it is one line naming
     it, at deploy time (the role validates the file, cluster_tools.config) and never a
     traceback part-way through notifying owners."""
-    cfg = config.require(path, CONFIG_KEYS)
+    cfg = {**CONFIG_DEFAULTS, **config.require(path, CONFIG_KEYS, CONFIG_OPTIONAL)}
     for key in ("notify", "disk_notify"):
         if set(cfg[key]) - NOTIFY:
             raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
@@ -422,6 +438,15 @@ def load_config(path):
         raise ConfigError(f"{path}: disk_repeat_days must be 0 (every day) or more")
     if cfg["idle_hours"] <= 0:
         raise ConfigError(f"{path}: idle_hours must be above 0")
+    if not 0 < cfg["io_share"] <= 1:
+        raise ConfigError(f"{path}: io_share is a fraction above 0, at most 1")
+    if cfg["io_minutes"] < 5 or cfg["io_top_jobs"] < 1 or cfg["io_repeat_hours"] < 0:
+        raise ConfigError(f"{path}: io_minutes must be 5 or more (the node rates are 5-minute rates), "
+                          "io_top_jobs 1 or more and io_repeat_hours 0 or more")  # fmt: skip
+    for mount, capacity in cfg["io_mounts"].items():
+        if (not isinstance(capacity, dict) or set(capacity) != {"read_bps", "write_bps"}
+                or not all(_positive(v) for v in capacity.values())):  # fmt: skip
+            raise ConfigError(f"{path}: io_mounts {mount}: needs read_bps and write_bps above 0")
     try:
         cfg["dm_text"].format(**DM_FIELDS)
     except (KeyError, IndexError, ValueError) as e:
@@ -491,6 +516,7 @@ def report_once():
     other = ap.add_mutually_exclusive_group()
     other.add_argument("--weekly", action="store_true", help="post the weekly per-person summary instead")
     other.add_argument("--disk", action="store_true", help="post the daily disk usage report instead")
+    other.add_argument("--io", action="store_true", help="tell who drives an NFS export's load instead")
     args = ap.parse_args()
     cfg = load_config(args.config)
     if args.weekly:
@@ -498,6 +524,9 @@ def report_once():
         return
     if args.disk:
         disk(cfg, args)
+        return
+    if args.io:
+        io(cfg, args)
         return
     preview = args.dry_run or bool(args.to)
     state = load_state(cfg["state_file"])
@@ -716,6 +745,57 @@ def disk(cfg, args):
             json.dumps({"users": cache, "told": told, "purge_told": state.get("purge_told", {})}),
             mode=0o600,
         )
+    if failures:
+        raise RuntimeError("; ".join(failures))
+
+
+def io(cfg, args):
+    """The I/O notices. For each node whose NFS traffic to a measured export stayed hot
+    (cluster_tools.io_report), the users of its top jobs are sent a DM and the
+    administrators one line per node, each when due (cluster_tools.notices: at once,
+    then every io_repeat_hours while it lasts); a root job is named to the
+    administrators only. A preview prints to --to and records nothing; one failed DM does
+    not stop the others, and the run fails at the end naming them."""
+    now = time.time()
+    if not cfg["io_mounts"]:
+        return
+    hot = io_report.collect(Prometheus(cfg["prometheus_url"]), cfg["io_mounts"], cfg["io_share"],
+                            cfg["io_minutes"], cfg["io_top_jobs"])  # fmt: skip
+    slack = Slack(cfg["slack_token"], args.dry_run)
+    path, state = side_state(cfg, "io.json")
+    cache, told = state.get("users", {}), state.get("told", {})
+    preview = args.dry_run or bool(args.to)
+    people = [
+        (item, rank, user) for item in hot for rank, (_, user, _) in enumerate(item["jobs"]) if user != "root"
+    ]
+    keys = set(notices.due([io_report.user_key(i, u) for i, _, u in people] + [io_report.admin_key(i) for i in hot],
+                           told, now, cfg["io_repeat_hours"] * 3600, leeway=RUN_LEEWAY))  # fmt: skip
+    failures = []
+    if args.to:
+        if hot:
+            slack.post(slack.channel(args.to), io_report.admin_text(hot))
+        return
+    for item, rank, user in people:
+        key = io_report.user_key(item, user)
+        if key not in keys or preview:
+            continue
+        try:
+            member = slack_id(user, cfg, slack, cache)
+            if member:
+                slack.post(slack.channel(member), io_report.dm_text(item, rank, cfg["io_advice"]))
+                told[key] = int(now)
+        except (RuntimeError, OSError) as e:
+            failures.append(f"notifying {user}: {e}")
+    due = [item for item in hot if io_report.admin_key(item) in keys]
+    if due and cfg["admin_channel"] and not preview:
+        try:
+            slack.post(cfg["admin_channel"], io_report.admin_text(due))
+            for item in due:
+                told[io_report.admin_key(item)] = int(now)
+        except (RuntimeError, OSError) as e:
+            failures.append(f"telling the administrators: {e}")
+    if not preview:
+        write_atomic(path, json.dumps({"users": cache, "told": told}), mode=0o600)
     if failures:
         raise RuntimeError("; ".join(failures))
 

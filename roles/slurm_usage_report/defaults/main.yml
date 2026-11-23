@@ -75,6 +75,20 @@ slurm_usage_report_cancel_warn_text: |-
   {jobs}
   Use the GPUs, or free them now with `scancel <job>`.
 
+# The I/O notices (systemd OnCalendar, every 5 minutes): a node whose NFS traffic to a
+# measured export (io_fairness_models, roles/io_defaults) stayed above io_share of what
+# the disk serves for io_minutes; the users of its io_top_jobs jobs by I/O are sent a
+# DM ending in io_advice and the administrators one line per node (admin_channel), at
+# once and every io_repeat_hours while it lasts. No models, no notices.
+slurm_usage_report_io_schedule: "*:0/5"
+slurm_usage_report_io_share: 0.4
+slurm_usage_report_io_minutes: 15
+slurm_usage_report_io_top_jobs: 3
+slurm_usage_report_io_repeat_hours: 6
+slurm_usage_report_io_advice: >-
+  Data a job reads or writes heavily belongs on the cluster's scratch space where there
+  is one, or on the node's local disk, with the results copied back once at the end.
+
 # Slurm user -> Slack member ID or email (default: the roster's, slack_members). Users
 # not listed are looked up as <user>@<email_domain> when email_domain is set; otherwise
 # shown without a mention.

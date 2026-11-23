@@ -13,3 +13,7 @@ StateDirectory={{ _slurm_usage_report_name }}
 ProtectSystem=full
 PrivateTmp=true
 NoNewPrivileges=true
+{% if item.quiet | default(false) %}
+SyslogLevel=notice
+LogLevelMax=notice
+{% endif %}

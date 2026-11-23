@@ -100,6 +100,13 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_usage_report_disk_top: 10
 #slurm_usage_report_disk_notify: [mention]
 #slurm_usage_report_disk_repeat_days: 7
+# The I/O notices: a node whose NFS traffic to a measured export (io_fairness_models)
+# stays above io_share of the disk's throughput for io_minutes; the users of its top
+# jobs by I/O get a DM ending in io_advice, the administrators one line per node.
+#slurm_usage_report_io_share: 0.4
+#slurm_usage_report_io_minutes: 15
+#slurm_usage_report_io_repeat_hours: 6
+#slurm_usage_report_io_advice: "Put data a job reads or writes heavily on /scratch."  # example
 
 # AI coding agents (roles/ai_agent_rules): the site's agent rules file (Markdown
 # starting with <!-- cluster-agent-rules -->), installed for Claude Code

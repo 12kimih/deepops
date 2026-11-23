@@ -312,7 +312,9 @@ class RunTests(unittest.TestCase):
                    "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
                    "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
                    "disk_top": 10, "disk_notify": ["mention"], "disk_repeat_days": 7,
-                   "people": [], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60}  # fmt: skip
+                   "people": [], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
+            "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
+            "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
             Path(f"{d}/config.json").write_text(json.dumps(cfg))
             slurm = {"jobs": idle, "nodes": {"gpu1": 1}, "reasons": [], "pending": {}}
             with mock.patch.object(sys, "argv", ["r", "--config", f"{d}/config.json"]), \
@@ -353,12 +355,22 @@ class ConfigTests(unittest.TestCase):
             "repeat_idle_gpu_hours": 50, "repeat_idle_share": 0.5, "repeat_weeks": 2,
             "cancel_warn_hours": 1, "cancel_warn_text": "{jobs} {hours}",
             "disk_top": 10, "disk_notify": ["mention", "dm"], "disk_repeat_days": 7,
-            "people": ["alice"], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60}  # fmt: skip
+            "people": ["alice"], "holds_on": False, "holds_from": 0, "disk_fill": 0.8, "disk_fill_mentions": 5, "stale_days": 60,
+            "io_mounts": {"/home": {"read_bps": 100, "write_bps": 80}}, "io_share": 0.4, "io_minutes": 15,
+            "io_top_jobs": 3, "io_repeat_hours": 6, "io_advice": "x"}  # fmt: skip
 
     def load(self, **change):
         with tempfile.TemporaryDirectory() as d:
             Path(f"{d}/c.json").write_text(json.dumps(dict(self.BASE, **change)))
             return report.load_config(f"{d}/c.json")
+
+    def test_a_config_written_before_the_io_notices_still_loads_and_tells_no_one(self):
+        old = {k: v for k, v in self.BASE.items() if not k.startswith("io_")}
+        with tempfile.TemporaryDirectory() as d:
+            Path(f"{d}/c.json").write_text(json.dumps(old))
+            cfg = report.load_config(f"{d}/c.json")
+        self.assertEqual(cfg["io_mounts"], {})
+        self.assertEqual(cfg["io_share"], 0.4)
 
     def test_a_good_config_loads(self):
         self.assertEqual(self.load()["channel"], "#c")
@@ -373,7 +385,9 @@ class ConfigTests(unittest.TestCase):
                              ({"cancel_after_hours": 24, "notify": []}, "notify"),
                              ({"channel": None}, "channel"), ({"disk_notify": ["email"]}, "disk_notify"),
                              ({"disk_top": 0}, "disk_top"),
-                             ({"disk_repeat_days": -1}, "disk_repeat_days"), ({"people": "alice"}, "people")):  # fmt: skip
+                             ({"disk_repeat_days": -1}, "disk_repeat_days"), ({"people": "alice"}, "people"),
+                             ({"io_share": 1.5}, "io_share"), ({"io_minutes": 2}, "io_minutes"),
+                             ({"io_mounts": {"/home": {"read_bps": 0, "write_bps": 1}}}, "io_mounts /home")):  # fmt: skip
             with self.subTest(change=change), self.assertRaisesRegex(report.ConfigError, word):
                 self.load(**change)
 
