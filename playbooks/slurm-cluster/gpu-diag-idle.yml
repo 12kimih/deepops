@@ -1,0 +1,15 @@
+---
+# Weekly DCGM diagnostics on the idle GPU nodes (roles/gpu_diag_idle), from the first
+# controller. Run a pass now with
+#   sudo systemctl start gpu-diag-idle.service
+# or preview which nodes it would take with
+#   sudo /usr/local/sbin/gpu-diag-idle run /etc/gpu-diag-idle.json --dry-run
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: gpu_diag_idle
+      gpu_diag_idle_state: "{{ deepops_components.gpu_diag_idle | component_phase(deepops_phase) }}"
+  tags: ['gpu-diag-idle']

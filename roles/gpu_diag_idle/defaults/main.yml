@@ -1,0 +1,39 @@
+---
+# gpu_diag_idle -- NVIDIA's DCGM diagnostics on the GPU nodes no job is using, once a
+# week, from the first controller (cluster_tools.gpu_diag_idle, which says how a pass
+# runs). Each idle GPU node is held by a MAINT reservation Slurm refuses once a job has
+# landed, diagnosed as a Slurm job holding all of its GPUs, and freed again; a node is
+# never taken from a job or from another reservation. A failure is rerun once: failed
+# twice, the node is drained ("gpu-diag: <tests>", which only an administrator lifts);
+# failed then passed, it is reported as flaky. A problem of the tool itself (the host
+# engine, a timeout, output it cannot read) is reported and never drains. Results go to
+# node_exporter textfile metrics (gpu_diag_idle_*), read by the alerts in
+# roles/prometheus/files/rules/gpu.yml.
+
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components.
+gpu_diag_idle_state: present
+
+# When the weekly pass starts (systemd OnCalendar): a quiet hour, so more nodes are idle.
+gpu_diag_idle_schedule: "Sun *-*-* 04:00:00"
+# dcgmi diag -r: 2, the medium run (about two minutes); its time limit is the shared
+# dcgm_diag_timeout (roles/slurm_paths).
+gpu_diag_idle_level: 2
+# A node diagnosed less than this many days ago waits for a later pass.
+gpu_diag_idle_period_days: 6
+# The longest a pass may run (seconds): no node is started that its two runs could not
+# finish within it; the rest wait for the next pass.
+gpu_diag_idle_budget_seconds: 10800
+# Drain a node whose diagnostics failed twice in a row (owner 2026-11-23).
+gpu_diag_idle_drain_on_failure: true
+# The reservation each node is held by is named <prefix>-<node>.
+gpu_diag_idle_reservation_prefix: gpu-diag
+
+gpu_diag_idle_command: /usr/local/sbin/gpu-diag-idle
+gpu_diag_idle_config: /etc/gpu-diag-idle.json
+# Root-only state: each node's last result and its raw dcgmi output.
+gpu_diag_idle_work_dir: /var/lib/gpu-diag-idle
+# The metrics file in node_exporter_prom_dir (roles/prometheus_paths); it also goes to
+# the kept copy roles/textfile_keep restores into that tmpfs at every boot.
+gpu_diag_idle_textfile: gpu-diag-idle.prom
+gpu_diag_idle_metrics_file: "{{ node_exporter_prom_keep_dir }}/{{ gpu_diag_idle_textfile }}"

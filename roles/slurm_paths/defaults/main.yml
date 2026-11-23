@@ -32,6 +32,11 @@ nhc_nvidia_smi_timeout: 10
 # out"; its default, 30 s, ended runs before the nvidia-smi bound could. Sized from it:
 # the two nvidia-smi checks of a GPU node, each tried twice, and 15 s for the rest.
 nhc_timeout: "{{ 2 * 2 * nhc_nvidia_smi_timeout | int + 15 }}"
+# The longest each DCGM diagnostic level (dcgmi diag -r) may run, in seconds, about four
+# times its usual length: 1 quick (seconds), 2 medium (about two minutes), 3 long stress
+# (about half an hour), 4 extended. The maintenance verify step (roles/maintenance) and
+# the weekly diagnostics (roles/gpu_diag_idle) both stop a run there.
+dcgm_diag_timeout: {1: 600, 2: 1200, 3: 7200, 4: 28800}
 
 # Directories each job sees as its own (Slurm's namespace/linux plugin, namespace.yaml):
 # empty when the job starts on a node, removed with all they hold when it ends, so jobs

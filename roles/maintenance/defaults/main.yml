@@ -86,8 +86,7 @@ maintenance_verify_gpus: >-
 # GPU, so it runs only here, on a node this run drained. Level 1 by default wherever
 # DCGM is installed (install_dcgm); playbooks/utilities/gpu-diag.yml runs a long one.
 maintenance_verify_dcgm_level: "{{ 1 if maintenance_verify_gpus | bool and install_dcgm | bool else 0 }}"
-# The longest each level may run (seconds), about four times its usual length.
-maintenance_verify_dcgm_timeout: {1: 600, 2: 1200, 3: 7200, 4: 28800}
+# The longest each level may run: dcgm_diag_timeout (roles/slurm_paths).
 # NHC where the deploy puts it (playbooks/slurm-cluster/nhc.yml: the compute nodes), not
 # wherever an nhc binary happens to be: a stale hand install elsewhere is not a health check.
 maintenance_verify_nhc: "{{ inventory_hostname in groups['slurm-node'] | default([]) and slurm_install_nhc | bool }}"

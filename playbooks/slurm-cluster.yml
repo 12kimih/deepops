@@ -174,6 +174,13 @@
   tags:
     - slurm-backup
 
+- name: Diagnose the idle GPU nodes weekly
+  import_playbook: slurm-cluster/gpu-diag-idle.yml
+  vars:
+    deepops_phase: install
+  tags:
+    - gpu-diag-idle
+
 - name: Install OpenMPI
   import_playbook: slurm-cluster/openmpi.yml
   vars:
@@ -446,6 +453,13 @@
     deepops_phase: remove
   tags:
     - slurm-backup
+
+- name: Remove the weekly GPU diagnostics where they are no longer wanted
+  import_playbook: slurm-cluster/gpu-diag-idle.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - gpu-diag-idle
 
 - name: Remove the job directories' own filesystem where it is no longer wanted
   import_playbook: slurm-cluster/job-scratch.yml

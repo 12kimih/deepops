@@ -1,0 +1,9 @@
+---
+dependencies:
+  - role: cluster_tools_lib
+  - role: prometheus_paths  # node_exporter_prom_dir, node_exporter_prom_keep_dir
+  - role: slurm_paths  # dcgm_diag_timeout
+
+galaxy_info:
+  namespace: deepops
+  role_name: gpu_diag_idle

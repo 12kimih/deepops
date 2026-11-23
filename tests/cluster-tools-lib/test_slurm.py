@@ -316,5 +316,18 @@ class PrintableTests(unittest.TestCase):
         self.assertEqual(slurm._timeout(None), slurm.DEFAULT_TIMEOUT)
 
 
+class StepTests(unittest.TestCase):
+    """slurm.step: a long Slurm call whose exit status is its result, never raising."""
+
+    def test_the_status_and_output_are_returned(self):
+        self.assertEqual(
+            slurm.step("sh", "-c", "echo out; echo err >&2; exit 3", timeout=30), (3, "out", "err")
+        )
+
+    def test_a_timeout_and_a_missing_client_are_statuses(self):
+        self.assertEqual(slurm.step("sleep", "5", timeout=1)[0], 124)
+        self.assertEqual(slurm.step("no-such-slurm-client", timeout=5)[0], 127)
+
+
 if __name__ == "__main__":
     unittest.main()

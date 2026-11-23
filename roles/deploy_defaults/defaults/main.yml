@@ -52,6 +52,9 @@ slurm_enable_monitoring: true
 # Daily backups of the controller with a monthly restore test (roles/slurm_backup);
 # nothing until slurm_backup_destinations is set
 slurm_enable_backup: true
+# Weekly DCGM diagnostics on the idle GPU nodes, from the first controller
+# (roles/gpu_diag_idle); a node failing twice is drained. Needs DCGM on the nodes.
+slurm_enable_gpu_diag_idle: true
 # The Open OnDemand web portal on the controller (needs its login and TLS settings)
 slurm_install_open_ondemand: false
 # The site's commands, shell defaults, login banner and per-user limits (roles/cluster_tools)

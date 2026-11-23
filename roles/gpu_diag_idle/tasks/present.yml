@@ -1,0 +1,82 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: gpu_diag_idle
+    component_record_action: begin
+    component_record_items: "{{ gpu_diag_idle_items }}"
+
+# The program is cluster_tools.gpu_diag_idle, shipped with the library it imports.
+- name: Install the diagnostics command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ gpu_diag_idle_command }}"
+      module: cluster_tools.gpu_diag_idle
+
+- name: Create the work directory
+  ansible.builtin.file:
+    path: "{{ gpu_diag_idle_work_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# The program's own check refuses a level without a time limit, so the deploy fails,
+# not the Sunday run.
+- name: Write the diagnostics configuration
+  ansible.builtin.copy:
+    dest: "{{ gpu_diag_idle_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ gpu_diag_idle_settings | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.gpu_diag_idle %s"
+
+- name: Record the diagnostics configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: gpu_diag_idle, module: cluster_tools.gpu_diag_idle, file: "{{ gpu_diag_idle_config }}", playbook: playbooks/slurm-cluster/gpu-diag-idle.yml}
+
+- name: Install the service and its weekly timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [gpu-diag-idle.service, gpu-diag-idle.timer]
+
+# The textfile directory is a tmpfs: the kept metrics go back at every boot, so a
+# node's result stays known until its next diagnosis.
+- name: Restore the kept metrics at every boot
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: restore
+  vars:
+    textfile_keep_name: "{{ gpu_diag_idle_keep_name }}"
+
+- name: Publish the metrics of the kept results
+  change_command:
+    argv: ["{{ gpu_diag_idle_command }}", publish, "{{ gpu_diag_idle_config }}"]
+    creates: "{{ node_exporter_prom_dir }}/{{ gpu_diag_idle_textfile }}"
+
+- name: Enable the weekly timer
+  systemd_unit:
+    name: gpu-diag-idle.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: gpu_diag_idle
+    component_record_action: present
+    component_record_items: "{{ gpu_diag_idle_items }}"

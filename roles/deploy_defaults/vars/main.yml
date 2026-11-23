@@ -134,6 +134,11 @@ deepops_component_registry:
   slurm_backup:
     rules:
       - {switch: "{{ slurm_enable_backup }}", group: slurm-master, first: true}
+  # Weekly DCGM diagnostics on the idle GPU nodes, run from the first controller; only
+  # where the nodes have DCGM. Each node's last result stays.
+  gpu_diag_idle:
+    rules:
+      - {switch: "{{ slurm_enable_gpu_diag_idle and install_dcgm }}", group: slurm-master, first: true}
   # Slurm's MailProg as Slack DMs, on every controller (MailProg must be on each).
   job_notice:
     rules:

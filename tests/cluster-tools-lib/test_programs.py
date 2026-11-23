@@ -27,6 +27,7 @@ PROGRAMS = {
     "egress_metrics",
     "container_gc",
     "submit_holds",
+    "gpu_diag_idle",
 }
 
 

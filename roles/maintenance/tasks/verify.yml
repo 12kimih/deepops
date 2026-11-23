@@ -103,7 +103,7 @@
       - --pipe
       - --collect
       - --quiet
-      - "--property=RuntimeMaxSec={{ maintenance_verify_dcgm_timeout[maintenance_verify_dcgm_level | int] }}"
+      - "--property=RuntimeMaxSec={{ dcgm_diag_timeout[maintenance_verify_dcgm_level | int] }}"
       - --
       - dcgmi
       - diag

@@ -224,6 +224,30 @@ instead of posting a second message, and later notices go into its thread.
 The config is checked with `amtool` before it is written. Visit
 http://\<slurm-metric ip\>:9093 to view and silence alerts.
 
+## Weekly GPU diagnostics
+
+`roles/gpu_diag_idle` (on with `slurm_enable_gpu_diag_idle` wherever DCGM is) runs NVIDIA's
+DCGM diagnostics on the GPU nodes no job is using, once a week from the first controller
+(`gpu_diag_idle_schedule`, Sunday 04:00). It takes the nodes that are exactly idle in Slurm
+and in no reservation, oldest diagnosis first, one at a time, within a time budget:
+
+1. A MAINT reservation holds the node. Slurm refuses it when a job has landed in the
+   meantime, and the node is skipped, so no user job shares a node with the diagnostics.
+2. `dcgmi diag -r 2 -j` runs as a Slurm job holding all of the node's GPUs (sq and
+   accounting show them used; root's jobs may take any count, a node with 7 GPUs too).
+3. A failed test is rerun once in the same reservation. Failed twice, the node is drained
+   with the reason `gpu-diag: <tests>`, which neither NHC nor the maintenance resume lifts
+   (`gpu_diag_idle_drain_on_failure`); failed then passed, it stays in service as flaky.
+   A problem of the tool (the host engine, a timeout, output it cannot read) never drains.
+4. The reservation is deleted; the node is back after a few minutes.
+
+The results are `gpu_diag_idle_*` textfile metrics, alerted as `GpuDiagFailed` (critical, says
+whether the node was drained and how to resume it), `GpuDiagFlaky`, `GpuDiagError`,
+`GpuDiagOverdue` (a node not diagnosed for four weeks) and `GpuDiagNotRunning`. Preview a
+pass with `sudo gpu-diag-idle run /etc/gpu-diag-idle.json --dry-run`; run one with
+`sudo systemctl start gpu-diag-idle.service`. Each node's last raw output is kept in
+`/var/lib/gpu-diag-idle/raw/`.
+
 ## Slack usage report
 
 `playbooks/slurm-cluster/slurm-usage-report.yml` installs a systemd timer on the
