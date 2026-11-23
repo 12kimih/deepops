@@ -128,6 +128,14 @@ class NhcConf(unittest.TestCase):
         self.assertEqual(same.count("check_fs_free"), 1)
 
 
+class SharedMounts(unittest.TestCase):
+    def test_each_mount_goes_through_the_check_that_tolerates_its_removal(self):
+        text = conf("debian.yml", "Debian", nhc_check_mounts=["/home", "/scratch"])
+        self.assertIn("check_shared_mount /home\n", text)
+        self.assertIn("check_shared_mount /scratch\n", text)
+        self.assertNotIn("check_fs_mount_rw -f", text)
+
+
 class Sysconfig(unittest.TestCase):
     """NHC's own bound on a run (TIMEOUT, 30 s by default) ended a run before the
     nvidia-smi bound and its retry could: it is set, and covers them."""

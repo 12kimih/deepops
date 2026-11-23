@@ -200,8 +200,24 @@ check_nv_remapped_rows() {
 
 # PCIe ACS on again on a device where roles/pcie_acs turned it off (a firmware or
 # hotplug reset): peer-to-peer traffic goes through the CPU. $1 is its program.
+# A shared filesystem (nhc_check_mounts): mounted read-write, its directory reachable
+# (the file test walks in first, so an automount is triggered rather than reported
+# missing on a freshly booted node). A mount point no longer in fstab was removed on
+# purpose (roles/nfs_client) before NHC was redeployed: not a failure, or removing a
+# mount would drain every node until then.
+NHC_FSTAB=${NHC_FSTAB:-/etc/fstab}
+check_shared_mount() {
+    local mountpoint="$1"
+    awk -v m="$mountpoint" '$1 !~ /^#/ && $2 == m { found = 1 } END { exit !found }' "$NHC_FSTAB" 2>/dev/null \
+        || return 0
+    check_file_test -d "$mountpoint/." && check_fs_mount_rw -f "$mountpoint"
+}
+
 check_pcie_acs() {
     local found
+    # A program no longer there was removed with its component (pcie_acs absent) before
+    # NHC was redeployed: not this node's failure, or removing it would drain every node.
+    command -v "$1" >/dev/null || return 0
     if ! found="$("$1" check 2>&1)"; then
         found="${found:-$1 check failed}"
         found="${found//$'\n'/, }"

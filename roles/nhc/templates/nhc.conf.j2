@@ -17,12 +17,9 @@
 {% endfor %}
 
 {% if nhc_check_mounts | length > 0 %}
-# Check that the shared filesystems are mounted rw. The file test walks into the
-# directory first, so a mount a site has put behind an automount is triggered rather
-# than reported missing by /proc/mounts on a freshly booted node.
+# The shared filesystems, mounted rw (check_shared_mount: one still in fstab).
 {% for mountpoint in nhc_check_mounts %}
- {{ ansible_facts.hostname }} || check_file_test -d {{ mountpoint }}/.
- {{ ansible_facts.hostname }} || check_fs_mount_rw -f {{ mountpoint }}
+ {{ ansible_facts.hostname }} || check_shared_mount {{ mountpoint }}
 {% endfor %}
 
 {% endif %}
