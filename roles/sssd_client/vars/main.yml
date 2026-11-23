@@ -1,4 +1,12 @@
 ---
+# The responders sssd's monitor starts (sssd.conf services) and the socket units the
+# packages ship for the same responders: one or the other runs a responder, and a socket
+# unit whose responder is listed fails at every start (sssd_check_socket_activated_responders),
+# so they stay off (sssd.conf(5), SERVICES SECTIONS).
+sssd_client_responders: [nss, pam]
+sssd_client_responder_sockets:
+  nss: [sssd-nss.socket]
+  pam: [sssd-pam.socket, sssd-pam-priv.socket]
 # What this component installs, for its record (roles/component_record). The cache
 # (/var/lib/sss) goes with the packages.
 sssd_client_packages: >-

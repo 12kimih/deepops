@@ -121,6 +121,27 @@
     state: started
     enabled: true
 
+# Every host showed the three units failed (HostSystemdUnitFailed, 2026-11-23).
+- name: Leave the socket units of the monitor's responders off
+  systemd_unit:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ sssd_client_responders | map('extract', sssd_client_responder_sockets) | flatten }}"
+
+- name: Read which of them systemd still holds as failed
+  ansible.builtin.command:
+    argv: "{{ ['systemctl', 'is-failed'] + sssd_client_responders | map('extract', sssd_client_responder_sockets) | flatten }}"
+  register: sssd_client_sockets_failed
+  changed_when: false
+  failed_when: false
+  check_mode: false  # read-only
+
+- name: Clear their failed state
+  change_command:
+    argv: "{{ ['systemctl', 'reset-failed'] + sssd_client_responders | map('extract', sssd_client_responder_sockets) | flatten }}"
+  when: "'failed' in sssd_client_sockets_failed.stdout_lines"
+
 # After the server was away (a restart for a renewed certificate) SSSD retries on a
 # growing backoff, answering from its cache meanwhile; SIGUSR2 makes it go online now
 # (sssd(8)), so what this run changed in the directory is seen at once.
