@@ -60,6 +60,28 @@ class JobNotice(unittest.TestCase):
         self.assertIn("`42` train, COMPLETED, 01:02:03", FakeSlack.calls[0][2])
         self.assertNotIn("exit", FakeSlack.calls[0][2], "a zero exit code is not shown")
 
+    def test_only_the_jobs_own_user_is_told_never_whom_mail_user_names(self):
+        # --mail-user may name anyone (a colleague, an outside address): the notice goes to
+        # the job's user (SLURM_JOB_USER) or to no one.
+        self.run_notice("bob@elsewhere.example", env={**ENV, "SLURM_JOB_USER": "alice"})
+        self.assertEqual(FakeSlack.calls[0][1], "DUALICE")
+        FakeSlack.calls = []
+        self.run_notice("someone@elsewhere.example")
+        self.assertEqual(FakeSlack.calls, [], "an outside address is never looked up")
+
+    def test_the_job_name_is_shown_as_text(self):
+        self.run_notice("alice", env={**ENV, "SLURM_JOB_NAME": "<!channel> & <@U1>"})
+        self.assertIn("&lt;!channel&gt; &amp; &lt;@U1&gt;", FakeSlack.calls[0][2])
+        self.assertNotIn("<!channel>", FakeSlack.calls[0][2])
+
+    def test_the_member_cache_outlives_a_run(self):
+        state_file = Path(json.loads(self.cfg.read_text())["state_file"])
+        self.run_notice("alice@example.org", now=1000.0)
+        first = json.loads(state_file.read_text())["_members"]["alice"]
+        self.run_notice("alice@example.org", now=5000.0)  # past the message window
+        self.assertEqual(json.loads(state_file.read_text())["_members"]["alice"], first,
+                         "the cached answer is reused, not looked up again")  # fmt: skip
+
     def test_the_sites_email_domain_names_the_login(self):
         self.run_notice("alice@example.org")
         self.assertEqual(FakeSlack.calls[0][1], "DUALICE")

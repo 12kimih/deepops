@@ -116,6 +116,12 @@ def _retry_after(error):
     return wait if 0 <= wait <= RETRY_MAX else None
 
 
+def escape(text):
+    """TEXT shown as itself in a Slack message: &, < and > are Slack's control characters
+    (a job name with <!channel> would mention everyone). api.slack.com/reference/surfaces/formatting"""
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def member(slack, user, user_map, email_domain, cache):
     """A cluster user's Slack member ID: from user_map (an ID, or an email to look up),
     else <user>@<email_domain>; "" when unknown. CACHE (a dict the caller keeps)
@@ -146,11 +152,13 @@ def bar(pct, width=BAR_WIDTH):
 
 
 def table(header, rows):
-    """A fixed-width table in a code block; Slack renders it monospaced."""
+    """A fixed-width table in a code block; Slack renders it monospaced. Cells may hold
+    what users named (folders, jobs): each is escaped after padding, so the columns line
+    up as Slack shows them."""
     widths = [max(len(str(c)) for c in col) for col in zip(header, *rows)]
 
     def fmt(r):
-        return "  ".join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip()
+        return "  ".join(escape(str(c).ljust(w)) for c, w in zip(r, widths)).rstrip()
 
     return "```\n" + "\n".join([fmt(header)] + [fmt(r) for r in rows]) + "\n```"
 
