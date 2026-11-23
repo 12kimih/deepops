@@ -2,10 +2,11 @@
 # The record of the units an owner masked (tasks_from: masked).
 _host_baseline_masked_record: "{{ deepops_state_dir }}/masked-units/{{ host_baseline_masked_owner }}"
 # The packages a host needs: host_baseline_protected_packages (shell-style patterns) and
-# every package a component records. A removal never takes one (tasks_from: absent).
+# every package a component records for a component that stays here (deepops_components
+# not absent; none known: all stay). A removal never takes one (tasks_from: absent).
 _host_baseline_recorded: >-
-  {{ (ansible_facts.ansible_local.deepops_components['items'] | default({})).keys()
-     | select('match', 'package:') | map('regex_replace', '^package:', '') | list }}
+  {{ (ansible_facts.ansible_local.deepops_components['items'] | default({}))
+     | packages_recorded(deepops_components | default({})) }}
 # apt's simulation of the host with $1's packages marked installed by name: against a copy
 # of apt's extended_states without their paragraphs (absent means manual), so a preview,
 # which marked nothing, plans what the run will do. "<name>+" instead asked apt to

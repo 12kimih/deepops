@@ -1,6 +1,7 @@
 """What a package removal would take that the host needs (roles/host_baseline, tasks/absent.yml).
 
     removal | packages_protected_taken(named, protected)  -> ["nvidia-driver-580-server-open"]
+    items | packages_recorded(desired)                     -> ["nvidia-driver-*", "munge"]
 
 REMOVAL is every package the removal takes (apt's plan, names with or without an
 architecture), NAMED the absent list as given, PROTECTED the patterns the host needs
@@ -13,6 +14,20 @@ would have taken the NVIDIA driver along unrefused (audit, 2026-11-23).
 """
 
 from fnmatch import fnmatchcase
+
+
+def packages_recorded(items, desired):
+    """The packages the component records (ITEMS: {"package:<name>": [owner, ...]}) hold
+    for a component that stays: one whose desired state on this host (DESIRED,
+    deepops_components) is not absent. Components retired together that share a package
+    (the NIS client and server, both recording yp-tools) can then go in either order; one
+    absent while the other stays keeps the package protected. An owner DESIRED does not
+    name counts as staying."""
+    out = []
+    for item, owners in (items or {}).items():
+        if str(item).startswith("package:") and any((desired or {}).get(o) != "absent" for o in owners or []):
+            out.append(str(item)[len("package:") :])
+    return sorted(out)
 
 
 def _base(name):
@@ -34,4 +49,4 @@ def packages_protected_taken(removal, named, protected):
 
 class FilterModule:
     def filters(self):
-        return {"packages_protected_taken": packages_protected_taken}
+        return {"packages_protected_taken": packages_protected_taken, "packages_recorded": packages_recorded}
