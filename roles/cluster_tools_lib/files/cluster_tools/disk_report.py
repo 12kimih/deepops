@@ -176,6 +176,24 @@ def over_warn(data):
     return sorted(rows, key=lambda r: (r[4][0][3] != "hard", -r[3]["used"], r[:3]))
 
 
+def projects_past(data):
+    """Lines for the card: each project past a level (the shared data's budget among
+    them, cluster_tools.shared_data), the hard limit first."""
+    rows = sorted(
+        ((k, e, past(e)[0]) for k, e in data["projects"].items() if past(e)),
+        key=lambda r: (r[2][3] != "hard", -r[1]["used"], r[0]),
+    )
+    lines = []
+    for (host, fs, project), entry, (_, used, level, kind) in rows:
+        if kind == "hard":
+            state = "at its limit, writes refused"
+        else:
+            state = "past its warn level" + (f", limit {size(entry['hard'])}" if entry["hard"] else "")
+        mark = ":no_entry:" if kind == "hard" else ":warning:"
+        lines.append(f"{mark} *{project}* on {where(host, fs)}: {size(used)} of {size(level)}, {state}")
+    return lines
+
+
 def row_key(row):
     """A row of over_warn's key in the notices' record: "host filesystem user"."""
     return " ".join(row[:3])
@@ -272,6 +290,9 @@ def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_m
                 for r in rows
             )
         )
+    shared = projects_past(data)
+    if shared:
+        card += sections("*Projects past a level*\n" + "\n".join(shared))
     if fill:
         card += sections(
             "*Filling up*: the largest users, please free what you can\n"

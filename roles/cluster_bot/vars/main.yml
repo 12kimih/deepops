@@ -16,7 +16,8 @@ _cluster_bot_ready: "{{ slack_bot_token | length > 0 and slack_app_token | lengt
 # The hosts the bot acts on, by the component that offers it a service there
 # (roles/cluster_bot_access), and their cluster addresses (the from= of its key).
 _cluster_bot_ban_hosts: "{{ deepops_component_registry | component_hosts(groups, 'fail2ban', deepops_component_removals) }}"
-_cluster_bot_reaches: "{{ _cluster_bot_ban_hosts | unique }}"
+_cluster_bot_data_hosts: "{{ deepops_component_registry | component_hosts(groups, 'shared_space', deepops_component_removals) }}"
+_cluster_bot_reaches: "{{ (_cluster_bot_ban_hosts + _cluster_bot_data_hosts[:1]) | unique }}"
 _cluster_bot_addresses: "{{ hostvars | cluster_addresses(_cluster_bot_reaches, cluster_networks) }}"
 _cluster_bot_cfg:
   bot_token_file: "{{ _cluster_bot_tokens.bot }}"
@@ -59,6 +60,15 @@ _cluster_bot_cfg:
     gid_min: "{{ shared_projects_gid_min | int }}"
     reserved_gids: "{{ directory_groups | map(attribute='gid') | map('int') | list }}"
     seen: "{{ _cluster_bot_home }}/projects-seen.json"
+  # Shared data requests (roles/shared_space's service on the home server; no host leaves
+  # them off), and the cleanup's notices (cluster_bot.data).
+  data:
+    host: "{{ _cluster_bot_addresses[_cluster_bot_data_hosts[0]] if _cluster_bot_data_hosts else '' }}"
+    kinds: "{{ shared_space_data }}"
+    root: "{{ shared_space_root }}"
+    unused_days: "{{ shared_space_data_unused_days | int }}"
+    grace_days: "{{ cluster_user_grace_days | int }}"
+    seen: "{{ _cluster_bot_home }}/data-seen.json"
 
 # What this component installs, for its record (roles/component_record). The bot's state
 # files and key in its home stay (data).

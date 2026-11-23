@@ -1,6 +1,7 @@
 """The cluster bot's Slack app: Socket Mode (an outbound connection, no port to open),
 one handler per action. Each handler reads Slack's input, asks a feature module
-(cluster_bot.accounts, .bans, .projects) and posts the outcome; nothing is decided here.
+(cluster_bot.accounts, .bans, .projects, .data) and posts the outcome; nothing is decided
+here.
 
     python3 -m cluster_bot.app CONFIG.json
 
@@ -11,7 +12,8 @@ cluster_bot.reminders), ssh {key, user, known_hosts} (cluster_bot.remote, to the
 it acts on), bans
 {hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
 leave {remind_days, leaving (people_leaving)}, command (the one slash command, its
-subcommands cluster_bot.commands').
+subcommands cluster_bot.commands'), data {host, kinds, root, unused_days, grace_days,
+seen} (shared data requests, cluster_bot.data; no host leaves them off).
 """
 
 import json
@@ -20,18 +22,32 @@ import threading
 import time
 from pathlib import Path
 
-from . import accounts_blocks, bans_blocks, commands, home_blocks, projects_blocks, reminders, state
+from . import (
+    accounts_blocks,
+    bans_blocks,
+    commands,
+    data_blocks,
+    home_blocks,
+    projects_blocks,
+    reminders,
+    state,
+)
 from . import blocks as shared
 from .accounts import JoinFeature, LeaveFeature, leaving_deadlines
 from .bans import SERVICE as BANS
 from .bans import UnbanFeature, address, watch
+from .data import SERVICE as SHARED_DATA
+from .data import DataFeature, size_of
+from .data import check as data_check
+from .data import watch as data_watch
 from .prefs import Prefs
 from .projects import ProjectFeature, notify_deployed
 from .remote import Remote
-from .requests import Engine
+from .requests import Engine, Failed
 
 REMIND_EVERY = 3600
 BAN_WATCH_EVERY = 300
+DATA_WATCH_EVERY = 600
 
 
 def load(path):
@@ -41,7 +57,7 @@ def load(path):
     return cfg
 
 
-def build(cfg, engine, join=None, unban=None, project=None):
+def build(cfg, engine, join=None, unban=None, project=None, data=None):
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
@@ -201,6 +217,50 @@ def build(cfg, engine, join=None, unban=None, project=None):
             return
         client.views_open(trigger_id=body["trigger_id"], view=projects_blocks.new_form())
 
+    # Shared data (cluster_bot.data): the request form, and the button of its notices.
+    def data_command(body, client):
+        if data is None or not user_of(body["user_id"]):
+            text = ("명부에 이 Slack 계정이 없습니다." if data
+                    else "이 클러스터는 Slack으로 공유 데이터 신청을 받지 않습니다.")  # fmt: skip
+            client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
+            return
+        client.views_open(trigger_id=body["trigger_id"], view=data_blocks.form(data.kinds))
+
+    @app.view("data.submit")
+    def data_submit(ack, body, client, view):
+        v = view["state"]["values"]
+
+        def value(field):
+            return ((v.get(field) or {}).get("v") or {}).get("value") or ""
+
+        slack_id = body["user"]["id"]
+        req = {"kind": "data", "user": user_of(slack_id),
+               "category": (((v.get("category") or {}).get("v") or {}).get("selected_option") or {}).get("value"),
+               "name": value("name").strip(), "url": value("url").strip(), "size": size_of(value("size")),
+               "sha256": value("sha256").strip().lower(), "purpose": value("purpose").strip()}  # fmt: skip
+        errors = data_check(req, data.kinds)
+        if errors:
+            ack(response_action="errors", errors=errors)
+            return
+        ack()
+        if req["user"]:
+            submit(client, slack_id, req)
+
+    @app.action("data.use")
+    def data_use(ack, body, client, action):
+        ack()
+        slack_id, login = body["user"]["id"], user_of(body["user"]["id"])
+        if data is None or not login:
+            client.chat_postMessage(channel=slack_id, text="명부에 이 Slack 계정이 없습니다.")
+            return
+        kind, name = action["value"].split("/", 1)
+        try:
+            data.run("use", kind, name, login)
+            text = f"{data.root}/{action['value']}을(를) 쓴다고 기록했습니다. 고맙습니다."
+        except Failed as e:
+            text = f"기록하지 못했습니다: {e}"
+        client.chat_postMessage(channel=slack_id, text=text)
+
     def help_command(body, client):
         client.chat_postEphemeral(
             channel=body["channel_id"], user=body["user_id"],
@@ -216,6 +276,7 @@ def build(cfg, engine, join=None, unban=None, project=None):
         "leave": leave_command,
         "unban": unban_command,
         "project": project_command,
+        "data": data_command,
         "help": help_command,
     }
     command = cfg["command"]
@@ -396,6 +457,39 @@ def admin_messages(client, channel, mention=""):
     return post, update
 
 
+def data_rounds(client, data, cfg, slack_of):
+    """The shared data's round (cluster_bot.data.watch), its messages sent through CLIENT."""
+    settings, channels = cfg["data"], cfg["channels"]
+    unused, grace = settings["unused_days"], settings["grace_days"]
+
+    def say(event, key, entry, removal=0, error=""):
+        path, who = f"{data.root}/{key}", slack_of(entry.get("requester"))
+        if event in ("done", "failed") and who:
+            client.chat_postMessage(channel=who, text=data_blocks.ended(event, path, entry))
+        elif event == "notice":
+            if who:
+                text, blocks = data_blocks.notice_dm(key, path, unused, removal)
+                client.chat_postMessage(channel=who, text=text, blocks=blocks)
+            text, blocks = data_blocks.notice_channel(key, path, entry.get("requester"), removal)
+            client.chat_postMessage(channel=channels["help"], text=text, blocks=blocks)
+        elif event == "removed":
+            text = data_blocks.removed(path, unused, grace)
+            if who:
+                client.chat_postMessage(channel=who, text=text)
+            client.chat_postMessage(channel=channels["admin"], text=text)
+        elif event == "failed_removal":
+            text, blocks = shared.mentioning(
+                cfg["admin_mention"], f"{path}을(를) 지우지 못했습니다: {error}", []
+            )
+            client.chat_postMessage(channel=channels["admin"], text=text, blocks=blocks or None)
+
+    def round_():
+        with state.locked(settings["seen"], {}) as seen:
+            data_watch(data, seen, time.time(), unused, grace, say)
+
+    return round_
+
+
 def main(argv=None):
     from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -406,11 +500,16 @@ def main(argv=None):
     def remote(host, service):
         return Remote(host, ssh["key"], ssh["user"], ssh["known_hosts"], service)
 
-    features, join, unban, project = {}, None, None, None
+    features, join, unban, project, data = {}, None, None, None, None
     if cfg["bans"]["hosts"]:
         hosts = {name: remote(addr, BANS) for name, addr in cfg["bans"]["hosts"].items()}
         unban = features["unban"] = UnbanFeature(hosts)
         unban.command = cfg["command"]  # the ban list names how to ask for an unban
+    settings = cfg.get("data") or {}
+    if settings.get("host"):
+        data = features["data"] = DataFeature(
+            remote(settings["host"], SHARED_DATA), settings["kinds"], settings["root"]
+        )
     gh = cfg.get("github") or {}
     if gh.get("repo"):
         from . import github, people_roster  # the roster module the role installs
@@ -427,7 +526,7 @@ def main(argv=None):
                 {**settings, "gid_min": p["gid_min"], "reserved_gids": p["reserved_gids"]},
             )
     engine = Engine(features, cfg["pending"])
-    app = build(cfg, engine, join, unban, project)
+    app = build(cfg, engine, join, unban, project, data)
 
     sources, slack_of = reminder_sources(cfg), {u: s for s, u in cfg["members"].items()}.get
 
@@ -449,6 +548,9 @@ def main(argv=None):
                 watch(unban, post, update, seen)
 
         every(BAN_WATCH_EVERY, "ban watch", watch_round)
+    if data is not None:
+        data_round = data_rounds(app.client, data, cfg, slack_of)
+        every(DATA_WATCH_EVERY, "shared data", data_round)
     SocketModeHandler(app, cfg["app_token"]).start()
 
 

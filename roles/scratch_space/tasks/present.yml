@@ -43,6 +43,7 @@
   ansible.builtin.include_role:
     name: shared_space
     tasks_from: folders
+    public: true  # its own includes read its dependencies' values (tests/include-scope)
   vars:
     shared_space_folders_dir: "{{ scratch_space_projects }}"
     shared_space_folders: "{{ shared_projects | people_projects_at('scratch') }}"

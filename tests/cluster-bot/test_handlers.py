@@ -144,6 +144,32 @@ class Handlers(unittest.TestCase):
         self.assertEqual(pinned["text"], "the list")
         self.assertEqual(len(pinned["blocks"]), 1)
 
+    def test_data_opens_its_form_and_checks_it_before_a_request(self):
+        shared = mock.Mock(kinds=["datasets", "models"], root="/home/shared")
+        built = app.build(CFG, self.engine, self.join, unban=mock.Mock(), data=shared)
+        self.app = built
+        self.call(
+            "command",
+            "/cluster",
+            body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T", "text": "data"},
+        )
+        self.assertEqual(self.client.views_open.call_args.kwargs["view"]["callback_id"], "data.submit")
+        state = {"category": {"v": {"selected_option": {"value": "datasets"}}}, "name": {"v": {"value": "coco"}},
+                 "url": {"v": {"value": "http://insecure.example/coco.tar"}}, "size": {"v": {"value": "20G"}},
+                 "sha256": {"v": {"value": None}}, "purpose": {"v": {"value": "detection"}}}  # fmt: skip
+        body, view = submitted(state, "UALICE", "data.submit")
+        ack = self.call("view", "data.submit", body=body, view=view)
+        self.assertEqual(ack.call_args.kwargs["errors"].keys(), {"url"})
+        self.engine.submit.assert_not_called()
+        state["url"] = {"v": {"value": " https://data.example/coco.tar "}}
+        self.call("view", "data.submit", body=body, view=view)
+        req = self.engine.submit.call_args.args[0]
+        self.assertEqual((req["kind"], req["user"], req["category"], req["url"], req["size"]),
+                         ("data", "alice", "datasets", "https://data.example/coco.tar", 20 << 30))  # fmt: skip
+        # A notice's button records a use by whoever pressed it.
+        self.call("action", "data.use", body={"user": {"id": "UALICE"}}, action={"value": "datasets/coco"})
+        shared.run.assert_called_with("use", "datasets", "coco", "alice")
+
     def test_unban_needs_a_person_of_the_roster(self):
         self.call(
             "command",

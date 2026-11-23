@@ -185,6 +185,24 @@ class RenderTests(unittest.TestCase):
         (_, card), _ = disk_report.render(data, who, 2, fill=fill, fill_mention=set())
         self.assertIn("75% full: bob 21G, alice 18G", text_of(card), "named every day, mentioned when due")
 
+    def test_a_project_past_its_warn_level_is_on_the_card(self):
+        # The shared data's budget (cluster_tools.shared_data): 20G hard, warned at 90%.
+        prom = site()
+        prom.now["disk_quota_project_used_bytes"].append(
+            row(19 * G, host="nfs", filesystem="/home", project="shared-data")
+        )
+        prom.now["disk_quota_project_limit_bytes"] += [
+            row(20 * G, host="nfs", filesystem="/home", project="shared-data", kind="hard"),
+            row(18 * G, host="nfs", filesystem="/home", project="shared-data", kind="warn"),
+        ]
+        (_, card), _ = disk_report.render(disk_report.collect(prom, NOW), who, 2)
+        body = text_of(card)
+        self.assertIn("*Projects past a level*", body)
+        self.assertIn(
+            ":warning: *shared-data* on nfs:/home: 19G of 18G, past its warn level, limit 20G", body
+        )
+        self.assertNotIn("/home/shared/datasets* on", body, "7G of a 10G limit is past nothing")
+
     def test_folders_worth_cleaning_in_the_thread_never_mentioned(self):
         prom = site()
         prom.now["disk_cleanup_candidate_bytes"] = [

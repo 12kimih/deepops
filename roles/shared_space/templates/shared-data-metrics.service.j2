@@ -1,0 +1,16 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Export the shared data's usage against its budget
+RequiresMountsFor={{ shared_space_root }}
+
+[Service]
+Type=oneshot
+# A oneshot has no start timeout by default; one hang would stop its timer for good.
+TimeoutStartSec=6h
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _shared_space_data_command }} {{ _shared_space_data_config }} metrics
+# Behind what people do, yet always moving (never the idle class, which a busy disk starves).
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

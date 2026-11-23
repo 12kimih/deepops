@@ -2,6 +2,10 @@
 dependencies:
   - role: shared_space_defaults  # the layout, shared_projects
   - role: system_accounts  # the writer's account
+  - role: deploy_defaults  # cluster_user_warn_fraction (the budget's warn level)
+  - role: slack_defaults  # cluster_bot_host, the bot's way in (cluster_bot_access_items)
+  - role: cluster_tools_lib  # cluster_tools.shared_data
+  - role: prometheus_paths  # node_exporter_prom_dir
 
 galaxy_info:
   namespace: deepops

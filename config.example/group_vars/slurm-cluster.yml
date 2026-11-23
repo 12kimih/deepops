@@ -200,6 +200,14 @@ slurm_ha_state_save_location: "/sw/slurm"
 #slurm_enable_submit_holds: false
 # Shared data and collaboration folders on the home server (docs/slurm-cluster/shared-space.md)
 #slurm_enable_shared_space: false
+# The shared data's one budget (the disk report warns at cluster_user_warn_fraction of it);
+# true once its disk_quota project carries the budget as the kernel's limit.
+#shared_space_data_budget: 20T
+#shared_space_data_quota: false
+# The hosts the bot's downloads may come from (each and below it); [] any public https host.
+#shared_space_data_sources: []
+# An entry only its requester said they use for this many days gets a cleanup notice.
+#shared_space_data_unused_days: 28
 #submit_holds_from: ""
 
 ################################################################################
