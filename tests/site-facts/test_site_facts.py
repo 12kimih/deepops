@@ -37,6 +37,7 @@ class Facts(unittest.TestCase):
             every = sf.facts(config)
         self.assertEqual(every["policy"]["stale_days"], 30)
         self.assertEqual(every["policy"]["grace_days"], 14, "the role default where the site sets none")
+        self.assertEqual(every["policy"]["cancel_after_hours"], 0, "the role's default: no cancel")
         self.assertIsNone(every["slack"]["admin_group"], "a template is Ansible's to resolve")
         self.assertEqual(
             every["quotas"]["hosts"], {"node1": {"filesystems": {"/data": {"block_hard": "1T"}}}}
@@ -76,7 +77,15 @@ class PublicAllowList(unittest.TestCase):
     def test_only_allowed_keys_and_fields_reach_the_public_file(self):
         every = {
             "commands": {"sq": {"summary": "s", "usage": "sq", "options": [], "internal": 1}},
-            "policy": {"stale_days": 60, "grace_days": 14, "warn_fraction": 0.9, "extra": 1},
+            "policy": {
+                "stale_days": 60,
+                "grace_days": 14,
+                "warn_fraction": 0.9,
+                "idle_hours": 2,
+                "cancel_after_hours": 6,
+                "cancel_warn_hours": 1,
+                "extra": 1,
+            },  # fmt: skip
             "slack": {"channels": {"admin": "#x"}},
             "quotas": {"hosts": {"n": {}}},
             "anything_new": {"a": 1},
@@ -84,7 +93,17 @@ class PublicAllowList(unittest.TestCase):
         out = sf.public(every)
         self.assertEqual(set(out), set(sf.PUBLIC))
         self.assertEqual(set(out["commands"]["sq"]), {"summary", "usage", "options"})
-        self.assertEqual(set(out["policy"]), {"stale_days", "grace_days", "warn_fraction"})
+        self.assertEqual(
+            set(out["policy"]),
+            {
+                "stale_days",
+                "grace_days",
+                "warn_fraction",
+                "idle_hours",
+                "cancel_after_hours",
+                "cancel_warn_hours",
+            },
+        )
         self.assertNotIn("slack", json.dumps(out))
 
     def test_the_allow_list_holds_nothing_private(self):
