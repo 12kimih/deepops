@@ -337,10 +337,6 @@ class Cli(unittest.TestCase):
                 self.assertEqual(dq.main(argv), 2)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class Scan(unittest.TestCase):
     """The weekly scan weighs each base's folders (cluster_tools.cleanup) and writes them."""
 
@@ -372,3 +368,7 @@ class Scan(unittest.TestCase):
             self.assertEqual(len(named), 2)
             self.assertTrue(any("/alice/old" in n for n in named) and any("/bob/stuff" in n for n in named))
             self.assertNotIn("/alice/live", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

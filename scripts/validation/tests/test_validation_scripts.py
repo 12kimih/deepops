@@ -335,10 +335,6 @@ class TestSlurmGpuJob(unittest.TestCase):
             self.assertIn('printf "%s=%%s' % key, script)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestValidatorsStartProcessesOneWay(unittest.TestCase):
     """A validator's one-shot command goes through cluster_tools.proc (bounded, its whole
     session killed on a timeout, undecodable bytes replaced, never raising): six copies of
@@ -357,3 +353,7 @@ class TestValidatorsStartProcessesOneWay(unittest.TestCase):
             if one_shot.search(line)
         ]
         self.assertEqual(offenders, [], "run commands with cluster_tools.proc (outcome or run)")
+
+
+if __name__ == "__main__":
+    unittest.main()

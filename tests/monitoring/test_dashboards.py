@@ -101,10 +101,6 @@ class DashboardConventionTests(unittest.TestCase):
                             self.assertIn(name, self.recorded)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class SlurmNativeMetricsTests(unittest.TestCase):
     """The Slurm dashboard reads slurmctld's own metrics: every name must be one the
     pinned Slurm serves (tests/cluster-tools/slurm-names.json, from its source by
@@ -137,3 +133,7 @@ class SlurmNativeMetricsTests(unittest.TestCase):
                     names |= self.metric_names(target.get("expr", ""))
         self.assertTrue(names)
         self.assertEqual(sorted(names - available), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
