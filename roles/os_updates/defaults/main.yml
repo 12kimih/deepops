@@ -52,4 +52,3 @@ os_updates_allowed_holds: []
 # /var/lib/os-updates and republished at boot, so updates that wait for a maintenance
 # window cannot pile up unseen. Debian family. false removes the timer.
 os_updates_metrics: true
-os_updates_metrics_textfile_dir: "{{ node_exporter_prom_dir }}"

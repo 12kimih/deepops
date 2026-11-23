@@ -71,7 +71,6 @@ egress_policy_ssh_client_file: /etc/ssh/ssh_config.d/40-egress-policy.conf
 # metrics (roles/prometheus/files/rules/egress-policy.yml alerts on them).
 egress_policy_metrics: true
 egress_policy_metrics_interval: 60s
-egress_policy_metrics_textfile_dir: "{{ node_exporter_prom_dir }}"
 # Tunnel programs, by executable or script name, or "program subcommand".
 egress_policy_tunnel_programs:
   - cloudflared

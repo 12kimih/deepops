@@ -44,8 +44,6 @@ slurm_backup_weekly_day: 7
 
 slurm_backup_script: /usr/local/sbin/slurm-backup
 slurm_backup_config: /etc/slurm-backup.json
-# node_exporter's textfile collector directory (node_exporter_prom_dir, roles/prometheus_paths).
-slurm_backup_textfile_dir: "{{ node_exporter_prom_dir }}"
 slurm_backup_textfile: slurm-backup.prom
 # Root-only working directory: the set being built and the lock backup and restore-test
 # share.

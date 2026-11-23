@@ -41,7 +41,7 @@ open_ondemand_items: >-
          'file:/etc/systemd/system/open-ondemand-tls-metrics.timer',
          'file:/etc/systemd/system/open-ondemand-tls-metrics.service',
          'file:/usr/local/sbin/open-ondemand-tls-metrics',
-         'file:' ~ open_ondemand_tls_metrics_textfile_dir ~ '/open_ondemand_tls.prom']
+         'file:' ~ node_exporter_prom_dir ~ '/open_ondemand_tls.prom']
         if open_ondemand_tls_metrics | bool else []) }}
 # Installed by OOD releases before this role (the jammy build's release package): adopted
 # and removed when the component goes on a host deployed before the record existed.

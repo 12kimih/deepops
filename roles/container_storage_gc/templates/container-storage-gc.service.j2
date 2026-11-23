@@ -7,7 +7,7 @@ Type=oneshot
 # A oneshot has no start timeout by default; one hang would stop its timer for good.
 TimeoutStartSec=3h
 # The directory may sit on /run, which is empty after a boot.
-ExecStartPre=/usr/bin/install -d -m 0755 {{ container_storage_gc_textfile_dir }}
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
 ExecStart={{ _container_storage_gc_command }} {{ _container_storage_gc_config }}
 # Behind what people do, yet always moving: the lowest best-effort I/O priority, never
 # the idle class, which a busy disk can starve.

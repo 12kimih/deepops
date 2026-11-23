@@ -17,6 +17,6 @@ provisioner:
               host: ldap.example.com:636
               insecureNoSSL: false
               userSearch: {baseDN: "ou=people,dc=example,dc=com", username: uid, idAttr: uid, emailAttr: mail, nameAttr: cn}
-        open_ondemand_tls_metrics_textfile_dir: /var/lib/node_exporter/textfile
+        node_exporter_prom_dir: /var/lib/node_exporter/textfile
 scenario:
   test_sequence: [destroy, syntax, create, prepare, converge, idempotence, side_effect, verify, destroy]

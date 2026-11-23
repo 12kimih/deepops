@@ -183,7 +183,6 @@ at the next deploy; `-e egress_policy_state=absent` does so at once on the hosts
 | `egress_policy_ssh_client_file` | `/etc/ssh/ssh_config.d/40-egress-policy.conf` |  |
 | `egress_policy_metrics` | `true` | Listening sockets of users and running tunnel programs, as node_exporter textfile metrics (roles/prometheus/files/rules/egress-policy.yml alerts on them). |
 | `egress_policy_metrics_interval` | `60s` |  |
-| `egress_policy_metrics_textfile_dir` | `'{{ node_exporter_prom_dir }}'` |  |
 | `egress_policy_tunnel_programs` | `[cloudflared, ngrok, frpc, frps, bore, lt, localtunnel, chisel, zrok, rathole, gost, inlets, pagekite.py, tunnelto, tmole, loophole, playit, wstunnel, devtunnel, code tunnel, code-tunnel, tailscaled, zerotier-one, wireguard-go]` | Tunnel programs, by executable or script name, or "program subcommand". |
 <!-- END GENERATED: role-variables:egress_policy -->
 

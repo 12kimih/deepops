@@ -14,7 +14,7 @@ slurm_backup_items: >-
      | map('regex_replace', '$', '.timer') | list
      + slurm_backup_unit_files | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ slurm_backup_script, 'file:' ~ slurm_backup_config, 'file:' ~ slurm_backup_metrics_file,
-        'file:' ~ slurm_backup_textfile_dir ~ '/' ~ slurm_backup_textfile, 'dir:' ~ slurm_backup_work_dir,
+        'file:' ~ node_exporter_prom_dir ~ '/' ~ slurm_backup_textfile, 'dir:' ~ slurm_backup_work_dir,
         'file:/etc/tmpfiles.d/deepops-textfile-' ~ slurm_backup_keep_name ~ '.conf',
         'file:' ~ cluster_tools_lib_config_records ~ '/slurm_backup.json'] }}
 # The name its kept metrics go by in roles/textfile_keep (the textfile without .prom).

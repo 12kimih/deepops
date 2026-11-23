@@ -23,4 +23,3 @@ container_storage_gc_people: "{{ people }}"
 
 # When the timer runs (systemd OnCalendar), spread over the hour that follows.
 container_storage_gc_on_calendar: "*-*-* 04:00:00"
-container_storage_gc_textfile_dir: "{{ node_exporter_prom_dir }}"

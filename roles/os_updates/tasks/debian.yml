@@ -161,7 +161,7 @@
             [Service]
             Type=oneshot
             TimeoutStartSec=15min
-            ExecStart=/usr/local/sbin/os-updates-metrics {{ os_updates_metrics_textfile_dir }}
+            ExecStart=/usr/local/sbin/os-updates-metrics {{ node_exporter_prom_dir }}
             Nice=10
           # The textfile directory is usually tmpfs: republish the kept metrics at
           # boot so the series never go absent until the next measurement.
@@ -174,7 +174,7 @@
             [Service]
             Type=oneshot
             TimeoutStartSec=1min
-            ExecStart=/usr/local/sbin/os-updates-metrics --publish {{ os_updates_metrics_textfile_dir }}
+            ExecStart=/usr/local/sbin/os-updates-metrics --publish {{ node_exporter_prom_dir }}
 
             [Install]
             WantedBy=multi-user.target
@@ -230,4 +230,4 @@
         - /etc/systemd/system/os-updates-metrics.publish.service
         - /etc/systemd/system/os-updates-metrics.timer
         - /var/lib/os-updates
-        - "{{ os_updates_metrics_textfile_dir }}/os-updates.prom"
+        - "{{ node_exporter_prom_dir }}/os-updates.prom"

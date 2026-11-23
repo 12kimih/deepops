@@ -102,7 +102,6 @@ open_ondemand_data_paths:
 # (open_ondemand_tls_cert_not_after_seconds), refreshed daily, so an alert can fire
 # before it lapses.
 open_ondemand_tls_metrics: true
-open_ondemand_tls_metrics_textfile_dir: "{{ node_exporter_prom_dir }}"
 
 # Files OOD's packages own that the role writes itself; dpkg -V may report these as
 # changed. Any other difference in an OOD package fails the run.
