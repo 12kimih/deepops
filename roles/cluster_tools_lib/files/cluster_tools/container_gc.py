@@ -390,9 +390,11 @@ def textfile(lines, ok, now):
     return "".join(line + "\n" for line in sorted(out))
 
 
-CONFIG_KEYS = {"textfile": str, "textfile_kept": str, "unused_days": int, "max_used_percent": int,
+CONFIG_KEYS = {"textfile": str, "unused_days": int, "max_used_percent": int,
                "active_uids": (list, type(None)), "stores": list}  # fmt: skip
-CONFIG_OPTIONAL = {"uid_min": int, "docker": dict}
+# textfile_kept: the kept copy that survives a reboot; without it (a config written
+# before it existed) none is written, as before.
+CONFIG_OPTIONAL = {"uid_min": int, "docker": dict, "textfile_kept": str}
 DOCKER_KEYS = ("socket", "label")
 
 
@@ -420,7 +422,7 @@ def main(argv=None):
         now = time.time()
         lines, ok = run(cfg, dry_run, now)
         if not dry_run and cfg.get("textfile"):
-            keep = cfg["textfile_kept"]
+            keep = cfg.get("textfile_kept", "")
             if ok:
                 write_textfile(cfg["textfile"], textfile(lines, ok, now), keep)
             else:  # keep the last success: the staleness alert then fires

@@ -292,6 +292,22 @@ class UnmanagedContainers(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual([line for line in lines if "docker" in line], [])
 
+    def test_a_config_from_before_the_kept_copy_still_runs(self):
+        # textfile_kept came later (73165688): an older config lacks it and writes no kept
+        # copy, as it did; requiring it refused every host's config (ARA 262).
+        out = Path(self.tmp.name, "gc.prom")
+        old = {
+            "textfile": str(out),
+            "unused_days": 14,
+            "max_used_percent": 80,
+            "active_uids": None,
+            "stores": [],
+        }
+        path = Path(self.tmp.name, "gc.json")
+        path.write_text(json.dumps(old))
+        self.assertEqual(gc.main(["container-storage-gc", str(path)]), 0)
+        self.assertIn("container_storage_gc_last_success", out.read_text())
+
     def test_the_config_takes_exactly_socket_and_label(self):
         base = {
             "textfile": "",

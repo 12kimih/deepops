@@ -5,10 +5,12 @@ A tool's config is checked whole by the tool's load_config, at deploy time by th
 config fails a deploy naming the playbook that rewrites it, not the tool's next run.
 """
 
+import ast
 import importlib
 import io
 import json
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -20,6 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
+import bounds  # noqa: E402
 from cluster_tools import config  # noqa: E402
 from repo_scan import ansible_files  # noqa: E402
 
@@ -195,6 +198,62 @@ class Roles(unittest.TestCase):
                 self.assertLessEqual(
                     written, set(tool.CONFIG_KEYS) | set(getattr(tool, "CONFIG_OPTIONAL", {}))
                 )
+
+
+def _git(*args):
+    r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=bounds.CHILD)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def _required_at(rev, module):
+    """The keys MODULE's CONFIG_KEYS literal requires at REV, or None where the module is
+    not there (a new tool: its config is new too)."""
+    path = "roles/cluster_tools_lib/files/" + module.replace(".", "/") + ".py"
+    source = _git("show", f"{rev}:{path}")
+    if source is None:
+        return None
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "CONFIG_KEYS" for t in node.targets):
+            return {k.value for k in node.value.keys}
+    return None
+
+
+class NewRequiredKeys(unittest.TestCase):
+    """A key a tool newly requires breaks it on every host whose config, written by the
+    playbook that publishes the config, lacks it: until that playbook runs, the tool
+    refuses its config, and cluster-tools.yml's staged check refuses the package
+    (ARA 243, ARA 262). Against what origin/main has (the merge-base): a new key goes in
+    CONFIG_OPTIONAL, read with a default that behaves as before; it may be required once
+    every host's config has it."""
+
+    def test_no_tool_newly_requires_a_key(self):
+        base = _git("merge-base", "HEAD", "origin/main")
+        if not base:
+            self.skipTest("no origin/main to compare with (not a clone of the repository)")
+        problems = []
+        for role, record in recorded().items():
+            module = record["module"]
+            before = _required_at(base, module)
+            if before is None:
+                continue
+            now = set(importlib.import_module(module).CONFIG_KEYS)
+            for key in sorted(now - before):
+                problems.append(
+                    f"new required key {key} in tool {module} ({role}): make it optional first "
+                    "(CONFIG_OPTIONAL, read with a default that behaves as before), require it "
+                    "once every host's config has it"
+                )
+        self.assertEqual(problems, [])
+
+    def test_the_rule_reads_a_required_key_added_since_a_revision(self):
+        # The parse the rule rests on: 73165688 required textfile_kept, its parent did not.
+        parent, commit = _git("rev-parse", "73165688^"), _git("rev-parse", "73165688")
+        if not (parent and commit):
+            self.skipTest("history not available")
+        added = _required_at(commit, "cluster_tools.container_gc") - _required_at(
+            parent, "cluster_tools.container_gc"
+        )
+        self.assertEqual(added, {"textfile_kept"})
 
 
 if __name__ == "__main__":
