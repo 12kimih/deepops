@@ -84,6 +84,13 @@ open_ondemand_proxied_services: []
 # with a title.
 open_ondemand_nav_groups: [apps, files, jobs, clusters]
 
+# The cluster's overview, a portal page behind the login (OOD custom_pages and a
+# dashboard widget): {nodes: [{name, cpus, memory_mb, gres}], partitions: [{name, nodes,
+# max_time}]}, the private facts deepops scripts/docs/site_facts.py writes ("cluster"),
+# never typed. Empty: no page. Its title in the top menu:
+open_ondemand_overview: {}
+open_ondemand_overview_title: Cluster
+
 # Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken
 # install) before changing them.
 open_ondemand_backup_dir: /var/backups/open-ondemand

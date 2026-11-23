@@ -1,0 +1,23 @@
+<%# {{ ansible_managed }}: the cluster overview (open_ondemand_overview), no Ruby here %>
+<div class="card mb-3">
+  <div class="card-header"><h3 class="h5 mb-0">{{ open_ondemand_overview_title | e }}</h3></div>
+  <div class="card-body">
+    <p>Live state: <code>sq</code>, <code>qos</code>, <code>sinfo</code> in a shell.</p>
+    <table class="table table-sm">
+      <thead><tr><th>Node</th><th>CPUs</th><th>Memory (GiB)</th><th>GPUs</th></tr></thead>
+      <tbody>
+{% for n in open_ondemand_overview.nodes | default([]) %}
+        <tr><td>{{ n.name | e }}</td><td>{{ n.cpus }}</td><td>{{ (n.memory_mb | int) // 1024 }}</td><td>{{ n.gres | e }}</td></tr>
+{% endfor %}
+      </tbody>
+    </table>
+    <table class="table table-sm">
+      <thead><tr><th>Partition</th><th>Nodes</th><th>Time limit</th></tr></thead>
+      <tbody>
+{% for p in open_ondemand_overview.partitions | default([]) %}
+        <tr><td>{{ p.name | e }}</td><td>{{ p.nodes | e }}</td><td>{{ p.max_time | e }}</td></tr>
+{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

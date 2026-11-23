@@ -59,6 +59,22 @@ class Slurm(unittest.TestCase):
         self.assertIn("kill_wait_seconds", sf.slurm_values(None))
 
 
+class Cluster(unittest.TestCase):
+    def test_nodes_and_partitions_from_the_literal_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            (config / "files/slurm").mkdir(parents=True)
+            (config / "files/slurm/slurm.conf").write_text(
+                "NodeName=n1 NodeAddr=192.0.2.1 CPUs=8 RealMemory=1000 Gres=gpu:t:2{{ tmp_disk('n1') }}\n"
+                "PartitionName=p Nodes=n1 MaxTime=1-00:00:00 State=UP\n"
+            )
+            got = sf.cluster(config)
+        self.assertEqual(got["nodes"], [{"name": "n1", "cpus": 8, "memory_mb": 1000, "gres": "gpu:t:2"}])
+        self.assertEqual(got["partitions"], [{"name": "p", "nodes": "n1", "max_time": "1-00:00:00"}])
+        self.assertNotIn("192.0.2.1", json.dumps(got), "no address")
+        self.assertNotIn("cluster", sf.PUBLIC, "infrastructure stays private")
+
+
 class Dates(unittest.TestCase):
     def test_the_schedule_passes_only_dates(self):
         with tempfile.TemporaryDirectory() as tmp:
