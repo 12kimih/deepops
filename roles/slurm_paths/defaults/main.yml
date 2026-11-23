@@ -23,6 +23,15 @@ slurm_slurmctld_port: 6817
 # Where roles/nhc installs the node health check, for the role and for whatever runs it.
 nhc_install_dir: /usr
 nhc_program: "{{ nhc_install_dir }}/sbin/nhc"
+# NHC's bounds, here because slurmd runs it within slurm.conf's HealthCheckTimeout (60 s
+# unless set; roles/slurm refuses a slurm.conf whose bound is not above nhc_timeout).
+# Each nvidia-smi try (seconds), made once more when it times out: with persistence mode
+# on (roles/nvidia_driver) nvidia-smi answers in a second or two, so a hang is a stuck GPU.
+nhc_nvidia_smi_timeout: 10
+# NHC's own bound on a run (seconds), past which it drains the node with "Script timed
+# out"; its default, 30 s, ended runs before the nvidia-smi bound could. Sized from it:
+# the two nvidia-smi checks of a GPU node, each tried twice, and 15 s for the rest.
+nhc_timeout: "{{ 2 * 2 * nhc_nvidia_smi_timeout | int + 15 }}"
 
 # Directories each job sees as its own (Slurm's namespace/linux plugin, namespace.yaml):
 # empty when the job starts on a node, removed with all they hold when it ends, so jobs

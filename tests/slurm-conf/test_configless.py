@@ -183,6 +183,15 @@ class ControllerCheck(unittest.TestCase):
     def test_role_template_passes(self):
         self.assertTrue(self.passes(rendered("slurm_conf_template")))
 
+    def test_nhc_ends_before_slurmd_kills_it(self):
+        conf = rendered("slurm_conf_template")
+        self.assertTrue(self.passes(conf + "\nHealthCheckTimeout=120\n"))
+        self.assertFalse(self.passes(conf + "\nHealthCheckTimeout=30\n"), "below nhc_timeout")
+        self.assertFalse(self.passes(conf, nhc_nvidia_smi_timeout=20), "nhc_timeout 95 > the default 60")
+        self.assertTrue(
+            self.passes(conf + "\nHealthCheckTimeout=30\n", slurm_health_check_program=""), "no NHC"
+        )
+
     def test_refuses_a_template_without_configless(self):
         conf = rendered("slurm_conf_template").replace(
             "SlurmctldParameters=enable_configless", "SlurmctldParameters=rl_enable"

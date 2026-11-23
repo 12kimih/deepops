@@ -5,3 +5,6 @@ SLURM_SINFO={{ slurm_install_prefix }}/bin/sinfo
 SLURM_SCONTROL={{ slurm_install_prefix }}/bin/scontrol
 ONLINE_NODE={{ nhc_libexec_dir }}/nhc/node-mark-online
 OFFLINE_NODE={{ nhc_libexec_dir }}/nhc/node-mark-offline
+# NHC's bound on a whole run (nhc_timeout) and each nvidia-smi try's (deepops.nhc).
+TIMEOUT={{ nhc_timeout }}
+NV_SMI_TIMEOUT={{ nhc_nvidia_smi_timeout }}
