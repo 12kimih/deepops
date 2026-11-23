@@ -97,7 +97,19 @@ for test_file in "${test_files[@]}"; do
     suite="$(dirname "${test_file}")"
     if "${fast}" && [ -e "${suite}/.slow" ]; then continue; fi
     module="$(basename "${test_file}" .py)"
-    step "unit tests (${suite}/${module})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} '${strict}' -q '${module}'"
+    # A slow suite runs each test method as its own check, side by side
+    # (scripts/deepops/test_units.py); a file it cannot split runs whole.
+    unit_names=()
+    if [ -e "${suite}/.slow" ]; then
+        mapfile -t unit_names < <("${python}" scripts/deepops/test_units.py "${test_file}")
+    fi
+    if [ "${#unit_names[@]}" -gt 1 ]; then
+        for unit in "${unit_names[@]}"; do
+            step "unit tests (${suite}/${module}.${unit})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} '${strict}' -q '${module}.${unit}'"
+        done
+    else
+        step "unit tests (${suite}/${module})" "${isolated[@]}" bash -c "cd '${suite}' && ${python} '${strict}' -q '${module}'"
+    fi
 done
 
 # ansible-lint renders every template, which nothing else in --fast does; on all of
@@ -121,7 +133,11 @@ if ! "${fast}"; then
         echo "Missing tools; run scripts/setup.sh, or: sudo apt-get install ${missing[*]}" >&2
         exit 2
     fi
-    step "unit tests (scripts/validation/tests)" "${isolated[@]}" "${python}" "${strict}" discover -s scripts/validation/tests -q
+    # One check per file, side by side, as for tests/ (together they took four minutes).
+    mapfile -d '' -t validation_tests < <(git ls-files -z -- 'scripts/validation/tests/test_*.py')
+    for test_file in "${validation_tests[@]}"; do
+        step "unit tests (${test_file%.py})" "${isolated[@]}" "${python}" "${strict}" discover -s scripts/validation/tests -p "$(basename "${test_file}")" -q
+    done
     step "ansible-lint" ansible-lint -q
     for playbook in playbooks/slurm-cluster.yml playbooks/k8s-cluster.yml; do
         step "syntax-check ${playbook}" ansible-playbook -i config.example/inventory --syntax-check "${playbook}"
