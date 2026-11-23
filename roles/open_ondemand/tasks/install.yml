@@ -106,3 +106,30 @@
   notify:
     - Restart apache2
     - Stop the per-user servers
+
+# A system app picks any .sprockets-manifest-*.json in its assets: one an earlier build
+# left (dpkg's purge never removes a file no package owns) names assets that are gone,
+# and the dashboard answers 500 "dashboard.js is not present in the asset pipeline"
+# (2026-11-23). Every manifest no package owns goes to the backup directory; the per-user
+# servers then start fresh.
+- name: Move away the asset manifests no package owns
+  change_command:
+    argv: [sh, -c, "{{ _stale_manifests }}", stale-manifests, move, "{{ open_ondemand_backup_dir }}/stale-manifests"]
+    unless: [sh, -c, "{{ _stale_manifests }}", stale-manifests, list]
+  vars:
+    _stale_manifests: |
+      set -eu
+      found=0
+      for f in /var/www/ood/apps/sys/*/public/assets/.sprockets-manifest-*.json; do
+        [ -e "$f" ] || continue
+        dpkg -S "$f" >/dev/null 2>&1 && continue
+        found=1
+        if [ "$1" = move ]; then
+          app=${f#/var/www/ood/apps/sys/}; app=${app%%/*}
+          mkdir -p -m 0700 "$2"
+          mv -- "$f" "$2/$app-${f##*/}"
+          echo "moved $f"
+        fi
+      done
+      [ "$1" = move ] || [ "$found" = 0 ]
+  notify: Stop the per-user servers
