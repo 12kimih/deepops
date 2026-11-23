@@ -75,6 +75,23 @@ class Cluster(unittest.TestCase):
         self.assertNotIn("cluster", sf.PUBLIC, "infrastructure stays private")
 
 
+class Quota(unittest.TestCase):
+    def test_limited_filesystems_with_derived_files_and_warnings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp, "disk_quota_inodes_per_tib: 1000\n",
+                          {"h1": 'disk_quota_filesystems: {"/": {}, "/data": {block_hard: 2T}}\n',
+                           "h2": 'disk_quota_filesystems: {"/fast": {block_hard: 512G, inode_hard: 7}}\n'})  # fmt: skip
+            got = sf.facts(config)["quota"]
+        self.assertEqual(
+            got["/data"],
+            {"block_hard_tib": 2.0, "block_warn_tib": 1.8, "inode_hard": 2000, "inode_warn": 1800},
+        )
+        self.assertEqual(got["/fast"]["inode_hard"], 7, "an inode_hard of its own wins")
+        self.assertNotIn("/", got, "a filesystem that only counts has no limits to show")
+        self.assertEqual(sf.public({"quota": {"/data": dict(got["/data"], extra=1)}})["quota"]["/data"].keys(),
+                         sf.QUOTA_FIELDS)  # fmt: skip
+
+
 class Dates(unittest.TestCase):
     def test_the_schedule_passes_only_dates(self):
         with tempfile.TemporaryDirectory() as tmp:
