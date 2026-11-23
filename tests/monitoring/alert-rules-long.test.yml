@@ -123,16 +123,20 @@ tests:
   - name: hosts that stay apart for over a day warn, a difference that passes does not
     interval: 1h
     input_series:
-      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="libfoo", version="1.1"}'
+      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="libfoo", source="repo", version="1.1"}'
         values: '1x40'
-      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libfoo", version="1.0"}'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libfoo", source="repo", version="1.0"}'
         values: '1x40'
-      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="libbar", version="2.1"}'
+      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="libbar", source="repo", version="2.1"}'
         values: '1x40'
-      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libbar", version="2.0"}'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libbar", source="repo", version="2.0"}'
         values: '1x10 stale'
-      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libbar", version="2.1"}'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="libbar", source="repo", version="2.1"}'
         values: '_x11 1x29'
+      - series: 'os_updates_package_info{host="n1", instance="n1:9100", package="vendortool", source="local", version="4.2"}'
+        values: '1x40'
+      - series: 'os_updates_package_info{host="n2", instance="n2:9100", package="vendortool", source="local", version="4.1"}'
+        values: '1x40'
       - series: 'node_uname_info{host="n1", instance="n1:9100", release="6.8.0-149-generic"}'
         values: '1x40'
       - series: 'node_uname_info{host="n2", instance="n2:9100", release="6.8.0-147-generic"}'
@@ -144,10 +148,14 @@ tests:
       - eval_time: 30h
         alertname: OsPackageVersionsDiffer
         exp_alerts:
-          - exp_labels: {severity: warning, package: libfoo}
+          - exp_labels: {severity: warning, package: libfoo, source: repo}
             exp_annotations:
               summary: "libfoo is installed at 2 different versions across the hosts"
               description: "`count by (version, host) (os_updates_package_info{package=\"libfoo\"})` shows which host has which; `ansible-playbook -K playbooks/utilities/apt-upgrade.yml` brings them level."
+          - exp_labels: {severity: warning, package: vendortool, source: local}
+            exp_annotations:
+              summary: "vendortool is installed at 2 different versions across the hosts"
+              description: "`count by (version, host) (os_updates_package_info{package=\"vendortool\"})` shows which host has which; no apt source offers it, so an upgrade cannot change it: rerun the role that installs it (`grep -rln vendortool roles/`)."
       - eval_time: 30h
         alertname: OsKernelsDiffer
         exp_alerts:

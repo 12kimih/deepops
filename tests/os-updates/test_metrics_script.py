@@ -17,9 +17,9 @@ from sandbox_path import sandbox_path  # noqa: E402
 
 SCRIPT = Path(__file__).resolve().parents[2] / "roles/os_updates/files/os-updates-metrics"
 # What the script runs besides the package tools each test fakes (dpkg, dpkg-query,
-# apt-get): never the host's, whose packages and pending reboot are not the test's.
+# apt-get, apt): never the host's, whose packages and pending reboot are not the test's.
 TOOLS = ("sh", "awk", "cat", "chmod", "date", "grep", "mkdir", "mktemp", "mv", "rm", "sed")
-STUBS = {"dpkg": "exit 0\n", "dpkg-query": "exit 0\n", "apt-get": "exit 0\n"}
+STUBS = {"dpkg": "exit 0\n", "dpkg-query": "exit 0\n", "apt-get": "exit 0\n", "apt": "exit 0\n"}
 
 
 def environment(bin_, state, run=None, flag=None, **stubs):
@@ -73,10 +73,25 @@ class PackageInfoTests(unittest.TestCase):
             self.assertEqual(
                 lines,
                 [
-                    'os_updates_package_info{package="libc6:amd64",version="2.39-0ubuntu8.6"} 1',
-                    'os_updates_package_info{package="linux-image-generic",version="6.8.0-149.149"} 1',
+                    'os_updates_package_info{package="libc6:amd64",version="2.39-0ubuntu8.6",source="repo"} 1',
+                    'os_updates_package_info{package="linux-image-generic",version="6.8.0-149.149",source="repo"} 1',
                 ],
             )
+
+    def test_a_package_no_source_offers_is_local(self):
+        # A .deb installed from a URL (enroot, a vendor tool): apt-upgrade cannot level it,
+        # only the role that installs it; apt list marks it [installed,local].
+        with tempfile.TemporaryDirectory() as d:
+            bin_, state, textfile = Path(d, "bin"), Path(d, "state"), Path(d, "textfile")
+            query = "printf 'ii |enroot|4.2.0-1\\nii |libc6:amd64|2.39-0ubuntu8.6\\n'\n"
+            listed = "printf 'Listing...\\nenroot/now 4.2.0-1 amd64 [installed,local]\\nlibc6/noble,now 2.39 amd64 [installed]\\n'\n"
+            env = environment(bin_, state, **{"dpkg-query": query, "apt": listed})
+            subprocess.run(["sh", str(SCRIPT), str(textfile)], env=env, check=True, capture_output=True)
+            text = (textfile / "os-updates.prom").read_text()
+            self.assertIn(
+                'os_updates_package_info{package="enroot",version="4.2.0-1",source="local"} 1', text
+            )
+            self.assertIn('package="libc6:amd64",version="2.39-0ubuntu8.6",source="repo"', text)
 
 
 class BootRepublishTests(unittest.TestCase):
