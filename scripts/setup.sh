@@ -180,6 +180,9 @@ fi
 if [ -d "${CONFIG_DIR}/.git" ] && [ -n "${MAIN_WORKTREE}" ] && [ "$(cd "${MAIN_WORKTREE}" && pwd -P)" = "$(cd "${REPO_DIR}" && pwd -P)" ] ; then
     install_hook "${CONFIG_DIR}" pre-commit config-pre-commit.sh
     install_hook "${CONFIG_DIR}" reference-transaction branch-guard.sh
+    # Its commit messages follow deepops's rule, checked as made and as pushed.
+    install_hook "${CONFIG_DIR}" commit-msg commit_message.py
+    install_hook "${CONFIG_DIR}" pre-push commit_message.py
 fi
 
 # Install the Galaxy collections and roles (roles/requirements.yml, then config/requirements.yml)

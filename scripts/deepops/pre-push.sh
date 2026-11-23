@@ -9,7 +9,7 @@ refs="$(cat)"
 [ -n "${refs}" ] || exit 0
 guards="$(dirname "$(readlink -f "$0")")"
 status=0
-for guard in sensitive_guard.py no_silent_revert.py ; do
+for guard in sensitive_guard.py no_silent_revert.py commit_message.py ; do
     printf '%s\n' "${refs}" | "${guards}/${guard}" push || status=1
 done
 exit "${status}"
