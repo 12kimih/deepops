@@ -9,6 +9,7 @@ Run as root on the portal host:
 import argparse
 import functools
 import json
+import os
 import re
 import shutil
 import socket
@@ -27,6 +28,7 @@ from cluster_tools import proc  # noqa: E402
 PACKAGES = ["ondemand", "ondemand-dex", "ondemand-nginx", "ondemand-passenger", "nodejs"]
 # The role installs this check with its package and conffile lists (one source).
 DPKG_VERIFY = "/usr/local/sbin/open-ondemand-dpkg-verify"
+BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 CLUSTERS_D = Path("/etc/ood/config/clusters.d")
 
 
@@ -89,8 +91,13 @@ def check_tls_and_login(result, url, host, port, min_days):
             return None
 
     opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ctx))
+    # As a browser asks: mod_auth_openidc answers a request that accepts no HTML (urllib
+    # sends no Accept) with 401 instead of the redirect to the login.
+    request = urllib.request.Request(
+        url.rstrip("/") + "/pun/sys/dashboard", headers={"Accept": BROWSER_ACCEPT}
+    )
     try:
-        resp = opener.open(url.rstrip("/") + "/pun/sys/dashboard", timeout=15)
+        resp = opener.open(request, timeout=15)
         status, location = resp.status, resp.headers.get("Location", "")
     except urllib.error.HTTPError as exc:
         with exc:  # the error is the response
@@ -149,6 +156,15 @@ def main(argv=None):
     parser.add_argument("--min-cert-days", type=int, default=30)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+
+    # dpkg -V reads package files only root may read: unprivileged, each would count as a
+    # difference.
+    if os.geteuid() != 0:
+        print(
+            "validate_open_ondemand.py: run as root (sudo): dpkg -V reads files only root can",
+            file=sys.stderr,
+        )
+        return 2
 
     parts = urlsplit(args.url)
     if parts.scheme != "https" or not parts.hostname:
