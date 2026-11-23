@@ -240,7 +240,7 @@ holds stayed at or under `slurm_usage_report_idle_util_threshold` percent the wh
 it: `mention` in the report thread, `dm`, both, or `[]` for neither. Each person is told
 once for all their idle jobs (one line in the thread, one mention, one DM), when a job of
 theirs first turns idle and then every `slurm_usage_report_notify_repeat_hours` while any
-stays idle, not on every report; the thread lists idle jobs either way.
+stays idle (0, the default: on every report); the thread lists idle jobs either way.
 `slurm_usage_report_cancel_after_hours` cancels any job, batch or interactive, whose GPUs
 sat idle that long (0 = never) and says so in the report thread. A job is cancelled only
 after its owner was told of it in an earlier report and warned
@@ -267,7 +267,7 @@ roster's active logins, `slurm_usage_report_people`), with their day's growth an
 everyone else there (root, the services, people who left) on one line; and the projects. `slurm_usage_report_disk_notify` says
 how the people past a level hear about it: `mention` on the card, `dm`, both, or `[]`.
 They are told when they first pass a level, every day while at a hard limit (their
-writes fail), and again every `slurm_usage_report_disk_repeat_days` (7) while past the
+writes fail), and again every `slurm_usage_report_disk_repeat_days` while past the
 same warn level (0: every day); the card lists everyone past a level every day, mentioning
 only those told. Who was told when is kept in `disk.json` beside the hourly state.
 A host whose usage was not reported in the last hour is named, since its figures are

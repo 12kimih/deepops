@@ -53,9 +53,10 @@ slurm_usage_report_idle_util_threshold: 0
 # How the owners of idle jobs are told, once per person for all their idle jobs: any of
 # mention (in the report thread) and dm; [] lists idle jobs without telling anyone. Told
 # when a job of theirs first turns idle, then every notify_repeat_hours while any stays
-# idle (cluster_tools.notices).
+# idle (cluster_tools.notices); 0 (the default) tells them on every hourly report while
+# it lasts (owner, 2026-11-23): the idle-job cancel bounds how long that goes on.
 slurm_usage_report_notify: [mention]
-slurm_usage_report_notify_repeat_hours: 6
+slurm_usage_report_notify_repeat_hours: 0
 # The DM (with dm in notify): {jobs} (one line each), {count}, {hours} (idle_hours).
 slurm_usage_report_dm_text: |-
   {count} of your jobs have had idle GPUs for {hours}h or more:
