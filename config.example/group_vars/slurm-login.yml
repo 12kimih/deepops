@@ -22,5 +22,10 @@
 #disk_quota_filesystems:  # example
 #  /: {block_hard: 20G, inode_hard: 500k}
 #disk_quota_projects: {}
+# The folders worth cleaning for the daily disk report, weighed weekly: base globs per
+# filesystem (the scratch space weighs its own: never list it here).
+#disk_quota_scan: {}
+#disk_quota_scan:  # example
+#  /home: ["/home/*", "/home/shared/projects/*"]
 #disk_quota_projects:  # example
 #  /home/shared/datasets: {id: 101, block_hard: 20T}

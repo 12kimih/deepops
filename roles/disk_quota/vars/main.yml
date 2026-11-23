@@ -2,7 +2,8 @@
 _disk_quota_command: /usr/local/libexec/disk-quota
 _disk_quota_config: "{{ cluster_tools_lib_config_dir }}/disk-quota.json"
 _disk_quota_textfile: "{{ node_exporter_prom_dir }}/disk-quota.prom"
-_disk_quota_units: [disk-quota.service, disk-quota.timer]
+_disk_quota_scan_textfile: "{{ node_exporter_prom_dir }}/disk-quota-scan.prom"
+_disk_quota_units: [disk-quota.service, disk-quota.timer, disk-quota-scan.service, disk-quota-scan.timer]
 _disk_quota_roster: "{{ people | default({}) }}"
 _disk_quota_cfg:
   filesystems: "{{ _disk_quota_roster | people_disk_quotas(disk_quota_filesystems) }}"
@@ -13,11 +14,18 @@ _disk_quota_cfg:
   inodes_per_tib: "{{ disk_quota_inodes_per_tib | int }}"
   projects: "{{ disk_quota_projects | project_filesystems(ansible_facts.mounts) }}"
   textfile: "{{ _disk_quota_textfile }}"
+  scan: "{{ disk_quota_scan }}"
+  scan_textfile: "{{ _disk_quota_scan_textfile }}"
+  scan_top: "{{ cluster_cleanup_top | int }}"
+  scan_max_entries: "{{ disk_quota_scan_max_entries | int }}"
+  stale_days: "{{ cluster_user_stale_days | int }}"
 
 # What this component installs, for its record (roles/component_record): the timer and
 # its service before their files. The cluster tools' directory stays (shared).
 disk_quota_items: >-
-  {{ ['package:quota', 'unit:disk-quota.timer', 'unit:disk-quota.service']
+  {{ ['package:quota', 'unit:disk-quota.timer', 'unit:disk-quota.service',
+      'unit:disk-quota-scan.timer', 'unit:disk-quota-scan.service']
      + _disk_quota_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
      + ['file:' ~ _disk_quota_command, 'file:' ~ _disk_quota_config, 'file:' ~ _disk_quota_textfile,
+        'file:' ~ _disk_quota_scan_textfile,
         'file:' ~ cluster_tools_lib_config_records ~ '/disk_quota.json'] }}

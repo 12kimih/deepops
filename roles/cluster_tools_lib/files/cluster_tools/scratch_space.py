@@ -32,6 +32,8 @@ person once per new removal date, from this run's textfile metrics:
   scratch_space_purge_scanned_files, scratch_space_purge_truncated
   scratch_space_purge_stale_days
   scratch_space_last_success_timestamp_seconds
+  disk_cleanup_candidate_bytes, disk_cleanup_candidate_unused_days (the cleanup_top
+  folders most worth cleaning, cluster_tools.cleanup, from the same walk)
 
 Refreshing access times only to escape the cleanup is against the cluster's rules;
 the burst figure makes it visible, and nothing is done about it automatically.
@@ -46,7 +48,8 @@ import sys
 import time
 from collections import defaultdict
 
-from . import config
+from . import cleanup, config
+from .cleanup import last_use, walk
 from .cli import Command, Opt, run_main
 from .files import write_atomic
 from .prom import key, render
@@ -68,6 +71,7 @@ CONFIG_KEYS = {
     "burst_files": int,
     "burst_share": float,
     "burst_window": int,
+    "cleanup_top": int,
     "state": str,
     "textfile": str,
 }
@@ -140,11 +144,6 @@ class Host:
             os.close(dfd)
 
 
-def last_use(st):
-    """When a file was last used: read (its access time, relatime) or written."""
-    return max(st.st_atime, st.st_mtime)
-
-
 def escape(path):
     """PATH (str, any bytes as surrogates) on one line: backslash, tab and newline escaped."""
     return path.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
@@ -163,34 +162,12 @@ def unescape(text):
     return "".join(out)
 
 
-def walk(host, top, dev, skip, budget):
-    """(path, lstat) of every regular file and symbolic link under TOP (str) on device
-    DEV, never following a link nor entering another filesystem, SKIP (paths) left out;
-    BUDGET ([n]) counts the entries looked at down to 0, which stops the walk."""
-    stack = [top]
-    while stack:
-        path = stack.pop()
-        try:
-            entries = list(host.scandir(path))
-        except OSError:
-            continue
-        for entry in entries:
-            if budget[0] <= 0:
-                return
-            budget[0] -= 1
-            child = os.path.join(path, entry.name)
-            if child in skip:
-                continue
-            try:
-                st = host.lstat(child)
-            except OSError:
-                continue
-            if st.st_dev != dev:
-                continue
-            if stat.S_ISDIR(st.st_mode):
-                stack.append(child)
-            elif stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode):
-                yield child, st
+def projects_of(host, cfg):
+    """The collaboration folders' names under the projects directory."""
+    try:
+        return sorted(e.name for e in host.scandir(cfg["projects"]))
+    except OSError:
+        return []
 
 
 def tops(host, cfg):
@@ -359,8 +336,8 @@ def write_lists(host, cfg, due, now, say):
             say(f"could not write the list of {login}: {e}")
 
 
-def metrics(cfg, due, bursts, removed, scanned, truncated, now):
-    values = {}
+def metrics(cfg, due, bursts, removed, scanned, truncated, now, candidates=()):
+    values = cleanup.values(cfg["root"], candidates, now) if candidates is not None else {}
     per = defaultdict(lambda: [0, 0, None])
     for entry in due.values():
         p = per[entry["user"]]
@@ -386,6 +363,12 @@ def purge(host, cfg, now, check=False, say=print):
     """One daily run; with CHECK, says what it would remove and changes nothing."""
     state = load_state(cfg["state"])
     files, _, bursts, scanned, truncated = scan(host, cfg, now)
+    # The folders worth cleaning, from the same walk (cluster_tools.cleanup).
+    folders = cleanup.Folders([os.path.join(cfg["root"], login) for login in cfg["people"]]
+                              + [os.path.join(cfg["projects"], d) for d in projects_of(host, cfg)])  # fmt: skip
+    for path, (owner, nbytes, used) in files.items():
+        folders.add(path, owner, nbytes, used)
+    candidates = folders.ranked(now, cfg["stale_days"], cfg["cleanup_top"])
     due = plan(cfg, files, state, truncated, now)
     removed = remove(host, cfg, due, now, check, say)
     if truncated:
@@ -394,7 +377,7 @@ def purge(host, cfg, now, check=False, say=print):
         return
     write_atomic(cfg["state"], json.dumps({"due": due}), mode=0o600)
     write_lists(host, cfg, due, now, say)
-    write_atomic(cfg["textfile"], metrics(cfg, due, bursts, removed, scanned, truncated, now))
+    write_atomic(cfg["textfile"], metrics(cfg, due, bursts, removed, scanned, truncated, now, candidates))
 
 
 # What a person sees.

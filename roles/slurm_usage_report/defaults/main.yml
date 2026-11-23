@@ -32,6 +32,11 @@ slurm_usage_report_disk_notify: [mention]
 # fail), and again every repeat_days while past the same warn level (0: every day). The
 # card lists everyone past a level every day, mentioning only those told.
 slurm_usage_report_disk_repeat_days: 7
+# A filesystem at least cluster_disk_fill_fraction full: its this many largest people are
+# named on the card every day, mentioned at most every disk_repeat_days. The thread also
+# lists each filesystem's folders worth cleaning (cluster_cleanup_top of them, from the
+# scans of roles/disk_quota and roles/scratch_space).
+slurm_usage_report_disk_fill_mentions: 5
 # The people the disk report ranks (the roster's active logins); everyone else on a disk
 # (root, the services, people who left) is one line. [] ranks every user.
 slurm_usage_report_people: "{{ people | people_active | list | sort }}"

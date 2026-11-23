@@ -17,7 +17,9 @@ channel with the weeks' numbers, their jobs now and what to do.
 With --disk it posts the day's disk usage instead (cluster_tools.disk_report, from
 the disk quota metrics): every counted filesystem, its largest people (config people,
 the roster's) and projects, and everyone past a warn level, mentioned or sent a DM
-(disk_notify). Standard library only.
+(disk_notify); a filesystem at least disk_fill full names its disk_fill_mentions largest
+people, mentioned at most every disk_repeat_days; and the folders worth cleaning
+(unused past stale_days, cluster_tools.cleanup). Standard library only.
 """
 
 import argparse
@@ -392,6 +394,7 @@ CONFIG_KEYS = {
     "cancel_warn_hours": (int, float), "cancel_warn_text": str, "disk_top": int,
     "disk_notify": list, "disk_repeat_days": (int, float), "people": list,
     "holds_on": bool, "holds_from": (int, float),
+    "disk_fill": (int, float), "disk_fill_mentions": int, "stale_days": int,
 }  # fmt: skip
 
 
@@ -405,6 +408,8 @@ def load_config(path):
             raise ConfigError(f"{path}: {key} takes only {', '.join(sorted(NOTIFY))}")
     if cfg["disk_top"] < 1:
         raise ConfigError(f"{path}: disk_top must be 1 or more")
+    if not 0 < cfg["disk_fill"] <= 1:
+        raise ConfigError(f"{path}: disk_fill is a fraction above 0, at most 1")
     if cfg["disk_repeat_days"] < 0:
         raise ConfigError(f"{path}: disk_repeat_days must be 0 (every day) or more")
     if cfg["idle_hours"] <= 0:
@@ -654,18 +659,29 @@ def disk(cfg, args):
     preview = args.dry_run or bool(args.to)
     notify = cfg["disk_notify"]
     rows = disk_report.over_warn(data)
+    # A filesystem filling up names its largest people every day, mentioning them when
+    # its notice is due: at most every disk_repeat_days, like a warn level.
+    fill = disk_report.fill_rows(data, cfg["disk_fill"], set(cfg["people"]), cfg["disk_fill_mentions"])
+    # One call over every key of this record: notices.due forgets the keys it is not
+    # given, so a second call on the same record would erase the first's.
     keys = set(
         notices.due(
-            [disk_report.row_key(r) for r in rows], told, now, cfg["disk_repeat_days"] * disk_report.DAY,
+            [disk_report.row_key(r) for r in rows] + [disk_report.fill_key(k) for k, _, _ in fill],
+            told, now, cfg["disk_repeat_days"] * disk_report.DAY,
             urgent={disk_report.row_key(r) for r in rows if r[4][0][3] == "hard"}, leeway=disk_report.LEEWAY,
         )
     )  # fmt: skip
     due = [r for r in rows if disk_report.row_key(r) in keys]
+    fill_due = {disk_report.fill_key(k) for k, _, _ in fill} & keys
     who = namer(cfg, slack, cache)
     hold = cfg["holds_from"] if cfg["holds_on"] else None
     card, thread = disk_report.render(
-        data, who, cfg["disk_top"], set(cfg["people"]), keys if "mention" in notify else set(), hold
-    )
+        data, who, cfg["disk_top"], set(cfg["people"]), keys if "mention" in notify else set(), hold,
+        fill=fill, fill_mention=fill_due, stale_days=cfg["stale_days"],
+    )  # fmt: skip
+    if not preview:
+        for k in fill_due:
+            told[k] = int(now)
     post_thread(slack, slack.channel(args.to) if args.to else cfg["channel"], card, thread)
     failures = []
     for row in due:

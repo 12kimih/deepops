@@ -83,12 +83,13 @@
   loop: "{{ _disk_quota_units }}"
   register: disk_quota_units
 
-- name: Export the usage metrics regularly
+- name: Export the usage metrics regularly, and weigh the folders weekly
   systemd_unit:
-    name: disk-quota.timer
+    name: "{{ item }}"
     enabled: true
     state: "{{ 'restarted' if disk_quota_units is changed else 'started' }}"
     daemon_reload: true
+  loop: [disk-quota.timer, disk-quota-scan.timer]
   when: not deepops_containerized | bool
 
 - name: Record the component as present

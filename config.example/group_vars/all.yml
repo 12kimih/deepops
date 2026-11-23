@@ -194,6 +194,10 @@
 # Every personal warning at this fraction of the limit it warns about (a person's warn
 # level of each hard limit).
 #cluster_user_warn_fraction: 0.9
+# How full a filesystem is before the daily disk report mentions its largest users.
+#cluster_disk_fill_fraction: 0.8
+# How many folders worth cleaning each filesystem's scan names for the daily report.
+#cluster_cleanup_top: 20
 
 ################################################################################
 # STORAGE                                                                      #

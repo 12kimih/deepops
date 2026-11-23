@@ -1,0 +1,16 @@
+{{ ansible_managed | comment }}
+# roles/disk_quota
+[Unit]
+Description=Weigh the folders worth cleaning on the counted filesystems
+
+[Service]
+Type=oneshot
+# A walk of every file of a home server: hours.
+TimeoutStartSec=1d
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _disk_quota_command }} {{ _disk_quota_config }} scan
+# Behind what people do, yet always moving: the lowest best-effort I/O priority, never
+# the idle class, which a busy disk can starve.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

@@ -339,3 +339,36 @@ class Cli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Scan(unittest.TestCase):
+    """The weekly scan weighs each base's folders (cluster_tools.cleanup) and writes them."""
+
+    def test_old_large_folders_are_named_recent_ones_never(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            now = 2_000_000_000
+            for rel, days in (("alice/old/a.bin", 200), ("alice/live/b.bin", 2), ("bob/stuff/c.bin", 90)):
+                path = os.path.join(tmp, rel)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as f:
+                    f.write(b"x" * 10)
+                os.utime(path, (now - days * 86400, now - days * 86400))
+
+            class Real(dq.Host):
+                def owner(self, uid):
+                    return "someone"
+
+            cfg = {
+                "scan": {tmp: [os.path.join(tmp, "*")]},
+                "scan_top": 5,
+                "scan_max_entries": 1000,
+                "stale_days": 60,
+            }
+            text = prom.render(dq.scan(Real(), cfg, now))
+            named = [line for line in text.splitlines() if line.startswith("disk_cleanup_candidate_bytes")]
+            self.assertEqual(len(named), 2)
+            self.assertTrue(any("/alice/old" in n for n in named) and any("/bob/stuff" in n for n in named))
+            self.assertNotIn("/alice/live", text)

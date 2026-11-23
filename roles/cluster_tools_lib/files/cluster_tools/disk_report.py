@@ -1,7 +1,10 @@
 """disk_report: the daily disk usage report, from the disk quota metrics.
 
     data = collect(prometheus, now)        -> what every counted filesystem holds, or None
-    (text, blocks), thread = render(data, who, top, people, mention)
+    (text, blocks), thread = render(data, who, top, people, mention, fill=...)
+    fill_rows(data, fraction, people, n)   -> [(disk key, fill, [(user, used)])] of the
+                                              filesystems at least FRACTION full
+    fill_key(disk key)                     -> the key of a filesystem's fill notice
     over_warn(data)                        -> the people past a warn level, with figures
     row_key(row)                           -> the key of a person's notices (cluster_tools.notices)
     purge = collect_purge(prometheus)      -> each person's files the scratch cleanup lists
@@ -15,7 +18,12 @@ projects (directory trees with one limit). Everyone past a warn level is named: 
 warn level only notifies, and the hard limit is the one the kernel enforces, at once.
 A person is told (mentioned, or sent a DM) when they first pass a level, every day at
 a hard limit, and again every repeat_days while past the same warn level; the card
-lists everyone past a level every day. It reads Prometheus and changes nothing;
+lists everyone past a level every day. A filesystem at least the fill fraction full
+names its largest people on the card every day, with a mention when its fill notice is
+due (cluster_tools.notices: at most every repeat_days). The thread lists each
+filesystem's folders worth cleaning (cluster_tools.cleanup's metrics: unused past the
+stale period, the largest and longest unused first), never with a mention. It reads
+Prometheus and changes nothing;
 cluster_tools.usage_report --disk posts it.
 Python 3.9 or newer, standard library only.
 """
@@ -101,7 +109,50 @@ def collect(prom, now):
         for k in sorted(counted)
     }
     reported = {k[0]: v for k, v in series(prom, "disk_quota_last_success_timestamp_seconds", ()).items()}
-    return {"now": now, "disks": disks, "users": users, "projects": projects, "reported": reported}
+    return {"now": now, "disks": disks, "users": users, "projects": projects, "reported": reported,
+            "cleanup": collect_cleanup(prom)}  # fmt: skip
+
+
+def collect_cleanup(prom):
+    """{(host, filesystem): [{path, user, bytes, unused_days}]}, the most worth cleaning
+    first (cluster_tools.cleanup's metrics, from whichever host scanned)."""
+    nbytes = series(prom, "disk_cleanup_candidate_bytes", ("filesystem", "path", "user"))
+    unused = series(prom, "disk_cleanup_candidate_unused_days", ("filesystem", "path", "user"))
+    out = {}
+    for k, v in nbytes.items():
+        out.setdefault(k[:2], []).append(
+            {"path": k[2], "user": k[3], "bytes": v, "unused_days": int(unused.get(k, 0))}
+        )
+    for rows in out.values():
+        rows.sort(key=lambda c: (-(c["bytes"] * c["unused_days"]), c["path"]))
+    return out
+
+
+def fill_rows(data, fraction, people=(), n=5):
+    """[(disk key, fill (0-1), [(user, used)])]: each filesystem at least FRACTION full,
+    with its N largest users among PEOPLE (everyone without a roster)."""
+    out = []
+    for key, disk in data["disks"].items():
+        if not disk["size"] or disk["avail"] is None:
+            continue
+        fill = (disk["size"] - disk["avail"]) / disk["size"]
+        if fill < fraction:
+            continue
+        users = sorted(
+            (
+                (u, e["used"])
+                for (h, f, u), e in data["users"].items()
+                if (h, f) == key and (not people or u in people)
+            ),
+            key=lambda r: (-r[1], r[0]),
+        )
+        out.append((key, fill, users[:n]))
+    return out
+
+
+def fill_key(key):
+    """A filesystem's fill notice in the notices' record: "fill host filesystem"."""
+    return "fill " + " ".join(key)
 
 
 def past(entry):
@@ -194,12 +245,14 @@ def others_line(rest, shown=3):
     return f"Not in the roster (root, services, people who left): {names}{more}; {size(sum(e['used'] for _, e in rest))} together"
 
 
-def render(data, who, top, people=(), mention=None, hold=None):
+def render(data, who, top, people=(), mention=None, hold=None, fill=None, fill_mention=(), stale_days=0):
     """The summary card (text, blocks) and the thread [(text, blocks)]: every disk and
-    everyone past a level on the card; each filesystem's TOP people, everyone else, and
-    the projects in the thread. With no PEOPLE (no roster) every user is ranked. Of those
-    past a level, the keys in MENTION (row_key) are mentioned; None mentions them all.
-    HOLD (hold_note) says what a hard limit means for their Slurm jobs."""
+    everyone past a level on the card; each filesystem's TOP people, everyone else, the
+    projects and the folders worth cleaning in the thread. With no PEOPLE (no roster)
+    every user is ranked. Of those past a level, the keys in MENTION (row_key) are
+    mentioned; None mentions them all. HOLD (hold_note) says what a hard limit means for
+    their Slurm jobs. FILL (fill_rows) names the largest people of each fuller
+    filesystem, mentioned where its fill_key is in FILL_MENTION."""
     stamp = datetime.fromtimestamp(data["now"]).strftime("%Y-%m-%d")
     rows = over_warn(data)
     full = []
@@ -217,6 +270,15 @@ def render(data, who, top, people=(), mention=None, hold=None):
             + "\n".join(
                 past_line(r, who, mention is None or row_key(r) in mention, hold_note(hold, data["now"]))
                 for r in rows
+            )
+        )
+    if fill:
+        card += sections(
+            "*Filling up*: the largest users, please free what you can\n"
+            + "\n".join(
+                f":large_orange_circle: *{where(*key)}* {100 * frac:.0f}% full: "
+                + ", ".join(f"{who(u, fill_key(key) in fill_mention)} {size(used)}" for u, used in users)
+                for key, frac, users in fill
             )
         )
     stale = sorted(
@@ -266,6 +328,10 @@ def render(data, who, top, people=(), mention=None, hold=None):
         ]
         head = ":open_file_folder: *Projects* (a directory tree with one limit)"
         detail += sections(f"{head}\n{table(('PROJECT', 'ON', 'USED', 'DAY', 'WARN', 'HARD'), body)}")
+    for key, rows in sorted((data.get("cleanup") or {}).items()):
+        body = [(c["path"], c["user"], size(c["bytes"]), f"{c['unused_days']}d") for c in rows]
+        head = f":broom: *{where(*key)}*, folders worth cleaning (unused over {stale_days} days, the largest and longest unused first)"
+        detail += sections(f"{head}\n{table(('FOLDER', 'OWNER', 'SIZE', 'UNUSED'), body)}")
     thread = [("Disk usage details", detail[i : i + MAX_BLOCKS]) for i in range(0, len(detail), MAX_BLOCKS)]
     return (text, card), thread
 
