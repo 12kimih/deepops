@@ -268,10 +268,13 @@ class VllmTests(unittest.TestCase):
 
     def test_dripping_body_hits_elapsed_guard_not_socket_timeout(self):
         # Every byte arrives before the socket timeout, but the full body takes
-        # longer than the elapsed budget. Without that guard all checks pass.
-        self.responses["/health"] = (200, b"x" * 20, {}, 0)
-        with endpoint(self.responses, drip_interval=0.02) as (url, requests):
-            result = self.run_validator(url, "--timeout", "0.1")
+        # longer than the elapsed budget. Without that guard all checks pass. The gap
+        # between bytes (10 ms) is 50 times under the timeout, so a loaded host (two
+        # full checks at once) cannot stretch one gap past it and hit the socket
+        # timeout instead; the body (200 bytes, 2 s) is four times the budget.
+        self.responses["/health"] = (200, b"x" * 200, {}, 0)
+        with endpoint(self.responses, drip_interval=0.01) as (url, requests):
+            result = self.run_validator(url, "--timeout", "0.5")
         self.assertFalse(result["ok"])
         self.assertEqual(result["errors"][0]["stage"], "health")
         self.assertIn("time limit", result["errors"][0]["message"])
