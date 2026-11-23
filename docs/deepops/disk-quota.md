@@ -65,6 +65,15 @@ work on ext4 and XFS.
 
 ## Count first, then limit
 
+Journaled quota files (ext4 without its quota feature) are kept current only while
+quotas are on: every time the role turns them on it counts afresh first (quotacheck, at
+low priority, up to a day on a large filesystem). Writes during that count are still
+missed, so before limits go on, recount when the filesystem is quiet:
+`sudo quotaoff -u <mount>`, then `playbooks/generic/disk-quota.yml` for the host (it
+counts and turns quotas on again). ext4's quota feature (below) keeps exact counts in
+the kernel and never needs this; move to it at the next window that can unmount the
+filesystem.
+
 A filesystem with `{}` (the default) only counts. A timer exports the usage
 every 15 minutes:
 

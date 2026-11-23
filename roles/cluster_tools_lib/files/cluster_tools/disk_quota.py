@@ -234,12 +234,16 @@ def filesystem_steps(host, mount, cfg):
     if not all(o in live for o in options):
         _refuse_options(mount, ",".join(options))
     steps = []
-    quota_file = os.path.join(mount, QUOTA_FILE)
-    if not feature and not host.exists(quota_file):
+    off = not re.search(r"\bis on\b", host.run(["quotaon", "-pu", mount], check=False))
+    # Journaled quota files are kept current only while quotas are on: whatever was
+    # written while they were off is not in them, an old count included (a quotacheck
+    # finished hours before the quotaon, 2026-11-23). So every turning on counts afresh
+    # first; with ext4's quota feature the kernel keeps the counts itself.
+    if not feature and off:
         check = ["quotacheck", "-cum", mount]
         steps.append((" ".join(check), lambda: host.scan(check)))
     # quotaon on a filesystem whose quotas are on already fails: asked only when off.
-    if steps or not re.search(r"\bis on\b", host.run(["quotaon", "-pu", mount], check=False)):
+    if off:
         on = ["quotaon", "-u", mount]
         steps.append((" ".join(on), lambda: host.run(on)))
     return steps

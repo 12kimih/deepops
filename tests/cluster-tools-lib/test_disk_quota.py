@@ -162,6 +162,15 @@ class Apply(unittest.TestCase):
         self.assertNotIn("3", argv[0][argv[0].index("-c") + 1], "never the idle class: it can starve")
         self.assertEqual(kwargs["timeout"], dq.SCAN_TIMEOUT)
 
+    def test_an_old_count_is_redone_before_quotas_go_on(self):
+        # A quota file from an earlier quotacheck, quotas off since: writes in between are
+        # not in it, so it is counted again before quotaon; once on, nothing is redone.
+        steps = plan(FakeHost(quota_file=True, on=False), {"filesystems": {"/": {}}, "release": [], **LEVELS})
+        self.assertEqual(steps, ["quotacheck -cum /", "quotaon -u /"])
+        self.assertEqual(
+            plan(FakeHost(quota_file=True, on=True), {"filesystems": {"/": {}}, "release": [], **LEVELS}), []
+        )
+
     def test_a_mount_without_its_quota_options_is_refused_naming_them(self):
         with self.assertRaisesRegex(
             dq.Error,
