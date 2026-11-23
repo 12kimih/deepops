@@ -14,7 +14,8 @@ for the supported CLI version, exact configuration and working download example.
 1. Confirm the approved existing NFS mount, one designated writer account,
    reader group, model license/access, available capacity and immutable revision.
    Do not create mounts, change exports, create users, or grant access implicitly.
-2. Review `config/inventory` and `config/group_vars/model-cache-warmer.yml`.
+2. Review `config/inventory`, `config/group_vars/model-cache-warmer.yml` and, in
+   `config/group_vars/all.yml`, `model_cache_root` and `user_environment.HF_HUB_CACHE`.
    Exactly one host belongs to `model-cache-warmer`. All readers need matching
    numeric group IDs and an existing mount at the intended workload path.
 3. Keep `HF_HOME`, `HF_TOKEN_PATH` and `HF_XET_CACHE` private; share only
@@ -29,7 +30,7 @@ for the supported CLI version, exact configuration and working download example.
    Apply without `--check --diff` only to the approved writer and cache path.
    The playbook must finish with `failed=0`; repeat once to check `changed=0`.
    A successful playbook **does not mean a model is cached**.
-2. As the writer, use `umask 0027`, source the generated `environment.sh`, and run
+2. As the writer, use `umask 0027`, check `HF_HUB_CACHE` names the cache (user_environment), and run
    the pinned `hf download` with a **full commit hash** and the approved file list
    as shown in the guide. Include every tokenizer/config file and weight shard
    required by the workload. Do not use `main`, `--local-dir`, or deprecated
@@ -55,7 +56,7 @@ for the supported CLI version, exact configuration and working download example.
 |---|---|
 | No NFS mount / wrong filesystem | Stop. Ask the storage owner to restore the approved mount; never bypass the guard. |
 | `ok: false`, missing or broken file | Rerun the same pinned download as the writer, then revalidate as the reader. Never infer readiness from a directory. |
-| Permission denied | Check group IDs and traversal/read permissions. Do not make the cache world-readable or use recursive `777`. |
+| Permission denied | Check group IDs and traversal/read permissions. Do not use recursive `777`; world-readable (2755) only by the site's decision. |
 | Valid file list but application fails | Check model-specific files and serving compatibility. File presence alone is not a serving test. |
 | Interrupted/offline transfer | Transfer the whole Hub cache preserving links, including top-level shared blobs. Do not transfer private auth or Xet state. |
 | Space pressure | Stop new downloads; arrange operator-reviewed retention. No automatic prune: pinned snapshots may have no named refs and still be in use. |

@@ -7,6 +7,7 @@ dependencies:
   - role: retired_settings  # the source build's settings
   - role: nvidia_versions  # nvidia_driver_cuda_release (the NVML headers the build uses)
   - role: system_accounts  # system_accounts: the slurm and build accounts
+  - role: user_environment_defaults  # user_environment_entries (the task prolog's job values)
 
 galaxy_info:
   namespace: deepops

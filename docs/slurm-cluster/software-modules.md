@@ -30,6 +30,12 @@ them, as the [Lmod docs](https://lmod.readthedocs.io/en/latest/030_installing.ht
   `/etc/fish/conf.d/z00_lmod.fish`, and puts a hook first in each installed shell's
   system rc file (`/etc/bash.bashrc`, `/etc/zsh/zshenv`, `/etc/csh.cshrc`), before any
   early return for shells that are not interactive.
+- `roles/cluster_tools` writes the users' environment variables, one list
+  (`user_environment` over the defaults in `roles/user_environment_defaults`: HF_HOME,
+  the uv and pip caches, a shared HF_HUB_CACHE where the site has one), as
+  `/etc/profile.d/z10-cluster-tools.{sh,csh}`; the Slurm task prolog gives a job the
+  value that differs there (the package caches in the job's own `/tmp`). Each is a
+  default: a value the user set wins.
 - Each deploy proves it: `roles/lmod/files/lmod-shell-check.py` runs `module --version`
   as `nobody` with a clean environment in every way each installed shell starts.
 

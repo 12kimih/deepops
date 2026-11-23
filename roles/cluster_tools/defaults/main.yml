@@ -44,18 +44,15 @@ cluster_tools_retired_libs: []
 
 # Commands to publish: a list of {src, dest}. src is copied VERBATIM -- shell scripts
 # routinely contain sequences Jinja would eat, `${#var}` opening a comment among them --
-# so anything site-specific belongs in cluster_tools_environment, not in a template.
+# so anything site-specific belongs in user_environment, not in a template.
 # dest is a bare command NAME (no extension) under cluster_tools_bin_dir; a name that
 # already resolves elsewhere in PATH is refused rather than left to shadow it.
 cluster_tools_scripts: []
 
-# Environment published through /etc/profile.d. This is where a tool's own default
-# belongs (SINFO_FORMAT, SQUEUE_FORMAT, ...): unlike an alias, the environment is
-# inherited by job scripts and remote commands, so the output is the same everywhere.
-# Each entry is a default -- a value the session already carries wins. Emptying it
-# removes the files. Written for sh-family shells (<name>.sh) and csh-family ones
-# (<name>.csh), which roles/login_shells makes read /etc/profile.d too.
-cluster_tools_environment: {}
+# The users' environment (user_environment, roles/user_environment_defaults) is published
+# through /etc/profile.d under this name, for sh-family shells (<name>.sh) and csh-family
+# ones (<name>.csh), which roles/login_shells makes read /etc/profile.d too. With no
+# entry the files are removed.
 cluster_tools_profile_name: z10-cluster-tools
 
 # Login banner: a title, the commands people should know about, and where to find

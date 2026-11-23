@@ -42,6 +42,15 @@ class ModelCachePlaybookTests(unittest.TestCase):
         # Stands in for gathered facts. Play vars, because Ansible sets ansible_facts
         # itself over an inventory variable of that name.
         self.facts = {"mounts": [{"mount": str(self.mount), "fstype": "nfs4"}]}
+        # What `exportfs -s` prints on this host: a fake one first in PATH, else none.
+        self.bin = Path(self.temp.name) / "bin"
+        self.bin.mkdir()
+
+    def exports(self, *paths):
+        fake = self.bin / "exportfs"
+        lines = "".join(f"{p}\t10.0.0.0/8(rw,sync,root_squash,no_subtree_check)\n" for p in paths)
+        fake.write_text(f"#!/bin/sh\nprintf '{lines}'\n")
+        fake.chmod(0o755)
 
     def run_play(self, success=True, check=False):
         path = Path(self.temp.name) / "fixture.yml"
@@ -54,6 +63,7 @@ class ModelCachePlaybookTests(unittest.TestCase):
             ANSIBLE_NOCOLOR="1",
             ANSIBLE_LOCAL_TEMP=str(Path(self.temp.name) / "ansible-local"),
             ANSIBLE_REMOTE_TEMP=str(Path(self.temp.name) / "ansible-remote"),
+            PATH=f"{self.bin}:{os.environ['PATH']}",
         )
         inventory = Path(self.temp.name) / "inventory"
         inventory.mkdir(exist_ok=True)
@@ -67,21 +77,47 @@ class ModelCachePlaybookTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0 if success else 2, result.stdout + result.stderr)
         return result.stdout
 
-    def test_create_environment_permissions_and_idempotence(self):
+    def test_permissions_and_idempotence(self):
         self.run_play()
         self.assertEqual(self.root.stat().st_mode & 0o7777, 0o2750)
         self.assertEqual((self.root / "hub").stat().st_mode & 0o7777, 0o2750)
-        script = self.root / "environment.sh"
-        self.assertEqual(script.stat().st_mode & 0o777, 0o640)
-        result = subprocess.run(
-            ["sh", "-c", '. "$1"; printf "%s|%s" "$HF_HUB_CACHE" "$HF_HOME"', "sh", str(script)],
-            env={"PATH": os.environ["PATH"], "HF_HOME": "/private/user-cache"},
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        self.assertEqual(result.stdout, str(self.root / "hub") + "|/private/user-cache")
         self.assertIn("changed=0", self.run_play())
+
+    def test_old_environment_file_removed(self):
+        # HF_HUB_CACHE is user_environment's (roles/user_environment_defaults) now.
+        self.root.mkdir()
+        (self.root / "environment.sh").write_text("export HF_HUB_CACHE=/old\n")
+        self.run_play()
+        self.assertFalse((self.root / "environment.sh").exists())
+
+    def test_every_user_reads_with_mode_2755(self):
+        self.site_vars["model_cache_mode"] = "2755"
+        self.run_play()
+        self.assertEqual((self.root / "hub").stat().st_mode & 0o7777, 0o2755)
+
+    def test_other_mode_rejected(self):
+        self.site_vars["model_cache_mode"] = "2777"
+        self.run_play(success=False)
+        self.assertFalse(self.root.exists())
+
+    def test_nfs_server_writes_its_own_export(self):
+        self.facts["mounts"][0]["fstype"] = "ext4"
+        self.exports(str(self.mount))
+        self.run_play()
+        self.assertTrue((self.root / "hub").is_dir())
+
+    def test_local_filesystem_exporting_another_path_fails(self):
+        self.facts["mounts"][0]["fstype"] = "ext4"
+        self.exports(str(self.mount) + "-other")
+        self.run_play(success=False)
+        self.assertFalse(self.root.exists())
+
+    def test_cache_below_a_subdirectory_of_the_mount(self):
+        custom = self.mount / "shared" / "models"
+        self.site_vars["model_cache_root"] = str(custom)
+        (self.mount / "shared").mkdir()
+        self.run_play()
+        self.assertTrue((custom / "hub").is_dir())
 
     def test_multiple_writers_rejected_before_cache_creation(self):
         self.hosts += "second-writer ansible_connection=local\n"

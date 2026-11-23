@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# The users' environment inside a job, where it differs from a login's
+# (user_environment, roles/user_environment_defaults; the login values are in
+# /etc/profile.d, roles/cluster_tools). Set when the task has none or carries the login
+# value (inherited from the submitting shell); a value the user chose is left alone.
+home=$(getent passwd "$(id -u)" | cut -d: -f6)
+{% for e in user_environment_entries if e.job %}
+{% set login = ('${home}/' ~ e.login[2:]) if e.login.startswith('~/') else e.login %}
+{% set job = ('${home}/' ~ e.job[2:]) if e.job.startswith('~/') else e.job %}
+case {{ '"${' ~ e.name ~ ':-}"' }} in
+    ''{{ ('|"' ~ login ~ '"') if login else '' }}) echo "export {{ e.name }}={{ job }}" ;;
+esac
+{% endfor %}

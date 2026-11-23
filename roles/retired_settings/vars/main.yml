@@ -4,6 +4,7 @@
 # this role and a deploy stops on it; scripts/deepops/config_lint.py reports a document
 # or config that still names one. Add a name here when a setting is renamed or removed.
 retired_settings:
+  cluster_tools_environment: user_environment in roles/user_environment_defaults (the one list of the users' environment; a value may differ inside jobs)
   disk_quota_limits: disk_quota_filesystems in roles/disk_quota, now a mapping of each filesystem to its own limits; a person's disk_quota in the roster is per filesystem too (docs/deepops/disk-quota.md)
   allow_user_set_gpu_clocks: nothing (nvidia-smi -acp is a no-op on current drivers); clocks are locked per site with playbooks/utilities/nvidia-set-gpu-clocks.yml
   host_file_backup: nothing (the repository is the hosts file's history; rule 14)

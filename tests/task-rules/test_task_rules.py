@@ -383,6 +383,8 @@ WORLD_WRITABLE_OK = {
     "roles/ai_agent_rules/tasks/main.yml": "fetched on the controller, as the operator (become: false)",
     "roles/download/tasks/main.yml": "the assert that refuses these paths names them",
     "roles/slurm_paths/defaults/main.yml": "slurm_job_private_dirs names the directories Slurm makes private per job",
+    "roles/user_environment_defaults/defaults/main.yml": "users' job values in the job's own /tmp; the user's tools write there",
+    "roles/slurm/tasks/prolog_epilog.yml": "the assert that refuses a job value in a /tmp not private to each job names them",
 }
 # file -> why it keeps Ansible's backup copy
 BACKUP_OK = {

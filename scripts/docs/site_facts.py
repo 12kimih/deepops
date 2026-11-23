@@ -25,6 +25,12 @@ Facts:
             times disk_quota_inodes_per_tib) and its warn level (cluster_user_warn_fraction)
   dates     the site's announced dates (config schedule.yml, name: YYYY-MM-DD), so a
             page states each once; only date values pass
+  environment
+            the users' environment (user_environment over user_environment_defaults,
+            roles/user_environment_defaults), each {name, login, job} as the profile.d
+            files and the task prolog get it (plugins/filter/user_environment.py); public
+            only an entry whose values are paths or URLs. A value naming another
+            setting ({{ model_cache_root }}/hub) is resolved when that one is literal
   cluster   the nodes (CPUs, memory, GPUs) and partitions (their nodes, time limit) the
             site's slurm.conf template lists (private: the portal's overview page)
   slack     the channels by purpose and the administrators' group (private)
@@ -35,6 +41,7 @@ with a template is not resolved here and is left out (the private file says whic
 """
 
 import importlib
+import importlib.util
 import json
 import re
 import os
@@ -48,6 +55,14 @@ sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 sys.path.insert(0, str(ROOT / "scripts/deepops"))
 import cli  # noqa: E402
 from repo_files import tracked  # noqa: E402
+
+# The one function every reader of the users' environment uses, loaded from its file:
+# plugins/filter on sys.path would shadow the standard library with its secrets.py.
+_spec = importlib.util.spec_from_file_location(
+    "user_environment", ROOT / "plugins/filter/user_environment.py"
+)
+_user_env = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_user_env)
 
 # The only top-level keys the public file may carry, and under commands and policy the
 # only fields: what a user may read on a public site.
@@ -64,6 +79,7 @@ PUBLIC = {
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
     "quota": None,  # each limited filesystem, its fields QUOTA_FIELDS
+    "environment": {"name", "login", "job"},  # only entries whose values are paths or URLs
 }
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 QUOTA_FIELDS = {"block_hard_tib", "block_warn_tib", "inode_hard", "inode_warn"}
@@ -114,6 +130,52 @@ def settings(config):
         for name in ("all.yml", "slurm-cluster.yml"):
             out.update(_yaml(Path(config) / "group_vars" / name))
     return {k: v for k, v in out.items() if _literal(v) is not None}
+
+
+_REF = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+
+
+def _resolve(value, settings_):
+    """VALUE with each {{ name }} of a literal string setting filled in; None when any
+    template is left (Ansible's to resolve). Dicts are resolved field by field."""
+    if isinstance(value, dict):
+        out = {k: _resolve(v, settings_) for k, v in value.items()}
+        return None if any(v is None and value[k] is not None for k, v in out.items()) else out
+    if not isinstance(value, str):
+        return value
+    text = _REF.sub(
+        lambda m: str(settings_[m.group(1)]) if isinstance(settings_.get(m.group(1)), str) else m.group(0),
+        value,
+    )
+    return None if "{{" in text or "{%" in text else text
+
+
+def environment(config):
+    """[{name, login, job}] from user_environment over user_environment_defaults, as
+    the filter gives the hosts; an entry whose value stays a template is left out."""
+    raw = {}
+    for defaults in tracked("roles/*/defaults/main.yml"):
+        data = _yaml(defaults)
+        for key in ("user_environment_defaults", "user_environment"):
+            if key in data:
+                raw.setdefault(key, data[key])
+    every = dict(raw)
+    if config:
+        for name in ("all.yml", "slurm-cluster.yml"):
+            every.update(_yaml(Path(config) / "group_vars" / name))
+    literal = settings(config)
+    resolved = {}
+    for key in ("user_environment_defaults", "user_environment"):
+        resolved[key] = {}
+        for name, value in (every.get(key) or {}).items():
+            value = _resolve(value, literal)
+            if value is not None or (every.get(key) or {}).get(name) is None:
+                resolved[key][name] = value
+    return _user_env.user_environment(resolved["user_environment_defaults"], resolved["user_environment"])
+
+
+def _path_or_url(value):
+    return value == "" or value.startswith(("/", "~/")) or "://" in value
 
 
 def commands(names):
@@ -231,6 +293,7 @@ def facts(config):
         "slurm": slurm_values(config),
         "dates": schedule(config),
         "quota": quota_limits(config, s),
+        "environment": environment(config),
         "cluster": cluster(config),
         "slack": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
@@ -245,6 +308,12 @@ def public(every):
         value = every.get(key)
         if key == "commands":
             out[key] = {c: {f: v for f, v in d.items() if f in fields} for c, d in (value or {}).items()}
+        elif key == "environment":
+            out[key] = [
+                {f: e[f] for f in fields}
+                for e in value or []
+                if _path_or_url(e["login"]) and _path_or_url(e["job"])
+            ]
         elif key == "quota":
             out[key] = {
                 m: {f: v for f, v in d.items() if f in QUOTA_FIELDS} for m, d in (value or {}).items()

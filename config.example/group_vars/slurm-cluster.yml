@@ -427,10 +427,14 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #cluster_tools_retired: []
 #cluster_tools_retired_libs: []
 
-# Change a Slurm command's default output through its own environment variable rather
-# than by wrapping the command (see `man sinfo`, `man squeue`). The environment is
-# inherited, so batch scripts and remote commands get the same output.
-#cluster_tools_environment:  # example
+# The users' environment beyond the defaults (roles/user_environment_defaults: HF_HOME,
+# UV_CACHE_DIR and PIP_CACHE_DIR, the caches in the job's /tmp inside a job), by name; null
+# drops a default. Change a Slurm command's default output through its own environment
+# variable rather than by wrapping the command (see `man sinfo`, `man squeue`): the
+# environment is inherited, so batch scripts and remote commands get the same output.
+#user_environment:  # example
+#  # The shared read-only model cache (playbooks/model-cache.yml), for everyone.
+#  HF_HUB_CACHE: "{{ model_cache_root }}/hub"
 #  SINFO_FORMAT: '%9P %5t %12N %5D %21G'
 #  # The name the commands print (sq, qos); without it they fall back to
 #  # Slurm's ClusterName.
