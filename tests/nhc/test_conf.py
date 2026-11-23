@@ -6,6 +6,7 @@ healthy idle nodes. Asking systemd also fails a node whose systemd hangs.
 """
 
 from pathlib import Path
+import re
 import sys
 import unittest
 
@@ -125,6 +126,35 @@ class NhcConf(unittest.TestCase):
         self.assertNotIn("/var/spool", off)
         same = conf("debian.yml", "Debian", nhc_check_free_paths=["/", "/srv/a", "/srv/b"])
         self.assertEqual(same.count("check_fs_free"), 1)
+
+
+class Sysconfig(unittest.TestCase):
+    """NHC's own bound on a run (TIMEOUT, 30 s by default) ended a run before the
+    nvidia-smi bound and its retry could: it is set, and covers them."""
+
+    def render(self, **overrides):
+        values = {**role_defaults("nhc"), "ansible_managed": "", "slurm_install_prefix": "/usr", **overrides}
+        text = render((ROLE / "templates" / "sysconfig_nhc.j2").read_text(), values)
+        return dict(
+            line.split("=", 1) for line in text.splitlines() if "=" in line and not line.startswith("#")
+        )
+
+    def test_the_run_bound_covers_two_tries_of_each_nvidia_smi_check(self):
+        settings = self.render()
+        per_try = int(settings["NV_SMI_TIMEOUT"])
+        self.assertEqual(per_try, role_defaults("nhc")["nhc_nvidia_smi_timeout"])
+        self.assertGreaterEqual(int(settings["TIMEOUT"]), 2 * 2 * per_try)
+
+    def test_the_run_bound_ends_before_slurmd_kills_it(self):
+        """slurmd kills the health check after HealthCheckTimeout, 60 s when slurm.conf
+        sets none (man slurm.conf): NHC must end, and drain if it must, before that."""
+        found = re.search(
+            r"HealthCheckTimeout=(\d+)", (ROOT / "roles/slurm/templates/etc/slurm/slurm.conf").read_text()
+        )
+        self.assertLess(int(self.render()["TIMEOUT"]), int(found[1]) if found else 60)
+
+    def test_it_follows_the_nvidia_smi_bound(self):
+        self.assertEqual(int(self.render(nhc_nvidia_smi_timeout=5)["TIMEOUT"]), 2 * 2 * 5 + 15)
 
 
 if __name__ == "__main__":

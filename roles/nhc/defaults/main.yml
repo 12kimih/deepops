@@ -57,11 +57,15 @@ nhc_check_free_paths: >-
   {{ ['/'] + ([slurm_job_private_base] if slurm_job_private_dirs | length > 0 else []) }}
 nhc_min_free: "5%"
 
-# GPU faults that drain a node until it reboots: the XIDs whose immediate action in
-# NVIDIA's XID catalog (docs.nvidia.com/deploy/xid-errors) is a GPU reset or a reboot.
-# Faults of the application (13, 31, 43, 45, 94...) leave the node in service. [] turns
-# the check off; a node drained by it returns by itself once a reboot clears the fault.
-nhc_gpu_drain_xids: [46, 48, 62, 64, 74, 79, 95, 109, 110, 119, 120, 136, 140, 143, 155, 156, 158]
+# GPU faults that drain a node until it reboots: the XIDs whose "Tenant In-Operation
+# Action" in NVIDIA's XID catalog is RESET_GPU (Xid-Catalog.xlsx of 2026-11-20,
+# docs.nvidia.com/deploy/xid-errors/analyzing-xid-catalog.html), and 79 (the GPU has
+# fallen off the bus: CONTACT_SUPPORT, and gone until a reboot). Faults of the
+# application (13, 31, 43, 45, 94...) leave the node in service; so do the ones the
+# catalog sends through a workflow (48, 74) or through Xid 154 (109), whose own verdict
+# the check reads instead. [] turns the check off; a node drained by it returns by itself
+# once a reboot clears the fault. tests/nhc/test_gpu_checks.py holds it to the catalog.
+nhc_gpu_drain_xids: [46, 62, 64, 79, 95, 110, 119, 120, 140, 143, 155, 156, 158, 160, 166, 167, 169, 175, 179, 180, 181, 184]
 # Drain a GPU node whose row remapping is pending (needs a GPU reset) or has failed
 # (out of spare rows, NVIDIA's RMA criterion).
 nhc_gpu_check_remapped_rows: true

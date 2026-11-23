@@ -502,9 +502,12 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #slurm_install_nhc: true
 # slurmd's health check follows it: NHC while installed, none otherwise.
 #slurm_health_check_program: "{{ nhc_program if slurm_install_nhc | bool else '' }}"
-# GPU faults that drain a node until it reboots (NVIDIA's XID catalog: reset or reboot);
-# [] turns the check off. A pending or failed row remapping drains too.
-#nhc_gpu_drain_xids: [46, 48, 62, 64, 74, 79, 95, 109, 110, 119, 120, 136, 140, 143, 155, 156, 158]
+# GPU faults that drain a node until it reboots (NVIDIA's XID catalog: RESET_GPU, and 79;
+# an Xid 154 asking for a reset or reboot drains too); [] turns the check off. A pending
+# or failed row remapping drains too. Each nvidia-smi try is bounded (seconds) and made
+# once more on a timeout; NHC's own bound on a run follows from it.
+#nhc_gpu_drain_xids: [46, 62, 64, 79, 95, 110, 119, 120, 140, 143, 155, 156, 158, 160, 166, 167, 169, 175, 179, 180, 181, 184]
+#nhc_nvidia_smi_timeout: 10
 #nhc_gpu_check_remapped_rows: true
 # Network interfaces that drain the node when down, by name (none by default).
 #nhc_check_interfaces: [eth0]  # example

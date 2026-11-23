@@ -19,6 +19,34 @@ from ansible_yaml import role_defaults  # noqa: E402
 from nhc_checks import CHECKS, argv  # noqa: E402
 
 DRAIN = " ".join(str(x) for x in role_defaults("nhc")["nhc_gpu_drain_xids"])
+# NVIDIA's XID catalog (Xid-Catalog.xlsx of 2026-11-20, sheet XIDs): the codes in use
+# whose "Tenant In-Operation Action" is RESET_GPU. A newer catalog that moves a code
+# changes this snapshot and nhc_gpu_drain_xids together.
+CATALOG_RESET_GPU = {
+    46,
+    62,
+    64,
+    95,
+    110,
+    119,
+    120,
+    140,
+    143,
+    155,
+    156,
+    158,
+    160,
+    166,
+    167,
+    169,
+    175,
+    179,
+    180,
+    181,
+    184,
+}
+# Drains though the catalog says CONTACT_SUPPORT: the GPU has fallen off the bus.
+DRAIN_ALSO = {79}
 
 KERNEL_LOG = """\
 NVRM: Xid (PCI:0000:3b:00): 13, pid=4242, name=python, Graphics Exception: ESR 0x504648=0x0
@@ -71,6 +99,34 @@ class Xid(unittest.TestCase):
         log = "NVRM: Xid (PCI:0000:01:00): 14, Channel 00000001\n"
         self.assertEqual(run("check_nv_xid", "4 140", log), (0, ""))
 
+    def test_the_list_is_the_catalogs_reset_class(self):
+        self.assertEqual(set(role_defaults("nhc")["nhc_gpu_drain_xids"]), CATALOG_RESET_GPU | DRAIN_ALSO)
+
+    def test_a_context_switch_timeout_alone_keeps_the_node(self):
+        # The catalog: Xid 109 follows the action of an Xid 154 logged with it, else RESTART_APP.
+        log = "NVRM: Xid (PCI:0000:3b:00): 109, pid=4242, name=python, Ch 00000010, errorString CTX SWITCH TIMEOUT\n"
+        self.assertEqual(run("check_nv_xid", DRAIN, log), (0, ""))
+
+    def test_xid_154_drains_on_its_latest_reset_or_reboot_verdict(self):
+        bad = (
+            "NVRM: Xid (PCI:0000:3b:00): 109, pid=4242, name=python, Ch 00000010\n"
+            "NVRM: Xid (PCI:0000:3b:00): 154, GPU recovery action changed from 0x0 (None) to 0x2 (Node Reboot Required)\n"
+            "NVRM: Xid (PCI:0000:5a:00): 154, GPU recovery action changed from 0x0 (None) to 0x3 (Drain P2P)\n"
+        )
+        self.assertEqual(
+            run("check_nv_xid", DRAIN, bad),
+            (1, "GPU fault, reboot to clear: XID 154 Node Reboot Required on PCI:0000:3b:00"),
+        )
+        for verdict in ("GPU Reset Required", "Drain and Reset"):
+            with self.subTest(verdict=verdict):
+                log = f"NVRM: Xid (PCI:0000:3b:00): 154, GPU recovery action changed from 0x0 (None) to 0x1 ({verdict})\n"
+                self.assertEqual(run("check_nv_xid", DRAIN, log)[0], 1)
+        cleared = (
+            bad
+            + "NVRM: Xid (PCI:0000:3b:00): 154, GPU recovery action changed from 0x2 (Node Reboot Required) to 0x0 (None)\n"
+        )
+        self.assertEqual(run("check_nv_xid", DRAIN, cleared), (0, ""), "the latest verdict counts")
+
     def test_no_list_drains_nothing(self):
         log = "NVRM: Xid (PCI:0000:5a:00): 79, GPU has fallen off the bus.\n"
         self.assertEqual(run("check_nv_xid", "", log), (0, ""))
@@ -106,6 +162,28 @@ class FailedTools(unittest.TestCase):
                     run(check, args, tools=broken),
                     (1, f"{check}: nvidia-smi{' -L' if check == 'check_nv_gpu_count' else ''} failed"),
                 )
+
+    def test_one_timed_out_nvidia_smi_is_tried_again(self):
+        """A first try that times out (124) is made once more; only two in a row fail."""
+        with tempfile.TemporaryDirectory() as tmp:
+            stub = Path(tmp, "nvidia-smi")
+            stub.write_text(
+                "#!/bin/sh\n"
+                f"n=$(cat {tmp}/n 2>/dev/null || echo 0); echo $((n + 1)) > {tmp}/n\n"
+                f'[ "$n" -lt "$(cat {tmp}/fails)" ] && exit 124\n'
+                "printf 'GPU 0: NVIDIA GPU (UUID: GPU-0)\\nGPU 1: NVIDIA GPU (UUID: GPU-1)\\n'\n"
+            )
+            stub.chmod(0o755)
+            env = {**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}"}
+            for fails, expected in ((1, (0, "")), (2, (1, "check_nv_gpu_count: nvidia-smi -L failed"))):
+                with self.subTest(fails=fails):
+                    Path(tmp, "n").write_text("0")
+                    Path(tmp, "fails").write_text(str(fails))
+                    proc = subprocess.run(
+                        argv("check_nv_gpu_count 2"), env=env, capture_output=True, text=True, check=False
+                    )
+                    self.assertEqual((proc.returncode, proc.stdout.strip()), expected)
+                    self.assertEqual(Path(tmp, "n").read_text().strip(), str(min(fails + 1, 2)))
 
     def test_gpu_count(self):
         out = "GPU 0: A (UUID: a)\n  MIG 1g.10gb Device 0: (UUID: m)\nGPU 1: A (UUID: b)\n"

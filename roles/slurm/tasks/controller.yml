@@ -140,6 +140,7 @@
     _prolog_flags: "{{ (_conf | regex_findall('(?m)^ *PrologFlags *= *(.+)') | last | default('') | trim).split(',') }}"
     _namespace: "{{ ['namespace/linux'] if slurm_job_private_dirs | length > 0 else [] }}"
     _notices: "{{ deepops_components.job_notice | default('absent') == 'present' }}"
+    _health_timeout: "{{ _conf | regex_findall('(?m)^ *HealthCheckTimeout *= *([0-9]+)') | last | default(60) | int }}"
     _tmp_disk_set: "{{ _conf | regex_findall('(?m)^ *NodeName=(\\S+) .*\\bTmpDisk=([0-9]+)') | map('join', '=') | sort }}"
     _tmp_disk_wanted: "{{ slurm_tmp_disk | dict2items | map(attribute='key') | zip(slurm_tmp_disk | dict2items | map(attribute='value') | map('string')) | map('join', '=') | sort }}"
   ansible.builtin.assert:
@@ -151,6 +152,7 @@
       - _conf | regex_findall('(?m)^ *JobContainerType *=') | length == 0
       - _namespace | length == 0 or 'Contain' in _prolog_flags
       - not _notices or _conf | regex_findall('(?m)^ *MailProg *= *(.+)') | map('trim') | list == [job_notice_command]
+      - slurm_health_check_program != nhc_program or nhc_timeout | int < _health_timeout | int
       - _namespace | length == 0 or _conf | regex_findall('(?m)^ *TmpFS *= *(.+)') | map('trim') | list == [slurm_job_private_base]
       - _tmp_disk_set == _tmp_disk_wanted
     fail_msg: >-
@@ -163,6 +165,8 @@
       JobContainerType (deprecated: Slurm warns it was replaced with NamespaceType).
       With job notices on this host (slurm_enable_job_notices), MailProg={{ '{{' }} job_notice_command {{ '}}' }}
       ({{ job_notice_command }}): any other MailProg sends them as local mail.
+      With NHC as the health check, HealthCheckTimeout (60 when unset) above NHC's own
+      bound, nhc_timeout ({{ nhc_timeout }} s): slurmd kills it otherwise, mid-check.
       With per-job private directories, TmpFS={{ '{{' }} slurm_job_private_base {{ '}}' }}
       ({{ slurm_job_private_base }}), and on each node's line TmpDisk={{ '{{' }} slurm_tmp_disk[node] {{ '}}' }}
       where slurm_tmp_disk has the node, nowhere else (wanted {{ _tmp_disk_wanted }},
