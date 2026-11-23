@@ -24,8 +24,11 @@ ME = os.getuid()
 class Host(ss.Host):
     """The real filesystem, with paths that seem to be another filesystem."""
 
-    def __init__(self, other=()):
-        self.other = set(other)
+    def __init__(self, other=(), busy=frozenset()):
+        self.other, self.busy = set(other), busy
+
+    def running_users(self):
+        return self.busy  # None: Slurm unreadable
 
     def lstat(self, path):
         st = os.lstat(path)
@@ -95,6 +98,36 @@ class Cleanup(Base):
         self.assertTrue(os.path.exists(fresh) and os.path.isdir(os.path.join(self.root, "alice")))
         values = prom.parse(Path(self.cfg["textfile"]).read_text())
         self.assertEqual(values[prom.key("scratch_space_purge_removed_files")], "1")
+
+    def test_a_running_jobs_files_are_deferred_once_then_go(self):
+        # Over NFS a job re-reading a cached file leaves its server atime old: while its
+        # owner has a running job a due file is deferred, once, by stale_days.
+        old = self.file("alice/code/train.py", 70)
+        self.run_at(NOW)
+        self.run_at(NOW + 14 * DAY, host=Host(busy={"alice"}))
+        self.assertTrue(os.path.exists(old))
+        self.assertEqual(self.due()[old]["due"], NOW + (14 + 60) * DAY)
+        self.assertEqual(self.due()[old]["deferred"], NOW + 14 * DAY)
+        values = prom.parse(Path(self.cfg["textfile"]).read_text())
+        self.assertEqual(values[prom.key("scratch_space_purge_deferred_files", user="alice")], "1")
+        listing = Path(self.root, "alice", ".purge-list").read_text()
+        self.assertIn("deferred once because you had running jobs", listing)
+        self.run_at(NOW + (14 + 60) * DAY, host=Host(busy={"alice"}))
+        self.assertFalse(os.path.exists(old), "deferred once only: it goes though jobs still run")
+
+    def test_another_persons_jobs_defer_nothing(self):
+        old = self.file("alice/data.bin", 70)
+        self.run_at(NOW)
+        self.run_at(NOW + 14 * DAY, host=Host(busy={"bob"}))
+        self.assertFalse(os.path.exists(old))
+
+    def test_nothing_goes_when_slurm_cannot_be_read(self):
+        old = self.file("alice/data.bin", 70)
+        self.run_at(NOW)
+        self.run_at(NOW + 14 * DAY, host=Host(busy=None))
+        self.assertTrue(os.path.exists(old))
+        self.assertEqual(self.due()[old]["due"], NOW + 14 * DAY, "its date is kept for the next run")
+        self.assertTrue(any("nothing is removed" in s for s in self.said))
 
     def test_a_file_used_in_the_grace_period_is_spared(self):
         old = self.file("alice/data.bin", 70)

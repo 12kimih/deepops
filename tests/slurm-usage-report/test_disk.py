@@ -359,6 +359,20 @@ class RunTests(unittest.TestCase):
         posted, _, _ = self.run_disk(prom, notify=["mention"])
         self.assertEqual(len([p for p in posted if p[0] == "UALICE" and "scratch space" in p[1]]), 1)
 
+    def test_a_deferral_for_running_jobs_is_said_in_the_notice(self):
+        prom = site()
+        prom.now.update({
+            "scratch_space_purge_due_files": [row(3, host="gpu8", user="alice")],
+            "scratch_space_purge_due_bytes": [row(2 * G, host="gpu8", user="alice")],
+            "scratch_space_purge_next_timestamp_seconds": [row(NOW + 60 * disk_report.DAY, host="gpu8", user="alice")],
+            "scratch_space_purge_stale_days": [row(60, host="gpu8")],
+            "scratch_space_purge_deferred_files": [row(2, host="gpu8", user="alice")],
+        })  # fmt: skip
+        posted, _, _ = self.run_disk(prom)
+        dm = [p for p in posted if p[0] == "UALICE" and "scratch space" in p[1]]
+        self.assertIn("2 of them were deferred because you have running jobs", dm[0][1])
+        self.assertIn("even if jobs still run", dm[0][1])
+
     def test_nothing_counted_posts_nothing(self):
         posted, error, _ = self.run_disk(Prom({}))
         self.assertEqual(posted, [])
