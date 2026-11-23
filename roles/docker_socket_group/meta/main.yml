@@ -1,5 +1,6 @@
 ---
 dependencies:
+  - role: directory_defaults  # docker_socket_group, docker_socket_group_gid, docker_socket_group_create_local
   - role: docker_restart  # the handlers: Restart the docker socket unit, Restart dockerd
 
 galaxy_info:
