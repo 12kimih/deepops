@@ -1,7 +1,7 @@
 ---
 _container_storage_gc_command: /usr/local/libexec/container-storage-gc
 _container_storage_gc_config: "{{ cluster_tools_lib_config_dir }}/container-storage-gc.json"
-_container_storage_gc_textfile: "{{ container_storage_gc_textfile_dir }}/container-storage-gc.prom"
+_container_storage_gc_textfile: "{{ node_exporter_prom_dir }}/container-storage-gc.prom"
 _container_storage_gc_units: [container-storage-gc.service, container-storage-gc.timer]
 # What this component installs, for its record (roles/component_record): the timer and
 # its service before their files. The cluster tools' directory stays (shared).

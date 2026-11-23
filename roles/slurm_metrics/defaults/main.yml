@@ -9,8 +9,6 @@
 # deepops_components.
 slurm_metrics_state: present
 slurm_metrics_command: /usr/local/libexec/slurm-gpu-metrics
-# node_exporter's textfile collector directory (roles/prometheus-node-exporter).
-slurm_metrics_textfile_dir: "{{ node_exporter_prom_dir }}"
 slurm_metrics_textfile: slurm-gpu.prom
 slurm_metrics_interval: 60s
 slurm_metrics_svc_name: slurm-gpu-metrics

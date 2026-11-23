@@ -14,4 +14,4 @@ slurm_metrics_service_items:
   - "file:/etc/systemd/system/{{ slurm_metrics_svc_name }}.timer"
   - "file:/etc/systemd/system/{{ slurm_metrics_svc_name }}.service"
   - "file:{{ slurm_metrics_command }}"
-  - "file:{{ slurm_metrics_textfile_dir }}/{{ slurm_metrics_textfile }}"
+  - "file:{{ node_exporter_prom_dir }}/{{ slurm_metrics_textfile }}"

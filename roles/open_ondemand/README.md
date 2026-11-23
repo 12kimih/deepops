@@ -91,6 +91,5 @@ the portal host.
 | `open_ondemand_backup_dir` | `/var/backups/open-ondemand` | Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken install) before changing them. |
 | `open_ondemand_data_paths` | `['{{ open_ondemand_backup_dir }}']` | Data the component never removes, present or absent. |
 | `open_ondemand_tls_metrics` | `true` | The certificate's expiry as a node_exporter textfile metric (open_ondemand_tls_cert_not_after_seconds), refreshed daily, so an alert can fire before it lapses. |
-| `open_ondemand_tls_metrics_textfile_dir` | `'{{ node_exporter_prom_dir }}'` |  |
 | `open_ondemand_managed_conffiles` | `[/etc/ood/config/ood_portal.yml, /etc/ood/config/nginx_stage.yml, /etc/ood/config/ood_portal.sha256sum, /etc/apache2/sites-available/ood-portal.conf, /etc/ood/dex/config.yaml, /etc/ood/dex/dex.db]` | Files OOD's packages own that the role writes itself; dpkg -V may report these as changed. Any other difference in an OOD package fails the run. |
 <!-- END GENERATED: role-variables:open_ondemand -->
