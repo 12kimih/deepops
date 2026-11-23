@@ -135,7 +135,7 @@ class Recording(unittest.TestCase):
                "HOME": str(base),
                "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"), "ANSIBLE_LOCALHOST_WARNING": "false",
                # facts gathered every time, into memory, never the operator's fact cache
-               "ANSIBLE_GATHERING": "implicit", "ANSIBLE_CACHE_PLUGIN": "memory"}  # fmt: skip
+               "ANSIBLE_GATHERING": "implicit"}  # fmt: skip
         out = subprocess.run(
             [str(BIN / "ansible-playbook"), "-i", "localhost,", str(d / "play.yml")],
             env=env, capture_output=True, text=True, timeout=unrecorded.TIMEOUT,
