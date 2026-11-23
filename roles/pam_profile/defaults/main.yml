@@ -1,0 +1,9 @@
+---
+# pam_profile -- one Debian PAM profile (/usr/share/pam-configs/<name>) on or off,
+# through pam-auth-update, the only writer of /etc/pam.d/common-*. See tasks/main.yml.
+pam_profile_name: ""
+pam_profile_enabled: true
+# How the outcome is checked: the module the profile adds, in the common-* file it
+# lands in (pam_sss.so in common-auth; pam_systemd.so in common-session).
+pam_profile_module: ""
+pam_profile_file: ""

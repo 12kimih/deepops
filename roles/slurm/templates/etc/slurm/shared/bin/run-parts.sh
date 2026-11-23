@@ -2,6 +2,7 @@
 # This could all be done with run-parts using regexes on ubuntu.
 # However, centos' version of run-parts is just a simple bash script with no useful flags.
 set -e
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 parts_dir"
@@ -12,7 +13,7 @@ parts_dir=$1
 # Logging never fails the run: a missing /dev/log (journald restarting) must not drain
 # the node.
 log () {
-    logger -s -t slurm "$@" || :
+    part_log slurm "$@"
 }
 
 # The node as Slurm names it, which need not be the host name.
@@ -36,22 +37,40 @@ job_scope_lib='{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh'
 # Does the job have the node to itself? Only then may the *-exclusive-* parts run: they
 # act on the whole node (every GPU's power and clocks, the CPU governor, the page
 # cache). Slurm's own answer is the job's Exclusive field (squeue -O Exclusive), NODE for
-# a whole-node allocation (--exclusive, or a partition with Exclusive=NODE); the prolog
-# and the epilog of a job both read the same field, so what one sets the other undoes.
+# a whole-node allocation (--exclusive, or a partition with Exclusive=NODE).
 # OverSubscribe (%h) "does not encode exclusivity" (man squeue): on a partition with
 # OverSubscribe=NO every job reads NO, and taking that for exclusive ran these parts for
-# every job on shared nodes (2026-11-23: other jobs' GPU processes were killed). The
-# lookup runs inside a conditional because of "set -e": a failed squeue must skip the
-# parts, not fail the job.
+# every job on shared nodes (2026-11-23: other jobs' GPU processes were killed).
+# The prolog asks and leaves a record on the node; the epilog undoes what the prolog did
+# by that record, never by asking again: a squeue that timed out in the epilog would
+# leave the GPUs at their max levels and the governor at performance. A context slurmd
+# does not name (an older slurmd) asks in both. Asked only when the parts directory has
+# such parts. The lookup runs inside a conditional because of "set -e": a failed squeue
+# must skip the parts, not fail the job.
 exclusive=0
-if job_exclusive=$(timeout "$squeue_timeout" "$squeue_bin" -h -j "$SLURM_JOB_ID" -O Exclusive 2>/dev/null); then
-    case "$(printf '%s' "$job_exclusive" | tr -d '[:space:]')" in
-        NODE) exclusive=1 ;;
-        NO|USER|MCS|TOPO) ;;
-        *) log "[WARN] squeue returned no usable Exclusive for job ${SLURM_JOB_ID} ('${job_exclusive}'); not running the node-wide parts." ;;
-    esac
-else
-    log "[WARN] squeue failed for job ${SLURM_JOB_ID}; not running the node-wide parts."
+exclusive_record='{{ slurm_exclusive_run_dir }}/job-'"${SLURM_JOB_ID}"
+if compgen -G "$parts_dir/*-exclusive-*" >/dev/null; then
+    if [ "${SLURM_SCRIPT_CONTEXT:-}" = epilog_slurmd ]; then
+        if [ -e "$exclusive_record" ]; then
+            exclusive=1
+        fi
+    elif job_exclusive=$(timeout "$squeue_timeout" "$squeue_bin" -h -j "$SLURM_JOB_ID" -O Exclusive 2>/dev/null); then
+        case "$(printf '%s' "$job_exclusive" | tr -d '[:space:]')" in
+            NODE) exclusive=1 ;;
+            NO|USER|MCS|TOPO) ;;
+            *) log "[WARN] squeue returned no usable Exclusive for job ${SLURM_JOB_ID} ('${job_exclusive}'); not running the node-wide parts." ;;
+        esac
+        if [ "$exclusive" = 1 ] && [ "${SLURM_SCRIPT_CONTEXT:-}" = prolog_slurmd ]; then
+            # Without the record the epilog would not undo the parts: run them only if
+            # it is written.
+            if ! { mkdir -p '{{ slurm_exclusive_run_dir }}' && : > "$exclusive_record"; } 2>/dev/null; then
+                exclusive=0
+                log "[WARN] cannot record job ${SLURM_JOB_ID} as exclusive in {{ slurm_exclusive_run_dir }}; not running the node-wide parts."
+            fi
+        fi
+    else
+        log "[WARN] squeue failed for job ${SLURM_JOB_ID}; not running the node-wide parts."
+    fi
 fi
 
 # Find out if there are any more jobs on this node for this user.
@@ -73,7 +92,10 @@ fi
 # last_user_job at 0, and disable the cleanup entirely.
 lastuserjob_states='{{ 'holding' | slurm_job_states | reject('eq', 'COMPLETING') | join(',') | lower }}'
 last_user_job=0
-if user_jobs=$(timeout "$squeue_timeout" "$squeue_bin" -h -u "$SLURM_JOB_USER" -w "$node_name" -t "$lastuserjob_states" -o '%i' 2>/dev/null); then
+# Asked only when the parts directory has such parts (the epilog's; not the prolog's).
+if ! compgen -G "$parts_dir/*-lastuserjob-*" >/dev/null; then
+    :
+elif user_jobs=$(timeout "$squeue_timeout" "$squeue_bin" -h -u "$SLURM_JOB_USER" -w "$node_name" -t "$lastuserjob_states" -o '%i' 2>/dev/null); then
     # Drop this job's own entry defensively. It should not be in the states
     # above, but an id match is cheap and keeps a future state addition from
     # silently switching the cleanup off.
@@ -167,6 +189,11 @@ for script in "$parts_dir"/*; do
         failed=1
     fi
 done
+
+# The job's exclusive record has served the epilog.
+if [ "${SLURM_SCRIPT_CONTEXT:-}" = epilog_slurmd ]; then
+    rm -f "$exclusive_record" || :
+fi
 
 if [ "$failed" = "1" ]; then
     log "One or more scripts failed."

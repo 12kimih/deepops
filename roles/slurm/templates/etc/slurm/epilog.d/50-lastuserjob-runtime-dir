@@ -3,6 +3,7 @@
 # in the prolog makes it). Never across a mount; a failure is logged, not returned: a
 # failing epilog drains the node.
 set -u
+. '{{ slurm_config_dir }}/shared/lib/log.sh'
 
 dir='{{ slurm_user_runtime_root }}'/"$SLURM_JOB_UID"
 
@@ -11,5 +12,5 @@ case "$SLURM_JOB_UID" in
 esac
 [ -d "$dir" ] && [ ! -L "$dir" ] || exit 0
 rm -rf --one-file-system -- "$dir" \
-    || logger -t slurm-runtime-dir "cannot remove all of $dir" 2>/dev/null || :
+    || part_log slurm-runtime-dir "cannot remove all of $dir"
 exit 0

@@ -53,39 +53,15 @@
 # Debian: libpam-sss's profile (pam-auth-update), enabled by default at install; turned
 # back on if someone took it off. Home directories are made on the account source, never
 # by pam_mkhomedir: over NFS with root_squash it would fail or leave root-owned homes.
-- name: Read whether PAM asks SSSD (Debian)
-  ansible.builtin.command:
-    argv: [grep, -q, pam_sss.so, /etc/pam.d/common-auth]
-  register: sssd_client_pam
-  changed_when: false
-  failed_when: sssd_client_pam.rc > 1
-  check_mode: false  # read-only; --check needs the result
-  when: ansible_facts.os_family == 'Debian'
-
-# The profiles are the PAM configuration (pam-auth-update), never hand edits: a file
-# someone edited makes pam-auth-update refuse, unasked or noninteractive, and still exit
-# 0 (gpu1, 2026-11-23: pam_pwquality cut from common-password in June; nsswitch then
-# named SSSD, PAM did not, and sudo refused every password). --force writes the
-# profiles; the edited files stay beside them as *.pam-old.
 - name: Let PAM ask SSSD (Debian)
-  change_command:
-    argv: [pam-auth-update, --force, --enable, sss]
-  environment:
-    DEBIAN_FRONTEND: noninteractive
-  when:
-    - ansible_facts.os_family == 'Debian'
-    - sssd_client_pam.rc == 1
-
-# Checked, not assumed: nsswitch below names SSSD only once PAM asks it, else accounts
-# resolve from the directory while no password is accepted for them.
-- name: Require PAM to ask SSSD (Debian)
-  ansible.builtin.command:
-    argv: [grep, -q, pam_sss.so, /etc/pam.d/common-auth]
-  changed_when: false
-  check_mode: false  # read-only
-  when:
-    - ansible_facts.os_family == 'Debian'
-    - not ansible_check_mode
+  ansible.builtin.include_role:
+    name: pam_profile
+  vars:
+    pam_profile_name: sss
+    pam_profile_enabled: true
+    pam_profile_module: pam_sss.so
+    pam_profile_file: /etc/pam.d/common-auth
+  when: ansible_facts.os_family == 'Debian'
 
 # RHEL: authselect owns PAM and nsswitch.conf; its sssd profile is both.
 - name: Read the authselect profile (RHEL)

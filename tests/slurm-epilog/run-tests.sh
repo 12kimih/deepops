@@ -50,6 +50,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 printf '%s: %s\n' "${tag:-logger}" "$*" >&2
+exit "${LOGGER_RC:-0}"  # a case sets 1: syslog unreachable
 STUB
     chmod +x "$1/bin/logger"
 }
@@ -59,12 +60,37 @@ render() {
     # Per-job private directories are off unless a case names them (RENDER_PRIVATE_DIRS,
     # comma-separated): with them on, the job-scope file cleanup never runs at all.
     python3 "$here/render.py" "$templates/$1" "$2" "${RENDER_SCOPE:-job}" "${RENDER_PRIVATE_DIRS-}" || return 1
+    # Every part logs through shared/lib/log.sh: point it at the harness's copy.
+    sed -i "s#/etc/slurm/shared/lib/log.sh#$work/shared-lib/log.sh#" "$2"
     chmod +x "$2"
     # A rendered script that does not parse would fail every behavioural case
     # below with the same opaque message; check the syntax separately so the
     # cause is named.
     bash -n "$2"
 }
+
+
+mkdir -p "$work/shared-lib"
+render "shared/lib/log.sh" "$work/shared-lib/log.sh"
+
+# --- logging never fails a part -------------------------------------------------------
+# Under "set -e" a logger that cannot reach syslog (journald restarting) exited 1, failed
+# the part and drained the node; every part logs through part_log, which cannot fail.
+echo
+echo "shared/lib/log.sh -- logging never fails a part"
+write_logger_stub "$work/logstub"
+if out=$(PATH="$work/logstub/bin:$PATH" LOGGER_RC=1 bash -ec ". '$work/shared-lib/log.sh'; part_log t hello; echo after" 2>&1) \
+   && grep -q '^after$' <<<"$out" && grep -q 'hello' <<<"$out"; then
+    ok "part_log returns 0 and still writes the message when logger fails"
+else
+    no "part_log returns 0 and still writes the message when logger fails" "$out"
+fi
+direct=$(grep -rlE '(^|[^_[:alnum:]])logger[[:space:]]' "$templates" | grep -v '/shared/lib/log.sh$' || :)
+if [ -z "$direct" ]; then
+    ok "no prolog/epilog template calls logger except through part_log"
+else
+    no "no prolog/epilog template calls logger except through part_log" "$direct"
+fi
 
 # A fake /proc: <root>/<pid>/status carries the Uid line and <root>/<pid>/cgroup
 # the cgroup membership, which is all the job-scoped helpers read. Paths are
@@ -190,6 +216,7 @@ STUB
     # fixture instead.
     mkdir -p "$dir/log"
     sed -i "s#/var/log/slurm/prolog-epilog#$dir/log/prolog-epilog#" "$dir/run-parts.sh"
+    sed -i "s#/run/slurm-exclusive#$dir/run#g" "$dir/run-parts.sh"
 
     # A marker script that records whether it ran. The -lastuserjob- infix is
     # what run-parts.sh gates on.
@@ -1077,6 +1104,19 @@ else
     else
         no "node-wide parts follow Slurm's Exclusive field" "NODE=$node NO=$shared USER=$user failed=$failed"
     fi
+    # The prolog records exclusivity; the epilog undoes by that record, not a new lookup.
+    rm -rf "$dir/run"
+    pro=$(runx env SLURM_SCRIPT_CONTEXT=prolog_slurmd SQUEUE_EXCLUSIVE=NODE)
+    recorded=$([ -e "$dir/run/job-1000" ] && echo yes || echo no)
+    epi=$(runx env SLURM_SCRIPT_CONTEXT=epilog_slurmd SQUEUE_EXCLUSIVE=NODE SQUEUE_EXCLUSIVE_RC=1)
+    consumed=$([ -e "$dir/run/job-1000" ] && echo no || echo yes)
+    norec=$(runx env SLURM_SCRIPT_CONTEXT=epilog_slurmd SQUEUE_EXCLUSIVE=NODE)
+    if [ "$pro/$recorded/$epi/$consumed/$norec" = "ran/yes/ran/yes/skipped" ]; then
+        ok "the epilog undoes what the prolog recorded, even when squeue fails, and only then"
+    else
+        no "the epilog undoes what the prolog recorded, even when squeue fails, and only then" \
+           "prolog=$pro recorded=$recorded epilog=$epi consumed=$consumed no-record=$norec"
+    fi
     if grep -q 'squeue_timeout' "$dir/run-parts.sh" && grep -q -- '-O Exclusive' "$dir/run-parts.sh" \
        && ! grep -q '"%h"' "$dir/run-parts.sh"; then
         ok "squeue is bounded, the Exclusive field is read, and OverSubscribe is not"
@@ -1190,7 +1230,8 @@ done
 # --- 26.09 snapshot -----------------------------------------------------------------
 # scope=user must render byte-for-byte what 26.09 deployed. The snapshots are the
 # 26.09 templates rendered with the same fixture values, then with the operator exemption
-# read through shared/lib/localusers.sh (same decisions, both scopes); script 41 is excluded
+# read through shared/lib/localusers.sh (same decisions, both scopes) and logging through
+# shared/lib/log.sh (it never fails a part, both scopes); script 41 is excluded
 # because its match fix applies in both scopes and is covered above, and script 50
 # because it now reads enroot.conf in both scopes (covered below), and run-parts.sh and
 # epilog.sh because their exclusive detection, bounded squeue and never-failing logging
@@ -1200,7 +1241,8 @@ echo "scope=user -- byte-identical to the 26.09 scripts"
 snap_ok() {
     # $1 = template relative path, $2 = snapshot file name
     local out="$work/snap-$2"
-    if RENDER_SCOPE=user render "$1" "$out" && cmp -s "$out" "$here/snapshots/user-scope/$2"; then
+    if RENDER_SCOPE=user render "$1" "$out" && sed -i "s#$work/shared-lib/log.sh#/etc/slurm/shared/lib/log.sh#" "$out" \
+       && cmp -s "$out" "$here/snapshots/user-scope/$2"; then
         ok "scope=user renders $2 identically to 26.09"
     else
         no "scope=user renders $2 identically to 26.09" "$(diff "$here/snapshots/user-scope/$2" "$out" 2>&1 | head -5 | tr '\n' ' ')"

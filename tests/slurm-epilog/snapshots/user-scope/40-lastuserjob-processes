@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -ex
+. '/etc/slurm/shared/lib/log.sh'
 
 # Sibling 41-lastuserjob-ssh already consults this list before it touches a
 # user, so that operator accounts do not lose access when their job ends.
@@ -17,6 +18,6 @@ fi
 
 if [ "$SLURM_JOB_USER" != root ]; then
     if killall -9 -u "$SLURM_JOB_USER" ; then
-        logger -s -t slurm-epilog 'Killed residual user processes'
+        part_log slurm-epilog 'Killed residual user processes'
     fi
 fi

@@ -130,6 +130,32 @@
     - prolog
     - epilog
 
+- name: Collect the shared prolog and epilog libraries
+  ansible.builtin.set_fact:
+    slurm_shared_libs: "{{ query('ansible.builtin.fileglob', role_path ~ '/templates/etc/slurm/shared/lib/*') | sort }}"
+  tags:
+    - prolog
+    - epilog
+
+# Sourced by root's prolog and epilog (shared/bin, the parts), so installed before them:
+# a part that sources a library not there yet fails and drains the node. Root-owned like
+# shared/bin: a directory the slurm account could write would let it change what root
+# runs. Every library is installed whatever the scope; the job-scope one is read only
+# when the scope is job.
+- name: Install the shared prolog and epilog libraries
+  ansible.builtin.include_role:
+    name: managed_dir
+    apply:
+      tags: [prolog, epilog]
+  vars:
+    managed_dir_path: "{{ slurm_config_dir }}/shared/lib"
+    managed_dir_sources: "{{ slurm_shared_libs }}"
+    managed_dir_template: true
+    managed_dir_mode: "0644"
+  tags:
+    - prolog
+    - epilog
+
 - name: Collect the shared prolog and epilog scripts
   ansible.builtin.set_fact:
     slurm_shared_scripts: "{{ query('ansible.builtin.fileglob', role_path ~ '/templates/etc/slurm/shared/bin/*') | sort }}"
@@ -157,30 +183,6 @@
       slurm_epilog_cleanup_scope: user restores the older user-scoped epilog
       cleanup and is deprecated; see docs/slurm-cluster/epilog-job-scoped-cleanup.md.
   when: slurm_epilog_cleanup_scope == 'user'
-  tags:
-    - prolog
-    - epilog
-
-- name: Collect the shared prolog and epilog libraries
-  ansible.builtin.set_fact:
-    slurm_shared_libs: "{{ query('ansible.builtin.fileglob', role_path ~ '/templates/etc/slurm/shared/lib/*') | sort }}"
-  tags:
-    - prolog
-    - epilog
-
-# Sourced by root's prolog and epilog, so root-owned like shared/bin: a directory the
-# slurm account could write would let it change what root runs. Every library is
-# installed whatever the scope; the job-scope one is read only when the scope is job.
-- name: Install the shared prolog and epilog libraries
-  ansible.builtin.include_role:
-    name: managed_dir
-    apply:
-      tags: [prolog, epilog]
-  vars:
-    managed_dir_path: "{{ slurm_config_dir }}/shared/lib"
-    managed_dir_sources: "{{ slurm_shared_libs }}"
-    managed_dir_template: true
-    managed_dir_mode: "0644"
   tags:
     - prolog
     - epilog
@@ -329,13 +331,21 @@
     - slurm_enable_pam_slurm_adopt
     - not slurm_restrict_node_access
 
-- name: Comment out pam_systemd.so as it conflicts with pam_slurm_adopt.so, see https://slurm.schedmd.com/pam_slurm_adopt.html
-  ansible.builtin.replace:
-    path: /etc/pam.d/common-session
-    regexp: "^([^#].*pam_systemd.so.*)"
-    replace: "# \\1 # ANSIBLE MANAGED (ansible-role-slurm)"
+# pam_systemd starts a user manager (user@UID) for every SSH login, outside the job
+# cgroup pam_slurm_adopt puts the session in (https://slurm.schedmd.com/pam_slurm_adopt.html).
+# Off through its profile, never a hand edit another pam-auth-update would undo.
+- name: Turn pam_systemd off for pam_slurm_adopt (Debian)
+  ansible.builtin.include_role:
+    name: pam_profile
+    apply:
+      tags: [config]
+  vars:
+    pam_profile_name: systemd
+    pam_profile_enabled: false
+    pam_profile_module: pam_systemd.so
+    pam_profile_file: /etc/pam.d/common-session
   when:
-    - ansible_facts.distribution == "Ubuntu"
+    - ansible_facts.os_family == "Debian"
     - slurm_enable_pam_slurm_adopt
   tags:
     - config
