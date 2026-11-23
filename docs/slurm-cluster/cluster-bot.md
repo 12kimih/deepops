@@ -29,6 +29,13 @@ request on the site configuration made with the roster's own editors
 administrator merges it and runs `slurm-cluster.yml --tags people`; the roster stays the
 only source of accounts.
 
+What a newcomer needs before the first login (`cluster_bot_connect`: the SSH host and
+port and the guide from `cluster_info`, the portal's `open_ondemand_url`
+(roles/open_ondemand_defaults) when Open OnDemand is installed) is in the `/cluster join` reply,
+with how an account comes about, and in a DM the bot sends once the person's account
+exists on its host (checked hourly; the first run only records the accounts there are,
+in `accounts-welcomed.json`). Slack only: these facts never go to the public docs.
+
 Before a person's last day (`ends` in the roster) the bot DMs them
 `cluster_bot_leave_remind_days` before (14, 7 and 1 days by default, the same
 `cluster_bot_remind_days`): new jobs stop after that day, login stops

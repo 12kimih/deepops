@@ -18,15 +18,8 @@ cluster_tools_lib_dir: /usr/local/lib/cluster-tools
 # user's PATH (conda, a venv), which may be older or carry a different package.
 cluster_tools_lib_python: /usr/bin/python3
 
-# Site facts Slurm cannot know, for the cluster's commands, login banner and alerts.
-# Rendered once to cluster_tools_lib_info_file and read through cluster_tools.site; a key
-# left empty is left out, and every reader skips what is missing. Set the real values in
-# config (they are private); derive a value from its own setting, never restate it.
-cluster_info:
-  name: ""  # system ID, e.g. <org>-<kind>
-  docs_url: ""  # public user docs
-  login_host: ""  # what users ssh to
-  ssh_port: 22
+# cluster_info, the site facts: roles/cluster_info_defaults.
+
 # Facts derived from other settings, published with cluster_info (a key set there wins).
 # Kept apart because a site's cluster_info replaces the whole dict: one listed there
 # would silently go missing at every site that sets its own.

@@ -41,13 +41,18 @@ class SiteTests(unittest.TestCase):
             "{{ cluster_tools_lib_config_dir }}", defaults["cluster_tools_lib_config_dir"]
         )
         self.assertEqual(info_file, site.PATH)
-        self.assertEqual(set(defaults["cluster_info"]), {"name", "docs_url", "login_host", "ssh_port"})
+        self.assertEqual(
+            set(load(ROOT / "roles/cluster_info_defaults/defaults/main.yml")["cluster_info"]),
+            {"name", "docs_url", "login_host", "ssh_port"},
+        )
         self.assertEqual(set(defaults["cluster_tools_lib_derived_info"]), {"dashboard_url", "prometheus_url"})
 
     def test_every_fact_a_program_reads_is_published(self):
         # A key read but published by neither dict is always missing on a host.
         defaults = load(ROOT / "roles/cluster_tools_lib/defaults/main.yml")
-        published = set(defaults["cluster_info"]) | set(defaults["cluster_tools_lib_derived_info"])
+        published = set(load(ROOT / "roles/cluster_info_defaults/defaults/main.yml")["cluster_info"]) | set(
+            defaults["cluster_tools_lib_derived_info"]
+        )
         package = ROOT / "roles/cluster_tools_lib/files/cluster_tools"
         read = {
             key

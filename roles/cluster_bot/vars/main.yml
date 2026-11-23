@@ -30,6 +30,8 @@ _cluster_bot_cfg:
   admins: "{{ cluster_bot_admins | map('extract', cluster_bot_members) | select | list }}"
   pending: "{{ _cluster_bot_home }}/requests-pending.json"
   reminders: "{{ _cluster_bot_home }}/reminders-sent.json"
+  welcomed: "{{ _cluster_bot_home }}/accounts-welcomed.json"
+  connect: "{{ cluster_bot_connect }}"
   prefs_file: "{{ cluster_bot_prefs_file }}"
   github:
     repo: "{{ cluster_bot_github_repo }}"

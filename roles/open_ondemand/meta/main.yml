@@ -14,3 +14,4 @@ dependencies:
   - role: slurm_paths       # slurm_install_prefix, slurm_config_dir
   - role: prometheus_paths  # node_exporter_prom_dir
   - role: directory_defaults  # the LDAP server, CA, suffix and dex reader for Dex
+  - role: open_ondemand_defaults  # the portal's name, port and URL

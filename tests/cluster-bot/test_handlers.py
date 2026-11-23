@@ -51,7 +51,7 @@ from cluster_tools import job_notice  # noqa: E402
 
 CFG = {"bot_token": "x", "command": "/cluster", "members": {"UALICE": "alice", "UBOSS": "boss"}, "admins": ["UBOSS"],
        "channels": {"help": "#help", "admin": "#admin"}, "admin_group": "@admins",
-       "admin_mention": "<!subteam^SADMINS>"}  # fmt: skip
+       "admin_mention": "<!subteam^SADMINS>", "connect": {"login_host": "login.example.org", "ssh_port": 2222}}  # fmt: skip
 
 
 def submitted(state, user, callback, metadata=""):
@@ -186,6 +186,29 @@ class Handlers(unittest.TestCase):
             body={"user_id": "UALICE", "channel_id": "C", "trigger_id": "T", "text": "join"},
         )
         self.client.views_open.assert_not_called()
+        reply = self.client.chat_postEphemeral.call_args.kwargs["text"]
+        self.assertIn("ssh -p 2222 alice@login.example.org", reply, "and how to log in, from the settings")
+
+    def test_a_join_request_is_answered_with_how_to_log_in_once_the_account_exists(self):
+        state = {"login": {"v": {"value": "carl"}}, "name": {"v": {"value": "Carl"}},
+                 "team": {"v": {"selected_option": {"value": "team-a"}}}, "key": {"v": {"value": "ssh-ed25519 AAA"}}}  # fmt: skip
+        body, view = submitted(state, "UNEW", "join.submit")
+        self.call("view", "join.submit", body=body, view=view)
+        dms = [
+            c.kwargs["text"]
+            for c in self.client.chat_postMessage.call_args_list
+            if c.kwargs["channel"] == "UNEW"
+        ]
+        self.assertTrue(any("/cluster join" in t and "login.example.org" in t for t in dms))
+        self.client.reset_mock()
+        self.engine.submit.return_value = mock.Mock(status="refused", text="no", request={})
+        self.call("view", "join.submit", body=body, view=view)
+        dms = [
+            c.kwargs["text"]
+            for c in self.client.chat_postMessage.call_args_list
+            if c.kwargs["channel"] == "UNEW"
+        ]
+        self.assertFalse(any("login.example.org" in t for t in dms), "not after a refusal")
 
     def test_leave_gives_back_only_ones_own_account_unless_admin(self):
         state = {"ends": {"v": {"selected_date": "2027-02-28"}}, "login": {"v": {"value": "boss"}}}

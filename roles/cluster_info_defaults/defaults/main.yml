@@ -1,0 +1,14 @@
+---
+# The cluster's site facts, named once for every role that needs them (a shared-defaults
+# role: roles list it as a meta dependency).
+#
+# Site facts Slurm cannot know, for the cluster's commands, login banner, alerts
+# and the bot's onboarding text.
+# Rendered once to cluster_tools_lib_info_file and read through cluster_tools.site; a key
+# left empty is left out, and every reader skips what is missing. Set the real values in
+# config (they are private); derive a value from its own setting, never restate it.
+cluster_info:
+  name: ""  # system ID, e.g. <org>-<kind>
+  docs_url: ""  # public user docs
+  login_host: ""  # what users ssh to
+  ssh_port: 22
