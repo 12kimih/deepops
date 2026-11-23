@@ -199,3 +199,5 @@ retired_settings:
   egress_policy_inbound_lockout_check: ingress_policy_lockout_check in roles/ingress_policy
   docker_login_reauth: nothing (roles/docker-login logs in again when the password changed; forcing it reported a change every run)
   maintenance_reboot_method: "bmc_cold_reboot: true in the host's host_vars (roles/bmc): every reboot then ends in a BMC power cycle"
+  package_repos_ubuntu_mirror: package_repos_ubuntu_mirrors in roles/package_repos, a list apt falls back along (the first that answers serves)
+  package_repos_ubuntu_security_mirror: package_repos_ubuntu_security_mirrors in roles/package_repos (a list, as package_repos_ubuntu_mirrors)

@@ -4,19 +4,26 @@
 #   tasks_from: epel   EPEL on the RHEL family (a no-op elsewhere)
 #   tasks_from: cuda   NVIDIA's CUDA repository (drivers, CUDA, DCGM): the cuda-keyring
 #                      package on Ubuntu, a dnf repository on the RHEL family
-#   tasks_from: ubuntu Ubuntu's own archive from a mirror (package_repos_ubuntu_mirror)
+#   tasks_from: ubuntu Ubuntu's own archive from mirrors (package_repos_ubuntu_mirrors)
 #   tasks_from: repo   any other repository, present or absent, from one declaration
 #                      (package_repos_repo; see tasks/repo.yml): a checked signing key
 #                      trusted for that repository only, a deb822 source or yum repo
 #
 # A mirror (an airgap) replaces the base URLs and keeps the layout below them.
 
-# Ubuntu's archive (tasks_from: ubuntu): a mirror's URI (e.g. a national mirror, or an
-# airgap's), and where the -security suite comes from (the same mirror by default;
+# Ubuntu's archive (tasks_from: ubuntu): mirror URIs in order of preference (e.g. a
+# national mirror, then Canonical's country mirror and archive.ubuntu.com, or an
+# airgap's one); apt takes the first that answers and moves to the next on a failure
+# (its mirror method, apt-transport-mirror(1)), so one mirror's outage stops neither a
+# deploy nor the nightly updates (a national mirror's /ubuntu went 404, 2026-11-23).
+# The -security suite comes from the same list by default; a list of just
 # http://security.ubuntu.com/ubuntu/ takes security fixes from Canonical directly, as
-# Ubuntu's own file does). Empty leaves the OS's sources alone.
-package_repos_ubuntu_mirror: ""
-package_repos_ubuntu_security_mirror: "{{ package_repos_ubuntu_mirror }}"
+# Ubuntu's own file does.
+# Empty leaves the OS's sources alone.
+package_repos_ubuntu_mirrors: []
+package_repos_ubuntu_security_mirrors: "{{ package_repos_ubuntu_mirrors }}"
+# Where the mirror lists live (one file per source, named after it).
+package_repos_ubuntu_mirror_dir: /etc/apt/mirrors
 package_repos_ubuntu_components: [main, restricted, universe, multiverse]
 
 package_repos_epel_release: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_facts.distribution_major_version }}.noarch.rpm"

@@ -263,11 +263,11 @@ At this point, the downloaded package repositories should be available on your o
 Point DeepOps at them in your configuration; do not add sources by hand. DeepOps writes
 each repository it uses itself, signed by its key (`roles/package_repos`, the Docker and
 Container Toolkit roles), refuses entries in `/etc/apt/sources.list` (the Ubuntu archive
-goes through `package_repos_ubuntu_mirror`), and a second, hand-written source for the
+goes through `package_repos_ubuntu_mirrors`), and a second, hand-written source for the
 same repository with other `trusted`/`signed-by` options breaks apt:
 
 ```yaml
-package_repos_ubuntu_mirror: http://repo-server/ubuntu                # the Ubuntu archive
+package_repos_ubuntu_mirrors: [http://repo-server/ubuntu]           # the Ubuntu archive
 docker_ubuntu_repo_base_url: http://repo-server/docker/linux/ubuntu  # its gpg key at <base>/gpg
 nvidia_container_toolkit_repo_base_url: http://repo-server/libnvidia-container
 package_repos_cuda_base: http://repo-server/cuda/repos               # <base>/ubuntu2404/x86_64/
