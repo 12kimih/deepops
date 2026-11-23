@@ -15,6 +15,9 @@ Facts:
             read from each command's one definition (cluster_tools.cli Command)
   policy    the cluster-wide periods and fraction every cleanup and warning uses
             (cluster_user_stale_days, cluster_user_grace_days, cluster_user_warn_fraction)
+  slurm     KillWait from the slurm.conf template the site renders, and what preemption
+            gives a job: GraceTime, which every preempted QoS has equal to KillWait
+            (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
   slack     the channels by purpose and the administrators' group (private)
   quotas    each host's disk_quota_filesystems and disk_quota_inodes_per_tib (private)
 
@@ -24,6 +27,7 @@ with a template is not resolved here and is left out (the private file says whic
 
 import importlib
 import json
+import re
 import os
 import sys
 from pathlib import Path
@@ -41,6 +45,7 @@ from repo_files import tracked  # noqa: E402
 PUBLIC = {
     "commands": {"summary", "usage", "options"},
     "policy": {"stale_days", "grace_days", "warn_fraction"},
+    "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
 }
 POLICY = {
     "stale_days": "cluster_user_stale_days",
@@ -103,6 +108,22 @@ def commands(names):
     return out
 
 
+def slurm_values(config):
+    """KillWait from the site's slurm.conf template (config/files/slurm/slurm.conf), else
+    the role's, and the preemption times that follow from it."""
+    site = Path(config) / "files/slurm/slurm.conf" if config else None
+    template = site if site and site.exists() else ROOT / "roles/slurm/templates/etc/slurm/slurm.conf"
+    m = re.search(r"(?m)^\s*KillWait\s*=\s*(\d+)\s*$", template.read_text())
+    if not m:
+        return {}
+    kill_wait = int(m.group(1))
+    return {
+        "kill_wait_seconds": kill_wait,
+        "preempt_grace_seconds": kill_wait,
+        "sigkill_after_seconds": 2 * kill_wait,
+    }
+
+
 def host_quotas(config):
     """{host: {filesystems, inodes_per_tib}} from the site's host_vars (private)."""
     out = {}
@@ -118,6 +139,7 @@ def facts(config):
     every = {
         "commands": commands(s.get("cluster_tools_builtin") or []),
         "policy": {field: s.get(key) for field, key in POLICY.items()},
+        "slurm": slurm_values(config),
         "slack": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }
