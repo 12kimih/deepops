@@ -2,6 +2,7 @@
 _scratch_space_command: /usr/local/libexec/scratch-space
 _scratch_space_config: "{{ cluster_tools_lib_config_dir }}/scratch-space.json"
 _scratch_space_textfile: "{{ node_exporter_prom_dir }}/scratch-space.prom"
+_scratch_space_kept: "{{ node_exporter_prom_keep_dir }}/scratch-space.prom"
 _scratch_space_units: [scratch-space-purge.service, scratch-space-purge.timer]
 _scratch_space_cfg:
   root: "{{ scratch_space_root }}"
@@ -17,6 +18,7 @@ _scratch_space_cfg:
   cleanup_top: "{{ cluster_cleanup_top | int }}"
   state: /var/lib/scratch-space/state.json
   textfile: "{{ _scratch_space_textfile }}"
+  textfile_kept: "{{ _scratch_space_kept }}"
 
 # What this component installs, for its record (roles/component_record): the cleanup's
 # timer, its service and files. Never the directories: they hold people's data.
@@ -24,5 +26,6 @@ scratch_space_items: >-
   {{ (['unit:scratch-space-purge.timer', 'unit:scratch-space-purge.service']
       + _scratch_space_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
       + ['file:' ~ _scratch_space_command, 'file:' ~ _scratch_space_config, 'file:' ~ _scratch_space_textfile,
+         'file:' ~ _scratch_space_kept, 'file:/etc/tmpfiles.d/deepops-textfile-scratch-space.conf',
          'file:' ~ cluster_tools_lib_config_records ~ '/scratch_space.json'])
      if scratch_space_purge | bool else [] }}

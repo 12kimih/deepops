@@ -59,7 +59,7 @@ from pathlib import Path
 
 from . import cleanup, config, proc
 from .cli import run_main
-from .files import write_atomic
+from .files import write_atomic, write_textfile
 from .prom import key, render
 
 MOUNTS = "/proc/self/mounts"
@@ -502,6 +502,7 @@ CONFIG_KEYS = {
     "textfile": str,
     "scan": dict,
     "scan_textfile": str,
+    "scan_textfile_kept": str,
     "scan_top": int,
     "scan_max_entries": int,
     "stale_days": int,
@@ -539,7 +540,9 @@ def main(argv=None):
                 return 0
             if args[1] == "scan":
                 if cfg.get("scan"):
-                    write_atomic(cfg["scan_textfile"], render(scan(host, cfg, time.time())))
+                    write_textfile(
+                        cfg["scan_textfile"], render(scan(host, cfg, time.time())), cfg["scan_textfile_kept"]
+                    )
                 return 0
             for text, action in steps_for(host, cfg, args[1]):
                 print(text)

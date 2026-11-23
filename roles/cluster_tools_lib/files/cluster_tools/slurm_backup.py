@@ -39,7 +39,7 @@ import tempfile
 from pathlib import Path
 
 from . import config, proc
-from .files import write_atomic
+from .files import write_textfile
 from .prom import key, parse, render
 
 DB_FILE = "slurm_acct_db.sql.gz"
@@ -170,11 +170,7 @@ def publish(cfg, values=None):
         merged.setdefault(series("destination_configured_timestamp_seconds", destination=path), now)
     merged.setdefault(series("restore_test_configured_timestamp_seconds"), now)
     text = render(merged)
-    if merged != old:
-        kept.parent.mkdir(parents=True, exist_ok=True)
-        write_atomic(str(kept), text)
-    Path(cfg["textfile_dir"]).mkdir(parents=True, exist_ok=True)
-    write_atomic(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), text)
+    write_textfile(str(Path(cfg["textfile_dir"]) / cfg["textfile"]), text, str(kept))
     return 0
 
 

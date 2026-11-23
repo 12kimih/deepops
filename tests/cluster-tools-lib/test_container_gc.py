@@ -181,14 +181,28 @@ class Collect(unittest.TestCase):
 
     def test_main_writes_the_textfile(self):
         self.store(20)
-        out = self.root / "gc.prom"
-        self.cfg["textfile"] = str(out)
+        out, kept = self.root / "gc.prom", self.root / "keep" / "gc.prom"
+        self.cfg.update(textfile=str(out), textfile_kept=str(kept))
         cfg = self.root / "gc.json"
         cfg.write_text(json.dumps(self.cfg))
         with mock.patch.object(gc, "processes", return_value={}):
             self.assertEqual(gc.main(["container-storage-gc", str(cfg)]), 0)
         values = prom.parse(out.read_text())
         self.assertIn(prom.key("container_storage_gc_last_success_timestamp_seconds"), values)
+        self.assertEqual(kept.read_text(), out.read_text(), "the copy roles/textfile_keep restores at boot")
+
+    def test_a_failed_run_after_a_reboot_keeps_the_last_success_from_the_kept_copy(self):
+        # The textfile directory is a tmpfs: after a boot only the kept copy holds the last
+        # success, and a failed run must carry it over, or the staleness alert never fires.
+        out, kept = self.root / "gc.prom", self.root / "keep" / "gc.prom"
+        kept.parent.mkdir()
+        kept.write_text("container_storage_gc_last_success_timestamp_seconds 1700000000\n")
+        self.cfg.update(textfile=str(out), textfile_kept=str(kept))
+        cfg = self.root / "gc.json"
+        cfg.write_text(json.dumps(self.cfg))
+        with mock.patch.object(gc, "run", return_value=(["container_storage_gc_failures 1"], False)):
+            self.assertEqual(gc.main(["container-storage-gc", str(cfg)]), 1)
+        self.assertIn("container_storage_gc_last_success_timestamp_seconds 1700000000", out.read_text())
 
 
 class FakeDockerd:
@@ -279,7 +293,14 @@ class UnmanagedContainers(unittest.TestCase):
         self.assertEqual([line for line in lines if "docker" in line], [])
 
     def test_the_config_takes_exactly_socket_and_label(self):
-        base = {"textfile": "", "unused_days": 14, "max_used_percent": 80, "active_uids": None, "stores": []}
+        base = {
+            "textfile": "",
+            "textfile_kept": "",
+            "unused_days": 14,
+            "max_used_percent": 80,
+            "active_uids": None,
+            "stores": [],
+        }
         for docker, good in (({"socket": "/run/docker.sock", "label": "deepops.unit"}, True),
                              ({"socket": "/run/docker.sock"}, False), ({"socket": "", "label": "x"}, False),
                              ({"socket": "/s", "label": "x", "extra": 1}, False)):  # fmt: skip

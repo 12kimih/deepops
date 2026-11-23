@@ -42,6 +42,15 @@
   loop: "{{ _container_storage_gc_units }}"
   register: container_storage_gc_units
 
+# The textfile directory is a tmpfs: the kept copy goes back at every boot, so the
+# last run's result (and its last success) stays until the next run.
+- name: Restore the kept metrics at every boot
+  ansible.builtin.include_role:
+    name: textfile_keep
+    tasks_from: restore
+  vars:
+    textfile_keep_name: container-storage-gc
+
 - name: Enable the container storage cleanup timer
   systemd_unit:
     name: container-storage-gc.timer

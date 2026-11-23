@@ -48,7 +48,7 @@ from pathlib import Path
 
 from . import config, proc
 from .cli import run_main
-from .files import write_atomic
+from .files import read_textfile, write_textfile
 from .prom import series
 
 UID_TOKENS = ("$(id -u)", "${UID}", "$UID")
@@ -390,7 +390,7 @@ def textfile(lines, ok, now):
     return "".join(line + "\n" for line in sorted(out))
 
 
-CONFIG_KEYS = {"textfile": str, "unused_days": int, "max_used_percent": int,
+CONFIG_KEYS = {"textfile": str, "textfile_kept": str, "unused_days": int, "max_used_percent": int,
                "active_uids": (list, type(None)), "stores": list}  # fmt: skip
 CONFIG_OPTIONAL = {"uid_min": int, "docker": dict}
 DOCKER_KEYS = ("socket", "label")
@@ -420,14 +420,15 @@ def main(argv=None):
         now = time.time()
         lines, ok = run(cfg, dry_run, now)
         if not dry_run and cfg.get("textfile"):
+            keep = cfg["textfile_kept"]
             if ok:
-                write_atomic(cfg["textfile"], textfile(lines, ok, now))
+                write_textfile(cfg["textfile"], textfile(lines, ok, now), keep)
             else:  # keep the last success: the staleness alert then fires
-                old = Path(cfg["textfile"]).read_text() if os.path.exists(cfg["textfile"]) else ""
+                old = read_textfile(cfg["textfile"], keep)
                 kept = [
                     line for line in old.splitlines() if line.startswith("container_storage_gc_last_success")
                 ]
-                write_atomic(cfg["textfile"], "".join(line + "\n" for line in sorted(lines + kept)))
+                write_textfile(cfg["textfile"], "".join(line + "\n" for line in sorted(lines + kept)), keep)
         return 0 if ok else 1
 
     return run_main("container-storage-gc", body)

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
-from cluster_tools.files import write_atomic  # noqa: E402
+from cluster_tools.files import read_textfile, write_atomic, write_textfile  # noqa: E402
 
 
 class WriteTests(unittest.TestCase):
@@ -27,6 +27,33 @@ class WriteTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError) as ctx:
                 write_atomic(path, "x")
             self.assertEqual(ctx.exception.filename, path)
+
+
+class TextfileTests(unittest.TestCase):
+    """write_textfile writes the live textfile and its kept copy; read_textfile falls back
+    to the copy when the live one is gone (after a boot, before roles/textfile_keep's
+    restore)."""
+
+    def test_both_written_directories_made(self):
+        with tempfile.TemporaryDirectory() as d:
+            live, kept = Path(d, "prom", "x.prom"), Path(d, "keep", "x.prom")
+            write_textfile(str(live), "a 1\n", str(kept))
+            self.assertEqual((live.read_text(), kept.read_text()), ("a 1\n", "a 1\n"))
+
+    def test_without_a_copy_only_the_live_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            live = Path(d, "x.prom")
+            write_textfile(str(live), "a 1\n")
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["x.prom"])
+
+    def test_reading_falls_back_to_the_copy(self):
+        with tempfile.TemporaryDirectory() as d:
+            live, kept = Path(d, "x.prom"), Path(d, "k.prom")
+            self.assertEqual(read_textfile(str(live), str(kept)), "")
+            kept.write_text("old 1\n")
+            self.assertEqual(read_textfile(str(live), str(kept)), "old 1\n")
+            live.write_text("new 2\n")
+            self.assertEqual(read_textfile(str(live), str(kept)), "new 2\n")
 
 
 if __name__ == "__main__":

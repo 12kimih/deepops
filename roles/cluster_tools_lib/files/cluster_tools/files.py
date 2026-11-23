@@ -29,3 +29,25 @@ def write_atomic(path, text, mode=0o644):
         os.fsync(dfd)
     finally:
         os.close(dfd)
+
+
+def write_textfile(path, text, kept=""):
+    """A node_exporter textfile: PATH, in node_exporter's textfile directory (a tmpfs,
+    empty after a boot), and KEPT, its copy on disk, which roles/textfile_keep puts back
+    into PATH at boot. Written whenever the metrics are, so a reboot after a daily run
+    keeps that run's result (and its last success) instead of losing the series until
+    the next run. Without KEPT, only PATH. Each is atomic; missing directories are made."""
+    for target in (kept, path):
+        if target:
+            os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
+            write_atomic(target, text)
+
+
+def read_textfile(path, kept=""):
+    """The metrics last written (write_textfile): PATH, else KEPT (after a boot, before
+    the restore), else ""."""
+    for source in (path, kept):
+        if source and os.path.exists(source):
+            with open(source) as f:
+                return f.read()
+    return ""
