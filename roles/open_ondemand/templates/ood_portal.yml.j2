@@ -18,7 +18,7 @@ dex:
 custom_vhost_directives:
   # Plain HTTP on the TLS port (a browser given http://): mod_ssl answers 400; sending
   # that answer to the https:// address turns it into the redirect people expect.
-  - 'ErrorDocument 400 https://{{ open_ondemand_servername }}:{{ open_ondemand_port | int }}/'
+  - 'ErrorDocument 400 {{ open_ondemand_url }}'
 {% for header in open_ondemand_proxied_services | map(attribute='user_header', default='') | select | unique %}
   # A client never sets the user header itself (early: before any other processing).
   - 'RequestHeader unset {{ header }} early'

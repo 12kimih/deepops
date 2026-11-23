@@ -104,6 +104,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── cachefilesd
 │   ├── cluster_bot
 │   ├── cluster_bot_access
+│   ├── cluster_info_defaults
 │   ├── cluster_sudoers
 │   ├── cluster_tools
 │   ├── cluster_tools_lib
@@ -197,6 +198,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── nvidia_power_limit
 │   ├── nvidia_versions
 │   ├── open_ondemand
+│   ├── open_ondemand_defaults
 │   ├── openmpi
 │   ├── os_updates
 │   ├── package_repos

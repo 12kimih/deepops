@@ -13,7 +13,9 @@ it acts on), bans
 {hosts {name: address}, seen} (no hosts leaves unban requests and the ban watch off),
 leave {remind_days, leaving (people_leaving)}, command (the one slash command, its
 subcommands cluster_bot.commands'), data {host, kinds, root, unused_days, grace_days,
-seen} (shared data requests, cluster_bot.data; no host leaves them off).
+seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
+{login_host, ssh_port, portal_url, docs_url} and welcomed (cluster_bot.onboarding: how to
+log in, the account notice).
 """
 
 import json
@@ -28,6 +30,7 @@ from . import (
     commands,
     data_blocks,
     home_blocks,
+    onboarding,
     projects_blocks,
     reminders,
     state,
@@ -80,6 +83,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
         client.chat_postMessage(channel=slack_id, text=outcome.text)
 
     def submit(client, slack_id, req):
+        """Submit REQ for SLACK_ID; the outcome."""
         outcome = engine.submit(req)
         if outcome.status == "held":
             approvers = engine.approvers(outcome.key)
@@ -99,6 +103,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
             client.chat_postMessage(channel=slack_id, text=outcome.text)
         else:
             tell(client, slack_id, outcome)
+        return outcome
 
     prefs = Prefs(cfg["prefs_file"])
 
@@ -131,9 +136,13 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
             prefs.set_muted(login, action["value"] == "off")
             publish_home(client, body["user"]["id"])
 
+    connect = cfg.get("connect") or {}
+
     def join_command(body, client):
         if join is None or user_of(body["user_id"]):
-            text = "이미 계정이 있습니다." if join else "이 클러스터는 Slack 계정 신청을 받지 않습니다."
+            text = "이 클러스터는 Slack 계정 신청을 받지 않습니다."
+            if join:
+                text = "이미 계정이 있습니다.\n" + onboarding.connect_text(connect, user_of(body["user_id"]))
             client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text=text)
             return
         client.views_open(trigger_id=body["trigger_id"], view=accounts_blocks.join_form(join.teams()))
@@ -145,7 +154,10 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
                "account": v["team"]["v"]["selected_option"]["value"], "key": v["key"]["v"]["value"],
                "slack": body["user"]["id"]}  # fmt: skip
         ack()
-        submit(client, body["user"]["id"], req)
+        if submit(client, body["user"]["id"], req).status != "refused":
+            client.chat_postMessage(
+                channel=body["user"]["id"], text=onboarding.join_text(connect, cfg["command"])
+            )
 
     def leave_command(body, client):
         user = user_of(body["user_id"])
@@ -490,6 +502,16 @@ def data_rounds(client, data, cfg, slack_of):
     return round_
 
 
+def _account_exists(login):
+    import pwd
+
+    try:
+        pwd.getpwnam(login)
+    except KeyError:
+        return False
+    return True
+
+
 def main(argv=None):
     from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -535,6 +557,15 @@ def main(argv=None):
             reminders.remind(sources, app.client, slack_of, sent, time.time())
 
     every(REMIND_EVERY, "reminders", remind_round)
+
+    if join is not None:  # the account notice: once the roster's account exists here
+
+        def welcome_round():
+            onboarding.welcome_round(cfg["members"], cfg["welcomed"], _account_exists,
+                                     lambda who, text: app.client.chat_postMessage(channel=who, text=text),
+                                     cfg.get("connect") or {}, cfg["command"])  # fmt: skip
+
+        every(REMIND_EVERY, "account notices", welcome_round)
     if project is not None:  # a deploy restarts the bot: whose role changed, told once
         p = cfg["projects"]
         notify_deployed(p["deployed"], p["seen"], p["root"], slack_of,

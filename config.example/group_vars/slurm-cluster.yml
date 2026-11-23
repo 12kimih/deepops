@@ -80,6 +80,13 @@ slurm_ha_state_save_location: "/sw/slurm"
 #cluster_bot_command: /cluster
 #cluster_bot_app_name: cluster-bot
 #cluster_bot_extra_scopes: []
+# What a newcomer needs before the first login (the join reply and the account notice),
+# each derived from the setting that holds it (cluster_info, open_ondemand_*).
+#cluster_bot_connect:
+#  login_host: "{{ cluster_info.login_host | default('') }}"
+#  ssh_port: "{{ cluster_info.ssh_port | default(22) }}"
+#  portal_url: "{{ open_ondemand_url if slurm_install_open_ondemand else '' }}"
+#  docs_url: "{{ cluster_info.docs_url | default('') }}"
 
 # Hourly GPU usage report and idle-GPU nudges, a weekly per-person summary of GPU-hours
 # held and left idle, and a daily disk usage report (roles/slurm_usage_report), posted to
@@ -478,7 +485,7 @@ openmpi_configure: "./configure --prefix={{ openmpi_install_prefix }} --disable-
 #  # after which the client's own value wins and this line stops mattering.
 #  COLORTERM: truecolor
 
-# Site facts Slurm cannot know (roles/cluster_tools_lib), set once here and read by the
+# Site facts Slurm cannot know (roles/cluster_info_defaults), set once here and read by the
 # cluster's commands, login banner and alerts; refer to them below rather than restating
 # a value. A key left empty is left out. Two more are published with them, derived:
 # dashboard_url (grafana_root_url) and prometheus_url (the prometheus component's host).
@@ -642,6 +649,10 @@ rsyslog_client_tcp_host: "{{ groups['slurm-master'][0] }}"
 # The portal's public name and its one port (Apache listens nowhere else).
 #open_ondemand_servername: portal.example.com  # example
 #open_ondemand_port: 443
+# Derived: the portal's URL (roles/open_ondemand_defaults), 443 not written.
+#open_ondemand_url: >-
+#  {{ ('https://' ~ open_ondemand_servername ~ ('' if open_ondemand_port | int == 443
+#      else ':' ~ (open_ondemand_port | int)) ~ '/') if open_ondemand_servername | length > 0 else '' }}
 
 # Certificate chain and private key under the inventory; vault the key.
 #open_ondemand_tls_cert_src: "{{ inventory_dir }}/files/tls/portal.fullchain.pem"  # example

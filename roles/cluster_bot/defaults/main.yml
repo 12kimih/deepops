@@ -62,5 +62,13 @@ cluster_bot_github_base: main
 cluster_bot_github_app_id: ""
 cluster_bot_github_installation_id: ""
 cluster_bot_github_app_key: ""
+# What a person needs before their first login, in the join reply and the DM sent once
+# their account exists (cluster_bot.onboarding), each from the setting that holds it; an
+# empty one is left out. Slack only: these are private.
+cluster_bot_connect:
+  login_host: "{{ cluster_info.login_host | default('') }}"
+  ssh_port: "{{ cluster_info.ssh_port | default(22) }}"
+  portal_url: "{{ open_ondemand_url if slurm_install_open_ondemand else '' }}"
+  docs_url: "{{ cluster_info.docs_url | default('') }}"
 # Accounts never offered to a new person (accounts without children are offered).
 cluster_bot_join_exclude: [root, admin]

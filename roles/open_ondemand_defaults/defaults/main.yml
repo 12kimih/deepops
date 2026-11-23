@@ -1,0 +1,12 @@
+---
+# The Open OnDemand portal's address, named once: roles/open_ondemand serves it and
+# other roles (cluster_bot's onboarding) point users at it.
+
+# The portal's public name and port. Apache listens on this port only (no port 80
+# redirect, no other Listen), with TLS.
+open_ondemand_servername: ""
+open_ondemand_port: 443
+# The portal's URL (empty without a name); 443 is not written.
+open_ondemand_url: >-
+  {{ ('https://' ~ open_ondemand_servername ~ ('' if open_ondemand_port | int == 443
+      else ':' ~ (open_ondemand_port | int)) ~ '/') if open_ondemand_servername | length > 0 else '' }}
