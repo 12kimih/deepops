@@ -290,68 +290,46 @@ def _qos_classes(qos_data):
     return rows
 
 
-def _qos_teams(assoc_data):
-    """{QoS: [team, ...]}: the accounts that grant each QoS while their parent does not,
-    the team that holds it (its sub-accounts inherit it). One rule, read from the
-    associations, so no name convention is assumed."""
+def _user_teams(assoc_data, classes):
+    """{user: [account, ...]}: each person's own accounts inside a team, a team being an
+    account that grants a high QoS its parent does not (its sub-accounts are in it). The
+    person's, not a job's: a job under another account (an admin one) still shows the
+    team the high QoS belongs to. Read from the associations the roster makes."""
     if not assoc_data:
         return {}
-    grants = {}
-    parent = {}
-    for a in assoc_data.get("associations") or []:
-        if a.get("user"):
-            continue
-        parent[a["account"]] = a.get("parent_account") or ""
-        grants[a["account"]] = set(a.get("qos") or [])
+    rows = assoc_data.get("associations") or []
+    parent, grants = {}, {}
+    for a in rows:
+        if not a.get("user"):
+            parent[a["account"]] = a.get("parent_account") or ""
+            grants[a["account"]] = set(a.get("qos") or [])
+
+    def in_team(account, seen=()):
+        if not account or account in seen:
+            return False
+        own = grants.get(account, set()) - grants.get(parent.get(account, ""), set())
+        return any((classes.get(q) or {}).get("high") for q in own) or in_team(
+            parent.get(account), (*seen, account)
+        )
+
     out = {}
-    for account, qos in grants.items():
-        for q in qos - grants.get(parent.get(account, ""), set()):
-            out.setdefault(q, []).append(account)
-    return {q: sorted(teams) for q, teams in out.items()}
+    for a in rows:
+        if a.get("user") and in_team(a["account"]):
+            out.setdefault(a["user"], set()).add(a["account"])
+    return {u: sorted(accounts, key=_natural) for u, accounts in out.items()}
 
 
-def _gpu_split(chosen, classes):
-    """Per user: teams (accounts), GPUs held by type under a high and a low QoS, and the
-    GPUs their pending jobs ask for."""
+def _gpu_split(held, classes):
+    """{user: {"high": {type: n}, "low": {type: n}}}: the GPUs each holds by type, under a
+    high QoS and a low one ("" for GPUs held without a type)."""
     rows = {}
-    for j in chosen:
-        if not (j["holds"] or j["state"] == "PD"):
-            continue
-        u = rows.setdefault(j["user"], {"teams": set(), "high": {}, "low": {}, "pending_gpus": 0})
-        u["teams"].add(j["account"])
-        if j["holds"]:
-            side = u["high"] if (classes.get(j["qos"]) or {}).get("high") else u["low"]
-            for kind, n in (j["alloc_types"] or {"": j["alloc"]["gres"]}).items():
-                if n:
-                    side[kind] = side.get(kind, 0) + n
-        else:
-            u["pending_gpus"] += j["req"]["gres"] * j["tasks"]
+    for j in held:
+        u = rows.setdefault(j["user"], {"high": {}, "low": {}})
+        side = u["high"] if (classes.get(j["qos"]) or {}).get("high") else u["low"]
+        for kind, n in (j["alloc_types"] or {"": j["alloc"]["gres"]}).items():
+            if n:
+                side[kind] = side.get(kind, 0) + n
     return rows
-
-
-def _headroom(held, classes, teams):
-    """Each high QoS with a GPU quota or GPUs in use, named by its team (TEAMS): per GPU
-    type its quota (None: no limit), what its running jobs hold, and who holds it, most
-    first."""
-    out = []
-    for name, q in sorted(classes.items(), key=lambda kv: (",".join(teams.get(kv[0]) or [kv[0]]), kv[0])):
-        if not q["high"]:
-            continue
-        holders = {}
-        for j in held:
-            if j["qos"] == name:
-                for kind, n in (j["alloc_types"] or {"": j["alloc"]["gres"]}).items():
-                    if n:
-                        holders.setdefault(kind, {}).setdefault(j["user"], 0)
-                        holders[kind][j["user"]] += n
-        kinds = sorted(set(q["limits"]) | set(holders), key=lambda k: (k == "", k))
-        if not kinds:
-            continue
-        out.append({"team": ",".join(teams.get(name) or []) or name, "qos": name, "gpus": [
-            {"type": k, "limit": q["limits"].get(k), "used": sum((holders.get(k) or {}).values()),
-             "holders": sorted((holders.get(k) or {}).items(), key=lambda x: (-x[1], x[0]))}
-            for k in kinds]})  # fmt: skip
-    return out
 
 
 def build(
@@ -413,12 +391,12 @@ def build(
     )
     user_nodes = len({h for u in user_rows for h in u["nodes"]})
     classes = _qos_classes(qos_data)
-    split = _gpu_split(chosen, classes)
+    split = _gpu_split([j for j in chosen if j["holds"]], classes)
+    teams = _user_teams(assoc_data, classes)
     for u in user_rows:
         u["nodes"] = len(u["nodes"])
-        s = split.get(u["user"]) or {"teams": set(), "high": {}, "low": {}, "pending_gpus": 0}
-        u.update(teams=sorted(t for t in s["teams"] if t), gpus={"high": s["high"], "low": s["low"]},
-                 pending_gpus=s["pending_gpus"])  # fmt: skip
+        u["teams"] = teams.get(u["user"], [])
+        u["gpus"] = split.get(u["user"]) or {"high": {}, "low": {}}
     gpu_types = sorted({k for n in nodes for k in n["gres_types"]}, key=_natural)
 
     why, details = {}, {}
@@ -523,7 +501,7 @@ def build(
         "cluster": cluster, "gres": key, "has_gres": has_gres, "free_what": key if has_gres else "cpu",
         "gres_pinned": bool(gres), "jobs": [_public(j) for j in chosen],
         "users": user_rows, "user_nodes": user_nodes, "gpu_types": gpu_types,
-        "qos_read": bool(classes), "headroom": _headroom(held, classes, _qos_teams(assoc_data)),
+        "qos_read": bool(classes),
         "why": [{"family": k[0], "code": k[1], "partition": k[2], "user": k[3], **v} for k, v in why.items()],
         "why_details": details, "pools": pool_tree,
         "nodes": [node_row(n, "") for n in nodes], "node_filter": sel,
@@ -611,17 +589,20 @@ def show_jobs(t, model, group=True, detail=False, scope="mine"):
         jobs = sorted(jobs, key=lambda j: (vocab.job_rank(j["state"]), -j["priority"], j["id"]))
     else:
         jobs = sorted(jobs, key=lambda j: j["id"])
-    heads = ["JOBID", "ST", "NAME", "USER", "PARTITION", "QOS", "N", "NODE(REASON)", "CPU", "GRES", "TIME",
-             "LIMIT", "PRIO"]  # fmt: skip
-    align = ["r", "l", "l", "l", "l", "l", "r", "l", "r", "l", "r", "r", "r"]
-    maxw = [20, 4, 20, 12, 12, 10, 3, 22, 5, 14, 10, 10, 11]  # a clipped job ID says nothing true
-    minw = [5, 4, 10, 6, 4, 4, 1, 8, 3, 4, 5, 5, 4]
-    want = [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 2, 0]
-    # Only free text narrows, and only where a reader can finish the word: a clipped
-    # number says nothing true. 0 never narrows; lower narrows first.
-    flex = [0, 0, 1, 3, 0, 0, 0, 2, 0, 0, 0, 0, 0]
-    softw = [8, 4, 14, 7, 12, 10, 3, 16, 5, 14, 10, 10, 11]
-    short = {7: "NODE"}
+    # The one column order (as every table: who, state, where, resources in Slurm's TRES
+    # order, then time and priority): header, align, max width (a clipped job ID says
+    # nothing true), min width, want (0 always shown; else added by rank as room allows),
+    # flex (only free text narrows, lower first; 0 never), soft width, short header.
+    columns = [
+        ("JOBID", "r", 20, 5, 0, 0, 8, ""), ("NAME", "l", 20, 10, 0, 1, 14, ""),
+        ("USER", "l", 12, 6, 0, 3, 7, ""), ("ST", "l", 4, 4, 0, 0, 4, ""),
+        ("PARTITION", "l", 12, 4, 0, 0, 12, ""), ("QOS", "l", 10, 4, 0, 0, 10, ""),
+        ("N", "r", 3, 1, 1, 0, 3, ""), ("CPU", "r", 5, 3, 0, 0, 5, ""), ("GRES", "l", 14, 4, 0, 0, 14, ""),
+        ("NODE(REASON)", "l", 22, 8, 0, 2, 16, "NODE"), ("TIME", "r", 10, 5, 0, 0, 10, ""),
+        ("LIMIT", "r", 10, 5, 2, 0, 10, ""), ("PRIO", "r", 11, 4, 0, 0, 11, ""),
+    ]  # fmt: skip
+    heads, align, maxw, minw, want, flex, softw, shorts = (list(x) for x in zip(*columns))
+    short = {i: x for i, x in enumerate(shorts) if x}
 
     rows = []
     for j in jobs:
@@ -641,8 +622,8 @@ def show_jobs(t, model, group=True, detail=False, scope="mine"):
             else (render.duration(j["limit_minutes"] * 60) if j["limit_minutes"] else dot)
         )
         cells = [
-            j["label"], f"{ascii_mark if t.ascii else mark} {j['state']}", j["name"], j["user"],
-            j["partition"] or dot, j["qos"] or dot, str(j["node_count"]), where, str(j["cpus"]), j["gres"] or dot,
+            j["label"], j["name"], j["user"], f"{ascii_mark if t.ascii else mark} {j['state']}",
+            j["partition"] or dot, j["qos"] or dot, str(j["node_count"]), str(j["cpus"]), j["gres"] or dot, where,
             render.duration(j["elapsed"]) if j["holds"] and j["elapsed"] else dot,
             limit, str(j["priority"]),
         ]  # fmt: skip
@@ -726,132 +707,86 @@ def _type_label(kind):
     return kind.upper() if kind else "ANY"
 
 
-def show_gpu_users(t, model):
-    """Who holds which GPUs: per user their teams, then per GPU type what they hold
-    under a high QoS / a low one (exact numbers, "-" for none), and the GPUs their
-    pending jobs ask for."""
-    users = model["users"]
-    kinds = list(model["gpu_types"])
-    if any("" in u["gpus"]["high"] or "" in u["gpus"]["low"] for u in users):
-        kinds.append("")  # GPUs held without a type
-    # Two spaces before each GPU type: the columns are pairs, and one space ran them together.
-    heads = ["USER", "TEAM"] + [f"  {_type_label(k)} hi/lo" for k in kinds] + ["  PEND"]
-    g = Grid(t, heads, align=["l", "l"] + ["r"] * (len(kinds) + 1), maxw=[16, 16])
-
-    def pair(hi, lo):
-        return [(str(hi) if hi else "-", t.c["acc"] + t.bold if hi else "faint"), (" / ", "faint"),
-                (str(lo) if lo else "-", "muted" if lo else "faint")]  # fmt: skip
-
-    tot_hi, tot_lo, tot_pend = {}, {}, 0
-    for u in users:
-        own = u["user"] == model["mine"]
-        held = sum(u["gpus"]["high"].values()) + sum(u["gpus"]["low"].values())
-        name_style = t.c["self"] + t.bold if own else ("text" if held else "muted")
-        cells = [(u["user"], name_style), (",".join(u["teams"]) or "-", "sub")]
-        for k in kinds:
-            hi, lo = u["gpus"]["high"].get(k, 0), u["gpus"]["low"].get(k, 0)
-            tot_hi[k], tot_lo[k] = tot_hi.get(k, 0) + hi, tot_lo.get(k, 0) + lo
-            cells.append(pair(hi, lo))
-        cells.append(
-            (str(u["pending_gpus"]) if u["pending_gpus"] else "-", "warn" if u["pending_gpus"] else "faint")
-        )
-        tot_pend += u["pending_gpus"]
-        g.row(cells, gutter=(t.g["self"], "self") if own else "")
-    g.rule()
-    s = t.c["sub"] + t.bold
-    g.row([("total", s), ("", s)] + [pair(tot_hi[k], tot_lo[k]) for k in kinds] + [(str(tot_pend), s)])
-    tally = [(f"{len(users)} user{'s' * (len(users) != 1)}", "sub")]
-    if not model["qos_read"]:
-        tally.append(("QoS unread: hi/lo split unknown, all shown as lo", "warn"))
-    return g.render("USERS", tally) + "\n"
-
-
-def _fit_holders(holders, cols):
-    """'user n, user n' in at most COLS columns, ending '+N more' when some do not fit."""
-    parts = [f"{u} {n}" for u, n in holders]
-    for keep in range(len(parts), -1, -1):
-        text = ", ".join(parts[:keep])
-        rest = len(parts) - keep
-        if rest:
-            text += (", " if keep else "") + f"+{rest} more"
-        if width(text) <= cols or keep == 0:
-            return text
-    return ""
-
-
-def show_headroom(t, model):
-    """TEAMS: each team's high QoS GPU quota per type, how much of it is held, and by
-    whom: what is left, and whom to ask. Bars here: a capacity view. USED keeps one width
-    (bar, then used/limit aligned); HOLDERS goes last, cut to the terminal's width."""
-    rows = model["headroom"]
-    if not rows:
-        return ""
-    figures = [(k["used"], k["limit"]) for q in rows for k in q["gpus"] if k["limit"]]
-    uw = max((len(str(u)) for u, _ in figures), default=1)
-    lw = max((len(str(lim)) for _, lim in figures), default=1)
-    g = Grid(t, ["TEAM", "GPU", "USED"], align=["l", "l", "l"], maxw=[16], tail_header="HOLDERS")
-    holders = []
-    for q in rows:
-        for i, k in enumerate(q["gpus"]):
-            if k["limit"] is None:  # in the bar's place, so USED keeps its width
-                use = [("no limit", "faint"), (f" {k['used']:>{uw}}", "text")]
-            elif k["limit"] == 0 and not k["used"]:
-                use = [("not allowed", "faint")]
-            else:
-                full = k["used"] >= k["limit"]
-                use = [(t.bar(k["used"], k["limit"], 8, "crit" if full else "part"), ""),
-                       (f" {k['used']:>{uw}}/{k['limit']:<{lw}}", "crit" if full else "text")]  # fmt: skip
-            g.row([(q["team"] if i == 0 else "", "part"), (_type_label(k["type"]), "sub"), use])
-            holders.append(k["holders"])
-    room = max(10, t.cols - g.total() - 1)
-    g.tail_width = room
-    at = [i for i, r in enumerate(g.rows) if r[0] == "row"]
-    for i, held in zip(at, holders):
-        mine = any(u == model["mine"] for u, _ in held)
-        text = _fit_holders(held, room) or "-"
-        g.rows[i] = (*g.rows[i][:4], t.paint("self" if mine else ("text" if held else "faint"), text))
-    hint = "a quota is the whole team's: ask its holders to free GPUs"
-    return g.render("TEAMS", [(hint, "sub")]) + "\n"
+def _gpu_kinds(model):
+    """The GPU types USERS gives a column each: the cluster's, then "" for GPUs held
+    without a type, when some are."""
+    kinds = list(model["gpu_types"]) if model["has_gres"] else []
+    if kinds and any("" in u["gpus"]["high"] or "" in u["gpus"]["low"] for u in model["users"]):
+        kinds.append("")
+    return kinds
 
 
 def show_users(t, model):
-    if model["has_gres"] and model["gpu_types"]:
-        quotas = show_headroom(t, model)
-        return show_gpu_users(t, model) + ("\n" + quotas if quotas else "")
+    """Per user: who (user, team), their jobs by state, then what they hold in Slurm's
+    TRES order (nodes, CPUs, memory, GPUs, and each GPU type held under a high QoS and a
+    low one as high/low), the share bar last."""
     users, gl = model["users"], model["gres"].upper()
     if not users:
         return t.section("USERS", 40, [("nobody", "faint")]) + "\n"
-    cap = model["pools"]["cluster"]["gres_total" if model["has_gres"] else "cpu_total"]
-    heads = ["USER", "RUN", "PEND", "NODES", "CPU", "MEMORY"] + ([gl] if model["has_gres"] else [])
-    g = Grid(
-        t, heads, align=["l", "r", "r", "r", "r", "r", "r"], maxw=[16], tail_header="SHARE", tail_width=15
-    )
+    kinds = _gpu_kinds(model)
+    s = t.c["sub"] + t.bold
 
     def num(n, style):
         return (str(n), style if n else "faint")
 
-    tot = dict.fromkeys(("running", "pending", "cpu", "mem", "gres"), 0)
+    def mem(mib, style):
+        return (f"{(mib + 512) // 1024}G", style if mib else "faint")
+
+    def pair(hi, lo):
+        return (f"{hi}/{lo}", "text") if hi or lo else ("-", "faint")
+
+    def held(u, k, side):
+        return u["gpus"][side].get(k, 0)
+
+    # The one column order: (header, align, width cap, cell of a user, cell of the total).
+    # A GPU type's header names its two figures as sinfo's CPUS(A/I/O/T) does: TYPE(H/L),
+    # held under a high QoS / a low one.
+    cols = [("USER", "l", 16, None, lambda: ("total", s))]
+    if model["qos_read"] and kinds:
+        cols.append(("TEAM", "l", 16, lambda u: (",".join(u["teams"]) or "-", "sub" if u["teams"] else "faint"),
+                     lambda: ("", s)))  # fmt: skip
+    cols += [
+        (
+            "RUN",
+            "r",
+            0,
+            lambda u: num(u["running"], "ok"),
+            lambda: (str(sum(u["running"] for u in users)), s),
+        ),
+        (
+            "PEND",
+            "r",
+            0,
+            lambda u: num(u["pending"], "warn"),
+            lambda: (str(sum(u["pending"] for u in users)), s),
+        ),
+        ("NODES", "r", 0, lambda u: num(u["nodes"], "text"), lambda: (str(model["user_nodes"]), s)),
+        ("CPU", "r", 0, lambda u: num(u["cpu"], "text"), lambda: (str(sum(u["cpu"] for u in users)), s)),
+        ("MEMORY", "r", 0, lambda u: mem(u["mem"], "text"), lambda: mem(sum(u["mem"] for u in users), s)),
+    ]
+    if model["has_gres"]:
+        cols.append((gl, "r", 0, lambda u: num(u["gres"], t.c["text"] + t.bold),
+                     lambda: (str(sum(u["gres"] for u in users)), s)))  # fmt: skip
+    for k in kinds:
+        cols.append((f"{_type_label(k)}(H/L)", "r", 0, lambda u, k=k: pair(held(u, k, "high"), held(u, k, "low")),
+                     lambda k=k: (f"{sum(held(u, k, 'high') for u in users)}/{sum(held(u, k, 'low') for u in users)}", s)))  # fmt: skip
+
+    g = Grid(t, [c[0] for c in cols], align=[c[1] for c in cols], maxw=[c[2] for c in cols], tail_header="SHARE",
+             tail_width=15)  # fmt: skip
+    cap = model["pools"]["cluster"]["gres_total" if model["has_gres"] else "cpu_total"]
     for u in users:
         own = u["user"] == model["mine"]
-        name_style = t.c["self"] + t.bold if own else ("text" if u["running"] else "muted")
+        name = (u["user"], t.c["self"] + t.bold if own else ("text" if u["running"] else "muted"))
         share = u["gres"] if model["has_gres"] else u["cpu"]
         pct = (100 * share + cap // 2) // cap if cap else 0
         tail = t.bar(share, cap, 10, "self" if own else "part") + " " + t.paint("sub", f"{pct:>3}%")
-        cells = [(u["user"], name_style), num(u["running"], "ok"), num(u["pending"], "warn"), num(u["nodes"], "text"),
-                 num(u["cpu"], "text"), (f"{(u['mem'] + 512) // 1024}G", "text" if u["mem"] else "faint")]  # fmt: skip
-        if model["has_gres"]:
-            cells.append(num(u["gres"], t.c["text"] + t.bold))
-        g.row(cells, gutter=(t.g["self"], "self") if own else "", tail=tail)
-        for k in tot:
-            tot[k] += u[k]
+        g.row([name] + [c[3](u) for c in cols[1:]], gutter=(t.g["self"], "self") if own else "", tail=tail)
     g.rule()
-    s = t.c["sub"] + t.bold
-    total = [("total", s), (str(tot["running"]), s), (str(tot["pending"]), s), (str(model["user_nodes"]), s),
-             (str(tot["cpu"]), s), (f"{(tot['mem'] + 512) // 1024}G", s)]  # fmt: skip
-    if model["has_gres"]:
-        total.append((str(tot["gres"]), s))
-    g.row(total)
-    return g.render("USERS", [(f"{len(users)} user{'s' * (len(users) != 1)}", "sub")]) + "\n"
+    g.row([c[4]() for c in cols])
+    tally = [(f"{len(users)} user{'s' * (len(users) != 1)}", "sub")]
+    if kinds and not model["qos_read"]:
+        tally.append(("QoS unread: all shown as low", "warn"))
+    return g.render("USERS", tally) + "\n"
 
 
 def show_why(t, model, detail=False):
@@ -956,8 +891,10 @@ def show_resources(t, model, view="grouped", split=False, detail=False):
         return ("", "") if n is None else (str(n), style if n else "faint")
 
     def grid(barw):
-        heads = ["NAME", "STATE", "CPU", "MEMORY"] + ([gl] if has_gres else []) + ["IDLE", "OFF", "FREE"]
-        g = Grid(t, heads, align=["l", "l", "l", "l"] + (["l"] if has_gres else []) + ["r", "r", "r"],
+        # Who and state, then Slurm's TRES order: nodes (idle, off), CPUs, memory, GPUs and
+        # the free ones as their breakdown.
+        heads = ["NAME", "STATE", "IDLE", "OFF", "CPU", "MEMORY"] + ([gl] if has_gres else []) + ["FREE"]
+        g = Grid(t, heads, align=["l", "l", "r", "r", "l", "l"] + (["l"] if has_gres else []) + ["r"],
                  maxw=[NAME_MAX, STATE_MAX])  # fmt: skip
         for item in rows:
             if item is None:
@@ -972,11 +909,12 @@ def show_resources(t, model, view="grouped", split=False, detail=False):
                 name_style = t.c["node"] + t.bold if r.get("mine") else "node"
             state = r["state"] if detail else r["class"]
             cells = [(r["name"], name_style), (state, NODE_ROLE.get(r["class"], "sub")),
+                     count(r["idle"], "ok"), count(r["off"], "hot"),
                      figure(r["cpu_used"], r["cpu_total"], "cpu", "", barw),
                      figure(gib(r["mem_used"]), gib(r["mem_total"]), "mem", "G", barw)]  # fmt: skip
             if has_gres:
                 cells.append(figure(r["gres_used"], r["gres_total"], "gres", "", barw))
-            cells += [count(r["idle"], "ok"), count(r["off"], "hot"), count(r["free"], "ok")]
+            cells.append(count(r["free"], "ok"))
             g.row(cells, prefix=prefix, gutter=(t.g["self"], "self") if r.get("mine") else "")
         return g
 
@@ -1042,7 +980,7 @@ def to_json(model, args):
     return {
         "cluster": model["cluster"], "gres": model["gres"], "free": model["free_what"],
         "jobs": model["jobs"], "users": model["users"], "gpu_types": model["gpu_types"],
-        "teams": model["headroom"], "pending": model["why"],
+        "pending": model["why"],
         "resources": [{k: v for k, v in r.items() if k not in ("occupancy", "partitions")} for r in resources],
     }  # fmt: skip
 
@@ -1055,8 +993,8 @@ _cache = {}
 
 
 def _accounting(kind, watching):
-    """sacctmgr's KIND (qos, associations), for the USERS view's high/low split and the
-    TEAMS quotas; None when the accounting database does not answer (the view says so).
+    """sacctmgr's KIND (qos, associations), for the USERS view's high/low split and each
+    person's team; None when the accounting database does not answer (the view says so).
     A watch reads it again every QOS_TTL seconds, not at every redraw."""
     hit = _cache.get(kind)
     if watching and hit and time.time() - hit[0] < QOS_TTL:
