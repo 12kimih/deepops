@@ -43,6 +43,21 @@ class Facts(unittest.TestCase):
         )
 
 
+class Slurm(unittest.TestCase):
+    def test_preemption_times_follow_killwait_from_the_sites_template(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            (config / "files/slurm").mkdir(parents=True)
+            (config / "files/slurm/slurm.conf").write_text("ClusterName=c\nKillWait=45\n")
+            got = sf.slurm_values(config)
+        self.assertEqual(
+            got, {"kill_wait_seconds": 45, "preempt_grace_seconds": 45, "sigkill_after_seconds": 90}
+        )
+
+    def test_without_a_site_template_the_roles(self):
+        self.assertIn("kill_wait_seconds", sf.slurm_values(None))
+
+
 class PublicAllowList(unittest.TestCase):
     def test_only_allowed_keys_and_fields_reach_the_public_file(self):
         every = {
