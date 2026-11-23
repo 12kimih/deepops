@@ -14,6 +14,7 @@ _scratch_space_cfg:
   burst_files: "{{ scratch_space_purge_burst_files | int }}"
   burst_share: "{{ scratch_space_purge_burst_share | float }}"
   burst_window: "{{ scratch_space_purge_burst_window | int }}"
+  cleanup_top: "{{ cluster_cleanup_top | int }}"
   state: /var/lib/scratch-space/state.json
   textfile: "{{ _scratch_space_textfile }}"
 

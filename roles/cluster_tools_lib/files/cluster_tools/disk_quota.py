@@ -3,6 +3,7 @@
     disk-quota CONFIG.json apply [--check]   set them up; --check prints the steps only
     disk-quota CONFIG.json remove [--check]  undo it: limits, quotas, the quota file
     disk-quota CONFIG.json metrics           usage and limits (textfile)
+    disk-quota CONFIG.json scan              the folders worth cleaning (textfile, weekly)
 
 Each step is printed as it is taken (or would be, with --check), one line each. CONFIG
 "-" is read from standard input (a preview of a configuration not written yet):
@@ -18,6 +19,11 @@ Each step is printed as it is taken (or would be, with --check), one line each. 
 Each filesystem has its own people's limits ({} counts only). Every name in release
 that a filesystem does not limit has whatever limit it had there lifted (the roster:
 someone left, or limited no longer).
+
+scan walks each filesystem of "scan" ({filesystem: [base glob, ...]}, e.g. each home and
+each collaboration folder) and writes the scan_top folders most worth cleaning, unused
+past stale_days, to scan_textfile (cluster_tools.cleanup), at low priority: a home
+server's walk takes hours, so it runs weekly.
 
 A limit is its hard limits: block_hard, and inode_hard, or else block_hard's TiB times
 inodes_per_tib (0: none), so the file count follows the space. The hard limit is the
@@ -42,14 +48,16 @@ Python 3.9 or newer, standard library only.
 """
 
 import csv
+import glob
 import io
 import os
+import pwd
 import re
 import sys
 import time
 from pathlib import Path
 
-from . import config, proc
+from . import cleanup, config, proc
 from .cli import run_main
 from .files import write_atomic
 from .prom import key, render
@@ -192,6 +200,21 @@ class Host:
 
     def remove(self, path):
         os.unlink(path)
+
+    def lstat(self, path):
+        return os.lstat(path)
+
+    def scandir(self, path):
+        return os.scandir(path)
+
+    def glob(self, pattern):
+        return sorted(p for p in glob.glob(pattern) if os.path.isdir(p) and not os.path.islink(p))
+
+    def owner(self, uid):
+        try:
+            return pwd.getpwuid(uid).pw_name
+        except KeyError:
+            return str(uid)
 
 
 def _limits_of(entry):
@@ -432,6 +455,26 @@ def metrics(host, cfg, now):
     return render(values)
 
 
+def scan(host, cfg, now):
+    """{key: value} of the folders worth cleaning on each filesystem of cfg's "scan"."""
+    values = {}
+    names = {}
+    for filesystem, patterns in sorted((cfg.get("scan") or {}).items()):
+        dev = host.lstat(filesystem).st_dev
+        bases = [b for pattern in patterns for b in host.glob(pattern)]
+        folders = cleanup.Folders(bases)
+        budget = [int(cfg["scan_max_entries"])]
+        for base in bases:
+            for path, st in cleanup.walk(host, base, dev, set(), budget):
+                if st.st_uid not in names:
+                    names[st.st_uid] = host.owner(st.st_uid)
+                folders.add(path, names[st.st_uid], st.st_size, cleanup.last_use(st))
+        values.update(
+            cleanup.values(filesystem, folders.ranked(now, int(cfg["stale_days"]), int(cfg["scan_top"])), now)
+        )
+    return values
+
+
 def steps_for(host, cfg, action):
     out = []
     if action == "remove":
@@ -448,7 +491,7 @@ def steps_for(host, cfg, action):
     return out + project_steps(host, cfg)
 
 
-USAGE = "usage: disk-quota CONFIG.json apply|remove [--check] | metrics"
+USAGE = "usage: disk-quota CONFIG.json apply|remove [--check] | metrics | scan"
 
 CONFIG_KEYS = {
     "filesystems": dict,
@@ -457,6 +500,11 @@ CONFIG_KEYS = {
     "warn_fraction": float,
     "inodes_per_tib": int,
     "textfile": str,
+    "scan": dict,
+    "scan_textfile": str,
+    "scan_top": int,
+    "scan_max_entries": int,
+    "stale_days": int,
 }
 
 
@@ -469,10 +517,15 @@ def main(argv=None):
     argv = sys.argv if argv is None else argv
     args = argv[1:]
     check = args[2:] == ["--check"]
-    if not (len(args) == 2 or (check and len(args) == 3)) or args[1] not in ("apply", "remove", "metrics"):
+    if not (len(args) == 2 or (check and len(args) == 3)) or args[1] not in (
+        "apply",
+        "remove",
+        "metrics",
+        "scan",
+    ):
         print(USAGE, file=sys.stderr)
         return 2
-    if check and args[1] == "metrics":
+    if check and args[1] in ("metrics", "scan"):
         print(USAGE, file=sys.stderr)
         return 2
 
@@ -483,6 +536,10 @@ def main(argv=None):
             if args[1] == "metrics":
                 if cfg.get("textfile"):
                     write_atomic(cfg["textfile"], metrics(host, cfg, time.time()))
+                return 0
+            if args[1] == "scan":
+                if cfg.get("scan"):
+                    write_atomic(cfg["scan_textfile"], render(scan(host, cfg, time.time())))
                 return 0
             for text, action in steps_for(host, cfg, args[1]):
                 print(text)

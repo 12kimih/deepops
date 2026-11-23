@@ -43,7 +43,7 @@ class Base(unittest.TestCase):
         self.cfg = {
             "root": self.root, "projects": self.projects, "people": {"alice": ME},
             "list_name": ".purge-list", "stale_days": 60, "grace_days": 14, "max_entries": 100000,
-            "burst_files": 3, "burst_share": 0.5, "burst_window": 600,
+            "burst_files": 3, "burst_share": 0.5, "burst_window": 600, "cleanup_top": 5,
             "state": os.path.join(self.tmp.name, "state.json"), "textfile": os.path.join(self.tmp.name, "s.prom"),
         }  # fmt: skip
         self.said = []
@@ -68,6 +68,17 @@ class Base(unittest.TestCase):
 
 
 class Cleanup(Base):
+    def test_the_folders_worth_cleaning_come_from_the_same_walk(self):
+        self.file("alice/old-runs/out.bin", 200, b"x" * 100)
+        self.file("alice/live/out.bin", 1)
+        self.run_at(NOW)
+        text = Path(self.cfg["textfile"]).read_text()
+        self.assertIn(
+            f'disk_cleanup_candidate_unused_days{{filesystem="{self.root}",path="{self.root}/alice/old-runs",user="alice"}} 200',
+            text,
+        )
+        self.assertNotIn("/alice/live", text)
+
     def test_a_stale_file_is_listed_then_removed_after_the_grace_period(self):
         old = self.file("alice/run1/out.bin", 70, b"12345")
         fresh = self.file("alice/keep.txt", 3)

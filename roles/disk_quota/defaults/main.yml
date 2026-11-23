@@ -42,5 +42,15 @@ disk_quota_inodes_per_tib: 0
 # project goes; only its limit is lifted.
 disk_quota_projects: {}
 
+# The folders worth cleaning (cluster_tools.cleanup), for the daily disk report: per
+# filesystem, the base directories whose folders are weighed, as globs ({"/home":
+# ["/home/*"]}: each home's folders). {} scans nothing. A home server's walk takes hours,
+# at low priority, so it runs weekly (disk_quota_scan_on_calendar). The scratch space's
+# own daily cleanup walk weighs its folders (roles/scratch_space): list it here never.
+disk_quota_scan: {}
+disk_quota_scan_on_calendar: "Sun *-*-* 01:00:00"
+# The most entries one scan looks at (a bound on time and memory).
+disk_quota_scan_max_entries: 1000000000
+
 # How often every user's usage is exported (systemd OnUnitActiveSec).
 disk_quota_metrics_interval: 15min

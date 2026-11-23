@@ -171,6 +171,35 @@ class RenderTests(unittest.TestCase):
         for blocks in [card] + [b for _, b in thread]:
             self.assertLessEqual(len(blocks), 50)
 
+    def test_a_filling_filesystem_names_its_largest_people_mentioned_when_due(self):
+        data = disk_report.collect(site(), NOW)
+        self.assertEqual(disk_report.fill_rows(data, 0.8), [], "75% full is below 80%")
+        fill = disk_report.fill_rows(data, 0.7, n=2)
+        self.assertEqual(
+            [(k, u) for k, _, u in fill], [(("login", "/"), [("bob", 21 * G), ("alice", 18 * G)])]
+        )
+        (_, card), _ = disk_report.render(
+            data, who, 2, fill=fill, fill_mention={disk_report.fill_key(("login", "/"))}
+        )
+        self.assertIn(":large_orange_circle: *login:/* 75% full: @bob 21G, @alice 18G", text_of(card))
+        (_, card), _ = disk_report.render(data, who, 2, fill=fill, fill_mention=set())
+        self.assertIn("75% full: bob 21G, alice 18G", text_of(card), "named every day, mentioned when due")
+
+    def test_folders_worth_cleaning_in_the_thread_never_mentioned(self):
+        prom = site()
+        prom.now["disk_cleanup_candidate_bytes"] = [
+            row(300 * G, host="nfs", filesystem="/home", path="/home/alice/old", user="alice")
+        ]
+        prom.now["disk_cleanup_candidate_unused_days"] = [
+            row(120, host="nfs", filesystem="/home", path="/home/alice/old", user="alice")
+        ]
+        data = disk_report.collect(prom, NOW)
+        _, thread = disk_report.render(data, who, 2, stale_days=60)
+        details = text_of(thread[0][1])
+        self.assertIn("nfs:/home*, folders worth cleaning (unused over 60 days", details)
+        self.assertIn("/home/alice/old  alice  300G  120d", details)
+        self.assertNotIn("@alice", details.split("folders worth cleaning")[1])
+
     def test_people_ranked_everyone_else_on_one_line(self):
         data = disk_report.collect(site(), NOW)
         data["users"][("login", "/", "root")] = dict(data["users"][("login", "/", "carol")], used=160 * G)
@@ -221,7 +250,7 @@ class RunTests(unittest.TestCase):
 
     CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, disk_top=10, disk_notify=["mention", "dm"],
-               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0,
+               disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
                admin_channel="#admins")  # fmt: skip
 
     def run_disk(self, prom, *extra, notify=("mention", "dm"), state=None, now=NOW):
@@ -281,6 +310,18 @@ class RunTests(unittest.TestCase):
             self.assertIn("<@UBOB> (bob)", posted[0][2])
             self.assertNotIn("<@UALICE>", posted[0][2])
             self.assertIn("alice on login:/", posted[0][2], "still listed, not mentioned")
+
+    def test_a_filling_filesystem_mentions_its_people_at_most_weekly(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.CFG = dict(RunTests.CFG, disk_fill=0.7)
+            posted, _, saved = self.run_disk(site(), notify=[], state=d)
+            self.assertEqual(saved["told"]["fill login /"], NOW)
+            self.assertIn("75% full: <@UBOB> (bob)", posted[0][2])
+            posted, _, _ = self.run_disk(site(), notify=[], state=d, now=NOW + disk_report.DAY)
+            self.assertIn("75% full: bob", posted[0][2], "named the next day, not mentioned")
+            posted, _, _ = self.run_disk(site(), notify=[], state=d, now=NOW + 7 * disk_report.DAY)
+            self.assertIn("75% full: <@UBOB> (bob)", posted[0][2], "mentioned again a week on")
+            self.CFG = RunTests.CFG
 
     def test_a_preview_sends_and_records_nothing(self):
         posted, error, saved = self.run_disk(site(), ("to", "UME"))
