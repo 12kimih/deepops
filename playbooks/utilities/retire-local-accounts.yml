@@ -14,7 +14,8 @@
 # gshadow is kept under retire_local_accounts_backup. Homes and files stay: the numbers
 # do not change. The break-glass administrators keep their local accounts: the members
 # of the local group the stock %sudo rule grants (retire_local_accounts_keep_group,
-# roles/cluster_sudoers keeps it). An account still logged in is skipped and reported;
+# roles/cluster_sudoers keeps it), and every host keeps directory_local_groups (the
+# Docker socket's group: a unit resolves it at boot). An account still logged in is skipped and reported;
 # run it again later.
 - hosts: "{{ hostlist | default('all') }}"
   become: true
@@ -65,7 +66,7 @@
         retire_local_kept: "{{ retire_local_accounts_keep }}"
         retire_local_stamp: "{{ now(fmt='%Y%m%d-%H%M%S') }}"
         retire_local: >-
-          {{ people | directory_local_leftovers(directory_groups_all,
+          {{ people | directory_local_leftovers(directory_groups_all | rejectattr('name', 'in', directory_local_groups) | list,
                retire_local_files.results[0].ansible_facts.getent_passwd,
                retire_local_files.results[1].ansible_facts.getent_group,
                retire_local_directory.results[0].stdout_lines,
