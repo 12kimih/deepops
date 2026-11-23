@@ -57,7 +57,7 @@ class ModelCachePlaybookTests(unittest.TestCase):
         play = {**self.play, "vars": {**self.play.get("vars", {}), "ansible_facts": self.facts}}
         path.write_text(yaml.safe_dump([play]))
         config = Path(self.temp.name) / "ansible.cfg"
-        config.write_text("[defaults]\nretry_files_enabled = False\n")
+        config.write_text(f"[defaults]\nretry_files_enabled = False\nroles_path = {ROOT / 'roles'}\n")
         env = unrecorded.env(
             ANSIBLE_CONFIG=str(config),
             ANSIBLE_NOCOLOR="1",

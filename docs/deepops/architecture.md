@@ -154,6 +154,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── maintenance_window
 │   ├── managed_dir
 │   ├── marked_files
+│   ├── model_cache_defaults
 │   ├── mofed
 │   ├── move-home-dirs
 │   ├── netapp-trident

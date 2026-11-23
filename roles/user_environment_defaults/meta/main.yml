@@ -1,6 +1,7 @@
 ---
 dependencies:
   - role: retired_settings  # cluster_tools_environment (now user_environment)
+  - role: model_cache_defaults  # model_cache_root, which a site's HF_HUB_CACHE names
 
 galaxy_info:
   namespace: deepops
