@@ -156,7 +156,9 @@
     _sum: "{{ open_ondemand_portal_files.results[1] }}"
   when:
     - _conf.content is defined
-    - (_sum.content | default('') | b64decode | regex_search('[0-9a-f]{64}')) != (_conf.content | b64decode | hash('sha256'))
+    # As the generator sums it: the file without its comment lines.
+    - (_sum.content | default('') | b64decode | regex_search('[0-9a-f]{64}'))
+      != (_conf.content | b64decode | regex_replace('(?m)^[ \t\r\f\v]*#.*(?:\n|$)', '') | hash('sha256'))
   block:
     - name: Create the backup directory for the portal config
       ansible.builtin.file:
