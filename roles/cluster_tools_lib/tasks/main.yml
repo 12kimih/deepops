@@ -6,6 +6,15 @@
     cluster_tools_lib_modules: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/cluster_tools/*.py') | sort }}"
     cluster_tools_lib_source: "{{ role_path }}/files"
 
+# Checked before it replaces the live package (tasks/configs.yml): the roles of this play
+# write and validate their own configs; a site deploy checks once at its end instead,
+# when every role has run.
+- name: Check the recorded tool configs against the package about to be published
+  ansible.builtin.include_tasks: configs.yml
+  vars:
+    cluster_tools_lib_configs_skip: "{{ ansible_play_role_names }}"
+  when: deepops_site_run is not defined
+
 # The package is its modules, nothing else: a copy of the directory would also ship the
 # controller's __pycache__, and a module dropped from the package would stay importable.
 # The bytecode cache Python keeps on the host goes only when the package changed.
@@ -40,15 +49,6 @@
     path: "{{ cluster_tools_lib_dir }}/clustertools"
     state: absent
   when: cluster_tools_lib_old_users.stdout_lines | length == 0
-
-# A changed package may refuse a config another playbook wrote (cluster_tools.config):
-# checked once this play's roles wrote theirs (handlers/main.yml).
-- name: Note that the package changed under the recorded tool configs
-  ansible.builtin.debug:
-    msg: the cluster_tools package changed; the recorded tool configs are checked after this play
-  changed_when: managed_dir_changed | bool
-  notify: Check the recorded tool configs
-  when: managed_dir_changed | bool
 
 - name: Create the cluster tools configuration directory
   ansible.builtin.file:
