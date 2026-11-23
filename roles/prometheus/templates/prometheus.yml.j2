@@ -40,3 +40,15 @@ scrape_configs:
       - source_labels: [__address__]
         regex: '(.+):\d+'
         target_label: host
+    metric_relabel_configs:
+      # node_exporter's mountstats: the per-mount byte and page counters stay; its 44
+      # per-operation, transport and event families per mount are dropped.
+      - source_labels: [__name__]
+        regex: 'node_mountstats_nfs_(operations|transport|event)_.+'
+        action: drop
+      # Its mountpoint as the host names it: the exporter's container sees the host's
+      # mounts under node_exporter_rootfs.
+      - source_labels: [__name__, mountpoint]
+        regex: 'node_mountstats_nfs_mountpoint_info;{{ node_exporter_rootfs | regex_escape }}(/.*)'
+        target_label: mountpoint
+        replacement: '$1'

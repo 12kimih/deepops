@@ -1,0 +1,43 @@
+---
+# Who drives the disks and the NFS exports: node_exporter's mountstats (what each node
+# sends to and reads from each NFS mount, over the wire) and roles/io_usage's textfile
+# counters (each job's and login's I/O on the node, cluster_tools.io_usage).
+groups:
+  - name: io-usage
+    rules:
+      # Bytes per second each node reads from and writes to the NFS server, by the
+      # mountpoint the host gives the export (the scrape strips the exporter's /host).
+      - record: host_mount:nfs_read_bytes:rate5m
+        expr: |
+          sum by (host, mountpoint) (
+            rate(node_mountstats_nfs_total_read_bytes_total[5m])
+            * on (instance, export, mountaddr, protocol) group_left (mountpoint)
+            node_mountstats_nfs_mountpoint_info
+          )
+      - record: host_mount:nfs_write_bytes:rate5m
+        expr: |
+          sum by (host, mountpoint) (
+            rate(node_mountstats_nfs_total_write_bytes_total[5m])
+            * on (instance, export, mountaddr, protocol) group_left (mountpoint)
+            node_mountstats_nfs_mountpoint_info
+          )
+      - alert: IoUsageStale
+        expr: time() - io_usage_last_success_timestamp_seconds > 600
+        labels: {severity: warning}
+        annotations:
+          summary: "I/O usage on {{ $labels.host }} has not been counted for 10 minutes"
+          description: >-
+            Which jobs and logins do I/O on the node is not known, so the I/O notices
+            cannot name them: `journalctl -u io-usage` and `systemctl list-timers
+            io-usage.timer` on the host.
+      # No timestamp at all where the unit is installed: the alert above has nothing to
+      # compare, so the unit's presence stands in.
+      - alert: IoUsageNeverReported
+        expr: |
+          count by (instance, host) (node_systemd_unit_state{name="io-usage.service"})
+          unless on (instance) io_usage_last_success_timestamp_seconds
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "I/O usage on {{ $labels.host }} has reported no success for 30 minutes"
+          description: "`journalctl -u io-usage` and `systemctl list-timers io-usage.timer` on the host."

@@ -1,0 +1,58 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: io_usage
+    component_record_action: begin
+    component_record_items: "{{ io_usage_items }}"
+
+- name: Install the I/O usage command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ _io_usage_command }}"
+      module: cluster_tools.io_usage
+
+- name: Write the I/O usage configuration
+  ansible.builtin.copy:
+    dest: "{{ _io_usage_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _io_usage_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.io_usage %s"
+
+- name: Record the I/O usage configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: io_usage, module: cluster_tools.io_usage, file: "{{ _io_usage_config }}", playbook: playbooks/slurm-cluster/io-usage.yml}
+
+- name: Install the I/O usage units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _io_usage_units }}"
+  register: io_usage_units
+
+- name: Count I/O every minute
+  systemd_unit:
+    name: io-usage.timer
+    enabled: true
+    state: "{{ 'restarted' if io_usage_units is changed else 'started' }}"
+    daemon_reload: true
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: io_usage
+    component_record_action: present
+    component_record_items: "{{ io_usage_items }}"

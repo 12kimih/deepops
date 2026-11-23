@@ -1,0 +1,20 @@
+---
+_io_usage_command: /usr/local/libexec/io-usage
+_io_usage_config: "{{ cluster_tools_lib_config_dir }}/io-usage.json"
+_io_usage_textfile: "{{ node_exporter_prom_dir }}/io-usage.prom"
+_io_usage_state_file: /var/lib/io-usage/state.json
+_io_usage_units: [io-usage.service, io-usage.timer]
+# What this component installs, for its record (roles/component_record).
+io_usage_items: >-
+  {{ ['unit:io-usage.timer', 'unit:io-usage.service']
+     + _io_usage_units | map('regex_replace', '^', 'file:/etc/systemd/system/') | list
+     + ['file:' ~ _io_usage_command, 'file:' ~ _io_usage_config, 'file:' ~ _io_usage_textfile,
+        'file:' ~ _io_usage_state_file, 'dir:' ~ (_io_usage_state_file | dirname),
+        'file:' ~ cluster_tools_lib_config_records ~ '/io_usage.json'] }}
+_io_usage_cfg:
+  proc_root: /proc
+  cgroup_root: /sys/fs/cgroup
+  sys_root: /sys
+  slices: "{{ io_usage_slices }}"
+  textfile: "{{ _io_usage_textfile }}"
+  state_file: "{{ _io_usage_state_file }}"

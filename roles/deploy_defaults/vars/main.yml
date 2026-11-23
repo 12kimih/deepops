@@ -125,6 +125,11 @@ deepops_component_registry:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-node}
     needs: [docker, nvidia_container_toolkit]
   # Text files node_exporter publishes; the report reads Prometheus.
+  # Each job's and login's I/O on every node, for the I/O notices and dashboards.
+  io_usage:
+    rules:
+      - {switch: "{{ slurm_enable_monitoring }}", group: slurm-cluster}
+    needs: [node_exporter]
   slurm_metrics:
     rules:
       - {switch: "{{ slurm_enable_monitoring }}", group: slurm-metric}

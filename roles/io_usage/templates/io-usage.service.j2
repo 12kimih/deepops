@@ -1,0 +1,14 @@
+{{ ansible_managed | comment }}
+[Unit]
+Description=Count each job's, login's and slice's I/O on this node
+
+[Service]
+Type=oneshot
+TimeoutStartSec=50s
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ _io_usage_command }} {{ _io_usage_config }}
+Nice=10
+# Every minute: only what goes wrong reaches the journal.
+SyslogLevel=notice
+LogLevelMax=notice
