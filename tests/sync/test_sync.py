@@ -38,8 +38,7 @@ def commit(repo, message):
 class Locks(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
-        self.lock = sync.run_lock()
-        self.lock.LOCKS = self.dir.name
+        self.base = self.dir.name
 
     def tearDown(self):
         self.dir.cleanup()
@@ -50,14 +49,14 @@ class Locks(unittest.TestCase):
             f.write("pid 1, a deploy")
             f.flush()
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            held, busy = sync.hold_deploy_locks(self.lock)
+            held, busy = sync.deploy_lock.hold_all("test", base=self.base)
             self.assertEqual(busy, ["pid 1, a deploy"])
             for fd in held:
                 os.close(fd)
 
     def test_no_deploy_holds_every_lock(self):
         Path(self.dir.name, "a.lock").touch()
-        held, busy = sync.hold_deploy_locks(self.lock)
+        held, busy = sync.deploy_lock.hold_all("test", base=self.base)
         self.assertEqual((len(held), busy), (1, []))
         for fd in held:
             os.close(fd)
