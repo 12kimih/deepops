@@ -69,10 +69,16 @@ if [ "$apt_ok" = 1 ]; then
 fi
 security_since=$(cat "$state/security-pending-since" 2>/dev/null || echo 0)
 reboot_state
-# One series per installed package ("?i": held ones too); label values escaped as the format requires.
-packages=$(dpkg-query -W -f '${db:Status-Abbrev}|${binary:Package}|${Version}\n' 2>/dev/null \
-    | awk -F'|' '$1 ~ /^.i/ { gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
-        printf "os_updates_package_info{package=\"%s\",version=\"%s\"} 1\n", $2, $3 }')
+# One series per installed package ("?i": held ones too); label values escaped as the
+# format requires. source: "local" when no configured apt source offers the installed
+# version (apt list's [installed,local]: a .deb installed by hand or from a URL, which only
+# the role that installed it can change), "repo" otherwise.
+packages=$( { apt list --installed 2>/dev/null | awk -F/ '/\[installed,local\]/ { print "L|" $1 }'
+              dpkg-query -W -f '${db:Status-Abbrev}|${binary:Package}|${Version}\n' 2>/dev/null; } \
+    | awk -F'|' '$1 == "L" { local[$2] = 1; next }
+        $1 ~ /^.i/ { name = $2; sub(/:.*/, "", name); gsub(/\\/, "\\\\", $3); gsub(/"/, "\\\"", $3);
+        printf "os_updates_package_info{package=\"%s\",version=\"%s\",source=\"%s\"} 1\n", $2, $3,
+               (name in local) ? "local" : "repo" }')
 tmp=$(mktemp "$state/.os-updates.XXXXXX")
 cat > "$tmp" <<METRICS
 # HELP os_updates_pending_packages Packages a full upgrade would install or change.

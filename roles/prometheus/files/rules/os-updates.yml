@@ -66,17 +66,21 @@ groups:
       # Hosts drift apart between maintenance windows: an update one node took and
       # another held back, a package or kernel changed by hand. Unattended upgrades land
       # on each node at its own time, so a difference counts once it outlasts a day.
-      # (roles/maintenance consistency.yml is the same comparison, run on demand.)
+      # (roles/maintenance consistency.yml is the same comparison, run on demand.) A package
+      # no apt source offers (source="local": a .deb installed from a URL) is levelled by the
+      # role that installs it, not by an upgrade.
       - alert: OsPackageVersionsDiffer
-        expr: count by (package) (count by (package, version) (os_updates_package_info)) > 1
+        expr: count by (package, source) (count by (package, version, source) (os_updates_package_info)) > 1
         for: 26h
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.package }} is installed at {{ $value }} different versions across the hosts"
           description: >-
             `count by (version, host) (os_updates_package_info{package="{{ $labels.package }}"})`
-            shows which host has which; `ansible-playbook -K playbooks/utilities/apt-upgrade.yml`
-            brings them level.
+            shows which host has which; {{ if eq $labels.source "local" }}no apt source offers it,
+            so an upgrade cannot change it: rerun the role that installs it (`grep -rln
+            {{ $labels.package }} roles/`).{{ else }}`ansible-playbook -K
+            playbooks/utilities/apt-upgrade.yml` brings them level.{{ end }}
       - alert: OsKernelsDiffer
         expr: count(count by (release) (max by (host, release) (node_uname_info))) > 1
         for: 26h
