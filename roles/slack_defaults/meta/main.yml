@@ -3,7 +3,7 @@ galaxy_info:
   namespace: deepops
   role_name: slack_defaults
   author: DeepOps
-  description: The cluster's Slack bot token and channels, named once
+  description: The cluster's Slack bot token, channels and administrators' group, named once
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:

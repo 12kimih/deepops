@@ -144,9 +144,10 @@ Alertmanager posts through the app's webhook).
    vaulted as `cluster_bot_github_app_key`
    (`uv run ansible-vault encrypt_string --stdin-name cluster_bot_github_app_key < key.pem`).
 5. Name the administrators' user group (roles/slack_defaults): `slack_admin_group`, the
-   @handle people tag in the help channel, and `slack_admin_group_id`, its S... ID (the
-   web client shows it in the group's details), with which the notices for the
-   administrators mention it. Slack notifies a group only by its ID.
+   @handle people tag in the help channel. Each deploy then asks Slack for its ID
+   (`usergroups.list`, the manifest's usergroups:read), uses it for the run and says it;
+   pin it as `slack_admin_group_id` to skip the lookup (a set ID always wins). Slack
+   notifies a group only by its ID; none found, the notices mention no one.
 6. Set `slurm_enable_cluster_bot: true` and run `playbooks/generic/cluster-bot.yml` (it
    also authorizes its key where fail2ban offers the bans service). A deploy that still
    lacks a setting says which, by name; without both tokens the bot is installed but

@@ -1,0 +1,49 @@
+---
+# The administrators' user group's ID, so the notices they act on can mention it, when
+# the site names the group (slack_admin_group, "@sysadmin") but not its ID: Slack is
+# asked once a run (usergroups.list, the bot token's usergroups:read), as this role runs
+# as the dependency ahead of every role that mentions them (alertmanager,
+# slurm_usage_report, cluster_bot), and slack_admin_mention follows. A configured
+# slack_admin_group_id always wins; not found, or Slack not answering, mentions no one.
+- name: Find the administrators' Slack user group's ID
+  when:
+    - slack_admin_group_id | length == 0
+    - slack_admin_group | length > 0
+    - slack_bot_token | length > 0
+    - _slack_admin_group_looked is not defined
+  run_once: true
+  block:
+    - name: Ask Slack for its user groups
+      ansible.builtin.uri:
+        url: https://slack.com/api/usergroups.list
+        headers:
+          Authorization: "Bearer {{ slack_bot_token }}"
+        return_content: true
+        timeout: 15
+      register: _slack_usergroups
+      delegate_to: localhost
+      become: false
+      check_mode: false  # a read; a preview needs the ID too
+      failed_when: false
+      no_log: true  # the token is in the request
+
+    - name: Use the group's ID for this run
+      ansible.builtin.set_fact:
+        slack_admin_group_id: "{{ _slack_usergroups.json | default({}) | slack_usergroup_id(slack_admin_group) }}"
+        _slack_admin_group_looked: true
+
+    - name: Say the group's ID, to pin as slack_admin_group_id
+      ansible.builtin.debug:
+        msg: >-
+          {{ slack_admin_group }} is {{ slack_admin_group_id }}: notices to administrators
+          mention it. Set slack_admin_group_id: {{ slack_admin_group_id }} in the site config
+          to skip the lookup.
+      when: slack_admin_group_id | length > 0
+
+    - name: Warn that the group was not found
+      ansible.builtin.debug:
+        msg: >-
+          [WARNING] Slack did not name {{ slack_admin_group }}'s ID ({{ (_slack_usergroups.json | default({})).get('error', _slack_usergroups.msg | default('no answer')) }}):
+          notices to administrators mention no one. Give the app usergroups:read (its manifest
+          has it), or set slack_admin_group_id.
+      when: slack_admin_group_id | length == 0
