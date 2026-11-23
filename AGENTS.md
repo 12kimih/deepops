@@ -167,6 +167,9 @@ and an r615+ driver the role will not install for you. See
 
 ## Contributing changes
 
+Move a shared checkout (the clone deploys run from, and its config) only with
+`scripts/deepops/sync.py`: it fast-forwards both and refuses while a deploy runs.
+
 Run before pushing: `scripts/check.sh` (every check CI runs; the pre-commit hook
 runs `scripts/check.sh --fast`). `scripts/push.sh` rebases onto origin/main, runs the
 full check and pushes, one worktree of a clone at a time (the next one waits). Public CI runs lint,
