@@ -52,11 +52,18 @@ def vault_password_file():
 
 
 def env(base=None, **extra):
-    """BASE (os.environ by default) with EXTRA, no callback plugins and, unless EXTRA
-    names one, the throwaway vault password file."""
+    """BASE (os.environ by default) with EXTRA, no callback plugins, facts cached in
+    memory only and, unless EXTRA names one, the throwaway vault password file.
+
+    ansible.cfg caches facts in the operator's ~/.cache/deepops/ansible-facts; a test
+    play on localhost wrote its checkout's interpreter there (discovered_interpreter_python
+    under /tmp), and once that checkout was gone every later localhost play, tests in
+    other checkouts and real runs delegating to localhost, failed: "The module
+    interpreter ... was not found" (2026-11-23)."""
     return {
         **(os.environ if base is None else base),
         "ANSIBLE_VAULT_PASSWORD_FILE": vault_password_file(),
         **extra,
         "ANSIBLE_CALLBACK_PLUGINS": callback_dir(),
+        "ANSIBLE_CACHE_PLUGIN": "memory",
     }

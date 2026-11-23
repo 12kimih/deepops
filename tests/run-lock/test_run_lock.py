@@ -84,7 +84,7 @@ class Runs(unittest.TestCase):
         self.play = d / "play.yml"
         self.env = {**unrecorded.env(), "HOME": str(d), "ANSIBLE_CALLBACK_PLUGINS": str(d / "callbacks"),
                     "ANSIBLE_CONFIG": str(ROOT / "ansible.cfg"), "ANSIBLE_LOCALHOST_WARNING": "false",
-                    "ANSIBLE_GATHERING": "explicit", "ANSIBLE_CACHE_PLUGIN": "memory"}  # fmt: skip
+                    "ANSIBLE_GATHERING": "explicit"}  # fmt: skip
 
     def run_play(self, *args, inventory="localhost,"):
         return subprocess.run(
