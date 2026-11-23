@@ -115,7 +115,17 @@
   changed_when: false
   check_mode: false  # read-only; --check needs the result
 
-# Unmanaged = present, not ours, not explicitly kept, and owned by no package.
+# A drop-in another component installed is that component's (its record lists it, as
+# file:/etc/sudoers.d/<name>; roles/component_record): pruning it broke the cluster
+# bot's sudo rule, which fail2ban.yml writes and this role ran after (2026-11-23).
+- name: Read the component records
+  ansible.builtin.slurp:
+    src: "{{ deepops_component_record }}"
+  register: cluster_sudoers_records
+  failed_when: false  # no record yet on a host no component has run on
+
+# Unmanaged = present, not ours, not explicitly kept, owned by no package and recorded
+# by no component.
 # `inert` are the ones sudo SKIPS -- it ignores any name containing a dot or ending
 # in '~' -- so they grant nothing.
 - name: Classify the sudoers drop-ins
@@ -129,7 +139,11 @@
     cluster_sudoers_unmanaged_names: >-
       {{ cluster_sudoers_dropins.stdout_lines | select('match', '^no ')
          | map('regex_replace', '^no ', '') | list
-         | difference([cluster_sudoers_file]) | difference(cluster_sudoers_keep) | sort }}
+         | difference([cluster_sudoers_file]) | difference(cluster_sudoers_keep)
+         | difference(cluster_sudoers_recorded) | sort }}
+    cluster_sudoers_recorded: >-
+      {{ ((cluster_sudoers_records.content | default('e30=') | b64decode | from_json).get('items', {})).keys()
+         | select('match', '^file:/etc/sudoers[.]d/[^/]+$') | map('regex_replace', '^file:/etc/sudoers[.]d/', '') | list }}
 
 # Reported on every run, whether or not pruning is on.
 - name: Report unmanaged sudoers drop-ins that actually grant sudo
