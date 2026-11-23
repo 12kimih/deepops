@@ -350,10 +350,28 @@ def _project_limits(proj):
     return {k: v for k, v in proj.items() if k not in ("filesystem", "id")}
 
 
+def project_groups(cfg):
+    """{(filesystem, id): [path, ...]}: a project id may cover several trees (one budget
+    for them together, ext4 and XFS count by id); each tree of one id names the same
+    limit, or the configuration is refused."""
+    groups, limits = {}, {}
+    for path, proj in sorted((cfg.get("projects") or {}).items()):
+        group = (proj["filesystem"], int(proj["id"]))
+        groups.setdefault(group, []).append(path)
+        limit = _project_limits(proj)
+        if limits.setdefault(group, limit) != limit:
+            raise Error(
+                f"project {group[1]} on {group[0]}: its trees name different limits ({', '.join(groups[group])})"
+            )
+    return groups
+
+
 def project_steps(host, cfg):
-    """[(description, action)] that make each configured project's tree and limit."""
+    """[(description, action)] that make each configured project's trees and limit."""
     steps = []
     on_checked = set()
+    limited = set()
+    project_groups(cfg)  # refuses one id with two limits
     for path, proj in sorted((cfg.get("projects") or {}).items()):
         mount, pid = proj["filesystem"], int(proj["id"])
         warn, hard, _, _ = levels(path, _project_limits(proj), cfg)
@@ -367,7 +385,8 @@ def project_steps(host, cfg):
             steps.append(
                 (f"make {path} project {pid}", lambda m=mount, p=path, i=pid: project_set(host, m, p, i))
             )
-        if _project_report(host, mount, fstype, pid)[1:] != (0, hard):
+        if (mount, pid) not in limited and _project_report(host, mount, fstype, pid)[1:] != (0, hard):
+            limited.add((mount, pid))
             steps.append(
                 (
                     f"limit project {pid} ({path}) to {hard} KiB",
@@ -442,11 +461,13 @@ def metrics(host, cfg, now):
                     values[key("disk_quota_limit_bytes", kind=kind, **labels)] = b * 1024
                 if i:
                     values[key("disk_quota_limit_inodes", kind=kind, **labels)] = i
-    for path, proj in sorted((cfg.get("projects") or {}).items()):
-        mount, pid = proj["filesystem"], int(proj["id"])
+    projects = cfg.get("projects") or {}
+    for (mount, pid), paths in sorted(project_groups(cfg).items()):
         used, _, hard = _project_report(host, mount, require_project_quota(host, mount), pid)
-        warn = levels(path, _project_limits(proj), cfg)[0]
-        labels = {"filesystem": mount, "project": path, "project_id": str(pid)}
+        warn = levels(paths[0], _project_limits(projects[paths[0]]), cfg)[0]
+        # One series per id: its trees together ("a, b"), never one per tree (each would
+        # show the id's whole use).
+        labels = {"filesystem": mount, "project": ", ".join(paths), "project_id": str(pid)}
         values[key("disk_quota_project_used_bytes", **labels)] = used * 1024
         for kind, b in (("warn", warn), ("hard", hard)):
             if b:

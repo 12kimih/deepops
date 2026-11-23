@@ -58,7 +58,8 @@ disk_quota_projects:
   /home/shared/datasets: {id: 101, block_hard: 20T}
 ```
 
-Each id is unique on its filesystem. The tree is marked with it (new files inherit it);
+Several trees may share one id, for one limit over them together (each names the same
+`block_hard`; the metrics show the id once, its trees joined). The tree is marked with it (new files inherit it);
 a file moved in from elsewhere on the filesystem is copied, so it is counted too. When a
 project goes, only its limit is lifted: the tree and its data stay. Project quotas
 work on ext4 and XFS.

@@ -236,6 +236,30 @@ class Apply(unittest.TestCase):
 
 
 class Projects(unittest.TestCase):
+    def test_one_id_over_several_trees_is_one_limit_and_one_series(self):
+        shared = {
+            "/home/shared/datasets": {"filesystem": "/home", "id": 300, "block_hard": "20T"},
+            "/home/shared/models": {"filesystem": "/home", "id": 300, "block_hard": "20T"},
+        }
+        host = FakeHost(home="rw,prjquota")
+        steps = plan(host, {"projects": shared, **LEVELS})
+        self.assertEqual(sum(s.startswith("limit project 300") for s in steps), 1, steps)
+        self.assertEqual(sum(s.startswith("make /home/shared/") for s in steps), 2, steps)
+        values = prom.parse(
+            dq.metrics(host, {"filesystems": {}, "release": [], "projects": shared, **LEVELS}, 1)
+        )
+        series = [k for k in values if k[0] == "disk_quota_project_used_bytes"]
+        self.assertEqual(len(series), 1, series)
+        self.assertIn("/home/shared/datasets, /home/shared/models", str(series[0]))
+
+    def test_one_id_with_two_limits_is_refused(self):
+        bad = {
+            "/a": {"filesystem": "/home", "id": 300, "block_hard": "20T"},
+            "/b": {"filesystem": "/home", "id": 300, "block_hard": "10T"},
+        }
+        with self.assertRaisesRegex(dq.Error, "different limits"):
+            plan(FakeHost(home="rw,prjquota"), {"projects": bad, **LEVELS})
+
     def test_an_ext4_project_gets_its_tree_and_hard_limit(self):
         host = FakeHost(home="rw,prjquota", pon=False)
         self.assertEqual(
