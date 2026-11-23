@@ -51,9 +51,15 @@ collaboration folders (`/scratch/projects`, each file counted to its owner):
    on the next run. Nothing else keeps a file: there is no button to press.
 3. On its date, a file still unused is removed, and the directories that leaves empty.
    A person's own directory and a collaboration folder itself always stay.
-4. Unless its owner has a running or suspended job then: the file is deferred once, by
-   `cluster_user_stale_days` more, and says so in the list and the notice. On that date
-   it goes even if jobs still run. When Slurm cannot be read, nothing is removed that day.
+4. Unless its owner has a job holding its allocation then (running, still starting,
+   suspended or completing), or, in a collaboration folder, any member of its group
+   does: the file is deferred once, by `cluster_user_stale_days` more, and says so in
+   the list and the notice (a folder whose group cannot be read counts as busy). On that
+   date it goes even if jobs still run. When Slurm cannot be read, nothing is removed
+   that day.
+5. Only the file that was listed goes: the removal reaches it without following a link
+   and checks it is still the same file (device, inode and owner), so a directory
+   swapped for a link, or a file replaced since the scan, is left alone.
 
 "Used" is the later of the file's access and modification times, so data a job only
 reads stays; the filesystem is mounted `relatime`, which keeps access times at the cost

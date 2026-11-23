@@ -24,11 +24,14 @@ ME = os.getuid()
 class Host(ss.Host):
     """The real filesystem, with paths that seem to be another filesystem."""
 
-    def __init__(self, other=(), busy=frozenset()):
-        self.other, self.busy = set(other), busy
+    def __init__(self, other=(), busy=frozenset(), members=None):
+        self.other, self.busy, self.members = set(other), busy, members or {}
 
     def running_users(self):
         return self.busy  # None: Slurm unreadable
+
+    def folder_members(self, folder):
+        return self.members.get(os.path.basename(folder), set())  # None: unreadable
 
     def lstat(self, path):
         st = os.lstat(path)
@@ -114,6 +117,65 @@ class Cleanup(Base):
         self.assertIn("deferred once because you had running jobs", listing)
         self.run_at(NOW + (14 + 60) * DAY, host=Host(busy={"alice"}))
         self.assertFalse(os.path.exists(old), "deferred once only: it goes though jobs still run")
+
+    def test_a_job_still_configuring_counts_as_running(self):
+        # vocab.job_holds, not a list of codes: CONFIGURING (nodes booting, prolog) holds
+        # its allocation, and its job reads its files as soon as it starts.
+        jobs = {"jobs": [{"user_name": "alice", "job_state": ["RUNNING", "CONFIGURING"]},
+                         {"user_name": "bob", "job_state": ["PENDING"]}]}  # fmt: skip
+        with mock.patch.object(ss.slurm, "load", return_value=jobs):
+            self.assertEqual(ss.Host().running_users(), {"alice"})
+
+    def test_a_collaboration_folders_file_waits_for_any_members_job(self):
+        old = self.file("projects/vision/shared.bin", 70)
+        self.run_at(NOW)
+        self.run_at(NOW + 14 * DAY, host=Host(busy={"carol"}, members={"vision": {"alice", "carol"}}))
+        self.assertTrue(os.path.exists(old), "a member's job may read a colleague's files")
+        self.assertTrue(any("carol (a member of vision)" in s for s in self.said))
+        unreadable = self.file("projects/audio/a.bin", 70)
+        self.run_at(NOW + 15 * DAY, host=Host(busy={"dave"}, members={"audio": None}))
+        self.assertTrue(os.path.exists(unreadable), "members unknown: deferred, not removed")
+
+    def scanned(self, now):
+        """The due map of one run, its dates come: the removal still to do."""
+        files, *_, truncated = ss.scan(Host(), self.cfg, now)
+        due = ss.plan(self.cfg, files, {"due": {}}, truncated, now)
+        for entry in due.values():
+            entry["due"] = now
+        return due
+
+    def test_a_directory_swapped_for_a_link_leads_nowhere(self):
+        # Between the scan and the removal a person swaps a directory of theirs for a
+        # link to another's tree: the removal walks without following links, so the
+        # other's file stays (it went, with the path string followed as root).
+        mine = self.file("alice/sub/x", 70)
+        theirs = self.file("bob/data/x", 70)
+        due = self.scanned(NOW)
+        os.rename(os.path.dirname(mine), os.path.join(self.root, "alice", "sub.real"))
+        os.symlink(os.path.dirname(theirs), os.path.dirname(mine))
+        ss.remove(Host(), self.cfg, due, NOW, False, self.said.append)
+        self.assertTrue(os.path.exists(theirs))
+        self.assertTrue(os.path.exists(os.path.join(self.root, "alice", "sub.real", "x")))
+
+    def test_the_walk_lists_nothing_through_a_swapped_directory(self):
+        theirs = self.file("bob/data/x", 70)
+        os.makedirs(os.path.join(self.root, "alice", "sub"))
+        host = Host()
+        host.root = self.root
+        self.assertEqual([e.name for e in host.scandir(os.path.join(self.root, "alice"))], ["sub"])
+        os.rmdir(os.path.join(self.root, "alice", "sub"))
+        os.symlink(os.path.dirname(theirs), os.path.join(self.root, "alice", "sub"))
+        with self.assertRaises(OSError):  # a link where the walk found a directory
+            host.scandir(os.path.join(self.root, "alice", "sub"))
+
+    def test_a_file_replaced_after_the_scan_stays(self):
+        old = self.file("alice/data.bin", 70)
+        due = self.scanned(NOW)
+        new = self.file("alice/new.bin", 70, data=b"new")  # another inode, made to look old
+        os.rename(new, old)
+        ss.remove(Host(), self.cfg, due, NOW, False, self.said.append)
+        self.assertTrue(os.path.exists(old))
+        self.assertTrue(any("no longer the file that was listed" in s for s in self.said))
 
     def test_another_persons_jobs_defer_nothing(self):
         old = self.file("alice/data.bin", 70)
