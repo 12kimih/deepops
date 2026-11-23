@@ -84,7 +84,8 @@ the portal host.
 | `open_ondemand_cluster_name` | `'{{ slurm_cluster_name }}'` | The Slurm cluster file: named after slurm.conf's ClusterName, as OOD 4.1+ passes the file name to Slurm. |
 | `open_ondemand_cluster_title` | `'{{ open_ondemand_cluster_name }}'` |  |
 | `open_ondemand_login_host` | `'{{ inventory_hostname }}'` |  |
-| `open_ondemand_proxied_services` | `[]` | A local web service published under a path of the portal, behind its login, e.g. Grafana: {path: /grafana/, upstream: "http://127.0.0.1:3000/", user_header: X-WEBAUTH-USER}. The portal sets user_header to the logged-in user and drops any value a client sends. Empty = none. |
+| `open_ondemand_proxied_services` | `[]` | A local web service published under a path of the portal, behind its login, e.g. Grafana: {path: /grafana/, upstream: "http://127.0.0.1:3000/grafana/", user_header: X-WEBAUTH-USER, title: Grafana, icon: "fas://chart-line"}. The upstream keeps the same path (the role refuses another: a service served from its sub path redirects a stripped request back to it, forever). The portal sets user_header to the logged-in user and drops any value a client sends; a title puts a link to it in the portal's top menu. Empty = none. |
+| `open_ondemand_nav_groups` | `[apps, files, jobs, clusters]` | The portal's top menu (OOD's nav_bar; a list replaces OOD's own menu): these, OOD's names for the pinned apps and its app groups, then a link to each proxied service with a title. |
 | `open_ondemand_backup_dir` | `/var/backups/open-ondemand` | Where the role keeps a copy of /etc/ood (and /var/www/ood when it rebuilds a broken install) before changing them. |
 | `open_ondemand_data_paths` | `['{{ open_ondemand_backup_dir }}']` | Data the component never removes, present or absent. |
 | `open_ondemand_tls_metrics` | `true` | The certificate's expiry as a node_exporter textfile metric (open_ondemand_tls_cert_not_after_seconds), refreshed daily, so an alert can fire before it lapses. |
