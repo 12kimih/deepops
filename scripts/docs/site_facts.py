@@ -14,7 +14,9 @@ Facts:
   commands  the people's cluster commands (cluster_tools_builtin) and their options,
             read from each command's one definition (cluster_tools.cli Command)
   policy    the cluster-wide periods and fraction every cleanup and warning uses
-            (cluster_user_stale_days, cluster_user_grace_days, cluster_user_warn_fraction)
+            (cluster_user_stale_days, cluster_user_grace_days, cluster_user_warn_fraction),
+            and the idle-GPU rules (slurm_usage_report_idle_hours, _cancel_after_hours,
+            _cancel_warn_hours; cancel_after_hours 0 means no cancel)
   slurm     KillWait from the slurm.conf template the site renders, and what preemption
             gives a job: GraceTime, which every preempted QoS has equal to KillWait
             (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
@@ -46,7 +48,14 @@ from repo_files import tracked  # noqa: E402
 # only fields: what a user may read on a public site.
 PUBLIC = {
     "commands": {"summary", "usage", "options"},
-    "policy": {"stale_days", "grace_days", "warn_fraction"},
+    "policy": {
+        "stale_days",
+        "grace_days",
+        "warn_fraction",
+        "idle_hours",
+        "cancel_after_hours",
+        "cancel_warn_hours",
+    },
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
 }
@@ -55,6 +64,12 @@ POLICY = {
     "stale_days": "cluster_user_stale_days",
     "grace_days": "cluster_user_grace_days",
     "warn_fraction": "cluster_user_warn_fraction",
+    # The idle-GPU rules (roles/slurm_usage_report): idle after idle_hours, a job cancelled
+    # after cancel_after_hours (0: never, the docs say not active), warned cancel_warn_hours
+    # before.
+    "idle_hours": "slurm_usage_report_idle_hours",
+    "cancel_after_hours": "slurm_usage_report_cancel_after_hours",
+    "cancel_warn_hours": "slurm_usage_report_cancel_warn_hours",
 }
 
 
