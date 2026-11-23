@@ -202,11 +202,11 @@ tests:
           - exp_labels: {severity: warning, host: n1, instance: "n1:9400", gpu: "1", xid: "48"}
             exp_annotations:
               summary: "XID 48 on n1 GPU 1"
-              description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
+              description: "What it needs is in the action column of NVIDIA's XID catalog (docs.nvidia.com/deploy/xid-errors); NHC drains the node itself on the XIDs that need a GPU reset or a reboot (nhc_gpu_drain_xids) and on an Xid 154 asking for one."
           - exp_labels: {severity: warning, host: n2, instance: "n2:9400", gpu: "2", xid: "79"}
             exp_annotations:
               summary: "XID 79 on n2 GPU 2"
-              description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
+              description: "What it needs is in the action column of NVIDIA's XID catalog (docs.nvidia.com/deploy/xid-errors); NHC drains the node itself on the XIDs that need a GPU reset or a reboot (nhc_gpu_drain_xids) and on an Xid 154 asking for one."
       - eval_time: 30m
         alertname: GpuXidError
         exp_alerts: []

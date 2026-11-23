@@ -10,7 +10,7 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "XID {{ $labels.xid }} on {{ $labels.host }} GPU {{ $labels.gpu }}"
-          description: "XID 48/63/64/74/79/92/94/95 usually need a drain and reset; see the NVIDIA XID catalogue."
+          description: "What it needs is in the action column of NVIDIA's XID catalog (docs.nvidia.com/deploy/xid-errors); NHC drains the node itself on the XIDs that need a GPU reset or a reboot (nhc_gpu_drain_xids) and on an Xid 154 asking for one."
       - alert: GpuFallenOffBus
         # The last XID the GPU raised, held until the exporter restarts: a GPU off the bus
         # stays reported while it is.
