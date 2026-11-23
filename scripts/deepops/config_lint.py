@@ -576,6 +576,36 @@ def check_retired():
     return problems
 
 
+# Paths retired with what replaces them: a config or doc still naming one points people
+# at nothing.
+RETIRED_PATHS = {
+    "/sw/docs": "the user docs site (cluster_info.docs_url) and the portal's overview page",
+    "config/docs": "the user docs site (cluster_info.docs_url)",
+}
+
+
+def check_retired_paths():
+    """No config file or doc names a retired path (RETIRED_PATHS)."""
+    problems = []
+    for label, tree, _ in configs():
+        for path in sorted(p for p in Path(tree.root).rglob("*") if p.is_file() and ".git" not in p.parts):
+            if path.suffix not in ("", ".yml", ".yaml", ".md", ".j2", ".txt"):
+                continue
+            try:
+                text = path.read_text()
+            except UnicodeDecodeError:
+                continue
+            for number, line in enumerate(text.splitlines(), 1):
+                if "cluster_tools_retired_shared_dirs" in line:
+                    continue  # the setting that removes them names them
+                for old, new in RETIRED_PATHS.items():
+                    if old in line:
+                        problems.append(
+                            f"retired-paths: {label}/{path.relative_to(tree.root)}:{number}: {old} is gone: {new}"
+                        )
+    return problems
+
+
 REGISTRY_FILE = ROOT / "roles" / "deploy_defaults" / "vars" / "main.yml"
 
 
@@ -755,6 +785,7 @@ CHECKS = {
     "shadow": check_shadow,
     "copies": check_copies,
     "retired": check_retired,
+    "retired-paths": check_retired_paths,
     "removals": check_removals,
 }
 

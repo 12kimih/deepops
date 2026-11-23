@@ -82,6 +82,9 @@ cluster_tools_motd_color: true
 # writing the same NFS path. Nothing is deleted from a destination: it also holds
 # files this role did not put there.
 cluster_tools_shared_dirs: []
+# Destinations published before and retired since, removed whole on the next run (a
+# list of paths); name only a tree this role published, since all of it goes.
+cluster_tools_retired_shared_dirs: []
 cluster_tools_motd_dir: /etc/update-motd.d
 cluster_tools_motd_file: 20-cluster-tools
 
