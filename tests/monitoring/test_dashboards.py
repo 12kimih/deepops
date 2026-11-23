@@ -7,7 +7,6 @@ uses are defined in the shipped rule files, so a renamed rule cannot leave a pan
 """
 
 import json
-import re
 import sys
 import unittest
 from pathlib import Path
@@ -18,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[2]
 RULES = ROOT / "roles/prometheus/files/rules"
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import tracked  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "scripts" / "validation"))
+from validate_monitoring import metric_names  # noqa: E402
 
 
 # Every dashboard deepops provisions, set -> files in src/dashboards/.
@@ -96,7 +98,9 @@ class DashboardConventionTests(unittest.TestCase):
         for path, dash in self.dashboards:
             for panel in all_panels(dash):
                 for target in panel.get("targets", []):
-                    for name in re.findall(r"\b[a-z_]+:[a-z_:]+\b", target.get("expr", "")):
+                    # A recorded name is level:metric:operation; validate_monitoring's reading
+                    # of PromQL finds it whole (rate5m included), strings and selectors aside.
+                    for name in sorted(n for n in metric_names(target.get("expr", "")) if ":" in n):
                         with self.subTest(path=str(path), panel=panel.get("title"), rule=name):
                             self.assertIn(name, self.recorded)
 

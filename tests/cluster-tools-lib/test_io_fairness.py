@@ -12,7 +12,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
-from cluster_tools import config  # noqa: E402
+from cluster_tools import blockdev, config  # noqa: E402
 from cluster_tools import io_fairness as iocost  # noqa: E402
 
 MODEL = {"rbps": 1272070703, "rseqiops": 60866, "rrandiops": 1587, "wbps": 894575285, "wseqiops": 565,
@@ -34,6 +34,7 @@ class Tree:
             node = self.sys / "block" / path
             node.mkdir(parents=True)
             (node / "dev").write_text(dev + "\n")
+            (node / "uevent").write_text(f"DEVNAME={Path(path).name}\n")
             if kind == "partition":
                 (node / "partition").write_text("1\n")
             elif kind:
@@ -46,7 +47,7 @@ class Tree:
 
     def on(self, major, minor):
         """Every path on MAJOR:MINOR."""
-        return mock.patch.object(iocost, "device_number", lambda path: os.makedev(major, minor))
+        return mock.patch.object(blockdev, "device_number", lambda path: os.makedev(major, minor))
 
 
 def cfg(tree, d, enable=False):
@@ -59,9 +60,9 @@ class Disk(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             tree = Tree(d)
             with tree.on(8, 17):
-                self.assertEqual(iocost.disk_of("/home", str(tree.sys)), "8:16")
+                self.assertEqual(blockdev.disk_of("/home", str(tree.sys)), "8:16")
             with tree.on(8, 0):
-                self.assertEqual(iocost.disk_of("/", str(tree.sys)), "8:0")
+                self.assertEqual(blockdev.disk_of("/", str(tree.sys)), "8:0")
 
     def test_stacked_and_blockless_filesystems_are_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -74,9 +75,9 @@ class Disk(unittest.TestCase):
                 with (
                     self.subTest(why=why),
                     tree.on(major, minor),
-                    self.assertRaises(iocost.Unusable) as caught,
+                    self.assertRaises(blockdev.Unusable) as caught,
                 ):
-                    iocost.disk_of("/x", str(tree.sys))
+                    blockdev.disk_of("/x", str(tree.sys))
                 self.assertIn(why, str(caught.exception))
 
 
@@ -96,7 +97,7 @@ class Apply(unittest.TestCase):
                 "8:16 enable=0 ctrl=user rpct=95 rlat=200278 wpct=95 wlat=400556 min=50 max=150\n",
             )
             self.assertIn(
-                'io_fairness_enabled{mount="/home",device="8:16"} 0', Path(d, "prom/io.prom").read_text()
+                'io_fairness_enabled{mount="/home",device="sdb"} 0', Path(d, "prom/io.prom").read_text()
             )
 
     def test_enabled_and_reset(self):

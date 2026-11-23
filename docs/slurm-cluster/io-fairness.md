@@ -37,6 +37,11 @@ node, at once and every `slurm_usage_report_io_repeat_hours` (6) while it lasts.
 job is named to the administrators only. Preview what it would say with
 `sudo /usr/local/libexec/slurm-usage-report --io --to <your Slack member ID>`.
 
+Grafana's **Storage / NFS and disks** dashboard shows them together: each node's NFS
+reads and writes, the top jobs and logins by I/O, and for the disks under iocost whether
+it is on, how busy they are, their latency and how long each slice waited for I/O. Set
+the time range across the moment iocost turned on to compare before and after.
+
 The job counters are `rchar` and `wchar` of `/proc/<pid>/io` summed over the job's
 processes (the cgroup path names `job_<id>`): page cache, pipes and sockets are in them,
 so they rank the jobs on a busy node, they are not NFS bytes. A task that already exited

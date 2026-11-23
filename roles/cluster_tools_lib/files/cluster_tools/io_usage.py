@@ -35,6 +35,7 @@ import time
 from collections import Counter
 
 from . import config
+from .blockdev import device_name
 from .files import write_atomic, write_textfile
 
 CONFIG_KEYS = {"proc_root": str, "cgroup_root": str, "sys_root": str, "slices": list, "textfile": str,
@@ -123,13 +124,6 @@ def carry(now, state):
     for job in set(state) - set(now):
         del state[job]
     return out
-
-
-def device_name(sys_root, device):
-    uevent = read(os.path.join(sys_root, "dev/block", device, "uevent")) or ""
-    return next(
-        (line.split("=", 1)[1] for line in uevent.splitlines() if line.startswith("DEVNAME=")), device
-    )
 
 
 def logins(cgroup_root, sys_root):
