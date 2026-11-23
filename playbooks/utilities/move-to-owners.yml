@@ -1,0 +1,112 @@
+---
+# Move each top-level entry of a directory everyone wrote into (move_to_owners_source)
+# into its owner's home, under move_to_owners_subdir: the data becomes each person's
+# own, where their disk quota already counted it. Within one filesystem this is a
+# rename, at once whatever the size; another filesystem is refused. An entry whose owner
+# is not an active person in the roster (root, a former member) stays and is listed, as
+# is one whose destination exists. A preview lists every move; the run moves nothing
+# unless move_to_owners_confirm is yes.
+#
+#   ansible-playbook -K playbooks/utilities/move-to-owners.yml -l <home server> -e move_to_owners_source=/home/data --check
+#   ansible-playbook -K playbooks/utilities/move-to-owners.yml -l <home server> -e move_to_owners_source=/home/data -e move_to_owners_confirm=yes
+- hosts: "{{ hostlist | default('slurm-nfs') }}"
+  become: true
+  gather_facts: false
+  roles:
+    - role: people_defaults
+  vars:
+    move_to_owners_source: ""
+    move_to_owners_subdir: "from-{{ move_to_owners_source | basename }}"
+    move_to_owners_confirm: ""
+    # login of each active person's UID
+    _move_logins: "{{ dict(people | people_active | dict2items | map(attribute='value.uid') | map('string')
+                      | zip(people | people_active | list)) }}"
+  tasks:
+    - name: Check the source and the subdirectory
+      ansible.builtin.assert:
+        that:
+          - move_to_owners_source is match('^/.+[^/]$')
+          - move_to_owners_subdir is match('^[A-Za-z0-9][A-Za-z0-9._-]*$')
+        fail_msg: >-
+          move_to_owners_source is an absolute directory ({{ move_to_owners_source }}) and
+          move_to_owners_subdir a plain name ({{ move_to_owners_subdir }}).
+        quiet: true
+
+    - name: Read the source's filesystem
+      ansible.builtin.stat:
+        path: "{{ move_to_owners_source }}"
+      register: _move_source
+
+    - name: Check the source is a directory on the homes' filesystem
+      ansible.builtin.stat:
+        path: "{{ people_home_root }}"
+      register: _move_homes
+
+    - name: Refuse a source that is not a directory on the homes' filesystem
+      ansible.builtin.assert:
+        that:
+          - _move_source.stat.isdir | default(false)
+          - _move_source.stat.dev == _move_homes.stat.dev
+        fail_msg: >-
+          {{ move_to_owners_source }} must be a directory on the same filesystem as
+          {{ people_home_root }} (a move there is a rename; across filesystems it would copy).
+        quiet: true
+
+    - name: List the source's top-level entries
+      find_present:
+        paths: "{{ move_to_owners_source }}"
+        file_type: any
+        hidden: true
+        recurse: false
+      register: _move_entries
+
+    - name: Look for destinations that already exist
+      ansible.builtin.stat:
+        path: "{{ people_home_root }}/{{ _move_logins[item.uid | string] }}/{{ move_to_owners_subdir }}/{{ item.path | basename }}"
+      loop: "{{ _move_entries.files | selectattr('uid', 'in', _move_logins.keys() | map('int') | list) | list }}"
+      loop_control:
+        label: "{{ item.path }}"
+      register: _move_taken
+
+    - name: Work out the moves
+      ansible.builtin.set_fact:
+        _move_plan: "{{ _move_taken.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
+        _move_blocked: "{{ _move_taken.results | selectattr('stat.exists') | map(attribute='item.path') | list }}"
+        _move_kept: "{{ _move_entries.files | rejectattr('path', 'in', _move_taken.results | map(attribute='item.path') | list)
+                        | map(attribute='path') | list }}"
+
+    - name: List the moves
+      ansible.builtin.debug:
+        msg:
+          move: "{{ _move_plan | map(attribute='path') | zip(_move_plan | map(attribute='uid') | map('string')
+                    | map('extract', _move_logins)) | map('join', ' -> ') | list }}"
+          stays_owner_not_an_active_person: "{{ _move_kept }}"
+          stays_destination_exists: "{{ _move_blocked }}"
+
+    - name: Refuse a run that is not confirmed
+      ansible.builtin.assert:
+        that: move_to_owners_confirm == 'yes'
+        fail_msg: Preview with --check, then pass -e move_to_owners_confirm=yes.
+        quiet: true
+      when: not ansible_check_mode and _move_plan | length > 0
+
+    - name: Make each owner's subdirectory
+      ansible.builtin.file:
+        path: "{{ people_home_root }}/{{ _move_logins[item | string] }}/{{ move_to_owners_subdir }}"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "{{ people_home_mode }}"
+      loop: "{{ _move_plan | map(attribute='uid') | unique | list }}"
+
+    - name: Move each entry into its owner's home
+      change_command:
+        argv:
+          - mv
+          - --no-target-directory
+          - --
+          - "{{ item.path }}"
+          - "{{ people_home_root }}/{{ _move_logins[item.uid | string] }}/{{ move_to_owners_subdir }}/{{ item.path | basename }}"
+      loop: "{{ _move_plan }}"
+      loop_control:
+        label: "{{ item.path }}"
