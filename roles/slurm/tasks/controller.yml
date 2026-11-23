@@ -195,6 +195,16 @@
   tags:
     - always
 
+- name: Check slurm.conf's timers agree with each other
+  ansible.builtin.assert:
+    that: _problems | length == 0
+    fail_msg: "slurm.conf: {{ _problems | join('; ') }} (plugins/filter/slurm_conf.py)"
+    quiet: true
+  vars:
+    _problems: "{{ lookup('ansible.builtin.template', slurm_conf_template) | slurm_timer_problems }}"
+  tags:
+    - config
+
 - name: Check the programs slurmctld runs are installed
   ansible.builtin.include_tasks:
     file: programs.yml
@@ -406,7 +416,8 @@
     - accounting
     - people
   vars:
-    _slurm_priority: "{{ lookup('ansible.builtin.template', slurm_conf_template) | regex_findall('(?m)^(Priority\\w+)=(\\S+)') | community.general.dict }}"
+    _slurm_conf_rendered: "{{ lookup('ansible.builtin.template', slurm_conf_template) }}"
+    _slurm_priority: "{{ _slurm_conf_rendered | regex_findall('(?m)^(Priority\\w+)=(\\S+)') | community.general.dict }}"
     _slurm_spec: "{{ lookup('ansible.builtin.file', slurm_accounting_file) | from_yaml }}"
   slurm_accounting:
     spec: "{{ _slurm_spec | combine({'users': (_slurm_spec.users | default({})) | combine(slurm_accounting_users, recursive=true)}) }}"
@@ -415,6 +426,9 @@
     prune: "{{ slurm_accounting_prune }}"
     revoke: "{{ slurm_accounting_revoke }}"
     priority_flags: "{{ (_slurm_priority.PriorityFlags | default('')).split(',') | select | list }}"
+    # A preempted job gets as long to stop as one at its time limit: slurm.conf's
+    # KillWait (Slurm's default 30 s when unset), one value for both.
+    preempted_grace_time: "{{ (_slurm_conf_rendered | regex_findall('(?m)^KillWait=(\\d+)') | first | default(30)) | int }}"
     priority_weights:
       qos: "{{ _slurm_priority.PriorityWeightQOS | default(0) }}"
       assoc: "{{ _slurm_priority.PriorityWeightAssoc | default(0) }}"
