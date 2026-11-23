@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 import scenario
-from cluster_tools import vocab
+from cluster_tools import sq as sq_tool, vocab
 from common import FAKE_PATH, LIB, run_tool
 
 TMP = tempfile.TemporaryDirectory()
@@ -155,42 +155,43 @@ class TableTests(unittest.TestCase):
 
 
 class GpuUserTests(unittest.TestCase):
-    """The USERS view on a typed-GPU cluster: per user their teams, GPUs by type split by a
-    high and a low QoS, and pending GPUs; then each high QoS's quota and its holders."""
+    """USERS on a typed-GPU cluster: the plain table, then each person's team and, per GPU
+    type, what they hold under a high QoS and a low one as high/low."""
 
     def users(self):
         return {u["user"]: u for u in model()["users"]}
 
+    def table(self, *args, env=None):
+        return ANSI.sub("", out("--no-queue", "--no-resources", "--no-why", "--ascii", *args, env=env))
+
     def test_gpus_split_by_type_and_qos_class(self):
+        self.assertEqual(self.users()["user1"]["gpus"], {"high": {"a10": 4, "a30": 2}, "low": {}})
+
+    def test_the_team_is_the_persons_not_the_jobs_account(self):
         u = self.users()
-        self.assertEqual(u["user1"]["gpus"], {"high": {"a10": 4, "a30": 2}, "low": {}})
-        self.assertEqual(u["user2"]["teams"], ["acct1", "acct16"])
-        self.assertEqual(u["user8"]["pending_gpus"], 106)
+        self.assertEqual(u["user1"]["teams"], ["acct5"])  # their jobs run under acct1
+        self.assertEqual(u["user2"]["teams"], ["acct4"])  # theirs under acct1 and acct16
 
-    def test_the_table_reads_hi_slash_lo_per_type(self):
-        text = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii"))
-        self.assertRegex(text, r"USER +TEAM +A10 hi/lo  +A30 hi/lo  +PEND")
-        self.assertRegex(text, r"(?m)^. user1 +acct1 +4 / - +2 / - +- *$")
+    def test_a_team_is_an_account_granting_a_high_qos_its_parent_does_not(self):
+        classes = {"low": {"high": False}, "high_a": {"high": True}}
+        assoc = {"associations": [
+            {"account": "root", "parent_account": "", "qos": ["low"]},
+            {"account": "admin", "parent_account": "root", "qos": ["low"]},
+            {"account": "a", "parent_account": "root", "qos": ["high_a", "low"]},
+            {"account": "a1", "parent_account": "a", "qos": ["high_a", "low"]},
+            {"user": "lead", "account": "admin", "qos": ["high_a", "low"]},
+            {"user": "lead", "account": "a1", "qos": ["high_a", "low"]},
+            {"user": "staff", "account": "admin", "qos": ["high_a", "low"]},
+        ]}  # fmt: skip
+        self.assertEqual(sq_tool._user_teams(assoc, classes), {"lead": ["a1"]})  # staff: no team, "-"
 
-    def test_each_teams_quota_names_its_holders_most_first(self):
-        quotas = {q["qos"]: q for q in model()["teams"]}
-        self.assertNotIn("normal", quotas)  # the lowest priority is no high tier
-        self.assertNotIn("hotfix", quotas)  # high, but no quota and nobody on it
-        a30 = next(k for k in quotas["high_t1"]["gpus"] if k["type"] == "a30")
-        self.assertEqual((a30["limit"], a30["used"]), (6, 13))
-        self.assertEqual(a30["holders"][0], ["user2", 10])
-        text = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii"))
-        self.assertEqual(quotas["high_t1"]["team"], "t1")  # the account that grants it, not its sub-accounts
-        self.assertRegex(text, r"(?m)^  t1 +A10 +4/0 +user1 4$")  # held where it is not allowed
-        self.assertRegex(text, r"(?m)^  t2 +A10 .* 0/14 +-$")
-
-    def test_holders_end_the_row_and_are_cut_to_the_terminal(self):
-        wide = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii", env={"COLUMNS": "200"}))
-        self.assertRegex(wide, r"(?m) 13/6  user2 10, user1 2, user4 1$")
-        narrow = ANSI.sub("", out("--no-queue", "--no-resources", "--ascii", env={"COLUMNS": "40"}))
-        a30 = next(line for line in narrow.splitlines() if " 13/6 " in line)
-        self.assertLessEqual(len(a30), 40)
-        self.assertRegex(a30, r"\+3 more$")
+    def test_who_then_jobs_then_tres_order_then_the_share(self):
+        text = self.table()
+        self.assertRegex(
+            text, r"USER +TEAM +RUN +PEND +NODES +CPU +MEMORY +GPU +A10\(H/L\) +A30\(H/L\) +SHARE"
+        )
+        self.assertRegex(text, r"(?m)^. user1 +acct5 +\d+ +\d+ +\d+ +\d+ +\d+G +6 +4/0 +2/0 ")
+        self.assertNotRegex(text, r"hi/lo|TEAMS|HOLDERS")
 
     def test_without_the_qos_the_split_is_said_to_be_unknown(self):
         broken = SCENE / "noqos"
@@ -200,7 +201,29 @@ class GpuUserTests(unittest.TestCase):
         r = sq("--no-queue", "--no-resources", "--ascii", env={"FIXTURES": str(broken)})
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("QoS unread", r.stdout)
-        self.assertNotIn("TEAMS", r.stdout)
+        self.assertNotIn("TEAM ", r.stdout)
+
+
+class ColumnOrderTests(unittest.TestCase):
+    """Every table reads alike: who, state, then resources in Slurm's TRES order (nodes,
+    CPUs, memory, GPUs and their breakdown), time or the summary last."""
+
+    def header(self, first, *args):
+        text = ANSI.sub("", out("--ascii", *args, env={"COLUMNS": "200"}))
+        return next(line.split() for line in text.splitlines() if line.split()[:1] == [first])
+
+    def test_jobs(self):
+        self.assertEqual(self.header("JOBID", "-a", "--no-users", "--no-resources", "--no-why"),
+                         ["JOBID", "NAME", "USER", "ST", "PARTITION", "QOS", "N", "CPU", "GRES", "NODE(REASON)",
+                          "TIME", "LIMIT", "PRIO"])  # fmt: skip
+
+    def test_resources(self):
+        self.assertEqual(self.header("NAME", "--no-queue", "--no-users", "--no-why"),
+                         ["NAME", "STATE", "IDLE", "OFF", "CPU", "MEMORY", "GPU", "FREE"])  # fmt: skip
+
+    def test_why(self):
+        self.assertEqual(self.header("REASON", "--no-queue", "--no-users", "--no-resources", "-W", "-d")[:5],
+                         ["REASON", "USER", "JOBS", "NODES", "CPU"])  # fmt: skip
 
 
 class QueueTests(unittest.TestCase):
