@@ -163,6 +163,10 @@
 #  - build-essential
 #  - linux-tools-generic
 #  - "{{ 'linux-headers-' + ansible_facts.kernel }}"
+# Vendor packages no repository carries, each a .deb kept in config/files with its sha256
+# (the pin: a different file is refused); per host, where the hardware is
+#software_vendor_debs:  # example
+#  - {file: "{{ inventory_dir }}/files/vendor/storcli_007.2507.0000.0000_all.deb", sha256: "<64 hex>"}
 
 
 ################################################################################

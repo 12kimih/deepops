@@ -407,6 +407,8 @@ CHECK_GATED_OK = {
         "the package file is fetched only by the run",
     ("roles/enroot/tasks/ubuntu.yml", "Ubuntu | install enroot from the release .deb"):
         "the package file is fetched only by the run",
+    ("playbooks/generic/software.yml", "Install each vendor package"):
+        "the package file is copied to the host only by the run",
     ("roles/nvidia_cuda_toolkit/tasks/present.yml", "Generate one Lmod modulefile per CUDA minor"):
         "a modulefile reads the toolkit the run installs",
     ("roles/internal_ca/tasks/cert.yml", "Install the certificate"):

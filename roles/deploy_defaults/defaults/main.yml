@@ -202,3 +202,8 @@ gpu_clock_lock: ""
 gpu_clock_reset: false
 # Packages playbooks/generic/software.yml adds on every host
 software_extra_packages: []
+# Vendor packages no repository carries (a RAID controller's CLI), each a .deb the site
+# keeps (under config/files) with its sha256: {file, sha256}. The file is the pin: a run
+# refuses one whose checksum differs, copies it to the host and installs it with apt,
+# and no repository can move it. Per host, where the hardware is.
+software_vendor_debs: []
