@@ -5,6 +5,7 @@
   roles:
     - retired_settings
     - role: deploy_defaults
+    - role: deepops_paths  # deepops_cache_dir, where vendor packages are copied
     # The shells people log in with, on every host, each reading /etc/profile.d.
     - role: login_shells
       tags: [people]  # the shells people chose
@@ -14,3 +15,58 @@
         name: "{{ software_extra_packages }}"
         state: present
       when: software_extra_packages | length > 0
+
+    - name: Read each vendor package's checksum
+      ansible.builtin.stat:
+        path: "{{ item.file }}"
+        checksum_algorithm: sha256
+        get_mime: false
+      loop: "{{ software_vendor_debs }}"
+      loop_control:
+        label: "{{ item.file | basename }}"
+      register: software_vendor_stat
+      delegate_to: localhost
+      become: false
+
+    - name: Refuse a vendor package that is not the one pinned
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.checksum == (item.item.sha256 | lower)
+        fail_msg: >-
+          {{ item.item.file }}: {{ 'missing' if not item.stat.exists else 'sha256 ' ~ item.stat.checksum }},
+          software_vendor_debs pins sha256 {{ item.item.sha256 }}. Put the vendor's file there, or update the pin
+          after checking the new one.
+        quiet: true
+      loop: "{{ software_vendor_stat.results }}"
+      loop_control:
+        label: "{{ item.item.file | basename }}"
+
+    - name: Create the directory of the vendor packages
+      ansible.builtin.file:
+        path: "{{ deepops_cache_dir }}/vendor"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: software_vendor_debs | length > 0
+
+    - name: Copy each vendor package to the host
+      ansible.builtin.copy:
+        src: "{{ item.file }}"
+        dest: "{{ deepops_cache_dir }}/vendor/{{ item.file | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ software_vendor_debs }}"
+      loop_control:
+        label: "{{ item.file | basename }}"
+
+    # The copy above is the preview's change: under --check the file is not on the host yet.
+    - name: Install each vendor package
+      ansible.builtin.apt:
+        deb: "{{ deepops_cache_dir }}/vendor/{{ item.file | basename }}"
+      loop: "{{ software_vendor_debs }}"
+      loop_control:
+        label: "{{ item.file | basename }}"
+      when: ansible_facts.os_family == "Debian" and not ansible_check_mode
