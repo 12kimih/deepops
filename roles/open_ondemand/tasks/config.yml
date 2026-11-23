@@ -123,15 +123,12 @@
 # says both (ServerTokens OS, ServerSignature On). This file sorts after it in
 # conf-enabled, and the last ServerTokens wins.
 - name: Keep Apache's version and OS off its pages
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: apache-hardening.conf.j2
     dest: "{{ open_ondemand_apache_conf }}"
     owner: root
     group: root
     mode: "0644"
-    content: |
-      # {{ ansible_managed }}
-      ServerTokens Prod
-      ServerSignature Off
   notify: Restart apache2
 
 - name: Enable that Apache setting
