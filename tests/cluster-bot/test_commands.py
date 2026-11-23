@@ -17,14 +17,16 @@ from cluster_bot import commands, home_blocks  # noqa: E402
 
 APP = ROOT / "roles/cluster_bot/files/cluster_bot/app.py"
 
-# Slack's built-in slash commands (https://slack.com/help/articles/201259356-Slack-commands
-# and its "Use built-in slash commands" list, 2026-11): an app's command of the same
-# name clashes with Slack's own.
+# Slack's built-in slash commands, as its Help Center lists them ("Use shortcuts to take
+# actions in Slack", table "Built-in shortcuts": https://slack.com/help/articles/201259356
+# (now also /help/articles/360057554553), read 2026-11-24): an app's command of the same
+# name clashes with Slack's own. /kick is /remove's other name; /msg has two forms.
 SLACK_BUILTINS = {
-    "/active", "/away", "/apps", "/archive", "/call", "/collapse", "/dm", "/dnd", "/expand",
-    "/feed", "/feedback", "/invite", "/join", "/kick", "/leave", "/me", "/msg", "/mute",
-    "/open", "/prefs", "/remind", "/remove", "/rename", "/search", "/shortcuts", "/shrug",
-    "/star", "/status", "/topic", "/who",
+    "/archive", "/browse", "/collapse", "/create", "/darkmode", "/description", "/dm", "/dnd",
+    "/downloads", "/drafts", "/expand", "/feedback", "/gif", "/huddle", "/invite", "/kick",
+    "/leave", "/mentions", "/msg", "/mute", "/notifications", "/people", "/remind", "/remove",
+    "/rename", "/saved", "/search", "/send", "/shortcuts", "/shrug", "/snippet", "/status",
+    "/topic", "/workflow",
 }  # fmt: skip
 
 # The Slack Web API methods the repository's code calls, as method names: Bolt's client

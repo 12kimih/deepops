@@ -22,7 +22,9 @@ bot's request and never runs as root.
 
 Public sources only: an https URL whose host resolves to global addresses alone (no
 private, loopback or link-local network, and every redirect is checked the same way),
-and, when the site names hosts, one of them or below it. The file is kept as it is
+and, when the site names hosts, one of them or below it. The connection goes to the
+address that was checked (TLS still verifies the name), never to a second lookup that
+could answer otherwise, and no proxy from the environment is used. The file is kept as it is
 published (an archive stays packed: many small files on the shared filesystem slow
 everyone), its sha256 checked when one was given, and it may not grow past MAX_BYTES
 (what was asked, within the budget).
@@ -39,17 +41,23 @@ with a warn and a hard level, cluster_tools.disk_report):
   disk_quota_project_limit_bytes{filesystem, project, kind}     warn, hard (the budget)
   shared_data_entries, shared_data_last_success_timestamp_seconds
 
+and, while the bot's service is offered (bot_service exists), when the bot last read the
+ledger (every cleanup round does): shared_data_bot_last_success_timestamp_seconds. The cleanup
+runs in the bot, so this is what says it stopped (roles/prometheus rules shared-space.yml).
+
 Python 3.9 or newer, standard library only.
 """
 
 import fcntl
 import hashlib
+import http.client
 import ipaddress
 import json
 import os
 import re
 import shutil
 import socket
+import ssl
 import stat
 import sys
 import time
@@ -83,6 +91,7 @@ CONFIG_KEYS = {
     "config": str,
     "project": str,
     "usage_metrics": bool,
+    "bot_service": str,
     "textfile": str,
     "textfile_kept": str,
 }
@@ -103,8 +112,15 @@ def load_config(path):
 
 
 def public_url(url, hosts=(), resolve=socket.getaddrinfo):
-    """URL when it is a public source, else an Error: https, no credentials in it, one of
-    HOSTS or below one (when any are named), resolving to global addresses only."""
+    """URL when it is a public source, else an Error (checked())."""
+    checked(url, hosts, resolve)
+    return url
+
+
+def checked(url, hosts=(), resolve=socket.getaddrinfo):
+    """(host, port, addresses) of URL when it is a public source, else an Error: https,
+    no credentials in it, one of HOSTS or below one (when any are named), resolving to
+    global addresses only."""
     try:
         parts = urllib.parse.urlsplit(url)
         host = (parts.hostname or "").lower()
@@ -120,7 +136,7 @@ def public_url(url, hosts=(), resolve=socket.getaddrinfo):
         raise Error(f"{host} does not resolve: {e}") from None
     if not found or not all(ipaddress.ip_address(a.split("%")[0]).is_global for a in found):
         raise Error(f"{host} is not a public host ({', '.join(sorted(found))})")
-    return url
+    return host, parts.port or 443, sorted(found)
 
 
 def path_of(cfg, kind, name):
@@ -233,6 +249,42 @@ def fetch(cfg, kind, name, url, sha256, max_bytes, requester, now, start=None, r
     return {"started": unit_name(kind, name)}
 
 
+class _Pinned(http.client.HTTPSConnection):
+    """A connection to ADDRESS for the name in HOST: the address that was checked, with
+    the certificate verified against the name (SNI) and the name in the Host header."""
+
+    def __init__(self, host, address, **kwargs):
+        super().__init__(host, **kwargs)
+        self.address = address
+
+    def connect(self):
+        sock = socket.create_connection((self.address, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _PinnedHTTPS(urllib.request.HTTPSHandler):
+    """Every https request (redirects too) is checked, then connected to the checked
+    address: the check and the connection see the same host."""
+
+    def __init__(self, hosts, resolve, context=None):
+        self.context = context or ssl.create_default_context()
+        super().__init__(context=self.context)
+        self.hosts, self.resolve = hosts, resolve
+
+    def https_open(self, req):
+        _, _, addresses = checked(req.full_url, self.hosts, self.resolve)
+        return self.do_open(
+            lambda host, **kw: _Pinned(host, addresses[0], **{**kw, "context": self.context}), req
+        )
+
+
+def opener_for(hosts, resolve, context=None):
+    """The download's opener: pinned https, redirects checked, no proxy, no plain http."""
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _PinnedHTTPS(hosts, resolve, context), _Checked(hosts, resolve)
+    ).open
+
+
 class _Checked(urllib.request.HTTPRedirectHandler):
     """Every redirect is to a public source too."""
 
@@ -263,7 +315,7 @@ def download(cfg, kind, name, now=time.time, opener=None, resolve=socket.getaddr
     os.mkdir(partial, 0o755)
     try:
         url = public_url(entry["url"], cfg["hosts"], resolve)
-        open_url = opener or urllib.request.build_opener(_Checked(cfg["hosts"], resolve)).open
+        open_url = opener or opener_for(cfg["hosts"], resolve)
         digest, size = hashlib.sha256(), 0
         with open_url(urllib.request.Request(url, headers={"User-Agent": "cluster-shared-data"}),
                       timeout=READ_TIMEOUT) as resp:  # fmt: skip
@@ -323,11 +375,18 @@ def mount_of(path):
     return path
 
 
+def round_file(cfg):
+    return os.path.join(os.path.dirname(cfg["ledger"]), "bot-round")
+
+
 def metrics(cfg, now):
     values = {
         key("shared_data_entries"): len(read_ledger(cfg)),
         key("shared_data_last_success_timestamp_seconds"): int(now),
     }
+    if cfg["bot_service"] and os.path.exists(cfg["bot_service"]) and os.path.exists(round_file(cfg)):
+        with open(round_file(cfg)) as f:
+            values[key("shared_data_bot_last_success_timestamp_seconds")] = int(f.read().strip() or 0)
     if cfg["usage_metrics"]:
         labels = {"filesystem": mount_of(cfg["root"]), "project": cfg["project"]}
         values[key("disk_quota_project_used_bytes", **labels)] = sum(usage(cfg).values())
@@ -340,7 +399,8 @@ def metrics(cfg, now):
 def serve(cfg, original, now):
     words = bot_serve.request(original, ARITY)
     op, args = words[0], words[1:]
-    if op == "list":
+    if op == "list":  # the bot's rounds and its requests: stamped for the staleness alert
+        write_atomic(round_file(cfg), f"{int(now)}\n")
         return listing(cfg)
     if op == "fetch":
         return fetch(cfg, *args, now)

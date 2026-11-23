@@ -23,6 +23,8 @@ _shared_space_data_cfg:
   config: "{{ _shared_space_data_config }}"
   project: shared-data
   usage_metrics: "{{ not (shared_space_data_quota | bool) }}"
+  # Offered to the bot: its cleanup rounds are exported for the staleness alert.
+  bot_service: "{{ (cluster_bot_serve_dir ~ '/' ~ _shared_space_bot_service.name ~ '.json') if cluster_bot_host | length > 0 else '' }}"
   textfile: "{{ _shared_space_data_textfile }}"
   textfile_kept: "{{ _shared_space_data_kept }}"
 

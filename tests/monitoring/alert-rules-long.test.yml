@@ -297,6 +297,44 @@ tests:
               summary: "The scratch space cleanup on s stops at its entry bound"
               description: "Each run looked at scratch_space_purge_max_entries entries and stopped: raise it (roles/scratch_space) or find who holds the files (`quota -s`, disk report)."
 
+  - name: the shared data's usage export and the bot's cleanup rounds warn when they stop
+    interval: 1h
+    input_series:
+      - series: 'shared_data_last_success_timestamp_seconds{host="h", instance="h:9100"}'
+        values: '0x10'
+      - series: 'node_systemd_unit_state{host="g", instance="g:9100", name="shared-data-metrics.service", state="inactive"}'
+        values: '1x10'
+      - series: 'shared_data_bot_last_success_timestamp_seconds{host="h", instance="h:9100"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: SharedDataUsageStale
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: SharedDataUsageStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: h, instance: "h:9100"}
+            exp_annotations:
+              summary: "The shared data's usage on h has not been exported for 3 hours"
+              description: "The disk report and the budget alert show old figures: `journalctl -u shared-data-metrics` and `systemctl list-timers shared-data-metrics.timer` on the host."
+      - eval_time: 4h
+        alertname: SharedDataUsageNeverReported
+        exp_alerts:
+          - exp_labels: {severity: warning, host: g, instance: "g:9100"}
+            exp_annotations:
+              summary: "The shared data's usage on g has never been exported"
+              description: "`journalctl -u shared-data-metrics` and `systemctl list-timers shared-data-metrics.timer` on the host."
+      - eval_time: 2h
+        alertname: SharedDataCleanupStale
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: SharedDataCleanupStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: h, instance: "h:9100"}
+            exp_annotations:
+              summary: "The cluster bot has not checked the shared data on h for 3 hours"
+              description: "Downloads are not told and unused entries get no notice nor removal: `systemctl status cluster-bot` and `journalctl -u cluster-bot` on the bot's host (its SSH to the home server's shared-data service)."
+
   - name: a periodic job installed on a host that never reports warns after its window
     interval: 1h
     input_series:
