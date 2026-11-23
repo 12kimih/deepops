@@ -16,9 +16,9 @@ acct = in_tree.load("roles/slurm/library/slurm_accounting.py")
 
 QOS = "\n".join(
     [
-        "normal|0||cluster|||||1.000000|Normal QOS default",
-        "low|0||cluster||||1-00:00:00|1.000000|low",
-        "high_a|10000|low|cluster||gres/gpu:x=4,gres/gpu:y=2|||1.000000|high_a",
+        "normal|0||cluster|||||1.000000|00:00:00||Normal QOS default",
+        "low|0||cluster||||1-00:00:00|1.000000|00:00:00||low",
+        "high_a|10000|low|cluster||gres/gpu:x=4,gres/gpu:y=2|||1.000000|00:00:00||high_a",
     ]
 )
 ASSOC = "\n".join(
@@ -72,8 +72,10 @@ def current():
     return q, a, u
 
 
-def plan(spec, prune=False, revoke=()):
-    cmds, unmanaged = acct.plan(spec, *current(), CLUSTER, prune=prune, revoke=revoke)
+def plan(spec, prune=False, revoke=(), preempted_grace_time=None):
+    cmds, unmanaged = acct.plan(
+        spec, *current(), CLUSTER, prune=prune, revoke=revoke, preempted_grace_time=preempted_grace_time
+    )
     return [c for c in cmds if not isinstance(c, tuple)], unmanaged
 
 
@@ -88,6 +90,25 @@ class Plan(unittest.TestCase):
         cmds, unmanaged = plan(SPEC)
         self.assertEqual(cmds, [])
         self.assertEqual(unmanaged, {"qos": [], "accounts": [], "associations": []})
+
+    def test_a_preempted_qos_gets_kill_waits_grace(self):
+        # One value for every way a job is made to stop: a QoS another preempts takes
+        # slurm.conf's KillWait as GraceTime; the others stay at 0; its own wins.
+        cmds, _ = plan(SPEC, preempted_grace_time=120)
+        self.assertEqual(cmds, [["modify", "qos", "where", "name=low", "set", "gracetime=120"]])
+        own = copy(SPEC)
+        own["qos"]["low"]["grace_time"] = 300
+        cmds, _ = plan(own, preempted_grace_time=120)
+        self.assertEqual(cmds, [["modify", "qos", "where", "name=low", "set", "gracetime=300"]])
+        cmds, _ = plan(SPEC)
+        self.assertEqual(cmds, [])
+
+    def test_slurm_times_read_as_seconds(self):
+        self.assertEqual(acct.seconds("00:02:00"), 120)
+        self.assertEqual(acct.seconds("1-00:00:00"), 86400)
+        self.assertEqual(acct.seconds("10"), 600)  # a bare number is minutes, as Slurm reads it
+        self.assertEqual(acct.minutes("00:00:30"), 1)  # a limit is never shortened
+        self.assertEqual(acct.fmt_seconds(600), "0-00:10:00")
 
     def test_defaults_state_a_policy_once_and_plan_the_same(self):
         # The same accounts with fairshare: parent stated once instead of per account,

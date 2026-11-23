@@ -14,7 +14,9 @@ options:
   spec:
     description:
       - "C(qos): name -> {priority, preempt, preempt_mode, grp_tres, max_tres_per_user,
-        max_wall, usage_factor, flags, description}."
+        max_wall, usage_factor, flags, grace_time, preempt_exempt_time, description}.
+        C(grace_time) is in seconds; C(preempt_exempt_time) a Slurm time (minimum run
+        time before a job of the QoS can be preempted)."
       - "C(accounts): name -> {parent, fairshare, priority, qos, default_qos,
         description, organization, members}. C(fairshare) takes an integer or
         C(parent). C(members) lists user names, or {user, fairshare, priority, qos,
@@ -49,6 +51,13 @@ options:
         C(require_qos_tiers: true) in I(spec), the module fails when association
         priority, fairshare and age could lift a job past the next QoS tier."
     type: dict
+  preempted_grace_time:
+    description:
+      - Seconds a preempted job gets to stop cleanly (SIGTERM, then SIGKILL), for each
+        QoS another QoS in I(spec) preempts and that sets no C(grace_time). Pass
+        slurm.conf's KillWait, so a preempted job gets the same time to stop as one
+        reaching its time limit. Unset leaves those QoS at their own C(grace_time) (0).
+    type: int
   priority_flags:
     description: PriorityFlags from slurm.conf (NO_NORMAL_QOS and NO_NORMAL_ASSOC matter).
     type: list
@@ -64,7 +73,7 @@ import shlex
 from ansible.module_utils import deepops_command, deepops_diff
 from ansible.module_utils.basic import AnsibleModule
 
-QOS_FIELDS = "name,priority,preempt,preemptmode,flags,grptres,maxtrespu,maxwall,usagefactor,description"
+QOS_FIELDS = "name,priority,preempt,preemptmode,flags,grptres,maxtrespu,maxwall,usagefactor,gracetime,preemptexempttime,description"
 ASSOC_FIELDS = "account,user,parentname,fairshare,priority,qos,defaultqos,maxsubmit"
 ACCOUNT_FIELDS = "account,description,organization"
 BUILTIN_QOS = {"normal"}
@@ -94,10 +103,9 @@ def names(text):
     return sorted(filter(None, (text or "").split(",")))
 
 
-def minutes(value):
-    """Slurm time -> minutes, or None for no limit. Slurm's forms: MM, MM:SS, HH:MM:SS,
-    and with days D-HH, D-HH:MM, D-HH:MM:SS (after a day count the first field is hours).
-    Seconds round up, as a limit is never shortened."""
+def seconds(value):
+    """Slurm time -> seconds, or None for none. Slurm's forms: MM, MM:SS, HH:MM:SS, and
+    with days D-HH, D-HH:MM, D-HH:MM:SS (after a day count the first field is hours)."""
     if value in (None, "", "UNLIMITED", "INFINITE", -1):
         return None
     value = str(value)
@@ -111,7 +119,14 @@ def minutes(value):
         h, m, s = 0, parts[0], parts[1]
     else:
         h, m, s = parts
-    return int(days or 0) * 1440 + h * 60 + m + (1 if s else 0)
+    return int(days or 0) * 86400 + h * 3600 + m * 60 + s
+
+
+def minutes(value):
+    """Slurm time -> minutes, or None for no limit. Seconds round up, as a limit is never
+    shortened."""
+    total = seconds(value)
+    return None if total is None else -(-total // 60)
 
 
 def fairshare(value):
@@ -136,6 +151,8 @@ def current_qos(text):
             "max_tres_per_user": tres(r["maxtrespu"]),
             "max_wall": minutes(r["maxwall"]),
             "usage_factor": float(r["usagefactor"] or 1),
+            "grace_time": seconds(r["gracetime"]) or 0,
+            "preempt_exempt_time": seconds(r["preemptexempttime"]),
             "description": r["description"],
         }
     return found
@@ -168,10 +185,18 @@ def current_assocs(assoc_text, account_text):
 # --- desired state ---------------------------------------------------------------
 
 
-def desired_qos(spec):
+def desired_qos(spec, preempted_grace_time=None):
+    """The declared QoS. A QoS another one preempts and that sets no grace_time takes
+    preempted_grace_time (slurm.conf's KillWait, one value for every way a job is made
+    to stop) when it is given."""
+    declared = spec.get("qos") or {}
+    preempted = {p for q in declared.values() for p in ((q or {}).get("preempt") or [])}
     out = {}
-    for name, q in (spec.get("qos") or {}).items():
+    for name, q in declared.items():
         q = q or {}
+        grace = q.get("grace_time")
+        if grace is None:
+            grace = preempted_grace_time if name in preempted and preempted_grace_time is not None else 0
         out[name] = {
             "priority": int(q.get("priority", 0)),
             "preempt": sorted(q.get("preempt") or []),
@@ -181,6 +206,8 @@ def desired_qos(spec):
             "max_tres_per_user": {k: int(v) for k, v in (q.get("max_tres_per_user") or {}).items()},
             "max_wall": minutes(q.get("max_wall")),
             "usage_factor": float(q.get("usage_factor", 1)),
+            "grace_time": int(grace),
+            "preempt_exempt_time": seconds(q.get("preempt_exempt_time")),
             "description": q.get("description"),
         }
     return out
@@ -294,6 +321,14 @@ def fmt_tres(want, have):
     return ",".join(f"{k}={v}" for k, v in sorted(merged.items()))
 
 
+def fmt_seconds(value):
+    """Seconds -> a Slurm time; -1 clears it."""
+    if value is None:
+        return "-1"
+    d, rem = divmod(value, 86400)
+    return f"{d}-{rem // 3600:02d}:{rem % 3600 // 60:02d}:{rem % 60:02d}"
+
+
 def fmt_minutes(value):
     if value is None:
         return "-1"
@@ -325,6 +360,10 @@ def qos_changes(want, have):
         sets.append(f"maxwall={fmt_minutes(want['max_wall'])}")
     if want["usage_factor"] != (have or {}).get("usage_factor", 1.0):
         sets.append(f"usagefactor={want['usage_factor']}")
+    if want["grace_time"] != (have or {}).get("grace_time", 0):
+        sets.append(f"gracetime={want['grace_time']}")
+    if want["preempt_exempt_time"] != (have or {}).get("preempt_exempt_time"):
+        sets.append(f"preemptexempttime={fmt_seconds(want['preempt_exempt_time'])}")
     if want["description"] is not None and not same_text(
         want["description"], (have or {}).get("description")
     ):
@@ -370,13 +409,13 @@ def ordered_accounts(accounts):
     return order
 
 
-def plan(spec, cur_qos, cur_accounts, cur_users, cluster, prune=False, revoke=()):
+def plan(spec, cur_qos, cur_accounts, cur_users, cluster, prune=False, revoke=(), preempted_grace_time=None):
     """The sacctmgr argument lists that make the database match spec, and what is unmanaged.
     The associations of the users in REVOKE that spec does not want are deleted even
     without PRUNE: people who left (people_former), whose access ends on the day."""
     where_cluster = [f"cluster={cluster}"]
     cmds = []
-    want_qos = desired_qos(spec)
+    want_qos = desired_qos(spec, preempted_grace_time)
     want_accounts = desired_accounts(spec)
     want_users = desired_users(spec, want_accounts, cur_accounts)
 
@@ -522,6 +561,7 @@ def main():
             "sacctmgr": {"type": "str", "default": "sacctmgr"},
             "priority_weights": {"type": "dict", "default": {}},
             "priority_flags": {"type": "list", "elements": "str", "default": []},
+            "preempted_grace_time": {"type": "int"},
         },
         supports_check_mode=True,
     )
@@ -559,6 +599,7 @@ def main():
             cluster,
             module.params["prune"],
             module.params["revoke"],
+            module.params["preempted_grace_time"],
         )
     except ValueError as exc:
         module.fail_json(msg=str(exc))
