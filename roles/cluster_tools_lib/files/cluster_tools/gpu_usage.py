@@ -24,7 +24,7 @@ import sys
 import time
 
 from . import slurm
-from .cli import Command, Opt, run_main
+from .cli import Command, Opt, opt_json, run_main
 from .prometheus import Error as PrometheusError
 from .prometheus import Prometheus
 from .render import Grid, duration
@@ -74,7 +74,7 @@ COMMAND = Command(
             brief=True,
             help="auto (default: Slurm's figures where the job has them, else Prometheus'), slurm or prometheus",
         ),
-        Opt("--json", section="Output", help="the figures as JSON, for scripts"),
+        opt_json("the figures as JSON, for scripts"),
     ],
     usage="gpu-usage [OPTIONS] JOB",
     machine="--json",

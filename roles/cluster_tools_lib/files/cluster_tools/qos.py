@@ -9,7 +9,7 @@ import json
 import sys
 
 from . import slurm, vocab
-from .cli import Command, Opt, me, run_main
+from .cli import Command, Opt, me, opt_all, opt_json, opt_me, opt_user, run_main
 from .render import Grid, duration, width
 
 BAR = 6  # quota bar width; shrinks to fit, then goes
@@ -28,7 +28,7 @@ NOTES = [
     "  Under PrivateData=jobs only your own jobs are visible, so usage reads low.\n"
     "  The any column is a quota on GPUs of every type together (gres/gpu=N).\n"
     "  A limit of 0 is not a full quota: that QoS may not use that GPU type at all.\n"
-    "  No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -T).\n"
+    "  No MAX WALL means no QoS limit; the partition's own MaxTime still applies (sq -P).\n"
     "  A job pending on QOSGrpGRES is waiting for its own QoS's quota, not for the cluster.",
 ]
 
@@ -36,23 +36,16 @@ COMMAND = Command(
     "qos",
     "the QoS levels you can submit against",
     [
-        Opt("-m", "--mine", brief=True, help="only the QoS you may submit against"),
-        Opt("-a", "--all", brief=True, help="include QoS held by no user (Slurm's built-in normal)"),
-        Opt(
-            "-u",
-            "--user",
-            metavar="NAME",
-            complete="users",
-            brief=True,
-            help="answer for someone else instead of you",
-        ),
+        opt_me("only the QoS you may submit against", renamed=("--mine",)),
+        opt_all("include QoS held by no user (Slurm's built-in normal)"),
+        opt_user("answer for someone else instead of you", metavar="NAME"),
         Opt(
             "--usage",
             negate=True,
             default=True,
             help="the live usage figures (--no-usage skips the job list)",
         ),
-        Opt("--json", section="Output", help="the model as JSON, for scripts (ignores $QOS_OPTIONS)"),
+        opt_json("the model as JSON, for scripts (ignores $QOS_OPTIONS)"),
     ],
     env="QOS_OPTIONS",
     machine="--json",
@@ -266,13 +259,13 @@ def main(argv=None):
             except (slurm.Failed, slurm.SchemaError) as e:
                 usage_error = str(e)
         usage = args.usage and not usage_error
-        model = build(qos_data, assoc_data, jobs, args.user or me(), usage, args.mine, args.all)
+        model = build(qos_data, assoc_data, jobs, args.user or me(), usage, args.me, args.all)
         model["usage_error"] = usage_error
         if args.json:
             json.dump(model, sys.stdout, indent=1)
             sys.stdout.write("\n")
         else:
-            sys.stdout.write(show(theme, model, args.mine))
+            sys.stdout.write(show(theme, model, args.me))
 
     return run_main("qos", body)
 
