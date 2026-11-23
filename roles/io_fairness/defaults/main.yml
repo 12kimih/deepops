@@ -1,0 +1,31 @@
+---
+# io_fairness -- blk-iocost shares the disks under the given mounts by cgroup weight
+# (cluster_tools.io_fairness): each mount's whole disk gets its measured cost model and
+# latency targets at every boot, and systemd's slices get their IOWeight. iocost never
+# throttles I/O from the root cgroup (nfsd, kernel threads), so on an NFS server it
+# keeps logins on the server itself from starving the exports, not one NFS client
+# from another (roles/io_usage and roles/io_notice attribute that by node and job).
+# docs/slurm-cluster/io-fairness.md.
+
+# present or absent (docs/deepops/component-state.md); a deploy sets it from
+# deepops_components. absent turns iocost off and gives each disk back the kernel's model.
+io_fairness_state: present
+
+# {mount: {measured, command, model, qos, latency}}, each printed by
+# scripts/deepops/io_model.py from one fio run of scripts/deepops/io-model.fio on that
+# mount: model is the linear cost model (io.cost.model ctrl=user), qos the latency
+# targets (io.cost.qos); measured, command and latency are the record of the run.
+io_fairness_models: {}
+
+# Whether iocost shares by weight. false writes each model and its targets with iocost
+# off, so the numbers can be seen (sudo /usr/local/sbin/io-fairness show /etc/io-fairness.json)
+# before anything is throttled.
+io_fairness_enable: false
+
+# IOWeight of systemd's slices (1 to 10000, systemd's default 100): services before
+# people's logins, so a login saturating the disk waits behind the services.
+io_fairness_slice_weights:
+  system.slice: 100
+  user.slice: 50
+# Each person's slice within user.slice: everyone equal.
+io_fairness_user_weight: 100

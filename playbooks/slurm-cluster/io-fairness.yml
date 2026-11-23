@@ -1,0 +1,14 @@
+---
+# iocost on the NFS servers' disks (roles/io_fairness): each mount in io_fairness_models
+# gets its measured model at every boot, and the slices their IOWeight. See what the
+# kernel holds with
+#   sudo /usr/local/sbin/io-fairness show /etc/io-fairness.json
+# Every host it runs on converges: present where deepops_components says so (the
+# switch and the target group, roles/deploy_defaults/vars/main.yml), removed elsewhere.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: io_fairness
+      io_fairness_state: "{{ deepops_components.io_fairness | component_phase(deepops_phase) }}"
+  tags: ['io-fairness']

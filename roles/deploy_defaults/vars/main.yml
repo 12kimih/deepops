@@ -139,6 +139,10 @@ deepops_component_registry:
   gpu_diag_idle:
     rules:
       - {switch: "{{ slurm_enable_gpu_diag_idle and install_dcgm }}", group: slurm-master, first: true}
+  # iocost on the NFS servers' disks, from the site's measured models.
+  io_fairness:
+    rules:
+      - {switch: "{{ slurm_enable_io_fairness }}", group: slurm-nfs}
   # Slurm's MailProg as Slack DMs, on every controller (MailProg must be on each).
   job_notice:
     rules:

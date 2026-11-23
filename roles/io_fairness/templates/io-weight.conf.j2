@@ -1,0 +1,4 @@
+{{ ansible_managed | comment }}
+# The disk share of this slice under iocost (roles/io_fairness).
+[Slice]
+IOWeight={{ item.value | int }}

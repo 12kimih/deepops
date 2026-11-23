@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: io_fairness_state in ['present', 'absent', 'kept']
+    fail_msg: "io_fairness_state must be present, absent or kept, not {{ io_fairness_state }}."
+    quiet: true
+
+- name: "Make io_fairness {{ io_fairness_state }}"
+  ansible.builtin.include_tasks: "{{ io_fairness_state }}.yml"
+  when: io_fairness_state != 'kept'

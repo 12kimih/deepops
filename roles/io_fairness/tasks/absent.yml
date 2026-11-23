@@ -1,0 +1,22 @@
+---
+# iocost off and the kernel's own model back, while the command and its configuration
+# are still there to name the disks; then everything this component installed goes.
+- name: Turn iocost off
+  ansible.builtin.command:
+    argv: ["{{ _io_fairness_command }}", reset, "{{ _io_fairness_config }}"]
+    removes: "{{ _io_fairness_config }}"
+  changed_when: true
+
+- name: Remove the slice weights
+  systemd_dropin:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ _io_fairness_dropins }}"
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: io_fairness
+    component_record_action: absent
+    component_record_items: "{{ io_fairness_items }}"

@@ -181,6 +181,13 @@
   tags:
     - gpu-diag-idle
 
+- name: Share the NFS server's disks by cgroup weight (iocost)
+  import_playbook: slurm-cluster/io-fairness.yml
+  vars:
+    deepops_phase: install
+  tags:
+    - io-fairness
+
 - name: Install OpenMPI
   import_playbook: slurm-cluster/openmpi.yml
   vars:
@@ -460,6 +467,13 @@
     deepops_phase: remove
   tags:
     - gpu-diag-idle
+
+- name: Turn iocost off where it is no longer wanted
+  import_playbook: slurm-cluster/io-fairness.yml
+  vars:
+    deepops_phase: remove
+  tags:
+    - io-fairness
 
 - name: Remove the job directories' own filesystem where it is no longer wanted
   import_playbook: slurm-cluster/job-scratch.yml

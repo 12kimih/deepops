@@ -146,6 +146,23 @@ slurm_ha_state_save_location: "/sw/slurm"
 #gpu_diag_idle_schedule: "Sun *-*-* 04:00:00"
 #gpu_diag_idle_drain_on_failure: true
 
+# --- I/O sharing on the NFS server (roles/io_fairness) ----------------------
+# iocost shares each mount's disk by cgroup weight with the disk's own measured model:
+# run scripts/deepops/io-model.fio on the mount (docs/slurm-cluster/io-fairness.md)
+# and paste what scripts/deepops/io_model.py prints. NFS traffic (nfsd, the root
+# cgroup) is never throttled; logins on the server wait behind the services and it.
+# io_fairness_enable: false writes the numbers with iocost off.
+#slurm_enable_io_fairness: false
+#io_fairness_models:  # example
+#  /home:
+#    measured: "2026-01-01T00:00+00:00"
+#    command: "sudo fio --output-format=json --output=result.json io-model.fio"
+#    model: {rbps: 1000000000, rseqiops: 50000, rrandiops: 1500, wbps: 800000000, wseqiops: 500, wrandiops: 450}
+#    qos: {rpct: 95, rlat: 200000, wpct: 95, wlat: 400000, min: 50, max: 150}
+#io_fairness_enable: false
+#io_fairness_slice_weights: {system.slice: 100, user.slice: 50}
+#io_fairness_user_weight: 100
+
 # --- Accounting as code (QoS, accounts, members) ----------------------------
 # Declare QoS and the account tree in one file; slurm.yml (tag accounting) applies it
 # with sacctmgr, previewable with --check --diff. Who is in which account comes from
