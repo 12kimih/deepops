@@ -16,7 +16,15 @@ Facts:
   policy    the cluster-wide periods and fraction every cleanup and warning uses
             (cluster_user_stale_days, cluster_user_grace_days, cluster_user_warn_fraction),
             and the idle-GPU rules (slurm_usage_report_idle_hours, _cancel_after_hours,
-            _cancel_warn_hours; cancel_after_hours 0 means no cancel)
+            _cancel_warn_hours; cancel_after_hours 0 means no cancel) and how an idle
+            job's owner is told (idle_notify: slurm_usage_report_notify, mention or dm);
+            how long a login lasts past a person's end (leave_grace_days:
+            people_leave_grace_days; new jobs are held from the day after the end);
+            whether srun and salloc GPU sessions must name a team QoS (interactive_team_qos:
+            slurm_job_submit_policy.interactive_gpu_qos set; the pattern stays private)
+  login     each person's limits on a login node (cluster_tools_user_slice_limits, the
+            slurm-login group's over the others): cpus (CPUQuota), memory_gib
+            (MemoryMax), tasks (TasksMax); a limit not set is left out
   slurm     KillWait from the slurm.conf template the site renders, and what preemption
             gives a job: GraceTime, which every preempted QoS has equal to KillWait
             (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
@@ -56,6 +64,7 @@ import sys
 from pathlib import Path
 
 import jinja2
+import jinja2.nativetypes
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,7 +92,11 @@ PUBLIC = {
         "idle_hours",
         "cancel_after_hours",
         "cancel_warn_hours",
+        "idle_notify",
+        "leave_grace_days",
+        "interactive_team_qos",
     },
+    "login": {"cpus", "memory_gib", "tasks"},
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
     "quota": None,  # each limited filesystem, its fields QUOTA_FIELDS
@@ -110,7 +123,10 @@ POLICY = {
     "idle_hours": "slurm_usage_report_idle_hours",
     "cancel_after_hours": "slurm_usage_report_cancel_after_hours",
     "cancel_warn_hours": "slurm_usage_report_cancel_warn_hours",
+    "idle_notify": "slurm_usage_report_notify",  # mention (in the report thread), dm; [] none
+    "leave_grace_days": "people_leave_grace_days",
 }
+_SIZE_GIB = {"K": 1 / 1024**2, "M": 1 / 1024, "G": 1, "T": 1024}
 
 
 class _Loader(yaml.SafeLoader):
@@ -158,14 +174,17 @@ def settings(config):
 
 
 # Ansible's templating as far as the settings alone go: an undefined name, or a filter or
-# test only Ansible has, leaves the template unresolved.
-_JINJA = jinja2.Environment(undefined=jinja2.StrictUndefined, autoescape=False)  # noqa: S701 (not HTML)
+# test only Ansible has, leaves the template unresolved. Native, as Ansible's: "{{ days }}"
+# over an integer is that integer, not its text.
+_JINJA = jinja2.nativetypes.NativeEnvironment(undefined=jinja2.StrictUndefined, autoescape=False)  # noqa: S701
 
 
 def _render(text, values):
     """TEXT rendered over VALUES, or None when it needs anything they lack."""
     try:
-        return _JINJA.from_string(text).render(values)
+        out = _JINJA.from_string(text).render(values)
+        # A lone undefined name renders as itself natively instead of raising.
+        return None if isinstance(out, jinja2.Undefined) else out
     except (jinja2.TemplateError, TypeError, ValueError, AttributeError):
         return None
 
@@ -317,6 +336,30 @@ def host_quotas(config):
     return out
 
 
+def login_limits(config, settings_):
+    """{cpus, memory_gib, tasks}: the user-.slice limits the login nodes get
+    (cluster_tools_user_slice_limits; group_vars/slurm-login.yml over the others)."""
+    limits = settings_.get("cluster_tools_user_slice_limits") or {}
+    if config:
+        limits = _yaml(Path(config) / "group_vars" / "slurm-login.yml").get(
+            "cluster_tools_user_slice_limits", limits
+        )
+    out = {}
+    cpu = str(limits.get("CPUQuota", "")).strip()
+    if cpu.endswith("%"):
+        out["cpus"] = _whole(float(cpu[:-1]) / 100)
+    memory = re.fullmatch(r"(\d+(?:\.\d+)?)([KMGT])", str(limits.get("MemoryMax", "")).strip())
+    if memory:
+        out["memory_gib"] = _whole(float(memory.group(1)) * _SIZE_GIB[memory.group(2)])
+    if str(limits.get("TasksMax", "")).isdigit():
+        out["tasks"] = int(limits["TasksMax"])
+    return out
+
+
+def _whole(x):
+    return int(x) if float(x).is_integer() else round(x, 1)
+
+
 def bot(settings_):
     """{command, subcommands: [{name, help}]}: the one slash command and its subcommands
     in their order, each with its Korean help line (cluster_bot.commands)."""
@@ -335,7 +378,10 @@ def facts(config):
     s = settings(config)
     every = {
         "commands": commands(s.get("cluster_tools_builtin") or []),
-        "policy": {field: s.get(key) for field, key in POLICY.items()},
+        "policy": {
+            **{field: s.get(key) for field, key in POLICY.items()},
+            "interactive_team_qos": bool((s.get("slurm_job_submit_policy") or {}).get("interactive_gpu_qos")),
+        },
         "slurm": slurm_values(config),
         "dates": schedule(config),
         "quota": quota_limits(config, s),
@@ -343,6 +389,7 @@ def facts(config):
         "cluster": cluster(config),
         "chat": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "bot": bot(s),
+        "login": login_limits(config, s),
         "reports": {field: s.get(key) for field, key in REPORTS.items()},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }

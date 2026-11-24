@@ -52,6 +52,10 @@ class Facts(unittest.TestCase):
         self.assertEqual(every["policy"]["stale_days"], 30)
         self.assertEqual(every["policy"]["grace_days"], 14, "the role default where the site sets none")
         self.assertEqual(every["policy"]["cancel_after_hours"], 0, "the role's default: no cancel")
+        self.assertEqual(
+            every["policy"]["idle_notify"], ["mention"], "how idle owners are told, the role default"
+        )
+        self.assertEqual(every["policy"]["leave_grace_days"], 30, "a template over the site's stale_days")
         self.assertIsNone(every["chat"]["admin_group"], "a template is Ansible's to resolve")
         self.assertEqual(
             every["quotas"]["hosts"], {"node1": {"filesystems": {"/data": {"block_hard": "1T"}}}}
@@ -120,6 +124,43 @@ class Dates(unittest.TestCase):
         )
 
 
+class InteractiveTeamQos(unittest.TestCase):
+    def test_whether_gpu_sessions_must_name_a_team_qos_and_never_the_pattern(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            self.assertIs(
+                sf.facts(config)["policy"]["interactive_team_qos"], False, "the role default: no rule"
+            )
+            (config / "group_vars" / "slurm-cluster.yml").write_text(
+                'slurm_job_submit_policy: {interactive_gpu_qos: "^team_"}\n'
+            )
+            every = sf.facts(config)
+        self.assertIs(every["policy"]["interactive_team_qos"], True)
+        self.assertNotIn("^team_", json.dumps(sf.public(every)))
+
+
+class LoginLimits(unittest.TestCase):
+    def test_the_login_groups_user_slice_limits_as_people_read_them(self):
+        """The login nodes' per-person limits (cluster_tools_user_slice_limits in
+        group_vars/slurm-login.yml): CPUQuota in CPUs, MemoryMax in GiB, TasksMax."""
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            (config / "group_vars" / "slurm-login.yml").write_text(
+                'cluster_tools_user_slice_limits: {CPUQuota: "800%", MemoryMax: 64G, TasksMax: 4096, IOAccounting: "yes"}\n'
+            )
+            self.assertEqual(sf.facts(config)["login"], {"cpus": 8, "memory_gib": 64, "tasks": 4096})
+            (config / "group_vars" / "slurm-login.yml").write_text(
+                "cluster_tools_user_slice_limits: {CPUQuota: 250%, MemoryMax: 512M}\n"
+            )
+            self.assertEqual(
+                sf.facts(config)["login"], {"cpus": 2.5, "memory_gib": 0.5}, "an unset limit is left out"
+            )
+
+    def test_no_login_limits_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(sf.facts(site(tmp))["login"], {})
+
+
 class PublicAllowList(unittest.TestCase):
     def test_only_allowed_keys_and_fields_reach_the_public_file(self):
         every = {
@@ -131,6 +172,9 @@ class PublicAllowList(unittest.TestCase):
                 "idle_hours": 2,
                 "cancel_after_hours": 6,
                 "cancel_warn_hours": 1,
+                "idle_notify": ["mention"],
+                "leave_grace_days": 60,
+                "interactive_team_qos": True,
                 "extra": 1,
             },  # fmt: skip
             "chat": {"channels": {"admin": "#x"}, "admin_group": "@ops", "admin_group_id": "S0"},
@@ -151,6 +195,9 @@ class PublicAllowList(unittest.TestCase):
                 "idle_hours",
                 "cancel_after_hours",
                 "cancel_warn_hours",
+                "idle_notify",
+                "leave_grace_days",
+                "interactive_team_qos",
             },
         )
         self.assertEqual(out["chat"], {"channels": {"admin": "#x"}, "admin_group": "@ops"})
