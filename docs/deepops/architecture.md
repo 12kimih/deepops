@@ -97,6 +97,7 @@ reader writes `| default(...)` for a defined variable;
 ├── roles
 │   ├── ai_agent_rules
 │   ├── alertmanager
+│   ├── ara_server
 │   ├── autofs
 │   ├── bmc
 │   ├── build_record
