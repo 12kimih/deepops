@@ -39,6 +39,13 @@ _cluster_bot_cfg:
     url: "{{ (cluster_bot_connect.docs_url | regex_replace('/+$', '') ~ '/notices.json') if cluster_bot_connect.docs_url | length > 0 else '' }}"
     channel: "{{ slack_channels.announce }}"
     seen: "{{ _cluster_bot_home }}/notices-posted.json"
+    pinned: "{{ _cluster_bot_home }}/notices-pinned.json"
+  # Each channel's guide (cluster_bot.channels): purpose, topic, canvas and bookmarks,
+  # from the docs site's channels.json, for the channels slack_channels names.
+  guides:
+    url: "{{ (cluster_bot_connect.docs_url | regex_replace('/+$', '') ~ '/channels.json') if cluster_bot_connect.docs_url | length > 0 else '' }}"
+    channels: "{{ slack_channels }}"
+    state: "{{ _cluster_bot_home }}/channel-guides.json"
   connect: "{{ cluster_bot_connect }}"
   prefs_file: "{{ cluster_bot_prefs_file }}"
   github:

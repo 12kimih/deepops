@@ -51,6 +51,7 @@ COMMAND = Command(
     machine="--json",
     notes=NOTES,
     theme_env="QOS_THEME",
+    summary_ko="내가 잡을 낼 수 있는 QoS",
 )
 
 

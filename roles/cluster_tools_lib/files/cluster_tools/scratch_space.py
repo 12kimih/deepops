@@ -578,6 +578,7 @@ COMMAND = Command(
         "this looks at each file again, so one you just used shows as spared. Run as root\n"
         "from a timer: scratch-space CONFIG.json purge [--check]."
     ],
+    summary_ko="스크래치 공간에서 정리될 예정인 내 파일과 그 시점",
 )
 
 

@@ -18,7 +18,9 @@ seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
 log in, the account notice), dm_log {channel, state} (where the notices the bot sends a
 person by DM are logged for the administrators, cluster_tools.slack.DmLog; no channel
 logs none), notices {url, channel, seen} (the user docs' notices posted in the
-announcement channel on their date, cluster_bot.notices; no url posts none).
+announcement channel on their date, the newest pinned, cluster_bot.notices; no url
+posts none), guides {url, channels {role: name}, state} (each channel's purpose, topic,
+canvas and bookmarks, cluster_bot.channels; no url keeps none).
 
 Every DM goes through cluster_tools.slack.Slack.dm (the bot's own client posts only to
 channels): a notice (a decision on a request, a reminder, the account notice, a
@@ -38,6 +40,7 @@ from cluster_tools.slack import DmLog, Slack  # the cluster's library (PYTHONPAT
 from . import (
     accounts_blocks,
     bans_blocks,
+    channels as guides,
     commands,
     notices as docs_notices,
     data_blocks,
@@ -64,6 +67,7 @@ REMIND_EVERY = 3600
 BAN_WATCH_EVERY = 300
 DATA_WATCH_EVERY = 600
 NOTICES_EVERY = 900
+GUIDES_EVERY = 900
 
 
 def load(path):
@@ -614,9 +618,24 @@ def main(argv=None):
                 lambda text, blocks: dms.post(docs["channel"], text, blocks),
                 docs["seen"],
                 date.today().isoformat(),
+                pin=lambda ts: docs_notices.pin_latest(dms, docs["channel"], docs["pinned"], ts),
             )
 
         every(NOTICES_EVERY, "docs notices", notices_round)
+    kept = cfg.get("guides") or {}
+    if kept.get("url"):
+
+        def guides_round():
+            guides.round_(
+                lambda: docs_notices.fetch_json(kept["url"]),
+                dms,
+                kept["channels"],
+                kept["state"],
+                date.today().isoformat(),
+                lambda line: print(f"cluster-bot: channel guides: {line}", file=sys.stderr, flush=True),
+            )
+
+        every(GUIDES_EVERY, "channel guides", guides_round)
     SocketModeHandler(app, cfg["app_token"]).start()
 
 

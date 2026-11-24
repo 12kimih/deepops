@@ -72,6 +72,17 @@ class Round(unittest.TestCase):
         self.run_round("2026-03-01")
         self.assertEqual(self.posted, ["today", "later"])
 
+    def test_each_posted_notice_is_pinned_so_the_newest_stays(self):
+        self.run_round("2026-01-01")
+        pinned = []
+
+        def post(text, blocks):
+            self.posted.append(text)
+            return f"ts-{text}"
+
+        notices.round_(lambda: self.doc, post, self.seen, "2026-03-01", pin=pinned.append)
+        self.assertEqual(pinned, ["ts-today", "ts-later"])
+
     def test_a_malformed_notice_is_left_out(self):
         self.run_round("2026-01-01")
         self.doc["notices"] += [{"id": "x", "date": "2026-01-02"}, "junk"]

@@ -33,7 +33,13 @@ Facts:
             settings (SHARED_HF_HUB_CACHE: model_cache_hub) is resolved as Ansible would
   cluster   the nodes (CPUs, memory, GPUs) and partitions (their nodes, time limit) the
             site's slurm.conf template lists (private: the portal's overview page)
-  slack     the channels by purpose and the administrators' group (private)
+  chat      the Slack channels by purpose (slack_channels, {role: name}) and the
+            administrators' group handle (slack_admin_group): names people see in Slack
+            anyway; the group's ID stays private
+  bot       the cluster bot's slash command (cluster_bot_command) and its subcommands
+            with their Korean help, in order (cluster_bot.commands SUBCOMMANDS)
+  reports   when the status channel's reports run (systemd OnCalendar):
+            usage (slurm_usage_report_schedule), weekly, disk
   quotas    each host's disk_quota_filesystems and disk_quota_inodes_per_tib (private)
 
 A site value set in the config overrides a role default. A template is rendered (Jinja,
@@ -69,7 +75,7 @@ _spec.loader.exec_module(_user_env)
 # The only top-level keys the public file may carry, and under commands and policy the
 # only fields: what a user may read on a public site.
 PUBLIC = {
-    "commands": {"summary", "usage", "options"},
+    "commands": {"summary", "summary_ko", "usage", "options"},
     "policy": {
         "stale_days",
         "grace_days",
@@ -82,6 +88,14 @@ PUBLIC = {
     "dates": None,  # any name the site's schedule gives, its value a date
     "quota": None,  # each limited filesystem, its fields QUOTA_FIELDS
     "environment": {"name", "login", "job"},  # only entries whose values are paths or URLs
+    "chat": {"channels", "admin_group"},
+    "bot": {"command", "subcommands"},
+    "reports": {"usage", "weekly", "disk"},
+}
+REPORTS = {
+    "usage": "slurm_usage_report_schedule",
+    "weekly": "slurm_usage_report_weekly_schedule",
+    "disk": "slurm_usage_report_disk_schedule",
 }
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 QUOTA_FIELDS = {"block_hard_tib", "block_warn_tib", "inode_hard", "inode_warn"}
@@ -204,6 +218,7 @@ def commands(names):
         cmd = module.COMMAND
         out[name] = {
             "summary": cmd.summary,
+            "summary_ko": cmd.summary_ko,
             "usage": cmd.usage,
             "options": [
                 {"flags": list(o.flags), "metavar": o.metavar or "", "help": o.help}
@@ -302,6 +317,20 @@ def host_quotas(config):
     return out
 
 
+def bot(settings_):
+    """{command, subcommands: [{name, help}]}: the one slash command and its subcommands
+    in their order, each with its Korean help line (cluster_bot.commands)."""
+    spec = importlib.util.spec_from_file_location(
+        "cluster_bot_commands", ROOT / "roles/cluster_bot/files/cluster_bot/commands.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return {
+        "command": settings_.get("cluster_bot_command"),
+        "subcommands": [{"name": s.name, "help": s.ko} for s in module.SUBCOMMANDS],
+    }
+
+
 def facts(config):
     s = settings(config)
     every = {
@@ -312,7 +341,9 @@ def facts(config):
         "quota": quota_limits(config, s),
         "environment": environment(config),
         "cluster": cluster(config),
-        "slack": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
+        "chat": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
+        "bot": bot(s),
+        "reports": {field: s.get(key) for field, key in REPORTS.items()},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }
     return every
