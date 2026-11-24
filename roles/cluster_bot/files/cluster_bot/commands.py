@@ -46,7 +46,9 @@ NAMES = tuple(s.name for s in SUBCOMMANDS)
 # call: each Web API method the repository calls (cluster_bot, cluster_tools.slack and
 # the tools on it) maps to its scope here, and a test fails on a method missing here, so
 # importing the manifest into the existing app never drops one a feature needs. The
-# deploys call one too (roles/slack_defaults: usergroups.list), counted the same way.
+# deploys call one too (roles/slack_defaults: usergroups.list), counted the same way. A
+# method that needs one scope for public channels and another for private ones maps to
+# both (the administrators' channel may be private).
 API_SCOPES = {
     "chat.postMessage": "chat:write",
     "chat.postEphemeral": "chat:write",
@@ -54,6 +56,19 @@ API_SCOPES = {
     "chat.getPermalink": None,  # the link of a logged DM (cluster_tools.slack): no scope
     "conversations.open": "im:write",
     "pins.add": "pins:write",
+    "pins.remove": "pins:write",
+    # The channel guides (cluster_bot.channels) and the latest notice's pin (.notices).
+    "conversations.list": ("channels:read", "groups:read"),
+    "conversations.info": ("channels:read", "groups:read"),
+    "conversations.setPurpose": ("channels:write.topic", "groups:write.topic"),
+    "conversations.setTopic": ("channels:write.topic", "groups:write.topic"),
+    "conversations.canvases.create": "canvases:write",
+    "canvases.edit": "canvases:write",
+    "canvases.access.set": "canvases:write",
+    "bookmarks.list": "bookmarks:read",
+    "bookmarks.add": "bookmarks:write",
+    "bookmarks.edit": "bookmarks:write",
+    "bookmarks.remove": "bookmarks:write",
     "users.lookupByEmail": "users:read.email",
     "usergroups.list": "usergroups:read",
     "views.open": None,  # forms: the interactivity of a slash command, no scope
@@ -64,7 +79,14 @@ SCOPES = {
     "chat:write.public": "post in a channel the app was not invited to (the report channels)",
     "commands": f"the one slash command ({'/'.join(NAMES)})",
     "im:write": "open a DM to a person (notices, the bot's answers)",
-    "pins:write": "pin the live ban list in the administrators' channel",
+    "pins:write": "pin the live ban list in the administrators' channel, and the latest notice",
+    "channels:read": "find each guided channel's ID by its name, and its topic and canvas",
+    "groups:read": "the same for a private channel (the administrators')",
+    "channels:write.topic": "set each guided channel's purpose and topic (narrower than channels:manage)",
+    "groups:write.topic": "the same for a private channel",
+    "canvases:write": "each guided channel's canvas: create, replace, keep read-only",
+    "bookmarks:read": "see which of the bot's own bookmarks are still there",
+    "bookmarks:write": "keep each guided channel's bookmarks, the bot's own only",
     "users:read": "users.lookupByEmail needs it beside users:read.email",
     "users:read.email": "find a person's Slack member by <login>@<domain> when the roster has no ID",
     "usergroups:read": "find the administrators' user group's ID by its handle (roles/slack_defaults)",

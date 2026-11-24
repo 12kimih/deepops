@@ -38,14 +38,14 @@ CODE = [
 CODE = [p for p in CODE if p.suffix == ".py"]
 # The deploys' own calls (ansible.builtin.uri to slack.com/api/<method>).
 TASKS = [p for p in tracked("roles") if p.parent.name == "tasks" and p.suffix == ".yml"]
-FAMILIES = "chat|conversations|users|usergroups|pins|views|reactions|files|bookmarks|team|auth|apps"
+FAMILIES = "chat|conversations|users|usergroups|pins|views|reactions|files|bookmarks|canvases|team|auth|apps"
 
 
 def methods_called():
     found = set()
     for path in CODE:
         text = path.read_text()
-        found |= set(re.findall(rf"[\"']((?:{FAMILIES})\.[a-zA-Z]+)[\"']", text))
+        found |= set(re.findall(rf"[\"']((?:{FAMILIES})(?:\.[a-zA-Z]+)+)[\"']", text))
         for family, name in re.findall(rf"\bclient\.({FAMILIES})_([a-zA-Z]+)\(", text):
             found.add(f"{family}.{name}")
     for path in TASKS:
@@ -93,7 +93,12 @@ class Commands(unittest.TestCase):
         self.assertIn("chat.postMessage", called, "the scan finds calls")
         unknown = sorted(called - set(commands.API_SCOPES))
         self.assertEqual(unknown, [], "map each method the code calls to its scope in API_SCOPES")
-        needed = {s for m, s in commands.API_SCOPES.items() if m in called and s}
+        needed = {
+            scope
+            for m, s in commands.API_SCOPES.items()
+            if m in called and s
+            for scope in ((s,) if isinstance(s, str) else s)
+        }
         m = commands.manifest("/cluster", extra_scopes=["incoming-webhook"])
         scopes = set(m["oauth_config"]["scopes"]["bot"])
         self.assertLessEqual(needed, scopes)

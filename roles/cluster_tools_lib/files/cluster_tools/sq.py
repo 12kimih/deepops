@@ -117,6 +117,7 @@ COMMAND = Command(
         "--array": _SQUEUE, "--noheader": _SQUEUE, "--no-jobs": "the section switch is now --no-queue "
         "(-j/--jobs is squeue's job ID filter)",
     },
+    summary_ko="큐, 누가 무엇을 쓰는지, 파티션별 남은 자원",
 )  # fmt: skip
 
 

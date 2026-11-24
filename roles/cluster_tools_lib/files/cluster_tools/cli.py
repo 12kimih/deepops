@@ -167,7 +167,8 @@ def opt_json(help="the model as JSON, for scripts", **kw):
 
 
 class Command:
-    """NAME and SUMMARY head the help; OPTIONS are Opt; ENV names the defaults variable;
+    """NAME and SUMMARY head the help (SUMMARY_KO is the same line in Korean, for the
+    user docs and the Slack channel guides); OPTIONS are Opt; ENV names the defaults variable;
     MACHINE is the option whose output scripts read, which ignores ENV defaults; NOTES
     are extra paragraphs for --help, as text or as a function returning text; THEME_ENV
     pins a flavour for this command only, after $CLUSTER_THEME; REFUSE maps options this
@@ -184,8 +185,10 @@ class Command:
         usage=None,
         theme_env=None,
         refuse=None,
+        summary_ko="",
     ):
         self.name, self.summary, self.options = name, summary, list(options) + STYLE
+        self.summary_ko = summary_ko
         self.env, self.machine, self.notes = env, machine, list(notes)
         self.theme_env = theme_env
         self.refuse = dict(refuse or {})

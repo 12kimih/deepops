@@ -24,6 +24,20 @@ def site(tmp, all_yml="", host_vars=None):
 
 
 class Facts(unittest.TestCase):
+    def test_every_cluster_command_has_its_korean_summary(self):
+        """The user docs and the Slack channel guides list the commands in Korean."""
+        with tempfile.TemporaryDirectory() as tmp:
+            names = sf.settings(site(tmp)).get("cluster_tools_builtin")
+        self.assertTrue(names)
+        for name, c in sf.commands(names).items():
+            self.assertTrue(c["summary_ko"], f"{name}: Command(summary_ko=...)")
+
+    def test_the_bots_subcommands_in_order_with_their_korean_help(self):
+        out = sf.bot({"cluster_bot_command": "/c"})
+        self.assertEqual(out["command"], "/c")
+        self.assertEqual(out["subcommands"][-1]["name"], "help")
+        self.assertTrue(all(s["help"] for s in out["subcommands"]))
+
     def test_commands_come_from_their_one_definition(self):
         got = sf.commands(["sq"])["sq"]
         flags = [f for o in got["options"] for f in o["flags"]]
@@ -38,7 +52,7 @@ class Facts(unittest.TestCase):
         self.assertEqual(every["policy"]["stale_days"], 30)
         self.assertEqual(every["policy"]["grace_days"], 14, "the role default where the site sets none")
         self.assertEqual(every["policy"]["cancel_after_hours"], 0, "the role's default: no cancel")
-        self.assertIsNone(every["slack"]["admin_group"], "a template is Ansible's to resolve")
+        self.assertIsNone(every["chat"]["admin_group"], "a template is Ansible's to resolve")
         self.assertEqual(
             every["quotas"]["hosts"], {"node1": {"filesystems": {"/data": {"block_hard": "1T"}}}}
         )
@@ -119,7 +133,9 @@ class PublicAllowList(unittest.TestCase):
                 "cancel_warn_hours": 1,
                 "extra": 1,
             },  # fmt: skip
-            "slack": {"channels": {"admin": "#x"}},
+            "chat": {"channels": {"admin": "#x"}, "admin_group": "@ops", "admin_group_id": "S0"},
+            "bot": {"command": "/c", "subcommands": [], "token": "x"},
+            "reports": {"usage": "hourly", "weekly": "Mon", "disk": "daily", "host": "h"},
             "quotas": {"hosts": {"n": {}}},
             "anything_new": {"a": 1},
         }
@@ -137,10 +153,14 @@ class PublicAllowList(unittest.TestCase):
                 "cancel_warn_hours",
             },
         )
-        self.assertNotIn("slack", json.dumps(out))
+        self.assertEqual(out["chat"], {"channels": {"admin": "#x"}, "admin_group": "@ops"})
+        self.assertEqual(set(out["bot"]), {"command", "subcommands"})
+        self.assertEqual(set(out["reports"]), {"usage", "weekly", "disk"})
+        self.assertEqual(set(out["commands"]["sq"]) - {"summary_ko"}, {"summary", "usage", "options"})
 
     def test_the_allow_list_holds_nothing_private(self):
-        self.assertFalse({"slack", "quotas"} & set(sf.PUBLIC), "channels and limits stay in the private file")
+        self.assertFalse({"slack", "quotas"} & set(sf.PUBLIC), "limits stay in the private file")
+        self.assertEqual(sf.PUBLIC["chat"], {"channels", "admin_group"}, "the group's ID stays private")
 
 
 class Check(unittest.TestCase):
