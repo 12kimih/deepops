@@ -1,7 +1,14 @@
 ---
 # What NFS servers and clients share: the NFS utilities, the NFSv4 ID mapping domain and
-# the network buffers of the NFS data path.
+# the network buffers of the NFS data path; and a server's exports, which roles beside
+# roles/nfs read (roles/io_fairness shares the disks of the mounts its host exports).
 nfs_idmapd_domain: localdomain
+
+# This host's exports, each {path, options, clients}: options are the exports(5) flags
+# alone ("rw,sync,root_squash,no_subtree_check") and clients defaults to
+# nfs_export_clients (roles/nfs), so who may mount is set once. An options string that
+# already holds "client(...)" is written as is.
+nfs_exports: []
 
 # Network/socket-buffer tuning for the NFS data path, sized for a 100GbE+ cluster
 # fabric as the GENERAL default. Lower these in config/ for slower

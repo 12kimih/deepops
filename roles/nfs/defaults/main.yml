@@ -1,9 +1,5 @@
 ---
-# Each export is {path, options, clients}: options are the exports(5) flags alone
-# ("rw,sync,root_squash,no_subtree_check") and clients defaults to nfs_export_clients,
-# so who may mount is set once. An options string that already holds "client(...)"
-# is written as is.
-nfs_exports: []
+# The exports themselves (nfs_exports) are roles/nfs_common's: io_fairness reads them too.
 
 # Directories inside the exported trees the server keeps at a fixed owner and mode, so a
 # hand chmod never lasts: e.g. a shared scratch {path: /home/data, mode: "1777"} (sticky:

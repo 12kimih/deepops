@@ -92,12 +92,18 @@ def textfile(rows):
 
 
 def apply(cfg, reset=False, out=sys.stdout):
-    """Write every device; 1 if any could not be set or reads back otherwise."""
+    """Write every device; 1 if any could not be set or reads back otherwise. A reset
+    passes over a mount iocost cannot be set for: there is nothing of iocost's on it."""
     status, rows = 0, []
     for dev in cfg["devices"]:
         try:
             device = disk_of(dev["mount"], cfg["sys_root"])
-        except (OSError, Unusable) as e:
+        except Unusable as e:
+            # iocost was never on there, so a reset has nothing to give back.
+            print(f"io-fairness: {e}{'; nothing to reset' if reset else ''}", file=sys.stderr)
+            status = status if reset else 1
+            continue
+        except OSError as e:
             print(f"io-fairness: {e}", file=sys.stderr)
             status = 1
             continue

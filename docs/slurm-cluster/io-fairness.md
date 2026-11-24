@@ -89,3 +89,9 @@ model between 50 % and 150 % to do it.
 `slurm_enable_io_fairness: false` turns iocost off, gives each disk back the kernel's
 model and removes the slice weights. The model is written again at every boot
 (`io-fairness.service`), resolving each mount to its whole disk then.
+
+The models are keyed by mount, for the whole cluster (the I/O notices read them too);
+each NFS server (`slurm-nfs`) sets those of the mounts it exports itself
+(`nfs_exports`), since the same path on another server is an NFS mount of the first.
+A server with no measured export has nothing to share and goes without the component;
+the deploy names its unmeasured exports.

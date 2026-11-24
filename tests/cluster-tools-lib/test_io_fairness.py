@@ -125,6 +125,15 @@ class Apply(unittest.TestCase):
                 self.assertEqual(iocost.apply(cfg(tree, d), out=io.StringIO()), 1)
             self.assertEqual((tree.cg / "io.cost.model").read_text(), "")
 
+    def test_a_reset_passes_over_an_unusable_mount(self):
+        # iocost was never on there: an earlier config naming another host's mount
+        # must not keep the component from being removed.
+        with tempfile.TemporaryDirectory() as d:
+            tree = Tree(d)
+            with tree.on(0, 50):
+                self.assertEqual(iocost.apply(cfg(tree, d), reset=True, out=io.StringIO()), 0)
+            self.assertEqual((tree.cg / "io.cost.model").read_text(), "")
+
 
 class Config(unittest.TestCase):
     def load(self, **device):
