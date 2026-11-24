@@ -30,7 +30,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "scripts", "deepops")
 )
 from ara_server import answers as server_answers  # noqa: E402,F401  (tests reach it here)
-from ara_server import offline_note  # noqa: E402
+from ara_server import offline_note, serves_this_run  # noqa: E402
 
 # ara.api.models: CharField(max_length=255) for Playbook.path, File.path, Play.name, Task.name
 LIMIT = 255
@@ -74,9 +74,10 @@ class CallbackModule(AraCallbackModule):
         super().set_options(task_keys=task_keys, var_options=var_options, direct=direct)
         # ARA's offline client starts its database layer for every request, about 4 s a
         # task; its API server (roles/ara_server, on ARA's default address) does not. When
-        # nothing chose a client (offline is ARA's default) and that server answers, the
+        # nothing chose a client (offline is ARA's default), the run's database is the one
+        # the server serves (scripts/deepops/ara_server.py) and that server answers, the
         # run records through it; with no server it records offline, as before.
-        if self.client is not None and self.get_option("api_client") == "offline":
+        if self.client is not None and self.get_option("api_client") == "offline" and serves_this_run():
             server = self.get_option("api_server")
             if server_answers(server):
                 self.client = client_utils.get_client(client="http", endpoint=server)
