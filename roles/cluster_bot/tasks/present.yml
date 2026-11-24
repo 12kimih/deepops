@@ -5,7 +5,7 @@
   vars:
     component_record_name: cluster_bot
     component_record_action: begin
-    component_record_items: "{{ cluster_bot_items }}"
+    component_record_items: "{{ cluster_bot_record_items }}"
 
 - name: Require the pinned Slack libraries' hashes
   ansible.builtin.assert:
@@ -52,38 +52,27 @@
   become: true
   become_user: "{{ cluster_bot_user }}"
 
-- name: Write the pinned Slack libraries
-  ansible.builtin.copy:
-    dest: "{{ _cluster_bot_prefix }}/requirements.txt"
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      slack_bolt=={{ cluster_bot_slack_bolt_version }} --hash=sha256:{{ cluster_bot_sha256.slack_bolt[cluster_bot_slack_bolt_version] }}
-      slack_sdk=={{ cluster_bot_slack_sdk_version }} --hash=sha256:{{ cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] }}
-      ruamel.yaml=={{ cluster_bot_ruamel_yaml_version }} --hash=sha256:{{ cluster_bot_sha256.ruamel_yaml[cluster_bot_ruamel_yaml_version] }}
-  register: cluster_bot_requirements
-
-- name: Look for the bot's venv
-  ansible.builtin.stat:
-    path: "{{ _cluster_bot_venv }}/bin/python"
-  register: cluster_bot_venv_python
-
-# A new pin rebuilds the venv from scratch, so nothing of the old one stays.
+# A new pin rebuilds the venv from scratch (roles/python_venv).
 - name: Install the Slack libraries into the bot's venv
-  change_shell:
-    cmd: |
-      set -eu
-      umask 022
-      venv={{ _cluster_bot_venv | quote }}
-      rm -rf "$venv"
-      python3 -m venv "$venv"
-      "$venv/bin/pip" install --no-cache-dir --disable-pip-version-check --require-hashes \
-        --only-binary :all: -r {{ (_cluster_bot_prefix ~ '/requirements.txt') | quote }}
-  args:
-    executable: /bin/bash
-  when: cluster_bot_requirements is changed or not cluster_bot_venv_python.stat.exists
+  ansible.builtin.include_role:
+    name: python_venv
+    tasks_from: create
+  vars:
+    python_venv_path: "{{ _cluster_bot_venv }}"
+    python_venv_steps: "{{ _cluster_bot_venv_steps }}"
+
+- name: Restart the bot for its new venv
+  ansible.builtin.debug:
+    msg: The bot's venv was built; the bot restarts.
+  when: python_venv_built is changed
+  changed_when: true
   notify: Restart the cluster bot
+
+# Where the first deploys wrote the pins; they live in the venv now.
+- name: Remove the pins' earlier place
+  ansible.builtin.file:
+    path: "{{ _cluster_bot_prefix }}/requirements.txt"
+    state: absent
 
 - name: Install the bot's program
   ansible.builtin.copy:
@@ -228,4 +217,4 @@
   vars:
     component_record_name: cluster_bot
     component_record_action: present
-    component_record_items: "{{ cluster_bot_items }}"
+    component_record_items: "{{ cluster_bot_record_items }}"

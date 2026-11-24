@@ -7,5 +7,5 @@
   vars:
     component_record_name: cluster_bot
     component_record_action: absent
-    component_record_items: "{{ cluster_bot_items }}"
+    component_record_items: "{{ cluster_bot_record_items }}"
     component_record_exclusive_packages: []

@@ -8,7 +8,7 @@
   vars:
     component_record_name: easybuild
     component_record_action: begin
-    component_record_items: "{{ easybuild_items }}"
+    component_record_items: "{{ easybuild_record_items }}"
 
 - name: Refuse an EasyBuild version without its checksums
   ansible.builtin.assert:
@@ -21,14 +21,14 @@
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
-    name: [python3-venv, tar, gzip, bzip2, unzip, xz-utils, patch]
+    name: [tar, gzip, bzip2, unzip, xz-utils, patch]
     state: present
   when: ansible_facts.os_family == "Debian"
 
 - name: Install what EasyBuild needs (RedHat family)
   become: true
   ansible.builtin.dnf:
-    name: [python3, tar, gzip, bzip2, unzip, xz, patch]
+    name: [tar, gzip, bzip2, unzip, xz, patch]
     state: present
   when: ansible_facts.os_family == "RedHat"
 
@@ -82,31 +82,25 @@
     - "{{ sm_module_path }}/EasyBuild"
     - /etc/xdg/easybuild.d
 
-- name: Write the pinned requirements
-  become: true
-  ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "{{ easybuild_venv }}/{{ item }}"
-    owner: root
-    group: root
-    mode: "0644"
-  loop: [setuptools.txt, requirements.txt]
-
 # setuptools first: the sdists have only setup.py, and building them without isolation
-# keeps pip from fetching an unpinned setuptools.
+# keeps pip from fetching an unpinned setuptools. Rendered here: a template lookup in
+# the include's arguments would look in roles/python_venv.
+- name: Note EasyBuild's pinned requirements
+  ansible.builtin.set_fact:
+    _easybuild_venv_steps:
+      - {requirements: "{{ lookup('ansible.builtin.template', 'setuptools.txt.j2') }}", args: "--only-binary :all:"}
+      - {requirements: "{{ lookup('ansible.builtin.template', 'requirements.txt.j2') }}", args: --no-build-isolation}
+
 - name: Install EasyBuild into its venv
-  become: true
-  ansible.builtin.shell: |
-    set -eu
-    umask 022
-    venv={{ easybuild_venv | quote }}
-    {{ easybuild_python | quote }} -m venv "$venv"
-    pip=("$venv/bin/pip" install --no-cache-dir --disable-pip-version-check --require-hashes)
-    "${pip[@]}" --only-binary :all: -r "$venv/setuptools.txt"
-    "${pip[@]}" --no-build-isolation -r "$venv/requirements.txt"
-  args:
-    executable: /bin/bash
-    creates: "{{ easybuild_venv }}/bin/eb"
+  ansible.builtin.include_role:
+    name: python_venv
+    tasks_from: create
+    apply:
+      become: true
+  vars:
+    python_venv_path: "{{ easybuild_venv }}"
+    python_venv_python: "{{ easybuild_python }}"
+    python_venv_steps: "{{ _easybuild_venv_steps }}"
 
 - name: Write the EasyBuild modulefile
   become: true
@@ -154,5 +148,5 @@
   vars:
     component_record_name: easybuild
     component_record_action: present
-    component_record_items: "{{ easybuild_items }}"
+    component_record_items: "{{ easybuild_record_items }}"
     component_record_version: "{{ easybuild_version }}"

@@ -1,0 +1,13 @@
+---
+# python_venv -- one venv from hash-pinned requirements, for the roles that install a
+# Python program of their own (roles/cluster_bot, roles/easy-build). Not a component:
+# include tasks/create.yml with these set; the role records the venv with its own items
+# and adds `<python> | python_venv_items(os_family)` (the OS packages venv needs).
+
+# The venv's directory. Required.
+python_venv_path: ""
+# The interpreter that makes it.
+python_venv_python: python3
+# What goes into it, in order: [{requirements: <a requirements file's text, every line
+# hash-pinned>, args: <pip install options for it>}]. pip runs with --require-hashes.
+python_venv_steps: []
