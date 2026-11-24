@@ -181,11 +181,11 @@ class Links(unittest.TestCase):
 
 
 # nvidia-smi over files in $FAKE: "rows" answers --query-gpu (one CSV row per GPU),
-# "rc-<flag>" is the status of a setting call (-pl, -rac, -rgc, -rmc); each call is
+# "rc-query" the status of the query, "rc-<flag>" the status of a setting call (-pl, -rac, -rgc, -rmc); each call is
 # logged to "calls".
 NVIDIA_SMI = """#!/bin/sh
 echo "$*" >> "$FAKE/calls"
-case "$1" in --query-gpu=*) cat "$FAKE/rows"; exit 0 ;; esac
+case "$1" in --query-gpu=*) [ -f "$FAKE/rc-query" ] && exit "$(cat "$FAKE/rc-query")"; cat "$FAKE/rows"; exit 0 ;; esac
 flag="$3"; [ -f "$FAKE/rc$flag" ] && exit "$(cat "$FAKE/rc$flag")"
 exit 0
 """
@@ -238,10 +238,19 @@ class Gpus(unittest.TestCase):
         self.assertEqual(rows["gpu/clock_lock"], (1, 1, 0))
         self.assertEqual(self.calls(), ["-i 0 -pl 250", "-i 0 -rac", "-i 0 -rgc", "-i 0 -rmc"])
 
-    def test_a_cap_above_the_default_is_no_target(self):
-        self.cap.write_text("NVIDIA_POWER_LIMIT_WATTS=450\n")
-        self.rows(self.card("0", pl="300.00"))
+    def test_a_cap_above_the_default_is_the_target(self):
+        # roles/nvidia_power_limit keeps the cap within the card's range, above its
+        # default too: holding the default would undo it every run.
+        self.cap.write_text("NVIDIA_POWER_LIMIT_WATTS=350\n")
+        self.rows(self.card("0", pl="350.00"))
         self.assertEqual(self.run_gpus(fix=True)[0]["gpu/power_limit"], (1, 0, 0))
+        self.rows(self.card("0", pl="300.00"))
+        self.assertEqual(self.run_gpus(fix=True)[0]["gpu/power_limit"], (1, 1, 0))
+
+    def test_a_driver_without_gpus_has_no_gpu_settings(self):
+        (self.d / "rc-query").write_text("6")  # No devices were found
+        rows, _ = self.run_gpus(fix=True)
+        self.assertEqual(rows["gpu/power_limit"], (0, 0, 0))
 
     def test_persistence_is_reported_never_set_and_a_failed_call_is_refused(self):
         (self.d / "rc-pl").write_text("1")

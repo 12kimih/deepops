@@ -1,4 +1,8 @@
 ---
+# The program as its unit runs it, outside the deploy's SSH session: on a node whose
+# GPUs are hidden from SSH (roles/slurm: login GPU hiding) nvidia-smi there finds none,
+# and every GPU setting would read as off (review 2026-11-24).
+_power_policy_outside_session: [systemd-run, --wait, --pipe, --collect, --quiet, --]
 _power_policy_textfile: "{{ node_exporter_prom_dir }}/power-policy.prom"
 # The program's configuration, as cluster_tools.power_policy reads it.
 _power_policy_cfg:
