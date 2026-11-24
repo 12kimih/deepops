@@ -19,8 +19,9 @@ groups:
             A sysfs setting the kernel refuses is the firmware's (ASPM, a BIOS power
             profile): set its performance profile in the BIOS or BMC.
       # Four runs in a row each found it off and set it back.
+      # Refused ones are PowerPolicyRefused's: off, but nothing set them back.
       - alert: PowerPolicyKeepsBeingReset
-        expr: power_policy_off > 0
+        expr: power_policy_off - power_policy_refused > 0
         for: 50m
         labels: {severity: warning}
         annotations:

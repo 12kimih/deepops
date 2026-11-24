@@ -1105,10 +1105,15 @@ tests:
   - name: a power setting refused, one kept being reset, and the runs stopping
     interval: 1m
     input_series:
-      - series: 'power_policy_refused{host="n1", instance="n1:9100", setting="module/pcie_aspm/parameters/policy"}'
+      - series: 'power_policy_refused{host="n1", instance="n1:9100", setting="pcie/aspm"}'
         values: '1x40'
       - series: 'power_policy_off{host="n1", instance="n1:9100", setting="devices/system/cpu/cpu*/cpufreq/scaling_governor"}'
         values: '0x10 1x60'
+      - series: 'power_policy_refused{host="n1", instance="n1:9100", setting="devices/system/cpu/cpu*/cpufreq/scaling_governor"}'
+        values: '0x80'
+      # Off and refused alike (the firmware keeps it): PowerPolicyRefused's, not a reset.
+      - series: 'power_policy_off{host="n1", instance="n1:9100", setting="pcie/aspm"}'
+        values: '1x80'
       - series: 'power_policy_last_success_timestamp_seconds{host="n1", instance="n1:9100"}'
         values: '0x80'
     alert_rule_test:
@@ -1118,9 +1123,9 @@ tests:
       - eval_time: 31m
         alertname: PowerPolicyRefused
         exp_alerts:
-          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", setting: module/pcie_aspm/parameters/policy}
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", setting: pcie/aspm}
             exp_annotations:
-              summary: "n1 will not hold module/pcie_aspm/parameters/policy at full performance"
+              summary: "n1 will not hold pcie/aspm at full performance"
               description: >-
                 `power-policy check /etc/power-policy.json` on n1 lists what each holds. A gpu/
                 setting: gpu/persistence is nvidia-persistenced's (`systemctl status

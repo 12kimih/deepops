@@ -23,8 +23,10 @@ power_policy_settings:
   - {path: devices/system/cpu/cpu*/cpufreq/energy_performance_preference, value: performance}
   - {path: devices/system/cpu/intel_pstate/no_turbo, value: "0"}
   - {path: devices/system/cpu/cpufreq/boost, value: "1"}
-  # PCIe links (GPUs, NICs, NVMe) stay in L0: no ASPM power states on the way to a GPU.
-  - {path: module/pcie_aspm/parameters/policy, value: performance}
+  # PCIe links (GPUs, NICs, NVMe) are not a setting here: the program reads each link's
+  # own ASPM state and turns it off where the kernel controls it (pcie/aspm). The
+  # kernel's policy file is not their state, and where the firmware keeps ASPM it
+  # refuses every write (ARA 285, every host here).
   # SATA links at full power (no link power management).
   - {path: class/scsi_host/host*/link_power_management_policy, value: max_performance}
 # The same at boot, before userspace: the governor and the ASPM policy from the first
