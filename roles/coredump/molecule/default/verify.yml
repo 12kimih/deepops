@@ -16,6 +16,16 @@
         src: /etc/ansible/facts.d/deepops_components.fact
       register: coredump_record
 
+    - name: Read the hold on apport's coredump hook
+      ansible.builtin.stat:
+        path: /etc/systemd/system/systemd-coredump@.service.d/apport-coredump-hook.conf
+      register: coredump_hook_mask
+
+    - name: Check apport's coredump hook is held off where apport ships it
+      ansible.builtin.assert:
+        that: coredump_hook_mask.stat.islnk and coredump_hook_mask.stat.lnk_source == '/dev/null'
+        quiet: true
+
     - name: Check systemd-coredump replaced apport's core handler and apport stayed
       ansible.builtin.assert:
         that:

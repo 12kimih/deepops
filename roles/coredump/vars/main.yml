@@ -15,6 +15,14 @@ coredump_sysctl_file: "{{ deepops_sysctl_prefix }}coredump.conf"
 # ulimit -c decides again, as core(5) has it.
 coredump_core_pattern: "|/usr/lib/systemd/systemd-coredump %P %u %g %s %t %c %h %d"
 
+# apport's own drop-in (its package's, under /usr/lib) chains apport-coredump-hook@ to every
+# systemd-coredump run (OnSuccess=), which writes an apport report to /var/crash: a
+# second crash handler behind this one, whose failures on users' programs each left a
+# failed unit and an alert (gpu2, gpu4, 2026-11-23/24). A drop-in of the same name in
+# /etc, linked to /dev/null, keeps systemd from applying it (systemd.unit(5)); the
+# package's file stays as shipped.
+coredump_apport_hook_dropin: /etc/systemd/system/systemd-coredump@.service.d/apport-coredump-hook.conf
+
 # What this component installs, for its record (roles/component_record).
 coredump_items: >-
   {{ coredump_packages | map('regex_replace', '^', 'package:') | list

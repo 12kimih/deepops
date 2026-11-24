@@ -9,7 +9,10 @@ reload their own way. Here a drop-in is one task:
 
   path:          the drop-in file, <directory>/<unit>.d/<name>.conf
   content:       its text (state present)
-  state:         present (default) or absent; absent also removes the directory once
+  state:         present (default), masked or absent. masked links the path to
+                 /dev/null: a package's drop-in of the same name (under /usr/lib) is
+                 then not applied, as systemd.unit(5) has it, with the package's
+                 file left as shipped. absent also removes the directory once
                  nothing else is in it (a site's own drop-ins stay, and so does it)
   daemon_reload: true (default): systemd reloads when the file changed, so the next
                  start or restart (a handler the task notifies) sees it
@@ -39,12 +42,12 @@ def check(args):
     path, state = str(args.get("path", "")), args.get("state", "present")
     if not DROPIN.match(path):
         return f"path is a unit's drop-in, <directory>/<unit>.d/<name>.conf, not {path!r}"
-    if state not in ("present", "absent"):
-        return f"state is present or absent, not {state!r}"
+    if state not in ("present", "masked", "absent"):
+        return f"state is present, masked or absent, not {state!r}"
     if state == "present" and "content" not in args:
         return "state present needs content"
-    if state == "absent" and "content" in args:
-        return "state absent takes no content"
+    if state != "present" and "content" in args:
+        return f"state {state} takes no content"
     return ""
 
 
@@ -77,6 +80,17 @@ class ActionModule(ActionBase):
         result["changed"] = bool(result.get("changed") or made.get("changed"))
         return result
 
+    def _mask(self, path, task_vars):
+        """The path, after its directory is made, a link to /dev/null."""
+        made = self._module(
+            "file", {"path": os.path.dirname(path), "state": "directory", "mode": "0755"}, task_vars
+        )
+        result = self._module(
+            "file", {"path": path, "src": "/dev/null", "state": "link", "force": True}, task_vars
+        )
+        result["changed"] = bool(result.get("changed") or made.get("changed"))
+        return result
+
     def _remove(self, path, task_vars):
         """The file's removal, then its directory's when nothing else is in it."""
         result = self._module("file", {"path": path, "state": "absent"}, task_vars)
@@ -101,8 +115,11 @@ class ActionModule(ActionBase):
         if refused:
             raise AnsibleActionFail(f"systemd_dropin: {refused}")
         path = str(args["path"])
-        if args.get("state", "present") == "present":
+        state = args.get("state", "present")
+        if state == "present":
             result.update(self._write(path, str(args["content"]), task_vars))
+        elif state == "masked":
+            result.update(self._mask(path, task_vars))
         else:
             result.update(self._remove(path, task_vars))
         if result.get("failed"):

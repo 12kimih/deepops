@@ -42,6 +42,22 @@
     mode: "0644"
   when: coredump_settings | length > 0
 
+# Wherever Ubuntu's apport could ship the hook: a hold on a drop-in no package ships
+# changes nothing, so apport installed later is held off as well.
+- name: Keep apport's coredump hook from running after systemd-coredump
+  systemd_dropin:
+    path: "{{ coredump_apport_hook_dropin }}"
+    state: masked
+  when: ansible_facts.os_family == 'Debian'
+
+# Failures the hook left before it was held off: theirs alone, nothing else's; each
+# would alert until the next boot.
+- name: Clear the failures apport's coredump hook left
+  ansible.builtin.command: systemctl reset-failed apport-coredump-hook@*.service
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == 'Debian'
+
 - name: Record the component as present
   ansible.builtin.include_role:
     name: component_record
