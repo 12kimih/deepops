@@ -9,3 +9,9 @@ _cluster_tools_lib_config_code: >-
 cluster_tools_lib_config_validate: >-
   {{ [cluster_tools_lib_python, '-I', '-c', _cluster_tools_lib_config_code, cluster_tools_lib_dir, 'check']
      | map('quote') | join(' ') }}
+# The package's releases on each host (tasks/release.yml) and the tool that unpacks and
+# switches them, kept beside them; the controller's built archives, named by content.
+_cluster_tools_lib_releases: "{{ cluster_tools_lib_dir }}/releases"
+_cluster_tools_lib_release_tool: "{{ cluster_tools_lib_dir }}/release.py"
+_cluster_tools_lib_release_dir: "{{ _cluster_tools_lib_releases }}/{{ cluster_tools_lib_release.hash }}"
+_cluster_tools_lib_build_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.cache/deepops/cluster-tools"

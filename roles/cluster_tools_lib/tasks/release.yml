@@ -1,0 +1,83 @@
+---
+# The cluster_tools package as one release (files/release.py): one archive, built once
+# on the controller, compared by checksum on each host, unpacked into its own release
+# directory when new, checked against the recorded tool configs (tasks/configs.yml),
+# then made live by one atomic switch of the package path. Unchanged, a host costs a
+# checksum, not a copy of every module.
+- name: Build the package's release on the controller
+  ansible.builtin.command:
+    argv: "{{ [ansible_playbook_python, role_path ~ '/files/release.py', 'build', _cluster_tools_lib_build_dir]
+              + cluster_tools_lib_modules }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: false
+  check_mode: false  # a file on the controller, named by its content
+  register: cluster_tools_lib_built
+
+- name: Name the release
+  ansible.builtin.set_fact:
+    cluster_tools_lib_release: "{{ cluster_tools_lib_built.stdout | from_json }}"
+
+# Made by the deploy's user, root on a host (a test runs it as itself): no chown.
+- name: Create the library and its releases directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: ["{{ cluster_tools_lib_dir }}", "{{ _cluster_tools_lib_releases }}"]
+
+- name: Install the release tool
+  ansible.builtin.copy:
+    src: release.py
+    dest: "{{ _cluster_tools_lib_release_tool }}"
+    mode: "0644"
+
+# The release itself is not the live package: a preview unpacks it too, so that the
+# recorded configs are checked against what the run would publish.
+- name: Copy the release archive
+  ansible.builtin.copy:
+    src: "{{ cluster_tools_lib_release.path }}"
+    dest: "{{ _cluster_tools_lib_releases }}/{{ cluster_tools_lib_release.path | basename }}"
+    mode: "0644"
+  check_mode: false
+
+- name: Unpack the release
+  ansible.builtin.command:
+    argv: ["{{ cluster_tools_lib_python }}", -I, "{{ _cluster_tools_lib_release_tool }}", unpack,
+           "{{ _cluster_tools_lib_releases }}/{{ cluster_tools_lib_release.path | basename }}",
+           "{{ _cluster_tools_lib_release_dir }}"]
+    creates: "{{ _cluster_tools_lib_release_dir }}/cluster_tools"
+  check_mode: false
+
+# Before the switch: the roles of this play write and validate their own configs; a
+# site deploy checks once at its end instead, when every role has run.
+- name: Check the recorded tool configs against the release
+  ansible.builtin.include_tasks: configs.yml
+  vars:
+    cluster_tools_lib_configs_skip: "{{ ansible_play_role_names }}"
+  when: deepops_site_run is not defined
+
+- name: Read where the live package points
+  ansible.builtin.stat:
+    path: "{{ cluster_tools_lib_dir }}/cluster_tools"
+    get_checksum: false
+  register: cluster_tools_lib_live
+
+# KEEP is the release the live path held, kept for a rollback; the first switch replaces
+# the package's earlier real directory, so there is none.
+- name: Make the release the live package
+  change_command:
+    argv: ["{{ cluster_tools_lib_python }}", -I, "{{ _cluster_tools_lib_release_tool }}", switch,
+           "{{ cluster_tools_lib_dir }}/cluster_tools", "{{ _cluster_tools_lib_release_dir }}",
+           "{{ (cluster_tools_lib_live.stat.lnk_target | default('')) | dirname | basename }}"]
+  register: cluster_tools_lib_switched
+  when: >-
+    not (cluster_tools_lib_live.stat.islnk | default(false))
+    or cluster_tools_lib_live.stat.lnk_target != _cluster_tools_lib_release_dir ~ '/cluster_tools'
+
+# For a service that imports the package and so runs the old one until restarted
+# (roles/cluster_bot).
+- name: Record whether the package changed
+  ansible.builtin.set_fact:
+    cluster_tools_lib_changed: "{{ cluster_tools_lib_switched is changed }}"
