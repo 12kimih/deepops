@@ -273,6 +273,34 @@
     state: absent
   when: cluster_tools_user_slice_limits | length == 0
 
+# The administrators' own slices, over the users' limits (cluster_tools_user_slice_exempt_uids):
+# the same file name in user-<uid>.slice.d takes precedence over user-.slice.d's.
+- name: Lift the per-user limits for the administrators
+  vars:
+    _exempt: "{{ cluster_tools_user_slice_exempt_uids if cluster_tools_user_slice_limits | length > 0 else [] }}"
+    _exempt_dirs: "{{ _exempt | map('string') | map('regex_replace', '^', 'user-') | map('regex_replace', '$', '.slice.d') | list }}"
+  block:
+    - name: Write the administrators' drop-ins
+      systemd_dropin:
+        path: "/etc/systemd/system/{{ item }}/{{ cluster_tools_user_slice_file }}"
+        content: "{{ lookup('ansible.builtin.template', 'user-slice-exempt.conf.j2') }}"
+      loop: "{{ _exempt_dirs }}"
+
+    - name: Find the per-uid drop-in directories
+      find_present:
+        paths: /etc/systemd/system
+        patterns: "user-*.slice.d"
+        file_type: directory
+      register: _cluster_tools_exempt_found
+
+    - name: Remove the drop-ins of people no longer exempt
+      systemd_dropin:
+        path: "/etc/systemd/system/{{ item }}/{{ cluster_tools_user_slice_file }}"
+        state: absent
+      loop: >-
+        {{ _cluster_tools_exempt_found.files | map(attribute='path') | map('basename')
+           | select('match', '^user-[0-9]+[.]slice[.]d$') | difference(_exempt_dirs) | list }}
+
 # cron's PAM stack has no pam_systemd, so a cron job runs in cron.service, outside
 # every user's slice and its limits: a server started from @reboot ran unlimited
 # there. With pam_systemd, each job gets a session in its owner's slice, like a login.

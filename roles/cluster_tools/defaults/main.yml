@@ -104,4 +104,11 @@ cluster_tools_motd_news: true
 # their owner's slice under the same limits instead of in cron.service.
 cluster_tools_user_slice_limits: {}
 cluster_tools_user_slice_dir: /etc/systemd/system/user-.slice.d
+# The administrators run the cluster's tooling from their own sessions (deploys, the
+# repository's checks, several agent sessions at once) and are not held to the users'
+# limits: under 8 cores the operator's own shell stalled while their checks queued
+# (2026-11-24). Each uid gets its own drop-in under user-<uid>.slice.d with the same
+# file name, which systemd applies over the user-.slice.d one: no CPU quota, no memory
+# or task ceiling. The roster's admins by default; [] holds everyone to the limits.
+cluster_tools_user_slice_exempt_uids: "{{ people | default({}) | people_uids('admin') }}"
 cluster_tools_user_slice_file: 50-limits.conf

@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+# An administrator's own slice (roles/cluster_tools, cluster_tools_user_slice_exempt_uids):
+# the users' limits of user-.slice.d lifted, each to "no limit"; accounting stays.
+[Slice]
+{% for name, value in cluster_tools_user_slice_limits | dictsort %}
+{% if name.endswith('Accounting') %}
+{{ name }}={{ value }}
+{% elif name == 'CPUQuota' %}
+{{ name }}=
+{% else %}
+{{ name }}=infinity
+{% endif %}
+{% endfor %}
