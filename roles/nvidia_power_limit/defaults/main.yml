@@ -30,10 +30,6 @@ nvidia_power_limit_watts: ""    # e.g. 450
 #     "NVIDIA A30": 150
 nvidia_power_limit_watts_by_model: {}
 
-# Name of the systemd unit installed under /etc/systemd/system/. It re-applies the cap
-# on every boot (nvidia-smi resets the power limit to the card default across a reboot
-# or driver reload), so the setting survives reboots.
-nvidia_power_limit_service_name: "nvidia-power-limit.service"
 
 # The wattage's node-side file, nvidia_power_limit_conf_file, is in roles/deepops_paths:
 # the Slurm prolog/epilog reads the cap back from it too.

@@ -216,7 +216,6 @@ STUB
     # fixture instead.
     mkdir -p "$dir/log"
     sed -i "s#/var/log/slurm/prolog-epilog#$dir/log/prolog-epilog#" "$dir/run-parts.sh"
-    sed -i "s#/run/slurm-exclusive#$dir/run#g" "$dir/run-parts.sh"
 
     # A marker script that records whether it ran. The -lastuserjob- infix is
     # what run-parts.sh gates on.
@@ -1104,18 +1103,13 @@ else
     else
         no "node-wide parts follow Slurm's Exclusive field" "NODE=$node NO=$shared USER=$user failed=$failed"
     fi
-    # The prolog records exclusivity; the epilog undoes by that record, not a new lookup.
-    rm -rf "$dir/run"
-    pro=$(runx env SLURM_SCRIPT_CONTEXT=prolog_slurmd SQUEUE_EXCLUSIVE=NODE)
-    recorded=$([ -e "$dir/run/job-1000" ] && echo yes || echo no)
-    epi=$(runx env SLURM_SCRIPT_CONTEXT=epilog_slurmd SQUEUE_EXCLUSIVE=NODE SQUEUE_EXCLUSIVE_RC=1)
-    consumed=$([ -e "$dir/run/job-1000" ] && echo no || echo yes)
-    norec=$(runx env SLURM_SCRIPT_CONTEXT=epilog_slurmd SQUEUE_EXCLUSIVE=NODE)
-    if [ "$pro/$recorded/$epi/$consumed/$norec" = "ran/yes/ran/yes/skipped" ]; then
-        ok "the epilog undoes what the prolog recorded, even when squeue fails, and only then"
+    # Each context asks for itself: the epilog too, and a failed squeue there skips.
+    epi=$(runx env SLURM_SCRIPT_CONTEXT=epilog_slurmd SQUEUE_EXCLUSIVE=NODE)
+    epifail=$(runx env SLURM_SCRIPT_CONTEXT=epilog_slurmd SQUEUE_EXCLUSIVE=NODE SQUEUE_EXCLUSIVE_RC=1)
+    if [ "$epi/$epifail" = "ran/skipped" ] && ! grep -q 'exclusive_record' "$dir/run-parts.sh"; then
+        ok "the epilog asks Slurm itself; no record of a prolog's change is kept"
     else
-        no "the epilog undoes what the prolog recorded, even when squeue fails, and only then" \
-           "prolog=$pro recorded=$recorded epilog=$epi consumed=$consumed no-record=$norec"
+        no "the epilog asks Slurm itself; no record of a prolog's change is kept" "epilog=$epi failed-squeue=$epifail"
     fi
     if grep -q 'squeue_timeout' "$dir/run-parts.sh" && grep -q -- '-O Exclusive' "$dir/run-parts.sh" \
        && ! grep -q '"%h"' "$dir/run-parts.sh"; then

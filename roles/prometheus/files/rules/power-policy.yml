@@ -13,9 +13,11 @@ groups:
           summary: "{{ $labels.host }} will not hold {{ $labels.setting }} at full performance"
           description: >-
             `power-policy check /etc/power-policy.json` on {{ $labels.host }}
-            lists the files and what they hold. The firmware owns a setting the kernel
-            refuses (ASPM, a BIOS power profile): set its performance profile in the
-            BIOS or BMC.
+            lists what each holds. A gpu/ setting: gpu/persistence is
+            nvidia-persistenced's (`systemctl status nvidia-persistenced`), the others
+            are what nvidia-smi refused (`journalctl -u power-policy` says which call).
+            A sysfs setting the kernel refuses is the firmware's (ASPM, a BIOS power
+            profile): set its performance profile in the BIOS or BMC.
       # Four runs in a row each found it off and set it back.
       - alert: PowerPolicyKeepsBeingReset
         expr: power_policy_off > 0
@@ -25,8 +27,8 @@ groups:
           summary: "Something keeps changing {{ $labels.setting }} on {{ $labels.host }}"
           description: >-
             Every run of power-policy sets it back (`journalctl -u power-policy` on {{
-            $labels.host }} lists each). Find what writes it: a job script, a tuned or
-            power-profiles daemon, a package's unit.
+            $labels.host }} lists each). Find what writes it: a job script (nvidia-smi
+            -pl, -ac, -lgc in a job), a tuned or power-profiles daemon, a package's unit.
       - alert: PowerPolicyStale
         expr: time() - power_policy_last_success_timestamp_seconds > 3600
         labels: {severity: warning}

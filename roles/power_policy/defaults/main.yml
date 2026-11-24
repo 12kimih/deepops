@@ -5,12 +5,16 @@
 # minimum for days (powersave, left by a Slurm epilog part) and a GPU job's feeding
 # thread ran five times slower (2026-11-24).
 #
-# One program sets each setting below at every boot (before nvidia-persistenced and
+# One program sets each setting below at every boot (after the GPUs' own units, before
 # slurmd) and again every power_policy_interval, so anything that changes one (a job,
 # a package, a firmware event) is put back; it writes what it found and fixed as
 # textfile metrics, and roles/prometheus alerts on settings it cannot set or keeps
 # having to set (cluster_tools.power_policy). Each path is a glob under /sys; a path
-# absent on a host (no SATA host, no intel_pstate) is no setting there.
+# absent on a host (no SATA host, no intel_pstate) is no setting there. Where
+# nvidia-smi is, every GPU is held too: persistence mode on (nvidia-persistenced's,
+# reported), the power limit at roles/nvidia_power_limit's cap or the card default,
+# default application clocks, no clock lock. No job changes a device's state: the
+# Slurm prolog and epilog have no part that does (2026-11-24).
 power_policy_state: present
 power_policy_settings:
   # CPU: the performance governor, the hardware hint to match (intel_pstate active or

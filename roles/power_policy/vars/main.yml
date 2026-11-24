@@ -5,6 +5,9 @@ _power_policy_cfg:
   sys_root: /sys
   textfile: "{{ _power_policy_textfile }}"
   settings: "{{ power_policy_settings }}"
+  gpu:
+    nvidia_smi: nvidia-smi
+    power_cap_file: "{{ nvidia_power_limit_conf_file }}"
 # What this component installs, for its record (roles/component_record): the timer
 # before its files.
 power_policy_items:

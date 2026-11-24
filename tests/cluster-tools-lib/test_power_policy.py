@@ -3,6 +3,8 @@ and reports. sysfs is a stand-in directory."""
 
 import io
 import json
+import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -123,6 +125,93 @@ class Apply(unittest.TestCase):
             self.assertEqual(policy.apply(self.tree.cfg, out=io.StringIO(), now=1), 1)
         self.assertIn("the kernel keeps powersave (Operation not permitted), not performance", err.getvalue())
         self.assertEqual(self.tree.metrics()[prom.key("power_policy_refused", setting=GOVERNOR)], 1)
+
+
+# nvidia-smi over files in $FAKE: "rows" answers --query-gpu (one CSV row per GPU),
+# "rc-<flag>" is the status of a setting call (-pl, -rac, -rgc, -rmc); each call is
+# logged to "calls".
+NVIDIA_SMI = """#!/bin/sh
+echo "$*" >> "$FAKE/calls"
+case "$1" in --query-gpu=*) cat "$FAKE/rows"; exit 0 ;; esac
+flag="$3"; [ -f "$FAKE/rc$flag" ] && exit "$(cat "$FAKE/rc$flag")"
+exit 0
+"""
+ROW = "{i}, {pm}, {pl}, 300.00, {ag}, 2490, {am}, 9001, {lock}\n"
+
+
+class Gpus(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        d = Path(self.dir.name)
+        (d / "bin").mkdir()
+        smi = d / "bin" / "nvidia-smi"
+        smi.write_text(NVIDIA_SMI)
+        smi.chmod(smi.stat().st_mode | stat.S_IEXEC)
+        self.cap = d / "nvidia-power-limit.conf"
+        self.gpu = {"nvidia_smi": str(smi), "power_cap_file": str(self.cap)}
+        patcher = mock.patch.dict(os.environ, {"FAKE": str(d)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.d = d
+
+    def rows(self, *gpus):
+        (self.d / "rows").write_text("".join(ROW.format(**g) for g in gpus))
+
+    def card(self, i, pm="Enabled", pl="300.00", ag="2490", am="9001", lock="Not Active"):
+        return {"i": i, "pm": pm, "pl": pl, "ag": ag, "am": am, "lock": lock}
+
+    def calls(self):
+        f = self.d / "calls"
+        return [c for c in f.read_text().splitlines() if not c.startswith("--query")] if f.exists() else []
+
+    def run_gpus(self, fix):
+        with mock.patch("sys.stderr", io.StringIO()) as err:
+            rows = policy.run_gpus(self.gpu, fix=fix, out=io.StringIO())
+        return {r[0]: r[1:] for r in rows}, err.getvalue()
+
+    def test_a_gpu_at_the_policy_is_left_alone(self):
+        self.rows(self.card("0"), self.card("1"))
+        rows, _ = self.run_gpus(fix=True)
+        self.assertEqual(rows["gpu/power_limit"], (2, 0, 0))
+        self.assertEqual(self.calls(), [])
+
+    def test_the_cap_file_is_the_target_and_what_is_off_is_set_back(self):
+        self.cap.write_text("NVIDIA_POWER_LIMIT_WATTS=250\n")
+        self.rows(self.card("0", pl="300.00", ag="1500", lock="Active"))
+        rows, _ = self.run_gpus(fix=True)
+        self.assertEqual(rows["gpu/power_limit"], (1, 1, 0))
+        self.assertEqual(rows["gpu/application_clocks"], (1, 1, 0))
+        self.assertEqual(rows["gpu/clock_lock"], (1, 1, 0))
+        self.assertEqual(self.calls(), ["-i 0 -pl 250", "-i 0 -rac", "-i 0 -rgc", "-i 0 -rmc"])
+
+    def test_a_cap_above_the_default_is_no_target(self):
+        self.cap.write_text("NVIDIA_POWER_LIMIT_WATTS=450\n")
+        self.rows(self.card("0", pl="300.00"))
+        self.assertEqual(self.run_gpus(fix=True)[0]["gpu/power_limit"], (1, 0, 0))
+
+    def test_persistence_is_reported_never_set_and_a_failed_call_is_refused(self):
+        (self.d / "rc-pl").write_text("1")
+        (self.d / "rc-rmc").write_text("3")  # not supported here: nothing to put back
+        self.rows(self.card("0", pm="Disabled", pl="250.00", lock="Active"))
+        rows, err = self.run_gpus(fix=True)
+        self.assertEqual(rows["gpu/persistence"], (1, 1, 1))
+        self.assertEqual(rows["gpu/power_limit"], (1, 1, 1))
+        self.assertEqual(rows["gpu/clock_lock"], (1, 1, 0))
+        self.assertIn("nvidia-persistenced keeps it", err)
+        self.assertNotIn("-pm", " ".join(self.calls()))
+
+    def test_check_lists_and_sets_nothing(self):
+        self.rows(self.card("0", ag="1500"))
+        out = io.StringIO()
+        policy.run_gpus(self.gpu, fix=False, out=out)
+        self.assertIn("GPU 0 gpu/application_clocks: graphics 1500 MHz, wants 2490 MHz", out.getvalue())
+        self.assertEqual(self.calls(), [])
+
+    def test_no_nvidia_smi_no_gpu_settings(self):
+        self.assertEqual(
+            policy.run_gpus({"nvidia_smi": "no-such-nvidia-smi", "power_cap_file": ""}, fix=True), []
+        )
 
 
 if __name__ == "__main__":
