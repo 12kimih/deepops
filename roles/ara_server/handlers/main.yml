@@ -1,0 +1,6 @@
+---
+- name: Restart the ARA server
+  systemd_unit:
+    name: "{{ ara_server_unit }}"
+    state: restarted
+    daemon_reload: true

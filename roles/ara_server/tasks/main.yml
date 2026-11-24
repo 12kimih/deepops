@@ -1,0 +1,43 @@
+---
+- name: Require the gunicorn that serves ARA in the checkout's environment
+  ansible.builtin.stat:
+    path: "{{ ara_server_venv }}/bin/gunicorn"
+  register: ara_server_gunicorn
+  when: ara_server_state == 'present'
+
+- name: Refuse an environment without gunicorn
+  ansible.builtin.assert:
+    that: ara_server_gunicorn.stat.executable | default(false)
+    fail_msg: "{{ ara_server_venv }}/bin/gunicorn is missing: run `uv sync --locked` in the checkout first."
+    quiet: true
+  when: ara_server_state == 'present'
+
+- name: Write the ARA server unit
+  ansible.builtin.template:
+    src: deepops-ara.service.j2
+    dest: "/etc/systemd/system/{{ ara_server_unit }}"
+    mode: "0644"
+  notify: Restart the ARA server
+  when: ara_server_state == 'present'
+
+- name: Run the ARA server
+  systemd_unit:
+    name: "{{ ara_server_unit }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: ara_server_state == 'present'
+
+- name: Stop the ARA server
+  systemd_unit:
+    name: "{{ ara_server_unit }}"
+    state: stopped
+    enabled: false
+  failed_when: false  # not installed
+  when: ara_server_state == 'absent'
+
+- name: Remove the ARA server unit
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ ara_server_unit }}"
+    state: absent
+  when: ara_server_state == 'absent'

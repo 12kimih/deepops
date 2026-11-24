@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+# The run history's API server (roles/ara_server): loopback only, for {{ ara_server_user }}.
+[Unit]
+Description=ARA run history API server for {{ ara_server_user }} (deepops)
+After=network.target
+
+[Service]
+User={{ ara_server_user }}
+Environment=ARA_BASE_DIR={{ ara_server_base_dir }}
+Environment=ARA_SETTINGS={{ ara_server_base_dir }}/settings.yaml
+ExecStart={{ ara_server_venv }}/bin/gunicorn --workers {{ ara_server_workers }} --bind {{ ara_server_bind }}:{{ ara_server_port }} ara.server.wsgi
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths={{ ara_server_base_dir }}
+
+[Install]
+WantedBy=multi-user.target

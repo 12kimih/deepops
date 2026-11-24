@@ -18,6 +18,12 @@ from __future__ import annotations
 from ara.plugins.callback.ara_default import DOCUMENTATION  # noqa: F401  # the loader reads it here
 from ara.plugins.callback.ara_default import CallbackModule as AraCallbackModule
 
+import socket
+from urllib.parse import urlsplit
+
+from ansible.utils.display import Display
+from ara.clients import utils as client_utils
+
 # ara.api.models: CharField(max_length=255) for Playbook.path, File.path, Play.name, Task.name
 LIMIT = 255
 BOUNDED = ("path", "name")
@@ -55,9 +61,29 @@ class BoundedClient:
         return getattr(self._client, name)
 
 
+def server_answers(url, timeout=1.0):
+    """Whether something accepts connections at URL's host and port (http only)."""
+    parts = urlsplit(url)
+    try:
+        with socket.create_connection((parts.hostname or "127.0.0.1", parts.port or 80), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 class CallbackModule(AraCallbackModule):
     def set_options(self, task_keys=None, var_options=None, direct=None):
         super().set_options(task_keys=task_keys, var_options=var_options, direct=direct)
+        # ARA's offline client starts its database layer for every request, about 4 s a
+        # task; its API server (roles/ara_server, on ARA's default address) does not. When
+        # nothing chose a client (offline is ARA's default) and that server answers, the
+        # run records through it; with no server it records offline, as before.
+        if self.client is not None and self.get_option("api_client") == "offline":
+            server = self.get_option("api_server")
+            if server_answers(server):
+                self.client = client_utils.get_client(client="http", endpoint=server)
+            else:
+                Display().vv(f"ARA: no server at {server}; recording offline")
         if self.client is not None:
             self.client = BoundedClient(self.client)
 

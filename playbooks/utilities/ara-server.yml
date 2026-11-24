@@ -1,0 +1,13 @@
+---
+# The run history's API server on this host, for the person running it (roles/ara_server):
+# every later run records through it, about 4 s a task faster than ARA's offline client.
+#
+#   uv run ansible-playbook -K playbooks/utilities/ara-server.yml
+#   uv run ansible-playbook -K playbooks/utilities/ara-server.yml -e ara_server_state=absent
+- name: The ARA server on the deepops host
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  roles:
+    - role: ara_server
