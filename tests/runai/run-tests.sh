@@ -14,7 +14,13 @@ ANSIBLE_CALLBACK_PLUGINS="$(mktemp -d)"; export ANSIBLE_CALLBACK_PLUGINS
 trap 'rm -rf "${ANSIBLE_CALLBACK_PLUGINS}"' EXIT
 fail=0
 pass() { echo "ok   - $1"; }
-bad()  { echo "FAIL - $1"; fail=1; }
+# A failed case shows the run it judged: a failure once read only "FAIL - <case>" for
+# every case after one (2026-11-24), and nothing said why.
+bad()  {
+    echo "FAIL - $1"
+    [ -n "${out:-}" ] && printf '%s\n' "$out" | grep -E 'fatal:|FAILED!|ERROR|msg:' | head -20 | sed 's/^/       /'
+    fail=1
+}
 
 run() {  # run <label> <extra ansible args...>; sets $out, $rc; fresh state per call unless STATE is set
   shift  # the label names the case where it is called
