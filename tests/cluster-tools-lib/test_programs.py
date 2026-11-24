@@ -30,6 +30,7 @@ PROGRAMS = {
     "gpu_diag_idle",
     "io_fairness",
     "io_usage",
+    "power_policy",
 }
 
 

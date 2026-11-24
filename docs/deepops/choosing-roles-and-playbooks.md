@@ -42,6 +42,7 @@ Different layers; the monitoring stack uses the exporter.
 
 ## PCIe ACS (GPU peer-to-peer)
 
+- `playbooks/generic/power-policy.yml` (`power_policy` role, switch `slurm_enable_power_policy`) -- holds every host's power management at full performance: the CPU governor, its EPP hint and turbo, PCIe ASPM and SATA link power at runtime, and the same plus NVMe power states on the kernel command line. It applies at boot before slurmd and again every 15 minutes, so a job or package that switches one is put back; the alerts in `roles/prometheus/files/rules/power-policy.yml` name a setting the kernel refuses (the firmware owns it) or one that keeps being switched. Nothing else (no prolog or epilog) changes these.
 - `playbooks/generic/pcie-acs.yml` (`pcie_acs` role, switch `slurm_disable_pcie_acs`) -- turns PCIe Access Control Services off on every device that has it, at every boot before the GPUs are opened, so GPUs below one PCIe switch talk peer to peer (NCCL's guidance for bare metal). NHC drains a node where ACS is back on; `playbooks/utilities/verify-acs.yml` reports it with the IOMMU state.
 
 ## Crash dumps

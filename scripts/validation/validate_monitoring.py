@@ -103,6 +103,7 @@ SOURCES = {
     "gpu_diag_idle": r"gpu_diag_idle_\w+",  # the weekly GPU diagnostics (roles/gpu_diag_idle)
     "io_usage": r"io_usage_\w+",  # each job's and login's I/O (roles/io_usage)
     "io_fairness": r"io_fairness_\w+",  # whether iocost shares a disk (roles/io_fairness)
+    "power_policy": r"power_policy_\w+",  # the hosts' power settings held at performance (roles/power_policy)
     "nfs": r"nfs_export_\w+",  # what roles/nfs exports (roles/textfile_keep)
     "nfs_client": r"nfs_client_\w+",  # the mounts the retry could not make (roles/nfs_client)
     "people": r"people_purge_\w+",  # when a leaver's files fall due (roles/people)

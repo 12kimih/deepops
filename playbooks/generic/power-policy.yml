@@ -1,0 +1,10 @@
+---
+# The hosts' power management held at full performance (roles/power_policy): CPU
+# governor, EPP and turbo, PCIe ASPM, SATA and NVMe link power, at boot and on a timer.
+# The kernel arguments take effect at the next reboot; the runtime settings at once.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+    - role: power_policy
+      power_policy_state: "{{ deepops_components.power_policy | component_phase(deepops_phase) }}"

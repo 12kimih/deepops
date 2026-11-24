@@ -1,0 +1,34 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): the host's power
+# management held at full performance (slurm_enable_power_policy). A compute cluster
+# wants every device at speed: gpu2, gpu4 and gpu8 ran every core at its 800 MHz
+# minimum for days (powersave, left by a Slurm epilog part) and a GPU job's feeding
+# thread ran five times slower (2026-11-24).
+#
+# One program sets each setting below at every boot (before nvidia-persistenced and
+# slurmd) and again every power_policy_interval, so anything that changes one (a job,
+# a package, a firmware event) is put back; it writes what it found and fixed as
+# textfile metrics, and roles/prometheus alerts on settings it cannot set or keeps
+# having to set (cluster_tools.power_policy). Each path is a glob under /sys; a path
+# absent on a host (no SATA host, no intel_pstate) is no setting there.
+power_policy_state: present
+power_policy_settings:
+  # CPU: the performance governor, the hardware hint to match (intel_pstate active or
+  # amd-pstate EPP), turbo or boost on.
+  - {path: devices/system/cpu/cpu*/cpufreq/scaling_governor, value: performance}
+  - {path: devices/system/cpu/cpu*/cpufreq/energy_performance_preference, value: performance}
+  - {path: devices/system/cpu/intel_pstate/no_turbo, value: "0"}
+  - {path: devices/system/cpu/cpufreq/boost, value: "1"}
+  # PCIe links (GPUs, NICs, NVMe) stay in L0: no ASPM power states on the way to a GPU.
+  - {path: module/pcie_aspm/parameters/policy, value: performance}
+  # SATA links at full power (no link power management).
+  - {path: class/scsi_host/host*/link_power_management_policy, value: max_performance}
+# The same at boot, before userspace: the governor and the ASPM policy from the first
+# instant, and NVMe autonomous power state transitions off (no runtime switch for it).
+# A reboot applies them; until then the program holds the runtime settings.
+power_policy_kernel_args:
+  - cpufreq.default_governor=performance
+  - pcie_aspm.policy=performance
+  - nvme_core.default_ps_max_latency_us=0
+# How often the settings are checked and put back (systemd time span).
+power_policy_interval: 15min

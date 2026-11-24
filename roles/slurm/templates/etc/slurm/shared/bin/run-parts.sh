@@ -35,15 +35,14 @@ epilog_proc_root=/proc
 job_scope_lib='{{ slurm_config_dir }}/shared/lib/epilog-job-scope.sh'
 
 # Does the job have the node to itself? Only then may the *-exclusive-* parts run: they
-# act on the whole node (every GPU's power and clocks, the CPU governor, the page
-# cache). Slurm's own answer is the job's Exclusive field (squeue -O Exclusive), NODE for
+# act on the whole node (every GPU's power and clocks, the page cache). Slurm's own answer is the job's Exclusive field (squeue -O Exclusive), NODE for
 # a whole-node allocation (--exclusive, or a partition with Exclusive=NODE).
 # OverSubscribe (%h) "does not encode exclusivity" (man squeue): on a partition with
 # OverSubscribe=NO every job reads NO, and taking that for exclusive ran these parts for
 # every job on shared nodes (2026-11-23: other jobs' GPU processes were killed).
 # The prolog asks and leaves a record on the node; the epilog undoes what the prolog did
 # by that record, never by asking again: a squeue that timed out in the epilog would
-# leave the GPUs at their max levels and the governor at performance. A context slurmd
+# leave the GPUs at their max levels. A context slurmd
 # does not name (an older slurmd) asks in both. Asked only when the parts directory has
 # such parts. The lookup runs inside a conditional because of "set -e": a failed squeue
 # must skip the parts, not fail the job.

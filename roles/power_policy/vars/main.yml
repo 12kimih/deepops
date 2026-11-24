@@ -1,0 +1,18 @@
+---
+_power_policy_textfile: "{{ node_exporter_prom_dir }}/power-policy.prom"
+# The program's configuration, as cluster_tools.power_policy reads it.
+_power_policy_cfg:
+  sys_root: /sys
+  textfile: "{{ _power_policy_textfile }}"
+  settings: "{{ power_policy_settings }}"
+# What this component installs, for its record (roles/component_record): the timer
+# before its files.
+power_policy_items:
+  - "unit:{{ power_policy_timer }}"
+  - "unit:{{ power_policy_service }}"
+  - "file:/etc/systemd/system/{{ power_policy_timer }}"
+  - "file:/etc/systemd/system/{{ power_policy_service }}"
+  - "file:{{ power_policy_program }}"
+  - "file:{{ power_policy_conf }}"
+  - "file:{{ _power_policy_textfile }}"
+  - "file:{{ cluster_tools_lib_config_records }}/power_policy.json"

@@ -52,7 +52,6 @@ VARS = role_defaults(
     "slurm_log_files",
     "slurm_job_private_dirs",
     "deepops_system_path",
-    "slurm_exclusive_governor_file",
     "slurm_exclusive_run_dir",
 )
 

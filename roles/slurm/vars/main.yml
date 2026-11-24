@@ -8,9 +8,7 @@ _slurm_build_account: "{{ system_accounts[slurm_deb_build_user] }}"
 slurm_controller_conf_files: [slurm.conf, job_submit.lua, cgroup.conf, gres.conf, namespace.yaml, plugstack.conf]
 
 # What a whole-node job's prolog leaves for its epilog to undo (shared/bin/run-parts.sh):
-# job-<id>, the record that the job had the node to itself, and governor, the CPU
-# governor in force before (prolog.d/50-exclusive-cpu, put back by epilog.d/60-
-# exclusive-cpu). Under /run: a reboot clears it, and the kernel then starts with its own
-# default governor and GPU levels anyway.
+# job-<id>, the record that the job had the node to itself. Under /run: a reboot clears
+# it, and the GPUs then start at their default levels anyway. The CPU governor is the
+# node's own policy (roles/cpu_governor), never a job's.
 slurm_exclusive_run_dir: /run/slurm-exclusive
-slurm_exclusive_governor_file: "{{ slurm_exclusive_run_dir }}/governor"

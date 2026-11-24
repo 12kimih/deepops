@@ -71,6 +71,9 @@ slurm_login_on_compute: false
 slurm_cluster_configure_gpu_power_limit: true
 # PCIe ACS off on the compute nodes for GPU peer-to-peer (roles/pcie_acs): bare metal only
 slurm_disable_pcie_acs: false
+# Every host's power management at full performance (roles/power_policy): CPU governor,
+# turbo, PCIe ASPM, SATA and NVMe link power, at boot and held on a timer
+slurm_enable_power_policy: false
 slurm_install_enroot: true
 slurm_install_pyxis: true
 # Rootless Podman on compute nodes, for Dockerfile builds in CPU jobs (roles/podman)

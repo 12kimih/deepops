@@ -1,0 +1,87 @@
+---
+- name: Record what this component installs
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: power_policy
+    component_record_action: begin
+    component_record_items: "{{ power_policy_items }}"
+
+- name: Set the power policy on the kernel command line
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+  vars:
+    host_baseline_kernel_args_owner: power-policy
+    host_baseline_kernel_args: "{{ power_policy_kernel_args }}"
+    host_baseline_kernel_args_reason: hold the CPUs and device links at full performance from boot
+
+- name: Install the power policy command
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: command
+  vars:
+    cluster_tools_lib_command:
+      dest: "{{ power_policy_program }}"
+      module: cluster_tools.power_policy
+
+- name: Write the power policy configuration
+  ansible.builtin.copy:
+    dest: "{{ power_policy_conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ _power_policy_cfg | to_nice_json }}\n"
+    validate: "{{ cluster_tools_lib_config_validate }} cluster_tools.power_policy %s"
+
+- name: Record the power policy configuration
+  ansible.builtin.include_role:
+    name: cluster_tools_lib
+    tasks_from: config
+  vars:
+    cluster_tools_lib_config: {role: power_policy, module: cluster_tools.power_policy, file: "{{ power_policy_conf }}", playbook: playbooks/generic/power-policy.yml}
+
+- name: Install the service and its timer
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - {src: power-policy.service.j2, dest: "{{ power_policy_service }}"}
+    - {src: power-policy.timer.j2, dest: "{{ power_policy_timer }}"}
+  loop_control:
+    label: "{{ item.dest }}"
+
+# A container shares the host's sysfs, read-only: the settings are the host's to make.
+- name: Apply the power policy at every boot
+  systemd_unit:
+    name: "{{ power_policy_service }}"
+    enabled: true
+    daemon_reload: true
+  when: not deepops_containerized
+
+- name: Hold the power policy on its timer
+  systemd_unit:
+    name: "{{ power_policy_timer }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not deepops_containerized
+
+# Now, not at the next tick, and only where a setting is off; the run fails, naming
+# each setting, where the kernel refuses one.
+- name: Apply the power policy now
+  change_command:
+    argv: ["{{ power_policy_program }}", apply, "{{ power_policy_conf }}"]
+    unless: ["{{ power_policy_program }}", check, "{{ power_policy_conf }}"]
+  when: not deepops_containerized
+
+- name: Record the component as present
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: power_policy
+    component_record_action: present
+    component_record_items: "{{ power_policy_items }}"

@@ -1,0 +1,35 @@
+---
+# The hosts' power management held at full performance (roles/power_policy textfile
+# metrics, cluster_tools.power_policy, run every 15 minutes): a setting the kernel will
+# not take, one that something keeps switching back, and the runs stopping.
+groups:
+  - name: power-policy
+    rules:
+      - alert: PowerPolicyRefused
+        expr: power_policy_refused > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} will not hold {{ $labels.setting }} at full performance"
+          description: >-
+            `power-policy check /etc/power-policy.json` on {{ $labels.host }}
+            lists the files and what they hold. The firmware owns a setting the kernel
+            refuses (ASPM, a BIOS power profile): set its performance profile in the
+            BIOS or BMC.
+      # Four runs in a row each found it off and set it back.
+      - alert: PowerPolicyKeepsBeingReset
+        expr: power_policy_off > 0
+        for: 50m
+        labels: {severity: warning}
+        annotations:
+          summary: "Something keeps changing {{ $labels.setting }} on {{ $labels.host }}"
+          description: >-
+            Every run of power-policy sets it back (`journalctl -u power-policy` on {{
+            $labels.host }} lists each). Find what writes it: a job script, a tuned or
+            power-profiles daemon, a package's unit.
+      - alert: PowerPolicyStale
+        expr: time() - power_policy_last_success_timestamp_seconds > 3600
+        labels: {severity: warning}
+        annotations:
+          summary: "The power policy on {{ $labels.host }} has not run for an hour"
+          description: "`journalctl -u power-policy` and `systemctl list-timers power-policy.timer` on the host."

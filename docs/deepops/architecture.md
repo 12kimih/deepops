@@ -205,6 +205,7 @@ reader writes `| default(...)` for a defined variable;
 │   ├── people
 │   ├── people_defaults
 │   ├── podman
+│   ├── power_policy
 │   ├── prometheus-ipmi-exporter
 │   ├── prometheus-node-exporter
 │   ├── prometheus-slurm-exporter
