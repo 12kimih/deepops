@@ -1,10 +1,16 @@
-"""roles/ara_server and the recorder (plugins/callback/ara_default.py): the role serves
-where the recorder looks, and the recorder tells a server that answers from none."""
+"""roles/ara_server and the recorder (plugins/callback/ara_default.py): each operator's
+server listens on their own unix socket, which the recorder uses only when it is
+theirs, and it records over it."""
 
+import os
 import socket
 import sys
+import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
@@ -15,19 +21,25 @@ recorder = in_tree.load("plugins/callback/ara_default.py")
 ara_server = in_tree.load("scripts/deepops/ara_server.py")
 
 
-class Port(unittest.TestCase):
+class Place(unittest.TestCase):
     def test_the_role_serves_where_the_recorder_looks(self):
-        # The recorder probes ARA's default api_server; the role must bind exactly there.
-        import yaml
-
-        doc = yaml.safe_load(recorder.DOCUMENTATION)
-        default = doc["options"]["api_server"]["default"]
         defaults = role_defaults("ara_server")
-        self.assertEqual(default, f"http://{defaults['ara_server_bind']}:{defaults['ara_server_port']}")
-        self.assertEqual(default, ara_server.ADDRESS, "the doctor probes the same address")
+        self.assertEqual(defaults["ara_server_runtime_dir"], "deepops-ara-{{ ara_server_user }}")
+        role = defaults["ara_server_socket"].replace(
+            "{{ ara_server_runtime_dir }}", defaults["ara_server_runtime_dir"]
+        )
+        self.assertEqual(role.replace("{{ ara_server_user }}", "{user}"), ara_server.SOCKET)
+        self.assertIn("{{ ara_server_user }}", defaults["ara_server_unit"], "one unit per operator")
+        self.assertIn("deepops-ara.service", defaults["ara_server_retired_units"], "the TCP one goes")
+
+    def test_the_unit_listens_on_no_tcp_port(self):
+        unit = (ROOT / "roles/ara_server/templates/deepops-ara.service.j2").read_text()
+        self.assertIn("--bind unix:{{ ara_server_socket }}", unit)
+        self.assertIn("RuntimeDirectoryMode=0700", unit)
+        self.assertNotRegex(unit, r"--bind [0-9]|ara_server_port")
 
     def test_a_run_without_the_server_says_how_to_install_it(self):
-        note = ara_server.offline_note()
+        note = ara_server.offline_note("/run/x/ara.sock")
         self.assertIn("nothing is lost", note)
         self.assertIn(ara_server.INSTALL, note)
         self.assertTrue((ROOT / ara_server.INSTALL.split()[-1]).is_file(), "the named playbook exists")
@@ -45,18 +57,77 @@ class Database(unittest.TestCase):
         self.assertFalse(ara_server.serves_this_run({"ARA_DATABASE_NAME": "/tmp/x.sqlite"}))
 
 
-class Fallback(unittest.TestCase):
-    def test_a_closed_port_does_not_answer(self):
-        with socket.socket() as s:
-            s.bind(("127.0.0.1", 0))
-            port = s.getsockname()[1]  # bound, never listening: refused
-            self.assertFalse(recorder.server_answers(f"http://127.0.0.1:{port}", timeout=0.5))
+class Hello(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802
+        body = b'{"path": "%s", "host": "%s"}' % (self.path.encode(), self.headers["Host"].encode())
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
-    def test_a_listening_port_answers(self):
-        with socket.socket() as s:
-            s.bind(("127.0.0.1", 0))
-            s.listen(1)
-            self.assertTrue(recorder.server_answers(f"http://127.0.0.1:{s.getsockname()[1]}", timeout=0.5))
+    def log_message(self, *args):
+        pass
+
+
+class UnixHTTPServer(HTTPServer):
+    address_family = socket.AF_UNIX
+
+    def server_bind(self):
+        self.socket.bind(self.server_address)
+
+    def get_request(self):
+        conn, _ = self.socket.accept()
+        return conn, ("local", 0)
+
+
+class Socket(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.run_dir = Path(self.dir.name, "run")
+        self.run_dir.mkdir(mode=0o700)
+        self.path = str(self.run_dir / "ara.sock")
+
+    def serve(self):
+        server = UnixHTTPServer(self.path, Hello)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+
+    def test_no_socket_is_not_usable(self):
+        self.assertEqual(ara_server.usable(self.path), "")
+        self.assertIn("No such file", ara_server.owned(self.path))
+
+    def test_ones_own_socket_answering_is_used(self):
+        self.serve()
+        self.assertEqual(ara_server.owned(self.path), "")
+        self.assertEqual(ara_server.usable(self.path, timeout=2), self.path)
+
+    def test_a_socket_of_another_uid_is_refused(self):
+        self.serve()
+        self.assertIn("not a socket of uid", ara_server.owned(self.path, uid=os.getuid() + 1))
+        self.assertEqual(ara_server.usable(self.path, uid=os.getuid() + 1), "")
+
+    def test_a_directory_others_may_enter_is_refused(self):
+        self.serve()
+        os.chmod(self.run_dir, 0o755)
+        self.assertIn("alone", ara_server.owned(self.path))
+
+    def test_a_file_that_is_no_socket_is_refused(self):
+        Path(self.path).write_text("")
+        self.assertIn("not a socket", ara_server.owned(self.path))
+
+    def test_the_recorder_talks_http_over_the_socket_and_no_proxy(self):
+        self.serve()
+        with mock.patch.dict(
+            os.environ, {"http_proxy": "http://203.0.113.1:9", "HTTP_PROXY": "http://203.0.113.1:9"}
+        ):
+            got = recorder.unix_client(self.path).get("/api/v1/playbooks", limit=1)
+        self.assertEqual(got, {"path": "/api/v1/playbooks?limit=1", "host": "localhost"})
+
+    def test_the_socket_path_names_the_person(self):
+        self.assertEqual(ara_server.socket_path(0), "/run/deepops-ara-root/ara.sock")
 
 
 if __name__ == "__main__":

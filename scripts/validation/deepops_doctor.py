@@ -245,7 +245,7 @@ def main():
 
     # The run history's server is a speed-up, not a precondition (runs record offline
     # without it): a fact for the operator, with the fix when it is down.
-    info["ara_server"] = "answers" if ara_server.answers() else ara_server.offline_note()
+    info["ara_server"] = "answers" if ara_server.usable() else ara_server.offline_note()
 
     ok = all(c["ok"] for c in checks)
     result = {"ok": ok, "checks": checks, "info": info}

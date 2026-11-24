@@ -160,10 +160,15 @@ refused a longer one, and the run went unrecorded). The records live in `~/.ara/
 (`bin_ansible_callbacks` in `ansible.cfg`), listed as `Ad-Hoc: <module>: <arguments>`,
 shortened when long; the whole command stays in the run's arguments.
 
-Recording goes through ARA's API server on the deepops host whenever one answers on
-ARA's default address (`roles/ara_server`): a loopback-only gunicorn service, run as the
-operator over their own `~/.ara/server`, started once with
-`playbooks/utilities/ara-server.yml`. ARA's offline client, which starts its database
+Recording goes through ARA's API server on the deepops host whenever the operator's own
+one answers (`roles/ara_server`): a gunicorn service per operator, run as them over
+their own `~/.ara/server`, started once with `playbooks/utilities/ara-server.yml`. It
+listens on a unix socket in `/run/deepops-ara-<user>/` (0700, theirs alone), never on
+a TCP port, which every account of a shared login node could read, write and take over;
+a run uses only a socket owned by the person running it. Its web view is reached from
+your own machine through SSH, which forwards a local port to the socket:
+`ssh -L 8000:/run/deepops-ara-<user>/ara.sock <deepops host>`, then
+`http://127.0.0.1:8000` there. ARA's offline client, which starts its database
 layer for every request, cost about 4 s a task (an 8-task play: 40 s offline, 7 s
 through the server). With no server answering the run records offline, as before.
 
@@ -172,7 +177,7 @@ uv run ara playbook list                                  # runs, newest first
 uv run ara result list --playbook <id> --status failed    # what failed
 uv run ara result list --playbook <id> --changed          # what changed
 uv run ara result show <id> --with-content                # one result: output, diff
-uv run ansible-playbook -K playbooks/utilities/ara-server.yml  # the API server; the browser view at 127.0.0.1:8000
+uv run ansible-playbook -K playbooks/utilities/ara-server.yml  # the API server (your own, on a unix socket)
 uv run ara playbook prune --days 365 --confirm            # drop old runs
 ```
 
