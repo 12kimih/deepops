@@ -70,12 +70,12 @@
     daemon_reload: true
   when: not deepops_containerized
 
-# Now, not at the next tick, and only where a setting is off; the run fails, naming
-# each setting, where the kernel refuses one.
+# Now, not at the next tick, and only where a setting is off; what the kernel or the
+# firmware refuses is said, never a failure (cluster_tools.power_policy).
 - name: Apply the power policy now
   change_command:
-    argv: ["{{ power_policy_program }}", apply, "{{ power_policy_conf }}"]
-    unless: ["{{ power_policy_program }}", check, "{{ power_policy_conf }}"]
+    argv: "{{ _power_policy_outside_session + [power_policy_program, 'apply', power_policy_conf] }}"
+    unless: "{{ _power_policy_outside_session + [power_policy_program, 'check', power_policy_conf] }}"
   when: not deepops_containerized
 
 - name: Record the component as present

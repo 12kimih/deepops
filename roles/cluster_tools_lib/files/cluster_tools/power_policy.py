@@ -61,6 +61,7 @@ GPU_FIELDS = ("index", "persistence_mode", "power.limit", "power.default_limit",
               "clocks.default_applications.graphics", "clocks.applications.memory",
               "clocks.default_applications.memory", "clocks_event_reasons.applications_clocks_setting")  # fmt: skip
 GPU_SETTINGS = ("gpu/persistence", "gpu/power_limit", "gpu/application_clocks", "gpu/clock_lock")
+NO_DEVICES = 6  # nvidia-smi's status for "No devices were found"
 WATTS_SLACK = 0.5  # nvidia-smi rounds a limit it was given
 
 
@@ -147,6 +148,10 @@ def gpu_rows(nvidia_smi):
     """{index: {field: text}} of every GPU nvidia-smi lists; raises OSError when it fails."""
     rc, out, err = proc.outcome([nvidia_smi, "--query-gpu=" + ",".join(GPU_FIELDS), "--format=csv,noheader,nounits"],
                                 timeout=NVSMI_TIMEOUT)  # fmt: skip
+    # 6 is "No devices were found": a driver without GPUs (a controller) has no GPU
+    # settings, which a failed driver does not mean.
+    if rc == NO_DEVICES:
+        return {}
     if rc != 0:
         raise OSError(f"nvidia-smi --query-gpu failed ({rc}): {err or out}")
     rows = {}
@@ -164,7 +169,9 @@ def gpu_off(row, cap):
         off["gpu/persistence"] = (row["persistence_mode"], "Enabled")
     limit, default = _number(row["power.limit"]), _number(row["power.default_limit"])
     if limit is not None and default is not None:
-        want = min(default, cap) if cap else default
+        # The cap is the target as set: roles/nvidia_power_limit has kept it within the
+        # card's own range, above its default too.
+        want = cap if cap else default
         if abs(limit - want) > WATTS_SLACK:
             off["gpu/power_limit"] = (f"{limit:g} W", f"{want:g} W")
     for kind in ("graphics", "memory"):
