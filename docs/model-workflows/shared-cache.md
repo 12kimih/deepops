@@ -8,9 +8,15 @@ Model licenses and gated-repository access remain the operator's responsibility.
 
 This opt-in example does **not** mount/export storage, create accounts, install
 packages on cluster nodes or download weights automatically. It is not part of
-either cluster deployment playbook. Users find the cache through `HF_HUB_CACHE`,
-which the site adds to `user_environment` (roles/user_environment_defaults, the
-one list of the users' environment: every login and job gets it).
+either cluster deployment playbook. Users find the cache through
+`SHARED_HF_HUB_CACHE`, derived from these settings (`model_cache_hub`) in the
+users' environment (roles/user_environment_defaults: every login and job gets it).
+It is a pointer to read from, never their `HF_HUB_CACHE`: huggingface_hub writes
+into its `HF_HUB_CACHE` (`blobs/`, `refs/`, `.locks/`) for every file not yet in it
+(and older releases when a branch moved), so a writer-owned default fails those
+with a permission error. Each user's own cache stays the default (`HF_HOME/hub`); a
+cache variable naming shared storage is refused at deploy
+(`plugins/filter/user_environment.py`).
 
 ## Prerequisites and trust boundary
 
@@ -35,7 +41,7 @@ one list of the users' environment: every login and job gets it).
   do not upgrade Ansible's or the serving application's Python dependencies.
 
 Keep **`HF_HOME`, `HF_TOKEN_PATH` and `HF_XET_CACHE` private and outside shared
-storage**. Only `HF_HUB_CACHE` is shared. `HF_HOME` contains authentication data;
+storage**. Only the hub cache is shared, read through `SHARED_HF_HUB_CACHE`. `HF_HOME` contains authentication data;
 sharing it can expose credentials. Do not write tokens into inventory, commands,
 logs, images, or the environment file. Public models need no login. For gated
 models, obtain access separately using the writer's private `hf auth login`.
@@ -44,7 +50,7 @@ models, obtain access separately using the writer's private `hf auth login`.
 
 Add exactly one host to `[model-cache-warmer]` in `config/inventory`. In
 `config/group_vars/all.yml`, where every host reads them, set the site's values of
-`roles/model_cache_defaults` and the users' variable naming the cache, for example:
+`roles/model_cache_defaults`, for example:
 
 ```yaml
 model_cache_mount: /shared
@@ -54,8 +60,6 @@ model_cache_group: model-readers
 model_cache_root: /shared/hf-cache
 # 2750 (default): the reader group reads. 2755: every user reads every model.
 #model_cache_mode: "2750"
-user_environment:
-  HF_HUB_CACHE: "{{ model_cache_root }}/hub"
 ```
 
 The variable reaches users with the cluster tools' profile file
@@ -96,7 +100,7 @@ downloading; public access does not replace that review. The commit hash, not
 
 ```bash
 umask 0027
-export HF_HUB_CACHE=/shared/hf-cache/hub   # already set where user_environment names it
+export HF_HUB_CACHE="$SHARED_HF_HUB_CACHE"   # the writer only: this shell writes the cache
 export MODEL_ID=openai-community/gpt2
 export MODEL_REVISION=607a30d783dfa663caf39e06633721c8d4cfcd7e
 "$HOME/.venvs/model-cache/bin/hf" download "$MODEL_ID" \
@@ -129,7 +133,7 @@ traversable by the consumer UID; run the validator from that checkout's root:
 
 ```bash
 python3 scripts/validation/validate_model_cache.py --json \
-  --cache-dir /shared/hf-cache/hub \
+  --cache-dir "$SHARED_HF_HUB_CACHE" \
   --repo-id openai-community/gpt2 \
   --revision 607a30d783dfa663caf39e06633721c8d4cfcd7e \
   --require-file config.json \
@@ -146,7 +150,12 @@ writes cache data, imports a model, or contacts an endpoint. It does not prove
 checksums, complete model coverage, mount health, locking, GPU compatibility, or
 inference quality. Review the required file list and run the workload's own test.
 
-Use the returned `snapshot_path` as the application's **local model path**.
+Use the returned `snapshot_path` as the application's **local model path**, or read
+the cache in place with
+`from_pretrained(repo_id, revision=<commit>, cache_dir=os.environ["SHARED_HF_HUB_CACHE"], local_files_only=True)`:
+with the full commit hash and `local_files_only` nothing is written to it. A model
+not in the cache is downloaded into the user's own `HF_HUB_CACHE` (the default), or
+asked for from the writer.
 Mount the entire cache read-only in containers, at the path used for validation;
 relative blob links need their parent directories. Keep tokenizer assets together
 with weights. A Slurm job uses the same path on each allocated node; in Kubernetes,

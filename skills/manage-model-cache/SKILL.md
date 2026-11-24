@@ -15,11 +15,12 @@ for the supported CLI version, exact configuration and working download example.
    reader group, model license/access, available capacity and immutable revision.
    Do not create mounts, change exports, create users, or grant access implicitly.
 2. Review `config/inventory` and, in `config/group_vars/all.yml`, the `model_cache_*`
-   settings (roles/model_cache_defaults) and `user_environment.HF_HUB_CACHE`.
+   settings (roles/model_cache_defaults); users read the cache through
+   `SHARED_HF_HUB_CACHE` (derived, `model_cache_hub`), never as their `HF_HUB_CACHE`.
    Exactly one host belongs to `model-cache-warmer`. All readers need matching
    numeric group IDs and an existing mount at the intended workload path.
-3. Keep `HF_HOME`, `HF_TOKEN_PATH` and `HF_XET_CACHE` private; share only
-   `HF_HUB_CACHE`. Never share authentication storage or paste credentials into commands.
+3. Keep `HF_HOME`, `HF_TOKEN_PATH` and `HF_XET_CACHE` private; share only the
+   hub cache, read-only. Never share authentication storage or paste credentials into commands.
 4. Use a private Python 3.10+ environment for `examples/model-cache/requirements.txt`.
    Do not install into Ansible's or the serving framework's environment. No login
    or paid service is needed for the public example.
@@ -30,7 +31,7 @@ for the supported CLI version, exact configuration and working download example.
    Apply without `--check --diff` only to the approved writer and cache path.
    The playbook must finish with `failed=0`; repeat once to check `changed=0`.
    A successful playbook **does not mean a model is cached**.
-2. As the writer, use `umask 0027`, check `HF_HUB_CACHE` names the cache (user_environment), and run
+2. As the writer, use `umask 0027`, `export HF_HUB_CACHE="$SHARED_HF_HUB_CACHE"` in that shell only, and run
    the pinned `hf download` with a **full commit hash** and the approved file list
    as shown in the guide. Include every tokenizer/config file and weight shard
    required by the workload. Do not use `main`, `--local-dir`, or deprecated

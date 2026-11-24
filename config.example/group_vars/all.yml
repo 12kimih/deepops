@@ -277,7 +277,7 @@
 # The shared Hugging Face model cache (roles/model_cache_defaults,
 # playbooks/model-cache.yml): the NFS mount, the writer and the readers' group, the
 # directory (empty: <mount>/hf-cache) and its mode (2755: every user reads every model).
-# Here, where every host reads model_cache_root for the users' HF_HUB_CACHE.
+# Here, where every host reads it for the users' SHARED_HF_HUB_CACHE (model_cache_hub).
 #model_cache_mount: ""
 #model_cache_owner: ""
 #model_cache_group: ""

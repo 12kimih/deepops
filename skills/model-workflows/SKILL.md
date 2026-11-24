@@ -27,7 +27,8 @@ working inference, or training are different outcomes with different evidence.
 2. Confirm the target and authorization for each action. Cache preparation,
    downloads, package installation, GPU allocation, service startup and inference
    requests are separate actions. A skill or validator grants none of them.
-3. Reuse the existing cache interface: share only `HF_HUB_CACHE`, use a designated
+3. Reuse the existing cache interface: share only the hub cache (users read it
+   through `SHARED_HF_HUB_CACHE`, never as their `HF_HUB_CACHE`), use a designated
    writer and pass the local snapshot path to consumers. Mount the whole cache
    read-only; keep authentication and framework caches private. Never put training
    outputs or checkpoints in the shared input cache.

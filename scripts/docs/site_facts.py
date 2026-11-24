@@ -29,15 +29,16 @@ Facts:
             the users' environment (user_environment over user_environment_defaults,
             roles/user_environment_defaults), each {name, login, job} as the profile.d
             files and the task prolog get it (plugins/filter/user_environment.py); public
-            only an entry whose values are paths or URLs. A value naming another
-            setting ({{ model_cache_root }}/hub) is resolved when that one is literal
+            only an entry whose values are paths or URLs. A value derived from other
+            settings (SHARED_HF_HUB_CACHE: model_cache_hub) is resolved as Ansible would
   cluster   the nodes (CPUs, memory, GPUs) and partitions (their nodes, time limit) the
             site's slurm.conf template lists (private: the portal's overview page)
   slack     the channels by purpose and the administrators' group (private)
   quotas    each host's disk_quota_filesystems and disk_quota_inodes_per_tib (private)
 
-A site value set in the config overrides a role default; a value the config computes
-with a template is not resolved here and is left out (the private file says which).
+A site value set in the config overrides a role default. A template is rendered (Jinja,
+over the settings already known, until nothing more resolves); one that needs what only
+a host knows (groups, facts, an Ansible filter) is left out (the private file says which).
 """
 
 import importlib
@@ -48,6 +49,7 @@ import os
 import sys
 from pathlib import Path
 
+import jinja2
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -121,7 +123,8 @@ def _literal(value):
 
 def settings(config):
     """Every setting the role defaults and the site's group_vars/all.yml and
-    group_vars/slurm-cluster.yml give, the site's over the defaults (literal values only)."""
+    group_vars/slurm-cluster.yml give, the site's over the defaults: the literal ones,
+    and each template string that renders from them (repeated while one more does)."""
     out = {}
     for defaults in tracked("roles/*/defaults/main.yml"):
         for key, value in _yaml(defaults).items():
@@ -129,25 +132,39 @@ def settings(config):
     if config:
         for name in ("all.yml", "slurm-cluster.yml"):
             out.update(_yaml(Path(config) / "group_vars" / name))
-    return {k: v for k, v in out.items() if _literal(v) is not None}
+    known = {k: v for k, v in out.items() if _literal(v) is not None}
+    pending = {k: v for k, v in out.items() if k not in known and isinstance(v, str)}
+    while pending:
+        done = {k: r for k, r in ((k, _render(v, known)) for k, v in pending.items()) if r is not None}
+        if not done:
+            break
+        known.update(done)
+        pending = {k: v for k, v in pending.items() if k not in done}
+    return known
 
 
-_REF = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+# Ansible's templating as far as the settings alone go: an undefined name, or a filter or
+# test only Ansible has, leaves the template unresolved.
+_JINJA = jinja2.Environment(undefined=jinja2.StrictUndefined, autoescape=False)  # noqa: S701 (not HTML)
+
+
+def _render(text, values):
+    """TEXT rendered over VALUES, or None when it needs anything they lack."""
+    try:
+        return _JINJA.from_string(text).render(values)
+    except (jinja2.TemplateError, TypeError, ValueError, AttributeError):
+        return None
 
 
 def _resolve(value, settings_):
-    """VALUE with each {{ name }} of a literal string setting filled in; None when any
-    template is left (Ansible's to resolve). Dicts are resolved field by field."""
+    """VALUE rendered over the settings; None when a template stays (Ansible's to
+    resolve). Dicts are resolved field by field."""
     if isinstance(value, dict):
         out = {k: _resolve(v, settings_) for k, v in value.items()}
         return None if any(v is None and value[k] is not None for k, v in out.items()) else out
-    if not isinstance(value, str):
+    if not isinstance(value, str) or ("{{" not in value and "{%" not in value):
         return value
-    text = _REF.sub(
-        lambda m: str(settings_[m.group(1)]) if isinstance(settings_.get(m.group(1)), str) else m.group(0),
-        value,
-    )
-    return None if "{{" in text or "{%" in text else text
+    return _render(value, settings_)
 
 
 def environment(config):

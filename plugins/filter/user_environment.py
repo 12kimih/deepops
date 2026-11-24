@@ -8,11 +8,28 @@ default's; a null or empty value drops it. login or job empty: not set there. A 
 starting with ~/ is under the user's home. The same function gives the profile.d files
 (roles/cluster_tools), the task prolog part (roles/slurm) and the docs' table
 (scripts/docs/site_facts.py), so the three cannot disagree.
+
+A library cache (PRIVATE_CACHES) is written by whoever uses it, so its value is per
+user: under ~/, or in a job the job's own /tmp; a shared path is refused. A shared
+read-only cache is published under a name of its own (SHARED_HF_HUB_CACHE) that users
+read from, never as the library's default (a writer-owned HF_HUB_CACHE fails every
+download not yet in it, and older huggingface_hub releases a moved branch too).
 """
 
 import re
 
 NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# The caches a library writes into as it runs (huggingface_hub, datasets, transformers,
+# torch, uv, pip, conda, XDG).
+PRIVATE_CACHES = frozenset({
+    "HF_HOME", "HF_HUB_CACHE", "HF_ASSETS_CACHE", "HF_XET_CACHE", "HF_DATASETS_CACHE",
+    "TRANSFORMERS_CACHE", "TORCH_HOME", "UV_CACHE_DIR", "PIP_CACHE_DIR", "CONDA_PKGS_DIRS",
+    "XDG_CACHE_HOME",
+})  # fmt: skip
+
+
+def _private(value, job):
+    return value.startswith("~/") or (job and (value == "/tmp" or value.startswith("/tmp/")))
 
 
 def user_environment(defaults, site=None):
@@ -33,6 +50,14 @@ def user_environment(defaults, site=None):
         login, job = str(login or ""), str(job or "")
         if not login and not job:
             continue
+        if name in PRIVATE_CACHES:
+            shared = [v for v, in_job in ((login, False), (job, True)) if v and not _private(v, in_job)]
+            if shared:
+                raise ValueError(
+                    f"user_environment: {name}={shared[0]} is a cache its library writes into: a path"
+                    " under ~/ (or the job's /tmp), never shared storage; publish a shared read-only"
+                    " cache under a name of its own (SHARED_HF_HUB_CACHE)"
+                )
         out.append({"name": str(name), "login": login, "job": job if job != login else ""})
     return out
 
