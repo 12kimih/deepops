@@ -14,6 +14,19 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 from cluster_bot import onboarding  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "tests/lib"))
+from fake_slack import FakeDM  # noqa: E402
+
+
+class DMs(FakeDM):
+    def __init__(self):
+        self.posts = []
+
+    def post(self, channel, text, blocks=None):
+        self.posts.append((channel, text))
+        return "1.0"
+
+
 CONNECT = {"login_host": "login.example.org", "ssh_port": 2222, "portal_url": "https://portal.example.org/",
            "docs_url": "https://docs.example.org/"}  # fmt: skip
 SOURCE = ROOT / "roles/cluster_bot/files/cluster_bot/onboarding.py"
@@ -79,11 +92,11 @@ class Setting(unittest.TestCase):
 class Welcome(unittest.TestCase):
     def test_once_each_after_the_first_look(self):
         with tempfile.TemporaryDirectory() as tmp:
-            seen, posts, accounts = str(Path(tmp) / "w.json"), [], {"alice"}
+            seen, dms, accounts = str(Path(tmp) / "w.json"), DMs(), {"alice"}
+            posts = dms.posts
 
             def run(members):
-                onboarding.welcome_round(members, seen, accounts.__contains__,
-                                         lambda who, text: posts.append((who, text)), CONNECT, "/cl")  # fmt: skip
+                onboarding.welcome_round(members, seen, accounts.__contains__, dms, CONNECT, "/cl")
 
             run({"UA": "alice"})
             self.assertEqual(posts, [], "the first look only records")
@@ -93,6 +106,7 @@ class Welcome(unittest.TestCase):
             run({"UA": "alice", "UC": "carl"})
             self.assertEqual([w for w, _ in posts], ["UC"])
             self.assertIn("carl@login.example.org", posts[0][1])
+            self.assertEqual(dms.dms, [("welcome", "carl", True)], "logged for the administrators")
             run({"UA": "alice", "UC": "carl"})
             self.assertEqual(len(posts), 1, "once")
 

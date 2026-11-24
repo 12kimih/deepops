@@ -64,8 +64,8 @@ slurm_ha_state_save_location: "/sw/slurm"
 #  admin: "#alerts"
 #  help: "#help"
 #  announce: "#announcements"
-# Where the tools' DMs to people are logged for the administrators: a daily thread,
-# mentioning no one (cluster_tools.slack.dm); "" logs none.
+# Where the tools' and the cluster bot's DMs to people are logged for the administrators:
+# a daily thread, mentioning no one (cluster_tools.slack.dm); "" logs none.
 #slack_dm_log_channel: "{{ slack_channels.admin }}"
 # The administrators' Slack user group: the @handle people tag in the help channel, and
 # its ID (S..., the web client shows it), with which notices for them mention the group.

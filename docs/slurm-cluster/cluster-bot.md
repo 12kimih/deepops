@@ -29,6 +29,13 @@ request on the site configuration made with the roster's own editors
 administrator merges it and runs `slurm-cluster.yml --tags people`; the roster stays the
 only source of accounts.
 
+Every DM the bot sends goes through `cluster_tools.slack` (the cluster's tools library,
+which the bot imports): the notices (the decision on a request, a request held for a
+project's owner, reminders, the account notice, a project's change, the shared data's
+cleanup) are logged for the administrators in `slack_dm_log_channel`, one daily thread,
+as the tools' DMs are; the answer to what a person just did (a join reply, "recorded")
+is not.
+
 What a newcomer needs before the first login (`cluster_bot_connect`: the SSH host and
 port and the guide from `cluster_info`, the portal's `open_ondemand_url`
 (roles/open_ondemand_defaults) when Open OnDemand is installed) is in the `/cluster join` reply,

@@ -48,9 +48,10 @@ def welcome(connect, command, login):
             + f"도움이 필요하면 `{command} help`를 보세요.")  # fmt: skip
 
 
-def welcome_round(members, seen_path, exists, post, connect, command):
+def welcome_round(members, seen_path, exists, dms, connect, command):
     """MEMBERS ({Slack member ID: login}): DM each login whose account EXISTS(login) and
-    that SEEN_PATH does not list, then list it. The first look (no file) only records
+    that SEEN_PATH does not list (through DMS, a cluster_tools.slack.Slack: logged for
+    the administrators), then list it. The first look (no file) only records
     the accounts there are, so a new bot does not greet everyone."""
     with state.locked(seen_path, {}) as seen:
         first = "logins" not in seen
@@ -59,6 +60,6 @@ def welcome_round(members, seen_path, exists, post, connect, command):
             if login in known or not exists(login):
                 continue
             if not first:
-                post(slack_id, welcome(connect, command, login))
+                dms.dm(slack_id, welcome(connect, command, login), kind="welcome", login=login)
             known.add(login)
         seen["logins"] = sorted(known)

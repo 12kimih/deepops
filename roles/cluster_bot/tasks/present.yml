@@ -94,6 +94,14 @@
     mode: u=rwX,go=rX
   notify: Restart the cluster bot
 
+# The bot imports cluster_tools (its DMs): a new package takes a restart.
+- name: Restart the bot for the new cluster_tools package
+  ansible.builtin.debug:
+    msg: The cluster_tools package changed; the bot restarts.
+  when: cluster_tools_lib_changed
+  changed_when: true
+  notify: Restart the cluster bot
+
 # The roster's checks and editors, the very file the deploy and people.py use: account
 # requests edit the roster as an administrator would.
 - name: Install the roster module

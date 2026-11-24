@@ -24,7 +24,7 @@ slack_channels:
   help: "#help"
   announce: "#announcements"
 
-# Where every notice a tool sends a person by DM is also logged, so the administrators
+# Where every notice a tool or the cluster bot sends a person by DM is also logged, so the administrators
 # see what people were told and can help them (cluster_tools.slack.dm): one message a
 # day in this channel, each DM a reply in its thread, mentioning no one. A person's own
 # job start and end notices are not logged. Empty logs none.

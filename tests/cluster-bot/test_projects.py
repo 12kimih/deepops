@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "tests/lib"))
 import in_tree  # noqa: E402
+from fake_slack import FakeDM  # noqa: E402
 import yaml  # noqa: E402
 from cluster_bot import projects, projects_blocks, requests  # noqa: E402
 
@@ -141,9 +142,15 @@ class Deployed(unittest.TestCase):
 
     def test_told_once_after_a_deploy_and_not_on_the_first_look(self):
         sent = []
+
+        class DMs(FakeDM):
+            def post(self, channel, text, blocks=None):
+                sent.append((channel, text))
+                return "1.0"
+
+        post = DMs()
         with tempfile.TemporaryDirectory() as d:
             seen = os.path.join(d, "seen.json")
-            post = lambda who, text: sent.append((who, text))  # noqa: E731
             slack_of = {"bob": "UBOB", "dave": "UDAVE"}.get
             projects.notify_deployed(
                 self.BEFORE, seen, "/home/shared/projects", slack_of, post, projects_blocks.notice
@@ -153,6 +160,7 @@ class Deployed(unittest.TestCase):
                 self.AFTER, seen, "/home/shared/projects", slack_of, post, projects_blocks.notice
             )
             self.assertEqual([w for w, _ in sent], ["UBOB", "UDAVE"], "carol has no Slack member: not told")
+            self.assertEqual(post.dms, [("project", "bob", True), ("project", "dave", True)], "logged")
             self.assertIn("멤버에서 관리자(으)로 바뀌었습니다", sent[0][1])
             self.assertIn("`/home/shared/projects/vision` (읽기만)", sent[1][1])
             self.assertEqual(json.loads(Path(seen).read_text()), self.AFTER)

@@ -141,9 +141,10 @@ def changes(before, after):
     return out
 
 
-def notify_deployed(projects, seen_path, root, slack_of, post, notice):
+def notify_deployed(projects, seen_path, root, slack_of, dms, notice):
     """Tell each person whose role in a project changed since the bot last looked (SEEN,
-    the deployed projects then): POST(slack_id, text). The first look only records."""
+    the deployed projects then), by a DM through DMS (cluster_tools.slack.Slack, logged
+    for the administrators). The first look only records."""
     from . import state
 
     seen = state.read(seen_path, None)
@@ -151,5 +152,5 @@ def notify_deployed(projects, seen_path, root, slack_of, post, notice):
         for login, name, old, new in changes(seen, projects):
             slack_id = slack_of(login)
             if slack_id:
-                post(slack_id, notice(name, old, new, root))
+                dms.dm(slack_id, notice(name, old, new, root), kind="project", login=login)
     state.write(seen_path, projects)
