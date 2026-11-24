@@ -2,6 +2,7 @@
 dependencies:
   - role: cluster_tools_lib
   - role: user_environment_defaults  # user_environment_entries (the profile.d files)
+  - role: people_defaults  # people (the administrators exempt from the login limits)
 
 galaxy_info:
   namespace: deepops

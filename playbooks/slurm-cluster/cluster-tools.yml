@@ -12,6 +12,8 @@
   roles:
     - role: proxy_defaults
     - role: deploy_defaults
+    # The administrators' exemption from the login limits comes from the roster.
     - role: cluster_tools
+      tags: [people]
       cluster_tools_state: "{{ deepops_components.cluster_tools | component_phase(deepops_phase) }}"
   environment: "{{ proxy_env }}"
