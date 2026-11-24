@@ -1,0 +1,9 @@
+---
+# The OS packages venv needs for python_venv_python.
+python_venv_packages: "{{ python_venv_python | python_venv_packages(ansible_facts.os_family) }}"
+
+# The record a finished build leaves in the venv: what it was built from. A build that
+# stopped partway leaves none, so the next run builds it again; a change to the
+# interpreter or any step builds it again from scratch.
+_python_venv_record: "{{ python_venv_path }}/.deepops-venv"
+_python_venv_digest: "{{ {'python': python_venv_python, 'steps': python_venv_steps} | to_json(sort_keys=True) | hash('sha256') }}"

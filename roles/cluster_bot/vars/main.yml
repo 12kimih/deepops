@@ -1,6 +1,13 @@
 ---
 _cluster_bot_prefix: "{{ deepops_dir }}/cluster-bot"
 _cluster_bot_venv: "{{ _cluster_bot_prefix }}/venv"
+# The Slack libraries, hash-pinned, wheels only (roles/python_venv).
+_cluster_bot_venv_steps:
+  - args: "--only-binary :all:"
+    requirements: |
+      slack_bolt=={{ cluster_bot_slack_bolt_version }} --hash=sha256:{{ cluster_bot_sha256.slack_bolt[cluster_bot_slack_bolt_version] }}
+      slack_sdk=={{ cluster_bot_slack_sdk_version }} --hash=sha256:{{ cluster_bot_sha256.slack_sdk[cluster_bot_slack_sdk_version] }}
+      ruamel.yaml=={{ cluster_bot_ruamel_yaml_version }} --hash=sha256:{{ cluster_bot_sha256.ruamel_yaml[cluster_bot_ruamel_yaml_version] }}
 _cluster_bot_lib: "{{ _cluster_bot_prefix }}/lib"
 _cluster_bot_etc: /etc/cluster-bot
 _cluster_bot_config: "{{ _cluster_bot_etc }}/config.json"
@@ -100,3 +107,5 @@ cluster_bot_items:
   - "file:{{ _cluster_bot_github_key }}"
   - "dir:{{ _cluster_bot_etc }}"
   - "dir:{{ _cluster_bot_prefix }}"
+# With the OS packages its venv needs (roles/python_venv).
+cluster_bot_record_items: "{{ cluster_bot_items + ('python3' | python_venv_items(ansible_facts.os_family)) }}"

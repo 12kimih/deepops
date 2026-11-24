@@ -11,5 +11,7 @@ easybuild_items:
   - "dir:{{ sm_software_path }}/EasyBuild"
   - "dir:{{ sm_module_path }}/EasyBuild"
   - dir:/etc/xdg/easybuild.d
+# With the OS packages its venv needs (roles/python_venv).
+easybuild_record_items: "{{ easybuild_items + (easybuild_python | python_venv_items(ansible_facts.os_family)) }}"
 # The build account as roles/system_accounts declares it.
 _easybuild_account: "{{ system_accounts[easybuild_user] }}"
