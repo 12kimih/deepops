@@ -15,7 +15,14 @@ leave {remind_days, leaving (people_leaving)}, command (the one slash command, i
 subcommands cluster_bot.commands'), data {host, kinds, root, unused_days, grace_days,
 seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
 {login_host, ssh_port, portal_url, docs_url} and welcomed (cluster_bot.onboarding: how to
-log in, the account notice).
+log in, the account notice), dm_log {channel, state} (where the notices the bot sends a
+person by DM are logged for the administrators, cluster_tools.slack.DmLog; no channel
+logs none).
+
+Every DM goes through cluster_tools.slack.Slack.dm (the bot's own client posts only to
+channels): a notice (a decision on a request, a reminder, the account notice, a
+project's change, the shared data's cleanup, a request held for its approver) is
+logged; the answer to what a person just did is not.
 """
 
 import json
@@ -23,6 +30,8 @@ import sys
 import threading
 import time
 from pathlib import Path
+
+from cluster_tools.slack import DmLog, Slack  # the cluster's library (PYTHONPATH, roles/cluster_bot)
 
 from . import (
     accounts_blocks,
@@ -60,7 +69,14 @@ def load(path):
     return cfg
 
 
-def build(cfg, engine, join=None, unban=None, project=None, data=None):
+def messenger(cfg):
+    """The DMs' sender: cluster_tools.slack.Slack with the administrators' DM log."""
+    log = cfg["dm_log"]
+    return Slack(cfg["bot_token"], dm_log=DmLog(log["channel"], log["state"]) if log["channel"] else None)
+
+
+def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
+    """The app; DMS (messenger(cfg)) sends every DM."""
     from slack_bolt import App  # the venv's; imported here so the logic tests need no Slack
 
     app = App(token=cfg["bot_token"])
@@ -73,14 +89,17 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
     projects = (cfg.get("projects") or {}).get("deployed") or {}
     projects_root = (cfg.get("projects") or {}).get("root", "")
 
-    def tell(client, slack_id, outcome):
+    def dm(slack_id, text, blocks=None, *, kind, log):
+        dms.dm(slack_id, text, blocks, kind=kind, login=user_of(slack_id) or slack_id, log=log)
+
+    def tell(client, slack_id, outcome, log=False):
         """The outcome: a line in the help channel (the request's thread when it has one)
-        and a DM to the person who asked."""
+        and a DM to the person who asked, logged (LOG) when it comes later than the ask."""
         req = outcome.request
         thread = req.get("thread_ts")
         text = f"<@{slack_id}> {engine.describe(req)}: {outcome.text}" if req else outcome.text
         client.chat_postMessage(channel=channels["help"], text=text, thread_ts=thread)
-        client.chat_postMessage(channel=slack_id, text=outcome.text)
+        dm(slack_id, outcome.text, kind="request", log=log)
 
     def submit(client, slack_id, req):
         """Submit REQ for SLACK_ID; the outcome."""
@@ -98,9 +117,11 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
                 text, blocks = outcome.text, shared.held(f"<@{slack_id}>", outcome.text, outcome.key)
                 if place == channels["admin"]:
                     text, blocks = shared.mentioning(cfg["admin_mention"], text, blocks)
-                client.chat_postMessage(channel=place, text=text, blocks=blocks)
+                    client.chat_postMessage(channel=place, text=text, blocks=blocks)
+                else:
+                    dm(place, text, blocks, kind="approval", log=True)
             engine.note(outcome.key, slack_id=slack_id, thread_ts=first["ts"])
-            client.chat_postMessage(channel=slack_id, text=outcome.text)
+            dm(slack_id, outcome.text, kind="request", log=False)
         else:
             tell(client, slack_id, outcome)
         return outcome
@@ -155,9 +176,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
                "slack": body["user"]["id"]}  # fmt: skip
         ack()
         if submit(client, body["user"]["id"], req).status != "refused":
-            client.chat_postMessage(
-                channel=body["user"]["id"], text=onboarding.join_text(connect, cfg["command"])
-            )
+            dm(body["user"]["id"], onboarding.join_text(connect, cfg["command"]), kind="join", log=False)
 
     def leave_command(body, client):
         user = user_of(body["user_id"])
@@ -263,7 +282,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
         ack()
         slack_id, login = body["user"]["id"], user_of(body["user"]["id"])
         if data is None or not login:
-            client.chat_postMessage(channel=slack_id, text="명부에 이 Slack 계정이 없습니다.")
+            dm(slack_id, "명부에 이 Slack 계정이 없습니다.", kind="data", log=False)
             return
         kind, name = action["value"].split("/", 1)
         try:
@@ -271,7 +290,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
             text = f"{data.root}/{action['value']}을(를) 쓴다고 기록했습니다. 고맙습니다."
         except Failed as e:
             text = f"기록하지 못했습니다: {e}"
-        client.chat_postMessage(channel=slack_id, text=text)
+        dm(slack_id, text, kind="data", log=False)
 
     def help_command(body, client):
         client.chat_postEphemeral(
@@ -309,7 +328,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
         ack()
         view = projects_blocks.join_form(projects, user_of(body["user"]["id"]))
         if view is None:
-            client.chat_postMessage(channel=body["user"]["id"], text="참여를 요청할 프로젝트가 없습니다.")
+            dm(body["user"]["id"], "참여를 요청할 프로젝트가 없습니다.", kind="project", log=False)
             return
         client.views_open(trigger_id=body["trigger_id"], view=view)
 
@@ -394,7 +413,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
         admin = body["user"]["id"]
         # An administrator, or one of the people the request is held for (a project's owners).
         if admin not in admins and user_of(admin) not in engine.approvers(action["value"]):
-            client.chat_postMessage(channel=admin, text="이 요청을 승인할 수 있는 사람이 아닙니다.")
+            dm(admin, "이 요청을 승인할 수 있는 사람이 아닙니다.", kind="request", log=False)
             return
         if action["action_id"] == "request.approve":
             outcome = engine.approve(action["value"], f"<@{admin}>")
@@ -404,7 +423,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None):
             channel=body["channel"]["id"], ts=body["message"]["ts"], text=outcome.text, blocks=[]
         )
         if outcome.request.get("slack_id"):
-            tell(client, outcome.request["slack_id"], outcome)
+            tell(client, outcome.request["slack_id"], outcome, log=True)
 
     return app
 
@@ -469,25 +488,27 @@ def admin_messages(client, channel, mention=""):
     return post, update
 
 
-def data_rounds(client, data, cfg, slack_of):
-    """The shared data's round (cluster_bot.data.watch), its messages sent through CLIENT."""
+def data_rounds(client, dms, data, cfg, slack_of):
+    """The shared data's round (cluster_bot.data.watch), its channel messages sent through
+    CLIENT and its DMs, logged, through DMS (cluster_tools.slack.Slack)."""
     settings, channels = cfg["data"], cfg["channels"]
     unused, grace = settings["unused_days"], settings["grace_days"]
 
     def say(event, key, entry, removal=0, error=""):
-        path, who = f"{data.root}/{key}", slack_of(entry.get("requester"))
+        login = entry.get("requester")
+        path, who = f"{data.root}/{key}", slack_of(login)
         if event in ("done", "failed") and who:
-            client.chat_postMessage(channel=who, text=data_blocks.ended(event, path, entry))
+            dms.dm(who, data_blocks.ended(event, path, entry), kind=f"data-{event}", login=login)
         elif event == "notice":
             if who:
                 text, blocks = data_blocks.notice_dm(key, path, unused, removal)
-                client.chat_postMessage(channel=who, text=text, blocks=blocks)
+                dms.dm(who, text, blocks, kind="data-unused", login=login)
             text, blocks = data_blocks.notice_channel(key, path, entry.get("requester"), removal)
             client.chat_postMessage(channel=channels["help"], text=text, blocks=blocks)
         elif event == "removed":
             text = data_blocks.removed(path, unused, grace)
             if who:
-                client.chat_postMessage(channel=who, text=text)
+                dms.dm(who, text, kind="data-removed", login=login)
             client.chat_postMessage(channel=channels["admin"], text=text)
         elif event == "failed_removal":
             text, blocks = shared.mentioning(
@@ -548,29 +569,27 @@ def main(argv=None):
                 {**settings, "gid_min": p["gid_min"], "reserved_gids": p["reserved_gids"]},
             )
     engine = Engine(features, cfg["pending"])
-    app = build(cfg, engine, join, unban, project, data)
+    dms = messenger(cfg)
+    app = build(cfg, engine, join, unban, project, data, dms=dms)
 
     sources, slack_of = reminder_sources(cfg), {u: s for s, u in cfg["members"].items()}.get
 
     def remind_round():
         with state.locked(cfg["reminders"], {}) as sent:
-            reminders.remind(sources, app.client, slack_of, sent, time.time())
+            reminders.remind(sources, dms, slack_of, sent, time.time())
 
     every(REMIND_EVERY, "reminders", remind_round)
 
     if join is not None:  # the account notice: once the roster's account exists here
 
         def welcome_round():
-            onboarding.welcome_round(cfg["members"], cfg["welcomed"], _account_exists,
-                                     lambda who, text: app.client.chat_postMessage(channel=who, text=text),
+            onboarding.welcome_round(cfg["members"], cfg["welcomed"], _account_exists, dms,
                                      cfg.get("connect") or {}, cfg["command"])  # fmt: skip
 
         every(REMIND_EVERY, "account notices", welcome_round)
     if project is not None:  # a deploy restarts the bot: whose role changed, told once
         p = cfg["projects"]
-        notify_deployed(p["deployed"], p["seen"], p["root"], slack_of,
-                        lambda who, text: app.client.chat_postMessage(channel=who, text=text),
-                        projects_blocks.notice)  # fmt: skip
+        notify_deployed(p["deployed"], p["seen"], p["root"], slack_of, dms, projects_blocks.notice)
     if unban is not None:
         post, update = admin_messages(app.client, channels["admin"], cfg["admin_mention"])
 
@@ -580,7 +599,7 @@ def main(argv=None):
 
         every(BAN_WATCH_EVERY, "ban watch", watch_round)
     if data is not None:
-        data_round = data_rounds(app.client, data, cfg, slack_of)
+        data_round = data_rounds(app.client, dms, data, cfg, slack_of)
         every(DATA_WATCH_EVERY, "shared data", data_round)
     SocketModeHandler(app, cfg["app_token"]).start()
 

@@ -26,6 +26,12 @@
     managed_dir_sources: "{{ cluster_tools_lib_modules }}"
     managed_dir_keep: [__pycache__]
 
+# For a service that imports the package and so runs the old one until restarted
+# (roles/cluster_bot).
+- name: Record whether the package changed
+  ansible.builtin.set_fact:
+    cluster_tools_lib_changed: "{{ managed_dir_changed }}"
+
 # The package's earlier name (clustertools, until 2026-11). A command another role installed
 # imports it until that role runs again, and sq, qos and the timers' tools would break if
 # it went first: it goes only once no installed command names it.

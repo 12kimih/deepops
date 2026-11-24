@@ -11,19 +11,23 @@ from pathlib import Path
 
 ROLE = Path(__file__).resolve().parents[2] / "roles/cluster_bot"
 sys.path.insert(0, str(ROLE / "files"))
+sys.path.insert(0, str(ROLE.parent / "cluster_tools_lib/files"))
+sys.path.insert(0, str(ROLE.parents[1] / "tests/lib"))
+from fake_slack import FakeDM  # noqa: E402
 from cluster_bot import accounts, accounts_blocks, app, reminders, state  # noqa: E402
 
 DAY = 86400
 
 
-class Client:
+class Client(FakeDM):
     def __init__(self, fail=False):
         self.sent, self.fail = [], fail
 
-    def chat_postMessage(self, **kw):
+    def post(self, channel, text, blocks=None):
         if self.fail:
             raise RuntimeError("Slack is down")
-        self.sent.append(kw)
+        self.sent.append({"channel": channel, "text": text, "blocks": blocks})
+        return "1.0"
 
 
 def deadlines(items):
@@ -54,6 +58,9 @@ class LogicTests(unittest.TestCase):
         self.assertEqual(
             [(m["channel"], m["text"]) for m in client.sent],
             [("UALICE", "곧 기한입니다")] * 2,
+        )
+        self.assertEqual(
+            client.dms, [("notice-reminder", "alice", True)] * 2, "logged for the administrators"
         )
         items[0]["ends"] = 13 * DAY  # moved by three days, inside the 7-day window
         reminders.remind(sources, client, SLACK_OF, sent, 9.6 * DAY)  # 3.4 days left: they just chose it

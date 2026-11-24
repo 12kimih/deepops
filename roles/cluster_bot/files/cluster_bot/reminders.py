@@ -1,7 +1,8 @@
 """Reminders before a deadline: a DM at each of a source's stages (days before), once
-each, for every feature that has deadlines (people leaving).
+each, for every feature that has deadlines (people leaving), sent through a
+cluster_tools.slack.Slack (DMS) as a "<source>-reminder" the administrators see logged.
 
-    remind(sources, client, slack_of, state, now)
+    remind(sources, dms, slack_of, state, now)
 
 A Source has `stages` (days, e.g. [14, 7, 1]), `deadlines()` -> {key: (deadline in
 epoch seconds, cluster user, item)} and `message(item, days_left)` -> (text, blocks).
@@ -56,7 +57,7 @@ def due(deadlines, stages, sent, now):
     return out
 
 
-def remind(sources, client, slack_of, state, now):
+def remind(sources, dms, slack_of, state, now):
     """Send what is due for each source in SOURCES ({name: source}); SLACK_OF(user) is a
     cluster user's Slack member ID or None (nothing to send, the stage is passed). A
     failed message is tried again next round; one failing never stops the others."""
@@ -73,7 +74,7 @@ def remind(sources, client, slack_of, state, now):
                 slack_id = slack_of(user)
                 if slack_id:
                     text, blocks = source.message(item, left)
-                    client.chat_postMessage(channel=slack_id, text=text, blocks=blocks)
+                    dms.dm(slack_id, text, blocks, kind=f"{name}-reminder", login=user)
             except Exception as e:  # noqa: BLE001 - the next round tries it again
                 print(f"cluster-bot: {name} reminder {key}: {e}", file=sys.stderr, flush=True)
                 continue
