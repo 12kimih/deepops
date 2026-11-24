@@ -33,6 +33,18 @@ class Port(unittest.TestCase):
         self.assertTrue((ROOT / ara_server.INSTALL.split()[-1]).is_file(), "the named playbook exists")
 
 
+class Database(unittest.TestCase):
+    def test_the_server_serves_the_roles_base_dir(self):
+        self.assertEqual(role_defaults("ara_server")["ara_server_base_dir"].split("}}")[-1], "/.ara/server")
+        self.assertEqual(ara_server.BASE_DIR, "~/.ara/server")
+
+    def test_a_run_with_its_own_database_is_never_sent_to_the_server(self):
+        self.assertTrue(ara_server.serves_this_run({}))
+        self.assertTrue(ara_server.serves_this_run({"ARA_BASE_DIR": "~/.ara/server/"}))
+        self.assertFalse(ara_server.serves_this_run({"ARA_BASE_DIR": "/tmp/test-ara"}))
+        self.assertFalse(ara_server.serves_this_run({"ARA_DATABASE_NAME": "/tmp/x.sqlite"}))
+
+
 class Fallback(unittest.TestCase):
     def test_a_closed_port_does_not_answer(self):
         with socket.socket() as s:
