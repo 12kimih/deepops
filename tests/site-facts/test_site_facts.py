@@ -124,6 +124,39 @@ class Dates(unittest.TestCase):
         )
 
 
+class ServicesAndPaths(unittest.TestCase):
+    """What the pages say runs, from the switches that run it; never an address."""
+
+    def test_the_portal_its_menu_and_the_dashboard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            self.assertEqual(sf.facts(config)["services"], {"portal": False, "overview": "", "menu": [], "dashboard": True},
+                             "the defaults: no portal, monitoring on")  # fmt: skip
+            (config / "group_vars" / "slurm-cluster.yml").write_text(
+                "slurm_install_open_ondemand: true\n"
+                "open_ondemand_servername: portal.example.org\n"
+                "open_ondemand_overview: \"{{ lookup('file', 'x') }}\"\n"
+                "open_ondemand_overview_title: Overview\n"
+                "open_ondemand_proxied_services:\n"
+                '  - {path: "{{ p }}", title: Grafana}\n'
+                "  - {path: /hidden/}\n"
+            )
+            every = sf.facts(config)
+        self.assertEqual(
+            every["services"],
+            {"portal": True, "overview": "Overview", "menu": ["Grafana"], "dashboard": True},
+        )
+        self.assertNotIn("portal.example.org", json.dumps(sf.public(every)))
+
+    def test_the_shared_trees(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = sf.facts(site(tmp, "sm_prefix: /opt/sw\n"))["paths"]
+        self.assertEqual(out["software"], "/opt/sw")
+        self.assertEqual(out["scratch"], "/scratch", "the role default")
+        self.assertTrue(out["shared"].startswith("/"), "a template over the system account's home")
+        self.assertIn("datasets", out["shared_data"])
+
+
 class InteractiveTeamQos(unittest.TestCase):
     def test_whether_gpu_sessions_must_name_a_team_qos_and_never_the_pattern(self):
         with tempfile.TemporaryDirectory() as tmp:
