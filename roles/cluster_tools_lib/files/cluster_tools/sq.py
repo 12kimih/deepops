@@ -15,6 +15,7 @@ import sys
 import time
 from fnmatch import fnmatchcase
 
+from . import qos as quota
 from . import render, slurm, vocab
 from . import cli
 from .cli import Command, Opt, opt_all, opt_json, opt_me, opt_user, run_main
@@ -79,7 +80,7 @@ COMMAND = Command(
         Opt("--no-queue", dest="queue", action="store_const", const="none", section="Sections",
             help="no job list (--queue none)"),
         Opt("-U", "--users", negate=True, default=True, section="Sections",
-            help="who holds what, and each user's share of the GPUs"),
+            help="who holds what (each GPU type under a high QoS and a low one), each user's share of the GPUs, and each team's high QoS quota in use"),
         Opt("-W", "--why", negate=True, default=False, brief=True, section="Sections",
             help="why jobs wait: reason families, then Slurm's codes"),
         Opt("--resources", negate=True, default=True, section="Sections", help="the CPU / memory / GPU table"),
@@ -275,15 +276,13 @@ def _family(partition):
 def _qos_classes(qos_data):
     """{QoS: {"priority", "high", "limits"}} from sacctmgr's JSON, or {} without it. A
     QoS is high when its priority is above the lowest any QoS has (the tier that may
-    preempt); its limits are its GrpTRES GPU quotas, {type: n}, "" for any type."""
+    preempt); its limits are its GrpTRES GPU quotas as the qos command reads them
+    (qos.gpu_limits: {gpu column: n})."""
     if not qos_data:
         return {}
     rows = {}
     for q in qos_data.get("qos") or []:
-        total = slurm.tres_list(((q.get("limits") or {}).get("max") or {}).get("tres", {}).get("total"))
-        limits = {k[len("gres/gpu:") :] if ":" in k else "": v for k, v in total.items()
-                  if k == "gres/gpu" or k.startswith("gres/gpu:")}  # fmt: skip
-        rows[q["name"]] = {"priority": slurm.num(q.get("priority")) or 0, "limits": limits}
+        rows[q["name"]] = {"priority": slurm.num(q.get("priority")) or 0, "limits": quota.gpu_limits(q)}
     floor = min((r["priority"] for r in rows.values()), default=0)
     for r in rows.values():
         r["high"] = r["priority"] > floor
@@ -317,6 +316,33 @@ def _user_teams(assoc_data, classes):
         if a.get("user") and in_team(a["account"]):
             out.setdefault(a["user"], set()).add(a["account"])
     return {u: sorted(accounts, key=_natural) for u, accounts in out.items()}
+
+
+def _team_quotas(assoc_data, classes, jobs_data):
+    """[{"team", "qos", "gpu": {column: {"used", "limit"}}}, ...] and the GPU columns: per
+    high QoS, the team account that grants it (its parent does not), its quota and what
+    its jobs hold now, counted as the qos command counts (qos.gpu_used), so the two show
+    the same figures. Every row has every column; a limit of None is none set."""
+    high = [name for name, c in classes.items() if c["high"]]
+    if not high or not assoc_data:
+        return [], []
+    parent, grants = {}, {}
+    for a in assoc_data.get("associations") or []:
+        if not a.get("user"):
+            parent[a["account"]] = a.get("parent_account") or ""
+            grants[a["account"]] = set(a.get("qos") or [])
+    team_of = {}
+    for account, own in grants.items():
+        for q in own - grants.get(parent.get(account, ""), set()):
+            team_of.setdefault(q, account)
+    used = quota.gpu_used(jobs_data)
+    columns = sorted({k for q in high for k in classes[q]["limits"]}, key=_natural)
+    rows = [
+        {"team": team_of.get(q, ""), "qos": q,
+         "gpu": {k: {"used": used.get((q, k), 0), "limit": classes[q]["limits"].get(k)} for k in columns}}
+        for q in high if q in team_of
+    ]  # fmt: skip
+    return sorted(rows, key=lambda r: (_natural(r["team"]), r["qos"])), columns
 
 
 def _gpu_split(held, classes):
@@ -393,6 +419,7 @@ def build(
     classes = _qos_classes(qos_data)
     split = _gpu_split([j for j in chosen if j["holds"]], classes)
     teams = _user_teams(assoc_data, classes)
+    team_quotas, quota_columns = _team_quotas(assoc_data, classes, jobs_data)
     for u in user_rows:
         u["nodes"] = len(u["nodes"])
         u["teams"] = teams.get(u["user"], [])
@@ -501,7 +528,7 @@ def build(
         "cluster": cluster, "gres": key, "has_gres": has_gres, "free_what": key if has_gres else "cpu",
         "gres_pinned": bool(gres), "jobs": [_public(j) for j in chosen],
         "users": user_rows, "user_nodes": user_nodes, "gpu_types": gpu_types,
-        "qos_read": bool(classes),
+        "qos_read": bool(classes), "teams": team_quotas, "quota_columns": quota_columns,
         "why": [{"family": k[0], "code": k[1], "partition": k[2], "user": k[3], **v} for k, v in why.items()],
         "why_details": details, "pools": pool_tree,
         "nodes": [node_row(n, "") for n in nodes], "node_filter": sel,
@@ -732,15 +759,15 @@ def show_users(t, model):
     def mem(mib, style):
         return (f"{(mib + 512) // 1024}G", style if mib else "faint")
 
-    def pair(hi, lo):
-        return (f"{hi}/{lo}", "text") if hi or lo else ("-", "faint")
+    def count(n):
+        return (str(n), "text") if n else ("-", "faint")
 
     def held(u, k, side):
         return u["gpus"][side].get(k, 0)
 
     # The one column order: (header, align, width cap, cell of a user, cell of the total).
-    # A GPU type's header names its two figures as sinfo's CPUS(A/I/O/T) does: TYPE(H/L),
-    # held under a high QoS / a low one.
+    # Each GPU type is a group of two columns under its name: HIGH, held under a high QoS
+    # (the team's quota), and LOW, under a low one (preemptible); "-" for none.
     cols = [("USER", "l", 16, None, lambda: ("total", s))]
     if model["qos_read"] and kinds:
         cols.append(("TEAM", "l", 16, lambda u: (",".join(u["teams"]) or "-", "sub" if u["teams"] else "faint"),
@@ -767,12 +794,15 @@ def show_users(t, model):
     if model["has_gres"]:
         cols.append((gl, "r", 0, lambda u: num(u["gres"], t.c["text"] + t.bold),
                      lambda: (str(sum(u["gres"] for u in users)), s)))  # fmt: skip
+    groups = []
     for k in kinds:
-        cols.append((f"{_type_label(k)}(H/L)", "r", 0, lambda u, k=k: pair(held(u, k, "high"), held(u, k, "low")),
-                     lambda k=k: (f"{sum(held(u, k, 'high') for u in users)}/{sum(held(u, k, 'low') for u in users)}", s)))  # fmt: skip
+        groups.append((_type_label(k), len(cols), len(cols) + 1))
+        for side in ("high", "low"):
+            cols.append((side.upper(), "r", 0, lambda u, k=k, side=side: count(held(u, k, side)),
+                         lambda k=k, side=side: (str(sum(held(u, k, side) for u in users)), s)))  # fmt: skip
 
     g = Grid(t, [c[0] for c in cols], align=[c[1] for c in cols], maxw=[c[2] for c in cols], tail_header="SHARE",
-             tail_width=15)  # fmt: skip
+             tail_width=15, groups=groups)  # fmt: skip
     cap = model["pools"]["cluster"]["gres_total" if model["has_gres"] else "cpu_total"]
     for u in users:
         own = u["user"] == model["mine"]
@@ -787,6 +817,42 @@ def show_users(t, model):
     if kinds and not model["qos_read"]:
         tally.append(("QoS unread: all shown as low", "warn"))
     return g.render("USERS", tally) + "\n"
+
+
+def show_teams(t, model):
+    """Per team, its high QoS quota of each GPU type and how much of it its jobs hold now,
+    with the qos command's figures and quota cells (qos.quota_cell), then the totals.
+    Nothing when QoS was not read or no QoS is a team's."""
+    rows, columns = model["teams"], model["quota_columns"]
+    if not rows:
+        return ""
+    s = t.c["sub"] + t.bold
+
+    totals = {}
+    for k in columns:
+        limits = [r["gpu"][k]["limit"] for r in rows if r["gpu"][k]["limit"] is not None]
+        totals[k] = (sum(r["gpu"][k]["used"] for r in rows), sum(limits) if limits else None)
+    figures = {k: max(width(quota.quota_figure(t, *totals[k])),
+                      *(width(quota.quota_figure(t, r["gpu"][k]["used"], r["gpu"][k]["limit"])) for r in rows))
+               for k in columns}  # fmt: skip
+
+    def table(bar):
+        g = Grid(t, ["TEAM", "QOS", *[_type_label("" if k == quota.ANY else k) for k in columns]],
+                 align=["l", "l", *["l"] * len(columns)])  # fmt: skip
+        for r in rows:
+            g.row([(r["team"], "text"), (r["qos"], "sub")]
+                  + [quota.quota_cell(t, r["gpu"][k]["used"], r["gpu"][k]["limit"], bar, figures[k])
+                     for k in columns])  # fmt: skip
+        g.rule()
+        g.row([("total", s), ("", s)] + [quota.quota_cell(t, *totals[k], bar, figures[k]) for k in columns])
+        return g
+
+    bar = BAR
+    g = table(bar)
+    while g.total() > t.cols and bar >= BAR_MIN:
+        bar = bar - 1 if bar > BAR_MIN else 0
+        g = table(bar)
+    return g.render("TEAMS", [("high QoS quota in use", "sub")]) + "\n"
 
 
 def show_why(t, model, detail=False):
@@ -964,6 +1030,7 @@ def show(t, model, args):
         parts.append(show_jobs(t, model, args.group, args.detail, args.queue))
     if args.users:
         parts.append(show_users(t, model))
+        parts.append(show_teams(t, model))
     if args.why:
         parts.append(show_why(t, model, args.detail))
     if args.resources:
@@ -979,7 +1046,7 @@ def to_json(model, args):
     resources = [item[1] for item in resource_rows(model, "grouped", True, plain) if item]
     return {
         "cluster": model["cluster"], "gres": model["gres"], "free": model["free_what"],
-        "jobs": model["jobs"], "users": model["users"], "gpu_types": model["gpu_types"],
+        "jobs": model["jobs"], "users": model["users"], "gpu_types": model["gpu_types"], "teams": model["teams"],
         "pending": model["why"],
         "resources": [{k: v for k, v in r.items() if k not in ("occupancy", "partitions")} for r in resources],
     }  # fmt: skip

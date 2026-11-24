@@ -136,5 +136,27 @@ class PunctuationTests(unittest.TestCase):
             self.assertIsNone(re.search("[–—·…]", glyphs))
 
 
+class GroupTests(unittest.TestCase):
+    """Grid's column groups: a label line over the columns it names, never narrower than
+    its label, the columns widened evenly."""
+
+    def setUp(self):
+        self.t = render.Theme(color=False, ascii=True)
+
+    def test_a_group_label_sits_over_its_columns(self):
+        g = render.Grid(self.t, ["USER", "HIGH", "LOW"], align=["l", "r", "r"], groups=[("A10", 1, 2)])
+        g.row([("alice", ""), ("6", ""), ("-", "")])
+        lines = g.render("USERS").splitlines()
+        group, head = lines[1], lines[2]
+        self.assertEqual(group.strip(), "- A10 --")
+        self.assertEqual(group.index("-"), head.index("HIGH"))
+        self.assertEqual(len(group), len(head.rstrip()))
+
+    def test_a_long_label_widens_its_columns_evenly(self):
+        # 1 + 1 + a space is 8 short of the 11 that "- A30 GPU -" needs: 4 each.
+        g = render.Grid(self.t, ["A", "B"], groups=[("A30 GPU", 0, 1)])
+        self.assertEqual(g.widths(), [5, 5])
+
+
 if __name__ == "__main__":
     unittest.main()

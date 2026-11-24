@@ -187,11 +187,37 @@ class GpuUserTests(unittest.TestCase):
 
     def test_who_then_jobs_then_tres_order_then_the_share(self):
         text = self.table()
-        self.assertRegex(
-            text, r"USER +TEAM +RUN +PEND +NODES +CPU +MEMORY +GPU +A10\(H/L\) +A30\(H/L\) +SHARE"
-        )
-        self.assertRegex(text, r"(?m)^. user1 +acct5 +\d+ +\d+ +\d+ +\d+ +\d+G +6 +4/0 +2/0 ")
-        self.assertNotRegex(text, r"hi/lo|TEAMS|HOLDERS")
+        self.assertRegex(text, r"USER +TEAM +RUN +PEND +NODES +CPU +MEMORY +GPU +HIGH +LOW +HIGH +LOW +SHARE")
+        # Each GPU type names its HIGH and LOW columns on the line above, over both.
+        lines = text.splitlines()
+        head = next(i for i, line in enumerate(lines) if line.split()[:1] == ["USER"])
+        group, cols = lines[head - 1], lines[head]
+        for label, first in (("A10", cols.index(" HIGH ")), ("A30", cols.rindex(" HIGH "))):
+            self.assertLessEqual(group.index(label) - 2, first + 6, label)
+            self.assertGreaterEqual(group.index(label), first, label)
+        self.assertRegex(text, r"(?m)^. user1 +acct5 +\d+ +\d+ +\d+ +\d+ +\d+G +6 +4 +- +2 +- ")
+        self.assertRegex(text, r"(?m)^  total +\d+ +\d+ +\d+ +\d+ +\d+G +17 +4 +0 +13 +0$")
+        self.assertNotRegex(text, r"\(H/L\)|hi/lo|HOLDERS")
+
+    def test_teams_show_each_high_qos_quota_as_the_qos_command_counts_it(self):
+        teams = {r["qos"]: r for r in model()["teams"]}
+        self.assertEqual(teams["high_t1"], {"team": "t1", "qos": "high_t1",
+                                            "gpu": {"a10": {"used": 4, "limit": 0}, "a30": {"used": 13, "limit": 6}}})  # fmt: skip
+        qos = run_tool("qos", "--json", "--all", env={"FIXTURES": str(SCENE), "USER": "user1"})
+        qos_rows = {r["name"]: r for r in json.loads(qos.stdout)["qos"]}
+        for name, r in teams.items():
+            self.assertEqual(r["gpu"], qos_rows[name]["gpu"], name)
+
+    def test_teams_rows_line_up_and_add_up(self):
+        text = self.table()
+        block = text[text.index("TEAMS") :]
+        rows = [line for line in block.splitlines() if re.match(r"  (t\d|total) ", line)]
+        self.assertEqual([r.split()[0] for r in rows], ["t1", "t2", "t3", "t4", "t5", "total"])
+        # Every quota cell has one shape: its bar starts in the same column on every row.
+        starts = {re.search(r"\d+/\d+ [#-]", r).end() - 1 for r in rows}
+        self.assertEqual(len(starts), 1, rows)
+        self.assertRegex(rows[-1], r"total +4/28 [#-]{10} +13/31 [#-]{10}$")
+        self.assertRegex(rows[0], r"t1 +high_t1 +4/0 -{10} +13/6 #{10}")
 
     def test_without_the_qos_the_split_is_said_to_be_unknown(self):
         broken = SCENE / "noqos"
