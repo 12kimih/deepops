@@ -533,6 +533,17 @@ do
     check("R4 a batch job needs no team QoS", submit(t), slurm.SUCCESS)
     t = {partition = "cpu"}
     check("R5 an interactive CPU session is not concerned", submit(t), slurm.SUCCESS)
+    -- The weekly GPU diagnostics as srun sends them (cluster_tools.gpu_diag_idle
+    -- diag_args): root, no batch script, no --qos, a node's every GPU, exclusive.
+    local function diagnosis()
+        return {gres = "gpu:a100:7", min_nodes = 1, num_tasks = 1, shared = 0,
+                reservation = "gpu-diag-n1", name = "gpu-diag"}
+    end
+    LOG = {}
+    t = diagnosis()
+    check("R6 root's diagnosis runs without a team QoS", slurm_job_submit(t, {}, 0), slurm.SUCCESS)
+    check("R6 and is routed like any", t.partition, "gpu-a100")
+    check("R7 a user's same srun is refused", submit(diagnosis()), slurm.ERROR)
     PLUGIN = saved
 end
 

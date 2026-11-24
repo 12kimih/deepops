@@ -611,10 +611,16 @@ local function job_submit(job_desc, part_list, submit_uid)
         return reject_multi_type()
     end
 
+    -- root's jobs are exempt from the rules that share the GPUs between users (this one
+    -- and the per-node count below), as in job_modify: an administrator's job, such as
+    -- the weekly GPU diagnostics (an srun holding a node's every GPU, however many), is
+    -- no one's session. The type stamping and routing still apply.
+    local admin = submit_uid == 0
+
     -- An interactive session (srun, salloc: no batch script) holds its GPUs while
     -- someone sits at a shell, so it runs only on a QoS matching INTERACTIVE_GPU_QOS,
     -- named with --qos (an unset QoS is the preemptible default, which never matches).
-    if INTERACTIVE_GPU_QOS ~= "" and job_desc.script == nil then
+    if INTERACTIVE_GPU_QOS ~= "" and job_desc.script == nil and not admin then
         local qos = job_desc.qos
         if qos == nil or qos == "" or not string.find(qos, INTERACTIVE_GPU_QOS) then
             slurm.log_user("Interactive GPU jobs (srun, salloc) run on your team's QoS: " ..
@@ -651,10 +657,7 @@ local function job_submit(job_desc, part_list, submit_uid)
     end
 
     -- Validate before rewriting anything, so a rejected job is reported as submitted.
-    -- root is exempt from the sizing rule, as in job_modify: an administrator's job may
-    -- take a node's every GPU however many it has (the weekly GPU diagnostics on a node
-    -- with 7); the type stamping and routing above and below still apply.
-    if submit_uid ~= 0 then
+    if not admin then
         local shape_rc = check_gpu_shape(job_desc)
         if shape_rc ~= slurm.SUCCESS then return shape_rc end
     end

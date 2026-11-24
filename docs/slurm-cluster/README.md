@@ -174,8 +174,9 @@ sends CPU-only jobs to a CPU partition; optionally it also pins GPU jobs to ever
 partition of their type (`force_gpu_partition`), sizes them by the partition defaults
 alone (`gpu_jobs_use_defaults`: CPU options dropped, memory options rejected, at most
 one task per GPU) and keeps interactive GPU sessions on a QoS matching
-`interactive_gpu_qos`. The logic is the same for every cluster; only the policy
-differs. `scripts/check.sh` renders it and runs `roles/slurm/tests/job_submit_test.lua`
+`interactive_gpu_qos`. root's jobs (the weekly GPU diagnostics, an administrator's)
+skip the per-node GPU count and the interactive QoS rule but are typed and routed like
+any. The logic is the same for every cluster; only the policy differs. `scripts/check.sh` renders it and runs `roles/slurm/tests/job_submit_test.lua`
 on the result. A site's own Lua file still works: point `slurm_job_submit_template` at
 a path not ending in `.j2` and it is installed as it is.
 

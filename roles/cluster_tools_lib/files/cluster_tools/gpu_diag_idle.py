@@ -164,7 +164,8 @@ def verdict(returncode, output):
 
 
 def diag_args(node, reservation, gres, level, timeout):
-    """srun's arguments for one run on NODE inside RESERVATION, holding GRES."""
+    """srun's arguments for one run on NODE inside RESERVATION, holding GRES (as root, an
+    administrator's job: job_submit.lua lets it past the users' rules, tests R6)."""
     minutes = math.ceil(timeout / 60)
     return [
         f"--reservation={reservation}", f"--nodelist={node}", "--nodes=1", "--ntasks=1",
