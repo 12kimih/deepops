@@ -166,6 +166,11 @@ mkdir "${logs}/no-callbacks"
 export ANSIBLE_CALLBACK_PLUGINS="${logs}/no-callbacks"
 (umask 077 && od -An -N16 -tx1 /dev/urandom | tr -d ' \n' >"${logs}/vault-pass")
 export ANSIBLE_VAULT_PASSWORD_FILE="${logs}/vault-pass"
+# Facts in memory only: ansible.cfg caches them in the operator's ~/.cache, where one
+# checkout's test wrote its own interpreter for localhost and every later localhost play
+# in another checkout failed once it was gone ("The module interpreter ... was not
+# found": the runai role tests, 2026-11-24).
+export ANSIBLE_CACHE_PLUGIN=memory
 run_one() {
     local i="$1" start=${SECONDS} status=ok
     nice -n 10 bash -c "${commands[$i]}" >"${logs}/${i}" 2>&1 </dev/null || status=FAILED
