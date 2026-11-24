@@ -9,8 +9,8 @@ def help_text(channel, group):
     administrators' Slack user group), with a ready-made example."""
     who = group or "관리자"
     return (
-        f"*도움 받기*: {channel}에 글을 하나 올리고, 이어지는 이야기는 그 글의 *스레드*에 적습니다. "
-        f"관리자를 부를 때는 {who}을(를) 태그하세요.\n"
+        f"*도움 받기*: {channel}에 글을 하나 올리고, 이어지는 이야기는 *그 글의 스레드* 안에 적어 주세요. "
+        f"관리자를 부를 때는 {who}을(를) 태그해 주세요.\n"
         "```\n"
         f"{who} 잡이 시작하자마자 끝납니다.\n"
         "- 잡 ID: 123456\n"
