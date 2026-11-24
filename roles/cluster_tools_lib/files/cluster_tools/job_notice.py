@@ -77,15 +77,16 @@ def locked_state(path):
         write_atomic(path, json.dumps(state), mode=0o600)
 
 
-def deliver(slack, state, slack_id, text_line, now, window):
+def deliver(slack, state, slack_id, login, text_line, now, window):
     """Post a new message, or add to the person's open one; returns the state entry."""
     open_ = state.get(slack_id)
     if open_ and now - open_["first"] < window:
         open_["lines"].append(text_line)
         slack.update(open_["channel"], open_["ts"], render(open_["lines"]))
         return open_
-    channel = slack.channel(slack_id)
-    ts = slack.post(channel, render([text_line]))
+    # A job's start and end are the person's own business: in the journal, not logged
+    # for the administrators (owner 2026-11-24).
+    channel, ts = slack.dm(slack_id, render([text_line]), kind="job", login=login, log=False)
     state[slack_id] = {"channel": channel, "ts": ts, "first": now, "lines": [text_line]}
     return state[slack_id]
 
@@ -141,7 +142,7 @@ def main(argv=None, env=None, now=None):
             cache = state.setdefault("_members", {})
             slack_id = member(slack, login, cfg.get("members", {}), cfg.get("email_domain", ""), cache)
             if slack_id:
-                deliver(slack, state, slack_id, line(env), now, cfg.get("coalesce_seconds", COALESCE))
+                deliver(slack, state, slack_id, login, line(env), now, cfg.get("coalesce_seconds", COALESCE))
     except SlackError as e:
         print(f"job-notice: {e}", file=sys.stderr)  # slurmctld logs it; the job is unaffected
     return 0

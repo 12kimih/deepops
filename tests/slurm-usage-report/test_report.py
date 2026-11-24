@@ -9,6 +9,8 @@ from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
+from fake_slack import FakeDM  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
 
 
@@ -289,14 +291,11 @@ class RunTests(unittest.TestCase):
                  "idle_gpus": 1} for i, u in (("1", "alice"), ("2", "bob"))]  # fmt: skip
         posted = []
 
-        class Slack:
+        class Slack(FakeDM):
             token = "t"
 
-            def __init__(self, *_):
+            def __init__(self, *_, **__):
                 pass
-
-            def channel(self, target):
-                return target
 
             def post(self, channel, text, blocks=None, thread_ts=None):
                 if channel == "UBOB":
@@ -435,7 +434,7 @@ class CancelTests(unittest.TestCase):
     def test_one_warning_per_person_for_all_their_jobs(self):
         jobs = [self.job("7", NOW - 3600), self.job("8", NOW - 3600), self.job("9", NOW - 3600, user="v")]
         self.run_act(jobs)
-        texts = [c.args[1] for c in self.slack.post.call_args_list]
+        texts = [c.args[1] for c in self.slack.dm.call_args_list]
         self.assertEqual(len(texts), 2, "one DM to u, one to v")
         self.assertTrue(texts[0].startswith("2: - `7`"), texts[0])
 
@@ -446,7 +445,7 @@ class CancelTests(unittest.TestCase):
     def test_told_once_per_person_and_every_job_of_theirs_counts_as_told(self):
         jobs = [self.job("7", None), self.job("8", None)]
         self.run_act(jobs, due=["u"], notify=["dm"], cancel_after_hours=0)
-        self.assertEqual(self.slack.post.call_count, 1, "one DM for both jobs")
+        self.assertEqual(self.slack.dm.call_count, 1, "one DM for both jobs")
         self.assertEqual(self.told, {"u": NOW})
         self.assertEqual([j["state"]["notified"] for j in jobs], [NOW, NOW])
 

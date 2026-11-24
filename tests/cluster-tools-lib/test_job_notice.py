@@ -10,20 +10,22 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "roles/cluster_tools_lib/files"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
+from fake_slack import FakeDM  # noqa: E402
 from cluster_tools import job_notice as jn  # noqa: E402
 
 ENV = {"SLURM_JOB_ID": "42", "SLURM_JOB_NAME": "train", "SLURM_JOB_STATE": "COMPLETED",
        "SLURM_JOB_RUN_TIME": "01:02:03", "SLURM_JOB_EXIT_CODE_MAX": "0"}  # fmt: skip
 
 
-class FakeSlack:
+class FakeSlack(FakeDM):
     calls = []
 
     def __init__(self, token, dry_run=False):
         self.token = token
 
-    def channel(self, target):
-        return "D" + target
+    def dm_channel(self, member):
+        return "D" + member
 
     def post(self, channel, text, blocks=None, thread_ts=None):
         FakeSlack.calls.append(("post", channel, text))

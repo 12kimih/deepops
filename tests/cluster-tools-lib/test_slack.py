@@ -1,11 +1,13 @@
 """cluster_tools.slack: the one Slack client. A member is found from the map, by email, or
-not at all, and an answer is reused for a day; a member ID becomes a DM channel; a
-dry run prints instead of posting; a refusal names the method and Slack's reason."""
+not at all, and an answer is reused for a day; every DM goes through dm(),
+logged for the administrators unless asked not to; a dry run prints instead of posting; a refusal names the method and Slack's reason."""
 
 import email.message
 import io
 import json
 import sys
+import tempfile
+import time
 import unittest
 import urllib.error
 from pathlib import Path
@@ -47,10 +49,86 @@ class SlackTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 1, "a cached answer is not looked up again")
         self.assertEqual(slack.member(client, "c", {}, "", cache), "")
 
-    def test_a_member_id_becomes_a_dm_channel(self):
-        client = Fake({"conversations.open": {"ok": True, "channel": {"id": "D9"}}})
-        self.assertEqual(client.channel("U1ABC"), "D9")
-        self.assertEqual(client.channel("#infra-status"), "#infra-status")
+    ANSWERS = {"conversations.open": {"ok": True, "channel": {"id": "D9"}}, "chat.postMessage": {"ok": True, "ts": "1.2"},
+               "chat.getPermalink": {"ok": True, "permalink": "https://x/p1"}, "chat.update": {"ok": True}}  # fmt: skip
+
+    def posts(self, client):
+        return [(p["channel"], p["text"]) for m, p in client.calls if m == "chat.postMessage"]
+
+    def logged(self, d):
+        client = Fake(self.ANSWERS)
+        client.dm_log = slack.DmLog("#alerts", f"{d}/dm-log.json")
+        return client
+
+    def test_a_dm_is_logged_under_the_days_message_and_says_so(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = self.logged(d)
+            with mock.patch("sys.stdout", io.StringIO()) as out:
+                self.assertEqual(client.dm("U1ABC", "Your disk use is high.\nMore.", kind="disk", login="kim"),
+                                 ("D9", "1.2"))  # fmt: skip
+                client.dm("U2", "Idle GPUs.", kind="idle", login="lee")
+            posts = [
+                (m, p["channel"], p["text"], p.get("thread_ts"))
+                for m, p in client.calls
+                if m in ("chat.postMessage", "chat.update")
+            ]
+            day = time.strftime("%Y-%m-%d")
+            self.assertEqual(posts[0][:2], ("chat.postMessage", "D9"))
+            self.assertIn(slack.DM_LOG_NOTE, posts[0][2])
+            self.assertEqual(posts[1], ("chat.postMessage", "#alerts", slack.dm_log_title(day, 0), None))
+            self.assertEqual(posts[2], ("chat.postMessage", "#alerts",
+                                        "`disk` to *kim*: Your disk use is high.  <https://x/p1|open>", "1.2"))  # fmt: skip
+            self.assertEqual(posts[3][:3], ("chat.update", "#alerts", slack.dm_log_title(day, 1)))
+            # The second DM of the day goes under the same message: no new one.
+            self.assertEqual([p[1] for p in posts[4:]], ["D9", "#alerts", "#alerts"])
+            self.assertEqual(posts[5][3], "1.2")
+            self.assertEqual(posts[6][2], slack.dm_log_title(day, 2))
+            self.assertIn("dm disk kim D9 1.2", out.getvalue())
+
+    def test_a_new_day_starts_a_new_message(self):
+        with tempfile.TemporaryDirectory() as d:
+            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
+            client = Fake(self.ANSWERS)
+            log.record(client, "a", now=time.mktime((2026, 11, 24, 12, 0, 0, 0, 0, -1)))
+            log.record(client, "b", now=time.mktime((2026, 11, 25, 9, 0, 0, 0, 0, -1)))
+            titles = [p["text"] for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
+            self.assertEqual(
+                titles, [slack.dm_log_title("2026-11-24", 0), slack.dm_log_title("2026-11-25", 0)]
+            )
+
+    def test_an_unlogged_dm_or_no_log_posts_the_dm_alone(self):
+        with tempfile.TemporaryDirectory() as d:
+            for client, log in ((self.logged(d), False), (Fake(self.ANSWERS), True)):
+                with self.subTest(log=log):
+                    with mock.patch("sys.stdout", io.StringIO()):
+                        client.dm("U1ABC", "Job 42 ended.", kind="job", login="kim", log=log)
+                    self.assertEqual(self.posts(client), [("D9", "Job 42 ended.")])
+
+    def test_a_failed_log_line_never_fails_the_sent_dm(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = self.logged(d)
+            sent = client.call
+
+            def call(method, **params):
+                if method == "chat.postMessage" and params["channel"] == "#alerts":
+                    raise slack.Error("Slack chat.postMessage failed: channel_not_found")
+                return sent(method, **params)
+
+            client.call = call
+            with mock.patch("sys.stdout", io.StringIO()), mock.patch("sys.stderr", io.StringIO()) as err:
+                self.assertEqual(client.dm("U1ABC", "x", kind="io", login="kim"), ("D9", "1.2"))
+            self.assertIn("the DM to kim (io) was sent; logging it failed", err.getvalue())
+
+    def test_a_message_to_a_person_is_refused_outside_dm(self):
+        client = Fake(self.ANSWERS)
+        with self.assertRaisesRegex(slack.Error, "a message to a person is a dm"):
+            client.post("U1ABC", "x")
+        self.assertEqual(client.calls, [])
+
+    def test_the_log_line_keeps_a_long_first_line_short(self):
+        line = slack.dm_log_line("io", "kim", "y" * 500)
+        self.assertLess(len(line), slack.DM_LOG_FIRST + 40)
+        self.assertTrue(line.endswith("..."))
 
     def test_dry_run_prints_and_posts_nothing(self):
         client = slack.Slack("", dry_run=True)
