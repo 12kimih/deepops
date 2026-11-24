@@ -573,6 +573,14 @@ def check_retired():
                     problems.append(
                         f"retired: {label}/{src.rel}:{e.line}: {e.name} is retired: set {gone[e.name]} instead"
                     )
+    # The extra-vars files deepops ships (-e @virtual/vars_files/...) stop a deploy alike.
+    for path in tracked("virtual/vars_files"):
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            name = line.split(":", 1)[0]
+            if ":" in line and not line.startswith((" ", "#", "-")) and name in gone:
+                problems.append(
+                    f"retired: {path.relative_to(ROOT)}:{number}: {name} is retired: set {gone[name]} instead"
+                )
     return problems
 
 

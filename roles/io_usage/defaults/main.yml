@@ -3,7 +3,7 @@
 # Slurm job's syscall reads and writes, each login's disk I/O, and how long each slice
 # waited for I/O, as node_exporter textfile counters. With node_exporter's mountstats
 # (roles/prometheus-node-exporter), what a node sends to each NFS export, they say
-# which node and which jobs drive an export's load (roles/io_notice, the dashboards).
+# which node and which jobs drive an export's load (roles/slurm_usage_report's I/O notices, the dashboards).
 # docs/slurm-cluster/io-fairness.md.
 
 # present or absent (docs/deepops/component-state.md); a deploy sets it from

@@ -8,9 +8,7 @@ slurm_allow_ssh_user:
 - "root"
 
 # Perform cleanup tasks during the install to minimize disk space impact
-hpcsdk_clean_up_tarball_after_extract: true
 hpcsdk_clean_up_temp_dir: true
-slurm_build_dir_cleanup: false
 
 # Ensure we use the slurm management node for syslog
 rsyslog_client_tcp_host: "{{ groups['slurm-metric'][0] }}"

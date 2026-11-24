@@ -1,6 +1,6 @@
 ---
 # One chassis power action (bmc_power_action) through the host's BMC, the one place the
-# repository drives ipmitool: playbooks/utilities/bmc-power and the maintenance reboot
+# repository drives ipmitool: playbooks/utilities/power.yml and the maintenance reboot
 # of a host that must be power-cycled both come here. Refuses the machine running
 # Ansible for anything but status and on: powering it off cuts the run off; and a
 # compute node that takes or runs jobs, as a reboot does (bmc_power_undrained).
