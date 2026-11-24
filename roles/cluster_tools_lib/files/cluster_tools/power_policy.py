@@ -15,7 +15,14 @@ The GPUs (where nvidia-smi is) are held at the node's policy, never a job's:
   gpu/clock_lock          no clock lock holding a busy GPU down (nvidia-smi reports it as
                           the applications_clocks_setting reason; set back: -rgc, -rmc)
 The driver reports no locked clock while it does not limit, so a lock on an idle GPU
-is seen once the GPU works. A choice file that lists every
+is seen once the GPU works.
+
+Every PCIe link (pcie/aspm) is read where it is decided, its Link Control register in
+the device's configuration space: ASPM (L0s, L1) enabled there is off. Where the kernel
+controls ASPM (the link's sysfs *_aspm and *_pcipm files exist) apply turns it off
+there; where the firmware keeps that control (ACPI gives the kernel none: the files are
+absent and the kernel's policy file refuses writes, ARA 285) it is refused, for the BIOS
+power settings to change. A choice file that lists every
 option with the chosen one in brackets ("[default] performance") holds the bracketed
 one. Run at boot before slurmd and again on a timer, apply puts back what anything else
 changed (a job, a package, a firmware event), and says so.
@@ -25,7 +32,9 @@ Metrics, one series per setting (its glob):
   power_policy_off          of them, found off at this run (apply set them)
   power_policy_refused      of them, the kernel would not set (firmware owns it)
   power_policy_last_success_timestamp_seconds
-An apply exits 1 when the kernel refused one; a check when one is off.
+A refusal fails nothing: apply sets what it can, says on stderr what it cannot and
+why, and the metrics carry it to the alert (what the firmware owns is no deploy's to
+fix). A check exits 1 when something is off, refused or not.
 
 CONFIG: sys_root (the sysfs root, /sys), textfile, settings: [{path (a glob under
 sys_root), value}]; optional gpu: {nvidia_smi (the command), power_cap_file}, no GPU
@@ -217,6 +226,63 @@ def run_gpus(gpu, fix, out=sys.stdout):
     return [(setting, *count[setting]) for setting in GPU_SETTINGS]
 
 
+PCI_EXPRESS = 0x10  # the PCI Express capability's ID
+LINK_CONTROL = 0x10  # its Link Control register's offset
+ASPM_BITS = 0x3  # Link Control bits 1:0, ASPM L0s and L1 enabled
+
+
+def link_control(config_bytes):
+    """The Link Control register of a device's configuration space, or None (no PCI
+    Express capability, or only the first 64 bytes readable, as for a non-root user)."""
+    if len(config_bytes) < 0x40 or not config_bytes[0x06] & 0x10:  # no capability list
+        return None
+    pointer, seen = config_bytes[0x34] & 0xFC, set()
+    while pointer and pointer not in seen and pointer + LINK_CONTROL + 2 <= len(config_bytes):
+        seen.add(pointer)
+        if config_bytes[pointer] == PCI_EXPRESS:
+            return int.from_bytes(config_bytes[pointer + LINK_CONTROL : pointer + LINK_CONTROL + 2], "little")
+        pointer = config_bytes[pointer + 1] & 0xFC
+    return None
+
+
+def run_links(sys_root, fix, out=sys.stdout):
+    """The PCIe row of a run: ("pcie/aspm", links, off, refused)."""
+    links = off = refused = 0
+    for device in sorted(glob.glob(os.path.join(sys_root, "bus/pci/devices/*"))):
+        try:
+            with open(os.path.join(device, "config"), "rb") as f:
+                control = link_control(f.read())
+        except OSError:
+            control = None
+        if control is None:
+            continue
+        links += 1
+        if not control & ASPM_BITS:
+            continue
+        off += 1
+        name = os.path.basename(device)
+        knobs = sorted(
+            glob.glob(os.path.join(device, "link/*_aspm")) + glob.glob(os.path.join(device, "link/*_pcipm"))
+        )
+        if not fix:
+            print(f"PCIe {name} pcie/aspm: enabled, wants disabled", file=out)
+            continue
+        if not knobs:
+            print(f"power-policy: PCIe {name} pcie/aspm: enabled, the firmware keeps ASPM (BIOS power settings)",
+                  file=sys.stderr)  # fmt: skip
+            refused += 1
+            continue
+        try:
+            for knob in knobs:
+                with open(knob, "w") as f:
+                    f.write("0")
+            print(f"PCIe {name} pcie/aspm: enabled -> disabled", file=out)
+        except OSError as e:
+            print(f"power-policy: PCIe {name} pcie/aspm: the kernel refuses ({e.strerror})", file=sys.stderr)
+            refused += 1
+    return [("pcie/aspm", links, off, refused)]
+
+
 def textfile(rows, now):
     lines = []
     for name, help_text, column in (
@@ -234,15 +300,19 @@ def textfile(rows, now):
     return "\n".join(lines) + "\n"
 
 
+def rows_of(cfg, fix, out):
+    """Every setting's row: the sysfs settings, the PCIe links, the GPUs."""
+    gpus = run_gpus(cfg["gpu"], fix=fix, out=out) if cfg.get("gpu") else []
+    return run(cfg, fix=fix, out=out) + run_links(cfg["sys_root"], fix=fix, out=out) + gpus
+
+
 def apply(cfg, out=sys.stdout, now=None):
-    rows = run(cfg, fix=True, out=out) + (run_gpus(cfg["gpu"], fix=True, out=out) if cfg.get("gpu") else [])
-    write_textfile(cfg["textfile"], textfile(rows, time.time() if now is None else now))
-    return int(any(row[3] for row in rows))
+    write_textfile(cfg["textfile"], textfile(rows_of(cfg, True, out), time.time() if now is None else now))
+    return 0
 
 
 def check(cfg, out=sys.stdout):
-    rows = run(cfg, fix=False, out=out) + (run_gpus(cfg["gpu"], fix=False, out=out) if cfg.get("gpu") else [])
-    return int(any(row[2] or row[3] for row in rows))
+    return int(any(row[2] or row[3] for row in rows_of(cfg, False, out)))
 
 
 def main(argv=None):

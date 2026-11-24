@@ -113,7 +113,7 @@ class Apply(unittest.TestCase):
         self.assertEqual(m[prom.key("power_policy_last_success_timestamp_seconds")], 100)
         self.assertEqual(policy.check(self.tree.cfg, out=io.StringIO()), 0)
 
-    def test_a_setting_the_kernel_keeps_is_refused_and_fails_the_run(self):
+    def test_a_setting_the_kernel_keeps_is_refused_and_reported_never_failing_the_run(self):
         real_open = open
 
         def refusing(path, mode="r", *args, **kw):
@@ -122,9 +122,62 @@ class Apply(unittest.TestCase):
             return real_open(path, mode, *args, **kw)
 
         with mock.patch("builtins.open", refusing), mock.patch("sys.stderr", io.StringIO()) as err:
-            self.assertEqual(policy.apply(self.tree.cfg, out=io.StringIO(), now=1), 1)
+            self.assertEqual(policy.apply(self.tree.cfg, out=io.StringIO(), now=1), 0)
         self.assertIn("the kernel keeps powersave (Operation not permitted), not performance", err.getvalue())
         self.assertEqual(self.tree.metrics()[prom.key("power_policy_refused", setting=GOVERNOR)], 1)
+
+
+def config_space(aspm):
+    """A device's configuration space with a PCI Express capability at 0x40 behind a
+    power management one at 0x50, its Link Control ASPM bits as given."""
+    space = bytearray(256)
+    space[0x06] = 0x10  # a capability list
+    space[0x34] = 0x50
+    space[0x50:0x52] = bytes([0x01, 0x40])  # power management, next 0x40
+    space[0x40:0x42] = bytes([0x10, 0x00])  # PCI Express, last
+    space[0x40 + 0x10] = aspm
+    return bytes(space)
+
+
+class Links(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.sys = Path(self.dir.name)
+
+    def device(self, name, aspm, knobs=(), short=False):
+        d = self.sys / "bus/pci/devices" / name
+        (d / "link").mkdir(parents=True)
+        (d / "config").write_bytes(config_space(aspm)[: 64 if short else 256])
+        for knob in knobs:
+            (d / "link" / knob).write_text("1\n")
+        return d
+
+    def test_the_register_is_found_through_the_capability_list(self):
+        self.assertEqual(policy.link_control(config_space(0x2)) & policy.ASPM_BITS, 0x2)
+        self.assertIsNone(policy.link_control(config_space(0x2)[:64]), "first 64 bytes only: unknown")
+        self.assertIsNone(policy.link_control(bytes(256)), "no capability list")
+
+    def test_kernel_controlled_links_are_set_off_and_firmware_ones_refused(self):
+        kernel = self.device("0000:01:00.0", 0x2, knobs=("l1_aspm", "l0s_aspm", "l1_1_pcipm"))
+        self.device("0000:02:00.0", 0x3)  # the firmware keeps ASPM: no knobs
+        self.device("0000:03:00.0", 0x0)
+        self.device("0000:04:00.0", 0x3, short=True)  # unreadable: not counted
+        out = io.StringIO()
+        with mock.patch("sys.stderr", io.StringIO()) as err:
+            rows = policy.run_links(str(self.sys), fix=True, out=out)
+        self.assertEqual(rows, [("pcie/aspm", 3, 2, 1)])
+        self.assertEqual({k.name: k.read_text() for k in (kernel / "link").iterdir()},
+                         {"l1_aspm": "0", "l0s_aspm": "0", "l1_1_pcipm": "0"})  # fmt: skip
+        self.assertIn("0000:01:00.0 pcie/aspm: enabled -> disabled", out.getvalue())
+        self.assertIn("0000:02:00.0 pcie/aspm: enabled, the firmware keeps ASPM", err.getvalue())
+
+    def test_check_lists_enabled_links_and_sets_nothing(self):
+        d = self.device("0000:01:00.0", 0x2, knobs=("l1_aspm",))
+        out = io.StringIO()
+        self.assertEqual(policy.run_links(str(self.sys), fix=False, out=out), [("pcie/aspm", 1, 1, 0)])
+        self.assertEqual((d / "link/l1_aspm").read_text(), "1\n")
+        self.assertIn("enabled, wants disabled", out.getvalue())
 
 
 # nvidia-smi over files in $FAKE: "rows" answers --query-gpu (one CSV row per GPU),
