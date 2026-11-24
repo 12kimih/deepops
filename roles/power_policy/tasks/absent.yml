@@ -1,0 +1,18 @@
+---
+# The settings keep their values until the next boot, which gives them back the
+# kernel's and the firmware's defaults: removal changes no device now.
+- name: Take the power policy off the kernel command line
+  ansible.builtin.include_role:
+    name: host_baseline
+    tasks_from: kernel_args
+  vars:
+    host_baseline_kernel_args_owner: power-policy
+    host_baseline_kernel_args: []
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: power_policy
+    component_record_action: absent
+    component_record_items: "{{ power_policy_items }}"

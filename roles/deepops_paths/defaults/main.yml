@@ -42,6 +42,12 @@ nvidia_power_limit_conf_file: /etc/nvidia-power-limit.conf
 # hand-installed one had (the old utilities/disable-acs.yml), so it is taken over in place.
 pcie_acs_program: /usr/local/sbin/pcie-acs
 pcie_acs_service: disable-acs.service
+# Holds the host's power management at full performance, at boot and on a timer, and
+# reports what it found (roles/power_policy).
+power_policy_program: /usr/local/sbin/power-policy
+power_policy_conf: /etc/power-policy.json
+power_policy_service: power-policy.service
+power_policy_timer: power-policy.timer
 # Software modules (Lmod): the prefix must be on storage every node shares.
 sm_prefix: /sw
 sm_module_root: "{{ sm_prefix }}/modules"

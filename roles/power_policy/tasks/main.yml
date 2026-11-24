@@ -1,0 +1,10 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: power_policy_state in ['present', 'absent', 'kept']
+    fail_msg: "power_policy_state must be present, absent or kept, not {{ power_policy_state }}."
+    quiet: true
+
+- name: "Make the power policy {{ power_policy_state }}"
+  ansible.builtin.include_tasks: "{{ power_policy_state }}.yml"
+  when: power_policy_state != 'kept'

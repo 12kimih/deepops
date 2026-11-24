@@ -174,7 +174,7 @@ class Roles(unittest.TestCase):
         self.assertEqual(
             sorted(recorded()),
             ["container_storage_gc", "disk_quota", "egress_policy", "gpu_diag_idle", "io_fairness", "io_usage", "job_notice",
-             "scratch_space", "shared_space", "slurm_backup", "slurm_usage_report", "submit_holds"],
+             "power_policy", "scratch_space", "shared_space", "slurm_backup", "slurm_usage_report", "submit_holds"],
         )  # fmt: skip
 
     def test_each_role_validates_records_and_removes_its_record(self):

@@ -133,6 +133,11 @@
   vars:
     deepops_phase: install
 
+- name: Hold the power management at full performance
+  import_playbook: generic/power-policy.yml
+  vars:
+    deepops_phase: install
+
 # Before NHC, which checks ACS stays off where this is present.
 - name: Turn PCIe ACS off for GPU peer-to-peer
   import_playbook: generic/pcie-acs.yml
@@ -515,6 +520,11 @@
 
 - name: Remove the GPU power limit where it is no longer wanted
   import_playbook: nvidia-software/nvidia-power-limit.yml
+  vars:
+    deepops_phase: remove
+
+- name: Remove the power policy where it is no longer wanted
+  import_playbook: generic/power-policy.yml
   vars:
     deepops_phase: remove
 

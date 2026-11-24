@@ -1,0 +1,9 @@
+---
+dependencies:
+  - role: cluster_tools_lib  # cluster_tools.power_policy
+  - role: deepops_paths  # power_policy_program, its config and units
+  - role: prometheus_paths  # node_exporter_prom_dir
+
+galaxy_info:
+  namespace: deepops
+  role_name: power_policy

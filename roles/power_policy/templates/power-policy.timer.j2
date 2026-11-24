@@ -1,0 +1,11 @@
+{{ ansible_managed | comment }}
+# roles/power_policy: the settings checked and put back every {{ power_policy_interval }}.
+[Unit]
+Description=Hold the power management at full performance, every {{ power_policy_interval }}
+
+[Timer]
+OnBootSec={{ power_policy_interval }}
+OnUnitActiveSec={{ power_policy_interval }}
+
+[Install]
+WantedBy=timers.target

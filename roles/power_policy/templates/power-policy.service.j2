@@ -1,0 +1,20 @@
+{{ ansible_managed | comment }}
+# roles/power_policy: the host's power management at full performance, at boot before
+# anything runs a job, and again from its timer.
+[Unit]
+Description=Hold the power management at full performance (deepops)
+Before=slurmd.service kubelet.service nvidia-persistenced.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=2min
+# The directory may sit on /run, which is empty after a boot.
+ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
+ExecStart={{ power_policy_program }} apply {{ power_policy_conf }}
+# Every few minutes: its own lines (what it set) stay in the journal, systemd's start
+# and finish lines do not.
+SyslogLevel=notice
+LogLevelMax=notice
+
+[Install]
+WantedBy=multi-user.target

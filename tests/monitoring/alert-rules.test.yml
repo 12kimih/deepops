@@ -1102,6 +1102,53 @@ tests:
               summary: "n1 has reported no disk quota usage for an hour"
               description: "`journalctl -u disk-quota` and `systemctl list-timers disk-quota.timer` on the host."
 
+  - name: a power setting refused, one kept being reset, and the runs stopping
+    interval: 1m
+    input_series:
+      - series: 'power_policy_refused{host="n1", instance="n1:9100", setting="module/pcie_aspm/parameters/policy"}'
+        values: '1x40'
+      - series: 'power_policy_off{host="n1", instance="n1:9100", setting="devices/system/cpu/cpu*/cpufreq/scaling_governor"}'
+        values: '0x10 1x60'
+      - series: 'power_policy_last_success_timestamp_seconds{host="n1", instance="n1:9100"}'
+        values: '0x80'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: PowerPolicyRefused
+        exp_alerts: []
+      - eval_time: 31m
+        alertname: PowerPolicyRefused
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", setting: module/pcie_aspm/parameters/policy}
+            exp_annotations:
+              summary: "n1 will not hold module/pcie_aspm/parameters/policy at full performance"
+              description: >-
+                `power-policy check /etc/power-policy.json` on n1 lists the files and what
+                they hold. The firmware owns a setting the kernel refuses (ASPM, a BIOS power
+                profile): set its performance profile in the BIOS or BMC.
+      - eval_time: 55m
+        alertname: PowerPolicyKeepsBeingReset
+        exp_alerts: []
+      - eval_time: 62m
+        alertname: PowerPolicyKeepsBeingReset
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100", setting: "devices/system/cpu/cpu*/cpufreq/scaling_governor"}
+            exp_annotations:
+              summary: "Something keeps changing devices/system/cpu/cpu*/cpufreq/scaling_governor on n1"
+              description: >-
+                Every run of power-policy sets it back (`journalctl -u power-policy` on n1 lists
+                each). Find what writes it: a job script, a tuned or power-profiles daemon, a
+                package's unit.
+      - eval_time: 59m
+        alertname: PowerPolicyStale
+        exp_alerts: []
+      - eval_time: 61m
+        alertname: PowerPolicyStale
+        exp_alerts:
+          - exp_labels: {severity: warning, host: n1, instance: "n1:9100"}
+            exp_annotations:
+              summary: "The power policy on n1 has not run for an hour"
+              description: "`journalctl -u power-policy` and `systemctl list-timers power-policy.timer` on the host."
+
   - name: a container outside Slurm past the grace period warns; a stopped or new one does not
     interval: 1m
     input_series:
