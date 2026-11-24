@@ -155,8 +155,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument(
         "--base-url",
-        default="http://127.0.0.1:8000",
-        help="Loopback HTTP origin, without /v1; proxies and redirects disabled",
+        required=True,
+        # No default: 127.0.0.1:8000, vLLM's own, is also the run history's server on
+        # the deploy host (roles/ara_server); the endpoint is always the one started.
+        help="Loopback HTTP origin of the server you started, without /v1; proxies and redirects disabled",
     )
     parser.add_argument("--model", required=True, help="Expected --served-model-name")
     parser.add_argument("--cache-dir", required=True, help="Explicit shared HF_HUB_CACHE")
