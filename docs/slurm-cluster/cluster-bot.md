@@ -79,6 +79,14 @@ host it cannot read keeps its bans on the list as last seen and is named there. 
 token is ever on those hosts: the bot reads them over the `bans` service. Invite the bot
 to the admin channel so it can pin the list.
 
+The user docs' notices: when `cluster_info.docs_url` is set, the bot reads
+`<docs_url>/notices.json` every 15 minutes (each notice already rendered as a Slack
+message by the docs site's build) and posts each notice in `slack_channels.announce`
+once, on its date. The docs repository holds no Slack credential; the announcement goes
+through this app. Its first look posts nothing: every notice already due counts as
+announced, so a new deploy never repeats one; a notice dated later still goes out on its
+date. A site it cannot reach is tried again at the next look.
+
 ### How the bot acts on other hosts
 
 A role that lets the bot do something on its hosts offers a service through
@@ -186,6 +194,6 @@ Who the bot knows comes from the people roster: `cluster_bot_members` (each pers
 | `/etc/cluster-bot/bot.token`, `app.token` | The tokens, read by the bot alone; never on a command line |
 | `/etc/cluster-bot/github-app.pem` | The GitHub App's private key, read by the bot alone |
 | `/etc/cluster-bot/known_hosts` | The host keys of the hosts it reaches, read from each host |
-| `/var/lib/cluster-bot/` | Its SSH key and state: held requests, reminders sent, bans seen, shared data notices (kept on removal) |
+| `/var/lib/cluster-bot/` | Its SSH key and state: held requests, reminders sent, bans seen, shared data notices, docs notices posted (kept on removal) |
 | `/etc/cluster-bot-access/<service>.json` | On a host it acts on: a service offered to it |
 | `/var/lib/cluster-bot/.ssh/authorized_keys` | On a host it acts on: its key, for the dispatcher only |

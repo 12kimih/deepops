@@ -17,7 +17,8 @@ seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
 {login_host, ssh_port, portal_url, docs_url} and welcomed (cluster_bot.onboarding: how to
 log in, the account notice), dm_log {channel, state} (where the notices the bot sends a
 person by DM are logged for the administrators, cluster_tools.slack.DmLog; no channel
-logs none).
+logs none), notices {url, channel, seen} (the user docs' notices posted in the
+announcement channel on their date, cluster_bot.notices; no url posts none).
 
 Every DM goes through cluster_tools.slack.Slack.dm (the bot's own client posts only to
 channels): a notice (a decision on a request, a reminder, the account notice, a
@@ -29,6 +30,7 @@ import json
 import sys
 import threading
 import time
+from datetime import date
 from pathlib import Path
 
 from cluster_tools.slack import DmLog, Slack  # the cluster's library (PYTHONPATH, roles/cluster_bot)
@@ -37,6 +39,7 @@ from . import (
     accounts_blocks,
     bans_blocks,
     commands,
+    notices as docs_notices,
     data_blocks,
     home_blocks,
     onboarding,
@@ -60,6 +63,7 @@ from .requests import Engine, Failed
 REMIND_EVERY = 3600
 BAN_WATCH_EVERY = 300
 DATA_WATCH_EVERY = 600
+NOTICES_EVERY = 900
 
 
 def load(path):
@@ -601,6 +605,18 @@ def main(argv=None):
     if data is not None:
         data_round = data_rounds(app.client, dms, data, cfg, slack_of)
         every(DATA_WATCH_EVERY, "shared data", data_round)
+    docs = cfg.get("notices") or {}
+    if docs.get("url") and docs.get("channel"):
+
+        def notices_round():
+            docs_notices.round_(
+                lambda: docs_notices.fetch_json(docs["url"]),
+                lambda text, blocks: dms.post(docs["channel"], text, blocks),
+                docs["seen"],
+                date.today().isoformat(),
+            )
+
+        every(NOTICES_EVERY, "docs notices", notices_round)
     SocketModeHandler(app, cfg["app_token"]).start()
 
 
