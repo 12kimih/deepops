@@ -33,6 +33,12 @@ _cluster_bot_cfg:
   welcomed: "{{ _cluster_bot_home }}/accounts-welcomed.json"
   # The notices the bot DMs a person, logged for the administrators (cluster_tools.slack).
   dm_log: {channel: "{{ slack_dm_log_channel }}", state: "{{ _cluster_bot_home }}/dm-log.json"}
+  # The user docs' notices, posted in the announcement channel on their date
+  # (cluster_bot.notices): the docs site publishes them as notices.json.
+  notices:
+    url: "{{ (cluster_bot_connect.docs_url | regex_replace('/+$', '') ~ '/notices.json') if cluster_bot_connect.docs_url | length > 0 else '' }}"
+    channel: "{{ slack_channels.announce }}"
+    seen: "{{ _cluster_bot_home }}/notices-posted.json"
   connect: "{{ cluster_bot_connect }}"
   prefs_file: "{{ cluster_bot_prefs_file }}"
   github:
