@@ -21,8 +21,7 @@ DeepOps supports a number of configuration values for specifying alternate sourc
 ## Using mirrors to deploy offline
 
 - [Deploying the NGC-Ready playbook offline](ngc-ready.md)
-- Deploying a Kubernetes cluster offline (TODO)
-- Deploying a Slurm cluster offline (TODO)
+- Deploying a Slurm or Kubernetes cluster offline: [skills/deploy-airgapped](../../skills/deploy-airgapped/SKILL.md)
 
 ## Dependency documentation
 

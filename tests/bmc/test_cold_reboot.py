@@ -1,4 +1,4 @@
-"""roles/bmc/files/bmc-cold-reboot: a reboot of a host that needs a cold start ends in a
+"""roles/bmc/templates/bmc-cold-reboot.j2: a reboot of a host that needs a cold start ends in a
 chassis power cycle by its own BMC, and nothing else does.
 
 A host whose GPUs drop off the bus on a warm reboot came back short after every Slurm

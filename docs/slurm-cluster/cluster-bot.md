@@ -17,8 +17,9 @@ the Slack app manifest and these docs all come from; a test requires a handler, 
 line and a doc line for each, and no command name Slack uses itself. App commands do not
 run inside message threads: use them in a channel or the bot's DM.
 
-Features today: account requests, unban requests, collaboration folders (below), and
-reminders before a person's last day.
+Features: account requests, unban requests, collaboration folders and shared data
+requests (below), reminders before a person's last day, the pinned ban list, the docs
+site's notices posted on their date and each channel's guide.
 
 Account requests (`/cluster join`, `/cluster leave`): a newcomer gives a login, a name, a team (the
 accounting file's accounts without children, but `cluster_bot_join_exclude`) and an SSH

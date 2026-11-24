@@ -4,7 +4,7 @@
 # latency targets at every boot, and systemd's slices get their IOWeight. iocost never
 # throttles I/O from the root cgroup (nfsd, kernel threads), so on an NFS server it
 # keeps logins on the server itself from starving the exports, not one NFS client
-# from another (roles/io_usage and roles/io_notice attribute that by node and job).
+# from another (roles/io_usage and roles/slurm_usage_report's I/O notices attribute that by node and job).
 # docs/slurm-cluster/io-fairness.md.
 
 # present or absent (docs/deepops/component-state.md); a deploy sets it from
