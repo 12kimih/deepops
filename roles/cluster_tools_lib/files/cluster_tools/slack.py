@@ -77,18 +77,25 @@ class DmLog:
                 state = {}
             day = time.strftime("%Y-%m-%d", time.localtime(now))
             if state.get("day") != day:
-                state = {"day": day, "ts": "", "count": 0}
+                state = {"day": day, "ts": "", "channel": "", "count": 0}
             yield state
             write_atomic(self.state_file, json.dumps(state), mode=0o600)
 
     def record(self, slack, line, now=None):
-        """LINE under today's message (made by this call if there is none yet)."""
+        """LINE under today's message (made by this call if there is none yet). The
+        message's channel is kept as Slack gave it, an ID: chat.update takes no name."""
         with self._today(time.time() if now is None else now) as state:
             if not state["ts"]:
-                state["ts"] = slack.post(self.channel, dm_log_title(state["day"], 0))
-            slack.post(self.channel, line, thread_ts=state["ts"])
+                made = slack.call(
+                    "chat.postMessage", channel=self.channel, text=dm_log_title(state["day"], 0)
+                )
+                state["ts"], state["channel"] = made["ts"], made["channel"]
+            slack.post(state["channel"], line, thread_ts=state["ts"])
             state["count"] += 1
-            slack.update(self.channel, state["ts"], dm_log_title(state["day"], state["count"]))
+            try:
+                slack.update(state["channel"], state["ts"], dm_log_title(state["day"], state["count"]))
+            except Error as e:  # the count is cosmetic: the line is in, and so is the state
+                print(f"slack: the day's DM count was not updated: {e}", file=sys.stderr)
 
 
 class Slack:
