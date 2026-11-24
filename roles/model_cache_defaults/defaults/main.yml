@@ -1,8 +1,11 @@
 ---
 # The shared Hugging Face model cache (playbooks/model-cache.yml), named once: the
-# playbook prepares it on its one writer, and every host reads model_cache_root for the
-# users' HF_HUB_CACHE (user_environment, roles/user_environment_defaults). Set these in
-# group_vars/all.yml, where every host reads them; empty: no shared cache.
+# playbook prepares it on its one writer, and every host reads model_cache_hub for the
+# users' SHARED_HF_HUB_CACHE (user_environment, roles/user_environment_defaults), a
+# pointer they read snapshots from. Never their HF_HUB_CACHE: the cache is the writer's,
+# and huggingface_hub writes into its HF_HUB_CACHE (blobs, refs, .locks) for anything
+# not yet in it. Set these in group_vars/all.yml, where every host reads them; empty: no
+# shared cache.
 # docs/model-workflows/shared-cache.md.
 
 # The existing NFS mount the cache lives on, the writer's account and the readers' group.
@@ -14,3 +17,9 @@ model_cache_root: ""
 # 2750: the reader group reads. 2755: every user reads every model in the cache (the
 # site's decision on licences); match the mode another role gives the same directory.
 model_cache_mode: "2750"
+
+# Derived, not settings: the cache's directory and the hub cache inside it.
+model_cache_path: >-
+  {{ (model_cache_root if model_cache_root | length > 0 else model_cache_mount ~ '/hf-cache')
+     if model_cache_mount | length > 0 else '' }}
+model_cache_hub: "{{ model_cache_path ~ '/hub' if model_cache_path | length > 0 else '' }}"

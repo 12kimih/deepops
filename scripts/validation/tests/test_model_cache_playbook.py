@@ -84,7 +84,7 @@ class ModelCachePlaybookTests(unittest.TestCase):
         self.assertIn("changed=0", self.run_play())
 
     def test_old_environment_file_removed(self):
-        # HF_HUB_CACHE is user_environment's (roles/user_environment_defaults) now.
+        # Users find the cache through SHARED_HF_HUB_CACHE (roles/user_environment_defaults) now.
         self.root.mkdir()
         (self.root / "environment.sh").write_text("export HF_HUB_CACHE=/old\n")
         self.run_play()

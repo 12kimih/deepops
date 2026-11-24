@@ -78,7 +78,8 @@ by these skills.
 ## Golden path: shared model cache
 
 Use `playbooks/model-cache.yml` only on an approved, existing NFS mount and one
-explicit `model-cache-warmer` host. Share `HF_HUB_CACHE`, never credentials or
+explicit `model-cache-warmer` host. Share the hub cache read-only (users read it
+through `SHARED_HF_HUB_CACHE`, never as their `HF_HUB_CACHE`), never credentials or
 `HF_HOME`. A designated writer downloads immutable model revisions; consumers
 use local snapshot paths and read-only mounts.
 

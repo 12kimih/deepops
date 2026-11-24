@@ -28,6 +28,13 @@ site_facts = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(site_facts)
 
 DEFAULTS = yaml.safe_load((ROOT / "roles/user_environment_defaults/defaults/main.yml").read_text())
+# The defaults as a host renders them with the role defaults alone (a derived one, such as
+# SHARED_HF_HUB_CACHE without a shared cache, empty and so not set).
+_ROLE_SETTINGS = site_facts.settings(None)
+RENDERED_DEFAULTS = {
+    k: site_facts._resolve(v, _ROLE_SETTINGS) for k, v in DEFAULTS["user_environment_defaults"].items()
+}
+assert None not in RENDERED_DEFAULTS.values(), RENDERED_DEFAULTS
 PROFILE_SH = "roles/cluster_tools/templates/profile.sh.j2"
 PROFILE_CSH = "roles/cluster_tools/templates/profile.csh.j2"
 PROLOG = "roles/slurm/templates/etc/slurm/task-prolog.d/60-user-environment"
@@ -86,9 +93,24 @@ class List(unittest.TestCase):
         with self.assertRaises(ValueError):
             user_environment({"A": {"logn": "/x"}})
 
+    def test_a_library_cache_on_shared_storage_is_refused(self):
+        # huggingface_hub writes into HF_HUB_CACHE for any file not yet in it: a shared,
+        # writer-owned default fails those downloads for everyone else.
+        for site in ({"HF_HUB_CACHE": "/srv/models/hub"}, {"HF_HOME": "/home/shared/hf"},
+                     {"PIP_CACHE_DIR": {"login": "/tmp/pip"}}, {"UV_CACHE_DIR": {"login": "~/u", "job": "/scratch/uv"}}):  # fmt: skip
+            with self.subTest(site=site), self.assertRaisesRegex(ValueError, "never shared storage"):
+                user_environment(RENDERED_DEFAULTS, site)
+        got = user_environment(
+            {}, {"HF_HUB_CACHE": "~/.cache/hub", "PIP_CACHE_DIR": {"login": "~/p", "job": "/tmp/p"}}
+        )
+        self.assertEqual([e["name"] for e in got], ["HF_HUB_CACHE", "PIP_CACHE_DIR"], "per user: allowed")
+        self.assertEqual(
+            user_environment({}, {"SHARED_HF_HUB_CACHE": "/srv/models/hub"})[0]["login"], "/srv/models/hub"
+        )
+
 
 class Rendered(unittest.TestCase):
-    entries = user_environment(DEFAULTS["user_environment_defaults"])
+    entries = user_environment(RENDERED_DEFAULTS)
 
     def login_env(self, shell, script, **preset):
         names = [e["name"] for e in self.entries if e["login"]]
@@ -135,7 +157,7 @@ class Rendered(unittest.TestCase):
 class Docs(unittest.TestCase):
     def test_the_docs_table_is_the_same_list(self):
         every = site_facts.facts(None)
-        entries = user_environment(DEFAULTS["user_environment_defaults"])
+        entries = user_environment(RENDERED_DEFAULTS)
         self.assertEqual(every["environment"], entries)
         public = site_facts.public(every)["environment"]
         self.assertEqual(
@@ -146,18 +168,25 @@ class Docs(unittest.TestCase):
         every = {"environment": user_environment({"P": "/p", "F": "%9P %5t"})}
         self.assertEqual([e["name"] for e in site_facts.public(every)["environment"]], ["P"])
 
-    def test_a_reference_to_a_literal_setting_resolves(self):
+    def environment(self, all_yml):
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / "config"
             (config / "group_vars").mkdir(parents=True)
-            (config / "group_vars" / "all.yml").write_text(
-                'model_cache_root: /srv/models\nuser_environment:\n  HF_HUB_CACHE: "{{ model_cache_root }}/hub"\n'
-                '  UV_CACHE_DIR: null\n  X: "{{ undefined_here }}"\n'
-            )
-            got = {e["name"]: e for e in site_facts.environment(config)}
-        self.assertEqual(got["HF_HUB_CACHE"]["login"], "/srv/models/hub")
+            (config / "group_vars" / "all.yml").write_text(all_yml)
+            return {e["name"]: e for e in site_facts.environment(config)}
+
+    def test_a_derived_setting_resolves_as_ansible_would(self):
+        got = self.environment(
+            "model_cache_mount: /srv\nmodel_cache_root: /srv/models\nuser_environment:\n"
+            '  UV_CACHE_DIR: null\n  X: "{{ undefined_here }}"\n  G: "{{ groups.all }}"\n'
+        )
+        self.assertEqual(got["SHARED_HF_HUB_CACHE"]["login"], "/srv/models/hub", "through model_cache_hub")
         self.assertNotIn("UV_CACHE_DIR", got, "null drops a default")
         self.assertNotIn("X", got, "a template left unresolved is left out")
+        self.assertNotIn("G", got, "what only a host knows is left out")
+        self.assertEqual(self.environment("model_cache_mount: /srv\n")["SHARED_HF_HUB_CACHE"]["login"],
+                         "/srv/hf-cache/hub", "the root's default")  # fmt: skip
+        self.assertNotIn("SHARED_HF_HUB_CACHE", self.environment("x: 1\n"), "no shared cache: not set")
 
 
 class NoSecondWriter(unittest.TestCase):
@@ -167,7 +196,7 @@ class NoSecondWriter(unittest.TestCase):
         names = set(DEFAULTS["user_environment_defaults"]) | set(
             re.findall(r"^#  ([A-Z][A-Z0-9_]*):", block, re.M)
         )
-        self.assertIn("HF_HUB_CACHE", names)
+        self.assertIn("SHARED_HF_HUB_CACHE", names)
         alt = "|".join(sorted(names))
         setting = re.compile(rf"(?:\bexport|\bsetenv|\benv)\s+(?:{alt})\b|^\s*(?:{alt})\s*[:=]", re.M)
         offenders = []

@@ -3,14 +3,12 @@
 # Run only on the designated writer. No mount, account, package, or download changes.
 # The writer is a client of the NFS mount or its server (the mount is in its active
 # exports). The settings are roles/model_cache_defaults'; users find the cache through
-# HF_HUB_CACHE in user_environment (roles/user_environment_defaults), "{{ model_cache_root }}/hub".
+# SHARED_HF_HUB_CACHE (model_cache_hub, roles/user_environment_defaults).
 - name: Prepare a shared model cache on existing storage
   hosts: model-cache-warmer
   gather_facts: true
   roles:
     - role: model_cache_defaults
-  vars:
-    model_cache_path: "{{ model_cache_root if model_cache_root | length > 0 else model_cache_mount ~ '/hf-cache' }}"
   tasks:
     - name: Require one explicit cache writer and site configuration
       ansible.builtin.assert:
@@ -67,7 +65,7 @@
         follow: false
       loop:
         - "{{ model_cache_path }}"
-        - "{{ model_cache_path }}/hub"
+        - "{{ model_cache_hub }}"
       register: model_cache_directories
 
     - name: Refuse redirected or non-directory cache paths
@@ -90,10 +88,10 @@
         mode: "{{ model_cache_mode }}"
       loop:
         - "{{ model_cache_path }}"
-        - "{{ model_cache_path }}/hub"
+        - "{{ model_cache_hub }}"
 
-    # HF_HUB_CACHE comes from user_environment for every user now; the writer's old
-    # opt-in file is gone.
+    # Users find the cache through SHARED_HF_HUB_CACHE (user_environment); the writer's
+    # old opt-in file is gone.
     - name: Remove the old opt-in cache environment
       become: true
       become_user: "{{ model_cache_owner }}"

@@ -123,7 +123,9 @@ def validate_bounded(args, timeout):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cache-dir", required=True, help="Explicit HF_HUB_CACHE directory")
+    parser.add_argument(
+        "--cache-dir", required=True, help="Explicit hub cache directory (SHARED_HF_HUB_CACHE)"
+    )
     parser.add_argument("--repo-id", required=True, help="Model repository, e.g. namespace/model")
     parser.add_argument("--revision", required=True, help="Full immutable model commit hash")
     parser.add_argument(

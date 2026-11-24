@@ -37,7 +37,7 @@ weight map. Add every additional file needed by the selected model.
 python3 scripts/validation/validate_finetune.py --json \
   --node "$NODE" --partition "$PARTITION" \
   --container-image "$TRAINING_IMAGE" \
-  --cache-dir "$HF_HUB_CACHE" --repo-id "$MODEL_REPO" --revision "$MODEL_REVISION" \
+  --cache-dir "$SHARED_HF_HUB_CACHE" --repo-id "$MODEL_REPO" --revision "$MODEL_REVISION" \
   --require-file config.json --require-file tokenizer.json \
   --require-file tokenizer_config.json --require-file model.safetensors
 ```

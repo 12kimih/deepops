@@ -74,12 +74,12 @@ The example model, `openai-community/gpt2` at
 license and access requirements when selecting another model or revision.
 
 ```bash
-: "${HF_HUB_CACHE:?the site sets the shared cache in user_environment}"
+: "${SHARED_HF_HUB_CACHE:?the site has no shared model cache (model_cache_mount)}"
 export MODEL_ID=openai-community/gpt2
 export MODEL_REVISION=607a30d783dfa663caf39e06633721c8d4cfcd7e
-export MODEL_PATH="$HF_HUB_CACHE/models--openai-community--gpt2/snapshots/$MODEL_REVISION"
+export MODEL_PATH="$SHARED_HF_HUB_CACHE/models--openai-community--gpt2/snapshots/$MODEL_REVISION"
 python3 scripts/validation/validate_model_cache.py --json \
-  --cache-dir "$HF_HUB_CACHE" --repo-id "$MODEL_ID" --revision "$MODEL_REVISION" \
+  --cache-dir "$SHARED_HF_HUB_CACHE" --repo-id "$MODEL_ID" --revision "$MODEL_REVISION" \
   --require-file config.json --require-file tokenizer.json --require-file model.safetensors
 ```
 

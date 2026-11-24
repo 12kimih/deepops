@@ -32,7 +32,7 @@ them, as the [Lmod docs](https://lmod.readthedocs.io/en/latest/030_installing.ht
   early return for shells that are not interactive.
 - `roles/cluster_tools` writes the users' environment variables, one list
   (`user_environment` over the defaults in `roles/user_environment_defaults`: HF_HOME,
-  the uv and pip caches, a shared HF_HUB_CACHE where the site has one), as
+  the uv and pip caches, SHARED_HF_HUB_CACHE where the site has a model cache), as
   `/etc/profile.d/z10-cluster-tools.{sh,csh}`; the Slurm task prolog gives a job the
   value that differs there (the package caches in the job's own `/tmp`). Each is a
   default: a value the user set wins.

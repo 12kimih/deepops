@@ -161,7 +161,7 @@ def main():
         help="Loopback HTTP origin of the server you started, without /v1; proxies and redirects disabled",
     )
     parser.add_argument("--model", required=True, help="Expected --served-model-name")
-    parser.add_argument("--cache-dir", required=True, help="Explicit shared HF_HUB_CACHE")
+    parser.add_argument("--cache-dir", required=True, help="Explicit shared hub cache (SHARED_HF_HUB_CACHE)")
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--revision", required=True, help="Full immutable model commit hash")
     parser.add_argument(
