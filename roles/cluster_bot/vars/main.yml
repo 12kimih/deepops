@@ -34,7 +34,9 @@ _cluster_bot_cfg:
   admin_group: "{{ slack_admin_group }}"
   admin_mention: "{{ slack_admin_mention }}"
   members: "{{ dict(cluster_bot_members.values() | zip(cluster_bot_members.keys())) }}"
-  admins: "{{ cluster_bot_admins | map('extract', cluster_bot_members) | select | list }}"
+  # The administrators the bot can reach: one without a Slack member (a shared admin
+  # login) approves nothing in Slack, and is left out here, not looked up.
+  admins: "{{ cluster_bot_admins | select('in', cluster_bot_members) | map('extract', cluster_bot_members) | list }}"
   pending: "{{ _cluster_bot_home }}/requests-pending.json"
   reminders: "{{ _cluster_bot_home }}/reminders-sent.json"
   welcomed: "{{ _cluster_bot_home }}/accounts-welcomed.json"
