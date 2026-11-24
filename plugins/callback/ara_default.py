@@ -19,18 +19,20 @@ from ara.plugins.callback.ara_default import DOCUMENTATION  # noqa: F401  # the 
 from ara.plugins.callback.ara_default import CallbackModule as AraCallbackModule
 
 import os
+import socket
 import sys
 
+import requests
+import urllib3
 from ansible.utils.display import Display
-from ara.clients import utils as client_utils
+from ara.clients.http import AraHttpClient
 
 # The probe and the note, shared with the doctor (scripts/deepops/ara_server.py); realpath:
 # the file may be linked into another callback directory (tests do that).
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "scripts", "deepops")
 )
-from ara_server import answers as server_answers  # noqa: E402,F401  (tests reach it here)
-from ara_server import offline_note, serves_this_run  # noqa: E402
+from ara_server import offline_note, serves_this_run, usable  # noqa: E402
 
 # ara.api.models: CharField(max_length=255) for Playbook.path, File.path, Play.name, Task.name
 LIMIT = 255
@@ -69,20 +71,75 @@ class BoundedClient:
         return getattr(self._client, name)
 
 
+class _UnixConnection(urllib3.connection.HTTPConnection):
+    """An HTTP connection over the unix socket PATH (the host name is only a header)."""
+
+    def __init__(self, path, **kwargs):
+        super().__init__("localhost", **kwargs)
+        self._path = path
+
+    def _new_conn(self):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        timeout = self.timeout if isinstance(self.timeout, (int, float)) else None
+        sock.settimeout(timeout)
+        sock.connect(self._path)
+        return sock
+
+
+class _UnixPool(urllib3.connectionpool.HTTPConnectionPool):
+    def __init__(self, path, **kwargs):
+        super().__init__("localhost", **kwargs)
+        self._path = path
+
+    def _new_conn(self):
+        return _UnixConnection(self._path, timeout=self.timeout.connect_timeout)
+
+
+class UnixAdapter(requests.adapters.HTTPAdapter):
+    """Every request of a session to one unix socket."""
+
+    def __init__(self, path):
+        super().__init__()
+        self._pool = _UnixPool(path)
+
+    def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        return self._pool
+
+    def get_connection(self, url, proxies=None):
+        return self._pool
+
+    def request_url(self, request, proxies):
+        return request.path_url
+
+    def close(self):
+        self._pool.close()
+        super().close()
+
+
+def unix_client(path):
+    """ARA's HTTP client, its every request sent over the unix socket PATH and never
+    through a proxy from the environment (a site's http_proxy)."""
+    client = AraHttpClient(endpoint="http://localhost")
+    session = client.client.http
+    session.trust_env = False
+    session.mount("http://localhost", UnixAdapter(path))
+    return client
+
+
 class CallbackModule(AraCallbackModule):
     def set_options(self, task_keys=None, var_options=None, direct=None):
         super().set_options(task_keys=task_keys, var_options=var_options, direct=direct)
         # ARA's offline client starts its database layer for every request, about 4 s a
-        # task; its API server (roles/ara_server, on ARA's default address) does not. When
-        # nothing chose a client (offline is ARA's default), the run's database is the one
-        # the server serves (scripts/deepops/ara_server.py) and that server answers, the
-        # run records through it; with no server it records offline, as before.
+        # task; its API server (roles/ara_server) does not. When nothing chose a client
+        # (offline is ARA's default), the run's database is the one the server serves,
+        # and the running person's own server answers on its socket
+        # (scripts/deepops/ara_server.py), the run records through it; otherwise offline.
         if self.client is not None and self.get_option("api_client") == "offline" and serves_this_run():
-            server = self.get_option("api_server")
-            if server_answers(server):
-                self.client = client_utils.get_client(client="http", endpoint=server)
+            path = usable()
+            if path:
+                self.client = unix_client(path)
             else:
-                Display().display(offline_note(server))
+                Display().display(offline_note())
         if self.client is not None:
             self.client = BoundedClient(self.client)
 

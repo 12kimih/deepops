@@ -1,15 +1,11 @@
 ---
 # ara_server -- the run history's API server on the host deepops runs from, for the
 # person who runs it (playbooks/utilities/ara-server.yml). The recorder (plugins/
-# callback/ara_default.py) sends each result to it whenever it answers on ARA's default
-# address, instead of starting ARA's database layer for every request, which cost about
+# callback/ara_default.py) sends each result to it whenever the running person's own one
+# answers on its socket, instead of starting ARA's database layer for every request, which cost about
 # 4 s a task (an 8-task play: 40 s offline, 7 s through the server; 2026-11-23). With no
 # server the run records offline, as before: slower, nothing lost.
 ara_server_state: present
-# Loopback only, on ARA's default api_server address, which the recorder probes (a test
-# keeps the two equal).
-ara_server_bind: 127.0.0.1
-ara_server_port: 8000
 # Whose history it serves: the person running the playbook (their ~/.ara/server, the one
 # the offline client writes too), with the checkout's own .venv.
 ara_server_user: "{{ lookup('ansible.builtin.env', 'USER') }}"
@@ -17,4 +13,12 @@ ara_server_base_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.ara/server"
 ara_server_venv: "{{ playbook_dir | dirname | dirname }}/.venv"
 # sqlite takes one writer at a time: workers beyond a couple only wait on its lock.
 ara_server_workers: 2
-ara_server_unit: deepops-ara.service
+# One server per person who installs one: their own unit, and their own socket in a
+# directory systemd makes for them alone (0700; scripts/deepops/ara_server.py says why
+# no TCP port, and a test keeps the socket path equal to the recorder's).
+ara_server_unit: "deepops-ara-{{ ara_server_user }}.service"
+ara_server_runtime_dir: "deepops-ara-{{ ara_server_user }}"
+ara_server_socket: "/run/{{ ara_server_runtime_dir }}/ara.sock"
+# The first version's unit, which served every user on 127.0.0.1:8000: stopped and
+# removed by every run of this role.
+ara_server_retired_units: [deepops-ara.service]

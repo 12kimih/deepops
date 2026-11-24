@@ -35,7 +35,7 @@ reboots each as it empties and returns it to service. See
 
 | Playbook | Default hosts | Does |
 | --- | --- | --- |
-| `utilities/ara-server.yml` | localhost | the run history's API server on the deepops host for the operator (`roles/ara_server`): runs then record through it, about 4 s a task faster than ARA's offline client; `-e ara_server_state=absent` removes it |
+| `utilities/ara-server.yml` | localhost | the run history's API server on the deepops host for the operator alone (`roles/ara_server`, a unix socket in `/run/deepops-ara-<user>/`, no TCP port): their runs then record through it, about 4 s a task faster than ARA's offline client; `-e ara_server_state=absent` removes it |
 | `utilities/apt-upgrade.yml` | slurm-node | rolling maintenance (roles/maintenance): one node at a time, drain it, upgrade every package (the held-back kernel, systemd, libc, GPU and scheduler stacks included), reboot if needed, check slurmd, GPUs, DCGM (level 1) and NHC, resume. Run it monthly |
 | `utilities/check-id-consistency.yml` | all | asserts that the groups the directory (NIS or LDAP) publishes resolve to their pinned GID on every node; read-only |
 | `utilities/fleet-consistency.yml` | slurm-cluster | are the hosts level: running kernel, shared packages, loaded NVIDIA driver, kernel policy sysctls, pending reboots, shared machine-ids; read-only |

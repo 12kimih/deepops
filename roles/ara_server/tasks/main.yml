@@ -12,6 +12,22 @@
     quiet: true
   when: ara_server_state == 'present'
 
+# The first version listened on TCP for every user of the host: gone before its
+# replacement starts.
+- name: Stop the retired ARA server units
+  systemd_unit:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ ara_server_retired_units }}"
+  failed_when: false  # never installed here
+
+- name: Remove the retired ARA server units
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}"
+    state: absent
+  loop: "{{ ara_server_retired_units }}"
+
 - name: Write the ARA server unit
   ansible.builtin.template:
     src: deepops-ara.service.j2

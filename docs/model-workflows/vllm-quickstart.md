@@ -163,8 +163,7 @@ accuracy. Neither server responses nor error bodies are copied into the result.
   **or skipped**: execution stops at the first error, whose stage identifies it.
 - Only literal loopback HTTP addresses with an explicit port are accepted,
   including `http://[::1]:8000`. No `/v1` suffix, credentials, hostname resolution,
-  proxy routing, or redirects. It has no default: name the endpoint you started
-  (`127.0.0.1:8000` is also the run history's server on the deploy host).
+  proxy routing, or redirects. It has no default: name the endpoint you started.
 - No retries. `--timeout` defaults to a 30-second socket timeout (maximum 120),
   with an elapsed-time guard checked between response-body reads. A final blocked
   read can add up to one socket timeout; this is not a hard process deadline.

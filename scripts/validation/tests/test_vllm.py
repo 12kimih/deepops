@@ -92,7 +92,7 @@ class VllmTests(unittest.TestCase):
         }
 
     def test_the_endpoint_is_always_named(self):
-        # No default: 127.0.0.1:8000 is also the run history's server (roles/ara_server).
+        # No default: the endpoint is always the one started.
         run = subprocess.run([sys.executable, str(SCRIPT), "--json", "--model", "m", "--cache-dir", str(self.cache),
                               "--repo-id", "a/b", "--revision", REVISION, "--require-file", "config.json"],
                              capture_output=True, text=True, timeout=bounds.CHILD)  # fmt: skip
