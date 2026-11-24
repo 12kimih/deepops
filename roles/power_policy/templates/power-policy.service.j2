@@ -1,13 +1,16 @@
 {{ ansible_managed | comment }}
 # roles/power_policy: the host's power management at full performance, at boot before
-# anything runs a job, and again from its timer.
+# anything runs a job, and again from its timer. After the GPUs' own boot units (the
+# persistence daemon, the power cap), whose settings it checks.
 [Unit]
 Description=Hold the power management at full performance (deepops)
-Before=slurmd.service kubelet.service nvidia-persistenced.service
+After=nvidia-persistenced.service {{ nvidia_power_limit_service_name }}
+Before=slurmd.service kubelet.service
 
 [Service]
 Type=oneshot
-TimeoutStartSec=2min
+# nvidia-smi takes about a second a GPU and setting; each call is bounded itself.
+TimeoutStartSec=5min
 # The directory may sit on /run, which is empty after a boot.
 ExecStartPre=/usr/bin/install -d -m 0755 {{ node_exporter_prom_dir }}
 ExecStart={{ power_policy_program }} apply {{ power_policy_conf }}

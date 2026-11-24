@@ -34,9 +34,13 @@ helm_bin: /usr/local/bin/helm
 maintenance_reboot_requests_dir: "{{ deepops_state_dir }}/reboot-requested-by"
 # Node-side home of a GPU power cap (roles/nvidia_power_limit). Its unit reads it as an
 # EnvironmentFile, so the number lives in one place on the node, and anything else that
-# changes a GPU's power limit reads the cap back instead of guessing: the Slurm
-# prolog/epilog does, so an exclusive job never gets the card maximum on a capped node.
+# checks a GPU's power limit reads the cap back instead of guessing: roles/power_policy
+# holds every GPU at it.
 nvidia_power_limit_conf_file: /etc/nvidia-power-limit.conf
+# Its unit under /etc/systemd/system: it re-applies the cap on every boot (nvidia-smi
+# resets the power limit to the card default across a reboot or driver reload); the
+# power policy starts after it (roles/power_policy).
+nvidia_power_limit_service_name: nvidia-power-limit.service
 # Turns PCIe ACS off, or lists the devices where it is on (roles/pcie_acs); NHC runs
 # it to drain a node where ACS came back (roles/nhc). Its boot unit keeps the name the
 # hand-installed one had (the old utilities/disable-acs.yml), so it is taken over in place.
