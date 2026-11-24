@@ -177,6 +177,9 @@ uv run ara playbook list                                  # runs, newest first
 uv run ara result list --playbook <id> --status failed    # what failed
 uv run ara result list --playbook <id> --changed          # what changed
 uv run ara result show <id> --with-content                # one result: output, diff
+uv run ara playbook list --label warnings                 # runs that showed a warning
+uv run ara record list --playbook <id>                    # its warnings and deprecations
+uv run ara task list --playbook <id> -c name -c warnings  # those a task result carried
 uv run ansible-playbook -K playbooks/utilities/ara-server.yml  # the API server (your own, on a unix socket)
 uv run ara playbook prune --days 365 --confirm            # drop old runs
 ```

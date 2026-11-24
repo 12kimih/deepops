@@ -39,15 +39,16 @@
     name: helm_release
   vars:
     helm_release:
-      release: "{{ item.item }}"
+      release: "{{ runai_gw_owner.item }}"
       namespace: "{{ runai_gateway_controller_namespace }}"
       state: absent
   loop: "{{ runai_gw_owners.results }}"
   loop_control:
-    label: "{{ item.item }}"
+    loop_var: runai_gw_owner
+    label: "{{ runai_gw_owner.item }}"
   when:
     - runai_gw_unused | bool
-    - item.stdout | length > 0
+    - runai_gw_owner.stdout | length > 0
 
 # KGateway creates this Secret at runtime, outside the Helm release. Remove it
 # only after the owned controller is stopped, before dropping its ownership record.

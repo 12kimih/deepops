@@ -753,6 +753,22 @@ class TaskRules(unittest.TestCase):
         self.assertEqual(offenders, [], "item is always defined in a loop; test the variable it names")
         scan.check(self)
 
+    def test_a_looped_include_names_its_own_loop_variable(self):
+        # A loop inside what a looped include runs takes item too, and Ansible warns "The
+        # variable 'item' is already in use" while the inner loop hides the outer item
+        # (open-ondemand.yml: its repositories looped over package_repos' repo.yml,
+        # whose own loop removes legacy files, 2026-11-25). The include's loop is named.
+        scan, offenders = Scan(minimum=MINIMUM_FILES), []
+        for path in map(scan.seen, ansible_files()):
+            for task in tasks(path):
+                name, _ = module(task)
+                looped = any(k == "loop" or k.startswith("with_") for k in task)
+                if name in ("include_tasks", "include_role") and looped:
+                    if (task.get("loop_control") or {}).get("loop_var", "item") == "item":
+                        offenders.append(f"{rel(path)}: {task.get('name')}")
+        self.assertEqual(offenders, [], "a looped include sets loop_control.loop_var to a name of its own")
+        scan.check(self)
+
     def test_tags_on_a_dynamic_include_reach_its_tasks(self):
         scan, offenders = Scan(minimum=MINIMUM_FILES), []
         for path in map(scan.seen, ansible_files()):

@@ -130,15 +130,16 @@
   ansible.builtin.include_role:
     name: recorded_files
   vars:
-    recorded_files_record: "{{ deepops_state_dir }}/recorded/enroot-{{ item.dir }}"
-    recorded_files_names: "{{ item.files | map(attribute='filename') | list }}"
-    recorded_files_dirs: ["/etc/enroot/{{ item.dir }}"]
+    recorded_files_record: "{{ deepops_state_dir }}/recorded/enroot-{{ enroot_conf_files.dir }}"
+    recorded_files_names: "{{ enroot_conf_files.files | map(attribute='filename') | list }}"
+    recorded_files_dirs: ["/etc/enroot/{{ enroot_conf_files.dir }}"]
   loop:
     - { dir: environ.d, files: "{{ enroot_environ_config_files }}" }
     - { dir: hooks.d, files: "{{ enroot_hook_config_files }}" }
     - { dir: mounts.d, files: "{{ enroot_mount_config_files }}" }
   loop_control:
-    label: "{{ item.dir }}"
+    loop_var: enroot_conf_files
+    label: "{{ enroot_conf_files.dir }}"
 
 - name: Record the component as present
   ansible.builtin.include_role:

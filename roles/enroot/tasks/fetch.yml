@@ -3,10 +3,12 @@
   ansible.builtin.include_role:
     name: download
   vars:
-    download_url: "{{ enroot_release_base_url }}/{{ item }}"
-    download_checksum: "{{ enroot_checksums[item] | default('') }}"
-    download_dest: "{{ deepops_cache_dir }}/{{ item }}"
+    download_url: "{{ enroot_release_base_url }}/{{ enroot_release_file }}"
+    download_checksum: "{{ enroot_checksums[enroot_release_file] | default('') }}"
+    download_dest: "{{ deepops_cache_dir }}/{{ enroot_release_file }}"
   loop: "{{ _enroot_files }}"
+  loop_control:
+    loop_var: enroot_release_file
 
 # Under --check a file not fetched yet is not there to install.
 - name: Note whether every release file is here

@@ -5,8 +5,8 @@
     name: helm_release
   vars:
     helm_release:
-      release: "{{ item.release }}"
-      namespace: "{{ item.namespace }}"
+      release: "{{ runai_release.release }}"
+      namespace: "{{ runai_release.namespace }}"
       state: absent
   loop: >-
     {{ [{'release': runai_cluster_release_name, 'namespace': runai_cluster_namespace},
@@ -15,7 +15,8 @@
        + ([{'release': runai_platform_ingress_release_name, 'namespace': runai_platform_ingress_namespace}]
           if runai_haproxy_managed | bool else []) }}
   loop_control:
-    label: "{{ item.release }}"
+    loop_var: runai_release
+    label: "{{ runai_release.release }}"
 
 - name: Remove the Gateway and what was installed for it
   ansible.builtin.include_tasks: gateway_remove.yml
