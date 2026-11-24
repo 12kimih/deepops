@@ -22,6 +22,13 @@ Facts:
             people_leave_grace_days; new jobs are held from the day after the end);
             whether srun and salloc GPU sessions must name a team QoS (interactive_team_qos:
             slurm_job_submit_policy.interactive_gpu_qos set; the pattern stays private)
+  services  what the cluster runs that the pages describe, so none says a service is coming
+            or missing: portal (slurm_install_open_ondemand), its overview page's menu title
+            (open_ondemand_overview_title, "" without one), the menu titles of the services
+            it publishes (open_ondemand_proxied_services, as Grafana), dashboard
+            (slurm_enable_monitoring); never an address
+  paths     the shared trees people use: scratch (scratch_space_root), software
+            (sm_prefix), shared (shared_space_root) and its data folders (shared_space_data)
   login     each person's limits on a login node (cluster_tools_user_slice_limits, the
             slurm-login group's over the others): cpus (CPUQuota), memory_gib
             (MemoryMax), tasks (TasksMax); a limit not set is left out
@@ -97,6 +104,8 @@ PUBLIC = {
         "interactive_team_qos",
     },
     "login": {"cpus", "memory_gib", "tasks"},
+    "services": {"portal", "overview", "menu", "dashboard"},
+    "paths": {"scratch", "software", "shared", "shared_data"},
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
     "quota": None,  # each limited filesystem, its fields QUOTA_FIELDS
@@ -336,6 +345,33 @@ def host_quotas(config):
     return out
 
 
+def services(config, settings_):
+    """{portal, overview, menu, dashboard}: whether the portal and the monitoring dashboard
+    run, the portal's overview page title (its setting is a template, set when the site
+    has one) and the titles of the services in its top menu."""
+    portal = bool(settings_.get("slurm_install_open_ondemand"))
+    raw = {}
+    for name in ("all.yml", "slurm-cluster.yml") if config else ():
+        raw.update(_yaml(Path(config) / "group_vars" / name))
+    overview = portal and raw.get("open_ondemand_overview", settings_.get("open_ondemand_overview"))
+    services_ = settings_.get("open_ondemand_proxied_services") or [] if portal else []
+    return {
+        "portal": portal,
+        "overview": settings_.get("open_ondemand_overview_title") if overview else "",
+        "menu": [svc["title"] for svc in services_ if svc.get("title")],
+        "dashboard": bool(settings_.get("slurm_enable_monitoring")),
+    }
+
+
+def paths(settings_):
+    return {
+        "scratch": settings_.get("scratch_space_root"),
+        "software": settings_.get("sm_prefix"),
+        "shared": settings_.get("shared_space_root"),
+        "shared_data": settings_.get("shared_space_data"),
+    }
+
+
 def login_limits(config, settings_):
     """{cpus, memory_gib, tasks}: the user-.slice limits the login nodes get
     (cluster_tools_user_slice_limits; group_vars/slurm-login.yml over the others)."""
@@ -390,6 +426,8 @@ def facts(config):
         "chat": {"channels": s.get("slack_channels"), "admin_group": s.get("slack_admin_group")},
         "bot": bot(s),
         "login": login_limits(config, s),
+        "services": services(config, s),
+        "paths": paths(s),
         "reports": {field: s.get(key) for field, key in REPORTS.items()},
         "quotas": {"hosts": host_quotas(config), "inodes_per_tib": s.get("disk_quota_inodes_per_tib")},
     }
