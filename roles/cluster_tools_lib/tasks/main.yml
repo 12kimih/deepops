@@ -6,31 +6,9 @@
     cluster_tools_lib_modules: "{{ query('ansible.builtin.fileglob', role_path ~ '/files/cluster_tools/*.py') | sort }}"
     cluster_tools_lib_source: "{{ role_path }}/files"
 
-# Checked before it replaces the live package (tasks/configs.yml): the roles of this play
-# write and validate their own configs; a site deploy checks once at its end instead,
-# when every role has run.
-- name: Check the recorded tool configs against the package about to be published
-  ansible.builtin.include_tasks: configs.yml
-  vars:
-    cluster_tools_lib_configs_skip: "{{ ansible_play_role_names }}"
-  when: deepops_site_run is not defined
-
-# The package is its modules, nothing else: a copy of the directory would also ship the
-# controller's __pycache__, and a module dropped from the package would stay importable.
-# The bytecode cache Python keeps on the host goes only when the package changed.
+# The package is its modules, nothing else, published as one release (tasks/release.yml).
 - name: Publish the cluster_tools package
-  ansible.builtin.include_role:
-    name: managed_dir
-  vars:
-    managed_dir_path: "{{ cluster_tools_lib_dir }}/cluster_tools"
-    managed_dir_sources: "{{ cluster_tools_lib_modules }}"
-    managed_dir_keep: [__pycache__]
-
-# For a service that imports the package and so runs the old one until restarted
-# (roles/cluster_bot).
-- name: Record whether the package changed
-  ansible.builtin.set_fact:
-    cluster_tools_lib_changed: "{{ managed_dir_changed }}"
+  ansible.builtin.include_tasks: release.yml
 
 # The package's earlier name (clustertools, until 2026-11). A command another role installed
 # imports it until that role runs again, and sq, qos and the timers' tools would break if

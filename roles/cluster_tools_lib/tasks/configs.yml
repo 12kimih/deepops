@@ -1,8 +1,9 @@
 ---
 # Every recorded tool config against the package this run publishes (cluster_tools.config
-# installed), staged in a temporary directory: tasks/main.yml runs it BEFORE replacing the
-# live package, so a tool that would refuse its config stops the run while the live tools
-# still run on their own package and config, naming the playbook that rewrites it. A new
+# installed), its release unpacked beside the live one: tasks/release.yml runs it BEFORE
+# switching the live package, so a tool that would refuse its config stops the run while
+# the live tools still run on their own package and config, naming the playbook that
+# rewrites it. A new
 # required key whose config another playbook writes would otherwise break that tool
 # until its playbook ran (disk quota and the usage report, ARA 243, 2026-11-23). The
 # roles listed in cluster_tools_lib_configs_skip write and validate their config in this
@@ -16,37 +17,17 @@
 - name: Check the recorded tool configs
   when: cluster_tools_lib_records.matched > 0
   block:
-    - name: Create a directory for the package being published
-      ansible.builtin.tempfile:
-        state: directory
-        suffix: .cluster_tools
-      register: cluster_tools_lib_staged
-      check_mode: false  # a scratch copy for the check, removed below
-
-    - name: Copy the package being published
-      ansible.builtin.copy:
-        src: "{{ role_path }}/files/cluster_tools"
-        dest: "{{ cluster_tools_lib_staged.path }}/"
-        mode: preserve
-      check_mode: false  # a scratch copy for the check, removed below
-
-    - name: Check every recorded tool config against the package
+    - name: Check every recorded tool config against the release
       ansible.builtin.command:
         argv: >-
           {{ [cluster_tools_lib_python, '-I', '-c', _cluster_tools_lib_config_code,
-              cluster_tools_lib_staged.path,
+              _cluster_tools_lib_release_dir,
               'installed', '--dir', cluster_tools_lib_config_records]
              + (cluster_tools_lib_configs_skip | default([]) | map('regex_replace', '^', '--skip=') | list) }}
       register: cluster_tools_lib_configs
       changed_when: false
       failed_when: false
       check_mode: false  # read-only; --check needs the result
-
-    - name: Remove the staged copy of the package
-      ansible.builtin.file:
-        path: "{{ cluster_tools_lib_staged.path }}"
-        state: absent
-      check_mode: false  # the scratch copy made above
 
     - name: Require that every tool takes its recorded config
       ansible.builtin.assert:
