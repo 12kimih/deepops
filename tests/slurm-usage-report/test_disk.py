@@ -10,6 +10,8 @@ from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
+from fake_slack import FakeDM  # noqa: E402
 from cluster_tools import disk_report  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
 
@@ -266,7 +268,7 @@ class RunTests(unittest.TestCase):
     """usage_report --disk: posts the report, notes everyone past a level when asked,
     and posts nothing when no disk usage is counted."""
 
-    CFG = dict(channel="#status", prometheus_url="", slack_token="t", email_domain="",
+    CFG = dict(channel="#status", dm_log_channel="", prometheus_url="", slack_token="t", email_domain="",
                user_map={"alice": "UALICE", "bob": "UBOB"}, disk_top=10, disk_notify=["mention", "dm"],
                disk_repeat_days=7, people=["alice", "bob", "carol"], holds_on=False, holds_from=0, disk_fill=0.8, disk_fill_mentions=5, stale_days=60,
                admin_channel="#admins", admin_mention="<!subteam^SADMINS>")  # fmt: skip
@@ -276,14 +278,11 @@ class RunTests(unittest.TestCase):
         NOW, keeping its state in the directory STATE (a fresh one when None)."""
         posted = []
 
-        class Slack:
+        class Slack(FakeDM):
             token = "t"
 
-            def __init__(self, *_):
+            def __init__(self, *_, **__):
                 pass
-
-            def channel(self, target):
-                return target
 
             def post(self, channel, text, blocks=None, thread_ts=None):
                 if channel == "UBOB":

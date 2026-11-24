@@ -51,6 +51,7 @@ API_SCOPES = {
     "chat.postMessage": "chat:write",
     "chat.postEphemeral": "chat:write",
     "chat.update": "chat:write",
+    "chat.getPermalink": None,  # the link of a logged DM (cluster_tools.slack): no scope
     "conversations.open": "im:write",
     "pins.add": "pins:write",
     "users.lookupByEmail": "users:read.email",

@@ -42,7 +42,7 @@ from .files import write_atomic
 from .prometheus import Prometheus
 from .render import duration
 from .site import info as site_info
-from .slack import MAX_BLOCKS, Slack, bar, escape, mentioning, sections, table
+from .slack import MAX_BLOCKS, MEMBER, DmLog, Slack, bar, escape, mentioning, sections, table
 from .slack import member as slack_member
 from .slurm import (
     Error,
@@ -396,6 +396,29 @@ def slack_id(user, cfg, slack, cache):
     return slack_member(slack, user, cfg["user_map"], cfg["email_domain"], cache)
 
 
+def client(cfg, args):
+    """The Slack client of a run: its DMs logged for the administrators in a daily thread
+    of dm_log_channel (cluster_tools.slack.DmLog), whose state sits beside the hourly
+    run's, shared by every run of this tool; no channel, not logged."""
+    dm_log = None
+    if cfg["dm_log_channel"]:
+        dm_log = DmLog(cfg["dm_log_channel"], os.path.join(os.path.dirname(cfg["state_file"]), "dm-log.json"))
+    return Slack(cfg["slack_token"], args.dry_run, dm_log=dm_log)
+
+
+def preview_channel(slack, to):
+    """Where a --to preview goes: an operator's DM (a member ID, not logged), or a channel
+    as named; "" for no preview."""
+    if not to:
+        return ""
+    return slack.dm_channel(to) if MEMBER.fullmatch(to) else to
+
+
+def to_channel(slack, to, channel, text, blocks=None):
+    """Post TEXT to the --to preview target, else to CHANNEL."""
+    slack.post(preview_channel(slack, to) or channel, text, blocks)
+
+
 # --- Main -----------------------------------------------------------------------
 
 CONFIG_KEYS = {
@@ -412,10 +435,11 @@ CONFIG_KEYS = {
 # Keys added after configs were written: optional, with these defaults, so the package
 # (which every host gets first) never refuses a config its role has not rewritten yet.
 # No io_mounts, no I/O notices.
+# No dm_log_channel: the DMs are not logged for the administrators (cluster_tools.slack).
 CONFIG_DEFAULTS = {"io_mounts": {}, "io_share": 0.4, "io_minutes": 15, "io_top_jobs": 3, "io_repeat_hours": 6,
-                   "io_advice": ""}  # fmt: skip
+                   "io_advice": "", "dm_log_channel": ""}  # fmt: skip
 CONFIG_OPTIONAL = {"io_mounts": dict, "io_share": (int, float), "io_minutes": int, "io_top_jobs": int,
-                   "io_repeat_hours": (int, float), "io_advice": str}  # fmt: skip
+                   "io_repeat_hours": (int, float), "io_advice": str, "dm_log_channel": str}  # fmt: skip
 
 
 def _positive(value):
@@ -533,7 +557,7 @@ def report_once():
 
     now = time.time()
     window = int(cfg["idle_hours"] * 3600)
-    slack = Slack(cfg["slack_token"], args.dry_run)
+    slack = client(cfg, args)
     report = collect_slurm(now)
     gpu = collect_gpus(Prometheus(cfg["prometheus_url"]), window)
     report.update(
@@ -638,7 +662,7 @@ def weekly(cfg, args):
     """The weekly summary, and the administrators' notice of heavy idlers. Touches no
     job; a preview posts both to --to and records nothing. Its own state file (the weeks
     and member lookups), so it never races the hourly report's."""
-    slack = Slack(cfg["slack_token"], args.dry_run)
+    slack = client(cfg, args)
     now = time.time()
     rows = collect_week(Prometheus(cfg["prometheus_url"]), cfg["idle_util_threshold"])
     path, state = side_state(cfg, "weekly.json")
@@ -646,14 +670,14 @@ def weekly(cfg, args):
     who = namer(cfg, slack, cache)
     preview = args.dry_run or bool(args.to)
     text, blocks = render_week(rows, who)
-    slack.post(slack.channel(args.to) if args.to else cfg["channel"], text, blocks)
+    to_channel(slack, args.to, cfg["channel"], text, blocks)
     remember_week(weeks, rows, now)
     heavy = repeaters(weeks, cfg)
     if heavy and (cfg["admin_channel"] or args.to):
         text, blocks = mentioning(
             cfg["admin_mention"], *render_repeaters(heavy, weeks, collect_slurm(now)["jobs"], cfg)
         )
-        slack.post(slack.channel(args.to) if args.to else cfg["admin_channel"], text, blocks)
+        to_channel(slack, args.to, cfg["admin_channel"], text, blocks)
     if not preview:
         write_atomic(path, json.dumps({"weeks": weeks, "users": cache}), mode=0o600)
 
@@ -692,7 +716,7 @@ def disk(cfg, args):
     if data is None:
         print("slurm-usage-report: no disk usage is counted anywhere (roles/disk_quota); nothing to post")
         return
-    slack = Slack(cfg["slack_token"], args.dry_run)
+    slack = client(cfg, args)
     path, state = side_state(cfg, "disk.json")
     cache, told = state.get("users", {}), state.get("told", {})
     preview = args.dry_run or bool(args.to)
@@ -721,7 +745,7 @@ def disk(cfg, args):
     if not preview:
         for k in fill_due:
             told[k] = int(now)
-    post_thread(slack, slack.channel(args.to) if args.to else cfg["channel"], card, thread)
+    post_thread(slack, preview_channel(slack, args.to) or cfg["channel"], card, thread)
     failures = []
     for row in due:
         delivered = "mention" in notify
@@ -729,9 +753,11 @@ def disk(cfg, args):
             try:
                 member = slack_id(row[2], cfg, slack, cache)
                 if member:
-                    slack.post(
-                        slack.channel(member),
+                    slack.dm(
+                        member,
                         disk_report.dm_text(row, disk_report.hold_note(hold, now)),
+                        kind="disk",
+                        login=row[2],
                     )
                     delivered = True
             except (RuntimeError, OSError) as e:
@@ -761,7 +787,7 @@ def io(cfg, args):
         return
     hot = io_report.collect(Prometheus(cfg["prometheus_url"]), cfg["io_mounts"], cfg["io_share"],
                             cfg["io_minutes"], cfg["io_top_jobs"])  # fmt: skip
-    slack = Slack(cfg["slack_token"], args.dry_run)
+    slack = client(cfg, args)
     path, state = side_state(cfg, "io.json")
     cache, told = state.get("users", {}), state.get("told", {})
     preview = args.dry_run or bool(args.to)
@@ -773,7 +799,7 @@ def io(cfg, args):
     failures = []
     if args.to:
         if hot:
-            slack.post(slack.channel(args.to), io_report.admin_text(hot))
+            to_channel(slack, args.to, "", io_report.admin_text(hot))
         return
     for item, rank, user in people:
         key = io_report.user_key(item, user)
@@ -782,7 +808,7 @@ def io(cfg, args):
         try:
             member = slack_id(user, cfg, slack, cache)
             if member:
-                slack.post(slack.channel(member), io_report.dm_text(item, rank, cfg["io_advice"]))
+                slack.dm(member, io_report.dm_text(item, rank, cfg["io_advice"]), kind="io", login=user)
                 told[key] = int(now)
         except (RuntimeError, OSError) as e:
             failures.append(f"notifying {user}: {e}")
@@ -820,7 +846,7 @@ def purge_notices(cfg, slack, cache, state, now, preview):
                 k, entry = entries[key]
                 member = slack_id(k[1], cfg, slack, cache)
                 if member:
-                    slack.post(slack.channel(member), disk_report.purge_dm_text(k, entry))
+                    slack.dm(member, disk_report.purge_dm_text(k, entry), kind="scratch-purge", login=k[1])
                     told[key] = int(now)
             elif key in bursts and cfg["admin_channel"]:
                 k, n = bursts[key]
@@ -836,7 +862,7 @@ def purge_notices(cfg, slack, cache, state, now, preview):
 def post_report(report, cfg, who, slack, to):
     """The summary card and its thread; returns (channel, ts) of the card."""
     card, thread = render(report, cfg, who)
-    channel = slack.channel(to) if to else cfg["channel"]
+    channel = preview_channel(slack, to) or cfg["channel"]
     return channel, post_thread(slack, channel, card, thread)
 
 
@@ -865,7 +891,7 @@ def act(report, cfg, who, slack, cache, now):
         if "dm" in cfg["notify"]:
             try:
                 text = cfg["dm_text"].format(jobs=job_lines(jobs), count=len(jobs), hours=hours)
-                slack.post(slack.channel(member), text)
+                slack.dm(member, text, kind="idle", login=user)
                 delivered = True
             except (RuntimeError, OSError) as e:
                 failures.append(f"notifying {user}: {e}")
@@ -892,7 +918,7 @@ def act(report, cfg, who, slack, cache, now):
                     text = cfg["cancel_warn_text"].format(
                         jobs=job_lines(ahead), count=len(ahead), hours=f"{cfg['cancel_warn_hours']:g}"
                     )
-                    slack.post(slack.channel(member), text)
+                    slack.dm(member, text, kind="idle-cancel-warning", login=user)
                     for j in ahead:
                         j["state"]["warned"] = now
             except (RuntimeError, OSError) as e:

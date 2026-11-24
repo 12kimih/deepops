@@ -10,6 +10,8 @@ from unittest import mock
 
 ROLES = Path(__file__).resolve().parents[2] / "roles"
 sys.path.insert(0, str(ROLES / "cluster_tools_lib/files"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests/lib"))
+from fake_slack import FakeDM  # noqa: E402
 from cluster_tools import io_report  # noqa: E402
 from cluster_tools import usage_report as report  # noqa: E402
 
@@ -77,21 +79,18 @@ class Collect(unittest.TestCase):
 
 
 class Run(unittest.TestCase):
-    CFG = dict(prometheus_url="", slack_token="t", email_domain="", user_map={"alice": "UALICE", "bob": "UBOB"},
+    CFG = dict(prometheus_url="", dm_log_channel="", slack_token="t", email_domain="", user_map={"alice": "UALICE", "bob": "UBOB"},
                admin_channel="#admins", admin_mention="", io_mounts=MOUNTS, io_share=0.4, io_minutes=15,
                io_top_jobs=3, io_repeat_hours=6, io_advice="Use /scratch.")  # fmt: skip
 
     def run_io(self, prom, state, now=NOW, to=None, fail=()):
         posted = []
 
-        class Slack:
+        class Slack(FakeDM):
             token = "t"
 
-            def __init__(self, *_):
+            def __init__(self, *_, **__):
                 pass
-
-            def channel(self, target):
-                return target
 
             def post(self, channel, text, blocks=None, thread_ts=None):
                 if channel in fail:

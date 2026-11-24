@@ -1,14 +1,21 @@
 """slack: the one client for Slack's Web API, for every tool that tells people something.
 
-    slack = Slack(token)                    # a bot token; dry_run=True prints instead
+    slack = Slack(token, dm_log=DmLog("#alerts", state))  # dry_run=True prints instead
     slack.post("#infra-status", text, blocks=None, thread_ts=None) -> the message's ts
+    slack.dm("U0123ABCD", text, kind="disk", login="kim")         -> (DM channel, ts)
+    slack.dm_channel("U0123ABCD")           -> a member's DM channel, for a preview
     slack.update(channel, ts, text, blocks=None)                  -> edits a message
-    slack.channel("U0123ABCD")              -> a member's DM channel (names, IDs as is)
     member(slack, user, user_map, email_domain, cache) -> a person's Slack member ID
     slack.call(method, **params)            -> any other method, parsed
     sections(text), table(header, rows)     -> message blocks within Slack's limits
     mentioning(who, text, blocks)           -> (text, blocks) that notify WHO first
     bar(percent)                            -> a text gauge for a code span or table
+
+Every message to a person goes through dm(), never post(), which refuses a member ID: so
+each DM is in the journal (one "dm KIND LOGIN" line) and, unless sent with log=False,
+logged for the administrators (DmLog: one reply per DM in a daily thread of their
+channel, no mention, so the channel's alerts stay on top) and says so to its reader.
+They see what people were told and can help.
 
 Every failure is an Error naming the method and Slack's reason; Error is a RuntimeError.
 Each call is bounded by TIMEOUT seconds. A call Slack rate-limits (HTTP 429) is sent
@@ -17,12 +24,18 @@ Mode) are the cluster bot's (roles/cluster_bot); this module only sends and read
 Python 3.9 or newer, standard library only.
 """
 
+import contextlib
+import fcntl
 import json
+import os
 import re
+import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+from .files import write_atomic
 
 API = "https://slack.com/api/"
 TIMEOUT = 30
@@ -35,15 +48,52 @@ MEMBER_TTL = 86400
 MAX_BLOCKS = 45  # Slack allows 50 blocks per message
 MAX_SECTION = 2900  # and 3000 characters per section text
 BAR_WIDTH = 10
+# What a logged DM tells its reader, and how much of its first line the log line keeps.
+DM_LOG_NOTE = "_The cluster administrators see a copy of this notice, so they can help._"
+DM_LOG_FIRST = 200
 
 
 class Error(RuntimeError):
     """Slack refused or could not be reached; str() says which method and why."""
 
 
+class DmLog:
+    """The administrators' record of the DMs: in CHANNEL, one message a day (on the first
+    DM of the day, its count kept up to date) and under it one reply per DM. STATE_FILE
+    holds today's message across runs and the processes of one tool (locked)."""
+
+    def __init__(self, channel, state_file):
+        self.channel, self.state_file = channel, state_file
+
+    @contextlib.contextmanager
+    def _today(self, now):
+        os.makedirs(os.path.dirname(os.path.abspath(self.state_file)), exist_ok=True)
+        with open(self.state_file + ".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                with open(self.state_file) as f:
+                    state = json.load(f)
+            except (OSError, ValueError):
+                state = {}
+            day = time.strftime("%Y-%m-%d", time.localtime(now))
+            if state.get("day") != day:
+                state = {"day": day, "ts": "", "count": 0}
+            yield state
+            write_atomic(self.state_file, json.dumps(state), mode=0o600)
+
+    def record(self, slack, line, now=None):
+        """LINE under today's message (made by this call if there is none yet)."""
+        with self._today(time.time() if now is None else now) as state:
+            if not state["ts"]:
+                state["ts"] = slack.post(self.channel, dm_log_title(state["day"], 0))
+            slack.post(self.channel, line, thread_ts=state["ts"])
+            state["count"] += 1
+            slack.update(self.channel, state["ts"], dm_log_title(state["day"], state["count"]))
+
+
 class Slack:
-    def __init__(self, token, dry_run=False, timeout=TIMEOUT):
-        self.token, self.dry_run, self.timeout = token, dry_run, timeout
+    def __init__(self, token, dry_run=False, timeout=TIMEOUT, dm_log=None):
+        self.token, self.dry_run, self.timeout, self.dm_log = token, dry_run, timeout, dm_log
 
     def call(self, method, **params):
         if self.dry_run and method != "users.lookupByEmail":
@@ -86,13 +136,9 @@ class Slack:
             print(params.get("text", ""))
         print()
 
-    def channel(self, target):
-        """A channel name or ID as is; a member ID (U...) becomes their DM channel."""
-        if MEMBER.fullmatch(target):
-            return self.call("conversations.open", users=target)["channel"]["id"]
-        return target
-
     def post(self, channel, text, blocks=None, thread_ts=None):
+        if MEMBER.fullmatch(channel):
+            raise Error(f"Slack chat.postMessage: {channel} is a person; a message to a person is a dm()")
         params = {"channel": channel, "text": text, "unfurl_links": "false", "unfurl_media": "false"}
         if blocks:
             params["blocks"] = json.dumps(blocks)
@@ -100,11 +146,50 @@ class Slack:
             params["thread_ts"] = thread_ts
         return self.call("chat.postMessage", **params)["ts"]
 
+    def dm_channel(self, member):
+        """MEMBER's DM channel: where dm() sends, and where an operator's own preview of
+        a run goes (cluster_tools.usage_report --to), which tells no one anything."""
+        return self.call("conversations.open", users=member)["channel"]["id"]
+
+    def dm(self, member, text, blocks=None, *, kind, login, log=True):
+        """A direct message to MEMBER (a member ID) about KIND for LOGIN; (channel, ts).
+        With log and a dm_log (DmLog), its reader is told the administrators see it and
+        the log gets one line: the kind, the login, the message's first line and a link.
+        That line failing is said on stderr, never undoes or repeats the sent DM."""
+        logged = log and self.dm_log is not None
+        if logged:
+            text = f"{text}\n{DM_LOG_NOTE}"
+            if blocks:
+                blocks = [*blocks, {"type": "context", "elements": [{"type": "mrkdwn", "text": DM_LOG_NOTE}]}]
+        channel = self.dm_channel(member)
+        ts = self.post(channel, text, blocks)
+        print(f"dm {kind} {login} {channel} {ts}")
+        if logged and not self.dry_run:
+            try:
+                link = self.call("chat.getPermalink", channel=channel, message_ts=ts).get("permalink", "")
+                self.dm_log.record(self, dm_log_line(kind, login, text, link))
+            except (Error, OSError) as e:
+                print(f"slack: the DM to {login} ({kind}) was sent; logging it failed: {e}", file=sys.stderr)
+        return channel, ts
+
     def update(self, channel, ts, text, blocks=None):
         params = {"channel": channel, "ts": ts, "text": text}
         if blocks:
             params["blocks"] = json.dumps(blocks)
         return self.call("chat.update", **params)
+
+
+def dm_log_title(day, count):
+    """The day's message the DM lines are threaded under."""
+    return f":envelope: Notices sent to people by DM on {day}: {count} (each in the thread)"
+
+
+def dm_log_line(kind, login, text, link=""):
+    """The administrators' line for one DM: what kind, to whom, its first line, a link."""
+    first = text.strip().splitlines()[0] if text.strip() else ""
+    if len(first) > DM_LOG_FIRST:
+        first = first[: DM_LOG_FIRST - 3] + "..."
+    return f"`{kind}` to *{escape(login)}*: {first}" + (f"  <{link}|open>" if link else "")
 
 
 def _retry_after(error):
