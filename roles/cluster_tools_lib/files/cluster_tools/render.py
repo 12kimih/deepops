@@ -429,10 +429,15 @@ class Grid:
     it breaks the tree lines and the columns a reader follows. Explanations belong in a
     column, a heading's tally, or the command's --help.
     Only single-piece cells are capped by maxw.
+    GROUPS, [(label, first column, last column)], puts a line above the headers naming
+    each run of columns that share a meaning (── A10 ── over its HIGH and LOW), so the
+    headers below stay short words; a group is never narrower than its label.
     """
 
-    def __init__(self, theme, headers, align=None, maxw=None, tail_header="", tail_width=0, header_rule=True):
+    def __init__(self, theme, headers, align=None, maxw=None, tail_header="", tail_width=0, header_rule=True,
+                 groups=()):  # fmt: skip
         self.t, self.headers = theme, list(headers)
+        self.groups = [(label, a, b) for label, a, b in groups]
         self.align = list(align or [])
         self.maxw = list(maxw or [])
         self.tail_header, self.tail_width = tail_header, tail_width
@@ -472,7 +477,31 @@ class Grid:
                 for c, pieces in enumerate(self._cells(r)):
                     w = sum(width(t) for t, _ in pieces) + (width(r[3]) if c == 0 else 0)
                     widths[c] = max(widths[c], w)
+        for label, a, b in self.groups:
+            span = sum(widths[a : b + 1]) + (b - a)
+            need = width(label) + 4  # a rule and a space on each side
+            # Short of the label: the columns widen in turn, so they stay even.
+            for i in range(max(0, need - span)):
+                widths[a + i % (b - a + 1)] += 1
         return widths
+
+    def _group_line(self, widths):
+        """The labels of the column groups over their columns, blank elsewhere."""
+        starts = {a: (label, b) for label, a, b in self.groups}
+        g, parts, c = self.t.g["rule"], [], 0
+        while c < len(self.headers):
+            if c in starts:
+                label, b = starts[c]
+                span = sum(widths[c : b + 1]) + (b - c)
+                inner = f" {label} "
+                left = (span - width(inner)) // 2
+                parts.append(self.t.paint("rule", g * left) + self.t.paint("head", inner)
+                             + self.t.paint("rule", g * (span - width(inner) - left)))  # fmt: skip
+                c = b + 1
+            else:
+                parts.append(" " * widths[c])
+                c += 1
+        return ("  " + " ".join(parts)).rstrip()
 
     def total(self):
         """Columns the table takes, from the margin to the end of its tail."""
@@ -486,6 +515,8 @@ class Grid:
         total = max(self.total(), 2 + width(t.g["sec"]) + width(title) + 3 + width(plain))
 
         out = [t.section(title, total, tally)]
+        if self.groups:
+            out.append(self._group_line(widths))
         head = "  " + " ".join(pad(h, widths[c], self._align(c)) for c, h in enumerate(self.headers))
         if self.tail_header:
             head += " " + self.tail_header

@@ -65,10 +65,51 @@ def _gpu_type(tres):
     return tres[len("gres/gpu:") :] if tres.startswith("gres/gpu:") else None
 
 
-def _gpu_limits(qos):
-    """{gpu column: limit} from the QoS's GrpTRES."""
+def gpu_limits(qos):
+    """{gpu column: limit} from the QoS's GrpTRES: the one reading of a QoS's GPU quota,
+    for this command and sq's TEAMS."""
     total = slurm.tres_list(((qos.get("limits") or {}).get("max") or {}).get("tres", {}).get("total"))
     return {_gpu_type(k): v for k, v in total.items() if _gpu_type(k)}
+
+
+def gpu_used(jobs_data):
+    """{(QoS, gpu column): GPUs its jobs hold now}: the one count of a quota's live use,
+    for this command and sq's TEAMS."""
+    used = {}
+    for j in (jobs_data or {}).get("jobs", []):
+        if not vocab.job_holds(j.get("job_state")):
+            continue
+        for key, n in slurm.tres_str(j.get("tres_alloc_str")).items():
+            if _gpu_type(key):
+                k = (j.get("qos", ""), _gpu_type(key))
+                used[k] = used.get(k, 0) + int(n)
+    return used
+
+
+def quota_figure(t, used, limit):
+    """A quota as text: USED/LIMIT. A limit of 0 is 0, barred; no limit at all is "-";
+    usage not read is a dot, never 0 (0/8 would read as free)."""
+    return f"{t.g['dot'] if used is None else used}/{'-' if limit is None else limit}"
+
+
+def quota_cell(t, used, limit, bar, figure_width=0):
+    """One quota as a Grid cell, the same shape in every row and every command: its
+    figure (quota_figure), right-aligned to FIGURE_WIDTH so a column's bars line up,
+    then a BAR-column trough filled by the load. Faint unless a limit above 0 gives the
+    load its colour (or GPUs are held past a limit of 0); a limit of 0 or none is an
+    empty trough."""
+    shown = quota_figure(t, used, limit)
+    if used is None or limit is None:
+        style = "faint"
+    elif limit == 0:
+        style = "crit" if used else "faint"  # held past a barred quota (lowered since)
+    else:
+        style = t.load(used, limit)
+    piece = [(" " * max(0, figure_width - width(shown)) + shown, style)]
+    if bar:
+        trough = [(t.g["bar_e"] * bar, "rule")]
+        piece += [(" ", "")] + (t.bar_pieces(used, limit, bar) if limit and used is not None else trough)
+    return piece
 
 
 def _dig(d, *path):
@@ -92,21 +133,14 @@ def build(qos_data, assoc_data, jobs_data, who, usage=True, mine_only=False, sho
     if not granted:  # read nothing: filtering on it would hide all
         show_all = True
 
-    used = {}  # (qos, gpu column) -> GPUs held by its jobs
-    for j in (jobs_data or {}).get("jobs", []) if usage else []:
-        if not vocab.job_holds(j.get("job_state")):
-            continue
-        for key, n in slurm.tres_str(j.get("tres_alloc_str")).items():
-            if _gpu_type(key):
-                k = (j.get("qos", ""), _gpu_type(key))
-                used[k] = used.get(k, 0) + int(n)
+    used = gpu_used(jobs_data) if usage else {}  # (qos, gpu column) -> GPUs held by its jobs
 
     qos_list = qos_data.get("qos", [])
     preempted_by = {}
     for q in qos_list:
         for victim in (q.get("preempt") or {}).get("list") or []:
             preempted_by.setdefault(victim, []).append(q["name"])
-    types = sorted({t for q in qos_list for t in _gpu_limits(q)})
+    types = sorted({t for q in qos_list for t in gpu_limits(q)})
 
     rows, hidden = [], 0
     for q in qos_list:
@@ -117,10 +151,9 @@ def build(qos_data, assoc_data, jobs_data, who, usage=True, mine_only=False, sho
             hidden += 1
             continue
         limits = q.get("limits") or {}
-        gpu = {
-            t: {"used": used.get((name, t), 0) if usage else None, "limit": lim}
-            for t, lim in _gpu_limits(q).items()
-        }
+        # Every GPU column, a quota or not, so each row has the same cells; None: no limit.
+        lims = gpu_limits(q)
+        gpu = {t: {"used": used.get((name, t), 0) if usage else None, "limit": lims.get(t)} for t in types}
         wall = slurm.num(_dig(limits, "max", "wall_clock", "per", "job"))
         rows.append(
             {
@@ -159,6 +192,10 @@ def _table(t, model, bar, caps):
     align = ["l", "r", "l", "l", *["l"] * len(types), "l"] + ["r"] * (exempt + grace)
     g = Grid(t, headers, align=align, maxw=[NAME_MAX, 8, caps[0], caps[1]])
     dot = t.g["dot"]
+    figures = {
+        ty: max(width(quota_figure(t, r["gpu"][ty]["used"], r["gpu"][ty]["limit"])) for r in rows)
+        for ty in types
+    }
     for r in rows:
         base = "text" if r["mine"] else "sub"
 
@@ -172,19 +209,8 @@ def _table(t, model, bar, caps):
             plain(",".join(r["preempted_by"]) or dot),
         ]
         for ty in types:
-            q = r["gpu"].get(ty)
-            if q is None:
-                cells.append((dot, "faint"))
-                continue
-            if q["used"] is None:  # unknown, never zero: 0/8 would read as free
-                cells.append([(f"{dot}/{q['limit']}", "faint")])
-                continue
-            u = q["used"]
-            style = "faint" if q["limit"] == 0 else t.load(u, q["limit"])  # 0: barred, not full
-            piece = [(f"{u}/{q['limit']}", style)]
-            if bar:
-                piece += [(" ", "")] + t.bar_pieces(u, q["limit"], bar)
-            cells.append(piece)
+            q = r["gpu"][ty]
+            cells.append(quota_cell(t, q["used"], q["limit"], bar, figures[ty]))
         cells.append(plain(duration(r["max_wall_seconds"], short=False) if r["max_wall_seconds"] else dot))
         if exempt:
             cells.append(plain(duration(r["exempt_seconds"], short=False) if r["exempt_seconds"] else dot))

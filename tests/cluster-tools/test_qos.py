@@ -54,7 +54,7 @@ class BuildTests(unittest.TestCase):
     def test_untyped_gpu_quota_is_its_own_column(self):
         q = {"limits": {"max": {"tres": {"total": [{"type": "gres", "name": "gpu", "count": 8},
                                                    {"type": "gres", "name": "gpu:a10", "count": 4}]}}}}  # fmt: skip
-        self.assertEqual(qos._gpu_limits(q), {"any": 8, "a10": 4})
+        self.assertEqual(qos.gpu_limits(q), {"any": 8, "a10": 4})
 
     def test_wall_and_types(self):
         rows = {r["name"]: r for r in model()["qos"]}
@@ -93,6 +93,28 @@ class ShowTests(unittest.TestCase):
         m = model("nobody")
         m["qos"] = []
         self.assertIn("nobody may not submit", qos.show(render.Theme(color=False), m))
+
+
+class QuotaCellTests(unittest.TestCase):
+    """One quota cell, shared by qos and sq's TEAMS: every case has the same shape, a
+    figure right-aligned to the column then a trough, so the bars line up."""
+
+    def cell(self, used, limit, figure_width=5, bar=4):
+        t = render.Theme(color=False, ascii=True)
+        return "".join(text for text, _ in qos.quota_cell(t, used, limit, bar, figure_width))
+
+    def test_every_case_has_the_same_shape(self):
+        self.assertEqual(self.cell(3, 6), "  3/6 ##--")
+        self.assertEqual(self.cell(0, 0), "  0/0 ----")  # barred: 0, an empty trough
+        self.assertEqual(self.cell(2, None), "  2/- ----")  # no limit at all
+        dot = render.Theme(color=False, ascii=True).g["dot"]
+        self.assertEqual(self.cell(None, 8), f"  {dot}/8 ----")  # usage unread: never 0
+        self.assertEqual({len(self.cell(u, lim)) for u, lim in ((3, 6), (0, 0), (2, None), (14, 14))}, {10})
+
+    def test_gpus_held_past_a_barred_quota_are_flagged(self):
+        t = render.Theme(color=False, ascii=True)
+        self.assertEqual(qos.quota_cell(t, 4, 0, 0)[0][1], "crit")
+        self.assertEqual(qos.quota_cell(t, 0, 0, 0)[0][1], "faint")
 
 
 class CommandTests(unittest.TestCase):
