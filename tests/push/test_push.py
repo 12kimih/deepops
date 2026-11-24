@@ -7,6 +7,7 @@ stub scripts/check.sh, and runs the real push.sh copied into the clone.
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -71,6 +72,22 @@ class Base(unittest.TestCase):
             timeout=bounds.CHILD, **kwargs,
         )  # fmt: skip
 
+    def spawn(self, argv, **kwargs):
+        """ARGV started in a session of its own, killed with everything it started when
+        the test ends: a failed case must leave no lock holder or check behind (one
+        holder's shell outlived its flock for eleven hours, 2026-11-24)."""
+        proc = subprocess.Popen(argv, start_new_session=True, **kwargs)
+
+        def stop():
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.wait()
+
+        self.addCleanup(stop)
+        return proc
+
     def origin_files(self):
         return sorted(git(self.origin, "ls-tree", "--name-only", "main").split())
 
@@ -102,18 +119,15 @@ class Push(Base):
     def test_a_second_checkout_waits_for_the_first(self):
         lock = Path(git(self.clone, "rev-parse", "--absolute-git-dir")) / "deepops-push.lock"
         lock.write_text("pid 1, someone, /elsewhere, since then\n")
-        # The holder keeps the lock until this checkout's check has run, then 2 s more:
-        # the check needs no lock, the push does.
-        checked = self.tmp / "checked"
-        holder = subprocess.Popen(
-            ["flock", str(lock), "sh", "-c", f"until [ -e {checked} ]; do sleep 0.1; done; sleep 2"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )  # fmt: skip
-        self.addCleanup(holder.kill)
-        while not lock.exists() or subprocess.run(["flock", "-n", str(lock), "true"]).returncode == 0:
+        # The holder keeps the lock until the push is blocked on it (the kernel lists the
+        # waiting request in /proc/locks, "->" with the file's inode): the check needs no
+        # lock, the push does. Released on that event, never after a time, so a loaded
+        # host cannot make the push arrive after the holder has gone.
+        waiting = f"grep -- '->' /proc/locks | grep -q ':{lock.stat().st_ino} '"
+        holder = self.spawn(["flock", str(lock), "sh", "-c", f"until {waiting}; do sleep 0.1; done"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
+        while subprocess.run(["flock", "-n", str(lock), "true"]).returncode == 0:
             time.sleep(0.1)
-        self.check(self.wt, f"touch {checked}")
-        git(self.wt, "commit", "-q", "-am", "check that marks it ran")
         self.commit(self.wt, "b")
         out = self.push(self.wt)
         self.assertEqual(out.returncode, 0, out.stderr)
@@ -140,14 +154,17 @@ class Push(Base):
         self.assertEqual(self.origin_files(), ["b", "c", "scripts"])
 
     def test_checkouts_check_at_once_and_the_later_push_checks_again_on_the_first(self):
-        # Each check waits until both have started (the old script held the lock through
-        # the check, so the second never started and the first gave up) and logs a run.
+        # Each check waits until both have started, on the other's marker and never on the
+        # clock: a loaded host may take long to reach a check, and a time limit there failed
+        # the push it waited for (2026-11-24, several checks at once). The old script held
+        # the lock through the check, so the second never started: the wait never ends
+        # and the test fails at its bound.
         log = self.tmp / "log"
         log.mkdir()
         self.check(
             self.clone,
             f"""touch {log}/$(basename "$PWD").started
-i=0; while [ "$(ls {log} | grep -c started)" -lt 2 ]; do i=$((i+1)); [ $i -gt 100 ] && exit 1; sleep 0.1; done
+while [ "$(ls {log} | grep -c started)" -lt 2 ]; do sleep 0.1; done
 echo "$(basename "$PWD") $(git rev-parse HEAD^)" >> {log}/runs""",
         )
         git(self.clone, "commit", "-q", "-am", "check that needs a peer")
@@ -157,8 +174,8 @@ echo "$(basename "$PWD") $(git rev-parse HEAD^)" >> {log}/runs""",
         git(self.wt, "checkout", "-q", "--detach", "origin/main")
         self.commit(self.wt, "b")
         self.commit(wt2, "c")
-        runs = [subprocess.Popen(["bash", "scripts/push.sh"], cwd=c, env=ENV, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, text=True) for c in (self.wt, wt2)]  # fmt: skip
+        runs = [self.spawn(["bash", "scripts/push.sh"], cwd=c, env=ENV, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE, text=True) for c in (self.wt, wt2)]  # fmt: skip
         outs = [p.communicate(timeout=bounds.CHILD) for p in runs]
         self.assertEqual([p.returncode for p in runs], [0, 0], outs)
         self.assertEqual(self.origin_files(), ["b", "c", "scripts"])
