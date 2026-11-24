@@ -2,7 +2,13 @@
 # The core pattern goes back to the kernel's own (a core file in the working directory,
 # within the core size limit) now, not at the next boot: until then it would pipe every
 # crash to the removed handler, losing the cores. apport's core handler, which the
-# package replaced, is not put back.
+# package replaced, is not put back; apport's coredump hook, held off by this
+# component, runs after systemd-coredump again.
+- name: Let apport's coredump hook run again
+  systemd_dropin:
+    path: "{{ coredump_apport_hook_dropin }}"
+    state: absent
+
 - name: Remove what this component installed
   ansible.builtin.include_role:
     name: component_record

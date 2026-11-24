@@ -1,6 +1,6 @@
 """plugins/action/systemd_dropin.py run by Ansible: a unit's drop-in is written with the
-directory it goes in (no package ships one), previewed under --check, and removed with
-that directory once nothing else is in it."""
+directory it goes in (no package ships one), previewed under --check, masked as a link to
+/dev/null, and removed with that directory once nothing else is in it."""
 
 import json
 import subprocess
@@ -49,6 +49,12 @@ WRITE = """    - name: write
         content: "[Unit]\\nAfter=y.service\\n"
         daemon_reload: false
 """
+MASK = """    - name: mask
+      systemd_dropin:
+        path: "{{ base }}/x.service.d/10-a.conf"
+        state: masked
+        daemon_reload: false
+"""
 REMOVE = """    - name: remove
       systemd_dropin:
         path: "{{ base }}/x.service.d/10-a.conf"
@@ -72,7 +78,8 @@ class Arguments(unittest.TestCase):
         path = "/etc/systemd/system/x.service.d/a.conf"
         self.assertIn("needs content", check({"path": path}))
         self.assertIn("no content", check({"path": path, "state": "absent", "content": ""}))
-        self.assertIn("present or absent", check({"path": path, "state": "latest"}))
+        self.assertIn("present, masked or absent", check({"path": path, "state": "latest"}))
+        self.assertIn("no content", check({"path": path, "state": "masked", "content": ""}))
         self.assertIn("unknown", check({"path": path, "content": "", "dest": path}))
 
 
@@ -113,6 +120,15 @@ class SystemdDropin(unittest.TestCase):
         self.assertTrue(got["changed"], got)
         self.assertFalse(self.dropin.exists())
         self.assertTrue(other.exists())
+
+    def test_a_mask_links_to_dev_null_and_goes_with_removal(self):
+        # Same name as a package's drop-in under /usr/lib: systemd then skips that one.
+        got = run(self.base, MASK)["mask"]
+        self.assertTrue(got["changed"] and not got.get("failed"), got)
+        self.assertEqual(str(self.dropin.readlink()), "/dev/null")
+        self.assertFalse(run(self.base, MASK)["mask"]["changed"])
+        self.assertTrue(run(self.base, REMOVE)["remove"]["changed"])
+        self.assertFalse(self.dropin.parent.exists())
 
     def test_a_bad_path_fails_the_task(self):
         bad = WRITE.replace("x.service.d/10-a.conf", "x.d/10-a.conf")
