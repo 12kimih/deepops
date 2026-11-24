@@ -12,8 +12,14 @@ io_fairness_items: >-
       'file:' ~ _io_fairness_command, 'file:' ~ _io_fairness_config, 'file:' ~ _io_fairness_textfile,
       'file:' ~ cluster_tools_lib_config_records ~ '/io_fairness.json']
      + _io_fairness_dropins | map('regex_replace', '^', 'file:') | list }}
+# The measured mounts this host exports: a model is the disk under one export, so only
+# the server holding that disk sets it (on another host the same path is an NFS mount).
+_io_fairness_exports: "{{ nfs_exports | map(attribute='path') | map('regex_replace', '(.)/+$', '\\1') | list }}"
+_io_fairness_models: "{{ io_fairness_models | dict2items | selectattr('key', 'in', _io_fairness_exports) | items2dict }}"
+# present with no measured export here has nothing to share: the host converges as absent.
+_io_fairness_state: "{{ 'absent' if io_fairness_state == 'present' and _io_fairness_models | length == 0 else io_fairness_state }}"
 _io_fairness_cfg:
   cgroup_root: /sys/fs/cgroup
   sys_root: /sys
   textfile: "{{ _io_fairness_textfile }}"
-  devices: "{{ io_fairness_models | io_fairness_devices(io_fairness_enable | bool) }}"
+  devices: "{{ _io_fairness_models | io_fairness_devices(io_fairness_enable | bool) }}"

@@ -5,6 +5,26 @@
     fail_msg: "io_fairness_state must be present, absent or kept, not {{ io_fairness_state }}."
     quiet: true
 
-- name: "Make io_fairness {{ io_fairness_state }}"
-  ansible.builtin.include_tasks: "{{ io_fairness_state }}.yml"
-  when: io_fairness_state != 'kept'
+- name: Check that there is a measured model to set
+  ansible.builtin.assert:
+    that: io_fairness_models | length > 0
+    fail_msg: >-
+      io_fairness_models is empty: measure each mount (docs/slurm-cluster/io-fairness.md)
+      or turn slurm_enable_io_fairness off.
+    quiet: true
+  when: io_fairness_state == 'present'
+
+- name: Say which exports of this host have no measured model
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} exports {{ _unmeasured | join(', ') }} with no measured model:
+      iocost sets nothing for {{ 'it' if _unmeasured | length == 1 else 'them' }} (one on the
+      disk of a measured export shares that disk's setting). Measure a disk of its own to
+      share it (docs/slurm-cluster/io-fairness.md).
+  vars:
+    _unmeasured: "{{ _io_fairness_exports | reject('in', io_fairness_models) | list }}"
+  when: io_fairness_state == 'present' and _unmeasured | length > 0
+
+- name: "Make io_fairness {{ _io_fairness_state }}"
+  ansible.builtin.include_tasks: "{{ _io_fairness_state }}.yml"
+  when: _io_fairness_state != 'kept'

@@ -28,10 +28,14 @@ latency:
 VARS = yaml.safe_load((ROOT / "roles/io_fairness/vars/main.yml").read_text())
 
 
+def values(**overrides):
+    exports = [{"path": m} for m in overrides.get("io_fairness_models", {})]
+    return {**role_defaults("io_fairness"), **VARS, "node_exporter_prom_dir": "/run/prom", "nfs_exports": exports,
+            "cluster_tools_lib_config_records": "/etc/cluster-tools/configs.d", **overrides}  # fmt: skip
+
+
 def rendered(**overrides):
-    values = {**role_defaults("io_fairness"), **VARS, "node_exporter_prom_dir": "/run/prom",
-              "cluster_tools_lib_config_records": "/etc/cluster-tools/configs.d", **overrides}  # fmt: skip
-    return render(VARS["_io_fairness_cfg"], values)
+    return render(VARS["_io_fairness_cfg"], values(**overrides))
 
 
 class Config(unittest.TestCase):
@@ -53,6 +57,29 @@ class Config(unittest.TestCase):
         with self.assertRaises(Exception) as caught:
             rendered(io_fairness_models={"/home": {"measured": "x"}})
         self.assertIn("/home has no model or qos", str(caught.exception))
+
+
+class Hosts(unittest.TestCase):
+    """A model is the disk under one export: only the server holding it sets it. The
+    same path on another NFS server is a mount of the first (ARA 298: /home's model on
+    the /scratch server failed its boot unit)."""
+
+    def test_each_server_sets_the_models_of_its_own_exports(self):
+        models = {"/home": ENTRY, "/scratch": ENTRY}
+        cfg = rendered(io_fairness_models=models, nfs_exports=[{"path": "/home/"}, {"path": "/sw"}])
+        self.assertEqual([dev["mount"] for dev in cfg["devices"]], ["/home"])
+
+    def test_a_server_with_no_measured_export_converges_as_absent(self):
+        v = values(io_fairness_models={"/home": ENTRY}, nfs_exports=[{"path": "/scratch"}])
+        self.assertEqual(render(VARS["_io_fairness_state"], v), "absent")
+        self.assertEqual(render(VARS["_io_fairness_state"], {**v, "io_fairness_state": "kept"}), "kept")
+        v = values(io_fairness_models={"/home": ENTRY})
+        self.assertEqual(render(VARS["_io_fairness_state"], v), "present")
+
+    def test_the_exports_are_the_nfs_servers_own_setting(self):
+        self.assertIn("nfs_exports", role_defaults("nfs_common"))
+        deps = [d["role"] for d in load("roles/io_fairness/meta/main.yml")["dependencies"]]
+        self.assertIn("nfs_common", deps)
 
 
 class Notices(unittest.TestCase):

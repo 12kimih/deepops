@@ -3,7 +3,7 @@ galaxy_info:
   namespace: deepops
   role_name: nfs_common
   author: DeepOps
-  description: What NFS servers and clients share (roles/nfs, roles/nfs_client install it)
+  description: What NFS servers and clients share, and a server's exports (roles/nfs, roles/nfs_client install it)
   license: BSD-3-Clause
   min_ansible_version: "2.17"
   platforms:
