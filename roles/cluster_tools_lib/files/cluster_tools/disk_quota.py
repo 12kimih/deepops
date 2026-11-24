@@ -179,6 +179,18 @@ def report(text):
     return out
 
 
+def user_report(host, mount):
+    """report() of MOUNT's user quotas, keyed by login. repquota asked for numbers (-n)
+    and each uid named here (Host.owner, one getpwuid each): repquota's own naming
+    enumerates the passwd database in one pass (its default --cache), which a
+    directory served by SSSD (enumerate off, the default) answers with the local
+    accounts only, so every directory user came out as a bare number, unmatched by the
+    roster and by the limits (2026-11-24, after the LDAP cutover). A uid no account
+    has keeps its number."""
+    rows = report(host.run(["repquota", "-u", "-v", "-n", "-O", "csv", mount]))
+    return {host.owner(int(uid)) if uid.isdigit() else uid: row for uid, row in rows.items()}
+
+
 class Host:
     """The commands and files the tool reads and changes: replaced in the tests."""
 
@@ -275,7 +287,7 @@ def filesystem_steps(host, mount, cfg):
 def limit_steps(host, mount, cfg, fresh=False):
     """[(description, action)] that set every user's hard limits on MOUNT (soft 0)."""
     want = wanted(cfg["filesystems"][mount], cfg)
-    have = {} if fresh else report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
+    have = {} if fresh else user_report(host, mount)
     steps = []
     for user, values in sorted(want.items()):
         if user not in have or _limits_of(have[user]) != kernel(values):
@@ -404,14 +416,14 @@ def remove_steps(host, mount, cfg):
     _, fstype, _ = _mounted(host, mount)
     if fstype == "xfs":
         # Its quotas go with the mount option; the limits are lifted here.
-        have = report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
+        have = user_report(host, mount)
         for user in sorted(set(cfg["filesystems"][mount]) | set(cfg.get("release") or [])):
             if user in have and any(_limits_of(have[user])):
                 argv = ["setquota", "-u", user, "0", "0", "0", "0", mount]
                 steps.append((" ".join(argv), lambda a=argv: host.run(a)))
         return steps
     if re.search(r"\bis on\b", host.run(["quotaon", "-pu", mount], check=False)):
-        have = report(host.run(["repquota", "-u", "-v", "-O", "csv", mount]))
+        have = user_report(host, mount)
         for user in sorted(set(cfg["filesystems"][mount]) | set(cfg.get("release") or [])):
             if user in have and any(_limits_of(have[user])):
                 argv = ["setquota", "-u", user, "0", "0", "0", "0", mount]
@@ -449,9 +461,7 @@ def metrics(host, cfg, now):
     values = {}
     for mount, limits in (cfg.get("filesystems") or {}).items():
         want = wanted(limits, cfg)
-        for user, (bu, _, bh, iu, _, ih) in report(
-            host.run(["repquota", "-u", "-v", "-O", "csv", mount])
-        ).items():
+        for user, (bu, _, bh, iu, _, ih) in user_report(host, mount).items():
             labels = {"filesystem": mount, "user": user}
             values[key("disk_quota_used_bytes", **labels)] = bu * 1024
             values[key("disk_quota_used_inodes", **labels)] = iu

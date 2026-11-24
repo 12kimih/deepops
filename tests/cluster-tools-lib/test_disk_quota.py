@@ -42,6 +42,12 @@ class FakeHost:
         self.exist = {"/aquota.user"} if quota_file else set()
         self.ran, self.removed, self.scanned = [], [], []
 
+    # The directory's accounts, as getpwuid answers them (FakeHost.names).
+    names = {1035: "dana"}
+
+    def owner(self, uid):
+        return self.names.get(uid, str(uid))
+
     def read(self, path):
         return self.files[path]
 
@@ -74,6 +80,10 @@ class FakeHost:
         if argv[:2] == ["repquota", "-P"]:
             return PCSV_HEAD + self.pcsv
         if argv[:2] == ["repquota", "-u"]:
+            # Asked for numbers (-n): a row's user comes back as #uid, which the tool names.
+            assert "-n" in argv, (
+                "repquota names users by enumerating passwd; SSSD answers that with local accounts only"
+            )
             return CSV_HEAD + self.csv
         if argv[:2] == ["lsattr", "-pd"]:
             return f"{self.project_ids.get(argv[2], 0)} --------------e------- {argv[2]}\n"
@@ -329,6 +339,15 @@ class Remove(unittest.TestCase):
 
 
 class Metrics(unittest.TestCase):
+    def test_a_directory_user_is_named_by_uid_not_by_repquotas_enumeration(self):
+        # SSSD does not enumerate: repquota's own naming left every directory user a
+        # bare number (2026-11-24). Each uid is named one by one; one no account has
+        # keeps its number.
+        csv = "#1035,ok,ok,4096,0,0,,7,0,0,\n#4242,ok,ok,8,0,0,,1,0,0,\n"
+        values = prom.parse(dq.metrics(FakeHost(csv=csv), CFG, 1700000000))
+        users = {dict(labels)["user"] for name, labels in values if name == "disk_quota_used_bytes"}
+        self.assertEqual(users, {"dana", "4242"})
+
     def test_usage_hard_from_the_kernel_warn_from_the_configuration(self):
         csv = f"root,ok,ok,1000,0,0,,10,0,0,\nalice,ok,ok,2048,0,{20 * GB},,5,0,500000,\n"
         host = FakeHost(csv=csv, home="rw,prjquota", pcsv=f"#101,ok,ok,7,0,{20 * TB},,1,0,0,\n")
