@@ -152,6 +152,9 @@ Alertmanager posts through the app's webhook).
 
 1. In the app's settings (api.slack.com/apps, the app, "App Manifest"), paste the
    manifest and save; reinstall the app to the workspace when Slack asks (new scopes).
+   The first time, the bot is still off and no deploy has written the file: generate it
+   with the command above. Reinstalling keeps the bot token; Slack's `auth.test` with
+   it answers `ok` and lists the granted scopes in its `x-oauth-scopes` header.
 2. Under "Basic Information", "App-Level Tokens", generate a token with
    `connections:write` (xapp-, for Socket Mode).
 3. Vault it in the site config as `slack_app_token`, the way `slack_bot_token` is vaulted:
