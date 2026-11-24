@@ -215,4 +215,8 @@ echo
 echo "*** Setup complete ***"
 echo "Run Ansible through uv, which keeps .venv equal to uv.lock:  uv run ansible-playbook ..."
 echo "For the Kubernetes playbooks:  source .venv-kubespray/bin/activate"
+# Once per machine: the run history's server (roles/ara_server), a unit up after every
+# boot; without it runs record offline, slower, and each says so with this command.
+echo "Once, for faster runs (the run history's server, up across reboots):"
+echo "  uv run ansible-playbook -K playbooks/utilities/ara-server.yml"
 echo

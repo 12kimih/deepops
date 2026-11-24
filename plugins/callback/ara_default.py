@@ -18,11 +18,19 @@ from __future__ import annotations
 from ara.plugins.callback.ara_default import DOCUMENTATION  # noqa: F401  # the loader reads it here
 from ara.plugins.callback.ara_default import CallbackModule as AraCallbackModule
 
-import socket
-from urllib.parse import urlsplit
+import os
+import sys
 
 from ansible.utils.display import Display
 from ara.clients import utils as client_utils
+
+# The probe and the note, shared with the doctor (scripts/deepops/ara_server.py); realpath:
+# the file may be linked into another callback directory (tests do that).
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "scripts", "deepops")
+)
+from ara_server import answers as server_answers  # noqa: E402,F401  (tests reach it here)
+from ara_server import offline_note  # noqa: E402
 
 # ara.api.models: CharField(max_length=255) for Playbook.path, File.path, Play.name, Task.name
 LIMIT = 255
@@ -61,16 +69,6 @@ class BoundedClient:
         return getattr(self._client, name)
 
 
-def server_answers(url, timeout=1.0):
-    """Whether something accepts connections at URL's host and port (http only)."""
-    parts = urlsplit(url)
-    try:
-        with socket.create_connection((parts.hostname or "127.0.0.1", parts.port or 80), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
 class CallbackModule(AraCallbackModule):
     def set_options(self, task_keys=None, var_options=None, direct=None):
         super().set_options(task_keys=task_keys, var_options=var_options, direct=direct)
@@ -83,7 +81,7 @@ class CallbackModule(AraCallbackModule):
             if server_answers(server):
                 self.client = client_utils.get_client(client="http", endpoint=server)
             else:
-                Display().vv(f"ARA: no server at {server}; recording offline")
+                Display().display(offline_note(server))
         if self.client is not None:
             self.client = BoundedClient(self.client)
 

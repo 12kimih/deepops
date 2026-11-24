@@ -30,6 +30,7 @@ git submodule update --init --recursive
 ./scripts/setup.sh                      # uv, the locked .venv, Galaxy collections, .venv-kubespray, config/
 $EDITOR config/inventory                # setup.sh started config/ from config.example
 ansible-playbook -k playbooks/bootstrap/bootstrap-ssh.yml   # only for hosts that still take a password
+ansible-playbook -K playbooks/utilities/ara-server.yml    # once: the run history's server, up across reboots
 python3 scripts/validation/deepops_doctor.py --json   # verify before deploying
 ```
 
