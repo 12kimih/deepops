@@ -130,10 +130,10 @@ class ServicesAndPaths(unittest.TestCase):
     def test_the_portal_its_menu_and_the_dashboard(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = site(tmp)
-            self.assertEqual(sf.facts(config)["services"], {"portal": False, "overview": "", "menu": [], "dashboard": True},
+            self.assertEqual(sf.facts(config)["services"], {"portal": False, "overview": "", "menu": [], "dashboard": True, "bot": False},
                              "the defaults: no portal, monitoring on")  # fmt: skip
             (config / "group_vars" / "slurm-cluster.yml").write_text(
-                "slurm_install_open_ondemand: true\n"
+                "slurm_install_open_ondemand: true\nslurm_enable_cluster_bot: true\n"
                 "open_ondemand_servername: portal.example.org\n"
                 "open_ondemand_overview: \"{{ lookup('file', 'x') }}\"\n"
                 "open_ondemand_overview_title: Overview\n"
@@ -144,7 +144,7 @@ class ServicesAndPaths(unittest.TestCase):
             every = sf.facts(config)
         self.assertEqual(
             every["services"],
-            {"portal": True, "overview": "Overview", "menu": ["Grafana"], "dashboard": True},
+            {"portal": True, "overview": "Overview", "menu": ["Grafana"], "dashboard": True, "bot": True},
         )
         self.assertNotIn("portal.example.org", json.dumps(sf.public(every)))
 
@@ -208,6 +208,7 @@ class PublicAllowList(unittest.TestCase):
                 "idle_notify": ["mention"],
                 "leave_grace_days": 60,
                 "interactive_team_qos": True,
+                "submit_holds_disk": True,
                 "extra": 1,
             },  # fmt: skip
             "chat": {"channels": {"admin": "#x"}, "admin_group": "@ops", "admin_group_id": "S0"},
@@ -231,6 +232,7 @@ class PublicAllowList(unittest.TestCase):
                 "idle_notify",
                 "leave_grace_days",
                 "interactive_team_qos",
+                "submit_holds_disk",
             },
         )
         self.assertEqual(out["chat"], {"channels": {"admin": "#x"}, "admin_group": "@ops"})
