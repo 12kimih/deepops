@@ -124,10 +124,11 @@ class Wiring(unittest.TestCase):
 
 
 class Recording(unittest.TestCase):
-    def run_play(self, base, callbacks):
+    def run_play(self, base, callbacks, play=PLAY):
         d = Path(tempfile.mkdtemp())
         self.addCleanup(subprocess.run, ["rm", "-rf", str(d)])
-        (d / "play.yml").write_text(PLAY)
+        (d / "play.yml").write_text(play)
+        base.mkdir(parents=True, exist_ok=True)  # the run's HOME: Ansible warns when it is missing
         # unrecorded.env for its throwaway vault password; the callbacks are this test's own.
         # HOME: run_lock's lock (plugins/callback) in the throwaway base, not shared with
         # another checkout's test running the same play at the same time.
@@ -159,6 +160,35 @@ class Recording(unittest.TestCase):
         self.assertIn("visible-output", content)
         self.assertNotIn(SECRET, content)
         self.assertNotIn(SECRET.encode(), (base / "ansible.sqlite").read_bytes())
+
+    def test_a_warning_shown_on_the_terminal_only_is_recorded(self):
+        # A reserved variable name: Ansible warns on the display, in no task result.
+        play = PLAY.replace("  tasks:\n", "  vars:\n    action: x\n  tasks:\n", 1)
+        self.assertNotEqual(play, PLAY)
+        base = Path(tempfile.mkdtemp()) / "ara"
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(base.parent)])
+        env = self.run_play(base, CALLBACKS, play)
+        (playbook,) = self.ara(env, "playbook", "list")
+        records = {r["key"]: r for r in self.ara(env, "record", "list", "--playbook", str(playbook["id"]))}
+        value = self.ara(env, "record", "show", str(records["warnings"]["id"]))["value"]
+        self.assertTrue(any("reserved name" in w for w in value), value)
+        shown = self.ara(env, "playbook", "show", str(playbook["id"]))
+        self.assertIn("warnings", [label["name"] for label in shown["labels"]])
+
+    def test_a_run_without_warnings_records_none(self):
+        base = Path(tempfile.mkdtemp()) / "ara"
+        self.addCleanup(subprocess.run, ["rm", "-rf", str(base.parent)])
+        env = self.run_play(base, CALLBACKS)
+        (playbook,) = self.ara(env, "playbook", "list")
+        self.assertEqual(self.ara(env, "record", "list", "--playbook", str(playbook["id"])), [])
+
+    def test_the_display_still_keeps_what_it_showed(self):
+        # The recorder reads the display's own sets: an ansible-core that renames them
+        # fails here, not by recording nothing.
+        from ansible.utils.display import Display
+
+        self.assertIsInstance(Display()._warns, set)
+        self.assertIsInstance(Display()._deprecations, set)
 
     def run_adhoc(self, base, callbacks, command=None):
         """A recorded ad-hoc command of more than 255 characters; its output."""

@@ -38,9 +38,11 @@
     tasks_from: command
   vars:
     cluster_tools_lib_command:
-      dest: "{{ cluster_tools_bin_dir }}/{{ item }}"
-      module: "cluster_tools.{{ item | replace('-', '_') }}"
+      dest: "{{ cluster_tools_bin_dir }}/{{ cluster_tools_command_name }}"
+      module: "cluster_tools.{{ cluster_tools_command_name | replace('-', '_') }}"
   loop: "{{ cluster_tools_commands }}"
+  loop_control:
+    loop_var: cluster_tools_command_name
 
 # bash-completion loads this on the first <TAB> after the command, and the command
 # describes its own options, so the completion never lags behind an upgrade. A host

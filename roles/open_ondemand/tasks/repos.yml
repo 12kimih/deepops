@@ -9,7 +9,7 @@
     name: package_repos
     tasks_from: repo
   vars:
-    package_repos_repo: "{{ item }}"
+    package_repos_repo: "{{ open_ondemand_repo }}"
   loop:
     - name: ondemand-web
       uris: "{{ open_ondemand_repo_url }}"
@@ -36,4 +36,5 @@
         - /etc/apt/sources.list.d/nodesource.list
         - "{{ deepops_cache_dir }}/open-ondemand/nodesource.asc"
   loop_control:
-    label: "{{ item.name }}"
+    loop_var: open_ondemand_repo
+    label: "{{ open_ondemand_repo.name }}"

@@ -116,6 +116,13 @@ class UnixAdapter(requests.adapters.HTTPAdapter):
         super().close()
 
 
+def displayed():
+    """{"warnings": [...], "deprecations": [...]}: what this process's display showed,
+    each once, as the terminal showed it."""
+    display = Display()
+    return {"warnings": sorted(display._warns), "deprecations": sorted(display._deprecations)}
+
+
 def unix_client(path):
     """ARA's HTTP client, its every request sent over the unix socket PATH and never
     through a proxy from the environment (a site's http_proxy)."""
@@ -142,6 +149,24 @@ class CallbackModule(AraCallbackModule):
                 Display().display(offline_note())
         if self.client is not None:
             self.client = BoundedClient(self.client)
+
+    # Ansible's own warnings and deprecations (a reserved variable name, the inventory, an
+    # interpreter, a notice no task result carries) reach the terminal only: ARA records
+    # just those a result carries, on its task. The run's display keeps each it showed
+    # (ansible-core 2.19 and newer, deduplicated), so they are recorded with the playbook,
+    # as the records "warnings" and "deprecations", and the playbook is labelled
+    # "warnings" so a list finds it (2026-11-25: a run's warning was seen on screen only).
+    def v2_playbook_on_stats(self, stats):
+        if self.client is not None and self.playbook is not None:
+            shown = displayed()
+            for key, messages in shown.items():
+                if messages:
+                    self.client.post(
+                        "/api/v1/records", playbook=self.playbook["id"], key=key, value=messages, type="list"
+                    )
+            if any(shown.values()):
+                self._set_playbook_labels([label["name"] for label in self.playbook["labels"]] + ["warnings"])
+        super().v2_playbook_on_stats(stats)
 
     # A file is found again by the path the server holds (the playbook's, for an ad-hoc
     # command's tasks): the cache is keyed the same way, or the file is read from disk.
