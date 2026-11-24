@@ -9,8 +9,10 @@ export RUNAI_TEST_BIN="$HERE/bin"
 export ANSIBLE_ROLES_PATH="$ROOT/roles"
 export ANSIBLE_CONFIG="$ROOT/ansible.cfg"
 export ANSIBLE_LOCALHOST_WARNING=False ANSIBLE_INVENTORY_UNPARSED_WARNING=False
-# Test runs leave no ARA record (scripts/deepops/unrecorded.py): no callback plugins.
+# Test runs leave no ARA record and share no cached facts (scripts/deepops/unrecorded.py):
+# no callback plugins, facts in memory only.
 ANSIBLE_CALLBACK_PLUGINS="$(mktemp -d)"; export ANSIBLE_CALLBACK_PLUGINS
+export ANSIBLE_CACHE_PLUGIN=memory
 trap 'rm -rf "${ANSIBLE_CALLBACK_PLUGINS}"' EXIT
 fail=0
 pass() { echo "ok   - $1"; }
