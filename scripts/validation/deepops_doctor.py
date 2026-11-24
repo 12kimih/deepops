@@ -28,6 +28,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))
 from cluster_tools import proc  # noqa: E402
 
+# Whether the run history's server answers (roles/ara_server), as the recorder sees it.
+sys.path.insert(0, str(ROOT / "scripts/deepops"))
+import ara_server  # noqa: E402
+
 
 # (rc, stdout, stderr), never raising; bounded (cluster_tools.proc).
 run = functools.partial(proc.outcome, timeout=120)
@@ -238,6 +242,10 @@ def main():
         # Hosts that hide GPUs from SSH sessions (Slurm login GPU hiding): there a
         # direct nvidia-smi over SSH is expected to fail and srun is the GPU test.
         info["ssh_gpu_hiding_hosts"] = count_positive_stdout_hosts(results) if rc == 0 else None
+
+    # The run history's server is a speed-up, not a precondition (runs record offline
+    # without it): a fact for the operator, with the fix when it is down.
+    info["ara_server"] = "answers" if ara_server.answers() else ara_server.offline_note()
 
     ok = all(c["ok"] for c in checks)
     result = {"ok": ok, "checks": checks, "info": info}

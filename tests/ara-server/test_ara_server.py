@@ -12,6 +12,7 @@ import in_tree  # noqa: E402
 from ansible_yaml import role_defaults  # noqa: E402
 
 recorder = in_tree.load("plugins/callback/ara_default.py")
+ara_server = in_tree.load("scripts/deepops/ara_server.py")
 
 
 class Port(unittest.TestCase):
@@ -23,6 +24,13 @@ class Port(unittest.TestCase):
         default = doc["options"]["api_server"]["default"]
         defaults = role_defaults("ara_server")
         self.assertEqual(default, f"http://{defaults['ara_server_bind']}:{defaults['ara_server_port']}")
+        self.assertEqual(default, ara_server.ADDRESS, "the doctor probes the same address")
+
+    def test_a_run_without_the_server_says_how_to_install_it(self):
+        note = ara_server.offline_note()
+        self.assertIn("nothing is lost", note)
+        self.assertIn(ara_server.INSTALL, note)
+        self.assertTrue((ROOT / ara_server.INSTALL.split()[-1]).is_file(), "the named playbook exists")
 
 
 class Fallback(unittest.TestCase):
