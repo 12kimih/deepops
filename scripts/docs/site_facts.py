@@ -26,7 +26,8 @@ Facts:
             or missing: portal (slurm_install_open_ondemand), its overview page's menu title
             (open_ondemand_overview_title, "" without one), the menu titles of the services
             it publishes (open_ondemand_proxied_services, as Grafana), dashboard
-            (slurm_enable_monitoring); never an address
+            (slurm_enable_monitoring), bot (slurm_enable_cluster_bot: the /cluster command);
+            never an address
   paths     the shared trees people use: scratch (scratch_space_root), software
             (sm_prefix), shared (shared_space_root) and its data folders (shared_space_data)
   login     each person's limits on a login node (cluster_tools_user_slice_limits, the
@@ -102,9 +103,10 @@ PUBLIC = {
         "idle_notify",
         "leave_grace_days",
         "interactive_team_qos",
+        "submit_holds_disk",
     },
     "login": {"cpus", "memory_gib", "tasks"},
-    "services": {"portal", "overview", "menu", "dashboard"},
+    "services": {"portal", "overview", "menu", "dashboard", "bot"},
     "paths": {"scratch", "software", "shared", "shared_data"},
     "slurm": {"kill_wait_seconds", "preempt_grace_seconds", "sigkill_after_seconds"},
     "dates": None,  # any name the site's schedule gives, its value a date
@@ -134,6 +136,7 @@ POLICY = {
     "cancel_warn_hours": "slurm_usage_report_cancel_warn_hours",
     "idle_notify": "slurm_usage_report_notify",  # mention (in the report thread), dm; [] none
     "leave_grace_days": "people_leave_grace_days",
+    "submit_holds_disk": "submit_holds_disk",  # a person at a disk hard limit cannot submit
 }
 _SIZE_GIB = {"K": 1 / 1024**2, "M": 1 / 1024, "G": 1, "T": 1024}
 
@@ -360,6 +363,7 @@ def services(config, settings_):
         "overview": settings_.get("open_ondemand_overview_title") if overview else "",
         "menu": [svc["title"] for svc in services_ if svc.get("title")],
         "dashboard": bool(settings_.get("slurm_enable_monitoring")),
+        "bot": bool(settings_.get("slurm_enable_cluster_bot")),
     }
 
 
