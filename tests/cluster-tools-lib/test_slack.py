@@ -49,7 +49,7 @@ class SlackTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 1, "a cached answer is not looked up again")
         self.assertEqual(slack.member(client, "c", {}, "", cache), "")
 
-    ANSWERS = {"conversations.open": {"ok": True, "channel": {"id": "D9"}}, "chat.postMessage": {"ok": True, "ts": "1.2"},
+    ANSWERS = {"conversations.open": {"ok": True, "channel": {"id": "D9"}}, "chat.postMessage": {"ok": True, "ts": "1.2", "channel": "C42"},
                "chat.getPermalink": {"ok": True, "permalink": "https://x/p1"}, "chat.update": {"ok": True}}  # fmt: skip
 
     def posts(self, client):
@@ -76,14 +76,34 @@ class SlackTests(unittest.TestCase):
             self.assertEqual(posts[0][:2], ("chat.postMessage", "D9"))
             self.assertIn(slack.DM_LOG_NOTE, posts[0][2])
             self.assertEqual(posts[1], ("chat.postMessage", "#alerts", slack.dm_log_title(day, 0), None))
-            self.assertEqual(posts[2], ("chat.postMessage", "#alerts",
+            # Then by the ID Slack gave: chat.update takes no channel name.
+            self.assertEqual(posts[2], ("chat.postMessage", "C42",
                                         "`disk` to *kim*: Your disk use is high.  <https://x/p1|open>", "1.2"))  # fmt: skip
-            self.assertEqual(posts[3][:3], ("chat.update", "#alerts", slack.dm_log_title(day, 1)))
+            self.assertEqual(posts[3][:3], ("chat.update", "C42", slack.dm_log_title(day, 1)))
             # The second DM of the day goes under the same message: no new one.
-            self.assertEqual([p[1] for p in posts[4:]], ["D9", "#alerts", "#alerts"])
+            self.assertEqual([p[1] for p in posts[4:]], ["D9", "C42", "C42"])
             self.assertEqual(posts[5][3], "1.2")
             self.assertEqual(posts[6][2], slack.dm_log_title(day, 2))
             self.assertIn("dm disk kim D9 1.2", out.getvalue())
+
+    def test_a_failed_count_update_keeps_the_days_message(self):
+        with tempfile.TemporaryDirectory() as d:
+            log = slack.DmLog("#alerts", f"{d}/dm-log.json")
+            client = Fake(self.ANSWERS)
+            sent = client.call
+
+            def call(method, **params):
+                if method == "chat.update":
+                    raise slack.Error("Slack chat.update failed: channel_not_found")
+                return sent(method, **params)
+
+            client.call = call
+            with mock.patch("sys.stderr", io.StringIO()) as err:
+                log.record(client, "a")
+                log.record(client, "b")
+            titles = [p for m, p in client.calls if m == "chat.postMessage" and "thread_ts" not in p]
+            self.assertEqual(len(titles), 1, "one message a day, the count failing or not")
+            self.assertIn("count was not updated", err.getvalue())
 
     def test_a_new_day_starts_a_new_message(self):
         with tempfile.TemporaryDirectory() as d:
