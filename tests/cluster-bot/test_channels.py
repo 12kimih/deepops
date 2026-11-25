@@ -113,6 +113,23 @@ class Guides(unittest.TestCase):
     def run_round(self, slack, today="2026-01-01"):
         channels.round_(lambda: self.doc, slack, NAMES, self.state, today, self.log.append)
 
+    def test_a_service_address_is_filled_from_the_config_or_its_line_left_out(self):
+        """The public channels.json holds [[url:portal]], never the address."""
+        self.doc = {"channels": {"announce": guide(
+            markdown="# News\n\n- [Portal]([[url:portal]]): log in\n- [Grafana]([[url:dashboard]]): charts\n",
+            bookmarks=[{"title": "Portal", "url": "[[url:portal]]", "emoji": ":globe_with_meridians:"},
+                       {"title": "Grafana", "url": "[[url:dashboard]]", "emoji": ":chart_with_upwards_trend:"}])}}  # fmt: skip
+        slack = FakeSlack()
+        urls = channels.service_urls({"portal_url": "https://portal.example/", "dashboard_url": ""})
+        channels.round_(lambda: self.doc, slack, NAMES, self.state, "2026-01-01", self.log.append, urls)
+        news = slack.chan["C1"]
+        self.assertEqual(
+            slack.canvases[news["canvas"]], "# News\n\n- [Portal](https://portal.example/): log in\n"
+        )
+        self.assertEqual([(b["title"], b["link"]) for b in news["bookmarks"].values()],
+                         [("Portal", "https://portal.example/")], "no address: no bookmark")  # fmt: skip
+        self.assertNotIn("[[url:", json.dumps(slack.calls))
+
     def test_a_channel_gets_its_purpose_topic_canvas_and_bookmarks_once(self):
         slack = FakeSlack()
         self.run_round(slack)

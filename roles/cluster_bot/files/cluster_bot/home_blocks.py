@@ -3,6 +3,14 @@
 from . import commands
 from .blocks import button
 
+# The services a person opens in a browser, as the Home tab's buttons: (connect key, label).
+LINKS = (("portal_url", "웹 포털"), ("dashboard_url", "Grafana"), ("docs_url", "사용 안내"))
+
+
+def links(connect):
+    """[(label, address)] of the services the bot's config gives an address (connect)."""
+    return [(label, connect[key]) for key, label in LINKS if connect.get(key)]
+
 
 def help_text(channel, group):
     """How to ask for help: in CHANNEL, one post and its thread, tagging GROUP (the
@@ -21,11 +29,16 @@ def help_text(channel, group):
     )
 
 
-def home(login, muted, features, command="/cluster", help_channel="", admin_group=""):
-    """LOGIN's Home tab: whether job notices reach them, the subcommands of COMMAND they
-    can use (FEATURES: the request kinds this cluster runs; cluster_bot.commands' list)
-    and how to ask for help (help_text)."""
+def home(login, muted, features, command="/cluster", help_channel="", admin_group="", web=()):
+    """LOGIN's Home tab: the services to open in a browser (WEB: links()), whether job
+    notices reach them, the subcommands of COMMAND they can use (FEATURES: the request
+    kinds this cluster runs; cluster_bot.commands' list) and how to ask for help
+    (help_text)."""
     blocks = [{"type": "header", "text": {"type": "plain_text", "text": f"{login}님의 클러스터"}}]
+    if web:
+        blocks.append({"type": "actions", "elements": [
+            {"type": "button", "text": {"type": "plain_text", "text": label}, "url": url, "action_id": f"home.link.{i}"}
+            for i, (label, url) in enumerate(web)]})  # fmt: skip
     state = "받지 않음" if muted else "받음"
     blocks += [
         {"type": "divider"},

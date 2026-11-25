@@ -1,7 +1,7 @@
 """What a person needs before their first login, from the cluster's settings only (the
-bot's config `connect`: login_host, ssh_port, portal_url, docs_url; roles/cluster_bot
-cluster_bot_connect derives each from the setting that holds it). Private: Slack
-only, never the public docs.
+bot's config `connect`: login_host, ssh_port, portal_url, dashboard_url, docs_url;
+roles/cluster_bot cluster_bot_connect derives each from the setting that holds it).
+Private: Slack only, never the public docs.
 
     connect_text(connect, login="<아이디>")  -> how to log in (ssh, the portal, the guide)
     join_text(connect, command)              -> the /join reply: how an account comes

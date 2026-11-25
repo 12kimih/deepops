@@ -14,7 +14,7 @@ it acts on), bans
 leave {remind_days, leaving (people_leaving)}, command (the one slash command, its
 subcommands cluster_bot.commands'), data {host, kinds, root, unused_days, grace_days,
 seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
-{login_host, ssh_port, portal_url, docs_url} and welcomed (cluster_bot.onboarding: how to
+{login_host, ssh_port, portal_url, dashboard_url, docs_url} and welcomed (cluster_bot.onboarding: how to
 log in, the account notice), dm_log {channel, state} (where the notices the bot sends a
 person by DM are logged for the administrators, cluster_tools.slack.DmLog; no channel
 logs none), notices {url, channel, seen} (the user docs' notices posted in the
@@ -29,6 +29,7 @@ logged; the answer to what a person just did is not.
 """
 
 import json
+import re
 import sys
 import threading
 import time
@@ -147,6 +148,7 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
             cfg["command"],
             cfg["channels"]["help"],
             cfg.get("admin_group", ""),
+            home_blocks.links(cfg.get("connect") or {}),
         )
         if project is not None:
             view["blocks"] += projects_blocks.home(login, projects, projects_root)
@@ -156,6 +158,10 @@ def build(cfg, engine, join=None, unban=None, project=None, data=None, *, dms):
     def home_opened(event, client):
         if event.get("tab") == "home":
             publish_home(client, event["user"])
+
+    @app.action(re.compile(r"home\.link\.\d+"))
+    def home_link(ack):
+        ack()  # a link button opens its address itself; Slack still tells the app
 
     @app.action("home.notices")
     def notices(ack, body, client, action):
@@ -633,6 +639,7 @@ def main(argv=None):
                 kept["state"],
                 date.today().isoformat(),
                 lambda line: print(f"cluster-bot: channel guides: {line}", file=sys.stderr, flush=True),
+                guides.service_urls(cfg.get("connect") or {}),
             )
 
         every(GUIDES_EVERY, "channel guides", guides_round)

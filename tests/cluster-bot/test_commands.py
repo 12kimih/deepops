@@ -83,6 +83,16 @@ class Commands(unittest.TestCase):
         home = home_blocks.home("alice", False, {"project"}, "/cl", "foot")
         self.assertIn("`/cl project`", str(home), "the Home tab's list is the same help")
 
+    def test_the_home_tab_opens_each_service_the_config_gives_an_address(self):
+        web = home_blocks.links(
+            {"portal_url": "https://portal.example/", "dashboard_url": "", "docs_url": "https://d/"}
+        )
+        self.assertEqual(web, [("웹 포털", "https://portal.example/"), ("사용 안내", "https://d/")])
+        home = home_blocks.home("alice", False, set(), web=web)
+        buttons = next(b for b in home["blocks"] if b["type"] == "actions")["elements"]
+        self.assertEqual([(b["text"]["text"], b["url"]) for b in buttons], web)
+        self.assertNotIn("actions", str(home_blocks.home("alice", False, set())), "no address, no buttons")
+
     def test_no_command_is_one_of_slacks_own(self):
         declared = [c["command"] for c in commands.manifest("/cluster")["features"]["slash_commands"]]
         self.assertEqual([c for c in declared if c in SLACK_BUILTINS], [])
