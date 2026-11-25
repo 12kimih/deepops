@@ -10,15 +10,17 @@ in one of the environment variables named overrides it, so a person's own choice
 
 per_worker() is what each worker of a Slurm task may use: --cpus-per-task when given,
 else the job's CPUs on the node shared by its workers there, one per task or per GPU
-(torchrun starts one per GPU), whichever is more; never more than usable(). A login
-and a task get these as their thread counts (roles/cluster_tools' profile.d, roles/slurm's
-task prolog), so a library that sizes its pool by the machine starts no more threads
-than its share.
+(torchrun starts one per GPU), whichever is more; never more than usable(). per_node()
+is what the job may use on this node, for a build's compilers: SLURM_CPUS_ON_NODE,
+never more than usable(). A login and a task get these as the knobs that size work by
+the machine (user_environment_cpu_knobs: roles/cluster_tools' profile.d, roles/slurm's
+task prolog), so a library or build starts no more threads than its share.
 
     usable(environ_names=("CHECK_JOBS",))  -> int
     per_worker()                           -> int
+    per_node()                             -> int
     python3 cpus.py [NAME ...]             prints usable(NAMES)
-    python3 cpus.py --job                  prints per_worker()
+    python3 cpus.py --job                  prints per_worker() and per_node()
 
 Python 3.9 or newer, standard library only: scripts in the repository run this file
 directly, and hosts run it as part of cluster_tools.
@@ -109,9 +111,15 @@ def per_worker(environ=None, proc_cgroup=Path("/proc/self/cgroup"), root=CGROUP_
     return max(1, min(on_node // workers, most))
 
 
+def per_node(environ=None, proc_cgroup=Path("/proc/self/cgroup"), root=CGROUP_ROOT):
+    environ = os.environ if environ is None else environ
+    most = usable((), environ, proc_cgroup, root)
+    return max(1, min(_count(environ.get("SLURM_CPUS_ON_NODE", "")) or most, most))
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    print(per_worker() if argv == ["--job"] else usable(argv))
+    print(f"{per_worker()} {per_node()}" if argv == ["--job"] else usable(argv))
     return 0
 
 

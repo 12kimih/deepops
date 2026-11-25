@@ -8,13 +8,9 @@
 if (! $?{{ e.name }}) setenv {{ e.name }} {{ quoted }}
 if ("${{ e.name }}" == "") setenv {{ e.name }} {{ quoted }}
 {% endfor %}
-{% if user_environment_thread_variables %}
-# Thread counts, as in {{ cluster_tools_profile_name }}.sh.
-if ( -x {{ user_environment_cpus_command }} ) then
-    setenv CLUSTER_CPUS `{{ user_environment_cpus_command }}`
-{% for name in user_environment_thread_variables %}
-    if (! $?{{ name }}) setenv {{ name }} "$CLUSTER_CPUS"
-    if ("${{ name }}" == "") setenv {{ name }} "$CLUSTER_CPUS"
+{% if user_environment_cpu_knobs %}
+# The knobs that size work by the machine, as in {{ cluster_tools_profile_name }}.sh.
+{% for line in user_environment_cpu_knobs | cpu_knob_lines('csh', user_environment_cpus_command) %}
+{{ line }}
 {% endfor %}
-endif
 {% endif %}

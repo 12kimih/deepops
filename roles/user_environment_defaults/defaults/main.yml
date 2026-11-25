@@ -26,14 +26,124 @@ user_environment_defaults:
 # alias, the environment reaches job scripts and remote commands.
 user_environment: {}
 
-# Thread counts: libraries that size their thread pool by the machine (OpenMP, MKL,
-# OpenBLAS, Python's os.cpu_count() from 3.13; GNU nproc reads OMP_NUM_THREADS) would
-# start one thread per CPU of the node, far more than a login's CPU quota or a job
-# worker's share, and be throttled. Each is set to what cluster_tools.cpus gives: a
-# login's usable CPUs (roles/cluster_tools' profile.d), a job worker's share (roles/slurm's
-# task prolog: --cpus-per-task, else the job's CPUs on the node over its tasks or GPUs
-# there). CLUSTER_CPUS carries the number set, so a job replaces the value its login
-# set and keeps one the user chose. A value the user set wins; [] sets none.
-user_environment_thread_variables: [OMP_NUM_THREADS, MKL_NUM_THREADS, OPENBLAS_NUM_THREADS, PYTHON_CPU_COUNT]
-# The command that prints them (cluster_tools.cpus; --job for a task's worker).
+# The knobs that size work by the machine: a library or build tool left to itself starts
+# one thread or compiler per CPU of the node, far more than a login's CPU quota or a job's
+# share, and is throttled (a flash-attn build on a login node ran hundreds of compilers).
+# Each is set from cluster_tools.cpus, by kind:
+#   threads  a login's usable CPUs; in a job, each worker's share (--cpus-per-task, else the
+#            job's CPUs on the node over its tasks or GPUs there)
+#   build    a login's usable CPUs; in a job, the job's CPUs on the node
+# value is what the variable gets, {n} the number ("1": a fixed value). One table, rendered
+# by plugins/filter/user_environment.py (cpu_knob_lines) into roles/cluster_tools'
+# profile.d (sh, csh) and roles/slurm's task prolog, and into the user docs
+# (scripts/docs/site_facts.py, threads). CLUSTER_CPUS and CLUSTER_BUILD_JOBS carry the
+# numbers set, so a job replaces a value its login set and keeps one the user chose: a value
+# the user set always wins. [] sets none.
+# Left out on purpose: knobs whose default is already 1 or small, where setting one raises
+# parallelism (JULIA_NUM_THREADS: 1; UV_THREADPOOL_SIZE, libuv: 4); knobs that change more
+# than size (TF_NUM_INTEROP_THREADS, JAVA_TOOL_OPTIONS); aliases of one listed
+# (GOTO_NUM_THREADS of OPENBLAS_NUM_THREADS); and I/O pools (UV_CONCURRENT_DOWNLOADS,
+# UV_CONCURRENT_INSTALLS).
+user_environment_cpu_knobs:
+  - name: OMP_NUM_THREADS
+    kind: threads
+    reader: OpenMP runtimes (libgomp, libomp), PyTorch's intra-op pool, GNU nproc
+    default: one thread per CPU
+    doc: https://gcc.gnu.org/onlinedocs/libgomp/OMP_005fNUM_005fTHREADS.html
+  - name: MKL_NUM_THREADS
+    kind: threads
+    reader: Intel oneMKL (NumPy and SciPy built on it)
+    default: one thread per physical core
+    doc: https://scikit-learn.org/stable/computing/parallelism.html
+  - name: OPENBLAS_NUM_THREADS
+    kind: threads
+    reader: OpenBLAS (NumPy and SciPy wheels)
+    default: one thread per CPU
+    doc: https://github.com/OpenMathLib/OpenBLAS/blob/develop/docs/runtime_variables.md
+  - name: BLIS_NUM_THREADS
+    kind: threads
+    reader: BLIS and AMD AOCL-BLAS
+    default: one thread (multithreaded builds read this)
+    doc: https://github.com/flame/blis/blob/master/docs/Multithreading.md
+  - name: NUMEXPR_NUM_THREADS
+    kind: threads
+    reader: NumExpr (pandas' eval)
+    default: the CPUs, at most 8
+    doc: https://github.com/pydata/numexpr/blob/master/doc/user_guide.rst
+  # NumExpr starts this many threads at import (64 by default) and never uses more: a user
+  # raising NUMEXPR_NUM_THREADS above it sets both.
+  - name: NUMEXPR_MAX_THREADS
+    kind: threads
+    reader: NumExpr's pool, started at import
+    default: "64"
+    doc: https://github.com/pydata/numexpr/blob/master/doc/user_guide.rst
+  - name: NUMBA_NUM_THREADS
+    kind: threads
+    reader: Numba's parallel CPU target
+    default: one thread per CPU core
+    doc: https://numba.readthedocs.io/en/stable/reference/envvars.html
+  - name: RAYON_NUM_THREADS
+    kind: threads
+    reader: Rust's Rayon pool (Hugging Face tokenizers, Polars)
+    default: one thread per CPU Rust sees
+    doc: https://docs.rs/rayon/latest/rayon/struct.ThreadPoolBuilder.html
+  - name: POLARS_MAX_THREADS
+    kind: threads
+    reader: Polars
+    default: one thread per CPU
+    doc: https://docs.pola.rs/api/python/stable/reference/api/polars.thread_pool_size.html
+  - name: TF_NUM_INTRAOP_THREADS
+    kind: threads
+    reader: TensorFlow's intra-op pool
+    default: one thread per CPU
+    doc: https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/common_runtime/process_util.cc
+  # Go reads only the limit of the cgroup the process is in, never a parent's: a login's
+  # quota on its user slice is missed.
+  - name: GOMAXPROCS
+    kind: threads
+    reader: Go programs
+    default: the CPUs, or the process's own cgroup's limit
+    doc: https://pkg.go.dev/runtime#hdr-Environment_Variables
+  - name: PYTHON_CPU_COUNT
+    kind: threads
+    reader: Python 3.13+ os.cpu_count() (multiprocessing and concurrent.futures pools)
+    default: the CPUs
+    doc: https://docs.python.org/3/using/cmdline.html#envvar-PYTHON_CPU_COUNT
+  - name: MAX_JOBS
+    kind: build
+    reader: PyTorch C++/CUDA extension builds (torch.utils.cpp_extension, ninja)
+    default: one compiler per CPU
+    doc: https://pytorch.org/docs/stable/cpp_extension.html
+  # flash-attn's build gives each of MAX_JOBS compilers NVCC_THREADS threads (4 by default):
+  # 1 keeps the total at MAX_JOBS. The other way, a rule that the product stay within the
+  # CPUs, is one no variable can hold.
+  - name: NVCC_THREADS
+    kind: build
+    value: "1"
+    reader: flash-attn's build (nvcc --threads)
+    default: "4"
+    doc: https://github.com/Dao-AILab/flash-attention/blob/main/setup.py
+  - name: CMAKE_BUILD_PARALLEL_LEVEL
+    kind: build
+    reader: cmake --build
+    default: the native build tool's (make one job, ninja one per CPU)
+    doc: https://cmake.org/cmake/help/latest/envvar/CMAKE_BUILD_PARALLEL_LEVEL.html
+  - name: CARGO_BUILD_JOBS
+    kind: build
+    reader: cargo
+    default: one compiler per CPU
+    doc: https://doc.rust-lang.org/cargo/reference/config.html#buildjobs
+  - name: UV_CONCURRENT_BUILDS
+    kind: build
+    reader: uv building source distributions
+    default: one per CPU
+    doc: https://docs.astral.sh/uv/reference/environment/#uv_concurrent_builds
+  # A -j on make's command line still wins over MAKEFLAGS from the environment.
+  - name: MAKEFLAGS
+    kind: build
+    value: "-j{n}"
+    reader: GNU make
+    default: one job
+    doc: https://www.gnu.org/software/make/manual/html_node/Options_002fRecursion.html
+# The command that prints the numbers (cluster_tools.cpus; --job in a job's task).
 user_environment_cpus_command: /usr/local/libexec/cluster-cpus

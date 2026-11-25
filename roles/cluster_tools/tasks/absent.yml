@@ -21,7 +21,7 @@
     cluster_tools_commands: []
     cluster_tools_scripts: []
     cluster_tools_profile_entries: []
-    user_environment_thread_variables: []
+    user_environment_cpu_knobs: []
     cluster_tools_shared_dirs: []
     cluster_tools_motd_title: ""
     cluster_tools_motd_news: true

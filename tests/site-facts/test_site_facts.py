@@ -266,14 +266,23 @@ class LoginLimits(unittest.TestCase):
 
 
 class Threads(unittest.TestCase):
-    def test_the_thread_count_variables_are_public(self):
-        """roles/user_environment_defaults' list; the site's own replaces it."""
+    def test_the_knobs_are_public_with_kind_reader_and_default(self):
+        """roles/user_environment_defaults' table; the site's own replaces it."""
         with tempfile.TemporaryDirectory() as tmp:
             every = sf.facts(site(tmp))
-            self.assertIn("OMP_NUM_THREADS", every["threads"]["variables"])
+            omp = next(v for v in every["threads"]["variables"] if v["name"] == "OMP_NUM_THREADS")
+            self.assertEqual((omp["kind"], omp["value"]), ("threads", "{n}"))
+            self.assertTrue(omp["reader"] and omp["default"])
             self.assertEqual(sf.public(every)["threads"], every["threads"])
-            config = site(tmp + "/b", all_yml="user_environment_thread_variables: [OMP_NUM_THREADS]\n")
-            self.assertEqual(sf.facts(config)["threads"], {"variables": ["OMP_NUM_THREADS"]})
+            config = site(tmp + "/b", all_yml="user_environment_cpu_knobs: [{name: MAX_JOBS, kind: build}]\n")
+            self.assertEqual(
+                sf.facts(config)["threads"],
+                {
+                    "variables": [
+                        {"name": "MAX_JOBS", "kind": "build", "value": "{n}", "reader": "", "default": ""}
+                    ]
+                },
+            )
 
 
 class PublicAllowList(unittest.TestCase):

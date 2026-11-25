@@ -84,10 +84,21 @@ class PerWorker(unittest.TestCase):
     def test_outside_a_job(self):
         self.assertEqual(self.share(usable=8), 8)
 
+    def test_a_builds_compilers_get_the_jobs_cpus_on_the_node(self):
+        with mock.patch.object(cpus, "usable", return_value=64):
+            self.assertEqual(cpus.per_node({"SLURM_CPUS_ON_NODE": "16", "SLURM_GPUS_ON_NODE": "8"}), 16)
+            self.assertEqual(cpus.per_node({}), 64, "outside a job: usable")
+        with mock.patch.object(cpus, "usable", return_value=4):
+            self.assertEqual(cpus.per_node({"SLURM_CPUS_ON_NODE": "16"}), 4, "never more than usable")
+
     def test_the_command(self):
-        with mock.patch.object(cpus, "per_worker", return_value=3), mock.patch("builtins.print") as out:
+        with (
+            mock.patch.object(cpus, "per_worker", return_value=3),
+            mock.patch.object(cpus, "per_node", return_value=12),
+            mock.patch("builtins.print") as out,
+        ):
             self.assertEqual(cpus.main(["--job"]), 0)
-        out.assert_called_once_with(3)
+        out.assert_called_once_with("3 12")
         with mock.patch.object(cpus, "usable", return_value=5) as usable, mock.patch("builtins.print") as out:
             cpus.main(["CHECK_JOBS"])
         usable.assert_called_once_with(["CHECK_JOBS"])
