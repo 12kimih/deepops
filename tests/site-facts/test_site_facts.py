@@ -206,6 +206,26 @@ class InteractiveTeamQos(unittest.TestCase):
         self.assertNotIn("^team_", json.dumps(sf.public(every)))
 
 
+class SubmitRules(unittest.TestCase):
+    def test_the_job_rules_the_user_pages_state_from_the_submit_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = site(tmp)
+            policy = sf.public(sf.facts(config))["policy"]
+            self.assertEqual(policy["gpus_per_node"], [], "the role default: any count")
+            for rule in (*sf.SUBMIT_RULES, "gpu_type_defaulted"):
+                self.assertIs(policy[rule], False, rule)
+            (config / "group_vars" / "slurm-cluster.yml").write_text(
+                "slurm_job_submit_policy: {gpus_per_node: ['1', 2, 4, 8], default_gpu_type: gtype,"
+                " strict_gpu_type: true, force_gpu_partition: true, gpu_jobs_use_defaults: true,"
+                " gpu_nodes_shared: true}\n"
+            )
+            policy = sf.public(sf.facts(config))["policy"]
+        self.assertEqual(policy["gpus_per_node"], [1, 2, 4, 8])
+        for rule in (*sf.SUBMIT_RULES, "gpu_type_defaulted"):
+            self.assertIs(policy[rule], True, rule)
+        self.assertNotIn("gtype", json.dumps(policy), "a GPU type is the site's, never public")
+
+
 class LoginLimits(unittest.TestCase):
     def test_the_login_groups_user_slice_limits_as_people_read_them(self):
         """The login nodes' per-person limits (cluster_tools_user_slice_limits in
