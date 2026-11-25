@@ -131,6 +131,11 @@
    --check does not notice: the BMC's shutdown hook passed its preview and failed the
    run, systemd ships no /usr/lib/systemd/system-shutdown (2026-11-22; rule 30 was the
    same for drop-ins). A templated directory is not checked.
+32. A block's `when` names no variable that a set_fact or register inside the block sets:
+   the block's condition is every inner task's, evaluated again before each, so once
+   the inner task sets it the rest of the block is skipped. The administrators' group
+   lookup set the ID its block required to be empty, and its report of the ID never ran
+   (slack_defaults, ARA 2026-11-25). Decide in a task before the block.
 3. No expression reads the internal `vars` dictionary (`x in vars`, `vars[...]`):
    ansible-core 2.20 deprecates it and 2.24 removes it. Test `x is defined`, or use
    the vars/varnames lookups for a computed name.
@@ -153,12 +158,14 @@ from systemd_dropin import UNIT_TYPES  # noqa: E402
 sys.path.insert(0, str(ROOT / "tests" / "lib"))
 from repo_scan import (  # noqa: E402
     CHANGES,
+    NESTED,
     COMMANDS,
     SERVICES,
     Scan,
     ansible_files,
     conditioned_tasks,
     module,
+    references,
     role_var_files,
     tasks,
     tracked,
@@ -1396,6 +1403,45 @@ class TaskRules(unittest.TestCase):
                 walk(doc, rel(path))
         scan.check(self)
         self.assertEqual(offenders, [], "write one backslash: YAML keeps it, ansible passes it on as is")
+
+    def test_a_block_condition_is_not_set_inside_it(self):
+        offenders = []
+        for path in ansible_files():
+            for task in tasks(path):
+                if "block" not in task or "when" not in task:
+                    continue
+                inside = set_inside(task)
+                hit = sorted(references({"when": task["when"]}) & inside)
+                if hit:
+                    offenders.append(f"{path.relative_to(ROOT)}: {task.get('name')}: {', '.join(hit)}")
+        self.assertEqual(offenders, [], "decide in a task before the block (rule 32)")
+
+    def test_a_block_condition_set_inside_it_is_found(self):
+        block = yaml.safe_load("""
+        - when: [x | length == 0, done is not defined]
+          block:
+            - ansible.builtin.set_fact: {x: found}
+            - ansible.builtin.command: {argv: [true]}
+              register: done
+              vars: {y: 1}
+        """)[0]
+        self.assertEqual(sorted(references({"when": block["when"]}) & set_inside(block)), ["done", "x"])
+
+
+def set_inside(task):
+    """The names a set_fact or register inside TASK's block, rescue and always sets (a
+    task's own vars stay its own)."""
+    found = set()
+    for key in NESTED:
+        for inner in task.get(key) or []:
+            if not isinstance(inner, dict):
+                continue
+            if module(inner)[0] == "set_fact":
+                found |= {k for k in module(inner)[1] if k not in ("cacheable",)}
+            if isinstance(inner.get("register"), str):
+                found.add(inner["register"])
+            found |= set_inside(inner)
+    return found
 
 
 if __name__ == "__main__":
