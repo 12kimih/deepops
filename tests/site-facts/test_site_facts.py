@@ -130,8 +130,16 @@ class ServicesAndPaths(unittest.TestCase):
     def test_the_portal_its_menu_and_the_dashboard(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = site(tmp)
-            self.assertEqual(sf.facts(config)["services"], {"portal": False, "overview": "", "menu": [], "dashboard": True, "bot": False,
-                              "job_notices": True}, "the defaults: no portal, monitoring and job notices on")  # fmt: skip
+            first = sf.facts(config)["services"]
+            boards = first.pop("dashboards")
+            self.assertEqual(first, {"portal": False, "overview": "", "menu": [], "dashboard": True, "bot": False,
+                              "job_notices": True, "portal_groups": [], "portal_files": []},
+                             "the defaults: no portal, monitoring and job notices on")  # fmt: skip
+            # Every dashboard the roles ship, each by the uid and title its file holds.
+            self.assertIn({"uid": "gpu-nodes", "title": "GPU / Nodes"}, boards)
+            self.assertEqual(
+                len(boards), sum(len(f) for f in sf.settings(config)["grafana_dashboard_sets"].values())
+            )
             (config / "group_vars" / "slurm-cluster.yml").write_text(
                 "slurm_install_open_ondemand: true\nslurm_enable_cluster_bot: true\nslurm_enable_job_notices: false\n"
                 "open_ondemand_servername: portal.example.org\n"
@@ -140,6 +148,8 @@ class ServicesAndPaths(unittest.TestCase):
                 "open_ondemand_proxied_services:\n"
                 '  - {path: "{{ p }}", title: Grafana}\n'
                 "  - {path: /hidden/}\n"
+                "slurm_enable_monitoring: false\n"
+                "open_ondemand_nav_groups: [files, jobs]\n"
             )
             every = sf.facts(config)
         self.assertEqual(
@@ -148,9 +158,12 @@ class ServicesAndPaths(unittest.TestCase):
                 "portal": True,
                 "overview": "Overview",
                 "menu": ["Grafana"],
-                "dashboard": True,
+                "dashboard": False,
                 "bot": True,
                 "job_notices": False,
+                "portal_groups": ["files", "jobs"],
+                "portal_files": ["/home"],
+                "dashboards": [],
             },
         )
         self.assertNotIn("portal.example.org", json.dumps(sf.public(every)))
