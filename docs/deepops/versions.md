@@ -70,4 +70,6 @@ pin). Each component's update steps are in [update-deepops.md](update-deepops.md
 | slurm | `slurm_version` | `26.05.6` |  |
 | slurm | `slurm_pyxis_version` | `0.24.0` |  |
 | standalone-container-registry | `standalone_container_registry_image` | `registry:3.1.2@sha256:82f6ff4a7f98` |  |
+| examples/model-cache | `huggingface_hub` | `2.1.1` | |
+| examples/vllm | `vllm` | `0.32.0` | |
 <!-- END GENERATED: versions -->

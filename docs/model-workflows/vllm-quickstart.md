@@ -13,7 +13,7 @@ is needed. Review the model license before use.
   in a login shell outside your allocation. Do not override `CUDA_VISIBLE_DEVICES`
   to reach other GPUs. This guide does not allocate resources or install drivers.
 - A driver compatible with the selected vLLM wheel's CUDA runtime. The tagged
-  v0.32.0 NVIDIA guide describes CUDA 13.0 (default) and 12.9 wheels and compute capability 7.5+.
+  vLLM v0.32.0 NVIDIA guide describes CUDA 13.0 (default) and 12.9 wheels and compute capability 7.5+.
   Check the upstream installation guide for your GPU/driver before installing;
   a working `nvidia-smi` alone does not establish wheel compatibility.
 - Python **3.12** with venv support, the Python 3.12 development headers and a C

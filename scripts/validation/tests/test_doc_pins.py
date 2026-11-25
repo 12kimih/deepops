@@ -66,6 +66,22 @@ def example_values():
     return found
 
 
+# A Python package an example pins (examples/*/requirements.txt), by the names docs and
+# URLs give it.
+PACKAGE_NAMES = {"vllm": ("vLLM", "vllm"), "huggingface_hub": ("huggingface_hub", "huggingface-hub", "Hub")}
+
+
+def example_pins():
+    """{package: version} from the examples' requirements files."""
+    found = {}
+    for path in tracked("examples/*/requirements*.txt"):
+        for line in path.read_text().splitlines():
+            m = re.match(r"^([A-Za-z0-9_.-]+)==([^\s#;]+)", line)
+            if m:
+                found[m.group(1).lower().replace("-", "_")] = m.group(2)
+    return found
+
+
 class DocPinTests(unittest.TestCase):
     def test_quoted_pins_match_defaults(self):
         defaults, examples = role_defaults(), example_values()
@@ -120,6 +136,30 @@ class DocPinTests(unittest.TestCase):
                         continue
                     stale.append(f"{rel}:{number}: {name} {version}, the role pins {pinned}")
         self.assertEqual(stale, [], "name the variable or docs/deepops/versions.md, not a number")
+
+    def test_docs_name_the_examples_pinned_packages(self):
+        """vllm-quickstart.md and shared-cache.md quoted vLLM and huggingface_hub at
+        their pins in prose and in every tagged link: a bump of the requirements file
+        left them at the old release. A version beside a requirement word (>=, or
+        newer) or the page's own history is not a pin."""
+        pins = example_pins()
+        self.assertLessEqual(set(PACKAGE_NAMES), set(pins), "a name list for a package no example pins")
+        stale = []
+        for doc in tracked("docs/*.md", "skills/*.md", "README.md", "AGENTS.md", "examples/*.md"):
+            for number, line in enumerate(doc.read_text().splitlines(), 1):
+                for package, names in PACKAGE_NAMES.items():
+                    alias = "|".join(map(re.escape, names))
+                    for m in re.finditer(
+                        rf"(?<![\w-])(?:{alias})(?![\w-])[^\s)\]]{{0,30}}?(?:==|[/@ ]v?|\s+\*\*v?)(\d+\.\d+\.\d+)",
+                        line,
+                    ):
+                        around = line[m.start() : m.end() + 12].lower()
+                        if m.group(1) == pins[package] or any(w in around for w in (*PROSE_NOT_A_PIN, ">=")):
+                            continue
+                        stale.append(
+                            f"{doc.relative_to(ROOT)}:{number}: {m.group(0)}, the example pins {pins[package]}"
+                        )
+        self.assertEqual(stale, [], "quote the version examples/*/requirements.txt pins")
 
 
 if __name__ == "__main__":

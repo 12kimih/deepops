@@ -11,7 +11,8 @@ and this script writes its body from the source (role defaults, the example
 config). Hand edits inside a block are overwritten.
 
 Generators:
-  versions              every pinned version, image and chart in role defaults
+  versions              every pinned version, image and chart in role defaults, and
+                        each package an example's requirements file pins
   role-variables:ROLE   the variables of roles/ROLE/defaults/main.yml, with the
                         comment above each one as its description
   tree:DIR              what is directly under DIR: its directories holding tracked
@@ -94,6 +95,14 @@ def gen_versions(_arg):
                 shown = re.sub(r"(@sha256:[0-9a-f]{12})[0-9a-f]{52}$", r"\1", str(value))
                 rows.append(
                     f"| {role} | `{name}` | `{cell(shown)}` | {('`' + cell(example[name]) + '`') if name in example and example[name] != str(value) else ''} |"
+                )
+    # The Python packages an example pins (its requirements file), by the example.
+    for path in sorted(tracked("examples/*/requirements*.txt")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^([A-Za-z0-9_.-]+)==([^\s#;]+)", line)
+            if m:
+                rows.append(
+                    f"| {path.parent.relative_to(ROOT).as_posix()} | `{m.group(1)}` | `{m.group(2)}` | |"
                 )
     return "\n".join(rows) + "\n"
 

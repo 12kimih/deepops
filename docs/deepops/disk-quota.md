@@ -76,7 +76,7 @@ the kernel and never needs this; move to it at the next window that can unmount 
 filesystem.
 
 A filesystem with `{}` (the default) only counts. A timer exports the usage
-every 15 minutes:
+every `disk_quota_metrics_interval`:
 
 | Metric | Labels |
 |---|---|
@@ -120,7 +120,7 @@ with the reason (where, how much, `quota -s` to look); their running jobs go on.
 | `slurm_enable_submit_holds` | Turns the holds on: a person past their roster `ends` is held from the next day (docs/deepops/accounts.md) |
 | `submit_holds_disk` | Holds a person at a hard limit too (and the disk report says what a hard limit means for Slurm). Off by default |
 | `submit_holds_from` | `YYYY-MM-DD`: no one is held before this date, the grace for everyone already at a limit when the holds are turned on; the disk report and its DMs say from when. `""` holds at once |
-| `submit_holds_interval` | How often the holds are worked out again (5 minutes) |
+| `submit_holds_interval` | How often the holds are worked out again |
 | `submit_holds_max_age` | How long, in seconds, `job_submit.lua` trusts the holds file after it was written; `SubmitHoldsStale` warns at half of it |
 
 A timer on the controllers reads the disk quota metrics from Prometheus (the same

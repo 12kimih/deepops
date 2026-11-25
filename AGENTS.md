@@ -144,8 +144,8 @@ limits, failure reasons and the distinction from training success.
 `playbooks/k8s-cluster/runai.yml` adds GPU-aware queues and fractional GPUs on top
 of the GPU Operator. The two modes exclude each other. Verify with
 `python3 scripts/validation/validate_runai.py --json` and require `"ok": true`.
-Memory-limited fractions (`runai_kai_gpu_fractioning`) need GPU Operator v26.7.1+
-and an r615+ driver the role will not install for you. See
+Memory-limited fractions (`runai_kai_gpu_fractioning`) need a GPU Operator and a driver
+at the minimums in `roles/runai` (`runai_gpu_operator_min_version`, `runai_gpu_fractioning_min_driver_major`) or newer, which the role will not install for you. See
 `skills/deploy-runai-kai/` and `docs/k8s-cluster/runai.md`.
 
 ## Gotchas that look like failures but are not
