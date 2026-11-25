@@ -38,6 +38,8 @@ assert None not in RENDERED_DEFAULTS.values(), RENDERED_DEFAULTS
 PROFILE_SH = "roles/cluster_tools/templates/profile.sh.j2"
 PROFILE_CSH = "roles/cluster_tools/templates/profile.csh.j2"
 PROLOG = "roles/slurm/templates/etc/slurm/task-prolog.d/60-user-environment"
+THREADS = "roles/slurm/templates/etc/slurm/task-prolog.d/65-thread-counts"
+THREAD_VARIABLES = DEFAULTS["user_environment_thread_variables"]
 # The only files that may set a name of the list: the list, its function, its renderers.
 OWNERS = {
     "roles/user_environment_defaults/defaults/main.yml",
@@ -48,7 +50,7 @@ OWNERS = {
 }
 
 
-def render(template, entries):
+def render(template, entries, cpus_command="/nonexistent", thread_variables=THREAD_VARIABLES):
     """TEMPLATE as Ansible renders it (trim_blocks), with ENTRIES."""
     env = Environment(  # noqa: S701 (shell, not HTML)
         loader=FileSystemLoader(str(ROOT)),
@@ -63,6 +65,8 @@ def render(template, entries):
         cluster_tools_profile_name="z10-test",
         cluster_tools_profile_entries=profile,
         user_environment_entries=entries,
+        user_environment_thread_variables=thread_variables,
+        user_environment_cpus_command=cpus_command,
     )
 
 
@@ -152,6 +156,62 @@ class Rendered(unittest.TestCase):
     def test_prolog_lines_pass_the_task_prologs_filter(self):
         line = re.compile(r"^(export [A-Za-z_][A-Za-z0-9_]*=|unset [A-Za-z_][A-Za-z0-9_]*$)")
         self.assertTrue(all(line.match(x) for x in self.prolog()))
+
+
+class ThreadCounts(unittest.TestCase):
+    """The thread counts (user_environment_thread_variables): a login's from its usable
+    CPUs, a task's from its worker's share, the user's own kept in both."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.command = Path(tmp.name) / "cluster-cpus"
+        # Prints 6 for a login and 3 for a job worker (--job), as cluster_tools.cpus does.
+        self.command.write_text('#!/bin/sh\n[ "$1" = --job ] && echo 3 || echo 6\n')
+        self.command.chmod(0o755)
+
+    def login(self, shell, template, **preset):
+        script = render(template, [], str(self.command)) + "".join(
+            f"printf '%s=%s\\n' {n} \"${n}\"\n" for n in ["CLUSTER_CPUS", *THREAD_VARIABLES]
+        )
+        env = {"PATH": os.environ["PATH"], "HOME": "/h", **preset}
+        out = run(shell, script, env, *(["-f"] if shell != "sh" else []))
+        return dict(line.split("=", 1) for line in out.splitlines())
+
+    def test_a_login_gets_its_usable_cpus_and_keeps_the_users(self):
+        got = self.login("sh", PROFILE_SH, OMP_NUM_THREADS="2")
+        self.assertEqual(
+            got, {"CLUSTER_CPUS": "6", **{n: "6" for n in THREAD_VARIABLES}, "OMP_NUM_THREADS": "2"}
+        )
+
+    @unittest.skipUnless(shutil.which("tcsh") or shutil.which("csh"), "csh not installed")
+    def test_a_csh_login_the_same(self):
+        shell = shutil.which("tcsh") or shutil.which("csh")
+        self.assertEqual(
+            self.login(shell, PROFILE_CSH, OMP_NUM_THREADS="2"),
+            self.login("sh", PROFILE_SH, OMP_NUM_THREADS="2"),
+        )
+
+    def test_without_the_command_a_login_sets_none(self):
+        script = render(PROFILE_SH, []) + 'printf "%s" "${OMP_NUM_THREADS:-unset}"\n'
+        self.assertEqual(run("sh", script, {"PATH": os.environ["PATH"], "HOME": "/h"}), "unset")
+
+    def prolog(self, **preset):
+        out = run("bash", render(THREADS, [], str(self.command)), {"PATH": os.environ["PATH"], **preset})
+        return sorted(out.splitlines())
+
+    def test_a_task_replaces_the_logins_value_and_keeps_the_users(self):
+        want = sorted([f"export {n}=3" for n in THREAD_VARIABLES] + ["export CLUSTER_CPUS=3"])
+        self.assertEqual(self.prolog(), want, "unset")
+        inherited = {"CLUSTER_CPUS": "6", **{n: "6" for n in THREAD_VARIABLES}}
+        self.assertEqual(self.prolog(**inherited), want, "the login's, inherited")
+        mine = self.prolog(**{**inherited, "OMP_NUM_THREADS": "2"})
+        self.assertNotIn("export OMP_NUM_THREADS=3", mine, "the user's own")
+        self.assertIn("export CLUSTER_CPUS=3", mine)
+
+    def test_none_listed_sets_none(self):
+        self.assertEqual(render(THREADS, [], str(self.command), []).count("export"), 0)
+        self.assertNotIn("CLUSTER_CPUS", render(PROFILE_SH, [], str(self.command), []))
 
 
 class Docs(unittest.TestCase):

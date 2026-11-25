@@ -8,8 +8,17 @@ slice, the person's own shell included. usable() is the CPUs this process may ru
 quota (cpu.max) from its own cgroup up to the root, and at least 1. A positive integer
 in one of the environment variables named overrides it, so a person's own choice wins.
 
+per_worker() is what each worker of a Slurm task may use: --cpus-per-task when given,
+else the job's CPUs on the node shared by its workers there, one per task or per GPU
+(torchrun starts one per GPU), whichever is more; never more than usable(). A login
+and a task get these as their thread counts (roles/cluster_tools' profile.d, roles/slurm's
+task prolog), so a library that sizes its pool by the machine starts no more threads
+than its share.
+
     usable(environ_names=("CHECK_JOBS",))  -> int
+    per_worker()                           -> int
     python3 cpus.py [NAME ...]             prints usable(NAMES)
+    python3 cpus.py --job                  prints per_worker()
 
 Python 3.9 or newer, standard library only: scripts in the repository run this file
 directly, and hosts run it as part of cluster_tools.
@@ -73,5 +82,38 @@ def usable(environ_names=(), environ=None, proc_cgroup=Path("/proc/self/cgroup")
     return max(1, count)
 
 
+def _count(value):
+    return int(value) if str(value).isdigit() and int(value) > 0 else 0
+
+
+def tasks_on_node(environ):
+    """The tasks of this step on this node: SLURM_STEP_TASKS_PER_NODE (the batch script's
+    SLURM_TASKS_PER_NODE) at this node's index, SLURM_NODEID; "2(x3),1" is 2, 2, 2, 1."""
+    spec = environ.get("SLURM_STEP_TASKS_PER_NODE") or environ.get("SLURM_TASKS_PER_NODE") or ""
+    counts = []
+    for part in spec.split(","):
+        count, _, repeat = part.partition("(x")
+        counts += [_count(count)] * (_count(repeat.rstrip(")")) or 1)
+    node = _count(environ.get("SLURM_NODEID", "0"))
+    return counts[node] if node < len(counts) else 0
+
+
+def per_worker(environ=None, proc_cgroup=Path("/proc/self/cgroup"), root=CGROUP_ROOT):
+    environ = os.environ if environ is None else environ
+    most = usable((), environ, proc_cgroup, root)
+    per_task = _count(environ.get("SLURM_CPUS_PER_TASK", ""))
+    if per_task:
+        return min(per_task, most)
+    on_node = _count(environ.get("SLURM_CPUS_ON_NODE", "")) or most
+    workers = max(1, tasks_on_node(environ), _count(environ.get("SLURM_GPUS_ON_NODE", "")))
+    return max(1, min(on_node // workers, most))
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    print(per_worker() if argv == ["--job"] else usable(argv))
+    return 0
+
+
 if __name__ == "__main__":
-    print(usable(sys.argv[1:]))
+    sys.exit(main())

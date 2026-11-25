@@ -56,5 +56,43 @@ class Usable(unittest.TestCase):
         self.assertGreaterEqual(cpus.usable(), 1)
 
 
+class PerWorker(unittest.TestCase):
+    """A Slurm task's workers: their share of the job's CPUs on the node."""
+
+    def share(self, usable=64, **environ):
+        with mock.patch.object(cpus, "usable", return_value=usable):
+            return cpus.per_worker({k: str(v) for k, v in environ.items()})
+
+    def test_cpus_per_task_when_given(self):
+        self.assertEqual(self.share(SLURM_CPUS_PER_TASK=6, SLURM_CPUS_ON_NODE=48, SLURM_GPUS_ON_NODE=8), 6)
+        self.assertEqual(self.share(usable=4, SLURM_CPUS_PER_TASK=6), 4, "never more than usable")
+
+    def test_one_worker_per_gpu(self):
+        """torchrun's workers, one per GPU of one task: the CPUs over the GPUs, never
+        each worker all of them."""
+        self.assertEqual(self.share(SLURM_CPUS_ON_NODE=64, SLURM_GPUS_ON_NODE=8, SLURM_TASKS_PER_NODE=1), 8)
+        self.assertEqual(self.share(SLURM_CPUS_ON_NODE=12, SLURM_GPUS_ON_NODE=8), 1, "at least one")
+
+    def test_one_worker_per_task(self):
+        environ = dict(SLURM_CPUS_ON_NODE=32, SLURM_STEP_TASKS_PER_NODE="4(x2),2", SLURM_TASKS_PER_NODE=1)
+        self.assertEqual(self.share(**environ, SLURM_NODEID=1), 8)
+        self.assertEqual(self.share(**environ, SLURM_NODEID=2), 16)
+        self.assertEqual(
+            self.share(**environ, SLURM_NODEID=2, SLURM_GPUS_ON_NODE=4), 8, "more GPUs than tasks"
+        )
+
+    def test_outside_a_job(self):
+        self.assertEqual(self.share(usable=8), 8)
+
+    def test_the_command(self):
+        with mock.patch.object(cpus, "per_worker", return_value=3), mock.patch("builtins.print") as out:
+            self.assertEqual(cpus.main(["--job"]), 0)
+        out.assert_called_once_with(3)
+        with mock.patch.object(cpus, "usable", return_value=5) as usable, mock.patch("builtins.print") as out:
+            cpus.main(["CHECK_JOBS"])
+        usable.assert_called_once_with(["CHECK_JOBS"])
+        out.assert_called_once_with(5)
+
+
 if __name__ == "__main__":
     unittest.main()

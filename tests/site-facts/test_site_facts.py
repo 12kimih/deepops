@@ -259,6 +259,17 @@ class LoginLimits(unittest.TestCase):
             self.assertEqual(sf.facts(site(tmp))["login"], {})
 
 
+class Threads(unittest.TestCase):
+    def test_the_thread_count_variables_are_public(self):
+        """roles/user_environment_defaults' list; the site's own replaces it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            every = sf.facts(site(tmp))
+            self.assertIn("OMP_NUM_THREADS", every["threads"]["variables"])
+            self.assertEqual(sf.public(every)["threads"], every["threads"])
+            config = site(tmp + "/b", all_yml="user_environment_thread_variables: [OMP_NUM_THREADS]\n")
+            self.assertEqual(sf.facts(config)["threads"], {"variables": ["OMP_NUM_THREADS"]})
+
+
 class PublicAllowList(unittest.TestCase):
     def test_only_allowed_keys_and_fields_reach_the_public_file(self):
         every = {

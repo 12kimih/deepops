@@ -30,6 +30,24 @@ Slurm applies to the task's environment
 skipped: a task prolog that fails cancels the task. Pyxis builds its container
 environment from the job's submitted environment, not from these exports.
 
+## Thread counts
+
+Libraries that size their thread pool by the machine (OpenMP, MKL, OpenBLAS, Python's
+`os.cpu_count()` from 3.13, and GNU `nproc`, which reads `OMP_NUM_THREADS`) would start
+one thread per CPU of the node: far more than a login's CPU quota, or a job worker's
+share, and throttled for it. `user_environment_thread_variables`
+(`roles/user_environment_defaults`) are set from `cluster_tools.cpus`, the one count the
+repository's own tools use too:
+
+- in a login (`/etc/profile.d`, `roles/cluster_tools`), to the CPUs the login may use: its
+  cpuset, capped by every cgroup CPU quota above it (a login node's per-person slice);
+- in a task (`task-prolog.d/65-thread-counts`), to each worker's share: `--cpus-per-task`
+  when given, else the job's CPUs on the node over its tasks there or its GPUs there,
+  whichever is more (torchrun starts one worker per GPU).
+
+`CLUSTER_CPUS` carries the number set, so the task replaces a value its login set and
+keeps one the user chose: a person's own value wins in both. `[]` sets none.
+
 ## Per tool
 
 - **Enroot** (`roles/enroot`, `enroot_version`, standard build): configured in

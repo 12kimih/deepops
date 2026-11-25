@@ -10,6 +10,7 @@ cluster_tools_items:
   - "dir:{{ cluster_tools_user_slice_dir }}"
   - "file:{{ cluster_tools_manifest }}"
   - "file:{{ cluster_tools_lib_manifest }}"
+  - "file:{{ user_environment_cpus_command }}"
 
 # The users' environment entries a login gets (a job-only one is the task prolog's).
 cluster_tools_profile_entries: "{{ user_environment_entries | rejectattr('login', 'equalto', '') | list }}"

@@ -42,6 +42,8 @@ Facts:
             times disk_quota_inodes_per_tib) and its warn level (cluster_user_warn_fraction)
   dates     the site's announced dates (config schedule.yml, name: YYYY-MM-DD), so a
             page states each once; only date values pass
+  threads   the thread count variables a login and a job get (user_environment_thread_variables;
+            the person's own value wins)
   environment
             the users' environment (user_environment over user_environment_defaults,
             roles/user_environment_defaults), each {name, login, job} as the profile.d
@@ -132,6 +134,7 @@ PUBLIC = {
     "dates": None,  # any name the site's schedule gives, its value a date
     "quota": None,  # each limited filesystem, its fields QUOTA_FIELDS
     "environment": {"name", "login", "job"},  # only entries whose values are paths or URLs
+    "threads": {"variables"},
     "chat": {"channels", "admin_group"},
     "bot": {"command", "subcommands"},
     "reports": {"usage", "weekly", "disk"},
@@ -478,6 +481,7 @@ def facts(config):
         "dates": schedule(config),
         "quota": quota_limits(config, s),
         "environment": environment(config),
+        "threads": {"variables": s.get("user_environment_thread_variables") or []},
         # the commands the overview page names: the ones the cluster publishes
         "cluster": {
             **cluster(config),
