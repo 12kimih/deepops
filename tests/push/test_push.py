@@ -21,7 +21,7 @@ import bounds  # noqa: E402
 
 PUSH = ROOT / "scripts" / "push.sh"
 ENV = {
-    **os.environ,
+    **{k: v for k, v in os.environ.items() if k != "DEEPOPS_CONFIG_DIR"},
     "GIT_CONFIG_GLOBAL": os.devnull,
     "GIT_CONFIG_NOSYSTEM": "1",
     "GIT_AUTHOR_NAME": "t",
@@ -67,8 +67,10 @@ class Base(unittest.TestCase):
         git(checkout, "commit", "-q", "-m", name)
 
     def push(self, checkout, env=None, **kwargs):
+        """push.sh in CHECKOUT; with no ENV, with no site config (none)."""
         return subprocess.run(
-            ["bash", "scripts/push.sh"], cwd=checkout, env=env or ENV, capture_output=True, text=True,
+            ["bash", "scripts/push.sh"], cwd=checkout, env=env or {**ENV, "DEEPOPS_CONFIG_DIR": "none"},
+            capture_output=True, text=True,
             timeout=bounds.CHILD, **kwargs,
         )  # fmt: skip
 
@@ -174,7 +176,7 @@ echo "$(basename "$PWD") $(git rev-parse HEAD^)" >> {log}/runs""",
         git(self.wt, "checkout", "-q", "--detach", "origin/main")
         self.commit(self.wt, "b")
         self.commit(wt2, "c")
-        runs = [self.spawn(["bash", "scripts/push.sh"], cwd=c, env=ENV, stdout=subprocess.PIPE,
+        runs = [self.spawn(["bash", "scripts/push.sh"], cwd=c, env={**ENV, "DEEPOPS_CONFIG_DIR": "none"}, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE, text=True) for c in (self.wt, wt2)]  # fmt: skip
         outs = [p.communicate(timeout=bounds.CHILD) for p in runs]
         self.assertEqual([p.returncode for p in runs], [0, 0], outs)
@@ -275,6 +277,121 @@ class SiteConfig(Base):
         self.assertEqual(out.returncode, 2)
         self.assertIn("do not rebase", out.stderr)
         self.assertEqual(self.origin_files(), ["scripts"], "nothing pushed")
+
+
+# A stand-in for scripts/docs/generate.py: the site's page states deepops' "facts" file.
+GENERATE = """import os, pathlib, sys
+config = pathlib.Path(os.environ["DEEPOPS_CONFIG_DIR"])
+want = pathlib.Path("facts").read_text()
+page = config / "page"
+if "--check" in sys.argv:
+    sys.exit(0 if page.read_text() == want else 1)
+page.write_text(want)
+"""
+
+
+class FindsTheConfig(Base):
+    """A worktree has no config/ of its own: it checks with the clone's, and with no
+    config anywhere it refuses unless told to check without one. Pushed from a worktree,
+    the check had read no site config at all and passed a change that left its pages
+    stale (2026-11-26)."""
+
+    def setUp(self):
+        super().setUp()
+        self.seen = self.tmp / "seen"
+        self.check(
+            self.wt, f'cat "$DEEPOPS_CONFIG_DIR/setting" > {self.seen} 2>/dev/null || echo none > {self.seen}'
+        )
+        git(self.wt, "commit", "-q", "-am", "check reads the config")
+
+    def test_a_worktree_checks_with_the_clones_config(self):
+        # The clone's config: its own repository, as the site config is.
+        origin = self.tmp / "config.git"
+        git(self.tmp, "init", "-q", "--bare", "-b", "main", str(origin))
+        git(self.tmp, "clone", "-q", str(origin), str(self.clone / "config"))
+        (self.clone / "config" / "setting").write_text("the clone's\n")
+        git(self.clone / "config", "add", "setting")
+        git(self.clone / "config", "commit", "-q", "-m", "config")
+        git(self.clone / "config", "push", "-q", "origin", "HEAD:main")
+        out = self.push(self.wt, env=ENV)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(self.seen.read_text(), "the clone's\n")
+
+    def test_no_config_anywhere_is_refused_unless_said(self):
+        out = self.push(self.wt, env=ENV)
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("no site config to check with", out.stderr)
+        self.assertEqual(self.origin_files(), ["scripts"], "nothing pushed")
+        out = self.push(self.wt, env={**ENV, "DEEPOPS_CONFIG_DIR": "none"})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(self.seen.read_text(), "none\n")
+
+
+class SitePages(Base):
+    """A deepops change that makes the site's generated pages stale pushes them, already
+    regenerated and checked, to the config's origin right after deepops."""
+
+    def setUp(self):
+        super().setUp()
+        self.config_origin = self.tmp / "config.git"
+        git(self.tmp, "init", "-q", "--bare", "-b", "main", str(self.config_origin))
+        self.config = self.tmp / "config"
+        git(self.tmp, "clone", "-q", str(self.config_origin), str(self.config))
+        (self.config / "page").write_text("old\n")
+        git(self.config, "add", "page")
+        git(self.config, "commit", "-q", "-m", "config base")
+        git(self.config, "push", "-q", "origin", "HEAD:main")
+        (self.wt / "scripts" / "docs").mkdir()
+        (self.wt / "scripts" / "docs" / "generate.py").write_text(GENERATE)
+        (self.wt / "facts").write_text("old\n")
+        self.check(self.wt, f'"{sys.executable}" scripts/docs/generate.py --check')
+        git(self.wt, "add", "-A")
+        git(self.wt, "commit", "-q", "-m", "pages from facts")
+        self.env = {**ENV, "DEEPOPS_CONFIG_DIR": str(self.config), "DEEPOPS_PYTHON": sys.executable}
+
+    def config_page(self):
+        return git(self.config_origin, "show", "main:page")
+
+    def test_a_change_that_stales_the_pages_pushes_them_with_it(self):
+        head = git(self.config, "rev-parse", "HEAD")
+        (self.wt / "facts").write_text("new\n")
+        git(self.wt, "commit", "-q", "-am", "facts change")
+        out = self.push(self.wt, env=self.env)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("pushed the site config's pages", out.stdout)
+        self.assertEqual(git(self.origin, "show", "main:facts"), "new")
+        self.assertEqual(self.config_page(), "new")
+        message = git(self.config_origin, "log", "-1", "--format=%s", "main")
+        self.assertEqual(
+            message,
+            f"docs: regenerate the pages from deepops {git(self.wt, 'rev-parse', '--short=12', 'HEAD')}",
+        )
+        self.assertEqual(git(self.config, "rev-parse", "HEAD"), head, "the checkout did not move")
+
+    def test_pages_already_current_push_nothing_to_the_config(self):
+        self.commit(self.wt, "b")
+        before = git(self.config_origin, "rev-parse", "main")
+        out = self.push(self.wt, env=self.env)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertNotIn("site config's pages", out.stdout + out.stderr)
+        self.assertEqual(git(self.config_origin, "rev-parse", "main"), before)
+
+    def test_unpushed_config_commits_behind_origin_are_refused(self):
+        peer = self.tmp / "config-peer"
+        git(self.tmp, "clone", "-q", str(self.config_origin), str(peer))
+        (peer / "other").write_text("theirs\n")
+        git(peer, "add", "other")
+        git(peer, "commit", "-q", "-m", "peer")
+        git(peer, "push", "-q", "origin", "HEAD:main")
+        (self.config / "mine").write_text("mine\n")
+        git(self.config, "add", "mine")
+        git(self.config, "commit", "-q", "-m", "mine")
+        (self.wt / "facts").write_text("new\n")
+        git(self.wt, "commit", "-q", "-am", "facts change")
+        out = self.push(self.wt, env=self.env)
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("rebase or push them first", out.stderr)
+        self.assertEqual(self.config_page(), "old")
 
 
 if __name__ == "__main__":
