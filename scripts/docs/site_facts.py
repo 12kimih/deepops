@@ -31,7 +31,9 @@ Facts:
             (sm_prefix), shared (shared_space_root) and its data folders (shared_space_data)
   login     each person's limits on a login node (cluster_tools_user_slice_limits, the
             slurm-login group's over the others): cpus (CPUQuota), memory_gib
-            (MemoryMax), tasks (TasksMax); a limit not set is left out
+            (MemoryMax), tasks (TasksMax); a limit not set is left out; and private_dirs,
+            the directories each login has its own of (login_private_dirs_paths), only
+            while slurm_enable_login_private_dirs is on
   slurm     KillWait from the slurm.conf template the site renders, and what preemption
             gives a job: GraceTime, which every preempted QoS has equal to KillWait
             (roles/slurm accounting), and the most until SIGKILL (GraceTime + KillWait)
@@ -106,7 +108,7 @@ PUBLIC = {
         "interactive_team_qos",
         "submit_holds_disk",
     },
-    "login": {"cpus", "memory_gib", "tasks"},
+    "login": {"cpus", "memory_gib", "tasks", "private_dirs"},
     "services": {
         "portal",
         "overview",
@@ -405,8 +407,9 @@ def paths(settings_):
 
 
 def login_limits(config, settings_):
-    """{cpus, memory_gib, tasks}: the user-.slice limits the login nodes get
-    (cluster_tools_user_slice_limits; group_vars/slurm-login.yml over the others)."""
+    """{cpus, memory_gib, tasks, private_dirs}: the user-.slice limits the login nodes
+    get (cluster_tools_user_slice_limits; group_vars/slurm-login.yml over the others),
+    and the directories each login has its own of (roles/login_private_dirs)."""
     limits = settings_.get("cluster_tools_user_slice_limits") or {}
     if config:
         limits = _yaml(Path(config) / "group_vars" / "slurm-login.yml").get(
@@ -421,6 +424,8 @@ def login_limits(config, settings_):
         out["memory_gib"] = _whole(float(memory.group(1)) * _SIZE_GIB[memory.group(2)])
     if str(limits.get("TasksMax", "")).isdigit():
         out["tasks"] = int(limits["TasksMax"])
+    if settings_.get("slurm_enable_login_private_dirs"):
+        out["private_dirs"] = settings_.get("login_private_dirs_paths")
     return out
 
 

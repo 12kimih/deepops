@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# roles/login_private_dirs: the instance directories (root's, mode 0000, as pam_namespace
+# requires), kept as the host's own rule keeps the directory they stand in for. "~": the
+# age applies to what is in each person's instance, not to the instance itself.
+{% for path in login_private_dirs_paths %}
+{% set rule = login_private_dirs_cat_config.stdout | tmpfiles_rule(path) %}
+{{ rule.type }} {{ path }}-inst 0000 root root {{ ('~' ~ rule.age) if rule.age else '-' }}
+{% endfor %}

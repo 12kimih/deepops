@@ -1,0 +1,26 @@
+---
+# The profile goes first, so no login turns to settings already removed. Sessions open
+# now keep their own directories until they end. The instance directories stay: they
+# hold people's files (an administrator moves what anyone still needs).
+- name: Read whether the PAM profile is there
+  ansible.builtin.stat:
+    path: "{{ login_private_dirs_profile_file }}"
+  register: login_private_dirs_profile_stat
+
+- name: Turn the PAM profile off
+  ansible.builtin.include_role:
+    name: pam_profile
+  vars:
+    pam_profile_name: "{{ login_private_dirs_profile }}"
+    pam_profile_enabled: false
+    pam_profile_module: pam_namespace.so
+    pam_profile_file: /etc/pam.d/common-session
+  when: login_private_dirs_profile_stat.stat.exists
+
+- name: Remove what this component installed
+  ansible.builtin.include_role:
+    name: component_record
+  vars:
+    component_record_name: login_private_dirs
+    component_record_action: absent
+    component_record_items: "{{ login_private_dirs_items }}"

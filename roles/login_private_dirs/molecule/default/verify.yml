@@ -1,0 +1,156 @@
+---
+# Each check is a new SSH login, as a person makes one. In a login, /proc/self/mountinfo
+# names what is mounted on /tmp and /var/tmp: the person's instance (its root field), or
+# no instance when the login keeps the shared directory (the image mounts a volume of
+# its own on /tmp, which every login sees under any instance).
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    login: [ssh, -i, /root/.ssh/molecule, -o, BatchMode=yes, -o, StrictHostKeyChecking=no, -o, UserKnownHostsFile=/dev/null, -o, LogLevel=error]
+    mounted: "awk '($5 == \"/tmp\" || $5 == \"/var/tmp\") && $4 ~ /-inst\\// {print $5, $4}' /proc/self/mountinfo"
+  tasks:
+    - name: Log in as alice and write to /tmp and /var/tmp
+      ansible.builtin.command:
+        argv: "{{ login + ['alice@127.0.0.1', mounted ~ '; echo a > /tmp/mine; echo a > /var/tmp/mine'] }}"
+      register: alice
+      changed_when: false
+
+    - name: Log in as alice again, as bob and as the service account
+      ansible.builtin.command:
+        argv: "{{ login + [item ~ '@127.0.0.1', mounted ~ '; cat /tmp/mine /var/tmp/mine 2>/dev/null; true'] }}"
+      loop: [alice, bob, "{{ login_private_dirs_test_service }}"]
+      register: again
+      changed_when: false
+
+    - name: Read alice's /tmp through sudo and sudo -i in her login
+      ansible.builtin.command:
+        argv: "{{ login + ['alice@127.0.0.1', 'sudo -n cat /tmp/mine && sudo -n -i cat /tmp/mine'] }}"
+      register: alice_sudo
+      changed_when: false
+
+    - name: Reach root's SSH agent from alice's login (agent forwarding)
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail;
+          eval "$(ssh-agent -s)" >/dev/null && ssh-add -q /root/.ssh/molecule &&
+          {{ login | map('quote') | join(' ') }} -A alice@127.0.0.1 'ssh-add -l' | wc -l;
+          status=$?; ssh-agent -k >/dev/null; exit $status
+        executable: /bin/bash
+      register: alice_agent
+      changed_when: false
+
+    - name: Look at the shared directories and the instances
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/tmp/mine, /var/tmp/mine, /tmp-inst/alice/mine, /var/tmp-inst/alice/mine]
+      register: files
+
+    - name: Read the session stacks
+      ansible.builtin.slurp:
+        src: "/etc/pam.d/{{ item }}"
+      loop: [common-session, common-session-noninteractive]
+      register: stacks
+
+    - name: Check each person's logins share an instance no one else sees
+      ansible.builtin.assert:
+        that:
+          - alice.stdout_lines == ['/tmp /tmp-inst/alice', '/var/tmp /var/tmp-inst/alice']
+          - again.results[0].stdout_lines == ['/tmp /tmp-inst/alice', '/var/tmp /var/tmp-inst/alice', 'a', 'a']
+          - again.results[1].stdout_lines == ['/tmp /tmp-inst/bob', '/var/tmp /var/tmp-inst/bob']
+          - again.results[2].stdout_lines == []
+          - alice_sudo.stdout_lines == ['a', 'a']
+          - alice_agent.stdout | trim == '1'
+          - files.results | map(attribute='stat.exists') | list == [false, false, true, true]
+          - "'pam_namespace.so' in stacks.results[0].content | b64decode"
+          - "'pam_namespace.so' not in stacks.results[1].content | b64decode"
+
+    # Never a lockout: a login whose instance cannot be set up proceeds with the shared
+    # /tmp. pam_namespace refuses an instance parent others could enter (mode not 0000).
+    - name: Make the instance parent one pam_namespace refuses
+      ansible.builtin.file:
+        path: /tmp-inst
+        mode: "0755"
+
+    - name: Log in as alice with it refused
+      ansible.builtin.command:
+        argv: "{{ login + ['alice@127.0.0.1', 'test -e /tmp/mine || echo shared'] }}"
+      register: alice_without
+      changed_when: false
+
+    - name: Give the instance parent its mode back
+      ansible.builtin.file:
+        path: /tmp-inst
+        mode: "0000"
+
+    - name: Check the login went ahead with the shared /tmp
+      ansible.builtin.assert:
+        that: alice_without.stdout | trim == 'shared'
+
+    # The boot's cleanup (systemd-tmpfiles --remove, as systemd-tmpfiles-setup runs it)
+    # empties /tmp-inst; the next login makes the person's instance again before anything
+    # is written to it, with /tmp's owner and mode (pam_namespace copies the polydir's:
+    # sticky, as /tmp is), reachable only from that person's logins (the parent is 0000).
+    - name: Empty the instances as a boot does
+      ansible.builtin.command:
+        argv: [systemd-tmpfiles, --create, --remove, /etc/tmpfiles.d/deepops-login-private-dirs.conf]
+      changed_when: true
+
+    - name: Read what the boot left
+      ansible.builtin.command:
+        argv: [find, /tmp-inst, -mindepth, 1]
+      register: after_boot
+      changed_when: false
+
+    - name: Log in as alice after the boot and read her instance
+      ansible.builtin.command:
+        argv: "{{ login + ['alice@127.0.0.1', 'ls -A /tmp | wc -l; echo b > /tmp/mine'] }}"
+      register: alice_boot
+      changed_when: false
+
+    - name: Read the instance and its parent
+      ansible.builtin.command:
+        argv: [stat, -c, '%n %U %G %a', /tmp-inst, /tmp-inst/alice]
+      register: boot_modes
+      changed_when: false
+
+    - name: Check the boot emptied the instances and the login made hers again
+      ansible.builtin.assert:
+        that:
+          - after_boot.stdout == ''
+          - alice_boot.stdout | trim == '0'
+          - boot_modes.stdout_lines == ['/tmp-inst root root 0', '/tmp-inst/alice root root 1777']
+
+    - name: Remove the component
+      ansible.builtin.include_role:
+        name: login_private_dirs
+      vars:
+        login_private_dirs_state: absent
+
+    - name: Log in as alice after it went
+      ansible.builtin.command:
+        argv: "{{ login + ['alice@127.0.0.1', mounted] }}"
+      register: alice_after
+      changed_when: false
+
+    - name: Look for the component's files and alice's instance
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/share/pam-configs/deepops-login-private-dirs
+        - /etc/security/namespace.d/deepops-login-private-dirs.conf
+        - /etc/tmpfiles.d/deepops-login-private-dirs.conf
+        - /tmp-inst/alice/mine
+      register: after
+
+    - name: Read the session stack again
+      ansible.builtin.slurp:
+        src: /etc/pam.d/common-session
+      register: stack_after
+
+    - name: Check absent took the profile and its settings and left alice's files
+      ansible.builtin.assert:
+        that:
+          - alice_after.stdout_lines == []
+          - after.results | map(attribute='stat.exists') | list == [false, false, false, true]
+          - "'pam_namespace.so' not in stack_after.content | b64decode"

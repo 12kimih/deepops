@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -254,7 +255,14 @@ class TestSlurmGpuJob(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--partition") + 1], "batch")
         self.assertIn("--gpus=1", validate_slurm.gpu_job_command("x", "", ""))
 
-    def main(self, argv, srun_rc, job_out="NVIDIA H100, 580.95\nprivate_tmp=1\nvulkan=1\negl=1", config=""):
+    def main(
+        self,
+        argv,
+        srun_rc,
+        job_out="NVIDIA H100, 580.95\nprivate_tmp=1\nvulkan=1\negl=1",
+        config="",
+        login=(False, None),
+    ):
         calls = []
 
         def fake_run(cmd, timeout=60):
@@ -270,6 +278,7 @@ class TestSlurmGpuJob(unittest.TestCase):
             mock.patch.object(validate_slurm, "run", fake_run),
             mock.patch.object(validate_slurm.slurm, "load", return_value={"nodes": self.NODES}),
             mock.patch.object(validate_slurm.shutil, "which", return_value="/usr/bin/scontrol"),
+            mock.patch.object(validate_slurm, "login_private_tmp", return_value=login),
             mock.patch.object(sys, "argv", ["validate_slurm.py", "--json"] + argv),
             contextlib.redirect_stdout(out),
         ):
@@ -326,6 +335,14 @@ class TestSlurmGpuJob(unittest.TestCase):
         self.assertEqual((rc, result["graphics_in_job"]), (1, False), "Vulkan without EGL is not enough")
         self.assertEqual(self.main([], 0)[1]["gpus_visible_in_job"], 1, "probe lines are not GPUs")
 
+    def test_a_login_whose_tmp_should_be_its_own_and_is_not_fails(self):
+        self.assertEqual(self.main([], 0, login=(True, True))[0], 0)
+        rc, result, _ = self.main([], 0, login=(True, False))
+        self.assertEqual(
+            (rc, result["private_tmp_login_expected"], result["private_tmp_in_login"]), (1, True, False)
+        )
+        self.assertIn("this login's /tmp is the shared one", " ".join(result["failures"]))
+
     def test_the_job_checks_its_tmp_after_its_gpus(self):
         script = validate_slurm.gpu_job_command("x", "", "")[-1]
         self.assertTrue(script.startswith("nvidia-smi "))
@@ -353,6 +370,59 @@ class TestValidatorsStartProcessesOneWay(unittest.TestCase):
             if one_shot.search(line)
         ]
         self.assertEqual(offenders, [], "run commands with cluster_tools.proc (outcome or run)")
+
+
+class TestLoginPrivateTmp(unittest.TestCase):
+    """pam_namespace's settings and this session's mounts, as roles/login_private_dirs
+    leaves them on a login node."""
+
+    MOUNTS = "22 1 8:2 / / rw,relatime shared:1 - ext4 /dev/sda2 rw\n"
+    OWN = MOUNTS + "530 22 8:2 /tmp-inst/alice /tmp rw,relatime master:1 - ext4 /dev/sda2 rw\n"
+
+    def check(self, conf, mounts, user="alice"):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = Path(tmp)
+            (settings / "namespace.d").mkdir()
+            (settings / "namespace.conf").write_text(
+                "# the distribution's, all commented\n#/tmp /tmp-inst/ level root,adm\n"
+            )
+            (settings / "namespace.d" / "deepops.conf").write_text(conf)
+            (settings / "mountinfo").write_text(mounts)
+            return validate_slurm.login_private_tmp(user, settings, settings / "mountinfo")
+
+    def test_a_login_with_its_own_tmp(self):
+        conf = "/tmp  /tmp-inst/  user  root,slurm\n/var/tmp  /var/tmp-inst/  user  root,slurm\n"
+        self.assertEqual(self.check(conf, self.OWN), (True, True))
+        self.assertEqual(self.check(conf, self.MOUNTS), (True, False), "the shared /tmp")
+        self.assertEqual(self.check(conf, self.OWN, user="bob"), (True, False), "someone else's")
+
+    def test_an_instance_on_a_filesystem_of_its_own(self):
+        """The mount's root is relative to its filesystem (here one mounted at /data)."""
+        data = self.MOUNTS + "40 22 8:3 / /data rw - xfs /dev/sdb1 rw\n"
+        conf = "/tmp /data/tmp-inst/ user root\n"
+        self.assertEqual(
+            self.check(conf, data + "530 22 8:3 /tmp-inst/alice /tmp rw - xfs /dev/sdb1 rw\n"), (True, True)
+        )
+        self.assertEqual(
+            self.check(conf, data + "530 22 8:3 /alice /tmp rw - xfs /dev/sdb1 rw\n"), (True, False)
+        )
+        self.assertEqual(
+            self.check(conf, data + "530 22 8:2 /tmp-inst/alice /tmp rw - ext4 /dev/sda2 rw\n"), (True, False)
+        )
+
+    def test_who_keeps_the_shared_tmp(self):
+        self.assertEqual(self.check("/tmp /tmp-inst/ user root,alice\n", self.MOUNTS), (False, None))
+        self.assertEqual(
+            self.check("/tmp /tmp-inst/ user ~bob\n", self.MOUNTS), (False, None), "~: only those listed"
+        )
+        self.assertEqual(self.check("/tmp /tmp-inst/ user ~bob,alice\n", self.OWN), (True, True))
+        self.assertEqual(self.check("/tmp /tmp-inst/ user\n", self.OWN), (True, True), "no list: everyone")
+
+    def test_no_setting_for_tmp_expects_nothing(self):
+        self.assertEqual(self.check("/var/tmp /var/tmp-inst/ user root\n", self.OWN), (False, None))
+        self.assertEqual(
+            self.check("/tmp /tmp-inst/ level root\n", self.OWN), (False, None), "SELinux levels"
+        )
 
 
 if __name__ == "__main__":

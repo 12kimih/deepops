@@ -1,0 +1,7 @@
+---
+provisioner:
+  inventory:
+    group_vars:
+      all:
+        # A service account of the default mapping (roles/system_accounts), made a login here.
+        login_private_dirs_test_service: easybuild

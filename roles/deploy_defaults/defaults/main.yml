@@ -96,6 +96,9 @@ slurm_enable_coredump: true
 # (roles/disk_quota): off by default; needs the quota mount options in
 # host_baseline_mount_options
 slurm_enable_disk_quota: false
+# Each person's own /tmp and /var/tmp at login on the login nodes, as each job has its
+# own (roles/login_private_dirs): sudo, cron and services keep the shared ones
+slurm_enable_login_private_dirs: false
 # The shared space on the home server (roles/shared_space, on the first slurm-nfs): shared
 # datasets, models and container images one account writes for everyone, and the
 # collaboration folders of shared_projects. Off by default.

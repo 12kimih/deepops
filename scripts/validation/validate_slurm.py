@@ -23,6 +23,7 @@ import functools
 import getpass
 import json
 import os
+import pwd
 import re
 import shutil
 import sys
@@ -120,6 +121,38 @@ def namespace_type():
     return "" if not found or found[-1] in ("(null)", "none") else found[-1]
 
 
+def login_private_tmp(user, settings=Path("/etc/security"), mountinfo=Path("/proc/self/mountinfo")):
+    """(expected, own) for this login's /tmp. Expected when pam_namespace's settings
+    (namespace.conf(5) and namespace.d, the first /tmp line) give USER an instance of
+    their own by user name, as roles/login_private_dirs does on the login nodes; own
+    when this session's /tmp is mounted from it (<prefix><user>). (False, None) when no
+    setting asks for one."""
+    rule = None
+    for path in [settings / "namespace.conf", *sorted((settings / "namespace.d").glob("*.conf"))]:
+        try:
+            lines = path.read_text().splitlines()
+        except OSError:
+            continue
+        rule = rule or next(
+            (f for f in (ln.split("#", 1)[0].split() for ln in lines) if f[:1] == ["/tmp"]), None
+        )
+    if not rule or len(rule) < 3 or rule[2] != "user":
+        return False, None
+    listed = rule[3].split(",") if len(rule) > 3 else []
+    only = bool(listed) and listed[0].startswith("~")  # ~: only the accounts listed get one
+    if (user in [listed[0].lstrip("~"), *listed[1:]] if listed else False) != only:
+        return False, None
+    mounts = [f for f in (ln.split() for ln in mountinfo.read_text().splitlines()) if len(f) > 4]
+    tmp = [f for f in mounts if f[4] == "/tmp"]
+    if not tmp:
+        return True, False
+    # The mount's root is relative to its filesystem: where that filesystem is mounted
+    # whole (root /) gives the absolute path.
+    device, root = tmp[-1][2], tmp[-1][3]
+    whole = next((f[4] for f in mounts if f[2] == device and f[3] == "/"), None)
+    return True, whole is not None and whole.rstrip("/") + root == rule[1] + user
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate a DeepOps Slurm deployment.")
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
@@ -177,6 +210,8 @@ def main():
         "private_tmp_in_job": None,
         "graphics_expected": False,
         "graphics_in_job": None,
+        "private_tmp_login_expected": False,
+        "private_tmp_in_login": None,
         "failures": [],
     }
 
@@ -235,6 +270,16 @@ def main():
         else:
             result["failures"].append("srun GPU job failed: %s" % (err or out or "rc=%s" % rc))
 
+    login = result["private_tmp_login_expected"], result["private_tmp_in_login"] = login_private_tmp(
+        pwd.getpwuid(os.getuid()).pw_name
+    )
+    if login == (True, False):
+        result["failures"].append(
+            "this login's /tmp is the shared one, though pam_namespace gives each login its own"
+            " (roles/login_private_dirs): a session opened before it was deployed (log in again),"
+            " or PAM could not set it up (journalctl -t sshd | grep pam_namespace)"
+        )
+
     result["ok"] = not result["failures"]
 
     if args.json:
@@ -251,6 +296,7 @@ def main():
             "gpu_job_ok",
             "private_tmp_in_job",
             "graphics_in_job",
+            "private_tmp_in_login",
         ):
             print("%s=%s" % (key, result[key]))
         for failure in result["failures"]:

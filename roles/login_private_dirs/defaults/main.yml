@@ -1,0 +1,27 @@
+---
+# present, absent or kept (docs/deepops/component-state.md): every person's login on a
+# login node gets its own /tmp and /var/tmp (pam_namespace(8)), so what one person, or
+# the agents they run, write there is neither seen by nor in the way of anyone else. A
+# deploy sets it from deepops_components (slurm_enable_login_private_dirs, on
+# slurm-login), as Slurm gives each job its own (slurm_job_private_dirs).
+#
+# Only logins: SSH and the console, through PAM's interactive session stack
+# (common-session). sudo and cron run the non-interactive one and keep the caller's
+# view, so an administrator's sudo sees their own /tmp, and services (systemd units, the
+# Docker daemon, the user's own systemd manager) see the shared one. Each person's
+# sessions share one instance, so tmux and screen attach across logins. A login whose
+# private /tmp cannot be set up proceeds with the shared one: the module is optional,
+# never a lockout. Each instance lives under <dir>-inst (root's, mode 0000) and is kept
+# as the host's own rule keeps <dir> (tmpfiles.d: Ubuntu empties /tmp at boot and after
+# 30 days unused, and never cleans /var/tmp). absent stops new logins from getting one;
+# the instances stay, their files being people's.
+# https://man7.org/linux/man-pages/man8/pam_namespace.8.html
+login_private_dirs_state: present
+
+# The directories each login gets its own of. /dev/shm is not among them: logind
+# removes a person's shared memory when their last session ends (RemoveIPC).
+login_private_dirs_paths: [/tmp, /var/tmp]
+
+# Accounts whose logins keep the shared directories: root (sudo -i keeps the caller's)
+# and the service accounts, whose logins are keys with forced commands.
+login_private_dirs_excluded: "{{ ['root'] + system_accounts | list }}"

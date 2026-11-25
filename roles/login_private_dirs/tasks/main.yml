@@ -1,0 +1,18 @@
+---
+- name: Check the component state
+  ansible.builtin.assert:
+    that: login_private_dirs_state in ['present', 'absent', 'kept']
+    fail_msg: "login_private_dirs_state must be present, absent or kept, not {{ login_private_dirs_state }}."
+    quiet: true
+
+# pam-auth-update writes the session stacks on the Debian family; RHEL's authselect has
+# no profile for pam_namespace.
+- name: Check the host is of the Debian family
+  ansible.builtin.assert:
+    that: ansible_facts.os_family == 'Debian' or login_private_dirs_state != 'present'
+    fail_msg: login_private_dirs supports the Debian family only (pam-auth-update).
+    quiet: true
+
+- name: "Make each login's own temporary directories {{ login_private_dirs_state }}"
+  ansible.builtin.include_tasks: "{{ login_private_dirs_state }}.yml"
+  when: login_private_dirs_state != 'kept'
