@@ -91,18 +91,21 @@ token is ever on those hosts: the bot reads them over the `bans` service. Invite
 to the admin channel so it can pin the list.
 
 The user docs' notices: when `cluster_info.docs_url` is set, the bot reads
-`<docs_url>/notices.json` every `NOTICES_EVERY` seconds (`cluster_bot/app.py`; each notice already rendered as a Slack
-message by the docs site's build) and posts each notice in `slack_channels.announce`
-once, on its date. The docs repository holds no Slack credential; the announcement goes
-through this app. Its first look posts nothing: every notice already due counts as
-announced, so a new deploy never repeats one; a notice dated later still goes out on its
-date. A site it cannot reach is tried again at the next look. The announcement channel
-keeps one pinned notice: the newest the bot posted (the one before is unpinned).
+`<docs_url>/notices.json` every `NOTICES_EVERY` seconds (`cluster_bot/app.py`; each
+notice already rendered as a Slack message by the docs site's build) and posts each
+notice in `slack_channels.announce` once, on its date. The docs repository holds no Slack
+credential; the announcement goes through this app. Its first look posts nothing: every
+notice already due counts as announced, so a new deploy never repeats one; a notice
+dated later still goes out on its date. A site it cannot reach is tried again at the
+next look. A notice reworded on the site after it went out is edited in place
+(`chat.update`), so the post says what the site says. The announcement channel keeps one
+pinned notice: the newest the bot posted (the one before is unpinned).
 
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
 canvas (the channel's README tab) and bookmarks from `<docs_url>/channels.json` (the docs
 site's build writes it, keyed by the channel's purpose, the keys of `slack_channels`),
-read every `GUIDES_EVERY` seconds (`cluster_bot/app.py`). The purpose and topic are set only when they differ. The canvas
+read every `GUIDES_EVERY` seconds (`cluster_bot/app.py`). The purpose and topic are set
+only when they differ. The canvas
 is created once and replaced in full when its text changes and once a day, so a hand
 edit lasts a day at most; it is kept read-only for the channel's members (a refusal is
 logged in the bot's journal). Only the bookmarks the bot added are kept in step; one a

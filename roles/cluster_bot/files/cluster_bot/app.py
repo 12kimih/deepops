@@ -629,6 +629,10 @@ def main(argv=None):
                 docs["seen"],
                 date.today().isoformat(),
                 pin=lambda ts: docs_notices.pin_latest(dms, docs["channel"], docs["pinned"], ts),
+                update=lambda ts, text, blocks: dms.update(
+                    docs_notices.channel_id(dms, docs["channel"]), ts, text, blocks
+                ),
+                pinned_path=docs["pinned"],
             )
 
         every(NOTICES_EVERY, "docs notices", notices_round)
