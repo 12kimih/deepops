@@ -45,7 +45,10 @@ class SiteTests(unittest.TestCase):
             set(load(ROOT / "roles/cluster_info_defaults/defaults/main.yml")["cluster_info"]),
             {"name", "docs_url", "login_host", "ssh_port"},
         )
-        self.assertEqual(set(defaults["cluster_tools_lib_derived_info"]), {"dashboard_url", "prometheus_url"})
+        self.assertEqual(
+            set(defaults["cluster_tools_lib_derived_info"]),
+            {"dashboard_url", "prometheus_url", "gpu_allocation_interval"},
+        )
 
     def test_every_fact_a_program_reads_is_published(self):
         # A key read but published by neither dict is always missing on a host.

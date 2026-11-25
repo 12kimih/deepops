@@ -67,6 +67,27 @@ class AlertRuleTests(unittest.TestCase):
         }
         self.assertEqual(sorted(alerts - tested), [], "alert rules without a firing test case")
 
+    def test_power_policy_waits_span_several_runs(self):
+        # The rules are static; the timer runs every power_policy_interval. A wait under
+        # a few runs would page between two runs that set a switched setting back.
+        def seconds(span):
+            number, unit = re.fullmatch(r"(\d+)\s*(s|min|m|h)?", str(span)).groups()
+            return int(number) * {"h": 3600, "min": 60, "m": 60}.get(unit, 1)
+
+        interval = seconds(
+            yaml.safe_load((promtool_runner.ROOT / "roles/power_policy/defaults/main.yml").read_text())[
+                "power_policy_interval"
+            ]
+        )
+        rules = {
+            r["alert"]: r
+            for g in yaml.safe_load((RULES / "power-policy.yml").read_text())["groups"]
+            for r in g["rules"]
+        }
+        self.assertGreaterEqual(seconds(rules["PowerPolicyKeepsBeingReset"]["for"]), 3 * interval)
+        stale = int(re.search(r"> (\d+)", rules["PowerPolicyStale"]["expr"]).group(1))
+        self.assertGreaterEqual(stale, 3 * interval)
+
     def test_every_alert_says_what_to_do(self):
         # A summary says what happened; whoever is paged needs the next step too (which
         # unit, which command, on which host). Watchdog only feeds the dead man's switch.

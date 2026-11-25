@@ -8,7 +8,7 @@ Two sources, each row naming its own:
   prometheus  DCGM through the monitoring stack (rules/slurm.yml job_device:*), per GPU:
               mean and max over the job's run of utilisation, SM activity (how much of
               the GPU the kernels kept busy), memory and board power. Kept for Prometheus' retention; a job
-              shorter than the allocation interval (a minute) may have no samples.
+              shorter than the allocation interval (slurm_metrics_interval) may have no samples.
 CPU: Slurm's own accounting for every job, its CPU time (TotalCPU, user plus system,
 summed over the steps) against its allocated CPUs over its elapsed time, as seff
 computes it; Slurm adds a step's CPU time when the step ends.
@@ -20,6 +20,7 @@ Python 3.9 or newer, standard library only.
 """
 
 import json
+import re
 import sys
 import time
 
@@ -44,7 +45,21 @@ SERIES = (
 )
 STATS = (("mean", "avg_over_time"), ("max", "max_over_time"))
 FIGURES = tuple(f"{name}_{stat}{unit}" for name, _, unit in SERIES for stat, _ in STATS)
-STEP = 60  # the allocation interval (roles/slurm_metrics): the shortest window with a sample
+# The allocation interval (slurm_metrics_interval, published in the site facts): the
+# shortest window that holds a sample. 60 s where the facts predate the key.
+DEFAULT_STEP = 60
+
+
+def seconds(span):
+    """A systemd time span in seconds or minutes ("60s", "2min", "90") as seconds."""
+    number, unit = re.fullmatch(r"\s*(\d+)\s*(s|sec|min|m)?\s*", str(span)).groups()
+    return int(number) * (60 if unit in ("min", "m") else 1)
+
+
+def step():
+    span = site_info().get("gpu_allocation_interval")
+    return seconds(span) if span else DEFAULT_STEP
+
 
 NOTES = [
     "Sources (each row names its own):\n"
@@ -54,7 +69,7 @@ NOTES = [
     "  prometheus  DCGM, per GPU in Slurm's numbering: the mean and the max over the job's run,\n"
     "              with SM activity (how much of the GPU the kernels kept busy: utilisation only\n"
     "              says a kernel ran) and board power, which Slurm does not record.\n"
-    "              Kept as long as Prometheus keeps data; a job under a minute may have none.\n"
+    "              Kept as long as Prometheus keeps data; a job shorter than one sample may have none.\n"
     "--source auto (the default) prefers Slurm's figures and falls back to Prometheus'.",
     "CPU: the job's CPU time (sacct TotalCPU) over its allocated CPUs times its elapsed\n"
     "time, as seff computes it: what share of its CPUs it kept busy. Slurm adds a step's\n"
@@ -138,7 +153,7 @@ def _ratio(percent):
 
 def prometheus_rows(api, label, start, end):
     """One row per GPU the job held, from Prometheus over [START, END]."""
-    span = max(int(end - start), STEP)
+    span = max(int(end - start), step())
     selector = f'{{job_id="{label}"}}'
     figures = {}
     for name, series, unit in SERIES:
@@ -192,7 +207,7 @@ def report(job, source, api, now):
                 out["rows"] += rows
                 if not rows:
                     out["notes"].append(
-                        "Prometheus has no samples of it (older than its retention, under a minute, "
+                        "Prometheus has no samples of it (older than its retention, shorter than one sample, "
                         "or from before the per-job rules were deployed)"
                     )
     return out

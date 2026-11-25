@@ -89,5 +89,36 @@ class TrackedTests(unittest.TestCase):
                 self.assertIn("│   └── all.yml", gen.gen_tree("config.example/group_vars"))
 
 
+class InventoryTests(unittest.TestCase):
+    """The exporters and dashboards the monitoring page lists come from what ships: by hand
+    it listed four dashboards while five shipped, and ports a site could change."""
+
+    def test_every_exporter_and_dashboard_is_listed(self):
+        exporters = gen.gen_exporters("")
+        for exporter in gen.defaults("prometheus_paths")["prometheus_exporters"]:
+            self.assertIn(f"`{exporter['module']}`", exporters)
+        self.assertNotRegex(exporters, r"\| \d+ \|", "a port is shown with its setting")
+        boards = gen.gen_dashboards("")
+        shipped = [
+            f for files in gen.defaults("prometheus_paths")["grafana_dashboard_sets"].values() for f in files
+        ]
+        self.assertEqual(boards.count("\n") - 2, len(shipped))
+        self.assertIn("| `slurm_metrics` |", boards)
+
+    def test_the_monitoring_page_uses_them(self):
+        page = (ROOT / "docs/slurm-cluster/slurm-monitor.md").read_text()
+        for name in ("exporters", "dashboards"):
+            self.assertIn(f"<!-- BEGIN GENERATED: {name} -->", page)
+
+    def test_every_port_setting_is_listed(self):
+        ports = gen.gen_ports("")
+        for role in gen.roles():
+            for name, value in gen.defaults(role).items():
+                if name.endswith("_port") and str(value).isdigit():
+                    self.assertIn(f"| {value}/", ports.split(f"`{name}`")[0].rsplit("\n", 1)[-1])
+        page = (ROOT / "docs/misc/network-ports.md").read_text()
+        self.assertIn("<!-- BEGIN GENERATED: ports -->", page)
+
+
 if __name__ == "__main__":
     unittest.main()

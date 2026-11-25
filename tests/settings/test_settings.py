@@ -1,5 +1,7 @@
 """settings.py: reading variable files, owners, Ansible's precedence, redundancy, diff."""
 
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -124,6 +126,24 @@ class Resolution(unittest.TestCase):
         self.assertEqual(sorted((s.rel, e.name) for s, e in same),
                          [("group_vars/all.yml", "same"), ("group_vars/lonely.yml", "alone")])  # fmt: skip
         self.assertEqual([(s.rel, e.name) for s, e in unused], [("group_vars/other.yml", "shadowed")])
+
+
+class Show(unittest.TestCase):
+    def test_named_settings_print_their_values_alone(self):
+        """A script reads one setting as its host resolves it (scripts/slurm/debug.sh:
+        the DCGM port), never a copy of the default."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        write(
+            tmp.name,
+            {"inventory": "[slurm-node]\nh1\n", "group_vars/slurm-node.yml": "dcgm_exporter_port: 9500\n"},
+        )
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = S.main(["--config", tmp.name, "show", "h1", "dcgm_exporter_port", "node_exporter_port"])
+        self.assertEqual((code, out.getvalue()), (0, "9500\n9100\n"))
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(S.main(["--config", tmp.name, "show", "h1", "no_such_setting"]), 1)
 
 
 class Revisions(unittest.TestCase):

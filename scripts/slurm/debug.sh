@@ -34,8 +34,15 @@ ansible slurm-master -ba "sinfo" -vv > ${logdir}/sinfo.log
 ansible slurm-master -ba "squeue" -vv > ${logdir}/squeue.log
 
 # DCGM example output / metrics
-# Collect metrics from all nodes for debug
-ansible slurm-node -vv -bm raw -a "curl http://127.0.0.1:9400/metrics" > ${logdir}/dcgm-metrics.log
+# Collect metrics from all nodes for debug, at the port the deploy gave dcgm-exporter
+# (dcgm_exporter_port as the first node resolves it: its default, or what config sets)
+dcgm_node=$(ansible slurm-node --list-hosts 2>/dev/null | sed -n 2p | tr -d ' ')
+dcgm_port=$(scripts/deepops/settings.py show "${dcgm_node}" dcgm_exporter_port 2>/dev/null)
+if [ -n "${dcgm_port}" ]; then
+    ansible slurm-node -vv -bm raw -a "curl http://127.0.0.1:${dcgm_port}/metrics" > ${logdir}/dcgm-metrics.log
+else
+    echo "no dcgm_exporter_port resolved (no config/inventory?)" > ${logdir}/dcgm-metrics.log
+fi
 
 # Packaging
 name="config/slurm-debug-${timestamp}.tgz"

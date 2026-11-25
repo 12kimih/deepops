@@ -69,7 +69,8 @@ kubectl describe configmap -n gpu-operator default-mig-parted-config > ${logdir}
 helm list -aA > ${logdir}/helm-list.log
 
 # DCGM example output / metrics
-# Collect metrics from all nodes for debug
+# Collect metrics from all nodes for debug. 9400 is the GPU Operator's dcgm-exporter
+# port (its chart's default), not a deepops setting.
 ansible kube_node -vv -bm raw -a "curl http://127.0.0.1:9400/metrics" > ${logdir}/dcgm-metrics.log
 
 # Packaging

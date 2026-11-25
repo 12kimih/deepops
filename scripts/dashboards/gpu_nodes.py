@@ -1,9 +1,10 @@
 """GPU / Nodes: one GPU node at a time: its GPUs (DCGM), host resources (node_exporter)
 and system power (the BMC through ipmi_exporter, or hwmon).
 
-The server list comes from DCGM series, so it holds GPU nodes only, on Slurm (instance
-host:9400) and Kubernetes (kubernetes_node) layouts alike; the hidden variables resolve
-the node's DCGM and node_exporter instances.
+The server list comes from DCGM series, so it holds GPU nodes only, on Slurm (the host
+label Prometheus' scrape sets, roles/prometheus) and Kubernetes (kubernetes_node) layouts
+alike; the hidden variables resolve the node's DCGM and node_exporter instances, whatever
+port each exporter listens on.
 """
 
 from grafana import at, dashboard, query, query_variable, row, stat, timeseries
@@ -304,20 +305,20 @@ def build():
     hostname = query_variable(
         "hostname",
         'query_result(label_replace(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node!=""}, "hostname", "$1", "kubernetes_node", "(.+)")'
-        ' or label_replace(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="",instance=~".*:9400"}, "hostname", "$1", "instance", "(.*):9400"))',
+        ' or label_replace(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="",host!=""}, "hostname", "$1", "host", "(.+)"))',
         '/hostname="([^"]+)"/',
         label="server",
     )
     gpu_instance = query_variable(
         "gpu_instance",
         'query_result(DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="$hostname"}'
-        ' or DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="",instance="$hostname:9400"})',
+        ' or DCGM_FI_DEV_BOARD_POWER_WATTS{kubernetes_node="",host="$hostname"})',
         '/instance="([^"]+)"/',
         hide=True,
     )
     node_instance = query_variable(
         "node_instance",
-        'query_result(node_uname_info{nodename="$hostname"} or node_uname_info{instance="$hostname:9100"})',
+        'query_result(node_uname_info{nodename="$hostname"} or node_uname_info{host="$hostname"})',
         '/instance="([^"]+)"/',
         hide=True,
     )

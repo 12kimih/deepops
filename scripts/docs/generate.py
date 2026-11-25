@@ -22,10 +22,17 @@ Generators:
                         and whether its removal is explicit
   bot-subcommands       the cluster bot's subcommands (cluster_bot.commands
                         SUBCOMMANDS), with the default command
+  exporters             what Prometheus scrapes (prometheus_exporters, roles/prometheus_paths):
+                        each exporter's groups (from the registry) and port setting
+  ports                 every port a role listens on or sends to (a *_port default): its
+                        default, protocol, setting and role, by port
+  dashboards            every dashboard deepops ships (grafana_dashboard_sets): its title,
+                        UID and description from its JSON, and the role that installs it
 
 Usage: generate.py [--check]   (--check reports stale blocks and exits 1)
 """
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -182,8 +189,71 @@ def gen_bot_subcommands(_arg):
     return "\n".join(commands.doc_lines(command)) + "\n"
 
 
+def registry():
+    path = ROOT / "roles" / "deploy_defaults" / "vars" / "main.yml"
+    return yaml.safe_load(path.read_text(encoding="utf-8"))["deepops_component_registry"]
+
+
+def setting(template):
+    """The variable a "{{ name }}" value names."""
+    return re.fullmatch(r"\{\{\s*(\w+)\s*\}\}", str(template)).group(1)
+
+
+def gen_exporters(_arg):
+    paths, components = defaults("prometheus_paths"), registry()
+    rows = ["| Exporter | Runs on | Port |", "|---|---|---|"]
+    for exporter in paths["prometheus_exporters"]:
+        groups = [
+            f"`{r['group']}`" for r in components[exporter["component"]].get("rules") or [] if r.get("group")
+        ]
+        port = setting(exporter["port"])
+        rows.append(
+            f"| `{exporter['module']}` | {', '.join(dict.fromkeys(groups))} | `{port}` ({paths[port]}) |"
+        )
+    slurmctld = defaults("slurm_paths")["slurm_slurmctld_port"]
+    rows.append(f"| slurmctld (Slurm itself) | the controller | `slurm_slurmctld_port` ({slurmctld}) |")
+    return "\n".join(rows) + "\n"
+
+
+def gen_ports(_arg):
+    rows = []
+    for role in roles():
+        for name, value in defaults(role).items():
+            if name.endswith("_port") and str(value).isdigit():
+                protocol = "udp" if "_udp_" in name else "tcp"
+                rows.append((int(value), protocol, name, role))
+    lines = ["| Port | Setting | Role |", "|---|---|---|"]
+    lines += [f"| {port}/{protocol} | `{name}` | `{role}` |" for port, protocol, name, role in sorted(rows)]
+    return "\n".join(lines) + "\n"
+
+
+def dashboard_set_roles():
+    """{dashboard set: the role that installs it}, from each role's own setting of it."""
+    found = {}
+    for path in tracked("roles/*/vars/main.yml") + tracked("roles/*/defaults/main.yml"):
+        for name, value in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items():
+            if re.search(r"dashboard_set(_own)?$", name) and isinstance(value, str) and "{{" not in value:
+                found[value] = path.parts[-3]
+    return found
+
+
+def gen_dashboards(_arg):
+    sets, owners = defaults("prometheus_paths")["grafana_dashboard_sets"], dashboard_set_roles()
+    rows = ["| Dashboard | UID | Shows | Installed by |", "|---|---|---|---|"]
+    for name, files in sets.items():
+        for file in files:
+            board = json.loads((ROOT / "src" / "dashboards" / file).read_text(encoding="utf-8"))
+            rows.append(
+                f"| {cell(board['title'])} | `{board['uid']}` | {cell(board.get('description', ''))} | `{owners[name]}` |"
+            )
+    return "\n".join(rows) + "\n"
+
+
 GENERATORS = {
     "components": gen_components,
+    "exporters": gen_exporters,
+    "dashboards": gen_dashboards,
+    "ports": gen_ports,
     "versions": gen_versions,
     "role-variables": gen_role_variables,
     "role-tree": gen_role_tree,

@@ -10,5 +10,5 @@
 slurm_metrics_state: present
 slurm_metrics_command: /usr/local/libexec/slurm-gpu-metrics
 slurm_metrics_textfile: slurm-gpu.prom
-slurm_metrics_interval: 60s
+# slurm_metrics_interval (how often it writes): roles/prometheus_paths.
 slurm_metrics_svc_name: slurm-gpu-metrics

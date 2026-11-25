@@ -203,5 +203,5 @@ def build():
         tags=["slurm", "gpu"],
         variables=variables,
         description="Who holds which GPU: Slurm allocation (roles/slurm_metrics) against usable capacity, "
-        "joined with DCGM utilisation.",
+        "joined with DCGM utilisation; each job's GPU use, with User and Job to pick your own.",
     )
