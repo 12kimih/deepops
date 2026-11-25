@@ -277,7 +277,20 @@ def gib(job):
 
 
 def render(report, cfg, who):
-    """Summary (text, blocks) and the thread messages [(text, blocks)]."""
+    """Summary (text, blocks) and the thread messages [(text, blocks)]. Each section is
+    its own function of only what it shows, so no section can see another's names."""
+    blocks = [
+        *idle_section(report["idle"], cfg, report.get("due", ()), who),
+        *nodes_section(report["reasons"]),
+        *pending_section(report["pending"]),
+        *people_section(report["jobs"], max(report["total_gpus"], 1)),
+    ]
+    thread = [("GPU 사용 현황 자세히", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
+    return summary_card(report), thread
+
+
+def summary_card(report):
+    """The channel message: (text, blocks)."""
     jobs, idle, total = report["jobs"], report["idle"], max(report["total_gpus"], 1)
     alloc = sum(len(j["gpus"]) for j in jobs)
     utils = [j["util"] for j in jobs if j["util"] is not None for _ in j["gpus"]]
@@ -304,62 +317,73 @@ def render(report, cfg, who):
     footer = "자세한 내용은 스레드에 있습니다"
     if report.get("dashboard_url"):
         footer += f"  |  <{report['dashboard_url']}|Grafana>"
-    summary = [
+    return text, [
         {"type": "header", "text": {"type": "plain_text", "text": f"\U0001f4ca GPU 사용 현황  {stamp}"}},
         rich.fields(*fields),
         rich.context(f"{status}  {footer}"),
     ]
 
-    blocks = []
-    if idle:
-        rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
-        lines = [f":zzz: **GPU를 쓰지 않는 잡**  _{rule}_"]
-        owners = by_owner(idle)
-        for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
-            jobs = owners[user]
-            told = "mention" in cfg["notify"] and user in report.get("due", ())
-            lines.append(f"• {who(user, told)}  잡 {len(jobs)}개")
-            for j in jobs:
-                hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
-                lines.append(
-                    f"    `{j['label']}`  {j['gpu_type'] or 'GPU'} {len(j['gpus'])}장, {hosts}  "
-                    f"{duration(j['runtime'])} 실행 중"
-                )
-        lines.append("_더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요._")
-        blocks.extend(sections("\n".join(lines)))
-    if report["reasons"]:
-        rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in report["reasons"]]
-        blocks.extend(
-            sections(
-                ":warning: **쓸 수 없는 노드 (drain, down)**\n"
-                + table(("노드", "상태", "언제부터", "누가", "사유"), rows)
-            )
-        )
-    if pending:
-        rows = [
-            (
-                u,
-                p["jobs"],
-                p["gpus"],
-                duration(p["wait"]),
-                ", ".join(f"{r.split(',')[0][:32]} ({c})" for r, c in p["reasons"].most_common(2)),
-            )
-            for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])
-        ]
-        blocks.extend(
-            sections(
-                ":hourglass_flowing_sand: **기다리는 잡**\n"
-                + table(("사용자", "잡", "GPU", "가장 오래", "사유"), rows)
-            )
-        )
 
+def idle_section(idle, cfg, due, who):
+    """The idle jobs per owner, each owner mentioned when told this run (DUE)."""
+    if not idle:
+        return []
+    rule = f"모든 GPU의 사용률이 {cfg['idle_util_threshold']:g}% 이하로 {cfg['idle_hours']:g}시간 넘게"
+    lines = [f":zzz: **GPU를 쓰지 않는 잡**  _{rule}_"]
+    owners = by_owner(idle)
+    for user in sorted(owners, key=lambda u: (-sum(len(j["gpus"]) for j in owners[u]), u)):
+        told = "mention" in cfg["notify"] and user in due
+        lines.append(f"• {who(user, told)}  잡 {len(owners[user])}개")
+        for j in owners[user]:
+            hosts = ",".join(sorted({h for h, _ in j["gpus"]}))
+            lines.append(
+                f"    `{j['label']}`  {j['gpu_type'] or 'GPU'} {len(j['gpus'])}장, {hosts}  "
+                f"{duration(j['runtime'])} 실행 중"
+            )
+    lines.append("_더 쓰지 않으신다면 `scancel <JOBID>`로 GPU를 반납해 주세요._")
+    return sections("\n".join(lines))
+
+
+def nodes_section(reasons):
+    """The nodes that cannot run jobs (drain, down), with why."""
+    if not reasons:
+        return []
+    rows = [(n, st, since.replace("T", " ")[:16], u, why) for n, st, since, u, why in reasons]
+    return sections(
+        ":warning: **쓸 수 없는 노드 (drain, down)**\n"
+        + table(("노드", "상태", "언제부터", "누가", "사유"), rows)
+    )
+
+
+def pending_section(pending):
+    """The waiting jobs per person: how many, how many GPUs, the longest wait, why."""
+    if not pending:
+        return []
+    rows = [
+        (
+            u,
+            p["jobs"],
+            p["gpus"],
+            duration(p["wait"]),
+            ", ".join(f"{r.split(',')[0][:32]} ({c})" for r, c in p["reasons"].most_common(2)),
+        )
+        for u, p in sorted(pending.items(), key=lambda kv: -kv[1]["gpus"])
+    ]
+    return sections(
+        ":hourglass_flowing_sand: **기다리는 잡**\n"
+        + table(("사용자", "잡", "GPU", "가장 오래", "사유"), rows)
+    )
+
+
+def people_section(jobs, total):
+    """Every running GPU job, per person, the most GPUs first; idle ones marked."""
     by_user = defaultdict(list)
     for j in jobs:
         if j["gpus"]:
             by_user[j["user"]].append(j)
-    if by_user:
-        blocks.append({"type": "divider"})
-        blocks.extend(sections(":busts_in_silhouette: **사람별 실행 중인 GPU 잡**"))
+    if not by_user:
+        return []
+    blocks = [{"type": "divider"}, *sections(":busts_in_silhouette: **사람별 실행 중인 GPU 잡**")]
     for user, ujobs in sorted(by_user.items(), key=lambda kv: -sum(len(j["gpus"]) for j in kv[1])):
         n = sum(len(j["gpus"]) for j in ujobs)
         rows = []
@@ -386,9 +410,7 @@ def render(report, cfg, who):
         blocks.extend(
             sections(f"{head}\n{table(('잡', 'GPU', '노드', '시간', 'QOS', '사용률', '메모리', ''), rows)}")
         )
-
-    thread = [("GPU 사용 현황 자세히", blocks[i : i + MAX_BLOCKS]) for i in range(0, len(blocks), MAX_BLOCKS)]
-    return (text, summary), thread
+    return blocks
 
 
 # --- Slack ----------------------------------------------------------------------
