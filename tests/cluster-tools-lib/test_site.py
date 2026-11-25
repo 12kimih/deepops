@@ -47,7 +47,7 @@ class SiteTests(unittest.TestCase):
         )
         self.assertEqual(
             set(defaults["cluster_tools_lib_derived_info"]),
-            {"dashboard_url", "prometheus_url", "gpu_allocation_interval"},
+            {"dashboard_url", "prometheus_url", "gpu_allocation_interval", "scratch_root"},
         )
 
     def test_every_fact_a_program_reads_is_published(self):

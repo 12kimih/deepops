@@ -2,6 +2,7 @@
 dependencies:
   - role: cluster_info_defaults  # cluster_info
   - role: prometheus_paths  # grafana_root_url, prometheus_url
+  - role: scratch_space_defaults  # scratch_space_root
 
 galaxy_info:
   namespace: deepops
