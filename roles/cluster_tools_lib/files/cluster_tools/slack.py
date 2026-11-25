@@ -142,7 +142,9 @@ class Slack:
             print(params.get("text", ""))
         print()
 
-    def post(self, channel, text, blocks=None, thread_ts=None):
+    def post(self, channel, text, blocks=None, thread_ts=None, metadata=None):
+        """The message's ts. METADATA ({"event_type", "event_payload"}, Slack's message
+        metadata) marks what the message is, so the bot finds it again exactly."""
         if MEMBER.fullmatch(channel):
             raise Error(f"Slack chat.postMessage: {channel} is a person; a message to a person is a dm()")
         msg = rich.message(text, blocks or None)
@@ -150,6 +152,8 @@ class Slack:
                   "unfurl_links": "false", "unfurl_media": "false"}  # fmt: skip
         if thread_ts:
             params["thread_ts"] = thread_ts
+        if metadata:
+            params["metadata"] = json.dumps(metadata)
         return self.call("chat.postMessage", **params)["ts"]
 
     def dm_channel(self, member):
@@ -178,11 +182,12 @@ class Slack:
                 print(f"slack: the DM to {login} ({kind}) was sent; logging it failed: {e}", file=sys.stderr)
         return channel, ts
 
-    def update(self, channel, ts, text, blocks=None):
+    def update(self, channel, ts, text, blocks=None, metadata=None):
         msg = rich.message(text, blocks or None)
-        return self.call(
-            "chat.update", channel=channel, ts=ts, text=msg["text"], blocks=json.dumps(msg["blocks"])
-        )
+        params = {"channel": channel, "ts": ts, "text": msg["text"], "blocks": json.dumps(msg["blocks"])}
+        if metadata:
+            params["metadata"] = json.dumps(metadata)
+        return self.call("chat.update", **params)
 
 
 def dm_log_title(day, count):

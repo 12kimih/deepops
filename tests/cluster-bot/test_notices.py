@@ -1,5 +1,8 @@
-"""cluster_bot.notices: the user docs' notices go to the announcement channel through the
-cluster's Slack app, each once, on its date; a first deploy repeats none."""
+"""cluster_bot.notices: the announcement channel kept like the user docs' notices.json,
+through the cluster's Slack app: each notice posted once on its date, edited when it is
+reworded or rendered anew, deleted when the docs drop it, the newest pinned; a first
+deploy repeats none. Before, a dropped notice's post stayed and a post kept the markup
+of the code that first rendered it."""
 
 import json
 import os
@@ -13,147 +16,299 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "roles/cluster_bot/files"))
 sys.path.insert(0, str(ROOT / "roles/cluster_tools_lib/files"))  # cluster_tools, which the bot imports
 from cluster_bot import notices  # noqa: E402
+from cluster_tools.slack import Error  # noqa: E402
+
+CHANNEL = "C1"
+SITE = "https://docs.example.org/news/"
 
 
 def notice(nid, day):
-    return {
-        "id": f"https://docs.example.org/news/{nid}/",
-        "date": day,
-        "text": nid,
-        "blocks": [{"type": "x"}],
-    }
+    return {"id": f"{SITE}{nid}/", "date": day, "text": nid, "blocks": [
+        {"type": "header", "text": {"type": "plain_text", "text": f":mega: {nid}"}},
+        {"type": "actions", "elements": [{"type": "button", "url": f"{SITE}{nid}/"}]}]}  # fmt: skip
 
 
-class Round(unittest.TestCase):
+class FakeSlack:
+    """The Slack Web API the round calls, over one channel's messages."""
+
+    def __init__(self):
+        self.messages, self.replies, self.pins, self.log = [], {}, set(), []
+        self.n, self.fail, self.locked = 0, set(), set()
+
+    def add(self, ts, text, blocks=None, bot="B1", app="A1", metadata=None, replies=()):
+        self.messages.append({"ts": ts, "bot_id": bot, "app_id": app, "text": text, "blocks": blocks or [],
+                              **({"metadata": metadata} if metadata else {}),
+                              **({"reply_count": len(replies)} if replies else {})})  # fmt: skip
+        self.replies[ts] = list(replies)
+
+    def call(self, method, **p):
+        if method == "auth.test":
+            return {"ok": True, "bot_id": "B1"}
+        if method == "bots.info":
+            return {"ok": True, "bot": {"app_id": "A1"}}
+        if method == "conversations.history":
+            return {"ok": True, "messages": sorted(self.messages, key=lambda m: -float(m["ts"]))}
+        if method == "conversations.replies":
+            return {"ok": True, "messages": [{"ts": p["ts"]}, *self.replies.get(p["ts"], [])]}
+        self.log.append((method, p.get("ts") or p.get("timestamp")))
+        if method == "chat.delete":
+            if p["ts"] in self.locked:
+                raise Error("Slack chat.delete failed: cant_delete_message")
+            self.messages = [m for m in self.messages if m["ts"] != p["ts"]]
+            for ts, rs in self.replies.items():
+                self.replies[ts] = [r for r in rs if r["ts"] != p["ts"]]
+        elif method == "pins.add":
+            self.pins.add(p["timestamp"])
+        elif method == "pins.remove":
+            self.pins.discard(p["timestamp"])
+        return {"ok": True}
+
+    def post(self, channel, text, blocks=None, metadata=None):
+        if text in self.fail:
+            raise RuntimeError("slack down")
+        self.n += 1
+        ts = f"{1000 + self.n}.0"
+        self.add(ts, text, blocks, metadata=metadata)
+        self.log.append(("post", text))
+        return ts
+
+    def update(self, channel, ts, text, blocks=None, metadata=None):
+        m = next(m for m in self.messages if m["ts"] == ts)
+        m.update(text=text, blocks=blocks, **({"metadata": metadata} if metadata else {}))
+        self.log.append(("update", text))
+
+    def posts(self):
+        return sorted(m["text"] for m in self.messages)
+
+    def did(self, *kinds):
+        return [e for e in self.log if e[0] in kinds]
+
+
+class Base(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.seen = os.path.join(self.dir.name, "notices-posted.json")
+        self.pinned = os.path.join(self.dir.name, "notices-pinned.json")
         self.doc = {"notices": [notice("old", "2026-01-01"), notice("today", "2026-02-01"),
                                 notice("later", "2026-03-01")]}  # fmt: skip
-        self.posted = []
+        self.slack, self.said = FakeSlack(), []
 
     def tearDown(self):
         self.dir.cleanup()
 
-    def run_round(self, today, post=None):
-        notices.round_(
-            lambda: self.doc, post or (lambda text, blocks: self.posted.append(text)), self.seen, today
-        )
+    def run_round(self, today="2026-03-01", **kw):
+        return notices.round_(lambda: self.doc, self.slack, CHANNEL, self.seen, self.pinned, today,
+                              self.said.append, **kw)  # fmt: skip
 
+    def record(self):
+        return json.loads(Path(self.seen).read_text())
+
+
+class Round(Base):
     def test_the_first_round_posts_nothing_and_counts_what_is_due_as_announced(self):
         self.run_round("2026-02-01")
-        self.assertEqual(self.posted, [])
-        self.assertEqual(
-            sorted(e["date"] for e in json.loads(Path(self.seen).read_text()).values()),
-            ["2026-01-01", "2026-02-01"],
-        )
+        self.assertEqual(self.slack.did("post"), [])
+        self.assertEqual(sorted(e["date"] for e in self.record().values()), ["2026-01-01", "2026-02-01"])
 
     def test_a_notice_goes_out_once_on_its_date(self):
         self.run_round("2026-02-01")
         self.run_round("2026-02-15")
-        self.assertEqual(self.posted, [])
+        self.assertEqual(self.slack.did("post"), [])
         self.run_round("2026-03-01")
         self.run_round("2026-03-01")
-        self.assertEqual(self.posted, ["later"])
+        self.assertEqual(self.slack.did("post"), [("post", "later")])
 
     def test_a_new_notice_already_due_is_posted_oldest_first(self):
         self.run_round("2026-01-01")
         self.doc["notices"].append(notice("new", "2026-01-15"))
-        self.run_round("2026-03-01")
-        self.assertEqual(self.posted, ["new", "today", "later"])
+        self.run_round()
+        self.assertEqual(self.slack.did("post"), [("post", "new"), ("post", "today"), ("post", "later")])
 
     def test_a_failed_post_keeps_what_went_out_and_retries_the_rest(self):
         self.run_round("2026-01-01")
-
-        def flaky(text, blocks):
-            if text == "later":
-                raise RuntimeError("slack down")
-            self.posted.append(text)
-
+        self.slack.fail.add("later")
         with self.assertRaises(RuntimeError):
-            self.run_round("2026-03-01", flaky)
-        self.run_round("2026-03-01")
-        self.assertEqual(self.posted, ["today", "later"])
+            self.run_round()
+        self.slack.fail.clear()
+        self.run_round()
+        self.assertEqual(self.slack.did("post"), [("post", "today"), ("post", "later")])
 
-    def test_each_posted_notice_is_pinned_so_the_newest_stays(self):
+    def test_the_newest_post_is_the_one_pinned(self):
         self.run_round("2026-01-01")
-        pinned = []
-
-        def post(text, blocks):
-            self.posted.append(text)
-            return f"ts-{text}"
-
-        notices.round_(lambda: self.doc, post, self.seen, "2026-03-01", pin=pinned.append)
-        self.assertEqual(pinned, ["ts-today", "ts-later"])
+        self.run_round("2026-02-01")
+        self.run_round("2026-03-01")
+        newest = self.record()[notice("later", "2026-03-01")["id"]]["ts"]
+        self.assertEqual(self.slack.pins, {newest}, "the earlier pin was taken off")
 
     def test_a_malformed_notice_is_left_out(self):
         self.run_round("2026-01-01")
         self.doc["notices"] += [{"id": "x", "date": "2026-01-02"}, "junk"]
         self.run_round("2026-01-02")
-        self.assertEqual(self.posted, [])
+        self.assertEqual(self.slack.did("post"), [])
 
     def test_an_unreachable_site_seeds_nothing(self):
         def down():
             raise OSError("no route")
 
         with self.assertRaises(OSError):
-            notices.round_(down, self.posted.append, self.seen, "2026-02-01")
+            notices.round_(down, self.slack, CHANNEL, self.seen, self.pinned, "2026-02-01", self.said.append)
         self.assertFalse(os.path.exists(self.seen))
 
+    def test_an_empty_export_deletes_nothing(self):
+        self.run_round("2026-01-01")
+        self.run_round()
+        self.doc["notices"] = []
+        self.run_round()
+        self.assertEqual(self.slack.did("chat.delete"), [])
+        self.assertEqual(self.slack.posts(), ["later", "today"])
 
-class Edits(unittest.TestCase):
-    """A notice reworded on the site after the bot posted it: the post is edited in place,
-    once; before, the Slack post kept the old text and only a one-off script fixed it."""
 
-    def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.seen = os.path.join(self.dir.name, "notices-posted.json")
-        self.pinned = os.path.join(self.dir.name, "notices-pinned.json")
-        self.doc = {"notices": [notice("old", "2026-01-01")]}
-        self.posted, self.updated = [], []
+class Reconcile(Base):
+    """The channel follows notices.json: what was posted is edited, dropped or kept."""
 
-    def tearDown(self):
-        self.dir.cleanup()
-
-    def post(self, text, blocks):
-        self.posted.append(text)
-        return f"ts-{len(self.posted)}"
-
-    def run_round(self, today="2026-03-01"):
-        notices.round_(lambda: self.doc, self.post, self.seen, today,
-                       update=lambda ts, text, blocks: self.updated.append((ts, text, blocks)),
-                       pinned_path=self.pinned)  # fmt: skip
+    def test_every_post_carries_its_notice_in_metadata(self):
+        self.run_round("2026-01-01")
+        self.run_round()
+        self.assertEqual([m["metadata"] for m in self.slack.messages],
+                         [notices.metadata(notice("today", "")["id"]),
+                          notices.metadata(notice("later", "")["id"])])  # fmt: skip
 
     def test_a_reworded_notice_edits_its_post_once(self):
         self.run_round("2026-01-01")
-        self.doc["notices"].append(notice("new", "2026-02-01"))
         self.run_round()
         self.run_round()
-        self.assertEqual((self.posted, self.updated), (["new"], []), "unchanged: nothing edited")
-        self.doc["notices"][1]["text"] = "new, reworded"
-        self.doc["notices"][1]["blocks"] = [{"type": "y"}]
+        self.assertEqual(self.slack.did("update"), [], "unchanged: nothing edited")
+        self.doc["notices"][2]["text"] = "later, reworded"
         self.run_round()
         self.run_round()
-        self.assertEqual(self.updated, [("ts-1", "new, reworded", [{"type": "y"}])])
-        self.assertEqual(self.posted, ["new"], "edited, never posted again")
+        self.assertEqual(self.slack.did("update"), [("update", "later, reworded")])
+        self.assertEqual(self.slack.posts(), ["later, reworded", "today"], "edited, never posted again")
 
-    def test_a_notice_seen_on_the_first_round_has_no_post_to_edit(self):
+    def test_a_new_renderer_edits_every_post_once(self):
+        self.doc = {"notices": [md_notice("qos", "2026-02-01")]}
         self.run_round("2026-01-01")
-        self.doc["notices"][0]["text"] = "old, reworded"
         self.run_round()
-        self.assertEqual((self.posted, self.updated), ([], []))
+        render = notices.render
+        newer = lambda n: {**render(n), "blocks": [*render(n)["blocks"], {"type": "divider"}]}  # noqa: E731
+        with mock.patch.object(notices, "render", newer):
+            self.run_round()
+            self.run_round()
+        self.assertEqual(self.slack.did("update"), [("update", "qos")])
+        self.assertEqual(
+            self.slack.messages[0]["blocks"][-1], {"type": "divider"}, "as today's code renders it"
+        )
 
-    def test_the_newest_notice_from_before_the_ts_was_kept_is_the_pinned_one(self):
-        Path(self.seen).write_text(json.dumps({notice("old", "2026-01-01")["id"]: "2026-01-01",
-                                               notice("new", "2026-02-01")["id"]: "2026-02-01"}))  # fmt: skip
-        Path(self.pinned).write_text(json.dumps({"ts": "ts-pinned"}))
-        self.doc["notices"].append(notice("new", "2026-02-01"))
+    def test_a_dropped_notice_loses_its_post_and_the_bots_replies(self):
+        self.run_round("2026-01-01")
         self.run_round()
+        ts = self.record()[notice("today", "")["id"]]["ts"]
+        m = next(m for m in self.slack.messages if m["ts"] == ts)
+        m["reply_count"] = 2
+        self.slack.replies[ts] = [{"ts": "1.5", "bot_id": "B1"}, {"ts": "1.6", "user": "U7"}]
+        del self.doc["notices"][1]
         self.run_round()
-        self.assertEqual(self.updated, [("ts-pinned", "new", [{"type": "x"}])], "brought up to date once")
-        self.assertEqual(self.posted, [])
-        entries = json.loads(Path(self.seen).read_text())
-        self.assertEqual(entries[notice("old", "2026-01-01")["id"]], {"date": "2026-01-01"})
+        self.assertEqual(self.slack.did("chat.delete"), [("chat.delete", "1.5"), ("chat.delete", ts)])
+        self.assertEqual(self.slack.posts(), ["later"])
+        self.assertNotIn(notice("today", "")["id"], self.record())
+        self.assertIn("1 replies of others left", self.said[-1])
+
+    def test_a_post_is_found_by_its_metadata_when_the_record_is_lost(self):
+        self.run_round("2026-01-01")
+        self.run_round()
+        Path(self.seen).write_text(json.dumps({n["id"]: {"date": n["date"]} for n in self.doc["notices"]}))
+        self.doc["notices"][1]["text"] = "today, reworded"
+        self.run_round()
+        self.assertEqual(self.slack.did("post"), [("post", "today"), ("post", "later")], "none again")
+        self.assertIn(("update", "today, reworded"), self.slack.did("update"))
+
+    def test_a_post_deleted_by_hand_is_not_posted_again(self):
+        self.run_round("2026-01-01")
+        self.run_round()
+        self.slack.messages = [m for m in self.slack.messages if m["text"] != "today"]
+        self.run_round()
+        self.assertEqual(self.slack.did("post"), [("post", "today"), ("post", "later")])
+
+    def test_another_apps_post_is_never_touched(self):
+        self.run_round("2026-01-01")
+        self.slack.add("5.0", "gone", notice("gone", "")["blocks"], bot="B9", app="A9")
+        self.run_round(adopt=True)
+        self.assertNotIn(("chat.delete", "5.0"), self.slack.log)
+        self.assertTrue(any(a["do"] == "foreign" for a in self.run_round(dry_run=True)))
+
+    def test_without_the_history_scope_new_notices_still_go_out(self):
+        self.run_round("2026-01-01")
+        history = self.slack.call
+
+        def call(method, **p):
+            if method == "conversations.history":
+                raise Error("Slack conversations.history failed: missing_scope")
+            return history(method, **p)
+
+        self.slack.call = call
+        self.run_round()
+        self.assertEqual(self.slack.did("post"), [("post", "today"), ("post", "later")])
+        self.assertIn("import the app manifest", self.said[0])
+
+    def test_a_post_the_bot_may_not_delete_is_said_and_the_round_goes_on(self):
+        self.run_round("2026-01-01")
+        self.slack.add("5.0", "gone", notice("gone", "")["blocks"], metadata=notices.metadata(f"{SITE}gone/"))
+        self.slack.locked.add("5.0")
+        self.run_round()
+        self.assertIn("not allowed", " ".join(self.said))
+        self.assertEqual(self.slack.did("post"), [("post", "today"), ("post", "later")])
+
+
+class OldPosts(Base):
+    """Posts from before metadata (the 11-19 notices the docs since dropped, a webhook's):
+    found by the button to their page or by their title; the bot's rounds leave them, the
+    owner's run (adopt) changes them after the dry run said what it would do."""
+
+    def setUp(self):
+        super().setUp()
+        Path(self.seen).write_text(json.dumps({n["id"]: n["date"] for n in self.doc["notices"][:2]}))
+        self.slack.add("1.0", "old", notice("old", "")["blocks"])  # its button: found by link
+        self.slack.add("2.0", "today", [notice("today", "")["blocks"][0]])  # a title only
+        self.slack.add("3.0", "dropped", notice("dropped", "")["blocks"])  # the docs dropped it
+        self.slack.add("4.0", "chat", [])  # no notice: never touched
+
+    def test_the_bots_round_leaves_them_and_posts_none_again(self):
+        self.run_round("2026-02-01")
+        self.assertEqual(self.slack.did("post", "update", "chat.delete"), [])
+
+    def test_the_dry_run_says_what_the_owners_run_does_and_does_nothing(self):
+        before = Path(self.seen).read_text()
+        actions = self.run_round("2026-02-01", dry_run=True, adopt=True)
+        self.assertEqual([(a["do"], a.get("ts"), a.get("how")) for a in actions],
+                         [("delete", "3.0", "link"), ("update", "1.0", "link"), ("update", "2.0", "title"),
+                          ("pin", None, None)])  # fmt: skip
+        self.assertEqual(self.slack.log, [], "no call that changes Slack")
+        self.assertEqual(Path(self.seen).read_text(), before, "nor the record")
+        self.assertTrue(any(line.startswith("delete 3.0") for line in self.said), self.said)
+
+    def test_the_owners_run_brings_them_to_the_notices(self):
+        self.run_round("2026-02-01", adopt=True)
+        self.assertEqual(self.slack.posts(), ["chat", "old", "today"])
+        ids = {m["metadata"]["event_payload"]["id"] for m in self.slack.messages if "metadata" in m}
+        self.assertEqual(
+            ids, {notice("old", "")["id"], notice("today", "")["id"]}, "found exactly from now on"
+        )
+        self.assertEqual(self.slack.pins, {"2.0"})
+        self.slack.log.clear()
+        self.run_round("2026-02-01")
+        self.assertEqual(self.slack.did("post", "update", "chat.delete"), [], "converged")
+
+    def test_a_second_post_of_one_notice_goes(self):
+        self.slack.add("6.0", "old", notice("old", "")["blocks"])
+        self.run_round("2026-02-01", adopt=True)
+        self.assertIn(("chat.delete", "6.0"), self.slack.log, "the first post stays")
+
+    def test_the_newest_entry_from_before_the_ts_was_kept_is_the_pinned_one(self):
+        Path(self.pinned).write_text(json.dumps({"ts": "2.0"}))
+        self.run_round("2026-02-01")
+        self.assertEqual(
+            self.slack.did("update"), [("update", "today")], "a recorded post: brought up to date"
+        )
+        self.assertEqual(self.record()[notice("old", "")["id"]], {"date": "2026-01-01"})
 
 
 def md_notice(nid, day, lead="**팀 QoS**로 제출해 주세요."):
@@ -175,7 +330,7 @@ class Markdown(unittest.TestCase):
 
     def test_a_notice_of_blocks_is_posted_as_it_is(self):
         old = notice("old", "2026-01-01")
-        self.assertEqual(notices.render(old), {"text": "old", "blocks": [{"type": "x"}]})
+        self.assertEqual(notices.render(old), {"text": "old", "blocks": old["blocks"]})
 
     def test_check_finds_what_the_bot_could_not_show(self):
         good = {"notices": [md_notice("qos", "2026-02-01")]}
@@ -186,25 +341,6 @@ class Markdown(unittest.TestCase):
         self.assertEqual(len(found), 3, found)
         self.assertIn("title", found[1])
         self.assertEqual(notices.check({"nope": []}), ['notices.json: no "notices" list'])
-
-    def test_a_rendering_change_edits_no_post_a_reworded_notice_does(self):
-        with tempfile.TemporaryDirectory() as d:
-            seen, updated = os.path.join(d, "seen.json"), []
-            doc = {"notices": [md_notice("qos", "2026-01-01")]}
-
-            def run():
-                notices.round_(lambda: doc, lambda text, blocks: "ts-1", seen, "2026-02-01",
-                               update=lambda ts, text, blocks: updated.append(text))  # fmt: skip
-
-            Path(seen).write_text("{}")
-            run()
-            with mock.patch.object(notices.rich, "blocks", lambda text: []):
-                run()
-            self.assertEqual(updated, [], "the digest is of the Markdown, not of its rendering")
-            doc["notices"][0]["markdown"] = "**팀 QoS**로 제출해 주세요. 바뀐 문장."
-            run()
-            run()
-            self.assertEqual(updated, ["qos"])
 
 
 if __name__ == "__main__":

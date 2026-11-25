@@ -17,9 +17,9 @@ seen} (shared data requests, cluster_bot.data; no host leaves them off), connect
 {login_host, ssh_port, portal_url, dashboard_url, docs_url} and welcomed (cluster_bot.onboarding: how to
 log in, the account notice), dm_log {channel, state} (where the notices the bot sends a
 person by DM are logged for the administrators, cluster_tools.slack.DmLog; no channel
-logs none), notices {url, channel, seen} (the user docs' notices posted in the
-announcement channel on their date, the newest pinned, cluster_bot.notices; no url
-posts none), guides {url, channels {role: name}, state} (each channel's purpose, topic,
+logs none), notices {url, channel, seen, pinned} (the announcement channel kept like
+the user docs' notices: each posted on its date, edited when reworded, deleted when
+dropped, the newest pinned, cluster_bot.notices; no url posts none), guides {url, channels {role: name}, state} (each channel's purpose, topic,
 canvas and bookmarks, cluster_bot.channels; no url keeps none).
 
 Every DM goes through cluster_tools.slack.Slack.dm (the bot's own client posts only to
@@ -630,14 +630,12 @@ def main(argv=None):
         def notices_round():
             docs_notices.round_(
                 lambda: docs_notices.fetch_json(docs["url"]),
-                lambda text, blocks: dms.post(docs["channel"], text, blocks),
+                dms,
+                docs["channel"],
                 docs["seen"],
+                docs["pinned"],
                 date.today().isoformat(),
-                pin=lambda ts: docs_notices.pin_latest(dms, docs["channel"], docs["pinned"], ts),
-                update=lambda ts, text, blocks: dms.update(
-                    docs_notices.channel_id(dms, docs["channel"]), ts, text, blocks
-                ),
-                pinned_path=docs["pinned"],
+                lambda line: print(f"cluster-bot: docs notices: {line}", file=sys.stderr, flush=True),
             )
 
         every(NOTICES_EVERY, "docs notices", notices_round)

@@ -13,25 +13,40 @@ what of a notices.json the bot could not show as written; the docs run it on eve
 commit (scripts/deepops/notice_render.py, the notice-render hook). A notice published
 before the docs sent Markdown carries its own "blocks", posted as they are.
 
-round_(fetch, post, seen_path, today, pin=None, update=None, pinned_path=None) posts every
-notice due (its date today or before) that SEEN_PATH does not list, oldest first, and
-records each one once Slack took it: its date, the message's ts (POST returns it) and a
-digest of its text and blocks. PIN(ts) keeps it as the channel's one pinned notice
-(pin_latest: the newest the bot posted, the previous one unpinned). A notice the site
-rewords after it went out is edited in place: UPDATE(ts, text, blocks) once its digest
-differs, so the post never keeps the old text. The first round (no SEEN_PATH yet) posts
-nothing: what is already due counts as announced, so a new deploy never repeats the
-notices people already saw; a notice dated later still goes out on its date.
+The channel is kept like notices.json, every round (round_, plan): each notice due (its
+date today or before) has one post, the newest pinned, and each post shows the notice
+as today's code renders it. A notice reworded on the site, or rendered differently by a
+newer rich, edits its post in place, once (the digest of the rendered post); a notice the
+site dropped has its post deleted; a second post of one notice goes too. Each post
+carries Slack message metadata (event_type cluster_notice, the notice's id), so the
+round finds its posts exactly; SEEN_PATH records each one's ts and digest as it goes.
 
-A notice recorded before the ts was kept (its entry only a date) is not edited, but for the
-newest one: its ts is the pinned notice's (PINNED_PATH), and it is brought up to date once.
+A post from before metadata (an older bot or its webhook) is found by its button to the
+notice's page, or by its title. The bot's own rounds leave those as they are; the
+owner's run changes them after reading what it would do:
+
+    python -m cluster_bot.notices CONFIG --dry-run    say each update, delete, post, pin
+    python -m cluster_bot.notices CONFIG              do it, then those posts carry metadata
+
+The first round (no SEEN_PATH yet) posts nothing: what is already due counts as
+announced, so a new deploy never repeats the notices people already saw. A notice whose
+post someone deleted by hand is not posted again. A post of another app or a person is
+never touched, only said.
 """
 
+import argparse
+import fcntl
 import hashlib
 import json
+import os
+import sys
 import urllib.request
+from contextlib import contextmanager
+from datetime import date
+from pathlib import Path
 
 from cluster_tools import rich  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+from cluster_tools.slack import Error, Slack
 
 from . import state
 from .channels import channel_ids
@@ -46,8 +61,7 @@ def fetch_json(url):
 
 HEADER_MAX = 150  # characters Slack shows in a header
 MAX_BLOCKS = 50  # blocks in one message
-# What a notice in Markdown says, and what the bot shows of it (render).
-SOURCE = ("text", "title", "markdown", "link", "context")
+EVENT = "cluster_notice"  # the metadata event_type of a notice post
 
 
 def render(notice):
@@ -94,24 +108,262 @@ def _complete(n):
     return all(n.get(k) for k in ("id", "date", "text")) and bool(n.get("markdown") or n.get("blocks"))
 
 
-def due(document, today):
-    """The notices of DOCUMENT dated TODAY (YYYY-MM-DD) or before, oldest first, each as
-    the bot posts it (render) with its digest; one missing what it needs is left out."""
-    notices = []
+def notices_of(document):
+    """{id: notice as the bot posts it} of DOCUMENT: {"id", "date", "text", "blocks",
+    "digest"}; one missing what it needs is left out."""
+    out = {}
     for n in (document or {}).get("notices", []):
-        if isinstance(n, dict) and _complete(n) and n["date"] <= today:
-            notices.append({"id": n["id"], "date": n["date"], **render(n), "digest": digest(n)})
-    return sorted(notices, key=lambda n: (n["date"], n["id"]))
+        if isinstance(n, dict) and _complete(n):
+            msg = render(n)
+            out[n["id"]] = {"id": n["id"], "date": n["date"], **msg, "digest": digest(n["id"], msg)}
+    return out
 
 
-def digest(notice):
-    """What a notice says, hashed: its Markdown (the rendering may change without a new
-    edit of every post), or for a notice of blocks its text and blocks."""
-    if "markdown" in notice:
-        said = [notice.get(k) for k in SOURCE]
-    else:
-        said = [notice["text"], notice["blocks"]]
+def digest(nid, msg):
+    """The post as today's code renders notice NID (MSG, render()), hashed: a reworded
+    notice and a renderer that shows it differently both edit the post, once."""
+    said = [nid, msg["text"], msg["blocks"]]
     return hashlib.sha256(json.dumps(said, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def metadata(nid):
+    """Slack message metadata on every notice post: which notice it is, read back exactly."""
+    return {"event_type": EVENT, "event_payload": {"id": nid}}
+
+
+def _header(blocks):
+    return next((b["text"].get("text", "") for b in blocks or [] if b.get("type") == "header"), "")
+
+
+def _button(blocks):
+    urls = (e.get("url") for b in blocks or [] if b.get("type") == "actions" for e in b.get("elements", []))
+    return next((u for u in urls if u), "")
+
+
+def identify(message, notes, recorded, sites):
+    """(notice id, how) of MESSAGE, or (None, None) when it is no notice post: its metadata
+    (exact), the ts SEEN recorded for a notice (exact), its button to a notice page under
+    one of SITES (the id is the page: a notice since dropped is found too), or a header that
+    is a notice's title. The last two find the posts from before metadata was set."""
+    payload = (message.get("metadata") or {}).get("event_payload") or {}
+    if (message.get("metadata") or {}).get("event_type") == EVENT and payload.get("id"):
+        return payload["id"], "metadata"
+    if message.get("ts") in recorded:
+        return recorded[message["ts"]], "record"
+    url = _button(message.get("blocks"))
+    if url and (url in notes or any(url.startswith(s) for s in sites)):
+        return url, "link"
+    title = _header(message.get("blocks"))
+    nid = next((i for i, n in notes.items() if title and _header(n["blocks"]) == title), None)
+    return (nid, "title") if nid else (None, None)
+
+
+EXACT = ("metadata", "record")
+
+
+def plan(messages, notes, seen, mine, today, adopt):
+    """What makes the channel's notice posts what NOTES (notices_of) says, in order:
+    [{"do", "id", "ts", "how", ...}]. MESSAGES are the channel's (history), SEEN the record,
+    MINE the bot's own (bot_id, app_id): its posts are the ones it may edit or delete. A post
+    found only by its button or title (from before metadata) is changed with ADOPT alone,
+    the owner's run after reading the dry run; otherwise it is left and counts as posted.
+
+      update   a post whose notice is in NOTES: its text, blocks and metadata today's
+      delete   a post whose notice NOTES no longer has, and a second post of one notice
+      post     a notice due (TODAY or before) with no post and none recorded
+      missing  a notice recorded as posted whose post is gone (deleted by hand): not again
+      foreign  a notice post of another app or a person: left, said
+      pin      the newest notice's post, the channel's one pinned notice
+    """
+    bot_id, app_id = mine
+    recorded = {e["ts"]: nid for nid, e in seen.items() if isinstance(e, dict) and e.get("ts")}
+    sites = {nid[: nid.index("/news/") + len("/news/")] for nid in notes if "/news/" in nid}
+    found, out = {}, []
+    for m in messages:
+        if m.get("thread_ts", m.get("ts")) != m.get("ts"):
+            continue  # a reply, not a post
+        nid, how = identify(m, notes, recorded, sites)
+        if nid is None:
+            continue
+        own = bool(bot_id and m.get("bot_id") == bot_id) or bool(app_id and m.get("app_id") == app_id)
+        title = _header(m.get("blocks")) or (m.get("text") or "")[:80]
+        if not own:
+            out.append({"do": "foreign", "id": nid, "ts": m["ts"], "how": how, "title": title,
+                        "by": m.get("bot_id") or m.get("user") or "?"})  # fmt: skip
+            continue
+        found.setdefault(nid, []).append({"ts": m["ts"], "how": how, "title": title,
+                                          "replies": m.get("reply_count", 0)})  # fmt: skip
+    kept = {}
+    for nid, posts in sorted(found.items()):
+        n = notes.get(nid)
+        entry = seen.get(nid) if isinstance(seen.get(nid), dict) else {}
+        keep = None
+        if n is not None:
+            keep = next((p for p in posts if p["ts"] == entry.get("ts")), None)
+            keep = keep or min(posts, key=lambda p: float(p["ts"]))
+            kept[nid] = keep["ts"]
+        for p in posts:
+            if not adopt and p["how"] not in EXACT:
+                continue
+            if p is not keep:
+                out.append({"do": "delete", "id": nid, **p, "why": "a second post" if n else "dropped"})
+            elif entry.get("ts") != p["ts"] or entry.get("digest") != n["digest"]:
+                out.append({"do": "update", "id": nid, **p})
+    for n in sorted(notes.values(), key=lambda n: (n["date"], n["id"])):
+        if n["id"] in kept or n["date"] > today:
+            continue
+        do = "missing" if n["id"] in seen else "post"
+        out.append({"do": do, "id": n["id"], "title": _header(n["blocks"])})
+    shown = set(kept) | {a["id"] for a in out if a["do"] == "post"}
+    if shown:
+        out.append({"do": "pin", "id": max(shown, key=lambda nid: (notes[nid]["date"], nid))})
+    return out
+
+
+def history(slack, channel):
+    """Every message in CHANNEL, newest first, with its metadata."""
+    out, cursor = [], ""
+    while True:
+        params = {"channel": channel, "limit": 200, "include_all_metadata": "true"}
+        if cursor:
+            params["cursor"] = cursor
+        body = slack.call("conversations.history", **params)
+        out += body.get("messages", [])
+        cursor = (body.get("response_metadata") or {}).get("next_cursor") or ""
+        if not cursor:
+            return out
+
+
+def mine(slack):
+    """(bot_id, app_id) of the bot's token: what its own posts carry."""
+    bot_id = slack.call("auth.test").get("bot_id") or ""
+    app_id = (slack.call("bots.info", bot=bot_id).get("bot") or {}).get("app_id", "") if bot_id else ""
+    return bot_id, app_id
+
+
+def own_replies(slack, channel, ts, ids):
+    """(the ts of the bot's own replies under TS, how many replies are someone else's)."""
+    replies = slack.call("conversations.replies", channel=channel, ts=ts, limit=1000).get("messages", [])
+    replies = [r for r in replies if r.get("ts") != ts]
+    own = [r["ts"] for r in replies if r.get("bot_id") == ids[0] or (ids[1] and r.get("app_id") == ids[1])]
+    return own, len(replies) - len(own)
+
+
+def describe(action, extra=""):
+    a = action
+    where = f" {a['ts']}" if a.get("ts") else ""
+    how = f", found by {a['how']}" if a.get("how") else ""
+    by = f", posted by {a['by']}" if a.get("by") else ""
+    why = f", {a['why']}" if a.get("why") else ""
+    return f"{a['do']}{where} {a['id']} {a.get('title', '')!r}{how}{by}{why}{extra}"
+
+
+GONE = ("message_not_found", "thread_not_found")
+
+
+def apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log):
+    """Do ACTIONS (plan) in CHANNEL, recording each in SEEN_PATH as it goes: a failure
+    later in the round never repeats what went out. A delete takes the bot's own replies
+    under the post first; someone else's reply stays, under Slack's "deleted" mark. A post
+    the bot may not change (cant_update_message, cant_delete_message) is said and left."""
+    for a in actions:
+        nid, n = a["id"], notes.get(a["id"])
+        try:
+            if a["do"] == "delete":
+                theirs = 0
+                if a.get("replies"):
+                    own, theirs = own_replies(slack, channel, a["ts"], ids)
+                    for ts in own:
+                        _delete(slack, channel, ts)
+                _delete(slack, channel, a["ts"])
+                log(describe(a, f", {theirs} replies of others left" if theirs else ""))
+                with state.locked(seen_path, {}) as seen:
+                    if n is None and (seen.get(nid) or {}).get("ts") in (a["ts"], None):
+                        seen.pop(nid, None)
+            elif a["do"] == "update":
+                slack.update(channel, a["ts"], n["text"], n["blocks"], metadata=metadata(nid))
+                log(describe(a))
+                with state.locked(seen_path, {}) as seen:
+                    seen[nid] = {"date": n["date"], "ts": a["ts"], "digest": n["digest"]}
+            elif a["do"] == "post":
+                ts = slack.post(channel, n["text"], n["blocks"], metadata=metadata(nid))
+                log(describe(a))
+                with state.locked(seen_path, {}) as seen:
+                    seen[nid] = {"date": n["date"], "ts": ts, "digest": n["digest"]}
+            elif a["do"] == "pin":
+                ts = (state.read(seen_path, {}).get(nid) or {}).get("ts")
+                if ts and ts != (state.read(pinned_path, {}) or {}).get("ts"):
+                    pin_latest(slack, channel, pinned_path, ts)
+                    log(describe(a, f" ({ts})"))
+            elif a["do"] in ("foreign", "missing"):
+                pass  # said by the dry run; nothing to do
+        except Exception as e:
+            if not any(code in str(e) for code in ("cant_update_message", "cant_delete_message")):
+                raise
+            log(describe(a, f": not allowed ({e})"))
+
+
+def _delete(slack, channel, ts):
+    try:
+        slack.call("chat.delete", channel=channel, ts=ts)
+    except Exception as e:
+        if not any(code in str(e) for code in GONE):
+            raise
+
+
+def round_(fetch, slack, channel, seen_path, pinned_path, today, log, dry_run=False, adopt=False):
+    """One round: the channel made what notices.json says (plan, apply). The first round
+    (no SEEN_PATH yet) counts every notice already due as announced, so a new deploy posts
+    none again. DRY_RUN says each action (LOG) and changes nothing, the record neither. A
+    notices.json with no notice changes nothing: an empty export is a broken one, never
+    "delete every post"."""
+    notes = notices_of(fetch())
+    if not notes:
+        log("notices.json lists no notice: nothing changed")
+        return []
+    channel = channel_id(slack, channel)
+    ids = mine(slack)
+    with _one_round(seen_path, dry_run):
+        first = state.read(seen_path, None) is None
+        seed = {n["id"]: {"date": n["date"]} for n in notes.values() if n["date"] <= today} if first else {}
+        if dry_run:
+            seen = seed or state.read(seen_path, {})
+            _entries(seen, pinned_path)
+        else:
+            with state.locked(seen_path, {}) as recorded:
+                recorded.update(seed)
+                _entries(recorded, pinned_path)
+                seen = dict(recorded)
+        try:
+            messages = history(slack, channel)
+        except Error as e:  # the app's manifest not yet imported: new notices still go out
+            if "missing_scope" not in str(e):
+                raise
+            log(f"the channel's history is not readable ({e}): import the app manifest; posting only")
+            messages = []
+        actions = plan(messages, notes, seen, ids, today, adopt)
+        if dry_run:
+            for a in actions:
+                theirs = ""
+                if a["do"] == "delete" and a.get("replies"):
+                    own, others = own_replies(slack, channel, a["ts"], ids)
+                    theirs = f", with {len(own)} bot replies; {others} replies of others left"
+                log(describe(a, theirs))
+            return actions
+        apply(actions, slack, channel, notes, seen_path, pinned_path, ids, log)
+        return actions
+
+
+@contextmanager
+def _one_round(seen_path, dry_run):
+    """One round at a time, the bot's and an owner's run alike (a flock beside SEEN_PATH)."""
+    if dry_run:
+        yield
+        return
+    os.makedirs(os.path.dirname(seen_path) or ".", exist_ok=True)
+    with open(f"{seen_path}.round", "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
 
 
 def _entries(seen, pinned_path):
@@ -124,29 +376,6 @@ def _entries(seen, pinned_path):
     ts = (state.read(pinned_path, {}) or {}).get("ts") if pinned_path and old else None
     if ts:
         seen[old[-1][1]]["ts"] = ts
-
-
-def round_(fetch, post, seen_path, today, pin=None, update=None, pinned_path=None):
-    notices = due(fetch(), today)
-    first = state.read(seen_path, None) is None
-    if first:
-        with state.locked(seen_path, {}) as seen:
-            seen.update({n["id"]: {"date": n["date"], "digest": n["digest"]} for n in notices})
-        return
-    with state.locked(seen_path, {}) as seen:
-        _entries(seen, pinned_path)
-    for n in notices:  # each recorded as it goes: a later failure never reposts it
-        posted = None
-        with state.locked(seen_path, {}) as seen:
-            entry = seen.get(n["id"])
-            if entry is None:
-                posted = post(n["text"], n["blocks"])
-                seen[n["id"]] = {"date": n["date"], "ts": posted, "digest": n["digest"]}
-            elif update is not None and entry.get("ts") and entry.get("digest") != n["digest"]:
-                update(entry["ts"], n["text"], n["blocks"])
-                entry["digest"] = n["digest"]
-        if posted is not None and pin is not None:
-            pin(posted)
 
 
 def channel_id(slack, channel):
@@ -168,3 +397,25 @@ def pin_latest(slack, channel, path, ts):
             except Exception as e:
                 if not any(code in str(e) for code in ("no_pin", "not_pinned", "message_not_found")):
                     raise
+
+
+def main(argv=None):
+    """One round now, as the bot's runs it: python -m cluster_bot.notices CONFIG [--dry-run]."""
+    parser = argparse.ArgumentParser(prog="python -m cluster_bot.notices", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)  # fmt: skip
+    parser.add_argument("config", help="the bot's config.json")
+    parser.add_argument("--dry-run", action="store_true", help="say what the round would do; change nothing")
+    args = parser.parse_args(argv)
+    cfg = json.loads(Path(args.config).read_text())
+    docs = cfg.get("notices") or {}
+    if not (docs.get("url") and docs.get("channel")):
+        parser.error(f"{args.config}: no notices url or channel")
+    slack = Slack(Path(cfg["bot_token_file"]).read_text().strip())
+    round_(lambda: fetch_json(docs["url"]), slack, docs["channel"], docs["seen"], docs["pinned"],
+           date.today().isoformat(), lambda line: print(f"notices: {line}", flush=True),
+           dry_run=args.dry_run, adopt=True)  # fmt: skip
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
