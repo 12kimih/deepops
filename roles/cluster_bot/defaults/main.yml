@@ -6,11 +6,11 @@
 # (roles/system_accounts) and needs slack_bot_token and slack_app_token (roles/
 # slack_defaults); without them it is installed but not started.
 #
-# Features, all subcommands of one slash command (cluster_bot_command; Slack commands are
-# not namespaced, and /leave is Slack's own): account requests (join, leave), unban
-# requests (unban, where fail2ban runs), collaboration folders (project), help;
-# reminders before a person's last day (the roster's `ends`), the Home tab. It acts on other hosts through the services they offer
-# it (roles/cluster_bot_access).
+# Its features are subcommands of one slash command (cluster_bot_command; Slack commands
+# are not namespaced, and /leave is Slack's own), listed once in cluster_bot.commands
+# SUBCOMMANDS; besides them, reminders before a person's last day (the roster's `ends`)
+# and the Home tab. It acts on other hosts through the services they offer it
+# (roles/cluster_bot_access).
 cluster_bot_state: present
 
 # The bot's one slash command; its subcommands come from cluster_bot.commands. Another
@@ -54,9 +54,9 @@ cluster_bot_admins: "{{ people | default({}) | people_with_role('admin') }}"
 cluster_bot_remind_days: [14, 7, 1]
 cluster_bot_leave_remind_days: "{{ cluster_bot_remind_days }}"
 
-# Account requests (/join, /leave) become pull requests on the site configuration, made
-# as the bot's GitHub App (docs/slurm-cluster/cluster-bot.md: creating it). Empty repo
-# leaves them off. The App's private key (PEM) is a secret: vault it.
+# Account requests (the join and leave subcommands) become pull requests on the site
+# configuration, made as the bot's GitHub App (docs/slurm-cluster/cluster-bot.md:
+# creating it). Empty repo leaves them off. The App's private key (PEM) is a secret: vault it.
 cluster_bot_github_repo: ""
 cluster_bot_github_base: main
 cluster_bot_github_app_id: ""

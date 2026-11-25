@@ -303,10 +303,12 @@ only those told. Who was told when is kept in `disk.json` beside the hourly stat
 A host whose usage was not reported in the last hour is named, since its figures are
 older. `--disk` with `--dry-run` or `--to` previews it.
 
-The role needs a Slack app bot token (`slack_bot_token` in roles/slack_defaults, scopes `chat:write`, `im:write`,
-`users:read`, `users:read.email`) invited to the channel. Slurm users map to Slack
-members through `slurm_usage_report_user_map`, or by email with
-`slurm_usage_report_email_domain`. Preview a report without notifying anyone, either
+The role needs the cluster's Slack app bot token (`slack_bot_token` in
+roles/slack_defaults) invited to the channel; the app's scopes are those of the manifest
+the cluster bot's deploy generates (`cluster_bot/commands.py`, `API_SCOPES`). Slurm
+users map to Slack members through the people roster (`slack_members`, each person's
+`slack`), and anyone it lacks by email at `slack_email_domain` when that is set; nothing
+to set here. Preview a report without notifying anyone, either
 printed or posted to one person's DM (or any channel):
 
 ```bash

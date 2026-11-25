@@ -4,7 +4,7 @@ roles/cluster_bot cluster_bot_connect derives each from the setting that holds i
 Private: Slack only, never the public docs.
 
     connect_text(connect, login="<아이디>")  -> how to log in (ssh, the portal, the guide)
-    join_text(connect, command)              -> the /join reply: how an account comes
+    join_text(connect, command)              -> the join reply: how an account comes
                                                 about, then how to log in once it has
     welcome(connect, command, login)         -> the account notice, once the account exists
     welcome_round(members, seen_path, exists, post, connect, command)

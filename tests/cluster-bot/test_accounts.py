@@ -1,4 +1,4 @@
-"""cluster_bot.accounts: /join and /leave go through the engine to a pull request made
+"""cluster_bot.accounts: join and leave requests go through the engine to a pull request made
 with the roster's own editors (plugins/filter/people.py); bad logins, keys, teams and
 duplicates are refused before an administrator sees them."""
 

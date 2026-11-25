@@ -8,14 +8,24 @@ systemd unit, and acts on other hosts only over its SSH key, whose one forced co
 there runs only the services the host offers (below).
 
 Every request is a subcommand of ONE slash command, `cluster_bot_command` (`/cluster`
-by default): `/cluster join`, `/cluster leave`, `/cluster unban`, `/cluster project`,
-`/cluster data`, `/cluster help` (or just `/cluster`). Slack's slash commands are not namespaced (the app
-installed last wins a name) and `/leave` is Slack's own, so the bot claims one name; a
-second cluster in the same workspace sets another. The subcommands are one table
-(`cluster_bot/commands.py`, `SUBCOMMANDS`) that the dispatcher, the help, the Home tab,
-the Slack app manifest and these docs all come from; a test requires a handler, a help
-line and a doc line for each, and no command name Slack uses itself. App commands do not
-run inside message threads: use them in a channel or the bot's DM.
+by default; just `/cluster` is the help):
+
+<!-- BEGIN GENERATED: bot-subcommands -->
+- `/cluster join`: ask for a cluster account
+- `/cluster leave`: give back your cluster account
+- `/cluster unban`: ask to lift a ban after failed logins
+- `/cluster project`: start a collaboration folder
+- `/cluster data`: ask for public data stored once for everyone
+- `/cluster help`: this list
+<!-- END GENERATED: bot-subcommands -->
+
+Slack's slash commands are not namespaced (the app installed last wins a name) and
+`/leave` is Slack's own, so the bot claims one name; a second cluster in the same
+workspace sets another. The subcommands are one table (`cluster_bot/commands.py`,
+`SUBCOMMANDS`) that the dispatcher, the help, the Home tab, the Slack app manifest and
+the list above all come from (`scripts/docs/generate.py`); a test requires a handler for
+each, and no command name Slack uses itself. App commands do not run inside message
+threads: use them in a channel or the bot's DM.
 
 Features: account requests, unban requests, collaboration folders and shared data
 requests (below), reminders before a person's last day, the pinned ban list, the docs
@@ -41,7 +51,7 @@ What a newcomer needs before the first login (`cluster_bot_connect`: the SSH hos
 port and the guide from `cluster_info`, the portal's `open_ondemand_url`
 (roles/open_ondemand_defaults) when Open OnDemand is installed) is in the `/cluster join` reply,
 with how an account comes about, and in a DM the bot sends once the person's account
-exists on its host (checked hourly; the first run only records the accounts there are,
+exists on its host (checked every `REMIND_EVERY` seconds, `cluster_bot/app.py`; the first run only records the accounts there are,
 in `accounts-welcomed.json`). Slack only: these facts never go to the public docs.
 
 Before a person's last day (`ends` in the roster) the bot DMs them
@@ -81,7 +91,7 @@ token is ever on those hosts: the bot reads them over the `bans` service. Invite
 to the admin channel so it can pin the list.
 
 The user docs' notices: when `cluster_info.docs_url` is set, the bot reads
-`<docs_url>/notices.json` every 15 minutes (each notice already rendered as a Slack
+`<docs_url>/notices.json` every `NOTICES_EVERY` seconds (`cluster_bot/app.py`; each notice already rendered as a Slack
 message by the docs site's build) and posts each notice in `slack_channels.announce`
 once, on its date. The docs repository holds no Slack credential; the announcement goes
 through this app. Its first look posts nothing: every notice already due counts as
@@ -91,8 +101,8 @@ keeps one pinned notice: the newest the bot posted (the one before is unpinned).
 
 The channels' guides: each channel `slack_channels` names gets its purpose, topic, a
 canvas (the channel's README tab) and bookmarks from `<docs_url>/channels.json` (the docs
-site's build writes it, keyed by the channel's purpose: announce, help, status, admin),
-read every 15 minutes. The purpose and topic are set only when they differ. The canvas
+site's build writes it, keyed by the channel's purpose, the keys of `slack_channels`),
+read every `GUIDES_EVERY` seconds (`cluster_bot/app.py`). The purpose and topic are set only when they differ. The canvas
 is created once and replaced in full when its text changes and once a day, so a hand
 edit lasts a day at most; it is kept read-only for the channel's members (a refusal is
 logged in the bot's journal). Only the bookmarks the bot added are kept in step; one a
@@ -217,8 +227,7 @@ Alertmanager posts through the app's webhook).
    space's shared-data, and ends by proving each as the bot; a host deployed before the
    bot fails it with the playbook to run there). A deploy that still
    lacks a setting says which, by name; without both tokens the bot is installed but
-   stopped. Invite the app to every channel `slack_channels` names (announce, help, status,
-   admin): it posts and pins in them and keeps their guides.
+   stopped. Invite the app to every channel `slack_channels` names: it posts and pins in them and keeps their guides.
 
 Who the bot knows comes from the people roster: `cluster_bot_members` (each person's
 `slack` attribute) and `cluster_bot_admins` (people with the `admin` role).

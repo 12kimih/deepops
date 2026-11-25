@@ -1,4 +1,4 @@
-"""Account requests as features of the request engine: /join and /leave become pull
+"""Account requests as features of the request engine: join and leave become pull
 requests on the site configuration, which an administrator merges and deploys.
 
     JoinFeature(repo, people, settings)    LeaveFeature(repo, people, settings)

@@ -69,6 +69,19 @@ class Commands(unittest.TestCase):
             self.assertTrue(any(f"`/cluster {name}`" in line for line in docs), name)
         self.assertEqual(len(re.findall(r"@app\.command\(", APP.read_text())), 1, "one slash command")
 
+    def test_no_subcommand_is_written_as_a_slash_command_of_its_own(self):
+        """The bot once had a slash command per request; a subcommand is `/cluster join`
+        now, and docs that kept the old names sent people to Slack's own leave command."""
+        old = re.compile(r"(?:^|[\s(])`?/(" + "|".join(commands.NAMES) + r")\b(?![/\w])(?!`? is Slack's own)")
+        files = tracked(*(f"roles/cluster_bot/*{s}" for s in (".py", ".yml", ".j2", ".md")),
+                        "docs/slurm-cluster/cluster-bot.md", "tests/cluster-bot/*.py")  # fmt: skip
+        found = []
+        for path in files:
+            for n, line in enumerate(path.read_text().splitlines(), 1):
+                if old.search(line) and "SLACK_BUILTINS" not in line and '"/leave"' not in line:
+                    found.append(f"{path.relative_to(ROOT)}:{n}: {line.strip()}")
+        self.assertEqual(found, [], "write the subcommand: /cluster join, or 'the join request'")
+
     def test_parse(self):
         self.assertEqual(commands.parse(""), ("help", ""))
         self.assertEqual(commands.parse("  Join "), ("join", ""))
