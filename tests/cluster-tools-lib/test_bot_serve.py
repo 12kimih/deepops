@@ -2,6 +2,8 @@
 of root's that nobody else may write, with the rest of the request as that service's
 own, and every service splits its request the same way."""
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -81,6 +83,20 @@ class Dispatch(unittest.TestCase):
                 mock.patch("cluster_tools.proc.become") as become:  # fmt: skip
             self.assertEqual(bot_serve.main(["cluster-bot-serve", self.dir]), 2)
         become.assert_not_called()
+
+    def test_offers_names_the_services_it_would_run_and_runs_none(self):
+        self.offer("shared-data", ["/usr/local/sbin/shared-data", "serve"])
+        self.offer("open", ["/bin/sh"], mode=0o666)
+        self.offer("relative", ["sh", "-c", "x"])
+        self.assertEqual(bot_serve.offers(self.dir, owner=ME), ["bans", "shared-data"])
+        self.assertEqual(bot_serve.offers(os.path.join(self.dir, "gone"), owner=ME), [])
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"SSH_ORIGINAL_COMMAND": "offers"}), \
+                mock.patch("cluster_tools.proc.become") as become, contextlib.redirect_stdout(out), \
+                mock.patch.object(bot_serve, "offers", lambda d: ["bans"]):  # fmt: skip
+            self.assertEqual(bot_serve.main(["cluster-bot-serve", self.dir]), 0)
+        become.assert_not_called()
+        self.assertEqual(json.loads(out.getvalue()), {"offers": ["bans"]})
 
 
 if __name__ == "__main__":

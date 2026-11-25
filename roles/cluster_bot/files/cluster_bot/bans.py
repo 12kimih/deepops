@@ -32,22 +32,21 @@ class UnbanFeature(Feature):
         self.hosts = hosts
 
     def survey(self):
-        """Every host's bans now: ({host: [ban, ...]}, {host: why it could not be read})."""
+        """Every host's bans now: ({host: [ban, ...]}, {host: the Failed it could not be
+        read for})."""
         found, errors = {}, {}
         for name, run in sorted(self.hosts.items()):
             try:
                 found[name] = run("list")
             except Failed as e:
-                errors[name] = str(e)
+                errors[name] = e
         return found, errors
 
     def where(self, ip):
         """The hosts that ban IP now, with their bans; Failed when none could be asked."""
         found, errors = self.survey()
         if errors and not found:
-            raise Failed(
-                "차단 목록을 읽지 못했습니다 (" + "; ".join(f"{h}: {e}" for h, e in errors.items()) + ")"
-            )
+            raise Failed(f"차단 목록을 읽지 못했습니다 ({bans_blocks.by_reason(errors)})")
         return {h: hits for h, bans in found.items() if (hits := [b for b in bans if b["ip"] == ip])}
 
     def decide(self, req):
@@ -58,19 +57,22 @@ class UnbanFeature(Feature):
         if not found:
             raise Refused(f"{ip}은(는) 지금 차단되어 있지 않습니다. 접속이 안 되면 도움 채널에 알려 주세요")
         since = min(b["since"] for bans in found.values() for b in bans)
-        return "admin", f"{ip} 차단 해제는 관리자가 승인합니다 ({', '.join(found)}, {since}부터 차단)"
+        return (
+            "admin",
+            f"{ip} 차단 해제는 관리자가 승인합니다 ({bans_blocks.hostlist(found)}, {since}부터 차단)",
+        )
 
     def apply(self, req):
-        lifted, errors = [], []
+        lifted, errors = [], {}
         for name, run in sorted(self.hosts.items()):
             try:
                 if run("unban", req["ip"])["unbanned"]:
                     lifted.append(name)
             except Failed as e:
-                errors.append(f"{name}: {e}")
+                errors[name] = e
         if errors:
-            raise Failed(f"{req['ip']} 차단을 다 풀지 못했습니다 (" + "; ".join(errors) + ")")
-        where = f" ({', '.join(lifted)})" if lifted else ""
+            raise Failed(f"{req['ip']} 차단을 다 풀지 못했습니다 ({bans_blocks.by_reason(errors)})")
+        where = f" ({bans_blocks.hostlist(lifted)})" if lifted else ""
         return f"{req['ip']} 차단을 풀었습니다{where}. 다시 접속해 보세요.", {"hosts": lifted}
 
     def describe(self, req):
@@ -98,6 +100,7 @@ def watch(feature, post, update, seen):
         sorted(now.values(), key=lambda b: b["since"], reverse=True),
         errors,
         getattr(feature, "command", "/cluster"),
+        read=bool(found),
     )
     if not (seen.get("list") and update(seen["list"], text, blocks)):
         seen["list"] = post(text, blocks, pin=True)

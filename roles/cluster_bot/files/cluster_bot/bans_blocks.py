@@ -1,5 +1,7 @@
 """The Slack form of unban requests (cluster_bot.bans)."""
 
+from cluster_tools.slurm import hostlist  # the cluster's library (PYTHONPATH, roles/cluster_bot)
+
 from .blocks import field
 
 
@@ -50,16 +52,40 @@ def new_bans(bans):
     return text, [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}, *_sections(shown)]
 
 
-def ban_list(bans, errors, command="/cluster"):
+def unread(errors):
+    """ERRORS ({host: Failed}) grouped by reason: [(host list, reason, fix)], the hosts
+    of one reason folded into one short list (gpu[1-8],master)."""
+    groups = {}
+    for host, e in errors.items():
+        groups.setdefault((str(e), getattr(e, "fix", "")), []).append(host)
+    return sorted(
+        ((hostlist(hosts), reason, fix) for (reason, fix), hosts in groups.items()), key=lambda g: g[0]
+    )
+
+
+def by_reason(errors):
+    """ERRORS on one line: 'gpu[1-8],master: reason; login: reason'."""
+    return "; ".join(f"{hosts}: {reason}" for hosts, reason, _ in unread(errors))
+
+
+def ban_list(bans, errors, command="/cluster", read=True):
     """The bans now, newest first, as the one message kept up to date: (text, blocks).
-    ERRORS ({host: why}) are the hosts not read this time; COMMAND is the bot's."""
-    text = f"현재 차단된 주소 {len(bans)}개"
-    lines = [_line(b) for b in bans[:LIST_MAX]] or ["없음"]
+    ERRORS ({host: Failed}) are the hosts not read this time, by reason with what to do;
+    their bans stay as last seen. READ: any host was read. COMMAND is the bot's."""
+    if bans:
+        text = f"현재 차단된 주소 {len(bans)}개"
+    else:
+        text = "현재 차단된 주소가 없습니다" if read else "차단 목록을 읽지 못했습니다"
+    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}]
+    lines = [_line(b) for b in bans[:LIST_MAX]]
     if len(bans) > LIST_MAX:
         lines.append(f"외 {len(bans) - LIST_MAX}개 (가장 최근 {LIST_MAX}개만 보입니다)")
-    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{text}*"}}, *_sections(lines)]
-    note = f"해제는 `{command} unban`으로 신청을 받아 승인합니다."
+    blocks += _sections(lines)
     if errors:
-        note = "읽지 못한 호스트: " + ", ".join(f"{h} ({e})" for h, e in sorted(errors.items())) + ". " + note
+        shown = [
+            f"• {hosts}: {reason}." + (f" {fix}." if fix else "") for hosts, reason, fix in unread(errors)
+        ]
+        blocks += _sections(["*읽지 못한 호스트* (그 호스트의 차단은 마지막으로 읽은 대로입니다)", *shown])
+    note = f"해제는 `{command} unban`으로 신청을 받아 승인합니다."
     blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": note}]})
     return text, blocks

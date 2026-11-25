@@ -3,11 +3,12 @@
   ansible.builtin.assert:
     that:
       - cluster_bot_access_service.name | default('') is match('^[a-z][a-z0-9-]{0,31}$')
+      - cluster_bot_access_service.name != 'offers'  # the dispatcher's own request
       - cluster_bot_access_service.argv | default('') is not string
       - cluster_bot_access_service.argv | default([]) | length > 0
       - cluster_bot_access_service.argv[0] is match('^/')
     fail_msg: >-
-      cluster_bot_access_service needs a name (lowercase letters, digits, -) and an argv
+      cluster_bot_access_service needs a name (lowercase letters, digits, -; not offers) and an argv
       whose first word is an absolute path; got {{ cluster_bot_access_service }}.
     quiet: true
 

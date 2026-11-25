@@ -120,6 +120,21 @@ offers a service, so `roles/component_record` removes them with the last of thos
 `playbooks/generic/cluster-bot.yml` authorizes the bot's key on the hosts that already
 offer a service right after making it, so a first deploy needs no second run.
 
+A role offers its service only while there is a bot, so a host deployed before the bot
+was switched on offers nothing yet. The playbook ends by proving each service the bot
+uses (`_cluster_bot_services` in `roles/cluster_bot/vars`: the service, its hosts, the
+playbook that offers it) as the bot itself: each host is asked over the bot's key which
+services it offers (the dispatcher's one request of its own, `offers`, runs nothing). A
+host that keeps the key out or lacks the service fails the run with the playbook to run
+there, for example
+`bans on gpu[1-2] (...): run playbooks/generic/fail2ban.yml -l gpu1,gpu2`, which offers
+the service and authorizes the key.
+
+The bot's ssh reads no ssh_config (`-F none`): only its own key, public-key
+authentication and the host keys the deploy pinned. A site's client settings (host-based
+authentication, shared connections) are for people and Ansible. A failure reaches Slack
+as one short reason per group of hosts, with what an administrator does about it.
+
 ### The GitHub App for account requests
 
 1. On GitHub, under the organization's settings, create a GitHub App: no webhook;
@@ -194,7 +209,8 @@ Alertmanager posts through the app's webhook).
    notifies a group only by its ID; none found, the notices mention no one.
 6. Set `slurm_enable_cluster_bot: true` and run `playbooks/generic/cluster-bot.yml` (it
    also authorizes its key on every host that offers a service: fail2ban's bans, the shared
-   space's shared-data). A deploy that still
+   space's shared-data, and ends by proving each as the bot; a host deployed before the
+   bot fails it with the playbook to run there). A deploy that still
    lacks a setting says which, by name; without both tokens the bot is installed but
    stopped. Invite the app to every channel `slack_channels` names (announce, help, status,
    admin): it posts and pins in them and keeps their guides.

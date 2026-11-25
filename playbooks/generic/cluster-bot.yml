@@ -25,3 +25,20 @@
         tasks_from: authorize
   tags:
     - cluster-bot
+
+# Proven as the bot: every host it uses answers for the service it uses there
+# (roles/cluster_bot, reach.yml), or the run fails with the playbook that offers it.
+- hosts: "{{ hostlist | default('slurm-cluster') }}"
+  become: true
+  roles:
+    - role: deploy_defaults
+  tasks:
+    - name: Prove the bot reaches the services it uses
+      ansible.builtin.include_role:
+        name: cluster_bot
+        tasks_from: reach
+        public: true
+      vars:
+        cluster_bot_state: "{{ deepops_components.cluster_bot | component_phase(deepops_phase) }}"
+  tags:
+    - cluster-bot

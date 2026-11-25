@@ -315,6 +315,44 @@ def hostnames(nodelist):
     return names
 
 
+_NUMBERED = re.compile(r"(.*?)(\d+)(\D*)")
+
+
+def hostlist(names):
+    """NAMES as one short host list, the inverse of hostnames(): ['gpu1', 'gpu2', 'gpu3',
+    'gpu5', 'master'] -> 'gpu[1-3,5],master'. Names that differ only in their last number
+    share a bracket, zero padding kept (n08, n09, n10 -> n[08-10]); the rest are listed as
+    they are. Sorted, each name once."""
+    numbered, out = {}, []
+    for name in set(names):
+        m = _NUMBERED.fullmatch(name)
+        if m:
+            numbered.setdefault((m.group(1), m.group(3)), set()).add(m.group(2))
+        else:
+            out.append(name)
+    for (prefix, suffix), digits in numbered.items():
+        # The padded width, if any is padded; the numbers that fit it go in its bracket.
+        width = max((len(d) for d in digits if d.startswith("0") and len(d) > 1), default=0)
+        brackets = {width: set(), 0: set()}
+        for d in digits:
+            brackets[width if width and len(d) == width else 0].add(int(d))
+        for w, numbers in brackets.items():
+            if not numbers:
+                continue
+            numbers, ranges = sorted(numbers), []
+            for n in numbers:
+                if ranges and n == ranges[-1][1] + 1:
+                    ranges[-1][1] = n
+                else:
+                    ranges.append([n, n])
+            if len(numbers) == 1:
+                out.append(f"{prefix}{numbers[0]:0{w}d}{suffix}")
+            else:
+                spec = ",".join(f"{a:0{w}d}" + (f"-{b:0{w}d}" if b > a else "") for a, b in ranges)
+                out.append(f"{prefix}[{spec}]{suffix}")
+    return ",".join(sorted(out))
+
+
 # --- Jobs ---------------------------------------------------------------------------
 
 

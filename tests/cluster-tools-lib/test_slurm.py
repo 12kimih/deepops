@@ -34,6 +34,28 @@ class HostlistTests(unittest.TestCase):
             ],
         )
 
+    def test_hostlist_is_the_inverse(self):
+        names = [
+            "master",
+            "gpu5",
+            "gpu1",
+            "gpu2",
+            "gpu3",
+            "n08",
+            "n09",
+            "n10",
+            "rack1-c1",
+            "rack1-c2",
+            "solo",
+            "gpu2",
+        ]
+        short = slurm.hostlist(names)
+        self.assertEqual(short, "gpu[1-3,5],master,n[08-10],rack1-c[1-2],solo")
+        self.assertEqual(sorted(slurm.hostnames(short)), sorted(set(names)))
+        self.assertEqual(slurm.hostlist(["gpu1"]), "gpu1")
+        self.assertEqual(slurm.hostlist(["gpu9", "gpu10"]), "gpu[9-10]")
+        self.assertEqual(slurm.hostlist([]), "")
+
     def test_empty_forms(self):
         for empty in ("", "(null)", "None assigned", None):
             self.assertEqual(slurm.hostnames(empty), [])
