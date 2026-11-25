@@ -194,8 +194,6 @@ def main(argv: list[str]) -> int:
         sets = [args.revs]
     else:
         sets = push_revs()
-        if sets is None:
-            return 0
     refused, warned = [], []
     for revs in sets:
         r, w = check(revs)
