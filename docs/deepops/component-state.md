@@ -81,6 +81,17 @@ or a run from another operator's machine.
   series (`roles/prometheus/files/rules/components.yml`): a component at two versions
   across its hosts (a run limited to some of them) or a local package at two versions
   alerts with each host's version and the playbook that brings them level.
+- **Behind the repository.** Hosts can agree and still be behind: a pin bumped, the
+  checkout synced, the playbook not run. `scripts/deepops/component_pins.py` reads each
+  role's own `component_record_version` expression and resolves it per host from the
+  role defaults and the site config (the settings.py model), and every prometheus.yml
+  run installs the result (`component-pins.yml`, the site's resolved state on its own
+  host, never in the repository). `ComponentVersionNotPinned` names each host whose
+  recorded version is another, with the playbook that installs it. A component whose
+  version only the host can work out (a fact, a value set at run time) is named in the
+  head of that file, unchecked, with the reason. `scripts/deepops/sync.py` prints which
+  hosts' expected versions a move of the checkouts changed, and the playbooks to run,
+  prometheus.yml among them, so a pin bump never passes unseen.
 
 ## One desired-state map
 

@@ -84,20 +84,20 @@ class Forward(unittest.TestCase):
 
     def test_moves_forward(self):
         self.advance()
-        self.assertIn("would move", sync.forward(self.clone, dry_run=True))
-        self.assertIn("moved", sync.forward(self.clone, dry_run=False))
-        self.assertIn("up to date", sync.forward(self.clone, dry_run=False))
+        self.assertIn("would move", sync.forward(self.clone, dry_run=True)[0])
+        self.assertIn("moved", sync.forward(self.clone, dry_run=False)[0])
+        self.assertIn("up to date", sync.forward(self.clone, dry_run=False)[0])
 
     def test_changed_files_are_left_alone(self):
         Path(self.clone, "f").write_text("x")
         git(self.clone, "add", "f")
         self.advance()
-        self.assertIn("left alone", sync.forward(self.clone, dry_run=False))
+        self.assertIn("left alone", sync.forward(self.clone, dry_run=False)[0])
 
     def test_local_commits_are_left_alone(self):
         commit(self.clone, "mine")
         self.advance()
-        self.assertIn("has commits", sync.forward(self.clone, dry_run=False))
+        self.assertIn("has commits", sync.forward(self.clone, dry_run=False)[0])
 
 
 if __name__ == "__main__":

@@ -10,7 +10,10 @@ locks a deploy holds for its whole life (scripts/deepops/deploy_lock.py), so it 
 while any deploy runs, and no deploy can start while it moves the checkouts.
 
 Each checkout moves only forward (git merge --ff-only) and only when its tracked files
-are unchanged; anything else is said and left as it is.
+are unchanged; anything else is said and left as it is. When one moves, it says which
+hosts' expected component versions changed and which playbooks install them, prometheus.yml
+among them so the ComponentVersionNotPinned alert expects them (component_pins.py): a pin
+bump cannot pass unseen.
 
   sync.py            fast-forward this clone and its config to origin's branch
   sync.py --dry-run  say what would move, move nothing
@@ -34,26 +37,44 @@ def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
     )
 
 
-def forward(repo: Path, dry_run: bool) -> str:
-    """Fast-forward REPO's checked-out branch to its upstream; what happened, in words."""
+def forward(repo: Path, dry_run: bool) -> tuple[str, str, str]:
+    """Fast-forward REPO's checked-out branch to its upstream: (what happened, in words,
+    the commit it was at, the commit it is at now or would be at: equal when it stays)."""
     name = repo.name if repo != ROOT else "deepops"
+    head = git(repo, "rev-parse", "HEAD", check=False).stdout.strip()
     branch = git(repo, "symbolic-ref", "--short", "-q", "HEAD", check=False).stdout.strip()
     if not branch:
-        return f"{name}: detached HEAD, left alone"
+        return f"{name}: detached HEAD, left alone", head, head
     if git(repo, "status", "--porcelain", "--untracked-files=no").stdout.strip():
-        return f"{name}: tracked files changed here, left alone (commit or discard them first)"
+        return f"{name}: tracked files changed here, left alone (commit or discard them first)", head, head
     git(repo, "fetch", "--quiet", "origin")
     upstream = f"origin/{branch}"
-    old = git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
-    new = git(repo, "rev-parse", "--short", upstream).stdout.strip()
-    if old == new:
-        return f"{name}: up to date at {old}"
+    new = git(repo, "rev-parse", upstream).stdout.strip()
+    if head == new:
+        return f"{name}: up to date at {head[:8]}", head, head
     if git(repo, "merge-base", "--is-ancestor", "HEAD", upstream, check=False).returncode != 0:
-        return f"{name}: {branch} has commits {upstream} lacks, left alone"
+        return f"{name}: {branch} has commits {upstream} lacks, left alone", head, head
     if dry_run:
-        return f"{name}: would move {old} -> {new}"
+        return f"{name}: would move {head[:8]} -> {new[:8]}", head, new
     git(repo, "merge", "--ff-only", "--quiet", upstream)
-    return f"{name}: moved {old} -> {new}"
+    return f"{name}: moved {head[:8]} -> {new[:8]}", head, new
+
+
+def pins_report(config: Path, revs: dict, dry_run: bool) -> list[str]:
+    """What the move changes in each host's expected component versions, and the
+    playbooks that install them. REVS: {repo: (old, new)}. After a move the new side is
+    the working trees; a dry run reads the commits it would move to."""
+    try:
+        import component_pins
+        import component_playbooks
+    except ImportError as e:  # run without the repository's environment (uv run)
+        return [f"component versions: not worked out ({e}; run it as uv run {Path(__file__).name})"]
+    (old, new), (cold, cnew) = revs[ROOT], revs.get(config, (None, None))
+    before = component_pins.state(config, old, cold)
+    after = component_pins.state(
+        config, new if dry_run else None, (cnew if dry_run else None) if cold else None
+    )
+    return component_pins.describe(component_pins.changes(before, after), component_playbooks.playbooks())
 
 
 def main(argv: list[str]) -> int:
@@ -70,8 +91,13 @@ def main(argv: list[str]) -> int:
                 print(f"sync: a deploy is running ({by}); not moving the checkouts", file=sys.stderr)
             return 1
         repos = [ROOT] + ([ROOT / "config"] if (ROOT / "config" / ".git").exists() else [])
+        revs = {}
         for repo in repos:
-            print(forward(repo, opts.dry_run))
+            said, old, new = forward(repo, opts.dry_run)
+            print(said)
+            revs[repo] = (old, new)
+        if any(old != new for old, new in revs.values()):
+            print("\n".join(pins_report(ROOT / "config", revs, opts.dry_run)))
         return 0
     finally:
         for fd in held:

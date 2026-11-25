@@ -237,10 +237,11 @@ def _defaults_files(tree, under):
             yield rel
 
 
-def owners(tree=None):
+def owners(tree=None, private=False):
     """{name: Owner} from every role's defaults: ours and Galaxy's under roles/, and
     Kubespray's (at the commit TREE records for the submodule). A name starting with
-    an underscore is a role's private helper, never a setting."""
+    an underscore is a role's private helper, never a setting: PRIVATE keeps them too,
+    for rendering a role's own expressions (component_pins.py)."""
     tree = tree or Tree(ROOT)
     found = {}
     # Galaxy roles are installed, never committed: read from disk at any revision.
@@ -258,7 +259,7 @@ def owners(tree=None):
                 continue
             where = prefix + rel
             for name, value in data.items():
-                if isinstance(name, str) and not name.startswith("_") and name not in NOT_OURS:
+                if isinstance(name, str) and (private or not name.startswith("_")) and name not in NOT_OURS:
                     found.setdefault(name, []).append((where, value))
     result = {}
     for name, defs in found.items():
