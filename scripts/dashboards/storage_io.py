@@ -7,7 +7,7 @@ node_exporter's disk counters. Set the time range across the moment io_fairness_
 turns 1 to compare the same panels before and after.
 """
 
-from grafana import dashboard, row, query, timeseries
+from grafana import dashboard, host_links, job_links, query, row, timeseries
 
 PATH = "src/dashboards/storage-io.json"
 
@@ -26,6 +26,7 @@ def build():
             unit="Bps",
             legend="table",
             calcs=("lastNotNull", "max", "mean"),
+            links=host_links("${__field.labels.host}"),
             description="Bytes each node read from each NFS export over the wire (node_exporter mountstats).",
         ),
         timeseries(
@@ -34,6 +35,7 @@ def build():
             unit="Bps",
             legend="table",
             calcs=("lastNotNull", "max", "mean"),
+            links=host_links("${__field.labels.host}"),
             description="Bytes each node wrote to each NFS export over the wire.",
         ),
         row("Jobs and logins"),
@@ -47,6 +49,7 @@ def build():
                 "Each job's reads and writes through system calls (rchar and wchar, roles/io_usage): "
                 "page cache and pipes included, so a ranking, not disk or NFS bytes."
             ),
+            links=[*job_links("${__field.labels.job_id}"), *host_links("${__field.labels.host}")],
         ),
         timeseries(
             "Top logins by disk I/O",

@@ -7,6 +7,7 @@ uses are defined in the shipped rule files, so a renamed rule cannot leave a pan
 """
 
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -103,6 +104,64 @@ class DashboardConventionTests(unittest.TestCase):
                     for name in sorted(n for n in metric_names(target.get("expr", "")) if ":" in n):
                         with self.subTest(path=str(path), panel=panel.get("title"), rule=name):
                             self.assertIn(name, self.recorded)
+
+
+def data_links(dash):
+    """(panel title, url) of every data link: on a panel's fields and in its overrides."""
+    for panel in all_panels(dash):
+        config = panel.get("fieldConfig") or {}
+        for item in (config.get("defaults") or {}).get("links") or []:
+            yield panel.get("title"), item["url"]
+        for override in config.get("overrides") or []:
+            for prop in override.get("properties") or []:
+                if prop.get("id") == "links":
+                    for item in prop["value"]:
+                        yield panel.get("title"), item["url"]
+
+
+class NavigationTests(unittest.TestCase):
+    """A user finds their jobs and nodes: every dashboard lists the others, and a job or a
+    host on one opens the dashboard about it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dashboards = {dash["uid"]: dash for _, dash in dashboards()}
+        cls.variables = {
+            uid: {v["name"] for v in dash["templating"]["list"]} for uid, dash in cls.dashboards.items()
+        }
+
+    def test_every_dashboard_lists_the_others(self):
+        for uid, dash in self.dashboards.items():
+            with self.subTest(uid=uid):
+                self.assertIn("deepops", dash["tags"])
+                menus = [link for link in dash["links"] if link.get("type") == "dashboards"]
+                self.assertEqual([m["tags"] for m in menus], [["deepops"]])
+
+    def test_each_data_link_opens_a_shipped_dashboard_with_its_variables(self):
+        found = 0
+        for uid, dash in self.dashboards.items():
+            for title, url in data_links(dash):
+                found += 1
+                with self.subTest(uid=uid, panel=title, url=url):
+                    match = re.fullmatch(r"/d/([a-z0-9-]+)\?((?:var-\w+=[^&]+&)*)\$\{__url_time_range\}", url)
+                    self.assertIsNotNone(match, "a link keeps the time range")
+                    self.assertIn(match[1], self.dashboards)
+                    for name in re.findall(r"var-(\w+)=", match[2]):
+                        self.assertIn(name, self.variables[match[1]])
+        self.assertGreater(found, 0)
+
+    def test_a_user_picks_their_own_jobs_on_the_gpu_allocation(self):
+        dash = self.dashboards["slurm-gpu-allocation"]
+        chosen = {v["name"]: v for v in dash["templating"]["list"] if v["name"] in ("user", "job_id")}
+        self.assertEqual(sorted(chosen), ["job_id", "user"])
+        for v in chosen.values():
+            self.assertTrue(v["multi"] and v["includeAll"])
+            self.assertEqual(v["current"]["value"], ["$__all"])
+        for panel in all_panels(dash):
+            if panel.get("title") in ("Allocations now", "GPU utilization by job", "GPU memory by job"):
+                for target in panel["targets"]:
+                    with self.subTest(panel=panel["title"]):
+                        self.assertIn('user=~"$user", job_id=~"$job_id"', target["expr"])
 
 
 class SlurmNativeMetricsTests(unittest.TestCase):

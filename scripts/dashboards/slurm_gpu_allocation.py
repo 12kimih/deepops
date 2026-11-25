@@ -7,7 +7,19 @@ through host_device:dcgm_gpu_util_ratio:max, which carries Slurm's GPU numbering
 per job through job_device:dcgm_gpu_util_ratio:max and job_device:dcgm_fb_used_bytes:max.
 """
 
-from grafana import STATE_COLORS, bars, dashboard, query, stat, table, timeseries
+from grafana import (
+    GPU_ALLOCATION,
+    STATE_COLORS,
+    bars,
+    dashboard,
+    host_links,
+    job_links,
+    label_variable,
+    query,
+    stat,
+    table,
+    timeseries,
+)
 
 PATH = "src/dashboards/slurm-gpu-allocation.json"
 
@@ -19,6 +31,10 @@ ALLOCATED = f"(count({ALLOC}) or vector(0))"
 JOB_UTIL = "job_device:dcgm_gpu_util_ratio:max"
 JOB_MEMORY = "job_device:dcgm_fb_used_bytes:max"
 JOB = "job_id, user, account"
+# The user and job variables: the panels about jobs show the chosen ones (All by
+# default); the cluster's capacity and totals do not.
+MINE = 'user=~"$user", job_id=~"$job_id"'
+MY_ALLOC = f"{ALLOC}{{{MINE}}}"
 NONE_ALLOCATED = "No GPU allocated"
 
 
@@ -46,6 +62,7 @@ def node_table():
         h=10,
         sort="node",
         value=("GPUs", "none", None),
+        links={"node": host_links("${__value.raw}")},
         colors={
             "state": {
                 "down|fail|error": STATE_COLORS["down"],
@@ -100,7 +117,7 @@ def build():
         node_table(),
         timeseries(
             "Allocated by user",
-            [query(f"count by (user) ({ALLOC})", "{{user}}")],
+            [query(f"count by (user) ({MY_ALLOC})", "{{user}}")],
             stack=True,
             decimals=0,
             w=12,
@@ -125,17 +142,19 @@ def build():
         table(
             "Allocations now",
             # Every allocation, with its utilisation where DCGM reports one (NaN otherwise).
-            f"{ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util_ratio:max or {ALLOC} * (0 / 0)",
+            f"{MY_ALLOC} * on (host, device) group_left () host_device:dcgm_gpu_util_ratio:max or {MY_ALLOC} * (0 / 0)",
             ["user", "account", "partition", "job_id", "node", "gpu", "gpu_type", "Utilization"],
             h=10,
             sort="node",
             value=("Utilization", "percentunit", "continuous-RdYlGr"),
             no_value=NONE_ALLOCATED,
-            description="Each GPU a running job holds, with its current utilisation (DCGM).",
+            links={"job_id": job_links("${__value.raw}"), "node": host_links("${__value.raw}")},
+            description="Each GPU a running job holds, with its current utilisation (DCGM). "
+            "A job opens it alone here, a node its GPU and host dashboards.",
         ),
         timeseries(
             "GPU utilization by job",
-            [query(f"avg by ({JOB}) ({JOB_UTIL})", "{{job_id}} {{user}}")],
+            [query(f"avg by ({JOB}) ({JOB_UTIL}{{{MINE}}})", "{{job_id}} {{user}}")],
             unit="percentunit",
             max=1,
             decimals=0,
@@ -145,12 +164,13 @@ def build():
             calcs=("mean", "max", "lastNotNull"),
             fill=0,
             no_value=NONE_ALLOCATED,
+            links=job_links("${__field.labels.job_id}"),
             description="Each job's mean utilisation over the GPUs it holds (DCGM, Slurm's GPU numbering); "
             "the legend's mean and max cover the time range.",
         ),
         timeseries(
             "GPU memory by job",
-            [query(f"sum by ({JOB}) ({JOB_MEMORY})", "{{job_id}} {{user}}")],
+            [query(f"sum by ({JOB}) ({JOB_MEMORY}{{{MINE}}})", "{{job_id}} {{user}}")],
             unit="bytes",
             w=12,
             h=10,
@@ -158,6 +178,7 @@ def build():
             calcs=("mean", "max", "lastNotNull"),
             fill=0,
             no_value=NONE_ALLOCATED,
+            links=job_links("${__field.labels.job_id}"),
             description="GPU memory each job uses, summed over the GPUs it holds (DCGM framebuffer used).",
         ),
         table(
@@ -167,14 +188,20 @@ def build():
             h=6,
             sort="host",
             no_value="None",
+            links={"host": host_links("${__value.raw}")},
             description="From the GpuBusyWithoutJob alert: pending for the first 15 minutes, then firing.",
         ),
     ]
+    variables = [
+        label_variable("user", ALLOC, "user", label_text="User"),
+        label_variable("job_id", f'{ALLOC}{{user=~"$user"}}', "job_id", label_text="Job"),
+    ]
     return dashboard(
-        "slurm-gpu-allocation",
+        GPU_ALLOCATION,
         "Slurm / GPU allocation",
         panels,
         tags=["slurm", "gpu"],
+        variables=variables,
         description="Who holds which GPU: Slurm allocation (roles/slurm_metrics) against usable capacity, "
         "joined with DCGM utilisation.",
     )

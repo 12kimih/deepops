@@ -4,6 +4,7 @@
   "id": null,
   "description": "Nodes, CPUs, GPUs, jobs and scheduler health of the Slurm cluster (slurmctld's own metrics).",
   "tags": [
+    "deepops",
     "slurm"
   ],
   "editable": false,
@@ -31,7 +32,20 @@
   "annotations": {
     "list": []
   },
-  "links": [],
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "deepops"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "icon": "external link"
+    }
+  ],
   "panels": [
     {
       "type": "row",

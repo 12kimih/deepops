@@ -61,14 +61,20 @@ fixed UID, so links survive renames:
 | Dashboard | UID | Shows | Installed by |
 |---|---|---|---|
 | GPU / Nodes | `gpu-nodes` | one GPU node: GPUs (DCGM), host resources, system power | `grafana` |
-| Slurm / GPU allocation | `slurm-gpu-allocation` | who holds which GPU, by user, account, type and node; each job's GPU utilisation and memory; GPUs busy with no job | `slurm_metrics` |
+| Slurm / GPU allocation | `slurm-gpu-allocation` | who holds which GPU, by user, account, type and node; each job's GPU utilisation and memory (User and Job pick your own); GPUs busy with no job | `slurm_metrics` |
 | Slurm / Scheduler | `slurm-scheduler` | nodes, CPUs, GPUs, jobs and scheduler statistics (slurmctld's metrics) | `grafana` |
+| Storage / NFS and disks | `storage-io` | each node's NFS traffic, the top jobs and logins by I/O, the shared disks before and after iocost | `grafana` |
 | Node Exporter / Hosts | `node-exporter-hosts` | per-host detail (grafana.com 1860 "Node Exporter Full", revision 46) | `grafana` |
 
 The dashboards deepops builds are Python (`scripts/dashboards/`, shared building blocks in
 `grafana.py`); `scripts/dashboards/build.py` writes the JSON the roles ship, and the
 checks fail when that JSON is stale. Edit the Python, never the JSON. Node Exporter / Hosts
-is the upstream file, kept as is.
+is the upstream file, kept as is but for the `deepops` tag and the menu below.
+
+Every dashboard's header has a Dashboards menu (the dashboards tagged `deepops`, at the
+same time range). A job or a node in a table or a legend is a link: a job opens Slurm /
+GPU allocation with only that job chosen, a node its GPU / Nodes and Node Exporter / Hosts
+pages. Viewers can use the menus, variables and links; nothing needs edit rights.
 
 Each role installs its dashboards into its own subdirectory and removes the ones it no
 longer ships; Grafana then deletes those, so the files are the only source of truth.

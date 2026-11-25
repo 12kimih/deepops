@@ -4,6 +4,7 @@
   "id": null,
   "description": "One GPU node: GPUs (DCGM), host resources (node-exporter) and system power (BMC).",
   "tags": [
+    "deepops",
     "gpu",
     "dcgm"
   ],
@@ -77,7 +78,20 @@
   "annotations": {
     "list": []
   },
-  "links": [],
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "deepops"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "icon": "external link"
+    }
+  ],
   "panels": [
     {
       "type": "row",
